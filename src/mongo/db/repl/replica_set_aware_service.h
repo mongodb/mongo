@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,9 +7,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/modules.h"
 
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -133,7 +108,7 @@ namespace mongo {
 /**
  * Main API implemented by each ReplicaSetAwareService.
  */
-class MONGO_MOD_PRIVATE ReplicaSetAwareInterface {
+class [[MONGO_MOD_PRIVATE]] ReplicaSetAwareInterface {
 public:
     /**
      * Called once during ReplicationCoordinator startup. A place to put startup logic such as
@@ -242,7 +217,7 @@ public:
 /**
  * The registry of ReplicaSetAwareServices.
  */
-class MONGO_MOD_PUB ReplicaSetAwareServiceRegistry final : public ReplicaSetAwareInterface {
+class [[MONGO_MOD_PUBLIC]] ReplicaSetAwareServiceRegistry final : public ReplicaSetAwareInterface {
     ReplicaSetAwareServiceRegistry(const ReplicaSetAwareServiceRegistry&) = delete;
     ReplicaSetAwareServiceRegistry& operator=(const ReplicaSetAwareServiceRegistry&) = delete;
 
@@ -300,8 +275,33 @@ private:
     void _registerService(ReplicaSetAwareInterface* service);
     void _unregisterService(ReplicaSetAwareInterface* service);
 
-    std::mutex _isShutdownMutex;
-    bool _isShutdown = false;  // GUARDED_BY(_isShutdownMutex)
+    /**
+     * Lifecycle states for the registry. The valid transitions are:
+     *
+     *     kUninitialized --> kStartup --> kStarted --------> kShutdown
+     *                                --> kStartupAborted --> kShutdown
+     *
+     * onStartup advances kUninitialized -> kStartup and publishes kStarted (all services started)
+     * or kStartupAborted (startup was terminated due to a concurrent shutdown request) when it
+     * returns. onShutdown waits for an in-progress startup to reach either terminal state before
+     * moving to kShutdown, so onShutdown never runs a service's onShutdown hook before or
+     * concurrently with its onStartup.
+     */
+    enum State : int {
+        kUninitialized,
+        kStartup,
+        kStarted,
+        kStartupAborted,
+        kShutdown,
+    };
+
+    // Tracks the current lifecycle state. Ensures onStartup runs at most once and lets onShutdown
+    // wait for an in-progress startup to finish.
+    WaitableAtomic<int> _state{kUninitialized};
+
+    // Set by the first onShutdown call. Lets an in-progress onStartup bail out of its loop early
+    // so shutdown does need not wait for every service to start up.
+    Atomic<bool> _inShutdown{false};
 
     std::vector<ReplicaSetAwareInterface*> _services;
 };
@@ -312,7 +312,7 @@ private:
  * start of this file for more detailed info.
  */
 template <class ActualService>
-class MONGO_MOD_OPEN ReplicaSetAwareService : private ReplicaSetAwareInterface {
+class [[MONGO_MOD_OPEN]] ReplicaSetAwareService : private ReplicaSetAwareInterface {
     ReplicaSetAwareService(const ReplicaSetAwareService&) = delete;
     ReplicaSetAwareService& operator=(const ReplicaSetAwareService&) = delete;
 
@@ -348,7 +348,7 @@ private:
  * Convenience version of ReplicaSetAwareService that is only active on config servers.
  */
 template <class ActualService>
-class MONGO_MOD_OPEN ReplicaSetAwareServiceConfigSvr
+class [[MONGO_MOD_OPEN]] ReplicaSetAwareServiceConfigSvr
     : public ReplicaSetAwareService<ActualService> {
 private:
     bool shouldRegisterReplicaSetAwareService() const final {
@@ -361,7 +361,8 @@ private:
  * Convenience version of ReplicaSetAwareService that is only active on shard servers.
  */
 template <class ActualService>
-class MONGO_MOD_OPEN ReplicaSetAwareServiceShardSvr : public ReplicaSetAwareService<ActualService> {
+class [[MONGO_MOD_OPEN]] ReplicaSetAwareServiceShardSvr
+    : public ReplicaSetAwareService<ActualService> {
 private:
     bool shouldRegisterReplicaSetAwareService() const final {
         return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);

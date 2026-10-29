@@ -3,3 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-collection-write-path
+  - "legacy_bounds_extractor.js":
+    approvers:
+      - 10gen/query-optimization
+  - "*scan*":
+    approvers:
+      - 10gen/query-optimization

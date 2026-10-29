@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
@@ -34,11 +8,15 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/database_name_util.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -68,6 +46,7 @@
 #include <algorithm>
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -113,29 +92,22 @@ public:
         return true;
     }
 
+    bool supportsQuerySettings() const override {
+        return true;
+    }
+
     class Invocation final : public MinimalInvocationBase {
     public:
         Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
             : MinimalInvocationBase(opCtx, cmd, opMsgRequest),
-              _ifrContext([&]() {
-                  const auto& requestFlagValues = request().getIfrFlags();
-                  return requestFlagValues.has_value()
-                      ? std::make_shared<IncrementalFeatureRolloutContext>(
-                            requestFlagValues.value())
-                      : std::make_shared<IncrementalFeatureRolloutContext>();
-              }()),
+              _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
               _extensionMetrics(
                   static_cast<const AggregateCommand*>(cmd)->getExtensionMetricsAllocation()),
-              _liteParsedPipeline(
-                  request(),
-                  false /* isRunningAgainstView_ForHybridSearch */,
-                  {.ifrContext = _ifrContext,
-                   .opCtx = opCtx,
-                   .extensionMetrics = &_extensionMetrics,
-                   // TODO SERVER-129127 the `usingMongos` field should be populated via a
-                   // ParseContext struct instead of LiteParserOptions.
-                   .usingMongos =
-                       aggregation_request_helper::getFromRouter(request()).value_or(false)}),
+              _liteParsedPipeline(request(),
+                                  /*isRunningAgainstView_ForHybridSearch=*/false,
+                                  {.ifrContext = _ifrContext,
+                                   .opCtx = opCtx,
+                                   .extensionMetrics = &_extensionMetrics}),
               _privileges(uassertStatusOK(
                   auth::getPrivilegesForAggregate(opCtx,
                                                   AuthorizationSession::get(opCtx->getClient()),
@@ -214,6 +186,10 @@ public:
             return request().getGenericArguments();
         }
 
+        bool shouldBypassQuerySettingsRejection() const override {
+            return _liteParsedPipeline.shouldBypassQuerySettingsRejection();
+        }
+
     private:
         bool supportsWriteConcern() const override {
             return true;
@@ -248,6 +224,13 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             globalOpCounters().gotAggregate();
+
+            markOperationQueryMemorySheddingEligible(opCtx);
+
+            if (_liteParsedPipeline.hasChangeStream()) {
+                change_stream::recordCursorOptionMetrics(request().getCursor().getBatchSize(),
+                                                         request().getMaxTimeMS());
+            }
 
             const auto& explain = request().getExplain();
             const auto& body = unparsedRequest().body;
@@ -291,8 +274,7 @@ public:
                                          _privileges,
                                          verbosity,
                                          reply,
-                                         _usedExternalDataSources,
-                                         _ifrContext));
+                                         _usedExternalDataSources));
 
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
@@ -329,8 +311,7 @@ public:
                                          _privileges,
                                          verbosity,
                                          reply,
-                                         _usedExternalDataSources,
-                                         _ifrContext));
+                                         _usedExternalDataSources));
         }
 
         bool canRetryOnStaleShardMetadataError(const OpMsgRequest& /* unused */) const override {

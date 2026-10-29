@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/convert_to_capped_coordinator.h"
@@ -192,14 +166,13 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
         tassert(10644529,
                 "Expected the collection to be capped to have a chunk on some shard",
                 !shards.empty());
-        // TODO SERVER-128349: Remove conversion to ShardRef
-        _doc.setDataShard(ShardRef{*(shards.begin())});
+        _doc.setDataShard(*(shards.begin()));
 
         _doc.setOriginalCollection(sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss()));
     } else {
         // The collection is located on the DBPrimary if it's not tracked by the sharding catalog.
-        const auto& selfShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
-        _doc.setDataShard(selfShardRef);
+        const auto& selfShardId = ShardingState::get(opCtx)->shardId();
+        _doc.setDataShard(selfShardId);
     }
 
     // Compute and persist the targetUUID of the newly capped collection before sending
@@ -249,7 +222,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     nss(),
                     _critSecReason,
                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                    !isAuthoritative /* clearShardCatalogCache */);
+                    /*clearShardCatalogCache=*/!isAuthoritative);
 
                 // Check preconditions again under the critical section because we're guaranteed no
                 // catalog changes can happen at this point.
@@ -280,15 +253,14 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
 
                     // Drop collection from any shard that is not db primary and does not own
                     // data (getting rid of possible stale incarnations due to SERVER-87010).
-                    std::vector<ShardRef> participantsNotOwningData;
+                    std::vector<ShardId> participantsNotOwningData;
 
-                    auto allShards =
-                        Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
-                    const auto& dataShardRef = *_doc.getDataShard();
-                    const auto& selfShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
-                    for (const auto& shardRef : allShards) {
-                        if (shardRef != dataShardRef && shardRef != selfShardRef) {
-                            participantsNotOwningData.push_back(shardRef);
+                    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                    const auto& dataShardId = *_doc.getDataShard();
+                    const auto& selfShardId = ShardingState::get(opCtx)->shardId();
+                    for (const auto& shardId : allShards) {
+                        if (shardId != dataShardId && shardId != selfShardId) {
+                            participantsNotOwningData.push_back(shardId);
                         }
                     }
 
@@ -300,9 +272,9 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         **executor,
                         token,
                         session,
-                        true /* fromMigrate */,
-                        false /* dropSystemCollections */,
-                        !isAuthoritative /* forceLegacyRefresh */,
+                        /*fromMigrate=*/true,
+                        /*dropSystemCollections=*/false,
+                        /*forceLegacyRefresh=*/!isAuthoritative,
                         _doc.getOriginalCollection()->getUuid());
                 }
             }))
@@ -316,7 +288,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kConvertCollectionToCappedOnDataShard,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                logConvertToCappedOnChangelog(opCtx, nss(), _doc.getSize(), true /* start */);
+                logConvertToCappedOnChangelog(opCtx, nss(), _doc.getSize(), /*start=*/true);
 
                 if (MONGO_unlikely(convertToCappedFailBeforeCappingTheCollection.shouldFail())) {
                     uasserted(ErrorCodes::InternalError,
@@ -350,7 +322,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     // If the primary is not a data bearing shard, op entries must not be visible to
                     // change stream readers.
                     convertToCapped(
-                        opCtx, nss(), _doc.getSize(), true /*fromMigrate*/, *_doc.getTargetUUID());
+                        opCtx, nss(), _doc.getSize(), /*fromMigrate=*/true, *_doc.getTargetUUID());
                 }
             }))
         .then(_buildPhaseHandler(
@@ -394,7 +366,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _doc.getOriginalCollection()->getUuid(),
-                            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+                            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
                             session,
                             executor,
                             token);
@@ -460,7 +432,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 }
 
                 logConvertToCappedOnChangelog(
-                    opCtx, nss(), _doc.getSize(), false /* end */, localCollUuid);
+                    opCtx, nss(), _doc.getSize(), /*start=*/false, localCollUuid);
             }))
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSectionOnDataShard,
@@ -496,7 +468,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     _critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
                     *actionPtr,
-                    true /* throwIfReasonDiffers */);
+                    /*throwIfReasonDiffers=*/true);
             }))
         .onError(
             [this, token, executor = executor, anchor = shared_from_this()](const Status& status) {
@@ -593,7 +565,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
                     _critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
                     *actionPtr,
-                    false /* throwIfReasonDiffers */);
+                    /*throwIfReasonDiffers=*/false);
             }
         });
 }

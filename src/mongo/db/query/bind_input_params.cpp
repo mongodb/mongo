@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/bind_input_params.h"
 
@@ -51,7 +25,6 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
@@ -129,7 +102,7 @@ public:
         auto tag = sbe::value::TypeTags::inList;
         auto val = sbe::value::bitcastFrom<sbe::InList*>(inListPtr.release());
 
-        bindParam(*slotId, true /*owned*/, tag, val);
+        bindParam(*slotId, /*owned=*/true, tag, val);
     }
 
     void visit(const ModMatchExpression* expr) final {
@@ -144,12 +117,12 @@ public:
 
         if (auto slotId = getSlotId(*divisorParam)) {
             auto value = sbe::value::bitcastFrom<int64_t>(expr->getDivisor());
-            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+            bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt64, value);
         }
 
         if (auto slotId = getSlotId(*remainderParam)) {
             auto value = sbe::value::bitcastFrom<int64_t>(expr->getRemainder());
-            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+            bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt64, value);
         }
     }
 
@@ -165,13 +138,13 @@ public:
         if (auto slotId = getSlotId(*sourceRegexParam)) {
             auto&& [bsonRegexTag, bsonRegexVal] =
                 sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
-            bindParam(*slotId, true /*owned*/, bsonRegexTag, bsonRegexVal);
+            bindParam(*slotId, /*owned=*/true, bsonRegexTag, bsonRegexVal);
         }
 
         if (auto slotId = getSlotId(*compiledRegexParam)) {
-            auto&& [compiledRegexTag, compiledRegexVal] =
-                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
-            bindParam(*slotId, true /*owned*/, compiledRegexTag, compiledRegexVal);
+            auto [compiledRegexTag, compiledRegexVal] =
+                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()).releaseToRaw();
+            bindParam(*slotId, /*owned=*/true, compiledRegexTag, compiledRegexVal);
         }
     }
 
@@ -182,7 +155,7 @@ public:
         }
 
         auto value = sbe::value::bitcastFrom<int32_t>(expr->getData());
-        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
+        bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt32, value);
     }
 
     void visit(const TypeMatchExpression* expr) final {
@@ -193,7 +166,7 @@ public:
 
         auto value = sbe::value::bitcastFrom<int32_t>(expr->typeSet().getBSONTypeMask());
 
-        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
+        bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt32, value);
     }
 
     void visit(const WhereMatchExpression* expr) final {
@@ -213,7 +186,7 @@ public:
             // need to call recoverWhereExprPredicate to move predicates back to
             // WhereMatchExpressions.
             bindParam(*slotId,
-                      true /*owned*/,
+                      /*owned=*/true,
                       sbe::value::TypeTags::jsFunction,
                       sbe::value::bitcastFrom<JsFunction*>(
                           const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
@@ -222,7 +195,7 @@ public:
                 sbe::value::TypeTags::jsFunction,
                 sbe::value::bitcastFrom<JsFunction*>(new JsFunction(expr->getPredicate())));
 
-            bindParam(*slotId, true /*owned*/, typeTag, value);
+            bindParam(*slotId, /*owned=*/true, typeTag, value);
         }
     }
 
@@ -284,7 +257,7 @@ private:
         // is acceptable because the 'MatchExpression' is held by the 'CanonicalQuery', and the
         // 'CanonicalQuery' lives for the lifetime of the query.
         auto [typeTag, val] = sbe::bson::convertToView(expr->getData());
-        bindParam(*slotId, false /*owned*/, typeTag, val);
+        bindParam(*slotId, /*owned=*/false, typeTag, val);
     }
 
     void visitBitTestExpression(const BitTestMatchExpression* expr) {
@@ -302,12 +275,12 @@ private:
 
         if (auto slotId = getSlotId(*bitPositionsParam)) {
             auto&& [bitPosTag, bitPosVal] = stage_builder::convertBitTestBitPositions(expr);
-            bindParam(*slotId, true /*owned*/, bitPosTag, bitPosVal);
+            bindParam(*slotId, /*owned=*/true, bitPosTag, bitPosVal);
         }
 
         if (auto slotId = getSlotId(*bitMaskParam)) {
             auto val = sbe::value::bitcastFrom<uint64_t>(expr->getBitMask());
-            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, val);
+            bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt64, val);
         }
     }
 
@@ -315,13 +288,10 @@ private:
                    bool owned,
                    sbe::value::TypeTags tag,
                    sbe::value::Value val) {
-        // Set up a guard and call getAccessor().
-        sbe::value::ValueGuard guard(owned, tag, val);
+        // Hold 'owned/tag/val' so it is released if 'getAccessor()' throws.
+        auto protectedVal = sbe::value::TagValueMaybeOwned::fromRaw(owned, tag, val);
         auto accessor = _data.env->getAccessor(slotId);
-
-        // Reset the guard and store 'owned/tag/val' into 'accessor'.
-        guard.reset();
-        accessor->reset(sbe::value::TagValueMaybeOwned::fromRaw(owned, tag, val));
+        accessor->reset(std::move(protectedVal));
     }
 
     boost::optional<sbe::value::SlotId> getSlotId(
@@ -435,19 +405,19 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
     runtimeEnvironment->resetSlot(indexSlots.isGenericScan,
                                   sbe::value::TypeTags::Boolean,
                                   sbe::value::bitcastFrom<bool>(isGenericScan),
-                                  /*owned*/ true);
+                                  /*owned=*/true);
     if (isGenericScan) {
         runtimeEnvironment->resetSlot(indexSlots.indexBounds,
                                       sbe::value::TypeTags::indexBounds,
                                       sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
-                                      /*owned*/ true);
+                                      /*owned=*/true);
     } else {
         auto [boundsTag, boundsVal] =
             stage_builder::packIndexIntervalsInSbeArray(std::move(intervals));
         runtimeEnvironment->resetSlot(indexSlots.lowHighKeyIntervals,
                                       boundsTag,
                                       boundsVal,
-                                      /*owned*/ true);
+                                      /*owned=*/true);
     }
 }
 
@@ -539,65 +509,6 @@ void bindIndexBounds(
             indexBoundsInfo, std::move(intervals), std::move(bounds), runtimeEnvironment);
     }
 }
-
-void bindClusteredCollectionBounds(const CanonicalQuery& cq,
-                                   const sbe::PlanStage* root,
-                                   const stage_builder::PlanStageData* data,
-                                   sbe::RuntimeEnvironment* runtimeEnvironment) {
-    // Arguments needed to mimic the original build-time bounds setting from the current query.
-    auto clusteredBoundInfos = data->staticData->clusteredCollBoundsInfos;
-    const MatchExpression* conjunct = cq.getPrimaryMatchExpression();  // this is csn->filter
-    bool minAndMaxEmpty = cq.getFindCommandRequest().getMin().isEmpty() &&
-        cq.getFindCommandRequest().getMax().isEmpty();
-
-    // Caching OR queries with collection scans is restricted, since it is challenging to determine
-    // which match expressions from the input query require a clustered collection scan. Therefore,
-    // we cannot correctly calculate the correct bounds for the query using the cached plan.
-    tassert(6125900,
-            "OR queries with clustered collection scans are not supported by the SBE cache.",
-            cq.getPrimaryMatchExpression()->matchType() != MatchExpression::OR || !minAndMaxEmpty);
-
-    tassert(7228000,
-            "We only expect to cache plans with one clustered collection scan.",
-            1 == clusteredBoundInfos.size());
-
-    const CollatorInterface* queryCollator = cq.getCollator();  // current query's desired collator
-
-    for (const auto& clusteredBoundInfo : clusteredBoundInfos) {
-        // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
-        // Scan start/end bounds.
-        RecordIdRange recordRange;
-
-        // Cast the return value to void since we are not building a CollectionScanNode here so do
-        // not need to set it in its 'hasCompatibleCollation' member.
-        static_cast<void>(
-            QueryPlannerAccess::handleRIDRangeScan(conjunct,
-                                                   queryCollator,
-                                                   data->staticData->ccCollator.get(),
-                                                   data->staticData->clusterKeyFieldName,
-                                                   recordRange));
-        QueryPlannerAccess::handleRIDRangeMinMax(cq,
-                                                 data->staticData->direction,
-                                                 queryCollator,
-                                                 data->staticData->ccCollator.get(),
-                                                 recordRange);
-        // Bind the scan bounds to input slots.
-        const auto& minRecord = recordRange.getMin();
-        if (minRecord) {
-            boost::optional<sbe::value::SlotId> minRecordId = clusteredBoundInfo.minRecord;
-            tassert(7571500, "minRecordId slot missing", minRecordId.has_value());
-            auto [tag, val] = sbe::value::makeCopyRecordId(minRecord->recordId());
-            runtimeEnvironment->resetSlot(minRecordId.value(), tag, val, true);
-        }
-        const auto& maxRecord = recordRange.getMax();
-        if (maxRecord) {
-            boost::optional<sbe::value::SlotId> maxRecordId = clusteredBoundInfo.maxRecord;
-            tassert(7571501, "maxRecordId slot missing", maxRecordId.has_value());
-            auto [tag, val] = sbe::value::makeCopyRecordId(maxRecord->recordId());
-            runtimeEnvironment->resetSlot(maxRecordId.value(), tag, val, true);
-        }
-    }
-}  // bindClusteredCollectionBounds
 
 void bindLimitSkipInputSlots(const CanonicalQuery& cq,
                              const stage_builder::PlanStageData* data,

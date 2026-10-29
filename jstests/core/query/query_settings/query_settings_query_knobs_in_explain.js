@@ -12,7 +12,6 @@
  *   directly_against_shardsvrs_incompatible,
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
- *   featureFlagPqsQueryKnobs,
  *   requires_fcv_90,
  * ]
  */
@@ -27,24 +26,29 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
 
 // Maps PQS wire name → server parameter name.
 const kWireNameToServerParam = {
-    planRankerMode: "internalQueryCBRCEMode",
-    automaticCEPlanRankingStrategy: "automaticCEPlanRankingStrategy",
+    planRanker: "internalQueryPlanRanker",
+    cbrCEMode: "internalQueryCBRCEMode",
+    mixedPlanRankingStrategy: "internalQueryMixedPlanRankingStrategy",
     samplingConfidenceInterval: "samplingConfidenceInterval",
     samplingMarginOfError: "samplingMarginOfError",
     samplingCEMethod: "internalQuerySamplingCEMethod",
+    noTableScan: "notablescan",
 };
 
 const kPqsKnobsDefaults = {
-    planRankerMode: "automaticCE",
-    automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+    planRanker: "mixed",
+    cbrCEMode: "samplingCE",
+    mixedPlanRankingStrategy: "NoMultiplanningResults",
     samplingConfidenceInterval: "95",
     samplingMarginOfError: 5.0,
     samplingCEMethod: "chunk",
+    noTableScan: false,
 };
 
 const kPqsKnobsNonDefault = {
-    planRankerMode: "heuristicCE",
-    automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+    planRanker: "costBased",
+    cbrCEMode: "heuristicCE",
+    mixedPlanRankingStrategy: "EstimateRankingEffort",
     samplingConfidenceInterval: "90",
     samplingMarginOfError: 2.5,
     samplingCEMethod: "random",

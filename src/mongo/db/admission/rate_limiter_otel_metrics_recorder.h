@@ -1,35 +1,9 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include "mongo/base/counter.h"
 #include "mongo/db/admission/rate_limiter_metrics_events.h"
 #include "mongo/db/admission/rate_limiter_metrics_recorder.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -38,11 +12,13 @@
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/moving_average.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
 #include <functional>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
@@ -53,32 +29,40 @@ namespace mongo::admission {
  * events into OTel instruments and reads the values back to satisfy the RateLimiterMetricsRecorder
  * accessors. The counter-backed accessors read directly from the OTel instruments, while the
  * moving average (gauge-only, no read-back) is tracked in process to keep it in sync.
+ *
+ * Only the metrics whose instrument names are supplied in the MetricsSpec are instantiated. For any
+ * metric left unset, recording the corresponding event is a no-op and its accessor returns a
+ * zero-valued default (or boost::none for averageTimeQueuedMicros). This lets lightweight callers
+ * mirror only the admission outcomes they care about without paying for the full instrument set.
  */
-class RateLimiterOtelMetricsRecorder final : public RateLimiterMetricsRecorder {
+class [[MONGO_MOD_PUBLIC]] RateLimiterOtelMetricsRecorder final
+    : public RateLimiterMetricsRecorder {
 public:
     /**
      * Identifies the OTel instrument names (from the central MetricNames registry) and the
-     * serverStatus dotted-path prefix used by a particular rate limiter. Every rate limiter that
-     * records metrics must use its own distinct instrument names (the MetricsService registry
-     * rejects re-registering a name with a different definition), so each caller supplies the spec
-     * appropriate for its limiter.
+     * serverStatus dotted-path prefix used by a particular rate limiter. Each recorder must use its
+     * own distinct instrument names. Having multiple recorders share the same MetricNames will
+     * cause each rate limiter to influence the same OTel instruments.
+     *
+     * Each field is optional: an unset field means the corresponding instrument is not created, so
+     * recording that metric is a no-op and its accessor returns a default value.
      */
     struct MetricsSpec {
-        otel::metrics::MetricName attemptedAdmissions;
-        otel::metrics::MetricName successfulAdmissions;
-        otel::metrics::MetricName rejectedAdmissions;
-        otel::metrics::MetricName exemptedAdmissions;
-        otel::metrics::MetricName addedToQueue;
-        otel::metrics::MetricName removedFromQueue;
-        otel::metrics::MetricName interruptedInQueue;
-        otel::metrics::MetricName tokensAcquired;
-        otel::metrics::MetricName currentQueueDepth;
-        otel::metrics::MetricName totalAvailableTokens;
-        otel::metrics::MetricName averageTimeQueuedMicros;
-        otel::metrics::MetricName timeQueuedMicros;
+        boost::optional<otel::metrics::MetricName> attemptedAdmissions;
+        boost::optional<otel::metrics::MetricName> successfulAdmissions;
+        boost::optional<otel::metrics::MetricName> rejectedAdmissions;
+        boost::optional<otel::metrics::MetricName> exemptedAdmissions;
+        boost::optional<otel::metrics::MetricName> addedToQueue;
+        boost::optional<otel::metrics::MetricName> removedFromQueue;
+        boost::optional<otel::metrics::MetricName> interruptedInQueue;
+        boost::optional<otel::metrics::MetricName> tokensAcquired;
+        boost::optional<otel::metrics::MetricName> currentQueueDepth;
+        boost::optional<otel::metrics::MetricName> totalAvailableTokens;
+        boost::optional<otel::metrics::MetricName> averageTimeQueuedMicros;
+        boost::optional<otel::metrics::MetricName> timeQueuedMicros;
     };
 
-    /** Creates the OTel instruments described by `spec`. */
+    /** Creates the OTel instruments described by the set fields of `spec`. */
     explicit RateLimiterOtelMetricsRecorder(MetricsSpec spec);
 
     void record(const RateLimiterMetricsRecorderEvent& event) noexcept override;
@@ -91,6 +75,7 @@ public:
     int64_t exemptedAdmissions() const override;
     int64_t attemptedAdmissions() const override;
     boost::optional<double> averageTimeQueuedMicros() const override;
+    int64_t totalTimeQueuedMicros() const override;
     double tokensAcquired() const override;
     double tokensAvailable() const override;
     int64_t currentQueueDepth() const override;
@@ -106,22 +91,34 @@ public:
                                                  std::function<double()> sampleAvailableTokens);
 
 private:
-    otel::metrics::Counter<int64_t>* _attemptedCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _successfulCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _rejectedCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _addedToQueueCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _removedFromQueueCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _interruptedInQueueCounter{nullptr};
-    otel::metrics::Counter<int64_t>* _exemptedAdmissionsCounter{nullptr};
-    otel::metrics::Counter<double>* _tokensAcquiredCounter{nullptr};
-    otel::metrics::Gauge<int64_t>* _queueDepthGauge{nullptr};
-    otel::metrics::Gauge<double>* _tokensAvailableGauge{nullptr};
-    otel::metrics::Gauge<double>* _averageTimeQueuedMicrosGauge{nullptr};
-    otel::metrics::Histogram<int64_t>* _timeQueuedMicrosHistogram{nullptr};
+    otel::metrics::Counter<int64_t>* _attemptedCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _successfulCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _rejectedCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _addedToQueueCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _removedFromQueueCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _interruptedInQueueCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<int64_t>* _exemptedAdmissionsCounter{
+        otel::metrics::NoopCounter<int64_t>::instance()};
+    otel::metrics::Counter<double>* _tokensAcquiredCounter{
+        otel::metrics::NoopCounter<double>::instance()};
+    otel::metrics::Gauge<int64_t>* _queueDepthGauge{otel::metrics::NoopGauge<int64_t>::instance()};
+    otel::metrics::Gauge<double>* _tokensAvailableGauge{
+        otel::metrics::NoopGauge<double>::instance()};
+    otel::metrics::Gauge<double>* _averageTimeQueuedMicrosGauge{
+        otel::metrics::NoopGauge<double>::instance()};
+    otel::metrics::Histogram<int64_t>* _timeQueuedMicrosHistogram{
+        otel::metrics::NoopHistogram<int64_t>::instance()};
 
     Atomic<int64_t> _queueDepthCounter{0};
     Atomic<double> _tokensAvailable{0};
     MovingAverage _averageTimeQueuedMicros{0.2};
+    Counter64 _totalTimeQueuedMicros;
 };
 
 }  // namespace mongo::admission

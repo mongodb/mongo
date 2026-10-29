@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/collection_crud/container_write.h"
 
@@ -35,32 +9,38 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 
+#include <algorithm>
+#include <tuple>
+
 namespace mongo::container_write {
-namespace {
-void assertCanAcceptContainerWrites(OperationContext* opCtx) {
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+CanAcceptContainerWritesGuarantee CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(
+    OperationContext* opCtx) {
     uassert(ErrorCodes::InvalidOptions,
             "Container write support is not enabled",
             rss::ReplicatedStorageService::get(opCtx->getServiceContext())
                     .getPersistenceProvider()
                     .mustUseContainerWrites() ||
                 ::mongo::feature_flags::gContainerWrites.isEnabledUseLastLTSFCVWhenUninitialized(
-                    VersionContext::getDecoration(opCtx), fcv));
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while writing to container",
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
                 opCtx, NamespaceString::kContainerNamespace));
+    return CanAcceptContainerWritesGuarantee{};
 }
-}  // namespace
 
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
               boost::optional<NonexistentKeyGuarantee> nkg) {
-    assertCanAcceptContainerWrites(opCtx);
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.insert(ru,
                                    key,
                                    value,
@@ -81,8 +61,11 @@ Status insert(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
               boost::optional<NonexistentKeyGuarantee> nkg) {
-    assertCanAcceptContainerWrites(opCtx);
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.insert(ru,
                                    key,
                                    value,
@@ -98,12 +81,102 @@ Status insert(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status insert(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              IntegerKeyedContainer& container,
+              std::span<const int64_t> keys,
+              std::span<const std::span<const char>> values,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
+              boost::optional<NonexistentKeyGuarantee> nkg) {
+    if (keys.empty() && values.empty()) {
+        return Status::OK();  // Early exit if empty
+    }
+    massert(13274502,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
+    auto status = container.insert(ru,
+                                   keys,
+                                   values,
+                                   nkg ? container::ExistingKeyPolicy::overwrite
+                                       : container::ExistingKeyPolicy::reject);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto ident = container.ident()->getIdent();
+
+    size_t runStart = 0;
+    for (size_t i = 1; i <= keys.size(); ++i) {
+        const bool finalRun = i == keys.size();
+        // Emit batched oplog entry on the final iteration, or when a non-contiguous key is found
+        if (finalRun || keys[i] != keys[i - 1] + 1) {
+            opObserver->onContainerInsert(
+                opCtx, ident, keys[runStart], values.subspan(runStart, i - runStart));
+            runStart = i;
+        }
+    }
+    return Status::OK();
+}
+
+Status insert(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              StringKeyedContainer& container,
+              std::span<const std::span<const char>> keys,
+              std::span<const std::span<const char>> values,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg,
+              boost::optional<NonexistentKeyGuarantee> nkg) {
+    if (keys.empty() && values.empty()) {
+        return Status::OK();  // Early exit if empty
+    }
+    massert(13274503,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
+    auto status = container.insert(ru,
+                                   keys,
+                                   values,
+                                   nkg ? container::ExistingKeyPolicy::overwrite
+                                       : container::ExistingKeyPolicy::reject);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto ident = container.ident()->getIdent();
+
+    size_t runStart = 0;
+    for (size_t i = 1; i <= keys.size(); ++i) {
+        const bool finalRun = i == keys.size();
+        // Emit batched oplog entry on final iteration, or when the key changes
+        if (finalRun ||
+            !std::equal(values[i].begin(),
+                        values[i].end(),
+                        values[runStart].begin(),
+                        values[runStart].end())) {
+            opObserver->onContainerInsert(
+                opCtx, ident, keys.subspan(runStart, i - runStart), values[runStart]);
+            runStart = i;
+        }
+    }
+
+    return Status::OK();
+}
+
 Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
-              std::span<const char> value) {
-    assertCanAcceptContainerWrites(opCtx);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.update(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -119,8 +192,11 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
               std::span<const char> key,
-              std::span<const char> value) {
-    assertCanAcceptContainerWrites(opCtx);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.update(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -135,8 +211,11 @@ Status update(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
-              int64_t key) {
-    assertCanAcceptContainerWrites(opCtx);
+              int64_t key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;
@@ -151,8 +230,11 @@ Status remove(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
-              std::span<const char> key) {
-    assertCanAcceptContainerWrites(opCtx);
+              std::span<const char> key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg) {
+    if (!wg) {
+        std::ignore = CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(opCtx);
+    }
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;

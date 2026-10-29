@@ -155,7 +155,22 @@ export class QuerySettingsUtils {
      */
     getQueryShapeHashFromExplain(representativeQuery) {
         const explainCmd = getExplainCommand(this.withoutDollarDB(representativeQuery));
-        const explain = assert.commandWorked(this._db.runCommand(explainCmd));
+        let explain;
+        // In sharded passthrough suites with rate-limiting failpoints, the config server replica
+        // set (config-rs) can become transiently unreachable, causing explain() to fail with
+        // FailedToSatisfyReadPreference. Retry on this specific error until the config-rs primary
+        // is reachable again.
+        assert.soon(
+            () => {
+                const result = this._db.runCommand(explainCmd);
+                if (!result.ok && result.code === ErrorCodes.FailedToSatisfyReadPreference) {
+                    return false;
+                }
+                explain = assert.commandWorked(result);
+                return true;
+            },
+            `Failed to run explain for ${tojson(representativeQuery)}`,
+        );
         return explain.queryShapeHash;
     }
 
@@ -339,10 +354,7 @@ export class QuerySettingsUtils {
             queryShapeHash = response.queryShapeHash;
             representativeQuery = response.representativeQuery;
 
-            // Assert that the 'expectedQueryShapeConfiguration' is present in the system. The
-            // returned configuration does not include 'representativeQuery' on updates, case in
-            // which we need to skip the representativeQuery comparison against the $querySettings
-            // output.
+            // The reply contains the normalized representative query for new settings.
             const hasRepresentativeQuery = representativeQuery !== undefined;
             const expectedQueryShapeConfiguration = {queryShapeHash, settings: response.settings};
             if (hasRepresentativeQuery) {

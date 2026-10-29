@@ -4,6 +4,7 @@
  * be returned.
  *
  * @tags: [
+ *   uses_explain,
  *   multiversion_incompatible,
  *   does_not_support_transactions,
  *   requires_getmore,

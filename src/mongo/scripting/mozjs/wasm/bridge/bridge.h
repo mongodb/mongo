@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
@@ -93,6 +68,9 @@ struct WasmEngineContext {
     static std::shared_ptr<WasmEngineContext> createFromPrecompiled(const uint8_t* data,
                                                                     size_t size);
 
+    // Destroys the wasmtime members under wasmLifecycleMutex() (see bridge.cpp).
+    ~WasmEngineContext();
+
 private:
     WasmEngineContext(wt::Engine engine, wc::Component component, wc::Linker linker)
         : _engine(std::move(engine)),
@@ -100,11 +78,12 @@ private:
           _linker(std::move(linker)) {}
 
     friend class MozJSWasmBridge;
-    wt::Engine _engine;
-    wc::Component _component;
+    // optional so the destructor can release them explicitly while holding the lifecycle lock.
+    boost::optional<wt::Engine> _engine;
+    boost::optional<wc::Component> _component;
     // Linker is constructed once with add_wasip2() so each bridge instantiation
     // can skip the per-call WASIP2 registration cost.
-    wc::Linker _linker;
+    boost::optional<wc::Linker> _linker;
 };
 
 // Wasmtime trap error code used by MozJSWasmBridge::_callFunc / _callFuncNoArgs.
@@ -133,13 +112,37 @@ public:
 
     explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts);
 
+    // Tears down the Store/Instance under wasmLifecycleMutex() (see bridge.cpp).
+    ~MozJSWasmBridge();
+
     bool initialize();
     void shutdown();
 
     // Signal that execution should be interrupted via Wasmtime epoch increment.
     // Safe to call from any thread. kill() provides a DeadlineMonitor-compatible interface.
-    void kill();
+    //
+    // kill() itself can be called more than once on the same bridge -- e.g. DeadlineMonitor's
+    // background thread periodically re-signals any task with isKillPending() still set, as a
+    // safety net for kills the target hasn't yet noticed (see deadlineMonitorThread()). Only the
+    // *first* call's reason is retained: it is safe to read back at any later point
+    // (_throwAfterTrap() reads it back directly; there is no public accessor since nothing
+    // outside the bridge needs it -- translation happens entirely inside _throwAfterTrap()).
+    // Every call still bumps the epoch, so a later, reason-less re-signal still does its job of
+    // re-arming the interrupt -- it just can't downgrade an already-recorded real reason (e.g.
+    // MaxTimeMSExpired) back to the generic Interrupted default.
+    // Must not be ErrorCodes::OK -- that value is reserved for "not killed" (see isKillPending()).
+    void kill(ErrorCodes::Error reason = ErrorCodes::Interrupted);
+
     bool isKillPending() const;
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    // Test-only: bumps the shared engine epoch so this bridge's epoch-deadline callback fires.
+    // Paired with the 'wasmBridgeInjectEpochTrap' failpoint, this provokes a genuine non-kill
+    // wasmtime trap originating inside the guest, so the non-memory trap classification in
+    // _throwAfterTrap() can be tested (a real SpiderMonkey MOZ_CRASH is not deterministically
+    // reachable from guest JS). Compiled out of production (non-debug) builds.
+    void _testTriggerEpochInterrupt();
+#endif
 
     uint64_t createFunction(std::string_view source);
 
@@ -151,6 +154,7 @@ public:
     BSONObj getGlobal(std::string_view name, bool implicitNull = false);
 
     void setGlobalValue(std::string_view name, const BSONObj& value);
+    void deleteGlobal(std::string_view name);
     BSONObj drainEmitBuffer();
 
     // Diagnostic memory statistics from inside the WASM instance:
@@ -236,7 +240,7 @@ private:
     void _assertUsable();
 
     // Triggers an epoch increment to interrupt WASM execution.
-    void _signalInterrupt();
+    void _signalInterrupt(ErrorCodes::Error reason);
 
     // Inspects the WIT result and handles all error cases:
     //   - mongo C++ exception (mozJSErrorCode != JSInterpreterFailure): overrides code, throws
@@ -266,15 +270,12 @@ private:
     // Calls a WASM function with no arguments. Same trap-latching as _callFunc.
     bool _callFuncNoArgs(wc::Func& func, wc::Val* results, size_t numResults);
 
-    // Latches State::Trapped and throws a DBException whose ErrorCode reflects the
-    // real reason execution stopped. When isKillPending() is true (the bridge was
-    // killed via kill()), this resolves the current OperationContext's actual kill
-    // status — e.g. MaxTimeMSExpired (50), CursorKilled (202), Interrupted (11601)
-    // — so callers see the same mongo error code they would have seen on the
-    // native MozJS engine, instead of a generic "wasm trap: interrupt" string.
-    // Falls back to Interrupted when no opCtx is available (e.g. shell). For
-    // traps without a pending kill, throws kWasmtimeTrapErrorCode.
-    // [[noreturn]] is asserted via uasserted/iassert; this function always throws.
+    // Latches State::Trapped and throws a DBException. When isKillPending() is true, throws
+    // killReason() directly -- the real mongo error (e.g. MaxTimeMSExpired, CursorKilled) if the
+    // kill() caller knew it, or plain Interrupted otherwise. No translation happens above the
+    // bridge. For traps without a pending kill, classifies and throws kWasmtimeTrapErrorCode or
+    // ExceededMemoryLimit.
+    // [[noreturn]]: always throws via uasserted.
     [[noreturn]] void _throwAfterTrap(const std::string& trapMessage);
 
     inline wt::Store::Context getContext() {
@@ -282,7 +283,18 @@ private:
     }
 
     Atomic<State> _state{State::Uninitialized};
-    Atomic<bool> _killPending{false};
+    // Set once, by whichever caller invokes kill(). See kill()'s doc comment. ErrorCodes::OK
+    // until kill() is first called; never reset afterward -- a killed bridge is excluded from
+    // the idle-bridge reuse pool via isHealthy(), so it is never reused and never needs clearing.
+    Atomic<ErrorCodes::Error> _killReason{ErrorCodes::OK};
+    // Set to true by the ResourceLimiter callback when memory.grow is denied.
+    // Read in _throwAfterTrap() to classify the resulting unreachable trap as
+    // ExceededMemoryLimit without needing string heuristics. Latched by the
+    // callback and cleared on reuse in resetEngine()/resetRealm().
+    Atomic<bool> _growDeniedByLimiter{false};
+    // Last size (bytes) requested of the limiter callback; logged on a trap so an
+    // OOM can be read against _storeLimitMB even without a live memory watermark.
+    Atomic<uint64_t> _growDeniedDesiredBytes{0};
     uint32_t _jsHeapLimitMB{0};
     uint32_t _storeLimitMB{0};
     bool _javascriptProtection{false};
@@ -294,6 +306,13 @@ private:
     // Each bridge owns its own _store and _instance for execution isolation.
     std::shared_ptr<WasmEngineContext> _ctx;
 
+    // WARNING: _store MUST be declared after every field its ResourceLimiter callback
+    // reads (_storeLimitMB, _growDeniedByLimiter, _growDeniedDesiredBytes). The callback
+    // captures `this`; members are destroyed in reverse declaration order, so _store (and
+    // the callback it owns) must tear down before those fields. Moving _store above them
+    // would create a use-after-free during destruction with no compiler diagnostic. An
+    // offsetof-based static_assert cannot guard this -- MozJSWasmBridge is not
+    // standard-layout, so offsetof would trip -Winvalid-offsetof under -Werror.
     boost::optional<wt::Store> _store;
     boost::optional<wc::Instance> _instance;
 
@@ -308,6 +327,7 @@ private:
     boost::optional<wc::Func> _invokePredicateFunc = boost::none;
     boost::optional<wc::Func> _setGlobalFunc = boost::none;
     boost::optional<wc::Func> _setGlobalValueFunc = boost::none;
+    boost::optional<wc::Func> _deleteGlobalFunc = boost::none;
     boost::optional<wc::Func> _setupEmitFunc = boost::none;
     boost::optional<wc::Func> _invokeMapFunc = boost::none;
     boost::optional<wc::Func> _drainEmitBufferFunc = boost::none;

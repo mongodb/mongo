@@ -6,7 +6,10 @@ import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {
-    setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsCacheSize: "10MB"},
+    setParameter: {
+        internalQueryStatsSampleRate: 1,
+        internalQueryStatsCacheSize: "10MB",
+    },
 };
 
 const conn = MongoRunner.runMongod(options);

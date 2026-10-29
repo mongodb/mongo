@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/query/search/mongot_cursor.h"
 
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
@@ -55,7 +29,6 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const OptimizationFlags& optimizationFlags,
     const boost::optional<SearchQueryViewSpec> view = boost::none,
     const boost::optional<int> protocolVersion = boost::none,
-    const boost::optional<long long> docsRequested = boost::none,
     const boost::optional<long long> batchSize = boost::none,
     const bool requiresSearchSequenceToken = false) {
     BSONObjBuilder cmdBob;
@@ -88,18 +61,10 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         cmdBob.append(kOptimizationFlagsField, optimizationFlags.serialize());
     }
 
-    if (docsRequested.has_value() || batchSize.has_value() || requiresSearchSequenceToken) {
-        tassert(
-            8953001,
-            "Only one of docsRequested or batchSize should be set on the initial mongot request.",
-            !docsRequested.has_value() || !batchSize.has_value());
-
+    if (batchSize.has_value() || requiresSearchSequenceToken) {
         BSONObjBuilder cursorOptionsBob(cmdBob.subobjStart(kCursorOptionsField));
         if (batchSize.has_value()) {
             cursorOptionsBob.append(kBatchSizeField, batchSize.get());
-        }
-        if (docsRequested.has_value()) {
-            cursorOptionsBob.append(kDocsRequestedField, docsRequested.get());
         }
         if (requiresSearchSequenceToken) {
             // Indicate to mongot that the user wants to paginate so mongot returns pagination
@@ -240,26 +205,11 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
 
     auto bounds = spec.getDocsNeededBounds();
     boost::optional<long long> batchSize = boost::none;
-    // We should only use batchSize if the batchSize feature flag (featureFlagSearchBatchSizeTuning)
-    // is enabled and we've already computed min/max bounds.
-    if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled() && bounds.has_value()) {
+    // We should only use batchSize if we've already computed min/max bounds.
+    if (bounds.has_value()) {
         const auto storedSourceElem = query[kReturnStoredSourceArg];
         bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
         batchSize = computeInitialBatchSize(expCtx, *bounds, userBatchSize, isStoredSource);
-    }
-
-    boost::optional<long long> docsRequested = spec.getMongotDocsRequested().has_value()
-        ? boost::make_optional<long long>(*spec.getMongotDocsRequested())
-        : boost::none;
-
-    // TODO SERVER-92576 Remove docsRequested.
-    if (batchSize.has_value()) {
-        // We disable setting docsRequested if we're already setting batchSize.
-        docsRequested = boost::none;
-    } else if (docsRequested.has_value()) {
-        // If we're enabling the docsRequested option, min/max bounds can be set to the
-        // docsRequested value.
-        bounds = DocsNeededBounds(*docsRequested, *docsRequested);
     }
 
     auto getMoreStrategy = std::make_unique<executor::MongotTaskExecutorCursorGetMoreStrategy>(
@@ -287,7 +237,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               getOptimizationFlagsForSearch(),
                                               view,
                                               protocolVersion,
-                                              docsRequested,
                                               batchSize,
                                               spec.getRequiresSearchSequenceToken()),
         taskExecutor,
@@ -309,8 +258,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     }
 
     auto getMoreStrategy = std::make_unique<executor::DefaultTaskExecutorCursorGetMoreStrategy>(
-        /*batchSize*/ boost::none,
-        /*preFetchNextBatch*/ false);
+        /*batchSize=*/boost::none,
+        /*preFetchNextBatch=*/false);
     return establishCursors(
         expCtx,
         getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),

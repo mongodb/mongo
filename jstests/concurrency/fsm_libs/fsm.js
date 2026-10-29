@@ -21,6 +21,10 @@ export var fsm = (function () {
         }
     }
 
+    function isInvocationRunningInsideTransaction(data) {
+        return data[kIsRunningInsideTransaction] === true;
+    }
+
     // args.data = 'this' object of the state functions
     // args.db = database object
     // args.collName = collection name
@@ -208,6 +212,7 @@ export var fsm = (function () {
 
     return {
         forceRunningOutsideTransaction,
+        isInvocationRunningInsideTransaction,
         run: runFSM,
         _getWeightedRandomChoice: getWeightedRandomChoice,
     };

@@ -7,7 +7,7 @@
  * `$config.data.collWithMigrations` which will be used by the moveChunk stage in this file.
  */
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 import {isMoveChunkErrorAcceptableWithConcurrent} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 

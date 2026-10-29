@@ -1,6 +1,7 @@
 /**
  * Tests that a {$**: 1} index can coexist with a {$**: 'text'} index in the same collection.
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,

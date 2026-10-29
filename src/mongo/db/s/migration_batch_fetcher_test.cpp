@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/s/migration_batch_fetcher.h"
@@ -94,8 +68,8 @@ protected:
         ShardServerTestFixture::setUp();
 
         {
-            auto donorShard = assertGet(shardRegistry()->getShard(
-                operationContext(), ShardRef(kDonorConnStr.getSetName())));
+            auto donorShard = assertGet(
+                shardRegistry()->getShard(operationContext(), kDonorConnStr.getSetName()));
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
                 ->setConnectionStringReturnValue(kDonorConnStr);
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
@@ -172,18 +146,16 @@ private:
         public:
             StaticCatalogClient() = default;
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
 
                 ShardType donorShard;
-                donorShard.setHandle(ShardHandle{ShardId(kDonorConnStr.getSetName()), boost::none});
+                donorShard.setName(kDonorConnStr.getSetName());
                 donorShard.setHost(kDonorConnStr.toString());
 
                 ShardType recipientShard;
-                recipientShard.setHandle(
-                    ShardHandle{ShardId(kRecipientConnStr.getSetName()), boost::none});
+                recipientShard.setName(kRecipientConnStr.getSetName());
                 recipientShard.setHost(kRecipientConnStr.toString());
 
                 return repl::OpTimeWith<std::vector<ShardType>>({donorShard, recipientShard});
@@ -227,7 +199,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        0 /* maxBytesPerThread */);
+        /*maxBytesPerThread=*/0);
 
     // Start asynchronous task for responding to _migrateClone requests.
     // Must name the return of value std::async.  The destructor of std::future joins the
@@ -266,7 +238,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTestRetry) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        0 /* maxBytesPerThread */);
+        /*maxBytesPerThread=*/0);
 
     auto fut = std::async(std::launch::async, [&]() {
         onCommand(getOnMigrateCloneCommandCb(getErrorRetryable()));
@@ -302,7 +274,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        0 /* maxBytesPerThread */);
+        /*maxBytesPerThread=*/0);
 
     auto fut = std::async(std::launch::async, [&]() {
         for (int i = 0; i < 8; ++i) {

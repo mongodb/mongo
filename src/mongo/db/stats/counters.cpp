@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/stats/counters.h"
 
@@ -55,7 +29,12 @@ using ::mongo::otel::metrics::MetricUnit;
 using ::mongo::otel::metrics::ServerStatusOptions;
 
 NetworkCounter::NetworkCounter()
-    : _ingressLogicalBytesIn(MetricsService::instance().createInt64Counter(
+    : _replicationSecondaryPhysicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kReplicationSecondaryPhysicalBytesIn,
+          "Total number of physical bytes received as a secondary over replication "
+          "connections",
+          MetricUnit::kBytes)),
+      _ingressLogicalBytesIn(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkIngressBytesIn,
           "Total number of logical bytes received from ingress (wire-protocol) clients.",
           MetricUnit::kBytes)),
@@ -67,9 +46,23 @@ NetworkCounter::NetworkCounter()
           MetricNames::kNetworkIngressBytesOut,
           "Total number of logical bytes sent to ingress (wire-protocol) clients.",
           MetricUnit::kBytes)),
+      _replicationPrimaryLogicalBytesOut(MetricsService::instance().createInt64Counter<int64_t>(
+          MetricNames::kReplicationPrimaryLogicalBytesOut,
+          "Total number of logical bytes sent to secondaries over replication connections",
+          MetricUnit::kBytes,
+          replicationIdAttribute())),
+      _replicationPrimaryPhysicalBytesOut(MetricsService::instance().createInt64Counter<int64_t>(
+          MetricNames::kReplicationPrimaryPhysicalBytesOut,
+          "Total number of physical bytes sent to secondaries over replication connections",
+          MetricUnit::kBytes,
+          replicationIdAttribute())),
       _egressLogicalBytesIn(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkEgressBytesIn,
           "Total number of logical bytes received on egress (outbound client) connections.",
+          MetricUnit::kBytes)),
+      _replicationSecondaryLogicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kReplicationSecondaryLogicalBytesIn,
+          "Total number of logical bytes received as a secondary over replication connections",
           MetricUnit::kBytes)),
       _egressNumRequests(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkEgressNumRequests,
@@ -88,8 +81,18 @@ NetworkCounter::NetworkCounter()
           "Total number of slow SSL handshake operations.",
           MetricUnit::kCount)) {}
 
-void NetworkCounter::hitPhysicalIn(ConnectionType connectionType, long long bytes) {
+
+void NetworkCounter::hitPhysicalIn(ConnectionType connectionType,
+                                   long long bytes,
+                                   ConnectionPurpose connectionPurpose) {
     static const int64_t MAX = 1ULL << 60;
+    // since this counter is hooked into otel, it cannot be nicely integrated with the
+    // rest of this function's logic
+    if (connectionType == ConnectionType::kEgress &&
+        connectionPurpose == ConnectionPurpose::kReplication) {
+        _replicationSecondaryPhysicalBytesIn.add(bytes);
+    }
+
     auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesIn
                                                            : _egressPhysicalBytesIn;
 
@@ -103,8 +106,16 @@ void NetworkCounter::hitPhysicalIn(ConnectionType connectionType, long long byte
     }
 }
 
-void NetworkCounter::hitPhysicalOut(ConnectionType connectionType, long long bytes) {
+void NetworkCounter::hitPhysicalOut(ConnectionType connectionType,
+                                    long long bytes,
+                                    ConnectionPurpose connectionPurpose,
+                                    boost::optional<int64_t> replicationId) {
     static const int64_t MAX = 1ULL << 60;
+    if (connectionType == ConnectionType::kIngress &&
+        connectionPurpose == ConnectionPurpose::kReplication) {
+        invariant(replicationId.has_value());
+        _replicationPrimaryPhysicalBytesOut.add(bytes, {replicationId.value()});
+    }
     auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesOut
                                                            : _egressPhysicalBytesOut;
 
@@ -118,7 +129,9 @@ void NetworkCounter::hitPhysicalOut(ConnectionType connectionType, long long byt
     }
 }
 
-void NetworkCounter::hitLogicalIn(ConnectionType connectionType, long long bytes) {
+void NetworkCounter::hitLogicalIn(ConnectionType connectionType,
+                                  long long bytes,
+                                  ConnectionPurpose connectionPurpose) {
     // The requests field only gets incremented here (and not in hitPhysical) because
     // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
     // functions would double-count the number of operations.
@@ -126,13 +139,23 @@ void NetworkCounter::hitLogicalIn(ConnectionType connectionType, long long bytes
         _ingressLogicalBytesIn.add(bytes);
         _ingressNumRequests.add(1);
     } else {
+        if (connectionPurpose == ConnectionPurpose::kReplication) {
+            _replicationSecondaryLogicalBytesIn.add(bytes);
+        }
         _egressLogicalBytesIn.add(bytes);
         _egressNumRequests.add(1);
     }
 }
 
-void NetworkCounter::hitLogicalOut(ConnectionType connectionType, long long bytes) {
+void NetworkCounter::hitLogicalOut(ConnectionType connectionType,
+                                   long long bytes,
+                                   ConnectionPurpose connectionPurpose,
+                                   boost::optional<int64_t> replicationId) {
     if (connectionType == ConnectionType::kIngress) {
+        if (connectionPurpose == ConnectionPurpose::kReplication) {
+            invariant(replicationId.has_value());
+            _replicationPrimaryLogicalBytesOut.add(bytes, {replicationId.value()});
+        }
         _ingressLogicalBytesOut.add(bytes);
     } else {
         _egressLogicalBytesOut.add(bytes);
@@ -166,6 +189,16 @@ void NetworkCounter::append(BSONObjBuilder& b) {
                          static_cast<long long>(_egressPhysicalBytesOut->loadRelaxed()));
     egressBuilder.append("numRequests", _egressNumRequests.valueForLegacyUse());
     egressBuilder.done();
+
+    BSONObjBuilder replBuilder(b.subobjStart("repl"));
+
+    BSONObjBuilder replSecondaryBuilder(replBuilder.subobjStart("secondary"));
+    replSecondaryBuilder.append("physicalBytesIn",
+                                _replicationSecondaryPhysicalBytesIn.valueForLegacyUse());
+    replSecondaryBuilder.append("bytesIn", _replicationSecondaryLogicalBytesIn.valueForLegacyUse());
+    replSecondaryBuilder.done();
+
+    replBuilder.done();
 
     b.append("numSlowDNSOperations", _numSlowDNSOperations.valueForLegacyUse());
     b.append("numSlowSSLOperations", _numSlowSSLOperations.valueForLegacyUse());
@@ -489,6 +522,8 @@ FastPathQueryCounters::FastPathQueryCounters()
 QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
 LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
+NonLeadingPushdownCounters nonLeadingPushdownCounters;
+PathArraynessCounters pathArraynessCounters;
 ValidatorCounters validatorCounters;
 ValidationLevelCounters validationLevelCounters;
 GroupCounters groupCounters;

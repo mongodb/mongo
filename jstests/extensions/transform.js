@@ -1,7 +1,7 @@
 /**
  * Tests an extension transform stage.
  *
- * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
+ * @tags: [ featureFlagExtensionsAPI, requires_fcv_90 ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

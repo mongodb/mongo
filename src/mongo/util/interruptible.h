@@ -1,42 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -50,7 +20,12 @@
 #include <utility>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace interruptible_detail {
 // Helper to release a lock, call a callable, and then reacquire the lock.
@@ -69,8 +44,10 @@ auto doWithoutLock(BasicLockableAdapter m, Callable&& callable) {
  * call), _all_ subsequent calls to waitForConditionXXX will fail. Interrupts must unblock all
  * callers of waitForConditionXXX.
  */
-class MONGO_MOD_OPEN Interruptible {
+class [[MONGO_MOD_OPEN]] Interruptible {
 public:
+    virtual ~Interruptible() = default;
+
     /**
      * Returns true if currently waiting for a condition/interrupt.
      * This function relies on waitForConditionOrInterrupt to properly set _isWaiting.
@@ -328,23 +305,23 @@ public:
      *
      * Returns state needed to pop the deadline.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual DeadlineState pushArtificialDeadline(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual DeadlineState pushArtificialDeadline(
         Date_t deadline, ErrorCodes::Error error) = 0;
 
     /**
      * Pops the subsidiary deadline introduced by push.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual void popArtificialDeadline(DeadlineState) = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual void popArtificialDeadline(DeadlineState) = 0;
 
     /**
      * Returns the equivalent of Date_t::now() + waitFor for the Interruptible's clock
      */
-    MONGO_MOD_FILE_PRIVATE virtual Date_t getExpirationDateForWaitForValue(
+    [[MONGO_MOD_FILE_PRIVATE]] virtual Date_t getExpirationDateForWaitForValue(
         Milliseconds waitFor) = 0;
 
 
 private:
-    AtomicWord<bool> _isWaiting{false};
+    Atomic<bool> _isWaiting{false};
 };
 
 /**
@@ -403,4 +380,4 @@ inline Interruptible* Interruptible::notInterruptible() {
     return &notInterruptible;
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

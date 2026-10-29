@@ -15,3 +15,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-ddl
       - 10gen/server-cluster-scalability
+  - "*migration_blocking_operation*":
+    approvers:
+      - 10gen/server-cluster-scalability

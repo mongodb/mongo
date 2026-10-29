@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,7 +12,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
@@ -48,7 +22,10 @@
 #include <memory>
 #include <mutex>
 #include <tuple>
+#include <utility>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -62,9 +39,9 @@ namespace mongo {
  * Otherwise this class' only output is to refresh the tickets available in the
  * `FlowControlTicketholder`.
  */
-class MONGO_MOD_PUBLIC FlowControl {
+class [[MONGO_MOD_PUBLIC]] FlowControl {
 public:
-    class MONGO_MOD_OPEN TimestampProvider {
+    class [[MONGO_MOD_OPEN]] TimestampProvider {
     public:
         virtual ~TimestampProvider() = default;
         /**
@@ -98,6 +75,12 @@ public:
          * Are the previous and current updates compatible?  For replication,
          * makes sure number of nodes is the same and the median node timestamp (the sustainer)
          * has not gone backwards.
+         *
+         * Contract: false marks the readings as incoherent, and FlowControl responds by
+         * PRESERVING the previous ticket target (and suppressing the sustainer-not-moving
+         * warning) — on a fresh primary that is kMaxTickets, i.e. no throttling. So false
+         * must not be used to signal missing data; a provider with coherent positions but
+         * no count signals that through getSustainerAppliedCount() returning -1 instead.
          */
         virtual bool sustainerAdvanced() const = 0;
 
@@ -116,6 +99,28 @@ public:
          */
         virtual std::int64_t getSustainerAppliedCount() const {
             return -1;
+        }
+
+        /**
+         * The sample-table position where the provider's in-progress measurement started:
+         * the provider's future queries still need the samples from here forward, so
+         * trimming never passes it — including while the provider's positions are absent
+         * from the sustainer getters (e.g. an ignored standby signal, or another signal
+         * being dominant). Null means no measurement in progress (the default): no
+         * constraint on trimming.
+         *
+         * Implementer contract: (1) trimming runs on every flow-control refresh (the
+         * periodic getNumTickets() pass), so report the anchor from the moment the
+         * measurement begins and hold it until the measurement ends — a single null return
+         * in between lets the next trim pass the anchor, and the loss is permanent; (2) the
+         * returned timestamp must be in the
+         * sample table's key domain (the timestamps passed to sample()) — a value from any
+         * other domain makes the trim bound meaningless. Memory stays bounded regardless:
+         * at the sample cap FlowControl loses resolution at the newest sample instead of
+         * growing.
+         */
+        virtual Timestamp measurementAnchor() const {
+            return Timestamp();
         }
     };
 
@@ -137,6 +142,12 @@ public:
      * testing.
      */
     FlowControl(repl::ReplicationCoordinator* replCoord);
+
+    /**
+     * Construct a provider-based flow control object without adding a periodic job runner for
+     * testing.
+     */
+    explicit FlowControl(std::unique_ptr<TimestampProvider> timestampProvider);
 
     static FlowControl* get(ServiceContext* service);
     static FlowControl* get(ServiceContext& service);
@@ -181,33 +192,49 @@ public:
      */
     void disableUntil(Date_t deadline);
 
+    // A resolved sample: its timestamp and the cumulative ops applied since startup at it.
+    struct ResolvedSample {
+        Timestamp timestamp;
+        std::int64_t cumulativeOps = 0;
+    };
+
     /**
-     * Returns an estimate of the number of oplog operations between two timestamps by querying
-     * the internal samples table.
+     * Returns the newest sample at or below `timestamp`, or none if the table is empty or
+     * `timestamp` precedes the oldest sample.
+     *
+     * A position, not a count (contrast _approximateOpsBetween), for callers that measure
+     * rates across SUCCESSIVE queries: anchoring the next query at the returned sample
+     * boundary makes consecutive windows tile exactly — ops between the boundary and the raw
+     * query timestamp are carried into the next window instead of dropped, differencing the
+     * cumulative coordinates counts every op exactly once regardless of sampling granularity,
+     * and "unanswerable" (none) stays distinct from "zero ops". A single count-between-two-
+     * timestamps query can provide none of these across calls.
      */
-    std::int64_t approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
+    boost::optional<ResolvedSample> resolveSampleAtOrBelow(Timestamp timestamp) const;
 
     /**
      * Underscore methods are public for testing.
      */
-    MONGO_MOD_PRIVATE std::int64_t _getLocksUsedLastPeriod();
-    MONGO_MOD_PRIVATE double _getLocksPerOp();
+    [[MONGO_MOD_PRIVATE]] std::int64_t _getLocksUsedLastPeriod();
+    [[MONGO_MOD_PRIVATE]] double _getLocksPerOp();
 
-    MONGO_MOD_PRIVATE std::int64_t _approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
+    [[MONGO_MOD_PRIVATE]] std::int64_t _approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
 
-    MONGO_MOD_PRIVATE int _calculateNewTicketsForLag(const Timestamp& prevSustainerTimestamp,
-                                                     const Timestamp& currSustainerTimestamp,
-                                                     std::int64_t locksUsedLastPeriod,
-                                                     double locksPerOp,
-                                                     std::uint64_t lagMillis,
-                                                     std::uint64_t thresholdLagMillis);
+    [[MONGO_MOD_PRIVATE]] int _calculateNewTicketsForLag(const Timestamp& prevSustainerTimestamp,
+                                                         const Timestamp& currSustainerTimestamp,
+                                                         std::int64_t locksUsedLastPeriod,
+                                                         double locksPerOp,
+                                                         std::uint64_t lagMillis,
+                                                         std::uint64_t thresholdLagMillis);
 
-    MONGO_MOD_PRIVATE void _trimSamples(Timestamp trimSamplesTo);
+    [[MONGO_MOD_PRIVATE]] void _trimSamples(Timestamp trimSamplesTo);
+
+    [[MONGO_MOD_PRIVATE]] Timestamp _trimTarget(Timestamp lastTargetTimestamp) const;
 
     // Sample of (timestamp, ops, lock acquisitions) where ops and lock acquisitions are
     // observations of the corresponding counter at (roughly) <timestamp>.
     typedef std::tuple<std::uint64_t, std::uint64_t, std::int64_t> Sample;
-    MONGO_MOD_PRIVATE const std::deque<Sample>& _getSampledOpsApplied_forTest() {
+    [[MONGO_MOD_PRIVATE]] const std::deque<Sample>& _getSampledOpsApplied_forTest() {
         return _sampledOpsApplied;
     }
 
@@ -216,14 +243,14 @@ private:
 
     // These values are updated with each flow control computation and are also surfaced in server
     // status.
-    AtomicWord<int> _lastTargetTicketsPermitted{kMaxTickets};
-    AtomicWord<double> _lastLocksPerOp{0.0};
-    AtomicWord<int> _lastSustainerAppliedCount{0};
-    AtomicWord<bool> _isLagged{false};
-    AtomicWord<int> _isLaggedCount{0};
+    Atomic<int> _lastTargetTicketsPermitted{kMaxTickets};
+    Atomic<double> _lastLocksPerOp{0.0};
+    Atomic<int> _lastSustainerAppliedCount{0};
+    Atomic<bool> _isLagged{false};
+    Atomic<int> _isLaggedCount{0};
     // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
-    AtomicWord<std::int64_t> _isLaggedTimeMicros{0};
-    AtomicWord<Date_t> _disableUntil;
+    Atomic<std::int64_t> _isLaggedTimeMicros{0};
+    Atomic<Date_t> _disableUntil;
 
     mutable std::mutex _sampledOpsMutex;
     std::deque<Sample> _sampledOpsApplied;
@@ -243,7 +270,8 @@ private:
 };
 
 namespace flow_control_details {
-class MONGO_MOD_PUBLIC ReplicationTimestampProvider final : public FlowControl::TimestampProvider {
+class [[MONGO_MOD_PUBLIC]] ReplicationTimestampProvider final
+    : public FlowControl::TimestampProvider {
 public:
     explicit ReplicationTimestampProvider(repl::ReplicationCoordinator* replCoord);
     Timestamp getCurrSustainerTimestamp() const final;

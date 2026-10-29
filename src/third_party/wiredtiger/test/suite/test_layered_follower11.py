@@ -79,7 +79,7 @@ class test_layered_follower11(wttest.WiredTigerTestCase):
         self.checkpoint()
         self.disagg_advance_checkpoint(self.conn_follow)
 
-        cursor = self.session_follow.open_cursor(uri, None, None)
+        cursor = self.session_follow.open_cursor(uri, None, 'overwrite=false')
 
         # Delete all the data
         for i in range(1, self.nitems):

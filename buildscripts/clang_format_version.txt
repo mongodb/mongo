@@ -1,0 +1,1 @@
+MongoDB clang-format version 19.1.7 (https://github.com/10gen/toolchain-builder)

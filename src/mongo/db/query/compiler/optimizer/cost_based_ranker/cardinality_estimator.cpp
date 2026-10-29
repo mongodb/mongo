@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cardinality_estimator.h"
 
@@ -37,7 +11,10 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include <absl/container/flat_hash_map.h>
@@ -59,24 +36,54 @@ size_t totalIntervalCount(const IndexBounds& bounds) {
     return total;
 }
 
+
+/**
+ * Returns true for stages whose presence in a plan disables the zero-CE fallback to the
+ * multi-planner for every index scan below them, because the multi-planner ranks such plans worse
+ * than CBR:
+ * - a blocking sort: CBR costs the sort, while the multi-planner may exhaust its works budget
+ *   without results and break the tie with heuristics;
+ * - index intersection;
+ * - an OR (index union): the multi-planner favors the plan whose left-most branch is the most
+ *   productive, which is not necessarily the best plan. A query whose root is an $or is subplanned
+ *   and never reaches CBR as a whole, so any OR here is non-top-level.
+ */
+bool disablesZeroCEFallback(StageType type) {
+    switch (type) {
+        case STAGE_SORT_DEFAULT:
+        case STAGE_SORT_SIMPLE:
+        case STAGE_SORT_MERGE:
+        case STAGE_AND_HASH:
+        case STAGE_AND_SORTED:
+        case STAGE_OR:
+            return true;
+        default:
+            return false;
+    }
+}
+
 }  // namespace
 
 CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
-                                           QueryPlanRankerModeEnum rankerMode)
+                                           QueryCBRCEModeEnum rankerMode,
+                                           bool considerZeroCESampledIXScanNonEstimable)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
       _collInfo(collInfo),
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
-      _rankerMode(rankerMode) {
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+      _ceMode(rankerMode),
+      _considerZeroCESampledIXScanNonEstimable(considerZeroCESampledIXScanNonEstimable) {
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         tassert(9746501,
-                "samplingEstimator cannot be null when ranker mode is samplingCE or automaticCE",
+                "samplingEstimator cannot be null when CBRCEMode is samplingCE",
                 _samplingEstimator != nullptr);
+        // Sampling CE uses the sampler's cardinality as the collection baseline.
+        _collCard = _samplingEstimator->getCollCard();
+        _inputCard = _collCard;
     }
     for (auto&& indexEntry : _collInfo.indexes) {
         for (auto&& indexedPath : indexEntry.keyPattern) {
@@ -109,31 +116,48 @@ CEResult CardinalityEstimator::estimatePlan(const QuerySolution& plan) {
     return _qsnEstimates.at(plan.root())->outCE;
 }
 
-void CardinalityEstimator::clampZeroEstimates() {
-    const auto clamp = [](CardinalityEstimate ce) -> CardinalityEstimate {
-        if (ce != zeroCE) {
-            return ce;
-        }
-        switch (ce.source()) {
-            case EstimationSource::Sampling:
-            case EstimationSource::Histogram:
-            case EstimationSource::Heuristics:
-            case EstimationSource::Mixed:
-                return CardinalityEstimate{CardinalityType{kMinCE}, ce.source()};
-            case EstimationSource::Metadata:
-            case EstimationSource::Code:
-                return ce;
-            case EstimationSource::Unknown:
-                tasserted(12307002, "Encountered a CE with unknown source during clamping");
-        }
-        MONGO_UNREACHABLE;
-    };
+CEResult CardinalityEstimator::estimateFilter(const MatchExpression* filter) {
+    // Restore initial state so the estimator can be reused across filters/plans.
+    _inputCard = _collCard;
+    _conjSels.clear();
 
+    auto ceRes = estimate(filter, /*isFilterRoot=*/true);
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    // A stanalone filter returns directly and never populates _qsnEstimates, so
+    // clampZeroEstimates() (which walks that map) would not see it. Apply the same policy to the
+    // scalar result here.
+    return clampZeroEstimate(ceRes.getValue());
+}
+
+CardinalityEstimate CardinalityEstimator::clampZeroEstimate(CardinalityEstimate ce) {
+    if (ce != zeroCE) {
+        return ce;
+    }
+    switch (ce.source()) {
+        case EstimationSource::Sampling:
+        case EstimationSource::Histogram:
+        case EstimationSource::Heuristics:
+        case EstimationSource::Mixed:
+            return CardinalityEstimate{CardinalityType{kMinCE}, ce.source()};
+        case EstimationSource::Metadata:
+        case EstimationSource::Code:
+        // A HyperLogLog sketch only estimates zero when it has seen no values.
+        case EstimationSource::HyperLogLog:
+            return ce;
+        case EstimationSource::Unknown:
+            tasserted(12307002, "Encountered a CE with unknown source during clamping");
+    }
+    MONGO_UNREACHABLE;
+}
+
+void CardinalityEstimator::clampZeroEstimates() {
     for (auto& [node, est] : _qsnEstimates) {
         if (est->inCE) {
-            est->inCE = clamp(*est->inCE);
+            est->inCE = clampZeroEstimate(*est->inCE);
         }
-        est->outCE = clamp(est->outCE);
+        est->outCE = clampZeroEstimate(est->outCE);
     }
 }
 
@@ -151,6 +175,15 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
                   str::stream{} << "Encountered " << nodeType
                                 << " stage in CardinalityEstimator which should be unreachable");
     }
+
+    // Index scans below a node that disables the zero-CE fallback are estimated as if the caller
+    // had asked for zero estimates to be costed; the flag is restored once the subtree is done.
+    const bool considerZeroCENonEstimable = _considerZeroCESampledIXScanNonEstimable;
+    if (disablesZeroCEFallback(nodeType)) {
+        _considerZeroCESampledIXScanNonEstimable = false;
+    }
+    ScopeGuard restoreZeroCEFlag(
+        [&] { _considerZeroCESampledIXScanNonEstimable = considerZeroCENonEstimable; });
 
     switch (nodeType) {
         case STAGE_COLLSCAN:
@@ -172,7 +205,7 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             ceRes = indexIntersectionCard(static_cast<const AndSortedNode*>(node));
             break;
         case STAGE_OR:
-            // Notice that his is not a conjunction breaker because the result can be combined with
+            // Notice that this is not a conjunction breaker because the result can be combined with
             // the parent's node estimates. Thus indexUnionCard is responsible for replacing the
             // selectivities of the union's children with the selectivity of the union as a whole.
             ceRes = indexUnionCard(static_cast<const OrNode*>(node));
@@ -193,7 +226,8 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
-        case STAGE_PROJECTION_SIMPLE: {
+        case STAGE_PROJECTION_SIMPLE:
+        case STAGE_SHARDING_FILTER: {
             ceRes = passThroughNodeCard(node);
             break;
         }
@@ -297,7 +331,7 @@ std::string_view CardinalityEstimator::getPath(const MatchExpression* node) {
 }
 
 CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool isFilterRoot) {
-    if (isFilterRoot && _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (isFilterRoot && _ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         // Sample the entire filter and scale it to the child's input cardinality.
         // The sampling estimator returns cardinality estimates scaled to the collection
         // cardinality, however this MatchExpression maybe appear in the context of a plan fragment
@@ -313,10 +347,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
 
     CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");
 
-    bool fallbackToHeuristicCE = true;
-    bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
-    bool useHistogram = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+    bool useHistogram = _ceMode == QueryCBRCEModeEnum::kHistogramCE;
 
     /**
      * Sargable expressions are those that can be transformed into intervals. They can be estimated
@@ -326,9 +357,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
      */
     if (useHistogram && isSargableExpr(node)) {
         ceRes = estimateConjWithHistogram(getPath(node), {node});
-        if (ceRes.isOK()) {
-            fallbackToHeuristicCE = false;
-        } else if (strict) {
+        if (!ceRes.isOK()) {
             return ceRes;
         }
     }
@@ -336,10 +365,9 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
     /**
      * Estimate via heuristic CE any leaf match expression. Notice that there are other such nodes
      * besides LeafMatchExpression subclasses. Heuristic CE doesn't estimate non-leaf nodes. This
-     * is done be the switch statment below.
+     * is done by the switch statement below.
      */
-    bool useHeuristic =
-        _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE;
+    bool useHeuristic = _ceMode == QueryCBRCEModeEnum::kHeuristicCE;
     if (useHeuristic && heuristicIsEstimable(node)) {
         tassert(9902901, "CE reestimation not allowed", !ceRes.isOK());
         const SelectivityEstimate sel = heuristicLeafMatchExpressionSel(node, _inputCard);
@@ -400,7 +428,12 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
                 estimate(static_cast<const InternalSchemaAllowedPropertiesMatchExpression*>(node));
             break;
         default:
-            MONGO_UNIMPLEMENTED_TASSERT(9586708);
+            // CBR does not know how to estimate this match expression type. Fall back to
+            // multi-planning.
+            return Status(ErrorCodes::UnsupportedCbrNode,
+                          str::stream() << "unsupported match expression type "
+                                        << static_cast<int>(node->matchType())
+                                        << " for CBR CE mode " << idlSerialize(_ceMode));
     }
 
     return ceRes;
@@ -572,7 +605,33 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
      * preceding fields.
      *
      * * NDV(a) * NumIntervals(b) * 1 * 1
+     *
+     * *POINT INTERVALS*
+     *
+     * A point interval has NDV=1 and does not multiply the seek count. Leading point intervals
+     * (before the first non-point interval) are still included in the NDV computation, because they
+     * restrict which keys the scan can reach:
+     *
+     * a: [[0, 0]], b: [[0, 9]], c: [[0, 0]]
+     *
+     *  NDV((a, b)) * NumIntervals(c), with the sample filtered by a: [[0, 0]] && b: [[0, 9]]
+     *
+     * Point intervals after the first non-point interval are removed from the NDV computation: the
+     * scan still seeks for every distinct value of the preceding non-point fields, whether or not
+     * the later points match. This can overestimate when the point is selective and is followed by
+     * another non-point field, but never underestimates the seeks on the preceding fields.
+     *
+     * a: [[0, 9]], b: [[0, 0]], c: [[0, 0]]
+     *
+     *  NDV(a) * NumIntervals(c)
      */
+
+    // An empty OIL means no index keys can match; there will be no key for the ixscan to seek to.
+    if (std::any_of(oils.begin(), oils.end(), [](const OrderedIntervalList& oil) {
+            return oil.intervals.empty();
+        })) {
+        return zeroCE;
+    }
 
     // Trailing fully open intervals do not change the number of seeks - a cursor will only need
     // to seek after encountering a key which does not match the current bounds.
@@ -583,33 +642,26 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
     if (!oils.empty()) {
         // This is the last (rightmost) field with a non-fully-open interval.
         // A single seek will be required per interval for this field.
-        if (oils.back().intervals.empty()) {
-            // This field has no intervals; there will be no key for the
-            // ixscan to seek to to start, and no documents returned.
-            return zeroCE;
-        }
         seekEstimate *= oils.back().intervals.size();
         oils.pop_back();
     }
 
-    // Remove point OILs (NDV=1, contribute a factor of 1 to seeks) and empty OILs in a single
-    // pass. Track whether any empty OIL is encountered - an empty OIL means no index keys can
-    // match.
-    bool isEmptyInterval = false;
-    std::erase_if(oils, [&](const OrderedIntervalList& oil) {
-        if (oil.intervals.empty()) {
-            isEmptyInterval = true;
-        }
-        return oil.intervals.empty() || oil.isPoint();
-    });
-
-    if (isEmptyInterval) {
-        return zeroCE;
-    }
-
-    if (oils.empty()) {
+    // Detect the first non-point OIL, keep leading point OILs and remove trailing point OILs.
+    auto isPoint = [](const OrderedIntervalList& oil) {
+        return oil.isPoint();
+    };
+    auto firstNonPoint = std::find_if_not(oils.begin(), oils.end(), isPoint);
+    // If all remaining OILs are point intervals (or 'oils' is empty), the NDV is at most 1 and we
+    // can skip the calculation.
+    if (firstNonPoint == oils.end()) {
         return CardinalityEstimate{CardinalityType{seekEstimate}, EstimationSource::Sampling};
     }
+
+    // Leading point OILs are kept in the NDV computation: although they do not multiply the seek
+    // count, they restrict which keys the scan can reach. Point OILs after the first non-point OIL
+    // are removed: the scan still seeks for every distinct value of the preceding non-point fields,
+    // whether or not the later point intervals match.
+    oils.erase(std::remove_if(firstNonPoint, oils.end(), isPoint), oils.end());
 
     std::vector<ce::FieldPathAndEqSemantics> fieldAndEqs;
     for (const auto& oil : oils) {
@@ -675,8 +727,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // Estimate the number of keys in the index scan interval.
     // We can avoid computing input selectivity for sampling CE on point queries over non-multikey
     // fields without residual filter, as input cardinality is equal to output cardinality.
-    if (_rankerMode != QueryPlanRankerModeEnum::kSamplingCE || node->index.multikey ||
-        node->filter) {
+    if (_ceMode != QueryCBRCEModeEnum::kSamplingCE || node->index.multikey || node->filter) {
         auto ceRes1 = estimate(&node->bounds);
         if (!ceRes1.isOK()) {
             return ceRes1;
@@ -685,7 +736,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     }
 
     // Estimate the output cardinality of IndexScan + Residual filter.
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         // Sampling will attempt to get an estimate for the number of RIDs that the scan returns
         // after deduplication and applying the filter. This approach does not combine selectivity
         // computed from the index scan.
@@ -712,8 +763,25 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             est.indexSeekCE = seekCE.getValue();
         }
 
+        // Record the scan's estimates before deciding whether the plan is estimable, so that
+        // explain shows the scan's estimates even when the plan falls back to the multi-planner.
+        const bool zeroInputEstimate =
+            _considerZeroCESampledIXScanNonEstimable && *est.inCE == zeroCE;
+        const auto inCESource = est.inCE->source();
         CardinalityEstimate outCE{est.outCE};
         _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
+
+        if (zeroInputEstimate) {
+            LOGV2_DEBUG(13336200,
+                        2,
+                        "Aborting CBR plan estimation: an index scan's input cardinality estimate "
+                        "is zero. The plan will be ranked by the multi-planner instead",
+                        "stage"_attr = nodeStageTypeToString(node),
+                        "ceSource"_attr = toStringData(inCESource));
+            return Status(ErrorCodes::ZeroCEEstimate,
+                          str::stream() << "Node " << nodeStageTypeToString(node)
+                                        << " has a zero input cardinality estimate");
+        }
         return outCE;
     }
 
@@ -756,7 +824,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         return ceRes1.getValue();
     }
 
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE &&
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE &&
         node->children[0]->getType() == STAGE_IXSCAN) {
         // If the FetchNode does not have a filter then its output cardinality will be unchanged
         // from its input cardinality.
@@ -846,6 +914,18 @@ template <IntersectionType T>
 CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
     tassert(9586703, "Index intersection nodes are not expected to have filters.", !node->filter);
 
+    // The planner can generate plans that contain an intersection of unions, e.g.
+    // AND_HASH -> [ OR -> [ IXSCAN, IXSCAN ], IXSCAN ], which are currently unsupported by CBR.
+    // TODO(SERVER-99091): Support intersections of unions.
+    bool hasOrStage =
+        std::any_of(node->children.begin(), node->children.end(), [](const auto& child) {
+            return child->getType() == StageType::STAGE_OR ||
+                child->getType() == StageType::STAGE_SORT_MERGE;
+        });
+    if (hasOrStage) {
+        return Status(ErrorCodes::UnsupportedCbrNode, "intersections of unions are unsupported");
+    }
+
     QSNEstimate est;
     // Ignore selectivities pushed by other operators up to this point.
     size_t selOffset = _conjSels.size();
@@ -929,17 +1009,17 @@ CEResult CardinalityEstimator::estimateConjWithHistogram(
 
     // At this point, we know that 'path' is non-multikey, so we can safely build an interval for
     // each conjunct and intersect them.
-    IndexEntry fakeIndex(BSON(path << "1") /* keyPattern */,
+    IndexEntry fakeIndex(/*kp=*/BSON(path << "1"),
                          INDEX_BTREE,
                          IndexDescriptor::IndexVersion::kV2,
-                         false /* multikey */,
-                         {} /* multikeyPaths */,
-                         {} /* multikeyPathSet */,
-                         false /* sparse */,
-                         false /* unique */,
+                         /*mk=*/false,
+                         /*mkp=*/{},
+                         /*multikeyPathSet=*/{},
+                         /*sp=*/false,
+                         /*unq=*/false,
                          CoreIndexInfo::Identifier("idx"),
-                         BSONObj::kEmptyObject /* infoObj */,
-                         nullptr /* wildcardProjection */);
+                         /*io=*/BSONObj::kEmptyObject,
+                         /*wildcardProjection=*/nullptr);
     OrderedIntervalList oil;
     IndexBoundsBuilder::allValuesForField(fakeIndex.keyPattern.firstElement(), &oil);
     IndexBoundsBuilder::BoundsTightness tightness;
@@ -1116,8 +1196,7 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // TODO SERVER-122571: Suppose we have an AND with some predicates on 'a' that can answered with
     // a histogram and some predicates on 'b' that can't. Should we still try to use histogram for
     // 'a'? The code as written will not.
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE) {
         size_t selOffset = _conjSels.size();
         auto ceRes = tryHistogramAnd(node);
         if (ceRes.isOK()) {
@@ -1188,8 +1267,7 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
     // Sampling and histogram handle this case higher up.
     uassert(9808601,
             "direct estimation of $elemMatch is currently only supported for heuristicCE",
-            _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE ||
-                _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE);
+            _ceMode == QueryCBRCEModeEnum::kHeuristicCE);
 
     size_t selOffset = _conjSels.size();
 
@@ -1361,7 +1439,7 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
         return Status(ErrorCodes::UnsupportedCbrNode, "simple ranges unsupported");
     }
 
-    if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+    if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         return _ceCache.getOrCompute(
             bounds, [&] { return _samplingEstimator->estimateKeysScanned(*bounds); });
     }
@@ -1416,19 +1494,18 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
         return zeroMetadataCE;
     }
 
-    auto localRankerMode = _rankerMode;
-    const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE || forceHistogram;
+    auto localRankerMode = _ceMode;
+    const bool strict = _ceMode == QueryCBRCEModeEnum::kHistogramCE || forceHistogram;
     const stats::CEHistogram* histogram = nullptr;
 
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE || forceHistogram) {
+    if (_ceMode == QueryCBRCEModeEnum::kHistogramCE || forceHistogram) {
         histogram = _collInfo.collStats->getHistogram(node->name);
         if (!histogram) {
             if (strict) {
                 return CEResult(ErrorCodes::HistogramCEFailure,
                                 str::stream{} << "no histogram found for path: " << node->name);
             }
-            localRankerMode = QueryPlanRankerModeEnum::kHeuristicCE;
+            localRankerMode = QueryCBRCEModeEnum::kHeuristicCE;
         }
     }
 
@@ -1437,8 +1514,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
     CardinalityEstimate resultCard = minCE;
     for (const auto& interval : node->intervals) {
         bool fallbackToHeuristicCE = false;
-        if (localRankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-            localRankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        if (localRankerMode == QueryCBRCEModeEnum::kHistogramCE) {
             if (ce::HistogramEstimator::canEstimateInterval(*histogram, interval)) {
                 resultCard += ce::HistogramEstimator::estimateCardinality(
                     *histogram,
@@ -1455,7 +1531,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
                 fallbackToHeuristicCE = true;
             }
         }
-        if (localRankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
+        if (localRankerMode == QueryCBRCEModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
             SelectivityEstimate sel = estimateInterval(interval, _inputCard);
             resultCard += sel * _inputCard;
         }
@@ -1579,7 +1655,12 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
         }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
-        case STAGE_PROJECTION_SIMPLE: {
+        case STAGE_PROJECTION_SIMPLE:
+        // A shard filter is estimated as a pass-through on the basis that chunk migrations are rare
+        // and so effectively no documents are filtered out. The limit is therefore propagated
+        // through it unchanged, consistent with that estimate.
+        // TODO SERVER-132848: Move these passthrough stages to be with the FETCH node.
+        case STAGE_SHARDING_FILTER: {
             // passthrough
             applyLimitToSelf();
             propagateToChildren(limit);

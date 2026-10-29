@@ -1,36 +1,12 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/ticketing/admission_context.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #include <string_view>
 
@@ -41,7 +17,23 @@ using namespace std::literals::string_view_literals;
 static constexpr std::string_view kNormalString = "normal"sv;
 static constexpr std::string_view kLowString = "low"sv;
 static constexpr std::string_view kExemptString = "exempt"sv;
+
+MONGO_FAIL_POINT_DEFINE(sleepInWaitingForAdmissionGuard);
+
+struct AggregateQueueingStats {
+    Atomic<int64_t> totalTimeQueuedMicros{0};
+};
+
+const auto aggregateQueueingStats = OperationContext::declareDecoration<AggregateQueueingStats>();
+
+void recordAggregateQueueTime(OperationContext* opCtx, Microseconds waitTime) {
+    aggregateQueueingStats(opCtx).totalTimeQueuedMicros.fetchAndAddRelaxed(waitTime.count());
+}
 }  // namespace
+
+Microseconds AdmissionContext::getTotalTimeQueuedForAdmission(const OperationContext* opCtx) {
+    return Microseconds{aggregateQueueingStats(opCtx).totalTimeQueuedMicros.loadRelaxed()};
+}
 
 AdmissionContext::AdmissionContext(const AdmissionContext& other)
     : _admissions(other._admissions.load()),
@@ -50,6 +42,9 @@ AdmissionContext::AdmissionContext(const AdmissionContext& other)
       _startQueueingTime(other._startQueueingTime.load()) {}
 
 AdmissionContext& AdmissionContext::operator=(const AdmissionContext& other) {
+    if (this == &other) {
+        return *this;
+    }
     _admissions.store(other._admissions.load());
     _priority.store(other._priority.load());
     _totalTimeQueuedMicros.store(other._totalTimeQueuedMicros.load());
@@ -96,6 +91,10 @@ void AdmissionContext::recordAdmission() {
 
 void AdmissionContext::setAdmission_forTest(int32_t admissions) {
     _admissions.store(admissions);
+}
+
+bool AdmissionContext::waitUntilQueued_forTest(Nanoseconds timeout) {
+    return bool(_startQueueingTime.waitFor(kNotQueueing, timeout));
 }
 
 void AdmissionContext::setTotalTimeQueuedMicros_forTest(int64_t micros) {
@@ -149,13 +148,21 @@ WaitingForAdmissionGuard::WaitingForAdmissionGuard(AdmissionContext* admCtx, Tic
     invariant(_admCtx->_startQueueingTime.swap(_tickSource->getTicks()) ==
               AdmissionContext::kNotQueueing);
     _admCtx->_startQueueingTime.notifyAll();
+
+    // When enabled, sleep for data["ms"] milliseconds while this context is marked as queueing so
+    // the injected wait is attributed to whichever admission gate constructed this guard.
+    sleepInWaitingForAdmissionGuard.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
 }
 
 WaitingForAdmissionGuard::~WaitingForAdmissionGuard() {
     auto startQueueingTime = _admCtx->_startQueueingTime.loadRelaxed();
     invariant(startQueueingTime != AdmissionContext::kNotQueueing);
-    _admCtx->_totalTimeQueuedMicros.fetchAndAdd(durationCount<Microseconds>(
-        _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startQueueingTime)));
+    auto waitTime = _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startQueueingTime);
+    _admCtx->_totalTimeQueuedMicros.fetchAndAdd(durationCount<Microseconds>(waitTime));
+    if (auto* opCtx = _admCtx->getOperationContext()) {
+        recordAggregateQueueTime(opCtx, waitTime);
+    }
     _admCtx->_startQueueingTime.store(AdmissionContext::kNotQueueing);
     _admCtx->_startQueueingTime.notifyAll();
 }

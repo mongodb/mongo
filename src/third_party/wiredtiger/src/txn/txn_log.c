@@ -429,6 +429,22 @@ __wti_txn_ts_log(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __checkpoint_log_cleanup --
+ *     Reset checkpoint logging state and free any allocated resources.
+ */
+static void
+__checkpoint_log_cleanup(WT_SESSION_IMPL *session)
+{
+    WT_TXN *txn;
+
+    txn = session->txn;
+    WT_INIT_LSN(&txn->ckpt_lsn);
+    txn->ckpt_nsnapshot = 0;
+    __wt_scr_free(session, &txn->ckpt_snapshot);
+    txn->full_ckpt = false;
+}
+
+/*
  * __wt_checkpoint_log --
  *     Write a log record for a checkpoint operation.
  */
@@ -512,6 +528,7 @@ __wt_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN 
             end += recsize;
             for (i = 0; i < txn->snapshot_data.snapshot_count; i++)
                 WT_ERR(__wt_vpack_uint(&p, WT_PTRDIFF(end, p), txn->snapshot_data.snapshot[i]));
+            txn->ckpt_snapshot->size = WT_PTRDIFF(p, txn->ckpt_snapshot->mem);
         }
         break;
     case WT_TXN_LOG_CKPT_STOP:
@@ -556,10 +573,7 @@ __wt_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN 
         /* FALLTHROUGH */
     case WT_TXN_LOG_CKPT_CLEANUP:
         /* Cleanup any allocated resources */
-        WT_INIT_LSN(ckpt_lsn);
-        txn->ckpt_nsnapshot = 0;
-        __wt_scr_free(session, &txn->ckpt_snapshot);
-        txn->full_ckpt = false;
+        __checkpoint_log_cleanup(session);
         break;
     default:
         WT_ERR(__wt_illegal_value(session, flags));
@@ -569,6 +583,8 @@ err:
 #ifdef HAVE_DIAGNOSTIC
     WT_CONN_CLOSE_ABORT(session, ret);
 #endif
+    if (ret != 0)
+        __checkpoint_log_cleanup(session);
     __wt_logrec_free(session, &logrec);
     return (ret);
 }
@@ -743,8 +759,6 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
         break;
 
     case WT_LOGREC_SYSTEM:
-        WT_ERR(__wt_struct_unpack(
-          session, p, WT_PTRDIFF(end, p), WT_UNCHECKED_STRING(II), &lsnfile, &lsnoffset));
         WT_ERR(__wt_fprintf(session, args->fs, "    \"type\" : \"system\",\n"));
         WT_ERR(__txn_oplist_printlog(session, &p, end, args));
         break;

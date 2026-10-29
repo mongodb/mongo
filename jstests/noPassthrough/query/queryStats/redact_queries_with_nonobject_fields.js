@@ -4,7 +4,7 @@
  */
 // Turn on the collecting of query stats metrics.
 let options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {internalQueryStatsSampleRate: 1},
 };
 
 const conn = MongoRunner.runMongod(options);

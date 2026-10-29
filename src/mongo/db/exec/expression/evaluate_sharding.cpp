@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/expression/evaluate_sharding.h"
 
@@ -117,14 +91,14 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
     // version the caller believes it has, so it is okay of the cached routing tables are stale
     // here.
     const auto cri =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, /*allowLocks=*/true));
 
     // Advances the version in the cache if the chunk manager is not yet available or its version is
     // stale.
     if (!cri.hasRoutingTable() ||
         (cri.getCollectionVersion().placementVersion() <=> shardVersion.placementVersion()) ==
             std::partial_ordering::less) {
-        catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
+        catalogCache->onStaleCollectionVersion(ns, /*wantedVersion=*/boost::none);
 
         uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
                   str::stream()
@@ -134,7 +108,7 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
 
     // Retrieve the shard id for the given shard key value.
     std::set<ShardId> shardIds;
-    cri.getChunkManager().getShardIdsForRange(opCtx, shardKeyVal, shardKeyVal, &shardIds);
+    cri.getChunkManager().getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
     uassert(6868601, "The value should belong to exactly one ShardId", shardIds.size() == 1);
     const auto shardId = *(shardIds.begin());
     return Value(shardId.toString());

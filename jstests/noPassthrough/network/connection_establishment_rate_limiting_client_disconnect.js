@@ -10,7 +10,8 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {RateLimiterKind} from "jstests/libs/admission/rate_limiter.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {
     getConnectionStats,
     runTestReplSet,
@@ -22,7 +23,9 @@ import {
 const maxQueueSize = 3;
 
 const testKillOnClientDisconnect = (conn) => {
-    let connDelayFailPoint = configureFailPoint(conn, "hangInRateLimiter");
+    let connDelayFailPoint = configureFailPoint(conn, "hangInRateLimiter", {
+        limiter: RateLimiterKind.SessionEstablishmentRateLimiter,
+    });
 
     let queuedConn;
     try {

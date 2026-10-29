@@ -46,7 +46,7 @@ let res = coll.validate();
 assert.commandWorked(res);
 assert(!res.valid);
 assert.contains(missingIndexEntries, res.warnings);
-assert.contains(missingSizeLimitations, res.errors);
+assert.contains(missingSizeLimitations, res.warnings);
 
 coll.drop();
 insertDocsAndBuildIndex();
@@ -62,6 +62,6 @@ res = coll.validate();
 assert.commandWorked(res);
 assert(!res.valid);
 assert.contains(extraIndexEntries, res.warnings);
-assert.contains(extraSizeLimitations, res.errors);
+assert.contains(extraSizeLimitations, res.warnings);
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});

@@ -1,48 +1,22 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObj;
 
 /**
  * We need to know what 'type' an index is in order to plan correctly.
  */
-enum MONGO_MOD_PUBLIC IndexType {
+enum [[MONGO_MOD_PUBLIC]] IndexType {
     INDEX_BTREE,
     INDEX_COLUMN,
     INDEX_2D,
@@ -62,13 +36,13 @@ enum MONGO_MOD_PUBLIC IndexType {
  * This function is used strictly for logging and makes no assumptions about which `IndexType`s
  * are valid.
  */
-std::string toString(IndexType indexType);
+[[MONGO_MOD_PUBLIC]] std::string toString(IndexType indexType);
 
 /**
  * We use the std::string representation of index names all over the place, so we declare them all
  * once here.
  */
-class MONGO_MOD_PUBLIC IndexNames {
+class [[MONGO_MOD_PUBLIC]] IndexNames {
 public:
     static const std::string BTREE;
     static const std::string GEO_2D;
@@ -106,9 +80,9 @@ public:
 /**
  * Contain utilities to work with wildcard fields used for Wildcard indexes.
  */
-struct MONGO_MOD_PUBLIC WildcardNames {
-    static constexpr std::string_view WILDCARD_FIELD_NAME = "$**"_sd;
-    static constexpr std::string_view WILDCARD_FIELD_NAME_SUFFIX = ".$**"_sd;
+struct [[MONGO_MOD_PUBLIC]] WildcardNames {
+    static constexpr std::string_view WILDCARD_FIELD_NAME = "$**"sv;
+    static constexpr std::string_view WILDCARD_FIELD_NAME_SUFFIX = ".$**"sv;
 
     inline static bool isWildcardFieldName(std::string_view fieldName) {
         return fieldName == WILDCARD_FIELD_NAME || fieldName.ends_with(WILDCARD_FIELD_NAME_SUFFIX);

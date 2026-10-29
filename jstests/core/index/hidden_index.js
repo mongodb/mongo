@@ -3,6 +3,7 @@
  * it will not be used in planning. It is handled in the same way as other indexes by the index
  * catalog and for TTL purposes.
  * @tags: [
+ *   uses_explain,
  *   # CollMod is not retryable.
  *   requires_non_retryable_commands,
  *   not_allowed_with_signed_security_token,
@@ -147,7 +148,7 @@ validateHiddenIndexBehaviour({query: {$text: {$search: "java"}}, index_type: "te
 validateHiddenIndexBehaviour({query: {"a.f": 1}, index_type: 1, wildcard: true});
 
 // Hidden index on capped collection.
-if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
+if (!FixtureHelpers.isMongos(db)) {
     coll = assertDropAndRecreateCollection(db, collName, {capped: true, size: 100});
     validateHiddenIndexBehaviour({query: {a: 1}, index_type: 1});
     coll = assertDropAndRecreateCollection(db, collName);

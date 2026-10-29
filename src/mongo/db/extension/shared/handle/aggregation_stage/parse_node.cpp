@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 
 #include "mongo/db/extension/shared/array/abi_array_to_raii_vector.h"
@@ -46,7 +20,9 @@ BSONObj AggStageParseNodeAPI::getQueryShape(const ::MongoExtensionHostQueryShape
     invokeCAndConvertStatusToException(
         [&]() { return _vtable().get_query_shape(get(), &opts, &buf); });
 
-    tassert(11188203, "buffer returned from get_query_shape must not be null", buf != nullptr);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "buffer returned from get_query_shape must not be null",
+            buf != nullptr);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
@@ -80,7 +56,7 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
                 break;
             }
             default:
-                tasserted(11113804, "ExpandedArray element has invalid type tag");
+                tasserted(ErrorCodes::ExtensionError, "ExpandedArray element has invalid type tag");
                 break;
         }
         return handle;
@@ -90,7 +66,9 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
 std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
     ::MongoExtensionExpandedArrayContainer* container = nullptr;
     invokeCAndConvertStatusToException([&]() { return _vtable().expand(get(), &container); });
-    tassert(11113803, "Container cannot be null after expand()", container != nullptr);
+    tassert(ErrorCodes::ExtensionError,
+            "Container cannot be null after expand()",
+            container != nullptr);
     ExpandedArrayContainerHandle handle(container);
     return handle->transfer();
 }
@@ -113,7 +91,7 @@ BSONObj AggStageParseNodeAPI::toBsonForLog() const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return _vtable().to_bson_for_log(get(), &buf); });
 
-    tassert(11906800,
+    tassert(ErrorCodes::ExtensionSerializationError,
             "Extension implementation of `to_bson_for_log` encountered nullptr",
             buf != nullptr);
 
@@ -147,7 +125,7 @@ struct ArrayElemAsRaii<::MongoExtensionDPLArrayElement> {
                 break;
             }
             default:
-                tasserted(11365500, "DPLArray element has invalid type tag");
+                tasserted(ErrorCodes::ExtensionError, "DPLArray element has invalid type tag");
                 break;
         }
         return handle;

@@ -65,12 +65,19 @@ filters:
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_context_decoration.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
   - "ifr_flag_registry.yml":
     approvers:
       - 10gen/rollout-flag-managers
   - "ifr_flag_retry_info*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_unrecognized_flag_info*":
+    approvers:
+      - 10gen/query-execution
   - "index_names.*":
     approvers:
       - 10gen/query-execution-write-exec
@@ -100,7 +107,7 @@ filters:
       - 10gen/server-programmability
   - "operation_cpu_timer*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "operation_id*":
     approvers:
       - 10gen/server-networking-and-observability
@@ -149,6 +156,9 @@ filters:
   - "*txn*":
     approvers:
       - 10gen/server-transactions
+  - "initialize_operation_session_info*":
+    approvers:
+      - 10gen/server-transactions
   - "dbdirectclient*":
     approvers:
       - 10gen/server-programmability
@@ -173,6 +183,9 @@ filters:
     approvers:
       - 10gen/server-security
   - "/keyfile_option*":
+    approvers:
+      - 10gen/server-security
+  - "landlock*":
     approvers:
       - 10gen/server-security
   - "server_options*":
@@ -218,6 +231,29 @@ filters:
     approvers:
       - 10gen/server-rw-concerns
   - "feature_compatibility*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_overview.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_setfcv_command.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_generic_references.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_constants_generation.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_feature_flags.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+      - 10gen/query-execution
+      - 10gen/rollout-flag-managers
+  - "README_multiversion_testing.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_feature_flag_rules.md":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "traffic*":
@@ -363,7 +399,22 @@ filters:
       - 10gen/server-workload-resilience
   - "feature_flag.*":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
+  - "incremental_rollout_metrics.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
   - "feature_flag_test.idl.tpl":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/server-catalog-and-routing
+      - 10gen/query-execution
+  - "metrics_filtering_util*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "metrics_policy_manager*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "metrics_category.idl":
+    approvers:
+      - 10gen/query-integration-observability

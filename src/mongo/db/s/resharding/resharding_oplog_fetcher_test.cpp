@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 
@@ -61,10 +35,12 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
@@ -82,6 +58,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -233,6 +210,13 @@ public:
         return std::make_unique<ReshardingOplogFetcher::Env>(_svcCtx, _metrics.get());
     }
 
+    ForwardableOperationMetadata makeTestFom() {
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        return fom;
+    }
+
     auto makeExecutor() {
         return executor::ThreadPoolTaskExecutor::create(
             ThreadPool::make({
@@ -255,16 +239,15 @@ public:
         public:
             StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
                 for (const auto& shardId : _shardIds) {
                     const ConnectionString cs = ConnectionString::forReplicaSet(
                         shardId.toString(), {makeHostAndPort(shardId)});
                     ShardType sType;
-                    sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
+                    sType.setName(cs.getSetName());
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };
@@ -531,7 +514,7 @@ public:
                         nss,
                         uuid,
                         BSON("msg" << "other noop"),
-                        boost::none /* o2 */,
+                        /*o2MsgObj=*/boost::none,
                         boost::none,
                         boost::none,
                         boost::none,
@@ -672,7 +655,8 @@ protected:
                                            _donorShard,
                                            _destinationShard,
                                            outputCollectionNss,
-                                           storeProgress);
+                                           storeProgress,
+                                           makeTestFom());
             fetcher.useReadConcernForTest(false);
             if (initialAggregateBatchSize) {
                 fetcher.setInitialBatchSizeForTest(*initialAggregateBatchSize);
@@ -1043,7 +1027,8 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       storeProgress);
+                                       storeProgress,
+                                       makeTestFom());
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
         fetcher.setMaxBatchesForTest(maxBatches);
@@ -1063,8 +1048,8 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
     // Store progress writes an update to the progress doc that is batched in an applyOps with
     // the insert(s).
     assertExpectedOplogEntries(outputCollectionNss,
-                               storeProgress /* usedApplyOpsToBatch */,
-                               1 /* numApplyOpsOplogEntries */);
+                               /*usedApplyOpsToBatch=*/storeProgress,
+                               /*numOplogEntries=*/1);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
@@ -1095,7 +1080,8 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       storeProgress);
+                                       storeProgress,
+                                       makeTestFom());
         fetcher.useReadConcernForTest(false);
 
         // Status has a private default constructor so we wrap it in a boost::optional to placate
@@ -1118,8 +1104,8 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     // Store progress writes an update to the progress doc that is batched in an applyOps with
     // the insert(s).
     assertExpectedOplogEntries(outputCollectionNss,
-                               storeProgress /* usedApplyOpsToBatch */,
-                               0 /* numApplyOpsOplogEntries */);
+                               /*usedApplyOpsToBatch=*/storeProgress,
+                               /*numOplogEntries=*/0);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
@@ -1151,7 +1137,8 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
 
     // The ReshardingOplogFetcher hasn't inserted a record yet so awaitInsert(startAt) won't be
     // immediately ready.
@@ -1249,7 +1236,8 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       storeProgress);
+                                       storeProgress,
+                                       makeTestFom());
 
         // Insert a document into the data collection and have it generate an oplog entry with a
         // "destinedRecipient" field.
@@ -1293,8 +1281,8 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         // Store progress writes an update to the progress doc that is batched in an applyOps with
         // the insert(s).
         assertExpectedOplogEntries(outputCollectionNss,
-                                   storeProgress /* usedApplyOpsToBatch */,
-                                   1 /* numApplyOpsOplogEntries */);
+                                   /*usedApplyOpsToBatch=*/storeProgress,
+                                   /*numOplogEntries=*/1);
 
         // Now, insert a document into a different collection that is not involved in resharding.
         auto writeToOtherCollectionTs = [&] {
@@ -1336,8 +1324,8 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         // Store progress writes an update to the progress doc that is batched in an applyOps with
         // the insert(s).
         assertExpectedOplogEntries(outputCollectionNss,
-                                   storeProgress /* usedApplyOpsToBatch */,
-                                   2 /* numApplyOpsOplogEntries */);
+                                   /*usedApplyOpsToBatch=*/storeProgress,
+                                   /*numOplogEntries=*/2);
 
         // The last document returned by ReshardingDonorOplogIterator::getNextBatch() would be
         // `writeToDataCollectionTs`, but ReshardingOplogFetcher would have inserted a doc with
@@ -1386,7 +1374,8 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       true /* storeProgress */);
+                                       /*storeProgress=*/true,
+                                       makeTestFom());
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
 
@@ -1442,7 +1431,8 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnNetworkTimeoutError) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       true /* storeProgress */);
+                                       /*storeProgress=*/true,
+                                       makeTestFom());
 
         auto factory = makeCancelableOpCtx();
         return fetcher.iterate(&cc(), factory);
@@ -1485,7 +1475,8 @@ TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetch
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
 
     auto future = fetcher.schedule(nullptr, CancellationToken::uncancelable());
 
@@ -1528,7 +1519,8 @@ DEATH_TEST_REGEX_F(ReshardingOplogFetcherTestDeathTest,
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       true /* storeProgress */);
+                                       /*storeProgress=*/true,
+                                       makeTestFom());
         fetcher.setInitialBatchSizeForTest(2);
 
         auto factory = makeCancelableOpCtx();
@@ -1567,7 +1559,8 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -1586,7 +1579,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
 
             auto postBatchResumeToken = _fetchTimestamp + 1;
             return makeMockAggregateResponse(
-                postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
+                postBatchResumeToken, /*oplogEntries=*/{}, cursorIdBeforePrepare);
         });
     });
 
@@ -1666,7 +1659,8 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -1684,14 +1678,14 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
 
         auto postBatchResumeToken = _fetchTimestamp + 1;
         return makeMockAggregateResponse(
-            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
+            postBatchResumeToken, /*oplogEntries=*/{}, cursorIdBeforePrepare);
     });
 
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         assertGetMoreCursorId(request, cursorIdBeforePrepare);
         auto postBatchResumeToken = _fetchTimestamp + 2;
         return makeMockAggregateResponse(
-            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
+            postBatchResumeToken, /*oplogEntries=*/{}, cursorIdBeforePrepare);
     });
 
     // The fetcher should kill the cursor after exhausting it.
@@ -1747,7 +1741,8 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionBeforeScheduling) {
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     fetcher.prepareForCriticalSection();
 
     auto executor = makeExecutor();
@@ -1793,7 +1788,8 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionMoreThanOnce) {
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -1815,7 +1811,7 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionMoreThanOnce) {
 
         auto postBatchResumeToken = _fetchTimestamp + 1;
         return makeMockAggregateResponse(
-            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
+            postBatchResumeToken, /*oplogEntries=*/{}, cursorIdBeforePrepare);
     });
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that the
@@ -1867,7 +1863,8 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       true /* storeProgress */);
+                                       /*storeProgress=*/true,
+                                       makeTestFom());
         auto executor = makeExecutor();
         executor->startup();
 
@@ -1960,7 +1957,8 @@ TEST_F(ReshardingOplogFetcherTest,
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -1980,7 +1978,7 @@ TEST_F(ReshardingOplogFetcherTest,
     auto awaitBatchProcessed0 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+        return makeMockAggregateResponse(postBatchResumeToken0, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got initialized based on the difference between the current timestamp
@@ -1999,7 +1997,7 @@ TEST_F(ReshardingOplogFetcherTest,
     auto awaitBatchProcessed1 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockGetMoreResponse(postBatchResumeToken1, {} /* oplogEntries */, cursorId);
+        return makeMockGetMoreResponse(postBatchResumeToken1, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got updated based on the difference between the current timestamp
@@ -2067,7 +2065,8 @@ TEST_F(ReshardingOplogFetcherTest,
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -2086,8 +2085,8 @@ TEST_F(ReshardingOplogFetcherTest,
     auto oplogEntry0 = makeOplog(dataCollectionNss,
                                  collectionUUID,
                                  repl::OpTypeEnum::kInsert,
-                                 BSONObj() /* oField */,
-                                 BSONObj() /* o2Field */,
+                                 /*oField=*/BSONObj(),
+                                 /*o2Field=*/BSONObj(),
                                  oplogWallClockTime0,
                                  oplogId0);
     auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
@@ -2117,8 +2116,8 @@ TEST_F(ReshardingOplogFetcherTest,
     auto oplogEntry1 = makeOplog(dataCollectionNss,
                                  collectionUUID,
                                  repl::OpTypeEnum::kInsert,
-                                 BSONObj() /* oField */,
-                                 BSONObj() /* o2Field */,
+                                 /*oField=*/BSONObj(),
+                                 /*o2Field=*/BSONObj(),
                                  oplogWallClockTime1,
                                  oplogId1);
     auto oplogEntries1 = BSON_ARRAY(oplogEntry1.toBSON());
@@ -2194,7 +2193,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayLessThan
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -2215,7 +2215,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayLessThan
     auto awaitBatchProcessed0 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+        return makeMockAggregateResponse(postBatchResumeToken0, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got initialized based on the difference between the current timestamp
@@ -2269,7 +2269,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayZeroSeco
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -2286,7 +2287,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayZeroSeco
     auto awaitBatchProcessed0 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+        return makeMockAggregateResponse(postBatchResumeToken0, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got initialized based on the difference between the current timestamp
@@ -2340,7 +2341,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayNegative
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -2357,7 +2359,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayNegative
     auto awaitBatchProcessed0 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+        return makeMockAggregateResponse(postBatchResumeToken0, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got initialized based on the difference between the current timestamp
@@ -2415,7 +2417,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -2435,7 +2438,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
     auto awaitBatchProcessed0 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+        return makeMockAggregateResponse(postBatchResumeToken0, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got initialized based on the difference between the current timestamp
@@ -2454,7 +2457,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         // Advance the clock before mocking a response with the resume token above.
         advanceTime(getMoreDuration1);
-        return makeMockGetMoreResponse(postBatchResumeToken1, {} /* oplogEntries */, cursorId);
+        return makeMockGetMoreResponse(postBatchResumeToken1, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got updated based on the time taken for the getMore command to
@@ -2475,7 +2478,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         // Advance the clock before mocking a response with the resume token above.
         advanceTime(getMoreDuration2);
-        return makeMockGetMoreResponse(postBatchResumeToken2, {} /* oplogEntries */, cursorId);
+        return makeMockGetMoreResponse(postBatchResumeToken2, /*oplogEntries=*/{}, cursorId);
     });
 
     // Verify that the average got updated based on the time taken for the getMore command to
@@ -2535,7 +2538,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
                                    _donorShard,
                                    _destinationShard,
                                    outputCollectionNss,
-                                   true /* storeProgress */);
+                                   /*storeProgress=*/true,
+                                   makeTestFom());
     auto executor = makeExecutor();
     executor->startup();
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
@@ -2555,7 +2559,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
     auto awaitBatchProcessed0 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId0);
+        return makeMockAggregateResponse(postBatchResumeToken0, /*oplogEntries=*/{}, cursorId0);
     });
 
     // Verify that the average got initialized based on the difference between the current timestamp
@@ -2575,7 +2579,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
     auto awaitBatchProcessed1 =
         launchAsync([&, this] { fetcher.awaitBatchProcessed(++numBatches); });
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return makeMockAggregateResponse(postBatchResumeToken1, {} /* oplogEntries */, cursorId1);
+        return makeMockAggregateResponse(postBatchResumeToken1, /*oplogEntries=*/{}, cursorId1);
     });
 
     // Verify that the average got updated based on the difference between the current timestamp
@@ -2626,7 +2630,8 @@ TEST_F(ReshardingOplogFetcherTest, RollsBackPartialBatchOnRetryableError) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       storeProgress);
+                                       storeProgress,
+                                       makeTestFom());
 
         const auto staringNumOplogEntriesCopied = fetcher.getNumOplogEntriesCopied();
         const auto startingLastSeenTimestamp = fetcher.getLastSeenTimestamp();
@@ -2809,6 +2814,9 @@ protected:
         }();
 
         auto startAt = ReshardingDonorOplogId{_fetchTimestamp, _fetchTimestamp};
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
         auto fetcher = std::make_unique<ReshardingOplogFetcher>(makeFetcherEnv(),
                                                                 _reshardingUUID,
                                                                 dataCollectionUUID,
@@ -2816,7 +2824,8 @@ protected:
                                                                 _donorShard,
                                                                 _destinationShard,
                                                                 outputCollectionNss,
-                                                                testOptions.storeProgress);
+                                                                testOptions.storeProgress,
+                                                                std::move(fom));
 
         return {std::move(fetcher),
                 startAt,
@@ -2844,7 +2853,7 @@ protected:
         // Store progress writes an update to the progress doc that is batched in an applyOps with
         // the insert(s).
         assertExpectedOplogEntries(outputNss,
-                                   expected.storedProgress /* usedApplyOpsToBatch */,
+                                   /*usedApplyOpsToBatch=*/expected.storedProgress,
                                    expected.lastFetchedCount);
     }
 
@@ -2967,8 +2976,8 @@ TEST_F(
         auto oplogEntry = makeOplog(testCtx.dataCollectionNss,
                                     testCtx.dataCollectionUUID,
                                     repl::OpTypeEnum::kInsert,
-                                    BSONObj() /* oField */,
-                                    BSONObj() /* o2Field */,
+                                    /*oField=*/BSONObj(),
+                                    /*o2Field=*/BSONObj(),
                                     oplogWallClockTime,
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
@@ -3015,8 +3024,8 @@ TEST_F(
         auto oplogEntry = makeOplog(testCtx.dataCollectionNss,
                                     testCtx.dataCollectionUUID,
                                     repl::OpTypeEnum::kInsert,
-                                    BSONObj() /* oField */,
-                                    BSONObj() /* o2Field */,
+                                    /*oField=*/BSONObj(),
+                                    /*o2Field=*/BSONObj(),
                                     oplogWallClockTime,
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
@@ -3062,8 +3071,8 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         auto oplogEntry0 = makeOplog(testCtx.dataCollectionNss,
                                      testCtx.dataCollectionUUID,
                                      repl::OpTypeEnum::kInsert,
-                                     BSONObj() /* oField */,
-                                     BSONObj() /* o2Field */,
+                                     /*oField=*/BSONObj(),
+                                     /*o2Field=*/BSONObj(),
                                      oplogWallClockTime0,
                                      oplogId0);
         auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
@@ -3118,8 +3127,8 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         auto oplogEntry0 = makeOplog(testCtx.dataCollectionNss,
                                      testCtx.dataCollectionUUID,
                                      repl::OpTypeEnum::kInsert,
-                                     BSONObj() /* oField */,
-                                     BSONObj() /* o2Field */,
+                                     /*oField=*/BSONObj(),
+                                     /*o2Field=*/BSONObj(),
                                      oplogWallClockTime0,
                                      oplogId0);
         auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
@@ -3264,8 +3273,8 @@ TEST_F(
         auto oplogEntry = makeOplog(testCtx.dataCollectionNss,
                                     testCtx.dataCollectionUUID,
                                     repl::OpTypeEnum::kInsert,
-                                    BSONObj() /* oField */,
-                                    BSONObj() /* o2Field */,
+                                    /*oField=*/BSONObj(),
+                                    /*o2Field=*/BSONObj(),
                                     oplogWallClockTime,
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
@@ -3314,8 +3323,8 @@ TEST_F(
         auto oplogEntry = makeOplog(testCtx.dataCollectionNss,
                                     testCtx.dataCollectionUUID,
                                     repl::OpTypeEnum::kInsert,
-                                    BSONObj() /* oField */,
-                                    BSONObj() /* o2Field */,
+                                    /*oField=*/BSONObj(),
+                                    /*o2Field=*/BSONObj(),
                                     oplogWallClockTime,
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
@@ -3367,8 +3376,8 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         auto oplogEntry0 = makeOplog(testCtx.dataCollectionNss,
                                      testCtx.dataCollectionUUID,
                                      repl::OpTypeEnum::kInsert,
-                                     BSONObj() /* oField */,
-                                     BSONObj() /* o2Field */,
+                                     /*oField=*/BSONObj(),
+                                     /*o2Field=*/BSONObj(),
                                      oplogWallClockTime0,
                                      oplogId0);
         auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());

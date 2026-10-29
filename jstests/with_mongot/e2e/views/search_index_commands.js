@@ -2,7 +2,7 @@
  * This test issues the search index management commands (createSearchIndex, dropSearchIndex,
  * updateSearchIndex) on views.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {
     createSearchIndex,

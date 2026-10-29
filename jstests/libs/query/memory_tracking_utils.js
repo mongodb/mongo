@@ -12,6 +12,7 @@ import {
     getExecutionStages,
     getPlanStage,
 } from "jstests/libs/query/analyze_plan.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /******************************************************************************************************
  * Constants for the regexes used to extract memory tracking metrics from the slow query log.
@@ -47,8 +48,23 @@ function assertNoMatchInLog(logLine, regex) {
  * or profiler. If the command returns a cursor, it is exhausted via getMore calls. The unique
  * comment appended to commandObj.comment is used to identify the relevant log lines and profiler
  * entries.
+ *
+ * The command and its getMores run with 'internalQueryMaxWriteToCurOpMemoryUsageBytes' set to 1 on
+ * every non-config node, so that the operation-wide memory tracker reports on every update instead
+ * of waiting for a 1MB boundary crossing these workloads never reach. In a sharded cluster the
+ * stages run on the shards (and the merge on the router), so the parameter is set cluster-wide
+ * rather than only through 'db'. The previous value is restored on exit, which keeps the helper
+ * safe to use against shared fixtures.
  */
 export function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
+    return runWithParamsAllNonConfigNodes(
+        db,
+        {internalQueryMaxWriteToCurOpMemoryUsageBytes: 1},
+        () => runPipelineAndGetDiagnosticsWithChunkSize1({db, collName, commandObj, source}),
+    );
+}
+
+function runPipelineAndGetDiagnosticsWithChunkSize1({db, collName, commandObj, source}) {
     const uniqueComment = commandObj.comment + "_" + ObjectId().str;
     commandObj = Object.assign({}, commandObj, {comment: uniqueComment});
 
@@ -526,8 +542,21 @@ function verifyServerStatusMetrics({db, stageName, featureFlagEnabled, before, e
 /**
  * For a given pipeline, verify that memory tracking statistics are correctly reported to
  * the slow query log, system.profile, and explain("executionStats").
+ *
+ * The whole verification runs with 'internalQueryMaxWriteToCurOpMemoryUsageBytes' set to 1 on
+ * every non-config node (restored on exit): the top-level explain metrics are sourced from CurOp,
+ * which only receives updates on chunk crossings, so the 1MB default would hide them for these
+ * small workloads.
  */
-export function runMemoryStatsTest({
+export function runMemoryStatsTest(params) {
+    return runWithParamsAllNonConfigNodes(
+        params.db,
+        {internalQueryMaxWriteToCurOpMemoryUsageBytes: 1},
+        () => runMemoryStatsTestWithChunkSize1(params),
+    );
+}
+
+function runMemoryStatsTestWithChunkSize1({
     db,
     collName,
     commandObj,
@@ -695,8 +724,26 @@ export function runShardedMemoryStatsTest({
 /**
  * For a time-series update command, verify that memory tracking statistics are correctly
  * reported to the slow query log, profiler, and explain("executionStats").
+ *
+ * As with 'runPipelineAndGetDiagnostics', the command runs with
+ * 'internalQueryMaxWriteToCurOpMemoryUsageBytes' set to 1 on every non-config node (restored on
+ * exit), so the slow query log and profiler assertions reflect this workload's reporting and do
+ * not depend on other tracked memory in the operation crossing the default chunk size.
  */
 export function runMemoryStatsTestForTimeseriesUpdateCommand({db, collName, commandObj}) {
+    return runWithParamsAllNonConfigNodes(
+        db,
+        {internalQueryMaxWriteToCurOpMemoryUsageBytes: 1},
+        () =>
+            runMemoryStatsTestForTimeseriesUpdateCommandWithChunkSize1({
+                db,
+                collName,
+                commandObj,
+            }),
+    );
+}
+
+function runMemoryStatsTestForTimeseriesUpdateCommandWithChunkSize1({db, collName, commandObj}) {
     const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
     jsTest.log.info("QueryMemoryTracking feature flag is " + featureFlagEnabled);
 

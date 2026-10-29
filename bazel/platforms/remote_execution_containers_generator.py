@@ -4,17 +4,88 @@
 import argparse
 import os
 import pathlib
+import platform
 import subprocess
 from datetime import datetime
 
 from retry import retry
 
+DEFAULT_PLATFORMS = ("linux/amd64", "linux/arm64/v8")
+RHEL_EXTRA_PLATFORMS = ("linux/ppc64le", "linux/s390x")
+DISTRO_EXTRA_PLATFORMS = {distro: RHEL_EXTRA_PLATFORMS for distro in ("rhel8", "rhel9", "rhel10")}
+ECR_PUBLIC_ALIAS = "w3i8j1a8"
+ECR_REPOSITORY_NAME = "devprod-build"
+ECR_REGISTRY = "public.ecr.aws"
+ECR_REPOSITORY = f"{ECR_REGISTRY}/{ECR_PUBLIC_ALIAS}/{ECR_REPOSITORY_NAME}"
+BINFMT_IMAGE = (
+    "tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0"
+)
+PUBLISHED_ARCHITECTURES = ("amd64", "arm64", "ppc64le", "s390x")
+MACHINE_ARCHITECTURES = {
+    "aarch64": "arm64",
+    "x86_64": "amd64",
+}
 
-@retry(tries=3)
-def log_subprocess_run(*args, **kwargs):
+
+def platforms_for_distro(distro: str) -> tuple[str, ...]:
+    """Return the architectures published for a distro's image manifest."""
+    return DEFAULT_PLATFORMS + DISTRO_EXTRA_PLATFORMS.get(distro, ())
+
+
+def resolve_dockerfile(configured_path: pathlib.Path) -> pathlib.Path:
+    """Resolve generated lowercase Dockerfiles referenced by older mappings."""
+    if configured_path.is_file():
+        return configured_path
+    generated_path = configured_path.with_name("dockerfile")
+    if generated_path.is_file():
+        return generated_path
+    raise FileNotFoundError(f"Could not find Dockerfile at {configured_path} or {generated_path}")
+
+
+def emulated_architectures(machine: str | None = None) -> tuple[str, ...]:
+    """Return published architectures that need QEMU on the current host."""
+    native_architecture = MACHINE_ARCHITECTURES.get(machine or platform.machine())
+    return tuple(arch for arch in PUBLISHED_ARCHITECTURES if arch != native_architecture)
+
+
+def _log_subprocess_run(*args, **kwargs):
     arg_list_or_string = kwargs["args"] if "args" in kwargs else args[0]
     print(" ".join(arg_list_or_string) if type(arg_list_or_string) == list else arg_list_or_string)
     return subprocess.run(*args, **kwargs)
+
+
+@retry(tries=3)
+def log_subprocess_run(*args, **kwargs):
+    return _log_subprocess_run(*args, **kwargs)
+
+
+@retry(tries=3)
+def create_buildx_builder(builder_name: str):
+    """Create a fresh Buildx builder, including after a failed bootstrap attempt."""
+    _log_subprocess_run(
+        ["docker", "buildx", "rm", "--force", builder_name],
+        check=False,
+    )
+    return _log_subprocess_run(
+        [
+            "docker",
+            "buildx",
+            "create",
+            "--name",
+            builder_name,
+            "--driver",
+            "docker-container",
+            "--use",
+            "--bootstrap",
+        ],
+        check=True,
+    )
+
+
+def web_url_for_image(image: str) -> str:
+    """Return the ECR Public gallery URL for a digest-pinned image reference."""
+    digest = image.split("@", 1)[1]
+    return f"https://gallery.ecr.aws/{ECR_PUBLIC_ALIAS}/{ECR_REPOSITORY_NAME}/{digest}"
 
 
 def main():
@@ -24,6 +95,22 @@ def main():
         "--skip-cleanup",
         action="store_true",
         help="Disable cleanup between container builds. This requires a large amount of disk space.",
+    )
+    parser.add_argument(
+        "--install-binfmt",
+        action="store_true",
+        help=(
+            "Install QEMU binfmt handlers for all non-native publication platforms. "
+            "This runs a privileged disposable container."
+        ),
+    )
+    parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help=(
+            "Keep updating the remaining distros when one fails to build, and report the "
+            "failures at the end."
+        ),
     )
     args = parser.parse_args()
 
@@ -45,6 +132,9 @@ Your docker images, volumes and containers will be purged if you continue. Enter
         code = compile(f.read(), container_file_path, "exec")
         exec(code, {}, remote_execution_containers)
 
+    binfmt_ready = False
+    builder_name = f"mongodb-rbe-publisher-{os.getpid()}"
+    failed_distros = []
     for distro, re_container in remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"].items():
         if args.distro is not None:
             if distro != args.distro:
@@ -61,42 +151,69 @@ Your docker images, volumes and containers will be purged if you continue. Enter
             ]:
                 log_subprocess_run(command, shell=True)
 
-        dockerfile = re_container["dockerfile"]
-        tag = f"quay.io/mongodb/bazel-remote-execution:{distro}-{datetime.now().strftime('%Y_%m_%d-%H_%M_%S')}"
+        dockerfile = resolve_dockerfile(pathlib.Path(re_container["dockerfile"]))
+        tag = f"{ECR_REPOSITORY}:{distro}-{datetime.now().strftime('%Y_%m_%d-%H_%M_%S')}"
 
         print(f"Updating {distro} container...")
         print(f"Using dockerfile: {dockerfile}")
         print(f"Using tag: {tag}\n")
 
-        log_subprocess_run(["docker", "buildx", "create", "--use", "default"], check=True)
-        log_subprocess_run(
-            [
-                "docker",
-                "buildx",
-                "build",
-                "--push",
-                "--platform",
-                "linux/arm64/v8,linux/amd64",
-                "--tag",
-                tag,
-                str(pathlib.Path(re_container["dockerfile"]).parent.resolve()),
-            ],
-            check=True,
-        )
+        if args.install_binfmt and not binfmt_ready:
+            log_subprocess_run(
+                [
+                    "docker",
+                    "run",
+                    "--privileged",
+                    "--rm",
+                    BINFMT_IMAGE,
+                    "--install",
+                    ",".join(emulated_architectures()),
+                ],
+                check=True,
+            )
+            binfmt_ready = True
 
-        log_subprocess_run(["docker", "pull", tag], check=True)
-        result = log_subprocess_run(
-            ["docker", "inspect", "--format='{{.RepoDigests}}'", tag],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        try:
+            create_buildx_builder(builder_name)
+            log_subprocess_run(
+                [
+                    "docker",
+                    "buildx",
+                    "build",
+                    "--builder",
+                    builder_name,
+                    "--push",
+                    "--platform",
+                    ",".join(platforms_for_distro(distro)),
+                    "--file",
+                    str(dockerfile.resolve()),
+                    "--tag",
+                    tag,
+                    str(dockerfile.parent.resolve()),
+                ],
+                check=True,
+            )
+            log_subprocess_run(["docker", "pull", tag], check=True)
+            result = log_subprocess_run(
+                ["docker", "inspect", "--format='{{.RepoDigests}}'", tag],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, OSError) as exc:
+            if not args.continue_on_error:
+                raise
+            print(f"Failed to update {distro}: {exc}")
+            print("************************************\n")
+            failed_distros.append(distro)
+            continue
+        finally:
+            log_subprocess_run(["docker", "buildx", "rm", "--force", builder_name], check=False)
 
         # The output of this command is a list of strings, ex. ['URL'] so we need to strip off the brackets and quotes.
-        re_container["container-url"] = "docker://" + result.stdout.strip()[2:-2]
-        re_container["web-url"] = "https://" + result.stdout.strip()[2:-2].replace(
-            "quay.io/", "quay.io/repository/"
-        ).replace("@sha256", "/manifest/sha256")
+        image = result.stdout.strip()[2:-2]
+        re_container["container-url"] = "docker://" + image
+        re_container["web-url"] = web_url_for_image(image)
 
         print(f"Finished updating {distro}")
         print("************************************\n")
@@ -124,6 +241,10 @@ Your docker images, volumes and containers will be purged if you continue. Enter
         with open(container_file_path, "r") as f:
             print(f"Finished writing to {container_file_path}:")
             print(f.read())
+
+    if failed_distros:
+        print(f"Failed to update these distros: {', '.join(failed_distros)}")
+        return 1
 
     return 0
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 
@@ -125,14 +99,14 @@ std::string EExpression::toString() const {
 }
 
 std::unique_ptr<EExpression> EConstant::clone() const {
-    auto [tag, val] = value::copyValue(_tag, _val);
+    auto [tag, val] = value::copyValue(_val.tag(), _val.value());
     return std::make_unique<EConstant>(tag, val);
 }
 
 vm::CodeFragment EConstant::compileDirect(CompileCtx& ctx) const {
     vm::CodeFragment code;
 
-    code.appendConstVal(_tag, _val);
+    code.appendConstVal(_val.tag(), _val.value());
 
     return code;
 }
@@ -142,7 +116,7 @@ std::vector<DebugPrinter::Block> EConstant::debugPrint() const {
     std::stringstream ss;
     value::ValuePrinters::make(ss,
                                PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true))
-        .writeValueToStream(_tag, _val);
+        .writeValueToStream(_val.tag(), _val.value());
 
     ret.emplace_back(ss.str());
 
@@ -151,7 +125,7 @@ std::vector<DebugPrinter::Block> EConstant::debugPrint() const {
 
 size_t EConstant::estimateSize() const {
     size_t size = sizeof(*this);
-    size += size_estimator::estimate(_tag, _val);
+    size += size_estimator::estimate(_val.tag(), _val.value());
     size += size_estimator::estimate(_nodes);
     return size;
 }
@@ -300,7 +274,7 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx, const Vector& clauses, b
 
 vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
     if (_op == EPrimNary::logicAnd || _op == EPrimNary::logicOr) {
-        return buildShortCircuitCode(ctx, _nodes, _op == EPrimNary::logicOr /*isDisjunction*/);
+        return buildShortCircuitCode(ctx, _nodes, /*isDisjunction=*/_op == EPrimNary::logicOr);
     }
 
     vm::CodeFragment code;
@@ -384,10 +358,10 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
 
     if (_op == EPrimBinary::logicAnd) {
         auto clauses = collectAndClauses();
-        return buildShortCircuitCode(ctx, clauses, false /*isDisjunction*/);
+        return buildShortCircuitCode(ctx, clauses, /*isDisjunction=*/false);
     } else if (_op == EPrimBinary::logicOr) {
         auto clauses = collectOrClauses();
-        return buildShortCircuitCode(ctx, clauses, true /*isDisjunction*/);
+        return buildShortCircuitCode(ctx, clauses, /*isDisjunction=*/true);
     } else if (_op == EPrimBinary::fillEmpty) {
         // Special cases: rhs is trivial to evaluate -> avoid a jump
         if (EConstant* rhsConst = _nodes[1]->as<EConstant>()) {
@@ -751,6 +725,8 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::addToArrayCapped, true}},
     {EFn::kMergeObjects,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::mergeObjects, true}},
+    {EFn::kMergeObjectsForExpr,
+     BuiltinFn{kAnyNumberOfArgs, vm::Builtin::mergeObjectsForExpr, false}},
     {EFn::kAddToSet, BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToSet, true}},
     {EFn::kAddToSetCapped,
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::addToSetCapped, true}},
@@ -769,10 +745,17 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggDoubleDoubleSum, true}},
     {EFn::kAggMergeDoubleDoubleSums,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggMergeDoubleDoubleSums, true}},
+    {EFn::kDoubleDoubleSumFromAcc,
+     BuiltinFn{kAnyNumberOfArgs, vm::Builtin::doubleDoubleSumFromAcc, false}},
+    {EFn::kMinFromAcc, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::minFromAcc, false}},
+    {EFn::kMaxFromAcc, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::maxFromAcc, false}},
+    {EFn::kAvgFromAcc, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::avgFromAcc, false}},
     {EFn::kDoubleDoubleSumFinalize,
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::doubleDoubleSumFinalize, false}},
     {EFn::kDoubleDoublePartialSumFinalize,
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::doubleDoublePartialSumFinalize, false}},
+    {EFn::kStdDevPopFromAcc, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::stdDevPopFromAcc, false}},
+    {EFn::kStdDevSampFromAcc, BuiltinFn{kAnyNumberOfArgs, vm::Builtin::stdDevSampFromAcc, false}},
     {EFn::kAggStdDev, BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggStdDev, true}},
     {EFn::kAggMergeStdDevs,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggMergeStdDevs, true}},
@@ -977,136 +960,12 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinNMerge, true}},
     {EFn::kAggMinNFinalize,
      BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinNFinalize, false}},
-    {EFn::kAggRank, BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRank, true}},
-    {EFn::kAggRankColl, BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::aggRankColl, true}},
-    {EFn::kAggDenseRank,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggDenseRank, true}},
-    {EFn::kAggDenseRankColl,
-     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::aggDenseRankColl, true}},
-    {EFn::kAggRankFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRankFinalize, false}},
-    {EFn::kAggExpMovingAvg,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggExpMovingAvg, true}},
-    {EFn::kAggExpMovingAvgFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggExpMovingAvgFinalize, false}},
-    {EFn::kAggRemovableSumAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSumAdd, true}},
-    {EFn::kAggRemovableSumRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSumRemove, true}},
-    {EFn::kAggRemovableSumFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSumFinalize, false}},
-    {EFn::kAggIntegralInit,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggIntegralInit, false}},
-    {EFn::kAggIntegralAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggIntegralAdd, true}},
-    {EFn::kAggIntegralRemove,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggIntegralRemove, true}},
-    {EFn::kAggIntegralFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggIntegralFinalize, false}},
-    {EFn::kAggDerivativeFinalize,
-     BuiltinFn{[](size_t n) { return n == 5; }, vm::Builtin::aggDerivativeFinalize, false}},
-    {EFn::kAggCovarianceAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggCovarianceAdd, true}},
-    {EFn::kAggCovarianceRemove,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggCovarianceRemove, true}},
-    {EFn::kAggCovarianceSampFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggCovarianceSampFinalize, false}},
-    {EFn::kAggCovariancePopFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggCovariancePopFinalize, false}},
-    {EFn::kAggRemovablePushAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovablePushAdd, true}},
-    {EFn::kAggRemovablePushRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovablePushRemove, true}},
-    {EFn::kAggRemovablePushFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovablePushFinalize, false}},
-    {EFn::kAggRemovableConcatArraysInit,
-     BuiltinFn{[](size_t n) { return n == 0; }, vm::Builtin::aggRemovableConcatArraysInit, false}},
-    {EFn::kAggRemovableConcatArraysAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableConcatArraysAdd, true}},
-    {EFn::kAggRemovableConcatArraysRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableConcatArraysRemove, true}},
-    {EFn::kAggRemovableConcatArraysFinalize,
-     BuiltinFn{
-         [](size_t n) { return n == 1; }, vm::Builtin::aggRemovableConcatArraysFinalize, false}},
-    {EFn::kAggRemovableStdDevAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevAdd, true}},
-    {EFn::kAggRemovableStdDevRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevRemove, true}},
-    {EFn::kAggRemovableStdDevSampFinalize,
-     BuiltinFn{
-         [](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevSampFinalize, false}},
-    {EFn::kAggRemovableStdDevPopFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevPopFinalize, false}},
-    {EFn::kAggRemovableAvgFinalize,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableAvgFinalize, false}},
-    {EFn::kAggLinearFillCanAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggLinearFillCanAdd, false}},
-    {EFn::kAggLinearFillAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggLinearFillAdd, true}},
-    {EFn::kAggLinearFillFinalize,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggLinearFillFinalize, false}},
-    {EFn::kAggRemovableFirstNInit,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableFirstNInit, false}},
-    {EFn::kAggRemovableFirstNAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableFirstNAdd, true}},
-    {EFn::kAggRemovableFirstNRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableFirstNRemove, true}},
-    {EFn::kAggRemovableFirstNFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableFirstNFinalize, false}},
-    {EFn::kAggRemovableLastNInit,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableLastNInit, false}},
-    {EFn::kAggRemovableLastNAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableLastNAdd, true}},
-    {EFn::kAggRemovableLastNRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableLastNRemove, true}},
-    {EFn::kAggRemovableLastNFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableLastNFinalize, false}},
-    {EFn::kAggRemovableSetCommonInit,
-     BuiltinFn{[](size_t n) { return n == 0; }, vm::Builtin::aggRemovableSetCommonInit, false}},
-    {EFn::kAggRemovableSetCommonCollInit,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSetCommonCollInit, false}},
-    {EFn::kAggRemovableAddToSetAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableAddToSetAdd, true}},
-    {EFn::kAggRemovableAddToSetRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableAddToSetRemove, true}},
-    {EFn::kAggRemovableSetUnionAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableSetUnionAdd, true}},
-    {EFn::kAggRemovableSetUnionRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSetUnionRemove, true}},
-    {EFn::kAggRemovableSetCommonFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSetCommonFinalize, false}},
-    {EFn::kAggRemovableMinMaxNCollInit,
-     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::aggRemovableMinMaxNCollInit, false}},
-    {EFn::kAggRemovableMinMaxNInit,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableMinMaxNInit, false}},
-    {EFn::kAggRemovableMinMaxNAdd,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableMinMaxNAdd, true}},
-    {EFn::kAggRemovableMinMaxNRemove,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableMinMaxNRemove, true}},
-    {EFn::kAggRemovableMinNFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableMinNFinalize, false}},
-    {EFn::kAggRemovableMaxNFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableMaxNFinalize, false}},
-    {EFn::kAggRemovableTopNInit,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableTopNInit, false}},
-    {EFn::kAggRemovableTopNAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableTopNAdd, true}},
-    {EFn::kAggRemovableTopNRemove,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableTopNRemove, true}},
-    {EFn::kAggRemovableTopNFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableTopNFinalize, false}},
-    {EFn::kAggRemovableBottomNInit,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableBottomNInit, false}},
-    {EFn::kAggRemovableBottomNAdd,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableBottomNAdd, true}},
-    {EFn::kAggRemovableBottomNRemove,
-     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableBottomNRemove, true}},
-    {EFn::kAggRemovableBottomNFinalize,
-     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableBottomNFinalize, false}},
     {EFn::kValueBlockExists,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockExists, false}},
     {EFn::kValueBlockIsNullish,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockIsNullish, false}},
+    {EFn::kValueBlockMqlComparisonRank,
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockMqlComparisonRank, false}},
     {EFn::kValueBlockTypeMatch,
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockTypeMatch, false}},
     {EFn::kValueBlockIsTimezone,
@@ -1403,6 +1262,8 @@ static stdx::unordered_map<EFn, InstrFn> kInstrFunctions = {
     {EFn::kIsMaxKey, InstrFn{1, generator<1, &vm::CodeFragment::appendIsMaxKey>, false}},
     {EFn::kIsTimestamp, InstrFn{1, generator<1, &vm::CodeFragment::appendIsTimestamp>, false}},
     {EFn::kIsKeyString, InstrFn{1, generator<1, &vm::CodeFragment::appendIsKeyString>, false}},
+    {EFn::kMqlComparisonRank,
+     InstrFn{1, generator<1, &vm::CodeFragment::appendMqlComparisonRank>, false}},
     {EFn::kValueBlockApplyLambda,
      InstrFn{3, generatorLegacy<&vm::CodeFragment::appendValueBlockApplyLambda>, false}},
 };
@@ -1841,7 +1702,7 @@ size_t ELocalLambda::estimateSize() const {
 
 
 std::unique_ptr<EExpression> EFail::clone() const {
-    return std::make_unique<EFail>(_code, getStringView(_messageTag, _messageVal));
+    return std::make_unique<EFail>(_code, getStringView(_message.tag(), _message.value()));
 }
 
 vm::CodeFragment EFail::compileDirect(CompileCtx& ctx) const {
@@ -1850,7 +1711,7 @@ vm::CodeFragment EFail::compileDirect(CompileCtx& ctx) const {
     code.appendConstVal(value::TypeTags::NumberInt64,
                         value::bitcastFrom<int64_t>(static_cast<int64_t>(_code)));
 
-    code.appendConstVal(_messageTag, _messageVal);
+    code.appendConstVal(_message.tag(), _message.value());
 
     code.appendFail();
 
@@ -1866,7 +1727,7 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
     ret.emplace_back(std::to_string(_code));
     ret.emplace_back("`,");
     ret.emplace_back("\"`");
-    ret.emplace_back(getStringView(_messageTag, _messageVal));
+    ret.emplace_back(getStringView(_message.tag(), _message.value()));
     ret.emplace_back("`\"`");
 
     ret.emplace_back("`)");
@@ -1875,7 +1736,7 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
 }
 
 size_t EFail::estimateSize() const {
-    return sizeof(*this) + size_estimator::estimate(_messageTag, _messageVal) +
+    return sizeof(*this) + size_estimator::estimate(_message.tag(), _message.value()) +
         size_estimator::estimate(_nodes);
 }
 

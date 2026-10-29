@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -415,6 +389,8 @@ public:
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
             UpdateOp::validate(request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
 
             invariant(_commandObj.isOwned());
 
@@ -424,8 +400,19 @@ public:
                 // Assuming identical collation for all elements in `updates`, future design could
                 // use the disjunction primitive (i.e, `$or`) to compile all queries into a single
                 // filter. Such a design also requires a sound way of combining hints.
+                // TODO (SERVER-134509): Make update commands mirror all elements in the updates
+                // array.
                 invariant(seq->objs.front().isOwned());
                 _updateOpObj = seq->objs.front();
+            } else if (auto updates = _commandObj["updates"]; updates.type() == BSONType::array) {
+                // When updates are not sent as a DocumentSequence, extract the first update object
+                // from the command body.
+                // TODO (SERVER-134509): Make update commands mirror all elements in the updates
+                // array.
+                BSONObjIterator it(updates.Obj());
+                if (it.more()) {
+                    _updateOpObj = it.next().Obj();
+                }
             }
         }
 
@@ -458,9 +445,6 @@ public:
                 // "filter", "sort", "hint", and "collation" fields are optional.
                 if (update.isEmpty())
                     return;
-
-                // The constructor verifies the following.
-                invariant(update.isOwned());
 
                 if (update.hasField("q"))
                     bob->append("filter", update["q"].Obj());
@@ -552,11 +536,15 @@ public:
             if (isTimeseriesRetryableUpdate && !wrappedByShardingRouter) {
                 auto executor = getLocalExecutor(opCtx);
                 ON_BLOCK_EXIT([&] {
-                    // Increments the counter if the command contains retries. This is normally done
-                    // within write_ops_exec::performUpdates. But for retryable timeseries updates,
-                    // we should handle the metrics only once at the caller since each statement
-                    // will be run as a separate update command through the internal transaction
-                    // API. See write_ops_exec::performUpdates for more details.
+                    // Increments the counters of retryable writes and if the command contains
+                    // retries, retried writes. This is normally done within
+                    // write_ops_exec::performUpdates. But for retryable timeseries updates, we
+                    // should handle the metrics only once at the caller since each statement will
+                    // be run as a separate update command through the internal transaction API. See
+                    // write_ops_exec::performUpdates for more details.
+                    if (opCtx->isRetryableWrite()) {
+                        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+                    }
                     if (!reply.retriedStmtIds.empty()) {
                         RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
                     }
@@ -754,6 +742,8 @@ public:
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
             DeleteOp::validate(request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
         }
 
         bool supportsWriteConcern() const final {

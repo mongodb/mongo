@@ -17,13 +17,7 @@ const assertNonShardedCluster = (conn) => {
     }
 
     assert(
-        topology &&
-            topology.type != Topology.kShardedCluster &&
-            !(
-                topology.type == Topology.kReplicaSet &&
-                topology.configsvr &&
-                TestData.testingReplicaSetEndpoint
-            ),
+        topology && topology.type != Topology.kShardedCluster,
         "Metadata consistency check command not found, but we are unexpectedly on a sharded cluster",
     );
 };
@@ -33,5 +27,7 @@ try {
 } catch (e) {
     if (e.code === ErrorCodes.CommandNotFound) {
         assertNonShardedCluster(conn);
+    } else {
+        throw e;
     }
 }

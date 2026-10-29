@@ -19,6 +19,7 @@ selector:
     - bazel-bin/**/canonical_query_bm*
     - bazel-bin/**/query_planner_bm*
     - bazel-bin/**/plan_cache_key_encoding_bm*
+    - bazel-bin/**/plan_shape_counters_bm*
     - bazel-bin/**/query_settings_lookup_bm*
     - bazel-bin/**/rate_limiting_bm*
     - bazel-bin/**/shapifying_bm*
@@ -26,6 +27,9 @@ selector:
     - bazel-bin/**/shapifying_update_bm*
     - bazel-bin/**/shapifying_delete_bm*
     - bazel-bin/**/sbe_builder_bm*
+    - bazel-bin/**/ndv_hashing_bm*
+    - bazel-bin/**/multi_bson_stream_cursor_bm*
+    - bazel-bin/**/top_k_sort_optimization_bm*
 
 executor:
   config: {}

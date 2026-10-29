@@ -1,0 +1,139 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_jscore_passthrough_with_replica_set_write_blocking.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      authenticationDatabase: admin
+      authenticationMechanism: SCRAM-SHA-256
+      eval:
+        jsTest.authenticate(db.getMongo()); await import("jstests/libs/override_methods/enable_replica_set_write_blocking.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData: &id001
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: jstests/libs/authTestsKey
+          keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+          roleGraphInvalidationIsFatal: true
+      password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+      username: __system
+  fixture:
+    auth_options: &id003
+      authenticationDatabase: admin
+      authenticationMechanism: SCRAM-SHA-256
+      password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+      username: __system
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongod_options:
+      auth: ""
+      keyFile: jstests/libs/authTestsKey
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsSampleRate: 1.0
+        internalQueryStatsWriteCmdSampleRate: 1
+    mongos_options:
+      keyFile: jstests/libs/authTestsKey
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsSampleRate: 1.0
+        internalQueryStatsWriteCmdSampleRate: 1
+    num_mongos: 3
+    num_shards: 2
+  hooks:
+    - class: RunQueryStats
+      shell_options: &id002
+        authenticationDatabase: admin
+        authenticationMechanism: SCRAM-SHA-256
+        eval: jsTest.authenticate(db.getMongo())
+        global_vars:
+          TestData: *id001
+        password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+        username: __system
+    - class: CheckReplDBHash
+      shell_options: *id002
+    - class: CheckMetadataConsistencyInBackground
+      shell_options: *id002
+    - class: ValidateCollections
+      shell_options: *id002
+    - class: CheckShardFilteringMetadata
+      shell_options: *id002
+    - class: CheckOrphansDeleted
+      shell_options: *id002
+    - class: CleanEveryN
+      n: 20
+      shell_options: *id003
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/bypass_doc_validation.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/distinct_index1.js
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
+    - jstests/core_sharding/chunk_operations/move_chunk_split_merge_timeseries.js
+    - jstests/core_sharding/chunk_operations/move_range_timeseries.js
+    - jstests/core_sharding/ddl/rename_collection_sharded.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_multiple_point_queries.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_single_field_point_queries.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_compound_sort_on_point_queries.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_profiling
+    - requires_capped
+    - creates_and_authenticates_user
+    - auth_incompatible
+    - uses_map_reduce_internal_merge_pipeline
+    - uses_parallel_shell
+    - query_intensive_pbt
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

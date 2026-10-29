@@ -33,7 +33,6 @@ from wtdataset import SimpleIndexDataSet
 from wtscenario import make_scenarios
 
 # session level drop operation
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_drop(wttest.WiredTigerTestCase):
     test_name = __qualname__
     name = test_name
@@ -104,6 +103,14 @@ class test_drop(wttest.WiredTigerTestCase):
 
     # Test drop of an object.
     def test_drop(self):
+        # FIXME-WT-18703: Investigate if this is intended behavior or not.
+        if (
+            self.runningHook("disagg")
+            and self.getDisaggParameters().schema_epochs
+            and self.uri == 'table:'
+        ):
+            self.skipTest(
+                "a drop returning EBUSY can still discard untimestamped data with schema epochs")
         cnt = 0
         # SimpleDataSet: Simple file or table object.
         # Try all combinations except dropping the index, the simple
@@ -116,7 +123,6 @@ class test_drop(wttest.WiredTigerTestCase):
 
         # SimpleIndexDataSet: A table with an index
         # Try almost all test combinations.
-        # Skip if tiered since indices don't work for tiered.
         if self.uri == "table:":
             for with_cursor in [False, True]:
                 for reopen in [False, True]:
@@ -128,7 +134,6 @@ class test_drop(wttest.WiredTigerTestCase):
 
         # ComplexDataSet: A complex, multi-file table object.
         # Try all test combinations.
-        # Skip if tiered since column groups don't work for tiered.
         if self.uri == "table:":
             for with_cursor in [False, True]:
                 for reopen in [False, True]:
@@ -140,8 +145,6 @@ class test_drop(wttest.WiredTigerTestCase):
 
     # Test drop of a non-existent object: force succeeds, without force fails.
     def test_drop_dne(self):
-        if 'tiered' in self.hook_names:
-            self.skipTest("negative tests for drop do not work in tiered storage")
         uri = self.uri + self.name
         cguri = 'colgroup:' + self.name
         idxuri = 'index:' + self.name + ':indexname'

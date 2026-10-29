@@ -54,6 +54,9 @@ selector:
     # will conflict with tests that explicitly set cluster parameters.
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/query/queryable_encryption/query_settings_fle.js
+    # failCommand closeConnection tests rely on exact command execution counts,
+    # which are invalidated by the shard-transition retry override.
+    - jstests/core/testing/failcommand_failpoint.js
     # These tests expect index creation to fail on a shard that contains an initial document with
     # parallel arrays. The index creation will succeed on the shard without a document and
     # as we transition to dedicated, the balancer will try an insert the document with a parallel
@@ -75,6 +78,7 @@ selector:
     - jstests/core/timeseries/query/bucket_unpacking_with_compound_sort_on_point_queries.js
     - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_single_field_point_queries.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_collation.js
     - jstests/core/timeseries/query/timeseries_find.js
@@ -93,7 +97,7 @@ selector:
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/core/administrative/cleanup_orphaned.js
     - jstests/core/catalog/views/views_all_commands.js
-    - jstests/core/repro/commands_namespace_parsing.js
+    - jstests/core/catalog/commands_namespace_parsing.js
     # Runs commands using legacy queries, which are not supported on sessions.
     - jstests/core/**/query/exhaust.js
     # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work

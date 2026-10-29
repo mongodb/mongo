@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -46,7 +20,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/client/shard_gen.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/executor/remote_command_response.h"
@@ -78,7 +51,7 @@ class RemoteCommandTargeter;
  * Presents an interface for talking to shards, regardless of whether that shard is remote or is
  * the current (local) shard.
  */
-class MONGO_MOD_PUBLIC Shard {
+class [[MONGO_MOD_PUBLIC]] Shard {
 public:
     struct CommandResponse {
         CommandResponse(boost::optional<HostAndPort> hostAndPort,
@@ -107,6 +80,13 @@ public:
          * is received instead of a CommandResponse an empty vector is returned.
          */
         static std::vector<std::string> getErrorLabels(
+            const StatusWith<CommandResponse>& swResponse);
+
+        /**
+         * Returns the server-hinted retry backoff from the response, if present. If an error
+         * status is received instead of a CommandResponse, boost::none is returned.
+         */
+        static boost::optional<Milliseconds> getBaseBackoffMS(
             const StatusWith<CommandResponse>& swResponse);
 
         boost::optional<HostAndPort> hostAndPort;
@@ -201,9 +181,11 @@ public:
                       Shard::RetryStrategy::RequestStartTransactionState isStartTransaction);
 
 
-        bool recordFailureAndEvaluateShouldRetry(Status s,
-                                                 const boost::optional<HostAndPort>& target,
-                                                 std::span<const std::string> errorLabels) override;
+        bool recordFailureAndEvaluateShouldRetry(
+            Status s,
+            const boost::optional<HostAndPort>& target,
+            std::span<const std::string> errorLabels,
+            boost::optional<Milliseconds> baseBackoffMS) override;
 
         void recordSuccess(const boost::optional<HostAndPort>& target) override;
         void recordBackoff(Milliseconds backoff) override;
@@ -232,7 +214,6 @@ public:
 
     private:
         void _recordOperationAttempted();
-        void _recordOperationNotOverloaded();
 
         RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCriteria,
                       AdaptiveRetryStrategy::RetryParameters parameters,
@@ -241,7 +222,15 @@ public:
         AdaptiveRetryStrategy _underlyingStrategy;
         ShardSharedStateCache::Stats* _stats;
         bool _recordedAttempted = false;
-        bool _previousAttemptOverloaded = false;
+
+        // Set when the most recent error observed was a SystemOverloadedError. Reset on any
+        // non-overload error.
+        bool _precedingErrorWasOverload = false;
+
+        // Set when the first retry due to a SystemOverloadedError is recorded. Set once and never
+        // reset.
+        bool _retriedAtLeastOnceDueToOverload = false;
+
         // The number of retries that avoided a server that previously returned an overload error.
         std::int64_t _numRetargets = 0;
     };
@@ -279,8 +268,10 @@ public:
         bool recordFailureAndEvaluateShouldRetry(
             Status s,
             const boost::optional<HostAndPort>& target,
-            std::span<const std::string> errorLabels) override {
-            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+            std::span<const std::string> errorLabels,
+            boost::optional<Milliseconds> baseBackoffMS) override {
+            return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+                s, target, errorLabels, baseBackoffMS);
         }
 
         void recordSuccess(const boost::optional<HostAndPort>& target) override {
@@ -307,13 +298,8 @@ public:
 
     virtual ~Shard() = default;
 
-    // TODO (SERVER-127200): remove and update all callers to rely on getHandle.
     const ShardId& getId() const {
-        return _handle.name();
-    }
-
-    const ShardHandle& getHandle() const {
-        return _handle;
+        return _id;
     }
 
     /**
@@ -484,13 +470,13 @@ public:
      * Do not use other than for very small (i.e., admin or metadata) collections.
      * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
      *
-     * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
-     * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
+     * ShardRemote instances expect "readConcern" to always be kMajority, whereas ShardLocal
+     * instances expect either kLocal or kMajority.
      */
     StatusWith<QueryResponse> exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const repl::ReadConcernLevel& readConcernLevel,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -523,7 +509,7 @@ public:
     AdaptiveRetryStrategy::RetryBudget& getRetryBudget_forTest() const;
 
 protected:
-    Shard(const ShardHandle& handle, std::shared_ptr<ShardSharedStateCache::State> sharedState);
+    Shard(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState);
 
     std::shared_ptr<ShardSharedStateCache::State> getSharedState() const;
 
@@ -574,7 +560,7 @@ private:
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const TargetingMetadata& targetingMetadata,
-        const repl::ReadConcernLevel& readConcernLevel,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -590,7 +576,10 @@ private:
         std::function<bool(const std::vector<BSONObj>& batch,
                            const boost::optional<BSONObj>& postBatchResumeToken)> callback) = 0;
 
-    const ShardHandle _handle;
+    /**
+     * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
+     */
+    const ShardId _id;
     std::shared_ptr<ShardSharedStateCache::State> _sharedState;
 
     friend class ConfigShardWrapper;

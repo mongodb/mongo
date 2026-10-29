@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
@@ -79,16 +52,17 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorMetadata
-extractShardingCoordinatorMetadata(const BSONObj& coorDoc);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(
+    const BSONObj& coorDoc);
 
 /**
  * Generic coordinator phase enum.
  * It may be converted to any enum used by coordinator implementations, provided that it has the
  * same underlying type and that it has a kUnset member with the value `0`.
  */
-enum class MONGO_MOD_PRIVATE CoordinatorGenericPhase : std::int32_t {
+enum class [[MONGO_MOD_PRIVATE]] CoordinatorGenericPhase : std::int32_t {
     kUnset = 0,
 };
 
@@ -96,9 +70,9 @@ enum class MONGO_MOD_PRIVATE CoordinatorGenericPhase : std::int32_t {
  * Represents a "generic" coordinator StateDoc.
  * This interface is implemented by the template class `CoordinatorStateDocImpl` defined below.
  */
-class MONGO_MOD_PRIVATE CoordinatorStateDoc {
+class [[MONGO_MOD_PRIVATE]] CoordinatorStateDoc {
 public:
-    static constexpr auto kIdFieldName = "_id"_sd;
+    static constexpr auto kIdFieldName = "_id"sv;
 
     virtual ~CoordinatorStateDoc() = default;
     virtual const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const = 0;
@@ -110,7 +84,7 @@ public:
     virtual std::unique_ptr<CoordinatorStateDoc> clone() const = 0;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinator
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ShardingCoordinator> {
 public:
     static inline const auto kExponentialBackoff = Backoff(Seconds(1), Milliseconds::max());
@@ -211,6 +185,10 @@ protected:
         return getBasicCoordinatorAttrs();
     }
 
+    virtual bool _shouldLogCompletionErrorAsWarning(const Status&) const {
+        return false;
+    }
+
     /*
      * Specify if the coordinator must indefinitely be retried in case of exceptions. It is always
      * expected for a coordinator to make progress after performing intermediate operations that
@@ -281,12 +259,25 @@ protected:
     virtual void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) {
     }
 
+    virtual void _checkIndexBuildsInProgress(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             const CancellationToken& token) {}
+
     virtual ExecutorFuture<void> _acquireLocksAsync(
         OperationContext* opCtx,
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
         const CancellationToken& token) = 0;
 
     virtual void _releaseLocks(OperationContext* opCtx) = 0;
+
+    /**
+     * Hook invoked by `run()` at the start of every execution that is not the first one.
+     * Recoverable coordinators override this to perform a causality barrier that invalidates any
+     * retryable writes issued by previous executions. The base implementation is a no-op since
+     * non-recoverable coordinators do not persist sessions.
+     */
+    virtual void _performCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token) {}
 
     virtual void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {}
 
@@ -329,6 +320,7 @@ private:
         const Status& status) noexcept;
 
     virtual void _onCleanup(OperationContext* opCtx) {}
+    virtual void _onInterrupt(Status status) {}
 
     void interrupt(Status status) final;
 
@@ -352,7 +344,7 @@ private:
     friend class ShardingDDLCoordinatorTest;
 };
 
-class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingCoordinator
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] RecoverableShardingCoordinator
     : public ShardingCoordinator,
       public OperationSessionPersistence {
 protected:
@@ -403,6 +395,11 @@ protected:
         return _sessionTracker.getCurrentSession(opCtx);
     }
 
+    virtual std::function<void(OperationContext*)> _decoratePhaseHandlerGeneric(
+        CoordinatorGenericPhase newPhase, std::function<void(OperationContext*)> handlerFn) {
+        return handlerFn;
+    }
+
     std::function<void()> _buildPhaseHandlerGeneric(
         CoordinatorGenericPhase newPhase, std::function<void(OperationContext*)>&& handlerFn);
 
@@ -444,6 +441,9 @@ protected:
 
     void _onCleanup(OperationContext* opCtx) override;
 
+    void _performCausalityBarrier(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token) override;
+
 private:
     boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override;
 
@@ -454,7 +454,7 @@ private:
 };
 
 template <typename StateDoc>
-class MONGO_MOD_PRIVATE CoordinatorStateDocImpl : public CoordinatorStateDoc {
+class [[MONGO_MOD_PRIVATE]] CoordinatorStateDocImpl : public CoordinatorStateDoc {
     constexpr static bool kDocHasPhase = requires(StateDoc doc) { doc.getPhase(); };
 
     consteval static auto getPhaseTypeHelper() {
@@ -527,14 +527,6 @@ public:
             bson = bson.removeField(
                 ShardingCoordinatorMetadata::kAuthoritativeMetadataAccessLevelFieldName);
         }
-        // TODO (SERVER-126212): Remove once v9.0 becomes last-LTS.
-        // In v8.x, some coordinators parse the document with strict:true, so do not serialize the
-        // default "shardId" value of shardIdentificationType.
-        // This is also correct for newer binaries, which interpret the missing field as "shardId".
-        if (_doc.getShardingCoordinatorMetadata().getShardIdentificationType() ==
-            ShardIdentificationTypeEnum::kShardId) {
-            bson = bson.removeField(ShardingCoordinatorMetadata::kShardIdentificationTypeFieldName);
-        }
         return bson;
     }
 
@@ -561,7 +553,7 @@ public:
  * Provide a typed StateDoc _doc for coordinator implementations.
  */
 template <typename TStateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN NonRecoverableTypedDocMixin {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] NonRecoverableTypedDocMixin {
 protected:
     using StateDoc = TStateDoc;
     using Phase = CoordinatorStateDocImpl<TStateDoc>::DocPhase;
@@ -572,6 +564,11 @@ protected:
      * the opCtxs made under them automatically marked as non-deprioritizable.
      */
     virtual bool isInCriticalSection(Phase phase) const = 0;
+
+    virtual std::function<void(OperationContext*)> _decoratePhaseHandler(
+        Phase phase, std::function<void(OperationContext*)> handlerFn) {
+        return handlerFn;
+    }
 
     explicit NonRecoverableTypedDocMixin(const BSONObj& coorDoc)
         : _docWrapper(
@@ -587,7 +584,7 @@ protected:
  * Provide typed protected functions for recoverable coordinators.
  */
 template <typename Base, typename TStateDoc>
-class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableTypedDocMixin
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] RecoverableTypedDocMixin
     : protected NonRecoverableTypedDocMixin<TStateDoc> {
 
 protected:

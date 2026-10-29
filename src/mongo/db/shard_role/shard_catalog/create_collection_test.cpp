@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 
@@ -161,7 +135,7 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
 
         WriteUnitOfWork wuow(opCtx.get());
         const auto status =
-            db->userCreateNS(opCtx.get(), newNss, options, false /*createDefaultIndexes*/);
+            db->userCreateNS(opCtx.get(), newNss, options, /*createDefaultIndexes=*/false);
         ASSERT_EQ(expectedError, status.code()) << status;
     });
 }
@@ -235,7 +209,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
                                           newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
 }
@@ -258,7 +232,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNestedIn
                                           newNss.dbName(),
                                           boost::none,
                                           BSON("create" << newNss.coll() << "uuid" << uuid),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
     ASSERT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
@@ -288,7 +262,7 @@ TEST_F(CreateCollectionTest,
                                           newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
-                                          /*allowRenameOutOfTheWay*/ true));
+                                          /*allowRenameOutOfTheWay=*/true));
 
     ASSERT_FALSE(collectionExists(opCtx.get(), curNss));
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
@@ -317,7 +291,7 @@ TEST_F(CreateCollectionTest,
                                           newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
-                                          /*allowRenameOutOfTheWay*/ true));
+                                          /*allowRenameOutOfTheWay=*/true));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
     ASSERT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
@@ -373,7 +347,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
                                           bucketsColl.dbName(),
                                           uuid2,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ true));
+                                          /*allowRenameOutOfTheWay=*/true));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     ASSERT_EQUALS(uuid2, getCollectionUuid(opCtx.get(), bucketsColl));
 
@@ -401,7 +375,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
                                           bucketsColl.dbName(),
                                           uuid1,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
     // This should rename the old collection back to its original name.
     ASSERT_FALSE(collectionExists(opCtx.get(), *renamedCollectionNss));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
@@ -469,7 +443,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsDoesNotCreateIdIndexOnCl
                           << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                       << "clustered_index"
                                       << "unique" << true)),
-            /*allowRenameOutOfTheWay*/ false));
+            /*allowRenameOutOfTheWay=*/false));
     }
 
     auto coll = acquireCollForRead(opCtx.get(), nss);
@@ -789,7 +763,7 @@ TEST_F(CreateCollectionTest,
             newNss.dbName(),
             uuid,
             fromjson("{create: 'view', viewOn: 'coll', pipeline: []}"),
-            /*allowRenameOutOfTheWay*/ false,
+            /*allowRenameOutOfTheWay=*/false,
             /*idIndex=*/boost::none,
             CreateCollCatalogIdentifier{.ident = "collection-1", .idIndexIdent = "index-1"s}),
         DBException,
@@ -1025,7 +999,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseries) {
                                           newNss.dbName(),
                                           uuid,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
 }
@@ -1050,9 +1024,40 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseriesDollarPrefix) 
                                           newNss.dbName(),
                                           uuid,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
+}
+
+TEST_F(CreateCollectionTest, RejectClusteredIndexNameWithEmbeddedNullByte) {
+    auto opCtx = makeOpCtx();
+
+    // Creates a clustered collection whose implicit index carries 'indexName'.
+    const auto createClusteredCollection = [&](std::string_view indexName) {
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("test.BadClusteredIndexName");
+        ASSERT_FALSE(collectionExists(opCtx.get(), nss));
+
+        ClusteredIndexSpec indexSpec;
+        indexSpec.setKey(BSON("_id" << 1));
+        indexSpec.setUnique(true);
+        indexSpec.setName(std::string{indexName});
+
+        CollectionOptions options;
+        options.clusteredIndex =
+            ClusteredCollectionInfo(std::move(indexSpec), /*legacyFormat=*/false);
+        return createCollection(opCtx.get(), nss, options, /*idIndex=*/boost::none);
+    };
+
+    ASSERT_EQ(createClusteredCollection("\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("\0\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("\0trailing"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("leading\0"sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_EQ(createClusteredCollection("embedded\0null"sv), ErrorCodes::CannotCreateIndex);
+
+    // An empty name is likewise rejected, while an ordinary name succeeds.
+    ASSERT_EQ(createClusteredCollection(""sv), ErrorCodes::CannotCreateIndex);
+    ASSERT_OK(createClusteredCollection("myClusteredIndex"sv));
 }
 
 }  // namespace

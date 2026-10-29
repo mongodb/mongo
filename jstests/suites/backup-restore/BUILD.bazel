@@ -16,6 +16,7 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "backup_restore",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/backup_restore.yml",
     data = [
         "//buildscripts/resmokeconfig:suites/concurrency_replication_for_backup_restore.yml",
@@ -31,12 +32,14 @@ resmoke_suite_test(
         "//src/mongo/db/modules/enterprise/jstests/live_restore/libs:all_javascript_files",
         "//x509:generate_main_certificates",
     ],
+    shard_count = 2,
     tags = [
-        "ci-release-critical",
-        "ci-requires-execution-on-windows-patch-build",
+        "ci-all-variants",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",
         "misc_js",
-        "resources:cpu:2",
+        "requires_execution_on_windows_patch_build",
+        "requires_xlarge_host",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
@@ -58,7 +61,7 @@ resmoke_suite_test(
     data = [
         "//src/mongo/db/modules/enterprise/jstests/hot_backups/libs:all_javascript_files",
     ],
-    tags = ["ci-release-critical"],
+    tags = ["ci-all-variants"],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",

@@ -3,7 +3,7 @@
  *
  * Verifies all query.cbr.* metrics under samplingCE mode.
  *
- * @tags: [requires_fcv_83]
+ * @tags: [requires_fcv_90]
  */
 
 // TODO (SERVER-121763): Move all server status tests to noPassthroughWithMongod
@@ -11,11 +11,13 @@
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
 function sumHistogramBucketCounts(histogram) {
+    assert(
+        Array.isArray(histogram) && histogram.length > 0,
+        `histogram should have buckets. Got: ${tojson(histogram)}`,
+    );
     let sum = 0;
-    for (const [_, bucket] of Object.entries(histogram)) {
-        if (bucket.hasOwnProperty("count")) {
-            sum += bucket.count;
-        }
+    for (const bucket of histogram) {
+        sum += bucket.count;
     }
     return sum;
 }
@@ -29,11 +31,12 @@ const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);
 coll.drop();
 
-// Enable CBR with samplingCE mode.
+// Enable CBR with samplingCE mode. Set planRanker to "costBased" so CBRCEMode is used directly.
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "costBased",
         internalQueryCBRCEMode: "samplingCE",
         internalQuerySamplingBySequentialScan: true,
     }),

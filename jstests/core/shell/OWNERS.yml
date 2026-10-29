@@ -6,3 +6,9 @@ filters:
   - "*multi_router*.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "preserve_id_bson_to_js.js":
+    approvers:
+      - 10gen/query-integration-features
+  - "error5.js":
+    approvers:
+      - 10gen/query-integration-features

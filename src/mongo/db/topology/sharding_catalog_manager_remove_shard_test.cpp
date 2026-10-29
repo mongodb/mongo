@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/sharding_environment/client/shard.h"
 
@@ -55,7 +29,6 @@
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -155,7 +128,7 @@ protected:
         auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrShardsNamespace,
             BSON(ShardType::name() << shardName),
             BSONObj(),
@@ -186,15 +159,15 @@ protected:
 TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     ShardType shard3;
-    shard3.setHandle(ShardHandle{ShardId("shard3"), boost::none});
+    shard3.setName("shard3");
     shard3.setHost("host3:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2, shard3});
@@ -213,7 +186,7 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     setupShards(std::vector<ShardType>{shard1});
@@ -226,11 +199,11 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
 TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -244,11 +217,11 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
 TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     auto epoch = OID::gen();
@@ -257,15 +230,15 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
                      ChunkVersion({epoch, timestamp}, {1, 1}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
                      ChunkVersion({epoch, timestamp}, {1, 2}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
                      ChunkVersion({epoch, timestamp}, {1, 3}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
 
     chunk3.setJumbo(true);
 
@@ -294,11 +267,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -323,11 +296,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     auto epoch = OID::gen();
@@ -336,15 +309,15 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
                      ChunkVersion({epoch, timestamp}, {1, 1}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
                      ChunkVersion({epoch, timestamp}, {1, 2}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
                      ChunkVersion({epoch, timestamp}, {1, 3}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
 
     std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};
 
@@ -373,7 +346,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     const NamespaceString chunkNS(NamespaceString::kConfigsvrChunksNamespace);
     for (const ChunkType& chunk : chunks) {
         ChunkType updatedChunk = chunk;
-        updatedChunk.setShard(ShardRef{shard2.getName()});
+        updatedChunk.setShard(shard2.getName());
         ASSERT_OK(updateToConfigCollection(
             operationContext(), chunkNS, chunk.toConfigBSON(), updatedChunk.toConfigBSON(), false));
     }
@@ -386,7 +359,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name() << shard1.getName()),
         BSONObj(),
@@ -396,11 +369,11 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
 TEST_F(RemoveShardTest, RemoveShardCommitWithPreconditionsNotMet) {
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -426,11 +399,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
                                              BSON("maxUserSize" << 20480));
 
     ShardType shard1;
-    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setName("shard1");
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
+    shard2.setName("shard2");
     shard2.setHost("host2:12345");
 
     auto epoch = OID::gen();
@@ -439,15 +412,15 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
                      ChunkVersion({epoch, timestamp}, {1, 1}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
                      ChunkVersion({epoch, timestamp}, {1, 2}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
                      ChunkVersion({epoch, timestamp}, {1, 3}),
-                     ShardRef{shard1.getName()});
+                     shard1.getName());
 
     chunk3.setJumbo(true);
 

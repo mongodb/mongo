@@ -31,6 +31,7 @@ let collCount = 0;
 
 let retriedCommandsCount = 0;
 let retriedStatementsCount = 0;
+let retriedWriteDelaySamplesCount = 0;
 
 /**
  * Accepts three arrays of measurements. The first set of measurements is used to create a new
@@ -181,6 +182,13 @@ const runTest = function (docsInsert, docsUpdateA, docsUpdateB) {
         (retriedStatementsCount += docs.length),
         transactionsServerStatus.retriedStatementsCount,
         "Incorrect statistic in db.serverStatus(): " + tojson(transactionsServerStatus),
+    );
+
+    // Every retried statement records one retry-delay sample.
+    const delayHistogram = transactionsServerStatus.retriedWritesDelayMillis;
+    assert.eq(
+        (retriedWriteDelaySamplesCount += docs.length),
+        delayHistogram.reduce((total, bucket) => total + bucket.count, 0),
     );
 
     session.endSession();

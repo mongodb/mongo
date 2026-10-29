@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
@@ -60,95 +34,95 @@ const size_t seed_value2 = 8713211;
 std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigurations = {
     {1,
      {CollectionFieldConfiguration(
-         /*fieldName*/ "f0",
-         /*fieldPosition*/ 0,
-         /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-         /*ndv*/ 1000,
-         /*dataDistribution*/ stats::DistrType::kUniform,
-         /*seed*/ seed_value1)}},
+         /*fieldName=*/"f0",
+         /*fieldPositionInCollection=*/0,
+         /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+         /*ndv=*/1000,
+         /*dataDistribution=*/stats::DistrType::kUniform,
+         /*seed=*/seed_value1)}},
     {2,
      {CollectionFieldConfiguration(
-         /*fieldName*/ "f0",
-         /*fieldPosition*/ 50,
-         /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-         /*ndv*/ 1000,
-         /*dataDistribution*/ stats::DistrType::kUniform,
-         /*seed*/ seed_value1)}},
+         /*fieldName=*/"f0",
+         /*fieldPositionInCollection=*/50,
+         /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+         /*ndv=*/1000,
+         /*dataDistribution=*/stats::DistrType::kUniform,
+         /*seed=*/seed_value1)}},
     {3,
      {
          CollectionFieldConfiguration(
-             /*fieldName*/ "f0",
-             /*fieldPosition*/ 0,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f0",
+             /*fieldPositionInCollection=*/0,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f1",
-             /*fieldPosition*/ 1,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f1",
+             /*fieldPositionInCollection=*/1,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f2",
-             /*fieldPosition*/ 2,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f2",
+             /*fieldPositionInCollection=*/2,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f3",
-             /*fieldPosition*/ 3,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f3",
+             /*fieldPositionInCollection=*/3,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f4",
-             /*fieldPosition*/ 4,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f4",
+             /*fieldPositionInCollection=*/4,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
      }},
     {4,
      {
          CollectionFieldConfiguration(
-             /*fieldName*/ "f0",
-             /*fieldPosition*/ 50,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f0",
+             /*fieldPositionInCollection=*/50,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f1",
-             /*fieldPosition*/ 51,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f1",
+             /*fieldPositionInCollection=*/51,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f2",
-             /*fieldPosition*/ 52,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f2",
+             /*fieldPositionInCollection=*/52,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f3",
-             /*fieldPosition*/ 53,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f3",
+             /*fieldPositionInCollection=*/53,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
          CollectionFieldConfiguration(
-             /*fieldName*/ "f4",
-             /*fieldPosition*/ 54,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ 1000,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ seed_value1),
+             /*fieldName=*/"f4",
+             /*fieldPositionInCollection=*/54,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
+             /*ndv=*/1000,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/seed_value1),
      }}};
 
 /**
@@ -183,7 +157,7 @@ auto queryConfig2 = WorkloadConfiguration(
 
 // Multi-field point queries.
 auto queryConfig3 = WorkloadConfiguration(
-    /*numberOfQueries*/ 20,
+    /*numberOfQueries=*/20,
     QueryConfiguration(
         {
             DataFieldDefinition(
@@ -277,8 +251,8 @@ std::map<int, WorkloadConfiguration> queryFieldsConfigurations(queryConfigVector
 void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state) {
     auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
     DataConfiguration dataConfig(
-        /*dataSize*/ state.range(0),
-        /*dataFieldConfig*/ fieldsConfig);
+        /*size=*/state.range(0),
+        /*allDataFieldConfig=*/fieldsConfig);
 
     // Setup query types.
     WorkloadConfiguration& workloadConfig = queryFieldsConfigurations[state.range(4)];
@@ -298,7 +272,7 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
 
     // Translate the sample size definition to corresponding sample size.
     auto sampleSize = translateSampleDefToActualSampleSize(
-        /*sampleSizeDef*/ static_cast<SampleSizeDef>(state.range(2)));
+        /*sampleSizeDef=*/static_cast<SampleSizeDef>(state.range(2)));
 
     // Translate the number of chunks variable to both number of chunks and sampling algo.
     // This benchmark given as input numOfChunks <= 0 will use kRandom.
@@ -315,7 +289,7 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
         samplingStyle.first,
         samplingStyle.second,
         SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
-        nullptr /*customerQueryExpCtx*/);
+        /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate query intervals.
@@ -347,8 +321,8 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
 void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& state) {
     auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
     DataConfiguration dataConfig(
-        /*dataSize*/ state.range(0),
-        /*dataFieldConfig*/ fieldsConfig);
+        /*size=*/state.range(0),
+        /*allDataFieldConfig=*/fieldsConfig);
 
     // Setup query types.
     WorkloadConfiguration& workloadConfig = queryFieldsConfigurations[state.range(4)];
@@ -368,7 +342,7 @@ void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& s
 
     // Translate the sample size definition to corresponding sample size.
     auto sampleSize = translateSampleDefToActualSampleSize(
-        /*sampleSizeDef*/ static_cast<SampleSizeDef>(state.range(2)));
+        /*sampleSizeDef=*/static_cast<SampleSizeDef>(state.range(2)));
 
     // Translate the number of chunks variable to both number of chunks and sampling algo.
     // This benchmark given as input numOfChunks <= 0 will use kRandom.
@@ -385,7 +359,7 @@ void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& s
         samplingStyle.first,
         samplingStyle.second,
         SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
-        nullptr /*customerQueryExpCtx*/);
+        /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate query intervals.

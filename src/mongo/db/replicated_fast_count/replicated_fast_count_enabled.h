@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,13 +13,13 @@ namespace mongo {
  * context.
  */
 // TODO(SERVER-119896): Delete this function and rename library.
-MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountEnabled(OperationContext* opCtx);
 
 /**
  * Returns whether the provided namespace string can be tracked by the replicated fast count
  * collection.
  */
-MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountEligible(const NamespaceString& nss);
 
 /**
  * Returns true if we should get the size and count for the specified 'nss' from the replicated fast
@@ -61,17 +35,23 @@ MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
  * replicated fast count, excluding the oplog collection, as long as the collection is a replica
  * set.
  */
-MONGO_MOD_PUBLIC bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
-                                                        const NamespaceString& nss);
-
-/**
- * Returns true if size metadata and timestamps are persisted in containers instead of collections.
- */
-MONGO_MOD_PUBLIC bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
+                                                            const NamespaceString& nss);
 
 /**
  * Returns true if replicated fast count metadata should be emitted in listCollections output.
  */
-MONGO_MOD_PUBLIC bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx);
+
+/**
+ * Returns true if initial sync should fetch the replicated fast count timestamp store timestamp.
+ */
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx);
+
+/**
+ * Returns true if the test-only 'disableReplicatedFastCount' failpoint is set and the persistence
+ * provider does not itself use replicated fast count.
+ */
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountDisabledForTest(OperationContext* opCtx);
 
 }  // namespace mongo

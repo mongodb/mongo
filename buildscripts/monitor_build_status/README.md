@@ -79,10 +79,10 @@ usual.
 
 Currently monitored thresholds:
 
-| **Quota** | **Team**<br>(older than 48h) | **VP**<br>(older than 7d) | **Global**<br>(older than 7d) |
+| **Quota** | **Team**<br>(older than 48h) | **VP**<br>(older than 5d) | **Global**<br>(older than 5d) |
 | --------- | ---------------------------- | ------------------------- | ----------------------------- |
-| Hot       | 6                            | 16                        | 60                            |
-| Cold      | 10                           | 32                        | 100                           |
+| Hot       | 3                            | 10                        | 60                            |
+| Cold      | 3                            | 7                         | 40                            |
 
 Source-of-truth implementation: [etc/code_lockdown.yml](../../etc/code_lockdown.yml).
 

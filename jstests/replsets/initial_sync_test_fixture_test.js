@@ -15,6 +15,9 @@
  *   # TODO SERVER-94948: Remove this tag once the test is fixed to handle arbitrary listCollection
  *   # ordering.
  *   does_not_support_config_fuzzer,
+ *   # TODO (SERVER-133476): Relies on specific oplog batches being applied which breaks when
+ *   # beginFetchingTimestamp is moved back
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
@@ -176,15 +179,6 @@ try {
     checkLogForGetTimestampMsg(secondary, "beginFetchingTimestamp", prepareTimestamp, false);
     checkLogForGetTimestampMsg(secondary, "beginApplyingTimestamp", prepareTimestamp, true);
     checkLogForCollectionClonerMsg(secondary, "listDatabases", "admin", false);
-
-    // Disable the initiating-set optimization so that beginApplyingTimestamp stays at the
-    // prepare timestamp.
-    assert.commandWorked(
-        secondary.adminCommand({
-            setParameter: 1,
-            initialSyncWaitForSyncSourceLastStableRecoveryTs: false,
-        }),
-    );
 
     // This step call will resume initial sync and pause it again after the node gets the
     // listDatabases result from its sync source.

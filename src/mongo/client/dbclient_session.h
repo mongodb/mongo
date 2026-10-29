@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,12 +13,14 @@
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/rpc_local_timing.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/rpc_local_timing.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
@@ -54,11 +30,13 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -90,7 +68,7 @@ class DBClientCursor;
  * exception, it is legal to call shutdown() or shutdownAndDisallowReconnect() from any thread as a
  * way to interrupt the owning thread.
  */
-class MONGO_MOD_PUBLIC DBClientSession : public DBClientBase {
+class [[MONGO_MOD_PUBLIC]] DBClientSession : public DBClientBase {
 public:
     /**
      * A hook used to validate the reply of a "hello" command during connection. If the hook
@@ -110,7 +88,12 @@ public:
                     double soTimeout,
                     MongoURI uri,
                     const HandshakeValidationHook& hook,
-                    const ClientAPIVersionParameters* apiParameters);
+                    const ClientAPIVersionParameters* apiParameters,
+                    ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
+
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
+    DBClientBase* runFireAndForgetCommand(OpMsgRequest request) override;
 
     ~DBClientSession() override {}
 
@@ -208,6 +191,10 @@ public:
 
     uint64_t getSockCreationMicroSec() const override;
 
+    void setTickSource_forTest(TickSource* tickSource) {
+        _rpcLocalTimingTickSource = tickSource;
+    }
+
     MessageCompressorManager& getCompressorManager() {
         return _compressorManager;
     }
@@ -225,6 +212,10 @@ public:
 
     bool authenticatedDuringConnect() const override {
         return _authenticatedDuringConnect;
+    }
+
+    ConnectionPurpose getConnectionPurpose() const {
+        return _connectionPurpose;
     }
 
     const MongoURI& getURI() const {
@@ -270,6 +261,8 @@ protected:
     bool _isReplicaSetMember = false;
     bool _isMongos = false;
 
+    // used for purpose-specific metrics, such as replication
+    ConnectionPurpose _connectionPurpose;
     // The session mutex must be held to shutdown the _session from a non-owning thread, or to
     // rebind the handle from the owning thread. The thread that owns this DBClientSession is
     // allowed to use the _session without locking the mutex. This mutex also guards writes to
@@ -280,8 +273,8 @@ protected:
     uint64_t _sessionCreationTimeMicros = INVALID_SOCK_CREATION_TIME;
     Date_t _lastConnectivityCheck;
 
-    AtomicWord<bool> _stayFailed{false};
-    AtomicWord<bool> _failed{false};
+    Atomic<bool> _stayFailed{false};
+    Atomic<bool> _failed{false};
     const bool _autoReconnect;
 
     HostAndPort _serverAddress;
@@ -289,6 +282,48 @@ protected:
     boost::optional<TransientSSLParams> _transientSSLParams;
 
 private:
+    /**
+     * A single call to run a command on DBClientSession may result in additional calls to run
+     * commands (e.g., if a new connection is needed). This class helps to ensure the RPC timing is
+     * correctly recorded, i.e., that nested calls are included in the outermost timing scope rather
+     * than spawning new timing scopes.
+     */
+    class RpcLocalTimingScope {
+    public:
+        RpcLocalTimingScope(DBClientSession& client, executor::RpcLocalTimingKind kind)
+            : _client(client), _kind(kind) {
+            if (_client._activeRpcLocalTiming || _client._rpcLocalTimingSuppressed) {
+                return;
+            }
+            _timing.emplace(_client._rpcLocalTimingTickSource);
+            _client._activeRpcLocalTiming = &*_timing;
+        }
+
+        /** Records the timing only if this is the outermost scope. */
+        ~RpcLocalTimingScope() {
+            if (_timing) {
+                _client._activeRpcLocalTiming = nullptr;
+                executor::recordRpcLocalLatency(
+                    *_timing, _kind, executor::RpcLocalTimingMode::kSync);
+            }
+        }
+
+        RpcLocalTimingScope(const RpcLocalTimingScope&) = delete;
+        RpcLocalTimingScope& operator=(const RpcLocalTimingScope&) = delete;
+
+    private:
+        DBClientSession& _client;
+        executor::RpcLocalTimingKind _kind;
+        boost::optional<RpcLocalTiming> _timing;
+    };
+
+    TickSource* _rpcLocalTimingTickSource;
+    // Entry points set this value, which nested calls then reuse. RpcLocalTimingScope manages this
+    // value and the logic around it.
+    RpcLocalTiming* _activeRpcLocalTiming = nullptr;
+    // Connection setup is included in an enclosing command but is not timed as a separate RPC.
+    bool _rpcLocalTimingSuppressed = false;
+
     Message _call(Message& toSend, std::string* actualServer) override;
     virtual StatusWith<std::shared_ptr<transport::Session>> _makeSession(
         const HostAndPort& host,

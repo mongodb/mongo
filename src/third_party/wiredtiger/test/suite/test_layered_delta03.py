@@ -68,28 +68,30 @@ class test_layered_delta03(wttest.WiredTigerTestCase):
         value1 = "aaaa"
         value2 = "bbbb"
 
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor[str(i)] = value1
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         self.session.checkpoint()
 
+        self.session.begin_transaction()
         for i in range(self.nitems):
             if i % 10 == 0:
                 cursor[str(i)] = value2
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         self.session.checkpoint()
 
+        self.session.begin_transaction()
         for i in range(self.nitems):
             if i % 10 == 0:
                 cursor[str(i)] = value2
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         self.session.checkpoint()
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         for i in range(self.nitems):
             if i % 10 == 0:
@@ -97,7 +99,4 @@ class test_layered_delta03(wttest.WiredTigerTestCase):
             else:
                 self.assertEqual(cursor[str(i)], value1)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_delta = stat_cursor[stat.conn.cache_read_leaf_delta][2]
-        self.assertEqual(read_delta, 0)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.conn.cache_read_leaf_delta), 0)

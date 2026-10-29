@@ -2,6 +2,7 @@
  * Tests releaseMemory in groupBy.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_82,
  *   # We use explain and we modify the value of a query knob using setParameter.
  *   does_not_support_stepdowns,

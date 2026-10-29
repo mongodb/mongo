@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -50,7 +24,7 @@ namespace mongo {
  *    matching all RecordIds.
  *  - An empty _ranges vector is the "empty" list (∅): no ranges, no records match.
  */
-class MONGO_MOD_PUBLIC RecordIdRangeList {
+class [[MONGO_MOD_PUBLIC]] RecordIdRangeList {
 public:
     /**
      * Constructs an unbounded list (∀) — a single fully-open range with no min and no max.
@@ -128,6 +102,27 @@ public:
 
     const std::vector<RecordIdRange>& getRanges() const {
         return _ranges;
+    }
+
+    // Tag struct returned if the rid given to seek is beyond all the ranges in the list.
+    struct SeekBeyondAllRanges {};
+    // Tag struct returned if the rid given to seek is in a specific range.
+    struct SeekInRange {
+        size_t idx;
+    };
+    // Tag struct returned if the rid given to seek falls between two ranges in the list.
+    struct SeekBeforeRange {
+        size_t idx;
+    };
+    using SeekResult = std::variant<SeekBeyondAllRanges, SeekInRange, SeekBeforeRange>;
+
+    // Uses std::lower_bound to seek for rid between the ranges:
+    //   if  forward: (startIdx, getRanges().size())
+    //   if !forward: [0, startIdx)
+    SeekResult seek(const RecordId& rid, size_t startIdx, bool forward) const;
+
+    bool operator==(const RecordIdRangeList& o) const {
+        return _ranges == o._ranges;
     }
 
 private:

@@ -205,6 +205,10 @@ async function runWorkloads(
     } finally {
         if (cluster.shouldPerformContinuousStepdowns()) {
             cluster.reestablishConnectionsAfterFailover();
+            // Refresh the cached DB object to the current primary, since this suite does continuous stepdowns.
+            for (const workload of cleanup) {
+                context[workload].db = cluster.getDB(context[workload].dbName);
+            }
         }
         // Await replication to ensure all writes are visible on secondaries before reads.
         if (cluster.isReplication()) {
@@ -280,7 +284,11 @@ if (TestData.runningWithCausalConsistency !== undefined) {
     }
 }
 
-if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns) {
+if (
+    TestData.runningWithConfigStepdowns ||
+    TestData.runningWithShardStepdowns ||
+    TestData.runningWithStepdowns
+) {
     sessionOptions.retryWrites = true;
 }
 

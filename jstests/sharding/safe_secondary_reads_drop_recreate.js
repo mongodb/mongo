@@ -17,6 +17,8 @@
  * performed.
  *
  * @tags: [
+ *   # Runs mapReduce with JS map/reduce functions, which requires server-side scripting.
+ *   requires_scripting,
  *   # SERVER-56565 avoid CS stepdowns, since  an election may trigger a  refresh of stale metadata
  *   # that form part of the test setup.
  *   does_not_support_stepdowns,
@@ -27,6 +29,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {commandsRemovedFromMongosSinceLastLTS} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
@@ -45,7 +48,6 @@ let validateTestCase = function (test) {
 
 let testCases = {
     _addShard: {skip: "primary only"},
-    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "primary only"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
@@ -63,8 +65,10 @@ let testCases = {
     _configsvrCommitChunkSplit: {skip: "primary only"},
     _configsvrCommitMergeAllChunksOnShard: {skip: "primary only"},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "primary only"},
+    _configsvrCommitMergeChunks: {skip: "primary only"},
+    _configsvrCommitMoveRange: {skip: "primary only"},
+    _configsvrCommitSplitChunk: {skip: "primary only"},
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: "primary only"},
     _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrResetPlacementHistory: {skip: "primary only"},
@@ -155,6 +159,7 @@ let testCases = {
     checkShardingIndex: {skip: "primary only"},
     cleanupOrphaned: {skip: "primary only"},
     cleanupStructuredEncryptionData: {skip: "does not return user data"},
+    clearJoinPlanCache: {skip: "does not return user data"},
     clearJumboFlag: {skip: "primary only"},
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},
@@ -263,6 +268,7 @@ let testCases = {
     getESECMKIdentifierListStatus: {skip: "does not return user data"},
     getESERotateActiveKEKStatus: {skip: "does not return user data"},
     getLog: {skip: "does not return user data"},
+    getMetricsFilteringAllowlist: {skip: "does not return user data"},
     getMore: {skip: "shard version already established"},
     getParameter: {skip: "does not return user data"},
     getQueryableEncryptionCountInfo: {skip: "primary only"},
@@ -421,6 +427,7 @@ let testCases = {
     untrackUnshardedCollection: {skip: "primary only"},
     update: {skip: "primary only"},
     updateESECMKIdentifierList: {skip: "does not return user data"},
+    updateMetricsFilteringAllowlist: {skip: "does not return user data"},
     updateRole: {skip: "primary only"},
     updateSearchIndex: {skip: "primary only"},
     updateUser: {skip: "primary only"},
@@ -431,6 +438,7 @@ let testCases = {
     waitForFailPoint: {skip: "does not return user data"},
     getShardingReady: {skip: "does not return user data"},
     whatsmyuri: {skip: "does not return user data"},
+    wiredTigerRepair: {skip: "does not return user data"},
 };
 
 commandsRemovedFromMongosSinceLastLTS.forEach(function (cmd) {
@@ -447,9 +455,14 @@ let scenarios = {
 
         // Ensure the latest version changes have been persisted and propagate to the secondary
         // before we target it with versioned commands.
-        assert.commandWorked(
-            st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB("admin")
+                    .runCommand({_flushRoutingTableCacheUpdates: nss}),
+            );
+        }
         st.rs0.awaitReplication();
 
         let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(
@@ -474,7 +487,7 @@ let scenarios = {
                     {
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
+                        "command.readConcern.level": "local",
                         "errCode": ErrorCodes.StaleConfig,
                     },
                     commandProfile,
@@ -489,7 +502,7 @@ let scenarios = {
                     {
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
+                        "command.readConcern.level": "local",
                         "errCode": {"$ne": ErrorCodes.StaleConfig},
                     },
                     commandProfile,
@@ -512,9 +525,14 @@ let scenarios = {
 
         // Ensure the latest version changes have been persisted and propagate to the secondary
         // before we target it with versioned commands.
-        assert.commandWorked(
-            st.rs0.getPrimary().getDB("admin").runCommand({_flushRoutingTableCacheUpdates: nss}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB("admin")
+                    .runCommand({_flushRoutingTableCacheUpdates: nss}),
+            );
+        }
         st.rs0.awaitReplication();
 
         let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(
@@ -539,7 +557,7 @@ let scenarios = {
                     {
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
+                        "command.readConcern.level": "local",
                         "errCode": ErrorCodes.StaleConfig,
                     },
                     commandProfile,
@@ -554,7 +572,7 @@ let scenarios = {
                     {
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
+                        "command.readConcern.level": "local",
                         "errCode": {"$ne": ErrorCodes.StaleConfig},
                     },
                     commandProfile,
@@ -624,7 +642,7 @@ let scenarios = {
                     {
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
+                        "command.readConcern.level": "local",
                         "errCode": ErrorCodes.StaleConfig,
                     },
                     commandProfile,
@@ -639,7 +657,7 @@ let scenarios = {
                     {
                         "command.shardVersion": {"$exists": true},
                         "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
+                        "command.readConcern.level": "local",
                         "errCode": {"$ne": ErrorCodes.StaleConfig},
                     },
                     commandProfile,

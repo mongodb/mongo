@@ -17,6 +17,7 @@
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 const timeFieldName = "t_field";
 const metaFieldName = "m_field";
 const maxNumCollections = 1;
@@ -62,9 +63,7 @@ export const $config = (function () {
     };
 
     let teardown = function (db, collName) {
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };
 
     return {

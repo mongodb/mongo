@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/query/engine_selection_plan.h"
 
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_solution_analyzer.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
 #include <string_view>
@@ -52,7 +27,7 @@ namespace {
 
 // Builds a state machine rule that matches the enabled local-side data access patterns for
 // $lookup-$unwind (LU), gated by the three local access-plan IFR flags.
-StateMachineRule makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) {
+StateMachine makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) {
     const bool collscanEnabled =
         ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSbeEqLookupUnwindLocalCollscan);
     const bool ixscanFetchEnabled =
@@ -61,7 +36,7 @@ StateMachineRule makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrConte
         feature_flags::gFeatureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans);
     static constexpr int kMaxBranchesInSbe = 100;
 
-    StateMachineRule sm;
+    StateMachine sm;
     int state = sm.getStartState();
 
     if (collscanEnabled) {
@@ -139,7 +114,7 @@ public:
 
     void preVisit(RuleEngine&, const GroupNode& node, size_t) {
         preVisitBase(node);
-        _enableSbe = true;
+        setSbeStatus(SbeStatus::kEnabled, node);
     }
 
     void preVisit(RuleEngine&, const EqLookupNode& node, size_t) {
@@ -147,14 +122,14 @@ public:
 
         if (!node.unwindSpec) {
             // $lookup case.
-            _enableSbe = true;
+            setSbeStatus(SbeStatus::kEnabled, node);
             return;
         }
 
         // $lookup + $unwind case: both the local-side access plan flag and the strategy flag must
         // be enabled for this LU node to be pushed into SBE.
         if (_containsLuPattern && _isStrategyEnabled(node.lookupStrategy)) {
-            _enableSbe = true;
+            setSbeStatus(SbeStatus::kEnabled, node);
         } else {
             // Reset the cut point, since this LU node has to be left out from the SBE plan. If we
             // have a non-LU child, it'll become the next cut point. If it's a LU child, it'll also
@@ -162,7 +137,7 @@ public:
             //
             // We also disable SBE for now, since this might be the bottom-most node in the QSN,
             // which would make us disable SBE for this QSN.
-            _enableSbe = false;
+            setSbeStatus(SbeStatus::kDisabled, node);
             _cutPoint = nullptr;
         }
     }
@@ -172,11 +147,29 @@ public:
     }
 
     void finish(RuleEngine& engine) {
-        if (_enableSbe && _cutPoint)
+        if (_sbeStatus == SbeStatus::kEnabled && _cutPoint)
             engine.match(_cutPoint);
     }
 
 private:
+    enum class SbeStatus { kDisabled, kEnabled };
+
+    void setSbeStatus(SbeStatus newStatus, const QuerySolutionNode& currentNode) {
+        static const auto statusToString = [](SbeStatus status) {
+            return status == SbeStatus::kEnabled ? "enabled" : "disabled";
+        };
+
+        if (_sbeStatus != newStatus) {
+            LOGV2_DEBUG(13022700,
+                        5,
+                        "Engine selection: _sbeStatus changed during QSN analysis",
+                        "oldValue"_attr = statusToString(_sbeStatus),
+                        "newValue"_attr = statusToString(newStatus),
+                        "node"_attr = redact(currentNode.toString()));
+            _sbeStatus = newStatus;
+        }
+    }
+
     // Returns true if the IFR flag for the given LU join strategy is enabled, meaning the strategy
     // is eligible for SBE pushdown.
     bool _isStrategyEnabled(EqLookupNode::LookupStrategy strategy) const {
@@ -212,7 +205,7 @@ private:
     // Indicates whether the query (either as a whole or after a cut) must be executed in SBE or
     // not. It's set to true by nodes that trigger SBE usage (e.g. GroupNode or EqLookupNode;
     // both $lookup and $lookup+$unwind are represented as EqLookupNode).
-    bool _enableSbe = false;
+    SbeStatus _sbeStatus = SbeStatus::kDisabled;
 
     // Represents the topmost QSN that must run in SBE. This is chosen so as to leave out the nodes
     // with disabled patterns.
@@ -295,8 +288,15 @@ static_assert(HasPreVisit<AndHashOrSortedRule, AndHashNode>);
 }  // namespace
 
 bool isPlanSbeCompatible(const QuerySolution* solution) {
-    return !treeMatchesAny(
+    const QuerySolutionNode* incompatibleNode = treeSearch(
         solution->root(), DistinctScanRule(), HashedIndexScanPatternRule(), AndHashOrSortedRule());
+    if (incompatibleNode) {
+        LOGV2_DEBUG(13022704,
+                    5,
+                    "SBE-incompatible node found",
+                    "node"_attr = redact(incompatibleNode->toString()));
+    }
+    return !incompatibleNode;
 }
 
 EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
@@ -305,25 +305,43 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
     LOGV2_DEBUG(11986305,
                 1,
                 "Plan-based engine selection logic invoked.",
-                "solution"_attr = solution->toString());
+                "solution"_attr = redact(solution->toString()));
 
     // Test-only: when the failpoint is active, override engine selection based on the index name
     // used by the winning plan's IXSCAN. An IXSCAN named "sbe" forces SBE; an IXSCAN named
     // "classic" forces classic. This takes precedence over all other rules.
     if (auto scoped = engineSelectionOverrideByIndexName.scoped();
         MONGO_unlikely(scoped.isActive())) {
-        if (treeMatchesAny(solution->root(), IndexNameRule_ForTest("sbe"))) {
+        if (treeMatchesAny(
+                solution->root(), /*allowEarlyExit=*/true, IndexNameRule_ForTest("sbe"))) {
             return {EngineChoice::kSbe, solution->root()};
         }
-        if (treeMatchesAny(solution->root(), IndexNameRule_ForTest("classic"))) {
+        if (treeMatchesAny(
+                solution->root(), /*allowEarlyExit=*/true, IndexNameRule_ForTest("classic"))) {
             return {EngineChoice::kClassic, nullptr};
         }
     }
 
-    const bool containsLuPattern = treeMatchesAny(dataAccessNode, makeLookupUnwindRule(ifrContext));
+    // TODO SERVER-129910 statically generate LU rule.
+    const auto luRule = makeLookupUnwindRule(ifrContext);
+    const bool containsLuPattern =
+        treeMatchesAny(dataAccessNode, /*allowEarlyExit=*/true, StateMachineMatcher(luRule));
+    LOGV2_DEBUG(13022705,
+                5,
+                "Engine selection analyzed plan for LU pattern",
+                "containsLuPattern"_attr = containsLuPattern);
 
     const QuerySolutionNode* planPushdownRoot =
         treeSearch(solution->root(), PlanPushdownSelector(containsLuPattern, ifrContext));
+
+    if (planPushdownRoot) {
+        LOGV2_DEBUG(13022706,
+                    5,
+                    "SBE chosen during plan-based engine selection",
+                    "root"_attr = redact(planPushdownRoot->toString()));
+    } else {
+        LOGV2_DEBUG(13022707, 5, "Classic chosen during plan-based engine selection");
+    }
 
     return {planPushdownRoot ? EngineChoice::kSbe : EngineChoice::kClassic, planPushdownRoot};
 }

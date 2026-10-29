@@ -19,6 +19,97 @@ selector:
     # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/crash_mongos_against_upgraded_cluster.js
 
+    # TODO SERVER-94362: now that last-LTS is 9.0, this test is obsolete and should be deleted
+    - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/create_and_drop_database_multiversion_coordination.js
+
+    # TODO SERVER-133004: this test verifies that downgrading FCV below 8.3 fails
+    # when v4 2dsphere indexes exist, downgrading to last-lts (8.0). It is documented (SERVER-118561)
+    # to be removed once 9.0 is last LTS, which this version bump does: last-lts is now 9.0 (>= 8.3),
+    # so the downgrade no longer trips the v4 restriction and the CannotDowngrade expectation fails.
+    - jstests/multiVersion/genericSetFCVUsage/s2_index_v4_downgrade.js
+
+    # TODO SERVER-109312: now that last-LTS is 9.0, this test is obsolete and should be deleted
+    - jstests/multiVersion/genericBinVersion/server-catalog-and-routing/replica_set_to_csrs_promotion_startup_flag.js
+
+    # TODO SERVER-133011: the test hardcodes the expected change-event sequence
+    # produced by the last-lts binary. Now that last-lts is 9.0, the DDL change-event stream differs
+    # from 8.0 (an extra/relocated "create" event), so the expectedEvents sequence no longer matches
+    # (expected "rename", got "create") on the last-lts binary before upgrade. Re-enable once the
+    # expected event sequence is updated for the 9.0 last-lts binary.
+    - jstests/multiVersion/genericChangeStreams/change_streams_event_resumability.js
+
+    # TODO SERVER-123007: Remove the part not required anymore now that 9.0 is lastLTS
+    - jstests/multiVersion/genericSetFCVUsage/replica_set_write_block_upgrade_downgrade.js
+
+    # TODO SERVER-132996: this test launches every entry in allSupportedVersions, including the
+    # static 8.0 binary. Now that last-LTS is 9.0, the 8.0 binary is no longer provisioned in the
+    # multiversion task ("Unable to start program mongod-8.0: No such file or directory"). Re-enable
+    # once the supported-version selection or binary provisioning is updated.
+    - jstests/multiVersion/validate_cross_version.js
+
+    # TODO SERVER-132957: featureFlagQEPrefixSuffixSearch and featureFlagQESubstringSearch are
+    # FCV-gated at 9.0. The test creates FLE2 collections using these QE string-search query types and
+    # expects downgrade to last-LTS to fail with CannotDowngrade. Now that last-LTS is 9.0 (>= 9.0),
+    # the feature is supported at last-LTS and the downgrade succeeds, breaking the CannotDowngrade
+    # expectation.
+    - jstests/multiVersion/genericBinVersion/server-security/fle2_string_search.js
+
+    # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
+    # FCV-gated at 9.0. The "retargeting" oplog notifications are only emitted when an FCV transition
+    # crosses the 9.0 boundary. Now that last-LTS is 9.0, downgrade/upgrade between latest and last-LTS
+    # stays at/above 9.0 and no longer crosses the boundary, so the expected notifications are not
+    # generated. Documented for deletion once the flag reaches last-lts (SERVER-98118).
+    - jstests/multiVersion/genericChangeStreams/set_feature_compatibility_version_triggers_change_streams_retargeting.js
+
+    # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
+    # FCV-gated at 9.0. The test expects change stream v2 to fall back to v1 when downgrading below
+    # 9.0. Now that last-LTS is 9.0, the downgrade target remains at the feature's FCV and the
+    # fallback expectations are no longer valid.
+    - jstests/multiVersion/genericChangeStreams/change_stream_v2_fcv_upgrade_downgrade.js
+
+    # TODO SERVER-132957: the test assumes the last-lts binary writes the authSchema document during
+    # createUser. That was true of the 8.0 binary, but the 9.0 binary only writes it during FCV
+    # downgrade (like latest). Now that last-lts is the 9.0 binary, the upgrade case ("last-lts" ->
+    # "latest") never triggers an FCV downgrade, so the authSchema doc is never created and the lookup
+    # at line 55 returns null.
+    - jstests/multiVersion/genericBinVersion/authz_schema_version.js
+
+    # TODO SERVER-133012: featureFlagConstraintValidationLevel is FCV-gated at 9.0. The test
+    # downgrades from latest to last-LTS and expects the constraint-upgrade collMod steps to be
+    # rejected with InvalidOptions while FCV is kDowngrading. Now that last-LTS is 9.0 (= 9.0), the
+    # feature is still enabled at the downgrade target, so the steps are not rejected and the
+    # commandFailedWithCode assertions fail.
+    - jstests/multiVersion/genericBinVersion/query-execution/constraint_validation_level_setfcv_concurrent.js
+
+    # TODO SERVER-133012: featureFlagConstraintValidationLevel is FCV-gated at 9.0. The
+    # test expects constraint validation operations to be rejected at last-LTS FCV. Now that
+    # last-LTS is 9.0 (= 9.0), the feature is enabled at the target FCV and the expected-failure
+    # assertions fail.
+    - jstests/multiVersion/genericBinVersion/query-execution/constraint_validation_level_fcv_gating.js
+
+    # TODO QUERY-EXECUTION: featureFlagConstraintValidationLevel is FCV-gated at 9.0. The test
+    # expects constraint validation to block downgrade to last-LTS with CannotDowngrade. Now that
+    # last-LTS is 9.0, the feature remains enabled and the downgrade succeeds.
+    - jstests/multiVersion/genericBinVersion/query-execution/schema_validation_level.js
+
+    # TODO SERVER-133012: featureFlagErrorAndLogValidationAction is FCV-gated at 8.1. The
+    # test expects downgrading to last-LTS to fail with CannotDowngrade while a collection uses the
+    # errorAndLog validation action. Now that last-LTS is 9.0 (>= 8.1), the feature remains enabled
+    # at the downgrade target, so the downgrade succeeds and the assertion fails.
+    - jstests/multiVersion/genericBinVersion/query-execution/error_and_log_validation_action.js
+
+    # TODO SERVER-126212: now that 9.0 is last-LTS, this test should be removed.
+    - jstests/multiVersion/genericSetFCVUsage/priority_port_downgrade_checks.js
+
+    # TODO SERVER-133010: featureFlagBinDataConvertNumeric is FCV-gated at 8.1. The
+    # test expects BinData numeric $convert to fail with ConversionFailure in all last-LTS-FCV states.
+    # Now that last-LTS is 9.0 (>= 8.1), the feature is enabled at last-LTS and the conversions
+    # succeed, breaking the expected-failure assertions.
+    - jstests/multiVersion/genericBinVersion/query-execution-classic/bindata_convert_numeric_view_upgrade_downgrade.js
+
+    # TODO SERVER-126212: now that 9.0 is last-LTS, this test should be removed.
+    - jstests/multiVersion/genericSetFCVUsage/fcv_upgrade_downgrade_manages_shard_uuids.js
+
     # Skip any tests that run with auth explicitly.
     - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
     - jstests/multiVersion/genericBinVersion/server-security/dollar_audit_mixed_version_mongods.js
@@ -32,6 +123,7 @@ selector:
 executor:
   config:
     shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       global_vars:
         TestData:
           setParameters:

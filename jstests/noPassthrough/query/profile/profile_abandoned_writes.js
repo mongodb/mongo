@@ -11,6 +11,7 @@
  * the level must be explicitly set back to 1 or 2.
  *
  * @tags: [
+ *   requires_profiling,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -7,7 +7,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -39,7 +39,7 @@ let kCommands = [
     {find: collName},
 ];
 // When UWE is enabled, findAndModify also returns NoProgressMade.
-if (FeatureFlagUtil.isPresentAndDisabled(testDB, "UnifiedWriteExecutor")) {
+if (!isUweEnabled(testDB)) {
     kCommands.push({findAndModify: collName, query: {_id: 0}, update: {$set: {x: 1}}});
 }
 

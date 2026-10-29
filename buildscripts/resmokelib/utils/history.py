@@ -44,6 +44,20 @@ def storable_dict_from_historic(to_storable):
         return to_storable
 
 
+def to_plain(obj):
+    """Recursively convert a Historic (or nested structure) into plain python objects.
+
+    This is the counterpart to 'make_historic': it walks HistoryDicts, lists and
+    tuples and returns plain dicts/lists/scalars suitable for e.g. json.dumps. Unlike
+    'to_storable_dict', it does not wrap the result in serialization metadata.
+    """
+    if isinstance(obj, MutableMapping):
+        return {key: to_plain(value) for key, value in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_plain(value) for value in obj]
+    return obj
+
+
 class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(ABC))):
     """ABC for classes that have trackable historic state."""
 

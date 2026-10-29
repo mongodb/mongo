@@ -1,0 +1,66 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/idl/generic_argument.idl"
+
+structs:
+    RepairReplicatedMetadataSpec:
+        description: "Replicated metadata to repair. Omitted subfields are not repaired."
+        strict: false
+        mod_visibility: public
+        fields:
+            sz:
+                description: "Logical size (bytes) diff to persist."
+                type: safeInt64
+                optional: true
+            ct:
+                description: "Document count diff to persist."
+                type: safeInt64
+                optional: true
+            hDiff:
+                description:
+                    "Collection validation hash diff. Folds into the collection's accumulated
+                    hash via XOR, so it can adjust a present hash but not repair an absent one."
+                type: safeInt64
+                optional: true
+            hSet:
+                description:
+                    "Collection validation hash to set. Replaces the collection's accumulated hash,
+                    including an absent one. A repairReplicatedMetadata command may specify
+                    'hDiff' or 'hSet', but not both."
+                type: safeInt64
+                optional: true
+
+    RepairReplicatedMetadataO2:
+        description: "The o2 field of a repairReplicatedMetadata no-op oplog entry."
+        strict: false
+        mod_visibility: public
+        fields:
+            type:
+                description: "Discriminator, always 'repairReplicatedMetadata'."
+                type: string
+            uuid:
+                description: "UUID of the collection whose replicated metadata is repaired."
+                type: uuid
+            m:
+                description: "The diffs used to repair the replicated metadata."
+                type: RepairReplicatedMetadataSpec
+
+commands:
+    repairReplicatedMetadata:
+        description: "Repairs replicated metadata"
+        command_name: repairReplicatedMetadata
+        namespace: ignored
+        api_version: ""
+        fields:
+            uuid:
+                description: "UUID of the collection whose replicated metadata is repaired."
+                type: uuid
+            metadata:
+                description: "The replicated metadata to repair."
+                type: RepairReplicatedMetadataSpec

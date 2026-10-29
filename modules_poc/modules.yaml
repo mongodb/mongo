@@ -91,6 +91,7 @@ core.service:
     - src/mongo/db/dbdirectclient[._]*
     - src/mongo/dbtests/directclienttests.cpp
     - src/mongo/db/feature_flag*
+    - src/mongo/db/ifr_context_decoration*
     - src/mongo/db/ifr_flag_retry_info*
     - src/mongo/db/error_labels*
     - src/mongo/db/server_feature_flags.idl
@@ -202,6 +203,7 @@ query:
     - src/mongo/db/fts/
     - src/mongo/db/geo/
     - src/mongo/db/hasher*
+    - src/mongo/db/ifr_unrecognized_flag_info*
     - src/mongo/db/index_names*
     - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
     - src/mongo/db/matcher/
@@ -265,6 +267,20 @@ query:
     - src/mongo/db/s/shardsvr_resolve_view_command_test.cpp
     - src/mongo/dbtests/commandtests.cpp
     - src/mongo/s/would_change_owning_shard_exception*
+
+query.knobs:
+  meta:
+    description: >-
+      The query knob framework. Knob server parameters are implementation details: all per-query
+      knob reads must go through QueryKnobConfiguration so that QuerySettings overrides are
+      applied and the values stay stable for the operation's lifetime.
+    fully_marked: true
+  files:
+    - src/mongo/db/query/query_knobs/
+    - src/mongo/db/query/query_execution_knobs*
+    - src/mongo/db/query/query_optimization_knobs*
+    - src/mongo/db/query/query_knob_descriptors_*
+    - src/mongo/db/query/stage_memory_limit_knobs/
 
 catalog_and_routing:
   meta:
@@ -423,7 +439,7 @@ access_control:
 admission:
   meta:
     slack: server-workload-resilience
-    jira: Workload Scheduling
+    jira: Workload Resilience
     fully_marked: true
   files:
     - src/mongo/db/admission/
@@ -432,7 +448,7 @@ admission:
 workload_simulation:
   meta:
     slack: server-workload-resilience
-    jira: Workload Scheduling
+    jira: Workload Resilience
     fully_marked: true
   files:
     - src/mongo/tools/workload_simulation/
@@ -479,9 +495,12 @@ security:
     - src/mongo/db/commands/connection_status.*
     - src/mongo/db/commands/hashcmd.cpp
     - src/mongo/db/commands/rotate_certificates*
+    - src/mongo/db/landlock*
     - src/mongo/db/modules/enterprise/src/fips
     - src/mongo/db/modules/enterprise/src/kmip
+    - src/mongo/db/modules/enterprise/src/landlock
     - src/mongo/db/system_index*
+    - src/mongo/util/landlock
 
 field_level_encryption:
   meta:
@@ -552,6 +571,8 @@ data_movement:
     - src/mongo/db/s/active_migrations*
     - src/mongo/db/s/random_migration_testing_utils*
     - src/mongo/db/s/*range_delet*
+    - src/mongo/db/s/max_key_orphan*
+    - src/mongo/db/s/max_key_zone*
     - src/mongo/db/s/chunk*
     - src/mongo/db/s/start_chunk*
     - src/mongo/db/s/*move_range*
@@ -634,6 +655,7 @@ observability.metrics:
     jira: Networking & Observability
     fully_marked: true
   files:
+    - src/mongo/db/metrics_*
     - src/mongo/otel/metrics/
 
 observability.ftdc:
@@ -650,7 +672,9 @@ observability.commands:
     jira: Networking & Observability
     fully_marked: true
   files:
+    - src/mongo/db/commands/get_metrics_filtering_allowlist*
     - src/mongo/db/commands/parse_log_component_settings*
+    - src/mongo/db/commands/update_metrics_filtering_allowlist*
     - src/mongo/db/commands/xray_commands*
     - src/mongo/s/commands/cluster_ftdc_commands.cpp
     - src/mongo/s/commands/cluster_netstat_cmd.cpp
@@ -674,9 +698,11 @@ networking:
     - src/mongo/executor/connection_metrics.h
     - src/mongo/executor/network*
     - src/mongo/executor/remote_command*
+    - src/mongo/executor/rpc_local_timing*
     - src/mongo/executor/test_network*
     - src/mongo/executor/mock_network*
     - src/mongo/executor/mock_async_rpc*
+    - src/mongo/executor/mock_async_client_factory*
     - src/mongo/executor/pooled_async_client_factory.h
     - src/mongo/executor/egress_*
 
@@ -1018,6 +1044,7 @@ replication.hello:
   files:
     - src/mongo/db/repl/hello/
     - src/mongo/db/repl/replication_info.cpp
+    - src/mongo/db/repl/replication_info_test.cpp
 
 replication.initial_sync:
   meta:
@@ -1030,6 +1057,7 @@ replication.initial_sync:
     - src/mongo/db/repl/*multiapplier*
     - src/mongo/db/repl/*storage_interface*
     - src/mongo/db/repl/*collection_bulk_loader*
+    - src/mongo/db/repl/clean_shutdown.idl
 
 replication.configs:
   meta:
@@ -1061,11 +1089,13 @@ replication.oplog:
     - src/mongo/db/repl/*apply_ops*
     - src/mongo/db/repl/*bgsync*
     - src/mongo/db/repl/*consistency_markers*
+    - src/mongo/db/repl/*internode_validation*
     - src/mongo/db/repl/*get_next_optimes_test*
     - src/mongo/db/repl/*idempotency_test_fixture*
     - src/mongo/db/repl/*insert_group*
     - src/mongo/db/repl/*noop_writer*
     - src/mongo/db/repl/*oplog*
+    - src/mongo/db/repl/*pipelined*
     - src/mongo/db/repl/*oplog_visibility_manager*
     - src/mongo/db/repl/*optime*
     - src/mongo/db/repl/*reporter*
@@ -1074,6 +1104,7 @@ replication.oplog:
     - src/mongo/db/repl/*sync_source*
     - src/mongo/db/repl/apply_container_ops_test.cpp
     - src/mongo/db/repl/local_oplog_info*
+    - src/mongo/db/repl/repl_network_traffic_stats*
     - src/mongo/db/repl/repl_worker_pool_thread_count*
     - src/mongo/s/commands/cluster_oplog_note_cmd.cpp
     - src/mongo/s/commands/cluster_repl_set_get_status_cmd.cpp
@@ -1126,6 +1157,8 @@ replication.replication_coordinator:
   files:
     - src/mongo/db/repl/*optime_observer*
     - src/mongo/db/repl/*replication_coordinator*
+    - src/mongo/db/repl/*write_concern_waiter_list*
+    - src/mongo/db/repl/*lock_guard_with_deferred_task*
     - src/mongo/db/repl/*external_state*
     - src/mongo/db/repl/*heartbeat*
     - src/mongo/db/repl/*topology_coordinator*

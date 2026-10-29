@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -49,6 +23,23 @@ using ProjectionParams = std::variant<NoProjection, TopLevelFieldsProjection>;
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 using SamplingMetadata = mongo::cost_based_ranker::SamplingMetadata;
 
+/**
+ * One persisted NDV statistic (analyze mode "ndv") that served an estimate: the (sorted) field
+ * paths it describes and the statistics document's creation time. Deliberately not part of
+ * SamplingMetadata: NDV statistics are field statistics, unrelated to the sample, even though
+ * the sampling estimator serves both.
+ */
+struct PersistedNDVEntry {
+    std::vector<std::string> sortedFieldPaths;
+    // When 'analyze' built this statistic; one namespace may serve several NDV statistics, each
+    // analyzed at its own time.
+    Date_t createdAt;
+    // The NDV of each persisted sketch variant, in the persisted order (see NdvStats in
+    // field_stats.idl). Lets the reader cache a loaded statistic compactly, without the
+    // 16KB-per-sketch registers.
+    std::vector<long long> ndvPerSketch;
+};
+
 class SamplingEstimator {
 public:
     virtual ~SamplingEstimator() {}
@@ -58,13 +49,6 @@ public:
      * sample.
      */
     virtual CardinalityEstimate estimateCardinality(const MatchExpression* expr) const = 0;
-
-    /**
-     * Batch Estimates the Cardinality of a vector of filter/MatchExpression by running the given
-     * MEs against the sample.
-     */
-    virtual std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<const MatchExpression*>& expr) const = 0;
 
     /**
      * Estimates the number of keys scanned for the given IndexBounds.
@@ -101,6 +85,12 @@ public:
      * Does not support estimating NDV over array-valued fields.
      * 'fields' specifies which fields should follow strict, $expr-style equality (null !=
      * missing) vs. regular equality semantics (null == missing).
+     *
+     * Note: when the estimate is served from persisted NDV statistics (no bounds, at most
+     * kNdvMaxFields fields), the semantics select the persisted folding variant. A single-field
+     * statistic carries only the strict ($expr) sketch and serves both semantics, off by at most
+     * one; a composite statistic carries one variant per folded field, and requests folding
+     * several fields fall back to the sample.
      */
     virtual CardinalityEstimate estimateNDV(
         const std::vector<FieldPathAndEqSemantics>& fields,
@@ -108,6 +98,16 @@ public:
 
     CardinalityEstimate estimateNDV(const std::vector<FieldPathAndEqSemantics>& fields) const {
         return estimateNDV(fields, boost::none);
+    }
+
+    /**
+     * Like estimateNDV(), but only serves the estimate from persisted NDV statistics (analyze mode
+     * "ndv") and never falls back to the sample. Returns boost::none if no persisted statistics
+     * cover the given fields.
+     */
+    virtual boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
+        const std::vector<FieldPathAndEqSemantics>& fields) const {
+        return boost::none;
     }
 
     /**
@@ -136,6 +136,22 @@ public:
      * Returns metadata about the sample used for cardinality estimation.
      */
     virtual SamplingMetadata getSamplingMetadata() const = 0;
+
+    /**
+     * Returns one entry per persisted NDV statistic (analyze mode "ndv") that served an
+     * estimate, sorted by field paths. Kept apart from getSamplingMetadata(): these are field
+     * statistics, not derived from the sample, even though this estimator serves both.
+     */
+    virtual std::vector<PersistedNDVEntry> getPersistedNDVMetadata() const = 0;
+
+    /**
+     * Returns the number of distinct persisted NDV statistics (analyze mode "ndv") this estimator
+     * has served so far. Repeated NDV requests for the same field path are memoized and counted
+     * once. Cheaper than getPersistedNDVMetadata() when only the count is needed.
+     */
+    virtual size_t getNumPersistedNDVStatsUsed() const {
+        return 0;
+    }
 };
 
 }  // namespace mongo::ce

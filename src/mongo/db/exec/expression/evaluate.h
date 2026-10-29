@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/db/pipeline/expression_function.h"
@@ -42,15 +17,134 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-class SimpleMemoryUsageTracker;
-
 namespace exec::expression {
+
+/**
+ * Resolves the memory-usage tracker an expression evaluator should use. Returns the stage-owned
+ * tracker when one was wired to 'ctx' (so usage is attributed to the stage); otherwise returns the
+ * query-scoped fallback tracker owned by the expression's ExpressionContext (see
+ * getExpressionFallbackTracker()). Contexts excluded from operation-wide memory tracking always
+ * use the fallback tracker.
+ */
+inline SimpleMemoryUsageTracker& getMemoryTracker(const Expression& expr,
+                                                  const EvaluationContext& ctx) {
+    auto* expCtx = expr.getExpressionContext();
+    if (ctx.tracker && !expCtx->getExcludeOperationMemoryTracking()) {
+        return *ctx.tracker;
+    }
+    return expCtx->getExpressionFallbackTracker();
+}
+
+/**
+ * Granularity at which a per-element evaluation loop (e.g. $concatArrays, $setUnion) should batch
+ * its charges to 'tracker' before calling add()/assertWithinMemoryLimit(). Scales with 'tracker's
+ * remaining budget across its whole base chain (see remainingMemoryUsageBytes()), since the
+ * binding limit is usually an ancestor (the operation-wide tracker), not 'tracker's own.
+ *
+ * Shrinks as usage approaches whichever limit in the chain binds first, down to 0 once some
+ * tracker in the chain is already at or over its limit -- so a caller checks in almost every
+ * element near the limit, and batches coarsely (up to the 1MB cap) far from it.
+ */
+inline int64_t expressionMemoryFlushThresholdBytes(const SimpleMemoryUsageTracker& tracker,
+                                                   OperationContext* opCtx) {
+    constexpr int64_t kDivisor = 256;
+    constexpr int64_t kMinThresholdBytes = 1024;         // 1KB
+    constexpr int64_t kMaxThresholdBytes = 1024 * 1024;  // 1MB
+    int64_t remaining = tracker.remainingMemoryUsageBytes(opCtx);
+    if (remaining <= 0) {
+        return 0;
+    }
+    return std::clamp(remaining / kDivisor, kMinThresholdBytes, kMaxThresholdBytes);
+}
+
+/**
+ * Owns the memory token for an expression evaluator and batches the charges an evaluation loop
+ * makes against the tracker: callers report bytes as they produce them with add(), and the tracker
+ * -- along with its limit check -- is only touched once the accumulated amount crosses the
+ * threshold returned by expressionMemoryFlushThresholdBytes(), which shrinks as usage approaches
+ * whichever limit in the base chain binds first. This keeps the common, far-from-the-limit case off
+ * the per-element path while still failing an over-limit query at nearly the same element the
+ * unbatched code would have.
+ *
+ * Callers must call flush() once they are done adding, so the final partial batch is charged and
+ * checked -- bytes still pending when this object goes out of scope are never charged at all. The
+ * token is released on destruction, exactly as a bare SimpleMemoryUsageToken would be.
+ */
+class BatchedExpressionMemoryCharger {
+public:
+    BatchedExpressionMemoryCharger(const Expression& expr,
+                                   const EvaluationContext& ctx,
+                                   std::string_view opName)
+        : _opCtx(expr.getExpressionContext()->getOperationContext()),
+          _stageName(ctx.stageName),
+          _opName(opName),
+          _tracker(getMemoryTracker(expr, ctx)),
+          _memToken(0, &_tracker),
+          _flushThreshold(expressionMemoryFlushThresholdBytes(_tracker, _opCtx)) {}
+
+    /**
+     * Uses the expression's own operator name. Templated on the concrete expression type because
+     * getOpName() is declared by the subclasses (ExpressionNary and friends), not by Expression.
+     */
+    template <typename ExpressionType>
+    BatchedExpressionMemoryCharger(const ExpressionType& expr, const EvaluationContext& ctx)
+        : BatchedExpressionMemoryCharger(expr, ctx, expr.getOpName()) {}
+
+    /**
+     * Reports 'bytes' of newly used memory, flushing to the tracker if the pending batch has grown
+     * past the current threshold.
+     */
+    void add(int64_t bytes) {
+        _pending += bytes;
+        if (MONGO_unlikely(_pending >= _flushThreshold)) {
+            flush();
+        }
+    }
+
+    /**
+     * Like add(), but for callers that know their cumulative size (e.g. the length of an output
+     * buffer) rather than the growth since the last report.
+     */
+    void setTotal(int64_t totalBytes) {
+        add(totalBytes - (_memToken.getCurrentMemoryUsageBytes() + _pending));
+    }
+
+    /**
+     * Charges any pending bytes to the tracker and asserts that the operation is still within its
+     * memory limit. A no-op when nothing is pending: usage has not moved since the last flush, so
+     * there is nothing to reject. Note this means a zero-byte charge made while the chain is
+     * already over its limit does not throw. The next charge that moves any memory does, and an
+     * evaluator which does not increase the memory again is not using memory worth failing the
+     * query over.
+     */
+    void flush() {
+        if (_pending == 0) {
+            return;
+        }
+        _memToken.add(_pending);
+        _pending = 0;
+        _tracker.assertWithinMemoryLimit(_opCtx, _opName, _stageName);
+        _flushThreshold = expressionMemoryFlushThresholdBytes(_tracker, _opCtx);
+    }
+
+private:
+    OperationContext* _opCtx;
+    std::string_view _stageName;
+    std::string_view _opName;
+    SimpleMemoryUsageTracker& _tracker;
+    SimpleMemoryUsageToken _memToken;
+
+    // Bytes reported by the caller but not yet charged to '_tracker'.
+    int64_t _pending = 0;
+    int64_t _flushThreshold;
+};
 
 /**
  * Calls function 'function' with zero parameters and returns the result. If AssertionException is
@@ -656,8 +750,10 @@ inline Value evaluate(const ExpressionCompare& expr,
                       Variables* variables,
                       const EvaluationContext& ctx) {
     const auto& children = expr.getChildren();
-    int cmp = expr.getExpressionContext()->getValueComparator().compare(
-        children[0]->evaluate(root, variables, ctx), children[1]->evaluate(root, variables, ctx));
+
+    const auto lhs = children[0]->evaluate(root, variables, ctx);
+    const auto rhs = children[1]->evaluate(root, variables, ctx);
+    int cmp = expr.getExpressionContext()->getValueComparator().compare(lhs, rhs);
 
     // Make cmp one of 1, 0, or -1.
     if (cmp == 0) {

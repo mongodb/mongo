@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
@@ -47,6 +22,7 @@ public:
     explicit SortImpl(SortStage& stage) : _stage(stage) {}
 
     void prepare(CompileCtx& ctx) override {
+        _bytecode = ctx.getByteCode();
         _stage._children[0]->prepare(ctx);
 
         size_t counter = 0;
@@ -78,7 +54,8 @@ public:
         }
 
         _stage._memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
-            _stage._opCtx, _stage._specificStats.maxMemoryUsageBytes);
+            _stage._opCtx,
+            MemoryUsageLimit{static_cast<int64_t>(_stage._specificStats.maxMemoryUsageBytes)});
     }
 
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) override {
@@ -104,13 +81,14 @@ public:
 
         _makeSorter();
 
+        auto& memoryTracker = _stage._memoryTracker.value();
+
         while (_stage._children[0]->getNext() == PlanState::ADVANCED) {
             KeyRow keys{_inKeyAccessors.size()};
 
             size_t idx = 0;
             for (auto accessor : _inKeyAccessors) {
-                auto [tag, val] = accessor->getViewOfValue();
-                keys.reset(idx++, false, tag, val);
+                keys.reset(idx++, accessor->getViewOfValue());
             }
 
             // Do not allocate the values here, instead let the sorter decide, since the sorter may
@@ -119,13 +97,12 @@ public:
                 ValueRow vals{_inValueAccessors.size()};
                 size_t idx = 0;
                 for (auto accessor : _inValueAccessors) {
-                    auto [tag, val] = accessor->getViewOfValue();
-                    vals.reset(idx++, false, tag, val);
+                    vals.reset(idx++, accessor->getViewOfValue());
                 }
                 return vals;
             });
 
-            _stage._memoryTracker.value().set(_sorter->stats().memUsage());
+            memoryTracker.set(_sorter->stats().memUsage());
         }
 
         _stage._specificStats.peakTrackedMemBytes =
@@ -231,7 +208,7 @@ private:
     };
 
     int64_t _runLimitCode() {
-        value::TagValueMaybeOwned res = vm::ByteCode{}.run(_limitCode.get());
+        value::TagValueMaybeOwned res = _bytecode->run(_limitCode.get());
         tassert(8349205,
                 "Limit code returned unexpected value",
                 res.tag() == value::TypeTags::NumberInt64);
@@ -280,6 +257,7 @@ private:
     SorterData* _outputDataIt{&_outputData};
     std::unique_ptr<Sorter<KeyRow, ValueRow>> _sorter;
     std::unique_ptr<vm::CodeFragment> _limitCode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 };
 
 std::unique_ptr<SortStage::SortIface> SortStage::_makeStageImpl() {

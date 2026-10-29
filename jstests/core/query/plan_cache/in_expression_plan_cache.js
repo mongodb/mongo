@@ -4,6 +4,7 @@
  * and without explode for sort optimization.
  *
  * @tags: [
+ *   uses_explain,
  *   # Since the plan cache is per-node state, this test assumes that all operations are happening
  *   # against the same mongod.
  *   assumes_read_preference_unchanged,
@@ -32,9 +33,7 @@ import {
     getPlanStages,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
-const isUsingSbePlanCache = sbePlanCacheEnabled(db);
 const coll = db.explode_for_sort_plan_cache;
 coll.drop();
 
@@ -241,7 +240,7 @@ assertQueryParameterizedCorrectly({
     newQueryCount: 60,
     // The plan cache entry is always reused for the classic engine but never reused for the SBE
     // engine.
-    reuseEntry: !isUsingSbePlanCache,
+    reuseEntry: true,
 });
 
 // Rewriting the $in predicate with $or should reuse the plan cache and gives correct results.
@@ -290,7 +289,7 @@ assertQueryParameterizedCorrectly({
     queryCount: 30,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 2, 3]}},
     newQueryCount: 60,
-    reuseEntry: !isUsingSbePlanCache,
+    reuseEntry: true,
     sortSpec: {c: 1},
     isExplodeForSort: true,
 });
@@ -303,14 +302,14 @@ for (let specialValue of [null, {x: 1}, [1]]) {
         queryCount: 30,
         newQuery: {a: {$eq: specialValue}, b: {$in: [1, 2]}},
         newQueryCount: 0,
-        reuseEntry: !isUsingSbePlanCache,
+        reuseEntry: true,
     });
     assertQueryParameterizedCorrectly({
         query: {a: {$eq: 1}, b: {$in: [1, 2]}},
         queryCount: 30,
         newQuery: {a: {$eq: 1}, b: {$in: [0, specialValue]}},
         newQueryCount: 0,
-        reuseEntry: !isUsingSbePlanCache,
+        reuseEntry: true,
     });
 }
 
@@ -364,7 +363,7 @@ assertQueryParameterizedCorrectly({
     queryCount: 60,
     newQuery: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
     newQueryCount: 60,
-    reuseEntry: !isUsingSbePlanCache,
+    reuseEntry: true,
     sortSpec: {c: 1},
     isExplodeForSort: true,
 });

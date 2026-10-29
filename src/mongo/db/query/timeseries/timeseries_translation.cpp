@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 
@@ -176,6 +150,10 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
             "Timeseries collections must have timeseries options",
             timeseriesFields.has_value());
 
+    // TypeCollectionTimeseriesFields carries no usesExtendedRange info, so the router cannot know
+    // whether it's safe to apply fixed-bucket optimizations; omitting the argument conservatively
+    // disables them. Shards set fixedBuckets correctly via
+    // populateUnpackBucketStagesFromCollection.
     return TimeseriesTranslationParams{
         timeseriesFields->getTimeseriesOptions(),
         !timeseriesFields->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true),
@@ -202,7 +180,8 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
     return TimeseriesTranslationParams{
         collPtr->getTimeseriesOptions().get(),
         !collPtr->getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads(),
-        canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions())};
+        canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions(),
+                                       collPtr->getRequiresTimeseriesExtendedRangeSupport())};
 }
 
 template <class T>
@@ -278,8 +257,9 @@ void populateUnpackBucketStagesFromCollection(Pipeline& pipeline, const Collecti
             }
 
             if (!unpack->fixedBuckets()) {
-                unpack->setFixedBuckets(
-                    canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions()));
+                unpack->setFixedBuckets(canUseFixedBucketOptimizations(
+                    *collPtr->getTimeseriesOptions(),
+                    collPtr->getRequiresTimeseriesExtendedRangeSupport()));
             }
 
             if (!unpack->usesExtendedRange()) {

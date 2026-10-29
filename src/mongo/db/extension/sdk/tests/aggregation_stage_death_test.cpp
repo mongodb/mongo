@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/query_execution_context.h"
-#include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/public/api.h"
@@ -173,79 +146,79 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, DescriptorAndParseNodeNameMismatchFa
     [[maybe_unused]] auto parseNodeHandle = handle->parse(stageBson);
 }
 
-DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
+DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "517") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
+DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "517") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.get_query_shape = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
+DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "517") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.expand = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
+DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "517") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
-DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTablePromote, "11113700") {
+DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTablePromote, "517") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
     vtable.promote = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
-DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableGetProperties, "11347800") {
+DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableGetProperties, "517") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
     vtable.get_properties = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
-DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsGetNext, "10956800") {
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsGetNext, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.get_next = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
-};
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsSetSource, "10957202") {
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsSetSource, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.set_source = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
-};
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsOpen, "11216705") {
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsOpen, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.open = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
-};
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsReopen, "11216706") {
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsReopen, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.reopen = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
-};
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsClose, "11216707") {
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsClose, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.close = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
-};
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsExplain, "12149001") {
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsExplain, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.explain = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
-};
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvanced, "10956801") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvanced, "519") {
     auto invalidExtensionExecAggStageAdvancedState =
         new extension::sdk::ExtensionExecAggStageAdapter(
             InvalidExtensionExecAggStageAdvancedState::make());
@@ -254,9 +227,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvance
     [[maybe_unused]] auto getNext = handle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest,
-             InvalidExtensionGetNextResultPauseExecution,
-             "10956802") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultPauseExecution, "519") {
     auto invalidExtensionExecAggStagePauseExecutionState =
         new extension::sdk::ExtensionExecAggStageAdapter(
             InvalidExtensionExecAggStagePauseExecutionState::make());
@@ -265,7 +236,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
     [[maybe_unused]] auto getNext = handle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultEOF, "10956805") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultEOF, "519") {
     auto invalidExtensionExecAggStageEofState = new extension::sdk::ExtensionExecAggStageAdapter(
         InvalidExtensionExecAggStageEofState::make());
 
@@ -273,7 +244,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultEOF, "1
     [[maybe_unused]] auto getNext = handle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidMongoExtensionGetNextResultCode, "10956803") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidMongoExtensionGetNextResultCode, "519") {
     ::MongoExtensionGetNextResult result = {.code =
                                                 static_cast<::MongoExtensionGetNextResultCode>(10),
                                             .resultDocument = createEmptyByteContainer()};
@@ -334,7 +305,7 @@ public:
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidExtensionGetNextResultAdvancedFromCompiledExecAggStage,
-             "10956801") {
+             "519") {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         TestLogicalStageCompileWithInvalidExtensionExecAggStageAdvancedState::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -346,7 +317,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidExtensionGetNextResultPauseExecutionFromCompiledExecAggStage,
-             "10956802") {
+             "519") {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         TestLogicalStageCompileWithInvalidExtensionExecAggStagePauseExecutionState::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -358,7 +329,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidExtensionGetNextResultEOFFromCompiledExecAggStage,
-             "10956805") {
+             "519") {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         TestLogicalStageCompileWithInvalidExtensionExecAggStageEofState::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
@@ -368,19 +339,17 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
     [[maybe_unused]] auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
 };
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsSize, "11368301") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsSize, "517") {
     auto vtable = sdk::ExtensionDPLArrayContainerAdapter::getVTable();
     vtable.size = nullptr;
-    DPLArrayContainerAPI::assertVTableConstraints(vtable);
-};
+    DPLArrayContainerAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
-DEATH_TEST_F(AggStageErrorFixtureDeathTest,
-             InvalidDPLArrayContainerVTableFailsTransfer,
-             "11368302") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsTransfer, "517") {
     auto vtable = sdk::ExtensionDPLArrayContainerAdapter::getVTable();
     vtable.transfer = nullptr;
-    DPLArrayContainerAPI::assertVTableConstraints(vtable);
-};
+    DPLArrayContainerAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              DPLArrayContainerExtensionToHostWrongSizeFails,
@@ -419,34 +388,34 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
     testDplInternalTransfer.transferInternal(targetArray);
 }
 
-DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetShards, "11027300") {
+DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetShards, "517") {
     auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.extract_shards_pipeline = nullptr;
-    DistributedPlanLogicAPI::assertVTableConstraints(vtable);
-};
-
-DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetMerging, "11027301") {
-    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
-    vtable.extract_merging_pipeline = nullptr;
-    DistributedPlanLogicAPI::assertVTableConstraints(vtable);
-};
-
-DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPattern, "11027302") {
-    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
-    vtable.get_sort_pattern = nullptr;
-    DistributedPlanLogicAPI::assertVTableConstraints(vtable);
-};
-
-DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRulePreconditionTasserts, "12201402") {
-    auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
-    vtable.evaluate_pipeline_rewrite_rule_precondition = nullptr;
-    LogicalAggStageAPI::assertVTableConstraints(vtable);
+    DistributedPlanLogicAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
-DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRuleTransformTasserts, "12201403") {
+DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetMerging, "517") {
+    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
+    vtable.extract_merging_pipeline = nullptr;
+    DistributedPlanLogicAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPattern, "517") {
+    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
+    vtable.get_sort_pattern = nullptr;
+    DistributedPlanLogicAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRulePreconditionTasserts, "517") {
+    auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
+    vtable.evaluate_pipeline_rewrite_rule_precondition = nullptr;
+    LogicalAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRuleTransformTasserts, "517") {
     auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
     vtable.evaluate_pipeline_rewrite_rule_transform = nullptr;
-    LogicalAggStageAPI::assertVTableConstraints(vtable);
+    LogicalAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterStageRulesTasserts, "12201401") {
@@ -459,7 +428,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterStageRulesTasserts, "122
         },
         .register_stage_rules = nullptr,
     };
-    sdk::HostPortalAPI::assertVTableConstraints(vtable);
+    sdk::HostPortalAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
@@ -522,44 +491,6 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NoSourceStageForTransformStage, "109
         std::make_unique<host::QueryExecutionContext>(expCtx.get()));
     // Call getNext() without setting a source.
     [[maybe_unused]] auto result = transformStage->getNext(&ctxAdapter, nullptr);
-}
-
-// TODO SERVER-123101: Move these death tests to host_aggregation_stage_death_test.cpp alongside the
-// other host adapter death tests (see host_aggregation_stage_death_test.cpp).
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, HostExecAggStageAdapterNullStageAsserts, "10957207") {
-    [[maybe_unused]] auto adapter = host_connector::HostExecAggStageAdapter{nullptr};
-}
-
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, SetSourceOnSourceStageFails, "10957210") {
-    // Setting the source of a source stage should fail irrespective of the type of the stage being
-    // set as the source.
-    auto sourceHandle =
-        extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStageAdapter(
-            shared_test_stages::AddFruitsToDocumentsExecStage::make())};
-    // ValidExtensionExecAggStage is a source stage.
-    auto handle = extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStageAdapter(
-        shared_test_stages::ValidExtensionExecAggStage::make())};
-
-    // Calling setSource on a source stage should fail.
-    handle->setSource(sourceHandle);
-}
-
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, GetSourceOnSourceStageFails, "10957208") {
-
-    shared_test_stages::FruitsAsDocumentsExecStage sourceStage{};
-    // Calling getSource on a source stage should fail.
-    [[maybe_unused]] auto source = sourceStage._getSource();
-}
-
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, GetNameOnMovedHandleFails, "10596403") {
-    auto sourceHandle =
-        extension::ExecAggStageHandle{new extension::sdk::ExtensionExecAggStageAdapter(
-            shared_test_stages::AddFruitsToDocumentsExecStage::make())};
-
-    auto sourceHandle2 = std::move(sourceHandle);
-
-    // Calling getName on a source handle should fail.
-    [[maybe_unused]] auto source = sourceHandle->getName();
 }
 
 }  // namespace

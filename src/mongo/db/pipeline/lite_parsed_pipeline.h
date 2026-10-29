@@ -1,36 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -52,6 +24,9 @@
 #include <string_view>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 namespace mongo {
 
 class CollectionRoutingInfo;
@@ -63,7 +38,7 @@ using StageSpecs = std::vector<std::unique_ptr<LiteParsedDocumentSource>>;
  * A semi-parsed version of a Pipeline, parsed just enough to determine information like what
  * foreign collections are involved.
  */
-class MONGO_MOD_PUBLIC LiteParsedPipeline {
+class [[MONGO_MOD_PUBLIC]] LiteParsedPipeline {
 public:
     /**
      * Constructs a LiteParsedPipeline from the raw BSON stages given in 'request'.
@@ -120,6 +95,7 @@ public:
     LiteParsedPipeline(const LiteParsedPipeline& other)
         : _originalParseNss(other._originalParseNss),
           _isRunningAgainstView_ForHybridSearch(other._isRunningAgainstView_ForHybridSearch),
+          _numPrependedViewStages(other._numPrependedViewStages),
           _hasChangeStream(&computeHasChangeStream),
           _involvedNamespaces(&computeInvolvedNamespaces) {
 
@@ -136,6 +112,7 @@ public:
         std::swap(_originalParseNss, other._originalParseNss);
         std::swap(_isRunningAgainstView_ForHybridSearch,
                   other._isRunningAgainstView_ForHybridSearch);
+        std::swap(_numPrependedViewStages, other._numPrependedViewStages);
         // _hasChangeStream and _involvedNamespaces are Deferred and will be recomputed on demand,
         // so we just reset them to point to our _stageSpecs.
         _hasChangeStream = Deferred<bool (*)(const StageSpecs&)>(&computeHasChangeStream);
@@ -192,6 +169,15 @@ public:
             spec->getForeignExecutionNamespaces(nssSet);
         }
         return {nssSet.begin(), nssSet.end()};
+    }
+
+    /**
+     * Returns true if this is the merging half of a split sharded aggregation, i.e. it begins with
+     * a $mergeCursors stage (injected by mongos when dispatching the merge). Such a pipeline is
+     * issued by a router even though it carries no shard/database version.
+     */
+    bool isMergePipeline() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->getParseTimeName() == "$mergeCursors"sv;
     }
 
     /**
@@ -281,6 +267,14 @@ public:
         return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
             return spec->isHybridSearchStage();
         });
+    }
+
+    /**
+     * Returns true if the pipeline has a stage backed by mongot.
+     */
+    bool hasMongotStage() const {
+        return hasSearchStage() || hasHybridSearchStage() || hasExtensionSearchStage() ||
+            hasExtensionVectorSearchStage();
     }
 
     /**
@@ -442,6 +436,15 @@ public:
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
     /**
+     * If 'request' has 'allowPartialResults: true', throws InvalidOptions when the pipeline
+     * contains a stage for which returning partial results does not make sense (write, change
+     * stream, or search stages). This is a no-op when 'allowPartialResults' is unset or false.
+     *
+     * This is only meaningful on a router.
+     */
+    void validateAllowPartialResults(const AggregateCommandRequest& request) const;
+
+    /**
      * Validates the pipeline against collection metadata. Checks stage constraints (e.g.
      * canRunOnTimeseries) using the provided collection routing info or acquisition.
      * Mirrors Pipeline::validateWithCollectionMetadata.
@@ -463,6 +466,28 @@ public:
 
     const StageSpecs& getStages() const {
         return _stageSpecs;
+    }
+
+    /**
+     * Rejection applies to the command as a whole, so a single bypassing stage exempts the
+     * entire pipeline. See LiteParsedDocumentSource::shouldBypassQuerySettingsRejection().
+     */
+    bool shouldBypassQuerySettingsRejection() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](const auto& stage) {
+            return stage->shouldBypassQuerySettingsRejection();
+        });
+    }
+
+    /**
+     * The number of stages at the front of this pipeline that came from a prepended view definition
+     * rather than from the user's request. See '_numPrependedViewStages'.
+     *
+     * Since getStageParams() emits exactly one StageParams per lite-parsed stage, this is a valid
+     * index into the pipeline it returns. It is NOT a valid index into a serialized DocumentSource
+     * pipeline, because alias stages ($sortByCount, $bucket, ...) expand only at parse time.
+     */
+    size_t getNumPrependedViewStages() const {
+        return _numPrependedViewStages;
     }
 
     /**
@@ -535,13 +560,39 @@ public:
      * Calls bindResolvedNamespace() on each stage in the pipeline.
      */
     void bindResolvedNamespaceToStages(const ResolvedNamespace& view,
-                                       const ResolvedNamespaceMap& resolvedNamespaces);
+                                       const ResolvedNamespaceMap& resolvedNamespaces,
+                                       size_t start,
+                                       size_t end);
+
+    /**
+     * Returns the FirstStageViewApplicationPolicy of the first stage the *user* wrote, skipping
+     * over any view-definition stages that handleView() prepended onto this pipeline. Returns
+     * kDefaultPrepend if there are no user stages.
+     *
+     * Never use a prepended view stage's policy to decide whether a view prefix can be discarded;
+     * the view would be silently dropped from the query.
+     *
+     * TODO SERVER-120477 Remove this when legacy mongot is removed.
+     */
+    FirstStageViewApplicationPolicy getUserFirstStageViewApplicationPolicy() const;
 
 private:
     /**
      * Checks that no stage in the pipeline has canRunOnTimeseries == false.
      */
     void validateTimeseries() const;
+
+    /**
+     * Returns true if this pipeline has at least one stage that the user wrote, i.e. one that
+     * handleView() did not prepend.
+     */
+    bool _hasUserStages() const;
+
+    /**
+     * Returns the first stage the user wrote, skipping any stages handleView() prepended. Requires
+     * _hasUserStages().
+     */
+    const LiteParsedDocumentSource* _getFirstUserStage() const;
 
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
@@ -554,6 +605,13 @@ private:
     // TODO SERVER-121094 This can be removed once hybrid search views are validated in
     // LiteParsed using the LiteParsedConstraints.
     bool _isRunningAgainstView_ForHybridSearch = false;
+
+    // Number of stages at the front of '_stageSpecs' that came from a view definition prepended by
+    // handleView(), rather than from the pipeline the user wrote. Maintained by _stitchFront() and
+    // adjusted by replaceStageWith() when one of those prepended stages is desugared in place. Used
+    // by getUserFirstStageViewApplicationPolicy() and getNumPrependedViewStages().
+    // TODO SERVER-120477 Remove this when legacy mongot is removed.
+    size_t _numPrependedViewStages = 0;
 
     /**
      * Prepend 'prefix' stages in front of this pipeline, taking ownership of prefix.

@@ -72,6 +72,7 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/rpc:object_check",
         "//src/mongo/util:varint",
         "//src/mongo/util/concurrency:spin_lock",
         "@zlib",
@@ -118,6 +119,29 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "register_module_ftdc_collectors",
+    srcs = [
+        "register_module_ftdc_collectors.cpp",
+    ],
+    srcs_select = [{
+        "//bazel/config:build_atlas_required_settings": [],
+        "//conditions:default": [
+            "register_module_ftdc_collectors_noop.cpp",
+        ],
+    }],
+    deps = [
+        ":ftdc",
+    ] + select({
+        "//bazel/config:build_atlas_required_settings": [
+            "//src/mongo/db/modules/atlas/src/disagg_storage/pali:register_ftdc_collectors",
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",
+        ],
+    }),
+)
+
+mongo_cc_library(
     name = "ftdc_commands",
     srcs = [
         "ftdc_commands.cpp",
@@ -129,6 +153,8 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:security_token",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/rss:replicated_storage_service",
     ],
 )
 
@@ -140,6 +166,7 @@ mongo_cc_library(
     deps = [
         ":ftdc_commands",
         ":ftdc_server",
+        ":register_module_ftdc_collectors",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:server_base",
         "//src/mongo/executor:task_executor_pool",
@@ -158,6 +185,7 @@ mongo_cc_library(
         ":ftdc_commands",
         ":ftdc_mongos",
         ":ftdc_server",
+        ":register_module_ftdc_collectors",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
@@ -177,6 +205,7 @@ mongo_cc_unit_test(
         "collector_test.cpp",
         "compressor_test.cpp",
         "controller_test.cpp",
+        "decompressor_test.cpp",
         "file_manager_test.cpp",
         "file_writer_test.cpp",
         "ftdc_prctl_test.cpp",

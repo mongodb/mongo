@@ -46,7 +46,6 @@ class test_truncate24(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(key_format_values, set_ts)
 
-    @wttest.skip_for_hook("tiered", "test depends on regular checkpoints running")
     def test_truncate24(self):
         if self.runningHook('disagg') and self.key_format == 'r':
             self.skipTest("disagg does not support column-store")
@@ -82,7 +81,7 @@ class test_truncate24(wttest.WiredTigerTestCase):
 
         # Check stats to make sure we fast-deleted at least one page.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[wiredtiger.stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[wiredtiger.stat.conn.cursor_truncate_fast_delete_pages][2]
         self.assertGreater(fastdelete_pages, 0)
 
         # Verify the data.

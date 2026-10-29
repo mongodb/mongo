@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/checked_cast.h"
@@ -92,11 +66,12 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/version_context.h"
+#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -191,174 +166,6 @@ void uassertStatusOKIgnoreNSNotFound(Status status) {
     uassertStatusOK(status);
 }
 
-/**
- * Generates values for the 'uuid' field of each document of 'config.shards', and then applies those
- * values to the shard identity document on each shard. Already existing 'uuids' values (which may
- * have been generated in a previous call of this function) are preserved. (For dedicated config
- * server, the generated and 'uuid' value will only be persisted on its own identify document).
- */
-void generateShardUUIDs(OperationContext* opCtx) {
-    // Ensure stable topology throughout the execution of this method against concurrent removeShard
-    // requests.
-    DDLLockManager::ScopedCollectionDDLLock ddlLock(
-        opCtx, NamespaceString::kConfigsvrShardsNamespace, "generateShardUUIDs", LockMode::MODE_IS);
-    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    {
-        // The write operations within this block are in/directly dispatched  through a
-        // DBDirectClient. Instantiate an AlternativeClientRegion to ensure 'majority' WC semantics
-        // and avoid polluting the original opCtx.
-        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        auto isConfigServerDedicated = true;
-
-        auto newClient =
-            opCtx->getService()->makeClient("generateShardUUIDs updateConfigShardsDocs");
-        const AlternativeClientRegion clientRegion{newClient};
-        auto altOpCtxHolder = CancelableOperationContext(
-            cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
-        auto* const altOpCtx = altOpCtxHolder.get();
-        altOpCtx->setWriteConcern(defaultMajorityWriteConcern());
-        if (!shardIds.empty()) {
-            // Create one statement per each config.shards document to assign new uuid values where
-            // missing.
-            std::vector<write_ops::UpdateOpEntry> insertUuidStmts;
-            insertUuidStmts.reserve(shardIds.size());
-            for (const auto& shardId : shardIds) {
-                write_ops::UpdateOpEntry updateStmt;
-                updateStmt.setQ(BSON(ShardType::name.name()
-                                     << shardId.toString() << ShardType::uuid.name()
-                                     << BSON("$exists" << false)));
-                updateStmt.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                    BSON("$set" << BSON(ShardType::uuid.name() << UUID::gen()))));
-                updateStmt.setUpsert(false);
-                updateStmt.setMulti(false);
-                insertUuidStmts.push_back(std::move(updateStmt));
-                if (shardId == ShardId::kConfigServerId) {
-                    // Annotate for later consumption.
-                    isConfigServerDedicated = false;
-                }
-            }
-
-            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrShardsNamespace);
-            updateOp.setUpdates(std::move(insertUuidStmts));
-
-            // Run the sequence of updates in a transaction. If at least one document is updated,
-            // bump one of the 'topologyTime' fields to advance the related vector clock component.
-            const auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
-                                              ExecutorPtr txnExec) {
-                const auto result = txnClient.runCRUDOpSync(BatchedCommandRequest(updateOp), {});
-                uassertStatusOK(result.toStatus());
-
-                if (result.getNModified() > 0) {
-                    const auto topologyTime =
-                        VectorClockMutable::get(altOpCtx)->tickClusterTime(1).asTimestamp();
-                    write_ops::UpdateOpEntry topologyTimeEntry;
-                    topologyTimeEntry.setQ(
-                        BSON(ShardType::name.name() << shardIds.back().toString()));
-                    topologyTimeEntry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                        BSON("$set" << BSON(ShardType::topologyTime.name() << topologyTime))));
-                    topologyTimeEntry.setUpsert(false);
-                    topologyTimeEntry.setMulti(false);
-
-                    write_ops::UpdateCommandRequest topologyTimeOp(
-                        NamespaceString::kConfigsvrShardsNamespace);
-                    topologyTimeOp.setUpdates({topologyTimeEntry});
-                    const auto topologyTimeResult =
-                        txnClient.runCRUDOpSync(BatchedCommandRequest(topologyTimeOp), {});
-                    uassertStatusOK(topologyTimeResult.toStatus());
-                }
-                LOGV2(12696400,
-                      "Successfully generated 'uuid' fields for 'config.shards'",
-                      "numUpdated"_attr = result.getNModified());
-
-                return SemiFuture<void>::makeReady();
-            };
-
-
-            auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-            txn_api::SyncTransactionWithRetries txn(altOpCtx,
-                                                    executor,
-                                                    nullptr, /*resourceYielder*/
-                                                    inlineExecutor);
-            txn.run(altOpCtx, transactionChain);
-        }
-
-        // For dedicated Config server, a 'uuid' value has to be generated and stored in its
-        // identity document.
-        if (isConfigServerDedicated) {
-            DBDirectClient directClient(altOpCtx);
-            write_ops::UpdateCommandRequest configIdentityUpdateOp(
-                NamespaceString::kServerConfigurationNamespace);
-            write_ops::UpdateOpEntry configIdentityEntry;
-            configIdentityEntry.setQ(BSON("_id" << ShardIdentityType::IdName
-                                                << ShardType::uuid.name()
-                                                << BSON("$exists" << false)));
-            configIdentityEntry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$set" << BSON(ShardType::uuid.name() << UUID::gen()))));
-            configIdentityEntry.setUpsert(false);
-            configIdentityEntry.setMulti(false);
-            configIdentityUpdateOp.setUpdates({configIdentityEntry});
-            configIdentityUpdateOp.setWriteConcern(defaultMajorityWriteConcern());
-            const auto configIdentityResult = directClient.update(configIdentityUpdateOp);
-            write_ops::checkWriteErrors(configIdentityResult);
-            LOGV2(12696404,
-                  "Successfully generated 'uuid' field for config server's shardIdentity document");
-        }
-    }
-
-    uassertStatusOK(ShardingCatalogManager::get(opCtx)->createIndexForConfigShards(
-        opCtx, /*checkPreconditions=*/false));
-
-    // Copy each generated 'uuid' value to the shard identity document on each shard.
-    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-
-    const auto opTimeWithShards =
-        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kLocalReadConcern);
-
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& shardType : opTimeWithShards.value) {
-        const auto& uuid = shardType.getUuid();
-        if (!uuid) {
-            LOGV2(12696403,
-                  "Shard does not have a 'uuid' field, skipping",
-                  "shard"_attr = shardType.getName());
-            continue;
-        }
-        write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON("_id" << ShardIdentityType::IdName));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$set" << BSON(ShardType::uuid.name() << *uuid))));
-        entry.setUpsert(false);
-        entry.setMulti(false);
-        updateOp.setUpdates({entry});
-        updateOp.setWriteConcern(defaultMajorityWriteConcern());
-        requests.emplace_back(ShardRef(shardType.getName()), updateOp.toBSON());
-    }
-
-    if (requests.empty()) {
-        return;
-    }
-
-    AsyncRequestsSender ars(opCtx,
-                            executor,
-                            DatabaseName::kAdmin,
-                            requests,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            Shard::RetryPolicy::kIdempotent,
-                            nullptr /* resourceYielder */,
-                            {} /* designatedHostsMap */);
-
-    while (!ars.done()) {
-        auto response = ars.next();
-        uassertStatusOKWithContext(AsyncRequestsSender::Response::getEffectiveStatus(response),
-                                   str::stream() << "Failed to update ShardIdentity uuid on shard '"
-                                                 << response.shardId << "'");
-    }
-
-    LOGV2(12696402, "Successfully updated 'uuid' field in ShardIdentity on all shards");
-}
-
 
 void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
     // No shards should be added until we have forwarded the clone command to all shards. We use the
@@ -374,7 +181,7 @@ void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
     // back.
     const auto opTimeWithShards =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+            opCtx, repl::ReadConcernArgs::kLocal);
 
     const auto sendCloneCommandToShard = [&](const std::shared_ptr<Shard>& shard) {
         ShardsvrCloneAuthoritativeMetadata request;
@@ -397,7 +204,7 @@ void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
         }
 
         const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
         if (!shardStatus.isOK()) {
             continue;
         }
@@ -568,6 +375,27 @@ public:
             if (isDryRun) {
                 return;
             }
+
+            // Some invocations of this command complete without performing any writes of their
+            // own (e.g. the early return below when the FCV is already at the target). In those
+            // cases, the client's lastOp can be stale, so waiting for it to be majority committed
+            // below would effectively be a no-op and give a false sense of durability. setFCV's
+            // result should always be based on majority-committed data regardless of whether this
+            // particular invocation performed a write, so unconditionally advance the client's
+            // lastOp to the system's current last opTime first.
+            try {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+            } catch (const DBException& ex) {
+                // Best-effort: this runs in a scope-exit handler, so we must not let an exception
+                // escape. Fall back to waiting on whatever lastOp the client already has.
+                LOGV2_DEBUG(12097800,
+                            2,
+                            "Failed to advance lastOp to the system's last opTime before waiting "
+                            "for setFeatureCompatibilityVersion write concern",
+                            "error"_attr = ex.toStatus());
+            }
+
             WriteConcernResult res;
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,
@@ -589,13 +417,6 @@ public:
             const bool shouldEarlyReturn = !fcvDoc.getPhase().has_value();
 
             if (shouldEarlyReturn) {
-                // Set the client's last opTime to the system last opTime so no-ops wait for
-                // writeConcern. This will wait for any previous setFCV disk writes to be majority
-                // committed before returning to the user, if the previous setFCV command had
-                // updated the FCV but encountered failover afterwards.
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-
                 // _finalizeUpgrade and _finalizeDowngrade are only for any tasks that must be done
                 // to fully complete the FCV upgrade AFTER the FCV document has been updated to the
                 // UPGRADED/DOWNGRADED FCV. We call them here because it's possible that during an
@@ -669,48 +490,61 @@ public:
                 .beforeStartWithoutFCVLock(opCtx, originalVersion, requestedVersion);
 
             {
-                // On shard servers, drain any in-flight chunk operations and block new ones for
-                // the window in which we flip the local FCV document to the transitional state.
+                // Drain any in-flight chunk operations and block new ones for the window in which
+                // we flip the FCV document to the transitional state for Authoritative Shards.
                 // TODO (SERVER-98118): Remove this guard.
                 boost::optional<MigrationBlockingGuard> drainChunkOperations;
-                if (role && role->has(ClusterRole::ShardServer)) {
+                if (role && role->has(ClusterRole::ShardServer) &&
+                    (feature_flags::gAuthoritativeShardsDDL
+                         .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                       originalVersion) ||
+                     feature_flags::gAuthoritativeShardsDDL
+                         .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                       originalVersion))) {
                     drainChunkOperations.emplace(opCtx,
                                                  std::string{"setFeatureCompatibilityVersion"});
+
+                    // At this point, because we are holding the MigrationBlockingGuard, no new
+                    // migrations can start and there are no active ongoing ones. Still, there could
+                    // be migrations pending recovery. Drain them.
+                    migrationutil::drainMigrationsPendingRecovery(opCtx);
+                    migrationutil::assertNoMigrationsRemaining(opCtx);
                 }
 
-                // Start transition to 'requestedVersion' by updating the local FCV document to a
-                // 'kUpgrading' or 'kDowngrading' state, respectively.
-                const auto fcvChangeRegion(
-                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+                auto withFCVLockHeld = [&] {
+                    uassert(ErrorCodes::Error(6744303),
+                            "Failing setFeatureCompatibilityVersion before reaching the FCV "
+                            "transitional stage due to 'failBeforeTransitioning' failpoint set",
+                            !failBeforeTransitioning.shouldFail());
 
-                uassert(ErrorCodes::Error(6744303),
-                        "Failing setFeatureCompatibilityVersion before reaching the FCV "
-                        "transitional stage due to 'failBeforeTransitioning' failpoint set",
-                        !failBeforeTransitioning.shouldFail());
+                    if (role && role->has(ClusterRole::ConfigServer)) {
+                        uassert(ErrorCodes::ConflictingOperationInProgress,
+                                "Failed to start FCV change because an addShardCoordinator is in "
+                                "progress",
+                                ShardingCoordinatorService::getService(opCtx)
+                                    ->areAllCoordinatorsOfTypeFinished(
+                                        opCtx, CoordinatorTypeEnum::kAddShard));
+                    }
 
-                if (role && role->has(ClusterRole::ConfigServer)) {
-                    uassert(
-                        ErrorCodes::ConflictingOperationInProgress,
-                        "Failed to start FCV change because an addShardCoordinator is in progress",
-                        ShardingCoordinatorService::getService(opCtx)
-                            ->areAllCoordinatorsOfTypeFinished(opCtx,
-                                                               CoordinatorTypeEnum::kAddShard));
-                }
-
-                // If this is a config server, then there must be no active
-                // SetClusterParameterCoordinator instances active when downgrading.
-                if (role && role->has(ClusterRole::ConfigServer) &&
-                    requestedVersion < originalVersion) {
-                    uassert(ErrorCodes::ConflictingOperationInProgress,
+                    // If this is a config server, then there must be no active
+                    // SetClusterParameterCoordinator instances active when downgrading.
+                    if (role && role->has(ClusterRole::ConfigServer) &&
+                        requestedVersion < originalVersion) {
+                        uassert(
+                            ErrorCodes::ConflictingOperationInProgress,
                             "Cannot downgrade while cluster server parameters are being set",
                             (ConfigsvrCoordinatorService::getService(opCtx)
                                  ->areAllCoordinatorsOfTypeFinished(
                                      opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter)));
-                }
+                    }
 
-                FCVStepRegistry::get(opCtx->getServiceContext())
-                    .beforeStartWithFCVLock(opCtx, originalVersion, requestedVersion);
+                    FCVStepRegistry::get(opCtx->getServiceContext())
+                        .beforeStartWithFCVLock(opCtx, originalVersion, requestedVersion);
+                };
 
+                // Start transition to 'requestedVersion' by updating the local FCV document to a
+                // 'kUpgrading' or 'kDowngrading' state, respectively.
+                //
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV
                 // doc field. This is to protect against the case where a previous FCV transition
@@ -722,7 +556,8 @@ public:
                     resolvedTransition.transitionalVersion,
                     SetFCVPhaseEnum::kStart,
                     changeTimestamp,
-                    boost::none /* setIsCleaningServerMetadata */);
+                    /*setIsCleaningServerMetadata=*/boost::none,
+                    withFCVLockHeld);
 
                 LOGV2(6744301,
                       "setFeatureCompatibilityVersion has set the FCV to the transitional state",
@@ -787,7 +622,7 @@ public:
                 resolvedTransition.transitionalVersion,
                 SetFCVPhaseEnum::kPrepare,
                 changeTimestamp,
-                boost::none /* setIsCleaningServerMetadata*/);
+                /*setIsCleaningServerMetadata=*/boost::none);
 
             uassert(ErrorCodes::Error(7555202),
                     "Failing downgrade due to "
@@ -836,16 +671,12 @@ public:
                 // Downgrading/ downgradingToUpgrading transition until the isCleaningServerMetadata
                 // is unset when we successfully finish the FCV upgrade/downgrade and transition to
                 // the upgraded/downgraded state.
-                {
-                    const auto fcvChangeRegion(
-                        FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-                    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                        opCtx,
-                        resolvedTransition.transitionalVersion,
-                        SetFCVPhaseEnum::kComplete,
-                        changeTimestamp,
-                        true /* setIsCleaningServerMetadata*/);
-                }
+                FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                    opCtx,
+                    resolvedTransition.transitionalVersion,
+                    SetFCVPhaseEnum::kComplete,
+                    changeTimestamp,
+                    /*setIsCleaningServerMetadata=*/true);
 
                 uassert(ErrorCodes::Error(10778000),
                         "Failing transition due to 'failTransitionDuringIsCleaningServerMetadata' "
@@ -873,7 +704,7 @@ public:
                 resolvedTransition.transitionalVersion,
                 SetFCVPhaseEnum::kEnableTargetFeatures,
                 changeTimestamp,
-                boost::none /* setIsCleaningServerMetadata */);
+                /*setIsCleaningServerMetadata=*/boost::none);
 
             if (role && role->has(ClusterRole::ConfigServer)) {
                 _sendEnterSetFCVPhaseRequestToShard(
@@ -897,7 +728,7 @@ public:
                 resolvedTransition.transitionalVersion,
                 SetFCVPhaseEnum::kCommitAddedFeatures,
                 changeTimestamp,
-                boost::none /* setIsCleaningServerMetadata */);
+                /*setIsCleaningServerMetadata=*/boost::none);
 
             if (role && role->has(ClusterRole::ConfigServer)) {
                 _sendEnterSetFCVPhaseRequestToShard(
@@ -914,23 +745,23 @@ public:
             {
                 hangBeforeFinalizingFCV.pauseWhileSet(opCtx);
 
+                auto withFCVLockHeld = [&] {
+                    uassert(ErrorCodes::Error(6794601),
+                            "Failing downgrade due to 'failBeforeUpdatingFcvDoc' failpoint set",
+                            !failBeforeUpdatingFcvDoc.shouldFail());
+
+                    hangBeforeUpdatingFcvDoc.pauseWhileSet();
+                };
+
                 // Complete transition by updating the local FCV document to the fully upgraded or
                 // downgraded requestedVersion.
-                const auto fcvChangeRegion(
-                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-
-                uassert(ErrorCodes::Error(6794601),
-                        "Failing downgrade due to 'failBeforeUpdatingFcvDoc' failpoint set",
-                        !failBeforeUpdatingFcvDoc.shouldFail());
-
-                hangBeforeUpdatingFcvDoc.pauseWhileSet();
-
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     requestedVersion,
                     boost::none, /* phase */
                     changeTimestamp,
-                    false /* setIsCleaningServerMetadata */);
+                    /*setIsCleaningServerMetadata=*/false,
+                    withFCVLockHeld);
             }
 
             // Under Symmetric FCV, _finalize* already ran inside the kEnableTargetFeatures block.
@@ -1160,11 +991,6 @@ private:
         // Run the authoritative clone phase on ALL shards (including the config
         // server if it's also a shard).
         if (role && role->has(ClusterRole::ConfigServer)) {
-            if (feature_flags::gFeatureFlagUniqueShardIdentifiers
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                generateShardUUIDs(opCtx);
-            }
             if (feature_flags::gAuthoritativeShardsDDL.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                     requestedVersion, originalVersion)) {
                 cloneAuthoritativeDatabaseMetadataOnShards(opCtx);

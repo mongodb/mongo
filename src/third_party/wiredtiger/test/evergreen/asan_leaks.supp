@@ -5,12 +5,6 @@ leak:InitModule
 # ARM64 python leaks memory from an unclear source. This suppresses that one leak.
 leak:PyObject_Malloc
 
-# FIXME-WT-16324: test_verify
-leak:__tiered_open
-
-# FIXME-WT-16331: test_tiered04
-leak:__tiered_name_str
-
 # Originates in the Python interpreter and cannot be addressed in WiredTiger code.
 leak:_PyBytes_FromSize
 

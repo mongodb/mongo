@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -150,11 +124,35 @@ public:
     }
 
     /**
+     * Same as 'getHighWaterMark()', but intended for use when producing the post-batch resume token
+     * that will be returned to the client.
+     */
+    BSONObj getHighWaterMarkForClient() {
+        return _arm->getHighWaterMarkForClient();
+    }
+
+    /**
      * Sets the current high water mark of the underlying 'AsyncResultsMerger'. Notably this allows
      * to set the high water mark to a timestamp earlier than the current high water mark.
      */
     void setHighWaterMark(const BSONObj& highWaterMark) {
         _arm->setHighWaterMark(highWaterMark);
+    }
+
+    /**
+     * Disables high-water-mark advancement based on promised sort keys in the underlying
+     * 'AsyncResultsMerger'.
+     */
+    void disablePromisedSortKeyHighWaterMarkAdvancement() {
+        _arm->disablePromisedSortKeyHighWaterMarkAdvancement();
+    }
+
+    /**
+     * Re-enables high-water-mark advancement based on promised sort keys in the underlying
+     * 'AsyncResultsMerger'.
+     */
+    void enablePromisedSortKeyHighWaterMarkAdvancement() {
+        _arm->enablePromisedSortKeyHighWaterMarkAdvancement();
     }
 
     /**
@@ -190,6 +188,8 @@ public:
     /**
      * Blocks until '_arm' has been killed, which involves cleaning up any remote cursors managed
      * by this results merger.
+     * Must be called on the OperationContext's own thread because the implementation writes
+     * deadline state while running without interruption.
      */
     void kill(OperationContext* opCtx);
 

@@ -1,7 +1,7 @@
 /**
  * Test that $queryStats properly tokenizes delete commands on mongod and mongos.
  *
- * @tags: [featureFlagQueryStatsDelete]
+ * @tags: [requires_fcv_90]
  */
 import {it} from "jstests/libs/mochalite.js";
 import {

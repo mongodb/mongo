@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -163,7 +137,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest,
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
     handleTopologyChangeStage->setState_forTest(
-        V2Stage::State::kFetchingStartingChangeStreamSegment, false /* validateStateTransition */);
+        V2Stage::State::kFetchingStartingChangeStreamSegment, /*validateStateTransition=*/false);
     exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
     handleTopologyChangeStage->setSegmentStartTimestamp_forTest(ts);
 
@@ -290,7 +264,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest,
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
     handleTopologyChangeStage->setState_forTest(
-        V2Stage::State::kFetchingStartingChangeStreamSegment, false /* validateStateTransition */);
+        V2Stage::State::kFetchingStartingChangeStreamSegment, /*validateStateTransition=*/false);
     exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
     handleTopologyChangeStage->setSegmentStartTimestamp_forTest(ts);
 
@@ -706,10 +680,10 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                        V2Stage::State::kFetchingNormalGettingChangeEvent,
                        V2Stage::State::kFetchingDegradedGettingChangeEvent,
                        V2Stage::State::kDowngrading}) {
-        docSource->setState_forTest(state, false /* validateStateTransition */);
+        docSource->setState_forTest(state, /*validateStateTransition=*/false);
 
         ASSERT_THROWS_CODE(docSource->setState_forTest(V2Stage::State::kWaiting,
-                                                       true /* validateStateTransition */),
+                                                       /*validateStateTransition=*/true),
                            AssertionException,
                            10657529);
     }
@@ -729,10 +703,10 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                        V2Stage::State::kFetchingNormalGettingChangeEvent,
                        V2Stage::State::kFetchingDegradedGettingChangeEvent,
                        V2Stage::State::kDowngrading}) {
-        docSource->setState_forTest(state, false /* validateStateTransition */);
+        docSource->setState_forTest(state, /*validateStateTransition=*/false);
 
         ASSERT_THROWS_CODE(docSource->setState_forTest(V2Stage::State::kFetchingInitialization,
-                                                       true /* validateStateTransition */),
+                                                       /*validateStateTransition=*/true),
                            AssertionException,
                            10657530);
     }
@@ -782,7 +756,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // The shard targeter returns kSwitchToV1 for the control event, so the state should
     // transition to kDowngrading and an EOF should be returned.
@@ -827,7 +801,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
 
     // Intentionally do not set the segment end timestamp before entering the state to trigger the
@@ -896,7 +870,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -947,7 +921,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
 
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 12013806);
@@ -975,7 +949,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                                dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
 }
@@ -1002,7 +976,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                                dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
 
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
@@ -1030,7 +1004,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                                dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657515);
 }
@@ -1058,7 +1032,7 @@ DEATH_TEST_REGEX_F(DSV2StageCursorManagementAndErrorHandlingTestDeathTest,
                                dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
     docSource->setSegmentEndTimestamp_forTest(Timestamp(42, 0));
 
@@ -1119,7 +1093,7 @@ TEST_F(DSV2StageCursorManagementAndErrorHandlingTest,
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Open only a config server cursor (no data shard cursors).
     getCursorManagerMock(params)->openCursorOnConfigServer(

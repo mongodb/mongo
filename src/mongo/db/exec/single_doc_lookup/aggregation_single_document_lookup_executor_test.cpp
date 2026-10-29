@@ -1,39 +1,16 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -45,6 +22,7 @@ namespace mongo::exec::agg {
 namespace {
 
 using HandledStatus = SingleDocumentLookupExecutor::LookupResult::HandledStatus;
+using otel::metrics::OtelMetricsCapturer;
 
 /**
  * Captures the arguments lookupSingleDocument() is called with (notably the readConcern the
@@ -63,10 +41,16 @@ public:
         lastCollectionUUID = collectionUUID;
         lastDocumentKey = documentKey;
         lastReadConcern = std::move(readConcern);
+        if (_throwTooManyMatching) {
+            uasserted(ErrorCodes::TooManyMatchingDocuments, "simulated duplicate match");
+        }
         return _result;
     }
 
     boost::optional<Document> _result;
+
+    // When set, lookupSingleDocument() throws TooManyMatchingDocuments instead of returning.
+    bool _throwTooManyMatching = false;
 
     int callCount = 0;
     NamespaceString lastNss;
@@ -85,6 +69,13 @@ protected:
         return mock;
     }
 
+    // The executor records into the process-global aggregation cell; tests that only care about the
+    // returned LookupResult share this real cell since recording is a no-op side effect for them.
+    AggregationSingleDocumentLookupExecutor makeExecutor() {
+        return AggregationSingleDocumentLookupExecutor{
+            exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder()};
+    }
+
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testdb.testcoll");
     const UUID collectionUUID = UUID::gen();
     const Document documentKey = Document{{"_id", 7}};
@@ -92,7 +83,7 @@ protected:
 
 TEST_F(AggregationSingleDocumentLookupExecutorTest, FoundDocumentReturnsKHandledFound) {
     auto mock = installMock(Document{{"_id", 7}, {"v", 1}});
-    AggregationSingleDocumentLookupExecutor executor;
+    auto executor = makeExecutor();
 
     auto result =
         executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1));
@@ -104,7 +95,7 @@ TEST_F(AggregationSingleDocumentLookupExecutorTest, FoundDocumentReturnsKHandled
 
 TEST_F(AggregationSingleDocumentLookupExecutorTest, AbsentDocumentReturnsKHandledNotFound) {
     auto mock = installMock(boost::none);
-    AggregationSingleDocumentLookupExecutor executor;
+    auto executor = makeExecutor();
 
     auto result =
         executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1));
@@ -116,7 +107,7 @@ TEST_F(AggregationSingleDocumentLookupExecutorTest, AbsentDocumentReturnsKHandle
 
 TEST_F(AggregationSingleDocumentLookupExecutorTest, BuildsMajorityReadConcernFromAfterClusterTime) {
     auto mock = installMock(boost::none);
-    AggregationSingleDocumentLookupExecutor executor;
+    auto executor = makeExecutor();
 
     executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1));
 
@@ -128,7 +119,7 @@ TEST_F(AggregationSingleDocumentLookupExecutorTest, BuildsMajorityReadConcernFro
 
 TEST_F(AggregationSingleDocumentLookupExecutorTest, NoReadConcernWhenAfterClusterTimeAbsent) {
     auto mock = installMock(boost::none);
-    AggregationSingleDocumentLookupExecutor executor;
+    auto executor = makeExecutor();
 
     executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, boost::none);
 
@@ -137,13 +128,69 @@ TEST_F(AggregationSingleDocumentLookupExecutorTest, NoReadConcernWhenAfterCluste
 
 TEST_F(AggregationSingleDocumentLookupExecutorTest, ForwardsNssUuidAndDocumentKey) {
     auto mock = installMock(boost::none);
-    AggregationSingleDocumentLookupExecutor executor;
+    auto executor = makeExecutor();
 
     executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, boost::none);
 
     ASSERT_EQ(mock->lastNss, nss);
     ASSERT(mock->lastCollectionUUID == boost::optional<UUID>(collectionUUID));
     ASSERT_BSONOBJ_EQ(mock->lastDocumentKey.toBson(), documentKey.toBson());
+}
+
+// A found lookup bumps the aggregation cell's 'found' counter and the latency histogram; an absent
+// lookup bumps 'notFound' and the histogram. The aggregation executor never declines, so
+// 'notHandled' is never touched here.
+TEST_F(AggregationSingleDocumentLookupExecutorTest, RecordsFoundAndNotFoundIntoAggregationCell) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const auto before = snapshotAggregationCell(capturer);
+
+    auto executor = makeExecutor();
+    installMock(Document{{"_id", 7}, {"v", 1}});
+    executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1));
+    installMock(boost::none);
+    executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1));
+
+    const auto after = snapshotAggregationCell(capturer);
+    ASSERT_EQ(after.found, before.found + 1);
+    ASSERT_EQ(after.notFound, before.notFound + 1);
+    // The aggregation executor never declines.
+    ASSERT_EQ(after.notHandled, before.notHandled);
+
+    // Both the found and not-found lookups record a latency sample; wall-clock magnitude is not
+    // asserted (the recorder unit test covers exact sums with synthetic durations).
+    ASSERT_EQ(after.latencyCount, before.latencyCount + 2);
+    ASSERT_GTE(after.latencySum, before.latencySum);
+}
+
+// A lookup that throws must propagate AND record nothing into any cell: the outcome is neither
+// found nor not-found.
+TEST_F(AggregationSingleDocumentLookupExecutorTest, ThrownLookupPropagatesAndRecordsNothing) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const auto before = snapshotAggregationCell(capturer);
+
+    auto mock = installMock(boost::none);
+    mock->_throwTooManyMatching = true;
+    auto executor = makeExecutor();
+
+    ASSERT_THROWS_CODE(
+        executor.performLookup(getExpCtx(), nss, collectionUUID, documentKey, Timestamp(100, 1)),
+        DBException,
+        ErrorCodes::TooManyMatchingDocuments);
+
+    const auto after = snapshotAggregationCell(capturer);
+    ASSERT_EQ(after.found, before.found);
+    ASSERT_EQ(after.notFound, before.notFound);
+    ASSERT_EQ(after.notHandled, before.notHandled);
+    ASSERT_EQ(after.latencyCount, before.latencyCount);
+    ASSERT_EQ(after.latencySum, before.latencySum);
 }
 
 }  // namespace

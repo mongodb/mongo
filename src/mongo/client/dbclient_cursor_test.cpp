@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/client/dbclient_cursor.h"
@@ -106,6 +80,10 @@ public:
         _lastSent = Message();
     }
 
+    void setRequestFlags(uint32_t flags) {
+        _requestFlags = flags;
+    }
+
 private:
     Message _call(Message& toSend, std::string* actualServer) override {
 
@@ -113,6 +91,12 @@ private:
         const auto reqId = nextMessageId();
         toSend.header().setId(reqId);
         toSend.header().setResponseToMsgId(0);
+
+        // Apply any configured flags to the request (e.g., 'moreToCome').
+        if (_requestFlags != 0) {
+            OpMsg::setFlag(&toSend, _requestFlags);
+        }
+
         OpMsg::appendChecksum(&toSend);
         _lastSent = toSend;
 
@@ -129,6 +113,7 @@ private:
     Message _mockRecvResponse;
     Message _lastSent;
     stdx::unordered_set<long long> _killedCursorIds;
+    uint32_t _requestFlags = 0;
 };
 
 class DBClientCursorTest : public unittest::Test {
@@ -277,7 +262,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -340,7 +325,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -424,7 +409,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -462,7 +447,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionAndDoesntKillCursorO
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -500,7 +485,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -760,7 +745,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     FindCommandRequest findCmd{nss};
     findCmd.setTailable(true);
     findCmd.setAwaitData(true);
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -980,7 +965,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_FindRequ
     FindCommandRequest findCmd{nss};
 
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, false /* isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/false);
     cursor->setBatchSize(1);
 
     // Set up mock 'find' response.
@@ -1009,7 +994,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_AggReque
     conn.setCallResponse(aggResponseMsg);
 
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &conn, aggCmd, false /* secondaryOk */, false /* useExhaust */));
+        &conn, aggCmd, /*secondaryOk=*/false, /*useExhaust=*/false));
 
     cursor.reset();
     ASSERT(conn.killedCursor(cursorId));
@@ -1025,7 +1010,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_Existing
     auto getMoreResponseMsg = mockGetMoreResponse(nss, cursorId, {docObj(1)});
     conn.setRecvResponse(getMoreResponseMsg);
 
-    auto cursor = std::make_unique<DBClientCursor>(&conn, nss, cursorId, false /* isExhaust */);
+    auto cursor = std::make_unique<DBClientCursor>(&conn, nss, cursorId, /*isExhaust=*/false);
 
     cursor.reset();
     ASSERT(conn.killedCursor(cursorId));
@@ -1041,7 +1026,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_FindRe
 
     for (bool keepCursorOpen : {true, false}) {
         auto cursor = std::make_unique<DBClientCursor>(
-            &conn, findCmd, ReadPreferenceSetting{}, false /* isExhaust*/, keepCursorOpen);
+            &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/false, keepCursorOpen);
         cursor->setBatchSize(1);
 
         // Set up mock 'find' response.
@@ -1074,7 +1059,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_AggReq
         conn.setCallResponse(aggResponseMsg);
 
         auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-            &conn, aggCmd, false /* secondaryOk */, false /* useExhaust */, keepCursorOpen));
+            &conn, aggCmd, /*secondaryOk=*/false, /*useExhaust=*/false, keepCursorOpen));
 
         cursor.reset();
         ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
@@ -1098,16 +1083,87 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_Existi
         auto cursor = std::make_unique<DBClientCursor>(&conn,
                                                        nss,
                                                        cursorId,
-                                                       false /* isExhaust */,
-                                                       std::vector<BSONObj>{} /* initialBatch */,
-                                                       boost::none /* operationTime */,
-                                                       boost::none /* operationTime */,
+                                                       /*isExhaust=*/false,
+                                                       /*initialBatch=*/std::vector<BSONObj>{},
+                                                       /*operationTime=*/boost::none,
+                                                       /*operationTime=*/boost::none,
                                                        keepCursorOpen);
 
         cursor.reset();
         ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
 
         cursorId++;
+    }
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDetectsUnexpectedResponseToMoreToComeInitialRequest) {
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
+
+    // Configure the mock connection to set the 'moreToCome' flag on the next outgoing requests.
+    conn.setRequestFlags(OpMsg::kMoreToCome);
+
+    // Create a response without the required 'cursor' field to verify that a ProtocolError error
+    // is thrown before the response is even parsed.
+    OpMsgBuilder builder;
+    BSONObjBuilder bodyBob;
+    bodyBob.append("ok", 1);
+    builder.setBody(bodyBob.done());
+    Message malformedResponseMsg = builder.finish();
+
+    conn.setCallResponse(malformedResponseMsg);
+    try {
+        cursor.init();
+        FAIL("Expected ProtocolError exception");
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ProtocolError);
+        ASSERT_STRING_SEARCH_REGEX(
+            ex.what(),
+            "Received an unexpected response for a request with the 'moreToCome' flag set\\. "
+            "Reply: op=msg, size=\\d+, requestID=\\d+, responseTo=\\d+");
+    }
+}
+
+TEST_F(DBClientCursorTest, DBClientCursorDetectsUnexpectedResponseToMoreToComeGetMoreRequest) {
+    DBClientConnectionForTest conn;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    FindCommandRequest findCmd{nss};
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
+
+    // Initialize the cursor normally with a response that indicates more data is available.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1), docObj(2)});
+    conn.setCallResponse(findResponseMsg);
+    ASSERT(cursor.init());
+
+    // Consume the initial batch.
+    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+    ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+    // Configure the mock connection to set the 'moreToCome' flag the next outgoing requests.
+    conn.setRequestFlags(OpMsg::kMoreToCome);
+
+    // Create a malformed response to verify that a ProtocolError error is thrown before the
+    // response is even parsed.
+    OpMsgBuilder builder;
+    BSONObjBuilder bodyBob;
+    bodyBob.append("ok", 1);
+    builder.setBody(bodyBob.done());
+    Message malformedResponseMsg = builder.finish();
+
+    conn.setCallResponse(malformedResponseMsg);
+    try {
+        cursor.more();
+        FAIL("Expected ProtocolError exception");
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ProtocolError);
+        ASSERT_STRING_SEARCH_REGEX(
+            ex.what(),
+            "Received an unexpected response for a request with the 'moreToCome' flag set\\. "
+            "Reply: op=msg, size=\\d+, requestID=\\d+, responseTo=\\d+");
     }
 }
 

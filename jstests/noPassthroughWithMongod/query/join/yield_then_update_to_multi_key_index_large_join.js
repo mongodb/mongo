@@ -1,12 +1,10 @@
 /**
- * This test ensures that the SBE plans join opt produces don't crash the server after unexpectedly
- * encountering an array in a join field after a yield during query execution. This test in particular
- * creates a pipeline of 8 $lookup-$unwind pairs that fan out from the base coll via a distinct join
- * field.
+ * This test ensures that when a join predicate field becomes multikey during a yield, the
+ * PathArraynessChecker kills the query with QueryPlanKilled. This test in particular creates a
+ * pipeline of 8 $lookup-$unwind pairs that fan out from the base coll via a distinct join field.
  *
  * While yielding during execution, an array value is inserted into each collection's indexed field.
- * The test then continues execution to ensure the unexpected array value doesn't put the server
- * in an unrecoverable state.
+ * The test then asserts the query is killed with QueryPlanKilled and the expected message.
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
@@ -14,10 +12,7 @@
  */
 
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
-
-const conn = MongoRunner.runMongod();
-const db = conn.getDB(jsTestName());
-assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 
 function* charRange(startChar, endChar) {
     for (let code = startChar.charCodeAt(0); code <= endChar.charCodeAt(0); code++) {
@@ -105,21 +100,40 @@ function runPipeline({pipeline, localColl}) {
             assert.commandWorked(coll.insert(doc));
             assert.commandWorked(localColl.insert(doc));
         }
-        while (cursor.hasNext()) {
-            /**
-             * Exhaust the server's cursor to ensure the JOO query plan encounters the multikey document during execution
-             * without crashing the server. This loop is the essential assessment of the test because the join-opt
-             * infrastructure currently *assumes* that the join fields are always non-multikey without ever actually
-             * *verifying* it; hence why we want to make sure we don't crash!
-             */
-            cursor.next();
-        }
+        /**
+         * With path arrayness tracking, the PathArraynessChecker detects that a join predicate
+         * field became multikey during a yield and kills the query with QueryPlanKilled.
+         */
+        const err = assert.throws(() => {
+            while (cursor.hasNext()) {
+                cursor.next();
+            }
+        });
+        assert.eq(err.code, ErrorCodes.QueryPlanKilled, "expected QueryPlanKilled", {err});
+        assert(
+            err.message.includes("non-array path became multikey while the query was suspended"),
+            "expected path arrayness kill message",
+            {err},
+        );
         resetCollections(db, localColl);
     }
 }
 
 const localColl = db.baseColl;
 
-const pipeline = buildOutCollectionsIndexesAndPipeline(db, localColl);
-runPipeline({pipeline, localColl});
-MongoRunner.stopMongod(conn);
+runWithKnobs(
+    db,
+    () => {
+        const pipeline = buildOutCollectionsIndexesAndPipeline(db, localColl);
+        runPipeline({pipeline, localColl});
+    },
+    {
+        internalEnableJoinOptimization: true,
+        // Yield on every check so the query is reliably yielding when the array values are
+        // inserted below.
+        internalQueryExecYieldIterations: 1,
+        // 'runPipeline()' overwrites this knob on each iteration; listing it here ensures the
+        // original value is restored once the test is complete.
+        internalRandomJoinOrderSeed: 0,
+    },
+);

@@ -1,41 +1,108 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/namespace_string_util.h"
+#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
+#include "mongo/db/shard_role/ddl/list_collections_gen.h"
+#include "mongo/db/shard_role/ddl/list_indexes_gen.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/scopeguard.h"
+
+#include <map>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+namespace {
+using CollectionsByShard = std::map<ShardId, std::set<NamespaceString>>;
+
+void throwIfIndexBuildInProgress(const AsyncRequestsSender::Response& cmdResponse,
+                                 const NamespaceString& nss) {
+    const auto status = AsyncRequestsSender::Response::getEffectiveStatus(cmdResponse);
+    if (!status.isOK()) {
+        if (status.code() == ErrorCodes::NamespaceNotFound ||
+            status.code() == ErrorCodes::CommandNotSupportedOnView) {
+            return;
+        }
+        uassertStatusOK(status);
+    }
+
+    const auto& replyData = cmdResponse.swResponse.getValue().data;
+    const auto cursorObj = replyData["cursor"];
+    const auto cursorId = cursorObj["id"].numberLong();
+    if (cursorId != 0) {
+        LOGV2_WARNING(11762400,
+                      "listIndexes reply has unexhausted cursor; "
+                      "index build check may be incomplete",
+                      "nss"_attr = nss,
+                      "shard"_attr = cmdResponse.shardId,
+                      "cursorId"_attr = cursorId);
+    }
+
+    for (const auto& indexEntry : cursorObj["firstBatch"].Array()) {
+        if (indexEntry["indexBuildInfo"].type() != BSONType::eoo) {
+            uasserted(ErrorCodes::BackgroundOperationInProgressForNamespace,
+                      str::stream() << "cannot perform operation: an index build is currently "
+                                    << "running for collection " << nss.toStringForErrorMsg()
+                                    << " on shard " << cmdResponse.shardId.toString());
+        }
+    }
+}
+
+void checkForInProgressIndexBuildsOnShards(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const std::vector<ShardId>& shardIds,
+                                           std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                           const CancellationToken& token) {
+    if (shardIds.empty()) {
+        return;
+    }
+
+    ListIndexes listIndexesCmd(nss);
+    listIndexesCmd.setIncludeIndexBuildInfo(true);
+    listIndexesCmd.setDbName(nss.dbName());
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListIndexes>>(
+        **executor, token, listIndexesCmd);
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, shardIds, /*throwOnError=*/false);
+    for (const auto& cmdResponse : responses) {
+        throwIfIndexBuildInProgress(cmdResponse, nss);
+    }
+}
+
+std::vector<ShardId> shardIdsHostingDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+    if (dbName.isConfigDB()) {
+        return {Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId()};
+    }
+    return Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+}
+
+void checkForInProgressIndexBuildsAcrossShards(
+    OperationContext* opCtx,
+    const std::set<NamespaceString>& nsses,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
+    if (nsses.empty()) {
+        return;
+    }
+
+    for (const auto& nss : nsses) {
+        checkForInProgressIndexBuildsOnShards(
+            opCtx, nss, shardIdsHostingDatabase(opCtx, nss.dbName()), executor, token);
+    }
+}
+
+}  // namespace
 
 ShardingDDLCoordinatorMixin::ShardingDDLCoordinatorMixin(const BSONObj& coorDoc)
     : _databaseVersion(extractShardingCoordinatorMetadata(coorDoc).getDatabaseVersion()) {}
@@ -80,7 +147,7 @@ void ShardingDDLCoordinatorMixin::_checkDBVersion(ShardingCoordinator& self,
         }
 
         ScopedSetShardRole scopedSetShardRole(
-            opCtx, originalNss, boost::none /* shardVersion */, _databaseVersion);
+            opCtx, originalNss, /*shardVersion=*/boost::none, _databaseVersion);
 
         self._getExternalState()->assertIsPrimaryShardForDb(opCtx, originalNss.dbName());
     };
@@ -91,11 +158,8 @@ std::set<NamespaceString> ShardingDDLCoordinatorMixin::_getAdditionalLocksToAcqu
     return {};
 }
 
-ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireAllDDLLocksAsync(
-    ShardingCoordinator& self,
-    OperationContext* opCtx,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) {
+std::set<NamespaceString> ShardingDDLCoordinatorMixin::_locksToAcquire(ShardingCoordinator& self,
+                                                                       OperationContext* opCtx) {
     const NamespaceString& originalNss = self.originalNss();
 
     // Fetching all the locks that need to be acquired. Sort them by nss to avoid deadlocks.
@@ -111,6 +175,16 @@ ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireAllDDLLocksAsync(
                                   ? additionalLock.getTimeseriesViewNamespace()
                                   : additionalLock);
     }
+
+    return locksToAcquire;
+}
+
+ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireAllDDLLocksAsync(
+    ShardingCoordinator& self,
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
+    std::set<NamespaceString> locksToAcquire = _locksToAcquire(self, opCtx);
 
     // Acquiring all DDL locks in sorted order to avoid deadlocks
     // Note that the sorted order is provided by default through the std::set container
@@ -160,6 +234,19 @@ void ShardingDDLCoordinatorMixin::_releaseDDLLocks(OperationContext* opCtx) {
     }
 }
 
+void ShardingDDLCoordinatorMixin::_checkIndexBuildsInProgressGeneric(
+    ShardingCoordinator& self,
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
+    const auto nsses = _conflictingIndexBuildNamespaces(self, opCtx);
+    for (const auto& nss : nsses) {
+        dassert(!nss.isDbOnly());
+    }
+
+    checkForInProgressIndexBuildsAcrossShards(opCtx, nsses, executor, token);
+}
+
 template <typename T>
 ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireDDLLockAsync(
     ShardingCoordinator& self,
@@ -187,7 +274,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireDDLLockAsync(
                               logv2::DynamicAttributes{
                                   logv2::DynamicAttributes(self.getCoordinatorLogAttrs()),
                                   "resource"_attr = toStringForLogging(resource),
-                                  "mode"_attr = modeName(lockMode),
+                                  "lockMode"_attr = modeName(lockMode),
                                   "error"_attr = redact(status)});
             }
             // Coordinators can't generally be rolled back so in case we recovered a coordinator

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/document_value/value.h"
 
@@ -223,25 +197,25 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
 Value::Value(const BSONArray& arr) : _storage(BSONType::array) {
     auto vec = make_intrusive<RCVector<Value>>();
     for (auto&& sub : arr) {
-        vec->vec.push_back(Value(sub));
+        vec->vec.emplace_back(sub);
     }
     _storage.putVector(std::move(vec));
 }
 
-Value::Value(const vector<BSONObj>& vec) : _storage(BSONType::array) {
+Value::Value(const std::vector<BSONObj>& vec) : _storage(BSONType::array) {
     auto storageVec = make_intrusive<RCVector<Value>>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
-        storageVec->vec.push_back(Value(obj));
+        storageVec->vec.emplace_back(obj);
     }
     _storage.putVector(std::move(storageVec));
 }
 
-Value::Value(const vector<Document>& vec) : _storage(BSONType::array) {
+Value::Value(const std::vector<Document>& vec) : _storage(BSONType::array) {
     auto storageVec = make_intrusive<RCVector<Value>>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
-        storageVec->vec.push_back(Value(obj));
+        storageVec->vec.emplace_back(obj);
     }
     _storage.putVector(std::move(storageVec));
 }
@@ -499,17 +473,29 @@ bool Value::coerceToBool() const {
 
 namespace {
 
+constexpr int kIntValueOutOfRangeMsgId = 31108;
+
+MONGO_COMPILER_NORETURN void throwValueOutOfRangeInt(std::string_view msg) {
+    uasserted(kIntValueOutOfRangeMsgId, msg);
+}
+
 template <typename T>
 void assertValueInRangeInt(const T& val) {
-    uassert(31108,
+    uassert(kIntValueOutOfRangeMsgId,
             str::stream() << "Can't coerce out of range value " << val << " to int",
             val >= std::numeric_limits<int32_t>::min() &&
                 val <= std::numeric_limits<int32_t>::max());
 }
 
+constexpr int kLongValueOutOfRangeMsgId = 31109;
+
+MONGO_COMPILER_NORETURN void throwValueOutOfRangeLong(std::string_view msg) {
+    uasserted(kLongValueOutOfRangeMsgId, msg);
+}
+
 template <typename T>
 void assertValueInRangeLong(const T& val) {
-    uassert(31109,
+    uassert(kLongValueOutOfRangeMsgId,
             str::stream() << "Can't coerce out of range value " << val << " to long",
             val >= std::numeric_limits<long long>::min() &&
                 val < BSONElement::kLongLongMaxPlusOneAsDouble);
@@ -529,9 +515,22 @@ int Value::coerceToInt() const {
             assertValueInRangeInt(_storage.doubleValue);
             return static_cast<int>(_storage.doubleValue);
 
-        case BSONType::numberDecimal:
-            assertValueInRangeInt(_storage.getDecimal().toDouble());
-            return (_storage.getDecimal()).toInt();
+        case BSONType::numberDecimal: {
+            // Round fractional Decimal128 values using the default rounding mode, which is
+            // 'kRoundTiesToEven'. This is inconsistent with how double values are rounded in the
+            // case above, as they always round towards zero. However, intentionally keep the
+            // difference for downwards-compability.
+            std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+            std::int32_t intValue = _storage.getDecimal().toInt(&signalingFlags);
+
+            // Check if coerced number is safely representable as an int.
+            if (signalingFlags != Decimal128::SignalingFlag::kNoFlag) {
+                throwValueOutOfRangeInt(str::stream()
+                                        << "Can't coerce out of range decimal value "
+                                        << _storage.getDecimal().toString() << " to int");
+            }
+            return static_cast<int>(intValue);
+        }
 
         default:
             uassert(16003,
@@ -553,9 +552,22 @@ long long Value::coerceToLong() const {
             assertValueInRangeLong(_storage.doubleValue);
             return static_cast<long long>(_storage.doubleValue);
 
-        case BSONType::numberDecimal:
-            assertValueInRangeLong(_storage.doubleValue);
-            return (_storage.getDecimal()).toLong();
+        case BSONType::numberDecimal: {
+            // Round fractional Decimal128 values using the default rounding mode, which is
+            // 'kRoundTiesToEven'. This is inconsistent with how double values are rounded in the
+            // case above, as they always round towards zero. However, intentionally keep the
+            // difference for downwards-compability.
+            std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+            std::int64_t longValue = _storage.getDecimal().toLong(&signalingFlags);
+
+            // Check if coerced number is safely representable as a long.
+            if (signalingFlags != Decimal128::SignalingFlag::kNoFlag) {
+                throwValueOutOfRangeLong(str::stream()
+                                         << "Can't coerce out of range decimal value "
+                                         << _storage.getDecimal().toString() << " to long");
+            }
+            return static_cast<long long>(longValue);
+        }
 
         default:
             uassert(16004,

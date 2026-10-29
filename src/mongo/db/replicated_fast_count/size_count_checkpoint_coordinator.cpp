@@ -1,73 +1,93 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_flusher.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::replicated_fast_count {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterSizeCountCheckpointCoordinatorStartupPublishesThreads);
-MONGO_FAIL_POINT_DEFINE(hangBeforeSizeCountCheckpointCoordinatorShutdownJoins);
+MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
+MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
 
 SizeCountCheckpointCoordinator::SizeCountCheckpointCoordinator(
-    SizeCountStore& sizeCountStore, SizeCountTimestampStore& timestampStore, UUID oplogUuid)
-    : _oplogTailer(std::make_unique<SizeCountCheckpointOplogTailer>()),
-      _flusher(std::make_unique<SizeCountCheckpointFlusher>(&sizeCountStore, &timestampStore)),
-      _buffer(std::make_unique<SizeCountCheckpointBuffer>(oplogUuid)),
-      _sizeCountStore(sizeCountStore),
-      _timestampStore(timestampStore) {}
+    SizeCountStore& sizeCountStore,
+    SizeCountTimestampStore& timestampStore,
+    UUID oplogUuid,
+    Timestamp startCheckpointingAfterTS)
+    : _sizeCountStore(sizeCountStore), _timestampStore(timestampStore), _buffer([&]() {
+          const boost::optional<RecordId> lastBufferedRid =
+              startCheckpointingAfterTS == Timestamp::min()
+              ? boost::optional<RecordId>{}
+              : massertStatusOK(
+                    record_id_helpers::keyForOptime(startCheckpointingAfterTS, KeyFormat::Long));
+          return SizeCountCheckpointBuffer(oplogUuid, lastBufferedRid);
+      }()) {}
 
 SizeCountCheckpointCoordinator::~SizeCountCheckpointCoordinator() {
-    shutdown();
-}
-void SizeCountCheckpointCoordinator::startup(ServiceContext* service,
-                                             Timestamp startCheckpointingAfterTS) {
+    stdx::thread tailer;
+    stdx::thread flusher;
+
     {
         std::lock_guard lk(_mutex);
-        if (_started || _shutdownRequested) {
-            return;
-        }
-        _started = true;
+        _shutdownRequested = true;
 
-        _tailerThread = stdx::thread([this, startCheckpointingAfterTS, service] {
-            _runTailerThread(service, startCheckpointingAfterTS);
-        });
+        tailer = std::move(_tailerThread);
+        flusher = std::move(_flushThread);
+
+        // Interrupt the worker opCtxs before joining. The destructor may run while the caller
+        // holds RSTL_X (e.g. during stepdown via onStepDownHook). The tailer and flush threads may
+        // race past their opCtx interrupt checks and block on RSTL_IS/IX acquisition, which will
+        // never be granted while the caller holds RSTL_X, causing a deadlock. Interrupting the
+        // opCtxs makes any pending lock wait throw immediately so the threads can exit.
+        _opCtxGroup.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
+    }
+
+    // join() throws an exception if it is called on a non-joinable thread. If startup() is not
+    // called before this destructor, these threads are not joinable, and the destructor does
+    // nothing. It is legal to call this destructor without calling startup(), e.g., during testing.
+    if (tailer.joinable() != flusher.joinable()) {
+        LOGV2_FATAL(13037102,
+                    "Replicated fast count oplog tailer thread and flusher thread should have same "
+                    "joinable status",
+                    "Oplog tailer"_attr = tailer.joinable(),
+                    "Flusher"_attr = flusher.joinable());
+    }
+    if (tailer.joinable() && flusher.joinable()) {
+        tailer.join();
+        flusher.join();
+    }
+}
+
+void SizeCountCheckpointCoordinator::startup(ServiceContext* service) {
+    {
+        std::lock_guard lk(_mutex);
+        invariant(!_shutdownRequested);
+        tassert(13037100,
+                "Replicated fast count oplog tailer thread already started",
+                !_tailerThread.joinable());
+        tassert(13037101,
+                "Replicated fast count flusher thread already started",
+                !_flushThread.joinable());
+
+        LOGV2(13215700, "SizeCountCheckpointCoordinator spawning tailer and flusher threads");
+
+        _tailerThread = stdx::thread([this, service] { _runTailerThread(service); });
         _flushThread = stdx::thread([this, service] { _runFlushThread(service); });
     }
 
@@ -77,78 +97,26 @@ void SizeCountCheckpointCoordinator::startup(ServiceContext* service,
     }
 }
 
-void SizeCountCheckpointCoordinator::shutdown() {
-    stdx::thread tailer;
-    stdx::thread flusher;
-
-    {
-        std::lock_guard lk(_mutex);
-        if (_shutdownRequested) {
-            return;
-        }
-        _shutdownRequested = true;
-
-        tailer = std::move(_tailerThread);
-        flusher = std::move(_flushThread);
-
-        // Interrupt the worker opCtxs before joining. shutdown() may be called while the caller
-        // holds RSTL_X (e.g. during stepdown via onStepDownHook). The tailer and flush threads may
-        // race past their opCtx interrupt checks and block on RSTL_IS/IX acquisition, which will
-        // never be granted while the caller holds RSTL_X, causing a deadlock. Interrupting the
-        // opCtxs makes any pending lock wait throw immediately so the threads can exit.
-        _opCtxGroup.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
-    }
-
-    hangBeforeSizeCountCheckpointCoordinatorShutdownJoins.pauseWhileSet();
-
-    if (tailer.joinable()) {
-        tailer.join();
-    }
-    if (flusher.joinable()) {
-        flusher.join();
-    }
-}
-
 bool SizeCountCheckpointCoordinator::isRunning_ForTest() const {
     std::lock_guard lk(_mutex);
-    return _started && !_shutdownRequested;
+    return _flushThread.joinable() && _tailerThread.joinable();
 }
 
 void SizeCountCheckpointCoordinator::requestFlush() {
-    _flusher->requestFlush();
-}
-
-void SizeCountCheckpointCoordinator::flushSync_ForTest(OperationContext* opCtx) {
-    if (!_tailerState_ForTest) {
-        // The timestamp store requires the caller to hold the global lock for the read; see
-        // SizeCountTimestampStore.
-        const auto startAfterTS = [&] {
-            Lock::GlobalLock readLock(opCtx, MODE_IS);
-            return _timestampStore.read(opCtx).value_or(Timestamp{});
-        }();
-        _tailerState_ForTest = _oplogTailer->bootstrap_ForTest(opCtx, startAfterTS, *_buffer);
+    {
+        std::lock_guard lk(_flushRequestMutex);
+        _flushRequested = true;
     }
-    _oplogTailer->runOneIteration_ForTest(opCtx, _tailerState_ForTest, *_buffer);
-    _flusher->runOneFlushCycle_ForTest(opCtx, *_buffer);
-    // Close the WT cursor so it doesn't outlive the caller's opCtx. The next call recreates it
-    // via ensureCursor(), which seeks to `lastBufferedRid` to resume where it left off.
-    if (_tailerState_ForTest) {
-        _tailerState_ForTest->cursor.reset();
-    }
+    _flushRequestCv.notify_one();
 }
 
 bool SizeCountCheckpointCoordinator::isFlushRequested_ForTest() const {
-    return _flusher->isFlushRequested_ForTest();
+    std::lock_guard lk(_flushRequestMutex);
+    return _flushRequested;
 }
 
-SizeCountCheckpointBuffer* SizeCountCheckpointCoordinator::getBuffer_ForTest() const {
-    std::lock_guard lk(_mutex);
-    return _buffer.get();
-}
-
-void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service,
-                                                      Timestamp startCheckpointingAfterTS) {
-    ThreadClient tc("SizeCountCheckpointOplogTailer", service->getService());
+void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service) {
+    ThreadClient tc("Replicated fast count oplog tailer", service->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
     auto opCtxHolder = [&]() -> boost::optional<OperationContextGroup::Context> {
@@ -166,11 +134,11 @@ void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service,
         opCtxHolder->opCtx(), AdmissionContext::Priority::kExempt);
 
     // Run until no longer a primary.
-    _oplogTailer->run(opCtxHolder->opCtx(), startCheckpointingAfterTS, *_buffer);
+    oplog_tailer::run(opCtxHolder->opCtx(), _buffer);
 }
 
 void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
-    ThreadClient tc("SizeCountCheckpointFlusher", service->getService());
+    ThreadClient tc("Replicated fast count flusher", service->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
     auto opCtxHolder = [&]() -> boost::optional<OperationContextGroup::Context> {
@@ -187,8 +155,95 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtxHolder->opCtx(), AdmissionContext::Priority::kExempt);
 
+    OperationContext* opCtx = opCtxHolder->opCtx();
+
     // Run until no longer a primary.
-    _flusher->run(opCtxHolder->opCtx(), *_buffer);
+    LOGV2(13215703, "Replicated fast count flusher thread started");
+    setFlusherIsRunning(true);
+    ON_BLOCK_EXIT([&] {
+        setFlusherIsRunning(false);
+        LOGV2(13215704, "Replicated fast count flusher thread exiting");
+        std::lock_guard lk(_flushRequestMutex);
+        _flushRequested = false;
+    });
+
+    while (true) {
+        try {
+            {
+                std::unique_lock lk(_flushRequestMutex);
+                opCtx->waitForConditionOrInterrupt(
+                    _flushRequestCv, lk, [this] { return _flushRequested; });
+                _flushRequested = false;
+            }
+
+            // Check if an in-flight batch already exists. This can happen if a previous flush
+            // failed.
+            boost::optional<OplogScanResult> batch = _buffer.checkoutForFlush();
+
+            // TODO(SERVER-135085): There exists a TOCTOU race condition here between checking the
+            // tailer has consumed the watermark entry and emitting the next watermark entry. If the
+            // tailer has not seen a pre-existing watermark entry when we call checkoutForFlush()
+            // and readyForWatermark() here, we erroneously emit a new watermark. This can happen
+            // when we emit a watermark then fault/step down. scanToNoHolesEOF() must tolerate this.
+            if (!batch && _buffer.readyForWatermark()) {
+                // Write a watermark so that the oplog tailer can cut the next batch.
+                flusher::writeWatermark(opCtx);
+                // Block until the oplog tailer has caught up to the watermark entry.
+                batch = _buffer.awaitCheckoutForFlush(opCtx);
+            }
+
+            const Date_t flushStart = Date_t::now();
+            boost::optional<flusher::FlushResult> result = boost::none;
+            hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
+            if (batch.has_value()) {
+                result = flusher::flush(opCtx, _sizeCountStore, _timestampStore, *batch);
+                // Acknowledge the flush in the SizeCountCheckpointBuffer, regardless if data was
+                // persisted or the flush was a no-op. The only time we do not acknowledge a flush
+                // is if flush() throws an exception.
+                _buffer.acknowledgeFlush();
+            }
+
+            sleepAfterFlush.execute([](const BSONObj& data) {
+                if (auto elem = data["sleepMs"]; elem) {
+                    sleepmillis(elem.numberInt());
+                }
+            });
+
+            const Milliseconds duration = Date_t::now() - flushStart;
+            if (result.has_value()) {
+                LOGV2(13195100,
+                      "SizeCountCheckpointFlusher flushed successfully",
+                      "previousValidAsOfTS"_attr = result->previousValidAsOfTS,
+                      "newValidAsOfTS"_attr = result->newValidAsOfTS,
+                      "checkpointBufferSize"_attr = result->checkpointBufferSize,
+                      "entryWriteCount"_attr = result->writeCounts.entryWriteCount,
+                      "insertCount"_attr = result->writeCounts.insertCount,
+                      "updateCount"_attr = result->writeCounts.updateCount,
+                      "flushAttempts"_attr = result->flushAttempts,
+                      "duration"_attr = duration);
+                recordFlush(flushStart, result->writeCounts);
+            } else {
+                LOGV2_DEBUG(13195101,
+                            3,
+                            "SizeCountCheckpointFlusher did not flush",
+                            "duration"_attr = duration);
+            }
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
+                ErrorCodes::isShutdownError(ex.code())) {
+                // The flusher is a primary-only thread. Stop the thread when stepping down or
+                // shutting down.
+                LOGV2(12917804,
+                      "Replicated fast count flusher interrupted",
+                      "error"_attr = ex.toStatus());
+                return;
+            }
+            incrementFlushFailureCount();
+            LOGV2_WARNING(12917805,
+                          "Exception handled in replicated fast count flusher flush loop",
+                          "error"_attr = ex.toStatus());
+        }
+    }
 }
 
 }  // namespace mongo::replicated_fast_count

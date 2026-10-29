@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/host/query_execution_context.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/agg/dynamic_batch_size.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
@@ -179,26 +154,72 @@ public:
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidCheckForInterrupt, "11098300") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.check_for_interrupt = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetMetrics, "11213507") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_metrics = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetDeadlineTimestampMs, "11646100") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_deadline_timestamp_ms = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetHostMetrics, "12199900") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_host_metrics = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
+
+DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidSetBatchSize, "13150703") {
+    auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
+    vtable.set_batch_size = nullptr;
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
+};
+
+TEST_F(QueryExecutionContextTestFixture, ThrowsErrorWhenBatchSizeSetToZero) {
+    extension::sdk::HostServicesAPI::setHostServices(
+        &extension::host_connector::HostServicesAdapter::get());
+    exec::agg::DynamicBatchSize dbs;
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), &dbs);
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    ASSERT_THROWS_CODE(handle->setBatchSize(0), DBException, 13150704);
+}
+
+TEST_F(QueryExecutionContextTestFixture, AdapterRejectsZeroBatchSize) {
+    extension::sdk::HostServicesAPI::setHostServices(
+        &extension::host_connector::HostServicesAdapter::get());
+    exec::agg::DynamicBatchSize dbs;
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx), &dbs);
+
+    auto* status = adapter.vtable->set_batch_size(&adapter, 0);
+    ASSERT(status);
+    ASSERT_EQ(status->vtable->get_code(status), 13150706);
+    status->vtable->destroy(status);
+}
+
+TEST_F(QueryExecutionContextTestFixture, SetBatchSizeWithoutDynamicBatchSizeThrows) {
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    ASSERT_THROWS_CODE(handle->setBatchSize(1), DBException, 13150705);
+}
 
 }  // namespace
 }  // namespace mongo::extension

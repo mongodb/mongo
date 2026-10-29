@@ -31,6 +31,15 @@ struct __wt_cache_eviction_controls {
     wt_shared uint8_t
       app_eviction_min_cache_fill_ratio; /* Application eviction minimum cache fill ratio */
 
+/* Configuration control for checkpoint scrub-evicting reconciled leaf pages. */
+#define WT_CACHE_CHECKPOINT_SCRUB_EVICT_AUTO 0
+#define WT_CACHE_CHECKPOINT_SCRUB_EVICT_OFF 1
+#define WT_CACHE_CHECKPOINT_SCRUB_EVICT_ON 2
+    wt_shared uint8_t checkpoint_scrub_eviction;
+
+    /* Percentage of the cache checkpoint may fill with retained scrub images. */
+    wt_shared uint8_t checkpoint_scrub_image_max;
+
 /* cache eviction controls bit positions */
 #define WT_CACHE_EVICT_INCREMENTAL_APP 0x1u
 #define WT_CACHE_PREFER_SCRUB_EVICTION 0x2u
@@ -39,7 +48,7 @@ struct __wt_cache_eviction_controls {
 };
 
 struct __wt_shared_dsk_item {
-    TAILQ_ENTRY(__wt_shared_dsk_item) hashq;
+    LIST_ENTRY(__wt_shared_dsk_item) hashq;
 
     void *data;
     uint32_t data_size;
@@ -77,17 +86,18 @@ typedef enum {
 #define WT_DSK_CACHE_READABLE(state) \
     ((state) == WT_DSK_CACHE_ACTIVE || (state) == WT_DSK_CACHE_READONLY)
 
-#define WT_DSK_CACHE_CAN_READ(state, btree) \
-    (WT_DSK_CACHE_READABLE(state) && F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+#define WT_DSK_CACHE_CAN_READ(state, btree)                                    \
+    (WT_DSK_CACHE_READABLE(state) && F_ISSET(btree, WT_BTREE_DISAGGREGATED) && \
+      !WT_DHANDLE_IS_CHECKPOINT((btree)->dhandle))
 
-#define WT_DSK_CACHE_CAN_WRITE(state, btree) \
-    ((state) == WT_DSK_CACHE_ACTIVE && F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-
+#define WT_DSK_CACHE_CAN_WRITE(state, btree)                                     \
+    ((state) == WT_DSK_CACHE_ACTIVE && F_ISSET(btree, WT_BTREE_DISAGGREGATED) && \
+      !WT_DHANDLE_IS_CHECKPOINT((btree)->dhandle))
 struct __wt_shared_dsk_cache {
     wt_shared uint8_t state;
     wt_shared uint64_t readonly_since; /* Seconds when the cache went read-only on step-up. */
 
-    TAILQ_HEAD(__wt_shared_dsk_hash, __wt_shared_dsk_item) * hash;
+    LIST_HEAD(__wt_shared_dsk_hash, __wt_shared_dsk_item) * hash;
     WT_SPINLOCK *hash_locks;
     u_int hash_size;
     u_int hash_lock_size;
@@ -122,6 +132,11 @@ struct __wt_cache {
     wt_shared uint64_t bytes_image_leaf; /* Bytes of disk images (leaf) */
     wt_shared uint64_t bytes_image_leaf_ingest;
     wt_shared uint64_t bytes_image_leaf_stable;
+    /* Clean re-instantiation images retained in cache by checkpoint scrub. */
+    wt_shared uint64_t bytes_scrub_image;
+    wt_shared uint64_t pages_scrub_image;
+    /* Shared disk image bytes charged to more than one btree's in-memory total. */
+    wt_shared uint64_t bytes_shared_dsk_duplicate;
     wt_shared uint64_t bytes_inmem; /* Bytes/pages in memory */
     wt_shared uint64_t bytes_inmem_ingest;
     wt_shared uint64_t bytes_inmem_stable;
@@ -135,6 +150,8 @@ struct __wt_cache {
     wt_shared uint64_t bytes_written;
 
     WT_CACHE_EVICTION_CONTROLS cache_eviction_controls;
+
+    WT_CACHE_TOP cache_top; /* Largest cache consumers, by tree. */
 
     /*
      * History store cache usage. TODO: The values for these variables are cached and potentially
@@ -195,6 +212,36 @@ struct __wt_cache {
 
     WT_SHARED_DSK_CACHE shared_dsk_cache;
 };
+
+/*
+ * On disaggregated storage each cache byte counter has an ingest and a stable variant that we
+ * mirror based on the btree's role. These macros update the base counter and the right variant in
+ * one place. The field argument is the base member name, and we build the variant names by token
+ * pasting, so all three members need to follow the base/_ingest/_stable naming.
+ */
+#define WT_CACHE_INCR(is_disagg, btree, cache, field, size)                             \
+    do {                                                                                \
+        (void)__wt_atomic_add_uint64_relaxed(&(cache)->field, (size));                  \
+        if (is_disagg) {                                                                \
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))                               \
+                (void)__wt_atomic_add_uint64_relaxed(&(cache)->field##_ingest, (size)); \
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))                            \
+                (void)__wt_atomic_add_uint64_relaxed(&(cache)->field##_stable, (size)); \
+        }                                                                               \
+    } while (0)
+
+#define WT_CACHE_DECR(session, is_disagg, btree, cache, field, size)                        \
+    do {                                                                                    \
+        __wt_cache_decr_check_uint64(session, &(cache)->field, (size), "WT_CACHE." #field); \
+        if (is_disagg) {                                                                    \
+            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))                                   \
+                __wt_cache_decr_check_uint64(                                               \
+                  session, &(cache)->field##_ingest, (size), "WT_CACHE." #field "_ingest"); \
+            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))                                \
+                __wt_cache_decr_check_uint64(                                               \
+                  session, &(cache)->field##_stable, (size), "WT_CACHE." #field "_stable"); \
+        }                                                                                   \
+    } while (0)
 
 /*
  * WT_CACHE_POOL --

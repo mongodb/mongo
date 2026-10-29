@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/platform/waitable_atomic.h"
@@ -45,7 +19,7 @@ class OperationContext;
 /**
  * Stores state and statistics related to admission control for a given transactional context.
  */
-class MONGO_MOD_OPEN AdmissionContext {
+class [[MONGO_MOD_OPEN]] AdmissionContext {
 public:
     AdmissionContext(const AdmissionContext& other);
     AdmissionContext& operator=(const AdmissionContext& other);
@@ -90,6 +64,17 @@ public:
      * Returns the total time this admission context has ever waited in a queue.
      */
     Microseconds totalTimeQueuedMicros() const;
+
+    /**
+     * Returns total admission queueing time accumulated in the per-operation aggregate counter for
+     * this OperationContext.
+     */
+    static Microseconds getTotalTimeQueuedForAdmission(const OperationContext* opCtx);
+
+    /** Returns the operation context associated with this admission context, if any. */
+    virtual OperationContext* getOperationContext() {
+        return nullptr;
+    }
 
     /**
      * Returns the time this admission context started waiting to be queued, if it is currently
@@ -156,9 +141,13 @@ public:
     /**
      * Setters for queue statistics to be used in unit tests only
      */
-    MONGO_MOD_PUBLIC void setAdmission_forTest(int32_t admissions);
+    [[MONGO_MOD_PUBLIC]] void setAdmission_forTest(int32_t admissions);
 
-    MONGO_MOD_PUBLIC void setTotalTimeQueuedMicros_forTest(int64_t micros);
+    [[MONGO_MOD_PUBLIC]] void setTotalTimeQueuedMicros_forTest(int64_t micros);
+
+    // Block until this AdmissionContext is queued waiting on a ticket or the timeout expires.
+    // Returns true if we got queued, or false if the timeout expired.
+    [[MONGO_MOD_PUBLIC]] bool waitUntilQueued_forTest(Nanoseconds timeout);
 
 protected:
     friend class ScopedAdmissionPriorityBase;
@@ -168,27 +157,22 @@ protected:
 
     constexpr static TickSource::Tick kNotQueueing = -1;
 
-    MONGO_MOD_PRIVATE Atomic<std::int32_t> _exemptedAdmissions{0};
-    MONGO_MOD_PRIVATE Atomic<std::int32_t> _lowAdmissions{0};
-    MONGO_MOD_PRIVATE Atomic<std::int32_t> _admissions{0};
-    MONGO_MOD_PRIVATE Atomic<Priority> _priority{Priority::kNormal};
-    MONGO_MOD_PRIVATE Atomic<std::int64_t> _totalTimeQueuedMicros;
-    MONGO_MOD_PRIVATE WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
-    MONGO_MOD_PRIVATE Atomic<bool> _holdingTicket;
-    MONGO_MOD_PRIVATE Atomic<bool> _loadShed;
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _exemptedAdmissions{0};
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _lowAdmissions{0};
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int32_t> _admissions{0};
+    [[MONGO_MOD_PRIVATE]] Atomic<Priority> _priority{Priority::kNormal};
+    [[MONGO_MOD_PRIVATE]] Atomic<std::int64_t> _totalTimeQueuedMicros;
+    [[MONGO_MOD_PRIVATE]] WaitableAtomic<TickSource::Tick> _startQueueingTime{kNotQueueing};
+    [[MONGO_MOD_PRIVATE]] Atomic<bool> _holdingTicket;
+    [[MONGO_MOD_PRIVATE]] Atomic<bool> _loadShed;
 };
 
 /**
  * Default-constructible admission context to use for testing purposes.
  */
-class MONGO_MOD_PUBLIC MockAdmissionContext : public AdmissionContext {
+class [[MONGO_MOD_PUBLIC]] MockAdmissionContext : public AdmissionContext {
 public:
     MockAdmissionContext() = default;
-    // Block until this AdmissionContext is queued waiting on a ticket or the timeout expires.
-    // Returns true if we got queued, or false if the timeout expired.
-    bool waitUntilQueued(Nanoseconds timeout) {
-        return bool(_startQueueingTime.waitFor(kNotQueueing, timeout));
-    }
 
     void recordDelinquentAcquisition(Milliseconds delay) {
         ++delinquentAcquisitions;
@@ -205,7 +189,7 @@ public:
  * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
  * lock.
  */
-class MONGO_MOD_PUBLIC ScopedAdmissionPriorityBase {
+class [[MONGO_MOD_PUBLIC]] ScopedAdmissionPriorityBase {
 public:
     explicit ScopedAdmissionPriorityBase(OperationContext* opCtx,
                                          AdmissionContext& admCtx,
@@ -221,14 +205,14 @@ private:
 };
 
 template <typename AdmissionContextType>
-class MONGO_MOD_PUBLIC ScopedAdmissionPriority : public ScopedAdmissionPriorityBase {
+class [[MONGO_MOD_PUBLIC]] ScopedAdmissionPriority : public ScopedAdmissionPriorityBase {
 public:
     explicit ScopedAdmissionPriority(OperationContext* opCtx, AdmissionContext::Priority priority)
         : ScopedAdmissionPriorityBase(opCtx, AdmissionContextType::get(opCtx), priority) {}
     ~ScopedAdmissionPriority() = default;
 };
 
-class MONGO_MOD_PUBLIC WaitingForAdmissionGuard {
+class [[MONGO_MOD_PUBLIC]] WaitingForAdmissionGuard {
 public:
     explicit WaitingForAdmissionGuard(AdmissionContext* admCtx, TickSource* tickSource);
     ~WaitingForAdmissionGuard();
@@ -238,41 +222,41 @@ private:
     TickSource* _tickSource;
 };
 
-MONGO_MOD_PUBLIC std::string_view toString(AdmissionContext::Priority priority);
+[[MONGO_MOD_PUBLIC]] std::string_view toString(AdmissionContext::Priority priority);
 
-MONGO_MOD_PUBLIC inline int compare(AdmissionContext::Priority lhs,
-                                    AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline int compare(AdmissionContext::Priority lhs,
+                                        AdmissionContext::Priority rhs) {
     using enum_t = std::underlying_type_t<AdmissionContext::Priority>;
     return static_cast<enum_t>(lhs) - static_cast<enum_t>(rhs);
 }
 
-MONGO_MOD_PUBLIC inline bool operator==(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator==(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) == 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator!=(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator!=(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) != 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator<(AdmissionContext::Priority lhs,
-                                       AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator<(AdmissionContext::Priority lhs,
+                                           AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) < 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator>(AdmissionContext::Priority lhs,
-                                       AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator>(AdmissionContext::Priority lhs,
+                                           AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) > 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator<=(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator<=(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) <= 0;
 }
 
-MONGO_MOD_PUBLIC inline bool operator>=(AdmissionContext::Priority lhs,
-                                        AdmissionContext::Priority rhs) {
+[[MONGO_MOD_PUBLIC]] inline bool operator>=(AdmissionContext::Priority lhs,
+                                            AdmissionContext::Priority rhs) {
     return compare(lhs, rhs) >= 0;
 }
 

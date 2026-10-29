@@ -3,6 +3,7 @@
  *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC], when a collection scan is used.
  *
  * @tags: [
+ *     uses_explain,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # This complicates aggregation extraction.

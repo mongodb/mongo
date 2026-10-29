@@ -9,7 +9,7 @@
  *   expects_explicit_underscore_id_index,
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
- *   requires_fcv_82
+ *   requires_fcv_82,
  * ]
  */
 
@@ -20,6 +20,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 2});
+
 const db = prepareShardedCollectionWithOrphans(st);
 
 runGroupWithAccNToDistinctScanTests(db);

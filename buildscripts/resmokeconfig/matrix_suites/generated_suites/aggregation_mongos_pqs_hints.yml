@@ -20,7 +20,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
-        await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+        await import("jstests/libs/override_methods/query/make_cursor_hints_into_query_settings.js");
       global_vars:
         TestData:
           isHintsToQuerySettingsSuite: true
@@ -30,13 +30,13 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
   hooks:
@@ -77,4 +77,5 @@ selector:
     - query_intensive_pbt
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test

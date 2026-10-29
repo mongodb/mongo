@@ -2,10 +2,9 @@
 // @tags: [
 //   requires_scripting,
 //   resource_intensive,
-//   # TODO SERVER-127318 re-enable on WASM once per-request JS context cost is
-//   # eliminated. This test times out on certain systems.
-//   mozjs_wasm_unsupported,
 // ]
+import {isMozjsWasm} from "jstests/libs/js_engine_util.js";
+
 const coll = db.accumulator_js_size_limits;
 
 function runExample(groupKey, accumulatorSpec, aggregateOptions = {}) {
@@ -24,13 +23,19 @@ function runExample(groupKey, accumulatorSpec, aggregateOptions = {}) {
     return coll.runCommand(Object.assign(aggregateCmd, aggregateOptions));
 }
 
+// BSONObjMaxUserSize (16 MB) from the server; BSONObjMaxInternalSize adds 16 KB of internal
+// overhead headroom on top of the user-facing limit (see bson/util/builder.h).
+const maxBsonOverhead = db.hello().maxBsonObjectSize + 16 * 1024;
+
 // Accumulator tries to create too long a String; it can't be serialized to BSON.
+// WASM: allocate just 1 byte over BSONObjMaxInternalSize so the BSON-size check fires
+// without requiring 20 MB of WASM linear memory.
+// Legacy: use the original 20 MB string.
+const tooBigStringLen = isMozjsWasm(db) ? maxBsonOverhead + 1 : 20 * 1024 * 1024;
 coll.drop();
 assert.commandWorked(coll.insert({}));
 let res = runExample(1, {
-    init: function () {
-        return "a".repeat(20 * 1024 * 1024);
-    },
+    init: `function() { return "a".repeat(${tooBigStringLen}); }`,
     accumulate: function () {
         throw "accumulate should not be called";
     },
@@ -48,13 +53,19 @@ let res = runExample(1, {
 assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 17260, 10334]);
 
 // Accumulator tries to return BSON larger than 16MB from JS.
+// WASM: use 2 strings of (BSONObjMaxInternalSize / 2 + 1) bytes each — BSON serialization
+// exceeds BSONObjMaxInternalSize with ~16 MB peak live JS memory, within the WASM store limiter.
+// Legacy: use the original 20 × 1 MB strings.
+const [tooBigArrayLen, tooBigArrayElemLen] = isMozjsWasm(db)
+    ? [2, maxBsonOverhead / 2 + 1]
+    : [20, 1 * 1024 * 1024];
 assert(coll.drop());
 assert.commandWorked(coll.insert({}));
 res = runExample(1, {
-    init: function () {
-        const str = "a".repeat(1 * 1024 * 1024);
-        return Array.from({length: 20}, () => str);
-    },
+    init: `function() {
+        const str = "a".repeat(${tooBigArrayElemLen});
+        return Array.from({length: ${tooBigArrayLen}}, () => str);
+    }`,
     accumulate: function () {
         throw "accumulate should not be called";
     },

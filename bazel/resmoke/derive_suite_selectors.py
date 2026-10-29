@@ -21,27 +21,9 @@ except ImportError:
 
 # Matches the top-level "selector:" block and its indented body.
 _SELECTOR_RE = re.compile(r"^selector:\s*\n((?:[ \t]+.*\n)*)", re.MULTILINE)
-# Matches the top-level "test_kind:" value.
-_TEST_KIND_RE = re.compile(r"^test_kind:\s*(\S+)", re.MULTILINE)
 
 OUTPUT_FILE = Path("bazel/resmoke/.resmoke_suites_derived.bzl")
 RESMOKE_MODULES_FILE = Path("buildscripts/resmokeconfig/resmoke_modules.yml")
-
-# Test kinds that don't enumerate individual source files via selector.roots.
-# These test binaries directly (mongos --test, dbtest, etc.) so an empty srcs
-# list is intentional — not a derive error.
-_NO_ROOTS_TEST_KINDS = frozenset(
-    [
-        "benchmark_test",
-        "cpp_integration_test",
-        "cpp_libfuzzer_test",
-        "cpp_unit_test",
-        "db_test",
-        "mongos_test",
-        "pretty_printer_test",
-        "sleep_test",
-    ]
-)
 
 # Fixed suite directories (relative to repo root).
 # Each entry is (suite_dir, bazel_package, target_prefix) where:
@@ -83,9 +65,16 @@ def _discover_suite_dirs(repo_root: Path) -> list[tuple[Path, str, str]]:
                     # Module suite_dirs
                     for suite_dir in module_cfg.get("suite_dirs", []):
                         p = Path(suite_dir)
-                        # Derive bazel package from parent dir
-                        bazel_pkg = p.parent.as_posix()
-                        target_prefix = p.name
+                        if _has_build_file(repo_root / p):
+                            # The suite dir is its own Bazel package; the ymls are
+                            # exported directly from it, so key by "//suite_dir:name.yml".
+                            bazel_pkg = p.as_posix()
+                            target_prefix = ""
+                        else:
+                            # Files are exported from the parent package with a prefix,
+                            # keyed as "//parent:suite_dir_name/name.yml".
+                            bazel_pkg = p.parent.as_posix()
+                            target_prefix = p.name
                         dirs.append((p, bazel_pkg, target_prefix))
 
                     # Module matrix_suite_dirs (use generated_suites subdir)
@@ -103,6 +92,41 @@ def _discover_suite_dirs(repo_root: Path) -> list[tuple[Path, str, str]]:
 def _has_build_file(dir_path: Path) -> bool:
     """Check if a directory contains a BUILD or BUILD.bazel file."""
     return (dir_path / "BUILD.bazel").exists() or (dir_path / "BUILD").exists()
+
+
+def _file_label(rel_path: Path, repo_root: Path) -> str | None:
+    """Build a Bazel label for a file, resolving its enclosing package.
+
+    Test files are not necessarily at the root of their Bazel package: a package
+    may export files from nested subdirectories via ``exports_files(glob(...))``.
+    Walk up from the file's directory to the nearest ancestor that owns a BUILD
+    file and reference the file by its path relative to that package, e.g.
+    ``//pkg:sub/dir/file.json``. Returns None if the file does not exist or no
+    enclosing package is found.
+    """
+    # A literal path may be a module-wildcard expansion (e.g. modules/*/foo.js)
+    # that resolves to a file only under some modules; skip ones that don't exist.
+    if not (repo_root / rel_path).is_file():
+        return None
+
+    for parent in rel_path.parents:
+        if _has_build_file(repo_root / parent):
+            target = rel_path.relative_to(parent).as_posix()
+            pkg = parent.as_posix()
+            return f"//:{target}" if pkg == "." else f"//{pkg}:{target}"
+    return None
+
+
+def _suite_label(bazel_package: str, target_prefix: str, yml_name: str) -> str:
+    """Build the SUITE_SELECTORS key for a suite YAML.
+
+    When the suite dir is its own package (empty target_prefix), the yml is
+    exported directly: "//pkg:name.yml". Otherwise the files are exported from
+    the parent package under a prefix: "//pkg:prefix/name.yml".
+    """
+    if target_prefix:
+        return f"//{bazel_package}:{target_prefix}/{yml_name}"
+    return f"//{bazel_package}:{yml_name}"
 
 
 def _glob_to_labels(pattern: str, repo_root: Path) -> list[str]:
@@ -147,20 +171,22 @@ def _glob_to_labels(pattern: str, repo_root: Path) -> list[str]:
 
     # Literal file path (no wildcards at all)
     if "*" not in pattern and "[" not in pattern and "?" not in pattern:
-        p = Path(pattern)
-        if _has_build_file(repo_root / p.parent):
-            return [f"//{p.parent.as_posix()}:{p.name}"]
-        return []
+        label = _file_label(Path(pattern), repo_root)
+        return [label] if label else []
 
-    # Complex or non-standard patterns: expand via filesystem glob
-    full_pattern = str(repo_root / pattern)
+    # Complex or non-standard patterns: expand via filesystem glob. A trailing
+    # slash (e.g. manual_tests/*/) means "directories only";
+    dirs_only = pattern.endswith("/")
+    full_pattern = str(repo_root / pattern) + ("/" if dirs_only else "")
     matches = sorted(glob.glob(full_pattern, recursive=True))
     labels: list[str] = []
     for match in matches:
         rel = os.path.relpath(match, repo_root)
         p = Path(rel)
         if p.is_file():
-            labels.append(f"//{p.parent.as_posix()}:{p.name}")
+            label = _file_label(p, repo_root)
+            if label:
+                labels.append(label)
         elif p.is_dir():
             labels.append(f"//{p.as_posix()}")
     return labels
@@ -249,29 +275,25 @@ def gen_suite_selectors(repo_root: Path) -> dict[str, object]:
                 if "from_target" in selector:
                     continue
 
+                key = _suite_label(bazel_package, target_prefix, yml_path.name)
+
                 roots = selector.get("roots")
                 if not roots or not isinstance(roots, list):
-                    # For known no-roots test kinds, emit an empty entry so
-                    # resmoke_suite_test can proceed in passthrough mode.
-                    m_kind = _TEST_KIND_RE.search(text)
-                    test_kind = m_kind.group(1) if m_kind else None
-                    if test_kind in _NO_ROOTS_TEST_KINDS:
-                        key = f"//{bazel_package}:{target_prefix}/{yml_path.name}"
-                        selectors[key] = []
+                    # A selector with no roots (missing, null, or an empty list —
+                    # e.g. every root commented out) enumerates no source files.
+                    selectors[key] = []
                     continue
 
-                # Map each root glob to Bazel labels
-                srcs: list[str] = []
+                # Map each root glob to Bazel labels. Overlapping globs
+                # can yield the same label more than once; de-dupe so the generated
+                # srcs stays valid.
+                srcs: set[str] = set()
                 for root in roots:
                     if not isinstance(root, str):
                         continue
-                    labels = _glob_to_labels(root, repo_root)
-                    srcs.extend(labels)
+                    srcs.update(_glob_to_labels(root, repo_root))
 
-                if srcs:
-                    # Key format: "bazel_package:target_prefix/name.yml"
-                    key = f"//{bazel_package}:{target_prefix}/{yml_path.name}"
-                    selectors[key] = srcs
+                selectors[key] = sorted(srcs)
 
         # Write the .bzl file
         content = _render_bzl(selectors)

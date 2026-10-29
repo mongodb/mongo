@@ -14,6 +14,7 @@ selector:
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - incompatible_with_initial_sync
+    - query_intensive_pbt
     # Tests that query the system.profile collection cannot run in this suite since an initial sync
     # may insert unexpected operations into the profile collection.
     - queries_system_profile_collection

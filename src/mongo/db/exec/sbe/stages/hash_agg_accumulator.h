@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,7 +11,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/modules.h"
@@ -49,6 +23,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+class CollatorInterface;
+
 namespace sbe {
 /**
  * Base class for the executable accumulator operators used by SBE's HashAggStage.
@@ -86,7 +62,8 @@ public:
      * a 'finalize()' call will produce the output expected from accumulating an exmpty list. Must
      * be called before executing any accumulate or merge operations.
      */
-    virtual void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const = 0;
+    virtual void initialize(vm::ByteCode& bytecode,
+                            value::AssignableSlotAccessor& accumulatorState) const = 0;
 
     /**
      * Reads the current accumulator state and a new value and writes out the updated accumulator
@@ -95,7 +72,8 @@ public:
      * The sources of the input accumulator state and input value are defined by the child
      * implementations of this method.
      */
-    virtual void accumulate(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const = 0;
+    virtual void accumulate(vm::ByteCode& bytecode,
+                            value::AssignableSlotAccessor& accumulatorState) const = 0;
 
     /**
      * Reads the current accumulator state, updates the accumulator's state with the recovered state
@@ -184,9 +162,11 @@ public:
 
     void prepareForMerge(CompileCtx& ctx, value::SlotAccessor* accumulatorAccessor) final;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
-    void accumulate(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final {
+    void accumulate(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final {
         accumulatorState.reset(bytecode.run(_accumulatorCode.get()));
     };
 
@@ -202,8 +182,8 @@ public:
     std::vector<DebugPrinter::Block> debugPrintMerge() const final;
 
     void debugPrintCode(std::vector<DebugPrinter::Block>& blocks) const final {
-        PlanStage::debugPrintBytecode(blocks, _accumulatorCode, "ACCUMULATE" /*title*/);
-        PlanStage::debugPrintBytecode(blocks, _mergingCode, "MERGE" /*title*/);
+        PlanStage::debugPrintBytecode(blocks, _accumulatorCode, /*title=*/"ACCUMULATE");
+        PlanStage::debugPrintBytecode(blocks, _mergingCode, /*title=*/"MERGE");
         PlanStage::debugPrintBytecode(blocks, _optionalInitializerCode, "INIT" /**/);
     }
 
@@ -265,7 +245,8 @@ public:
 
     void prepareForMerge(CompileCtx& ctx, value::SlotAccessor* accumulatorAccessor) final;
 
-    void accumulate(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void accumulate(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void merge(vm::ByteCode& bytecode,
                value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -295,8 +276,8 @@ protected:
      * (owned, type tag, value) pair and update the accumulator state stored in the
      * 'accumulatorState' accessor to incorporate the new value.
      */
-    virtual void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                            HashAggAccessor& accumulatorState) const = 0;
+    virtual void accumulateTransformedValue(
+        value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accumulatorState) const = 0;
 
     /**
      * Child implementations of this class must override this method to accept the recovered state
@@ -350,11 +331,12 @@ class ArithmeticAverageHashAggAccumulatorBase : public SinglePurposeHashAggAccum
 public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -406,16 +388,6 @@ public:
     AddToSetHashAggAccumulator(value::SlotId outSlot,
                                value::SlotId spillSlot,
                                std::unique_ptr<EExpression> transformExpr,
-                               boost::optional<value::SlotId> collatorSlot)
-        : SinglePurposeHashAggAccumulator(
-              outSlot, spillSlot, std::move(transformExpr), collatorSlot),
-          _collatorSlot(collatorSlot) {
-        _sizeCap = internalQueryMaxAddToSetBytes.load();
-    }
-
-    AddToSetHashAggAccumulator(value::SlotId outSlot,
-                               value::SlotId spillSlot,
-                               std::unique_ptr<EExpression> transformExpr,
                                boost::optional<value::SlotId> collatorSlot,
                                int64_t sizeCap)
         : SinglePurposeHashAggAccumulator(
@@ -428,13 +400,14 @@ public:
             _outSlot, _spillSlot, _transformExpr->clone(), _collatorSlot, _sizeCap);
     }
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void singlePurposePrepare(CompileCtx& ctx) final;
 
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -458,30 +431,23 @@ public:
     PushHashAggAccumulator(value::SlotId outSlot,
                            value::SlotId spillSlot,
                            std::unique_ptr<EExpression> transformExpr,
-                           boost::optional<value::SlotId> collatorSlot)
-        : SinglePurposeHashAggAccumulator(
-              outSlot, spillSlot, std::move(transformExpr), collatorSlot) {
-        _sizeCap = internalQueryMaxPushBytes.load();
-    }
-
-    PushHashAggAccumulator(value::SlotId outSlot,
-                           value::SlotId spillSlot,
-                           std::unique_ptr<EExpression> transformExpr,
+                           boost::optional<value::SlotId> collatorSlot,
                            int64_t sizeCap)
         : SinglePurposeHashAggAccumulator(
-              outSlot, spillSlot, std::move(transformExpr), boost::none),
+              outSlot, spillSlot, std::move(transformExpr), collatorSlot),
           _sizeCap(sizeCap) {}
 
     std::unique_ptr<HashAggAccumulator> clone() const final {
         return std::make_unique<PushHashAggAccumulator>(
-            _outSlot, _spillSlot, _transformExpr->clone(), _sizeCap);
+            _outSlot, _spillSlot, _transformExpr->clone(), boost::none, _sizeCap);
     }
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -501,7 +467,8 @@ class FirstHashAggAccumulator : public SinglePurposeHashAggAccumulator {
 public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     std::unique_ptr<HashAggAccumulator> clone() const final {
         return std::make_unique<FirstHashAggAccumulator>(
@@ -510,7 +477,7 @@ public:
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -530,11 +497,12 @@ class CountHashAggAccumulatorBase : public SinglePurposeHashAggAccumulator {
 public:
     using SinglePurposeHashAggAccumulator::SinglePurposeHashAggAccumulator;
 
-    void initialize(vm::ByteCode& bytecode, HashAggAccessor& accumulatorState) const final;
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
 
 protected:
     void accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                    HashAggAccessor& accumulatorState) const final;
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
 
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
@@ -580,6 +548,100 @@ protected:
     void finalizePartialAggregate(value::TagValueOwned partialAggregate,
                                   value::AssignableSlotAccessor& result) const final;
 };
+
+/**
+ * Base class for the single-purpose implementation of the $minN/$maxN accumulators.
+ */
+template <AccumulatorMinMaxN::MinMaxSense S>
+class MinMaxNHashAggAccumulatorBase : public SinglePurposeHashAggAccumulator {
+public:
+    MinMaxNHashAggAccumulatorBase(value::SlotId outSlot,
+                                  value::SlotId spillSlot,
+                                  std::unique_ptr<EExpression> transformExpr,
+                                  boost::optional<value::SlotId> collatorSlot,
+                                  std::unique_ptr<EExpression> maxSizeExpr,
+                                  int32_t memLimit)
+        : SinglePurposeHashAggAccumulator(
+              outSlot, spillSlot, std::move(transformExpr), collatorSlot),
+          _collatorSlot(collatorSlot),
+          _maxSizeExpr(std::move(maxSizeExpr)),
+          _memLimit(memLimit) {}
+
+    void initialize(vm::ByteCode& bytecode,
+                    value::AssignableSlotAccessor& accumulatorState) const final;
+
+    size_t estimateSize() const override;
+
+protected:
+    void singlePurposePrepare(CompileCtx& ctx) final;
+
+    void accumulateTransformedValue(value::TagValueMaybeOwned field,
+                                    value::AssignableSlotAccessor& accumulatorState) const final;
+
+    void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
+                             value::MaterializedSingleRowAccessor& accumulatorState) const final;
+
+    value::TagValueOwned extractHeap(value::TagValueOwned partialAggregate) const;
+
+    std::string getDebugName() const final {
+        return S == AccumulatorMinMaxN::MinMaxSense::kMin ? "_internalMinN" : "_internalMaxN";
+    }
+
+    CollatorInterface* getCollator() const;
+
+    boost::optional<value::SlotId> _collatorSlot;
+    value::SlotAccessor* _collatorAccessor = nullptr;
+    std::unique_ptr<EExpression> _maxSizeExpr;
+    std::unique_ptr<vm::CodeFragment> _maxSizeCode;
+    int32_t _memLimit;
+};
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+class MinMaxNHashAggAccumulatorTerminal : public MinMaxNHashAggAccumulatorBase<S> {
+public:
+    using MinMaxNHashAggAccumulatorBase<S>::MinMaxNHashAggAccumulatorBase;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<MinMaxNHashAggAccumulatorTerminal<S>>(this->_outSlot,
+                                                                      this->_spillSlot,
+                                                                      this->_transformExpr->clone(),
+                                                                      this->_collatorSlot,
+                                                                      this->_maxSizeExpr->clone(),
+                                                                      this->_memLimit);
+    }
+
+protected:
+    void finalizePartialAggregate(value::TagValueOwned partialAggregate,
+                                  value::AssignableSlotAccessor& result) const final;
+};
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+class MinMaxNHashAggAccumulatorPartial : public MinMaxNHashAggAccumulatorBase<S> {
+public:
+    using MinMaxNHashAggAccumulatorBase<S>::MinMaxNHashAggAccumulatorBase;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<MinMaxNHashAggAccumulatorPartial<S>>(this->_outSlot,
+                                                                     this->_spillSlot,
+                                                                     this->_transformExpr->clone(),
+                                                                     this->_collatorSlot,
+                                                                     this->_maxSizeExpr->clone(),
+                                                                     this->_memLimit);
+    }
+
+protected:
+    void finalizePartialAggregate(value::TagValueOwned partialAggregate,
+                                  value::AssignableSlotAccessor& result) const final;
+};
+
+using MinNHashAggAccumulator =
+    MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMin>;
+using MaxNHashAggAccumulator =
+    MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMax>;
+using MinNHashAggAccumulatorPartial =
+    MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMin>;
+using MaxNHashAggAccumulatorPartial =
+    MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMax>;
 
 namespace size_estimator {
 inline size_t estimate(const std::unique_ptr<HashAggAccumulator>& accumulator) {

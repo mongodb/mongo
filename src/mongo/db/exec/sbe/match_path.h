@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,6 +10,7 @@
 #include <string_view>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 
 /**
  * The sbe::MatchPath class is used by SBE to represent field paths for MatchExpressions. This class
@@ -69,7 +44,7 @@ public:
     }
 
     std::string_view getPart(FieldIndex i) const {
-        return FieldRef::numParts() == 0 && i == 0 ? ""_sd : FieldRef::getPart(i);
+        return FieldRef::numParts() == 0 && i == 0 ? ""sv : FieldRef::getPart(i);
     }
 
     std::string_view operator[](int index) const {
@@ -77,12 +52,12 @@ public:
     }
 
     bool equalsDottedField(std::string_view other) const {
-        return FieldRef::numParts() == 0 ? other == ""_sd : FieldRef::equalsDottedField(other);
+        return FieldRef::numParts() == 0 ? other == ""sv : FieldRef::equalsDottedField(other);
     }
 
     std::string_view dottedField(FieldIndex offsetFromStart = 0) const {
         if (FieldRef::numParts() == 0) {
-            return (offsetFromStart == 0) ? ""_sd : std::string_view();
+            return (offsetFromStart == 0) ? ""sv : std::string_view();
         }
 
         return FieldRef::dottedField(offsetFromStart);
@@ -90,14 +65,14 @@ public:
 
     std::string_view dottedSubstring(FieldIndex startPart, FieldIndex endPart) const {
         if (!FieldRef::numParts()) {
-            return (startPart == 0 && endPart == 1) ? ""_sd : std::string_view();
+            return (startPart == 0 && endPart == 1) ? ""sv : std::string_view();
         }
 
         return FieldRef::dottedSubstring(startPart, endPart);
     }
 
     bool isPathComponentEmpty(FieldIndex i) const {
-        return getPart(i) == ""_sd;
+        return getPart(i) == ""sv;
     }
 
     bool hasEmptyPathComponents() const {

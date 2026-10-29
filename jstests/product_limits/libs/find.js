@@ -5,7 +5,6 @@ export class FindWorkload extends Workload {
     runWorkload(dataset, _, db) {
         const coll = db.getCollection(this.collection());
         const find = this.find(dataset);
-        jsTest.log.info({find});
 
         coll.explain("allPlansExecution").find(dataset, {"_id": 0});
 

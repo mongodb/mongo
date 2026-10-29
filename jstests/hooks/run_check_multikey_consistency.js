@@ -141,9 +141,12 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         // Sample one doc to derive candidate field paths to query.
         let sampleDoc;
         try {
-            sampleDoc = members[0].getDB(dbName)[collName].findOne({}, {_id: 0});
+            sampleDoc = members[0].getDB(dbName).getCollection(collName).findOne({}, {_id: 0});
         } catch (e) {
-            if (e.code === ErrorCodes.NamespaceNotFound) return;
+            // QueryPlanKilled: the collection was dropped while this read was running.
+            if (e.code === ErrorCodes.NamespaceNotFound || e.code === ErrorCodes.QueryPlanKilled) {
+                return;
+            }
             throw e;
         }
         if (!sampleDoc) return;
@@ -229,6 +232,7 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         }
         members.push(conn);
     }
+
     if (members.length < 2) {
         print(
             "Skipping multikey consistency check: fewer than 2 readable members on " + rst.getURL(),
@@ -275,7 +279,7 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
     for (const {dbName, collName} of allColls) {
         let indexes;
         try {
-            indexes = primary.getDB(dbName)[collName].getIndexes();
+            indexes = primary.getDB(dbName).getCollection(collName).getIndexes();
         } catch (e) {
             // Race: between enumeration and this read a concurrent workload may have dropped the
             // collection (NamespaceNotFound) or replaced it with a view of the same name

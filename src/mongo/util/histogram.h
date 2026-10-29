@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -47,7 +21,7 @@
 #include <fmt/format.h>
 
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Generic histogram that supports data collection into intervals based on user-specified partitions
@@ -62,7 +36,7 @@ namespace MONGO_MOD_PUB mongo {
 template <typename T,
           typename Cmp = std::less<T>,
           typename Counter = std::atomic_int64_t>  // NOLINT
-class MONGO_MOD_UNFORTUNATELY_OPEN Histogram {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] Histogram {
     struct AtEnd {};
 
 public:
@@ -176,28 +150,62 @@ protected:
 };
 
 /**
+ * Builds the BSON field name ("[lower, upper)") for each bucket of `hist`, in bucket order.
+ *
+ * The keys depend only on the histogram's partitions, which are fixed at construction. Callers that
+ * serialize the same histogram repeatedly should build this once and pass it to the overload of
+ * `appendHistogram` below rather than paying the formatting cost on every call.
+ */
+template <typename... Ts>
+std::vector<std::string> makeHistogramBucketKeys(const Histogram<Ts...>& hist) {
+    std::vector<std::string> keys;
+    keys.reserve(hist.getPartitions().size() + 1);
+    for (auto&& bucket : hist) {
+        keys.push_back(
+            fmt::format("{}{}, {})",
+                        bucket.lower ? '[' : '(',
+                        bucket.lower ? fmt::to_string(*bucket.lower) : std::string{"-inf"},
+                        bucket.upper ? fmt::to_string(*bucket.upper) : std::string{"inf"}));
+    }
+    return keys;
+}
+
+/**
  * Appends data (i.e. count and lower/upper bounds of all buckets) of a histogram to the provided
- * BSON object builder. `histKey` is used as the field name for the appended BSON object containing
- * the data.
+ * BSON object builder, using bucket keys previously built by `makeHistogramBucketKeys(hist)`.
+ * `histKey` is used as the field name for the appended BSON object containing the data.
+ *
+ * `bucketKeys` must contain exactly one entry per bucket, in bucket order.
+ */
+template <typename... Ts>
+void appendHistogram(BSONObjBuilder& bob,
+                     const Histogram<Ts...>& hist,
+                     const std::string_view histKey,
+                     const std::vector<std::string>& bucketKeys) {
+    BSONObjBuilder histBob(bob.subobjStart(histKey));
+    long long totalCount = 0;
+    size_t i = 0;
+
+    invariant(bucketKeys.size() == hist.getPartitions().size() + 1,
+              "bucketKeys must have one entry per histogram bucket");
+    for (auto&& bucket : hist) {
+        BSONObjBuilder(histBob.subobjStart(bucketKeys[i]))
+            .append("count", static_cast<long long>(bucket.count));
+        totalCount += bucket.count;
+        ++i;
+    }
+    histBob.append("totalCount", totalCount);
+}
+
+/**
+ * As above, but builds the bucket keys on each call. Prefer the overload taking precomputed keys on
+ * any path that serializes the same histogram more than once.
  */
 template <typename... Ts>
 void appendHistogram(BSONObjBuilder& bob,
                      const Histogram<Ts...>& hist,
                      const std::string_view histKey) {
-    BSONObjBuilder histBob(bob.subobjStart(histKey));
-    long long totalCount = 0;
-
-    for (auto&& [count, lower, upper] : hist) {
-        std::string bucketKey = fmt::format("{}{}, {})",
-                                            lower ? "[" : "(",
-                                            lower ? fmt::format("{}", *lower) : "-inf",
-                                            upper ? fmt::format("{}", *upper) : "inf");
-
-        BSONObjBuilder(histBob.subobjStart(bucketKey))
-            .append("count", static_cast<long long>(count));
-        totalCount += count;
-    }
-    histBob.append("totalCount", totalCount);
+    appendHistogram(bob, hist, histKey, makeHistogramBucketKeys(hist));
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

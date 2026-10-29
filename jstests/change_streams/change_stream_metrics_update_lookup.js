@@ -1,0 +1,313 @@
+/**
+ * Verifies that enriching update events with a post-image (fullDocument: "updateLookup") records the
+ * single-document-lookup outcome into the per-engine serverStatus metrics under
+ * 'changeStreams.updateLookup.<engine>'.
+ *
+ * @tags: [
+ *   # Can not run in balancer suites as it expects no data migrations across shards for correct
+ *   # metric capture (test expects shard local lookup).
+ *   assumes_balancer_off,
+ *   # The exact change-event and metrics-delta assertions no longer hold once the txn
+ *   # passthrough bundles the test's writes into transactions.
+ *   change_stream_does_not_expect_txns,
+ *   requires_fcv_90,
+ *   assumes_no_implicit_cursor_exhaustion,
+ *   # The 'gone' document's post-image lookup relies on observing the delete that immediately
+ *   # follows its update. The lookup's read concern is {level: "majority", afterClusterTime:
+ *   # <the update's own clusterTime T1>}, a minimum bound, not "now". A secondary servicing
+ *   # that read may not yet have majority-committed (or advanced its per-batch lastApplied past)
+ *   # the later delete at T2 > T1, so it can legitimately still see the pre-delete state.
+ *   assumes_read_preference_unchanged,
+ * ]
+ */
+import {before, beforeEach, after, afterEach, describe, it} from "jstests/libs/mochalite.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertChangeStreamEventsEqWithDeploymentAwareness,
+    withChangeStreamTest,
+} from "jstests/libs/query/change_stream_util.js";
+import {
+    expectedUpdateLookupEngine,
+    ServerStatusMetrics,
+    UpdateLookupExecutor,
+} from "jstests/libs/query/change_stream_metrics_util.js";
+import {withClusteredColl, withCollation} from "jstests/libs/query/collection_config_decorators.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// A compound _id with a Timestamp component (to exercise non-scalar key encoding), fully derived
+// from 'seed' so equal seeds yield equal ids. The string 'a' component keeps the id
+// collation-sensitive, so the collation configs exercise collation-aware key encoding of a
+// string nested inside a compound key, on both the _id_-index seek and the clustered-RecordId
+// seek paths.
+function compoundId(seed) {
+    return {a: `s${seed}`, b: Timestamp(seed, 1)};
+}
+
+describe("change stream updateLookup single-document-lookup metrics", function () {
+    const configs = [
+        {
+            name: "scalar _id",
+            collOpts: {},
+            presentId: "present",
+            goneId: "gone",
+        },
+        {
+            name: "compound _id",
+            collOpts: {},
+            presentId: compoundId(100),
+            goneId: compoundId(200),
+        },
+    ]
+        .flatMap((config) => [config, withClusteredColl(config)])
+        .flatMap((config) => [config, withCollation(config)]);
+
+    for (const config of configs) {
+        describe(config.name, function () {
+            const testDB = db.getSiblingDB(config.name.replace(/\s+/g, "_"));
+            const testColl = testDB.getCollection("test");
+            const ns = {db: testDB.getName(), coll: testColl.getName()};
+
+            before(function () {
+                assertDropAndRecreateCollection(testDB, testColl.getName(), config.collOpts);
+            });
+
+            after(function () {
+                assert.commandWorked(testDB.dropDatabase());
+            });
+
+            beforeEach(function () {
+                assert.commandWorked(
+                    testColl.insert([{_id: config.presentId}, {_id: config.goneId}]),
+                );
+            });
+
+            afterEach(function () {
+                assert.commandWorked(testColl.deleteMany({}));
+            });
+
+            it("records found / notFound into the engine's single-document-lookup cell", function () {
+                const engine = expectedUpdateLookupEngine();
+
+                const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                    testDB,
+                    () => {
+                        withChangeStreamTest(testDB, (cst) => {
+                            const cursor = cst.startWatchingChanges({
+                                pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+                                collection: testColl.getName(),
+                            });
+
+                            // presentId still exists when the post-image is looked up ->
+                            // recordFound.
+                            assert.commandWorked(
+                                testColl.update({_id: config.presentId}, {$set: {v: 1}}),
+                            );
+
+                            // goneId is deleted before we drain the stream, so its update event's
+                            // post-image lookup finds nothing -> recordNotFound.
+                            assert.commandWorked(
+                                testColl.update({_id: config.goneId}, {$set: {v: 1}}),
+                            );
+                            assert.commandWorked(testColl.remove({_id: config.goneId}));
+
+                            cst.assertNextChangesEqualWithDeploymentAwareness({
+                                cursor,
+                                expectedChanges: [
+                                    {
+                                        operationType: "update",
+                                        ns,
+                                        documentKey: {_id: config.presentId},
+                                        fullDocument: {_id: config.presentId, v: 1},
+                                    },
+                                    {
+                                        operationType: "update",
+                                        ns,
+                                        documentKey: {_id: config.goneId},
+                                        fullDocument: null,
+                                    },
+                                    {
+                                        operationType: "delete",
+                                        ns,
+                                        documentKey: {_id: config.goneId},
+                                    },
+                                ],
+                            });
+                        });
+                    },
+                );
+
+                const lookup = delta.changeStreams.updateLookup[engine];
+                const fallbackLookup =
+                    delta.changeStreams.updateLookup[UpdateLookupExecutor.kAggregation];
+
+                // Every _id shape resolves on the primary engine directly, compound objects
+                // included; the fallback never engages.
+                assert.eq(lookup.found, 1, {lookup});
+                assert.eq(lookup.notFound, 1, {lookup});
+
+                // Since there are no migrations, the primary executor should always succeed.
+                assert.eq(lookup.notHandled, 0, {lookup});
+                assert.eq(fallbackLookup.found + fallbackLookup.notFound, 0, {
+                    lookup,
+                    fallbackLookup,
+                });
+
+                // Both lookups (found + notFound) recorded a latency observation.
+                // 'latencyMicros' is a histogram; 'totalCount' is its number of recorded
+                // observations.
+                assert.gt(lookup.latencyMicros.totalCount, 0, {lookup});
+            });
+        });
+    }
+
+    // One shared enrichment window mixing scalar and compound _ids, with the middle doc gone
+    // so both shape and outcome vary, in both triplet orders.
+    const mixedIdConfigs = [
+        {
+            name: "mixed _id, scalar-compound-scalar order",
+            collOpts: {},
+            order: ["scalar", "compound", "scalar"],
+        },
+        {
+            name: "mixed _id, compound-scalar-compound order",
+            collOpts: {},
+            order: ["compound", "scalar", "compound"],
+        },
+    ]
+        .flatMap((config) => [config, withClusteredColl(config)])
+        .flatMap((config) => [config, withCollation(config)]);
+
+    describe("mixed scalar/compound _id batches", function () {
+        const testDB = db.getSiblingDB(jsTestName());
+        const testColl = testDB.getCollection("test");
+        const ns = {db: testDB.getName(), coll: testColl.getName()};
+
+        afterEach(function () {
+            assert.commandWorked(testDB.dropDatabase());
+        });
+
+        for (const config of mixedIdConfigs) {
+            it(`records per-document outcome for a mixed scalar/compound _id batch [${config.name}]`, function () {
+                assertDropAndRecreateCollection(testDB, testColl.getName(), config.collOpts);
+
+                // The middle document (index 1) is the one that goes missing before the lookup
+                // runs; the outer two stay present.
+                const docs = config.order.map((shape, i) => ({
+                    shape,
+                    outcome: i === 1 ? "gone" : "present",
+                    id: shape === "scalar" ? `scalar${i}` : compoundId(500 + i),
+                }));
+                assert.commandWorked(testColl.insert(docs.map((d) => ({_id: d.id}))));
+
+                const engine = expectedUpdateLookupEngine();
+
+                let actualChanges;
+                let expectedChanges;
+                const delta = ServerStatusMetrics.withServerStatusMetricsAcrossCluster(
+                    testDB,
+                    () => {
+                        // See the configs comment above for why this is coll.watch() + .next()
+                        // rather than ChangeStreamTest's helpers. batchSize: 0 parks everything
+                        // onto the first getMore, whose unset batchSize leaves room for the
+                        // remaining events to fill one window.
+                        const cursor = testColl.watch([], {
+                            fullDocument: "updateLookup",
+                            cursor: {batchSize: 0},
+                        });
+
+                        assert.commandWorked(testColl.insert({_id: "batchWarmer"}));
+                        expectedChanges = [
+                            {
+                                operationType: "insert",
+                                ns,
+                                documentKey: {_id: "batchWarmer"},
+                                fullDocument: {_id: "batchWarmer"},
+                            },
+                        ];
+
+                        for (const d of docs) {
+                            const isGone = d.outcome === "gone";
+                            assert.commandWorked(testColl.update({_id: d.id}, {$set: {v: 1}}));
+                            expectedChanges.push({
+                                operationType: "update",
+                                ns,
+                                documentKey: {_id: d.id},
+                                fullDocument: isGone ? null : {_id: d.id, v: 1},
+                            });
+
+                            if (isGone) {
+                                assert.commandWorked(testColl.remove({_id: d.id}));
+                                expectedChanges.push({
+                                    operationType: "delete",
+                                    ns,
+                                    documentKey: {_id: d.id},
+                                });
+                            }
+                        }
+
+                        // A change stream cursor never signals EOF; drain exactly the expected
+                        // count. On a sharded topology a getMore can legitimately return an empty
+                        // batch (e.g. while merging per-shard cursors), so hasNext() alone can't
+                        // tell "no more events yet" from "done": keep polling until the expected
+                        // count is drained.
+                        actualChanges = [];
+                        assert.soon(() => {
+                            while (
+                                actualChanges.length < expectedChanges.length &&
+                                cursor.hasNext()
+                            ) {
+                                actualChanges.push(cursor.next());
+                            }
+                            return actualChanges.length >= expectedChanges.length;
+                        });
+                        cursor.close();
+                    },
+                );
+
+                // Correctness: every event matches (ordered on replica sets, unordered on sharded
+                // topologies, where cross-shard event order may not match client issue order).
+                assertChangeStreamEventsEqWithDeploymentAwareness(
+                    db,
+                    actualChanges,
+                    expectedChanges,
+                );
+
+                // fillBatch() admits exactly one event into the first window while 'shouldWaitForInserts'
+                // is set (its stop-after-one break), so 2 windows over 5 events means window 1 was the
+                // warmer alone and window 2 held all three updates plus the delete. Batching is a
+                // property of the SBE primary, not of the collection.
+                //
+                // 'enrichBatchesStarted' is counted per enrichment pipeline, and a sharded change
+                // stream runs one pipeline per targeted shard: the exact count above only holds
+                // when a single shard sees the events, so only assert it there. With more than one
+                // shard, which _id lands on which shard (and so how many pipelines run) depends on
+                // hashed placement, making the count non-deterministic from the test's perspective.
+                if (FixtureHelpers.numberOfShardsForCollection(testColl) === 1) {
+                    const batchingApplies = engine === UpdateLookupExecutor.kSBE;
+                    assert.eq(
+                        delta.changeStreams.updateLookup.enrichBatchesStarted,
+                        batchingApplies ? 2 : expectedChanges.length,
+                        {delta},
+                    );
+                } else {
+                    assert.gte(delta.changeStreams.updateLookup.enrichBatchesStarted, 1, {delta});
+                }
+
+                const lookup = delta.changeStreams.updateLookup[engine];
+                const fallbackLookup =
+                    delta.changeStreams.updateLookup[UpdateLookupExecutor.kAggregation];
+
+                // Every _id shape resolves on the primary, compound objects included: the
+                // two outer (present) docs are found, the middle (gone)
+                // one is notFound, and the fallback never engages.
+                assert.eq(lookup.found, 2, {lookup});
+                assert.eq(lookup.notFound, 1, {lookup});
+                assert.eq(lookup.notHandled, 0, {lookup});
+                assert.eq(fallbackLookup.found + fallbackLookup.notFound, 0, {
+                    lookup,
+                    fallbackLookup,
+                });
+            });
+        }
+    });
+});

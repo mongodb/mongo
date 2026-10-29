@@ -2,6 +2,7 @@ module(
     name = "googletest",
 )
 
+bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(
     name = "platforms",
     version = "0.0.9",

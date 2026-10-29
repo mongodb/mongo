@@ -56,7 +56,7 @@ jsTest.log.info("Transaction prepared. Checking count from an external observer 
 
 // Before restart: with replicated fast count, the external observer does NOT see the prepared
 // transaction's inserts. _replicatedNumRecords has not been adjusted (only happens on commit),
-// and the external observer's UncommittedFastCountChange is empty.
+// and the external observer's UncommittedFastCountChanges is empty.
 const countBeforeRestart = testColl.count();
 jsTest.log.info("Count before restart (external observer): " + countBeforeRestart);
 assert.eq(

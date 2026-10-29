@@ -1,40 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <memory>
-#include <utility>
-#include <vector>
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,6 +20,7 @@
 #include "mongo/db/exec/classic/limit.h"
 #include "mongo/db/exec/classic/merge_sort.h"
 #include "mongo/db/exec/classic/mock_stage.h"
+#include "mongo/db/exec/classic/multi_range_clustered_scan.h"
 #include "mongo/db/exec/classic/or.h"
 #include "mongo/db/exec/classic/projection.h"
 #include "mongo/db/exec/classic/return_key.h"
@@ -70,7 +40,6 @@
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -81,13 +50,53 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <memory>
+#include <utility>
+#include <vector>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
 namespace mongo::stage_builder {
+
+namespace {
+void assertCompatibleMultiRangeCollScan(const CollectionScanNode* csn) {
+    // None of the resume/tailable/oplog features
+    // apply to multi-range scans — they are mutually exclusive with the
+    // multi-range optimization on the planner side.
+    tassert(12591300, "Multi-range collection scan cannot be tailable", !csn->tailable);
+    tassert(12591301,
+            "Multi-range collection scan cannot track latest oplog timestamp",
+            !csn->shouldTrackLatestOplogTimestamp);
+    tassert(12591302,
+            "Multi-range collection scan does not support assertTsHasNotFallenOff",
+            !csn->assertTsHasNotFallenOff);
+    tassert(12591303,
+            "Multi-range collection scan does not wait for oplog visibility",
+            !csn->shouldWaitForOplogVisibility);
+    tassert(12591304,
+            "Multi-range collection scan does not produce resume tokens",
+            !csn->requestResumeToken);
+    tassert(12591305,
+            "Multi-range collection scan cannot be resumed from a scan point",
+            !csn->resumeScanPoint);
+    tassert(12591306,
+            "stopApplyingFilterAfterFirstMatch unsupported for multi-range "
+            "collection scan",
+            !csn->stopApplyingFilterAfterFirstMatch);
+}
+}  // namespace
+
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
+//
+// A failed index lookup below uasserts. Planning can yield between choosing a solution and building
+// it (e.g. during CBR sampling), so an index may be dropped by the time we look it up. That is a
+// DDL race so we kill the query. Lookup is by ident, not name, so an index recreated under the same
+// name during the yield also fails rather than being silently substituted.
 std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* root) {
     auto* const expCtx = _cq.getExpCtxRaw();
 
@@ -97,19 +106,44 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         switch (root->getType()) {
             case STAGE_COLLSCAN: {
                 const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
+                const auto direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
+                                                             : CollectionScanParams::BACKWARD;
+
+                if (csn->rangeList.getRanges().size() != 1) {
+                    // Multi-range clustered scan.
+                    assertCompatibleMultiRangeCollScan(csn);
+
+                    MultiRangeClusteredScanParams params;
+                    params.rangeList = csn->rangeList;
+                    params.direction = direction;
+                    return std::make_unique<MultiRangeClusteredScan>(
+                        expCtx, _collection, params, _ws, csn->filter.get());
+                }
+
+                // A single range: collapse to the contiguous CollectionScan, with bounds derived
+                // from the rangeList's outer bounds. (For an unbounded rangeList, outerBounds()
+                // returns a range with no min/max — i.e. a full collection scan.)
+                const auto outer = csn->rangeList.outerBounds();
+                const bool startInclusive = (direction == CollectionScanParams::FORWARD)
+                    ? outer.isMinInclusive()
+                    : outer.isMaxInclusive();
+                const bool endInclusive = (direction == CollectionScanParams::FORWARD)
+                    ? outer.isMaxInclusive()
+                    : outer.isMinInclusive();
+
                 CollectionScanParams params;
                 params.tailable = csn->tailable;
                 params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
                 params.assertTsHasNotFallenOff = csn->assertTsHasNotFallenOff;
-                params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
-                                                         : CollectionScanParams::BACKWARD;
+                params.direction = direction;
                 params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
-                params.minRecord = csn->minRecord;
-                params.maxRecord = csn->maxRecord;
+                params.minRecord = outer.getMin();
+                params.maxRecord = outer.getMax();
                 params.requestResumeToken = csn->requestResumeToken;
                 params.resumeScanPoint = csn->resumeScanPoint;
                 params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
-                params.boundInclusion = csn->boundInclusion;
+                params.boundInclusion =
+                    CollectionScanParams::makeInclusion(startInclusive, endInclusive);
                 return std::make_unique<CollectionScan>(
                     expCtx, _collection, params, _ws, csn->filter.get());
             }
@@ -285,13 +319,25 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.nearQuery = node->nq;
                 params.baseBounds = node->baseBounds;
                 params.filter = node->filter.get();
+                // Mirror what FetchStage does with its filter: a trivially true predicate is not
+                // worth evaluating per document.
+                params.residualFilter =
+                    (node->residualFilter && !node->residualFilter->isTriviallyTrue())
+                    ? node->residualFilter.get()
+                    : nullptr;
                 params.addPointMeta = node->addPointMeta;
                 params.addDistMeta = node->addDistMeta;
 
                 invariant(collectionPtr);
-                const auto twoDIndex = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, node->index.identifier.catalogName);
-                invariant(twoDIndex);
+                const auto* twoDIndex = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, node->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << node->index.toString(),
+                        twoDIndex);
 
                 return std::make_unique<GeoNear2DStage>(
                     params, expCtx, _ws, _collection, twoDIndex);
@@ -303,13 +349,25 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.nearQuery = node->nq;
                 params.baseBounds = node->baseBounds;
                 params.filter = node->filter.get();
+                // Mirror what FetchStage does with its filter: a trivially true predicate is not
+                // worth evaluating per document.
+                params.residualFilter =
+                    (node->residualFilter && !node->residualFilter->isTriviallyTrue())
+                    ? node->residualFilter.get()
+                    : nullptr;
                 params.addPointMeta = node->addPointMeta;
                 params.addDistMeta = node->addDistMeta;
 
                 invariant(collectionPtr);
-                const auto s2Index = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, node->index.identifier.catalogName);
-                invariant(s2Index);
+                const auto* s2Index = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, node->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << node->index.toString(),
+                        s2Index);
 
                 return std::make_unique<GeoNear2DSphereStage>(
                     params, expCtx, _ws, _collection, s2Index);
@@ -332,10 +390,13 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 tassert(5432200, "collection object is not provided", collectionPtr);
                 auto catalog = collectionPtr->getIndexCatalog();
                 tassert(5432201, "index catalog is unavailable", catalog);
-                auto entry = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
-                tassert(5432202,
-                        str::stream() << "no index named '" << node->index.identifier.catalogName
-                                      << "' found in catalog",
+                const auto* entry = catalog->findIndexByIdent(
+                    _opCtx, node->index.indexCatalogEntryStorage->getIdent());
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << node->index.toString(),
                         entry);
                 auto fam = static_cast<const FTSAccessMethod*>(entry->accessMethod());
                 tassert(5432203, "access method for index is not defined", fam);
@@ -374,9 +435,15 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
                 invariant(collectionPtr);
-                auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, dn->index.identifier.catalogName);
-                tassert(8862201, "Index descriptor cannot be null", descriptor);
+                const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, dn->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << dn->index.toString(),
+                        entry);
 
                 std::unique_ptr<ShardFiltererImpl> shardFilterer;
                 if (dn->isShardFiltering) {
@@ -393,7 +460,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 // We use the node's internal name, keyPattern and multikey details here. For $**
                 // indexes, these may differ from the information recorded in the index's
                 // descriptor.
-                DistinctParams params{descriptor,
+                DistinctParams params{entry,
                                       dn->index.identifier.catalogName,
                                       dn->index.keyPattern,
                                       dn->index.multikeyPaths,
@@ -402,6 +469,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 params.scanDirection = dn->direction;
                 params.bounds = dn->bounds;
                 params.fieldNo = dn->fieldNo;
+                params.unwindsArrays = dn->unwindsArrays;
                 return std::make_unique<DistinctScan>(expCtx,
                                                       _collection,
                                                       std::move(params),
@@ -413,14 +481,20 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
                 invariant(collectionPtr);
-                auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
-                    _opCtx, csn->index.identifier.catalogName);
-                tassert(8862200, "Index descriptor cannot be null", descriptor);
+                const auto* entry = collectionPtr->getIndexCatalog()->findIndexByIdent(
+                    _opCtx, csn->index.indexCatalogEntryStorage->getIdent());
+
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "Index descriptor not found. Namespace: "
+                                      << collectionPtr->ns().toStringForErrorMsg()
+                                      << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                      << ", IndexEntry: " << csn->index.toString(),
+                        entry);
 
                 // We use the node's internal name, keyPattern and multikey details here. For
                 // $** indexes, these may differ from the information recorded in the index's
                 // descriptor.
-                CountScanParams params{descriptor,
+                CountScanParams params{entry,
                                        csn->index.identifier.catalogName,
                                        csn->index.keyPattern,
                                        csn->index.multikeyPaths,
@@ -469,12 +543,15 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 return mockStage;
             }
             case STAGE_BATCHED_DELETE:
+            case STAGE_BATCHED_FETCH:
             case STAGE_CACHED_PLAN:
+            case STAGE_COLLSCAN_MULTI_RANGE:
             case STAGE_COUNT:
             case STAGE_DELETE:
             case STAGE_EQ_LOOKUP:
             case STAGE_EQ_LOOKUP_UNWIND:
             case STAGE_GROUP:
+            case STAGE_STREAMING_GROUP:
             case STAGE_IDHACK:
             case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
             case STAGE_INDEX_PROBE_NODE:
@@ -498,8 +575,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             case STAGE_SENTINEL:
             case STAGE_UPDATE:
             case STAGE_UNWIND:
-            case STAGE_SEARCH:
-            case STAGE_WINDOW: {
+            case STAGE_SEARCH: {
                 LOGV2_WARNING(4615604,
                               "Can't build exec tree for node",
                               "node"_attr = redact(root->toString()));
@@ -509,7 +585,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
     }();
 
     if (_planStageQsnMap) {
-        _planStageQsnMap->insert({result.get(), root});
+        _planStageQsnMap->insert({result.get(), QsnMapping{root, root->nodeId()}});
     }
     return result;
 }

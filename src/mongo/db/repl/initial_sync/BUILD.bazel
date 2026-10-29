@@ -58,6 +58,34 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "clean_shutdown_checker",
+    srcs = [
+        "clean_shutdown_checker.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/repl:clean_shutdown_idl",
+        "//src/mongo/db/repl:read_concern_args",
+        "//src/mongo/db/repl/clang_checked",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "clean_shutdown_checker_test",
+    size = "small",
+    srcs = ["clean_shutdown_checker_test.cpp"],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":clean_shutdown_checker",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_library(
     name = "initial_sync_cloners",
     srcs = [
         "all_database_cloner.cpp",
@@ -65,8 +93,12 @@ mongo_cc_library(
         "database_cloner.cpp",
         "initial_sync_base_cloner.cpp",
     ],
+    hdrs = [
+        "fast_count_initial_sync_aggregator.h",
+    ],
     deps = [
         ":base_cloner",
+        ":clean_shutdown_checker",
         ":cloner_utils",
         ":repl_sync_shared_data",
         "//src/mongo:base",
@@ -76,11 +108,15 @@ mongo_cc_library(
         "//src/mongo/db/commands:list_collections_filter",
         "//src/mongo/db/index_builds:index_build_entry_helpers",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/index_builds/primary_driven:enabled",
         "//src/mongo/db/repl:member_data",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:replication_auth",
         "//src/mongo/db/repl:replication_consistency_markers_impl",
         "//src/mongo/db/repl:task_runner",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
+        "//src/mongo/db/replicated_fast_count:size_count_store",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/util:progress_meter",
         "//src/mongo/util/concurrency:thread_pool",
@@ -96,6 +132,7 @@ mongo_cc_library(
         "initial_syncer_factory.cpp",
     ],
     deps = [
+        ":clean_shutdown_checker",
         ":initial_sync_cloners",
         ":repl_sync_shared_data",
         "//src/mongo/client:clientdriver_network",
@@ -113,7 +150,13 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:rollback_checker",
         "//src/mongo/db/repl:storage_interface",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
+        "//src/mongo/db/replicated_fast_count:size_count_store",
+        "//src/mongo/db/replicated_fast_count:size_count_timestamp_store_oplog",
         "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/storage/kv:kv_engine",
         "//src/mongo/db/transaction",
         "//src/mongo/executor:scoped_task_executor",
         "//src/mongo/executor:task_executor_interface",
@@ -128,6 +171,7 @@ mongo_cc_unit_test(
     deps = [
         ":initial_syncer",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
         "//src/mongo/db/repl:abstract_async_component",
         "//src/mongo/db/repl:data_replicator_external_state_mock",
@@ -137,6 +181,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:sync_source_resolver",
         "//src/mongo/db/repl:sync_source_selector_mock",
         "//src/mongo/db/repl:task_executor_mock",
+        "//src/mongo/db/replicated_fast_count:size_count_store",
+        "//src/mongo/db/storage:ident",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",

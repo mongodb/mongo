@@ -2,6 +2,7 @@
 // for each plan cache entry when appropriate.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
@@ -56,13 +57,7 @@ for (const entry of planCacheContents) {
 // Otherwise, we expect "shard" to be absent. In either case, this should be true for each
 // individual plan cache entry.
 for (const entry of planCacheContents) {
-    assert.eq(
-        FixtureHelpers.isMongos(db) ||
-            (TestData.hasOwnProperty("testingReplicaSetEndpoint") &&
-                TestData.testingReplicaSetEndpoint),
-        entry.hasOwnProperty("shard"),
-        entry,
-    );
+    assert.eq(FixtureHelpers.isMongos(db), entry.hasOwnProperty("shard"), entry);
 }
 
 // If we group the results by shard or host, then we should only get one plan cache entry for each

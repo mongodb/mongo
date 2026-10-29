@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/explain.h"
 
@@ -40,7 +14,9 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
@@ -48,8 +24,12 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/assert_util.h"
@@ -74,25 +54,15 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 /**
- * Adds the 'queryPlanner' explain section to the BSON object being built by 'out'.
- *
- * This is a helper for generating explain BSON. It is used by explainStages(...).
- *
- * - 'exec' is a PlanExecutor which executes the plan for the operation being explained.
- * - 'collection' is the collection used in the operation. The caller should hold an IS lock on the
- *    collection which the query is for, even if 'collection' is nullptr.
- * - 'extraInfo' specifies additional information to include into the output.
- * - 'out' is a builder for the explain output.
+ * Appends the version-independent "general" queryPlanner information: namespace, parsed query,
+ * collation, query settings, plan-cache hashes, optimization time, CE sampling metadata, and the
+ * plan-enumerator limits. This block is identical across explain versions.
  */
-void generatePlannerInfo(PlanExecutor* exec,
-                         ExplainOptions::Verbosity verbosity,
-                         const BSONObj& cmd,
-                         const Explain::PlannerContext& plannerContext,
-                         BSONObj extraInfo,
-                         const SerializationContext& serializationContext,
-                         BSONObjBuilder* out) {
-    BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
-
+void appendQueryPlannerCommonInfo(PlanExecutor* exec,
+                                  const Explain::PlannerContext& plannerContext,
+                                  const BSONObj& extraInfo,
+                                  const SerializationContext& serializationContext,
+                                  BSONObjBuilder& plannerBob) {
     plannerBob.append("namespace",
                       NamespaceStringUtil::serialize(exec->nss(), serializationContext));
 
@@ -132,6 +102,8 @@ void generatePlannerInfo(PlanExecutor* exec,
         plannerBob.append("planCacheKey", zeroPaddedHex(*plannerContext.planCacheKeyHash));
     }
 
+    // TODO SERVER-132079: source the planning time from the executor's own explain data instead
+    // of the per-operation diagnostics state.
     if (exec->getOpCtx() != nullptr) {
         const auto planningTimeOpt =
             CurOp::get(exec->getOpCtx())->debug().getAdditiveMetrics().planningTime;
@@ -151,6 +123,34 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     auto&& explainer = exec->getPlanExplainer();
 
+    if (const auto joinPlanCacheKeyHash = explainer.getJoinPlanCacheKeyHash();
+        joinPlanCacheKeyHash.has_value()) {
+        plannerBob.append("joinPlanCacheKey", zeroPaddedHex(*joinPlanCacheKeyHash));
+    }
+
+    if (const auto& joinMetrics = CurOp::get(exec->getOpCtx())->debug().joinOptimizationMetrics) {
+        if (joinMetrics->fallbackReason) {
+            plannerBob.append("joinFallbackReason",
+                              join_ordering::toReasonName(*joinMetrics->fallbackReason));
+        }
+
+        BSONObjBuilder joinOptBob(plannerBob.subobjStart("joinOptimizationMetrics"));
+        joinOptBob.appendNumber("joinModelingTimeMicros",
+                                static_cast<long long>(joinMetrics->joinModelingTimeMicros));
+        joinOptBob.appendNumber("sbeLoweringTimeMicros",
+                                static_cast<long long>(joinMetrics->sbeLoweringTimeMicros));
+        if (const auto& pe = joinMetrics->planEnumerationMetrics) {
+            joinOptBob.appendNumber("samplingTimeMicros",
+                                    static_cast<long long>(pe->samplingTimeMicros));
+            joinOptBob.appendNumber("cbrPlanningTimeMicros",
+                                    static_cast<long long>(pe->cbrPlanningTimeMicros));
+            joinOptBob.appendNumber("planEnumerationTimeMicros",
+                                    static_cast<long long>(pe->planEnumerationTimeMicros));
+            joinOptBob.appendNumber("ceTimeMicros", static_cast<long long>(pe->ceTimeMicros));
+            joinOptBob.append("wtLeafPagesAvailable", pe->numApproxLeafPagesUnavailable == 0);
+        }
+    }
+
     if (const auto ceSamplingMeta = explainer.getCeSamplingMetadata(); ceSamplingMeta.has_value()) {
         BSONObjBuilder ceSamplingMetaBob(plannerBob.subobjStart("ceSamplingMetadata"));
         for (const auto& [ns, meta] : ceSamplingMeta.value()) {
@@ -168,10 +168,31 @@ void generatePlannerInfo(PlanExecutor* exec,
             nsMetaBob.appendNumber("sampleDocCount", static_cast<long long>(meta.docCount));
             nsMetaBob.appendNumber("sampleMemorySizeBytes",
                                    static_cast<long long>(meta.memorySizeBytes));
+            tassert(13096900,
+                    "sampleNumPages must only be set when the sample was persisted",
+                    !meta.numPages || meta.isPersisted);
+            if (meta.numPages) {
+                nsMetaBob.appendNumber("sampleNumPages",
+                                       static_cast<long long>(meta.numPages.value()));
+            }
             tassert(12433203,
                     "SamplingMetadata::createdAt must be set before explain is generated",
                     meta.createdAt.has_value());
             nsMetaBob.appendDate("sampleCreatedAt", meta.createdAt.value());
+        }
+    }
+
+    // Field statistics (analyze mode "ndv") that served estimates during planning.
+    if (const auto fieldStatsMeta = explainer.getFieldStatsMetadata(); fieldStatsMeta.has_value()) {
+        BSONObjBuilder fieldStatsBob(plannerBob.subobjStart("fieldStatsMetadata"));
+        for (const auto& [ns, entries] : fieldStatsMeta.value()) {
+            BSONObjBuilder nsBob(fieldStatsBob.subobjStart(ns));
+            BSONArrayBuilder ndvArr(nsBob.subarrayStart("ndv"));
+            for (const auto& entry : entries) {
+                BSONObjBuilder entryBob(ndvArr.subobjStart());
+                entryBob.append("fieldPaths", entry.sortedFieldPaths);
+                entryBob.appendDate("createdAt", entry.createdAt);
+            }
         }
     }
     auto&& enumeratorInfo = explainer.getEnumeratorInfo();
@@ -179,9 +200,41 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
     plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
     plannerBob.append("prunedSimilarIndexes", enumeratorInfo.prunedAnyIndexes);
+}
 
-    auto&& [winningStats, _] = explainer.getWinningPlanStatsQueryPlanner(
-        verbosity == ExplainOptions::Verbosity::kInternal /*printBytecode*/);
+/**
+ * Adds the 'queryPlanner' explain section to the BSON object being built by 'out'.
+ *
+ * This is a helper for generating explain BSON. It is used by explainStages(...).
+ *
+ * - 'exec' is a PlanExecutor which executes the plan for the operation being explained.
+ * - 'collection' is the collection used in the operation. The caller should hold an IS lock on the
+ *    collection which the query is for, even if 'collection' is nullptr.
+ * - 'extraInfo' specifies additional information to include into the output.
+ * - 'out' is a builder for the explain output.
+ */
+void generatePlannerInfo(PlanExecutor* exec,
+                         ExplainOptions::Verbosity verbosity,
+                         const BSONObj& cmd,
+                         const Explain::PlannerContext& plannerContext,
+                         BSONObj extraInfo,
+                         const SerializationContext& serializationContext,
+                         BSONObjBuilder* out) {
+    // generatePlannerInfo() renders the legacy queryPlanner output and must only be called with a
+    // legacy verbosity; the V3 hooks translate V3 verbosities to legacy before delegating here.
+    tassert(13076112,
+            "generatePlannerInfo() must be called with a legacy (non-V3) verbosity",
+            !ExplainOptions::isV3Verbosity(verbosity));
+    BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
+
+    appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
+
+    auto&& explainer = exec->getPlanExplainer();
+    auto plannerPolicy = explainPolicyFor(ExplainOptions::Verbosity::kQueryPlanner);
+    if (explainPolicyFor(verbosity).hasByteCode()) {
+        plannerPolicy = plannerPolicy.with(ExplainSettings::kBytecode);
+    }
+    auto&& [winningStats, _] = explainer.getWinningPlanStats(plannerPolicy);
     plannerBob.append("winningPlan", winningStats);
 
     BSONArrayBuilder bab{plannerBob.subarrayStart("rejectedPlans")};
@@ -243,9 +296,11 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
 
 /**
  * Adds the "executionStats" field to out. Assumes that the PlanExecutor has already been executed
- * to the point of reaching EOF. Also assumes that verbosity >= kExecStats.
+ * to the point of reaching EOF. Also assumes the verbosity's policy has exec stats
+ * (ExplainPolicy::hasExecStats()).
  *
- * If verbosity >= kExecAllPlans, it will include the "allPlansExecution" array.
+ * If the policy also has all-plans stats (ExplainPolicy::hasAllPlansStats()), it will include the
+ * "allPlansExecution" array.
  *
  * - 'execPlanStatus' is OK if the query was exected successfully, or a non-OK status if there
  *   was a runtime error.
@@ -255,16 +310,21 @@ void generateExecutionInfo(PlanExecutor* exec,
                            Status executePlanStatus,
                            boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
                            BSONObjBuilder* out) {
+    // Like generatePlannerInfo(), this renders legacy output and must only receive a legacy
+    // verbosity; the V3 hooks translate V3 verbosities to legacy before delegating here.
+    tassert(13076113,
+            "generateExecutionInfo() must be called with a legacy (non-V3) verbosity",
+            !ExplainOptions::isV3Verbosity(verbosity));
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     tassert(11320911,
-            fmt::format("The explain verbosity must be at least 'kExecStats' when generating "
-                        "execution info, but found {}",
+            fmt::format("The explain verbosity's policy must be 'executionStats' when generating "
+                        "execution info, but found verbosity {}",
                         idl::serialize(verbosity)),
-            verbosity >= ExplainOptions::Verbosity::kExecStats);
+            explainPolicy.hasExecStats());
 
     auto&& explainer = exec->getPlanExplainer();
 
-    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans &&
-        explainer.areThereRejectedPlansToExplain()) {
+    if (explainPolicy.hasAllPlansStats() && explainer.areThereRejectedPlansToExplain()) {
         tassert(11320912,
                 "winningPlanTrialStats must be present when requesting all execution stats",
                 winningPlanTrialStats);
@@ -286,11 +346,11 @@ void generateExecutionInfo(PlanExecutor* exec,
     generateSinglePlanExecutionInfo(explainer.getWinningPlanStats(verbosity),
                                     totalTimeMicros,
                                     &execBob,
-                                    false /* isTrialPeriodInfo */);
+                                    /*isTrialPeriodInfo=*/false);
 
     // Also generate exec stats for all plans, if the verbosity level is high enough. These stats
     // reflect what happened during the trial period that ranked the plans.
-    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+    if (explainPolicy.hasAllPlansStats()) {
         // If we ranked multiple plans against each other, then add stats collected from the trial
         // period of the winning plan. The "allPlansExecution" section will contain an
         // apples-to-apples comparison of the winning plan's stats against all rejected plans' stats
@@ -301,13 +361,13 @@ void generateExecutionInfo(PlanExecutor* exec,
         if (explainer.areThereRejectedPlansToExplain()) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
             generateSinglePlanExecutionInfo(
-                *winningPlanTrialStats, boost::none, &planBob, true /* isTrialPeriodInfo */);
+                *winningPlanTrialStats, boost::none, &planBob, /*isTrialPeriodInfo=*/true);
             planBob.doneFast();
 
             for (auto&& stats : explainer.getRejectedPlansStats(verbosity)) {
                 BSONObjBuilder planBob(allPlansBob.subobjStart());
                 generateSinglePlanExecutionInfo(
-                    stats, boost::none, &planBob, true /* isTrialPeriodInfo */);
+                    stats, boost::none, &planBob, /*isTrialPeriodInfo=*/true);
                 planBob.doneFast();
             }
         }
@@ -335,6 +395,197 @@ void executePlan(PlanExecutor* exec) {
  */
 BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
     return BSON("explainVersion" << version);
+}
+
+/**
+ * Appends the 'rankerChoice' object to 'out', which contains details the ranker that decided the
+ * winning plan and the reason for this choice.
+ */
+void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
+                            const boost::optional<PlanRankerReason> reason,
+                            const bool isSbeExplainer,
+                            BSONObjBuilder& out) {
+    BSONObjBuilder planRankerBob(out.subobjStart("rankerChoice"));
+
+    planRankerBob.append("chosenRanker", getPlanSelectionStrategyName(decidingPlanRanker));
+    if (decidingPlanRanker == PlanSelectionStrategy::kSinglePlan ||
+        decidingPlanRanker == PlanSelectionStrategy::kCachedPlan ||
+        decidingPlanRanker == PlanSelectionStrategy::kExpress) {
+        // No ranking took place (single candidate solution, count scan, cached plan, express
+        // execution). singlePlan is the only valid reason for those strategies, so it is derived
+        // here as a constant function of the recorded strategy - collapsing the plumbing for the
+        // several no-ranking paths to zero - rather than reconstructed from which statistics happen
+        // to be present.
+        // TODO SERVER-132012 SERVER-132079: make the caller pass kSinglePlan at the point of
+        // decision.
+        planRankerBob.append("reason", getPlanRankerReasonName(PlanRankerReason::kSinglePlan));
+    } else {
+        // A strategy decided, so it must have recorded why (it populated the same explain data
+        // this value comes from).
+        // TODO SERVER-134550 Remove the condition on SBE explainer and the extra bool parameter.
+        tassert(13237700,
+                "a ranking strategy decided the winning plan but recorded no reason",
+                reason.has_value() || isSbeExplainer);
+        if (reason.has_value()) {
+            planRankerBob.append("reason", getPlanRankerReasonName(reason.value()));
+        }
+    }
+
+    planRankerBob.doneFast();
+}
+
+/**
+ * Appends to 'planBob' the plan-level trial subobject 'name' ("multiPlanEstimateStats" or
+ * "multiPlanFinalizeStats"): the optional 'score' and 'stopCondition', then the totals of that
+ * trial phase. The plan's nReturned and execution time are not emitted here: they equal the
+ * candidate root node's values, already shown in that node's "statistics" subobject.
+ */
+void appendPlanPhaseStats(BSONObjBuilder& planBob,
+                          std::string_view name,
+                          boost::optional<double> score,
+                          boost::optional<MultiPlannerStopCondition> stopCondition,
+                          const PlanSummaryStats& totals) {
+    BSONObjBuilder bob(planBob.subobjStart(name));
+    if (score) {
+        bob.appendNumber("score", *score);
+    }
+    if (stopCondition) {
+        bob.append("stopCondition", toStringView(*stopCondition));
+    }
+    bob.appendNumber("totalKeysExamined", static_cast<long long>(totals.totalKeysExamined));
+    bob.appendNumber("totalDocsExamined", static_cast<long long>(totals.totalDocsExamined));
+}
+
+/**
+ * The V3 analogue of generatePlannerInfo(): produces the version 3 "queryPlanner" section for
+ * plannerChoice and the stats-rich V3 verbosities (plannerStats, execStats) - the
+ * version-independent general block followed by one uniform "plans" array of per-plan objects
+ * (winner first, then the remaining candidates ordered by the deciding ranker's metric), replacing
+ * the legacy winningPlan / rejectedPlans split.
+ *
+ * The shape is uniform across those modes; what varies is which statistics each plan carries, and
+ * that is decided by the ExplainPolicy alone. At plannerChoice both ranking-statistics families are
+ * off, so plans[] holds structure only: no per-node "statistics" subobject and no plan-level
+ * multi-planner group ("multiPlanEstimateStats"/"multiPlanFinalizeStats"). The plans are still
+ * *ordered* by the deciding ranker's metric - ordering reads the metric without displaying it, so
+ * the ranking that happened stays visible in the sequence.
+ *
+ * planSummary mode still renders legacy-shaped output under explainVersion "3".
+ *   TODO SERVER-133235 (the remaining reduction) closes that window.
+ *
+ * Both delegations must map the verbosity to legacy first: the legacy generators tassert on a V3
+ * verbosity.
+ */
+void generatePlannerInfoV3(PlanExecutor* exec,
+                           ExplainOptions::Verbosity v3Verbosity,
+                           const BSONObj& cmd,
+                           const Explain::PlannerContext& plannerContext,
+                           BSONObj extraInfo,
+                           const SerializationContext& serializationContext,
+                           BSONObjBuilder* out) {
+    if (v3Verbosity == ExplainOptions::Verbosity::kPlanSummary) {
+        generatePlannerInfo(exec,
+                            mapV3ToLegacyVerbosity(v3Verbosity),
+                            cmd,
+                            plannerContext,
+                            extraInfo,
+                            serializationContext,
+                            out);
+        return;
+    }
+
+    const ExplainPolicy policy = explainPolicyFor(v3Verbosity);
+    auto&& explainer = exec->getPlanExplainer();
+    // The ranker that decided the winning plan; it determines the ordering of plans[] after the
+    // winner. Explainers that never ranked a plan report none, which orders as a single plan.
+    const PlanSelectionStrategy decidingPlanRanker =
+        explainer.getPlanSelectionStrategy().value_or(PlanSelectionStrategy::kSinglePlan);
+    auto entries = explainer.getPlanEntries(policy, PlanStatsFormat::kV3, decidingPlanRanker);
+    // Zero entries means the explainer does not implement the per-plan enumerator and inherited
+    // the default-empty getPlanEntries().
+    if (entries.empty()) {
+        generatePlannerInfo(exec,
+                            mapV3ToLegacyVerbosity(v3Verbosity),
+                            cmd,
+                            plannerContext,
+                            extraInfo,
+                            serializationContext,
+                            out);
+        return;
+    }
+
+    BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
+    appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
+
+    // Append the rankerChoice sub-object including details around the chosen ranker and reasoning.
+    appendPlanRankerChoice(decidingPlanRanker,
+                           explainer.getPlanRankerReason(),
+                           explainer.isSbeExplainer(),
+                           plannerBob);
+
+    BSONArrayBuilder plansBob(plannerBob.subarrayStart("plans"));
+    for (auto&& entry : entries) {
+        BSONObjBuilder planBob(plansBob.subobjStart());
+        planBob.append("isCached", entry.isCached);
+        // TODO SERVER-134561: emit "usedJoinOptimization", which legacy reports whenever the join
+        // optimization knob is on.
+        if (internalQueryAllowForcedPlanByHash.load() && entry.solutionHash) {
+            planBob.append("solutionHashUnstable", static_cast<long long>(*entry.solutionHash));
+        }
+        if (entry.hasTrialStats && entry.summary) {
+            // Plan-level trial totals, one subobject per trial phase the plan did work in,
+            // regardless of which ranker decided. 'score' and the plan's final 'stopCondition'
+            // are emitted inside the last subobject present.
+            const bool finalizeIsLast = entry.finalizeSummary.has_value();
+            if (entry.estimateSummary) {
+                appendPlanPhaseStats(planBob,
+                                     "multiPlanEstimateStats",
+                                     finalizeIsLast ? boost::none : entry.summary->score,
+                                     entry.estimateStopCondition,
+                                     *entry.estimateSummary);
+            }
+            if (entry.finalizeSummary) {
+                appendPlanPhaseStats(planBob,
+                                     "multiPlanFinalizeStats",
+                                     entry.summary->score,
+                                     entry.stopCondition,
+                                     *entry.finalizeSummary);
+            }
+        }
+        planBob.append("planStages", entry.planStatsTree);
+        // SBE-only, winner-only content: the compiled SBE tree behind this plan, or the warning
+        // that it did not fit in what the explain size threshold left for it.
+        if (entry.slotBasedPlan) {
+            planBob.append("slotBasedPlan", *entry.slotBasedPlan);
+        }
+        // The tree that ran, present only when it differs from the ranked tree above.
+        if (entry.executedPlanStages) {
+            planBob.append("executedPlanStages", *entry.executedPlanStages);
+        }
+        if (entry.warning) {
+            planBob.append("warning", *entry.warning);
+        }
+    }
+    plansBob.doneFast();
+    plannerBob.doneFast();
+}
+
+/**
+ * The V3 analogue of generateExecutionInfo(): emits the retained "executionStats" section for the
+ * V3 execStats verbosity. By design the section is the legacy kExecStats section unchanged -
+ * legacy node shape (fused counters, no per-node statistics grouping) and never an
+ * allPlansExecution array (that content lives in queryPlanner.plans[]) - which is why this
+ * delegates to the legacy generator at the kExecStats verbosity. Do not fork the section's
+ * generation path: V3 execStats' executionStats must stay information-identical to the legacy
+ * executionStats verbosity's section.
+ */
+void generateExecutionInfoV3(PlanExecutor* exec,
+                             ExplainOptions::Verbosity v3Verbosity,
+                             Status executePlanStatus,
+                             boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
+                             BSONObjBuilder* out) {
+    generateExecutionInfo(
+        exec, ExplainOptions::Verbosity::kExecStats, executePlanStatus, winningPlanTrialStats, out);
 }
 
 template <typename EntryType>
@@ -396,19 +647,38 @@ void Explain::explainStages(PlanExecutor* exec,
     //
 
     auto&& explainer = exec->getPlanExplainer();
-    out->appendElements(explainVersionToBson(explainer.getVersion()));
+    out->appendElements(explainVersionToBson(explainer.getVersion(verbosity)));
 
-    if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(
+    // Policy-driven dispatch: the V3 verbosities are routed to the V3 section generators, the
+    // legacy verbosities to the legacy ones; within each family the policy decides which sections
+    // are present. In particular, the V3 planner-side modes (planSummary, plannerChoice,
+    // plannerStats) have no execution statistics, so only execStats emits the retained
+    // executionStats section.
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
+    if (ExplainOptions::isV3Verbosity(verbosity)) {
+        generatePlannerInfoV3(
             exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
-    }
-
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+        if (explainPolicy.hasExecStats()) {
+            generateExecutionInfoV3(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+        }
+    } else {
+        if (explainPolicy.hasPlannerInfo()) {
+            generatePlannerInfo(
+                exec, verbosity, command, plannerContext, extraInfo, serializationContext, out);
+        }
+        if (explainPolicy.hasExecStats()) {
+            generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+        }
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    // Report peak tracked memory only at executionStats verbosity or higher, matching how execution
+    // stats are reported. Memory consumed during planning/optimization is still counted in the
+    // operation-wide total, but must not surface in a queryPlanner-verbosity explain (which does no
+    // execution).
+    if (explainPolicyFor(verbosity).hasExecStats()) {
+        explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    }
     explain_common::appendIfRoom(command, "command", out);
 }
 
@@ -423,19 +693,25 @@ void Explain::explainPipeline(PlanExecutor* exec,
     auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(exec);
     tassert(11320915, "expected 'exec' to be a PlanExecutorPipeline", pipelineExec);
 
-    // If we need execution stats, this runs the plan in order to gather the stats.
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
-        // TODO SERVER-32732: An execution error should be reported in explain, but should not
-        // cause the explain itself to fail.
+    auto&& explainer = pipelineExec->getPlanExplainer();
+    out->appendElements(explainVersionToBson(explainer.getVersion(verbosity)));
+
+    // Only execute the pipeline if the verbosity policy requires execution statistics.
+    if (explainPolicyFor(verbosity).hasExecStats() && executePipeline) {
+        // (TODO SERVER-32732: an execution error should be reported in explain rather than failing
+        // the explain itself.)
         executePlan(pipelineExec);
     }
-
-    auto&& explainer = pipelineExec->getPlanExplainer();
-    out->appendElements(explainVersionToBson(explainer.getVersion()));
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    // Report peak tracked memory only at executionStats verbosity or higher, matching how execution
+    // stats are reported. Memory consumed during planning/optimization is still counted in the
+    // operation-wide total, but must not surface in a queryPlanner-verbosity explain (which does no
+    // execution).
+    if (explainPolicyFor(verbosity).hasExecStats()) {
+        explain_common::generatePeakTrackedMemBytes(exec->getOpCtx(), out);
+    }
     explain_common::generateServerInfo(out);
 
     const auto& expCtx = pipelineExec->getPipeline()->getContext();
@@ -456,9 +732,15 @@ void Explain::explainStages(PlanExecutor* exec,
     Status executePlanStatus = Status::OK();
     const MultipleCollectionAccessor* collectionsPtr = &collections;
 
+    // Whether the plan must be executed to gather execution statistics: exactly when the
+    // verbosity's policy has winner-execution statistics. The planner-side modes - legacy
+    // queryPlanner and the V3 planSummary/plannerChoice/plannerStats - do not execute the query;
+    // in particular plannerStats reports the multi-planning trial statistics without executing.
+    const bool requiresExecution = explainPolicyFor(verbosity).hasExecStats();
+
     // If we need execution stats, then run the plan in order to gather the stats.
     const MultipleCollectionAccessor emptyCollections;
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (requiresExecution) {
         try {
             executePlan(exec);
         } catch (const DBException&) {
@@ -542,7 +824,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         for (auto&& stats : execStats) {
             BSONObjBuilder planBob(creationBuilder.subobjStart());
             generateSinglePlanExecutionInfo(
-                stats, boost::none, &planBob, false /* isTrialPeriodInfo */);
+                stats, boost::none, &planBob, /*isTrialPeriodInfo=*/false);
             planBob.doneFast();
         }
         explain_common::appendIfRoom(creationBuilder.arr(), "creationExecStats", out);

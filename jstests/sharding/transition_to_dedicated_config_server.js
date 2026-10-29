@@ -165,13 +165,17 @@ describe("Check transition to dedicated config server starts, returns correct st
             0,
             configPrimary.getDB("config").getCollection("shard.catalog.databases").find().itcount(),
         );
-        assert.eq(
-            0,
+        // The check on config.shard.collections here is imprecise due to the fact that during
+        // transition to dedicated config.system.sessions collections entry is preserved across
+        // removeShard operation, however it also may be migrated to another shard during earlier
+        // drain or move back, making such check unstable.
+        assert.lte(
             configPrimary
                 .getDB("config")
                 .getCollection("shard.catalog.collections")
                 .find()
                 .itcount(),
+            1,
         );
         assert.eq(
             0,

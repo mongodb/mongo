@@ -52,7 +52,16 @@ export class Stage {
     }
 
     getStage(stageName) {
-        return this.is(stageName) ? this : this.children.find((s) => s.getStage(stageName));
+        if (this.is(stageName)) {
+            return this;
+        }
+        for (const child of this.children) {
+            const found = child.getStage(stageName);
+            if (found) {
+                return found;
+            }
+        }
+        return undefined;
     }
 
     #expectInner(stageName, ...expectations) {

@@ -1,20 +1,19 @@
 /**
  * Test to confirm queryShapeHash from $queryStats on mongos matches queryShapeHash from mongod
  * slow query logs for update and delete commands.
- *
- * @tags: [requires_fcv_90]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
-    getQueryShapeHashFromSlowLogs,
     getQueryShapeHashSetFromSlowLogs,
     getQueryStatsDeleteCmd,
     getQueryStatsUpdateCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
-import {resetTestCollectionsShardedCluster} from "jstests/libs/query/query_stats_write_cmd_utils.js";
+import {
+    assertQueryStatsAndMongodHashesMatch,
+    resetTestCollectionsShardedCluster,
+} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test data to insert into collections.
@@ -28,68 +27,6 @@ const testDocuments = [
     {v: 7, x: 70, y: "a"},
     {v: 8, x: 80, y: "b"},
 ];
-
-/**
- * Gets the latest queryShapeHash from $queryStats for a collection using the provided getter.
- */
-function getLatestQueryShapeHashFromQueryStats(mongosConn, collName, getQueryStatsFn) {
-    const entries = getQueryStatsFn(mongosConn, {
-        collName: collName,
-        customSort: {"metrics.latestSeenTimestamp": -1},
-    });
-    if (entries.length === 0) {
-        return null;
-    }
-    return entries[0].queryShapeHash;
-}
-
-/**
- * Asserts that the queryShapeHash from $queryStats matches the queryShapeHash from mongod slow
- * query logs.
- *
- * @param {object} mongosConn - The mongos connection.
- * @param {string} collName - The collection name.
- * @param {string} comment - The comment used to identify the query in slow logs.
- * @param {object} mongodDB - The mongod database connection to check slow logs.
- * @param {function} getQueryStatsFn - e.g. getQueryStatsUpdateCmd or getQueryStatsDeleteCmd.
- * @param {string} [testDesc] - Optional description for error messages.
- */
-function assertQueryStatsAndMongodHashesMatch(
-    mongosConn,
-    collName,
-    comment,
-    mongodDB,
-    getQueryStatsFn,
-    testDesc = "",
-) {
-    // Get queryShapeHash from mongos $queryStats.
-    const queryStatsHash = getLatestQueryShapeHashFromQueryStats(
-        mongosConn,
-        collName,
-        getQueryStatsFn,
-    );
-    assert.neq(
-        queryStatsHash,
-        null,
-        `queryShapeHash should be present in $queryStats${testDesc ? " for " + testDesc : ""}`,
-    );
-
-    // Get queryShapeHash from mongod slow query logs.
-    const mongodHash = getQueryShapeHashFromSlowLogs({testDB: mongodDB, queryComment: comment});
-    assert.neq(
-        mongodHash,
-        null,
-        `queryShapeHash should be present in mongod slow query logs${testDesc ? " for " + testDesc : ""}`,
-    );
-
-    // Verify they match.
-    assert.eq(
-        queryStatsHash,
-        mongodHash,
-        `queryShapeHash mismatch${testDesc ? " for " + testDesc : ""}: ` +
-            `$queryStats=${queryStatsHash}, mongod=${mongodHash}`,
-    );
-}
 
 /**
  * Asserts that for a batch of updates or deletes, the queryShapeHash from $queryStats matches the
@@ -209,8 +146,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.unsharded,
                 comment,
                 this.shard0DB,
-                getQueryStatsUpdateCmd,
-                "single update on unsharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsUpdateCmd,
+                    testDesc: "single update on unsharded collection",
+                },
             );
         });
 
@@ -235,8 +174,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard0DB,
-                getQueryStatsUpdateCmd,
-                "single update on sharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsUpdateCmd,
+                    testDesc: "single update on sharded collection",
+                },
             );
         });
     });
@@ -258,8 +199,7 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard0DB,
-                getQueryStatsUpdateCmd,
-                "fully no-op update",
+                {getQueryStatsFn: getQueryStatsUpdateCmd, testDesc: "fully no-op update"},
             );
         });
 
@@ -279,8 +219,10 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard0DB,
-                getQueryStatsUpdateCmd,
-                "update with some no-op modifiers",
+                {
+                    getQueryStatsFn: getQueryStatsUpdateCmd,
+                    testDesc: "update with some no-op modifiers",
+                },
             );
         });
     });
@@ -318,11 +260,6 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
 
     describe("Single Deletes", function () {
         it("single delete on unsharded collection: queryStats hash matches mongod slow log hash", function () {
-            // TODO SERVER-123427 remove once the feature flag is enabled.
-            if (!FeatureFlagUtil.isEnabled(this.routerDB, "featureFlagQueryStatsDelete")) {
-                jsTest.log.info(`Skipping test featureFlagQueryStatsDelete is disabled`);
-                return;
-            }
             const comment = `single_delete_unsharded_${UUID().toString()}`;
 
             assert.commandWorked(
@@ -338,17 +275,14 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.unsharded,
                 comment,
                 this.shard0DB,
-                getQueryStatsDeleteCmd,
-                "single delete on unsharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsDeleteCmd,
+                    testDesc: "single delete on unsharded collection",
+                },
             );
         });
 
         it("single delete on sharded collection: queryStats hash matches mongod slow log hash", function () {
-            // TODO SERVER-123427 remove once the feature flag is enabled.
-            if (!FeatureFlagUtil.isEnabled(this.routerDB, "featureFlagQueryStatsDelete")) {
-                jsTest.log.info(`Skipping test featureFlagQueryStatsDelete is disabled`);
-                return;
-            }
             const comment = `single_delete_sharded_${UUID().toString()}`;
 
             assert.commandWorked(
@@ -364,19 +298,16 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
                 this.collNames.sharded,
                 comment,
                 this.shard0DB,
-                getQueryStatsDeleteCmd,
-                "single delete on sharded collection",
+                {
+                    getQueryStatsFn: getQueryStatsDeleteCmd,
+                    testDesc: "single delete on sharded collection",
+                },
             );
         });
     });
 
     describe("Batched Deletes", function () {
         it("batched delete: every queryStats entry has a matching queryShapeHash in mongod slow logs", function () {
-            // TODO SERVER-123427 remove once the feature flag is enabled.
-            if (!FeatureFlagUtil.isEnabled(this.routerDB, "featureFlagQueryStatsDelete")) {
-                jsTest.log.info(`Skipping test featureFlagQueryStatsDelete is disabled`);
-                return;
-            }
             // Clear the query stats cache so we only see entries from this test.
             resetQueryStatsStore(this.st.s, "1%");
 

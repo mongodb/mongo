@@ -28,6 +28,8 @@
 
 #include "test_checkpoint.h"
 
+#define VERIFY_MAX_ROLLBACK_RETRY 10
+
 static WT_THREAD_RET checkpointer(void *);
 static WT_THREAD_RET clock_thread(void *);
 static int compare_cursors(WT_CURSOR *, table_type, WT_CURSOR *, table_type);
@@ -83,7 +85,6 @@ start_threads(void)
 void
 end_threads(void)
 {
-    /* Shutdown checkpoint after flush thread completes because flush depends on checkpoint. */
     testutil_check(__wt_thread_join(NULL, &g.checkpoint_thread));
 
     if (g.use_timestamps) {
@@ -210,25 +211,6 @@ checkpointer(void *arg)
 }
 
 /*
- * set_flush_tier_delay --
- *     Set up a random delay for the next flush_tier.
- */
-void
-set_flush_tier_delay(WT_RAND_STATE *rnd)
-{
-    /*
-     * When we are in sweep stress mode, we checkpoint between 4 and 8 seconds, so we'll flush
-     * between 5 and 15 seconds (that is, 5 million and 15 million microseconds). When we aren't in
-     * sweep stress mode, we are checkpointing constantly, and we'll do a flush tier with a random
-     * delay between 0 - 10000 microseconds.
-     */
-    if (g.sweep_stress)
-        g.opts.tiered_flush_interval_us = 5 * WT_MILLION + __wt_random(rnd) % (10 * WT_MILLION);
-    else
-        g.opts.tiered_flush_interval_us = __wt_random(rnd) % 10001;
-}
-
-/*
  * real_checkpointer --
  *     Do the work of creating checkpoints and then verifying them. Also responsible for finishing
  *     in a timely fashion.
@@ -241,13 +223,11 @@ real_checkpointer(THREAD_DATA *td)
     wt_timestamp_t tmp_ts;
     uint64_t delay;
     int ret;
-    char buf[128], flush_tier_config[128], timestamp_buf[64];
+    char buf[128], timestamp_buf[64];
     const char *checkpoint_config, *ts_config;
-    bool flush_tier;
 
     ts_config = "use_timestamp=false";
     verify_ts = WT_TS_NONE;
-    flush_tier = false;
 
     while (g.ntables > g.ntables_created && g.opts.running)
         __wt_yield();
@@ -263,12 +243,6 @@ real_checkpointer(THREAD_DATA *td)
         checkpoint_config = buf;
     } else
         checkpoint_config = ts_config;
-
-    testutil_snprintf(
-      flush_tier_config, sizeof(flush_tier_config), "flush_tier=(enabled,force),%s", ts_config);
-
-    /* Use the extra random generator as the tier delay doesn't affect the actual data content. */
-    set_flush_tier_delay(&td->extra_rnd);
 
     while (g.opts.running) {
         /*
@@ -307,27 +281,10 @@ real_checkpointer(THREAD_DATA *td)
         }
 
         /* Execute a checkpoint */
-        if ((ret = session->checkpoint(
-               session, flush_tier ? flush_tier_config : checkpoint_config)) != 0)
+        if ((ret = session->checkpoint(session, checkpoint_config)) != 0)
             return (log_print_err("session.checkpoint", ret, 1));
         printf("Finished a checkpoint\n");
         fflush(stdout);
-        if (flush_tier) {
-            /*
-             * FIXME: when we change the API to notify that a flush_tier has completed, we'll need
-             * to set up a general event handler and catch that notification, so we can pass the
-             * flush_tier "cookie" to the test utility function.
-             */
-            testutil_tiered_flush_complete(&g.opts, session, NULL);
-            flush_tier = false;
-            printf("Finished a flush_tier\n");
-
-            /*
-             * Use the extra random generator as the tier delay doesn't affect the actual data
-             * content.
-             */
-            set_flush_tier_delay(&td->extra_rnd);
-        }
 
         if (!g.opts.running)
             goto done;
@@ -350,16 +307,17 @@ real_checkpointer(THREAD_DATA *td)
             testutil_check(g.conn->set_timestamp(g.conn, timestamp_buf));
         }
 
-        if (g.sweep_stress)
+        if (g.sweep_stress) {
             /*
-             * Random value between 4 and 8 seconds. Use the extra random generator as the tier
-             * sleep delay doesn't affect the actual data content.
+             * Random value between 4 and 8 seconds. Use the extra random generator as the sleep
+             * delay doesn't affect the actual data content.
              */
             delay = __wt_random(&td->extra_rnd) % 5 + 4;
-        else
-            /* Just find out if we should flush_tier. */
-            delay = 0;
-        testutil_tiered_sleep(&g.opts, session, delay, &flush_tier);
+            while (delay > 0 && g.opts.running) {
+                __wt_sleep(1, 0);
+                --delay;
+            }
+        }
     }
 
 done:
@@ -478,6 +436,9 @@ do_cursor_next(WT_CURSOR *cursor)
     while ((ret = cursor->next(cursor)) != WT_NOTFOUND) {
         if (ret == 0)
             break;
+        else if (ret == WT_ROLLBACK)
+            /* The caller restarts the walk in a new transaction. */
+            return (ret);
         else if (ret != WT_PREPARE_CONFLICT) {
             (void)log_print_err("cursor->next", ret, 1);
             return (ret);
@@ -511,12 +472,12 @@ do_cursor_prev(WT_CURSOR *cursor)
 }
 
 /*
- * verify_consistency --
- *     Open a cursor on each table at the last checkpoint and walk through the tables in parallel.
- *     The key/values should match across all tables.
+ * verify_consistency_once --
+ *     A single pass of the consistency check. Returns WT_ROLLBACK if the reading transaction was
+ *     rolled back before the pass completed.
  */
-int
-verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_checkpoint)
+static int
+verify_consistency_once(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_checkpoint)
 {
     WT_CURSOR **cursors;
     uint64_t key_count;
@@ -578,7 +539,7 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_check
             if (ret == WT_NOTFOUND && t_ret == WT_NOTFOUND)
                 continue;
             else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND) {
-                (void)log_print_err(
+                ret = log_print_err(
                   "verify_consistency tables with different amount of data", EFAULT, 1);
                 goto err;
             }
@@ -596,14 +557,49 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_check
     fflush(stdout);
 
 err:
+    /* The walk reports the end of the tables as WT_NOTFOUND, which is not a failure. */
+    if (ret == WT_NOTFOUND)
+        ret = 0;
+
     for (i = 0; i < g.ntables; i++) {
-        if (cursors[i] != NULL && (ret = cursors[i]->close(cursors[i])) != 0)
-            (void)log_print_err("verify_consistency:cursor close", ret, 1);
+        if (cursors[i] != NULL && (t_ret = cursors[i]->close(cursors[i])) != 0) {
+            (void)log_print_err("verify_consistency:cursor close", t_ret, 1);
+            if (ret == 0)
+                ret = t_ret;
+        }
     }
-    if (!use_checkpoint)
-        testutil_check(session->commit_transaction(session, NULL));
+    if (!use_checkpoint) {
+        if (ret == WT_ROLLBACK)
+            testutil_check(session->rollback_transaction(session, NULL));
+        else
+            testutil_check(session->commit_transaction(session, NULL));
+    }
     free(cursors);
     return (ret);
+}
+
+/*
+ * verify_consistency --
+ *     Open a cursor on each table at the last checkpoint and walk through the tables in parallel.
+ *     The key/values should match across all tables.
+ */
+int
+verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts, bool use_checkpoint)
+{
+    int i, ret;
+
+    ret = WT_ROLLBACK;
+
+    /*
+     * A pass reads every table under one long-running transaction, which cache pressure can roll
+     * back; that says nothing about consistency. Repeat the pass instead: whatever data the new
+     * transaction sees, the tables must still agree.
+     */
+    for (i = 0; i < VERIFY_MAX_ROLLBACK_RETRY; i++)
+        if ((ret = verify_consistency_once(session, verify_ts, use_checkpoint)) != WT_ROLLBACK)
+            return (ret);
+
+    return (log_print_err("verify_consistency: too many rollbacks", ret, 1));
 }
 
 /*

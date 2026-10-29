@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -255,6 +229,53 @@ TEST(SimpleSBEKeyStringTest, KeyComponentInclusion) {
            ("I know the kings of England, and I quote the fights historical" ==
             value::getStringView(value.tag, value.value)))
         << "Incorrect value from accessor: " << valueDebugString(value);
+}
+
+// Regression test for SERVER-134335: outstanding accessors have to be reset (and thus contain
+// Nothing) when keys contain different component counts.
+TEST(SimpleSBEKeyStringTest, KeyComponentSizeVariance) {
+    // Key with 2 components.
+    key_string::Builder longKeyBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    longKeyBuilder.appendString(std::string(200, 'A'));
+    longKeyBuilder.appendString(std::string(75, 'B'));
+    longKeyBuilder.appendRecordId(RecordId{0});
+    auto longKey = longKeyBuilder.getValueCopy();
+
+    // Key with 1 component.
+    key_string::Builder shortKeyBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
+    shortKeyBuilder.appendString(std::string(60, 'C'));
+    shortKeyBuilder.appendRecordId(RecordId{0});
+    auto shortKey = shortKeyBuilder.getValueCopy();
+
+    std::vector<SortedDataKeyValueView> keyViews;
+    for (const auto& ks : {longKey, shortKey}) {
+        auto keySize =
+            key_string::getKeySize(ks.getView(), key_string::ALL_ASCENDING, ks.getVersion());
+        keyViews.emplace_back(ks.getView(),
+                              ks.getView().subspan(keySize),
+                              ks.getTypeBitsView(),
+                              ks.getVersion(),
+                              true);
+    }
+
+    std::vector<value::OwnedValueAccessor> accessors(2);
+    BufBuilder builder;
+
+    // As in ixscan.cpp, create accessors to read the components from each compound index.
+    readKeyStringValueIntoAccessors(keyViews[0], key_string::ALL_ASCENDING, &builder, &accessors);
+    ASSERT_EQ(accessors.size(), 2);
+
+    // Reset buffer.
+    builder.reset();
+    readKeyStringValueIntoAccessors(keyViews[1], key_string::ALL_ASCENDING, &builder, &accessors);
+    ASSERT_EQ(accessors.size(), 2);
+
+    auto [firstTag, firstVal] = accessors[0].getViewOfValue();
+    ASSERT(value::isString(firstTag));
+    ASSERT_EQ(value::getStringView(firstTag, firstVal), std::string(60, 'C'));
+
+    auto [secondTag, secondVal] = accessors[1].getViewOfValue();
+    ASSERT_EQ(value::TypeTags::Nothing, secondTag);
 }
 
 }  // namespace mongo::sbe

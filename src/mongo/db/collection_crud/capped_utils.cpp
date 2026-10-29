@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/collection_crud/capped_utils.h"
 
@@ -237,7 +211,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                 // commit.
                 if (!BatchedWriteContext::get(opCtx).writesAreBatched()) {
                     auto oplogInfo = LocalOplogInfo::get(opCtx);
-                    auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
+                    auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*count=*/1);
                     insertStmt.oplogSlot = oplogSlots.front();
                 }
             }
@@ -245,8 +219,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             uassertStatusOK(collection_internal::insertDocument(opCtx,
                                                                 toCollection.getCollectionPtr(),
                                                                 std::move(insertStmt),
-                                                                nullptr /* OpDebug */,
-                                                                true /*fromMigrate*/));
+                                                                /*OpDebug=*/nullptr,
+                                                                /*fromMigrate=*/true));
             wunit.commit();
 
             // Go to the next document
@@ -282,7 +256,8 @@ ConvertToCappedAcquisitions acquireLocksForConvertToCapped(
     const NamespaceString& fromNs,
     const boost::optional<UUID>& targetUUID) {
     const auto& dbName = fromNs.dbName();
-    const auto modelName = fmt::format("tmp%%%%%.convertToCapped.{}", fromNs.coll());
+    const auto modelName = fmt::format(
+        "{}{}", NamespaceString::kConvertToCappedTmpCollectionModelPrefix, fromNs.coll());
 
     // If given a targetUUID we must also acquire whatever collection with it since it's a
     // temporary leftover collection from a failed execution and will be dropped.s
@@ -409,7 +384,7 @@ void convertToCapped(OperationContext* opCtx,
         }
     }
 
-    cloneCollectionAsCapped(opCtx, db, sourceAcq, tmpAcq, size, true /* temp */, targetUUID);
+    cloneCollectionAsCapped(opCtx, db, sourceAcq, tmpAcq, size, /*temp=*/true, targetUUID);
 
     RenameCollectionOptions options;
     options.dropTarget = true;

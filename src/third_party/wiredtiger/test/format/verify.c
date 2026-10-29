@@ -47,11 +47,20 @@ table_verify(TABLE *table, void *arg)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, table->track_prefix, session_prefetch_cfg(), &session);
 
-    /* Verify can race with special-handle transitions, retry briefly on EBUSY. */
-    for (retries = 0; (ret = session->verify(session, table->uri, "strict")) == EBUSY; ++retries) {
-        if (retries >= WT_MINUTE)
-            break;
-        sleep(1); /* Sleep for 1 second before retrying */
+    /*
+     * Verify can race with special-handle transitions and return EBUSY. In switch and multi-node
+     * modes, skip the retry delay to avoid minutes of accumulated wait time across many runs.
+     */
+    if (disagg_is_mode_switch() || disagg_is_multi_node()) {
+        ret = session->verify(session, table->uri, "strict");
+        retries = 0;
+    } else {
+        for (retries = 0; (ret = session->verify(session, table->uri, "strict")) == EBUSY;
+          ++retries) {
+            if (retries >= WT_MINUTE)
+                break;
+            sleep(1);
+        }
     }
 
     /*
@@ -62,8 +71,12 @@ table_verify(TABLE *table, void *arg)
     testutil_assert(
       ret == 0 || ret == EBUSY || (g.disagg_storage_config && !g.disagg_leader && ret == ENOENT));
 
-    if (ret == EBUSY)
-        WARN("table.%u skipped verify because of EBUSY after %u retries", table->id, retries);
+    if (ret == EBUSY) {
+        if (disagg_is_mode_switch() || disagg_is_multi_node())
+            WARN("table.%u skipped verify in disagg mode (EBUSY)", table->id);
+        else
+            WARN("table.%u skipped verify because of EBUSY after %u retries", table->id, retries);
+    }
     wt_wrap_close_session(session);
 }
 
@@ -407,6 +420,16 @@ wts_verify(WT_CONNECTION *conn, bool mirror_check)
 
     if (g.reopen && GV(OPS_SALVAGE)) {
         WARN("%s", "skipping mirror verify on reopen because salvage testing was done");
+        return;
+    }
+
+    /*
+     * A follower cannot persist layered content, only a leader checkpoint makes it durable. On
+     * reopen after a follower-only run the layered tables restart empty while any non-disaggregated
+     * mirror keeps its locally checkpointed rows, so the mirrors legitimately diverge.
+     */
+    if (g.reopen && g.disagg_storage_config && !g.disagg_leader && !disagg_is_mode_switch()) {
+        WARN("%s", "skipping mirror verify on reopen after a follower-only run");
         return;
     }
 

@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
 # Test that log is flushed for all writes that occurred in the checkpoint.
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable35(test_rollback_to_stable_base):
 
     format_values = [
@@ -119,9 +118,7 @@ class test_rollback_to_stable35(test_rollback_to_stable_base):
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
                 time.sleep(1)
 
             self.large_updates(uri_1, uri_2, valuec, ds_1, ds_2, nrows)
@@ -134,9 +131,7 @@ class test_rollback_to_stable35(test_rollback_to_stable_base):
             ckpt_stop_timing_stress = 0
             while not ckpt_stop_timing_stress:
                 time.sleep(1)
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_stop_timing_stress = stat_cursor[stat.conn.checkpoint_stop_stress_active][2]
-                stat_cursor.close()
+                ckpt_stop_timing_stress = self.get_stat(stat.conn.checkpoint_stop_stress_active)
 
             copy_wiredtiger_home(self, '.', "RESTART")
 

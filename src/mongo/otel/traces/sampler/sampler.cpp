@@ -1,69 +1,107 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/traces/sampler/sampler.h"
 
+#include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo::otel::traces {
 namespace {
-VersionedValue<const SamplerState> samplerState;
-thread_local auto snapshot = samplerState.makeSnapshot();
+
+using admission::RateLimiter;
+using admission::RateLimiterMetricsRecorder;
+using admission::RateLimiterOtelMetricsRecorder;
+using otel::metrics::MetricName;
+using otel::metrics::MetricNames;
+
+// Builds rate limiter options that record into the given metrics recorder. Use this function if the
+// rate limiter should own the RateLimiterMetricsRecorder.
+RateLimiter::Options makeRateLimiterOptions(
+    TickSource* tickSource, std::unique_ptr<RateLimiterMetricsRecorder> metricsRecorder) {
+    return RateLimiter::Options{.tickSource = tickSource,
+                                .metricsRecorder = std::move(metricsRecorder)};
+}
+
+// Builds rate limiter options that record into the given metrics recorder. Use this function if the
+// rate limiter should NOT own the RateLimiterMetricsRecorder.
+RateLimiter::Options makeRateLimiterOptions(TickSource* tickSource,
+                                            RateLimiterMetricsRecorder* metricsRecorder) {
+    return RateLimiter::Options{.tickSource = tickSource, .metricsRecorder = metricsRecorder};
+}
+
+// Builds a RateLimiterOtelMetricsRecorder that records only successful and rejected admissions for
+// the otel metrics referred to by the given metric names.
+std::unique_ptr<RateLimiterOtelMetricsRecorder> makeMetricsRecorder(MetricName successfulAdmissions,
+                                                                    MetricName rejectedAdmissions) {
+    return std::make_unique<RateLimiterOtelMetricsRecorder>(
+        RateLimiterOtelMetricsRecorder::MetricsSpec{.successfulAdmissions = successfulAdmissions,
+                                                    .rejectedAdmissions = rejectedAdmissions});
+}
+
+// Returns the process-wide metrics recorder shared by every internal span rate limiter. Sharing a
+// single recorder means all internal spans record into the same instruments, so their stats are
+// aggregated together across spans. It is an immortal singleton so that it outlives the rate
+// limiters stored in TracingSamplerImpl::_samplerState, which reference it via raw pointers.
+RateLimiterMetricsRecorder* internalMetricsRecorder() {
+    static StaticImmortal<std::unique_ptr<RateLimiterMetricsRecorder>> recorder(makeMetricsRecorder(
+        MetricNames::kOtelTracingSamplerInternalSpanRateLimiterSuccessfulAdmissions,
+        MetricNames::kOtelTracingSamplerInternalSpanRateLimiterRejectedAdmissions));
+    return recorder->get();
+}
 }  // namespace
 
+VersionedValue<const SamplerState> TracingSamplerImpl::_samplerState;
+thread_local VersionedValue<const SamplerState>::Snapshot TracingSamplerImpl::_snapshot =
+    TracingSamplerImpl::_samplerState.makeSnapshot();
 
-using SamplingFactorMap = SamplerState::SamplingFactorMap;
-using RateLimiterMap = SamplerState::RateLimiterMap;
+VersionedValue<const RateLimiterMap> TracingSamplerImpl::_internalRateLimiters{
+    std::make_shared<const RateLimiterMap>()};
+thread_local VersionedValue<const RateLimiterMap>::Snapshot TracingSamplerImpl::_rlSnapshot =
+    TracingSamplerImpl::_internalRateLimiters.makeSnapshot();
 
 TracingSamplerImpl::TracingSamplerImpl(TickSource* tickSource) : _tickSource(tickSource) {
-    samplerState.update(std::make_shared<const SamplerState>());
+    auto& externalRateLimitParams = _samplingConfig.externalRateLimits;
+    auto externalBurstCapacitySecs =
+        externalRateLimitParams.maxTokens / externalRateLimitParams.refillRate;
+
+    _samplerState.update(std::make_shared<const SamplerState>(SamplerState::SamplingParamsMap{}));
+
+    _internalRateLimiters.update(std::make_shared<const RateLimiterMap>());
+
+    _externalRateLimiter = std::make_unique<RateLimiter>(
+        externalRateLimitParams.refillRate,
+        externalBurstCapacitySecs,
+        /*maxQueueDepth=*/0,
+        "external",
+        makeRateLimiterOptions(
+            tickSource,
+            makeMetricsRecorder(
+                MetricNames::kOtelTracingSamplerExternalSpanRateLimiterSuccessfulAdmissions,
+                MetricNames::kOtelTracingSamplerExternalSpanRateLimiterRejectedAdmissions)));
 }
 
 bool TracingSamplerImpl::shouldSample(std::string_view spanName, double sampleValue) {
-    samplerState.refreshSnapshot(snapshot);
-    auto samplingFactor = snapshot->samplingFactorMap.find(spanName);
-    if (samplingFactor == snapshot->samplingFactorMap.end()) {
+    _samplerState.refreshSnapshot(_snapshot);
+    auto it = _snapshot->samplingParamsMap.find(spanName);
+    if (it == _snapshot->samplingParamsMap.end()) {
+        return false;
+    }
+    const auto& params = it->second;
+
+    if (sampleValue >= params.factor) {
         return false;
     }
 
-    if (sampleValue >= samplingFactor->second) {
-        return false;
-    }
+    auto rateLimiter = _getOrCreateRateLimiter(spanName, params.rateLimits, _snapshot.version());
+    return rateLimiter->tryAcquireToken(1);
+}
 
-    auto rateLimiter = snapshot->rateLimiterMap.find(spanName);
-    if (rateLimiter == snapshot->rateLimiterMap.end()) {
-        return false;
-    }
-
-    return rateLimiter->second->tryAcquireToken(1);
+bool TracingSamplerImpl::shouldAcceptExternalTrace() const {
+    return _externalRateLimiter->tryAcquireToken(1);
 }
 
 void TracingSamplerImpl::updateInternalConfig(
@@ -79,12 +117,30 @@ void TracingSamplerImpl::updateExternalConfig(RateLimitParams rateLimits) {
     invariant(rateLimits.maxTokens > 0);
     std::lock_guard lk(_mutex);
     _samplingConfig.externalRateLimits = rateLimits;
-    // TODO(SERVER-129287): Update the external rate limiter params too.
+    auto burstCapacitySecs = rateLimits.maxTokens / rateLimits.refillRate;
+    invariant(_externalRateLimiter);
+    _externalRateLimiter->updateRateParameters(rateLimits.refillRate, burstCapacitySecs);
 }
 
 SamplingConfig TracingSamplerImpl::getConfig() const {
     std::lock_guard lk(_mutex);
     return _samplingConfig;
+}
+
+TracingSamplerStats TracingSamplerImpl::getStats() const {
+    TracingSamplerStats stats;
+    stats.internalSpans.admitted = internalMetricsRecorder()->successfulAdmissions();
+    stats.internalSpans.rejected = internalMetricsRecorder()->rejectedAdmissions();
+
+    const auto& externalStats = _externalRateLimiter->stats();
+    stats.externalSpan.admitted = externalStats.successfulAdmissions();
+    stats.externalSpan.rejected = externalStats.rejectedAdmissions();
+
+    return stats;
+}
+
+size_t TracingSamplerImpl::getNumInternalRateLimiters() const {
+    return _internalRateLimiters.makeSnapshot()->size();
 }
 
 void TracingSamplerImpl::sampleByDefault(SpanName name) {
@@ -95,60 +151,90 @@ void TracingSamplerImpl::sampleByDefault(SpanName name) {
 }
 
 void TracingSamplerImpl::_rebuild(WithLock) {
-    SamplingFactorMap newSamplingFactors;
-    RateLimiterMap newRateLimiters;
-    auto oldSnapshot = samplerState.makeSnapshot();
+    SamplerState::SamplingParamsMap newSamplingParams;
 
-    auto setSamplingFactorAndRateLimits = [&](std::string_view name, SamplingParameters params) {
-        double refillRate = params.rateLimits.refillRate;
-        int maxTokens = params.rateLimits.maxTokens;
-
-        newSamplingFactors[name] = params.factor;
-
-        invariant(refillRate > 0, fmt::format("Invalid refillRate for {} span", name));
-        invariant(maxTokens > 0, fmt::format("Invalid maxTokens for {} span", name));
-        double burstCapacitySecs = maxTokens / refillRate;
-        if (auto it = oldSnapshot->rateLimiterMap.find(name);
-            it != oldSnapshot->rateLimiterMap.end()) {
-            // Update the existing rate limiter and copy it into the new map.
-            it->second->updateRateParameters(refillRate, burstCapacitySecs);
-            newRateLimiters[name] = it->second;
-        } else {
-            // Rate limiter didn't exist so create a new one with the correct parameters.
-            newRateLimiters[name] = std::make_shared<admission::RateLimiter>(refillRate,
-                                                                             burstCapacitySecs,
-                                                                             0 /* maxQueueDepth */,
-                                                                             std::string(name),
-                                                                             _tickSource);
-        }
+    auto addSpanSamplingParams = [&](std::string_view name, const SamplingParameters& params) {
+        invariant(params.rateLimits.refillRate > 0,
+                  fmt::format("Invalid refillRate for {} span", name));
+        invariant(params.rateLimits.maxTokens > 0,
+                  fmt::format("Invalid maxTokens for {} span", name));
+        newSamplingParams[name] = params;
     };
 
     for (const auto& name : _defaultSampledSpanNames) {
-        setSamplingFactorAndRateLimits(name, _samplingConfig.defaultSpans);
+        addSpanSamplingParams(name, _samplingConfig.defaultSpans);
+    }
+    // Per-span overrides intentionally overwrite the default-seeded entries, and also apply to
+    // spans that were never registered via sampleByDefault.
+    for (const auto& [name, params] : _samplingConfig.perSpanOverrides) {
+        addSpanSamplingParams(name, params);
     }
 
-    // Per-span overrides intentionally overwrite the default-seeded entries above, and also
-    // apply to spans that were never registered via sampleByDefault.
-    for (const auto& [name, params] : _samplingConfig.perSpanOverrides) {
-        setSamplingFactorAndRateLimits(name, params);
+    // update() bumps the version, so existing limiters re-parameterize on their next hit.
+    _samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingParams)));
+}
+
+std::shared_ptr<admission::RateLimiter> TracingSamplerImpl::_getOrCreateRateLimiter(
+    std::string_view name, const RateLimitParams& rateLimits, uint64_t generation) {
+    // If a limiter already exists and reflects the current config generation, re-use as is.
+    _internalRateLimiters.refreshSnapshot(_rlSnapshot);
+    if (auto it = _rlSnapshot->find(name);
+        it != _rlSnapshot->end() && it->second.generation == generation) {
+        return it->second.limiter;
     }
-    samplerState.update(std::make_shared<const SamplerState>(std::move(newSamplingFactors),
-                                                             std::move(newRateLimiters)));
+
+    // If this is the first sighting of this span or the config has changed since the last
+    // generation, update existing or create new limiter. Rate-limit params were validated at config
+    // time in _rebuild.
+    double refillRate = rateLimits.refillRate;
+    int maxTokens = rateLimits.maxTokens;
+    double burstCapacitySecs = maxTokens / refillRate;
+
+    std::lock_guard lk(_mutex);
+
+    auto oldMap = _internalRateLimiters.makeSnapshot();
+    auto newMap = std::make_shared<RateLimiterMap>(*oldMap);
+
+    auto& entry = (*newMap)[std::string(name)];
+    if (entry.limiter) {
+        entry.limiter->updateRateParameters(refillRate, burstCapacitySecs);
+    } else {
+        entry.limiter = std::make_shared<RateLimiter>(
+            refillRate,
+            burstCapacitySecs,
+            /*maxQueueDepth=*/0,
+            std::string(name),
+            // TODO(SERVER-131083): Once the rate limiter otel stats have span name attributes,
+            // each recorder should write to its attribute rather than the aggregated total.
+            makeRateLimiterOptions(_tickSource, internalMetricsRecorder()));
+    }
+    entry.generation = generation;
+    auto limiter = entry.limiter;
+    _internalRateLimiters.update(std::move(newMap));
+    return limiter;
 }
 
 namespace {
 
 class FunctionSampler : public TracingSampler {
 public:
-    explicit FunctionSampler(unique_function<bool(std::string_view, double)> fn)
-        : _fn(std::move(fn)) {}
+    explicit FunctionSampler(
+        unique_function<bool(std::string_view, double)> shouldSample,
+        unique_function<bool()> shouldAcceptExternalTrace = [] { return false; })
+        : _shouldSample(std::move(shouldSample)),
+          _shouldAcceptExternalTrace(std::move(shouldAcceptExternalTrace)) {}
 
     bool shouldSample(std::string_view spanName, double sampleValue) override {
-        return _fn(spanName, sampleValue);
+        return _shouldSample(spanName, sampleValue);
+    }
+
+    bool shouldAcceptExternalTrace() const override {
+        return _shouldAcceptExternalTrace();
     }
 
 private:
-    unique_function<bool(std::string_view, double)> _fn;
+    unique_function<bool(std::string_view, double)> _shouldSample;
+    unique_function<bool()> _shouldAcceptExternalTrace;
 };
 
 std::unique_ptr<TracingSampler>& globalSampler() {
@@ -179,8 +265,10 @@ private:
 };
 
 ScopedSamplerOverride setTraceSamplingFnForTest(
-    unique_function<bool(std::string_view, double)> fn) {
-    return std::make_unique<SamplerOverrideImpl>(std::make_unique<FunctionSampler>(std::move(fn)));
+    unique_function<bool(std::string_view, double)> shouldSample,
+    unique_function<bool()> shouldAcceptExternalTrace) {
+    return std::make_unique<SamplerOverrideImpl>(std::make_unique<FunctionSampler>(
+        std::move(shouldSample), std::move(shouldAcceptExternalTrace)));
 }
 
 TracingSampler& TracingSampler::get() {

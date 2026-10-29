@@ -22,19 +22,19 @@ filters:
       - 10gen/query-integration-observability
   - "densify_stage*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
   - "internal_all_collection_stats_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "internal_convert_bucket_index_stats_stage*":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "internal_list_collections_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "internal_set_window_fields_stage*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
   - "list_catalog_stage*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

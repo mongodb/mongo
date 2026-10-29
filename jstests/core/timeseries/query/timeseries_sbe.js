@@ -2,6 +2,7 @@
  * Tests that we do lower queries over time-series to SBE when the corresponding flags are enabled.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   # Aggregation with explain may return incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
@@ -15,7 +16,6 @@
  *   assumes_standalone_mongod
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {
     checkSbeStatus,
@@ -23,18 +23,13 @@ import {
     kSbeDisabled,
 } from "jstests/libs/query/sbe_util.js";
 
-// We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true and when
-// featureFlagTimeSeriesInSbe is set.
+// We pushdown unpack when checkSbeRestrictedOrFullyEnabled is true.
 
 const sbeStatus = checkSbeStatus(db);
 const sbeFullyEnabled = sbeStatus == kFeatureFlagSbeFullEnabled;
 const sbeUnpackPushdownEnabled =
     // SBE can't be disabled altogether.
-    sbeStatus != kSbeDisabled &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
-
-// const sbeUnpackPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db) &&
-//     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
+    sbeStatus != kSbeDisabled;
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -247,7 +242,7 @@ runTest({
     shouldUseSbe: sbeUnpackPushdownEnabled,
 
     // Everything should get pushed into SBE except setWindowFields.
-    aggStages: sbeFullyEnabled ? [] : ["$_internalSetWindowFields"],
+    aggStages: ["$_internalSetWindowFields"],
 });
 
 // $lookup-$unwind is not lowered to SBE for time-series collections in default settings.

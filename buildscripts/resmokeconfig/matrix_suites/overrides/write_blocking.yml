@@ -1,0 +1,202 @@
+# Authentication and write-blocking overrides for the write-blocking passthrough suites.
+
+# Anchors for reuse - stored in a dummy entry that resmoke ignores.
+- name: _write_blocking_anchors
+  value:
+    keyFile: &keyFile jstests/libs/authTestsKey
+    keyFileData: &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+    authOptions: &authOptions
+      authenticationDatabase: admin
+      authenticationMechanism: SCRAM-SHA-256
+      password: *keyFileData
+      username: __system
+
+    testData: &testData
+      auth: true
+      authMechanism: SCRAM-SHA-256
+      keyFile: *keyFile
+      keyFileData: *keyFileData
+      roleGraphInvalidationIsFatal: true
+
+    hookShellOptions: &hookShellOptions
+      global_vars:
+        TestData: *testData
+      eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+
+- name: auth_shell_options_sharding
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData: *testData
+          <<: *authOptions
+
+- name: auth_shell_options_sharded_collections
+  value:
+    executor:
+      config:
+        shell_options:
+          # Remove the base suite's implicit-sharding eval so the mapping can add all
+          # initialization evals in the required order.
+          eval: null
+          global_vars:
+            TestData: *testData
+          <<: *authOptions
+
+- name: fixture_with_auth_sharded
+  value:
+    executor:
+      fixture:
+        auth_options: *authOptions
+        mongos_options:
+          keyFile: *keyFile
+        mongod_options:
+          auth: ""
+          keyFile: *keyFile
+
+- name: authenticated_sharding_hooks
+  value:
+    executor:
+      hooks:
+        - class: RunQueryStats
+          shell_options: *hookShellOptions
+        - class: CheckReplDBHash
+          shell_options: *hookShellOptions
+        - class: CheckMetadataConsistencyInBackground
+          shell_options: *hookShellOptions
+        - class: ValidateCollections
+          shell_options: *hookShellOptions
+        - class: CheckShardFilteringMetadata
+          shell_options: *hookShellOptions
+        - class: CheckOrphansDeleted
+          shell_options: *hookShellOptions
+        - class: CheckConnectionCount
+          max_connections_per_test: 1000
+          shell_options: *authOptions
+        - class: CleanEveryN
+          n: 20
+          shell_options: *authOptions
+
+- name: authenticated_sharded_collections_hooks
+  value:
+    executor:
+      hooks:
+        - class: RunQueryStats
+          shell_options: *hookShellOptions
+        - class: CheckReplDBHash
+          shell_options: *hookShellOptions
+        - class: CheckMetadataConsistencyInBackground
+          shell_options: *hookShellOptions
+        - class: ValidateCollections
+          shell_options: *hookShellOptions
+        - class: CheckShardFilteringMetadata
+          shell_options: *hookShellOptions
+        - class: CheckOrphansDeleted
+          shell_options: *hookShellOptions
+        - class: CleanEveryN
+          n: 20
+          shell_options: *authOptions
+
+- name: user_write_blocking_eval
+  value:
+    eval: >-
+      jsTest.authenticate(db.getMongo());
+      await import("jstests/libs/override_methods/enable_user_write_blocking.js");
+
+- name: replica_set_write_blocking_eval
+  value:
+    eval: >-
+      jsTest.authenticate(db.getMongo());
+      await import("jstests/libs/override_methods/enable_replica_set_write_blocking.js");
+      await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+
+- name: write_blocking_auth_exclude_tags
+  value:
+    exclude_with_any_tags:
+      - creates_and_authenticates_user
+      - auth_incompatible
+      # MapReduce tests with internal merge pipelines require special permissions.
+      - uses_map_reduce_internal_merge_pipeline
+      # Parallel shell spawns unauthenticated connections, which are incompatible with this
+      # authenticated passthrough.
+      - uses_parallel_shell
+      # These tests run many aggregations, and authentication plus the write-blocking override can
+      # slow them down enough to hit the Evergreen timeout.
+      - query_intensive_pbt
+
+- name: user_write_blocking_exclude_files
+  value:
+    exclude_files:
+      # The __system test user cannot access the FLE2 key vault collection.
+      - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
+      - jstests/core/administrative/*[aA]uth*.js
+      # These tests are incompatible with the authenticated passthrough connection.
+      - jstests/core/**/list_all_sessions.js
+      - jstests/core/**/list_sessions.js
+      - jstests/core/**/list_collections_no_views.js
+      - jstests/core/**/rename_collection_system_db.js
+      - jstests/core/catalog/agg_internal_list_collections_stage.js
+      - jstests/core/catalog/views/invalid_dbname.js
+      - jstests/core/catalog/views/view_with_invalid_dbname.js
+      - jstests/core/catalog/views/views_creation.js
+      - jstests/core/catalog/views/views_drop.js
+      - jstests/core/**/query/disallow_system_views_user_writes.js
+      - jstests/core/timeseries/ddl/*.js
+      - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+      - jstests/core/**/illegal_cmd_namespace.js
+      - jstests/core/query/bulk/bulk_write_non_auth.js
+
+- name: replica_set_write_blocking_exclude_files
+  value:
+    exclude_files:
+      # The __system test user cannot access the FLE2 key vault collection.
+      - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
+      # This test moves a chunk away from and back to the write-blocked shard. The range deleter
+      # cannot remove the resulting orphans because replica set write blocking disallows deletions.
+      - jstests/core_sharding/chunk_operations/move_chunk_split_merge_timeseries.js
+      # These tests perform chunk migrations, either directly or through
+      # ensureDataIsDistributedIfSharded(). Their orphan cleanup cannot delete on the
+      # write-blocked shard, causing the tests to hang or fail.
+      - jstests/core_sharding/chunk_operations/move_range_timeseries.js
+      - jstests/core_sharding/ddl/rename_collection_sharded.js
+      - jstests/core/timeseries/query/bucket_unpacking_with_sort.js
+      - jstests/core/timeseries/query/bucket_unpacking_with_sort_multiple_point_queries.js
+      # These tests create sharded time-series collections whose orphan cleanup cannot delete bucket
+      # documents on the write-blocked shard, causing the range deleter to retry indefinitely.
+      - jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
+      - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_single_field_point_queries.js
+      - jstests/core/timeseries/query/bucket_unpacking_with_compound_sort_on_point_queries.js
+      - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
+      - jstests/core/timeseries/query/timeseries_internal_bounded_sort.js
+      - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
+
+- name: replica_set_write_blocking_sharding_exclude_files
+  value:
+    exclude_files:
+      # This test creates capped collections, which are incompatible with the implicit sharding
+      # performed by the replica set write blocking override.
+      - jstests/core/query/cursor/tailable_skip_limit.js
+      # These tests make single-collection explain/index metadata assumptions, but implicit
+      # sharding produces one plan or index state per shard.
+      - jstests/core/query/expr/expr_index_use.js
+      - jstests/core/index/index_multikey.js
+      - jstests/core/query/explain/optimized_match_explain.js
+      - jstests/core/query/distinct/distinct_index1.js
+
+- name: replica_set_write_blocking_exclude_tags
+  value:
+    exclude_with_any_tags:
+      # These tests rely on collection or index creation behavior that is incompatible with the
+      # implicit sharding performed by the replica set write blocking override.
+      - assumes_no_implicit_collection_creation_on_get_collection
+      - assumes_no_implicit_collection_creation_after_drop
+      - assumes_no_implicit_index_creation
+      - assumes_unsharded_collection
+      # These tests create unique indexes that are incompatible with the hashed shard key used by
+      # the implicit sharding override.
+      - cannot_create_unique_index_when_using_hashed_shard_key
+      # Capped collections cannot be implicitly sharded.
+      - requires_capped

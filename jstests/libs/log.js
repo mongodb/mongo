@@ -1,3 +1,5 @@
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
+
 /**
  * Iterates log lines that match the given filter.
  * Yields every logline that contains the specified fields. The regex escape function used here is
@@ -98,4 +100,53 @@ export function findSlowInProgressQueryLogLine(db, comment) {
         return findMatchingLogLine(globalLog.log, {id: 1794200});
     }
     return findMatchingLogLine(globalLog.log, {id: 1794200, comment: comment});
+}
+
+/**
+ * Asserts cpuNanos in the final slow query log is greater than the slow in-progress query log.
+ */
+export function assertSlowInProgressQueryReportsFinalCpuNanos(db, comment) {
+    // We only collect cpuNanos on Linux.
+    if (!isLinux()) {
+        return;
+    }
+    const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
+
+    const inProgressLine = findMatchingLogLine(globalLog, {id: 1794200, comment: comment});
+    assert.neq(
+        null,
+        inProgressLine,
+        "Did not find the 'Slow in-progress query' log line for the operation",
+        {comment},
+    );
+    const inProgressLog = JSON.parse(inProgressLine);
+
+    const finalLine = findMatchingLogLine(globalLog, {
+        id: 51803,
+        comment: comment,
+        // These fields ensure we are comparing the in-progress and final slow query log lines of the same operation.
+        ns: inProgressLog.attr.ns,
+        opid: inProgressLog.attr.opid,
+    });
+    assert.neq(null, finalLine, "Did not find the final 'Slow query' log line for the operation", {
+        comment,
+    });
+
+    const finalLog = JSON.parse(finalLine);
+    const inProgressCpuNanos = inProgressLog.attr.cpuNanos;
+    const finalCpuNanos = finalLog.attr.cpuNanos;
+
+    assert(
+        typeof inProgressCpuNanos === "number" && typeof finalCpuNanos === "number",
+        "cpuNanos is not reported on both the 'Slow in-progress query' and 'Slow query' logs",
+        {comment, inProgressCpuNanos, finalCpuNanos},
+    );
+
+    assert.gt(
+        finalCpuNanos,
+        inProgressCpuNanos,
+        "The final 'Slow query' cpuNanos must be greater than the 'Slow in-progress query' " +
+            "cpuNanos, since the operation kept running after the in-progress log fired",
+        {comment, inProgressCpuNanos, finalCpuNanos},
+    );
 }

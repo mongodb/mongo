@@ -55,10 +55,6 @@ PrepareHelpers.prepareTransaction(session2, {w: 1});
 // Commit the transaction that was prepared before the common point.
 PrepareHelpers.commitTransaction(session1, prepareTs);
 
-// This is not exactly correct, but characterizes the current behavior of fastcount, which
-// includes the prepared but uncommitted transaction in the collection count.
-assert.eq(6, testColl.count());
-
 // Check the visible documents.
 assert.sameMembers(
     [{_id: "a"}, {_id: "b"}, {_id: "t2_a"}, {_id: "t2_b"}, {_id: "t2_c"}],

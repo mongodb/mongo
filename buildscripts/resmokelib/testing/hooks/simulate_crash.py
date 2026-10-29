@@ -121,27 +121,33 @@ class SimulateCrash(bghook.BGHook):
                 absolute_filepath = os.path.join(current_path, filename)
                 self.copy_file(dbpath, absolute_filepath, dest_root)
 
-    @classmethod
-    def copy_file(cls, root, absolute_filepath, new_root):
+    def copy_file(self, root, absolute_filepath, new_root):
         """Copy a file in |root| at |absolute_filepath| into |new_root|, maintaining its relative position.
 
         For example: '/a/b/c' if copied from '/a/b' to '/x' would yield '/x/c'.
         """
-        in_fd = os.open(absolute_filepath, os.O_RDONLY)
-        in_bytes = os.stat(in_fd).st_size
-
         rel = absolute_filepath[len(root) :]
-        out_fd = os.open(new_root + rel, os.O_WRONLY | os.O_CREAT)
-
-        total_bytes_sent = 0
-        while total_bytes_sent < in_bytes:
-            bytes_sent = os.sendfile(out_fd, in_fd, total_bytes_sent, in_bytes - total_bytes_sent)
-            if bytes_sent == 0:
-                raise ValueError("Unexpectedly reached EOF copying file")
-            total_bytes_sent += bytes_sent
-
-        os.close(out_fd)
-        os.close(in_fd)
+        with open(absolute_filepath, "rb") as src, open(new_root + rel, "wb") as dst:
+            in_bytes = os.fstat(src.fileno()).st_size
+            total_bytes_sent = 0
+            while total_bytes_sent < in_bytes:
+                chunk = src.read(min(1024 * 1024, in_bytes - total_bytes_sent))
+                if not chunk:
+                    current_bytes = os.fstat(src.fileno()).st_size  # file may have shrunk
+                    if current_bytes <= total_bytes_sent:
+                        self.logger.warning(
+                            "%s shrank from %d to %d bytes while copying for a crash simulation "
+                            "snapshot; keeping the %d bytes already copied",
+                            absolute_filepath,
+                            in_bytes,
+                            current_bytes,
+                            total_bytes_sent,
+                        )
+                        break
+                    in_bytes = current_bytes
+                    continue
+                dst.write(chunk)
+                total_bytes_sent += len(chunk)
 
     def validate_all(self):
         """Start a standalone node to validate all collections on the copied data files."""

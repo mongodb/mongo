@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/expression_algo.h"
 
@@ -1158,6 +1132,86 @@ TEST(SplitMatchExpression, ShouldMoveIndependentLeafPredicateAcrossRename) {
     ASSERT_FALSE(splitExpr.second.get());
 }
 
+TEST(SplitMatchExpression, ShouldMovePredicateAcrossRenameWithEmptySrcComponent) {
+    BSONObj matchPredicate = fromjson("{'.a': 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'meta.a': {$eq: 2}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateOnDeeperPathAcrossRenameWithEmptySrcComponent) {
+    BSONObj matchPredicate = fromjson("{'.a.b': 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'meta.a.b': {$eq: 2}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateWithNestedEmptyComponentAcrossRenameWithEmptySrc) {
+    BSONObj matchPredicate = fromjson("{'..a': 7}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'meta..a': {$eq: 7}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateOnExactEmptyPathAcrossRename) {
+    BSONObj matchPredicate = fromjson("{'': 1}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{meta: {$eq: 1}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldApplyMultiEmptyComponentRenameAsPrefix) {
+    BSONObj matchPredicate = fromjson("{'...': 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"..", "a"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'a.': {$eq: 2}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
 TEST(SplitMatchExpression, ShouldMoveIndependentAndPredicateAcrossRename) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 2}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -1227,6 +1281,60 @@ TEST(SplitMatchExpression,
 
     ASSERT_TRUE(splitExpr.second.get());
     ASSERT_BSONOBJ_EQ(splitExpr.second->serialize(), fromjson("{a: {$eq: 1}}"));
+}
+
+TEST(SplitMatchExpression, ShouldNotSplitPredicateOnAncestorOfDottedRename) {
+    // A rename onto the dotted path "a.b.c" materializes "a" and "a.b" as objects if they were
+    // missing, so a predicate on either of them cannot be pushed ahead of the rename.
+    for (auto&& dependentPredicate : {fromjson("{a: {$type: 'object'}}"),
+                                      fromjson("{'a.b': {$type: 'object'}}"),
+                                      fromjson("{$expr: {$eq: [{$type: '$a.b'}, 'object']}}")}) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(dependentPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a.b.c", "x"}};
+        auto [splitOutExpr, residualExpr] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_FALSE(splitOutExpr.get()) << dependentPredicate;
+        ASSERT_TRUE(residualExpr.get()) << dependentPredicate;
+    }
+}
+
+TEST(SplitMatchExpression, ShouldSplitPredicateOnNonAncestorOfDottedRename) {
+    // Neither "a.z" nor "b" is an ancestor of the new name "a.b.c", so these predicates are
+    // unaffected by the rename and can be pushed ahead of it.
+    for (auto&& independentPredicate :
+         {fromjson("{'a.z': {$type: 'object'}}"), fromjson("{b: {$type: 'object'}}")}) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(independentPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a.b.c", "x"}};
+        auto [splitOutExpr, residualExpr] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+        ASSERT_TRUE(splitOutExpr.get()) << independentPredicate;
+        ASSERT_FALSE(residualExpr.get()) << independentPredicate;
+    }
+}
+
+TEST(SplitMatchExpression, ShouldStillSplitAndRenamePredicateOnDescendantOfDottedRename) {
+    // A predicate on the renamed path itself, or on a descendant of it, is still splittable with a
+    // rename applied.
+    BSONObj matchPredicate = fromjson("{'a.b.c.d': 1}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a.b.c", "x"}};
+    auto [splitOutExpr, residualExpr] =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitOutExpr.get());
+    ASSERT_BSONOBJ_EQ(splitOutExpr->serialize(), fromjson("{'x.d': {$eq: 1}}"));
+    ASSERT_FALSE(residualExpr.get());
 }
 
 TEST(SplitMatchExpression, ShouldMoveElemMatchObjectAcrossRename) {
@@ -1320,7 +1428,7 @@ TEST(SplitMatchExpression, ShouldNotMoveEqAcrossAttemptedButFailedRename) {
     // TODO SERVER-74298 Implement renaming by each path component for sub-classes of
     // PathMatchExpression so that such match expressions can be split out.
     auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
-        std::move(matcher.getValue()), /*fields*/ {}, /*renames*/ {{"x.y"s, "a.b"s}});
+        std::move(matcher.getValue()), /*fields=*/{}, /*renames=*/{{"x.y"s, "a.b"s}});
 
     ASSERT_FALSE(splitOutExpr.get())
         << splitOutExpr->serialize()
@@ -1348,7 +1456,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossAttemptedButFailedR
     // TODO SERVER-74298 Implement renaming by each path component for sub-classes of
     // PathMatchExpression so that such match expressions can be split out.
     auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
-        std::move(matcher.getValue()), /*fields*/ {}, /*renames*/ {{"x.y"s, "a.b"s}});
+        std::move(matcher.getValue()), /*fields=*/{}, /*renames=*/{{"x.y"s, "a.b"s}});
 
     ASSERT_FALSE(splitOutExpr.get())
         << splitOutExpr->serialize()

@@ -12,6 +12,7 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 import {binVersionToFCV} from "src/mongo/shell/feature_compatibility_version.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 /**
  * Background operation type constants.
@@ -198,17 +199,13 @@ class BackgroundMutator {
         const downgradeFCV = config.downgradeFCV || lastContinuousFCV;
 
         // Downgrade to the configured FCV.
-        assert.commandWorked(
-            conn.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(conn, downgradeFCV);
 
         // Wait for the system to settle in the downgraded state.
         sleep(delayMs);
 
         // Upgrade back to latestFCV.
-        assert.commandWorked(
-            conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(conn, latestFCV);
     }
 
     /**

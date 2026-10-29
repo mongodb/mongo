@@ -18,7 +18,8 @@ typedef struct {
     WT_ITEM *max_key;  /* Largest key */
     WT_ITEM *max_addr; /* Largest key page */
 
-    uint64_t fcnt; /* Progress counter */
+    uint64_t fcnt;           /* Progress counter */
+    WT_TIMER progress_timer; /* Last progress report time */
 
     /* Accumulated size of all blocks in this btree. */
     uint64_t total_block_size;
@@ -34,6 +35,12 @@ typedef struct {
     bool dump_layout, dump_tree_shape;
     bool dump_pages;
     bool read_corrupt;
+    bool skip_per_key_hs;
+
+    /* When set, overwrite the checkpoint metadata size with the derived size on mismatch. */
+    bool fix_btree_size;
+    /* Set when any checkpoint's size has been corrected, so the metadata is written back. */
+    bool size_fixed;
 
     /* Page layout information. */
     uint64_t depth, depth_internal[100], depth_leaf[100], tree_stack[100], keys_count_stack[100],
@@ -47,6 +54,7 @@ typedef struct {
 static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int __verify_compare_page_id(const void *, const void *);
 static int __verify_disagg_accumulate_size(WT_SESSION_IMPL *, WT_VSTUFF *, const void *, size_t);
+static int __verify_one_checkpoint(WT_SESSION_IMPL *, WT_VSTUFF *, WT_CKPT *, bool, bool);
 static int __verify_page_content_int(
   WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
 static int __verify_page_content_leaf(
@@ -57,6 +65,24 @@ static int __verify_row_int_key_order(
 static int __verify_row_leaf_key_order(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
 static int __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
 static int __verify_unique_btree_ids(WT_SESSION_IMPL *);
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __verify_lock_held --
+ *     Check that the session holds a lock verify depends on. A schema operation running under a
+ *     transaction uses an internal session that inherits the outer session's lock flags while the
+ *     outer session owns the lock, so accept an inherited flag on an internal session when the lock
+ *     is held.
+ */
+static WT_INLINE bool
+__verify_lock_held(WT_SESSION_IMPL *session, WT_SPINLOCK *lock, uint32_t flag)
+{
+    if (__wt_spin_owned(session, lock))
+        return (true);
+    return (F_ISSET(session, WT_SESSION_INTERNAL) && FLD_ISSET(session->lock_flags, flag) &&
+      __wt_spin_locked(session, lock));
+}
+#endif
 
 /*
  * __verify_config --
@@ -97,6 +123,19 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     WT_RET(__wt_config_gets(session, cfg, "read_corrupt", &cval));
     vs->read_corrupt = cval.val != 0;
     vs->verify_err = 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "skip_per_key_hs", &cval));
+    vs->skip_per_key_hs = cval.val != 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "fix_btree_size", &cval));
+    vs->fix_btree_size = cval.val != 0;
+    if (vs->fix_btree_size) {
+        if (F_ISSET(S2C(session), WT_CONN_READONLY))
+            WT_RET_MSG(session, ENOTSUP, "fix_btree_size requires a writable connection");
+        if (!__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
+            WT_RET_MSG(
+              session, ENOTSUP, "fix_btree_size requires a disaggregated leader connection");
+    }
 
     WT_RET(__wt_config_gets(session, cfg, "stable_timestamp", &cval));
     vs->stable_timestamp = WT_TS_NONE; /* Ignored unless a value has been set */
@@ -215,78 +254,142 @@ __verify_disagg_accumulate_size(
     return (0);
 }
 
-typedef struct {
-    uint32_t id;
-    char *uri;
-} WT_ID_URI_PAIR;
-
 /*
- * __id_uri_pair_cmp --
- *     Comparator for sorting btree ID entries by ID.
+ * __verify_unique_internal --
+ *     Given a metadata cursor, look for duplicates. Shared logic between local and shared metadata.
  */
-static int WT_CDECL
-__id_uri_pair_cmp(const void *a, const void *b)
+static int
+__verify_unique_internal(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
-    uint32_t ia, ib;
+    WT_DECL_RET;
+    char *first_uri = NULL;
+    char *second_uri = NULL;
+    size_t allocated = 0;
+    size_t count = 0;
+    uint32_t *ids = NULL;
 
-    ia = ((const WT_ID_URI_PAIR *)a)->id;
-    ib = ((const WT_ID_URI_PAIR *)b)->id;
-    return (ia < ib ? -1 : (ia == ib ? 0 : 1));
+    while ((ret = cursor->next(cursor)) == 0) {
+        const char *key, *value;
+        WT_ERR(cursor->get_key(cursor, &key));
+        WT_ERR(cursor->get_value(cursor, &value));
+        if (!WT_PREFIX_MATCH(key, "file:") || !__wt_btree_entry_is_shared(session, key, value))
+            continue;
+
+        WT_CONFIG_ITEM id_val;
+        WT_ERR(__wt_config_getones(session, value, "id", &id_val));
+        WT_ERR(__wt_realloc_def(session, &allocated, count + 1, &ids));
+        ids[count++] = (uint32_t)id_val.val;
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    uint32_t dup_id;
+    if (__wt_metadata_btree_ids_find_duplicate(ids, count, &dup_id)) {
+        WT_ERR(__wt_metadata_stable_uris_for_id(session, cursor, dup_id, &first_uri, &second_uri));
+        __wt_verbose_error(session, WT_VERB_VERIFY,
+          "metadata corruption: btree ID %" PRIu32 " is shared by %s and %s", dup_id, first_uri,
+          second_uri);
+        ret = WT_ERROR;
+    }
+
+err:
+    __wt_free(session, second_uri);
+    __wt_free(session, first_uri);
+    __wt_free(session, ids);
+    return (ret);
 }
 
 /*
  * __verify_unique_btree_ids --
- *     Verify that no two stable constituent files in the local metadata share the same btree ID.
- *     Only called for .wt_stable files, where the verify session's exclusive lock is on the stable
- *     file not the metadata file so a shared metadata cursor can be opened directly.
+ *     Verify that no two shared files in the local metadata share the same btree ID. Only called
+ *     for shared trees, where the verify session's exclusive lock is on the shared file not the
+ *     metadata file so a metadata cursor can be opened directly.
  */
 static int
 __verify_unique_btree_ids(WT_SESSION_IMPL *session)
 {
-    WT_CONFIG_ITEM id_val;
-    WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_ID_URI_PAIR *pairs;
-    size_t allocated, count, i;
-    const char *key, *value;
 
-    cursor = NULL;
-    pairs = NULL;
-    allocated = count = 0;
-
+    WT_CURSOR *cursor = NULL;
     WT_ERR(__wt_metadata_cursor(session, &cursor));
 
-    while ((ret = cursor->next(cursor)) == 0) {
-        WT_ERR(cursor->get_key(cursor, &key));
-        if (!WT_PREFIX_MATCH(key, "file:") || !WT_URI_IS_STABLE(key))
-            continue;
-        WT_ERR(cursor->get_value(cursor, &value));
-        WT_ERR(__wt_config_getones(session, value, "id", &id_val));
-        WT_ERR(__wt_realloc_def(session, &allocated, count + 1, &pairs));
-        pairs[count].id = (uint32_t)id_val.val;
-        WT_ERR(__wt_strdup(session, key, &pairs[count].uri));
-        ++count;
-    }
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    if (count > 1) {
-        __wt_qsort(pairs, count, sizeof(WT_ID_URI_PAIR), __id_uri_pair_cmp);
-        for (i = 0; i < count - 1; ++i) {
-            if (pairs[i].id != pairs[i + 1].id)
-                continue;
-            __wt_verbose_error(session, WT_VERB_VERIFY,
-              "metadata corruption: btree ID %" PRIu32 " is shared by %s and %s", pairs[i].id,
-              pairs[i].uri, pairs[i + 1].uri);
-            ret = WT_ERROR;
-        }
-    }
+    WT_ERR(__verify_unique_internal(session, cursor));
 
 err:
-    for (i = 0; i < count; ++i)
-        __wt_free(session, pairs[i].uri);
-    __wt_free(session, pairs);
     if (cursor != NULL)
         WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
+}
+
+/*
+ * __verify_unique_shared_ids --
+ *     Verify that no two entries in the shared metadata share the same btree ID.
+ */
+static int
+__verify_unique_shared_ids(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+
+    WT_CURSOR *sh_cursor = NULL;
+    const char *open_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL};
+    WT_WITHOUT_DHANDLE(
+      session, ret = __wt_open_cursor(session, WT_DISAGG_METADATA_URI, NULL, open_cfg, &sh_cursor));
+    WT_ERR(ret);
+
+    WT_ERR(__verify_unique_internal(session, sh_cursor));
+
+err:
+    if (sh_cursor != NULL)
+        WT_TRET(sh_cursor->close(sh_cursor));
+    return (ret);
+}
+
+/*
+ * __wt_disagg_get_database_size --
+ *     Recompute the disaggregated database size from scratch: walk the metadata and sum the most
+ *     recent checkpoint size for every file. The fixed overhead for the KEK table and shared turtle
+ *     page is not included; callers add it when comparing against or storing a database_size.
+ */
+int
+__wt_disagg_get_database_size(WT_SESSION_IMPL *session, uint64_t *sizep)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    uint64_t ckpt_size, total_size;
+    const char *uri, *value;
+
+    cursor = NULL;
+    total_size = 0;
+
+    WT_RET(__wt_metadata_cursor(session, &cursor));
+
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &uri));
+
+        /* Only consider shared file entries as only they contribute to database_size. */
+        WT_ERR(cursor->get_value(cursor, &value));
+        if (!WT_PREFIX_MATCH(uri, "file:") || !__wt_btree_entry_is_shared(session, uri, value))
+            continue;
+
+        /* Extract the most recent checkpoint size from the metadata string. */
+        WT_ERR_NOTFOUND_OK(__wt_ckpt_last_size(session, value, &ckpt_size), true);
+        if (ret == WT_NOTFOUND)
+            continue;
+
+        total_size += ckpt_size;
+
+        __wt_verbose_debug3(session, WT_VERB_VERIFY,
+          "disagg database size: %s checkpoint size %" PRIu64, uri, ckpt_size);
+    }
+    /*
+     * A not found error is okay. cursor->next() returns it once it goes through all the metadata
+     * entries.
+     */
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    *sizep = total_size;
+
+err:
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     return (ret);
 }
 
@@ -299,10 +402,7 @@ int
 __wt_verify_disagg_database_size(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    uint64_t database_size, ckpt_size, total_size;
-    const char *uri, *value;
+    uint64_t database_size, total_size;
 
     /*
      * Skip the check when no checkpoint has been picked up yet: the in-memory database size is
@@ -313,36 +413,9 @@ __wt_verify_disagg_database_size(WT_SESSION_IMPL *session)
         return (0);
 
     conn = S2C(session);
-    cursor = NULL;
-    total_size = 0;
-
     database_size = conn->disaggregated_storage.database_size;
 
-    WT_RET(__wt_metadata_cursor(session, &cursor));
-
-    while ((ret = cursor->next(cursor)) == 0) {
-        WT_ERR(cursor->get_key(cursor, &uri));
-
-        /* Only consider file URIs as only they contribute to database_size. */
-        if (!WT_PREFIX_MATCH(uri, "file:") || !WT_SUFFIX_MATCH(uri, ".wt_stable"))
-            continue;
-
-        /* Look up the metadata string and extract the most recent checkpoint size. */
-        WT_ERR(cursor->get_value(cursor, &value));
-        WT_ERR_NOTFOUND_OK(__wt_ckpt_last_size(session, value, &ckpt_size), true);
-        if (ret == WT_NOTFOUND)
-            continue;
-
-        total_size += ckpt_size;
-
-        __wt_verbose_debug3(session, WT_VERB_VERIFY,
-          "disagg database size verify: %s checkpoint size %" PRIu64, uri, ckpt_size);
-    }
-    /*
-     * A not found error is okay. cursor->next() returns it once it goes through all the metadata
-     * entries.
-     */
-    WT_ERR_NOTFOUND_OK(ret, false);
+    WT_RET(__wt_disagg_get_database_size(session, &total_size));
 
     /*
      * Three cases to consider after the metadata walk:
@@ -366,14 +439,151 @@ __wt_verify_disagg_database_size(WT_SESSION_IMPL *session)
         total_size += WT_DISAGG_CHECKPOINT_SIZE_BUFFER;
 
         if (total_size != database_size)
-            WT_ERR_MSG(session, WT_ERROR,
+            WT_RET_MSG(session, WT_ERROR,
               "database size mismatch: sum of btree checkpoint sizes %" PRIu64
               " does not match stored database size %" PRIu64,
               total_size, database_size);
     }
 
+    return (0);
+}
+
+/*
+ * __verify_one_checkpoint --
+ *     Load, verify and unload a single checkpoint.
+ */
+static int
+__verify_one_checkpoint(
+  WT_SESSION_IMPL *session, WT_VSTUFF *vs, WT_CKPT *ckpt, bool skip_hs, bool last_ckpt)
+{
+    WT_BTREE *btree = S2BT(session);
+    WT_BM *bm = btree->bm;
+    WT_DECL_RET;
+    const char *name = session->dhandle->name;
+    bool evict_off = false;
+
+    if (WT_VRFY_DUMP(vs)) {
+        WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+        WT_RET(__wt_msg(session, "%s, ckpt_name: %s", name, ckpt->name));
+    }
+
+    size_t root_addr_size;
+    uint8_t root_addr[WT_ADDR_MAX_COOKIE];
+    WT_RET(bm->checkpoint_load(
+      bm, session, ckpt->raw.data, ckpt->raw.size, root_addr, &root_addr_size, true));
+
+    /* Skip trees with no root page. */
+    if (root_addr_size == 0)
+        goto done;
+
+    WT_ERR(__wti_btree_tree_open(session, root_addr, root_addr_size));
+
+    if (WT_VRFY_DUMP(vs))
+        WT_ERR(__wt_msg(session, "Root:\n\t> addr: %s",
+          __wt_addr_string(session, root_addr, root_addr_size, vs->tmp1)));
+
+    /*
+     * We currently hold an exclusive lock which means eviction cannot work on that tree. Eviction
+     * must work on trees being verified (else we'd have to do our own eviction), so we release the
+     * lock while verifying.
+     */
+    __wt_evict_file_exclusive_off(session);
+    evict_off = true;
+
+    /* Create a fake, unpacked parent cell for the tree based on the checkpoint information. */
+    WT_CELL_UNPACK_ADDR addr_unpack;
+    memset(&addr_unpack, 0, sizeof(addr_unpack));
+    WT_TIME_AGGREGATE_COPY(&addr_unpack.ta, &ckpt->ta);
+    if (ckpt->ta.prepare)
+        addr_unpack.ta.prepare = 1;
+    addr_unpack.raw = WT_CELL_ADDR_INT;
+
+    /* Verify the tree. */
+    WT_WITH_PAGE_INDEX(session, ret = __verify_tree(session, &btree->root, &addr_unpack, vs));
+    WT_ERR(ret);
+
+    /* Account for the root page in the accumulated total block size. */
+    WT_ERR(__verify_disagg_accumulate_size(session, vs, ckpt->raw.data, ckpt->raw.size));
+
+    if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size) {
+
+        if (vs->fix_btree_size) {
+            __wt_verbose_notice(session, WT_VERB_VERIFY,
+              "checkpoint %s: size mismatch detected, correcting checkpoint size from "
+              "%" PRIu64 " to %" PRIu64,
+              ckpt->name, ckpt->size, vs->total_block_size);
+            ckpt->size = vs->total_block_size;
+            vs->size_fixed = true;
+        } else {
+            __wt_verbose_level_id(session, 1881000, WT_VERB_VERIFY, WT_VERBOSE_WARNING,
+              "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
+              ckpt->size, vs->total_block_size);
+#ifdef HAVE_DIAGNOSTIC
+            /*
+             * FIXME-WT-18038: Mismatches can arise from the reconciliation panic boundary:
+             * bytes_total increments happen before the boundary, so a reconciliation that fails
+             * after the increment but before completion leaves the counter inconsistent. Fail in
+             * diagnostic builds so the drift is caught during testing; production builds only warn.
+             */
+            WT_ERR_MSG(session, WT_ERROR,
+              "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
+              ckpt->size, vs->total_block_size);
+#endif
+        }
+    }
+
+    /*
+     * The checkpoints are in time-order, so the last one in the list is the most recent. If this is
+     * the most recent checkpoint, verify the history store against it, also verify page discard
+     * function if we're in disagg mode.
+     */
+    if (ret == 0 && last_ckpt) {
+        if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
+            /*
+             * The page discard verification routine depends on get_page_ids being implemented.
+             *
+             * FIXME-WT-18567: We opt shared metadata out of the page count check. When we create a
+             * new shared metadata root page during checkpoint, we remove the old one after the
+             * checkpoint metadata is written. But we verify at the LSN where we wrote the
+             * checkpoint metadata, so PALI doesn't "see" that discard, reports the page as live,
+             * and gives us one more page than the btree thinks it has.
+             */
+            WT_BLOCK_DISAGG *block_disagg = (WT_BLOCK_DISAGG *)bm->block;
+            if (block_disagg->plhandle->plh_get_page_ids != NULL && ckpt->raw.data != NULL &&
+              !F_ISSET(session->dhandle, WT_DHANDLE_DISAGG_META))
+                WT_ERR(__verify_page_discard(session, bm));
+        }
+
+        if (!skip_hs) {
+            __wt_verbose(session, WT_VERB_VERIFY, "%s: verify against history store", name);
+            WT_ERR_MSG_CHK(session,
+              __wt_hs_verify_one(session, btree->id, vs->stable_timestamp, !vs->skip_per_key_hs),
+              "history store verification failed");
+        }
+    }
+
+    /*
+     * If the read_corrupt mode was turned on, we may have continued traversing and verifying the
+     * pages of the tree despite encountering an error. Set the error.
+     */
+    if (vs->verify_err != 0)
+        ret = vs->verify_err;
+
+done:
 err:
-    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    /*
+     * If eviction was enabled to verify the tree, re-acquire the exclusive lock and discard the
+     * tree before unloading the checkpoint.The discard must run while the lock is held and before
+     * the unload, as the tree's pages reference this checkpoint's block manager.
+     */
+    if (evict_off) {
+        WT_TRET(__wt_evict_file_exclusive_on(session));
+        WT_TRET(__wt_evict_file(session, WT_SYNC_DISCARD));
+    }
+
+    /* Unload the checkpoint. */
+    WT_TRET(bm->checkpoint_unload(bm, session));
+
     return (ret);
 }
 
@@ -386,17 +596,16 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_BM *bm;
     WT_BTREE *btree;
-    WT_CELL_UNPACK_ADDR addr_unpack;
     WT_CKPT *ckptbase, *ckpt;
     WT_DECL_RET;
     WT_VSTUFF *vs, _vstuff;
-    size_t root_addr_size;
-    uint8_t root_addr[WT_ADDR_MAX_COOKIE];
     const char *name;
     bool bm_start, quit, skip_hs;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
-    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+    WT_ASSERT(session,
+      __verify_lock_held(session, &S2C(session)->checkpoint_lock, WT_SESSION_LOCKED_CHECKPOINT));
+    WT_ASSERT(
+      session, __verify_lock_held(session, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA));
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -417,6 +626,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     /* Check configuration strings. */
     WT_ERR(__verify_config(session, cfg, vs));
 
+    /* Start the progress-report timer; progress is reported on a time interval, not per page. */
+    __wt_timer_start(session, &vs->progress_timer);
+
     /* Optionally dump specific block offsets. */
 #ifdef HAVE_DIAGNOSTIC
     WT_ERR(__verify_config_offsets(session, cfg, &quit, vs));
@@ -427,12 +639,20 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         goto done;
 
     /*
-     * Check that no two stable constituent files share the same btree ID. Only run for stable files
-     * the verify session's exclusive lock is on the stable file, not the metadata file, so a shared
-     * metadata cursor can be opened directly on the verify session.
+     * Check that no two shared files share the same btree ID. Only run for shared trees: the verify
+     * session's exclusive lock is on the shared file, not the metadata file, so a shared metadata
+     * cursor can be opened directly on the verify session.
+     *
+     * FIXME-WT-18582: Having these per-URI means we do a metadata scan for each verified URI.
      */
-    if (WT_URI_IS_STABLE(name))
+    if (__wt_dhandle_shared_btree_kind(btree->dhandle) != WT_SHARED_BTREE_NONE) {
         WT_ERR(__verify_unique_btree_ids(session));
+
+        /* If we're already verifying shared metadata, don't manually perform this step. */
+        if (!WT_IS_DISAGG_META(session->dhandle) &&
+          __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
+            WT_ERR(__verify_unique_shared_ids(session));
+    }
 
     /*
      * Get a list of the checkpoints for this file. Empty objects and ingest tables have no
@@ -448,9 +668,16 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
           "violation as the ingest table does not get checkpointed.",
           name);
 
-    /* Inform the underlying block manager we're verifying. */
-    WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
+    /* Set before the call, a failed start can leave state that only verify end frees. */
     bm_start = true;
+    WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
+
+    /*
+     * Announce the object being verified. Info-level verify messages are normally disabled in
+     * standalone WiredTiger, but MongoDB enables this category by default so the message appears in
+     * mongod logs without extra configuration.
+     */
+    __wt_verbose_info(session, WT_VERB_VERIFY, "verify: starting on %s", name);
 
     /*
      * Skip the history store explicit call if:
@@ -460,7 +687,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
      * - the debug flag is set where we do not clear the record's txn IDs. Visibility rules may not
      * work correctly when we do not clear the record's txn IDs.
      */
-    skip_hs = strcmp(name, WT_METAFILE_URI) == 0 || WT_IS_URI_HS(name) ||
+    skip_hs = WT_IS_URI_METADATA(name) || WT_IS_URI_HS(name) ||
       F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID);
 
     /* Loop through the file's checkpoints, verifying each one. */
@@ -474,117 +701,19 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         /* House-keeping between checkpoints. */
         __verify_checkpoint_reset(vs);
 
-        if (WT_VRFY_DUMP(vs)) {
-            WT_ERR(__wt_msg(session, "%s", WT_DIVIDER));
-            WT_ERR(__wt_msg(session, "%s, ckpt_name: %s", name, ckpt->name));
-        }
-
-        /* Load the checkpoint. */
-        WT_ERR(bm->checkpoint_load(
-          bm, session, ckpt->raw.data, ckpt->raw.size, root_addr, &root_addr_size, true));
-
-        /* Skip trees with no root page. */
-        if (root_addr_size != 0) {
-            WT_ERR(__wti_btree_tree_open(session, root_addr, root_addr_size));
-
-            if (WT_VRFY_DUMP(vs))
-                WT_ERR(__wt_msg(session, "Root:\n\t> addr: %s",
-                  __wt_addr_string(session, root_addr, root_addr_size, vs->tmp1)));
-
-            __wt_evict_file_exclusive_off(session);
-
-            /*
-             * Create a fake, unpacked parent cell for the tree based on the checkpoint information.
-             */
-            memset(&addr_unpack, 0, sizeof(addr_unpack));
-            WT_TIME_AGGREGATE_COPY(&addr_unpack.ta, &ckpt->ta);
-            if (ckpt->ta.prepare)
-                addr_unpack.ta.prepare = 1;
-            addr_unpack.raw = WT_CELL_ADDR_INT;
-
-            /* Verify the tree. */
-            WT_WITH_PAGE_INDEX(
-              session, ret = __verify_tree(session, &btree->root, &addr_unpack, vs));
-
-            /* Account for the root page in the accumulated total block size. */
-            WT_TRET(__verify_disagg_accumulate_size(session, vs, ckpt->raw.data, ckpt->raw.size));
-
-            /* Validate the size of the btree. */
-            if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size) {
-                /*
-                 * FIXME-WT-16660: We are seeing mismatches due to nuanced reconciliation issues,
-                 * where bytes_total increments happen before the reconciliation panic boundary,
-                 * leaving us in an inconsistent state if reconciliation fails after the increment
-                 * but before completion. Re-enable this check once this is resolved.
-                 */
-                if (false)
-                    WT_ERR_MSG(session, WT_ERROR,
-                      "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
-                      ckpt->size, vs->total_block_size);
-            }
-
-            /*
-             * The checkpoints are in time-order, so the last one in the list is the most recent. If
-             * this is the most recent checkpoint, verify the history store against it, also verify
-             * page discard function if we're in disagg mode.
-             */
-            if (ret == 0 && (ckpt + 1)->name == NULL) {
-                if (F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
-                    /*
-                     * The page discard verification routine depends on get_page_ids being
-                     * implemented.
-                     */
-                    WT_BLOCK_DISAGG *block_disagg = (WT_BLOCK_DISAGG *)bm->block;
-                    if (block_disagg->plhandle->plh_get_page_ids != NULL && ckpt->raw.data != NULL)
-                        WT_TRET(__verify_page_discard(session, bm));
-                }
-
-                if (!skip_hs) {
-                    __wt_verbose(session, WT_VERB_VERIFY, "%s: verify against history store", name);
-                    WT_TRET_MSG(session, __wt_hs_verify_one(session, btree->id),
-                      "history store verification failed");
-                }
-                /*
-                 * We cannot error out here. If we got an error verifying the history store, we need
-                 * to follow through with reacquiring the exclusive call below. We'll error out
-                 * after that and unloading this checkpoint.
-                 */
-            }
-
-            /*
-             * If the read_corrupt mode was turned on, we may have continued traversing and
-             * verifying the pages of the tree despite encountering an error. Set the error.
-             */
-            if (vs->verify_err != 0)
-                ret = vs->verify_err;
-
-            /*
-             * We have an exclusive lock on the handle, but we're swapping root pages in-and-out of
-             * that handle, and there's a race with eviction entering the tree and seeing an invalid
-             * root page. Eviction must work on trees being verified (else we'd have to do our own
-             * eviction), lock eviction out whenever we're loading a new root page. This loop works
-             * because we are called with eviction locked out, so we release the lock at the top of
-             * the loop and re-acquire it here.
-             */
-            WT_TRET(__wt_evict_file_exclusive_on(session));
-            WT_TRET(__wt_evict_file(session, WT_SYNC_DISCARD));
-        }
-
-        /* Unload the checkpoint. */
-        WT_TRET(bm->checkpoint_unload(bm, session));
-
-        /*
-         * We've finished one checkpoint's verification (verification, then eviction and checkpoint
-         * unload): if any errors occurred, quit. Done this way because otherwise we'd need at least
-         * two more state variables on error, one to know if we need to discard the tree from the
-         * cache and one to know if we need to unload the checkpoint.
-         */
-        WT_ERR(ret);
+        WT_ERR(__verify_one_checkpoint(session, vs, ckpt, skip_hs, (ckpt + 1)->name == NULL));
 
         /* Display the tree shape. */
         if (vs->dump_layout)
             WT_ERR(__dump_layout(session, vs));
     }
+
+    /*
+     * If any checkpoint's size was corrected, write the updated checkpoint list back to the
+     * metadata.
+     */
+    if (vs->size_fixed)
+        WT_ERR(__wt_meta_ckptlist_set(session, session->dhandle, ckptbase, NULL));
 
 done:
 err:
@@ -794,6 +923,23 @@ __tree_stack(WT_VSTUFF *vs)
 }
 
 /*
+ * __wti_verify_progress_due --
+ *     Return whether at least the reporting interval has elapsed since the last verify progress
+ *     report, restarting the timer when it has so the next interval is measured from now.
+ */
+bool
+__wti_verify_progress_due(WT_SESSION_IMPL *session, WT_TIMER *last_report, uint64_t interval_ms)
+{
+    uint64_t elapsed_ms;
+
+    __wt_timer_evaluate_ms(session, last_report, &elapsed_ms);
+    if (elapsed_ms < interval_ms)
+        return (false);
+    __wt_timer_start(session, last_report);
+    return (true);
+}
+
+/*
  * __verify_tree --
  *     Verify a tree, recursively descending through it in depth-first fashion. The page argument
  *     was physically verified (so we know it's correctly formed), and the in-memory version built.
@@ -807,7 +953,7 @@ __verify_tree(
     WT_BTREE *btree;
     WT_CELL_UNPACK_ADDR *unpack, _unpack;
     WT_DECL_RET;
-    WT_PAGE *page;
+    WT_PAGE *home, *page;
     WT_REF *child_ref;
     size_t my_stack_level, next_stack_level;
     uint32_t entry;
@@ -815,6 +961,7 @@ __verify_tree(
     btree = S2BT(session);
     bm = btree->bm;
     unpack = &_unpack;
+    home = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
     page = ref->page;
 
     /*
@@ -848,6 +995,9 @@ __verify_tree(
           F_ISSET(ref, WT_REF_FLAG_LEAF) ? "LEAF" : "");
     }
 
+    if (!__wt_ref_type_matches_page(ref, page->type))
+        WT_RET_MSG(session, WT_ERROR, "page type does not match reference type");
+
     /*
      * The page's physical structure was verified when it was read into memory by the read server
      * thread, and then the in-memory version of the page was built. Now we make sure the page and
@@ -864,9 +1014,13 @@ __verify_tree(
      * we split page verification into a physical verification, which allows the in-memory version
      * of the page to be built, and then a subsequent logical verification which happens here.
      *
-     * Report progress occasionally.
+     * Report progress on a time interval rather than a page count, so a fast verify stays quiet and
+     * a long-running one emits a periodic heartbeat. The clock read is negligible next to the
+     * per-page verification work.
      */
-    if (__wt_counter_backoff(++vs->fcnt, 100))
+    ++vs->fcnt;
+    if (__wti_verify_progress_due(
+          session, &vs->progress_timer, (uint64_t)WT_PROGRESS_MSG_PERIOD * WT_THOUSAND))
         WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
@@ -930,11 +1084,11 @@ __verify_tree(
          * been completed, the parent page's write generation number must be higher than that of its
          * children.
          */
-        if (!__wt_ref_is_root(ref) && page->dsk->write_gen >= ref->home->dsk->write_gen)
+        if (!__wt_ref_is_root(ref) && page->dsk->write_gen >= home->dsk->write_gen)
             WT_RET_MSG(session, EINVAL,
               "child write generation number %" PRIu64
               " is greater/equal to the parent page write generation number %" PRIu64,
-              page->dsk->write_gen, ref->home->dsk->write_gen);
+              page->dsk->write_gen, home->dsk->write_gen);
 
         switch (page->type) {
         case WT_PAGE_COL_INT:
@@ -1042,7 +1196,9 @@ celltype_err:
             }
 
             /* Unpack the address block and check timestamps */
-            __wt_cell_unpack_addr(session, child_ref->home->dsk, child_ref->addr, unpack);
+            __wt_cell_unpack_addr(session,
+              ((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&child_ref->home))->dsk, child_ref->addr,
+              unpack);
             WT_RET(__verify_addr_ts(session, child_ref, unpack, vs));
 
             /*
@@ -1110,7 +1266,9 @@ celltype_err:
                 WT_RET(__verify_row_int_key_order(session, page, child_ref, entry, vs));
 
             /* Unpack the address block and check timestamps */
-            __wt_cell_unpack_addr(session, child_ref->home->dsk, child_ref->addr, unpack);
+            __wt_cell_unpack_addr(session,
+              ((WT_PAGE *)__wt_atomic_load_ptr_relaxed(&child_ref->home))->dsk, child_ref->addr,
+              unpack);
             WT_RET(__verify_addr_ts(session, child_ref, unpack, vs));
 
             /*
@@ -1179,11 +1337,13 @@ __verify_row_int_key_order(
     btree = S2BT(session);
 
     /*
-     * The maximum key is usually set from the leaf page first. If the first leaf page is corrupted,
-     * it is possible that the key is not set. In that case skip this check.
+     * The maximum key is usually set from the leaf page first. It can legitimately be unset here:
+     * the first leaf page is corrupted, or every leaf visited so far rebuilt from a base image and
+     * deltas with all of its keys dropped as globally visible deletes. In either case there is
+     * nothing to compare against, and the comparison below is skipped.
      */
     if (!vs->verify_err)
-        WT_ASSERT(session, vs->max_addr->size != 0);
+        WT_ASSERT(session, vs->max_addr->size != 0 || WT_DELTA_LEAF_ENABLED(session));
 
     /* Get the parent page's internal key. */
     __wt_ref_key(parent, ref, &item.data, &item.size);
@@ -1228,7 +1388,9 @@ __verify_row_leaf_key_order(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs
     page = ref->page;
 
     /*
-     * If a tree is empty (just created), it won't have keys; if there are no keys, we're done.
+     * A page has no keys when the tree is empty (just created), or when it was rebuilt from a base
+     * image and deltas and the merge dropped every key whose stop is globally visible. Either way
+     * there is nothing to compare, and the largest key we've seen so far stands.
      */
     if (page->entries == 0)
         return (0);
@@ -1301,118 +1463,28 @@ __verify_overflow(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
 /*
  * __verify_ts_stable_cmp --
  *     Verify that a pair of start and stop timestamps are valid against the global stable
- *     timestamp. Takes in either a key for history store timestamps or a ref and cell number.
+ *     timestamp. Takes in a ref and cell number to report against.
  */
 static int
-__verify_ts_stable_cmp(WT_SESSION_IMPL *session, WT_ITEM *key, WT_REF *ref, uint32_t cell_num,
+__verify_ts_stable_cmp(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t cell_num,
   wt_timestamp_t start_ts, wt_timestamp_t stop_ts, WT_VSTUFF *vs)
 {
-    WT_BTREE *btree;
-    WT_DECL_RET;
+    wt_timestamp_t failed_ts;
     char tp_string[2][WT_TS_INT_STRING_SIZE];
     bool start;
 
-    btree = S2BT(session);
-    start = true;
+    if (!__wt_ts_stable_violation(start_ts, stop_ts, vs->stable_timestamp, &start, &failed_ts))
+        return (0);
 
-    if (start_ts != WT_TS_NONE && start_ts > vs->stable_timestamp)
-        goto msg;
-
-    if (stop_ts != WT_TS_MAX && stop_ts > vs->stable_timestamp) {
-        start = false;
-        goto msg;
-    }
-
-    return (ret);
-
-msg:
-    WT_ASSERT(session, ref != NULL || key != NULL);
-    if (ref != NULL)
-        WT_RET(__wt_buf_fmt(session, vs->tmp1, "cell %" PRIu32 " on page at %s", cell_num,
-          __verify_addr_string(session, ref, vs->tmp2)));
-    else if (key != NULL)
-        WT_RET(__wt_buf_fmt(session, vs->tmp1, "Value in history store for key {%s}",
-          __wt_key_string(session, key->data, key->size, btree->key_format, vs->tmp2)));
+    WT_RET(__wt_buf_fmt(session, vs->tmp1, "cell %" PRIu32 " on page at %s", cell_num,
+      __verify_addr_string(session, ref, vs->tmp2)));
 
     WT_RET_MSG(session, WT_ERROR,
       "%s has failed verification with a %s timestamp of %s greater than the stable_timestamp of "
       "%s",
       (char *)vs->tmp1->data, start ? "start" : "stop",
-      __wt_timestamp_to_string(start ? start_ts : stop_ts, tp_string[0]),
+      __wt_timestamp_to_string(failed_ts, tp_string[0]),
       __wt_timestamp_to_string(vs->stable_timestamp, tp_string[1]));
-}
-
-/*
- * __verify_key_hs --
- *     Verify a key against the history store. The unpack denotes the data store's timestamp range
- *     information and is used for verifying timestamp range overlaps.
- */
-static int
-__verify_key_hs(
-  WT_SESSION_IMPL *session, WT_ITEM *tmp1, wt_timestamp_t newer_start_ts, WT_VSTUFF *vs)
-{
-/* FIXME-WT-10779 - Enable the history store validation. */
-#ifdef WT_VERIFY_VALIDATE_HISTORY_STORE
-    WT_BTREE *btree;
-    WT_CURSOR *hs_cursor;
-    WT_DECL_RET;
-    wt_timestamp_t older_start_ts, older_stop_ts;
-    uint64_t hs_counter;
-    uint32_t hs_btree_id;
-    char ts_string[2][WT_TS_INT_STRING_SIZE];
-
-    btree = S2BT(session);
-    hs_btree_id = btree->id;
-    WT_RET(__wt_curhs_open(session, hs_btree_id, NULL, NULL, &hs_cursor));
-    F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
-
-    /*
-     * Set the data store timestamp and transactions to initiate timestamp range verification. Since
-     * transaction-ids are wiped out on start, we could possibly have a start txn-id of WT_TXN_NONE,
-     * in which case we initialize our newest with the max txn-id.
-     */
-    older_stop_ts = WT_TS_NONE;
-
-    /*
-     * Open a history store cursor positioned at the end of the data store key (the newest record)
-     * and iterate backwards until we reach a different key or btree.
-     */
-    hs_cursor->set_key(hs_cursor, 4, hs_btree_id, tmp1, WT_TS_MAX, UINT64_MAX);
-    ret = __wt_curhs_search_near_before(session, hs_cursor);
-
-    for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
-        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, vs->tmp2, &older_start_ts, &hs_counter));
-        /* Verify the newer record's start is later than the older record's stop. */
-        if (newer_start_ts < older_stop_ts) {
-            WT_ERR_MSG(session, WT_ERROR,
-              "key %s has a overlap of timestamp ranges between history store stop timestamp %s "
-              "being newer than a more recent timestamp range having start timestamp %s",
-              __wt_buf_set_printable_format(
-                session, tmp1->data, tmp1->size, btree->key_format, false, vs->tmp2),
-              __wt_timestamp_to_string(older_stop_ts, ts_string[0]),
-              __wt_timestamp_to_string(newer_start_ts, ts_string[1]));
-        }
-
-        if (vs->stable_timestamp != WT_TS_NONE)
-            WT_ERR(
-              __verify_ts_stable_cmp(session, tmp1, NULL, 0, older_start_ts, older_stop_ts, vs));
-
-        /*
-         * Since we are iterating from newer to older, the current older record becomes the newer
-         * for the next round of verification.
-         */
-        newer_start_ts = older_start_ts;
-    }
-err:
-    WT_TRET(hs_cursor->close(hs_cursor));
-    return (ret == WT_NOTFOUND ? 0 : ret);
-#else
-    WT_UNUSED(session);
-    WT_UNUSED(tmp1);
-    WT_UNUSED(newer_start_ts);
-    WT_UNUSED(vs);
-    return (0);
-#endif
 }
 
 /*
@@ -1427,17 +1499,27 @@ __verify_page_content_int(
     WT_DECL_RET;
     WT_PAGE *page;
     const WT_PAGE_HEADER *dsk;
-    WT_TIME_AGGREGATE *ta;
+    WT_TIME_AGGREGATE effective_ta, *ta;
     uint32_t cell_num;
 
     page = ref->page;
     dsk = page->dsk;
-    ta = &unpack.ta;
 
     /* Walk the page, verifying overflow pages and validating timestamps. */
     cell_num = 0;
     WT_CELL_FOREACH_ADDR (session, dsk, unpack) {
         ++cell_num;
+
+        /*
+         * The aggregate in a deleted-address cell predates the truncate, so validate the effective
+         * aggregate: the unpacked one with the page deletion applied as its stop point.
+         */
+        ta = &unpack.ta;
+        if (unpack.type == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
+            WT_TIME_AGGREGATE_COPY(&effective_ta, &unpack.ta);
+            WT_TIME_AGGREGATE_MERGE_PAGE_DEL(&effective_ta, &unpack.page_del);
+            ta = &effective_ta;
+        }
 
         __wt_verbose_debug3(session, WT_VERB_VERIFY,
           "cell num: %" PRIu32 ", cell type: %s, page type: %s", cell_num - 1,
@@ -1473,7 +1555,7 @@ __verify_page_content_int(
 
             if (vs->stable_timestamp != WT_TS_NONE)
                 WT_RET(__verify_ts_stable_cmp(
-                  session, NULL, ref, cell_num - 1, ta->oldest_start_ts, ta->newest_stop_ts, vs));
+                  session, ref, cell_num - 1, ta->oldest_start_ts, ta->newest_stop_ts, vs));
             break;
         }
     }
@@ -1494,19 +1576,23 @@ __verify_page_content_leaf(
     WT_DECL_RET;
     WT_PAGE *page;
     const WT_PAGE_HEADER *dsk;
-    WT_ROW *rip;
     WT_TIME_WINDOW *tw;
-    uint64_t recno, rle;
+    uint64_t rle;
     uint32_t cell_num;
-    uint8_t *p;
     char tw_string[WT_TIME_STRING_SIZE];
-    bool found_ovfl;
+    bool found_ovfl, from_delta;
 
     page = ref->page;
     dsk = page->dsk;
-    rip = page->pg_row;
+    /*
+     * Tells the parent-aggregate check below that this page was rebuilt from a base image and
+     * deltas, so it may relax a start-time mismatch that a full image could not have.
+     *
+     * FIXME-WT-17968: revisit whether from_delta is still needed once the checkpoint pick-up
+     * pinned-timestamp gate is restored, rather than assuming it is.
+     */
+    from_delta = page->disagg_info != NULL && page->disagg_info->block_meta.delta_count > 0;
     tw = &unpack.tw;
-    recno = ref->ref_recno;
     found_ovfl = false;
 
     /* Walk the page, tracking timestamps and verifying overflow pages. */
@@ -1547,33 +1633,28 @@ __verify_page_content_leaf(
             __wt_verbose_debug3(session, WT_VERB_VERIFY, "cell num: %" PRIu32 ", time window: %s",
               cell_num - 1, __wt_time_window_to_string(tw, tw_string));
 
-            if ((ret = __wt_time_value_validate(session, tw, &parent->ta, false)) != 0)
+            if ((ret = __wt_time_value_validate(session, tw, &parent->ta, from_delta, false)) != 0)
                 WT_RET_MSG(session, ret,
                   "cell %" PRIu32 " on page at %s failed timestamp validation", cell_num - 1,
                   __verify_addr_string(session, ref, vs->tmp1));
 
             if (vs->stable_timestamp != WT_TS_NONE)
                 WT_RET(__verify_ts_stable_cmp(
-                  session, NULL, ref, cell_num - 1, tw->start_ts, tw->stop_ts, vs));
+                  session, ref, cell_num - 1, tw->start_ts, tw->stop_ts, vs));
             break;
         }
 
-        /* Verify key-associated history-store entries. */
-        if (page->type == WT_PAGE_ROW_LEAF) {
-            if (unpack.type != WT_CELL_VALUE && unpack.type != WT_CELL_VALUE_COPY &&
-              unpack.type != WT_CELL_VALUE_OVFL && unpack.type != WT_CELL_VALUE_SHORT)
-                continue;
+        /*
+         * On a disaggregated stable table, account inline values that share the layered tombstone's
+         * encoded namespace. Overflow values never qualify (they are large and the cell holds an
+         * address, not the bytes), so only inline value cells are checked.
+         */
+        if ((unpack.type == WT_CELL_VALUE || unpack.type == WT_CELL_VALUE_SHORT) &&
+          F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
+            __wt_clayered_stable_value_stat(session, unpack.data, unpack.size);
 
-            WT_RET(__wt_row_leaf_key(session, page, rip++, vs->tmp1, false));
-            WT_RET(__verify_key_hs(session, vs->tmp1, tw->start_ts, vs));
-        } else if (page->type == WT_PAGE_COL_VAR) {
+        if (page->type == WT_PAGE_COL_VAR) {
             rle = __wt_cell_rle(&unpack);
-            p = vs->tmp1->mem;
-            WT_RET(__wt_vpack_uint(&p, 0, recno));
-            vs->tmp1->size = WT_PTRDIFF(p, vs->tmp1->mem);
-            WT_RET(__verify_key_hs(session, vs->tmp1, tw->start_ts, vs));
-
-            recno += rle;
             vs->records_so_far += rle;
         }
     }
@@ -1618,13 +1699,13 @@ __verify_compare_page_id_lists(WT_SESSION_IMPL *session, uint64_t *btree_ids, si
             __wt_verbose_error(session, WT_VERB_VERIFY,
               "Unreferenced page was not discarded: PALI[%" PRIu32 "] %" PRIu64, index_in_pali,
               id_in_pali);
-            WT_TRET(EINVAL);
+            WT_TRET(WT_ERROR);
             index_in_pali++;
         } else if (index_in_pali == num_pali || id_in_pali > id_in_btree) {
             __wt_verbose_error(session, WT_VERB_VERIFY,
               "Discarded page is still in use: BTREE[%" PRIu32 "] %" PRIu64, index_in_btree,
               id_in_btree);
-            WT_TRET(EINVAL);
+            WT_TRET(WT_ERROR);
             index_in_btree++;
         } else {
             index_in_pali++;
@@ -1636,84 +1717,134 @@ __verify_compare_page_id_lists(WT_SESSION_IMPL *session, uint64_t *btree_ids, si
 }
 
 /*
+ * WT_VERIFY_PAGE_ID_LIST --
+ *     A list of page IDs found walking the btree.
+ */
+typedef struct {
+    uint64_t *ids;
+    size_t count;
+    size_t capacity_in_bytes;
+} WT_VERIFY_PAGE_ID_LIST;
+
+/*
+ * __verify_page_id_append --
+ *     Append a page ID to the given list, growing the list if necessary.
+ */
+static int
+__verify_page_id_append(WT_SESSION_IMPL *session, WT_VERIFY_PAGE_ID_LIST *list, uint64_t page_id)
+{
+    if (list->count == (list->capacity_in_bytes / sizeof(*list->ids)))
+        WT_RET(
+          __wt_realloc_def(session, &list->capacity_in_bytes, list->count * 2 + 10, &list->ids));
+
+    list->ids[list->count++] = page_id;
+    return (0);
+}
+
+/*
+ * __verify_page_discard_skip --
+ *     Tree walk callback. Skip fast-truncated pages, but record their page IDs.
+ */
+static int
+__verify_page_discard_skip(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
+{
+    WT_UNUSED(visible_all);
+
+    *skipp = false;
+    if (WT_REF_GET_STATE(ref) != WT_REF_DELETED)
+        return (0);
+    *skipp = true;
+
+    WT_ADDR_COPY addr;
+    if (!__wt_ref_addr_copy(session, ref, &addr))
+        /* Block already freed, no need to record it. */
+        return (0);
+
+    const uint8_t *p = addr.addr;
+    WT_BLOCK_DISAGG_ADDRESS_COOKIE cookie;
+    WT_RET(__wt_block_disagg_addr_unpack(session, &p, addr.size, &cookie));
+
+    WT_VERIFY_PAGE_ID_LIST *list = context;
+    return (__verify_page_id_append(session, list, cookie.page_id));
+}
+
+/*
  * __verify_page_discard --
  *     Verify all live pages in disagg mode, ensuring that no pages were incorrectly discarded.
  */
 static int
 __verify_page_discard(WT_SESSION_IMPL *session, WT_BM *bm)
 {
-    WT_REF *ref = NULL;
-    uint64_t num_pages_found_in_btree = 0;
-    size_t capacity_in_bytes = 0;
-    uint64_t *page_ids = NULL;
-    int ret = 0;
+    WT_DECL_ITEM(item);
+    WT_DECL_RET;
+    WT_REF *ref;
+    WT_VERIFY_PAGE_ID_LIST list;
+    size_t num_pages_found_in_pali;
+    uint64_t checkpoint_lsn;
+
+    ref = NULL;
+    WT_CLEAR(list);
 
     /*
      * Walk the btree to retrieve the page IDs for all pages in the btree at the loaded checkpoint
-     * time.
+     * time. Fast-truncated pages are collected by the skip function: their blocks are not discarded
+     * until their parent is reconciled, so PALI still holds them.
      */
-    while ((ret = (__wt_tree_walk(session, &ref, WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED))) == 0 &&
+    while ((ret = (__wt_tree_walk_custom_skip(session, &ref, __verify_page_discard_skip, &list,
+              WT_READ_SEE_DELETED | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED))) == 0 &&
       ref != NULL) {
         WT_PAGE *page = ref->page;
 
-        /*
-         * Use dynamically allocated array to track page IDs as we don't know the number of pages
-         *  here. Check if the array size needs to grow.
-         */
-        if (num_pages_found_in_btree == (capacity_in_bytes / sizeof(*page_ids))) {
-            uint64_t new_capacity_count = num_pages_found_in_btree * 2 + 10;
-            WT_RET(__wt_realloc_def(session, &capacity_in_bytes, new_capacity_count, &page_ids));
-        }
-
         if (page != NULL) {
             WT_ASSERT(session, page->disagg_info != NULL);
-            page_ids[num_pages_found_in_btree++] = page->disagg_info->block_meta.page_id;
+            /* Pages created in memory and never reconciled have no backing block. */
+            if (page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID)
+                WT_ERR(
+                  __verify_page_id_append(session, &list, page->disagg_info->block_meta.page_id));
         }
     }
 
-    WT_RET_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    checkpoint_lsn = __wt_atomic_load_uint64_acquire(
+      &S2C(session)->disaggregated_storage.last_checkpoint_meta_lsn);
+    if (checkpoint_lsn == WT_DISAGG_LSN_NONE)
+        /* FIXME-WT-18186: should probably be page log LSN max. */
+        checkpoint_lsn = INT_MAX;
 
     /*
-     * Track the number of pages found in the PALI walk. This value is tracked separately because
-     * WT_ITEM->size must match the allocated memory, while the actual number of pages found may be
-     * smaller than that allocation.
+     * Get page IDs from PALI. The number of pages is tracked separately because WT_ITEM->size must
+     * match the allocated memory, while the actual number of pages found may be smaller than that
+     * allocation.
      */
-    size_t num_pages_found_in_pali = 0;
-    uint64_t checkpoint_lsn;
-    checkpoint_lsn =
-      S2C(session)->disaggregated_storage.last_checkpoint_meta_lsn == WT_DISAGG_LSN_NONE ?
-      INT_MAX :
-      S2C(session)->disaggregated_storage.last_checkpoint_meta_lsn;
-
-    WT_DECL_ITEM(item);
-    WT_RET(__wt_scr_alloc(session, num_pages_found_in_pali, &item));
-
+    num_pages_found_in_pali = 0;
+    WT_ERR(__wt_scr_alloc(session, 0, &item));
     WT_ASSERT(session, bm->get_page_ids != NULL);
-    /* Get page IDs from PALI. */
     WT_ERR(bm->get_page_ids(bm, session, item, &num_pages_found_in_pali, checkpoint_lsn));
 
-    if ((uint64_t)num_pages_found_in_pali != num_pages_found_in_btree) {
+    if ((uint64_t)num_pages_found_in_pali != list.count) {
         __wt_verbose_error(session, WT_VERB_VERIFY,
           "Mismatch in the number of page IDs found from PALI and btree walk: PALI %" PRIu64
-          " Btree walk %" PRIu64,
-          (uint64_t)num_pages_found_in_pali, num_pages_found_in_btree);
-        WT_TRET(EINVAL);
+          " Btree walk %" WT_SIZET_FMT,
+          (uint64_t)num_pages_found_in_pali, list.count);
+        WT_TRET(WT_ERROR);
     }
 
     /*
      * Sort the btree walk array by page ID in ascending order to match the order used in the PALI
      * walk.
      */
-    __wt_qsort(page_ids, num_pages_found_in_btree, sizeof(uint64_t), __verify_compare_page_id);
+    __wt_qsort(list.ids, list.count, sizeof(uint64_t), __verify_compare_page_id);
 
-    WT_ERR_MSG_CHK(session,
-      __verify_compare_page_id_lists(session, page_ids, (size_t)num_pages_found_in_btree,
-        (const uint64_t *)item->data, num_pages_found_in_pali),
-      "Page discard verification found mismatches");
+    WT_TRET(__verify_compare_page_id_lists(
+      session, list.ids, list.count, (const uint64_t *)item->data, num_pages_found_in_pali));
+    if (ret != 0)
+        WT_ERR_SUB(session, WT_ERROR, WT_VERIFY_PAGE_ID_MISMATCH,
+          "Page discard verification found mismatches");
 
 err:
-
-    __wt_free(session, page_ids);
+    __wt_free(session, list.ids);
     __wt_scr_free(session, &item);
 
     return (ret);

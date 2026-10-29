@@ -1,40 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -266,6 +242,190 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesWithVariableRegExPattern) {
                     Value("<--><-->ij"sv));
     ASSERT_VALUE_EQ(replaceAll("xyzxx"sv, BSONRegEx("x+"), "abc"sv).second, Value("abcyzabc"sv));
     ASSERT_VALUE_EQ(replaceAll("abc->defg->hij"sv, BSONRegEx(".*"), "a"sv).second, Value("aa"sv));
+}
+
+TEST(ExpressionEvaluateReplaceTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    auto [expCtx, expression] = parse(
+        "$replaceAll", Document{{"input", "aaaa"sv}, {"find", ""sv}, {"replacement", "XY"sv}});
+
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    ASSERT_VALUE_EQ(expression->evaluate({}, &expCtx->variables, ctx), Value("XYaXYaXYaXYaXY"sv));
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenNonEmptyFindGrowsOutput) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", "a"sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    // Two-level tracker: a stage tracker with a generous local limit reporting into the
+    // operation-wide tracker, which carries the small cap that the growing output exceeds.
+    const int64_t limit = 256;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker tracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    try {
+        expression->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$replaceAll");
+    }
+
+    // The MemoryUsageToken fired on unwind, so the operation-wide tracker is left balanced.
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", ""sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    // The operation-wide tracker holds the small cap; the stage tracker reporting into it has a
+    // generous local limit, so the throw must come from the per-operation cap via the base chain
+    // rollup, not the local stage limit.
+    const int64_t limit = 256;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    try {
+        expression->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$replaceAll");
+    }
+}
+
+TEST(ExpressionEvaluateReplaceTest, ManySmallReplacementsCollectivelyExceedingLimitStillThrow) {
+    // Many small matches, none individually near the limit, must still trip it once accumulated
+    // output growth crosses it.
+    auto [expCtx, expression] =
+        parse("$replaceAll",
+              Document{{"input", std::string(2000, 'a')}, {"find", "a"sv}, {"replacement", "b"sv}});
+
+    const int64_t limit = 512;  // Well under the ~2000 bytes of total output growth.
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_LT(operationTracker.peakTrackedMemoryBytes(), limit + 1024 * 1024);
+}
+
+TEST(ExpressionEvaluateReplaceTest, SingleOversizedReplacementThrowsImmediately) {
+    // A single match whose replacement alone is larger than the whole limit must be caught
+    // immediately.
+    auto [expCtx, expression] =
+        parse("$replaceAll",
+              Document{{"input", "a"sv}, {"find", "a"sv}, {"replacement", std::string(1024, 'x')}});
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionEvaluateReplaceTest, ManySmallRegexReplacementsCollectivelyExceedLimit) {
+    // Exercises the regex-'find' code path (replaceAllOpRegEx in evaluate_regex.cpp): many small
+    // matches, none individually near the limit, must still trip it once accumulated.
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(2000, 'a')},
+                                               {"find", BSONRegEx("a")},
+                                               {"replacement", "b"sv}});
+
+    const int64_t limit = 512;  // Well under the ~2000 bytes of total output growth.
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_LT(operationTracker.peakTrackedMemoryBytes(), limit + 1024 * 1024);
+}
+
+TEST(ExpressionEvaluateReplaceTest, SingleOversizedRegexReplacementThrowsImmediately) {
+    // Exercises the regex-'find' code path (replaceAllOpRegEx in evaluate_regex.cpp): a single
+    // match whose replacement alone is larger than the whole limit must be caught immediately.
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", "a"sv},
+                                               {"find", BSONRegEx("a")},
+                                               {"replacement", std::string(1024, 'x')}});
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expression->evaluate({}, &expCtx->variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionEvaluateReplaceTest, FallbackTrackerWithinLimitDoesNotThrow) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", ""sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression
+    // cap.
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    // Within the configured limit, evaluation succeeds and charges the fallback tracker.
+    EvaluationContext ctx{};
+    ASSERT_DOES_NOT_THROW(expression->evaluate({}, &expCtx->variables, ctx));
+
+    auto& tracker = expCtx->getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionEvaluateReplaceTest, FallbackTrackerEnforcesLimit) {
+    auto [expCtx, expression] = parse("$replaceAll",
+                                      Document{{"input", std::string(1000, 'a')},
+                                               {"find", ""sv},
+                                               {"replacement", std::string(100, 'X')}});
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression
+    // cap.
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    try {
+        expression->evaluate({}, &expCtx->variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$replaceAll");
+    }
+
+    auto& tracker = expCtx->getExpressionFallbackTracker();
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), limit);
 }
 
 }  // namespace expression_evaluation_test

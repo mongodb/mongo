@@ -1,39 +1,7 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/index_tag.h"
-
-
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <limits>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/field_ref.h"
@@ -41,6 +9,11 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <limits>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 
@@ -253,7 +226,7 @@ bool pushdownNode(MatchExpression* node,
     }
 
     if (MatchExpression::AND == target->matchType()) {
-        auto [indexedOr, fieldRef_unused] = getIndexedOr({} /*fieldRef*/, target);
+        auto [indexedOr, fieldRef_unused] = getIndexedOr(/*currentPath=*/{}, target);
         tassert(11321003, "indexedOr must not be null", indexedOr);
         return pushdownNode(node, indexedOr, std::move(destinations), pathsToUpdate);
     }
@@ -361,7 +334,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
     }
     if (MatchExpression::AND == tree->matchType()) {
         AndMatchExpression* andNode = static_cast<AndMatchExpression*>(tree);
-        auto [indexedOr, indexedOrPath] = getIndexedOr({} /*fieldRef*/, andNode);
+        auto [indexedOr, indexedOrPath] = getIndexedOr(/*currentPath=*/{}, andNode);
 
         if (indexedOr) {
             for (size_t i = 0; i < andNode->numChildren(); ++i) {
@@ -374,7 +347,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
                     std::vector<MatchExpression*> orPushdownDescendants;
                     stdx::unordered_map<MatchExpression*, FieldRef> pathsToUpdate;
                     getElemMatchOrPushdownDescendants(indexedOrPath,
-                                                      {} /*currentPath*/,
+                                                      /*currentPath=*/{},
                                                       child,
                                                       &orPushdownDescendants,
                                                       &pathsToUpdate);
@@ -382,7 +355,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
                         static_cast<void>(
                             processOrPushdownNode(descendant, indexedOr, pathsToUpdate));
                     }
-                } else if (processOrPushdownNode(child, indexedOr, {} /*pathsToUpdate*/)) {
+                } else if (processOrPushdownNode(child, indexedOr, /*pathsToUpdate=*/{})) {
                     // The indexed $or can completely satisfy the child predicate, so we trim it.
                     auto ownedChild = andNode->removeChild(i);
                     --i;

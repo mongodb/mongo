@@ -153,6 +153,7 @@ function isAcceptableRetryFailedResponse(cmdName, res) {
 // Commands that may return different values or fail if retried on a new primary after a
 // failover.
 const kNonFailoverTolerantCommands = new Set([
+    "clearJoinPlanCache", // The join plan cache isn't replicated.
     "currentOp", // Failovers can change currentOp output.
     "getLog", // The log is different on different servers.
     "killOp", // Failovers may interrupt operations intended to be killed later in the test.
@@ -779,7 +780,7 @@ function shouldRetryWithNetworkErrorOverride(
         // node in the replica set to take longer than 15 seconds so we allow retrying
         // for up to 5 minutes.
         logError(
-            "Failed to find primary when attempting to run command," +
+            "Failed to find or connect to primary when attempting to run command," +
                 " will retry for another 15 seconds",
         );
         return kContinue;
@@ -920,7 +921,7 @@ function shouldRetryWithNetworkExceptionOverride(
         // node in the replica set to take longer than 15 seconds so we allow retrying
         // for up to 5 minutes.
         logError(
-            "Failed to find primary when attempting to run command," +
+            "Failed to find or connect to primary when attempting to run command," +
                 " will retry for another 15 seconds",
         );
         return false;

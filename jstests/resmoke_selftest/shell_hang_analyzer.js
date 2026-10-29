@@ -23,9 +23,16 @@ TestData.cleanUpCoreDumpsFromExpectedCrash = true;
     MongoRunner.runHangAnalyzer.disable();
     MongoRunner.runHangAnalyzer.enable();
 
-    assert.eq(0, MongoRunner.runHangAnalyzer([child.pid]));
+    // The hang-analyzer only runs when TestData.inEvergreen is set (see
+    // MongoRunner.runHangAnalyzer in servers.js), which is normally only true when resmoke is
+    // invoked with an Evergreen task id. Force it on here so this self-test exercises the real
+    // code path consistently, whether run in Evergreen or locally.
+    const origInEvg = TestData.inEvergreen;
+    try {
+        TestData.inEvergreen = true;
 
-    if (TestData && TestData.inEvergreen) {
+        assert.eq(0, MongoRunner.runHangAnalyzer([child.pid]));
+
         assert.soon(
             () => {
                 // Ensure the hang-analyzer has killed the process.
@@ -39,22 +46,28 @@ TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
         const lines = rawMongoProgramOutput(".*").split("\n");
         const buildInfo = globalThis.db.getServerBuildInfo();
-        if (buildInfo.isAddressSanitizerActive() || buildInfo.isThreadSanitizerActive()) {
-            assert.soon(() => {
-                // On ASAN/TSAN builds, the processes have a lot of shadow memory that gdb
-                // likes to include in the core dumps. We send a SIGABRT to the processes
-                // on these builds because the kernel knows how to get rid of the shadow memory.
-                return anyLineMatches(lines, /Sending SIGABRT to/);
-            });
+        // The hang analyzer sends SIGABRT instead of attaching a debugger in two cases: on
+        // ASAN/TSAN builds (the kernel handles the large shadow-memory core dumps better than gdb),
+        // and when no debugger is installed (e.g. remote execution workers have no gdb). It reports
+        // the latter by logging "No debugger found". In both cases we expect a SIGABRT; otherwise a
+        // debugger attaches and dumps a core file.
+        const usesSigabrt =
+            buildInfo.isAddressSanitizerActive() ||
+            buildInfo.isThreadSanitizerActive() ||
+            anyLineMatches(lines, /No debugger found/);
+        if (usesSigabrt) {
+            assert(
+                anyLineMatches(lines, /Sending SIGABRT to/),
+                "expected hang analyzer to send SIGABRT",
+            );
         } else {
-            assert.soon(() => {
-                // Outside of ASAN builds, we expect the core to be dumped.
-                return anyLineMatches(lines, /Dumping core/);
-            });
+            assert(
+                anyLineMatches(lines, /Dumping core/),
+                "expected hang analyzer to dump a core file",
+            );
         }
-    } else {
-        // When running locally the hang-analyzer is not run.
-        MongoRunner.stopMongod(child);
+    } finally {
+        TestData.inEvergreen = origInEvg;
     }
 })();
 

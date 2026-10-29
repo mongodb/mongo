@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -47,7 +21,7 @@
 #include <string_view>
 #include <utility>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * This class represents the metadata that the query execution engine can associate with a
  * particular intermediate result (either index key or document) passing between execution stages.
@@ -102,9 +76,19 @@ public:
     static std::string_view serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**
+     * Returns true if 'name' is a recognized metadata name that can be parsed by parseMetaType().
+     */
+    static bool isValidMetaType(std::string_view name);
+
+    /**
      * Returns true if this metadata value produces score metadata.
      */
     static bool isScoreProducingMetaType(std::string_view name);
+
+    /**
+     * Returns true if this metadata value produces scoreDetails metadata.
+     */
+    static bool isScoreDetailsProducingMetaType(std::string_view name);
 
     /**
      * Reads serialized metadata out of 'buf', and uses it to populate 'out'. Expects 'buf' to have
@@ -439,8 +423,7 @@ public:
         return _holder->score;
     }
 
-    // TODO SERVER-85426 Remove all feature flag logic.
-    void setScore(double score, bool featureFlagAlreadyValidated = false);
+    void setScore(double score);
 
     bool hasScoreDetails() const {
         return _holder && _holder->metaFields.test(MetaType::kScoreDetails);
@@ -451,8 +434,7 @@ public:
         return _holder->scoreDetails;
     }
 
-    // TODO SERVER-85426 Remove all feature flag logic.
-    void setScoreDetails(Value scoreDetails, bool featureFlagAlreadyValidated = false);
+    void setScoreDetails(Value scoreDetails);
 
     /**
      * This sets 'scoreDetails' and retrieves the "value" field from 'scoreDetails' to set the
@@ -566,4 +548,4 @@ using QueryMetadataBitSet = std::bitset<DocumentMetadataFields::MetaType::kNumFi
 // Prints the metadata's name to the given stream.
 std::ostream& operator<<(std::ostream& stream, DocumentMetadataFields::MetaType type);
 StringBuilder& operator<<(StringBuilder& sb, DocumentMetadataFields::MetaType type);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

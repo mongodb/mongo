@@ -353,7 +353,11 @@ static bool mc_FLE2IndexedEncryptedValue_decrypt(_mongocrypt_crypto_t *crypto,
     const _mongocrypt_buffer_t *token_buf = mc_ServerDataEncryptionLevel1Token_get(token);
     uint32_t bytes_written;
 
-    _mongocrypt_buffer_resize(&iev->Inner, fle2alg->get_plaintext_len(iev->InnerEncrypted.len, status));
+    const uint32_t inner_len = fle2alg->get_plaintext_len(iev->InnerEncrypted.len, status);
+    if (!mongocrypt_status_ok(status)) {
+        return false;
+    }
+    _mongocrypt_buffer_resize(&iev->Inner, inner_len);
 
     /* Decrypt InnerEncrypted. */
     if (!fle2alg->do_decrypt(crypto,
@@ -445,7 +449,11 @@ bool mc_FLE2IndexedEncryptedValue_add_K_Key(_mongocrypt_crypto_t *crypto,
         return false;
     }
     /* Attempt to decrypt ClientEncryptedValue */
-    _mongocrypt_buffer_resize(&iev->ClientValue, fle2aead->get_plaintext_len(iev->ClientEncryptedValue.len, status));
+    const uint32_t client_value_len = fle2aead->get_plaintext_len(iev->ClientEncryptedValue.len, status);
+    if (!mongocrypt_status_ok(status)) {
+        return false;
+    }
+    _mongocrypt_buffer_resize(&iev->ClientValue, client_value_len);
     uint32_t bytes_written;
     if (!fle2aead->do_decrypt(crypto,
                               &iev->K_KeyId,

@@ -1,6 +1,6 @@
 /*
  * Tests hybrid search with the rank fusion using the $rankFusion stage.
- * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

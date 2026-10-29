@@ -92,22 +92,32 @@ class test_layered_checkpoint16(wttest.WiredTigerTestCase):
         self.assertGreater(value, expected_value)
 
     def test_layered_checkpoint16(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S')
-        self.insert_data(self.session, 'v1-', 10)
-        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(10)}')
-        self.session.checkpoint()
-
+        # Open the follower.
         conn_follow = self.wiredtiger_open(
             'follower',
             self.extensionsConfig() + ',create,' + self.conn_base_config +
             'disaggregated=(role="follower")')
         session_follow = conn_follow.open_session('')
 
-        # First pick-up: Entries are new to the follower's local metadata, so they are inserted.
+        # Create an initial checkpoint on the leader and pick it up on the follower to establish
+        # the baseline metadata state, e.g., picking up the shared history store.
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(1)}')
+        self.session.checkpoint()
+        self.disagg_advance_checkpoint(conn_follow)
+        initial_meta_inserted = self.get_stat(session_follow, stat.conn.disagg_pick_up_file_meta_inserted)
+        initial_meta_updated = self.get_stat(session_follow, stat.conn.disagg_pick_up_file_meta_updated)
+
+        # Create the table on the leader and insert some data.
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.insert_data(self.session, 'v1-', 10)
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(10)}')
+        self.session.checkpoint()
+
+        # First pick-up after create: Entries are new to the follower's local metadata, so they are inserted.
         self.disagg_advance_checkpoint(conn_follow)
         self.check_data(session_follow, 'v1-')
-        self.assertStatGreater(session_follow, stat.conn.disagg_pick_up_file_meta_inserted, 0)
-        self.assertStatEqual(session_follow, stat.conn.disagg_pick_up_file_meta_updated, 0)
+        self.assertStatGreater(session_follow, stat.conn.disagg_pick_up_file_meta_inserted, initial_meta_inserted)
+        self.assertStatEqual(session_follow, stat.conn.disagg_pick_up_file_meta_updated, initial_meta_updated)
         inserted_after_first = self.get_stat(session_follow, stat.conn.disagg_pick_up_file_meta_inserted)
 
         # Create a new checkpoint without changing the table data, then pick it up.
@@ -116,7 +126,7 @@ class test_layered_checkpoint16(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
         self.check_data(session_follow, 'v1-')
         self.assertStatEqual(session_follow, stat.conn.disagg_pick_up_file_meta_inserted, inserted_after_first)
-        self.assertStatEqual(session_follow, stat.conn.disagg_pick_up_file_meta_updated, 0)
+        self.assertStatEqual(session_follow, stat.conn.disagg_pick_up_file_meta_updated, initial_meta_updated)
 
         # Now change the table, create a checkpoint, and pick it up. The metadata must be updated.
         self.insert_data(self.session, 'v2-', 20)
@@ -125,7 +135,7 @@ class test_layered_checkpoint16(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
         self.check_data(session_follow, 'v2-')
         self.assertStatEqual(session_follow, stat.conn.disagg_pick_up_file_meta_inserted, inserted_after_first)
-        self.assertStatGreater(session_follow, stat.conn.disagg_pick_up_file_meta_updated, 0)
+        self.assertStatGreater(session_follow, stat.conn.disagg_pick_up_file_meta_updated, initial_meta_updated)
 
         session_follow.close()
         conn_follow.close()

@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -45,6 +18,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_explainer_express.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -77,6 +51,7 @@
 namespace mongo {
 
 namespace express {
+using namespace std::literals::string_view_literals;
 
 /**
  * We encountered a situation where the record referenced by the index entry is gone. Check whether
@@ -87,6 +62,16 @@ void logRecordNotFound(OperationContext* opCtx,
                        const BSONObj& indexKey,
                        const BSONObj& keyPattern,
                        const NamespaceString& ns);
+
+/**
+ * uasserts (InvalidBSON) if a fetched record is not structurally valid BSON. Used on the
+ * non-cursor-reuse path (e.g. disaggregated storage), where a torn page read can yield a malformed
+ * document that would otherwise trip an opaque invariant deep inside mutablebson.
+ */
+void assertFetchedRecordIsValidBson(const char* data,
+                                    int size,
+                                    const NamespaceString& ns,
+                                    const RecordId& rid);
 
 void throwIfExpressWriteConflictFailpointEnabled();
 void throwIfExpressTemporarilyUnavailableFailpointEnabled();
@@ -318,17 +303,25 @@ class IdLookupViaIndex {
 public:
     IdLookupViaIndex(const BSONObj& queryFilter) : _queryFilter(queryFilter.getOwned()) {}
 
-    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx,
+              CollectionAcquisition collection,
+              bool forWrite,
+              IteratorStats* stats) {
         _indexCatalogEntry =
             IdLookupViaIndex::getIndexCatalogEntryForIdIndex(opCtx, accessCollection(collection));
         _collection = std::move(collection);
         _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        _providerSupportsCursorReuse = provider.supportsCursorReuseForExpressPathQueries();
+        _reuseCursor = (!forWrite || internalQueryReuseCursorForExpressPathUpdates.load()) &&
+            _providerSupportsCursorReuse;
+
         _stats = stats;
-        _stats->setStageName("EXPRESS_IXSCAN"_sd);
+        _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(IndexConstants::kIdIndexName);
-        _stats->setIndexKeyPattern("{ _id: 1 }"_sd);
+        _stats->setIndexKeyPattern(kIdIndexSpec);
     }
 
     template <class Continuation>
@@ -369,26 +362,21 @@ public:
             return Exhausted();
         }
 
-        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-        const bool reuseCursor = provider.supportsCursorReuseForExpressPathQueries();
-
-        // When the cursor will be reused (typical WiredTiger path), the cursor — held as a
-        // member — outlives this call, so the non-owning BSONObj view remains valid. Skip the
-        // full-record memcpy (`makeOwned`) here and let the caller materialize an owned BSON
-        // after the stage's scoped timer has ended, matching the classic FETCH path.
-        //
-        // When cursor reuse is disabled (e.g. for disaggregated storage), we are about to destroy
-        // the cursor and must take ownership of the record bytes before the underlying buffer
-        // becomes invalid.
-        if (!reuseCursor) {
+        if (!_reuseCursor) {
+            // Cursor will relinquish its resources; need to make a local copy.
             record->data.makeOwned();
+        }
+        if (!_providerSupportsCursorReuse) {
+            // Guard against torn reads in disaggregated storage.
+            assertFetchedRecordIsValidBson(
+                record->data.data(), record->data.size(), accessCollection(collection).ns(), rid);
         }
         Snapshotted<BSONObj> obj(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
                                  record->data.releaseToBson());
 
         _stats->incNumDocumentsFetched(1);
 
-        if (!reuseCursor) {
+        if (!_reuseCursor) {
             // Reusing the cursor lowers write latency. For YCSB-style workloads, this causes the
             // cache to run dirtier. This results in increased preemption of application threads to
             // do eviction. With storage providers where eviction has a higher cost (e.g: for
@@ -447,12 +435,16 @@ public:
     }
 
 private:
+    inline static const BSONObj kIdIndexSpec = BSON("_id" << 1);
+
     static const IndexCatalogEntry* getIndexCatalogEntryForIdIndex(OperationContext* opCtx,
                                                                    const Collection& collection) {
         const IndexCatalog* catalog = collection.getIndexCatalog();
         const auto entry = catalog->findIdIndex(opCtx);
-        tassert(8884401, "Missing _id index on non-clustered collection", entry);
 
+        // Throw QueryPlanKilled in case the index entry is missing.
+        uassert(
+            ErrorCodes::QueryPlanKilled, "Missing _id index on non-clustered collection", entry);
         return entry;
     }
 
@@ -468,6 +460,8 @@ private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
     IteratorStats* _stats{nullptr};
     bool _exhausted{false};
+    bool _providerSupportsCursorReuse{false};
+    bool _reuseCursor{false};
 };
 
 /**
@@ -482,13 +476,16 @@ public:
     IdLookupOnClusteredCollection(const BSONObj& queryFilter)
         : _queryFilter(queryFilter.getOwned()) {}
 
-    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx,
+              CollectionAcquisition collection,
+              bool forWrite,
+              IteratorStats* stats) {
         _collection = std::move(collection);
         _collectionUUID = accessCollection(unwrapCollection(_collection)).uuid();
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN"_sd);
+        _stats->setStageName("EXPRESS_CLUSTERED_IXSCAN"sv);
     }
 
     template <class Continuation>
@@ -627,10 +624,13 @@ struct FetchFromCollectionCallback {
 };
 
 /**
- * A document iterator that uses an arbitrary index to iterate over documents in a collection that
- * match a simple equality predicate on the first field in the index key pattern. There is no
- * uniqueness requirement for the queried field, and this iterator can produce multiple matching
- * documents.
+ * A document iterator that uses an arbitrary index to find documents in a collection that match a
+ * simple equality predicate on the first field in the index key pattern. There is no uniqueness
+ * requirement for the queried field.
+ *
+ * Produces at most one document and then reports itself exhausted -- it holds no cursor across
+ * 'consumeOne()' calls, so it cannot advance. 'getIndexForExpressEquality()' only admits this plan
+ * where one document is enough: a unique single-field index, or an unsharded limit(1) query.
  *
  * The iterator owns the resources associated with the collection it iterates.
  */
@@ -648,7 +648,10 @@ public:
           _collator(collator),
           _projection(projection) {}
 
-    void open(OperationContext* opCtx, CollectionAcquisition collection, IteratorStats* stats) {
+    void open(OperationContext* opCtx,
+              CollectionAcquisition collection,
+              bool forWrite,
+              IteratorStats* stats) {
         _indexCatalogEntry = LookupViaUserIndex::getIndexCatalogEntryForUserIndex(
             opCtx, accessCollection(collection), _indexIdent, _indexName);
         _collection = std::move(collection);
@@ -656,10 +659,9 @@ public:
         _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
 
         _stats = stats;
-        _stats->setStageName("EXPRESS_IXSCAN"_sd);
+        _stats->setStageName("EXPRESS_IXSCAN"sv);
         _stats->setIndexName(_indexName);
-        _stats->setIndexKeyPattern(
-            KeyPattern::toString(_indexCatalogEntry->descriptor()->keyPattern()));
+        _stats->setIndexKeyPattern(_indexCatalogEntry->descriptor()->keyPattern());
         if constexpr (std::is_same_v<FetchCallback, CreateDocumentFromIndexKey>) {
             _stats->setProjectionCovered(true);
         }
@@ -694,15 +696,15 @@ public:
         // Now seek to the first matching key in the index.
         auto sortedAccessMethod = _indexCatalogEntry->accessMethod()->asSortedData();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        auto indexCursor = sortedAccessMethod->newCursor(opCtx, ru, true /* forward */);
-        indexCursor->setEndPosition(endKey, true /* endKeyInclusive */);
+        auto indexCursor = sortedAccessMethod->newCursor(opCtx, ru, /*isForward=*/true);
+        indexCursor->setEndPosition(endKey, /*inclusive=*/true);
         key_string::Builder builder(
             sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion());
         auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             startKey,
             sortedAccessMethod->getSortedDataInterface()->getOrdering(),
-            true /* forward */,
-            true /* startKeyInclusive */,
+            /*isForward=*/true,
+            /*inclusive=*/true,
             builder);
 
         auto keyEntry = indexCursor->seekForKeyValueView(ru, keyStringForSeek);
@@ -727,11 +729,16 @@ public:
                               IndexKeyEntry::rehydrateKey(keyPattern, dehydratedKp),
                               keyPattern,
                               accessCollection(collection).ns());
-            return Ready();
+
+            // TODO SERVER-87016: If this iterator gains multi-key scanning, advance a persisted
+            // cursor past the bad entry instead, so a multi-result query is not silently
+            // truncated at the first orphaned index key.
+            _exhausted = true;
+            return Exhausted();
         }
 
         auto progress =
-            continuation(collection, *keyEntry.getRecordId(), std::move(obj), nullptr /*cursor*/);
+            continuation(collection, *keyEntry.getRecordId(), std::move(obj), /*cursor=*/nullptr);
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
@@ -889,7 +896,7 @@ const FieldRef idFieldRef(idFieldName);
 
 class UpdateOperation {
 public:
-    static constexpr std::string_view name = "update"_sd;
+    static constexpr std::string_view name = "update"sv;
 
     UpdateOperation(UpdateDriver* updateDriver,
                     bool isUserInitiatedWrite,
@@ -943,12 +950,12 @@ public:
                                               obj,
                                               doc,
                                               _isUserInitiatedWrite,
-                                              nullptr /* cq */,
+                                              /*cq=*/nullptr,
                                               rid,
                                               _updateDriver,
                                               _request,
                                               shouldWriteToOrphan,
-                                              nullptr /* updatedRecordIds*/,
+                                              /*updatedRecordIds=*/nullptr,
                                               cursor);
                 if (docWasModified) {
                     _stats->incDocsUpdated(1);  // explains are also treated as though they wrote
@@ -1050,7 +1057,7 @@ public:
             });
     }
 
-    static constexpr std::string_view name = "delete"_sd;
+    static constexpr std::string_view name = "delete"sv;
 
 private:
     StmtId _stmtId;
@@ -1088,7 +1095,7 @@ public:
         }
     }
 
-    static constexpr std::string_view name = "delete"_sd;
+    static constexpr std::string_view name = "delete"sv;
 
 private:
     bool _returnDeleted;
@@ -1098,7 +1105,7 @@ private:
 
 class NoWriteOperation {
 public:
-    static constexpr std::string_view name = "nowriteop"_sd;
+    static constexpr std::string_view name = "nowriteop"sv;
 
     void open(WriteOperationStats*) {}
 
@@ -1167,8 +1174,9 @@ public:
               PlanStats* planStats,
               IteratorStats* iteratorStats,
               WriteOperationStats* writeOperationStats) {
+        constexpr bool forWrite = !std::is_same<WriteOperationChoice, NoWriteOperation>::value;
         _planStats = planStats;
-        _iterator.open(opCtx, collection, iteratorStats);
+        _iterator.open(opCtx, collection, forWrite, iteratorStats);
         _exceptionRecoveryPolicy = exceptionRecoveryPolicy;
         _writeOperation.open(writeOperationStats);
     }

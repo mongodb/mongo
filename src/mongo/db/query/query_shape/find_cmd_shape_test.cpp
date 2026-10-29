@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 
@@ -41,7 +15,6 @@ namespace mongo::query_shape {
 
 namespace {
 /**
- * TODO this was stolen from another test. Time for a library?
  * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
  */
 std::string applyHmacForTest(std::string_view sd) {
@@ -59,12 +32,14 @@ struct RequestOptions {
     OptionalBool tailable = {};
     OptionalBool awaitData = {};
     OptionalBool mirrored = {};
+    OptionalBool rawData = {};
     OptionalBool limit = {};
     OptionalBool skip = {};
 };
 class FindCmdShapeTest : public ServiceContextTest {
 public:
     void setUp() final {
+        ServiceContextTest::setUp();
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
@@ -116,10 +91,11 @@ public:
         fcr->setSingleBatch(requestOptions.singleBatch);
         fcr->setAllowDiskUse(requestOptions.allowDiskUse);
         fcr->setReturnKey(requestOptions.returnKey);
-        fcr->setAllowDiskUse(requestOptions.showRecordId);
+        fcr->setShowRecordId(requestOptions.showRecordId);
         fcr->setTailable(requestOptions.tailable);
         fcr->setAwaitData(requestOptions.awaitData);
         fcr->setMirrored(requestOptions.mirrored);
+        fcr->setRawData(requestOptions.rawData);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
         return std::make_unique<FindCmdShapeComponents>(*parsedFind, _expCtx);
     }
@@ -191,12 +167,18 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToTrue) {
     fcr->setAwaitData(true);
     fcr->setMirrored(true);
     fcr->setOplogReplay(true);
+    fcr->setRawData(true);
     fcr->setLimit(1);
     fcr->setSkip(1);
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0x2FFFF, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
+    // optionalArgumentsEncoding() uses 18 bits: 8 flags × 2 bits at positions 2-17 (the loop
+    // shifts each flag left after ORing, so the first flag singleBatch lands at bits 16-17 and
+    // the last flag oplogReplay at bits 2-3), plus limit at bit 1 and skip at bit 0.
+    // rawData is NOT part of this value; it is encoded separately in sha256Hash.
+    ASSERT_EQUALS((0b1011'1111'1111'1111 << 2) | 0b11,
+                  getShapeComponents(*cmdShape).optionalArgumentsEncoding());
 }
 
 TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
@@ -209,10 +191,88 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
     fcr->setAwaitData(false);
     fcr->setMirrored(false);
     fcr->setOplogReplay(false);
+    fcr->setRawData(false);
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0x2AAA8, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
+    // 8 flags × 0b10 (false) = 16 bits, shifted left 2 for limit/skip = 18 bits. No skip/limit.
+    ASSERT_EQUALS(0b1010101010101010 << 2,
+                  getShapeComponents(*cmdShape).optionalArgumentsEncoding());
+}
+
+TEST_F(FindCmdShapeTest, RawDataTrueAppearsInShape) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setRawData(true);
+    auto&& parsedRequest =
+        uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+
+    ASSERT_TRUE(cmdShape->rawData);
+
+    auto shapeBson =
+        cmdShape->toBson(_expCtx->getOperationContext(),
+                         SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                         SerializationContext::stateDefault());
+    ASSERT_TRUE(shapeBson.hasField(FindCommandRequest::kRawDataFieldName));
+    ASSERT_TRUE(shapeBson[FindCommandRequest::kRawDataFieldName].boolean());
+}
+
+TEST_F(FindCmdShapeTest, RawDataAbsentOrFalseNotInShape) {
+    // rawData=false is normalized to absent: it does not change the query shape.
+    for (auto rawDataVal : {boost::optional<bool>{}, boost::optional<bool>{false}}) {
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        if (rawDataVal.has_value()) {
+            fcr->setRawData(*rawDataVal);
+        }
+        auto&& parsedRequest =
+            uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+        auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
+
+        ASSERT_FALSE(cmdShape->rawData);
+
+        auto shapeBson =
+            cmdShape->toBson(_expCtx->getOperationContext(),
+                             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                             SerializationContext::stateDefault());
+        ASSERT_FALSE(shapeBson.hasField(FindCommandRequest::kRawDataFieldName));
+    }
+}
+
+TEST_F(FindCmdShapeTest, RawDataDifferentiatesQueryShape) {
+    auto makeShape = [&](boost::optional<bool> rawData) {
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(BSON("x" << 1));
+        if (rawData.has_value()) {
+            fcr->setRawData(*rawData);
+        }
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+        return std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+    };
+
+    auto shapeNoRawData = makeShape(boost::none);
+    auto shapeRawDataTrue = makeShape(true);
+    auto shapeRawDataFalse = makeShape(false);
+
+    // rawData=absent and rawData=false should produce the same hash (false does not change shape).
+    // rawData=true should be distinct from both.
+    auto hashNone = shapeNoRawData->sha256Hash(nullptr, SerializationContext{});
+    auto hashTrue = shapeRawDataTrue->sha256Hash(nullptr, SerializationContext{});
+    auto hashFalse = shapeRawDataFalse->sha256Hash(nullptr, SerializationContext{});
+
+    ASSERT_NE(hashNone.toHexString(), hashTrue.toHexString());
+    ASSERT_EQ(hashNone.toHexString(), hashFalse.toHexString());
+    ASSERT_NE(hashTrue.toHexString(), hashFalse.toHexString());
+}
+
+TEST_F(FindCmdShapeTest, RawDataPreservedInToFindCommandRequest) {
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setRawData(true);
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto cmdShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+
+    auto roundTripped = cmdShape->toFindCommandRequest();
+    ASSERT_TRUE(roundTripped->getRawData().has_value());
+    ASSERT_TRUE(bool(roundTripped->getRawData()));
 }
 
 
@@ -326,6 +386,22 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
         auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
         auto shapeHash = findCommandShape->sha256Hash(nullptr, SerializationContext{});
         ASSERT_EQ(templateHashValue, shapeHash.toHexString());
+    }
+
+    // The same shape with different literal values must hash identically: only field paths and
+    // predicate/sort structure belong to the shape, never the constants themselves.
+    {
+        auto differentLiterals = makeTemplateFindCommandRequest(kDefaultTestNss);
+        differentLiterals->setFilter(BSON("a" << 987654));
+        differentLiterals->setMin(BSON("d" << 0));
+        differentLiterals->setMax(BSON("d" << 100));
+        differentLiterals->setLet(BSON("e" << -1));
+        auto parsedFind =
+            uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(differentLiterals)}));
+        auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+        auto shapeHash = findCommandShape->sha256Hash(nullptr, SerializationContext{});
+        ASSERT_EQ(templateHashValue, shapeHash.toHexString())
+            << "changing literal values must not change the query shape hash";
     }
 
     // Functions that modify a single component of the "find" command shape.

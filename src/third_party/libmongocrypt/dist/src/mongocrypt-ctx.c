@@ -248,6 +248,9 @@ bool mongocrypt_ctx_setopt_algorithm(mongocrypt_ctx_t *ctx, const char *algorith
     } else if (mstr_eq_ignore_case(algo_str, mstrv_lit(MONGOCRYPT_ALGORITHM_STRING_STR))) {
         ctx->opts.index_type.value = MONGOCRYPT_INDEX_TYPE_STRING;
         ctx->opts.index_type.set = true;
+    } else if (mstr_eq_ignore_case(algo_str, mstrv_lit(MONGOCRYPT_ALGORITHM_TEXTPREVIEW_DEPRECATED_STR))) {
+        _mongocrypt_ctx_fail_w_msg(ctx, "Algorithm 'textPreview' is deprecated, please use 'string'");
+        return false;
     } else {
         char *error = bson_strdup_printf("unsupported algorithm string \"%.*s\"",
                                          algo_str.len <= (size_t)INT_MAX ? (int)algo_str.len : INT_MAX,

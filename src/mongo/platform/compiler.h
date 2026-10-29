@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 #include <string_view>
@@ -160,7 +134,8 @@
  * Overrides compiler heuristics to force a function to be inlined.
  */
 #define MONGO_COMPILER_ALWAYS_INLINE MONGO_COMPILER_ALWAYS_INLINE_
-#if defined(_MSC_VER)
+// clang-cl defines _MSC_VER for MSVC compatibility, but is still Clang for attribute support.
+#if defined(_MSC_VER) && !defined(__clang__)
 #define MONGO_COMPILER_ALWAYS_INLINE_ [[msvc::forceinline]]
 #elif MONGO_COMPILER_HAS_ATTRIBUTE(gnu::always_inline)
 #define MONGO_COMPILER_ALWAYS_INLINE_ [[gnu::always_inline]]
@@ -199,6 +174,20 @@
 #define MONGO_COMPILER_NOINLINE                  \
     MONGO_COMPILER_IF_MSVC(__declspec(noinline)) \
     MONGO_COMPILER_IF_GNUC([[gnu::noinline]])
+
+/**
+ * Omits the stack-protector canary from a function, overriding '-fstack-protector-strong'.
+ *
+ * Use this only on a function that is both hot and provably not a place a canary would help: no
+ * arrays or other buffers on its stack, and nothing that writes through a pointer derived from a
+ * caller-supplied index or length. A function typically acquires a canary because it has an
+ * address-taken local (for example one passed by reference to a callee), which is not by itself a
+ * reason to suppress the check. Prefer restructuring the code so that the canary is not emitted in
+ * the hot function at all; reach for this only when that is not possible.
+ *
+ * No effect on MSVC, which has no equivalent per-function opt-out.
+ */
+#define MONGO_COMPILER_NO_STACK_PROTECTOR MONGO_COMPILER_IF_GNUC([[gnu::no_stack_protector]])
 
 /**
  * Tells the compiler that the function always returns a non-null value, potentially allowing

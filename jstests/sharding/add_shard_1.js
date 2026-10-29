@@ -11,6 +11,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
+// This test adds a shard that already contains data. Replicated fast count does not seed
+// pre-existing collections when addShard upgrades the shard's FCV, which corrupts their size and
+// count, so disable it for this test.
+TestData.setParameters = TestData.setParameters || {};
+TestData.setParameters["failpoint.disableReplicatedFastCount"] = tojson({mode: "alwaysOn"});
+
 let s = new ShardingTest({name: "add_shard1", shards: 0, useHostname: false});
 
 // Create a shard and add a database; for the first shard we allow data on the replica set

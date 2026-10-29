@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
@@ -47,6 +21,8 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -69,6 +45,8 @@ using namespace std::literals::string_view_literals;
 using namespace std::literals::string_view_literals;
 namespace mongo::pipeline::dependency_graph {
 namespace {
+
+using Stages = std::vector<const DocumentSource*>;
 
 class PipelineDependencyGraphTest : public unittest::Test {
 protected:
@@ -525,6 +503,22 @@ TEST_F(PipelineDependencyGraphTest, LookupWithAbsorbedUnwindArrayIndexIsNotArray
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayUnwindArrayIndexIsNotSubpipeline) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 2}}]
+        }},
+        {$unwind: {path: "$docs", includeArrayIndex: "docsIdx"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "docsIdx.b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayUnknownSubField) {
     setOptimizedPipeline(R"([
         {$lookup: {
@@ -538,6 +532,41 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineCanPathBeArrayUnknownSubField) {
     runTest([&] {
         // 'docs.unknown' comes from the sub-pipeline's input collection, arrayness is unknown.
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "docs.unknown"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanRenamedSubPipelinePathBeArray) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: "$docs"},
+        {$set: {x: "$docs.b_ssn"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "docs.b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanIncludedSubPipelinePathBeArray) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: "$docs"},
+        {$project: {"docs.b_ssn": 1}}
+    ])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "docs.b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
     });
 }
 
@@ -561,6 +590,22 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageThenMatch) {
         auto subDeclaringStage = subGraph->getPrevModifyingStage(nullptr, "b_ssn");
         ASSERT_EQUALS(result.srcStages.back(), subDeclaringStage);
         ASSERT_TRUE(result.fromSubpipeline);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubPipelineUnwindArrayIndexNotFromSubpipeline) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e', "
+        "            pipeline: [{$set: {b_ssn: 2}}]}}, "
+        " {$unwind: {path: '$e', includeArrayIndex: 'idx'}}]");
+    runTest([&] {
+        auto idxResult =
+            graph->getPrevModifyingStageIncludingSubpipelines_forTest(nullptr, "idx.b_ssn");
+        ASSERT_FALSE(idxResult.fromSubpipeline);
+
+        auto embeddedResult =
+            graph->getPrevModifyingStageIncludingSubpipelines_forTest(nullptr, "e.b_ssn");
+        ASSERT_TRUE(embeddedResult.fromSubpipeline);
     });
 }
 
@@ -873,7 +918,7 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineUsesSecondaryCollPathArrayness) {
     // Set up a PathArrayness for coll_b that marks 'b_non_array' as provably not an array.
     auto secondaryPathArrayness = std::make_shared<PathArrayness>();
     secondaryPathArrayness->addPath(
-        FieldPath("b_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+        FieldPath("b_non_array"), /*multikeyPath=*/{}, /*isFullRebuild=*/true);
 
     // Inject the main ExpCtx using the sub-pipeline NSS as the key.
     auto subExpCtx = subPipeline->front()->getExpCtx();
@@ -909,7 +954,7 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineEmptyCanPathBeArray) {
     // Set up a PathArrayness for coll_b that marks 'b_non_array' as provably not an array.
     auto secondaryPathArrayness = std::make_shared<PathArrayness>();
     secondaryPathArrayness->addPath(
-        FieldPath("b_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+        FieldPath("b_non_array"), /*multikeyPath=*/{}, /*isFullRebuild=*/true);
 
     // Use getSubpipelineExpCtx() to obtain the from-collection's ExpCtx
     // even though the sub-pipeline is empty.
@@ -1293,6 +1338,48 @@ TEST_F(PipelineDependencyGraphTest, InclusionDottedAfterExhaustive) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, InclusionAndModificationOfSubfields) {
+    setPipeline(
+        "[{$set: { 'a.b.c': 1 }},"
+        " {$project: { 'a.str': 'value', 'a.b.c': 1 }}]");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.c"), stages[0]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.str"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModificationOfSubfieldDropsPriorSiblings) {
+    setPipeline(
+        "[{$set: { 'a.b.c': 1 }},"
+        " {$project: { 'a.str': 'value' }}]");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a"), stages[1]);
+        // 'a.b' is not included by the projection, so it does not pass through from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.c"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.str"), stages[1]);
+        // The constant from $set must not survive the projection.
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.b.c").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModificationOfNestedSubfieldDropsPriorSiblings) {
+    setPipeline(
+        "[{$set: { 'a.b.c': 1, 'a.b.d': 2 }},"
+        " {$project: { 'a.b.str': 'value', 'a.b.c': 1 }}]");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+        // 'a.b.c' is included, so it passes through from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.c"), stages[0]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.str"), stages[1]);
+        // 'a.b.d' is not included, so it does not pass through from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b.d"), stages[1]);
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, SetFieldThenIncludeDottedPath) {
     setPipeline(
         "[{$set: { a: 1 }},"
@@ -1429,6 +1516,114 @@ TEST_F(PipelineDependencyGraphTest, CanRenamedWithProjectBeArray) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixInheritAccumulatorArrayness) {
+    setPipeline(
+        "[{$group: {_id: null, m: {$minN: {input: '$a', n: 1}}}},"
+        " {$project: {'m.m2': '$a'}}]");
+    runTest([&] {
+        // The $minN accumulator output 'm' is always an array, and the dotted inclusion projection
+        // '{m.m2: ...}' must preserve that arrayness.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "m"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanRenamedAccumulatorResultBeArray) {
+    // $minN produces an array field 'm'. We move it to a new field 'n' via a rename.
+    setPipeline(
+        "[{$group: {_id: null, m: {$minN: {input: '$a', n: 1}}}},"
+        " {$set: {n: '$m'}}]");
+    runTest([&] {
+        // 'm' is the $minN accumulator result, which is an array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "m"));
+        // 'n' is a rename of 'm', so it inherits the accumulator's arrayness and can be an array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "n"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanInclusionProjectionDottedPrefixInheritDeclaredArrayness) {
+    setPipeline(
+        "[{$addFields: {m: {$literal: [1, 2]}}},"
+        " {$project: {'m.m2': '$a'}}]");
+    runTest([&] {
+        // 'm' has a declared array value that must be preserved across the dotted inclusion
+        // projection.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "m"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       CanInclusionProjectionComputedDottedPrefixInheritDeclaredArrayness) {
+    // Like the rename variant above, but the dotted projection uses a computed expression
+    // ('{m.m2: {$add: [2, 2]}}') so it exercises the non-RenamePath (ModifyPath) code path. The
+    // declared array value of the prefix 'm' must still be preserved.
+    setPipeline(
+        "[{$addFields: {m: {$literal: [1, 2]}}},"
+        " {$project: {'m.m2': {$add: [2, 2]}}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionProjectionDottedPrefixScalarStaysNonArray) {
+    setPipeline(
+        "[{$addFields: {m: {$literal: 5}}},"
+        " {$project: {'m.m2': '$a'}}]");
+    runTest([&] {
+        // A scalar prefix must not be reported as able to be an array by the dotted inclusion
+        // projection.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "m"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionProjectionComputedDottedPrefixScalarStaysNonArray) {
+    // Like the rename variant above, but the dotted projection uses a computed expression so it
+    // exercises the non-RenamePath (ModifyPath) code path. A scalar prefix must not be reported as
+    // able to be an array.
+    setPipeline(
+        "[{$addFields: {m: {$literal: 5}}},"
+        " {$project: {'m.m2': {$add: [2, 2]}}}]");
+    runTest([&] { ASSERT_FALSE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       CanInclusionPreservePathDottedPrefixInheritAccumulatorArrayness) {
+    // A pure (non-computed) dotted inclusion '{m.x: 1}' is described as a PreservePath and handled
+    // by includeField(), a different code path than computed dotted projections. It must still
+    // preserve the prior arrayness of the prefix 'm' produced by the $minN accumulator.
+    setPipeline(
+        "[{$group: {_id: null, m: {$minN: {input: '$a', n: 1}}}},"
+        " {$project: {'m.x': 1}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanInclusionPreservePathDottedPrefixInheritArrayLeafArrayness) {
+    // 'm' is a concrete array leaf from the previous stage. A pure dotted inclusion '{m.x: 1}'
+    // shadows the leaf and must still preserve 'm's array-ness across the fresh inclusion root.
+    setPipeline(
+        "[{$addFields: {m: {$literal: [1, 2]}}},"
+        " {$project: {'m.x': 1}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "m")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GroupCompoundKeyDoesNotPreservePrefixArrayness) {
+    // '_id' is itself a concrete array [1, 2] from the $set stage, so its prefix arrayness is true.
+    // The $group compound key rewrites '_id' as a freshly constructed object '{a: "$x"}': the
+    // rename x -> _id.a *builds* the '_id' prefix rather than array-traversing it, so the
+    // reconstructed '_id' is a plain object and must NOT inherit the prior array-ness of '_id'.
+    setPipeline(
+        "[{$set: {_id: {$literal: [1, 2]}}},"
+        " {$group: {_id: {a: '$x'}}}]");
+    runTest([&] {
+        // Before the $group, '_id' is the array [1, 2].
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "_id"));
+        // After the $group, the reconstructed '_id' is a plain object, not an array: the rename
+        // does not preserve the prior array-ness of '_id'.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "_id"));
+        // '_id' and its compound-key subfield '_id.a' are declared by $group, not carried over
+        // from $set.
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "_id"), stages[1]);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "_id.a"), stages[1]);
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, CanGroupAccumulatorFieldBeArray) {
     pathArrayness->addPath("c", {}, true);
     setPipeline("[{$set: {}}, {$group: { _id: '$a', b: { $avg: '$c' } }}, {$match: {b: 1}}]");
@@ -1553,6 +1748,179 @@ TEST_F(PipelineDependencyGraphTest, DottedNewPathBaseFieldMetadataUsesFullCollec
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, InclusionDottedPathAfterPriorStageIsNotArray) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$match: {m: 1}}, "
+        " {$project: {'a.b.c': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        // To be done: a.b.d is definitely missing.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, RepeatedInclusionIsNotArray) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$project: {'a.b.c': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionNestedSiblingIsNotArray) {
+    pathArrayness->addPath("a.b.d", {}, true);
+    setPipeline("[{$project: {'a.b.c': 1, 'a.b.d': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionSameStageSiblingIsNotArray) {
+    pathArrayness->addPath("a.c.d", {}, true);
+    setPipeline("[{$project: {'a.b.x': 1, 'a.c.d': 1}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.c.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DeepestSubpathRedefinedMaybeArray) {
+    pathArrayness->addPath("a.b.c.d", {}, true);
+    setPipeline(
+        "[{$set: { 'a.b.c': '$m' }}, "
+        " {$set: { 'a.b.c.d.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DeepestSubpathRedefinedNotArray) {
+    pathArrayness->addPath("a.b.c.d", {}, true);
+    setPipeline(
+        "[{$project: { 'a.b.c': 1 }}, "
+        " {$set: { 'a.b.c.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.e"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DeepestSubpathRedefinedSiblingNotArray) {
+    pathArrayness->addPath("a.b.c.d", {}, true);
+    pathArrayness->addPath("a.b.c.x", {}, true);
+    setPipeline(
+        "[{$project: { 'a.b.c': 1 }}, "
+        " {$set: { 'a.b.c.d.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModifiedDottedPathAfterPriorStageIsNotArray) {
+    pathArrayness->addPath(FieldPath("a.b"), {}, true);
+    setPipeline(R"([{$match: {m: 1}}, {$project: {"a.b.c": "$x"}}])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModifiedSiblingAfterPriorStageIsNotArray) {
+    pathArrayness->addPath(FieldPath("a.b"), {}, true);
+    pathArrayness->addPath(FieldPath("a.b.d"), {}, true);
+    setPipeline(R"([{$match: {m: 1}}, {$project: {"a.b.c": "$x", "a.b.d.e": "$y"}}])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b")) << graph->toDebugString();
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.d"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.d.e"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, LaterStageSiblingIsNotArray) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    pathArrayness->addPath("a.x", {}, true);
+    setPipeline(
+        "[{$set: {'a.b.c': 1}}, "
+        " {$set: {'a.x.y': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionDottedSiblingDroppedByPriorInclusionIsMissing) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$project: {'a.x.y': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        // To be done: a.x is non-array, since the project definitely removes all paths except a.b.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       InclusionWithComputedDottedSiblingDroppedByPriorInclusionIsMissing) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$project: {'a.x.y': {$rand: {}}}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        // To be done: a.x is non-array, since the project definitely removes all paths except a.b.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+
+TEST_F(PipelineDependencyGraphTest, RedefinedSubpathIgnoresSameNamedCollectionField) {
+    pathArrayness->addPath("d.e", {}, true);
+    pathArrayness->addPath("a.b", {}, true);
+    pathArrayness->addPath("m", {}, true);
+    setPipeline(
+        "[{$set: { 'a.b.c': '$m' }}, "
+        " {$set: { 'a.b.c.d.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        // 'a.b.c.d' is 'm.d', whose arrayness is unknown, and not the top-level 'd'.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c.d")) << graph->toDebugString();
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, BaseDocumentFieldAliasAfterDottedInclusion) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$set: {n: '$a.b.c'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a.b.c"), FieldPath("n"));
+        ASSERT_FALSE(graph->getBaseDocumentFieldAlias(nullptr, "zzz"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, CanPathBeArrayChecksShadowingFieldArrayness) {
     pathArrayness->addPath("x.y", {}, true);
     // c can be array (a is not indexed). c.y is shadowed by c: even though c's alias
@@ -1576,6 +1944,63 @@ TEST_F(PipelineDependencyGraphTest, ShadowedRenameChecksShadowingFieldArrayness)
     runTest([&] {
         auto* ds = stages.back().get();
         ASSERT_TRUE(graph->canPathBeArray(ds, "d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterUnrelated) {
+    setPipeline("[{$set: {unrelated: 1}}, {$project: {'a.b': '$foo'}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterPriorBaseInclusion) {
+    setPipeline("[{$project: {a: 1}}, {$project: {'a.b': '$foo'}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterPriorInclusion) {
+    setPipeline("[{$project: {'a.b': 1}}, {$project: {'a.b': '$foo'}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanIncludedAliasSubPathBeArray) {
+    pathArrayness->addPath("b.x", {}, true);
+    setPipeline(
+        "[{$set: { a: '$b' }}, "
+        " {$project: { 'a.x': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "a.x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanModifiedAliasSubPathBeArray) {
+    pathArrayness->addPath("b.x", {}, true);
+    setPipeline(
+        "[{$set: { a: '$b' }}, "
+        " {$set: { 'a.x.y': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "a.x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanIncludedDottedBaseCollectionPrefixBeArray) {
+    pathArrayness->addPath("a.b", {}, true);
+    setPipeline("[{$project: { 'a.b': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
     });
 }
 
@@ -1779,6 +2204,48 @@ TEST_F(PipelineDependencyGraphTest, TruncateWithSwappedStages) {
 
     // Must grow to size 5, not truncate because of stale B.
     ASSERT_DOES_NOT_THROW(graph->resize(container.end()));
+}
+
+using PipelineDependencyGraphDeathTest = PipelineDependencyGraphTest;
+
+DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
+                   PipelineEndOnPartialGraphThrows,
+                   "Tripwire assertion.*13118101") {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {a: 2}}]");
+    auto& container = pipeline->getSources();
+    graph = std::make_unique<DependencyGraph>(container, std::next(container.begin()));
+
+    ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
+}
+
+DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
+                   PipelineEndOnPartialGraphAfterResizeThrows,
+                   "Tripwire assertion.*13118101") {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {a: 2}}]");
+    auto& container = pipeline->getSources();
+    ASSERT_DOES_NOT_THROW(graph->getPrevModifyingStage(nullptr, "a"));
+
+    graph->resize(std::next(container.begin()));
+    ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
+}
+
+DEATH_TEST_REGEX_F(PipelineDependencyGraphDeathTest,
+                   PipelineEndOnEmptyGraphThrows,
+                   "Tripwire assertion.*13118101") {
+    setPipeline("[{$set: {a: 1}}]");
+    auto& container = pipeline->getSources();
+    graph = std::make_unique<DependencyGraph>(container, container.begin());
+
+    ASSERT_THROWS_CODE(graph->getPrevModifyingStage(nullptr, "a"), AssertionException, 13118101);
+}
+
+TEST_F(PipelineDependencyGraphTest, PipelineEndOnEmptyPipelineWorks) {
+    setPipeline("[]");
+    ASSERT_DOES_NOT_THROW(graph->getPrevModifyingStage(nullptr, "a"));
 }
 
 TEST_F(PipelineDependencyGraphTest, ArrayLeafSiblingRedeclared) {
@@ -3077,6 +3544,759 @@ TEST_F(PipelineDependencyGraphTest, AlivenessThreeLevelNestedPathSiblingDead) {
     // 'a.b.c' is referenced, but 'a.b.d' isn't, so the latter is dead.
     setPipeline("[{$set: {'a.b.c': 1, 'a.b.d': 2}}, {$group: {_id: '$a.b.c'}}]");
     runTest([&] { assertDeadFieldsEq({{stages[0].get(), "a.b.d"}}); });
+}
+
+void assertOrigin(const FieldOrigin& origin,
+                  FieldOriginKind expectedKind,
+                  const DocumentSource* expectedSource,
+                  const char* expectedName) {
+    ASSERT_EQ(origin.kind, expectedKind);
+    ASSERT_EQ(origin.modifyingStage.get(), expectedSource);
+    if (expectedName) {
+        ASSERT_NE(origin.inputField, boost::none);
+        ASSERT_EQ(*origin.inputField, std::string(expectedName));
+    } else {
+        ASSERT_EQ(origin.inputField, boost::none);
+    }
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginBaseDocumentPassthrough) {
+    setPipeline("[{$match: {x: 1}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "a"), FieldOriginKind::kBaseDocument, nullptr, "a");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginInclusionKeptBaseField) {
+    setPipeline("[{$project: {x: 1}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "x"), FieldOriginKind::kBaseDocument, nullptr, "x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "x.x"),
+                     FieldOriginKind::kBaseDocument,
+                     nullptr,
+                     "x.x");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginSimpleRename) {
+    setPipeline("[{$set: {a: '$b'}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "a"), FieldOriginKind::kAlias, stages[0].get(), "b");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x.y"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.x.y");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginDottedRenameWithArrayFreePrefix) {
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.c");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.c.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x.y"),
+                     FieldOriginKind::kAlias,
+                     stages[0].get(),
+                     "b.c.x.y");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginDottedRenameWithPossibleArrayPrefix) {
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x.y"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginRenameReachedThroughArrayPrefixIsOther) {
+    setPipeline("[{$set: {a: '$b'}}, {$set: {'a.c': '$d'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.c"),
+                     FieldOriginKind::kOther,
+                     stages[1].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.c.x"),
+                     FieldOriginKind::kOther,
+                     stages[1].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.c.x.y"),
+                     FieldOriginKind::kOther,
+                     stages[1].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasChainResolvesOneHopAtATime) {
+    setPipeline("[{$set: {b: '$a'}}, {$set: {c: '$b'}}]");
+    runTest([&] {
+        auto origin = graph->resolveFieldOrigin(nullptr, "c");
+        assertOrigin(origin, FieldOriginKind::kAlias, stages[1].get(), "b");
+
+        origin = graph->resolveFieldOrigin(origin.modifyingStage.get(), *origin.inputField);
+        assertOrigin(origin, FieldOriginKind::kAlias, stages[0].get(), "a");
+
+        origin = graph->resolveFieldOrigin(origin.modifyingStage.get(), *origin.inputField);
+        assertOrigin(origin, FieldOriginKind::kBaseDocument, nullptr, "a");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginComputedField) {
+    setPipeline("[{$set: {a: {$add: ['$x', 1]}}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasOfComputedFieldIsStillAlias) {
+    setPipeline("[{$set: {a: {$add: ['$x', 1]}}}, {$set: {b: '$a'}}]");
+    runTest([&] {
+        assertOrigin(
+            graph->resolveFieldOrigin(nullptr, "b"), FieldOriginKind::kAlias, stages[1].get(), "a");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "b.x"),
+                     FieldOriginKind::kAlias,
+                     stages[1].get(),
+                     "a.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a.x"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginDroppedByInclusionProjectionIsOther) {
+    setPipeline("[{$project: {b: 1}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginRemovedByExclusionProjectionIsOther) {
+    setPipeline("[{$project: {a: 0}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginReplaceRootIsOther) {
+    setPipeline("[{$replaceRoot: {newRoot: {a: 1}}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginSubpipelineCrossing) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: '$e'}]");
+    runTest([&] {
+        // A path under the embedding crosses into the sub-pipeline with the prefix stripped.
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y.x"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y.x");
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y.x.z"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y.x.z");
+        // Referencing the whole embedded document is not a single collection field.
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginUnwindArrayIndexIsNotSubpipeline) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: {path: '$e', includeArrayIndex: 'idx'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "idx.y"),
+                     FieldOriginKind::kOther,
+                     stages[0].get(),
+                     nullptr);
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "e.y"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ResolveFieldOriginAliasThenSubpipeline) {
+    setOptimizedPipeline(
+        "[{$lookup: {from: 'coll_b', localField: 'x', foreignField: 'y', as: 'e'}}, "
+        " {$unwind: '$e'}, "
+        " {$set: {f: '$e.y'}}]");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "f"),
+                     FieldOriginKind::kAlias,
+                     stages[1].get(),
+                     "e.y");
+        assertOrigin(graph->resolveFieldOrigin(stages[1].get(), "e.y"),
+                     FieldOriginKind::kSubpipeline,
+                     stages[0].get(),
+                     "y");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasProject) {
+    setPipeline("[{$project: {a: '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("a"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x"), FieldPath("a.x"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x.y"), FieldPath("a.x.y"));
+        // A collection field that is not aliased has no visible alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), boost::none);
+        // The alias name itself is not a collection field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasSet) {
+    setPipeline("[{$set: {a: '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("a"));
+        // A collection field that is not aliased has no visible alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), boost::none);
+        // The alias name itself is not a collection field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasDottedSourceMaybeArrayPrefix) {
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        // Cannot resolve anything here, since 'b' might be array, therefore 'a' is not necessarily
+        // a value-preserving alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c.x"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasDottedSourceArrayFreePrefix) {
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {a: '$b.c'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c"), FieldPath("a"));
+        // A sub-path of the aliased collection path resolves through the prefix alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c.x"), FieldPath("a.x"));
+        // 'b' is only a prefix of the aliased path, not itself aliased, so it has no visible alias.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasVisiblePrefixMaybeArray) {
+    // 'b' is provably not an array, so the rename source is clean. But the visible alias 'a.q'
+    // sits under 'a', which might be an array, so reading 'a.q' would require array traversal and
+    // 'a.q' is not a value-preserving alias.
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {'a.q': '$b'}}]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasVisiblePrefixArrayFree) {
+    // Both 'b' (rename source) and 'a' (visible prefix) are provably not arrays, so the nested
+    // alias 'a.q' is a value-preserving alias of 'b'.
+    pathArrayness->addPath("b", {}, true);
+    pathArrayness->addPath("a", {}, true);
+    setPipeline("[{$set: {'a.q': '$b'}}]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("a.q")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasNestedTieBreakMaybeArrayPrefix) {
+    // Same pipeline as GetBaseDocumentFieldAliasNestedTieBreak, but without arrayness info the
+    // visible prefixes 'z' and 'y' might be arrays, so neither nested alias is reachable.
+    setPipeline("[{$set: {'z.a': '$x', 'y.b.c': '$x'}}]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), boost::none); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasOverwrittenIsNotVisibleAtEnd) {
+    setPipeline("[{$project: {a: '$b'}}, {$set: {a: 1}}]");
+    runTest([&] {
+        // At the end of the pipeline the alias is overwritten by the computed field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+        // But it is still visible at the input of the shadowing stage.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(stages[1].get(), "b"), FieldPath("a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasShadowedIsNotVisibleAtEnd) {
+    setPipeline("[{$project: {a: '$b'}}, {$set: {'a.x': 1}}]");
+    runTest([&] {
+        // At the end of the pipeline the alias is shadowed by the computed field.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+        // But it is still visible at the input of the shadowing stage.
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(stages[1].get(), "b"), FieldPath("a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasEmptyPipeline) {
+    setPipeline("[]");
+    runTest([&] { ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasTieBreaksLexicographically) {
+    // Three top-level aliases of 'x'; all have one component, so the lexicographically-first wins.
+    setPipeline("[{$set: {d: '$x', c: '$x', e: '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("c"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"c", "d", "e"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefersFewerComponents) {
+    // A top-level alias 'z' (1 component) is preferred over the nested alias 'a.c' (2).
+    pathArrayness->addPath("a", {}, true);
+    setPipeline("[{$set: {'a.c': '$x', z: '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("z"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"a.c", "z"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefersFewerComponentsTwoThree) {
+    pathArrayness->addPath("a.b", {}, true);
+    pathArrayness->addPath("z", {}, true);
+    setPipeline("[{$set: {'a.b.c': '$x', 'z.w': '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("z.w"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"a.b.c", "z.w"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasNestedTieBreak) {
+    // Only nested aliases exist: the shallower 'z.a' (2 components) beats 'y.b.c' (3).
+    // The visible prefixes must be provably non-array for the nested aliases to be reachable.
+    pathArrayness->addPath("z", {}, true);
+    pathArrayness->addPath("y", {}, true);
+    pathArrayness->addPath("y.b", {}, true);
+    setPipeline("[{$set: {'z.a': '$x', 'y.b.c': '$x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "x"), FieldPath("z.a"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "x"),
+                  OrderedPathSet({"y.b.c", "z.a"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefixThroughNestedField) {
+    // The visible prefix 'p' must be provably non-array for the nested alias 'p.q' to be reachable.
+    pathArrayness->addPath("p", {}, true);
+    setPipeline("[{$set: {'p.q': '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("p.q"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x"), FieldPath("p.q.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasPrefersShorterCandidateOverPrefix) {
+    // 'p' aliases 'b.x' exactly (1 component); 'a' aliases 'b', reaching 'b.x' as 'a.x' (2).
+    // The shorter candidate 'p' wins. 'b' must be non-array so the dotted source 'b.x' resolves.
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: {a: '$b', p: '$b.x'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.x"), FieldPath("p"));
+        ASSERT_EQ(graph->getAllBaseDocumentFieldAliases_forTest(nullptr, "b.x"),
+                  OrderedPathSet({"a.x", "p"}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasChainedProjectsRenameSurvives) {
+    setPipeline(
+        "[{$project: {a: 1, b: 'string', renamed: '$c'}}, "
+        " {$project: {b: '$a', renamed: 1}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), FieldPath("b"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), FieldPath("renamed"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "renamed"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "otherField"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasInclusionProjectWithComputedField) {
+    setPipeline("[{$project: {x: '$a', y: {$add: ['$b', 1]}, z: '$c'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), FieldPath("x"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), FieldPath("z"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasExclusionProjectPreservesRename) {
+    setPipeline("[{$set: {renamed: '$c'}}, {$project: {c: 0}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), FieldPath("renamed"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "renamed"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "otherField"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasExclusionThenRenameOfPassthrough) {
+    setPipeline("[{$project: {a: 0}}, {$set: {c: '$b'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("c"));
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a"), boost::none);
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "c"), boost::none);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasSubPipelineProjectionRename) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {x: 1}}, {$project: {"obj.obj.b": "$b"}}]
+        }},
+        {$unwind: "$docs"}
+    ])");
+
+    auto secondary = std::make_shared<PathArrayness>();
+    secondary->addPath(FieldPath("obj"), {}, true);
+    secondary->addPath(FieldPath("obj.obj"), {}, true);
+    auto subExpCtx = stages[0]->getSubpipelineExpCtx();
+    pipeline->getContext()->setPathArraynessForNss(subExpCtx->getNamespaceString(), secondary);
+    graph->recompute_forTest();
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto subGraphEntry = stages[0]->getSubPipeline()->front();
+        ASSERT_FALSE(subGraph->canPathBeArray(subGraphEntry.get(), "obj"));
+        ASSERT_FALSE(subGraph->canPathBeArray(subGraphEntry.get(), "obj.obj"));
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "obj"));
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "obj.obj"));
+        ASSERT_EQ(subGraph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("obj.obj.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterUnionWith) {
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$unionWith: {
+            coll: "coll_c",
+            pipeline: [{$match: {x: {$not: {$type: 'array'}}}}]
+        }}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(stages[0].get(), "x").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(stages[1].get(), "x").toDebugString(), "~array");
+        auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+        // In theory, we could union the types from both branches, but this is currently not
+        // supported.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
+    });
+}
+
+
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterLookupOnUnrelatedField) {
+    // Similar to the above in the sense that we are dealing with a subpipeline. However in this
+    // case, the subpipeline only affects 'docs.*', so we can keep the narrowed type on 'x'.
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {x: {$not: {$type: 'array'}}}}]
+        }}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+        // For now, don't propagate type information from the subpipeline to the top-level pipeline.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "docs.x").toDebugString(), "any");
+        auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicate) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$type: 'double'}}},
+        {$match: {x: {$not: {$type: 'array'}}}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateOnDottedPath) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {'x': {$not: {$type: 'array'}}}},
+        {$match: {'x.y': {$not: {$type: 'array'}}}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x"));
+        ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x.y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateAfterRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$set: {x: '$y'}},
+        {$match: {x: {$not: {$type: 'array'}}}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$set: {x: '$y'}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeTransitiveRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$set: {y: '$z'}},
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$set: {x: '$y'}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_FALSE(graph->canPathBeArray(stages[2].get(), "y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeDottedRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$match: {'y.z': {$not: {$type: 'array'}}}},
+        {$set: {x: '$y.z'}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[2].get(), "y.z"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeDottedModification) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$set: {'y.z': 7}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "y"));
+        auto yz = graph->getConstant(nullptr, "y.z");
+        ASSERT_TRUE(yz.has_value());
+        ASSERT_VALUE_EQ(*yz, Value(7));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeDottedInclusion) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$project: {'y.z': 1}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, NotArrayTypePredicatePreservesSiblingOfLookupDottedAs) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {a: {$not: {$type: 'array'}}}},
+        {$lookup: {from: "coll_b", as: "a.b", pipeline: []}}
+    ])");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.c"), nullptr);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasDottedSourceNotArrayTypePredicate) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {b: {$not: {$type: 'array'}}}},
+        {$set: {a: '$b.c'}}
+    ])");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kAlias,
+                     stages[1].get(),
+                     "b.c");
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c"), FieldPath("a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayIgnoresTypeWhenFeatureFlagDisabled) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", false};
+    setPipeline("[{$match: {x: {$not: {$type: 'array'}}}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "x")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWithTypePredicateMatchingArrayElements) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$match: {x: {$type: 'double'}}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "x")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeSkipsMatchOnUnrelatedDeclaredField) {
+    setPipeline(R"([
+        {$project: {x: '$b', y: '$c'}},
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$match: {y: {$type: 'number'}}},
+        {$match: {$expr: {$eq: ['$$ROOT', {x: 1}]}}},
+        {$match: {z: {$type: 'string'}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x"),
+                  (Stages{stages[1].get(), stages[3].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "y"),
+                  (Stages{stages[2].get(), stages[3].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "z"),
+                  (Stages{stages[3].get(), stages[4].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfDottedPathConsidersMatchesOnPrefix) {
+    setPipeline(R"([
+        {$set: {x: '$b', y: '$c'}},
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$match: {y: {$type: 'number'}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x.a"),
+                  (Stages{stages[1].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "y.a.b"),
+                  (Stages{stages[2].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeConsidersMatchesOnPathAndItsPrefixes) {
+    setPipeline(R"([
+        {$set: {'x.y.z': '$a'}},
+        {$match: {'x.y.z': {$type: 'number'}}},
+        {$match: {'x.y': {$type: 'object'}}},
+        {$match: {x: {$type: 'object'}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x.y.z"),
+                  (Stages{stages[1].get(), stages[2].get(), stages[3].get()}));
+    });
+}
+
+// TODO(SERVER-135797): A $match on any path under 'x' may narrow the type of 'x' and its subpaths,
+// so none of these stages should be skipped.
+TEST_F(PipelineDependencyGraphTest, GetTypeSkipsMatchesOnSubpathsAndSiblings) {
+    setPipeline(R"([
+        {$set: {'x.y': '$a', 'x.z': '$b'}},
+        {$match: {'x.y': {$type: 'number'}}},
+        {$match: {'x.z': {$type: 'number'}}},
+        {$match: {x: {$type: 'object'}}}
+    ])");
+    runTest([&] {
+        // In reality, all three $match stages can help us narrow down the type of 'x'.
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x"),
+                  (Stages{stages[3].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x.y"),
+                  (Stages{stages[1].get(), stages[3].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeConsidersMatchesOnIndexedPaths) {
+    setPipeline(R"([
+        {$set: {'x.y': '$a', w: '$b'}},
+        {$match: {'x.0.y': {$type: 'number'}}},
+        {$match: {'x.0': {$type: 'number'}}},
+        {$match: {'w.0': {$type: 'number'}}}
+    ])");
+    runTest([&] {
+        // A $match on a path with an array index depends on the prefix before the index, i.e. 'x'.
+        for (auto&& path : {"x", "x.y", "x.0", "x.0.y"}) {
+            ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, path),
+                      (Stages{stages[1].get(), stages[2].get()}))
+                << path;
+        }
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeDoesNotSkipMatchesOnOtherBaseDocumentFields) {
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$match: {y: {$type: 'number'}}}
+    ])");
+    runTest([&] {
+        // TODO(SERVER-135643): Base document fields are not represented in the graph as Field
+        // nodes, so we currently can't tell which stages depend on which base document fields.
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x"),
+                  (Stages{stages[0].get(), stages[1].get()}));
+    });
 }
 
 }  // namespace

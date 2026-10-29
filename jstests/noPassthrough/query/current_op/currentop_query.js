@@ -7,6 +7,7 @@
  *    requires_scripting,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkSbeFullyEnabled,
@@ -60,9 +61,11 @@ function dropAndRecreateTestCollection() {
     );
     // The insert via direct connection will fail with stale config if the metadata is unknown, so
     // we forcefully refresh it.
-    assert.commandWorked(
-        rsConn.adminCommand({_flushRoutingTableCacheUpdates: mongosColl.getFullName()}),
-    );
+    if (!FeatureFlagUtil.isPresentAndEnabled(rsConn, "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(
+            rsConn.adminCommand({_flushRoutingTableCacheUpdates: mongosColl.getFullName()}),
+        );
+    }
 }
 
 /**
@@ -273,7 +276,10 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     1,
                 );
             },
-            planSummary: "COLLSCAN",
+            // The unfiltered $group + $sum plans a COUNT_SCAN over the _id index.
+            // When the collection is sharded the shard's plan requires shard filtering,
+            // so the planner enumerates a COLLSCAN with a shard filter instead.
+            planSummary: isRemoteShardCurOp ? "COLLSCAN" : "COUNT_SCAN { _id: 1 }",
             queryFramework: sbeRestrictedOrEnabled ? "sbe" : "classic",
             currentOpFilter: commandOrOriginatingCommand(
                 {
@@ -646,11 +652,17 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
 
         TestData.commandResult = cmdRes;
 
-        currentOpFilter = {
-            "command.getMore": isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id,
-            "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
-            "cursor.originatingCommand.comment": "currentop_query",
-        };
+        currentOpFilter = isRemoteShardCurOp
+            ? {
+                  op: "getmore",
+                  "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
+                  "cursor.originatingCommand.comment": "currentop_query",
+              }
+            : {
+                  "command.getMore": TestData.commandResult.cursor.id,
+                  "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
+                  "cursor.originatingCommand.comment": "currentop_query",
+              };
 
         confirmCurrentOpContents({
             test: function (db) {

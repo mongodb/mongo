@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -142,15 +116,23 @@ public:
 
     void setLastMaterializedLsn(uint64_t lsn) override;
 
-    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) override;
+    Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) override;
 
     void promoteToLeader() override;
 
-    void demoteFromLeader() override;
+    void demoteToFollower() override;
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
     Timestamp getStableTimestamp() const override;
+
+    void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) override;
+
+    Timestamp getStepDownTimestamp() const override;
+
+    std::unique_lock<std::mutex> lockStepDown() override {
+        return _engine->lockStepDown();
+    }
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
@@ -208,9 +190,7 @@ public:
     }
 
     void dropIdent(RecoveryUnit& ru, std::string_view ident) override;
-    void addDropPendingIdent(const DropTime& dropTime,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) override;
+    void addDropPendingIdent(const DropTime& dropTime, std::shared_ptr<Ident> ident) override;
     void dropUnknownIdent(RecoveryUnit& ru,
                           const Timestamp& stableTimestamp,
                           std::string_view ident) override;
@@ -321,11 +301,26 @@ public:
 
     Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) override;
 
+    StatusWith<std::string> wiredTigerRepair(const std::string& config) override;
+
+    Status fixDatabaseSize() override;
+
+    void pauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) override;
+
+    Status tryPauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) override;
+
     bool underCachePressure(int concurrentOpOuts) override;
 
     size_t getCacheSizeMB() override;
 
     bool hasOngoingLiveRestore() override;
+
+    bool isInLeaderMode() override;
+
+    StatusWith<int64_t> getIndexStorageSize(
+        OperationContext* opCtx, const std::vector<std::string>& indexIdents) const override;
+
+    StatusWith<int64_t> getSharedHistoryStoreStorageSize(OperationContext* opCtx) const override;
 
 private:
     using CollIter = std::list<std::string>::iterator;

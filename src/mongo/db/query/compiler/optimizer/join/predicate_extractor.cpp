@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
 
@@ -53,7 +27,8 @@ struct SingleTablePredicateClassifier
 };
 
 struct PredicateExtractor {
-    PredicateExtractor(const std::vector<LetVariable>& variables) {
+    PredicateExtractor(const DocumentSource* source, const std::vector<LetVariable>& variables)
+        : _source{source} {
         for (auto&& var : variables) {
             _variables.insert(var.id);
         }
@@ -138,7 +113,7 @@ struct PredicateExtractor {
         if (auto cmp = dynamic_cast<const ExpressionCompare*>(aggExpr.get())) {
             if (isExprEquijoin(cmp)) {
                 return SplitPredicatesResult{
-                    .joinPredicates = {JoinPredicateExpr::make(cmp, letVars)},
+                    .joinPredicates = {ExtractedJoinPredicate::make(_source, cmp, letVars)},
                 };
             }
         }
@@ -171,7 +146,7 @@ struct PredicateExtractor {
                 return splitJoinAndSingleCollectionPredicates(expr->getExpression(), variables);
             }
             case MatchExpression::AND: {
-                std::vector<JoinPredicateExpr> joinPredicates;
+                std::vector<ExtractedJoinPredicate> joinPredicates;
                 auto singleTablePreds = std::make_unique<AndMatchExpression>();
 
                 // Recursive calls to split for each child and aggregate join and residual
@@ -222,23 +197,27 @@ struct PredicateExtractor {
         return SplitPredicatesResult{.singleTablePredicates = matchExpr->clone()};
     }
 
+    const DocumentSource* _source;
     stdx::unordered_set<Variables::Id> _variables;
 };
 
 class ExtractExprPredicatesHelper {
 public:
-    explicit ExtractExprPredicatesHelper(PathResolver& pathResolver)
-        : _pathResolver(pathResolver), _expressionIsFullyAbsorbed(true) {}
+    explicit ExtractExprPredicatesHelper(PathResolver& pathResolver, const DocumentSource* src)
+        : _src(src),
+          _pathResolver(pathResolver),
+          _fallbackReason(boost::none),
+          _expressionIsFullyAbsorbed(true) {}
 
     ExprPredicatesResult extract(const MatchExpression* expr) {
         _expressionIsFullyAbsorbed = true;
         _predicates.clear();
+        _fallbackReason = boost::none;
         extractMatch(expr);
 
-        return {
-            .expressionIsFullyAbsorbed = _expressionIsFullyAbsorbed,
-            .predicates = std::move(_predicates),
-        };
+        return {.expressionIsFullyAbsorbed = _expressionIsFullyAbsorbed,
+                .predicates = std::move(_predicates),
+                .reason = std::move(_fallbackReason)};
     }
 
 private:
@@ -277,8 +256,9 @@ private:
                 extractMatchExpr(static_cast<const ExprMatchExpression*>(expr));
                 break;
             default:
+                // Not a $expr- this $match can't encode a join predicate.
                 _expressionIsFullyAbsorbed = false;
-                // ignore
+                _fallbackReason = JoinFallbackReason::kMatchNonExprPredicate;
                 break;
         }
     }
@@ -292,7 +272,12 @@ private:
     void extractMatchExpr(const ExprMatchExpression* expr) {
         ExpressionVisitor visitor{*this};
         expr->getExpression()->acceptVisitor(&visitor);
-        _expressionIsFullyAbsorbed &= (visitor.numVisitedNodes() == 1);
+        if (visitor.numVisitedNodes() != 1) {
+            // The visitor only visits expressions we can extract join predicates from ($and & $eq),
+            // so an unvisited node is an expression we don't support.
+            _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchUnsupportedExpression;
+        }
     }
 
     void extractExpressionAnd(const ExpressionAnd* expr) {
@@ -300,7 +285,11 @@ private:
         for (const auto& child : expr->getChildren()) {
             child->acceptVisitor(&visitor);
         }
-        _expressionIsFullyAbsorbed &= (visitor.numVisitedNodes() == expr->getChildren().size());
+        if (visitor.numVisitedNodes() != expr->getChildren().size()) {
+            // As above- some child of this $and is an expression we don't support.
+            _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchUnsupportedExpression;
+        }
     }
 
     // Returns the field path to pass to PathResolver::resolve(), or boost::none if 'expr' is not a
@@ -320,6 +309,7 @@ private:
         if (expr->getOp() != ExpressionCompare::EQ || children.size() != 2) {
             // 1. Extract equality predicates only.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchNonEqualityPredicate;
             return;
         }
 
@@ -329,6 +319,7 @@ private:
         if (left == nullptr || right == nullptr) {
             // 2. Both sides of the equality predicate must be field paths.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchNonFieldPathOperand;
             return;
         }
 
@@ -340,11 +331,12 @@ private:
             // single-component path ('$$NOW', '$$ROOT', '$$CURRENT') cannot name a field of a
             // collection and so cannot be a join predicate.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchVariableOperand;
             return;
         }
 
-        auto leftPathId = _pathResolver.resolve(*leftPath);
-        auto rightPathId = _pathResolver.resolve(*rightPath);
+        auto leftPathId = _pathResolver.resolve(*leftPath, _src, boost::none, _fallbackReason);
+        auto rightPathId = _pathResolver.resolve(*rightPath, _src, boost::none, _fallbackReason);
         if (!leftPathId.has_value() || !rightPathId.has_value()) {
             // 4. Both field paths must be attributable to a single node in the graph.
             _expressionIsFullyAbsorbed = false;
@@ -354,6 +346,7 @@ private:
         if (_pathResolver[*leftPathId].nodeId == _pathResolver[*rightPathId].nodeId) {
             // 5. To be a proper join predicate the field paths must be from different collections.
             _expressionIsFullyAbsorbed = false;
+            _fallbackReason = JoinFallbackReason::kMatchPredicateOnSameNode;
             return;
         }
 
@@ -361,7 +354,9 @@ private:
             {.op = JoinPredicate::ExprEq, .left = *leftPathId, .right = *rightPathId});
     }
 
+    const DocumentSource* _src;
     PathResolver& _pathResolver;
+    boost::optional<JoinFallbackReason> _fallbackReason;
     std::vector<JoinPredicate> _predicates;
     bool _expressionIsFullyAbsorbed;
 };
@@ -403,26 +398,39 @@ FieldPath localCollectionFieldPath(const std::vector<LetVariable>& letVars,
 
 }  // namespace
 
-JoinPredicateExpr JoinPredicateExpr::make(const ExpressionCompare* eqNode,
-                                          const std::vector<LetVariable>& letVars) {
+ExtractedJoinPredicate ExtractedJoinPredicate::make(const DocumentSource* source,
+                                                    const ExpressionCompare* eqNode,
+                                                    const std::vector<LetVariable>& letVars) {
     auto left = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[0].get());
     auto right = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[1].get());
 
     if (left->isVariableReference()) {
-        return {localCollectionFieldPath(letVars, left),
+        return {true /* is $expr */,
+                localCollectionFieldPath(letVars, left),
                 right->getFieldPathWithoutCurrentPrefix(),
-                eqNode};
+                eqNode,
+                source};
     }
 
     tassert(11317203,
             "Expected a variable & a field path in a join predicate",
             right->isVariableReference());
+    return {true /* is $expr */,
+            localCollectionFieldPath(letVars, right),
+            left->getFieldPathWithoutCurrentPrefix(),
+            eqNode,
+            source};
+}
+
+ExtractedJoinPredicate ExtractedJoinPredicate::make(FieldPath localField,
+                                                    FieldPath foreignField,
+                                                    const DocumentSource* source) {
     return {
-        localCollectionFieldPath(letVars, right), left->getFieldPathWithoutCurrentPrefix(), eqNode};
+        false /* isn't $expr */, std::move(localField), std::move(foreignField), nullptr, source};
 }
 
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
-    const MatchExpression* matchExpr, const std::vector<LetVariable>& variables) {
+    const DocumentSourceMatch* match, const std::vector<LetVariable>& variables) {
     // Verify the let variables are suitable for extracting join predicates.
     for (auto&& variable : variables) {
         auto rhs = dynamic_cast<ExpressionFieldPath*>(variable.expression.get());
@@ -438,13 +446,13 @@ boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
         // At this point, we have verified the RHS of the variable refers to a field in the local
         // collection, which can be used to specify a join predicate.
     }
-    return PredicateExtractor{variables}.splitJoinAndSingleCollectionPredicates(matchExpr,
-                                                                                variables);
+    return PredicateExtractor{match, variables}.splitJoinAndSingleCollectionPredicates(
+        match->getMatchExpression(), variables);
 }
 
 ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver,
-                                           const MatchExpression* expr) {
-    ExtractExprPredicatesHelper helper{pathResolver};
-    return helper.extract(expr);
+                                           const DocumentSourceMatch* match) {
+    ExtractExprPredicatesHelper helper{pathResolver, match};
+    return helper.extract(match->getMatchExpression());
 }
 };  // namespace mongo::join_ordering

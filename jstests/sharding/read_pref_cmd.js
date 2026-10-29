@@ -3,10 +3,12 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
  *    resource_intensive,
- *    requires_scripting
+ *    requires_scripting,
+ *    requires_profiling
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts, reconnect} from "jstests/replsets/rslib.js";
 
@@ -24,7 +26,6 @@ const allowedOnSecondary = Object.freeze({kNever: 0, kAlways: 1});
 
 // Checking UUID and index consistency involves reading from the config server through mongos, but
 // this test sets an invalid readPreference on the connection to the mongos.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
 /**
@@ -36,7 +37,12 @@ let setUp = function (rst) {
         configDB.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}),
     );
     assert.commandWorked(configDB.adminCommand({shardCollection: kShardedNs, key: {x: 1}}));
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: kShardedNs}));
+    }
+
+    // Wait for the secondaries to catch up before enabling profiling on them.
+    rst.awaitReplication();
 
     // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.

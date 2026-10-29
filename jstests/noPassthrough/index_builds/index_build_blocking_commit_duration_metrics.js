@@ -177,6 +177,10 @@ describe("indexBuilds serverStatus metrics", function () {
 
         awaitCreateIndex();
 
+        // The secondary records the metric on the oplog applier thread, after the index build thread
+        // has already dropped its currentOp entry, so we wait for the commitIndexBuild oplog entry to finish applying.
+        this.rst.awaitReplication();
+
         checkMetrics(
             this.secondaryDB,
             [
@@ -217,6 +221,10 @@ describe("indexBuilds serverStatus metrics", function () {
 
         IndexBuildTest.waitForIndexBuildToStop(this.primaryDB);
 
+        // Startup recovery only replays the commitIndexBuild entry if the secondary journaled it
+        // before being killed. Wait on the durable optime rather than the applied one.
+        this.rst.awaitReplication(null, ReplSetTest.OpTimeType.LAST_DURABLE, [this.secondary]);
+
         this.rst.stop(
             this.secondary,
             /*signal=*/ 9,
@@ -237,6 +245,9 @@ describe("indexBuilds serverStatus metrics", function () {
         );
 
         const secondary = this.rst.getSecondary();
+        // serverStatus is answerable before startup recovery has applied the commitIndexBuild entry.
+        // Reaching SECONDARY guarantees recovery finished and the metric was recorded.
+        this.rst.awaitSecondaryNodes(null, [secondary]);
         const secondaryDBAfterRestart = secondary.getDB(dbName);
 
         awaitCreateIndex();

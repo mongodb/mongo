@@ -44,7 +44,6 @@ selector:
     - requires_standalone
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
-    - requires_replication
     # mongos has no system.profile collection.
     - requires_profiling
     - assumes_unsharded_collection

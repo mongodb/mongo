@@ -1,51 +1,33 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/executor.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/compiler/optimizer/join/hint.h"
+#include "mongo/db/query/compiler/optimizer/join/index_fingerprint.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
+#include "mongo/db/query/compiler/optimizer/join/server_status_metrics.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
+#include "mongo/db/query/plan_cache/join_plan_cache_key.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -54,17 +36,45 @@
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/timer.h"
 
 #include <algorithm>
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryJoin
 
 namespace mongo::join_ordering {
 
 MONGO_FAIL_POINT_DEFINE(sleepWhileJoinOptimizing);
+MONGO_FAIL_POINT_DEFINE(hangAfterJoinModelConstruction);
+
+// These sleep for {ms: <millis>} inside the phase they name, so that tests can verify that
+// 'sbeLoweringTimeMicros' and 'planEnumerationTimeMicros' measure those phases.
+MONGO_FAIL_POINT_DEFINE(sleepWhileLoweringJoinPlanToSbe);
+MONGO_FAIL_POINT_DEFINE(sleepWhileEnumeratingJoinPlans);
 
 namespace {
+/**
+ * Number of times a usable plan was found in the join plan cache. Exposed in serverStatus as
+ * 'metrics.query.planCache.join.hits'.
+ */
+auto& joinPlanCacheHits = *MetricBuilder<Counter64>{"query.planCache.join.hits"};
+
+/**
+ * Number of times no usable plan was found in the join plan cache (either absent or stale).
+ * Exposed in serverStatus as 'metrics.query.planCache.join.misses'.
+ */
+auto& joinPlanCacheMisses = *MetricBuilder<Counter64>{"query.planCache.join.misses"};
+
+/**
+ * Number of times a cached plan was found but had gone stale and was evicted, a subset of
+ * 'joinPlanCacheMisses'. Exposed in serverStatus as
+ * 'metrics.query.planCache.join.invalidations'.
+ */
+auto& joinPlanCacheInvalidations = *MetricBuilder<Counter64>{"query.planCache.join.invalidations"};
+
 PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
     switch (shape) {
         case JoinPlanTreeShapeEnum::kLeftDeep:
@@ -125,54 +135,93 @@ EnumerationStrategy getEnumerationStrategy(const QueryKnobConfiguration& qkc) {
             .enableHJOrderPruning = qkc.getEnableJoinEnumerationHJOrderPruning()};
 }
 
-bool isCollPtrEligibleForJoinOpt(const CollectionPtr& cptr) {
-    return !cptr->isCapped() && !cptr->isClustered() &&
-        CollatorInterface::isSimpleCollator(cptr->getDefaultCollator());
+/**
+ * These return the reason the collection is ineligible for join optimization, or boost::none if it
+ * is eligible.
+ */
+boost::optional<JoinFallbackReason> isCollPtrEligibleForJoinOpt(const CollectionPtr& coll) {
+    if (coll->isCapped()) {
+        return JoinFallbackReason::kCollectionCapped;
+    }
+    if (coll->isClustered()) {
+        return JoinFallbackReason::kCollectionClustered;
+    }
+    if (!CollatorInterface::isSimpleCollator(coll->getDefaultCollator())) {
+        return JoinFallbackReason::kCollectionCollation;
+    }
+    return boost::none;
 }
 
-bool isCollectionEligibleForJoinOpt(const CollectionAcquisition& coll) {
-    return coll.exists() && !coll.getShardingDescription().isSharded() &&
-        isCollPtrEligibleForJoinOpt(coll.getCollectionPtr());
+boost::optional<JoinFallbackReason> isCollectionEligibleForJoinOpt(
+    const CollectionAcquisition& coll) {
+    if (!coll.exists()) {
+        return JoinFallbackReason::kCollectionMissing;
+    }
+    if (coll.getShardingDescription().isSharded()) {
+        return JoinFallbackReason::kCollectionSharded;
+    }
+    return isCollPtrEligibleForJoinOpt(coll.getCollectionPtr());
 }
 
-bool isCollectionOrViewEligibleForJoinOpt(const CollectionOrViewAcquisition& coll) {
+boost::optional<JoinFallbackReason> isCollectionOrViewEligibleForJoinOpt(
+    const CollectionOrViewAcquisition& coll) {
     // TODO SERVER-112239: permit foreign collection views/ resolve them.
     // Note: timeseries views should automatically be excluded if they are resolved.
-    return coll.isCollection() && isCollectionEligibleForJoinOpt(coll.getCollection());
+    if (!coll.isCollection()) {
+        return JoinFallbackReason::kCollectionIsView;
+    }
+    return isCollectionEligibleForJoinOpt(coll.getCollection());
+}
+
+bool isJoinOrderingEnabled(const ExpressionContext& ctx) {
+    // The join optimizer unconditionally uses CBR, if the feature flag is disabled
+    // this also disables join ordering.
+    // TODO: SERVER-129697 Remove this check when the feature flag is removed.
+    if (!feature_flags::gFeatureFlagCostBasedRanker.checkEnabled()) {
+        return false;
+    }
+
+    const auto& queryKnob = ctx.getQueryKnobConfiguration();
+    if (!queryKnob.isJoinOrderingEnabled()) {
+        return false;
+    }
+    if (queryKnob.isForceClassicEngineEnabled()) {
+        return false;
+    }
+    return true;
 }
 
 bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
                                     const Pipeline& pipeline,
                                     const boost::optional<BSONObj>& queryHint) {
-    const auto& queryKnob = pipeline.getContext()->getQueryKnobConfiguration();
-
-    if (!queryKnob.isJoinOrderingEnabled()) {
-        return false;
-    }
-
-    if (queryKnob.isForceClassicEngineEnabled()) {
+    if (!AggJoinModel::pipelineEligibleForJoinReordering(pipeline)) {
+        // Return false- don't want to record any kind of metric for this.
         return false;
     }
 
     if (queryHint.has_value() && !queryHint->isEmpty()) {
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kUserHintPresent);
         return false;
     }
 
     if (!mca.hasMainCollection()) {
         // We can't determine if the base collection is sharded.
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kNoMainCollection);
         return false;
     }
 
     // Ensure that the base collection is eligible. If not, this aggregation can't participate in
     // join optimization.
-    if (!isCollectionEligibleForJoinOpt(mca.getMainCollectionAcquisition())) {
+    if (auto reason = isCollectionEligibleForJoinOpt(mca.getMainCollectionAcquisition())) {
+        joinOptMetrics.fallbackReasons.increment(*reason);
         return false;
     }
 
     // Check that all foreign collections are eligible.
     // TODO SERVER-125401: instead of falling back, shorten the prefix.
     for (const auto& [_, collAcq] : mca.getSecondaryCollectionAcquisitions()) {
-        if (!isCollectionOrViewEligibleForJoinOpt(collAcq)) {
+        if (auto reason = isCollectionOrViewEligibleForJoinOpt(collAcq)) {
+            joinOptMetrics.fallbackReasons.increment(*reason);
             return false;
         }
     }
@@ -186,10 +235,12 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
         }
     });
     if (foundCrossDbLookup) {
+        joinOptMetrics.fallbackReasons.increment(JoinFallbackReason::kCrossDbLookup);
         return false;
     }
 
-    return AggJoinModel::pipelineEligibleForJoinReordering(pipeline);
+    // Yay! Eligible.
+    return true;
 }
 
 bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
@@ -202,16 +253,14 @@ bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
  * Pre-process indexes to filter out those ineligible for conversion to INLJ, and output a map of
  * collection namespaces to indexes available.
  */
-AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& cbrCqQsns,
+AvailableIndexes extractINLJEligibleIndexes(const JoinGraph& graph,
                                             const MultipleCollectionAccessor& mca) {
     AvailableIndexes perCollIdxs;
-    for (const auto& [cq, _] : cbrCqQsns) {
-        const auto& ns = cq->nss();
+    for (size_t n = 0; n < graph.numNodes(); ++n) {
+        const NamespaceString& ns = graph.getNode(n).collectionName;
         if (perCollIdxs.contains(ns)) {
-            // We've already pre-processed this collection's indexes.
             continue;
         }
-
         const auto& indexCatalog = *mca.lookupCollection(ns)->getIndexCatalog();
         std::vector<std::shared_ptr<const IndexCatalogEntry>> entries;
         for (auto&& ice : indexCatalog.getEntriesShared(IndexCatalog::InclusionPolicy::kReady)) {
@@ -229,11 +278,14 @@ CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectio
     stdx::unordered_map<NamespaceString, CollectionStats> collStats;
     mca.forEach([&collStats, &ru](const CollectionPtr& coll) {
         auto* recordStore = coll->getRecordStore();
+        const boost::optional<double> approxNumLeafPages{recordStore->approxNumLeafPages(ru)};
         // TODO SERVER-117620: set .pageSizeBytes.
         collStats.emplace(coll->ns(),
                           CollectionStats{static_cast<double>(recordStore->dataSize()),
                                           static_cast<double>(recordStore->storageSize(ru) -
-                                                              recordStore->freeStorageSize(ru))});
+                                                              recordStore->freeStorageSize(ru)),
+                                          kDefaultPageSizeBytes,
+                                          approxNumLeafPages});
     });
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     double cacheSizeBytes = engine->getCacheSizeMB() * 1024 * 1024;
@@ -269,6 +321,323 @@ PerCollUniqueFieldInfo buildUniqueFieldInfo(const AvailableIndexes& perCollIdxs)
     }
     return uniqueFieldInfoMap;
 }
+
+std::pair<std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>,
+          std::unique_ptr<PlanYieldPolicySBE>>
+lowerToSbePlanStageTree(OperationContext* opCtx,
+                        const JoinGraph& graph,
+                        PlanYieldPolicy::YieldPolicy yieldPolicy,
+                        const MultipleCollectionAccessor& mca,
+                        NodeId baseNode,
+                        const QuerySolution& soln,
+                        const cost_based_ranker::EstimateMap* estimates,
+                        bool prepare,
+                        OpDebug::JoinOptimizationMetrics& metrics) {
+    Timer sbeLoweringTimer;
+    ON_BLOCK_EXIT([&]() { metrics.sbeLoweringTimeMicros = sbeLoweringTimer.micros(); });
+    sleepWhileLoweringJoinPlanToSbe.execute(
+        [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
+    auto& baseCQ = *graph.accessPathAt(baseNode);
+    auto baseNss = baseCQ.nss();
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
+    auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
+        opCtx, mca, baseCQ, soln, sbeYieldPolicy.get(), estimates);
+    if (prepare) {
+        // We don't need to prepare plans if we're not planning to execute them.
+        stage_builder::prepareSlotBasedExecutableTree(opCtx,
+                                                      planStagesAndData.first.get(),
+                                                      &planStagesAndData.second,
+                                                      baseCQ,
+                                                      mca,
+                                                      sbeYieldPolicy.get(),
+                                                      /*preparingFromSbeCache=*/false,
+                                                      /*remoteCursors=*/nullptr);
+    }
+    return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
+}
+
+/**
+ * Records how much of the non-join-reorderable pipeline suffix was lowered into SBE versus how much
+ * remains to be executed as DocumentSources.
+ */
+void recordSuffixLoweringMetrics(const Pipeline* suffix,
+                                 size_t numPushedToSbe,
+                                 OpDebug::JoinOptimizationMetrics& metrics) {
+    metrics.numSuffixSourcesPushedToSbe = numPushedToSbe;
+    metrics.numResidualClassicSources = suffix ? suffix->getSources().size() : 0;
+}
+
+/**
+ * Identifies the portion of the pipeline not pushed down into the join optimizer, but eligible to
+ * pushdown into SBE. Pushes that portion into SBE, and removes those stages from the pipeline so
+ * they are not executed twice. Also records the resulting lowering metrics.
+ *
+ * Shared by the join plan cache hit path and the full optimization path so that recovering a plan
+ * from the cache produces the same executor as the query that populated the cache.
+ */
+void pushDownSbeEligibleSuffix(OperationContext* opCtx,
+                               const MultipleCollectionAccessor& mca,
+                               const AggJoinModel& model,
+                               NodeId baseNode,
+                               std::unique_ptr<QuerySolution>& soln,
+                               OpDebug::JoinOptimizationMetrics& metrics) {
+    auto* suffix = model.getSuffix();
+    size_t numPushedToSbe = 0;
+    if (suffix && suffix->peekFront()) {
+        auto& prefix = *model.getGraph().getNode(baseNode).accessPath;
+        // This helper identifies the stages in the 'suffix' pipeline that are eligible for running
+        // in SBE and prepend them to prefix.cqPipeline.
+
+        // When we call extendWithAggPipeline() below, it will mutate the existing join reordered
+        // query solution such that the stages in prefix.cqPipeline are placed above the join
+        // optimized stages. Any stages not eligible for join reordering or SBE pushdown remain
+        // in the `suffix` pipeline.
+        attachPipelineStages(
+            mca,
+            suffix,
+            /*needsMerge=*/false,
+            &prefix,
+            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForPushDownStagesDecision{
+                .opCtx = opCtx,
+                .canonicalQuery = prefix,
+                .collections = mca,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+            }));
+
+        // 'attachPipelineStages()' prepends the SBE-eligible suffix stages onto
+        // 'prefix.cqPipeline()', so its size is exactly the number of stages we lowered.
+        numPushedToSbe = prefix.cqPipeline().size();
+
+        if (!prefix.cqPipeline().empty()) {
+            QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = opCtx,
+                .canonicalQuery = prefix,
+                .collections = mca,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+            });
+
+            plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, prefix, mca);
+            plannerParams.setTargetSbeStageBuilder(prefix, mca);
+            // Create the query solution
+            soln = QueryPlanner::extendWithAggPipeline(prefix,
+                                                       std::move(soln),
+                                                       plannerParams.secondaryCollectionsInfo,
+                                                       /*skipProjectGroupOptimization=*/false);
+        }
+        // Remove any of the stages pushed down via attachPipelineStages, from the pipeline 'suffix'
+        // so they are not executed twice (once in SBE and again in classic). Only the remaining
+        // stages in suffix will be executed in classic.
+        finalizePipelineStages(suffix, &prefix);
+    }
+    recordSuffixLoweringMetrics(suffix, numPushedToSbe, metrics);
+}
+
+/**
+ * Builds an accessor with only the collections the join graph references. The full 'mca' also
+ * carries suffix $lookup namespaces, which are not in the join graph; excluding them keeps an
+ * entry's collection tags aligned with its join tree.
+ */
+MultipleCollectionAccessor makeGraphOnlyCollectionAccessor(const MultipleCollectionAccessor& mca,
+                                                           const JoinGraph& graph) {
+    auto mainAcq =
+        CollectionOrViewAcquisition(CollectionAcquisition(mca.getMainCollectionAcquisition()));
+    CollectionOrViewAcquisitionMap secondaries;
+    for (size_t i = 0; i < graph.numNodes(); ++i) {
+        const auto nss = graph.getNode(static_cast<NodeId>(i)).collectionName;
+        if (nss == mca.getMainCollection()->ns()) {
+            continue;
+        }
+        if (auto it = mca.getSecondaryCollectionAcquisitions().find(nss);
+            it != mca.getSecondaryCollectionAcquisitions().end()) {
+            secondaries.emplace(nss, it->second);
+        }
+    }
+    return MultipleCollectionAccessor(std::move(mainAcq), std::move(secondaries), false);
+}
+
+/**
+ * Returns true if the cached entry 'hit' can still be used against the current catalog, and false
+ * if it is stale and the query must be replanned.
+ *
+ * 'planCacheKeyHex' is an output parameter, left empty on the fast 'kCurrent' path and otherwise
+ * filled lazily with the formatted plan cache key once a log line fires.
+ *
+ * A bumped collection version alone is not enough to reject the entry. The DDL responsible may have
+ * touched an index this plan could never use, or one it considered but did not choose; neither can
+ * change which plan the optimizer would pick now. The per-node index fingerprints tell the two
+ * cases apart from an index change that does matter.
+ */
+bool validateCacheEntry(JoinPlanCacheEntry& hit,
+                        const MultipleCollectionAccessor& graphOnlyMca,
+                        const AggJoinModel& model,
+                        const AvailableIndexes& perCollIdxs,
+                        const JoinPlanCacheKey& cacheKey,
+                        std::string& planCacheKeyHex) {
+    auto cachedTags = hit.getCollectionTags();
+    auto validation = classifyCollectionTags(cachedTags, graphOnlyMca);
+
+    // The formatted plan cache key costs a hash pass over the whole key plus an allocation, so only
+    // compute it when a log line will actually be emitted; the value lands in 'planCacheKeyHex' so
+    // this function's reason logs and the caller's removal log share it instead of hashing twice.
+    const auto getPlanCacheKeyHex = [&]() -> const std::string& {
+        if (planCacheKeyHex.empty()) {
+            planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
+        }
+        return planCacheKeyHex;
+    };
+
+    switch (validation.status) {
+        case CollectionTagStatus::kCurrent:
+            // Nothing has changed since the entry was cached, so no fingerprinting is needed.
+            return true;
+        case CollectionTagStatus::kStale:
+            // A stale tag can mean a dropped collection or a sample refresh.
+            if (validation.droppedCollectionUuid) {
+                LOGV2(12926600,
+                      "Join plan cache entry references a collection which no longer exists",
+                      "planCacheKey"_attr = getPlanCacheKeyHex(),
+                      "planShape"_attr = hit.joinTree ? hit.joinTree->toBSONForLog() : BSONObj(),
+                      "uuid"_attr = *validation.droppedCollectionUuid);
+            }
+            return false;
+        case CollectionTagStatus::kNeedsIndexRevalidation:
+            LOGV2_DEBUG(13445403,
+                        5,
+                        "the entry against the current indexes",
+                        "planCacheKey"_attr = getPlanCacheKeyHex());
+            break;
+    }
+
+    tassert(13036801,
+            "Cached join plan must have one index fingerprint per join graph node",
+            hit.nodeFingerprints.size() == model.getGraph().numNodes());
+
+    auto currentFingerprints = makeNodeFingerprints(
+        model.getGraph(), model.getResolvedPaths(), perCollIdxs, *hit.joinTree);
+    for (size_t node = 0; node < hit.nodeFingerprints.size(); ++node) {
+        if (!canReuseNodeFingerprint(hit.nodeFingerprints[node], currentFingerprints[node])) {
+            LOGV2(13036802,
+                  "Join plan cache entry invalidated by a DDL",
+                  "planCacheKey"_attr = getPlanCacheKeyHex(),
+                  "planShape"_attr = hit.joinTree ? hit.joinTree->toBSONForLog() : BSONObj(),
+                  "node"_attr = static_cast<int>(node),
+                  "nss"_attr = redact(toStringForLogging(
+                      model.getGraph().getNode(static_cast<NodeId>(node)).collectionName)),
+                  "cachedUsedFingerprint"_attr =
+                      static_cast<unsigned long long>(hit.nodeFingerprints[node].usedFingerprint),
+                  "currentUsedFingerprint"_attr =
+                      static_cast<unsigned long long>(currentFingerprints[node].usedFingerprint),
+                  "cachedRelevantIndexCount"_attr =
+                      static_cast<int>(hit.nodeFingerprints[node].relevantIndexHashes.size()),
+                  "currentRelevantIndexCount"_attr =
+                      static_cast<int>(currentFingerprints[node].relevantIndexHashes.size()));
+            return false;
+        }
+    }
+
+    // The catalog change either left the relevant indexes untouched or only dropped ones this plan
+    // does not use, so the entry is valid against the current collection state. Adopt that state's
+    // version tags so subsequent lookups take the fast path above instead of re-fingerprinting on
+    // every query.
+    auto currentTags = makeCollectionTags(graphOnlyMca);
+    hit.refreshCollectionTags(currentTags);
+
+    LOGV2_DEBUG(13036803,
+                5,
+                "Join plan cache entry revalidated: the catalog change did not affect any index "
+                "this plan relies on",
+                "cachedVersions"_attr = collectionVersionsForLog(cachedTags),
+                "currentVersions"_attr = collectionVersionsForLog(currentTags));
+    return true;
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
+    OperationContext* opCtx,
+    const JoinPlanCacheKey& cacheKey,
+    const MultipleCollectionAccessor& mca,
+    const MultipleCollectionAccessor& graphOnlyMca,
+    const AggJoinModel& model,
+    const AvailableIndexes& perCollIdxs,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    OpDebug::JoinOptimizationMetrics& metrics) {
+    auto& cache = JoinPlanCache::get(opCtx->getServiceContext());
+    auto hit = cache.lookup(cacheKey);
+    if (!hit) {
+        return nullptr;
+    }
+
+    // validateCacheEntry fills 'planCacheKeyHex' lazily while deciding the entry is stale, so the
+    // failure path below reuses it instead of hashing the key a second time.
+    std::string planCacheKeyHex;
+    if (!validateCacheEntry(*hit, graphOnlyMca, model, perCollIdxs, cacheKey, planCacheKeyHex)) {
+        if (planCacheKeyHex.empty()) {
+            planCacheKeyHex = joinPlanCacheKeyForLog(cacheKey);
+        }
+        if (cache.removeIfMatches(cacheKey, hit)) {
+            joinPlanCacheInvalidations.increment(1);
+            LOGV2(13445401, "Join plan cache entry removed", "planCacheKey"_attr = planCacheKeyHex);
+        } else {
+            LOGV2_DEBUG(13445402,
+                        2,
+                        "Join plan cache entry invalidated but already removed or replaced by "
+                        "another operation; no removal performed",
+                        "planCacheKey"_attr = planCacheKeyHex);
+        }
+        return nullptr;
+    }
+
+    LOGV2_DEBUG(11083906, 5, "Join plan cache hit, skipping join optimization");
+    auto qsn =
+        fromCachedJoinPlan(opCtx, model.getGraph(), graphOnlyMca, perCollIdxs, *hit->joinTree);
+    auto winnerSoln = std::make_unique<QuerySolution>();
+    winnerSoln->setRoot(std::move(qsn));
+
+    // Use 'mca' instead of 'graphOnlyMca' for SBE lowering because non-join eligible stages may
+    // reference other collections.
+    pushDownSbeEligibleSuffix(opCtx, mca, model, hit->baseNode, winnerSoln, metrics);
+
+    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
+    // PathArraynessChecker monitors them during execution yields.
+    model.getGraph()
+        .accessPathAt(hit->baseNode)
+        ->getExpCtx()
+        ->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
+
+    auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
+                                                                       model.getGraph(),
+                                                                       yieldPolicy,
+                                                                       mca,
+                                                                       hit->baseNode,
+                                                                       *winnerSoln,
+                                                                       /*estimates=*/nullptr,
+                                                                       /*prepare=*/true,
+                                                                       metrics);
+
+    size_t plannerOptions = QueryPlannerParams::DEFAULT;
+    if (model.getSuffix() && model.getSuffix()->peekFront()) {
+        plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
+    }
+    auto exec = plan_executor_factory::make(opCtx,
+                                            /*cq=*/nullptr,
+                                            std::move(winnerSoln),
+                                            std::move(planStagesAndData),
+                                            mca,
+                                            plannerOptions,
+                                            mca.getMainCollection()->ns(),
+                                            std::move(sbeYieldPolicy),
+                                            /*isFromPlanCache=*/true,
+                                            /*cachedPlanHash=*/false,
+                                            /*usedJoinOpt=*/true,
+                                            /*rejectedJoinPlans=*/{},
+                                            /*remoteCursors=*/nullptr,
+                                            /*remoteExplains=*/nullptr,
+                                            /*classicRuntimePlannerStage=*/nullptr,
+                                            /*maybeExplainData=*/boost::none,
+                                            PlanSelectionStrategy::kJoinCachedPlan);
+    return exec;
+}
+
 }  // namespace
 
 /**
@@ -281,11 +650,39 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     const boost::optional<BSONObj>& queryHint,
     OperationContext* opCtx,
     const boost::intrusive_ptr<ExpressionContext> expCtx) {
+    // Don't proceed if join optimization is not enabled.
+    if (!isJoinOrderingEnabled(*expCtx)) {
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Pipeline or collection ineligible for join-reordering");
+    }
+
     // Quick eligibility check.
     if (!isAggEligibleForJoinReordering(mca, pipeline, queryHint)) {
         return Status(ErrorCodes::QueryFeatureNotAllowed,
                       "Pipeline or collection ineligible for join-reordering");
     }
+
+    // Initialize metrics after we determine that the query shape vaguely looks join-optimizable, as
+    // otherwise we would have these metrics for every aggregation. Note that on retry, these
+    // metrics will be (intentionally!) reset.
+    auto& od = CurOp::get(opCtx)->debug();
+    od.joinOptimizationMetrics.emplace();
+    auto& metrics = *od.joinOptimizationMetrics;
+
+    // The sampling estimators are created only after a join plan cache miss further down; the
+    // recording guard needs them in scope to tally the persisted NDV statistics they served.
+    SamplingEstimatorMap samplingEstimators;
+
+    ON_BLOCK_EXIT([&] {
+        // Record serverStatus metrics on every exit path, including the ones that throw.
+        if (auto& pe = metrics.planEnumerationMetrics) {
+            for (const auto& [nss, samplingEstimator] : samplingEstimators) {
+                pe->numPersistentNDVStatsUsed +=
+                    static_cast<int>(samplingEstimator->getNumPersistedNDVStatsUsed());
+            }
+        }
+        recordJoinOptimizationMetrics(metrics);
+    });
 
     // Try to build JoinGraph.
     const auto& config = pipeline.getContext()->getQueryKnobConfiguration();
@@ -294,7 +691,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
             JoinGraphBuildParams(config.getMaxNodesInJoinGraph(), config.getMaxEdgesInJoinGraph()),
         .maxNumberNodesConsideredForImplicitEdges =
             static_cast<size_t>(config.getMaxNumberNodesConsideredForImplicitEdges())};
-    auto swModel = AggJoinModel::constructJoinModel(pipeline, buildParams);
+    auto swModel = AggJoinModel::constructJoinModel(pipeline, buildParams, metrics);
     if (!swModel.isOK()) {
         // We failed to apply join-reordering, so we take the regular path.
         const auto status = swModel.getStatus();
@@ -314,6 +711,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                return !mca.knowsNamespace(lookup->getFromNs());
                                            });
     if (missingAcquisitions) {
+        metrics.fallbackReason = JoinFallbackReason::kMissingForeignAcquisition;
         return Status(
             ErrorCodes::QueryFeatureNotAllowed,
             "Pipeline ineligible for join-reordering due to missing foreign namespace acquisition");
@@ -325,15 +723,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 "graph"_attr = swModel.getValue().toBSON());
     auto model = std::move(swModel.getValue());
 
-    // Select access plans for each table in the join.
+    // Snapshot only the join-graph collections so the entry's tags match its join tree, and the
+    // cache invalidates only on DDL affecting the join graph.
+    const auto graphOnlyMca = makeGraphOnlyCollectionAccessor(mca, model.getGraph());
+
     auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
-    SamplingEstimatorMap samplingEstimators =
-        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy);
-    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators);
-    if (!swAccessPlans.isOK()) {
-        return swAccessPlans.getStatus();
-    }
-    auto singleTableAccess = std::move(swAccessPlans.getValue());
 
     // Retrieve a copy of the hint if present.
     boost::optional<EnumerationStrategy> hintedStrat;
@@ -345,23 +739,84 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     const auto qkc = expCtx->getQueryKnobConfiguration();
 
-    // Pre-process indexes per collection to facilitate INLJ enumeration.
-    auto indexesPerColl = extractINLJEligibleIndexes(singleTableAccess.cbrCqQsns, mca);
+    // Consult the join plan cache before running single-table access planning.
+    const bool useJoinPlanCache = !hintedStrat &&
+        qkc.getJoinReorderMode() != JoinReorderModeEnum::kRandom && qkc.getEnableJoinPlanCache() &&
+        !expCtx->getExplain().has_value();
+
+    // Set iff 'useJoinPlanCache' is true.
+    boost::optional<JoinPlanCacheKey> cacheKey;
+    // Set iff 'useJoinPlanCache' is true and the lookup missed.
+    boost::optional<std::vector<CollectionTag>> collectionTags;
+
+    const auto eligibleIdxs = extractINLJEligibleIndexes(model.getGraph(), graphOnlyMca);
+
+    if (useJoinPlanCache) {
+        cacheKey = makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
+        auto exec = checkPlanCacheForPlan(
+            opCtx, *cacheKey, mca, graphOnlyMca, model, eligibleIdxs, yieldPolicy, metrics);
+        if (exec) {
+            joinPlanCacheHits.increment(1);
+            return JoinReorderedExecutorResult{.executor = std::move(exec),
+                                               .model = std::move(model)};
+        }
+        // Capture the tags before sampling: a yield re-acquires collections from the latest
+        // catalog, which would tag the entry with a newer state than the plan is built from.
+        collectionTags = makeCollectionTags(graphOnlyMca);
+        joinPlanCacheMisses.increment(1);
+        LOGV2_DEBUG(11083907, 5, "Join plan cache miss, running optimization");
+    }
+
+    // Initialize enumeration metrics if we're here- we don't want to do this on cache hits/
+    // whenever we don't plan.
+    metrics.planEnumerationMetrics.emplace();
+    auto& peMetrics = *metrics.planEnumerationMetrics;
+
+    // Acquire the samples that CE (both here and in CBR below) will consult.
+    samplingEstimators = makeSamplingEstimators(
+        graphOnlyMca, model.getGraph(), yieldPolicy, model.getJoinExpCtx(), peMetrics);
+
+    // Select access plans for each table in the join.
+    auto swAccessPlans = singleTableAccessPlans(
+        opCtx, graphOnlyMca, model.getGraph(), samplingEstimators, peMetrics);
+    if (!swAccessPlans.isOK()) {
+        metrics.fallbackReason = JoinFallbackReason::kFailedToGetSingleTableAccessViaCBR;
+        return swAccessPlans.getStatus();
+    }
+    auto singleTableAccess = std::move(swAccessPlans.getValue());
+
+    // A trivially false predicate yields an EOF access plan, which carries no 'SolutionCacheData'
+    // and therefore cannot be serialized into the join plan cache.
+    const bool cacheWinningPlan = useJoinPlanCache &&
+        std::all_of(singleTableAccess.cbrCqQsns.cbegin(),
+                    singleTableAccess.cbrCqQsns.cend(),
+                    [](const auto& cqQsn) { return cqQsn.second->cacheData != nullptr; });
     PerCollUniqueFieldInfo uniqueFieldInfo;
     if (qkc.getEnableJoinOptimizationUseIndexUniqueness()) {
-        uniqueFieldInfo = buildUniqueFieldInfo(indexesPerColl);
+        uniqueFieldInfo = buildUniqueFieldInfo(eligibleIdxs);
     }
 
     JoinReorderingContext ctx{.joinGraph = model.getGraph(),
                               .resolvedPaths = model.getResolvedPaths(),
                               .singleTableAccess = std::move(singleTableAccess),
-                              .perCollIdxs = std::move(indexesPerColl),
-                              .catStats = createCatalogStats(opCtx, mca),
+                              .perCollIdxs = eligibleIdxs,
+                              .catStats = createCatalogStats(opCtx, graphOnlyMca),
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
                               .samplingEstimators = &samplingEstimators,
                               .explain = expCtx->getExplain().has_value()};
 
-    JoinCardinalityEstimator cardEstimator(JoinCardinalityEstimator::make(ctx, samplingEstimators));
+    // Count the distinct join-graph namespaces whose storage-engine approximate leaf page count is
+    // unavailable, forcing cost estimation onto the size-based fallback. 'collStats' covers every
+    // collection in 'mca', a superset of the join-graph namespaces; collections referenced only by
+    // the unoptimized suffix are never costed, so they are not counted.
+    const auto& graphNamespaces = model.getDistinctNamespaces();
+    peMetrics.numApproxLeafPagesUnavailable = static_cast<int>(
+        std::count_if(graphNamespaces.begin(), graphNamespaces.end(), [&](const auto& nss) {
+            return !ctx.catStats.collStats.at(nss).hasApproxNumLeafPages();
+        }));
+
+    JoinCardinalityEstimator cardEstimator(
+        JoinCardinalityEstimator::make(ctx, samplingEstimators, peMetrics));
     JoinCostEstimatorImpl costEstimator(ctx, cardEstimator);
 
     // Inject delay for testing purposes (allows tests to verify optimizationTimeMillis is
@@ -372,6 +827,15 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
 
     StatusWith<ReorderedJoinSolution> swReordered = [&]() {
+        // Time required to generate a QSN by any method- even if we fail to generate a QSN.
+        Timer planEnumerationTimer;
+        ON_BLOCK_EXIT([&] {
+            peMetrics.planEnumerationTimeMicros = planEnumerationTimer.micros();
+            peMetrics.ceTimeMicros = cardEstimator.getEstimationTimeMicros();
+        });
+        sleepWhileEnumeratingJoinPlans.execute(
+            [](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+
         if (hintedStrat || qkc.getJoinReorderMode() == JoinReorderModeEnum::kBottomUp) {
             uassert(12016318,
                     "Cannot have hinted & random mode",
@@ -382,7 +846,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                              cardEstimator,
                                              costEstimator,
                                              hintedStrat ? std::move(*hintedStrat)
-                                                         : getEnumerationStrategy(qkc));
+                                                         : getEnumerationStrategy(qkc),
+                                             /*populateCachedPlan=*/cacheWinningPlan,
+                                             *metrics.planEnumerationMetrics);
         }
 
         tassert(12016315,
@@ -397,84 +863,94 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                 &costEstimator,
                                                 qkc.getRandomJoinOrderSeed(),
                                                 getPlanTreeShape(qkc.getJoinPlanTreeShape()),
-                                                getJoinMethod(qkc.getJoinMethod()));
+                                                getJoinMethod(qkc.getJoinMethod()),
+                                                /*enableHJOrderPruning=*/false,
+                                                /*maxRandomHintRetries=*/3,
+                                                *metrics.planEnumerationMetrics);
     }();
     uassertStatusOK(swReordered.getStatus());
     auto reordered = std::move(swReordered.getValue());
 
+    // Store the winning plan in the join plan cache for future queries with the same shape.
+    if (cacheWinningPlan && reordered.cachedJoinPlan) {
+        tassert(13036804,
+                "Join plan cache key and collection tags must be set when the join plan cache is "
+                "in use",
+                cacheKey.has_value() && collectionTags.has_value());
+
+        // A yield may have occurred during sampling above. Re-check CollectionTags and skip caching
+        // if the live CollectionTags have advanced.
+        if (classifyCollectionTags(*collectionTags, graphOnlyMca).status !=
+            CollectionTagStatus::kCurrent) {
+            LOGV2_DEBUG(135049,
+                        5,
+                        "Skipping join plan cache write: index DDL occurred during planning",
+                        "planCacheKey"_attr = joinPlanCacheKeyForLog(*cacheKey));
+        } else {
+            auto fingerprints = makeNodeFingerprints(model.getGraph(),
+                                                     model.getResolvedPaths(),
+                                                     eligibleIdxs,
+                                                     *reordered.cachedJoinPlan);
+            const auto& currentTags = *collectionTags;
+            const auto planCacheKeyHex = joinPlanCacheKeyForLog(*cacheKey);
+            // 'serializeForLogging()' handles redaction of user content per the
+            // 'redactClientLogData' policy.
+            const auto queryShapeForLog = pipeline.serializeForLogging();
+            const NamespaceString baseNss =
+                model.getGraph().getNode(reordered.baseNode).collectionName;
+            const auto logVersions = collectionVersionsForLog(currentTags);
+
+            auto entry = std::make_unique<JoinPlanCacheEntry>(std::move(reordered.cachedJoinPlan),
+                                                              reordered.baseNode,
+                                                              currentTags,
+                                                              std::move(fingerprints));
+            const BSONObj planShapeForLog =
+                entry->joinTree ? entry->joinTree->toBSONForLog() : BSONObj();
+            const long long estimatedSizeBytes =
+                static_cast<long long>(entry->estimatedEntrySizeBytes);
+            const size_t numEntriesEvicted = JoinPlanCache::get(opCtx->getServiceContext())
+                                                 .put(std::move(*cacheKey), std::move(entry));
+
+            LOGV2(13445400,
+                  "Join plan cache entry put",
+                  "planCacheKey"_attr = planCacheKeyHex,
+                  "queryShape"_attr = queryShapeForLog,
+                  "planShape"_attr = planShapeForLog,
+                  "nss"_attr = redact(toStringForLogging(baseNss)),
+                  "baseNode"_attr = static_cast<int>(reordered.baseNode),
+                  "estimatedSizeBytes"_attr = estimatedSizeBytes,
+                  "collections"_attr = logVersions,
+                  "entriesEvicted"_attr = static_cast<long long>(numEntriesEvicted));
+        }
+    }
+
     // Identify suffix stages that are eligible for SBE pushdown & consequently lower them to the
     // SBE executor with the join-reordered prefix.
-    if (auto* suffix = model.getSuffix(); suffix && suffix->peekFront()) {
+    // Note: this uses the original MCA with all collections, not just the join-graph collections in
+    // 'graphOnlyMca' because the SBE executor needs access to all collections pushed down to SBE.
+    pushDownSbeEligibleSuffix(opCtx, mca, model, reordered.baseNode, reordered.soln, metrics);
 
-        auto& prefix = *model.getGraph().getNode(reordered.baseNode).accessPath;
-        // This helper identifies the stages in the 'suffix' pipeline that are eligible for running
-        // in SBE and prepend them to prefix.cqPipeline.
+    // Test hook: all sampling and join reordering is complete at this point.
+    hangAfterJoinModelConstruction.pauseWhileSet(opCtx);
 
-        // When we call extendWithAggPipeline() below, it will mutate the existing join reordered
-        // query solution such that the stages in prefix.cqPipeline are grafted above the join
-        // optimized stages. Any stages not eligible for join reordering or SBE pushdown remain
-        // in the `suffix` pipeline.
-        attachPipelineStages(
-            mca,
-            suffix,
-            false /* needsMerge */,
-            &prefix,
-            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForPushDownStagesDecision{
-                .opCtx = opCtx,
-                .canonicalQuery = prefix,
-                .collections = mca,
-                .plannerOptions = QueryPlannerParams::DEFAULT,
-            }));
+    auto& baseNodeCQ = *model.getGraph().accessPathAt(reordered.baseNode);
 
-        if (!prefix.cqPipeline().empty()) {
-            QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForSingleCollectionQuery{
-                .opCtx = opCtx,
-                .canonicalQuery = prefix,
-                .collections = mca,
-                .plannerOptions = QueryPlannerParams::DEFAULT,
-            });
+    // Merge join-field non-array path learnings into the chosen base node's expCtx so the
+    // PathArraynessChecker monitors them during execution yields.
+    baseNodeCQ.getExpCtx()->mergeNonArrayPathsForNss(
+        model.getJoinExpCtx()->getNonArrayPathsForNss());
 
-            plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, prefix, mca);
-            plannerParams.setTargetSbeStageBuilder(prefix, mca);
-            // Create the query solution
-            reordered.soln =
-                QueryPlanner::extendWithAggPipeline(prefix,
-                                                    std::move(reordered.soln),
-                                                    plannerParams.secondaryCollectionsInfo,
-                                                    false /* skipOptimization */);
-        }
-        // Remove any of the stages pushed down via attachPipelineStages, from the pipeline 'suffix'
-        // so they are not executed twice (once in SBE and again in classic). Only the remaining
-        // stages in suffix will be executed in classic.
-        finalizePipelineStages(suffix, &prefix);
-    }
     // Lower to SBE.
-    auto lower =
-        [&model, &opCtx, yieldPolicy, &mca](NodeId baseNode,
-                                            const QuerySolution& soln,
-                                            const cost_based_ranker::EstimateMap* estimates,
-                                            bool prepare) {
-            auto& baseCQ = *model.getGraph().accessPathAt(baseNode);
-            auto baseNss = baseCQ.nss();
-            auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
-            auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
-                opCtx, mca, baseCQ, soln, sbeYieldPolicy.get(), estimates);
-            if (prepare) {
-                // We don't need to prepare plans if we're not planning to execute them.
-                stage_builder::prepareSlotBasedExecutableTree(opCtx,
-                                                              planStagesAndData.first.get(),
-                                                              &planStagesAndData.second,
-                                                              baseCQ,
-                                                              mca,
-                                                              sbeYieldPolicy.get(),
-                                                              false /*preparingFromCache*/,
-                                                              nullptr /*remoteCursors*/);
-            }
-            return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
-        };
+    auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
+                                                                       model.getGraph(),
+                                                                       yieldPolicy,
+                                                                       mca,
+                                                                       reordered.baseNode,
+                                                                       *reordered.soln,
+                                                                       &reordered.estimates,
+                                                                       /*prepare=*/true,
+                                                                       metrics);
 
-    auto [planStagesAndData, sbeYieldPolicy] =
-        lower(reordered.baseNode, *reordered.soln, &reordered.estimates, true /* prepare */);
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(11083905,
                 5,
@@ -483,8 +959,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                     sbe::DebugPrinter{}.print(planStagesAndData.first->debugPrint(debugPrintInfo)),
                 "sbePlanStageData"_attr = planStagesAndData.second.debugString());
 
-    // If there is a pipeline suffix, then that suffix will execute inside a PlanExecutorPipeline,
-    // which expects to received owned BSON objects from the inner PlanExecutor.
+    // If there is a pipeline suffix, then that suffix will execute inside a
+    // PlanExecutorPipeline, which expects to received owned BSON objects from the inner
+    // PlanExecutor.
     size_t plannerOptions = QueryPlannerParams::DEFAULT;
     if (model.getSuffix() && model.getSuffix()->peekFront()) {
         plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
@@ -497,8 +974,17 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         for (auto&& rs : reordered.rejectedSolns) {
             auto soln = std::move(rs.first);
             auto baseNode = rs.second;
-            auto [stagesAndData, _] =
-                lower(baseNode, *soln, &reordered.estimates, false /* prepare */);
+            // We don't count time spent on rejected plan lowering for explain.
+            OpDebug::JoinOptimizationMetrics rejectedMetrics;
+            auto [stagesAndData, _] = lowerToSbePlanStageTree(opCtx,
+                                                              model.getGraph(),
+                                                              yieldPolicy,
+                                                              mca,
+                                                              baseNode,
+                                                              *soln,
+                                                              &reordered.estimates,
+                                                              /*prepare=*/false,
+                                                              rejectedMetrics);
             rejectedPlans.push_back(JoinOptPlan{.soln = std::move(soln),
                                                 .stage = std::move(stagesAndData.first),
                                                 .data = std::move(stagesAndData.second)});
@@ -510,34 +996,47 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     if (ctx.explain) {
         PlanExplainerData explainData;
         for (const auto& [nss, estimator] : samplingEstimators) {
-            explainData.ceSamplingMetadata.emplace(
-                NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext()),
-                estimator->getSamplingMetadata());
+            const std::string serializedNss =
+                NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext());
+            explainData.ceSamplingMetadata.emplace(serializedNss, estimator->getSamplingMetadata());
+            if (auto ndvMetadata = estimator->getPersistedNDVMetadata(); !ndvMetadata.empty()) {
+                explainData.fieldStatsMetadata.emplace(serializedNss, std::move(ndvMetadata));
+            }
         }
+        // Compute the join plan cache key hash for explain regardless of whether the join plan
+        // cache is enabled.
+        if (!cacheKey.has_value()) {
+            cacheKey =
+                makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
+        }
+        explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(*cacheKey);
+        // The join-reordering estimates cover the winning and the rejected plans, and are only
+        // serialized by explain. The rejected plans were lowered above, so the map can be moved.
+        explainData.estimates = std::move(reordered.estimates);
         maybeExplainData = std::move(explainData);
     }
 
-    // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the estimate
-    // map from join-reordering 'reordered.estimates' can be combined with the estimate map from
-    // CBR 'ctx.singleTableAccess.estimate' before creating the executor below.
-    // We actually have several canonical queries, so we don't try to pass one in.
+    // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the
+    // estimate map from CBR 'ctx.singleTableAccess.estimate' can be combined into the explain
+    // data's estimates alongside the join-reordering estimates. We actually have several
+    // canonical queries, so we don't try to pass one in.
     auto exec = plan_executor_factory::make(opCtx,
-                                            nullptr /* cq */,
+                                            /*cq=*/nullptr,
                                             std::move(reordered.soln),
                                             std::move(planStagesAndData),
                                             mca,
                                             plannerOptions,
                                             mca.getMainCollection()->ns(),
                                             std::move(sbeYieldPolicy),
-                                            false /* isFromPlanCache */,
-                                            false /* cachedPlanHash */,
-                                            true /*usedJoinOpt*/,
-                                            std::move(reordered.estimates),
+                                            /*isFromPlanCache=*/false,
+                                            /*cachedPlanHash=*/false,
+                                            /*usedJoinOpt=*/true,
                                             std::move(rejectedPlans),
-                                            nullptr /* remoteCursors */,
-                                            nullptr /* remoteExplains */,
-                                            nullptr /* classicRuntimePlannerStage */,
-                                            std::move(maybeExplainData));
+                                            /*remoteCursors=*/nullptr,
+                                            /*remoteExplains=*/nullptr,
+                                            /*classicRuntimePlannerStage=*/nullptr,
+                                            std::move(maybeExplainData),
+                                            PlanSelectionStrategy::kJoinOptimization);
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

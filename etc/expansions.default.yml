@@ -18,6 +18,7 @@ disable_unit_tests: "false"
 skip_tests: /dev/null
 resmoke_jobs: "1"
 should_shuffle: "true"
+shuffle_mode: ""
 continue_on_failure: "true"
 skip_symbolization: "false"
 install_dir: dist-test/bin

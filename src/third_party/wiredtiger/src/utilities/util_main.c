@@ -11,8 +11,9 @@
 const char *home = "."; /* Home directory */
 const char *progname;   /* Program name */
                         /* Global arguments */
-const char *usage_prefix = "[-BLmpRrSVv] [-C config] [-E secretkey] [-h home]";
-bool verbose = false; /* Verbose flag */
+const char *usage_prefix = "[-BLmpqRrSVv] [-C config] [-E secretkey] [-h home]";
+bool verbose = false;      /* Verbose flag */
+bool read_corrupt = false; /* -q: continue past corrupt pages for read-oriented wt commands */
 
 static const char *command; /* Command name */
 
@@ -25,6 +26,12 @@ static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=s
 #define REC_RECOVER "log=(recover=on)"
 #define SALVAGE "salvage=true"
 #define VERIFY_METADATA "verify_metadata=true"
+
+typedef int (*util_func_t)(WT_SESSION *, int, char *[]);
+static util_func_t disagg_supported[] = {
+  util_dump, util_list, util_page, util_read, util_stat, util_turtle, util_verify};
+
+static const char disagg_supported_flags[] = {'C', 'E', 'h', 'm', 'p', 'q', 'V', 'v', '?'};
 
 /*
  * wt_explicit_zero --
@@ -68,7 +75,7 @@ util_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, WT_SESSION *session)
      * Leader-mode pickup is handled inside wiredtiger_open by __wti_disagg_conn_config. Connections
      * without a page log don't need pickup.
      */
-    if (conn_impl->layered_table_manager.leader ||
+    if (__wt_atomic_load_bool_relaxed(&conn_impl->layered_table_manager.leader) ||
       conn_impl->disaggregated_storage.npage_log == NULL)
         return (0);
 
@@ -109,7 +116,17 @@ util_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, WT_SESSION *session)
     }
     WT_ERR(__wt_snprintf(reconfig, reconfig_len, "disaggregated=(checkpoint_meta=\"%.*s\")",
       (int)args.checkpoint_metadata.size, (const char *)args.checkpoint_metadata.data));
-    WT_ERR(conn->reconfigure(conn, reconfig));
+    /*
+     * A failed pickup is non-fatal in the utility: the checkpoint may be corrupt or unreadable, but
+     * individual pages can still be read directly off the page log (wt page -t). Warn and proceed
+     * with empty metadata.
+     */
+    if ((ret = conn->reconfigure(conn, reconfig)) != 0) {
+        fprintf(stderr,
+          "%s: failed to pick up the latest checkpoint (%s); proceeding with empty metadata\n",
+          progname, wiredtiger_strerror(ret));
+        ret = 0;
+    }
 
 err:
 done:
@@ -119,6 +136,44 @@ done:
         WT_TRET(page_log->terminate(page_log, session));
 
     return (ret);
+}
+
+/*
+ * util_func_supports_read_corrupt --
+ *     Whether a wt subcommand accepts the -q (read-corrupt) flag. Only supported for read-oriented
+ *     commands. Verify has it's own read_corrupt flag. List, printlog, and page do not benefit from
+ *     read_corrupt.
+ */
+static bool
+util_func_supports_read_corrupt(util_func_t util_func)
+{
+    return (util_func == util_dump || util_func == util_read || util_func == util_stat);
+}
+
+/*
+ * util_func_allowed_disagg --
+ *     Whether a wt subcommand is allowed in disaggregated storage mode.
+ */
+static bool
+util_func_allowed_disagg(util_func_t util_func)
+{
+    for (size_t i = 0; i < WT_ELEMENTS(disagg_supported); i++)
+        if (util_func == disagg_supported[i])
+            return (true);
+    return (false);
+}
+
+/*
+ * util_flag_allowed_disagg --
+ *     Whether a wt global option is allowed in disaggregated storage mode.
+ */
+static bool
+util_flag_allowed_disagg(int ch)
+{
+    for (size_t i = 0; i < WT_ELEMENTS(disagg_supported_flags); i++)
+        if (ch == disagg_supported_flags[i])
+            return (true);
+    return (false);
 }
 
 /*
@@ -134,6 +189,10 @@ usage(void)
       "run live restore using the source path specified.", "-m", "run verify on metadata", "-p",
       "disable pre-fetching on the connection (use this option when dumping/verifying corrupted "
       "data)",
+      "-q",
+      "continue past corrupt pages where possible: asks WiredTiger to skip corrupt pages instead "
+      "of panicking, for read-oriented commands (dump, read, stat). Output "
+      "is best-effort and the command exits non-zero when corruption was encountered.",
       "-R", "run recovery (if recovery configured)", "-r",
       "access the database via a readonly connection", "-S",
       "run salvage recovery (if recovery configured)", "-V", "display library version and exit",
@@ -145,8 +204,8 @@ usage(void)
       "load an object from a text file", "page", "read a single page through WT_PAGE_LOG",
       "printlog", "display the database log", "read", "read values from an object", "salvage",
       "salvage a file", "stat", "display statistics for an object", "truncate",
-      "truncate an object, removing all content", "verify", "verify an object", "write",
-      "write values to an object", NULL, NULL};
+      "truncate an object, removing all content", "turtle", "dump the turtle file", "verify",
+      "verify an object", "write", "write values to an object", NULL, NULL};
 
     fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
       WIREDTIGER_VERSION_MINOR);
@@ -166,13 +225,14 @@ main(int argc, char *argv[])
     WT_DECL_RET;
     WT_SESSION *session;
     size_t len;
-    int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
+    int ch, disagg_bad_flag, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
     const char *cmd_config, *conn_config, *live_restore_path, *p1, *p2, *p3, *rec_config,
       *session_config;
     bool backward_compatible, disable_prefetch, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
+    disagg_bad_flag = 0;
     p = NULL;
 
     /* Get the program name. */
@@ -202,7 +262,7 @@ main(int argc, char *argv[])
       false;
     /* Check for standard options. */
     __wt_optwt = 1; /* enable WT-specific behavior */
-    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:l:LmpRrSVv?")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:l:LmpqRrSVv?")) != EOF) {
         switch (ch) {
         case 'B': /* backward compatibility */
             backward_compatible = true;
@@ -236,6 +296,9 @@ main(int argc, char *argv[])
         case 'p':
             disable_prefetch = true;
             break;
+        case 'q':
+            read_corrupt = true;
+            break;
         case 'R': /* recovery */
             rec_config = REC_RECOVER;
             recover = true;
@@ -259,6 +322,10 @@ main(int argc, char *argv[])
             usage();
             goto err;
         }
+
+        if (disagg_bad_flag == 0 && !util_flag_allowed_disagg(ch))
+            disagg_bad_flag = ch;
+    }
     if ((logoff && recover) || (logoff && salvage) || (recover && salvage)) {
         fprintf(stderr, "Only one of -L, -R, and -S is allowed.\n");
         goto err;
@@ -344,6 +411,8 @@ main(int argc, char *argv[])
     case 't':
         if (strcmp(command, "truncate") == 0)
             func = util_truncate;
+        else if (strcmp(command, "turtle") == 0)
+            func = util_turtle;
         break;
     case 'v':
         if (strcmp(command, "verify") == 0) {
@@ -365,6 +434,18 @@ main(int argc, char *argv[])
     }
     if (func == NULL) {
         usage();
+        goto err;
+    }
+
+    /*
+     * -q is only meaningful for read-oriented commands. Reject it on anything else so users get
+     * an immediate, clear error rather than a silently ignored flag.
+     */
+    if (read_corrupt && !util_func_supports_read_corrupt(func)) {
+        fprintf(stderr,
+          "%s: -q is only valid for read-oriented commands: dump, read, stat (verify has its own "
+          "-c flag)\n",
+          progname);
         goto err;
     }
 
@@ -420,6 +501,23 @@ open:
         goto err;
     }
 
+    /*
+     * Reject the global options and the subcommands that are not supported in disaggregated storage
+     * mode.
+     */
+    if (((WT_CONNECTION_IMPL *)conn)->disaggregated_storage.page_log_meta != NULL) {
+        if (disagg_bad_flag != 0) {
+            fprintf(stderr, "%s: -%c is not supported in disaggregated storage mode\n", progname,
+              disagg_bad_flag);
+            goto err;
+        }
+        if (func != NULL && !util_func_allowed_disagg(func)) {
+            fprintf(
+              stderr, "%s: %s is not supported in disaggregated storage mode\n", progname, command);
+            goto err;
+        }
+    }
+
     if (secretkey != NULL) {
         /* p contains a copy of secretkey, so zero both before freeing */
         wt_explicit_zero(p, strlen(p));
@@ -438,6 +536,9 @@ open:
         goto err;
     }
 
+    if (read_corrupt)
+        F_SET((WT_SESSION_IMPL *)session, WT_SESSION_READ_SKIP_CORRUPT);
+
     if ((ret = util_disagg_pick_up_latest_checkpoint(conn, session)) != 0) {
         (void)util_err(session, ret, "failed to pick up latest disaggregated checkpoint");
         goto err;
@@ -445,6 +546,13 @@ open:
 
     /* Call the function after opening the database and session. */
     ret = func(session, argc, argv);
+
+    /*
+     * The block manager sets WT_CONN_DATA_CORRUPTION at every corruption-detection site.
+     */
+    if (read_corrupt &&
+      F_ISSET_ATOMIC_32(S2C((WT_SESSION_IMPL *)session), WT_CONN_DATA_CORRUPTION) && ret == 0)
+        ret = WT_ERROR;
 
     if (0) {
 err:

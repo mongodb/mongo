@@ -30,6 +30,8 @@ extern "C" {
 #include "wt_internal.h"
 }
 
+#include <algorithm>
+
 #include "model/driver/kv_workload_sequence.h"
 #include "model/util.h"
 
@@ -114,6 +116,16 @@ kv_workload_sequence::must_finish_before(kv_workload_sequence *other)
 {
     other->_dependencies.push_back(this);
     _unblocks.push_back(other);
+
+    /* The bitset is stored as 64-bit words so that merging is a word-wide OR. */
+    const std::vector<uint64_t> &other_bitset = other->_must_finish_before_bitset;
+    size_t words = std::max(other->_seq_no / 64 + 1, other_bitset.size());
+    if (_must_finish_before_bitset.size() < words)
+        _must_finish_before_bitset.resize(words);
+
+    _must_finish_before_bitset[other->_seq_no / 64] |= (uint64_t)1 << (other->_seq_no % 64);
+    for (size_t i = 0; i < other_bitset.size(); i++)
+        _must_finish_before_bitset[i] |= other_bitset[i];
 }
 
 } /* namespace model */

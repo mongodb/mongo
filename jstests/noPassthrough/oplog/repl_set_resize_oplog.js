@@ -8,7 +8,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let replSet = new ReplSetTest({nodes: 2, oplogSize: 50});
-replSet.startSet();
+replSet.startSet({
+    oplogMinRetentionHours: 24,
+});
 replSet.initiate();
 
 let primary = replSet.getPrimary();
@@ -19,10 +21,13 @@ const PB = 1024 * GB;
 const EB = 1024 * PB;
 
 assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 50 * MB);
+let serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 24);
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionMinutes, 24 * 60);
 
-// Too small: 990MB
+// Too small: 0.5 MB
 assert.commandFailedWithCode(
-    primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 900}),
+    primary.getDB("admin").runCommand({replSetResizeOplog: 1, size: 0.5}),
     [ErrorCodes.BadValue, 51024], // getting BadValue when binary is > 7.1, else 51024
     "Expected replSetResizeOplog to fail because the size was too small",
 );
@@ -59,6 +64,9 @@ assert.commandWorked(
         .getDB("admin")
         .runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB, minRetentionHours: 5}),
 );
+serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 5);
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionMinutes, 5 * 60);
 
 // Valid minRetentionHours with no size parameter.
 assert.commandWorked(
@@ -66,5 +74,26 @@ assert.commandWorked(
 );
 
 assert.eq(primary.getDB("local").oplog.rs.stats().maxSize, 1 * PB);
+serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionHours, 1);
+assert.eq(serverStatus.oplogTruncation.oplogMinRetentionMinutes, 1 * 60);
+
+// TODO (SERVER-131719): Remove this workaround
+// In disaggregated storage, listCollections reads from the secondary's in-memory catalog while
+// listCatalog reads from the shared durable catalog, which is updated by the primary and may
+// reflect the result of replSetResizeOplog from the primary. This can cause a shutdown consistency
+// check to fail because listCollections and listCatalog on the secondary have different
+// options.size values for the oplog.rs collection.
+// As a workaround, set the secondary to the same value as the primary.
+let secondary = replSet.getSecondary();
+assert.commandWorked(
+    secondary
+        .getDB("admin")
+        .runCommand({replSetResizeOplog: 1, size: (1 * PB) / MB, minRetentionHours: 1}),
+);
+assert.eq(
+    primary.getDB("local").oplog.rs.stats().maxSize,
+    secondary.getDB("local").oplog.rs.stats().maxSize,
+);
 
 replSet.stopSet();

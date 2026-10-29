@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 
@@ -239,7 +213,7 @@ std::vector<AsyncRequestsSender::Request> buildShardVersionedRequests(
 
     if (cm.hasRoutingTable()) {
         for (const auto& shardId : shardIds) {
-            BSONObj versionedCmd = appendShardVersion(cmdObj, cri.getShardVersion(opCtx, shardId));
+            BSONObj versionedCmd = appendShardVersion(cmdObj, cri.getShardVersion(shardId));
             versionedCmd = appendSampleId(versionedCmd, shardId);
             requests.emplace_back(shardId, std::move(versionedCmd));
         }
@@ -375,52 +349,73 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
     // Get the responses.
     std::vector<AsyncRequestsSender::Response> responses;  // Stores results by ShardId
 
+    // Inside a transaction, a bail-out below must not abandon sibling responses still in flight: a
+    // response's participant metadata is only enrolled when next() validates it. Capture the first
+    // failure, stop retrying (the error surfaces regardless, so retries would only delay it),
+    // drain the remaining responses, then surface the first failure. Outside a transaction there
+    // is no metadata to enroll, so a bail-out surfaces immediately.
+    const bool drainOnBailOut = static_cast<bool>(TransactionRouter::get(opCtx));
+    auto firstError = Status::OK();
+
     while (!ars.done()) {
-        auto response = ars.next();
+        try {
+            auto response = ars.next();
 
-        auto status = response.swResponse.getStatus();
-        if (status.isOK()) {
-            // We successfully received a response.
+            auto status = response.swResponse.getStatus();
+            if (status.isOK()) {
+                // We successfully received a response.
 
-            // Check for special errors that require throwing out any accumulated results.
-            auto& responseObj = response.swResponse.getValue().data;
-            status = getStatusFromCommandResult(responseObj);
+                // Check for special errors that require throwing out any accumulated results.
+                auto& responseObj = response.swResponse.getValue().data;
+                status = getStatusFromCommandResult(responseObj);
 
-            // If we specify to throw on stale shard version errors, then we will early exit
-            // from examining results. Otherwise, we will allow stale shard version errors to
-            // accumulate in the list of results.
-            if (throwOnStaleShardVersionErrors &&
-                ErrorCodes::isStaleShardVersionError(status.code())) {
-                uassertStatusOK(status.withContext(str::stream()
-                                                   << "got stale shardVersion response from shard "
-                                                   << response.shardId << " at host "
-                                                   << response.shardHostAndPort->toString()));
+                // If we specify to throw on stale shard version errors, then we will early exit
+                // from examining results. Otherwise, we will allow stale shard version errors to
+                // accumulate in the list of results.
+                if (throwOnStaleShardVersionErrors &&
+                    ErrorCodes::isStaleShardVersionError(status.code())) {
+                    uassertStatusOK(status.withContext(
+                        str::stream()
+                        << "got stale shardVersion response from shard " << response.shardId
+                        << " at host " << response.shardHostAndPort->toString()));
+                }
+                if (ErrorCodes::StaleDbVersion == status) {
+                    uassertStatusOK(status.withContext(
+                        str::stream()
+                        << "got stale databaseVersion response from shard " << response.shardId
+                        << " at host " << response.shardHostAndPort->toString()));
+                }
+                if (ErrorCodes::CannotImplicitlyCreateCollection == status) {
+                    uassertStatusOK(status.withContext(
+                        str::stream() << "got cannotImplicitlyCreateCollection response from shard "
+                                      << response.shardId << " at host "
+                                      << response.shardHostAndPort->toString()));
+                }
+
+                // In the case a read is performed against a view, the server can return an error
+                // indicating that the underlying collection may be sharded. When this occurs the
+                // return message will include an expanded view definition and collection
+                // namespace. We pass the definition back to the caller by throwing the error. This
+                // allows the caller to rewrite the request as an aggregation and retry it.
+                if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status) {
+                    uassertStatusOK(status);
+                }
             }
-            if (ErrorCodes::StaleDbVersion == status) {
-                uassertStatusOK(status.withContext(
-                    str::stream() << "got stale databaseVersion response from shard "
-                                  << response.shardId << " at host "
-                                  << response.shardHostAndPort->toString()));
+            responses.push_back(std::move(response));
+        } catch (const DBException& ex) {
+            // Either a bail-out above or a metadata failure from next(), which drains the
+            // remaining responses itself before throwing. The first failure in time order wins.
+            if (!drainOnBailOut) {
+                throw;
             }
-            if (ErrorCodes::CannotImplicitlyCreateCollection == status) {
-                uassertStatusOK(status.withContext(
-                    str::stream() << "got cannotImplicitlyCreateCollection response from shard "
-                                  << response.shardId << " at host "
-                                  << response.shardHostAndPort->toString()));
-            }
-
-            // In the case a read is performed against a view, the server can return an error
-            // indicating that the underlying collection may be sharded. When this occurs the return
-            // message will include an expanded view definition and collection namespace. We pass
-            // the definition back to the caller by throwing the error. This allows the caller to
-            // rewrite the request as an aggregation and retry it.
-            if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status) {
-                uassertStatusOK(status);
+            if (firstError.isOK()) {
+                firstError = ex.toStatus();
+                ars.stopRetrying();
             }
         }
-        responses.push_back(std::move(response));
     }
 
+    uassertStatusOK(firstError);
     return responses;
 }
 
@@ -442,7 +437,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
         readPref,
         retryPolicy,
         requests,
-        true /* throwOnStaleShardVersionErrors */,
+        /*throwOnStaleShardVersionErrors=*/true,
         executor ? executor : Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         routingCtx);
 }
@@ -478,8 +473,8 @@ void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version) {
 }
 
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
-                              bool appendRC,
-                              bool appendWC,
+                              bool setRC,
+                              bool setWC,
                               const BSONObj& cmdObj) {
     if (TransactionRouter::get(opCtx)) {
         // When running in a transaction, the rules are:
@@ -492,7 +487,7 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
             return cmdObj;
         }
 
-        if (!appendRC) {
+        if (!setRC) {
             // First operation in transaction, but the caller has not requested readConcern be
             // applied, so there's nothing to do.
             return cmdObj;
@@ -500,43 +495,30 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
 
         // First operation in transaction, so ensure that writeConcern is not applied, then continue
         // and apply the readConcern.
-        appendWC = false;
+        setWC = false;
     }
 
-    // Append all original fields to the new command.
+    // Append all original fields to the new command, dropping any existing read/write concern that
+    // will be overwritten below.
     BSONObjBuilder output;
-    bool seenReadConcern = false;
-    bool seenWriteConcern = false;
-    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     for (const auto& elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
-        if (appendRC && name == repl::ReadConcernArgs::kReadConcernFieldName) {
-            seenReadConcern = true;
+        if (setRC && name == repl::ReadConcernArgs::kReadConcernFieldName) {
+            continue;
         }
-        if (appendWC && name == WriteConcernOptions::kWriteConcernField) {
-            seenWriteConcern = true;
+        if (setWC && name == WriteConcernOptions::kWriteConcernField) {
+            continue;
         }
-        if (!output.hasField(name)) {
-            // Forward opCtx's RC to the shard when mongos selected atClusterTime, or when the
-            // wire RC carries no level (the dispatcher merged any CWRC default into opCtx in
-            // that case; the partial wire RC would otherwise reach the shard without the merge).
-            // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes
-            // RC there.
-            if (name == repl::ReadConcernArgs::kReadConcernFieldName &&
-                (readConcernArgs.wasAtClusterTimeSelected() ||
-                 !elem.Obj().hasField(repl::ReadConcernArgs::kLevelFieldName))) {
-                output.appendElements(readConcernArgs.toBSON());
-            } else {
-                output.append(elem);
-            }
-        }
+
+        output.append(elem);
     }
 
-    // Finally, add the new read/write concern.
-    if (appendRC && !seenReadConcern) {
-        output.appendElements(readConcernArgs.toBSON());
+    // Unconditionally set the read/write concern from opCtx, overwriting whatever the caller
+    // provided.
+    if (setRC) {
+        output.appendElements(repl::ReadConcernArgs::get(opCtx).toBSON());
     }
-    if (appendWC && !seenWriteConcern) {
+    if (setWC) {
         output.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
     }
 
@@ -572,13 +554,21 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
+    Shard::RetryPolicy retryPolicy,
+    std::shared_ptr<executor::TaskExecutor> executor) {
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto&& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx)) {
         requests.emplace_back(std::move(shardId), cmdObj);
     }
 
-    return gatherResponses(opCtx, dbName, NamespaceString(dbName), readPref, retryPolicy, requests);
+    return gatherResponses(opCtx,
+                           dbName,
+                           NamespaceString(dbName),
+                           readPref,
+                           retryPolicy,
+                           requests,
+                           /*routingCtx=*/nullptr,
+                           executor);
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigServerAndShards(
@@ -617,7 +607,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                                      nss,
                                                      routingCtx.getCollectionRoutingInfo(nss),
                                                      collation,
-                                                     boost::none /*explainVerbosity*/,
+                                                     /*verbosity=*/boost::none,
                                                      letParameters,
                                                      runtimeConstants);
     return scatterGatherVersionedTargetByRoutingTable(expCtx,
@@ -647,7 +637,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
         buildVersionedRequestsForTargetedShards(expCtx,
                                                 nss,
                                                 routingCtx.getCollectionRoutingInfo(nss),
-                                                {} /* shardsToSkip */,
+                                                /*shardsToSkip=*/{},
                                                 cmdObj,
                                                 query,
                                                 collation,
@@ -684,7 +674,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                readPref,
                                retryPolicy,
                                requests,
-                               false /* throwOnStaleShardVersionErrors */,
+                               /*throwOnStaleShardVersionErrors=*/false,
                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                &routingCtx);
 }
@@ -721,10 +711,10 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
                                                                cri,
-                                                               BSONObj() /*collation*/,
-                                                               boost::none /*explainVerbosity*/,
-                                                               boost::none /*letParameters*/,
-                                                               boost::none /*runtimeConstants*/);
+                                                               /*collation=*/BSONObj(),
+                                                               /*verbosity=*/boost::none,
+                                                               /*letParameters=*/boost::none,
+                                                               /*runtimeConstants=*/boost::none);
 
     const auto query = cri.isSharded()
         ? cri.getChunkManager().getShardKeyPattern().getKeyPattern().globalMin()
@@ -737,7 +727,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(
-            expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */),
+            expCtx, nss, cri, /*shardsToSkip=*/{}, cmdObj, query, /*collation=*/BSONObj()),
         &routingCtx);
     return std::move(responses.front());
 }
@@ -765,7 +755,7 @@ RawResponsesResult appendRawResponses(
         // run inside transactions do not wait for write concern, except for commit and abort.
         if (TransactionRouter::get(opCtx) &&
             isTransientTransactionError(
-                status.code(), false /*hasWriteConcernError*/, false /*isCommitOrAbort*/)) {
+                status.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false)) {
             // Re-throw on transient transaction errors to make sure appropriate error labels are
             // appended to the result.
             uassertStatusOK(status);
@@ -918,11 +908,11 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
                                                                nss,
                                                                cri,
                                                                collation,
-                                                               boost::none /*explainVerbosity*/,
+                                                               /*verbosity=*/boost::none,
                                                                letParameters,
                                                                runtimeConstants);
     return buildVersionedRequestsForTargetedShards(
-        expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation);
+        expCtx, nss, cri, /*shardsToSkip=*/{}, cmdObj, query, collation);
 }
 
 StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
@@ -989,7 +979,7 @@ CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
     OperationContext* opCtx, const NamespaceString& nss) {
     const auto& catalogCache = Grid::get(opCtx)->catalogCache();
 
-    catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+    catalogCache->onStaleCollectionVersion(nss, /*wantedVersion=*/boost::none);
 
     auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
@@ -1076,11 +1066,10 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
                     // with chunks. For consistency with cluster listIndexes, load from the shard
                     // that owns the minKey chunk.
                     const auto& cm = cri.getChunkManager();
-                    const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation(opCtx);
+                    const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
                     return {uassertStatusOK(
                                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
-                            appendShardVersion(cmdNoVersion,
-                                               cri.getShardVersion(opCtx, minKeyShardId))};
+                            appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
                 } else {
                     // For a collection without routing table, the primary shard will have correct
                     // indexes. Attach dbVersion + shardVersion: UNTRACKED.

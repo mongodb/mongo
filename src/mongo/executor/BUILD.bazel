@@ -155,6 +155,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "rpc_local_timing",
+    srcs = [
+        "rpc_local_timing.cpp",
+    ],
+    hdrs = [
+        "rpc_local_timing.h",
+    ],
+    deps = [
+        "//src/mongo/client:async_client",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "network_interface_tl",
     srcs = [
         "exhaust_response_reader_tl.cpp",
@@ -168,6 +182,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/transport:transport_layer",
         "//src/mongo/transport:transport_layer_manager",
     ],
@@ -315,6 +330,7 @@ mongo_cc_library(
         ":remote_command",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util/net:network",
     ],
 )
@@ -443,6 +459,20 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "rpc_local_timing_test",
+    srcs = [
+        "rpc_local_timing_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":rpc_local_timing",
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "network_executor_test",
     srcs = [
         "async_multicaster_test.cpp",
@@ -450,10 +480,13 @@ mongo_cc_unit_test(
         "async_rpc_util_test.cpp",
         "connection_pool_test.cpp",
         "connection_pool_test_fixture.cpp",
+        "connection_pool_tl_test.cpp",
+        "mock_async_client_factory_test.cpp",
         "mock_async_rpc_test.cpp",
         "mock_network_fixture_test.cpp",
         "network_interface_mock_test.cpp",
         "network_interface_mock_test_fixture.cpp",
+        "network_interface_tl_test.cpp",
         "pinned_connection_task_executor_test.cpp",
         "remote_command_request_test.cpp",
     ],
@@ -481,6 +514,10 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
     ],
 )
@@ -535,6 +572,7 @@ mongo_cc_integration_test(
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:pinned_connection_task_executor",
         "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:transport_layer_common",
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",

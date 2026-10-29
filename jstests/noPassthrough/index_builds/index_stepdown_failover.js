@@ -10,7 +10,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
-import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 const {metricsDir: primaryMetricsDir, otelParams: primaryOtelParams} = otelFileExportParams(
     `${jsTestName()}_node0`,
@@ -117,6 +117,11 @@ if (primaryDriven) {
             metrics.toBeResumed === primaryBaselineMetrics.toBeResumed + 1 &&
             metrics.failed === primaryBaselineMetrics.failed,
         "Expected the stepped-down primary to record the index build as to-be-resumed, not failed",
+    );
+    assert.eq(
+        primary.getDB("admin").serverStatus().metrics.indexBuilds.toBeResumed,
+        primaryBaselineMetrics.toBeResumed + 1,
+        "Expected serverStatus to also record the index build as to-be-resumed",
     );
     waitForIndexStatusMetrics(
         metricsDirsByNodeId[secondaryNodeId],

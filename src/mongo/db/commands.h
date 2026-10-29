@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,12 +32,14 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/stdx/unordered_set.h"
@@ -91,9 +66,10 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class AuthorizationContract;
 class Command;
@@ -123,12 +99,19 @@ bool prepareForFLERewrite(OperationContext* opCtx,
                           const boost::optional<EncryptionInformation>& encryptionInformation);
 
 /**
+ * Returns a copy of 'cmdObj' with sensitive fields removed for logging, via
+ * 'command->snipForLogging()'. 'command' must be non-null. The returned object still needs to pass
+ * through redact() before being logged.
+ */
+BSONObj snipCommandForLogging(const Command* command, const BSONObj& cmdObj);
+
+/**
  * A simple set of type-erased hooks for pre and post command actions.
  *
  * These hooks will only run on external requests that form CommandInvocations (a.k.a. OP_MSG
  * requests). They are not applied for runCommandDirectly() or raw CommandInvocation::run() calls.
  */
-class MONGO_MOD_OPEN CommandInvocationHooks {
+class [[MONGO_MOD_OPEN]] CommandInvocationHooks {
 public:
     /**
      * Set `hooks` as the `CommandInvocationHooks` decoration of `serviceContext`
@@ -346,7 +329,7 @@ struct CommandHelpers {
                                    Command* command,
                                    bool allowTransactionsOnConfigDatabase);
 
-    static constexpr std::string_view kHelpFieldName = "help"_sd;
+    static constexpr std::string_view kHelpFieldName = "help"sv;
 
     /**
      * Checks if the command passed in is in the list of failCommands defined in the fail point.
@@ -407,7 +390,7 @@ private:
 /**
  * Serves as a base for server commands. See the constructor for more details.
  */
-class MONGO_MOD_OPEN Command {
+class [[MONGO_MOD_OPEN]] Command {
 public:
     enum class AllowedOnSecondary { kAlways, kNever, kOptIn };
     enum class HandshakeRole { kNone, kHello, kAuth };
@@ -761,6 +744,14 @@ public:
     }
 
     /**
+     * Returns whether this command supports query settings (PQS). Commands that resolve query
+     * settings for their query (e.g. find, aggregate, distinct) override this to return true.
+     */
+    virtual bool supportsQuerySettings() const {
+        return false;
+    }
+
+    /**
      * Override to true if this command should be allowed on a direct shard connection regardless
      * of the directShardOperations ActionType.
      */
@@ -795,7 +786,7 @@ private:
 /**
  * Represents a single invocation of a given command.
  */
-class MONGO_MOD_OPEN CommandInvocation {
+class [[MONGO_MOD_OPEN]] CommandInvocation {
 public:
     CommandInvocation(const Command* definition) : _definition(definition) {}
 
@@ -883,7 +874,7 @@ public:
         }
 
         if (auto result = supportsReadConcern(repl::ReadConcernLevel::kMajorityReadConcern,
-                                              false /* isImplicitDefault */);
+                                              /*isImplicitDefault=*/false);
             result.readConcernSupport.isOK()) {
             // If the command supports read concern, it has storage and newtork implications.
             return false;
@@ -898,6 +889,14 @@ public:
      */
     virtual bool supportsRawData() const {
         return false;
+    }
+
+    /**
+     * Returns the invocation this invocation wraps, or nullptr if it does not wrap one. Wrapping
+     * invocations (e.g. explain) override this so callers can inspect the wrapped invocation.
+     */
+    virtual const CommandInvocation* inner() const {
+        return nullptr;
     }
 
     /**
@@ -978,6 +977,16 @@ public:
     }
 
     /**
+     * Returns true to bypass rejection by query settings with 'reject: true'.
+     *
+     * Reserved for admin operations whose rejection would render the cluster unusable
+     * (e.g. explain). Do NOT override for ordinary user-facing commands.
+     */
+    virtual bool shouldBypassQuerySettingsRejection() const {
+        return false;
+    }
+
+    /**
      * The command definition that this invocation runs.
      * Note: nonvirtual.
      */
@@ -1025,7 +1034,7 @@ private:
  * sequences. Commands should implement this class if they require access to the
  * ReplyBuilderInterface (e.g. to set the next invocation for an exhaust command).
  */
-class MONGO_MOD_OPEN BasicCommandWithReplyBuilderInterface : public Command {
+class [[MONGO_MOD_OPEN]] BasicCommandWithReplyBuilderInterface : public Command {
 private:
     class Invocation;
 
@@ -1162,7 +1171,7 @@ private:
 /**
  * Commands should implement this class if they do not require access to the ReplyBuilderInterface.
  */
-class MONGO_MOD_OPEN BasicCommand : public BasicCommandWithReplyBuilderInterface {
+class [[MONGO_MOD_OPEN]] BasicCommand : public BasicCommandWithReplyBuilderInterface {
 public:
     using BasicCommandWithReplyBuilderInterface::BasicCommandWithReplyBuilderInterface;
 
@@ -1213,7 +1222,8 @@ public:
  *
  */
 template <typename Derived>
-class MONGO_MOD_OPEN BasicCommandWithRequestParser : public BasicCommandWithReplyBuilderInterface {
+class [[MONGO_MOD_OPEN]] BasicCommandWithRequestParser
+    : public BasicCommandWithReplyBuilderInterface {
 private:
     static constexpr std::string_view _commandAlias() {
         using T = typename Derived::Request;
@@ -1323,7 +1333,7 @@ private:
 /**
  * Deprecated. Do not add new subclasses.
  */
-class MONGO_MOD_OPEN ErrmsgCommandDeprecated : public BasicCommand {
+class [[MONGO_MOD_OPEN]] ErrmsgCommandDeprecated : public BasicCommand {
     using BasicCommand::BasicCommand;
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
@@ -1366,7 +1376,7 @@ class MONGO_MOD_OPEN ErrmsgCommandDeprecated : public BasicCommand {
  *     base classes provided: InvocationBase or MinimalInvocationBase.
  */
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand : public Command {
+class [[MONGO_MOD_OPEN]] TypedCommand : public Command {
 public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) final;
@@ -1387,7 +1397,7 @@ private:
 };
 
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
+class [[MONGO_MOD_OPEN]] TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
 public:
     using RequestType = typename Derived::Request;
 
@@ -1396,7 +1406,17 @@ public:
                            const OpMsgRequest& opMsgRequest)
         : CommandInvocation(command),
           _request{_parseRequest(opCtx, command, opMsgRequest)},
-          _opMsgRequest{opMsgRequest} {}
+          _opMsgRequest{opMsgRequest} {
+        // Generic args are parsed as part of _request (which ran in the member-init list, before
+        // this ctor body). Install the IFRContext now so that IFR-flag-dependent parsing in a
+        // *derived* invocation (e.g. aggregate's lite-parse, which runs in the derived member-init
+        // list after this base ctor body) observes wire values. The window between _parseRequest
+        // and this call is intentional: _parseRequest must not consult IFR flags; if it ever
+        // needs to, this install would have to move into _parseRequest itself.
+        // Idempotent: the SEP's later readRequestMetadata call becomes a no-op for typed commands.
+        // For direct clients, tryGet() returns the parent opCtx's context and exits early.
+        rpc::installIfrContextFromWire(opCtx, request().getGenericArguments());
+    }
 
     const DatabaseName& db() const override {
         return request().getDbName();
@@ -1449,7 +1469,8 @@ private:
 };
 
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand<Derived>::MinimalInvocationBase : public InvocationBaseInternal {
+class [[MONGO_MOD_OPEN]] TypedCommand<Derived>::MinimalInvocationBase
+    : public InvocationBaseInternal {
     // Implemented as just a strong typedef for InvocationBaseInternal.
     using InvocationBaseInternal::InvocationBaseInternal;
 };
@@ -1458,7 +1479,7 @@ class MONGO_MOD_OPEN TypedCommand<Derived>::MinimalInvocationBase : public Invoc
  * Mix-in base for requests containing a `GenericArguments`.
  * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
  */
-class MONGO_MOD_OPEN GenericArgumentsTypedRequest {
+class [[MONGO_MOD_OPEN]] GenericArgumentsTypedRequest {
 public:
     explicit GenericArgumentsTypedRequest(const OpMsgRequest& req) : _args{_parseArgs(req)} {}
 
@@ -1488,7 +1509,7 @@ private:
  * Mix-in base for Requests containing a DatabaseName.
  * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
  */
-class MONGO_MOD_OPEN DbNameTypedRequest {
+class [[MONGO_MOD_OPEN]] DbNameTypedRequest {
 public:
     explicit DbNameTypedRequest(const OpMsgRequest& req) : _dbName{req.parseDbName()} {}
 
@@ -1504,8 +1525,8 @@ private:
  * Base for Requests having a `GenericArguments` and a `DatabaseName`.
  * Fills the `TypedCommand` `Request` requirements.
  */
-class MONGO_MOD_OPEN BasicTypedRequest : public GenericArgumentsTypedRequest,
-                                         public DbNameTypedRequest {
+class [[MONGO_MOD_OPEN]] BasicTypedRequest : public GenericArgumentsTypedRequest,
+                                             public DbNameTypedRequest {
 public:
     explicit BasicTypedRequest(const OpMsgRequest& req)
         : GenericArgumentsTypedRequest{req}, DbNameTypedRequest{req} {}
@@ -1538,7 +1559,7 @@ public:
  *     }
  */
 template <typename Derived>
-class MONGO_MOD_OPEN TypedCommand<Derived>::InvocationBase : public InvocationBaseInternal {
+class [[MONGO_MOD_OPEN]] TypedCommand<Derived>::InvocationBase : public InvocationBaseInternal {
 public:
     using InvocationBaseInternal::InvocationBaseInternal;
 

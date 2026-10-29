@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/replica_set_aware_service.h"
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -41,11 +16,14 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder_mock.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_mock.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>
@@ -61,6 +39,7 @@ template <class ActualService>
 class TestService : public ReplicaSetAwareService<ActualService> {
 public:
     int numCallsOnStartup{0};
+    int numCallsOnShutdown{0};
     int numCallsOnSetCurrentConfig{0};
     int numCallsOnConsistentDataAvailable{0};
     int numCallsOnStepUpBegin{0};
@@ -104,7 +83,9 @@ protected:
         numCallsOnBecomeArbiter++;
     }
 
-    void onShutdown() override {}
+    void onShutdown() override {
+        numCallsOnShutdown++;
+    }
 };
 
 /**
@@ -300,6 +281,83 @@ ServiceContext* SlowService::getServiceContext() {
     return getSlowService.owner(this);
 }
 
+/**
+ * Service whose onStartup can be made to block until the test explicitly unblocks it. Used to
+ * exercise shutdown waiting for an in-progress startup to complete.
+ */
+class BlockingService : public TestService<BlockingService> {
+public:
+    static BlockingService* get(ServiceContext* serviceContext);
+
+    void enableStartupBlocking() {
+        _blockStartup.store(true);
+    }
+
+    void waitForStartupReached() {
+        _startupReached.get();
+    }
+
+    void unblockStartup() {
+        _proceedWithStartup.set();
+    }
+
+private:
+    bool shouldRegisterReplicaSetAwareService() const final {
+        return true;
+    }
+
+    std::string getServiceName() const final {
+        return "BlockingService";
+    }
+
+    void onStartup(OperationContext* opCtx) final {
+        if (_blockStartup.load()) {
+            _startupReached.set();
+            _proceedWithStartup.get();
+        }
+        TestService::onStartup(opCtx);
+    }
+
+    Atomic<bool> _blockStartup{false};
+    Notification<void> _startupReached;
+    Notification<void> _proceedWithStartup;
+};
+
+const auto getBlockingService = ServiceContext::declareDecoration<BlockingService>();
+ReplicaSetAwareServiceRegistry::Registerer<BlockingService> blockingServiceRegisterer(
+    "BlockingService");
+
+BlockingService* BlockingService::get(ServiceContext* serviceContext) {
+    return &getBlockingService(serviceContext);
+}
+
+/**
+ * Service registered to run after BlockingService (it depends on it). Used to verify that an
+ * in-progress startup stops early once a shutdown is requested: this service must not be started in
+ * that case, even though it is still shut down.
+ */
+class DownstreamService : public TestService<DownstreamService> {
+public:
+    static DownstreamService* get(ServiceContext* serviceContext);
+
+private:
+    bool shouldRegisterReplicaSetAwareService() const final {
+        return true;
+    }
+
+    std::string getServiceName() const final {
+        return "DownstreamService";
+    }
+};
+
+const auto getDownstreamService = ServiceContext::declareDecoration<DownstreamService>();
+ReplicaSetAwareServiceRegistry::Registerer<DownstreamService> downstreamServiceRegisterer(
+    "DownstreamService", {"BlockingService"});
+
+DownstreamService* DownstreamService::get(ServiceContext* serviceContext) {
+    return &getDownstreamService(serviceContext);
+}
+
 class ReplicaSetAwareServiceTest : public ServiceContextTest {
 public:
     void setUp() override {
@@ -323,6 +381,10 @@ public:
     }
 
 protected:
+    ReplicaSetAwareServiceRegistry& registry() {
+        return ReplicaSetAwareServiceRegistry::get(getGlobalServiceContext());
+    }
+
     long long _term = 1;
     repl::ReplSetConfig _replSetConfig;
 
@@ -382,7 +444,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ReplicaSetAwareServiceRegistry::get(sc).onSetCurrentConfig(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onSetCurrentConfig(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onConsistentDataAvailable(
-        opCtx, false /* isMajority */, false /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/false);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
@@ -420,24 +482,155 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(1, c->numCallsOnBecomeArbiter);
 }
 
-TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceSkipsStartupIfShutdownAlreadyCalled) {
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceCanStartThenShutdown) {
     auto sc = getGlobalServiceContext();
     auto opCtxHolder = makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto& reg = registry();
 
     auto b = ServiceB::get(sc);
     auto c = ServiceC::get(sc);
 
+    reg.onStartup(opCtx);
+    ASSERT_EQ(1, b->numCallsOnStartup);
+    ASSERT_EQ(1, c->numCallsOnStartup);
+    ASSERT_EQ(0, b->numCallsOnShutdown);
+    ASSERT_EQ(0, c->numCallsOnShutdown);
+
+    reg.onShutdown();
+    ASSERT_EQ(1, b->numCallsOnStartup);
+    ASSERT_EQ(1, c->numCallsOnStartup);
+    ASSERT_EQ(1, b->numCallsOnShutdown);
+    ASSERT_EQ(1, c->numCallsOnShutdown);
+}
+
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceCanShutdownWithoutStartup) {
+    auto sc = getGlobalServiceContext();
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    auto& reg = registry();
+
+    auto b = ServiceB::get(sc);
+    auto c = ServiceC::get(sc);
+
+    // Shutting down a never-started instance is allowed and still drives onShutdown per service.
+    reg.onShutdown();
     ASSERT_EQ(0, b->numCallsOnStartup);
     ASSERT_EQ(0, c->numCallsOnStartup);
+    ASSERT_EQ(1, b->numCallsOnShutdown);
+    ASSERT_EQ(1, c->numCallsOnShutdown);
 
-    // Call onShutdown() before onStartup().
-    ReplicaSetAwareServiceRegistry::get(sc).onShutdown();
-    ReplicaSetAwareServiceRegistry::get(sc).onStartup(opCtx);
-
-    // No service should have had onStartup() called because shutdown was already called.
+    // Once shutdown has occurred, a later startup is a no-op.
+    reg.onStartup(opCtx);
     ASSERT_EQ(0, b->numCallsOnStartup);
     ASSERT_EQ(0, c->numCallsOnStartup);
+}
+
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceCannotStartTwice) {
+    auto sc = getGlobalServiceContext();
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    auto& reg = registry();
+
+    auto b = ServiceB::get(sc);
+    auto c = ServiceC::get(sc);
+
+    reg.onStartup(opCtx);
+    ASSERT_EQ(1, b->numCallsOnStartup);
+    ASSERT_EQ(1, c->numCallsOnStartup);
+
+    // A second startup must be skipped (and logged at INFO); services must not be started again.
+    unittest::LogCaptureGuard logs;
+    reg.onStartup(opCtx);
+    logs.stop();
+
+    ASSERT_EQ(1, b->numCallsOnStartup);
+    ASSERT_EQ(1, c->numCallsOnStartup);
+    ASSERT_EQ(1, logs.countBSONContainingSubset(BSON("id" << 12968800)));
+    // 12968800: "Skipping ReplicaSetAwareServiceRegistry startup";
+}
+
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceCannotShutdownTwice) {
+    auto sc = getGlobalServiceContext();
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    auto& reg = registry();
+
+    auto b = ServiceB::get(sc);
+    auto c = ServiceC::get(sc);
+
+    reg.onStartup(opCtx);
+    reg.onShutdown();
+    ASSERT_EQ(1, b->numCallsOnShutdown);
+    ASSERT_EQ(1, c->numCallsOnShutdown);
+
+    // A second shutdown must not run onShutdown on the services again.
+    reg.onShutdown();
+    ASSERT_EQ(1, b->numCallsOnShutdown);
+    ASSERT_EQ(1, c->numCallsOnShutdown);
+}
+
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceShutdownInterruptsStartup) {
+    auto sc = getGlobalServiceContext();
+    auto& reg = registry();
+
+    auto blockingService = BlockingService::get(sc);
+    auto downstreamService = DownstreamService::get(sc);
+    blockingService->enableStartupBlocking();
+
+    // Run startup on a separate thread. It will block inside BlockingService::onStartup, leaving
+    // the registry in its "startup in progress" state. DownstreamService is ordered after
+    // BlockingService and has not been started yet.
+    stdx::thread startupThread([&] {
+        ThreadClient tc(sc->getService());
+        auto opCtx = tc.get()->makeOperationContext();
+        reg.onStartup(opCtx.get());
+    });
+
+    Atomic<bool> shutdownReturned{false};
+    stdx::thread shutdownThread;
+
+    // Always release startup and join the threads, even if an assertion throws below.
+    ON_BLOCK_EXIT([&] {
+        if (startupThread.joinable()) {
+            blockingService->unblockStartup();
+            startupThread.join();
+        }
+        if (shutdownThread.joinable()) {
+            shutdownThread.join();
+        }
+    });
+
+    // Wait until startup is actually in progress before initiating shutdown.
+    blockingService->waitForStartupReached();
+
+    // Run shutdown on a separate thread. Because startup is in progress, it must block rather than
+    // shutting any service down.
+    shutdownThread = stdx::thread([&] {
+        reg.onShutdown();
+        shutdownReturned.store(true);
+    });
+
+    // While startup is blocked, shutdown cannot make progress. Sleep briefly so that a non-waiting
+    // implementation would have a chance to (incorrectly) proceed before we check.
+    sleepFor(Milliseconds(100));
+    ASSERT_FALSE(shutdownReturned.load());
+    ASSERT_EQ(0, blockingService->numCallsOnShutdown);
+
+    // Let the blocked startup resume. It should observe the shutdown request, stop before starting
+    // DownstreamService, and let shutdown run to completion.
+    blockingService->unblockStartup();
+    startupThread.join();
+    shutdownThread.join();
+
+    // BlockingService had already entered onStartup, so it is started; DownstreamService comes
+    // after it and must be skipped because the shutdown request breaks the startup loop.
+    ASSERT_EQ(1, blockingService->numCallsOnStartup);
+    ASSERT_EQ(0, downstreamService->numCallsOnStartup);
+    // Both services are shut down regardless of whether they were started.
+    ASSERT_EQ(1, blockingService->numCallsOnShutdown);
+    ASSERT_EQ(1, downstreamService->numCallsOnShutdown);
+    ASSERT_TRUE(shutdownReturned.load());
 }
 
 TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceLogSlowServices) {

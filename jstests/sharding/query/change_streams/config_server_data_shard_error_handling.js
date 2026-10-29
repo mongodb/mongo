@@ -2,6 +2,10 @@
  * Tests the behavior of change streams error handling.
  *
  * @tags: [
+ *  # The test already runs db/cluster-scoped streams natively, so passthrough is redundant, and
+ *  # it breaks the collection-scoped stream's event assertions once upconverted.
+ *  do_not_run_in_whole_db_passthrough,
+ *  do_not_run_in_whole_cluster_passthrough,
  *  requires_sharding,
  *  requires_fcv_83,
  *  requires_persistence,

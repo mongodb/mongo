@@ -1,0 +1,67 @@
+## Need to update a resmoke_suite_test?
+# Explanations of fields of the resmoke_suite_test rule are in bazel/resmoke/README.md.
+# In addition, certain `tags` and `target_compatible_with` are used to control which
+# tests are run in which CI tasks. Common cases are enumerated in jstests/suites/README.md.
+#
+# To run a suite:
+# bazel test //jstests/suites/query-execution:core
+#
+# To run a single test in a suite:
+# bazel test //jstests/suites/query-execution:core --test_sharding_strategy=disabled --test_arg=jstests/some_test.js
+#
+# To run outside the bazel sandbox, you may still use:
+# python buildscripts/resmoke.py run --suites=core
+
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+resmoke_suite_test(
+    name = "timeseries_write_pbt",
+    config = "//buildscripts/resmokeconfig:suites/timeseries_write_pbt.yml",
+    shard_count = 2,
+    # The Evergreen task passes --fastCheckParameters='${fastCheckParameters|}', an Evergreen
+    # expansion that cannot be expressed statically here, so this suite is not run remotely.
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "timeseries_write_pbt_replset",
+    config = "//buildscripts/resmokeconfig:suites/timeseries_write_pbt_replset.yml",
+    shard_count = 5,
+    # The Evergreen task passes --fastCheckParameters='${fastCheckParameters|}', an Evergreen
+    # expansion that cannot be expressed statically here, so this suite is not run remotely.
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "timeseries_write_pbt_sharded",
+    config = "//buildscripts/resmokeconfig:suites/timeseries_write_pbt_sharded.yml",
+    shard_count = 6,
+    # The Evergreen task passes --fastCheckParameters='${fastCheckParameters|}', an Evergreen
+    # expansion that cannot be expressed statically here, so this suite is not run remotely.
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

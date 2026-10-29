@@ -1,33 +1,18 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/crypto/encryption_fields_validation.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/encryption_fields_util.h"
+#include "mongo/crypto/fle_numeric.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #include <cmath>
 #include <cstdint>
@@ -40,23 +25,11 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/container/small_vector.hpp>
 #include <boost/cstdint.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/crypto/encryption_fields_util.h"
-#include "mongo/crypto/fle_numeric.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
-
 #include <boost/move/utility_core.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 
@@ -165,28 +138,6 @@ uint32_t getNumberOfBitsInDomain(const boost::optional<Decimal128>& min,
     }
 }
 
-std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType) {
-    switch (fieldType) {
-        case BSONType::numberDouble:
-            return {mongo::Value(std::numeric_limits<double>::lowest()),
-                    mongo::Value(std::numeric_limits<double>::max())};
-        case BSONType::numberDecimal:
-            return {mongo::Value(Decimal128::kLargestNegative),
-                    mongo::Value(Decimal128::kLargestPositive)};
-        case BSONType::numberInt:
-            return {mongo::Value(std::numeric_limits<int>::min()),
-                    mongo::Value(std::numeric_limits<int>::max())};
-        case BSONType::numberLong:
-            return {mongo::Value(std::numeric_limits<long long>::min()),
-                    mongo::Value(std::numeric_limits<long long>::max())};
-        case BSONType::date:
-            return {mongo::Value(Date_t::min()), mongo::Value(Date_t::max())};
-        default:
-            uasserted(7018202, "Range index only supports numeric types and the Date type.");
-    }
-    MONGO_UNREACHABLE;
-}
-
 uint64_t exp2UInt64(uint32_t exp) {
     uassert(9203501, "Exponent out of bounds for uint64", exp < 64);
 
@@ -258,6 +209,28 @@ void validateRangeBoundsInt(T typeInfo, uint32_t sparsity, uint32_t trimFactor) 
 
 }  // namespace
 
+std::pair<mongo::Value, mongo::Value> getRangeMinMaxDefaults(BSONType fieldType) {
+    switch (fieldType) {
+        case BSONType::numberDouble:
+            return {mongo::Value(std::numeric_limits<double>::lowest()),
+                    mongo::Value(std::numeric_limits<double>::max())};
+        case BSONType::numberDecimal:
+            return {mongo::Value(Decimal128::kLargestNegative),
+                    mongo::Value(Decimal128::kLargestPositive)};
+        case BSONType::numberInt:
+            return {mongo::Value(std::numeric_limits<int>::min()),
+                    mongo::Value(std::numeric_limits<int>::max())};
+        case BSONType::numberLong:
+            return {mongo::Value(std::numeric_limits<long long>::min()),
+                    mongo::Value(std::numeric_limits<long long>::max())};
+        case BSONType::date:
+            return {mongo::Value(Date_t::min()), mongo::Value(Date_t::max())};
+        default:
+            uasserted(7018202, "Range index only supports numeric types and the Date type.");
+    }
+    MONGO_UNREACHABLE;
+}
+
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<BSONElement>& min,
                                  const boost::optional<BSONElement>& max,
@@ -284,6 +257,14 @@ uint32_t getNumberOfBitsInDomain(BSONType fieldType,
     }
 }
 
+uint32_t getNumberOfBitsInDomain(BSONType fieldType, const QueryTypeConfig& query) {
+    auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
+    return getNumberOfBitsInDomain(
+        fieldType,
+        query.getMin().value_or(defMin),
+        query.getMax().value_or(defMax),
+        query.getPrecision().map([](int32_t p) { return static_cast<uint32_t>(p); }));
+}
 
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
                                  const boost::optional<Value>& min,
@@ -419,8 +400,7 @@ void validateRangeIndex(BSONType fieldType, std::string_view fieldPath, QueryTyp
         auto precision = query.getPrecision().map([](int32_t i) { return (uint32_t)(i); });
 
         auto [defMin, defMax] = getRangeMinMaxDefaults(fieldType);
-        uint32_t bits = getNumberOfBitsInDomain(
-            fieldType, query.getMin().value_or(defMin), query.getMax().value_or(defMax), precision);
+        uint32_t bits = getNumberOfBitsInDomain(fieldType, query);
 
         // We allow the case where #bits = TF = 0.
         uassert(8574000,

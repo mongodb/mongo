@@ -90,7 +90,7 @@ __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp
      * until the page-index is updated, but I'm not willing to debug that
      * one if I'm wrong.)
      */
-    if (pindex->index[pindex->entries - 1]->home != ref->page)
+    if (__wt_atomic_load_ptr_relaxed(&pindex->index[pindex->entries - 1]->home) != ref->page)
         return (true);
 
     *pindexp = pindex;
@@ -108,13 +108,12 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
   int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool, bool *), void *func_cookie,
   uint32_t flags)
 {
-    struct timespec start, stop;
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_PAGE_INDEX *pindex;
     WT_REF *couple, *ref, *ref_orig;
     WT_REF_STATE current_state;
-    uint64_t restart_sleep, restart_yield, time_diff_ms;
+    uint64_t restart_sleep, restart_yield, start, stop, time_diff_ms;
     uint32_t slot;
     bool empty_internal, prev, skip;
 
@@ -181,7 +180,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
      */
     WT_ENTER_PAGE_INDEX(session);
 
-    __wt_epoch(session, &start);
+    start = __wt_clock(session);
     /* If no page is active, begin a walk from the start/end of the tree. */
     if ((ref = ref_orig) == NULL) {
         if (0) {
@@ -200,6 +199,14 @@ restart:
             ref = &btree->root;
             WT_INTL_INDEX_GET(session, ref->page, pindex);
             slot = prev ? pindex->entries - 1 : 0;
+            /*
+             * The root is the walk's starting point and is never swapped in below, so account it
+             * here. Only reached when a walk begins at the tree's start; a seek-positioned scan
+             * misses the root and the descent path leading to the first page. A WT_RESTART could
+             * cause re-entry and over accounting. This is a known limitation.
+             */
+            if (LF_ISSET(WT_READ_SIZE_STAT))
+                WT_ERR(__wti_size_stat_page(session, ref->page));
             goto descend;
         }
     }
@@ -336,6 +343,16 @@ descend:
                 if (__wt_session_prefetch_check(session, ref))
                     WT_ERR(__wti_btree_prefetch(session, ref));
 
+                /*
+                 * Accumulate the size summary. Every page (leaf and internal) is swapped in here
+                 * exactly once per traversal, so this is the single choke point for per-page
+                 * accounting. The one exception is WT_RESTART: it restarts the descent and
+                 * re-accounts the pages, requiring a concurrent a split. This should be rare to
+                 * impossible for databases being verified as they are read-only.
+                 */
+                if (LF_ISSET(WT_READ_SIZE_STAT))
+                    WT_ERR(__wti_size_stat_page(session, ref->page));
+
                 /* Return leaf pages to our caller. */
                 if (F_ISSET(ref, WT_REF_FLAG_LEAF)) {
                     *refp = ref;
@@ -379,6 +396,12 @@ descend:
             if (ret == WT_RESTART)
                 goto restart;
 
+            /* Skip-on-corrupt: treat as a clean break so the outer loop advances to the sibling. */
+            if (ret == WT_ERROR && WT_READ_SKIP_CORRUPT_HIT(session, flags)) {
+                WT_NOT_READ(ret, 0);
+                break;
+            }
+
             /* Unexpected error, so "couple" was released. */
             couple = NULL;
             goto err;
@@ -386,8 +409,8 @@ descend:
     }
 
 done:
-    __wt_epoch(session, &stop);
-    time_diff_ms = WT_TIMEDIFF_MS(stop, start);
+    stop = __wt_clock(session);
+    time_diff_ms = WT_CLOCKDIFF_MS(stop, start);
     if (time_diff_ms > 10 * WT_THOUSAND)
         __wt_verbose_warning(session, WT_VERB_READ,
           "tree walk took more than 10 seconds (%" PRIu64 "ms)", time_diff_ms);

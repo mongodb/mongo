@@ -155,7 +155,7 @@ ReplSetTest.prototype.upgradeNode = function (node, opts = {}, user, pwd) {
         ReplSetTest.State.SECONDARY,
         ReplSetTest.State.ARBITER,
     ];
-    this.waitForState(newNode, waitForStates);
+    this.waitForMyState(newNode, waitForStates);
 
     if (user !== undefined) {
         newNode.getDB("admin").logout();

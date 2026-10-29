@@ -43,13 +43,26 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         jsTestLog(
             "Executing bucket level update on: " + collName + " on field '" + updateField + "'",
         );
-        assert.commandWorked(
-            shardedColl.update(
-                {[updateField]: {$gte: oldValue}},
-                {$inc: {[updateField]: 1}},
-                {multi: true},
-            ),
+        const res = shardedColl.update(
+            {[updateField]: {$gte: oldValue}},
+            {$inc: {[updateField]: 1}},
+            {multi: true},
         );
+
+        // A multi:true update can run while a chunk migration commits on the same shard. During the
+        // commit the shard bumps its placement version, so an update that has already changed some
+        // documents stops with a placement version mismatch, which the server reports as
+        // QueryPlanKilled. The server does this on purpose: the update is not a retryable write and
+        // not in a transaction, so a retry could apply the change twice.
+        if (res.hasWriteError()) {
+            assert.eq(
+                res.getWriteError().code,
+                ErrorCodes.QueryPlanKilled,
+                () => "Unexpected write error during bucket level update: " + tojson(res),
+            );
+            return;
+        }
+        assert.commandWorked(res);
     };
 
     $config.data.validateCollection = function validate(db, collName) {

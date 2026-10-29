@@ -28,6 +28,7 @@ featureCompatibilityVersions:
   - "8.2"
   - "8.3"
   - "9.0"
+  - "9.1"
   - "100.0" # This version is not an actual version and used for testing only
 # All LTS releases starting with 4.0.
 longTermSupportReleases:
@@ -38,6 +39,7 @@ longTermSupportReleases:
   - "6.0"
   - "7.0"
   - "8.0"
+  - "9.0"
 
 # List of stable MongoDB versions since 2.0 that have been EOL'd.
 # Entries to this section will also stop them from running as "old" versions in

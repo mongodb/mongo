@@ -61,11 +61,11 @@ function runTxn(mongosHost, dbName, collName) {
     jsTest.log("Committed the cross-shard transaction");
 }
 
-function runSetFCV(primaryHost) {
-    const primaryConn = new Mongo(primaryHost);
-    jsTest.log("Starting a setFCV command on " + primaryHost);
+function runSetFCV(mongoSHost) {
+    const mongoSConn = new Mongo(mongoSHost);
+    jsTest.log("Starting a setFCV command on " + mongoSHost);
     assert.commandWorked(
-        primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        mongoSConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
     );
     jsTest.log("Completed the setFCV command");
 }
@@ -78,10 +78,10 @@ const txnThread = new Thread(runTxn, st.s.host, dbName, collName);
 txnThread.start();
 writeDecisionFp.wait();
 
-// Run a setFCV command against shard0 and wait for the setFCV thread to start waiting to acquire
-// the MultiDocumentTransactionsBarrier S lock (i.e. waiting for existing prepared transactions to
+// Run setFCV and wait for the setFCV thread on shard0 to start waiting to acquire the
+// MultiDocumentTransactionsBarrier S lock (i.e. waiting for existing prepared transactions to
 // commit or abort).
-const setFCVThread = new Thread(runSetFCV, shard0Primary.host);
+const setFCVThread = new Thread(runSetFCV, st.s.host);
 setFCVThread.start();
 assert.soon(() => {
     return shard0Primary

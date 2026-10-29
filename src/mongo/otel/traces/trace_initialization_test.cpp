@@ -1,37 +1,16 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/traces/trace_initialization.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/otel/traces/trace_settings.h"
+#include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #include <gmock/gmock.h>
 #include <opentelemetry/trace/noop.h>
@@ -46,9 +25,9 @@ class TraceInitializationTest : public unittest::Test {
 public:
     void setUp() override {
         // Initialize TracerProviderService with no-op provider
-        auto tracerProviderService = TracerProviderService::create();
+        auto tracerProviderService = createNoOpTracerProviderService();
         tracerProviderService->setTracerProvider_ForTest(
-            std::make_shared<opentelemetry::trace::NoopTracerProvider>());
+            std::make_unique<opentelemetry::trace::NoopTracerProvider>());
         setGlobalTracerProviderService(std::move(tracerProviderService));
     }
 
@@ -66,7 +45,7 @@ TEST_F(TraceInitializationTest, NoTraceProvider) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->getTracerProvider());
 }
 
 TEST_F(TraceInitializationTest, Shutdown) {
@@ -74,14 +53,14 @@ TEST_F(TraceInitializationTest, Shutdown) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->getTracerProvider());
 
     unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
     shutdown();
 
     tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->getTracerProvider());
 }
 
 TEST_F(TraceInitializationTest, FileTraceProvider) {
@@ -90,8 +69,9 @@ TEST_F(TraceInitializationTest, FileTraceProvider) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_TRUE(tracerProviderService->isEnabled());
-    EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
+    auto* provider = tracerProviderService->getTracerProvider();
+    ASSERT_NE(provider, nullptr);
+    EXPECT_FALSE(isNoop(provider));
 }
 
 TEST_F(TraceInitializationTest, HttpTraceProvider) {
@@ -101,8 +81,9 @@ TEST_F(TraceInitializationTest, HttpTraceProvider) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_TRUE(tracerProviderService->isEnabled());
-    EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
+    auto* provider = tracerProviderService->getTracerProvider();
+    ASSERT_NE(provider, nullptr);
+    EXPECT_FALSE(isNoop(provider));
 }
 
 TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
@@ -113,8 +94,9 @@ TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
 
     auto tracerProviderService = getGlobalTracerProviderService();
     ASSERT_TRUE(tracerProviderService);
-    EXPECT_TRUE(tracerProviderService->isEnabled());
-    EXPECT_TRUE(isNoop(tracerProviderService->getTracerProvider().get()));
+    auto* provider = tracerProviderService->getTracerProvider();
+    ASSERT_NE(provider, nullptr);
+    EXPECT_TRUE(isNoop(provider));
 }
 
 TEST_F(TraceInitializationTest, InvalidCompressionFails) {
@@ -144,6 +126,26 @@ TEST_F(TraceInitializationTest, MaxBatchSizeEqualToMaxQueueSizeSucceeds) {
     unittest::ServerParameterGuard batchSizeParam{"openTelemetryTracingMaxBatchSize", 512};
     unittest::ServerParameterGuard queueSizeParam{"openTelemetryTracingMaxQueueSize", 512};
     ASSERT_OK(initialize(kServiceName));
+}
+
+TEST_F(TraceInitializationTest, HeadersWithoutHttpExporterLogsWarning) {
+    // Configure HTTP export headers while only the file exporter is enabled. The headers cannot be
+    // sent without the HTTP exporter, so initialization must log a warning.
+    unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+
+    OpenTelemetryTracingHttpExportHeaders headersParam{"openTelemetryTracingHttpExportHeaders",
+                                                       ServerParameterType::kStartupOnly};
+    auto setHeaders = [&](BSONObj doc) {
+        auto storage = BSON("v" << doc);
+        return headersParam.set(storage.firstElement(), /*tenantId=*/boost::none);
+    };
+    ASSERT_OK(setHeaders(BSON("Authorization" << "Bearer ignored-token")));
+    ON_BLOCK_EXIT([&] { invariant(setHeaders(BSONObj{})); });
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(initialize(kServiceName));
+    logs.stop();
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12877900)), 1);
 }
 
 }  // namespace

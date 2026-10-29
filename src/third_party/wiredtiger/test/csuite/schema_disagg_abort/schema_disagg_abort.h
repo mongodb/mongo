@@ -1,0 +1,368 @@
+/*-
+ * Copyright (c) 2014-present MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
+/*
+ * Disaggregated schema crash recovery test: one or two nodes create, populate and drop tables over
+ * a shared page log while the parent switches their roles, kills them or stops them cleanly. Each
+ * node is then recovered from shared storage and verified against per-operation record files. See
+ * README.md for the architecture, the generator's table model and what verification asserts.
+ *
+ * Main parts:
+ *   - the parent: orchestrates and verifies;
+ *   - a node: leads or follows;
+ *   - events: generator writes them to a pipe, the reader demuxes them to
+ *     per-worker queues, the workers apply them;
+ *   - checkpoints are in their own thread, independent of the workers;
+ *   - role changes and the graceful stop are driven by sentinel files the parent drops;
+ */
+
+#pragma once
+
+#include "test_util.h"
+
+/* Tunables. */
+
+/*
+ * Generator parameters.
+ */
+#define GEN_INSERT_ODDS 64      /* an insert: 1 in N visits to a published table */
+#define GEN_DROP_ODDS 48        /* a drop: 1 in N visits to a published table */
+#define GEN_APPLY_RATE_FLOOR 30 /* applied values/second, the multi-node worst case */
+#define GEN_LEAD_PER_THREAD 32  /* in-flight events per worker, so the workers stay fed */
+#define GEN_STEPDOWN_EVENTS 64  /* step-down events before flushing, and a lone node's minimum */
+
+/*
+ * Frontier window to track completed timestamps across workers. Must be large enough to accommodate
+ * all in-flight timestamps.
+ */
+#define FRONTIER_WINDOW 0x10000u
+
+#define MAX_CKPT_INVL 4 /* checkpoint thread: upper bound on the interval, in seconds */
+#define TS_BOOTSTRAP 1  /* the timestamp sequence starts here, on either mode */
+#define MAX_NODES 2
+#define MAX_OP_WAIT 30 /* maximum time to wait for an in-node operation */
+#define MAX_POOL_SIZE 64
+#define MAX_TIME 40
+#define MIN_TIME 10
+#define MAX_WAIT 60 /* parent: a child starting, stopping, or posting a sentinel */
+#define MAX_STEPDOWN_WAIT (2 * MAX_WAIT) /* maximum time to wait for a step-down to complete */
+#define MIN_POOL_SIZE 2
+#define MAX_TH 12
+#define MIN_TH 2
+
+/* Directory layout under the test home. */
+#define NODE_HOME_FMT "WT_NODE%" PRIu32
+#define PAGE_LOG_DIR "PALITE"
+
+/* URI / file name patterns; tables and record files are namespaced by owning node. */
+#define DATA_KEY_MIN 0
+#define DATA_KEY_MAX 9
+/* node, thread, slot: the slot's name, which every create in that slot reuses. */
+#define SCHEMA_TABLE_FMT "table:schema_%" PRIu32 "_%" PRIu32 "_%" PRIu32
+
+/*
+ * Per-node, per-thread record files: "<records dir>/node<node>-<role>-<thread>", named for the role
+ * the node held when it wrote them. Its "leader" files log the operations it originated; its
+ * "follower" files log the peer's events it applied.
+ */
+#define LEADER_RECORDS_FILE RECORDS_DIR DIR_DELIM_STR "node%" PRIu32 "-leader-%" PRIu32
+#define FOLLOWER_RECORDS_FILE RECORDS_DIR DIR_DELIM_STR "node%" PRIu32 "-follower-%" PRIu32
+
+/*
+ * Sentinels the nodes and the parent coordinate through. The switch request is consumed by the
+ * acting node (the leader, or a lone node), so each request fires exactly one switch.
+ */
+#define LEADER_READY_FILE "leader_ready"       /* initial leader completed a checkpoint */
+#define FOLLOWER_READY_FILE "follower_ready"   /* initial follower completed a pickup */
+#define SWITCH_REQUEST_FILE "switch_request"   /* parent directs a role switch */
+#define SWITCH_DONE_FMT "switch_done.%" PRIu32 /* the n-th switch completed */
+#define STOP_FILE "stop_run"                   /* parent directs a graceful stop */
+
+/*
+ * The follower's latest adopted checkpoint, its LSN and its schema epoch: a stepping-down leader
+ * polls the LSN, and a leading generator the epoch.
+ */
+#define ADOPTED_CKPT_FILE "ckpt_adopted"
+
+/* WiredTiger connection config. Local state is disposable, as in MongoDB. */
+#define ENV_CONFIG_BASE "create,disaggregated=(lose_all_my_data=true)"
+
+/* The nodes connections log statistics. */
+#define ENV_CONFIG_DEF ENV_CONFIG_BASE ",statistics=(all),statistics_log=(json,on_close,wait=1)"
+
+/* Timestamp fields accepted by query_ts and set_ts. */
+#define TS_OLDEST 0x01u
+#define TS_STABLE 0x02u
+#define TS_STABLE_SCHEMA_EPOCH 0x04u
+#define TS_STEPDOWN_TIMESTAMP 0x08u
+#define TS_STEPDOWN_SCHEMA_EPOCH 0x10u
+#define TS_LAST_SCHEMA_EPOCH 0x20u
+#define TS_LAST_CHECKPOINT 0x40u
+#define TS_FRONTIER (TS_OLDEST | TS_STABLE | TS_STABLE_SCHEMA_EPOCH)
+#define TS_STEPDOWN (TS_STEPDOWN_TIMESTAMP | TS_STEPDOWN_SCHEMA_EPOCH)
+/* The epoch bits set_ts drops when epochs are off; setting either one leaves legacy mode. */
+#define TS_SCHEMA_EPOCHS (TS_STABLE_SCHEMA_EPOCH | TS_STEPDOWN_SCHEMA_EPOCH)
+
+/* Which process this instance of the binary is. */
+typedef enum { ROLE_PARENT = 0, ROLE_NODE } TEST_ROLE;
+
+/* Timed SIGKILL targets; leader/follower refer to the CURRENT role at kill time. */
+typedef enum { KILL_LONE = 0, KILL_LEADER, KILL_FOLLOWER } KILL_TARGET;
+#define KILL_TARGETS 3
+
+/* Test-wide events. Leader sends them; follower receives them from the peer. */
+typedef enum {
+    EVENT_NONE = 0,
+    EVENT_CREATE,
+    EVENT_DROP,
+    EVENT_INSERT,
+    EVENT_PUBLISH_CREATE,
+    EVENT_PUBLISH_DROP,
+    EVENT_PENDING,
+    EVENT_STEPDOWN,
+    EVENT_SWITCH
+} EVENT_TYPE;
+
+/* Where a worker takes an event's timestamp. */
+typedef enum {
+    TIMESTAMP_NEXT = 0, /* the next timestamp */
+    TIMESTAMP_RESERVED  /* one of those reserved at or below the step-down timestamp */
+} TIMESTAMP_SOURCE;
+
+typedef struct {
+    EVENT_TYPE type;
+    uint32_t thread_id;
+    uint32_t slot;
+    uint32_t reserve_count;     /* step-down: timestamps to reserve for the pending publishes */
+    TIMESTAMP_SOURCE ts_source; /* where the event's timestamp comes from */
+    /*-
+     * The completion timestamp for this event:
+     *   - a publish epoch,
+     *   - an insert's commit timestamp,
+     *   - a legacy schema op's timestamp (epoch-less mode).
+     */
+    uint64_t event_ts;
+    uint32_t key_min;
+    uint32_t key_max;
+    char uri[64];
+} SCHEMA_EVENT;
+
+/*
+ * The generator's view of a table's position in its lifecycle.
+ */
+typedef enum {
+    TABLE_NONE = 0,  /* no local table, nothing unpublished */
+    TABLE_CREATED,   /* created; the publish may be delayed */
+    TABLE_PUBLISHED, /* create published; may take data, and is droppable */
+    TABLE_DROPPED,   /* dropped; the publish may be delayed */
+    TABLE_REMOVED    /* drop published; back to NONE once the stable epoch covers it */
+} TABLE_STATE;
+
+/* One table, carried across leader-follower transitions. */
+typedef struct {
+    TABLE_STATE state;
+    /* Published create's epoch once its publish applies, else 0; atomic access. */
+    uint64_t create_epoch;
+    /* Published drop's epoch once its publish applies, else 0; atomic access. */
+    uint64_t drop_epoch;
+    /* Inserted data is uncovered yet. Not droppable until a checkpoint. */
+    bool uncovered_insert;
+    /* The stream position of the table's last event this phase; generator only. */
+    uint64_t emitted_at;
+} TABLE;
+
+/* Test-wide configuration, built from the command line by every role independently. */
+typedef struct {
+    TEST_OPTS *opts;
+    TEST_ROLE role;
+    bool with_leader;   /* parent: the -r topology */
+    bool with_follower; /* parent: the -r topology */
+    uint32_t node_id;   /* this node's id (namespace, homes, records); parent: unused */
+    bool start_leader;  /* this node's parent-assigned starting role */
+    bool peer_alive;    /* this node has a live peer; cleared on pipe EOF/EPIPE; atomic access */
+    char home[PATH_MAX];
+    char page_log_home[PATH_MAX];
+    uint32_t thread_count;
+    uint32_t pool_size;
+    bool epoch_less;                  /* -e: legacy schema operations without epochs or publish */
+    uint32_t total_time;              /* -t: graceful stop after this many seconds */
+    uint32_t switch_interval;         /* -s: switch roles every N seconds; 0: never */
+    uint32_t kill_time[KILL_TARGETS]; /* -k [l|f]N: SIGKILL the target at N; 0: never */
+    bool verify_only;
+    int pipe_read_fd;       /* this node's in-pipe (peer's events); -1 when lone */
+    int pipe_write_fd;      /* this node's out-pipe (events to the peer); -1 when lone */
+    int self_pipe_read_fd;  /* this node's own event source; the generator writes it when */
+    int self_pipe_write_fd; /* leading, the reader drains it; process lifetime, never closed */
+} TEST_CONFIG;
+
+/*
+ * Per-worker single-producer/single-consumer event ring: the reader thread produces, the worker
+ * consumes. A full ring blocks the reader, which stops draining the source pipe and so
+ * backpressures the producer - the peer leader, or the node's own generator.
+ */
+#define EVQ_SIZE 256
+typedef struct {
+    SCHEMA_EVENT ev[EVQ_SIZE];
+    uint64_t head; /* consumer position; atomic access */
+    uint64_t tail; /* producer position; atomic access */
+} EVENT_QUEUE;
+
+/*-
+ * The phase's shutdown stages:
+ *    1. the generator first so the stream ends,
+ *    2. then the reader,
+ *    3. then the workers draining what it delivered,
+ *    4. and last the checkpoint and timestamp threads.
+ *
+ * Checkpoint and timestamp threads go after the workers because a draining worker may be blocked on
+ * a DROP waiting for durable state.
+ */
+#define STAGE_NONE 0
+#define STAGE_GENERATOR 1
+#define STAGE_READER 2
+#define STAGE_WORKERS 3
+#define STAGE_CKPT 4
+#define STAGE_TS 5
+/*
+ * Stage index is also the count of auxiliary threads. One slot per stage; STAGE_NONE and
+ * STAGE_WORKERS are unused.
+ */
+#define AUX_THR_COUNT (STAGE_TS + 1)
+
+/*
+ * Workload-engine state, one per node process, owned by node.c.
+ */
+typedef struct {
+    TEST_CONFIG *cfg;          /* bound at creation */
+    WT_CONNECTION *conn;       /* owned here; open for the node's life */
+    WT_PAGE_LOG *page_log;     /* owned here; held for the node's life */
+    bool leads;                /* this phase leads */
+    bool generates;            /* this phase generates events into the self-pipe; fixed per phase */
+    bool handover_received;    /* the term was handed over this phase; atomic access */
+    uint32_t stop_stage;       /* how far the phase's shutdown has progressed; atomic access */
+    uint64_t adopted_ckpt_lsn; /* skip re-adopting the same checkpoint; reset on role change */
+    uint64_t adopted_ckpt_epoch; /* latest adopted checkpoint epoch (on follower); atomic access. */
+
+    uint32_t switch_gen; /* how many role transitions this node has completed */
+
+    /* Step-down state, zero outside a transition; atomic access. */
+    uint64_t stepdown_ts;       /* while set, stable stops at it; no periodic checkpoints */
+    uint64_t reserved_ts;       /* the last of the reserved timestamps handed out */
+    bool stepdown_ckpt_due;     /* the timestamp is set: the checkpoint thread may take it */
+    uint64_t stepdown_ckpt_lsn; /* the step-down checkpoint, once taken */
+
+    /* Single monotonic value for schema operations and commit timestamps. */
+    uint64_t current_ts;
+    uint64_t frontier_ts;  /* every timestamp at or below it is applied; atomic access */
+    uint64_t stable_epoch; /* the stable schema epoch this node last set; atomic access */
+    /* Circular buffer for completed timestamps of all workers; atomic access. */
+    uint8_t completed_ts[FRONTIER_WINDOW];
+    uint64_t applied;      /* worker: how many events have been applied; atomic access */
+    uint32_t worker_count; /* how many workers are in use this phase */
+
+    /* Per-worker-thread state; the reader fills the queue, the table model is the generator's. */
+    struct {
+        wt_thread_t thr;            /* this worker's handle */
+        EVENT_QUEUE evq;            /* this worker's inbound events */
+        bool busy;                  /* the worker is mid-apply; atomic access */
+        WT_RAND_STATE rnd;          /* this worker's random stream */
+        TABLE table[MAX_POOL_SIZE]; /* this worker's tables */
+    } workers[MAX_TH];
+
+    /* The single-threaded stages, indexed by stage: generator, reader, checkpoint, timestamp. */
+    wt_thread_t aux_thr[AUX_THR_COUNT];
+
+    /* Auxiliary random stream */
+    WT_RAND_STATE ext_rnd;
+
+} WORKLOAD_STATE;
+
+/*
+ * The checkpoint thread's bookkeeping for one phase.
+ */
+typedef struct {
+    struct timespec phase_start; /* when the phase began, used for checkpoint timeouts */
+
+    /* Leading only: the cadence. */
+    uint32_t produced;    /* checkpoints produced so far */
+    struct timespec last; /* when the previous checkpoint completed */
+    uint64_t wait;        /* seconds to the next one, redrawn after each */
+    WT_RAND_STATE *rnd;   /* the cadence's random stream */
+} CKPT_CTX;
+
+/*
+ * A node role: leader or follower. The role's checkpoint operation is the only behavior that
+ * differs between them, everything else is shared.
+ */
+typedef struct {
+    const char *name;         /* also the disaggregated connection mode string */
+    const char *close_config; /* connection close configuration for a graceful stop */
+    bool leads;               /* this role generates events and produces checkpoints */
+    void (*checkpoint)(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
+} NODE_ROLE;
+
+/* main.c */
+void println(const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 1, 2)));
+uint64_t query_ts(WT_CONNECTION *conn, uint8_t bit);
+void set_ts(const TEST_CONFIG *cfg, WT_CONNECTION *conn, uint8_t mask, uint64_t ts);
+void adopted_ckpt_publish(uint32_t node_id, uint64_t lsn, uint64_t schema_epoch);
+uint64_t adopted_ckpt_read(uint64_t *schema_epochp);
+
+/* parent.c */
+void parent_main(TEST_CONFIG *cfg, const char *self_path);
+
+/*
+ * node.c: the generic node - the control loop and role state machine, the connection, the workload
+ * engine's state and per-phase lifecycle, the worker event queues, and the timestamp thread.
+ */
+int node_main(TEST_CONFIG *cfg);
+const NODE_ROLE *node_role(bool leads);
+bool node_is_lone(const TEST_CONFIG *cfg);
+bool node_peer_alive(TEST_CONFIG *cfg);
+void disagg_opts_init(const TEST_CONFIG *cfg);
+bool node_switch_request_consume(void);
+bool workload_active(WORKLOAD_STATE *state, uint32_t stage);
+bool node_stage_stopped(WORKLOAD_STATE *state, uint32_t stage);
+void workload_counter_advance(WORKLOAD_STATE *state, uint64_t v);
+void workload_set_frontier(WORKLOAD_STATE *state, uint64_t ts);
+
+/* evq.c: the per-worker event queues - the reader produces, its worker consumes. */
+void evq_enqueue(WORKLOAD_STATE *state, const SCHEMA_EVENT *ev);
+bool evq_dequeue(WORKLOAD_STATE *state, uint32_t thread_index, SCHEMA_EVENT *ev);
+bool evq_is_empty(WORKLOAD_STATE *state, uint32_t thread_index);
+uint64_t evq_depth(WORKLOAD_STATE *state, uint32_t thread_index);
+void evq_drain_barrier(WORKLOAD_STATE *state);
+
+/* event_pipe.c: the event framing every pipe shares. */
+bool pipe_relay_event(TEST_CONFIG *cfg, const SCHEMA_EVENT *ev);
+void pipe_event_write(int fd, const SCHEMA_EVENT *ev);
+bool pipe_event_read(int fd, SCHEMA_EVENT *ev);
+bool pipe_wait_readable(int fd);
+
+/* generator.c: the generator stage - the node's command stream, and all switch triggering. */
+WT_THREAD_RET thread_generator_run(void *arg);
+
+/* reader.c: the reader stage - demuxing the source pipe to the workers. */
+WT_THREAD_RET thread_reader_run(void *arg);
+
+/* ckpt.c: the checkpoint and timestamps - running independently of the workload - and the roles. */
+WT_THREAD_RET thread_ckpt_run(void *arg);
+WT_THREAD_RET thread_ts_run(void *arg);
+void ckpt_adopt_latest(WORKLOAD_STATE *state);
+bool ckpt_get(
+  WORKLOAD_STATE *state, WT_SESSION *session, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args);
+void leader_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
+void follower_checkpoint(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt);
+
+/* worker.c: the worker stage - executing events and recording them. */
+void node_workers_start(WORKLOAD_STATE *state);
+void node_workers_stop(WORKLOAD_STATE *state);
+
+/* verify.c */
+void verify_schema_state(WT_CONNECTION *conn, const TEST_CONFIG *cfg);
+void verify_relay_prefix(const TEST_CONFIG *cfg);

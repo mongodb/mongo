@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
@@ -402,6 +376,17 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
                    "{}");
 }
 
+TEST_F(CanonicalQueryEncoderTest, ComputeKeyDistinctUnwindsArrays) {
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
+    unique_ptr<CanonicalQuery> cqPlain(canonicalize(opCtx(), "{}"));
+    cqPlain->setDistinct(CanonicalDistinct("a"));
+    unique_ptr<CanonicalQuery> cqUnwound(canonicalize(opCtx(), "{}"));
+    cqUnwound->setDistinct(
+        CanonicalDistinct("a", false, boost::none, boost::none, false, /*unwindsArrays=*/true));
+    ASSERT_NOT_EQUALS(canonical_query_encoder::encodeClassic(*cqPlain),
+                      canonical_query_encoder::encodeClassic(*cqUnwound));
+}
+
 // Cache keys for $_internalBucketGeoWithin with flat and spherical geometry should
 // not be the same.
 TEST_F(CanonicalQueryEncoderTest, ComputeKeyTimeseriesGeoWithin) {
@@ -608,9 +593,9 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBE) {
                       "{}",
                       "{}",
                       "{}",
-                      nullptr /* findCommand */,
-                      {} /* pipeline */,
-                      true /* isCountLike */);
+                      /*findCommand=*/nullptr,
+                      /*pipelineObj=*/{},
+                      /*isCountLike=*/true);
 
     // With FindCommandRequest
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -748,19 +733,19 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyWithNeedsMerge) {
                       "{}",
                       "{}",
                       "{}",
-                      nullptr /* findCommand */,
+                      /*findCommand=*/nullptr,
                       {groupStage},
-                      false /* isCountLike */,
-                      false /* needsMerge */);
+                      /*isCountLike=*/false,
+                      /*needsMerge=*/false);
 
     testComputeSBEKey(gctx,
                       "{}",
                       "{}",
                       "{}",
-                      nullptr /* findCommand */,
+                      /*findCommand=*/nullptr,
                       {groupStage},
-                      false /* isCountLike */,
-                      true /* needsMerge */);
+                      /*isCountLike=*/false,
+                      /*needsMerge=*/true);
 }
 
 TEST_F(CanonicalQueryEncoderTest, ComputeKeyForPipeline) {

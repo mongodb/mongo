@@ -78,7 +78,9 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
 
     extra_args="$extra_args --jobs=${resmoke_jobs}"
 
-    if [ ${should_shuffle} = true ]; then
+    if [ -n "${shuffle_mode}" ]; then
+        extra_args="$extra_args --shuffleMode=${shuffle_mode}"
+    elif [ ${should_shuffle} = true ]; then
         extra_args="$extra_args --shuffleMode=longest-first"
     elif [ ${should_shuffle} = false ]; then
         extra_args="$extra_args --shuffleMode=off"
@@ -128,6 +130,9 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     # Add test selection flag based on patch parameter
     if [ -n "${enable_evergreen_api_test_selection}" ]; then
         extra_args="$extra_args --enableEvergreenApiTestSelection=${enable_evergreen_api_test_selection}"
+    # If no parameter present, check the project setting
+    elif [ "${is_test_selection_enabled}" == true ]; then
+        extra_args="$extra_args --enableEvergreenApiTestSelection=${is_test_selection_enabled}"
     fi
 
     # Split comma separated list of strategies
@@ -175,6 +180,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
         --revisionOrderId=${revision_order_id} \
         --taskId=${task_id} \
         --taskName=${task_name} \
+        --displayTaskName="${display_task_name}" \
         --variantName=${build_variant} \
         --versionId=${version_id} \
         --requester=${requester} \

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 
@@ -91,8 +65,10 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     const CollectionCatalog* catalogAfterSnapshot,
     long long replTermBeforeSnapshot,
     long long replTermAfterSnapshot,
-    boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot,
-    boost::optional<OperationContext*> activeStateTransitionAfterSnapshot) {
+    boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+        activeStateTransitionBeforeSnapshot,
+    boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+        activeStateTransitionAfterSnapshot) {
     // The catalog and replication term are equal before and after opening the snapshot.
     bool catalogEqual = catalogBeforeSnapshot == catalogAfterSnapshot;
     bool replTermEqual = replTermBeforeSnapshot == replTermAfterSnapshot;
@@ -104,15 +80,28 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     // If there is an active transition, if our opCtx is the interruption's opCtx, we permit the
     // read so the transition can complete.
     bool isStateTransitionThread = activeStateTransitionBeforeSnapshot
-        ? (opCtx == activeStateTransitionBeforeSnapshot.get())
+        ? (opCtx == activeStateTransitionBeforeSnapshot->opCtx)
         : false;
 
     // If this operation should not be killed during an interruption (it's allowed to see an
     // inconsistent state), permit the read (ex: FTDC thread).
     bool canKillOperationInStepdown = opCtx->getClient()->canKillOperationInStepdown();
 
+    // The active transition is a step up that takes the global lock in MODE_X, a read holding
+    // MODE_IS blocks the step up, so we must succeed so step up can proceed. This is safe because
+    // step up acquires the global lock in MODE_X, so the snapshot is guaranteed to be consistent
+    // until the read finishes.
+    //
+    // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
+    bool isStepUpOrderedByGlobalLock = activeStateTransitionBeforeSnapshot &&
+        activeStateTransitionBeforeSnapshot == activeStateTransitionAfterSnapshot &&
+        activeStateTransitionBeforeSnapshot->type ==
+            rss::consensus::IntentRegistry::InterruptionType::StepUp &&
+        activeStateTransitionBeforeSnapshot->orderedByGlobalLock;
+
     return catalogEqual && replTermEqual &&
-        (noStateTransition || isStateTransitionThread || !canKillOperationInStepdown);
+        (noStateTransition || isStateTransitionThread || !canKillOperationInStepdown ||
+         isStepUpOrderedByGlobalLock);
 }
 
 }  // namespace
@@ -183,11 +172,12 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         const long long replTermBeforeSnapshot =
             repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
-        boost::optional<OperationContext*> activeStateTransitionBeforeSnapshot = boost::none;
+        boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+            activeStateTransitionBeforeSnapshot = boost::none;
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             activeStateTransitionBeforeSnapshot =
                 rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .replicationStateTransitionInterruptionCtx();
+                    .activeStateTransitionInfo();
         }
         auto catalog = CollectionCatalog::get(opCtx);
 
@@ -210,11 +200,12 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         // Verify that that the replication state stayed the same while we opened the storage
         // snapshot.
         const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-        boost::optional<OperationContext*> activeStateTransitionAfterSnapshot = boost::none;
+        boost::optional<rss::consensus::IntentRegistry::ActiveStateTransition>
+            activeStateTransitionAfterSnapshot = boost::none;
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             activeStateTransitionAfterSnapshot =
                 rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                    .replicationStateTransitionInterruptionCtx();
+                    .activeStateTransitionInfo();
         }
 
         if (haveAcquiredConsistentCatalogAndSnapshot(opCtx,
@@ -274,7 +265,7 @@ AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
           return options;
       }()) {
 
-    acquireConsistentCatalogAndSnapshotUnsafe(opCtx, /*dbName*/ boost::none);
+    acquireConsistentCatalogAndSnapshotUnsafe(opCtx, /*dbName=*/boost::none);
 }
 
 AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,

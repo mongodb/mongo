@@ -41,10 +41,7 @@ executor:
     auth_options: *authOptions
     launch_mongot: true
     num_nodes: 1
-    load_extensions:
-      - "add_fields_match"
     mongod_options:
       keyFile: *keyFile
       set_parameters:
         enableTestCommands: 1
-        featureFlagExtensionsAPI: true

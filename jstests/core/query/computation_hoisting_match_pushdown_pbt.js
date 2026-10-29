@@ -6,6 +6,7 @@
  * the original unoptimized pipeline.
  *
  * @tags: [
+ *   uses_explain,
  *   query_intensive_pbt,
  *   requires_getmore,
  *   # Tests a rewrite that was added in v9.0.

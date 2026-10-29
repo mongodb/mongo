@@ -3,6 +3,7 @@
  * Verifies some basic eligibility restrictions such as match expression shape and index options,
  * and checks the query results.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_81,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,

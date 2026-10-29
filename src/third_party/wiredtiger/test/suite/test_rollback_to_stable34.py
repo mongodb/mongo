@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 import wttest
 
 # Test interaction between fast-delete and RTS.
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable34(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
     conn_config = 'cache_size=50MB,statistics=(all),log=(enabled=false),verbose=(rts:5)'
@@ -174,7 +173,7 @@ class test_rollback_to_stable34(test_rollback_to_stable_base):
 
         # Check stats to make sure we fast-deleted at least one page.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
         self.assertGreater(fastdelete_pages, 0)
 
         if self.second_checkpoint:

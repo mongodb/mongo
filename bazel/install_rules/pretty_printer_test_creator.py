@@ -8,6 +8,8 @@ parser.add_argument("--pip-requirements-script")
 parser.add_argument("--pretty-printer-output")
 parser.add_argument("--pretty-printer-launcher-infile")
 parser.add_argument("--gdb-path")
+parser.add_argument("--mongo-toolchain-readelf")
+parser.add_argument("--mongo-toolchain-objcopy")
 # Because we 'install' these files to a different location then where they are created
 # we want to pass the final location of these files rather than where they currently are
 parser.add_argument("--final-binary-path")
@@ -16,12 +18,14 @@ parser.add_argument("--pretty-printer-launcher-output")
 
 extra_lines = [
     "import os,subprocess,sys,traceback",
-    "cmd = 'python -c \"import os,sys;print(os.linesep.join(sys.path).strip())\"'",
-    "paths = subprocess.check_output(cmd,shell=True).decode('utf-8').split()",
+    "python_executable = os.environ.get('MONGO_GDB_PYTHON', 'python')",
+    "cmd = [python_executable, '-c', 'import os,sys;print(os.linesep.join(sys.path).strip())']",
+    "paths = subprocess.check_output(cmd).decode('utf-8').split()",
     "sys.path.extend(paths)",
     "symbols_loaded = False",
     "try:",
-    "    if gdb.objfiles()[0].lookup_global_symbol('main') is not None:",
+    "    symbol_info = gdb.execute('info address main', to_string=True)",
+    "    if symbol_info.startswith('Symbol '):",
     "        symbols_loaded = True",
     "except Exception:",
     "    pass",
@@ -60,6 +64,8 @@ replacements = {
     "@VERBOSE@": "True",
     "@pretty_printer_test_py@": args.final_pretty_printer_path,
     "@gdb_path@": args.gdb_path,
+    "@mongo_toolchain_readelf@": args.mongo_toolchain_readelf,
+    "@mongo_toolchain_objcopy@": args.mongo_toolchain_objcopy,
     "@pretty_printer_test_program@": args.final_binary_path,
     "@test_args@": '[""]',
 }

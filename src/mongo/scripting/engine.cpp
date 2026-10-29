@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/scripting/engine.h"
@@ -80,7 +54,7 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
-AtomicWord<long long> Scope::_lastVersion(1);
+Atomic<long long> Scope::_lastVersion(1);
 
 
 namespace {
@@ -348,9 +322,9 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     // remove things from scope that were removed from the system.js collection
     for (set<string>::iterator i = _storedNames.begin(); i != _storedNames.end();) {
         if (thisTime.count(*i) == 0) {
-            string toDelete = str::stream() << "delete " << *i;
+            string name = *i;
             _storedNames.erase(i++);
-            execSetup(toDelete, "clean up scope");
+            deleteGlobal(name);
         } else {
             ++i;
         }
@@ -457,6 +431,13 @@ class ScopeCache {
 public:
     using PoolName = std::tuple<DatabaseName, string>;
     void release(const PoolName& poolName, const std::shared_ptr<Scope>& scope) {
+        // The scope may still be registered to the releasing operation if it is being released
+        // on an exception path (e.g. getPooledScope() interrupted in loadStored() before the
+        // caller could arm its own unregisterOperation() guard). A scope must never sit in the
+        // pool -- or be destroyed from it -- while registered: the OperationContext it points to
+        // belongs to a request that may complete and be freed at any time.
+        scope->unregisterOperation();
+
         std::lock_guard<std::mutex> lk(_mutex);
 
         if (scope->hasOutOfMemoryException()) {
@@ -655,6 +636,9 @@ public:
     void setFunction(const char* field, const char* code) override {
         _real->setFunction(field, code);
     }
+    void deleteGlobal(std::string_view name) override {
+        _real->deleteGlobal(name);
+    }
     ScriptingFunction createFunction(const char* code) override {
         return _real->createFunction(code);
     }
@@ -703,6 +687,14 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
                                                const DatabaseName& db,
                                                const string& scopeType) {
     const auto fullPoolName = std::make_tuple(db, scopeType);
+
+    tassert(13286900, "must have an operation context", opCtx);
+
+    // Fail before registering the operation on a scope: an already-interrupted operation (e.g.
+    // maxTimeMS expired) would only throw part-way through the setup below, leaving a scope
+    // registered to a soon-to-be-destroyed OperationContext.
+    opCtx->checkForInterrupt();
+
     std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());

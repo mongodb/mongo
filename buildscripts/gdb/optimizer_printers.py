@@ -8,9 +8,10 @@ import gdb
 import gdb.printing
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-from buildscripts.gdb.mongo_utils import lookup_type
+from buildscripts.gdb.mongo_utils import lookup_symbol, lookup_type
 
 ABT_NS = "mongo::abt"
+CBR_NS = "mongo::cost_based_ranker"
 
 # Tracks the indentation for Op* tree types.
 operator_indent_level = 0
@@ -18,6 +19,13 @@ operator_indent_level = 0
 
 def strip_namespace(value):
     return str(value).split("::")[-1]
+
+
+def _format_sbe_printed_value(printed_value):
+    """Extract the value from printTagAndVal while preserving GDB string quoting."""
+    if printed_value.startswith('"') and printed_value.endswith('"'):
+        printed_value = printed_value[1:-1]
+    return '"{}"'.format(printed_value.split(", val: ", 1)[1])
 
 
 class StrongStringAliasPrinter(object):
@@ -183,12 +191,18 @@ class ConstantPrinter(object):
 
     @staticmethod
     def print_sbe_value(tag, value):
-        value_print_fn = "mongo::sbe::value::print"
-        (print_fn_symbol, _) = gdb.lookup_symbol(value_print_fn)
-        if print_fn_symbol is None:
+        value_print_fn = "mongo::sbe::value::printTagAndVal"
+        print_fn = lookup_symbol(
+            value_print_fn,
+            "std::string (*)(unsigned char, unsigned long)",
+            function_signatures=(
+                f"{value_print_fn}(mongo::sbe::value::TypeTags, mongo::sbe::value::Value)",
+                f"{value_print_fn}(mongo::sbe::value::TypeTags, unsigned long)",
+            ),
+        )
+        if print_fn is None:
             raise gdb.GdbError("Could not find pretty print function: " + value_print_fn)
-        print_fn = print_fn_symbol.value()
-        return print_fn(tag, value)
+        return _format_sbe_printed_value(str(print_fn(tag, value)))
 
     def to_string(self):
         return "Constant[{}]".format(
@@ -380,11 +394,83 @@ class PolyValuePrinter(object):
         )
 
 
+class OptimizerEstimatePrinter(object):
+    """Pretty-printer for subclasses of mongo::cost_based_ranker::OptimizerEstimate.
+
+    This covers CardinalityEstimate, CostEstimate, CostCoefficient and SelectivityEstimate, which
+    all share the same layout: the underlying value lives in the '_estimate._v' member (from the
+    StrongDouble held by OptimizerEstimate) and the estimate's source lives in the '_source' member
+    inherited from EstimateBase.
+    """
+
+    def __init__(self, val, label):
+        """Initialize OptimizerEstimatePrinter."""
+        self.val = val
+        self.label = label
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return None
+
+    def to_string(self):
+        # Mirror the C++ 'toString()' output: "<label>: <value>, Source: <src>".
+        value = self.val["_estimate"]["_v"]
+        source = strip_namespace(self.val["_source"])
+        return "{}: {}, Source: {}".format(self.label, value, source)
+
+
+class CardinalityEstimatePrinter(OptimizerEstimatePrinter):
+    """Pretty-printer for mongo::cost_based_ranker::CardinalityEstimate."""
+
+    def __init__(self, val):
+        """Initialize CardinalityEstimatePrinter."""
+        super().__init__(val, "Cardinality")
+
+
+class CostEstimatePrinter(OptimizerEstimatePrinter):
+    """Pretty-printer for mongo::cost_based_ranker::CostEstimate."""
+
+    def __init__(self, val):
+        """Initialize CostEstimatePrinter."""
+        super().__init__(val, "Cost")
+
+
+class CostCoefficientPrinter(OptimizerEstimatePrinter):
+    """Pretty-printer for mongo::cost_based_ranker::CostCoefficient."""
+
+    def __init__(self, val):
+        """Initialize CostCoefficientPrinter."""
+        super().__init__(val, "Cost coefficient")
+
+
+class SelectivityEstimatePrinter(OptimizerEstimatePrinter):
+    """Pretty-printer for mongo::cost_based_ranker::SelectivityEstimate."""
+
+    def __init__(self, val):
+        """Initialize SelectivityEstimatePrinter."""
+        super().__init__(val, "Selectivity")
+
+
 def register_optimizer_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
 
     # Utility types within the optimizer.
     pp.add("StrongStringAlias", f"{ABT_NS}::StrongStringAlias", True, StrongStringAliasPrinter)
+
+    # Cost-based ranker estimate types.
+    for cbr_type in [
+        "CardinalityEstimate",
+        "CostEstimate",
+        "CostCoefficient",
+        "SelectivityEstimate",
+    ]:
+        pp.add(
+            cbr_type,
+            f"{CBR_NS}::{cbr_type}",
+            False,
+            getattr(sys.modules[__name__], cbr_type + "Printer"),
+        )
 
     # Add the sub-printers for each of the possible ABT types.
     # This is the set of known ABT variants that GDB is aware of. When adding to this list, ensure

@@ -29,7 +29,30 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
         # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
         # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
         "jstests/aggregation/sources/unionWith/unionWith.js",
-        "jstests/core_sharding/ddl/check_metadata_consistency_basic.js",
+        "jstests/core/query/release_memory/group.js",
+        "jstests/core/query/query_settings/query_settings_knob_validation_pbt.js",
+        "jstests/core/query/query_knob_correctness_pbt.js",
+        # Skip tests that enable the 'simulateAvailableDiskSpace' failpoint on all primaries, which
+        # makes a concurrent checkMetadataConsistency aggregation fail with OutOfDiskSpace.
+        "jstests/core/query/release_memory/graph_lookup.js",
+        "jstests/core/query/release_memory/hash_lookup.js",
+        "jstests/core/query/release_memory/hash_lookup_unwind.js",
+        "jstests/core/query/release_memory/set_window_fields.js",
+        "jstests/core/query/release_memory/sort.js",
+        "jstests/core/query/release_memory/text_or.js",
+        # Skip tests that directly create/drop system.buckets collections, bypassing the normal
+        # timeseries creation path, which transiently produces malformed bucket collections.
+        # TODO(SERVER-111600): Remove these exceptions
+        "jstests/core/timeseries/ddl/timeseries_user_system_buckets.js",
+        "jstests/core/timeseries/ddl/timeseries_drop_legacy.js",
+        "jstests/core/timeseries/ddl/rename_timeseries_legacy.js",
+        "jstests/core/timeseries/ddl/timeseries_clustered_index_options_legacy.js",
+        # During commit of timeseries $out, CheckMetadataConsistency may see the committed
+        # system.buckets collection, but its corresponding view has not yet been created.
+        # TODO(SERVER-131165): Remove those exceptions once the false positive bug is fixed
+        # TODO(SERVER-111600): Remove these exceptions once only viewless collections exist
+        "jstests/core/timeseries/query/timeseries_out_non_sharded.js",
+        "jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out.js",
     ]
 
     if _IS_WINDOWS:

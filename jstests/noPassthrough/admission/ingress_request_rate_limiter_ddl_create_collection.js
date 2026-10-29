@@ -167,7 +167,7 @@ describe("createCollection (unsharded + sharded) under IRRL at each cluster node
         {
             const collName = nextCollName();
             const ns = `${kDb}.${collName}`;
-            enableZeroBurstRateLimiter(configPrimary, kExemptions);
+            enableZeroBurstRateLimiter(configPrimary, kExemptions, {useKeyFileAuth: true});
             const result = exemptConn.getDB(kDb).createCollection(collName);
             jsTestLog(`[A1] Unsharded create: ${result.ok ? "OK" : "FAIL"}`, {result});
             assert.commandWorked(
@@ -208,7 +208,7 @@ describe("createCollection (unsharded + sharded) under IRRL at each cluster node
                 // RPCs (ShardingCoordinatorNetwork / SEPTransactionClient). The assert.soon below
                 // is the proof that IRRL was active: it polls until the coordinator's rejected
                 // admission count rises.
-                enableZeroBurstRateLimiter(configPrimary, kExemptions);
+                enableZeroBurstRateLimiter(configPrimary, kExemptions, {useKeyFileAuth: true});
                 const rejBefore = getRateLimiterStats(configExemptConn).rejectedAdmissions;
 
                 hangFp.off();
@@ -257,7 +257,7 @@ describe("createCollection (unsharded + sharded) under IRRL at each cluster node
     // exempt). Coordinator rejects before the command runs; mongos retries a bounded number
     // of times → fast failure for both paths.
     it("Scenario B: IRRL on coordinator shard — DDLs routed via TaskExecutorPool (mongos → coordinator) are rejected immediately; 462 propagates to the client", function () {
-        enableZeroBurstRateLimiter(coordinatorShard, kExemptions);
+        enableZeroBurstRateLimiter(coordinatorShard, kExemptions, {useKeyFileAuth: true});
         assertIrrlActive(exemptConn, {_id: -1}); // {_id: -1} routes to coordinator shard
 
         // B1: Unsharded createCollection
@@ -312,7 +312,7 @@ describe("createCollection (unsharded + sharded) under IRRL at each cluster node
     //   kCreateCollectionOnParticipants skips participant (no chunks there); DDL succeeds.
     //   In both cases, IRRL active + DDL success proves no non-exempt participant contact.
     it("Scenario C: IRRL on participant shard — coordinator-to-participant RPCs via ShardingCoordinatorNetwork are exempt; DDL completes unaffected", function () {
-        enableZeroBurstRateLimiter(participantShard, kExemptions);
+        enableZeroBurstRateLimiter(participantShard, kExemptions, {useKeyFileAuth: true});
         assertIrrlActive(exemptConn, {_id: 1}); // {_id: 1} routes to participant shard
 
         // C1: Unsharded createCollection
@@ -358,7 +358,7 @@ describe("createCollection (unsharded + sharded) under IRRL at each cluster node
         const ns = `${kDb}.${collName}`;
 
         jsTestLog(`[D] Enabling IRRL on participant shard: ${participantShard.host}`);
-        enableZeroBurstRateLimiter(participantShard, kExemptions);
+        enableZeroBurstRateLimiter(participantShard, kExemptions, {useKeyFileAuth: true});
         assertIrrlActive(exemptConn, {_id: 1}); // {_id: 1} routes to participant shard
 
         const rejBefore = getRateLimiterStats(participantExemptConn).rejectedAdmissions;

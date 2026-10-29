@@ -4,6 +4,9 @@
  * observation of a newly created system.* collection.
  *
  * @tags: [
+ *   # The test already exercises native whole-db and whole-cluster streams directly.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   assumes_read_preference_unchanged,
  *   requires_majority_read_concern,
  *   uses_change_streams,
@@ -12,10 +15,6 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {assertChangeStreamEventEq} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-// This test involves opening change stream on the internal collection, which is not allowed through
-// a router.
-TestData.replicaSetEndpointIncompatible = true;
 
 // Asserts that the next event in a change stream connected to via cursor 'changeStreamCursor' is
 // equal to 'eventDocument'.

@@ -55,7 +55,6 @@ class test_truncate19(wttest.WiredTigerTestCase):
         self.session.truncate(None, None, hicursor, None)
         self.session.commit_transaction()
 
-    @wttest.skip_for_hook("tiered", "test depends of sizes of associated file objects")
     @wttest.skip_for_hook("disagg", "test depends of sizes of associated file objects")
     def test_truncate19(self):
         uri = 'table:oplog'
@@ -93,7 +92,7 @@ class test_truncate19(wttest.WiredTigerTestCase):
 
             # Check stats to make sure we fast-deleted at least one page.
             stat_cursor = self.session.open_cursor('statistics:', None, None)
-            fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+            fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
 
             self.assertGreater(fastdelete_pages, 0)
 

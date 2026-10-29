@@ -166,7 +166,7 @@ verify_backup(const char *backup_home)
     testutil_copy(backup_home, CHECK_DIR);
 
     /* Open the backup. */
-    testutil_wiredtiger_open(opts, CHECK_DIR, env_config, NULL, &conn, true, false);
+    testutil_wiredtiger_open(opts, CHECK_DIR, env_config, NULL, &conn, true);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Verify self-consistency. */
@@ -231,7 +231,7 @@ do_work_after_failure(bool backup_from_min)
     bool do_incr;
 
     /* Reopen the database and find available backup IDs. */
-    testutil_wiredtiger_open(opts, WT_HOME_DIR, env_config, NULL, &conn, false, false);
+    testutil_wiredtiger_open(opts, WT_HOME_DIR, env_config, NULL, &conn, false);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     do_incr = true;
@@ -308,8 +308,7 @@ run_test_backup(void)
 
     if (pid == 0) { /* Child. */
         testutil_recreate_dir(WT_HOME_DIR);
-        testutil_wiredtiger_open(
-          opts, WT_HOME_DIR, env_config, &child_event_handler, &conn, false, false);
+        testutil_wiredtiger_open(opts, WT_HOME_DIR, env_config, &child_event_handler, &conn, false);
         testutil_check(conn->open_session(conn, NULL, NULL, &session));
         testutil_check(session->create(session, TABLE_URI, TABLE_CONFIG));
 
@@ -371,8 +370,7 @@ run_test_force_stop(void)
 
     if (pid == 0) { /* Child. */
         testutil_recreate_dir(WT_HOME_DIR);
-        testutil_wiredtiger_open(
-          opts, WT_HOME_DIR, env_config, &child_event_handler, &conn, false, false);
+        testutil_wiredtiger_open(opts, WT_HOME_DIR, env_config, &child_event_handler, &conn, false);
         testutil_check(conn->open_session(conn, NULL, NULL, &session));
         testutil_check(session->create(session, TABLE_URI, TABLE_CONFIG));
 

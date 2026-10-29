@@ -4,15 +4,114 @@ Wrapper python script to launch the pretty_printer_test_py program
 with the standard input set to the test file readtest_input.
 """
 
-import subprocess
+import glob
 import os
 import shlex
+import subprocess
+
 verbose = @VERBOSE@
 test_script = r'@pretty_printer_test_py@'
 test_args = @test_args@
-gdb_path = '@gdb_path@'
-args = [
-    gdb_path,
+
+
+def resolve_bazel_path(path):
+    path_variants = [path]
+    toolchain_marker = "lib/gdb-toolchain/"
+    normalized_path = path.replace(os.sep, "/")
+    if toolchain_marker in normalized_path:
+        toolchain_path = "gdb-toolchain/" + normalized_path.split(toolchain_marker, 1)[1]
+        path_variants.append(toolchain_path)
+
+    local_candidates = []
+    runfiles_candidates = []
+    runfiles_dir = os.environ.get("RUNFILES_DIR")
+    runfiles_manifest = os.environ.get("RUNFILES_MANIFEST_FILE")
+    test_workspace = os.environ.get("TEST_WORKSPACE")
+    for path_variant in path_variants:
+        local_candidates.extend([
+            path_variant,
+            os.path.join(os.getcwd(), path_variant),
+            os.path.join(os.getcwd(), "..", path_variant),
+            os.path.join("bazel-bin", path_variant),
+        ])
+        if path_variant.startswith("external/"):
+            local_candidates.extend(glob.glob(os.path.join(os.getcwd(), "bazel-out", "*", "bin", path_variant)))
+        if runfiles_dir:
+            runfiles_candidates.extend([
+                os.path.join(runfiles_dir, path_variant),
+                os.path.join(runfiles_dir, "_main", path_variant),
+            ])
+            if test_workspace:
+                runfiles_candidates.append(os.path.join(runfiles_dir, test_workspace, path_variant))
+    manifest_candidates = []
+    if runfiles_manifest and os.path.isfile(runfiles_manifest):
+        with open(runfiles_manifest, encoding="utf-8") as manifest:
+            for line in manifest:
+                manifest_path, separator, resolved_path = line.rstrip("\n").partition(" ")
+                if not separator:
+                    continue
+                manifest_path = manifest_path.rstrip("/")
+                for path_variant in path_variants:
+                    path_variant = path_variant.rstrip("/")
+                    suffix = None
+                    if manifest_path == path_variant:
+                        suffix = ""
+                    elif path_variant.startswith(manifest_path + "/"):
+                        suffix = path_variant[len(manifest_path) + 1:]
+                    elif manifest_path.endswith("/" + path_variant):
+                        suffix = ""
+                    else:
+                        path_parts = path_variant.split("/")
+                        for index in range(1, len(path_parts)):
+                            relative_prefix = "/".join(path_parts[:index])
+                            if manifest_path == relative_prefix or manifest_path.endswith("/" + relative_prefix):
+                                suffix = path_variant[len(relative_prefix) + 1:]
+                                break
+                    if suffix is not None:
+                        manifest_candidates.append(
+                            os.path.join(resolved_path, suffix) if suffix else resolved_path
+                        )
+
+    candidates = []
+    if runfiles_dir or runfiles_manifest:
+        candidates.extend(runfiles_candidates)
+        candidates.extend(manifest_candidates)
+    candidates.extend(local_candidates)
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return os.path.abspath(candidate)
+
+    return None
+
+
+gdb_path = resolve_bazel_path('@gdb_path@')
+using_bazel_gdb = gdb_path is not None
+if not using_bazel_gdb:
+    gdb_path = '/opt/mongodbtoolchain/v5/bin/gdb'
+
+mongo_toolchain_readelf = resolve_bazel_path(r'@mongo_toolchain_readelf@')
+mongo_toolchain_objcopy = resolve_bazel_path(r'@mongo_toolchain_objcopy@')
+if mongo_toolchain_readelf is None:
+    mongo_toolchain_readelf = '/opt/mongodbtoolchain/v5/bin/llvm-readelf'
+if mongo_toolchain_objcopy is None:
+    mongo_toolchain_objcopy = '/opt/mongodbtoolchain/v5/bin/llvm-objcopy'
+
+if using_bazel_gdb:
+    gdb_root = os.path.normpath(os.path.join(
+        os.path.dirname(gdb_path), "..", ".."
+    ))
+    gdb_prefix = os.path.join(gdb_root, "v5")
+    gdb_home = os.path.join(gdb_root, "stow", "gdb-v5")
+    python_home = os.path.join(gdb_root, "stow", "python313-v5")
+    mongo_toolchain_root = os.path.normpath(os.path.join(
+        os.path.dirname(mongo_toolchain_readelf), "..", ".."
+    ))
+
+args = [gdb_path]
+if using_bazel_gdb:
+    args += ['--data-directory', os.path.join(gdb_home, 'share', 'gdb')]
+args += [
     '-nx',
     '-batch',
     '-ex',
@@ -27,6 +126,27 @@ if verbose:
 # We assume we are running from project root, and require modules buried in the src directory
 python_env = os.environ.copy()
 python_env['PYTHONPATH'] = os.getcwd() + os.pathsep + python_env.get('PYTHONPATH', "")
+if using_bazel_gdb:
+    python_env['PYTHONHOME'] = python_home
+    python_env['MONGO_GDB_PYTHON'] = os.path.join(python_home, 'bin', 'python3')
+    python_env['PYTHONPATH'] = os.path.join(python_home, "lib", "python3.13") + os.pathsep + python_env['PYTHONPATH']
+    python_env['LD_LIBRARY_PATH'] = os.pathsep.join([
+        os.path.join(python_home, "lib"),
+        os.path.join(python_home, "lib64"),
+        os.path.join(gdb_prefix, "lib"),
+        os.path.join(gdb_home, "lib"),
+        os.path.join(mongo_toolchain_root, "stow", "llvm-v5", "lib"),
+        os.path.join(mongo_toolchain_root, "stow", "libedit-v5", "lib"),
+        python_env.get('LD_LIBRARY_PATH', ""),
+    ])
+    python_env['MONGO_GDB_PP_DIR'] = os.path.join(mongo_toolchain_root, "stow", "gcc-v5", "share")
+else:
+    python_env['MONGO_GDB_PP_DIR'] = '/opt/mongodbtoolchain/v5/share'
+python_env['MONGO_GDB_READELF'] = mongo_toolchain_readelf
+python_env['MONGO_GDB_OBJCOPY'] = mongo_toolchain_objcopy
+python_env['READELF'] = mongo_toolchain_readelf
+python_env['OBJCOPY'] = mongo_toolchain_objcopy
+python_env['GDB'] = gdb_path
 
 proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                       env=python_env)

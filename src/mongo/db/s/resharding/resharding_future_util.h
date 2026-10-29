@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,13 +8,17 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/s/primary_only_service_helpers/retrying_cancelable_operation_context_factory.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -56,11 +34,49 @@ const auto kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern = [](const St
         status == ErrorCodes::LockTimeout;
 };
 
+// Treats errors caused by an active replica set write block as retryable. Used on its own to extend
+// a base retryability so that a held resharding operation keeps retrying instead of failing while a
+// replica set write block is active.
+const auto kRetryabilityPredicateReplicaSetWritesBlocked = [](const Status& status) {
+    return status == ErrorCodes::ReplicaSetWritesBlocked ||
+        (status == ErrorCodes::IndexBuildAborted &&
+         status.reason().find("Write blocking") != std::string::npos);
+};
+
+const auto kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndLockTimeoutAndWriteConcern =
+    [](const Status& status) {
+        return kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern(status) ||
+            kRetryabilityPredicateReplicaSetWritesBlocked(status);
+    };
+
+// Extends the default write-concern-timeout retryability with only an active replica set write
+// block, without also making LockTimeout retryable. Used by the resharding cloners so they hold and
+// resume through a write block while otherwise preserving their default retryability; LockTimeout
+// is left to be retried by the recipient state machine that drives them.
+const auto kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern =
+    [](const Status& status) {
+        return kRetryabilityPredicateIncludeWriteConcernTimeout(status) ||
+            kRetryabilityPredicateReplicaSetWritesBlocked(status);
+    };
+
+/**
+ * Rate-limits the "writes to this replica set are blocked" warning that the resharding cloner,
+ * oplog applier, and recipient state machine each emit while held on a replica set write block.
+ */
+bool shouldLogWriteBlockWarning(Atomic<long long>& lastWarningAt);
+
 template <typename BodyCallable>
 primary_only_service_helpers::WithAutomaticRetry<BodyCallable> WithAutomaticRetry(
     BodyCallable&& body) {
     return primary_only_service_helpers::WithAutomaticRetry<BodyCallable>(
         std::move(body), kRetryabilityPredicateIncludeWriteConcernTimeout);
+}
+
+template <typename BodyCallable>
+primary_only_service_helpers::WithAutomaticRetry<BodyCallable> WithAutomaticRetry(
+    BodyCallable&& body, RetryabilityPredicate isRetryable) {
+    return primary_only_service_helpers::WithAutomaticRetry<BodyCallable>(std::move(body),
+                                                                          std::move(isRetryable));
 }
 
 /**
@@ -94,6 +110,30 @@ ExecutorFuture<void> cancelWhenAnyErrorThenQuiesce(
     const std::vector<SharedSemiFuture<void>>& futures,
     ExecutorPtr executor,
     CancellationSource cancelSource);
+
+/**
+ * Runs the callable until it succeeds or the stepdown token is canceled. Retries on any error with
+ * exponential backoff between attempts, invoking 'onRetry' (if provided) with the failure status
+ * before each retry.
+ */
+template <typename SleepableExecutor>
+ExecutorFuture<void> runUntilSuccessOrStepdown(unique_function<void()> callable,
+                                               SleepableExecutor executor,
+                                               const CancellationToken& stepdownToken,
+                                               unique_function<void(const Status&)> onRetry = {}) {
+    static const Backoff kUntilSuccessOrStepdownBackoff(Seconds(1), Milliseconds::max());
+
+    return AsyncTry([callable = std::move(callable)] { callable(); })
+        .until([stepdownToken, onRetry = std::move(onRetry)](Status status) {
+            const bool done = status.isOK() || stepdownToken.isCanceled();
+            if (!done && onRetry) {
+                onRetry(status);
+            }
+            return done;
+        })
+        .withBackoffBetweenIterations(kUntilSuccessOrStepdownBackoff)
+        .on(std::move(executor), CancellationToken::uncancelable());
+}
 
 }  // namespace resharding
 }  // namespace mongo

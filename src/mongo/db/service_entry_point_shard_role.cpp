@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/service_entry_point_shard_role.h"
@@ -42,6 +16,9 @@
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticketholder.h"
+#include "mongo/db/admission/write_throttler.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
+#include "mongo/db/admission/write_throttler_parameters_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_contract_guard.h"
@@ -73,6 +50,9 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
+#include "mongo/db/query/query_latency_accumulator.h"
+#include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -130,7 +110,8 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/otel/traces/tracing_enablement.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
@@ -154,6 +135,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
@@ -204,6 +186,39 @@ auto& notPrimaryUnackWrites =
 namespace {
 using namespace std::literals::string_view_literals;
 
+
+bool isWriteThrottlerOperation(Command::ReadWriteType readWriteType) {
+    return readWriteType == Command::ReadWriteType::kWrite ||
+        readWriteType == Command::ReadWriteType::kTransaction;
+}
+
+void admitWriteThrottlerIfNeeded(OperationContext* opCtx,
+                                 CommandInvocation* invocation,
+                                 bool isExemptFromAdmissionControl) {
+    if (!gWriteThrottlerEnabled.load() || isExemptFromAdmissionControl ||
+        !invocation->supportsWriteConcern() ||
+        !isWriteThrottlerOperation(invocation->definition()->getReadWriteType())) {
+        return;
+    }
+    if (auto* throttler = WriteThrottler::get(opCtx)) {
+        throttler->admitOperation(opCtx);
+    }
+}
+
+bool shouldFinalizeWriteThrottlerAdmission(OperationContext* opCtx,
+                                           Command::ReadWriteType readWriteType) {
+    if (!isWriteThrottlerOperation(readWriteType)) {
+        return false;
+    }
+
+    if (gWriteThrottlerEnabled.load()) {
+        return true;
+    }
+
+    // Preserve command-end reconciliation for writes admitted before a runtime disable, while
+    // keeping reads out of the write-throttler finalization path.
+    return WriteThrottlerAdmissionContext::get(opCtx).getAdmissions() > 0;
+}
 
 void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation* invocation) {
     CommandHelpers::runCommandInvocation(rec.getOpCtx(), invocation, rec.getReplyBuilder());
@@ -400,8 +415,8 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                        code,
                        wcCode,
                        isInternalClient,
-                       false /* isMongos */,
-                       OperationShardingState::isShardingAware(opCtx) /* isComingFromRouter */,
+                       /*isMongos=*/false,
+                       /*isComingFromRouter=*/OperationShardingState::isShardingAware(opCtx),
                        lastOpBeforeRun,
                        lastOpAfterRun);
     commandBodyFieldsBob->appendElements(errorLabels);
@@ -441,17 +456,19 @@ void appendAdditionalParticipants(OperationContext* opCtx, BSONObjBuilder* comma
 
     std::vector<BSONObj> participantArray;
     for (const auto& p : *additionalParticipants) {
-        auto shardId = ShardId(p.first);
-
+        BSONObjBuilder entry;
+        entry.append(AdditionalParticipantInfo::kShardIdFieldName, ShardId(p.first));
         // The "readOnly" value is set for participants upon a successful response. If an error
         // occurred before getting a response from a participant, it will not have a readOnly value
         // set.
-        auto readOnly = p.second;
-        if (readOnly) {
-            participantArray.emplace_back(BSON("shardId" << shardId << "readOnly" << *readOnly));
-        } else {
-            participantArray.emplace_back(BSON("shardId" << shardId));
+        if (p.second.readOnly) {
+            entry.append(AdditionalParticipantInfo::kReadOnlyFieldName, *p.second.readOnly);
         }
+        // Forward the replication term observed for this participant.
+        if (p.second.term) {
+            entry.append(AdditionalParticipantInfo::kTermFieldName, *p.second.term);
+        }
+        participantArray.emplace_back(entry.obj());
     }
 
     commandBodyFieldsBob->appendElements(
@@ -860,7 +877,7 @@ void CheckoutSessionAndInvokeCommand::run() {
             txnParticipant.handleWouldChangeOwningShardError(opCtx, wouldChangeOwningShardInfo);
             _stashTransaction(txnParticipant);
 
-            auto txnResponseMetadata = txnParticipant.getResponseMetadata();
+            auto txnResponseMetadata = txnParticipant.getResponseMetadata(opCtx);
             (_ecd->getExtraFieldsBuilder())->appendElements(txnResponseMetadata);
             return ex.toStatus();
         } catch (const DBException& ex) {
@@ -987,7 +1004,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
                     {*sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter()},
                     sessionOptions.getAutocommit(),
                     transactionAction,
-                    sessionOptions.getTransactionRuntimeContext());
+                    sessionOptions.getTransactionRuntimeContext(),
+                    sessionOptions.getIsServerInitiatedTransaction());
                 beganOrContinuedTxn = true;
             } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
                 auto prevTxnExitedPrepare = txnParticipant.onExitPrepare();
@@ -1053,7 +1071,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // transaction resources.
         if (command->shouldAffectReadOptionCounters() && opCtx->inMultiDocumentTransaction()) {
             ServerReadConcernMetrics::get(opCtx)->recordReadConcern(readConcernArgs,
-                                                                    true /* isTransaction */);
+                                                                    /*isTransaction=*/true);
         }
 
         // For replica sets, we do not receive the readConcernArgs of our parent transaction
@@ -1157,7 +1175,7 @@ void CheckoutSessionAndInvokeCommand::_commitInvocation() {
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            auto txnResponseMetadata = txnParticipant.getResponseMetadata();
+            auto txnResponseMetadata = txnParticipant.getResponseMetadata(execContext.getOpCtx());
             auto bodyBuilder = replyBuilder->getBodyBuilder();
             bodyBuilder.appendElements(txnResponseMetadata);
             appendAdditionalParticipants(execContext.getOpCtx(), &bodyBuilder);
@@ -1185,7 +1203,7 @@ void RunCommandImpl::_prologue() {
     if (!opCtx->getClient()->isInDirectClient() && command->shouldAffectReadOptionCounters() &&
         !opCtx->inMultiDocumentTransaction()) {
         ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx),
-                                                                false /* isTransaction */);
+                                                                /*isTransaction=*/false);
     }
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1216,12 +1234,13 @@ void RunCommandImpl::_epilogue() {
     // This fail point blocks all commands which are running on the specified namespace, or which
     // are present in the given list of commands, or which match a given comment. If no namespace,
     // command list, or comment are provided, then the failpoint will block all commands.
-    waitAfterCommandFinishesExecution.executeIf(
-        [&](const BSONObj& data) {
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
-        },
-        [&](const BSONObj& data) {
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &waitAfterCommandFinishesExecution,
+        opCtx,
+        "waitAfterCommandFinishesExecution",
+        /*whileWaiting=*/nullptr,
+        /*nss=*/{},
+        /*extraPred=*/[&](const BSONObj& data) {
             auto& request = execContext.getRequest();
             auto commands =
                 data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
@@ -1683,14 +1702,6 @@ void ExecCommandDatabase::_initiateCommand() {
                 _isInternalClient());
     }
 
-    if (auto& traceCtx = genericArgs.getTraceCtx()) {
-        auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
-        if (telemetryCtx) {
-            auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(opCtx);
-            telemetryCtxHolder.setTelemetryContext(telemetryCtx);
-        }
-    }
-
     if (MONGO_unlikely(genericArgs.getHelp().value_or(false))) {
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
@@ -1705,28 +1716,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
     auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
-
-    // On DSC, we block writes to local collections.
-    // We block transactions to local collections in case part of the transaction is a write for
-    // future proofing.
-    if (dbName == DatabaseName::kLocal &&
-        !rss.getPersistenceProvider().supportsLocalCollections()) {
-        bool commandIsWrite = (command->getReadWriteType() == Command::ReadWriteType::kWrite ||
-                               command->getReadWriteType() == Command::ReadWriteType::kTransaction);
-        uassert(ErrorCodes::IllegalOperation,
-                "Not allowed to write to 'local' database",
-                !commandIsWrite);
-
-        bool commandIsCreateCollection = command->getName() == "create";
-        uassert(ErrorCodes::IllegalOperation,
-                "Not allowed to create 'local' collections",
-                !commandIsCreateCollection);
-
-        bool commandIsCreateIndex = command->getName() == "createIndexes";
-        uassert(ErrorCodes::IllegalOperation,
-                "Not allowed to create indexes on 'local' collections",
-                !commandIsCreateIndex);
-    }
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1879,10 +1868,7 @@ void ExecCommandDatabase::_initiateCommand() {
         IngressAdmissionContext::get(opCtx).isHoldingTicket();
 
     if (gFeatureFlagIngressRateLimiting.isEnabled()) {
-        const bool exemptFromIngressRateLimit =
-            isExemptFromAdmissionControl || !admission::gIngressRequestRateLimiterEnabled.load();
-        uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(
-            opCtx, exemptFromIngressRateLimit));
+        uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(opCtx));
     }
 
     if (gIngressAdmissionControlEnabled.load()) {
@@ -1897,6 +1883,8 @@ void ExecCommandDatabase::_initiateCommand() {
         auto& admissionController = IngressAdmissionController::get(opCtx);
         _admissionTicket = admissionController.admitOperation(opCtx);
     }
+
+    admitWriteThrottlerIfNeeded(opCtx, getInvocation(), isExemptFromAdmissionControl);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
@@ -1987,7 +1975,7 @@ void ExecCommandDatabase::_initiateCommand() {
                         timeseriesBucketsNss,
                         shardVersion,
                         {},
-                        true /* disableCheckVersioningCorrectness */);
+                        /*disableCheckVersioningCorrectness=*/true);
                 }
             }
         }
@@ -2009,12 +1997,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
 void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
-
-    // We do not want to create a span for every incoming command, we only want a span when
-    // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
-    // Span::start.
-    auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
-        opCtx, _execContext.getCommand()->getTraceSpanName());
 
     // If this command should start a new transaction, waitForReadConcern will be invoked
     // after invoking the TransactionParticipant, which will determine whether a transaction
@@ -2065,8 +2047,16 @@ void ExecCommandDatabase::_commandExec() {
 
             const bool waitedForInitialized = _awaitShardingInitializedIfNeeded(ex.toStatus());
 
+            // TODO (SERVER-98118): remove once 9.0 becomes last LTS. Note that the service entry
+            // point never retries operations that are run in a DBDirectClient, hence the exclusion
+            // here. Callers that may hit this error via dbDirectClient handle their own retries.
+            const bool shouldRetryDueToFCVTransition =
+                ex.code() == ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition &&
+                !opCtx->getClient()->isInDirectClient();
+
             const bool errorMayBeRetried =
-                staleExceptionIsRetryable == shard_role_loop::CanRetry::YES || waitedForInitialized;
+                staleExceptionIsRetryable == shard_role_loop::CanRetry::YES ||
+                waitedForInitialized || shouldRetryDueToFCVTransition;
 
             if (errorMayBeRetried && canRetryCommand(ex.toStatus())) {
                 _resetLockerStateAfterShardingUpdate(opCtx);
@@ -2084,11 +2074,8 @@ void ExecCommandDatabase::_commandExec() {
     if (auto writeError = OperationShardingState::get(opCtx).resetShardingOperationFailedStatus()) {
         try {
             shard_role_loop::handleStaleError(opCtx, *writeError, shardRetryCtx);
-        } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
-            ex.addContext("interruption while recovering sharding metadata upon write error");
-            throw;
         } catch (const DBException&) {
-            // Ignore other exceptions. We don't want to destroy the top-level command status.
+            // Ignore exceptions. We don't want to destroy the top-level command status.
         }
     }
 }
@@ -2143,6 +2130,11 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
         return _invocation->canRetryOnStaleShardMetadataError(_execContext.getRequest());
     }
 
+    // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+    if (execError == ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition) {
+        return true;
+    }
+
     return false;
 }
 
@@ -2183,7 +2175,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.isEmpty()) {
         auto readConcernArgsStatus = _extractReadConcern(
-            opCtx, false /*startTransaction*/, false /* startOrContinueTransaction */);
+            opCtx, /*startTransaction=*/false, /*startOrContinueTransaction=*/false);
         if (readConcernArgsStatus.isOK()) {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
             // it may be concurrently read by CurrentOp.
@@ -2250,6 +2242,14 @@ void parseCommand(HandleRequest::ExecutionContext& execContext) try {
         checkAllowedOpQueryCommand(*client, opMsgReq.getCommandName());
     }
     execContext.setRequest(opMsgReq);
+
+    // Check for the presence of a telemetry context in the request first as that is much cheaper
+    // than checking if tracing is enabled.
+    if (execContext.getRequest().telemetryContext &&
+        otel::traces::isTracingEnabled(execContext.getOpCtx())) {
+        execContext.setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
+            execContext.getRequest().telemetryContext));
+    }
 } catch (const DBException& ex) {
     // Need to set request as `makeCommandResponse` expects an empty request on failure.
     execContext.setRequest({});
@@ -2280,6 +2280,19 @@ void executeCommand(HandleRequest::ExecutionContext& execContext) {
     }
 
     Command* c = execContext.getCommand();
+    auto& telemetryCtx = execContext.getTelemetryContext();
+    execContext.setOtelSpan(otel::traces::Span::startIngressSpan(
+        telemetryCtx,
+        c->getTraceSpanName(),
+        /*options=*/
+        {.kind = execContext.hasMoreToComeFlag() ? otel::traces::SpanKind::kConsumer
+                                                 : otel::traces::SpanKind::kServer}));
+    // Keep the OpCtx decoration in sync so later Span::start(opCtx, ...) calls see the same
+    // context. Skip when null so the common no-tracing path never touches the decoration.
+    if (telemetryCtx) {
+        otel::TelemetryContextHolder::getDecoration(opCtx).setTelemetryContext(telemetryCtx);
+    }
+
     LOGV2_DEBUG(
         21965,
         2,
@@ -2313,7 +2326,7 @@ DbResponse makeCommandResponse(const HandleRequest::ExecutionContext& execContex
     const Command* c = execContext.getCommand();
     auto replyBuilder = execContext.getReplyBuilder();
 
-    if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
+    if (execContext.hasMoreToComeFlag()) {
         // Close the connection to get client to go through server selection again.
         if (NotPrimaryErrorTracker::get(opCtx->getClient()).hadError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
@@ -2451,6 +2464,13 @@ DbResponse HandleRequest::runOperation() {
 void HandleRequest::completeOperation(DbResponse& response) {
     auto opCtx = executionContext.getOpCtx();
     auto& currentOp = executionContext.currentOp();
+    const auto readWriteType = currentOp.getReadWriteType();
+
+    if (shouldFinalizeWriteThrottlerAdmission(opCtx, readWriteType)) {
+        if (auto* throttler = WriteThrottler::get(opCtx)) {
+            throttler->finalizeAdmission(opCtx);
+        }
+    }
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be written to the profiler.
@@ -2467,7 +2487,14 @@ void HandleRequest::completeOperation(DbResponse& response) {
         .increment(opCtx,
                    currentOp.elapsedTimeExcludingPauses(),
                    currentOp.debug().workingTimeMillis,
-                   currentOp.getReadWriteType());
+                   readWriteType);
+
+    // Add this op's time toward its query's total; the originating find/aggregate already recorded
+    // the strategy on the accumulator (shared via QueryLifespan). getIfExists lets non-query ops
+    // skip cheaply.
+    if (shouldRecordLatencyStats(opCtx) && QueryLifespan::getIfExists(opCtx)) {
+        QueryLatencyAccumulator::get(opCtx).addLatency(currentOp.elapsedTimeExcludingPauses());
+    }
 
     if (shouldProfile) {
         // Performance profiling is on
@@ -2493,6 +2520,23 @@ void HandleRequest::completeOperation(DbResponse& response) {
         auto ldapCumulativeOperationsStats = LDAPCumulativeOperationStats::get();
         if (ldapCumulativeOperationsStats) {
             ldapCumulativeOperationsStats->recordOpStats(ldapOperationStatsSnapshot);
+        }
+    }
+
+    const auto& errInfo = currentOp.debug().errInfo;
+    if (!errInfo.isOK()) {
+        try {
+            collectQueryStatsMongodReadErrored(opCtx, errInfo.code());
+        } catch (const DBException& ex) {
+            // Failing to collect query stats for an errored operation is a bug. Surface a BF/AF,
+            // but swallow it and fire once per process to avoid any negative impact on the cluster.
+            static std::once_flag once;
+            std::call_once(once, [&] {
+                tassertedNoThrow(13192400,
+                                 str::stream()
+                                     << "Failed to collect query stats for an errored operation: "
+                                     << redact(ex));
+            });
         }
     }
 }

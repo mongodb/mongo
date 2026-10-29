@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -54,12 +28,12 @@ namespace mongo::bsoncolumn {
  * BSONColumn decompression.
  */
 template <class T>
-concept Appendable MONGO_MOD_PUBLIC = requires(T& t,
-                                               std::string_view strVal,
-                                               BSONBinData binVal,
-                                               BSONCode codeVal,
-                                               BSONElement bsonVal,
-                                               int32_t n) {
+concept Appendable [[MONGO_MOD_PUBLIC]] = requires(T& t,
+                                                   std::string_view strVal,
+                                                   BSONBinData binVal,
+                                                   BSONCode codeVal,
+                                                   BSONElement bsonVal,
+                                                   int32_t n) {
     t.append(true);
     t.append((int32_t)1);
     t.append((int64_t)1);
@@ -100,6 +74,20 @@ concept Appendable MONGO_MOD_PUBLIC = requires(T& t,
 };
 
 /**
+ * A Container for Collector that materializes elements as usual but retains none of them.
+ *
+ * This is for callers that decompress purely for the side effects of decoding and materializing,
+ * such as validation establishing that a column can be unpacked without throwing. Elements are
+ * still materialized into the BSONElementStorage passed to decompress(), so this saves only the
+ * cost of accumulating them, not the cost of materializing them.
+ */
+template <class Element>
+class [[MONGO_MOD_PUBLIC]] DiscardingContainer {
+public:
+    void push_back(const Element&) {}
+};
+
+/**
  * Interface to accept elements decoded from BSONColumn and materialize them
  * as Elements of user-defined type.
  *
@@ -122,12 +110,12 @@ concept Appendable MONGO_MOD_PUBLIC = requires(T& t,
  * materializePreallocated() instead of materialize().
  */
 template <class T>
-concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
-                                                 BSONElementStorage& alloc,
-                                                 std::string_view strVal,
-                                                 BSONBinData binVal,
-                                                 BSONCode codeVal,
-                                                 BSONElement bsonVal) {
+concept Materializer [[MONGO_MOD_PUBLIC]] = requires(T& t,
+                                                     BSONElementStorage& alloc,
+                                                     std::string_view strVal,
+                                                     BSONBinData binVal,
+                                                     BSONCode codeVal,
+                                                     BSONElement bsonVal) {
     typename T::Element;
 
     { T::materialize(alloc, true) } -> std::same_as<typename T::Element>;
@@ -177,7 +165,7 @@ concept Materializer MONGO_MOD_PUBLIC = requires(T& t,
  * to collect the position information of values within documents.
  */
 template <typename T>
-concept PositionInfoAppender MONGO_MOD_PUBLIC = requires(T& t, int32_t n) {
+concept PositionInfoAppender [[MONGO_MOD_PUBLIC]] = requires(T& t, int32_t n) {
     { t.appendPositionInfo(n) } -> std::same_as<void>;
 };
 
@@ -473,7 +461,7 @@ public:
         return decompressAllMissing(ptr,
                                     end,
                                     buffer,
-                                    simple8b::kSingleZero /* lastNonRLEBlock */,
+                                    /*lastNonRLEBlock=*/simple8b::kSingleZero,
                                     [](size_t count, uint64_t lastNonRLEBlock) {});
     }
 
@@ -543,7 +531,7 @@ public:
         return decompressAllLiteral<Encoding>(ptr,
                                               end,
                                               buffer,
-                                              simple8b::kSingleZero /* lastNonRLEBlock */,
+                                              /*lastNonRLEBlock=*/simple8b::kSingleZero,
                                               [](size_t count, uint64_t lastNonRLEBlock) {});
     }
 
@@ -747,7 +735,7 @@ public:
 /**
  * Implements the "materializer" concept such that the output elements are BSONElements.
  */
-class MONGO_MOD_PUBLIC BSONElementMaterializer {
+class [[MONGO_MOD_PUBLIC]] BSONElementMaterializer {
 public:
     using Element = BSONElement;
 
@@ -936,7 +924,7 @@ namespace internal {
  */
 template <class Path>
 bool isRootPath(Path& path) {
-    return !path.elementsToMaterialize(BSONObj{}, /*traverseArrays*/ true).empty();
+    return !path.elementsToMaterialize(BSONObj{}, /*traverseArrays=*/true).empty();
 }
 }  // namespace internal
 }  // namespace mongo::bsoncolumn

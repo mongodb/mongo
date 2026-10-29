@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/geo/big_polygon.h"
 
@@ -33,6 +7,7 @@
 
 #include <cmath>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <s2.h>
@@ -576,5 +551,38 @@ TEST(BigSimplePolygon, ShareEdgeContained) {
     checkConsistency(bigPoly, expandedBigPoly, collinearPoly);
     checkConsistency(bigPoly, expandedBigPoly, line);
     checkConsistency(bigPoly, expandedBigPoly, collinearLine);
+}
+
+TEST(BigSimplePolygon, ConcurrentBorderCacheInitIsThreadSafe) {
+    // Fresh BigSimplePolygon with uninitialized cache (not yet accessed from any thread).
+    BigSimplePolygon bigPoly(loop(points() << LatLng(10.0, 10.0) << LatLng(10.0, -10.0)
+                                           << LatLng(-10.0, -10.0) << LatLng(-10.0, 10.0)));
+
+    // Shapes used for concurrent queries.
+    S2Polygon innerPoly(loopVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
+                                         << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+    S2Polyline innerLine(pointVec(points() << LatLng(5.0, 5.0) << LatLng(5.0, -5.0)
+                                           << LatLng(-5.0, -5.0) << LatLng(-5.0, 5.0)));
+
+    constexpr int kThreads = 16;
+    constexpr int kIters = 100;
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kIters; ++i) {
+                // Exercises the polygon border cache (Contains/Intersects S2Polygon path)
+                // and the line border cache (Intersects S2Polyline path) concurrently.
+                ASSERT_TRUE(bigPoly.Contains(innerPoly));
+                ASSERT_TRUE(bigPoly.Intersects(innerPoly));
+                ASSERT_TRUE(bigPoly.Intersects(innerLine));
+                ASSERT_TRUE(bigPoly.Contains(innerLine));
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
 }
 }  // namespace

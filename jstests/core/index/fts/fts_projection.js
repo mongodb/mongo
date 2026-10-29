@@ -1,5 +1,6 @@
 // Test $text with $textScore projection.
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 // ]
 

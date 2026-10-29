@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 #include "mongo/util/time_support.h"
@@ -42,6 +17,22 @@ namespace mongo {
 namespace mozjs {
 
 class WasmtimeImplScope;
+
+/**
+ * Derives the kill reason a JS scope should be killed with for 'opCtx', or ErrorCodes::OK if the
+ * operation is not interrupted. Mirrors OperationContext::checkForInterruptNoAssert() priority:
+ *   1. an expired deadline (honoring the maxTimeNeverTimeOut/maxTimeAlwaysTimeOut failpoints)
+ *      outranks everything, e.g. MaxTimeMSExpired;
+ *   2. then the recorded kill status (killOp, killCursors, shutdown, ...);
+ *   3. then a disconnected client session (SERVER-130767: an op stuck inside JS never polls
+ *      checkForInterrupt(), so nothing else ever discovers the disconnect).
+ *
+ * Concurrency: per getKillStatus()'s contract, the caller must either be the thread executing
+ * on behalf of 'opCtx' or hold the lock on the Client owning it. The kill-op listener paths
+ * (interrupt()/interruptAll()) are called with that lock held; WasmtimeImplScope's
+ * kill()/isKillPending() take it before calling this from the DeadlineMonitor thread.
+ */
+ErrorCodes::Error scriptKillReasonFor(OperationContext* opCtx);
 
 /**
  * Host-side JavaScript engine that runs on mongod. Implements the ScriptEngine interface by
@@ -90,12 +81,15 @@ public:
     void registerOperation(OperationContext* ctx,
                            WasmtimeImplScope* scope,
                            std::function<void()> onTeardown);
-    void unregisterOperation(OperationContext* opCtx);
+    // Removes 'scope's entry from the registrations on 'opCtx'. Other scopes' overlapping
+    // registrations are left intact: a stale unregister must never remove another registrant.
+    void unregisterOperation(OperationContext* opCtx, WasmtimeImplScope* scope);
 
-    // Returns a pre-warmed WasmEngineContext from the pool if available, or creates a fresh one.
-    // Each scope (and each post-kill rebuild) gets its own context so that the engine-wide
-    // interrupt-epoch counter cannot leak across scopes.
-    std::shared_ptr<wasm::WasmEngineContext> createWasmEngineContext() const;
+    // Returns the process-wide shared WasmEngineContext, deserializing it once on first use. Every
+    // scope shares the same context; kills stay isolated per Store via each bridge's epoch-deadline
+    // callback, so sharing the engine-wide interrupt-epoch counter is safe (see the _wasmContext
+    // member and getWasmEngineContext()).
+    std::shared_ptr<wasm::WasmEngineContext> getWasmEngineContext() const;
 
     // Thread-local idle bridge (one per thread). Populated when a healthy scope is destroyed;
     // consumed by the next createScopeForCurrentThread() on the same thread.
@@ -150,12 +144,20 @@ public:
     static bool hasIdleBridgeForTest();
 
 private:
-    // A small pool of lazily-warmed contexts reduces the cost of cold-start scope creation and
-    // post-kill recovery by amortising Engine+Component+Linker initialisation over time.
-    mutable std::mutex _contextPoolMutex;
-    mutable std::once_flag _poolOnce;
-    mutable std::vector<std::shared_ptr<wasm::WasmEngineContext>> _contextPool;
-    static constexpr size_t kContextPoolSize = 4;
+    // One long-lived WasmEngineContext (Engine + deserialized Component + Linker) shared by every
+    // scope on this engine. A WasmEngineContext is structurally immutable after construction; the
+    // engine's interrupt-epoch counter is shared mutable state, but it is isolated per Store by
+    // each bridge's epoch-deadline callback (see bridge.cpp). The context is explicitly designed to
+    // back many bridges: MozJSWasmBridge instantiates a fresh per-Store Instance from the shared
+    // _component/_linker under wasmLifecycleMutex(). Deserializing the component once — instead of
+    // per scope — eliminates the dominant cold-start cost (~90% of a cold scope creation; the rest
+    // is per-Store instantiation + SpiderMonkey init). It also sidesteps the Wasmtime ASAN
+    // double-free from concurrent wasmtime_component_deserialize of the same bytes, and the
+    // cross-thread destruction hazard, because the context is deserialized exactly once and
+    // destroyed exactly once at engine teardown. Per-scope WASM linear-memory reservation is
+    // unaffected (it belongs to each Store, not the shared context).
+    mutable std::once_flag _wasmContextOnce;
+    mutable std::shared_ptr<wasm::WasmEngineContext> _wasmContext;
 };
 
 }  // namespace mozjs

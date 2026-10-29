@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 
@@ -170,6 +144,43 @@ TEST(WiredTigerConnectionTest, ReleaseSessionAfterShutdown) {
     ASSERT_EQ(connection->getIdleSessionsCount(), 0);
 }
 
+// Test that a session made stale by a rollback to stable is closed when it is released, rather than
+// abandoned as it is during a clean shutdown. A rollback to stable leaves the WT_CONNECTION intact,
+// so an abandoned session keeps its cached cursors, and therefore the data handles of their tables,
+// open for the lifetime of the process.
+TEST(WiredTigerConnectionTest, ReleaseSessionAfterRollbackToStableClosesItsCursors) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+    const std::string uri = "table:rollback_to_stable";
+
+    {
+        WiredTigerManagedSession session = connection->getUninterruptibleSession();
+        ASSERT_OK(
+            wtRCToStatus(session->create(uri.c_str(), "key_format=q,value_format=u"), *session));
+    }
+
+    {
+        WiredTigerManagedSession session = connection->getUninterruptibleSession();
+
+        // Leave a cursor on the table in the session's cursor cache. It stays open, so WiredTiger
+        // holds the table's data handle until the session itself is closed.
+        session->releaseCursor(WiredTigerUtil::genTableId(), session->getNewCursor(uri), "");
+        ASSERT_EQ(session->cachedCursors(), 1);
+
+        connection->shuttingDown(WiredTigerConnection::ShutdownReason::kRollbackToStable);
+        connection->restart();
+    }
+
+    // The session's rollback to stable epoch was stale, so it was not returned to the cache.
+    ASSERT_EQ(connection->getIdleSessionsCount(), 0);
+
+    // Nothing holds the table's data handle any more, so the table can be dropped. Do not wait for
+    // locks, so that a leaked cursor fails the drop with EBUSY instead of hanging the test.
+    WiredTigerManagedSession session = connection->getUninterruptibleSession();
+    ASSERT_OK(wtRCToStatus(session->drop(uri.c_str(), "checkpoint_wait=false,lock_wait=false"),
+                           *session));
+}
+
 // Test that, if a recovery unit reconfigures its session, the session will have its configuration
 // reset to default values before it is released to the session cache where it can be used by
 // another recovery unit.
@@ -181,12 +192,12 @@ TEST(WiredTigerConnectionTest, resetConfigurationBeforeReleasingSessionToCache) 
     ASSERT_EQ(connection->getIdleSessionsCount(), 0U);
     {
         WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
-        // Set cache max wait time to be a non-default value.
-        recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
+        // Set ignore_cache_size to be true
+        recoveryUnit.optOutOfCacheEviction();
 
         WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
-        // Set ignore_cache_size to be true
-        session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
+        // Set cache max wait time to be a non-default value.
+        session->modifyConfiguration("cache_max_wait_ms=100", "cache_max_wait_ms=0");
         // Set isolation level to be read-uncommitted (by default it is snapshot)
         session->modifyConfiguration("isolation=read-uncommitted", "isolation=snapshot");
         // Set cache_cursors to be false
@@ -221,10 +232,9 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
     WiredTigerConnection* connection = harnessHelper.getConnection();
 
     WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
-    // Set cache max wait time to be a non-default value.
-    recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
-
     WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
+    // Set cache max wait time to be a non-default value.
+    session->modifyConfiguration("cache_max_wait_ms=100", "cache_max_wait_ms=0");
     // Set ignore_cache_size to be true
     session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
     // Set isolation level to be read-uncommitted (by default it is snapshot)
@@ -241,13 +251,44 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
     ASSERT(undoConfigStringsSet.find("cache_cursors=true") != undoConfigStringsSet.end());
 
     // Set all values back to their defaults.
-    recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{0});
+    session->modifyConfiguration("cache_max_wait_ms=0", "cache_max_wait_ms=0");
     session->modifyConfiguration("ignore_cache_size=false", "ignore_cache_size=false");
     session->modifyConfiguration("isolation=snapshot", "isolation=snapshot");
     session->modifyConfiguration("cache_cursors=true", "cache_cursors=true");
 
     // Check that we do not store any undo config strings.
     ASSERT_EQ(session->getUndoConfigStrings().size(), 0);
+}
+
+// Test that opting out of cache eviction sets ignore_cache_size on the recovery unit's session.
+TEST(WiredTigerConnectionTest, optOutOfCacheEvictionIgnoresCacheSize) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+
+    WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+    WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
+    recoveryUnit.optOutOfCacheEviction();
+
+    auto undoConfigStringsSet = session->getUndoConfigStrings();
+
+    ASSERT_EQ(undoConfigStringsSet.size(), 1);
+    ASSERT(undoConfigStringsSet.find("ignore_cache_size=false") != undoConfigStringsSet.end());
+}
+
+// Test that opting out of cache eviction applies to a session opened after the opt-out.
+TEST(WiredTigerConnectionTest, optOutOfCacheEvictionAppliesToLaterSession) {
+    WiredTigerConnectionHarnessHelper harnessHelper("");
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+
+    WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+    // No session exists yet, so the opt-out must be recorded and replayed when one is opened.
+    recoveryUnit.optOutOfCacheEviction();
+
+    WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
+    auto undoConfigStringsSet = session->getUndoConfigStrings();
+
+    ASSERT_EQ(undoConfigStringsSet.size(), 1);
+    ASSERT(undoConfigStringsSet.find("ignore_cache_size=false") != undoConfigStringsSet.end());
 }
 
 TEST(WiredTigerConnectionTest, CheckSessionCacheMax) {

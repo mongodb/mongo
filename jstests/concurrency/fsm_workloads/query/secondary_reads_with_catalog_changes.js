@@ -17,6 +17,7 @@
  * interrupted.
  *
  * @tags: [
+ *   assumes_against_mongod_not_mongos,
  *   creates_background_indexes,
  *   requires_replication,
  *   uses_write_concern,

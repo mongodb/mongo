@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/oplog_applier.h"
 
@@ -37,14 +11,16 @@
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <limits>
@@ -108,6 +84,7 @@ protected:
 };
 
 void OplogApplierTest::setUp() {
+    ServiceContextTest::setUp();
     _buffer =
         std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize, kTestOplogBufferCount);
     _applier = std::make_unique<OplogApplierMock>(_buffer.get());
@@ -122,6 +99,7 @@ void OplogApplierTest::tearDown() {
     _opCtxHolder = {};
     _applier = {};
     _buffer = {};
+    ServiceContextTest::tearDown();
 }
 
 const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);
@@ -222,12 +200,12 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpW
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsPreparedApplyOpsOrPreparedCommits) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeApplyOpsOplogEntry(1, true /* prepare */));
-    srcOps.push_back(makeApplyOpsOplogEntry(2, true /* prepare */));
-    srcOps.push_back(makeCommitTransactionOplogEntry(3, dbName, true /* prepared */));
+    srcOps.push_back(makeApplyOpsOplogEntry(1, /*prepare=*/true));
+    srcOps.push_back(makeApplyOpsOplogEntry(2, /*prepare=*/true));
+    srcOps.push_back(makeCommitTransactionOplogEntry(3, dbName, /*prepared=*/true));
     srcOps.push_back(makeAbortTransactionOplogEntry(4, dbName));
-    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
-    srcOps.push_back(makeApplyOpsOplogEntry(6, true /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, /*prepare=*/true));
+    srcOps.push_back(makeApplyOpsOplogEntry(6, /*prepare=*/true));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
     // Prepares can be batched together.
@@ -253,9 +231,9 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithPreparedApplyOpsOrP
     std::vector<OplogEntry> srcOps;
     auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
     srcOps.push_back(makeInsertOplogEntry(1, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(2, true /* prepare */));
-    srcOps.push_back(makeApplyOpsOplogEntry(3, true /* prepare */));
-    srcOps.push_back(makeCommitTransactionOplogEntry(4, dbName, true /* prepared */));
+    srcOps.push_back(makeApplyOpsOplogEntry(2, /*prepare=*/true));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, /*prepare=*/true));
+    srcOps.push_back(makeCommitTransactionOplogEntry(4, dbName, /*prepared=*/true));
     srcOps.push_back(makeInsertOplogEntry(5, nss));
     srcOps.push_back(makeAbortTransactionOplogEntry(6, dbName));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
@@ -290,9 +268,9 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
     // The DBCheck oplog shouldn't be batched with any preceding oplog, but it can be batched with
     // any subsequent oplog that is batchable.
     srcOps.push_back(makeDBCheckBatchEntry(2, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(3, false /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, /*prepare=*/false));
     srcOps.push_back(makeInsertOplogEntry(4, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, /*prepare=*/true));
 
     // The DBCheck oplog shouldn't be batched with the previous DBCheck oplog.
     srcOps.push_back(makeDBCheckBatchEntry(6, nss));
@@ -300,7 +278,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
 
     // DBCheck oplog shouldn't be batched with a prepared commit that follows it as prepared commit
     // must start a new batch.
-    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, true /* prepared */));
+    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, /*prepared=*/true));
 
     // DBCheck oplog shouldn't be batched with a prepared commit that precedes it.
     srcOps.push_back(makeDBCheckBatchEntry(9, nss));
@@ -344,9 +322,9 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsNewPrimary) {
     // The New Primary oplog shouldn't be batched with any preceding oplog, but it can be batched
     // with any subsequent oplog that is batchable.
     srcOps.push_back(makeNewPrimaryBatchEntry(2));
-    srcOps.push_back(makeApplyOpsOplogEntry(3, false /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, /*prepare=*/false));
     srcOps.push_back(makeInsertOplogEntry(4, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, /*prepare=*/true));
 
     // The New Primary oplog shouldn't be batched with the previous New Primary oplog.
     srcOps.push_back(makeNewPrimaryBatchEntry(6));
@@ -354,7 +332,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsNewPrimary) {
 
     // New Primary oplog shouldn't be batched with a prepared commit that follows it as prepared
     // commit must start a new batch.
-    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, true /* prepared */));
+    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, /*prepared=*/true));
 
     // New Primary oplog shouldn't be batched with a prepared commit that precedes it.
     srcOps.push_back(makeNewPrimaryBatchEntry(9));
@@ -670,18 +648,38 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithTruncateRangeOnNorm
     ASSERT_EQUALS(srcOps[2], batch[0]);
 }
 
-class OplogApplierDelayTest : public OplogApplierTest {
-    // This constructor lets us give a variable name to mockClock so we can copy the same
-    // shared_ptr into SharedClockSourceAdapters we give to ServiceContext::make and the
-    // _mockClock member variable.
-    explicit OplogApplierDelayTest(std::shared_ptr<ClockSourceMock> mockClock)
-        : OplogApplierTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
-                                   std::make_unique<SharedClockSourceAdapter>(mockClock)))),
-          _mockClock(std::move(mockClock)) {}
+TEST_F(OplogApplierTest, GetNextApplierBatchProcessesTruncateRangeIndividuallyDuringMagicRestore) {
+    storageGlobalParams.magicRestore = true;
+    ScopeGuard resetMagicRestore([] { storageGlobalParams.magicRestore = false; });
 
+    std::vector<OplogEntry> srcOps;
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+    int oplogTs = 0;
+
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+    // Without magicRestore this would batch with the entry above.
+    srcOps.push_back(makeTruncateRangeOnPreImagesEntry(++oplogTs, 0));
+    // Without magicRestore, these entries would sit with each other.
+    srcOps.push_back(makeTruncateRangeOnOplogEntry(++oplogTs, 1));
+    srcOps.push_back(makeInsertOplogEntry(++oplogTs, nss));
+
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+
+    for (int i = 0; i < 4; i++) {
+        auto batch =
+            unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+        ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+        ASSERT_EQUALS(srcOps[i], batch[0]);
+    }
+}
+
+class OplogApplierDelayTest : public OplogApplierTest {
 public:
-    OplogApplierDelayTest() : OplogApplierDelayTest(std::make_shared<ClockSourceMock>()) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(_mockClock),
+                                 std::make_unique<SharedClockSourceAdapter>(_mockClock)));
+    }
 
     void setUp() override {
         OplogApplierTest::setUp();
@@ -710,9 +708,9 @@ public:
     }
 
 protected:
-    std::shared_ptr<ClockSourceMock> _mockClock;
+    std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    AtomicWord<bool> _failWaits{false};
+    Atomic<bool> _failWaits{false};
 
 private:
     std::string _origThreadName;
@@ -753,7 +751,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchWaitsForBatchToFill) {
             srcOps.push_back(makeInsertOplogEntry(
                 2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
             _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
-            peekFailPoint->waitForTimesEntered(peekFailPoint.initialTimesEntered() + 1);
+            peekFailPoint.waitForOneNewEntry();
             _mockClock->advance(Milliseconds(5));
         }
         ASSERT(waitForWait());
@@ -783,7 +781,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchWaitsForBatchToTimeout) {
             srcOps.push_back(makeInsertOplogEntry(
                 2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
             _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
-            peekFailPoint->waitForTimesEntered(peekFailPoint.initialTimesEntered() + 1);
+            peekFailPoint.waitForOneNewEntry();
             _mockClock->advance(Milliseconds(5));
         }
         ASSERT(waitForWait());
@@ -812,7 +810,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchInterrupted) {
             srcOps.push_back(makeInsertOplogEntry(
                 2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
             _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
-            peekFailPoint->waitForTimesEntered(peekFailPoint.initialTimesEntered() + 1);
+            peekFailPoint.waitForOneNewEntry();
             _mockClock->advance(Milliseconds(5));
         }
         ASSERT(waitForWait());

@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -73,6 +46,18 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
+
+// $lookup re-parses resolvedPipeline BSON per input document and buildPipeline() runs
+// makeLookupViewBinder to bind view info onto extension stages at parse time. When
+// resolvedPipeline is serialized from an already-parsed pipeline (e.g. hybrid search
+// introspection), view binding is already applied.
+// Re-binding overwrites already-resolved stages with the user-facing view name. The binding start
+// offset skips only the already-resolved view prefix.
+enum class LookupResolvedPipelineViewBinding {
+    kNeedsBinding,
+    kAlreadyBound,
+};
 
 struct LookUpSharedState {
     // TODO SERVER-107976: Move 'pipeline' and 'execPipeline' entirely into the 'LookUpStage' class.
@@ -85,6 +70,13 @@ struct LookUpSharedState {
     // move it back to the 'DocumentSourceLookUp' class.
     std::vector<BSONObj> resolvedPipeline;
 
+    LookupResolvedPipelineViewBinding resolvedPipelineViewBinding =
+        LookupResolvedPipelineViewBinding::kNeedsBinding;
+
+    // Number of already-materialized foreign view stages at the front of resolvedPipeline. These
+    // stages must not be rebound, but user stages after them still need view binding.
+    size_t viewBindingStart = 0;
+
     // A pipeline parsed from _sharedState->resolvedPipeline at creation time, intended to support
     // introspective functions. If sub-$lookup stages are present, their pipelines are constructed
     // recursively.
@@ -96,26 +88,24 @@ struct LookUpSharedState {
 void lookupPipeValidator(const Pipeline& pipeline);
 
 // Parses $lookup's 'from' field. Accepts a string or a '{db, coll}' object with specific
-// exceptions. `usingMongos` and `isParsingViewDefinition` tighten validation; lite-parse omits
-// them because expCtx is unavailable.
+// exceptions for internal namespaces (config.cache.chunks.*, local.oplog.rs,
+// config.collections, config.chunks) and when allowGenericForeignDbLookup is set.
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb,
-                                                   bool allowGenericForeignDbLookup,
-                                                   bool usingMongos = false,
-                                                   bool isParsingViewDefinition = false);
+                                                   bool allowGenericForeignDbLookup);
 
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLookUp final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceLookUp final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$lookup"_sd;
-    static constexpr std::string_view kFromField = "from"_sd;
-    static constexpr std::string_view kLocalField = "localField"_sd;
-    static constexpr std::string_view kForeignField = "foreignField"_sd;
-    static constexpr std::string_view kPipelineField = "pipeline"_sd;
-    static constexpr std::string_view kAsField = "as"_sd;
+    static constexpr std::string_view kStageName = "$lookup"sv;
+    static constexpr std::string_view kFromField = "from"sv;
+    static constexpr std::string_view kLocalField = "localField"sv;
+    static constexpr std::string_view kForeignField = "foreignField"sv;
+    static constexpr std::string_view kPipelineField = "pipeline"sv;
+    static constexpr std::string_view kAsField = "as"sv;
 
     /**
      * Copy constructor used for clone().
@@ -186,7 +176,10 @@ public:
                          boost::optional<std::pair<std::string, std::string>> localForeignFields,
                          boost::optional<BSONObj> unwindSpec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                         bool containsUserSpecifiedPipeline = true);
+                         bool containsUserSpecifiedPipeline = true,
+                         FirstStageViewApplicationPolicy subpipelineViewPolicy =
+                             FirstStageViewApplicationPolicy::kDefaultPrepend,
+                         size_t subpipelineViewPrefixLen = 0);
 
     static std::unique_ptr<Pipeline> parsePipelineFromStageParamsWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
@@ -194,12 +187,6 @@ public:
         StageParamsPipeline stageParams,
         const std::vector<BSONObj>& rawPipeline,
         const NamespaceString& fromNss);
-
-    void resolvedPipelineHelper(
-        NamespaceString fromNs,
-        std::vector<BSONObj> pipeline,
-        boost::optional<std::pair<std::string, std::string>> localForeignFields,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Builds the BSONObj used to query the foreign collection and wraps it in a $match.
@@ -212,7 +199,7 @@ public:
     /**
      * Helper to absorb an $unwind stage. Only used for testing this special behavior.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void setUnwindStage_forTest(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setUnwindStage_forTest(
         const boost::intrusive_ptr<DocumentSourceUnwind>& unwind) {
         invariant(!_unwindSrc);
         _unwindSrc = unwind;
@@ -429,6 +416,61 @@ private:
     void insertFieldMatchPlaceholder();
 
     /**
+     * Returns the index, in the subpipeline we serialize for a remote receiver, at which the join
+     * $match belongs.
+     *
+     * '_fieldMatchPipelineIdx' cannot be sent as-is: it indexes the unexpanded BSON of
+     * '_sharedState->resolvedPipeline', while serialization sends the parsed pipeline, in which
+     * alias stages have become their components (a view of [$sortByCount, $limit] is two stages of
+     * BSON but three parsed) and extension stages have been desugared.
+     *
+     * '_fieldMatchIntrospectionIdx' records the boundary in parsed DocumentSources, so this method
+     * only has to sum how many stages each source ahead of it serializes to.
+     */
+    size_t _serializedFieldMatchPipelineIdx(const query_shape::SerializationOptions& opts) const;
+
+    /**
+     * Whether the subpipeline should be parsed in two halves split at 'splitPoint' so that
+     * _spliceIntrospectionPipelineAtFieldMatch() can record the seam. 'numStages' is the length of
+     * the pre-parse pipeline being split, in the same units as 'splitPoint'.
+     *
+     * A 'splitPoint' of 0 needs no split: nothing precedes the join $match, so its position needs
+     * no translation either way.
+     */
+    bool _shouldSpliceAtFieldMatch(size_t splitPoint, size_t numStages) const {
+        return _canSplitAtFieldMatch && splitPoint > 0 && splitPoint <= numStages;
+    }
+
+    /**
+     * Splits 'stages' at 'splitPoint', builds a Pipeline from each half with the matching builder,
+     * and sets '_sharedState->resolvedIntrospectionPipeline' to the prefix followed by the suffix,
+     * recording the join $match's position at the seam in '_fieldMatchIntrospectionIdx'.
+     *
+     * Note that parsing the subpipeline in halves runs validateTopLevelPipeline() once per half
+     * rather than once overall, so the suffix's first stage is checked as though it led a pipeline;
+     * Pipeline::appendPipeline() then re-runs only validateCommon() on the joined result.
+     */
+    template <typename StageContainer, typename PrefixBuilder, typename SuffixBuilder>
+    void _spliceIntrospectionPipelineAtFieldMatch(StageContainer stages,
+                                                  size_t splitPoint,
+                                                  PrefixBuilder&& buildPrefix,
+                                                  SuffixBuilder&& buildSuffix) {
+        const auto seam = stages.begin() + splitPoint;
+        StageContainer prefix(std::make_move_iterator(stages.begin()),
+                              std::make_move_iterator(seam));
+        StageContainer suffix(std::make_move_iterator(seam), std::make_move_iterator(stages.end()));
+
+        auto prefixPipe = buildPrefix(std::move(prefix));
+        auto suffixPipe = suffix.empty() ? nullptr : buildSuffix(std::move(suffix));
+
+        _fieldMatchIntrospectionIdx = prefixPipe->getSources().size();
+        if (suffixPipe) {
+            prefixPipe->appendPipeline(std::move(suffixPipe));
+        }
+        _sharedState->resolvedIntrospectionPipeline = std::move(prefixPipe);
+    }
+
+    /**
      * Given a mutable document, appends execution stats such as 'totalDocsExamined',
      * 'totalKeysExamined', 'collectionScans', 'indexesUsed', etc. to it.
      */
@@ -438,6 +480,42 @@ private:
      * Returns true if we are not in a transaction.
      */
     bool foreignShardedLookupAllowed() const;
+
+    /**
+     * Folds the user-supplied $lookup subpipeline and records
+     * where the automatically-generated join $match belongs.
+     *
+     * This method only positions the join $match; the caller is still responsible for building the
+     * introspection pipeline and inserting the actual $match placeholder.
+     *
+     * This helper is meant only to be called from the DocumentSourceLookUp constructors.
+     */
+    void resolvedPipelineHelper(
+        const std::vector<BSONObj>& pipeline,
+        boost::optional<std::pair<std::string, std::string>> localForeignFields,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        FirstStageViewApplicationPolicy subpipelineViewPolicy =
+            FirstStageViewApplicationPolicy::kDefaultPrepend);
+
+    /**
+     * Handles a subpipeline that applies the foreign view itself, so the view's stages are not
+     * prepended and the subpipeline is used as-is. Positions the join $match after the
+     * subpipeline's own view-applying stage.
+     *
+     * This is meant only to be called from 'resolvedPipelineHelper'.
+     */
+    void handleSelfApplyingViewStage(const std::vector<BSONObj>& pipeline,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Builds the resolved pipeline for the standard case where the materialized view prefix is kept
+     * and the user subpipeline is appended after it. When localField/foreignField are used, ensures
+     * the join $match precedes the user stages.
+     *
+     * This is meant only to be called from 'resolvedPipelineHelper'.
+     */
+    void handlePrependedViewPipeline(const std::vector<BSONObj>& pipeline,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
@@ -454,6 +532,14 @@ private:
     // Indicates the index in '_sharedState->resolvedPipeline' where the local/foreignField $match
     // resides.
     boost::optional<size_t> _fieldMatchPipelineIdx;
+    // Where the join $match belongs among the parsed sources of
+    // '_sharedState->resolvedIntrospectionPipeline'; unset means '_fieldMatchPipelineIdx' is
+    // already in the units we serialize and needs no translation.
+    boost::optional<size_t> _fieldMatchIntrospectionIdx;
+    // True when '_fieldMatchPipelineIdx' splits a view prefix from the user's stages and so can be
+    // translated into '_fieldMatchIntrospectionIdx'; false for a mongot subpipeline and when a
+    // $documents/$queue source stage sits ahead of the join $match.
+    bool _canSplitAtFieldMatch = false;
 
     // Holds 'let' defined variables defined both in this stage and in parent pipelines.
     // These are copied to the '_fromExpCtx' ExpressionContext's 'variables' and

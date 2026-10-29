@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -53,7 +27,7 @@ namespace rss {
  * expected behaviors, allowing consumers to act based on these flags, rather than needing to reason
  * about how a particular provider would behave in a given context.
  */
-class MONGO_MOD_OPEN PersistenceProvider {
+class [[MONGO_MOD_OPEN]] PersistenceProvider {
 public:
     virtual ~PersistenceProvider() = default;
 
@@ -125,6 +99,18 @@ public:
     virtual bool shouldUseReplicatedFastCount() const = 0;
 
     /**
+     * If true, per-document validation hashes are stored on oplog entries and verified against the
+     * applied document during oplog application.
+     */
+    virtual bool shouldUseContinuousInternodeValidation() const = 0;
+
+    /**
+     * If true, applying replicated container operations (ci/cu/cd) tolerates state mismatches by
+     * converting between insert/update and ignoring deletes of missing keys.
+     */
+    virtual bool relaxContainerOplogConstraints() const = 0;
+
+    /**
      * If true, writes to the oplog should be used as the unit of progress for flow control
      * sampling.
      */
@@ -178,6 +164,13 @@ public:
     virtual bool supportsTableLogging() const = 0;
 
     /**
+     * If true, the provider supports opening WiredTiger version cursors, which iterate the history
+     * of values for a given key. These are debug-only cursors, used to print record and index entry
+     * metadata when validation finds an inconsistency.
+     */
+    virtual bool supportsVersionCursor() const = 0;
+
+    /**
      * If true, the provider supports cross-shard transactions.
      */
     virtual bool supportsCrossShardTransactions() const = 0;
@@ -205,6 +198,12 @@ public:
      */
     virtual bool supportsOplogSampling() const = 0;
 
+    /**
+     * If true, the provider supports a full collection scan over the oplog collection when
+     * initializing truncation markers.
+     */
+    virtual bool supportsOplogScanning() const = 0;
+
     virtual bool supportsWriteConcernOptions(
         const WriteConcernOptions& writeConcernOptions) const = 0;
 
@@ -225,6 +224,12 @@ public:
      * The default memory_page_max value to set on WT for the oplog in string format.
      */
     virtual const char* getWTMemoryPageMaxForOplogStrValue() const = 0;
+
+    /**
+     * The smallest oplog size, in MB, that the provider accepts when the oplog is resized via
+     * replSetResizeOplog.
+     */
+    virtual double getMinOplogSizeMB() const = 0;
 
     /**
      * If true, the provider supports compaction.
@@ -298,9 +303,31 @@ public:
     virtual bool supportsLegacyReplSetCommands() const = 0;
 
     /**
+     * If true, the provider supports external usage of dbHash.
+     */
+    virtual bool supportsDBHashExternalCall() const = 0;
+
+    /**
      * Creates and returns a new policy that governs checkpoint scheduling for this provider.
      */
     virtual std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const = 0;
+
+    /**
+     * If true, the provider supports the apply ops user-facing command.
+     */
+    virtual bool supportsApplyOpsCommand() const = 0;
+
+    /**
+     * If true, the provider supports external usage of the getDiagnosticData command.
+     */
+    virtual bool supportsGetDiagnosticDataExternalCall() const = 0;
+
+    /**
+     * Reports the current number of active layered data handles to any provider-specific metrics
+     * sink. Default is a no-op; only providers that expose a metric derived from this count
+     * override it.
+     */
+    virtual void reportLayeredDataHandleCount(int64_t count) const {}
 };
 
 }  // namespace rss

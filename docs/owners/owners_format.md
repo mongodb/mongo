@@ -3,6 +3,10 @@
 After modifying any OWNERS files, the overall ownership database (`.github/CODEOWNERS`) must be
 rebuilt. This is done by running `bazel run codeowners`.
 
+The group also validates GitHub's parsed CODEOWNERS result when CI supplies an expansions file with
+credentials. That remote validation is reported as skipped during local runs without credentials;
+generation and local validation still run.
+
 ## OWNERS.yml File Format
 
 This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owners/) and
@@ -38,6 +42,17 @@ there are two options:
 - `no_parent_owners`, which defaults to false. If set to true it stops upwards OWNERS resolution.
 - `no_auto_approver`, which defaults to false. If set to true it prevents the generated `CODEOWNERS`
   entry for this `OWNERS.yml` file from automatically including `@svc-auto-approve-bot`.
+
+## Filter Resolution
+
+Resolution starts at the deepest `OWNERS.yml` in the directory tree relative to the changed file and
+walks upward toward the repo root. The deepest file that has a matching filter wins — filters from
+higher-up `OWNERS.yml` files are only consulted if no filter in a deeper file matches.
+`no_parent_owners: true` stops upward traversal entirely.
+
+Within a single file, **order matters**: all filters are evaluated in order and the last matching
+filter wins. This mirrors how GitHub's `CODEOWNERS` format works, where the last matching pattern
+takes precedence.
 
 ### Example file
 
@@ -104,7 +119,7 @@ aliases:
     - user.name@mongodb.com # email address
 ```
 
-## Filter resolution
+## Filter resolution examples
 
 a/b/c/OWNERS.yml
 
@@ -156,8 +171,8 @@ filters:
 ### Example 1
 
 If someone changes `a/b/c/file.py` the owner resolution will select teamC since the first file
-searched is `a/b/c/OWNERS.yml` First we compare if `file.py` matches `*.md`. It does not so we now
-check if `file.py` matches `*`. It does match so teamC is selected for review.
+searched is `a/b/c/OWNERS.yml` First we compare if `file.py` matches `**/*.md`. It does not so we
+now check if `file.py` matches `**/*.py`. It does match so teamC is selected for review.
 
 ### Example 2
 

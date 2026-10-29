@@ -194,6 +194,7 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_CHECKPOINT_RECONCILE_THREADS *ckpt_threads;
     WT_DECL_RET;
     uint64_t time_rec_start;
+    uint32_t reconcile_flags;
     bool signalled;
 
     ckpt_threads = S2C(session)->ckpt_reconcile_threads;
@@ -225,9 +226,14 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         session->isolation = session->txn->isolation = entry->isolation;
 
         /* Reconcile the page. */
+        reconcile_flags = entry->reconcile_flags;
+        if (FLD_ISSET(reconcile_flags, WT_REC_SAVE_IMAGE_CLEAN) &&
+          !__wt_cache_scrub_image_budget_ok(session))
+            FLD_CLR(reconcile_flags, WT_REC_SAVE_IMAGE_CLEAN);
+
         time_rec_start = __wt_clock(session);
         WT_WITH_DHANDLE(session, entry->dhandle,
-          ret = __wt_reconcile(session, entry->ref, NULL, entry->reconcile_flags));
+          ret = __wt_reconcile(session, entry->ref, NULL, reconcile_flags, NULL));
 
         /* Update the reconciliation time and the statistics. */
         entry->reconcile_time = __wt_clock(session) - time_rec_start;
@@ -525,6 +531,46 @@ __wti_checkpoint_parallel_commit(WT_SESSION_IMPL *session)
     ckpt_threads = S2C(session)->ckpt_reconcile_threads;
     WT_RET(__wt_thread_group_foreach(
       session, &ckpt_threads->thread_group, __checkpoint_parallel_thread_commit));
+
+    return (0);
+}
+
+/*
+ * __checkpoint_parallel_thread_rollback --
+ *     Roll back the transaction associated with the thread.
+ */
+static int
+__checkpoint_parallel_thread_rollback(WT_SESSION_IMPL *session, WT_THREAD *thread)
+{
+    WT_UNUSED(thread);
+
+    if (F_ISSET(session->txn, WT_TXN_RUNNING)) {
+        __wt_verbose(session, WT_VERB_CHECKPOINT,
+          "Checkpoint page reconciliation thread %u rolling back the transaction", thread->id);
+        WT_RET(__wt_txn_rollback(session, NULL, false));
+    }
+
+    return (0);
+}
+
+/*
+ * __wti_checkpoint_parallel_rollback --
+ *     Roll back all transactions for the checkpoint page reconciliation workers.
+ */
+int
+__wti_checkpoint_parallel_rollback(WT_SESSION_IMPL *session)
+{
+    WT_CHECKPOINT_RECONCILE_THREADS *ckpt_threads;
+
+    if (!WT_PARALLEL_CHECKPOINTS_ENABLED(session))
+        return (0);
+
+    WT_ASSERT_ALWAYS(session, __checkpoint_parallel_work_queue_empty(session),
+      "Checkpoint page reconciliation workers still have work to do");
+
+    ckpt_threads = S2C(session)->ckpt_reconcile_threads;
+    WT_RET(__wt_thread_group_foreach(
+      session, &ckpt_threads->thread_group, __checkpoint_parallel_thread_rollback));
 
     return (0);
 }

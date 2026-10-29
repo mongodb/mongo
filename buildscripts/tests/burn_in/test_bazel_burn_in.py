@@ -89,6 +89,33 @@ class TestCreateBurnInTarget(unittest.TestCase):
     @patch(ns("buildozer.bd_print"))
     @patch("builtins.open", new_callable=mock_open)
     @patch(ns("parse_bazel_target"))
+    def test_create_burn_in_target_overrides_shard_count_above_native_cap(
+        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_remove, mock_bd_move
+    ):
+        """A suite sharded past Bazel's native cap of 50 must still burn in with one shard."""
+        target_original = "//jstests:big_config"
+        target_burn_in = "//jstests:big_burn_in_find_js"
+
+        mock_parse.side_effect = [
+            ("jstests/BUILD.bazel", "big"),
+            ("jstests/BUILD.bazel", "big_burn_in_find_js"),
+        ]
+        mock_rule = (
+            'resmoke_suite_test(\n    name = "big",\n    resmoke_args = [],\n'
+            "    shard_count = 60,\n)"
+        )
+        mock_bd_print.side_effect = [mock_rule, "[]"]
+
+        under_test.create_burn_in_target(target_original, target_burn_in, "jstests/core/find.js")
+
+        mock_bd_set.assert_any_call([target_burn_in], "shard_count", "1")
+
+    @patch(ns("buildozer.bd_move"))
+    @patch(ns("buildozer.bd_remove"))
+    @patch(ns("buildozer.bd_set"))
+    @patch(ns("buildozer.bd_print"))
+    @patch("builtins.open", new_callable=mock_open)
+    @patch(ns("parse_bazel_target"))
     def test_create_burn_in_target_basic(
         self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_remove, mock_bd_move
     ):
@@ -250,13 +277,119 @@ class TestGetTargetsWithTag(unittest.TestCase):
         """Test that the bazel query subtracts incompatible_with_bazel_remote_test targets."""
         mock_run.return_value.stdout = "//jstests/suites/foo:bar\n"
 
-        under_test.get_targets_with_tag("ci-release-critical")
+        under_test.get_targets_with_tag("ci-all-variants")
 
         query_arg = mock_run.call_args[0][0]
         query_str = " ".join(query_arg)
         # The query passed to bazel should contain a set difference excluding
         # targets tagged with incompatible_with_bazel_remote_test
         self.assertIn("incompatible_with_bazel_remote_test", query_str)
+
+
+class TestGetTargetsMatchingTagFilter(unittest.TestCase):
+    """Tests for get_targets_matching_tag_filter function."""
+
+    TAGS_TO_TARGETS = {
+        "ci-development-critical": ["//s:dev"],
+        "ci-all-variants": ["//s:rel", "//s:mitigated"],
+        "suggested_excluding_required__for_devprod_mitigation_only": ["//s:mitigated"],
+        "requires_all_feature_flags": [],
+        "requires_compile_variant": [],
+        "incompatible_development_variant": ["//s:dev"],
+    }
+
+    def setUp(self):
+        patcher = patch(ns("get_targets_with_tag"), side_effect=self.TAGS_TO_TARGETS.__getitem__)
+        self.mock_get_targets_with_tag = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_union_of_positive_tags(self):
+        self.assertEqual(
+            under_test.get_targets_matching_tag_filter("ci-development-critical,ci-all-variants"),
+            {"//s:dev", "//s:rel", "//s:mitigated"},
+        )
+
+    def test_negated_tags_are_excluded(self):
+        self.assertEqual(
+            under_test.get_targets_matching_tag_filter(
+                "ci-development-critical,ci-all-variants,"
+                "-suggested_excluding_required__for_devprod_mitigation_only,"
+                "-requires_all_feature_flags,-requires_compile_variant,"
+                "-incompatible_development_variant"
+            ),
+            {"//s:rel"},
+        )
+
+    def test_negations_query_the_tag_without_the_dash(self):
+        under_test.get_targets_matching_tag_filter("ci-all-variants,-requires_compile_variant")
+
+        queried = [call.args[0] for call in self.mock_get_targets_with_tag.call_args_list]
+        self.assertEqual(queried, ["ci-all-variants", "requires_compile_variant"])
+
+    def test_blank_entries_are_ignored(self):
+        self.assertEqual(
+            under_test.get_targets_matching_tag_filter(" ci-all-variants , "),
+            {"//s:rel", "//s:mitigated"},
+        )
+
+
+class TestGetPlatformCompatibleTargets(unittest.TestCase):
+    """Tests for get_platform_compatible_targets function."""
+
+    @patch(ns("subprocess.run"))
+    def test_incompatible_targets_are_dropped(self, mock_run):
+        """Targets excluded by target_compatible_with must not be scheduled for burn-in."""
+        mock_run.return_value.stdout = "//s:ok OK\n//s:incompatible INCOMPATIBLE\n"
+
+        result = under_test.get_platform_compatible_targets(
+            "variant", ("--flag",), ("//s:ok", "//s:incompatible")
+        )
+
+        self.assertEqual(result, {"//s:ok"})
+
+    @patch(ns("subprocess.run"))
+    def test_cquery_receives_variant_flags(self, mock_run):
+        """The cquery must be configured with the variant's own flags, not generic ones."""
+        mock_run.return_value.stdout = "//s:ok OK\n"
+
+        under_test.get_platform_compatible_targets("variant", ("--define=FOO=1",), ("//s:ok",))
+
+        command = mock_run.call_args[0][0]
+        self.assertIn("--define=FOO=1", command)
+        # Variant flags are forwarded as-is; the caller gets them from variant_cquery_flags.
+        self.assertNotIn("--//bazel/resmoke:skip_deps_for_cquery", command)
+
+
+class TestFilterBurnInTargets(unittest.TestCase):
+    """Tests for filter_burn_in_targets function."""
+
+    TARGETS = {
+        under_test.BurnInTargetInfo(
+            burn_in_target="//s:compatible_burn_in_jstests_foo.js",
+            original_target="//s:compatible",
+            test="jstests/foo.js",
+        ),
+        under_test.BurnInTargetInfo(
+            burn_in_target="//s:incompatible_burn_in_jstests_foo.js",
+            original_target="//s:incompatible",
+            test="jstests/foo.js",
+        ),
+        under_test.BurnInTargetInfo(
+            burn_in_target="//s:untagged_burn_in_jstests_foo.js",
+            original_target="//s:untagged",
+            test="jstests/foo.js",
+        ),
+    }
+
+    def test_incompatible_and_untagged_suites_are_skipped(self):
+        """Only suites matching the tag filter AND compatible with the platform run burn-in."""
+        result = under_test.filter_burn_in_targets(
+            self.TARGETS,
+            targets_with_tag={"//s:compatible", "//s:incompatible"},
+            compatible_originals={"//s:compatible", "//s:untagged"},
+        )
+
+        self.assertEqual(result, ["//s:compatible_burn_in_jstests_foo.js"])
 
 
 if __name__ == "__main__":

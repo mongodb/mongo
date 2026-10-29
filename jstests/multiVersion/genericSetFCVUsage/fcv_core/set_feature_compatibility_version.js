@@ -2,9 +2,6 @@
  * Tests setFeatureCompatibilityVersion.
  */
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // A replset test case checks that replication to a secondary ceases, so we do not expect identical
 // data.
 TestData.skipCheckDBHashes = true;

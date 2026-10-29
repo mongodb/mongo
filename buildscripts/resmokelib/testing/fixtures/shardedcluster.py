@@ -12,9 +12,12 @@ import yaml
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.extensions import (
     add_extensions_signature_pub_key_path,
+    build_mongot_dynamic_options,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
+    mongot_extension_requested,
     normalize_load_extensions,
 )
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
@@ -61,6 +64,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         configsvr_replset_name="config-rs",
         use_priority_ports=False,
         uds_path_prefix=None,
+        new_binary_set_parameters=None,
     ):
         """
         Initialize ShardedClusterFixture with different options for the cluster processes.
@@ -81,6 +85,11 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.mongod_options = self.fixturelib.make_historic(
             certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
+        # Forwarded to each shard/configsvr ReplicaSetFixture; only ever merged into the
+        # new-binary half of a mixed-bin-versions node (see replicaset.py, _builder.py).
+        self.new_binary_set_parameters = self.fixturelib.make_historic(
+            self.fixturelib.default_if_none(new_binary_set_parameters, {})
+        )
 
         # Process load_extensions: ["*"] means all, otherwise load named extensions.
         _load_exts = normalize_load_extensions(load_extensions)
@@ -88,6 +97,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             _load_exts = ["*"]
 
         self.loaded_extensions = None
+        # mongos's mongot .conf name, generated in setup(); doubles as a re-setup guard.
+        self._mongot_extension_conf_name = None
+        # mongotHost isn't known yet, so defer mongod's mongot .conf to the shards' child nodes
+        # (see _builder.py) and mongos's to setup().
+        self._defer_mongot_extension = mongot_extension_requested(_load_exts, launch_mongot)
+        self._skip_extensions_signature_verification = skip_extensions_signature_verification
         if "*" in _load_exts:
             self.loaded_extensions = find_and_generate_all_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
@@ -102,13 +117,19 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 self.mongos_options,
             )
         elif _load_exts:
-            self.loaded_extensions = find_and_generate_named_extension_configs(
-                extension_names=_load_exts,
-                is_evergreen=self.config.EVERGREEN_TASK_ID,
-                logger=self.logger,
-                mongod_options=self.mongod_options,
-                mongos_options=self.mongos_options,
+            generate_now = (
+                [n for n in _load_exts if n != get_mongot_extension_name()]
+                if self._defer_mongot_extension
+                else _load_exts
             )
+            if generate_now:
+                self.loaded_extensions = find_and_generate_named_extension_configs(
+                    extension_names=generate_now,
+                    is_evergreen=self.config.EVERGREEN_TASK_ID,
+                    logger=self.logger,
+                    mongod_options=self.mongod_options,
+                    mongos_options=self.mongos_options,
+                )
             add_extensions_signature_pub_key_path(
                 skip_extensions_signature_verification,
                 self.config,
@@ -129,6 +150,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 "set_parameters"
             ].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
         )
+
+        # 'reshardingDocumentVerification' defaults to false in production, so enable it in test
+        # suites to keep coverage for resharding document-count validation.
+        self.mongod_options["set_parameters"].setdefault("reshardingDocumentVerification", True)
 
         self.mongos_options["set_parameters"] = self.fixturelib.make_historic(
             self.mongos_options.get("set_parameters", {})
@@ -271,6 +296,27 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
             self.searchIndexManagementHostAndPort = self.mongotHost
 
+            mongos_extension_options = None
+            if self._defer_mongot_extension and self._mongot_extension_conf_name is None:
+                # Deferred from __init__, when no mongot port existed yet. Generated into a
+                # scratch dict because each mongos holds its own copy of mongos_options.
+                mongos_extension_options = {}
+                self._mongot_extension_conf_name = find_and_generate_named_extension_configs(
+                    extension_names=[get_mongot_extension_name()],
+                    is_evergreen=self.config.EVERGREEN_TASK_ID,
+                    logger=self.logger,
+                    mongod_options=mongos_extension_options,
+                    dynamic_options={
+                        get_mongot_extension_name(): build_mongot_dynamic_options(self.mongotHost)
+                    },
+                )
+                # Register the mongos conf for teardown cleanup alongside any mongod-side confs.
+                self.loaded_extensions = (
+                    f"{self.loaded_extensions},{self._mongot_extension_conf_name}"
+                    if self.loaded_extensions
+                    else self._mongot_extension_conf_name
+                )
+
             for mongos in self.mongos:
                 # In search enabled sharded cluster, mongos has to be spun up with a connection string to a
                 # mongot in order to issue PlanShardedSearch commands.
@@ -278,6 +324,15 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 mongos.mongos_options["searchIndexManagementHostAndPort"] = (
                     self.searchIndexManagementHostAndPort
                 )
+                if mongos_extension_options is not None:
+                    existing = mongos.mongos_options.get("loadExtensions")
+                    new_names = mongos_extension_options["loadExtensions"]
+                    mongos.mongos_options["loadExtensions"] = (
+                        f"{existing},{new_names}" if existing else new_names
+                    )
+                    mongos.mongos_options["extensionsConfigPath"] = mongos_extension_options[
+                        "extensionsConfigPath"
+                    ]
 
         with ThreadPoolExecutor() as executor:
             tasks = []
@@ -486,8 +541,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
-        if finished and self.loaded_extensions:
-            delete_extension_configs(self.loaded_extensions, self.logger)
+        if finished:
+            if self.loaded_extensions:
+                delete_extension_configs(self.loaded_extensions, self.logger)
+            # Shard-node teardown never receives finished=True; clean up their confs here.
+            for shard in self.shards:
+                delete_for_members = getattr(shard, "delete_extension_configs_for_members", None)
+                if delete_for_members:
+                    delete_for_members()
 
         running_at_start = self.is_running()
         if not running_at_start:
@@ -721,6 +782,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             "replset_config_options": replset_config_options,
             "shard_logging_prefix": self.configsvr_shard_logging_prefix,
             "uds_path_prefix": self.uds_path_prefix,
+            "new_binary_set_parameters": self.new_binary_set_parameters,
             **configsvr_options,
         }
 
@@ -800,6 +862,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             "shard_logging_prefix": shard_logging_prefix,
             "use_auto_bootstrap_procedure": use_auto_bootstrap_procedure,
             "uds_path_prefix": self.uds_path_prefix,
+            "new_binary_set_parameters": self.new_binary_set_parameters,
             **shard_options,
         }
 
@@ -1197,6 +1260,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongos.pid,
+            version=self._get_binary_version(self.mongos_executable),
         )
         return [info]
 

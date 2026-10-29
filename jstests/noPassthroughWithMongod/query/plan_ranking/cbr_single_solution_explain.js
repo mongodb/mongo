@@ -1,12 +1,20 @@
 /**
  * Test handling of queries with a single possible solution/plan, under CBR.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {
     getRejectedPlans,
     getWinningPlanFromExplain,
     getEngine,
 } from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {
+    assertPlanCosted,
+    getPlanRankerConfig,
+    setPlanRankerConfig,
+} from "jstests/libs/query/cbr_utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("CBR single-solution early exit", function () {
@@ -15,26 +23,36 @@ describe("CBR single-solution early exit", function () {
 
     // CBR configurations to exercise the early exit under to ensure behaviour is consistent.
     // 'cbrAlwaysCosted' indicates whether the strategy is guaranteed to produce CBR cost estimates
-    // for a single-solution explain. CBRForNoMultiplanningResults may bypass CBR entirely when
+    // for a single-solution explain. NoMultiplanningResults may bypass CBR entirely when
     // multiplanning completes early (e.g. a COLLSCAN that exhausts the collection within the
     // trial-phase work budget), so it does not guarantee cost estimates.
     const configs = [
         {
-            internalQueryCBRCEMode: "automaticCE",
-            automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+            internalQueryPlanRanker: "mixed",
+            internalQueryCBRCEMode: "samplingCE",
+            internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
             cbrAlwaysCosted: false,
         },
         {
-            internalQueryCBRCEMode: "automaticCE",
-            automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+            internalQueryPlanRanker: "mixed",
+            internalQueryCBRCEMode: "samplingCE",
+            internalQueryMixedPlanRankingStrategy: "EstimateRankingEffort",
             cbrAlwaysCosted: true,
         },
-        {internalQueryCBRCEMode: "samplingCE", cbrAlwaysCosted: true},
-        {internalQueryCBRCEMode: "heuristicCE", cbrAlwaysCosted: true},
+        {
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "samplingCE",
+            cbrAlwaysCosted: true,
+        },
+        {
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "heuristicCE",
+            cbrAlwaysCosted: true,
+        },
     ];
 
     before(function () {
-        savedConfig = getCBRConfig(db);
+        savedConfig = getPlanRankerConfig(db);
         coll.drop();
         const docs = [];
         for (let i = 0; i < 1000; i++) {
@@ -47,18 +65,18 @@ describe("CBR single-solution early exit", function () {
     });
 
     after(function () {
-        setCBRConfig(db, savedConfig);
+        setPlanRankerConfig(db, savedConfig);
         coll.drop();
     });
 
     for (const config of configs) {
-        const label = config.automaticCEPlanRankingStrategy
-            ? `${config.internalQueryCBRCEMode}/${config.automaticCEPlanRankingStrategy}`
+        const label = config.internalQueryMixedPlanRankingStrategy
+            ? `${config.internalQueryCBRCEMode}/${config.internalQueryMixedPlanRankingStrategy}`
             : config.internalQueryCBRCEMode;
 
         describe(`with ${label}`, function () {
             before(function () {
-                setCBRConfig(db, Object.assign({featureFlagCostBasedRanker: true}, config));
+                setPlanRankerConfig(db, Object.assign({featureFlagCostBasedRanker: true}, config));
             });
 
             it("returns correct results for a single-solution query without explain", function () {
@@ -76,7 +94,7 @@ describe("CBR single-solution early exit", function () {
                     assert.eq(getRejectedPlans(explain).length, 0, {explain});
                     // The !isExplain guard does not fire, so the ranking strategy runs.
                     // Strategies that always invoke CBR must surface costEstimate on the plan.
-                    // CBRForNoMultiplanningResults may bypass CBR via the earlyExit path (when
+                    // NoMultiplanningResults may bypass CBR via the earlyExit path (when
                     // multiplanning finishes within its trial budget), so it is excluded.
                     if (config.cbrAlwaysCosted) {
                         assertPlanCosted(winningPlan, {explain});

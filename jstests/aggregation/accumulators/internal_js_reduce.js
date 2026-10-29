@@ -3,9 +3,6 @@
 //
 // @tags: [
 //   requires_scripting,
-//   # TODO SERVER-127318 (PR #54257): re-enable on WASM once per-request JS context cost is
-//   # eliminated.
-//   mozjs_wasm_unsupported,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

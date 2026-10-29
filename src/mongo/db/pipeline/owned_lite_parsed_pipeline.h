@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,7 +8,13 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
+#include <concepts>
+#include <cstddef>
+#include <iterator>
+#include <type_traits>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -51,6 +31,12 @@ public:
     OwnedLiteParsedPipeline(const NamespaceString& nss,
                             const std::vector<BSONObj>& pipelineStages,
                             const LiteParserOptions& options = {});
+
+    // Moves already-parsed stages directly, without reparsing. Use this instead of the BSON-vector
+    // constructor when the caller already holds StageSpecs (e.g. a desugarer re-assembling a
+    // subpipeline) — reparsing loses information for stages whose original BSON is only a
+    // placeholder (e.g. AST-only extension sub-stages), which can't round-trip through BSON.
+    OwnedLiteParsedPipeline(NamespaceString nss, StageSpecs stages);
 
     OwnedLiteParsedPipeline(OwnedLiteParsedPipeline&&) noexcept = default;
     OwnedLiteParsedPipeline& operator=(OwnedLiteParsedPipeline&&) noexcept = default;
@@ -89,6 +75,19 @@ public:
         return _pipeline;
     }
 
+    // The view NSS this pipeline was materialized from, if any. Set only for sub-pipelines created
+    // by materializeViewSubpipeline() (e.g. the view pipeline materialized into a $graphLookup
+    // stage), where the pipeline is parsed under the backing-collection NSS rather than the view's.
+    // The current consumer is resolveInvolvedNamespacesImpl's cycle detection, which needs the view
+    // NSS because the backing-collection NSS stored in _originalParseNss is not a view.
+    const boost::optional<NamespaceString>& getViewNss() const {
+        return _viewNss;
+    }
+
+    void setViewNss(NamespaceString nss) {
+        _viewNss = std::move(nss);
+    }
+
 private:
     static std::vector<BSONObj> _makeStagesOwned(const std::vector<BSONObj>& pipelineStages);
 
@@ -96,6 +95,157 @@ private:
     // so the owned copies must exist before '_pipeline' parses them.
     std::vector<BSONObj> _ownedStages;
     LiteParsedPipeline _pipeline;
+    boost::optional<NamespaceString> _viewNss;
 };
+
+/**
+ * A view over a vector of LiteParsedPipelines that allows iterating and accessing and modifying
+ * each pipeline in place, but never exposes the owning OwnedLiteParsedPipeline wrappers:
+ * subpipelines cannot be reordered, swapped out, added, or removed through this view. This lets
+ * stages that attach meaning to the pipeline order (e.g.
+ * LiteParsedDocumentSourceOrderedNestedPipelines, which aligns pipeline names with subpipelines by
+ * index) rely on that order being stable.
+ *
+ * 'Vector' is either std::vector<OwnedLiteParsedPipeline> or its const counterpart.
+ */
+template <typename Vector>
+class OwnedLiteParsedPipelinesView {
+    static_assert(
+        std::is_same_v<std::remove_const_t<Vector>, std::vector<OwnedLiteParsedPipeline>>);
+
+    static constexpr bool kIsConst = std::is_const_v<Vector>;
+
+    using OwnedPipeline =
+        std::conditional_t<kIsConst, const OwnedLiteParsedPipeline, OwnedLiteParsedPipeline>;
+    using LitePipeline = std::conditional_t<kIsConst, const LiteParsedPipeline, LiteParsedPipeline>;
+
+public:
+    /**
+     * A handle to a single subpipeline slot, returned by value from every element accessor. It
+     * dereferences straight through to the LiteParsedPipeline (for in-place edits) but never
+     * yields the owning OwnedLiteParsedPipeline wrapper, so the slot cannot be reassigned, moved
+     * from, or swapped with another.
+     */
+    class reference {
+    public:
+        LitePipeline& operator*() const {
+            return *_owned;
+        }
+        LitePipeline* operator->() const {
+            return &*_owned;
+        }
+
+        // Wrapper-level accessors used by generic consumers (view cycle detection, desugaring).
+        decltype(auto) pipeline() const {
+            return _owned.pipeline();
+        }
+        const boost::optional<NamespaceString>& getViewNss() const {
+            return _owned.getViewNss();
+        }
+
+    private:
+        friend class OwnedLiteParsedPipelinesView;
+        explicit reference(OwnedPipeline& owned) : _owned(owned) {}
+
+        // Reference member: the handle is non-assignable, so std::swap, std::iter_swap and the
+        // reordering algorithms fail to compile when applied to it.
+        OwnedPipeline& _owned;
+    };
+
+    /**
+     * Forward-only iterator yielding 'reference' handles by value. Deliberately not bidirectional:
+     * std::reverse/std::sort reject it on iterator category alone, and the by-value proxy defeats
+     * iter_swap-based reordering.
+     */
+    class iterator {
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = OwnedLiteParsedPipeline;
+        using reference = OwnedLiteParsedPipelinesView::reference;
+        using pointer = void;
+
+        reference operator*() const {
+            return reference{*_it};
+        }
+        iterator& operator++() {
+            ++_it;
+            return *this;
+        }
+        iterator operator++(int) {
+            auto copy = *this;
+            ++_it;
+            return copy;
+        }
+        bool operator==(const iterator& other) const = default;
+
+    private:
+        friend class OwnedLiteParsedPipelinesView;
+        using BaseIterator =
+            std::conditional_t<kIsConst,
+                               typename std::vector<OwnedLiteParsedPipeline>::const_iterator,
+                               typename std::vector<OwnedLiteParsedPipeline>::iterator>;
+        explicit iterator(BaseIterator it) : _it(it) {}
+        BaseIterator _it;
+    };
+
+    explicit OwnedLiteParsedPipelinesView(Vector& pipelines) : _pipelines(pipelines) {}
+
+    // In the const instantiation, constructs a const view from a mutable one (mirroring
+    // T* -> const T*). In the mutable instantiation this is simply the copy constructor.
+    OwnedLiteParsedPipelinesView(
+        const OwnedLiteParsedPipelinesView<std::remove_const_t<Vector>>& other)
+        : _pipelines(other._pipelines) {}
+
+    iterator begin() const {
+        return iterator{_pipelines.begin()};
+    }
+    iterator end() const {
+        return iterator{_pipelines.end()};
+    }
+    reference operator[](size_t idx) const {
+        return reference{_pipelines[idx]};
+    }
+    reference front() const {
+        return reference{_pipelines.front()};
+    }
+    reference back() const {
+        return reference{_pipelines.back()};
+    }
+    size_t size() const {
+        return _pipelines.size();
+    }
+    bool empty() const {
+        return _pipelines.empty();
+    }
+
+private:
+    // Allows the const instantiation's converting constructor to read the mutable view's
+    // underlying vector without exposing it publicly.
+    template <typename>
+    friend class OwnedLiteParsedPipelinesView;
+
+    Vector& _pipelines;
+};
+
+// Compile-time regression checks for the stable-order contract:
+// - callers can still edit each subpipeline in place through the handle:
+static_assert(requires(MutableSubPipelinesView view) {
+    { &*view.front() } -> std::same_as<LiteParsedPipeline*>;
+    { &**view.begin() } -> std::same_as<LiteParsedPipeline*>;
+    { view[0].pipeline() } -> std::same_as<LiteParsedPipeline&>;
+});
+static_assert(requires(ConstSubPipelinesView view) {
+    { &*view.front() } -> std::same_as<const LiteParsedPipeline*>;
+});
+// - but the owning wrappers cannot be reassigned, swapped, or reordered through the view:
+static_assert(!std::assignable_from<typename MutableSubPipelinesView::reference&,
+                                    typename MutableSubPipelinesView::reference>);
+static_assert(
+    !std::assignable_from<typename MutableSubPipelinesView::reference&, OwnedLiteParsedPipeline&&>);
+static_assert(!std::swappable_with<typename MutableSubPipelinesView::reference&,
+                                   typename MutableSubPipelinesView::reference&>);
+static_assert(!std::bidirectional_iterator<typename MutableSubPipelinesView::iterator>);
+static_assert(!std::bidirectional_iterator<typename ConstSubPipelinesView::iterator>);
 
 }  // namespace mongo

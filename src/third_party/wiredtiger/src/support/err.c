@@ -339,8 +339,11 @@ __eventv(WT_SESSION_IMPL *session, bool is_json, int error, uint32_t log_id, con
             WT_ERROR_APPEND(p, remain, ", %s", prefix);
     }
 
-    /* Session name. */
-    if ((prefix = session->name) != NULL) {
+    /* Session name: on the default session, the connection method this thread is running. */
+    prefix = __wt_conn_api_name != NULL && session == S2C(session)->default_session ?
+      __wt_conn_api_name :
+      session->name;
+    if (prefix != NULL) {
         if (is_json)
             WT_ERROR_APPEND(p, remain, "\"session_name\":\"%s\",", prefix);
         else
@@ -807,25 +810,6 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
                handler, wt_session, s == NULL ? session->name : s, v)) != 0)
             __handler_failure(session, ret, "progress", false);
     return (0);
-}
-
-/*
- * __wt_counter_backoff --
- *     Return true only when the leading two digits of 'v' change, so the reporting interval grows
- *     with 'v' and avoids excessive logging.
- */
-bool
-__wt_counter_backoff(uint64_t v, uint64_t accuracy)
-{
-    /*
-     * Using v - 1 causes unsigned underflow when v == 0, resulting in v_last/base being very large.
-     * This makes the function return true for v == 0, which is acceptable since the first call
-     * should always trigger.
-     */
-    uint64_t base, v_last = v - 1;
-    for (base = 1; v / base > accuracy; base *= 10)
-        ;
-    return (v / base != v_last / base);
 }
 
 /*

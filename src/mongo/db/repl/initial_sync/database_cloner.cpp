@@ -1,44 +1,16 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/repl/initial_sync/database_cloner.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/namespace_string_util.h"
-#include "mongo/db/repl/initial_sync/database_cloner.h"
 #include "mongo/db/repl/initial_sync/database_cloner_gen.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
@@ -55,8 +27,11 @@
 #include <mutex>
 #include <string_view>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
 namespace mongo {
 namespace repl {
@@ -68,12 +43,14 @@ DatabaseCloner::DatabaseCloner(const DatabaseName& dbName,
                                DBClientConnection* client,
                                StorageInterface* storageInterface,
                                ThreadPool* dbPool,
-                               std::shared_ptr<InitialSyncSummaryStats> summaryStats)
+                               std::shared_ptr<InitialSyncSummaryStats> summaryStats,
+                               std::shared_ptr<FastCountInitialSyncAggregator> fastCountAggregator)
     : InitialSyncBaseCloner(
           "DatabaseCloner"sv, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage),
-      _summaryStats(summaryStats) {
+      _summaryStats(summaryStats),
+      _fastCountAggregator(std::move(fastCountAggregator)) {
     invariant(!dbName.isEmpty());
     _stats.dbname = dbName;
 }
@@ -110,6 +87,31 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
                 e.toStatus()
                     .withContext(str::stream() << "Collection info could not be parsed : " << info)
                     .reason());
+        }
+
+        if (_fastCountAggregator) {
+            const auto& collInfo = result.getInfo();
+            const auto& fastCount = collInfo.getFastCount();
+            if (fastCount) {
+                uassert(ErrorCodes::FailedToParse,
+                        str::stream() << "Collection info with fastCount must have (validAsOf, "
+                                         "Size, and Count) or timestampStoreTs: "
+                                      << info,
+                        (fastCount->getTimestampStoreTs() &&
+                         (!fastCount->getValidAsOf() && !fastCount->getSize() &&
+                          !fastCount->getCount())) ||
+                            (fastCount->getValidAsOf() && fastCount->getSize() &&
+                             fastCount->getCount()));
+
+                if (auto tsStoreTs = fastCount->getTimestampStoreTs()) {
+                    _fastCountAggregator->recordTimestampStoreTs(*tsStoreTs);
+                }
+                if (fastCount->getValidAsOf()) {
+                    FastCountEntry entry{
+                        *fastCount->getValidAsOf(), *fastCount->getSize(), *fastCount->getCount()};
+                    _fastCountAggregator->addEntry(collInfo.getUuid(), entry);
+                }
+            }
         }
 
         NamespaceString collectionNamespace(

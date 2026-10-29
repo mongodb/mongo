@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,6 +17,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -95,7 +70,15 @@ bool checkCOperationType(const BSONObj& opObj, const std::string_view opName) {
  *
  * May throw exceptions if the input is malformed.
  */
-OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
+OplogApplicationValidity validateApplyOpsCommand(OperationContext* opCtx, const BSONObj& cmdObj) {
+
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    uassert(ErrorCodes::CommandNotSupported,
+            str::stream() << "applyOps command is not supported in this storage mode: "
+                          << provider.name(),
+            provider.supportsApplyOpsCommand() || getTestCommandsEnabled());
+
+
     const size_t maxApplyOpsDepth = 10;
     std::stack<std::pair<size_t, BSONObj>> toCheck;
 
@@ -305,7 +288,7 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
-        OplogApplicationValidity validity = validateApplyOpsCommand(cmdObj);
+        OplogApplicationValidity validity = validateApplyOpsCommand(opCtx, cmdObj);
         return OplogApplicationChecks::checkAuthForOperation(opCtx, dbName, cmdObj, validity);
     }
 
@@ -317,7 +300,7 @@ public:
         ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
             opCtx, std::vector<NamespaceString>{});
 
-        validateApplyOpsCommand(cmdObj);
+        validateApplyOpsCommand(opCtx, cmdObj);
 
         boost::optional<DisableDocumentValidationForInternalOp> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))

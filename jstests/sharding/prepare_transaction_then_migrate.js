@@ -12,8 +12,10 @@ import {
     moveChunkStepNames,
     pauseMigrateAtStep,
     unpauseMigrateAtStep,
+    waitForMigrateStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
@@ -50,6 +52,14 @@ let runTest = function (testMode) {
             {_id: 2, x: -2, note: "keep out of chunk range being migrated"},
             {_id: 3, x: 50, note: "move out of chunk range being migrated"},
             {_id: 4, x: 100, note: "keep in chunk range being migrated"},
+            // No test case for "move out of chunk range but still same shard after txn commit
+            // then move doc to destination shard" because it will conflict with the doc cloner
+            // inserted and cause a dup key error.
+            {
+                _id: 9,
+                x: 102,
+                note: "move out of chunk range but still same shard after txn commit then delete",
+            },
         ]),
     );
 
@@ -86,6 +96,7 @@ let runTest = function (testMode) {
                 {q: {x: -2.01}, u: {$set: {x: -10.01}}},
                 {q: {x: 50.01}, u: {$set: {x: -20.01}}},
                 {q: {x: 100.01}, u: {$set: {x: 500.01}}},
+                {q: {x: 102}, u: {$set: {y: 102}}},
             ],
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
@@ -107,22 +118,16 @@ let runTest = function (testMode) {
     let prepareTimestamp = res.prepareTimestamp;
 
     if (testMode == TestMode.kWithStepUp) {
-        st.rs0.stepUp(st.rs0.getSecondary());
+        const newPrimary = st.rs0.getSecondary();
+        st.rs0.stepUp(newPrimary);
+        awaitRSClientHosts(st.s, {host: newPrimary.host}, {ok: true, ismaster: true}, st.rs0);
     } else if (testMode == TestMode.kWithRestart) {
         TestData.skipCollectionAndIndexValidation = true;
-        // TODO(SERVER-113373): We can't use the new failpoint in multiversion
-        // tests until 9.0 becomes last-lts.
-        const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-            Boolean(TestData.multiversionBinVersion);
-        const rsOpts = isMultiversion
-            ? null
-            : {
-                  setParameter: {
-                      ["failpoint." + hangBeforeFinishingInitAndListenFpName]:
-                          "{'mode':'alwaysOn'}",
-                  },
-              };
+        const rsOpts = {
+            setParameter: {
+                ["failpoint." + hangBeforeFinishingInitAndListenFpName]: "{'mode':'alwaysOn'}",
+            },
+        };
         st.rs0.restart(st.rs0.getPrimary(), rsOpts);
         st.rs0.waitForPrimary();
         TestData.skipCollectionAndIndexValidation = false;
@@ -137,6 +142,8 @@ let runTest = function (testMode) {
             }
         });
     }
+
+    pauseMigrateAtStep(st.shard1, migrateStepNames.cloned);
 
     const joinMoveChunk = moveChunkParallel(
         staticMongod,
@@ -172,6 +179,31 @@ let runTest = function (testMode) {
             ),
         ),
     );
+
+    {
+        // Perform the operations to move the doc out of chunk range and then delete it
+        // after the transaction commits and the cloner copied all the docs.
+        waitForMigrateStep(st.shard1, migrateStepNames.cloned);
+
+        let session = st.s.startSession();
+        session.startTransaction();
+        assert.commandWorked(
+            session
+                .getDatabase(dbName)
+                .getCollection(collName)
+                .update({x: 102}, {$set: {x: -102}}),
+        );
+        session.commitTransaction_forTesting();
+
+        assert.commandWorked(
+            st.s.getDB(dbName).runCommand({
+                delete: collName,
+                deletes: [{q: {x: -102}, limit: 1}],
+            }),
+        );
+
+        unpauseMigrateAtStep(st.shard1, migrateStepNames.cloned);
+    }
 
     unpauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
 

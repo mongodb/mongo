@@ -14,6 +14,8 @@ set -o pipefail
 IMAGE="901841024863.dkr.ecr.us-east-1.amazonaws.com/dockerhub/mongodb/mongodb-atlas-search:latest"
 
 echo "Pulling mongot localdev image: $IMAGE"
-docker pull "$IMAGE"
-docker tag "$IMAGE" mongot-localdev:latest
+# RHEL images ship podman instead of docker.
+if command -v docker >/dev/null 2>&1; then ENGINE=docker; else ENGINE=podman; fi
+$ENGINE pull "$IMAGE"
+$ENGINE tag "$IMAGE" mongot-localdev:latest
 echo "mongot_image: mongot-localdev:latest" >mongot_image_expansion.yml

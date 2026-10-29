@@ -86,7 +86,7 @@ def gettype(c):
     return ctype or 'string'
 
 def typedesc(c):
-    '''Descripe what type of value is expected for the given config item'''
+    '''Describe what type of value is expected for the given config item'''
     checks = c.flags
     cmin = str(checks.get('min', ''))
     cmax = str(checks.get('max', ''))

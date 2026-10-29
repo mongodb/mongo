@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 
@@ -53,7 +27,6 @@
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/basic_types_serialization.h"
 #include "mongo/unittest/unittest.h"
@@ -98,7 +71,7 @@ private:
             ->initializeIfNeeded(operationContext(), /* term */ 1);
 
         // Initialize a shard
-        shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+        shard0.setName("shard0");
         shard0.setHost("shard0:12");
         setupShards({shard0});
     }
@@ -117,10 +90,9 @@ public:
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(UUID::gen());
         chunk.setVersion(chunkVersion);
-        chunk.setShard(ShardRef{shard0.getName()});
+        chunk.setShard(shard0.getName());
         chunk.setOnCurrentShardSince(Timestamp(1, 1));
-        chunk.setHistory(
-            {ChunkHistory(*chunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
         chunk.setRange({kMinBSONKey, kMaxBSONKey});
 
         // Initialize the sharded collection
@@ -243,15 +215,18 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
     const auto fromColl = setupShardedCollection(kFromNss);
 
     // No exception is thrown if the TO collection does not exist and has no associated tags
-    sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kToNss, boost::none /*toColl*/, false /*isSourceUnsharded*/, false /* dropTarget */);
+    sharding_ddl_util::checkRenamePreconditions(opCtx,
+                                                kToNss,
+                                                /*optTargetCollType=*/boost::none,
+                                                /*isSourceUnsharded=*/false,
+                                                /*dropTarget=*/false);
 
     // Initialize the sharded TO collection
     const auto toColl = setupShardedCollection(kToNss);
 
     // No exception is thrown if the TO collection exists and dropTarget is `true`
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kToNss, toColl, false /*isSourceUnsharded*/, true /* dropTarget */);
+        opCtx, kToNss, toColl, /*isSourceUnsharded=*/false, /*dropTarget=*/true);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
@@ -267,14 +242,14 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
         dbName + "." +
         std::string(NamespaceString::MaxUserNsShardedCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, longEnoughNss, boost::none, false /*isSourceUnsharded*/, false /* dropTarget */);
+        opCtx, longEnoughNss, boost::none, /*isSourceUnsharded=*/false, /*dropTarget=*/false);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkRenamePreconditions(
-            opCtx, tooLongNss, boost::none, false /*isSourceUnsharded*/, false /* dropTarget */),
+            opCtx, tooLongNss, boost::none, /*isSourceUnsharded=*/false, /*dropTarget=*/false),
         AssertionException,
         ErrorCodes::InvalidNamespace);
 }
@@ -292,14 +267,14 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLongUnsplitta
         dbName + "." +
         std::string(NamespaceString::MaxUserNsCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, longEnoughNss, boost::none, true /*isSourceUnsharded*/, false /* dropTarget */);
+        opCtx, longEnoughNss, boost::none, /*isSourceUnsharded=*/true, /*dropTarget=*/false);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkRenamePreconditions(
-            opCtx, tooLongNss, boost::none, true /*isSourceUnsharded*/, false /* dropTarget */),
+            opCtx, tooLongNss, boost::none, /*isSourceUnsharded=*/true, /*dropTarget=*/false),
         AssertionException,
         ErrorCodes::InvalidNamespace);
 }
@@ -316,7 +291,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkRenamePreconditions(
-            opCtx, kToNss, toColl, false /*isSourceUnsharded*/, false /* dropTarget */),
+            opCtx, kToNss, toColl, /*isSourceUnsharded=*/false, /*dropTarget=*/false),
         AssertionException,
         ErrorCodes::NamespaceExists);
 }
@@ -338,11 +313,10 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
     ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
 
     // Check that an exception is thrown if some tag is associated to the target collection
-    ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkRenamePreconditions(
-            opCtx, kToNss, toColl, false /*isSourceUnsharded*/, true /* dropTarget */),
-        AssertionException,
-        ErrorCodes::CommandFailed);
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
+                           opCtx, kToNss, toColl, /*isSourceUnsharded=*/false, /*dropTarget=*/true),
+                       AssertionException,
+                       ErrorCodes::CommandFailed);
 }
 
 TEST_F(ShardingDDLUtilTest, NamespaceTooLong) {
@@ -359,25 +333,25 @@ TEST_F(ShardingDDLUtilTest, NamespaceTooLong) {
 
     // Always valid.
     ASSERT_DOES_NOT_THROW(
-        sharding_ddl_util::assertNamespaceLengthLimit(validNss, true /*isUnsharded*/));
+        sharding_ddl_util::assertNamespaceLengthLimit(validNss, /*isUnsharded=*/true));
     ASSERT_DOES_NOT_THROW(
-        sharding_ddl_util::assertNamespaceLengthLimit(validNss, false /*isUnsharded*/));
+        sharding_ddl_util::assertNamespaceLengthLimit(validNss, /*isUnsharded=*/false));
 
     // Only valid if the collection is unsharded.
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, false /*isUnsharded*/),
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, /*isUnsharded=*/false),
         DBException,
         ErrorCodes::InvalidNamespace);
     ASSERT_DOES_NOT_THROW(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, true /*isUnsharded*/));
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, /*isUnsharded=*/true));
 
     // Never valid.
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, true /*isUnsharded*/),
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, /*isUnsharded=*/true),
         DBException,
         ErrorCodes::InvalidNamespace);
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, false /*isUnsharded*/),
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, /*isUnsharded=*/false),
         DBException,
         ErrorCodes::InvalidNamespace);
 }

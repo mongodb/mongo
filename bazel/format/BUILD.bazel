@@ -1,5 +1,5 @@
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary")
 
 py_binary(
@@ -25,6 +25,7 @@ py_binary(
     main = "rules_lint_format_wrapper.py",
     visibility = ["//visibility:public"],
     deps = [
+        "//bazel/toolchains/cc/mongo_linux:gdb_python_version_check",
         "//buildscripts:bazel_custom_formatter",
         "//buildscripts:sort_backport_multiversion",
         "@bazel_rules_mongo//utils:evergreen_git",

@@ -1,41 +1,21 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
+#include "mongo/db/repl/container_oplog_entry_serialization.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
@@ -44,33 +24,23 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/container.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::replicated_fast_count::test_helpers {
 using namespace std::literals::string_view_literals;
-
-namespace {
-bool findPersistedDocInCollection(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
-    auto fastCountColl = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx,
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-            AcquisitionPrerequisites::kRead),
-        MODE_IS);
-
-    return Helpers::findById(
-        opCtx, fastCountColl.getCollectionPtr()->ns(), BSON("_id" << uuid), outDoc);
-}
-
-}  // namespace
 
 bool findPersistedDocInContainer(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
     Lock::GlobalLock globalLock(opCtx, MODE_IS);
@@ -101,17 +71,13 @@ bool findPersistedDocInContainer(OperationContext* opCtx, const UUID& uuid, BSON
     return true;
 }
 
-void checkFastCountMetadataInInternalStore(
-    OperationContext* opCtx,
-    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
-    const UUID& uuid,
-    bool expectPersisted,
-    int64_t expectedCount,
-    int64_t expectedSize) {
+void checkFastCountMetadataInInternalStore(OperationContext* opCtx,
+                                           const UUID& uuid,
+                                           bool expectPersisted,
+                                           int64_t expectedCount,
+                                           int64_t expectedSize) {
     BSONObj persisted;
-    const bool found = fastCountManager->usesContainers_ForTest()
-        ? findPersistedDocInContainer(opCtx, uuid, persisted)
-        : findPersistedDocInCollection(opCtx, uuid, persisted);
+    const bool found = findPersistedDocInContainer(opCtx, uuid, persisted);
 
     EXPECT_EQ(found, expectPersisted);
     if (!expectPersisted) {
@@ -131,24 +97,23 @@ void checkFastCountMetadataInInternalStore(
     ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
 }
 
-void checkUncommittedFastCountChanges(OperationContext* opCtx,
-                                      const UUID& uuid,
-                                      int64_t expectedCount,
-                                      int64_t expectedSize) {
-    auto uncommittedChanges = UncommittedFastCountChange::getForRead(opCtx);
-    auto uncommittedSizeAndCount = uncommittedChanges.find(uuid);
-
-    EXPECT_EQ(uncommittedSizeAndCount.count, expectedCount);
-    EXPECT_EQ(uncommittedSizeAndCount.size, expectedSize);
+void checkUncommittedSizeCount(OperationContext* opCtx,
+                               UUID uuid,
+                               CollectionSizeCount expectedSizeCount) {
+    const CollectionSizeCount uncommittedSizeAndCount =
+        UncommittedFastCountChanges::find(opCtx, uuid);
+    EXPECT_EQ(uncommittedSizeAndCount, expectedSizeCount);
 }
 
-void checkCommittedSizeCount(OperationContext* opCtx, UUID uuid, CollectionSizeCount sizeCount) {
+void checkCommittedSizeCount(OperationContext* opCtx,
+                             UUID uuid,
+                             CollectionSizeCount expectedSizeCount) {
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
     const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
     invariant(collection);
     const RecordStore* recordStore = collection->getRecordStore();
-    EXPECT_EQ(recordStore->accurateNumRecords(), sizeCount.count);
-    EXPECT_EQ(recordStore->accurateDataSize(), sizeCount.size);
+    EXPECT_EQ(recordStore->accurateNumRecords(), expectedSizeCount.count);
+    EXPECT_EQ(recordStore->accurateDataSize(), expectedSizeCount.size);
 }
 
 void insertDocs(OperationContext* opCtx,
@@ -167,13 +132,13 @@ void insertDocs(OperationContext* opCtx,
         MODE_IX);
 
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::nonAtomicGroup};
         for (int i = startingCount; i < startingCount + numDocs; ++i) {
             BSONObj doc = makeDoc(i);
             ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
         }
-        checkUncommittedFastCountChanges(
-            opCtx, coll.uuid(), numDocs, numDocs * sampleDoc.objsize());
+        checkUncommittedSizeCount(
+            opCtx, coll.uuid(), {.size = numDocs * sampleDoc.objsize(), .count = numDocs});
         checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
         if (!abortWithoutCommit) {
             wuow.commit();
@@ -189,7 +154,7 @@ void insertDocs(OperationContext* opCtx,
                                  .count = startingCount + numDocs});
     }
 
-    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
+    checkUncommittedSizeCount(opCtx, coll.uuid(), {.size = 0, .count = 0});
 }
 
 void updateDocs(OperationContext* opCtx,
@@ -213,13 +178,14 @@ void updateDocs(OperationContext* opCtx,
     const int numTotalUpdates = endIdx - startIdx + 1;
 
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::nonAtomicGroup};
         for (int i = startIdx; i <= endIdx; ++i) {
             BSONObj updated = makeUpdatedDoc(i);
             Helpers::update(opCtx, coll, BSON("_id" << i), BSON("$set" << updated));
         }
         checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
-        checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, numTotalUpdates * sizeDelta);
+        checkUncommittedSizeCount(
+            opCtx, coll.uuid(), {.size = numTotalUpdates * sizeDelta, .count = 0});
         wuow.commit();
     }
 
@@ -227,7 +193,7 @@ void updateDocs(OperationContext* opCtx,
         opCtx,
         coll.uuid(),
         {.size = startingSize + numTotalUpdates * sizeDelta, .count = startingCount});
-    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
+    checkUncommittedSizeCount(opCtx, coll.uuid(), {.size = 0, .count = 0});
 }
 
 void deleteDocsByIDRange(OperationContext* opCtx,
@@ -249,14 +215,16 @@ void deleteDocsByIDRange(OperationContext* opCtx,
     ASSERT(numTotalDeletes <= startingCount);
     ASSERT(numTotalDeletes * sampleDoc.objsize() <= startingSize);
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::nonAtomicGroup};
         for (int i = startIdx; i <= endIdx; ++i) {
             RecordId rid = Helpers::findOne(opCtx, coll, BSON("_id" << i));
             Helpers::deleteByRid(opCtx, coll, rid);
         }
         checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
-        checkUncommittedFastCountChanges(
-            opCtx, coll.uuid(), -numTotalDeletes, -numTotalDeletes * sampleDoc.objsize());
+        checkUncommittedSizeCount(
+            opCtx,
+            coll.uuid(),
+            {.size = -numTotalDeletes * sampleDoc.objsize(), .count = -numTotalDeletes});
         wuow.commit();
     }
 
@@ -264,7 +232,7 @@ void deleteDocsByIDRange(OperationContext* opCtx,
                             coll.uuid(),
                             {.size = startingSize - (numTotalDeletes)*sampleDoc.objsize(),
                              .count = startingCount - numTotalDeletes});
-    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
+    checkUncommittedSizeCount(opCtx, coll.uuid(), {.size = 0, .count = 0});
 }
 
 OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries) {
@@ -274,7 +242,17 @@ OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries) {
     }
 }
 
+OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries,
+                                 int throwWriteConflictOnNthCall)
+    : OplogCursorMock(std::move(entries)) {
+    _throwOnNthCall = throwWriteConflictOnNthCall;
+}
+
 boost::optional<Record> OplogCursorMock::next() {
+    if (++_nextCallCount == _throwOnNthCall) {
+        throwWriteConflictException("OplogCursorMock injected WriteConflictException");
+    }
+
     if (_records.empty()) {
         return boost::none;
     }
@@ -380,9 +358,6 @@ repl::OplogEntry getLatestApplyOpsForNss(OperationContext* opCtx, const Namespac
 }
 
 std::vector<repl::OplogEntry> getApplyOpsForFastCountStore(OperationContext* opCtx) {
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-
     auto predicate = [&](const repl::OplogEntry& entry) {
         if (entry.getOpType() != repl::OpTypeEnum::kCommand ||
             entry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
@@ -393,10 +368,6 @@ std::vector<repl::OplogEntry> getApplyOpsForFastCountStore(OperationContext* opC
         repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &inner);
 
         for (const auto& innerEntry : inner) {
-            // Collection-backed path: inner op on the fast count metadata collection.
-            if (innerEntry.getNss() == fastCountStoreNss) {
-                return true;
-            }
             // Container-backed path: inner op is a container op on the fast count metadata ident.
             if (auto container = innerEntry.getContainer();
                 container && ident::isReplicatedFastCountIdent(*container)) {
@@ -440,81 +411,6 @@ void readMetaFieldsInto(const BSONObj& entryBson, ObservedApplyOp& out) {
     out.observedSize = sizeElem.safeNumberLong();
 }
 
-ObservedApplyOp parseCollectionInnerOp(const repl::OplogEntry& innerEntry) {
-    ObservedApplyOp out;
-    EXPECT_EQ(repl::OplogEntry::CommandType::kNotCommand, innerEntry.getCommandType());
-    switch (innerEntry.getOpType()) {
-        case repl::OpTypeEnum::kInsert: {
-            out.opType = FastCountOpType::kInsert;
-            const auto& obj = innerEntry.getObject();
-            out.uuid = UUID::parse(obj["_id"]).getValue();
-
-            const auto metaElem = obj[replicated_fast_count::kMetadataKey];
-            EXPECT_TRUE(metaElem.isABSONObj())
-                << "Meta field not an object for UUID " << out.uuid << ": " << metaElem;
-            readMetaFieldsInto(obj, out);
-            break;
-        }
-        case repl::OpTypeEnum::kUpdate: {
-            out.opType = FastCountOpType::kUpdate;
-            const auto& o2 = innerEntry.getObject2();
-            EXPECT_TRUE(o2);
-            out.uuid = UUID::parse(o2->getField("_id")).getValue();
-
-            // Extract the size from the update diff. The diff algorithm may either use a
-            // subdiff for the meta object (smeta: {u: {sz: N}}) or replace the whole meta
-            // field as part of the top-level update (u: {meta: {sz: N}}), depending on which
-            // representation is more compact. In practice, the former is used when only `sz`
-            // changes and the latter is used when count + size both change.
-            const auto& obj = innerEntry.getObject();
-            const auto diffField = obj.getField("diff");
-            ASSERT_TRUE(diffField.isABSONObj()) << "Expected 'diff' object in kUpdate op for UUID "
-                                                << out.uuid << ": " << obj.toString();
-            const BSONObj diffBson = diffField.Obj();
-
-            const std::string smetaKey = "s" + std::string(replicated_fast_count::kMetadataKey);
-            const BSONElement smetaField = diffBson.getField(smetaKey);
-            BSONElement sizeElem;
-            if (smetaField.isABSONObj()) {
-                // Subdiff format: {diff: {smeta: {u: {sz: N}}}}
-                const BSONObj smetaBson = smetaField.Obj();
-                const BSONElement uField = smetaBson.getField("u");
-                if (uField.isABSONObj()) {
-                    sizeElem = uField.Obj().getField(replicated_fast_count::kSizeKey);
-                }
-            } else {
-                // Full-replacement format: {diff: {u: {meta: {sz: N}}}}
-                const BSONElement uField = diffBson.getField("u");
-                if (uField.isABSONObj()) {
-                    const BSONObj uBson = uField.Obj();
-                    const BSONElement metaField =
-                        uBson.getField(replicated_fast_count::kMetadataKey);
-                    if (metaField.isABSONObj()) {
-                        sizeElem = metaField.Obj().getField(replicated_fast_count::kSizeKey);
-                    }
-                }
-            }
-            EXPECT_TRUE(sizeElem.isNumber())
-                << "Size field not numeric for UUID " << out.uuid << ": " << sizeElem;
-            out.observedSize = sizeElem.safeNumberLong();
-
-            ASSERT_BSONOBJ_EQ(o2.get(), BSON("_id" << out.uuid));
-            break;
-        }
-        case repl::OpTypeEnum::kDelete: {
-            out.opType = FastCountOpType::kDelete;
-            const auto& obj = innerEntry.getObject();
-            out.uuid = UUID::parse(obj["_id"]).getValue();
-            break;
-        }
-        default: {
-            FAIL(std::string("Unexpected opType for collection fast-count applyOps inner op: ") +
-                 std::string{idl::serialize(innerEntry.getOpType())});
-        }
-    }
-    return out;
-}
-
 ObservedApplyOp parseContainerInnerOp(const repl::OplogEntry& innerEntry) {
     ObservedApplyOp out;
     // Container writes carry the full Entry BSON (no diff), so both kInsert and kUpdate surface
@@ -527,7 +423,7 @@ ObservedApplyOp parseContainerInnerOp(const repl::OplogEntry& innerEntry) {
             const auto parsed = repl::ContainerInsertOplogEntryO::parse(
                 innerEntry.getObject(), IDLParserContext("ContainerInsertOplogEntryO"));
             key = parsed.getKey();
-            val = parsed.getValue();
+            val = parsed.getValue().value();
             break;
         }
         case repl::OpTypeEnum::kContainerUpdate: {
@@ -582,11 +478,6 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
     repl::ApplyOps::extractOperationsTo(
         applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerOperations);
 
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto timestampStoreNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-
     int seenFastCountOps = 0;
     for (const auto& innerEntry : innerOperations) {
         // TODO SERVER-123384: Add explicit validation for the timestamp store writes.
@@ -594,25 +485,18 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
         // Timestamp-store ops are written alongside metadata ops in the same applyOps; skip them
         // here since they aren't part of the per-collection metadata being validated.
         ObservedApplyOp observed;
-        if (auto container = innerEntry.getContainer(); container) {
-            if (*container == ident::kFastCountMetadataStoreTimestamps) {
-                continue;
-            }
-            EXPECT_EQ(ident::kFastCountMetadataStore, *container)
-                << "Found unexpected non-fast-count container op in applyOps payload. "
-                << applyOpsEntry.toStringForLogging() << " Inner operation "
-                << innerEntry.toStringForLogging();
-            observed = parseContainerInnerOp(innerEntry);
-        } else {
-            if (innerEntry.getNss() == timestampStoreNss) {
-                continue;
-            }
-            EXPECT_EQ(fastCountStoreNss, innerEntry.getNss())
-                << "Found unexpected non-fast-count operation in applyOps payload. "
-                << applyOpsEntry.toStringForLogging() << " Inner operation "
-                << innerEntry.toStringForLogging();
-            observed = parseCollectionInnerOp(innerEntry);
+        auto container = innerEntry.getContainer();
+        ASSERT_TRUE(container) << "Expected container-backed fast count op in applyOps payload. "
+                               << applyOpsEntry.toStringForLogging() << " Inner operation "
+                               << innerEntry.toStringForLogging();
+        if (*container == ident::kFastCountMetadataStoreTimestamps) {
+            continue;
         }
+        EXPECT_EQ(ident::kFastCountMetadataStore, *container)
+            << "Found unexpected non-fast-count container op in applyOps payload. "
+            << applyOpsEntry.toStringForLogging() << " Inner operation "
+            << innerEntry.toStringForLogging();
+        observed = parseContainerInnerOp(innerEntry);
 
         auto it = expectedByUuid.find(observed.uuid);
         if (it == expectedByUuid.end()) {
@@ -696,7 +580,7 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
 
-    auto cursor = collAcq.getCollectionPtr()->getCursor(opCtx, /*forward*/ true);
+    auto cursor = collAcq.getCollectionPtr()->getCursor(opCtx, /*forward=*/true);
 
     CollectionSizeCount sizeCount;
     for (auto record = cursor->next(); record; record = cursor->next()) {
@@ -708,20 +592,22 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
 
 absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
     const repl::OplogEntry& applyOpsEntry) {
-    replicated_fast_count::SizeCountDeltas entries;
-    replicated_fast_count::extractSizeCountDeltasForApplyOps(applyOpsEntry, entries);
+    replicated_fast_count::ReplicatedMetadataDeltas entries;
+    replicated_fast_count::extractReplicatedMetadataDeltasForApplyOps(applyOpsEntry, entries);
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
     for (const auto& [uuid, entry] : entries) {
-        deltas[uuid] = entry.sizeCount;
+        deltas[uuid] = entry.metadata.sizeCount;
     }
     return deltas;
 }
 
 
 namespace {
-repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta,
+                                                       boost::optional<int64_t> hash) {
     SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
+    m.setH(hash);
     return m;
 }
 }  // namespace
@@ -729,14 +615,15 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDel
 repl::OplogEntry makeOplogEntry(Timestamp ts,
                                 NsAndUUID userColl,
                                 repl::OpTypeEnum opType,
-                                int32_t sizeDelta) {
+                                int32_t sizeDelta,
+                                boost::optional<int64_t> hash) {
     return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
         .opTime = repl::OpTime(ts, 1),
         .opType = opType,
         .nss = userColl.nss,
         .uuid = userColl.uuid,
         .oField = BSONObj(),
-        .sizeMetadata = makeOperationSizeMetadata(sizeDelta),
+        .sizeMetadata = makeOperationSizeMetadata(sizeDelta, hash),
         .wallClockTime = Date_t::now(),
     }};
 }
@@ -748,6 +635,52 @@ repl::OplogEntry makeOplogEntry(const Timestamp ts, NsAndUUID userColl, repl::Op
         .nss = userColl.nss,
         .uuid = userColl.uuid,
         .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+repl::OplogEntry makeContainerOplogEntry(Timestamp ts,
+                                         std::string_view containerIdent,
+                                         repl::OpTypeEnum opType) {
+    // Placeholder values for the container write key-value pair. These are never read by the oplog
+    // parsing code but would normally contain a UUID key and collection metadata value.
+    constexpr int64_t kKey = 1;
+    static const char kValue[] = "\0";
+    const auto key = repl::ContainerKey(kKey);
+    const auto value = repl::ContainerVal(std::span<const char>(kValue, 1));
+
+    BSONObj o = [&] {
+        switch (opType) {
+            case repl::OpTypeEnum::kContainerInsert: {
+                repl::ContainerInsertOplogEntryO o;
+                o.setKey(key);
+                o.setValue(value);
+                return o.toBSON();
+            }
+            case repl::OpTypeEnum::kContainerUpdate: {
+                repl::ContainerUpdateOplogEntryO o;
+                o.setKey(key);
+                o.setValue(value);
+                o.setVersion(
+                    static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
+                return o.toBSON();
+            }
+            case repl::OpTypeEnum::kContainerDelete: {
+                repl::ContainerDeleteOplogEntryO o;
+                o.setKey(key);
+                return o.toBSON();
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = opType,
+        .nss = NamespaceString::kContainerNamespace,
+        .container = containerIdent,
+        .oField = o,
         .wallClockTime = Date_t::now(),
     }};
 }
@@ -790,6 +723,16 @@ repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl) {
     }};
 }
 
+repl::OplogEntry makeWatermarkOplogEntry(Timestamp ts) {
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kNoop,
+        .nss = NamespaceString{},
+        .oField = BSON("msg" << kWatermarkMsg),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
 repl::OplogEntry makeImportCollectionOplogEntry(
     Timestamp ts, NsAndUUID userColl, int64_t numRecords, int64_t dataSize, bool dryRun) {
 
@@ -819,14 +762,15 @@ void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry) {
     wuow.commit();
 }
 
-void insertSizeCountEntry(OperationContext* opCtx,
-                          SizeCountStore& store,
-                          UUID uuid,
-                          const SizeCountStore::Entry& entry) {
+boost::optional<SizeCountStore::Entry> insertSizeCountEntry(OperationContext* opCtx,
+                                                            SizeCountStore& store,
+                                                            UUID uuid,
+                                                            const SizeCountStore::Entry& entry) {
     Lock::GlobalLock writeLock(opCtx, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
-    store.write(opCtx, uuid, entry);
+    const boost::optional<SizeCountStore::Entry> oldValue = store.insert(opCtx, uuid, entry);
     wuow.commit();
+    return oldValue;
 }
 
 void insertSizeCountTimestamp(OperationContext* opCtx,
@@ -850,7 +794,145 @@ std::span<const char> uuidSpan(const UUID& u) {
     return std::span<const char>{reinterpret_cast<const char*>(cdr.data()), cdr.length()};
 }
 
+ContainerFastCountStores createContainerFastCountStores(OperationContext* opCtx) {
+    ASSERT_OK(createInternalFastCountContainers(opCtx,
+                                                NamespaceString::kAdminCommandNamespace,
+                                                ident::kFastCountMetadataStore,
+                                                KeyFormat::String,
+                                                ident::kFastCountMetadataStoreTimestamps,
+                                                KeyFormat::Long,
+                                                /*writeToOplog=*/false));
+    KVEngine* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    return ContainerFastCountStores{
+        .sizeCountStore = std::make_unique<SizeCountStore>(
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStore,
+                                   RecordStore::Options{.keyFormat = KeyFormat::String},
+                                   /*uuid=*/boost::none)),
+        .timestampStore = std::make_unique<SizeCountTimestampStore>(
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none))};
+}
+
 std::span<const char> bsonSpan(const BSONObj& obj) {
     return std::span<const char>{obj.objdata(), static_cast<size_t>(obj.objsize())};
 };
+
+void registerOpObserverForTest(ServiceContext* service) {
+    auto* registry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    ASSERT(registry);
+    registry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+}
+
+Timestamp waitForFlush(OperationContext* opCtx,
+                       SizeCountTimestampStore& timestampStore,
+                       std::function<void()> requestFlush) {
+    constexpr Seconds kWaitDeadline{30};
+    const Date_t deadline = Date_t::now() + kWaitDeadline;
+    auto readValidAsOf = [&] {
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        return timestampStore.read(opCtx);
+    };
+    const Timestamp afterTs = readValidAsOf().value_or(Timestamp::min());
+    // Retry in a loop because the tailer may not have buffered the work yet, in which case the
+    // flush cycle is a no-op.
+    while (readValidAsOf().value_or(Timestamp::min()) <= afterTs && Date_t::now() < deadline) {
+        requestFlush();
+        // The fixture does not run the oplog visibility thread, which is what wakes the tailer's
+        // capped-insert notifier in production. Signal as a stand-in so the tailer rescans after
+        // the flusher writes its watermark.
+        repl::signalOplogWaiters();
+        sleepFor(Milliseconds(10));
+    }
+    const boost::optional<Timestamp> newValidAsOf = readValidAsOf();
+    invariant(
+        newValidAsOf.has_value() && newValidAsOf > afterTs,
+        "waitForFlush(): checkpoint valid-as-of did not advance past the requested timestamp");
+    return *newValidAsOf;
+}
+
+void waitForFlushFailpoint(FailPointEnableBlock& fp, std::function<void()> requestFlush) {
+    // We need to spawn a thread because the Failpoint API does not provide a non-blocking way to
+    // check the number of times the failpoint has been entered.
+    // TODO(SERVER-135644): Remove this thread spawn.
+    Atomic<bool> stop{false};
+    stdx::thread driver([&] {
+        while (!stop.load()) {
+            repl::signalOplogWaiters();
+            requestFlush();
+            sleepFor(Milliseconds(10));
+        }
+    });
+    fp.waitForOneNewEntry();
+    stop.store(true);
+    driver.join();
+}
+
+repl::OplogEntry makeWatermarkEntry(Timestamp ts) {
+    return repl::OplogEntry(BSON("ts" << ts << "t" << -1 << "v" << 2 << "wall" << Date_t() << "op"
+                                      << "n"
+                                      << "ns" << ""
+                                      << "o" << BSON("msg" << std::string(kWatermarkMsg))));
+}
+
+repl::OplogEntry makeCheckpointEntry(Timestamp validAsOf,
+                                     const std::vector<CheckpointWriteSpec>& writes) {
+    std::vector<BSONObj> innerOps;
+    for (const auto& spec : writes) {
+        const auto keyBytes = SizeCountStore::uuidToContainerKey(spec.uuid);
+        const std::string keyStorage(keyBytes.data(), keyBytes.size());
+        const repl::ContainerKey key(std::span<const char>(keyStorage.data(), keyStorage.size()));
+
+        BSONObjBuilder oBuilder;
+        key.serialize("k", &oBuilder);
+        if (spec.metadata.has_value()) {
+            const BSONObj value =
+                BSON("valid-as-of" << validAsOf << "meta"
+                                   << BSON("ct" << spec.metadata->sizeCount.count << "sz"
+                                                << spec.metadata->sizeCount.size));
+            const repl::ContainerVal valueView(
+                std::span<const char>(value.objdata(), value.objsize()));
+            valueView.serialize("v", &oBuilder);
+            BSONObjBuilder innerBuilder;
+            innerBuilder.append("op", "ci");
+            innerBuilder.append("ns", "admin.$cmd");
+            innerBuilder.append("container", std::string(ident::kFastCountMetadataStore));
+            innerBuilder.append("o", oBuilder.obj());
+            innerOps.push_back(innerBuilder.obj());
+        } else {
+            BSONObjBuilder innerBuilder;
+            innerBuilder.append("op", "cd");
+            innerBuilder.append("ns", "admin.$cmd");
+            innerBuilder.append("container", std::string(ident::kFastCountMetadataStore));
+            innerBuilder.append("o", oBuilder.obj());
+            innerOps.push_back(innerBuilder.obj());
+        }
+    }
+
+    const BSONObj tsValue = BSON("valid-as-of" << validAsOf);
+    const repl::ContainerVal tsValueView(
+        std::span<const char>(tsValue.objdata(), tsValue.objsize()));
+    BSONObjBuilder tsOBuilder;
+    tsOBuilder.append("$v",
+                      static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
+    repl::ContainerKey(1).serialize("k", &tsOBuilder);
+    tsValueView.serialize("v", &tsOBuilder);
+    BSONObjBuilder cuBuilder;
+    cuBuilder.append("op", "cu");
+    cuBuilder.append("ns", "admin.$cmd");
+    cuBuilder.append("container", std::string(ident::kFastCountMetadataStoreTimestamps));
+    cuBuilder.append("o", tsOBuilder.obj());
+    innerOps.push_back(cuBuilder.obj());
+
+    return repl::OplogEntry(BSON("ts" << validAsOf << "t" << -1 << "v" << 2 << "wall" << Date_t()
+                                      << "op" << "c"
+                                      << "ns" << "admin.$cmd"
+                                      << "o" << BSON("applyOps" << innerOps))
+                                .getOwned());
+}
 }  // namespace mongo::replicated_fast_count::test_helpers

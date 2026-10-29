@@ -61,29 +61,31 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         val_size = 10
 
         # Insert data and take the baseline checkpoint.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(nrows):
             c[f'key{i:06d}'] = 'a' * val_size
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
 
         # Rewrite every row three times, checkpointing each time.
         # Each cycle rewrites all leaf, internal, and root pages.
         for cycle, ch in enumerate(['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'], start=1):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             for i in range(nrows):
                 c[f'key{i:06d}'] = ch * val_size
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1 + cycle))
             self.session.checkpoint()
 
         final = self.get_checkpoint_size()
 
         # With delta_pct=20 and this workload (rewriting every row each cycle),
         # no deltas should ever be emitted, only full page images.
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        delta_count = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-        stat_cursor.close()
+        delta_count = self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri)
         self.assertEqual(delta_count, 0,
             f"Expected no deltas with delta_pct=20, but got {delta_count}")
 
@@ -102,10 +104,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Write initial page with multiple keys
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(10):
             c[f'key{i:02d}'] = f'value{i}'
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         # The size of the first page we wrote + its root page.
@@ -113,11 +117,13 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
 
         # Multiple iterations: first create deltas, then force full page writes
         for cycle, ch in enumerate(['b', 'c', 'd', 'e', 'f', 'g', 'h'], start=1):#, 'h', 'i', 'j', 'k', 'l', 'm'], start=1):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             # Update existing keys to create deltas
             for i in range(0, 10, 2):
                 c[f'key{i:02d}'] = f'newvalue{cycle}{i}'
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1 + cycle))
             self.session.checkpoint()
 
         final = self.get_checkpoint_size()
@@ -128,38 +134,36 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
             f"Check delta chain termination handling in rec_write.c")
 
         # Verify we actually created deltas during the test
-        stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-        total_deltas = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-        stat_cursor.close()
-        self.assertGreater(total_deltas, 0, "No deltas were created during test")
+        self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, 0, uri=self.uri, msg="No deltas were created during test")
 
     # Uses the class-level delta_pct=90 -- no reconfigure needed.
     def test_bytes_total_leak_delta_normal_ops(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Write initial page with multiple keys
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(10):
             c[f'key{i:02d}'] = f'value{i}'
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
 
         # Multiple iterations updating existing keys to create deltas
         for cycle, ch in enumerate(['b', 'c', 'd', 'e', 'f'], start=1):
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             # Update existing keys instead of inserting new ones
             for i in range(0, 10, 2):  # Update every other key
                 c[f'key{i:02d}'] = f'newvalue{cycle}{i}'
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1 + cycle))
             self.session.checkpoint()
 
             # Verify deltas were created
-            stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-            delta_count = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-            stat_cursor.close()
-            self.assertGreater(delta_count, 0,
-                f"Cycle {cycle}: Expected leaf page deltas but got {delta_count}")
+            self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, 0, uri=self.uri,
+                msg=f"Cycle {cycle}: Expected leaf page deltas but got 0")
 
     # Regression test for the size leak after rec_result is set to WT_PAGE_CLEAN.
     def test_size_leak_after_rec_result_page_clean(self):
@@ -175,7 +179,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         for i in range(nrows):
             c['key' + str(i)] = 'A' * val_size
         c.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
         self.pr(f"Baseline checkpoint size: {baseline}")
@@ -186,7 +190,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         for i in range(0, nrows, 5):
             c['key' + str(i)] = 'x' * val_size
         c.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
 
         size_after_delta = self.get_checkpoint_size()
@@ -209,7 +213,7 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         for i in range(nrows):
             c['key' + str(i)] = 'y' * val_size
         c.close()
-        self.session.commit_transaction()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         self.session.checkpoint()
 
         final = self.get_checkpoint_size()
@@ -229,10 +233,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
         # Write initial data. Small enough for a single leaf page 4K.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri)
         for i in range(nrows):
             c['key' + str(i)] = 'A' * val_size
         c.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
         baseline = self.get_checkpoint_size()
         self.pr(f"Baseline checkpoint size: {baseline}")
@@ -240,22 +246,20 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
         prev_delta_count = 0
         for cycle in range(ncycles):
             # Step 1: Create a delta on top of the current page.
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             for i in range(0, nrows, 5):
                 c['key' + str(i)] = 'x' * val_size
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2 + 2 * cycle))
             self.session.checkpoint()
 
             size_after_delta = self.get_checkpoint_size()
 
             # Verify a new delta was actually created this cycle.
-            stat_cursor = self.session.open_cursor('statistics:' + self.uri)
-            delta_count = stat_cursor[stat.dsrc.rec_page_delta_leaf][2]
-            stat_cursor.close()
-            new_deltas = delta_count - prev_delta_count
-            prev_delta_count = delta_count
-            self.assertGreater(new_deltas, 0,
-                f"Cycle {cycle}: expected new deltas but got {new_deltas}")
+            self.assertStatGreaterSoon(stat.dsrc.rec_page_delta_leaf, prev_delta_count, uri=self.uri,
+                msg=f"Cycle {cycle}: expected new deltas but did not get")
+            prev_delta_count = self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri)
 
             # Step 2: Evict the leaf page. On next access it will be read from the page service,
             # prior to the fix this would set cumulative_size to the last delta's raw size instead
@@ -270,10 +274,12 @@ class test_disagg_checkpoint_size03(wttest.WiredTigerTestCase):
 
             # Step 3: Force a full page rewrite to terminate the delta chain.
             self.conn.reconfigure('page_delta=(delta_pct=1)')
+            self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
             for i in range(nrows):
                 c['key' + str(i)] = 'y' * val_size
             c.close()
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3 + 2 * cycle))
             self.session.checkpoint()
 
         final = self.get_checkpoint_size()

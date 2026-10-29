@@ -50,16 +50,19 @@ class NotificationsConfig(BaseModel):
     slack: SlackConfig
 
 
+# Note: pydantic 2 dropped the v1 behavior where `Optional[X]` implied a
+# default of None — without an explicit `= None` such fields are REQUIRED
+# and yaml entries that omit them fail validation.
 class TeamConfig(BaseModel):
     name: str
-    slack_tags: Optional[list[str]]
-    thresholds: Optional[ThresholdOverride]
+    slack_tags: Optional[list[str]] = None
+    thresholds: Optional[ThresholdOverride] = None
 
 
 class GroupConfig(BaseModel):
     name: str
     teams: list[str]
-    slack_tags: Optional[list[str]]
+    slack_tags: Optional[list[str]] = None
     thresholds: Optional[ThresholdOverride] = None
 
 

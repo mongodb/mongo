@@ -23,6 +23,10 @@ import {
     getRandomShardName,
     setupTestDatabase,
 } from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
+import {
+    runRenameUntrackedCollectionAcrossDbsScenarios,
+    setupSamePrimaryDatabases,
+} from "jstests/libs/cluster_helpers/rename_collection_across_dbs_helpers.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
@@ -85,6 +89,16 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     const toColl = testDB.getCollection(toCollName);
     assert.eq(toColl.find({x: 0}).itcount(), 1, "Expected exactly one document on the shard");
     assert.eq(toColl.find({x: 2}).itcount(), 1, "Expected exactly one document on the shard");
+}
+
+{
+    jsTest.log("Shared cross-database rename scenarios (same primary shard)");
+    const {sourceDb, targetDb, primaryShard} = setupSamePrimaryDatabases(
+        db,
+        jsTestName() + "_sharedCrossDbFrom",
+        jsTestName() + "_sharedCrossDbTo",
+    );
+    runRenameUntrackedCollectionAcrossDbsScenarios(sourceDb, targetDb, "shared");
 }
 
 {

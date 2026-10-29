@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/fle_crud.h"
@@ -129,6 +103,7 @@ MONGO_FAIL_POINT_DEFINE(fleCrudThrowTransientTxnError);
 namespace mongo {
 using namespace std::literals::string_view_literals;
 namespace {
+
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
     std::vector<write_ops::WriteError> errors;
 
@@ -334,6 +309,19 @@ std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesFo
 const std::shared_ptr<executor::TaskExecutor>& getFLE2TaskExecutorForMongoS(
     OperationContext* opCtx) {
     return Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+}
+
+void assertFLECrudNotYetProcessed(const EncryptionInformation& ei) {
+    tassert(12783101,
+            "FLE2 CRUD processing entered but command is already processed.",
+            !ei.getCrudProcessed().value_or(false));
+}
+
+void assertFLECrudNotYetProcessed(const boost::optional<EncryptionInformation>& ei) {
+    tassert(12783102,
+            "FLE2 CRUD processing entered without encryptionInformation in the command.",
+            ei.has_value());
+    assertFLECrudNotYetProcessed(*ei);
 }
 
 namespace {
@@ -1396,14 +1384,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
 FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                const BatchedCommandRequest& request,
                                BatchedCommandResponse* response) {
-    {
-        std::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
-
-    if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
-        return FLEBatchResult::kNotProcessed;
-    }
+    assertFLECrudNotYetProcessed(request.getWriteCommandRequestBase().getEncryptionInformation());
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
         auto insertRequest = request.getInsertRequest();
@@ -1458,7 +1439,8 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
 std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
     OperationContext* opCtx, const BatchedCommandRequest& request) {
-    invariant(request.hasEncryptionInformation());
+    assertFLECrudNotYetProcessed(request.getWriteCommandRequestBase().getEncryptionInformation());
+
     auto getExpCtx = [&](const auto& op) {
         auto expCtx =
             ExpressionContextBuilder{}
@@ -1471,11 +1453,6 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         expCtx->stopExpressionCounters();
         return expCtx;
     };
-
-    {
-        std::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         auto deleteRequest = request.getDeleteRequest();
@@ -1711,21 +1688,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                        const write_ops::FindAndModifyCommandRequest& request,
                                        StatusWith<write_ops::FindAndModifyCommandReply>& swReply,
                                        boost::optional<WriteConcernErrorDetail>& wceReply) {
-    if (!request.getEncryptionInformation().has_value()) {
-        return FLEBatchResult::kNotProcessed;
-    }
-
-    {
-        std::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
-
-    // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as
-    // findAndModify so query can do any necessary transformations. But on the nested call, CRUD
-    // does not need to do any more work.
-    if (request.getEncryptionInformation()->getCrudProcessed()) {
-        return FLEBatchResult::kNotProcessed;
-    }
+    assertFLECrudNotYetProcessed(request.getEncryptionInformation());
 
     // This callback ensures that any write concern errors are returned in the event that
     // processFindAndModifyRequest returned a non-OK status, which is then thrown.
@@ -1769,9 +1732,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongos(OperationContext* opCtx,
                                      const write_ops::FindAndModifyCommandRequest& request) {
-    tassert(6513400,
-            "Missing encryptionInformation for findAndModify",
-            request.getEncryptionInformation().has_value());
+    assertFLECrudNotYetProcessed(request.getEncryptionInformation());
 
     return uassertStatusOK(processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
         opCtx, request, &getTransactionWithRetriesForMongoS, processFindAndModifyExplain));
@@ -2060,12 +2021,14 @@ std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString&
 void processFLEFindS(OperationContext* opCtx,
                      const NamespaceString& nss,
                      FindCommandRequest* findCommand) {
+    assertFLECrudNotYetProcessed(findCommand->getEncryptionInformation());
     fle::processFindCommand(opCtx, nss, findCommand, &getTransactionWithRetriesForMongoS);
 }
 
 void processFLECountS(OperationContext* opCtx,
                       const NamespaceString& nss,
                       CountCommandRequest& countCommand) {
+    assertFLECrudNotYetProcessed(countCommand.getEncryptionInformation());
     fle::processCountCommand(opCtx, nss, &countCommand, &getTransactionWithRetriesForMongoS);
 }
 
@@ -2073,6 +2036,7 @@ std::unique_ptr<Pipeline> processFLEPipelineS(OperationContext* opCtx,
                                               NamespaceString nss,
                                               const EncryptionInformation& encryptInfo,
                                               std::unique_ptr<Pipeline> toRewrite) {
+    assertFLECrudNotYetProcessed(encryptInfo);
     return fle::processPipeline(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoS);
 }

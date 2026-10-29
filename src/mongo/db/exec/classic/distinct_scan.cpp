@@ -1,40 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/classic/distinct_scan.h"
 
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/classic/orphan_chunk_skipper.h"
-
-#include <memory>
-#include <vector>
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -48,7 +18,11 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 
+#include <memory>
+#include <vector>
+
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -56,6 +30,44 @@ namespace mongo {
 
 using std::unique_ptr;
 
+namespace {
+/**
+ * Returns 'key' with its 'fieldNo'-th element rewritten from undefined to null, or 'key' unchanged
+ * if that element is not undefined.
+ */
+BSONObj replaceUndefinedWithNull(const BSONObj& key, size_t fieldNo) {
+    size_t i = 0;
+    for (auto&& elt : key) {
+        if (i++ < fieldNo) {
+            continue;
+        }
+        if (elt.type() != BSONType::undefined) {
+            return key;
+        }
+        break;
+    }
+
+    BSONObjBuilder bob;
+    i = 0;
+    for (auto&& elt : key) {
+        if (i++ == fieldNo) {
+            bob.appendNull(elt.fieldNameStringData());
+        } else {
+            bob.append(elt);
+        }
+    }
+    return bob.obj();
+}
+
+/**
+ * Returns true if the distinct field itself may contain arrays. The index may be multikey because
+ * of another field, so check path-level multikey info when available.
+ */
+bool distinctFieldIsMultikey(const DistinctParams& params) {
+    return params.isMultiKey &&
+        (params.multikeyPaths.empty() || !params.multikeyPaths[params.fieldNo].empty());
+}
+}  // namespace
 
 DistinctScan::DistinctScan(ExpressionContext* expCtx,
                            CollectionAcquisition collection,
@@ -66,12 +78,21 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexEntry, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
+      _ordering(Ordering::make(_keyPattern)),
       _scanDirection(params.scanDirection),
       _bounds(std::move(params.bounds)),
       _fieldNo(params.fieldNo),
+      // A non-multikey undefined key can only be an undefined value, which groups as undefined,
+      // whereas a multikey one is indistinguishable from an empty array, which gets the same group
+      // key as null.
+      _replaceUndefinedWithNull(params.unwindsArrays && distinctFieldIsMultikey(params)),
       _checker(&_bounds, _keyPattern, _scanDirection),
       _shardFilterer(std::move(shardFilterer)),
       _needsFetch(needsFetch) {
+    tassert(3371501,
+            "_replaceUndefinedWithNull requires that keys are scanned in an ascending order",
+            !_replaceUndefinedWithNull ||
+                _scanDirection * Ordering::make(_keyPattern).get(_fieldNo) == 1);
     _specificStats.keyPattern = _keyPattern;
     _specificStats.indexName = params.name;
     _specificStats.indexVersion = static_cast<int>(indexDescriptor()->version());
@@ -87,6 +108,7 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
                                    .getOwned();
     _specificStats.isShardFiltering = _shardFilterer != nullptr;
     _specificStats.isFetching = _needsFetch;
+    _specificStats.unwindsArrays = params.unwindsArrays;
     _specificStats.isShardFilteringDistinctScanEnabled =
         expCtx->isFeatureFlagShardFilteringDistinctScanEnabled();
 
@@ -135,20 +157,22 @@ PlanStage::StageState DistinctScan::doFetch(WorkingSetMember* member,
 
             return ADVANCED;
         },
+        /*yieldHandler=*/
         [&] {
             // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may be
             // freed when we yield.
             member->makeObjOwnedIfNeeded();
             _idRetrying = id;
             *out = WorkingSet::INVALID_ID;
-        } /* yieldHandler */);
+        });
 }
 
 PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
 
-    boost::optional<IndexKeyEntry> kv;
+    // A view of the next index entry, if any. Valid until the cursor is advanced.
+    SortedDataKeyValueView view;
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DistinctScan",
@@ -159,7 +183,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             }
 
             if (_needsSequentialScan) {
-                kv = _cursor->next(ru);
+                view = _cursor->nextKeyValueView(ru);
                 _needsSequentialScan = false;
                 return PlanStage::ADVANCED;
             }
@@ -167,40 +191,49 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             key_string::Builder builder(
                 indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                 indexAccessMethod()->getSortedDataInterface()->getOrdering());
-            kv = _cursor->seek(ru,
-                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                   _seekPoint, _scanDirection == 1, builder));
+            view = _cursor->seekForKeyValueView(
+                ru,
+                IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                    _seekPoint, _scanDirection == 1, builder));
             return PlanStage::ADVANCED;
         },
-        [&] {
-            *out = WorkingSet::INVALID_ID;
-        } /* yieldHandler */);
+        /*yieldHandler=*/[&] { *out = WorkingSet::INVALID_ID; });
 
     if (ret != PlanStage::ADVANCED) {
         return ret;
     }
 
-    if (!kv) {
+    if (view.isEmpty()) {
         _commonStats.isEOF = true;
         return PlanStage::IS_EOF;
     }
 
     ++_specificStats.keysExamined;
 
-    switch (_checker.checkKey(kv->key, &_seekPoint)) {
-        case IndexBoundsChecker::MUST_ADVANCE: {
+    BSONObj dehydratedKey = key_string::toBson(view.getKeyStringWithoutRecordIdView(),
+                                               _ordering,
+                                               view.getTypeBitsView(),
+                                               view.getVersion());
+
+    switch (_checker.checkKey(dehydratedKey, &_seekPoint)) {
+        case KeyState::MUST_ADVANCE: {
             // Try again next time. The checker has adjusted the _seekPoint.
             return PlanStage::NEED_TIME;
         }
-        case IndexBoundsChecker::DONE: {
+        case KeyState::DONE: {
             // There won't be a next time.
             _commonStats.isEOF = true;
             _cursor.reset();
             return IS_EOF;
         }
-        case IndexBoundsChecker::VALID: {
-            if (!kv->key.isOwned())
-                kv->key = kv->key.getOwned();
+        case KeyState::VALID: {
+            if (_replaceUndefinedWithNull) {
+                // The empty array gets the same group key as the 'undefined' BSON value but
+                // produces a null group key when unwound. Note that rewriting undefined to null
+                // here also makes the seek below skip the adjacent null band, so at most one null
+                // key is returned.
+                dehydratedKey = replaceUndefinedWithNull(dehydratedKey, _fieldNo);
+            }
 
             // If we are retrying a fetch that yielded, reuse the existing working set member;
             // otherwise allocate a new one.
@@ -212,10 +245,10 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             } else {
                 id = _workingSet->allocate();
                 member = _workingSet->get(id);
-                member->recordId = kv->loc;
+                member->recordId = *view.getRecordId();
                 member->keyData.push_back(
                     IndexKeyDatum(_keyPattern,
-                                  kv->key,
+                                  dehydratedKey,
                                   workingSetIndexId(),
                                   shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
                 _workingSet->transitionToRecordIdAndIdx(id);
@@ -256,7 +289,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                         // the prefix leading up to the shard key. Adjust the _seekPoint so that it
                         // is exclusive on the field we are using, in case the next prefix matches
                         // more owned chunks.
-                        _seekPoint.keyPrefix = kv->key;
+                        _seekPoint.keyPrefix = dehydratedKey;
                         _seekPoint.prefixLen = _fieldNo + 1;
                         _seekPoint.firstExclusive = _fieldNo;
                         _workingSet->free(id);
@@ -284,7 +317,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             switch (belongs) {
                 case ShardFilterer::DocumentBelongsResult::kBelongs: {
                     // Adjust the _seekPoint so that it is exclusive on the field we are using.
-                    _seekPoint.keyPrefix = kv->key;
+                    _seekPoint.keyPrefix = dehydratedKey;
                     _seekPoint.prefixLen = _fieldNo + 1;
                     _seekPoint.firstExclusive = _fieldNo;
 

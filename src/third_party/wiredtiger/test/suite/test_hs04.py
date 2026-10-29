@@ -64,12 +64,6 @@ class test_hs04(wttest.WiredTigerTestCase):
             config += ',in_memory=' + ('true' if self.in_memory else 'false')
         return config
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_hs(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
 

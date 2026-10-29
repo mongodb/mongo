@@ -77,10 +77,7 @@ class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         self.session.checkpoint()
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower")'
-        self.reopen_conn(config=follower_config)
-
-        cursor = self.session.open_cursor(uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         for i in range(self.nitems):
             self.assertEqual(cursor["Hello " + str(i)], "World")

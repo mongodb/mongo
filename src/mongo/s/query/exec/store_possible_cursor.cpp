@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/store_possible_cursor.h"
 
@@ -69,7 +43,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         OwnedRemoteCursor&& remoteCursor,
                                         PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode) {
+                                        TailableModeEnum tailableMode,
+                                        bool allowPartialResults) {
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
     auto result = storePossibleCursor(opCtx,
                                       std::string{remoteCursor->getShardId()},
@@ -79,7 +54,9 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                       executorPool->getArbitraryExecutor(),
                                       Grid::get(opCtx)->getCursorManager(),
                                       std::move(privileges),
-                                      tailableMode);
+                                      tailableMode,
+                                      boost::none,
+                                      allowPartialResults);
 
     // On success, release ownership of the cursor because it has been registered with the cursor
     // manager and is now owned there.
@@ -96,7 +73,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode,
-                                        boost::optional<BSONObj> routerSort) {
+                                        boost::optional<BSONObj> routerSort,
+                                        bool allowPartialResults) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -120,7 +98,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                cursorManager,
                                privileges,
                                tailableMode,
-                               routerSort);
+                               routerSort,
+                               allowPartialResults);
 }
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
@@ -132,7 +111,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode,
-                                        boost::optional<BSONObj> routerSort) {
+                                        boost::optional<BSONObj> routerSort,
+                                        bool allowPartialResults) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
     opDebug.getAdditiveMetrics().nBatches = 1;
     // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
@@ -149,12 +129,14 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          incomingCursorResponse.releaseBatch(),
                                          incomingCursorResponse.getAtClusterTime(),
                                          incomingCursorResponse.getPostBatchResumeToken());
+        exhaustedResponse.setPartialResultsReturned(
+            incomingCursorResponse.getPartialResultsReturned());
         return exhaustedResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
     ClusterClientCursorParams params(incomingCursorResponse.getNSS(),
                                      APIParameters::get(opCtx),
-                                     boost::none /* ReadPreferenceSetting */,
+                                     /*readPreference=*/boost::none,
                                      repl::ReadConcernArgs::get(opCtx),
                                      [&] {
                                          if (!opCtx->getLogicalSessionId())
@@ -167,16 +149,19 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          }
                                          return osi;
                                      }());
+    params.isAllowPartialResults = allowPartialResults;
     params.remotes.emplace_back();
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
-    remoteCursor.setCursorResponse(
-        CursorResponse(incomingCursorResponse.getNSS(),
-                       incomingCursorResponse.getCursorId(),
-                       {}, /* batch */
-                       incomingCursorResponse.getAtClusterTime(),
-                       incomingCursorResponse.getPostBatchResumeToken()));
+    CursorResponse remoteCursorResponse(incomingCursorResponse.getNSS(),
+                                        incomingCursorResponse.getCursorId(),
+                                        {}, /* batch */
+                                        incomingCursorResponse.getAtClusterTime(),
+                                        incomingCursorResponse.getPostBatchResumeToken());
+    remoteCursorResponse.setPartialResultsReturned(
+        incomingCursorResponse.getPartialResultsReturned());
+    remoteCursor.setCursorResponse(std::move(remoteCursorResponse));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.originatingPrivileges = std::move(privileges);
@@ -213,6 +198,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                           incomingCursorResponse.releaseBatch(),
                                           incomingCursorResponse.getAtClusterTime(),
                                           incomingCursorResponse.getPostBatchResumeToken());
+    outgoingCursorResponse.setPartialResultsReturned(
+        incomingCursorResponse.getPartialResultsReturned());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 
@@ -226,7 +213,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         PrivilegeVector privileges,
                                         std::function<BSONObj(BSONObj)> documentTransform,
                                         TailableModeEnum tailableMode,
-                                        boost::optional<BSONObj> routerSort) {
+                                        boost::optional<BSONObj> routerSort,
+                                        bool allowPartialResults) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -262,13 +250,14 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          std::move(transformedFirstBatch),
                                          response.getAtClusterTime(),
                                          response.getPostBatchResumeToken());
+        exhaustedResponse.setPartialResultsReturned(response.getPartialResultsReturned());
         return exhaustedResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
     // Build the cursor params pointing at the shard's open cursor.
     ClusterClientCursorParams params(response.getNSS(),
                                      APIParameters::get(opCtx),
-                                     boost::none /* ReadPreferenceSetting */,
+                                     /*readPreference=*/boost::none,
                                      repl::ReadConcernArgs::get(opCtx),
                                      [&] {
                                          if (!opCtx->getLogicalSessionId())
@@ -280,15 +269,18 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                          }
                                          return osi;
                                      }());
+    params.isAllowPartialResults = allowPartialResults;
     params.remotes.emplace_back();
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
-    remoteCursor.setCursorResponse(CursorResponse(response.getNSS(),
-                                                  response.getCursorId(),
-                                                  {} /* first batch served above */,
-                                                  response.getAtClusterTime(),
-                                                  response.getPostBatchResumeToken()));
+    CursorResponse remoteCursorResponse(response.getNSS(),
+                                        response.getCursorId(),
+                                        {} /* first batch served above */,
+                                        response.getAtClusterTime(),
+                                        response.getPostBatchResumeToken());
+    remoteCursorResponse.setPartialResultsReturned(response.getPartialResultsReturned());
+    remoteCursor.setCursorResponse(std::move(remoteCursorResponse));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.originatingPrivileges = std::move(privileges);
@@ -307,7 +299,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     //
     // extractARMParams() moves 'remotes' out of params. The remaining fields in params are still
     // needed by ClusterClientCursorImpl for auth, session, and metrics bookkeeping.
-    auto armParams = params.extractARMParams();
+    auto armParams = params.extractARMParams(opCtx);
     auto mergeStage = std::make_unique<RouterStageMerge>(opCtx, executor, std::move(armParams));
     auto transformStage = std::make_unique<RouterStageTransform>(
         opCtx, std::move(mergeStage), std::move(documentTransform));
@@ -335,6 +327,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                           std::move(transformedFirstBatch),
                                           response.getAtClusterTime(),
                                           response.getPostBatchResumeToken());
+    outgoingCursorResponse.setPartialResultsReturned(response.getPartialResultsReturned());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 

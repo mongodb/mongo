@@ -1,0 +1,23 @@
+diff --git a/bazel/private/cc_proto_support.bzl b/bazel/private/cc_proto_support.bzl
+index fbd78adba9b..186784f76e0 100644
+--- a/bazel/private/cc_proto_support.bzl
++++ b/bazel/private/cc_proto_support.bzl
+@@ -127,14 +127,12 @@ def cc_proto_compile_and_link(ctx, deps, sources, headers, disallow_dynamic_libr
+         )
+         libraries = []
+ 
++    # Bazel 9 removed the privileged CcInfo.debug_context() accessor this
++    # allowlisted path relied on, and bazel_features still reports protobuf as allowlisted. Skip
++    # the debug context until protobuf is re-imported at a Bazel 9 compatible release; the only
++    # loss is .dwo/temps aggregation for generated proto C++ code.
+     debug_context = None
+     temps = []
+-    if bazel_features.cc.protobuf_on_allowlist:
+-        debug_context = cc_common.merge_debug_context(
+-            [cc_common.create_debug_context(compilation_outputs)] +
+-            [dep[CcInfo].debug_context() for dep in deps if CcInfo in dep],
+-        )
+-        temps = compilation_outputs.temps()
+ 
+     return CcInfo(
+         compilation_context = compilation_context,

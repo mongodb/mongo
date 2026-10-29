@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -68,7 +42,7 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -80,50 +54,52 @@ class ExtendedRelaxedV200Generator;
 class LegacyStrictGenerator;
 
 /**
-   C++ representation of a "BSON" object -- that is, an extended JSON-style
-   object in a binary representation.
-
-   See bsonspec.org.
-
-   A `BSONObj` may be passed cheaply by value, similarly to a `std::shared_ptr`.
-
-   An atomic refcount is kept in a heap-allocated struct, adjacent to its data.
-   It is safe to copy, destroy, or otherwise access a `BSONObj` object,
-   regardless of whether that object shares ownership of its data with other
-   `BSONObj` objects that might be accessed by other threads.
-
-   While access to the data pointed to by a `BSONObj` is thread-safe, the
-   `BSONObj` itself is unsynchronized. Multiple threads must not mutate
-   the same `BSONObj` object. For example, changing what a `BSONObj`
-   variable points to (via swap or assignment) would be unsafe.
-
- BSON object format:
-
- code
- <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
-
- totalSize includes itself.
-
- Data:
- Bool:      <byte>
- EOO:       nothing follows
- Undefined: nothing follows
- OID:       an OID object
- NumberDouble: <double>
- NumberInt: <int32>
- NumberDecimal: <dec128>
- String:    <unsigned32 strsizewithnull><cstring>
- Date:      <8bytes>
- Regex:     <cstring regex><cstring options>
- Object:    a nested object, leading with its entire size, which terminates with EOO.
- Array:     same as object
- DBRef:     <strlen> <cstring ns> <oid>
- DBRef:     a database reference: basically a collection name plus an Object ID
- BinData:   <int len> <byte subtype> <byte[len] data>
- Code:      a function (not a closure): same format as String.
- Symbol:    a language symbol (say a python symbol).  same format as String.
- Code With Scope: <total size><String><Object>
- \endcode
+ * C++ representation of a "BSON" object -- that is, an extended JSON-style
+ * object in a binary representation.
+ *
+ * See bsonspec.org.
+ *
+ * A `BSONObj` may be passed cheaply by value, similarly to a `std::shared_ptr`.
+ *
+ * An atomic refcount is kept in a heap-allocated struct, adjacent to its data.
+ * It is safe to copy, destroy, or otherwise access a `BSONObj` object,
+ * regardless of whether that object shares ownership of its data with other
+ * `BSONObj` objects that might be accessed by other threads.
+ *
+ * While access to the data pointed to by a `BSONObj` is thread-safe, the
+ * `BSONObj` itself is unsynchronized. Multiple threads must not mutate
+ * the same `BSONObj` object. For example, changing what a `BSONObj`
+ * variable points to (via swap or assignment) would be unsafe.
+ *
+ * It is required that construction of a BSONObj is performed on data that
+ * represents structurally valid BSON. Failure to do so will trigger defensive
+ * checks that throw ErrorCodes::BSONInternalError.
+ *
+ * BSON object format:
+ *
+ *   <unsigned totalSize> {<byte BSONType><cstring FieldName><Data>}* EOO
+ *
+ *   totalSize includes itself.
+ *
+ *   Data:
+ *   Bool:      <byte>
+ *   EOO:       nothing follows
+ *   Undefined: nothing follows
+ *   OID:       an OID object
+ *   NumberDouble: <double>
+ *   NumberInt: <int32>
+ *   NumberDecimal: <dec128>
+ *   String:    <unsigned32 strsizewithnull><cstring>
+ *   Date:      <8bytes>
+ *   Regex:     <cstring regex><cstring options>
+ *   Object:    a nested object, leading with its entire size, which terminates with EOO.
+ *   Array:     same as object
+ *   DBRef:     <strlen> <cstring ns> <oid>
+ *   DBRef:     a database reference: basically a collection name plus an Object ID
+ *   BinData:   <int len> <byte subtype> <byte[len] data>
+ *   Code:      a function (not a closure): same format as String.
+ *   Symbol:    a language symbol (say a python symbol).  same format as String.
+ *   Code With Scope: <total size><String><Object>
  */
 class BSONObj {
 public:
@@ -164,16 +140,23 @@ public:
 
     /**
      * Construct a BSONObj from data in the proper format.
-     *  Use this constructor when something else owns bsonData's buffer
+     *  Use this constructor when something else owns bsonData's buffer.
      */
-    template <typename Traits = DefaultSizeTrait>
-    explicit BSONObj(const char* bsonData, Traits t = Traits{}) {
-        init<Traits>(bsonData);
+    explicit BSONObj(const char* bsonData) : BSONObj(bsonData, DefaultSizeTrait{}) {}
+
+    template <typename Traits>
+    BSONObj(const char* bsonData, Traits) : _objdata(bsonData) {
+        // TODO(SERVER-133681): Remove size traits and move the run time size check out.
+        if (!isValid<Traits>())
+            _assertInvalid(Traits::MaxSize);
+        _validateEoo();
     }
 
     explicit BSONObj(ConstSharedBuffer ownedBuffer)
         : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata()),
-          _ownedBuffer(std::move(ownedBuffer)) {}
+          _ownedBuffer(std::move(ownedBuffer)) {
+        _validateEoo();
+    }
 
     /**
      * Move construct a BSONObj
@@ -252,6 +235,7 @@ public:
     BSONObj& shareOwnershipWith(ConstSharedBuffer buffer) & {
         invariant(buffer);
         _ownedBuffer = std::move(buffer);
+        _validateEoo();
         return *this;
     }
     BSONObj& shareOwnershipWith(const BSONObj& other) & {
@@ -336,21 +320,22 @@ public:
                              fmt::memory_buffer& buffer,
                              size_t writeLimit = 0) const;
 
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
-                                                  int pretty,
-                                                  bool isArray,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
-                                                  int pretty,
-                                                  bool isArray,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
-    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
-                                                  int pretty,
-                                                  bool isArray,
-                                                  fmt::memory_buffer& buffer,
-                                                  size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(
+        ExtendedCanonicalV200Generator const& generator,
+        int pretty,
+        bool isArray,
+        fmt::memory_buffer& buffer,
+        size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                                      int pretty,
+                                                      bool isArray,
+                                                      fmt::memory_buffer& buffer,
+                                                      size_t writeLimit = 0) const;
+    [[MONGO_MOD_PRIVATE]] BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                                      int pretty,
+                                                      bool isArray,
+                                                      fmt::memory_buffer& buffer,
+                                                      size_t writeLimit = 0) const;
 
     /**
      * Add specific field to the end of the object if it did not exist, otherwise replace it
@@ -483,7 +468,7 @@ public:
      * arrays are bson objects with numeric and increasing field names
      * @return true if field names are numeric and increasing
      */
-    MONGO_MOD_USE_REPLACEMENT(this almost certainly is not what you want; contact us if it is)
+    [[MONGO_MOD_USE_REPLACEMENT("this almost certainly is not what you want; contact us if it is")]]
     bool couldBeArray() const;
 
     /**
@@ -645,7 +630,7 @@ public:
      * Return a version of this object where top level elements of
      * MinKey and MaxKey type are replaced with EJSON-like objects.
      */
-    MONGO_MOD_USE_REPLACEMENT(move this code to data_movement) BSONObj clientReadable() const;
+    [[MONGO_MOD_USE_REPLACEMENT("move this code to data_movement")]] BSONObj clientReadable() const;
 
     static BSONObj stripFieldNames(const BSONObj& obj);
 
@@ -728,14 +713,15 @@ private:
 
     void _assertInvalid(int maxSize) const;
 
-    template <typename Traits = DefaultSizeTrait>
-    void init(const char* data) {
-        _objdata = data;
-        if (!isValid<Traits>())
-            _assertInvalid(Traits::MaxSize);
-    }
-
     void _validateUnownedSize(int size) const;
+
+    void _validateEoo() const {
+        // Casting mimics type extraction in BSONElement::type().
+        tassert(ErrorCodes::BSONInternalError,
+                "BSONObj does not end with EOO",
+                static_cast<BSONType>(static_cast<signed char>(_objdata[objsize() - 1])) ==
+                    BSONType::eoo);
+    }
 
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;

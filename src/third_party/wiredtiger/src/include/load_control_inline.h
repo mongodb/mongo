@@ -24,8 +24,7 @@ __wt_conn_load_control_read_loadshed(WT_SESSION_IMPL *session)
 
     /* Shed reads when load control is enabled and the read load is at or above the threshold. */
     if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL) && load_control->control_threshold > 0)
-        return (load_control->control_threshold <=
-          __wt_atomic_load_uint16_relaxed(&load_control->read_load));
+        return (load_control->control_threshold <= __wt_conn_calc_read_load(session));
 
     return (false);
 }
@@ -42,8 +41,7 @@ __wt_conn_load_control_write_loadshed(WT_SESSION_IMPL *session)
 
     /* Shed writes when load control is enabled and the write load is at or above the threshold. */
     if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL) && load_control->control_threshold > 0)
-        return (load_control->control_threshold <=
-          __wt_atomic_load_uint16_relaxed(&load_control->write_load));
+        return (load_control->control_threshold <= __wt_conn_calc_write_load(session));
 
     return (false);
 }

@@ -39,10 +39,7 @@ RUN retry_apt.sh "Python 3.13 installation" sh -c "\
 RUN ln -f $(which python3.13) /usr/bin/python
 RUN ln -f $(which python3.13) /usr/bin/python3
 
-RUN python -m pip install --upgrade pip wheel
-
-# Clean up retry script after use
-RUN rm /usr/local/bin/retry_apt.sh
+RUN retry_apt.sh "pip/wheel upgrade" python -m pip install --upgrade pip wheel
 
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions
@@ -89,16 +86,22 @@ RUN ./src/scripts/npm_run.sh jstestfuzz -- --help
 # Initialize the MongoDB repository
 WORKDIR /mongo
 
-# Copy mongodb python deps first
-COPY src/pyproject.toml src/poetry.lock src/poetry_requirements.txt ./
+# Copy mongodb python deps first (uv_version.txt is the shared version
+# pin — same file that venv_setup.sh, uv_sync.sh, and the devcontainer
+# Dockerfile all read from).
+COPY src/pyproject.toml src/uv.lock src/buildscripts/uv_version.txt ./
 
-# Install mongodb python deps with poetry
-RUN python -m pip install -r poetry_requirements.txt
-RUN python -m poetry install --no-root --sync
+# Install mongodb python deps with uv, pinned via uv_version.txt.
+RUN retry_apt.sh "uv installation" sh -c 'python -m pip install "uv==$(cat uv_version.txt)"'
+# UV_PROJECT_ENVIRONMENT points uv at /opt/venv as the install target so the
+# resulting venv has a stable, well-known path independent of uv's default
+# `.venv` layout.
+RUN retry_apt.sh "python dependency sync" sh -c "\
+    python -m venv /opt/venv && \
+    UV_PROJECT_ENVIRONMENT=/opt/venv python -m uv sync --locked --all-groups --no-install-project"
 
-# Add the poetry venv to the $PATH so that it's activated by default
-# (We use a symlink because the path to the poetry venv is unknown & generated at runtime)
-RUN ln -s $(dirname $(dirname $(poetry run which python))) /opt/venv
+# Clean up retry script after use
+RUN rm /usr/local/bin/retry_apt.sh
 ENV PATH="/opt/venv/bin:$PATH"
 
 # copy mongo

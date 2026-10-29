@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -44,6 +17,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
@@ -54,6 +28,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -61,13 +36,15 @@
 
 namespace mongo {
 
+using namespace std::literals::string_view_literals;
+
 using namespace query_stats;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(QueryStats);
 
 class DocumentSourceQueryStats final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$queryStats"_sd;
+    static constexpr std::string_view kStageName = "$queryStats"sv;
 
     class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
@@ -104,6 +81,10 @@ public:
             return true;
         }
 
+        bool shouldBypassQuerySettingsRejection() const final {
+            return true;
+        }
+
         void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
@@ -127,7 +108,7 @@ public:
     StageConstraints constraints(PipelineSplitState = PipelineSplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kLocalOnly,
+                                     HostTypeRequirement::kReceivingHostOnly,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
@@ -157,7 +138,29 @@ public:
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    /**
+     * Records the keyHash locations extracted from a downstream keyHash-only $match, or boost::none
+     * if there is no such $match. Set by the query stats keyHash pushdown rule during pipeline
+     * optimization so the execution stage can resolve these values directly through the query stats
+     * store's 'KeyHashIndex' instead of scanning the entire store.
+     */
+    void setKeyHashLookupLocations(boost::optional<std::vector<std::string>> locations) {
+        _keyHashLookupSet = std::move(locations);
+    }
+
+    // Exposes the captured locations for tests, mirroring what the execution stage consumes.
+    const boost::optional<std::vector<std::string>>& getKeyHashLookupLocations_forTest() const {
+        return _keyHashLookupSet;
+    }
+
+    void setTopKSortSpec(boost::optional<query_stats::TopKSortSpec> spec) {
+        _topKSortSpec = std::move(spec);
+    }
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceQueryStatsToStageFn(
@@ -171,6 +174,15 @@ private:
           _algorithm(algorithm),
           _hmacKey(hmacKey) {}
 
+    DocumentSourceQueryStats(const DocumentSourceQueryStats& other,
+                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+        : DocumentSource(kStageName, newExpCtx),
+          _transformIdentifiers(other._transformIdentifiers),
+          _algorithm(other._algorithm),
+          _hmacKey(other._hmacKey),
+          _keyHashLookupSet(other._keyHashLookupSet),
+          _topKSortSpec(other._topKSortSpec) {}
+
     // When true, apply hmac to field names from returned query shapes.
     bool _transformIdentifiers;
 
@@ -183,6 +195,14 @@ private:
      * Key used for SHA-256 HMAC application on field names.
      */
     std::string _hmacKey;
+
+    // Populated during pipeline optimization when a downstream keyHash-only $match is detected,
+    // boost::none otherwise. Referenced during pipeline execution to avoid a full query stats store
+    // scan in favor of a keyHash-based lookup.
+    boost::optional<std::vector<std::string>> _keyHashLookupSet;
+
+    // If set, enables the top-k sort optimization during execution.
+    boost::optional<query_stats::TopKSortSpec> _topKSortSpec;
 };
 
 }  // namespace mongo

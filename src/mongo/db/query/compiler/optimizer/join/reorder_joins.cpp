@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
@@ -36,11 +11,13 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryJoin
 
 namespace mongo::join_ordering {
 
@@ -51,6 +28,7 @@ namespace {
 std::unique_ptr<QuerySolutionNode> makeBinaryJoinEmbeddingQSN(
     JoinMethod method,
     std::vector<QSNJoinPredicate>&& joinPreds,
+    std::vector<QSNJoinPredicate>&& probePreds,
     std::unique_ptr<QuerySolutionNode> leftChild,
     boost::optional<FieldPath> leftEmbedPath,
     std::unique_ptr<QuerySolutionNode> rightChild,
@@ -68,12 +46,14 @@ std::unique_ptr<QuerySolutionNode> makeBinaryJoinEmbeddingQSN(
                                                                  std::move(joinPreds),
                                                                  leftEmbedPath,
                                                                  rightEmbedPath);
-        case JoinMethod::INLJ:
+        case JoinMethod::INLJ: {
             return std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(leftChild),
                                                                         std::move(rightChild),
                                                                         std::move(joinPreds),
+                                                                        std::move(probePreds),
                                                                         leftEmbedPath,
                                                                         rightEmbedPath);
+        }
     }
     MONGO_UNREACHABLE_TASSERT(11336909);
 }
@@ -103,6 +83,9 @@ std::unique_ptr<QuerySolutionNode> createIndexProbeQSN(
         matchExpr != nullptr && !matchExpr->isTriviallyTrue()) {
         qsn->filter = matchExpr->clone();
     }
+    if (auto proj = node.accessPath->getProj()) {
+        return std::make_unique<ProjectionNodeDefault>(std::move(qsn), nullptr, *proj);
+    }
     return qsn;
 }
 
@@ -117,15 +100,17 @@ std::unique_ptr<QuerySolutionNode> createIndexProbeQSN(
  */
 FieldPath expandEmbeddedPath(const JoinReorderingContext& ctx, PathId pathId, bool expand) {
     const auto& resolvedPath = ctx.resolvedPaths[pathId];
+    const auto& strippedPath =
+        resolvedPath.fieldPathAfterRenames.value_or(resolvedPath.underlyingFieldPath);
     if (!expand) {
-        return resolvedPath.fieldName;
+        return strippedPath;
     }
 
     const auto& node = ctx.joinGraph.getNode(resolvedPath.nodeId);
     if (node.embedPath.has_value()) {
-        return node.embedPath->concat(resolvedPath.fieldName);
+        return node.embedPath->concat(strippedPath);
     }
-    return resolvedPath.fieldName;
+    return strippedPath;
 }
 
 QSNJoinPredicate makePhysicalPredicate(const JoinReorderingContext& ctx,
@@ -155,26 +140,57 @@ std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
     return preds;
 }
 
-void addEstimatesIfExplain(const JoinReorderingContext& ctx,
-                           const PlanEnumeratorContext& peCtx,
-                           QuerySolutionNode* node,
-                           NodeSet set,
-                           const JoinCostEstimate& cost,
-                           cost_based_ranker::EstimateMap& estimates) {
-    if (!ctx.explain) {
-        return;
+// Helper to construct a join predicate used by an INLJ probe.
+std::vector<QSNJoinPredicate> makeProbePredicates(const JoiningNode& join,
+                                                  const JoinPlanNodeRegistry& registry,
+                                                  const JoinReorderingContext& ctx,
+                                                  bool expandLeftPath) {
+    std::vector<QSNJoinPredicate> probePreds;
+    if (join.method == JoinMethod::INLJ) {
+        const auto& rhs = registry.getAs<INLJRHSNode>(join.right);
+        auto probeEdge = ctx.joinGraph.getEdge(rhs.probeEdge);
+        if (probeEdge.right != rhs.node) {
+            probeEdge = probeEdge.reverseEdge();
+        }
+        for (const auto& pred : probeEdge.predicates) {
+            probePreds.push_back({.op = convertToPhysicalOperator(pred.op),
+                                  // We expand the left field & apply aliases as normal, since it
+                                  // comes from the left subtree.
+                                  .leftField = expandEmbeddedPath(ctx, pred.left, expandLeftPath),
+                                  // We don't expand the right field or apply any projections to it,
+                                  // as this is sourced directly from the index.
+                                  .rightField = ctx.resolvedPaths[pred.right].underlyingFieldPath});
+        }
     }
+    return probePreds;
+}
 
-    auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
+void addEstimatesForExplain(const JoinReorderingContext& ctx,
+                            const PlanEnumeratorContext& peCtx,
+                            QuerySolutionNode* node,
+                            NodeSet set,
+                            const JoinCostEstimate& cost,
+                            const std::vector<EdgeId>& edges,
+                            cost_based_ranker::EstimateMap& estimates) {
+    auto* ceEstimator = peCtx.getJoinCardinalityEstimator();
+    auto ce = ceEstimator->getOrEstimateSubsetCardinality(set);
     auto est = std::make_unique<cost_based_ranker::QSNEstimate>(ce, cost.getTotalCost());
     if (internalQueryExplainJoinCostComponents.load()) {
         auto joinEst = std::make_unique<JoinExtraEstimateInfo>(ce, cost.getTotalCost());
         joinEst->docsProcessed = cost.getNumDocsProcessed().toDouble();
         joinEst->docsOutput = cost.getNumDocsOutput().toDouble();
+        joinEst->numDocsTransmitted = cost.getNumDocsTransmitted().toDouble();
         joinEst->sequentialIOPages = cost.getIoSeqPages().toDouble();
         joinEst->randomIOPages = cost.getIoRandPages().toDouble();
         joinEst->localOpCost = cost.getLocalOpCost().toDouble();
+        joinEst->totalCost = cost.getTotalCost().toDouble();
         joinEst->mackertLohmanCase = cost.getMackertLohmanCase();
+        joinEst->cardinalityRHSBeforeJoinPred = cost.getCardinalityRHSBeforeJoinPred();
+        for (const auto edgeId : edges) {
+            if (const auto* ndv = ceEstimator->getEdgeSelectivityEstimate(edgeId)) {
+                joinEst->edgeSelectivities.push_back(*ndv);
+            }
+        }
         est = std::move(joinEst);
     }
     estimates.insert_or_assign(node, std::move(est));
@@ -185,24 +201,52 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
     const JoinReorderingContext& ctx,
     const PlanEnumeratorContext& peCtx,
     const JoiningNode& join,
-    cost_based_ranker::EstimateMap& estimates);
+    cost_based_ranker::EstimateMap& estimates,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
-std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(const JoinReorderingContext& ctx,
-                                                        const PlanEnumeratorContext& peCtx,
-                                                        JoinPlanNodeId nodeId,
-                                                        cost_based_ranker::EstimateMap& estimates) {
+// Increments the winning-plan join method counts in 'metrics' as the plan tree is walked.
+std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
+    const JoinReorderingContext& ctx,
+    const PlanEnumeratorContext& peCtx,
+    JoinPlanNodeId nodeId,
+    cost_based_ranker::EstimateMap& estimates,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     std::unique_ptr<QuerySolutionNode> qsn;
     std::visit(OverloadedVisitor{
                    [&](const JoiningNode& join) {
-                       qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
-                       addEstimatesIfExplain(
-                           ctx, peCtx, qsn.get(), join.bitset, join.cost, estimates);
+                       switch (join.method) {
+                           case JoinMethod::HJ:
+                               metrics.numFinalPlanHashJoins++;
+                               break;
+                           case JoinMethod::NLJ:
+                               metrics.numFinalPlanNestedLoopJoins++;
+                               break;
+                           case JoinMethod::INLJ:
+                               metrics.numFinalPlanIndexedNestedLoopJoins++;
+                               break;
+                       }
+                       qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates, metrics);
+
+                       if (ctx.explain) {
+                           const auto joinEdges =
+                               ctx.joinGraph.getJoinEdges(peCtx.registry().getBitset(join.left),
+                                                          peCtx.registry().getBitset(join.right));
+                           addEstimatesForExplain(
+                               ctx, peCtx, qsn.get(), join.bitset, join.cost, joinEdges, estimates);
+                       }
                    },
                    [&](const BaseNode& base) {
                        // TODO SERVER-111913: Avoid this clone
                        qsn = base.soln->root()->clone();
-                       addEstimatesIfExplain(
-                           ctx, peCtx, qsn.get(), NodeSet().set(base.node), base.cost, estimates);
+                       if (ctx.explain) {
+                           addEstimatesForExplain(ctx,
+                                                  peCtx,
+                                                  qsn.get(),
+                                                  NodeSet().set(base.node),
+                                                  base.cost,
+                                                  /*edges=*/{},
+                                                  estimates);
+                       }
                    },
                    [&](const INLJRHSNode& ip) {
                        qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);
@@ -275,12 +319,14 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
     const JoinReorderingContext& ctx,
     const PlanEnumeratorContext& peCtx,
     const JoiningNode& join,
-    cost_based_ranker::EstimateMap& estimates) {
-    auto leftChild = buildQSNFromJoinPlan(ctx, peCtx, join.left, estimates);
-    auto rightChild = buildQSNFromJoinPlan(ctx, peCtx, join.right, estimates);
+    cost_based_ranker::EstimateMap& estimates,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
+    auto leftChild = buildQSNFromJoinPlan(ctx, peCtx, join.left, estimates, metrics);
+    auto rightChild = buildQSNFromJoinPlan(ctx, peCtx, join.right, estimates, metrics);
 
-    const auto& leftSubset = peCtx.registry().getBitset(join.left);
-    const auto& rightSubset = peCtx.registry().getBitset(join.right);
+    const auto& registry = peCtx.registry();
+    const auto& leftSubset = registry.getBitset(join.left);
+    const auto& rightSubset = registry.getBitset(join.right);
 
     const bool isLeftBaseNode = leftSubset.count() == 1;
     const bool isRightBaseNode = rightSubset.count() == 1;
@@ -306,14 +352,17 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
 
     return makeBinaryJoinEmbeddingQSN(join.method,
                                       std::move(joinPreds),
+                                      makeProbePredicates(join, registry, ctx, expandLeftPath),
                                       std::move(leftChild),
                                       leftEmbedding,
                                       std::move(rightChild),
                                       rightEmbedding);
 }
 
-ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
-                                            const PlanEnumeratorContext& peCtx) {
+ReorderedJoinSolution makeReorderedJoinSoln(
+    const JoinReorderingContext& ctx,
+    const PlanEnumeratorContext& peCtx,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
     const auto& registry = peCtx.registry();
@@ -321,14 +370,23 @@ ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
                 5,
                 "Winning join plan",
                 "plan"_attr =
-                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph.numNodes()));
+                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph, /*brief=*/false));
 
-    // Build QSN based on best plan.
+    // Populate enumeration-wide metrics.
+    metrics.numPlansEnumerated = peCtx.getNumFinalSubsetPlans();
+    metrics.numHashJoins = peCtx.getNumHashJoins();
+    metrics.numNestedLoopJoins = peCtx.getNumNestedLoopJoins();
+    metrics.numIndexedNestedLoopJoins = peCtx.getNumIndexedNestedLoopJoins();
+    metrics.numMemoizedNodes = peCtx.getNumNodes();
+    metrics.numJoinNodesRejectedByCost = peCtx.getNumJoinNodesRejectedByCost();
+    metrics.winningPlanCost = registry.getCost(bestPlanNodeId).getTotalCost().toDouble();
+
+    // Build QSN based on best plan. Winning plan metrics updated here.
     auto ret = std::make_unique<QuerySolution>();
     auto baseNodeId = getLeftmostNodeIdOfJoinPlan(ctx, bestPlanNodeId, registry);
 
     cost_based_ranker::EstimateMap estimates;
-    ret->setRoot(buildQSNFromJoinPlan(ctx, peCtx, bestPlanNodeId, estimates));
+    ret->setRoot(buildQSNFromJoinPlan(ctx, peCtx, bestPlanNodeId, estimates, metrics));
     LOGV2_DEBUG(11179803, 5, "QSN for winning plan", "qsn"_attr = ret->toString());
 
     ReorderedJoinSolution out{
@@ -339,9 +397,12 @@ ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
         auto rejectedPlans = peCtx.getRejectedFinalPlans();
         out.rejectedSolns.reserve(rejectedPlans.size());
 
+        // Rejected plans aren't part of the winning plan, so we discard them.
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics rejectedMetrics;
         for (auto&& planNodeId : rejectedPlans) {
             auto solution = std::make_unique<QuerySolution>();
-            solution->setRoot(buildQSNFromJoinPlan(ctx, peCtx, planNodeId, out.estimates));
+            solution->setRoot(
+                buildQSNFromJoinPlan(ctx, peCtx, planNodeId, out.estimates, rejectedMetrics));
             out.rejectedSolns.push_back(
                 {std::move(solution), getLeftmostNodeIdOfJoinPlan(ctx, planNodeId, registry)});
         }
@@ -491,7 +552,8 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
     PlanTreeShape planShape,
     boost::optional<JoinMethod> method,
     bool enableHJOrderPruning,
-    size_t maxRandomHintRetries) {
+    size_t maxRandomHintRetries,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     random_utils::PseudoRandomGenerator rand(seed);
 
     // We always run once, then retry up to 'maxRandomHintTries' times.
@@ -518,7 +580,7 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
         peCtx.enumerateJoinSubsets();
 
         if (peCtx.enumerationSuccessful()) {
-            return makeReorderedJoinSoln(ctx, peCtx);
+            return makeReorderedJoinSoln(ctx, peCtx, metrics);
         }
     }
 
@@ -527,11 +589,13 @@ StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
                   "enumeration with the current settings");
 }
 
-StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReorderingContext& ctx,
-                                                            JoinCardinalityEstimator& estimator,
-                                                            JoinCostEstimator& coster,
-                                                            EnumerationStrategy strategy) {
-
+StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(
+    const JoinReorderingContext& ctx,
+    JoinCardinalityEstimator& estimator,
+    JoinCostEstimator& coster,
+    EnumerationStrategy strategy,
+    bool populateCachedJoinPlan,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
     PlanEnumeratorContext peCtx(ctx, &estimator, &coster, std::move(strategy));
     peCtx.enumerateJoinSubsets();
     if (!peCtx.enumerationSuccessful()) {
@@ -541,6 +605,137 @@ StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReordering
             "provided enumeration settings");
     }
 
-    return makeReorderedJoinSoln(ctx, peCtx);
+    auto out = makeReorderedJoinSoln(ctx, peCtx, metrics);
+    if (populateCachedJoinPlan) {
+        out.cachedJoinPlan = toCachedJoinPlan(ctx, peCtx.registry(), peCtx.getBestFinalPlan());
+    }
+    return out;
+}
+
+std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ctx,
+                                                 const JoinPlanNodeRegistry& registry,
+                                                 JoinPlanNodeId nodeId) {
+    return std::visit(
+        OverloadedVisitor{
+            [&](const BaseNode& base) -> std::unique_ptr<CachedJoinPlan> {
+                tassert(12926201,
+                        "SolutionCacheData must be present on base node",
+                        base.soln->cacheData);
+                return std::make_unique<CachedJoinPlan>(CachedAccessPath{
+                    .nodeId = base.node,
+                    .solnCacheData = base.soln->cacheData->clone(),
+                });
+            },
+            [&](const INLJRHSNode& ip) -> std::unique_ptr<CachedJoinPlan> {
+                return std::make_unique<CachedJoinPlan>(CachedInljNode{
+                    .nodeId = ip.node,
+                    .inljForeignIndexName = std::string(ip.entry->descriptor()->indexName()),
+                });
+            },
+            [&](const JoiningNode& join) -> std::unique_ptr<CachedJoinPlan> {
+                const auto leftBitset = registry.getBitset(join.left);
+                const auto rightBitset = registry.getBitset(join.right);
+
+                const bool isLeftBase = leftBitset.count() == 1;
+                const bool isRightBase = rightBitset.count() == 1;
+
+                boost::optional<FieldPath> leftEmbed, rightEmbed;
+                if (isLeftBase) {
+                    leftEmbed = findFirstNode(ctx.joinGraph, leftBitset).embedPath;
+                }
+                if (isRightBase) {
+                    rightEmbed = findFirstNode(ctx.joinGraph, rightBitset).embedPath;
+                }
+
+                auto edges = getEdges(ctx.joinGraph, leftBitset, rightBitset);
+                auto joinPreds = makeJoinPreds(ctx,
+                                               edges,
+                                               /*expandLeftPath=*/!isLeftBase,
+                                               /*expandRightPath=*/!isRightBase);
+
+                return std::make_unique<CachedJoinPlan>(CachedJoinNode{
+                    .method = join.method,
+                    .joinPredicates = std::move(joinPreds),
+                    .probePredicates = makeProbePredicates(join, registry, ctx, !isLeftBase),
+                    .leftEmbeddingField = std::move(leftEmbed),
+                    .rightEmbeddingField = std::move(rightEmbed),
+                    .left = toCachedJoinPlan(ctx, registry, join.left),
+                    .right = toCachedJoinPlan(ctx, registry, join.right),
+                });
+            },
+        },
+        registry.get(nodeId));
+}
+std::unique_ptr<QuerySolutionNode> fromCachedJoinPlan(OperationContext* opCtx,
+                                                      const JoinGraph& joinGraph,
+                                                      const MultipleCollectionAccessor& collections,
+                                                      const AvailableIndexes& perCollIdxs,
+                                                      const CachedJoinPlan& plan) {
+    return std::visit(
+        OverloadedVisitor{
+            [&](const CachedAccessPath& ap) -> std::unique_ptr<QuerySolutionNode> {
+                const CanonicalQuery* cq = joinGraph.accessPathAt(ap.nodeId);
+                tassert(12926301,
+                        fmt::format("cannot find access path for node {}", ap.nodeId),
+                        cq != nullptr);
+
+                const NamespaceString& nss = joinGraph.getNode(ap.nodeId).collectionName;
+                std::vector<IndexEntry> indexes;
+                if (auto it = perCollIdxs.find(nss);
+                    it != perCollIdxs.end() && !it->second.empty()) {
+                    const CollectionPtr& collection = collections.lookupCollection(nss);
+                    for (const auto& ice : it->second) {
+                        indexes.push_back(
+                            indexEntryFromIndexCatalogEntry(opCtx, collection, ice, *cq));
+                    }
+                }
+                QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
+                    .opCtx = opCtx,
+                    .canonicalQuery = *cq,
+                    .collections = collections,
+                });
+                params.mainCollectionInfo.indexes = std::move(indexes);
+
+                auto solnStatus = QueryPlanner::planFromCache(*cq, params, *ap.solnCacheData);
+                tassert(12926303,
+                        fmt::format("planFromCache failed for cached access path: {}",
+                                    solnStatus.getStatus().toString()),
+                        solnStatus.isOK());
+                return solnStatus.getValue()->root()->clone();
+            },
+            [&](const CachedInljNode& inlj) -> std::unique_ptr<QuerySolutionNode> {
+                const auto& joinNode = joinGraph.getNode(inlj.nodeId);
+                const NamespaceString& nss = joinNode.collectionName;
+                auto idxIt = perCollIdxs.find(nss);
+                tassert(12926304,
+                        "Available indexes must exist for INLJ collection",
+                        idxIt != perCollIdxs.end());
+                for (const auto& ice : idxIt->second) {
+                    if (ice->descriptor()->indexName() == inlj.inljForeignIndexName) {
+                        return createIndexProbeQSN(joinNode, ice);
+                    }
+                }
+                tasserted(12926305,
+                          fmt::format("Could not find index {} for INLJ collection {}",
+                                      inlj.inljForeignIndexName,
+                                      nss.toStringForErrorMsg()));
+            },
+            [&](const CachedJoinNode& join) -> std::unique_ptr<QuerySolutionNode> {
+                auto leftChild =
+                    fromCachedJoinPlan(opCtx, joinGraph, collections, perCollIdxs, *join.left);
+                auto rightChild =
+                    fromCachedJoinPlan(opCtx, joinGraph, collections, perCollIdxs, *join.right);
+                auto qsn =
+                    makeBinaryJoinEmbeddingQSN(join.method,
+                                               std::vector<QSNJoinPredicate>(join.joinPredicates),
+                                               std::vector<QSNJoinPredicate>(join.probePredicates),
+                                               std::move(leftChild),
+                                               join.leftEmbeddingField,
+                                               std::move(rightChild),
+                                               join.rightEmbeddingField);
+                return qsn;
+            },
+        },
+        plan.node);
 }
 }  // namespace mongo::join_ordering

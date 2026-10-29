@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
@@ -53,7 +27,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -193,7 +167,7 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
         void waitFor(int n) {
             waitFor([this, n]() { return this->step.load() == n; });
         }
-        AtomicWord<int> step{0};
+        Atomic<int> step{0};
     } state;
 
     stdx::thread t1([&]() {
@@ -743,6 +717,12 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleBlockedOnRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        // With intent registration enabled, GlobalLock no longer acquires the RSTL, so a raw
+        // RSTL acquisition on opCtx1 does not conflict with opCtx2's GlobalLock and this
+        // scenario is not reproducible.
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -1350,7 +1330,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
-    AtomicWord<int> ready{0};
+    Atomic<int> ready{0};
     std::vector<stdx::thread> threads;
 
     DatabaseName fooDb = DatabaseName::createDatabaseName_forTest(boost::none, "foo");
@@ -1485,7 +1465,7 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
-    AtomicWord<int> ready{0};
+    Atomic<int> ready{0};
     std::vector<stdx::thread> threads;
 
     for (int threadId = 0; threadId < kMaxStressThreads; threadId++) {
@@ -2185,8 +2165,8 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
 TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
     int numThreads = 8;
     int testMicros = 500'000;
-    AtomicWord<unsigned long long> readOnlyInterval{0};
-    AtomicWord<bool> done{false};
+    Atomic<unsigned long long> readOnlyInterval{0};
+    Atomic<bool> done{false};
     std::vector<uint64_t> acquisitionCount(numThreads);
     std::vector<uint64_t> timeoutCount(numThreads);
     std::vector<uint64_t> busyWaitCount(numThreads);
@@ -2650,7 +2630,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockWithCallback_ActionCalledWhenConte
     boost::optional<Lock::CollectionLock> collLock1;
     collLock1.emplace(opCtx1, collNss, MODE_X);
 
-    AtomicWord<bool> actionCalled{false};
+    Atomic<bool> actionCalled{false};
     stdx::thread t2([&] {
         Lock::GlobalLock globalLock2(opCtx2, MODE_IS);
         Lock::DBLock dbLock2(opCtx2, collNss.dbName(), MODE_IS);
@@ -2685,7 +2665,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockWithCallback_ActionCalledThenTimeo
     Lock::DBLock dbLock1(opCtx1, collNss.dbName(), MODE_IX);
     Lock::CollectionLock collLock1(opCtx1, collNss, MODE_X);
 
-    AtomicWord<bool> actionCalled{false};
+    Atomic<bool> actionCalled{false};
     stdx::thread t2([&] {
         Lock::GlobalLock globalLock2(opCtx2, MODE_IS);
         Lock::DBLock dbLock2(opCtx2, collNss.dbName(), MODE_IS);
@@ -2823,7 +2803,7 @@ TEST_F(DConcurrencyTestFixture, GetConflictingLockerIds_MultipleIXHoldersConflic
 
     // Use the callback to get the MODE_S conflict with MODE_IX list.
     std::vector<LockerId> capturedIds;
-    AtomicWord<bool> callbackDone{false};
+    Atomic<bool> callbackDone{false};
     stdx::thread t([&] {
         Lock::GlobalLock queryGlobal(queryOpCtx, MODE_IS);
         Lock::DBLock queryDb(queryOpCtx, collNss.dbName(), MODE_IS);

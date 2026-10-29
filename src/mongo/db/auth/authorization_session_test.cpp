@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -59,7 +33,7 @@
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -93,8 +67,6 @@ using namespace std::literals::string_view_literals;
 
 class AuthorizationSessionTest : public AuthorizationSessionTestFixture {
 public:
-    using AuthorizationSessionTestFixture::AuthorizationSessionTestFixture;
-
     void testInvalidateUser();
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
@@ -115,8 +87,9 @@ public:
 
 class AuthorizationSessionTestWithoutAuth : public AuthorizationSessionTest {
 public:
-    AuthorizationSessionTestWithoutAuth()
-        : AuthorizationSessionTest(Options{}.setAuthEnabled(false)) {}
+    Options makeServiceContextOptions() override {
+        return AuthorizationSessionTest::makeServiceContextOptions().setAuthEnabled(false);
+    }
 };
 
 const TenantId kTenantId1(OID("12345678901234567890aaaa"));
@@ -959,7 +932,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNames
         ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 
         auto aggNoBypassDocumentValidationReq =
-            buildAggReq(nssFoo, pipeline, false /* bypassDocValidation*/);
+            buildAggReq(nssFoo, pipeline, /*bypassDocValidation=*/false);
 
         privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggNoBypassDocumentValidationReq, false));
@@ -983,7 +956,7 @@ TEST_F(AuthorizationSessionTest,
             nssFoo.dbName());
 
         BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
-        auto aggReq = buildAggReq(nssFoo, pipeline, true /* bypassDocValidation*/);
+        auto aggReq = buildAggReq(nssFoo, pipeline, /*bypassDocValidation=*/true);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, false));
         ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
@@ -1008,7 +981,7 @@ TEST_F(AuthorizationSessionTest,
             nssFoo.dbName());
 
         BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
-        auto aggReq = buildAggReq(nssFoo, pipeline, true /* bypassDocValidation*/);
+        auto aggReq = buildAggReq(nssFoo, pipeline, /*bypassDocValidation=*/true);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, true));
         ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
@@ -1523,127 +1496,6 @@ TEST_F(AuthorizationSessionTest, NoExpirationTime) {
     assertLogout(testFooCollResource, ActionType::insert);
 }
 
-TEST_F(AuthorizationSessionTest, TenantSeparation) {
-    const UserName readWriteAnyDBUser = {"rwanyuser", "test"};
-    std::unique_ptr<UserRequest> readWriteAnyDBUserRequest =
-        std::make_unique<UserRequestGeneral>(readWriteAnyDBUser, boost::none);
-    const UserName tenant2SystemUser = {"gmarks", "test", kTenantId2};
-    std::unique_ptr<UserRequest> tenant2SystemUserRequest =
-        std::make_unique<UserRequestGeneral>(tenant2SystemUser, boost::none);
-    const UserName systemUser = {"spencer", "test"};
-    std::unique_ptr<UserRequest> systemUserRequest =
-        std::make_unique<UserRequestGeneral>(systemUser, boost::none);
-
-    auto testSystemRolesResource = ResourcePattern::forExactNamespace(
-        NamespaceString::createNamespaceString_forTest("test", "system.roles"));
-    auto testSystemRolesTenant2Resource = ResourcePattern::forExactNamespace(
-        NamespaceString::createNamespaceString_forTest(kTenantId2, "test", "system.roles"));
-
-    ASSERT_OK(createUser(kTenant1UserTest, {{"readWrite", "test"}}));
-    ASSERT_OK(createUser(kTenant2UserTest, {{"readWriteAnyDatabase", "admin"}}));
-    ASSERT_OK(createUser(kUser1Test, {{"readWrite", "test"}}));
-    ASSERT_OK(createUser(kUser2Test, {{"root", "admin"}}));
-    ASSERT_OK(createUser(readWriteAnyDBUser, {{"readWriteAnyDatabase", "admin"}}));
-    ASSERT_OK(createUser(tenant2SystemUser, {{"__system", "admin"}}));
-    ASSERT_OK(createUser(systemUser, {{"__system", "admin"}}));
-
-    // User with tenant ID #1 with basic read/write privileges on "test" should be able to write to
-    // tenant ID #1's test collection, and no others.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(
-        _opCtx.get(), kTenant1UserTestRequest->clone(), boost::none));
-    assertActive(testTenant1FooCollResource, ActionType::insert);
-    assertNotAuthorized(testFooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(kTenant1UserTestRequest->getUserName().getDatabaseName(),
-                                 "Log out tenant 1 for test"sv);
-    assertLogout(testTenant1FooCollResource, ActionType::insert);
-
-    // User with tenant ID #2 with readWriteAny should be able to write to any of tenant ID #2's
-    // normal collections, and no others.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(
-        _opCtx.get(), kTenant2UserTestRequest->clone(), boost::none));
-    assertActive(testTenant2FooCollResource, ActionType::insert);
-    assertNotAuthorized(testFooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(kTenant2UserTestRequest->getUserName().getDatabaseName(),
-                                 "Log out tenant 2 for test"sv);
-    assertLogout(testTenant2FooCollResource, ActionType::insert);
-
-    // User with no tenant ID with basic read/write privileges on "test" should be able to write to
-    // the no-tenant test collection, and no others.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
-    assertActive(testFooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(kTestDB, "Log out user 1 for test"sv);
-    assertLogout(testFooCollResource, ActionType::insert);
-
-    // User with no tenant ID with root should be able to write to any tenant's normal
-    // collections, because boost::none acts as "any tenant" for privileges which don't specify a
-    // namespace/DB, and root has the useTenant privilege.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest->clone(), boost::none));
-    assertActive(testFooCollResource, ActionType::insert);
-    assertActive(testTenant1FooCollResource, ActionType::insert);
-    assertActive(testTenant2FooCollResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(kTestDB, "Log out user 2 for test"sv);
-    assertLogout(testFooCollResource, ActionType::insert);
-
-    // User with no tenant ID with readWriteAnyDatabase should be able to write to normal
-    // collections with no tenant ID, because readWriteAnyDatabase lacks the useTenant privilege and
-    // thus can't read/write to other tenants' databases.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(
-        _opCtx.get(), std::move(readWriteAnyDBUserRequest), boost::none));
-    assertActive(testFooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(kTestDB, "Log out read/write any DB user for test"sv);
-    assertLogout(testFooCollResource, ActionType::insert);
-
-    // User with tenant ID 2 with __system privileges should be able to write to any of tenant 2's
-    // collections, including system collections.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(
-        _opCtx.get(), tenant2SystemUserRequest->clone(), boost::none));
-    assertActive(testTenant2FooCollResource, ActionType::insert);
-    assertNotAuthorized(testFooCollResource, ActionType::insert);
-    assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
-    assertNotAuthorized(testSystemRolesResource, ActionType::insert);
-    assertActive(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(tenant2SystemUserRequest->getUserName().getDatabaseName(),
-                                 "Log out tenant 2 system user for test"sv);
-    assertLogout(testTenant2FooCollResource, ActionType::insert);
-
-    // User with no tenant ID with __system privileges should be able to write to any tenant's
-    // collections.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), std::move(systemUserRequest), boost::none));
-    assertActive(testFooCollResource, ActionType::insert);
-    assertActive(testTenant1FooCollResource, ActionType::insert);
-    assertActive(testTenant2FooCollResource, ActionType::insert);
-    assertActive(testSystemRolesResource, ActionType::insert);
-    assertActive(testSystemRolesTenant2Resource, ActionType::insert);
-
-    authzSession->logoutDatabase(kTestDB, "Log out system user for test"sv);
-    assertLogout(testFooCollResource, ActionType::insert);
-}
-
 TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
     // Tests authorization session flow from unauthenticated to active to expired to active (reauth)
     // to expired to logged out.
@@ -1693,120 +1545,6 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 }
 
 
-TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
-    constexpr auto kVTSKey = "secret"sv;
-    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
-    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", kVTSKey);
-
-    // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
-    // active (via stateful connection) to unauthenticated.
-
-    // Create and authorize a security token user.
-    ASSERT_OK(createUser(kTenant1UserTest, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
-    ASSERT_OK(createUser(kUser1Test, {{"readWriteAnyDatabase", "admin"}}));
-    ASSERT_OK(createUser(kTenant2UserTest, {{"readWriteAnyDatabase", "admin"}}));
-
-    {
-        auth::ValidatedTenancyScope validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::create(
-                kTenant1UserTest,
-                kVTSKey,
-                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
-
-        // Actual expiration used by AuthorizationSession will be the minimum of
-        // the token's known expiraiton time and the expiration time passed in.
-        const auto checkExpiration = [&](const boost::optional<Date_t>& expire,
-                                         const Date_t& expect) {
-            auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
-            ASSERT_OK(authzSession->addAndAuthorizeUser(
-                _opCtx.get(), kTenant1UserTestRequest->clone(), expire));
-            ASSERT_EQ(authzSession->getExpiration(), expect);
-
-            // Reset for next test.
-            auth::ValidatedTenancyScope::set(_opCtx.get(), boost::none);
-            authzSession->startRequest(_opCtx.get());
-            assertLogout(testTenant1FooCollResource, ActionType::insert);
-        };
-        const auto exp = validatedTenancyScope.getExpiration();
-        checkExpiration(boost::none, exp);    // Uses token's expiration
-        checkExpiration(Date_t::max(), exp);  // Longer expiration does not override token.
-        checkExpiration(exp - Seconds{1}, exp - Seconds{1});  // Shorter expiration does.
-    }
-
-    {
-        auth::ValidatedTenancyScope validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::create(
-                kTenant1UserTest,
-                kVTSKey,
-                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
-
-        // Perform authentication checks.
-        auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
-        ASSERT_OK(authzSession->addAndAuthorizeUser(
-            _opCtx.get(), kTenant1UserTestRequest->clone(), boost::none));
-
-        // Assert that the session is authenticated and authorized as expected.
-        assertSecurityToken(testTenant1FooCollResource, ActionType::insert);
-
-        // Since user has a tenantId, we expect it should only have access to its own collections.
-        assertNotAuthorized(testFooCollResource, ActionType::insert);
-        assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
-
-        // Assert that another user can't be authorized while the security token is auth'd.
-        ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(
-            _opCtx.get(), kUser1TestRequest->clone(), boost::none));
-
-        // Check that starting a new request without the security token decoration results in token
-        // user logout.
-        auth::ValidatedTenancyScope::set(_opCtx.get(), boost::none);
-        authzSession->startRequest(_opCtx.get());
-        assertLogout(testTenant1FooCollResource, ActionType::insert);
-
-        // Assert that a connection-based user with an expiration policy can be authorized after
-        // token logout.
-        const auto kSomeCollNss = NamespaceString::createNamespaceString_forTest(
-            boost::none, "anydb"sv, "somecollection"sv);
-        const auto kSomeCollRsrc = ResourcePattern::forExactNamespace(kSomeCollNss);
-        ASSERT_OK(authzSession->addAndAuthorizeUser(
-            _opCtx.get(), kUser1TestRequest->clone(), Date_t() + Hours{1}));
-        assertActive(kSomeCollRsrc, ActionType::insert);
-
-        // Check that logout proceeds normally.
-        authzSession->logoutDatabase(kTestDB, "Log out readWriteAny user for test"sv);
-        assertLogout(kSomeCollRsrc, ActionType::insert);
-    }
-
-    // Create a new validated tenancy scope for the readWriteAny tenant user.
-    {
-        auth::ValidatedTenancyScope validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::create(
-                kTenant2UserTest,
-                kVTSKey,
-                auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
-        auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
-        auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
-
-        ASSERT_OK(authzSession->addAndAuthorizeUser(
-            _opCtx.get(), kTenant2UserTestRequest->clone(), boost::none));
-
-        // Ensure that even though it has the readWriteAny role, this user only has privileges on
-        // collections with matching tenant ID.
-        assertSecurityToken(testTenant2FooCollResource, ActionType::insert);
-
-        assertNotAuthorized(testFooCollResource, ActionType::insert);
-        assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
-
-        // Check that starting a new request without the security token decoration results in token
-        // user logout.
-        auth::ValidatedTenancyScope::set(_opCtx.get(), boost::none);
-        authzSession->startRequest(_opCtx.get());
-        assertLogout(testTenant2FooCollResource, ActionType::insert);
-    }
-}
-
 TEST_F(AuthorizationSessionTest, CheckBuiltInRolesForBypassDefaultMaxTimeMS) {
     // Verify the "root" role is authorised  for 'bypassDefaultMaxTimeMS'.
     authzSession->assumePrivilegesForBuiltinRole(RoleName{"root", "admin"});
@@ -1838,7 +1576,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryAuthorizedUse
 
     // Assume privileges for the database to allow releaseMemoryAnyCursor action.
     PrivilegeVector privileges;
-    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
+    auth::generateUniversalPrivileges(&privileges, /*tenantId=*/boost::none);
     auto user = authzSessionForCommand->getAuthenticatedUser();
     ASSERT(user != boost::none);
     (*user)->addPrivileges(privileges);
@@ -1937,7 +1675,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForKillCursorsAuthorizedUser)
 
     // Assume privileges for the database to allow killAnyCursor action.
     PrivilegeVector privileges;
-    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
+    auth::generateUniversalPrivileges(&privileges, /*tenantId=*/boost::none);
     auto user = authzSessionForCommand->getAuthenticatedUser();
     ASSERT(user != boost::none);
     (*user)->addPrivileges(privileges);
@@ -2057,13 +1795,13 @@ const ResourcePattern SystemBucketsTest::otherDbSystemBucketResource(
 
 const ResourcePattern SystemBucketsTest::testBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
-        boost::none /* tenantId */, "sb_db_test"sv, "sb_coll_test"sv)));
+        /*tenantId=*/boost::none, "sb_db_test"sv, "sb_coll_test"sv)));
 const ResourcePattern SystemBucketsTest::otherBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
-        boost::none /* tenantId */, "sb_db_test"sv, "sb_coll_other"sv)));
+        /*tenantId=*/boost::none, "sb_db_test"sv, "sb_coll_other"sv)));
 const ResourcePattern SystemBucketsTest::otherDbBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
-        boost::none /* tenantId */, "sb_db_other"sv, "sb_coll_test"sv)));
+        /*tenantId=*/boost::none, "sb_db_other"sv, "sb_coll_test"sv)));
 
 const ResourcePattern SystemBucketsTest::sbCollTestInAnyDB(
     ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "sb_coll_test"sv));

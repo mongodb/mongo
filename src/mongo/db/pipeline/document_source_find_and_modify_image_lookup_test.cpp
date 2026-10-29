@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 
@@ -132,7 +106,7 @@ repl::OplogEntry makeOplogEntry(
                           nss,
                           uuid,
                           oField,
-                          boost::none /* o2Field */,
+                          /*o2Field=*/boost::none,
                           sessionInfo,
                           stmtIds,
                           preImageOpTime,
@@ -265,8 +239,8 @@ TEST_F(FindAndModifyImageLookupTest,
                                                            BSON("_id" << 1),
                                                            sessionInfo,
                                                            {stmtId},
-                                                           boost::none /* preImageOpTime */,
-                                                           boost::none /* postImageOpTime */,
+                                                           /*preImageOpTime=*/boost::none,
+                                                           /*postImageOpTime=*/boost::none,
                                                            repl::RetryImageEnum::kPreImage)
                                                 .getEntry()
                                                 .toBSON());
@@ -315,8 +289,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
                                 BSON("a" << 1),
                                 sessionInfo,
                                 {stmtId},
-                                boost::none /* preImageOpTime */,
-                                boost::none /* postImageOpTime */,
+                                /*preImageOpTime=*/boost::none,
+                                /*postImageOpTime=*/boost::none,
                                 repl::RetryImageEnum::kPreImage)
                      .getEntry()
                      .toBSON());
@@ -371,8 +345,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                                BSON("_id" << 1),
                                                sessionInfo,
                                                {stmtId},
-                                               boost::none /* preImageOpTime */,
-                                               boost::none /* postImageOpTime */,
+                                               /*preImageOpTime=*/boost::none,
+                                               /*postImageOpTime=*/boost::none,
                                                imageType)
                                     .getEntry();
         const auto oplogEntryBson = oplogEntry.toBSON();
@@ -433,7 +407,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
               "test"_attr = unittest::getTestName(),
               "imageType"_attr = idl::serialize(imageType));
         auto documentSourceImageLookup = DocumentSourceFindAndModifyImageLookup::create(
-            getExpCtx(), true /* includeCommitTransactionTimestamp */);
+            getExpCtx(), /*includeCommitTransactionTimestamp=*/true);
         auto imageLookupStage = exec::agg::buildStage(documentSourceImageLookup);
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNum = 1LL;
@@ -555,7 +529,7 @@ TEST_F(FindAndModifyImageLookupTest,
         }
 
         auto documentSourceImageLookup = DocumentSourceFindAndModifyImageLookup::create(
-            getExpCtx(), true /* includeCommitTransactionTimestamp */);
+            getExpCtx(), /*includeCommitTransactionTimestamp=*/true);
         auto imageLookupStage = exec::agg::buildStage(documentSourceImageLookup);
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNum = 1LL;

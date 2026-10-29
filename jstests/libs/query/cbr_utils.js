@@ -26,10 +26,15 @@ export function planEstimatedWithHistogram(plan) {
 }
 
 /**
- * Returns whether the given plan was costed or not.
+ * Returns whether the given plan was costed or not. Legacy explain places the cost estimate flat
+ * on the plan node; the V3 explain shape groups it under the per-node "statistics.costBased"
+ * subobject.
  */
 export function isPlanCosted(plan) {
-    return plan.hasOwnProperty("costEstimate");
+    return (
+        plan.hasOwnProperty("costEstimate") ||
+        plan.statistics?.costBased?.hasOwnProperty("costEstimate") === true
+    );
 }
 
 /**
@@ -47,38 +52,38 @@ export function assertPlanCosted(plan) {
     assert(isPlanCosted(plan), plan);
 }
 
-export function getPlanRankerMode(db) {
+export function getPlanRanker(db) {
     if (db !== null) {
         const getParam = db.adminCommand({
             getParameter: 1,
             featureFlagCostBasedRanker: 1,
-            internalQueryCBRCEMode: 1,
+            internalQueryPlanRanker: 1,
         });
 
         return !getParam.featureFlagCostBasedRanker?.value
             ? "multiPlanning"
-            : getParam.internalQueryCBRCEMode;
+            : getParam.internalQueryPlanRanker;
     } else {
-        return TestData.setParameters.planRankerMode
-            ? TestData.setParameters.planRankerMode
+        return TestData.setParameters.planRanker
+            ? TestData.setParameters.planRanker
             : "multiPlanning";
     }
 }
 
-export function getAutomaticCEPlanRankingStrategy(db) {
+export function getMixedPlanRankingStrategy(db) {
     if (db !== null) {
         const getParam = db.adminCommand({
             getParameter: 1,
-            automaticCEPlanRankingStrategy: 1,
+            internalQueryMixedPlanRankingStrategy: 1,
         });
 
-        return getParam.hasOwnProperty("automaticCEPlanRankingStrategy")
-            ? getParam.automaticCEPlanRankingStrategy
-            : "HistogramCEWithHeuristicFallback";
+        return getParam.hasOwnProperty("internalQueryMixedPlanRankingStrategy")
+            ? getParam.internalQueryMixedPlanRankingStrategy
+            : "NoMultiplanningResults";
     } else {
-        return TestData.setParameters.automaticCEPlanRankingStrategy
-            ? TestData.setParameters.automaticCEPlanRankingStrategy
-            : "HistogramCEWithHeuristicFallback";
+        return TestData.setParameters.internalQueryMixedPlanRankingStrategy
+            ? TestData.setParameters.internalQueryMixedPlanRankingStrategy
+            : "NoMultiplanningResults";
     }
 }
 
@@ -117,43 +122,82 @@ export function getExpectedWorksPerPlan(db, coll, numPlans) {
     return Math.max(params.internalQueryPlanEvaluationWorks, collFraction * numRecords);
 }
 
-export function getCBRConfig(db) {
+export function getPlanRankerConfig(db) {
+    if (db === null) {
+        // In suites without db (e.g. sharding) fall back to TestData.
+        const params = TestData.setParameters;
+        return {
+            featureFlagCostBasedRanker: params.featureFlagCostBasedRanker ?? false,
+            internalQueryPlanRanker: params.internalQueryPlanRanker ?? "multiPlanning",
+            internalQueryCBRCEMode: params.internalQueryCBRCEMode ?? "",
+            internalQueryMixedPlanRankingStrategy:
+                params.internalQueryMixedPlanRankingStrategy ?? "",
+        };
+    }
+
     const config = assert.commandWorked(
         db.adminCommand({
             getParameter: 1,
             featureFlagCostBasedRanker: 1,
+            internalQueryPlanRanker: 1,
             internalQueryCBRCEMode: 1,
-            automaticCEPlanRankingStrategy: 1,
+            internalQueryMixedPlanRankingStrategy: 1,
+            internalSamplingSizeOverride: 1,
         }),
     );
 
     return {
         featureFlagCostBasedRanker: config.featureFlagCostBasedRanker.value,
+        internalQueryPlanRanker: config.internalQueryPlanRanker,
         internalQueryCBRCEMode: config.internalQueryCBRCEMode,
-        automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
+        internalQueryMixedPlanRankingStrategy: config.internalQueryMixedPlanRankingStrategy,
+        internalSamplingSizeOverride: config.internalSamplingSizeOverride,
     };
 }
 
-export function setCBRConfig(
+export function setPlanRankerConfig(
     db,
     {
         featureFlagCostBasedRanker = true,
-        internalQueryCBRCEMode = "automaticCE",
-        automaticCEPlanRankingStrategy = "CBRForNoMultiplanningResults",
+        internalQueryPlanRanker = "mixed",
+        internalQueryCBRCEMode = "samplingCE",
+        internalQueryMixedPlanRankingStrategy = "NoMultiplanningResults",
+        internalSamplingSizeOverride = 0,
     } = {},
 ) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker,
+            internalQueryPlanRanker,
             internalQueryCBRCEMode,
-            automaticCEPlanRankingStrategy,
+            internalQueryMixedPlanRankingStrategy,
+            internalSamplingSizeOverride,
         }),
     );
 }
 
-export function setCBRConfigOnAllNonConfigNodes(conn, config) {
+/**
+ * @param {Parameters<typeof setPlanRankerConfig>[1]} config
+ */
+export function setPlanRankerConfigOnAllNonConfigNodes(conn, config) {
     for (const host of DiscoverTopology.findNonConfigNodes(conn)) {
-        setCBRConfig(new Mongo(host).getDB("admin"), config);
+        setPlanRankerConfig(new Mongo(host).getDB("admin"), config);
     }
+}
+
+/**
+ * Returns the cost estimate of a plan root, handling both the flat and the 'statistics.costBased'
+ * explain shapes.
+ */
+export function getCost(plan) {
+    if (plan.hasOwnProperty("costEstimate")) {
+        return plan.costEstimate;
+    }
+    assert(
+        plan.hasOwnProperty("statistics") && plan.statistics.hasOwnProperty("costBased"),
+        "plan has no cost estimate",
+        {plan},
+    );
+    return plan.statistics.costBased.costEstimate;
 }

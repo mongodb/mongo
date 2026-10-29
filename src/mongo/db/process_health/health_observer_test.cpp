@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/process_health/health_observer.h"
 
@@ -39,7 +13,7 @@
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -80,7 +54,7 @@ TEST_F(FaultManagerTest, Registration) {
 TEST_F(FaultManagerTest, Stats) {
     resetManager(std::make_unique<FaultManagerConfig>());
     auto faultFacetType = FaultFacetType::kMock1;
-    AtomicWord<Severity> mockResult(Severity::kFailure);
+    Atomic<Severity> mockResult(Severity::kFailure);
     registerMockHealthObserver(faultFacetType, [&mockResult] { return mockResult.load(); });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
@@ -124,7 +98,7 @@ TEST_F(FaultManagerTest, Stats) {
 }
 
 TEST_F(FaultManagerTest, ProgressMonitorCheck) {
-    AtomicWord<bool> shouldBlock{true};
+    Atomic<bool> shouldBlock{true};
     registerMockHealthObserver(FaultFacetType::kMock1, [&shouldBlock] {
         while (shouldBlock.load()) {
             sleepFor(Milliseconds(1));
@@ -160,7 +134,7 @@ TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
         BSON("values" << BSON_ARRAY(BSON("type" << "test"
                                                 << "interval" << 1)))};
     auto faultFacetType = FaultFacetType::kMock1;
-    AtomicWord<Severity> severity{Severity::kOk};
+    Atomic<Severity> severity{Severity::kOk};
     registerMockHealthObserver(faultFacetType, [&severity] { return severity.load(); });
 
     assertSoon([this] { return (manager().getFaultState() == FaultState::kStartupCheck); });
@@ -199,7 +173,7 @@ TEST_F(FaultManagerTest,
                                                 << "interval" << 1)))};
     unittest::ServerParameterGuard _serverParamController{"activeFaultDurationSecs", 5};
 
-    AtomicWord<bool> shouldBlock{true};
+    Atomic<bool> shouldBlock{true};
     registerMockHealthObserver(
         FaultFacetType::kMock1,
         [&shouldBlock] {
@@ -258,7 +232,7 @@ TEST_F(FaultManagerTest, HealthCheckThrowingExceptionMakesFailedStatus) {
     resetManager(std::make_unique<FaultManagerConfig>());
 
     FaultFacetType facetType = FaultFacetType::kMock1;
-    AtomicWord<bool> shouldThrow{false};
+    Atomic<bool> shouldThrow{false};
 
     std::string logMsg = "Failed due to exception";
 

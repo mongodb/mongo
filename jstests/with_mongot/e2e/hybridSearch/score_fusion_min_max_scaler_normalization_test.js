@@ -1,6 +1,6 @@
 /**
  * Tests that the $minMaxScaler normalization option on $scoreFusion computes the correct values.
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
+ * @tags: [requires_fcv_82]
  */
 
 const coll = db[jsTestName()];

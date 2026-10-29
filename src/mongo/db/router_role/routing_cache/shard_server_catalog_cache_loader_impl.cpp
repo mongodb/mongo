@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/router_role/routing_cache/shard_server_catalog_cache_loader_impl.h"
 
@@ -64,16 +38,18 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
@@ -108,7 +84,16 @@ MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
 MONGO_FAIL_POINT_DEFINE(hangDatabaseFlush);
 MONGO_FAIL_POINT_DEFINE(noCacheMetadataTassert);
 
-AtomicWord<unsigned long long> taskIdGenerator{0};
+Atomic<unsigned long long> taskIdGenerator{0};
+
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+void uassertAuthoritativeShardsDisabled(OperationContext* opCtx) {
+    uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+            "Non-authoritative config.cache.* update can't proceed: FCV has changed",
+            !feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+}
 
 /**
  * Drops all chunks from the persisted metadata whether the collection's epoch has changed.
@@ -160,7 +145,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         BSON(ShardCollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         update.toBSON(),
-        true /*upsert*/);
+        /*upsert=*/true);
     if (!status.isOK()) {
         return status;
     }
@@ -200,7 +185,7 @@ Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
              << DatabaseNameUtil::serialize(dbt.getDbName(), SerializationContext::stateDefault())),
         dbt.toBSON(),
         BSONObj(),
-        true /*upsert*/);
+        /*upsert=*/true);
     if (!status.isOK()) {
         return status;
     }
@@ -580,6 +565,8 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
                         "Unable to refresh routing table because replica set state changed or "
                         "the node is shutting down.",
                         _term == term);
+                // Ensure we haven't missed the interrupt after Authoritative Shards was enabled.
+                uassertAuthoritativeShardsDisabled(context.opCtx());
             }
 
             if (isPrimary) {
@@ -624,6 +611,8 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
                         "Unable to refresh database because replica set state changed or the node "
                         "is shutting down.",
                         _term == term);
+                // Ensure we haven't missed the interrupt after Authoritative Shards was enabled.
+                uassertAuthoritativeShardsDisabled(context.opCtx());
             }
 
             if (isPrimary) {
@@ -633,6 +622,37 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
             }
         })
         .semi();
+}
+
+void ShardServerCatalogCacheLoaderImpl::interruptAfterAuthoritativeShardsTransition() {
+    std::lock_guard<std::mutex> lg(_mutex);
+    _contexts.interrupt(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition);
+}
+
+void ShardServerCatalogCacheLoaderImpl::waitForAllFlushes(OperationContext* opCtx) {
+    std::vector<NamespaceString> collNssToFlush;
+    std::vector<DatabaseName> dbNamesToFlush;
+    {
+        std::lock_guard<std::mutex> lg(_mutex);
+        tassert(12797901,
+                "Expected waitForAllFlushes to be called after Authoritative Shards is enabled",
+                feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        for (const auto& [nss, _] : _collAndChunkTaskLists) {
+            collNssToFlush.push_back(nss);
+        }
+        for (const auto& [dbName, _] : _dbTaskLists) {
+            dbNamesToFlush.push_back(dbName);
+        }
+    }
+
+    for (const auto& nss : collNssToFlush) {
+        waitForCollectionFlush(opCtx, nss);
+    }
+    for (const auto& dbName : dbNamesToFlush) {
+        waitForDatabaseFlush(opCtx, dbName);
+    }
 }
 
 void ShardServerCatalogCacheLoaderImpl::waitForCollectionFlush(OperationContext* opCtx,
@@ -1104,6 +1124,9 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleCollAnd
     {
         std::lock_guard<std::mutex> lock(_mutex);
 
+        // Check Authoritative Shards flag under _mutex to serialize with waitForAllFlushes.
+        uassertAuthoritativeShardsDisabled(opCtx);
+
         auto& list = _collAndChunkTaskLists[nss];
         auto wasEmpty = list.empty();
         list.addTask(std::move(task));
@@ -1132,6 +1155,9 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleDbTask(
     performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleDbTask");
     {
         std::lock_guard<std::mutex> lock(_mutex);
+
+        // Check Authoritative Shards flag under _mutex to serialize with waitForAllFlushes.
+        uassertAuthoritativeShardsDisabled(opCtx);
 
         auto& list = _dbTaskLists[dbName];
         auto wasEmpty = list.empty();
@@ -1406,14 +1432,29 @@ ShardServerCatalogCacheLoaderImpl::_forcePrimaryCollectionRefreshAndWaitForRepli
             Seconds{30},
             Shard::RetryPolicy::kIdempotent));
 
-        uassertStatusOK(cmdResponse.commandStatus);
+        // If the error is `MetadataRefreshCanceledDueToFCVTransition` it means that the primary is
+        // already relying on the authoritative model to acknowledge filtering metadata and will not
+        // serve more refreshes. In order to follow the same protocol, this node has to wait for the
+        // seen opTime from the last call (same behaviour as today), and then fail, so an upper
+        // layer will retry this refresh using the authoritative protocol.
 
-        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
-            opCtx,
-            {repl::OpTime{
-                 cmdResponse.response.getField(LogicalTime::kOperationTimeFieldName).timestamp(),
-                 term},
-             boost::none}));
+        auto status = cmdResponse.commandStatus;
+        auto waitForOptime = [&]() {
+            uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+                opCtx,
+                {repl::OpTime{cmdResponse.response.getField(LogicalTime::kOperationTimeFieldName)
+                                  .timestamp(),
+                              term},
+                 boost::none}));
+        };
+
+        if (status == ErrorCodes::MetadataRefreshCanceledDueToFCVTransition) {
+            waitForOptime();
+        }
+
+        uassertStatusOK(status);
+
+        waitForOptime();
         return notif;
     });
 }

@@ -29,6 +29,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 load("//build_defs:cpp_opts.bzl", "COPTS")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 # This works around https://github.com/bazelbuild/bazel/issues/19124 by using a generated header to
 # inject the Bazel path of the test plugins.
@@ -58,7 +59,7 @@ EOF
         testonly = True,
     )
 
-    native.cc_library(
+    cc_library(
         name = name,
         hdrs = [hdr],
         strip_include_prefix = "/src",

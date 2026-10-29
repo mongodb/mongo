@@ -62,26 +62,11 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             }, // Exclude 'drop' command from the filter to make sure that we don't kill the the
             // drop command which is responsible for dropping the temporary collection.
         };
-        if (TestData.testingReplicaSetEndpoint) {
-            // The sharding DDL operations do not have opid.
-            filter["$and"] = [
-                {desc: {$ne: "CreateCollectionCoordinator"}},
-                {desc: {$ne: "DropCollectionCoordinator"}},
-                {desc: {$ne: "DropParticipantInstance"}},
-                {desc: {$ne: "RenameCollectionCoordinator"}},
-                {desc: {$ne: "RenameParticipantInstance"}},
-            ];
-        }
         this.killOpsMatchingFilter(db, filter);
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
         // Ensure that no temporary collection is left behind.
-        if (TestData.testingReplicaSetEndpoint) {
-            // When testing replica set endpoint, the temporary collection might not get deleted.
-            // Instead, it will be cleaned up on the next step up.
-            return;
-        }
         assert.eq(db.getCollectionNames().filter((col) => col.includes("tmp.agg_out")).length, 0);
     };
 

@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import threading, time
+import os, threading, time
 import wttest
-import wiredtiger
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -36,7 +35,6 @@ from wtscenario import make_scenarios
 # Test reading a checkpoint that contains prepared data.
 
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     format_values = [
@@ -97,21 +95,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.assertEqual(count, nrows)
         cursor.close()
 
-    def checkfail(self, ds, ckpt, key, ts):
-        if ckpt is None:
-            ckpt = 'WiredTigerCheckpoint'
-        cfg = 'checkpoint=' + ckpt
-        if ts is not None:
-            cfg += ',debug=(checkpoint_read_timestamp=' + self.timestamp_str(ts) + ')'
-        cursor = self.session.open_cursor(ds.uri, None, cfg)
-        #self.session.begin_transaction()
-        cursor.set_key(ds.key(key))
-        self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: cursor.search(),
-            '/conflict with a prepared/')
-        #self.session.rollback_transaction()
-        cursor.close()
-
     def test_checkpoint(self):
         uri = 'table:checkpoint20'
         nrows = 10000
@@ -160,7 +143,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.check(ds, self.first_checkpoint, nrows, value_a, 20)
         self.check(ds, self.first_checkpoint, nrows, value_a, None)
 
-        # Without ignore_prepare, we'd want to check that one of the prepared keys fails.
-        #self.checkfail(ds, self.first_checkpoint, nrows // 2 + 1, 20)
-        #if self.stable_ts >= 20:
-        #    self.checkfail(ds, self.first_checkpoint, nrows // 2 + 1, None)
+        # The Windows CI builders can be slow.
+        if os.name == 'nt':
+            self.ignoreStdoutPatternIfExists('tree walk took more than')

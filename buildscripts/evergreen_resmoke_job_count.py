@@ -42,15 +42,21 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
     {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
     {"task": r"noPassthrough", "factor": 0.25},
+    {
+        "task": r"replica_sets_reconfig_.*jscore_.*passthrough.*",
+        "factor": 0.20,
+    },
     {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.125},
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
     {"task": r"sharding_jscore_passthrough.*", "factor": 0.25},
+    # NOTE: this more-specific entry must precede the broader sharding.*stepdown.* entry below,
+    # otherwise first-match-wins in get_task_factor() would shadow it and 0.09375 would never apply.
+    {"task": "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough", "factor": 0.09375},
     {"task": r"sharding.*stepdown.*jscore_passthrough.*", "factor": 0.125},
     {
         "task": r"sharded_collections_causally_consistent_jscore_txns_passthrough.*",
         "factor": 0.125,
     },
-    {"task": "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough", "factor": 0.09375},
     # more common overrides should be placed after more specific overrides
     {"task": r".*shard.*", "factor": 0.25},
 ]
@@ -99,8 +105,14 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
         {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
     ],
+    r"enterprise-amazon2023-linux-x86-debug-tsan.*": [
+        # Reduce concurrency for the disagg override suite under TSAN to avoid CPU starvation
+        # of the SLS log server containers, which causes cascading failures.
+        {"task": r"no_passthrough_disagg_override.*", "factor": 0.125},
+    ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-all-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
+    "rhel8-debug-aubsan-non-rollback-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-roll-back-incremental-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-x86": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-arm64": _AUBSAN_TASK_FACTOR_OVERRIDES,
@@ -144,6 +156,14 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
             "factor": 0.25,
         },
     ],
+    "amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-sharded-clusters": [
+        # Restrict this suite to a single resmoke job to avoid running out of memory under
+        # {A,UB}SAN on this variant.
+        {
+            "task": r"disagg_sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.*",
+            "factor": 0.02,
+        },
+    ],
     "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
     "enterprise-windows-all-feature-flags-non-essential": [
         {"task": "noPassthrough", "factor": 0.5}
@@ -180,9 +200,7 @@ GLOBAL_TASK_FACTOR_OVERRIDES = {
     r"causally_consistent_hedged_reads_jscore_passthrough.*": 0.25,
     r"logical_session_cache.*_refresh_jscore_passthrough.*": 0.25,
     r"multi_shard_.*multi_stmt_txn_.*jscore_passthrough.*": 0.125,
-    r"replica_sets_reconfig_jscore_passthrough.*": 0.25,
-    r"replica_sets_reconfig_jscore_stepdown_passthrough.*": 0.25,
-    r"replica_sets_reconfig_kill_primary_jscore_passthrough.*": 0.25,
+    r"replica_sets_reconfig_.*jscore_.*passthrough.*": 0.25,
     r"replica_sets_transition_to_csrs_jscore_passthrough.*": 0.25,
     r"sharded_causally_consistent_jscore_passthrough.*": 0.75,
     r"sharded_collections_jscore_passthrough.*": 0.75,
@@ -317,7 +335,7 @@ def maybe_override_num_jobs_on_required(task_name, variant, jobs):
         all_factors |= {
             "search_no_pinned_connections_auth": 0.5,
         }
-    elif variant in ("linux-64-debug-required", "linux-64-debug-required-toolchain-v5"):
+    elif variant in ("linux-arm64-debug-required", "linux-64-debug-required-toolchain-v5"):
         all_factors |= {
             "^noPassthrough$": 0.5,
             "read_concern_linearizable_passthrough": 1,
@@ -370,7 +388,7 @@ def main():
         type=float,
         default=1.0,
         help=(
-            "Job factor to use as a mulitplier with the number of CPUs. Defaults" " to %(default)s."
+            "Job factor to use as a mulitplier with the number of CPUs. Defaults to %(default)s."
         ),
     )
     parser.add_argument(
@@ -387,7 +405,7 @@ def main():
     parser.add_argument(
         "--outFile",
         dest="outfile",
-        help=("File to write configuration to. If" " unspecified no file is generated."),
+        help=("File to write configuration to. If unspecified no file is generated."),
     )
 
     options = parser.parse_args()

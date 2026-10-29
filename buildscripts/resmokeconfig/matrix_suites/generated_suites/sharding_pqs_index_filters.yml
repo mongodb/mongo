@@ -23,7 +23,7 @@ executor:
   config:
     shell_options:
       eval:
-        'await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+        'await import("jstests/libs/override_methods/query/make_index_filters_into_query_settings.js");
         db.adminCommand({configureFailPoint: ''querySettingsPlanCacheInvalidation'',
         mode: ''alwaysOn''});'
       global_vars:
@@ -35,13 +35,13 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 1
     num_rs_nodes_per_shard: 1

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 
@@ -35,6 +9,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -102,8 +77,7 @@ bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine, Time
 KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
 void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime& dropTime,
-                                                   std::shared_ptr<Ident> ident,
-                                                   StorageEngine::DropIdentCallback&& onDrop) {
+                                                   std::shared_ptr<Ident> ident) {
     std::lock_guard lock(_mutex);
 
     // Debug instrumentation, BF-42904 was caused by duplicate drops of the same ident, in
@@ -134,7 +108,6 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
     auto& info = _dropPendingIdents[identName];
     info.identName = identName;
     info.dropToken = ident;
-    info.onDrop = onDrop;
     info.dropTime = dropTime;
 
     std::visit(
@@ -241,27 +214,41 @@ size_t KVDropPendingIdentReaper::getNumIdents() const {
 
 void KVDropPendingIdentReaper::dropIdentsOlderThan(
     OperationContext* opCtx, const StorageEngine::TimestampMonitor::Timestamps& timestamps) {
+    {
+        std::lock_guard lock(_mutex);
+        if (_dropPendingIdents.empty()) {
+            LOGV2_DEBUG(13442900, 1, "No drop-pending idents are registered");
+            return;
+        }
+    }
+
     const bool usesSchemaEpochs =
         rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().usesSchemaEpochs();
 
     auto oldestTs = timestamps.oldest;
     auto stableTs = timestamps.stable;
 
-    // If we have no checkpoint timestamp, then we cannot rollback to stable and don't need to keep
-    // tables required for RTS. If we do, then we can't drop tables which need to return to being
-    // present after a RTS even if they're otherwise expired.
-    // TODO(SERVER-122163): once schema epochs are fully implemented we don't need to defer drops
-    // until after a checkpoint when schema epochs are used.
+    // On ASC, we need a checkpoint at or after the drop timestamp to ensure that rollback to stable
+    // will not attempt to roll back to a point before we dropped the table. However, if we've never
+    // taken a checkpoint then we have nothing to roll back to at all and this doesn't apply.
+    // On DSC, we need a table to not have any uncheckpointed writes to avoid a race where we try to
+    // checkpoint the final writes concurrently with dropping the table and can't because the data
+    // is gone. Requiring a checkpoint at or after the drop timestamp is more conservative than
+    // needed for this, but there isn't any obvious upside to making it more precise.
     if (!timestamps.checkpoint.isNull()) {
         oldestTs = std::min(oldestTs, timestamps.checkpoint);
         stableTs = std::min(stableTs, timestamps.checkpoint);
     }
 
     boost::optional<rss::consensus::IntentGuard> writeIntentGuard;
-    if (usesSchemaEpochs) {
-        // Replicated drop mode: only primary can proceed.
+    boost::optional<Lock::GlobalLock> globalLock;
+    if (usesSchemaEpochs && !storageGlobalParams.magicRestore) {
+        // Replicated drop mode: only primary can proceed. During magic restore, even though
+        // we're technically a primary, we're operating in a standby-like mode in that we're
+        // not supposed to perform any writes. So we avoid taking the Intent::Write here.
         try {
             writeIntentGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+            globalLock.emplace(opCtx, MODE_IX);
         } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
             LOGV2_DEBUG(11873700, 1, "Not primary, will skip replicated ident drops");
         }
@@ -342,9 +329,27 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(
                             "ident"_attr = identInfo->identName,
                             "dropTimestamp"_attr = identInfo->dropTime,
                             "error"_attr = status);
+        } else if (status == ErrorCodes::LockBusy) {
+            LOGV2(12865400,
+                  "Drop-pending ident could not be locked. This typically means that a "
+                  "checkpoint was accessing the table.",
+                  "ident"_attr = identInfo->identName,
+                  "dropTimestamp"_attr = identInfo->dropTime,
+                  "error"_attr = status);
         } else if (status.isA<ErrorCategory::Interruption>()) {
             LOGV2(11873702,
                   "Interruption while dropping ident",
+                  "ident"_attr = identInfo->identName,
+                  "dropTimestamp"_attr = identInfo->dropTime,
+                  "error"_attr = status);
+        } else if (status == ErrorCodes::WriteConflict ||
+                   status == ErrorCodes::TemporarilyUnavailable ||
+                   status == ErrorCodes::TransactionTooLargeForCache) {
+            // When replicating a drop as primary, the oplog write can transiently conflict.
+            // The ident stays drop-pending and the whole drop is redone on a later pass.
+            LOGV2(12716400,
+                  "Storage was transiently unavailable while completing a replicated ident drop; "
+                  "will retry on a later pass",
                   "ident"_attr = identInfo->identName,
                   "dropTimestamp"_attr = identInfo->dropTime,
                   "error"_attr = status);
@@ -395,6 +400,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
     for (size_t retries = 1;; ++retries) {
         auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, boost::none);
         if (status != ErrorCodes::ObjectIsBusy) {
+            invariant(status != ErrorCodes::LockBusy);
             return status;
         }
 
@@ -411,6 +417,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
                       logv2::LogSeverity::Log(),
                       retries,
                       "Retrying immediate drop of drop-pending ident",
+                      "ident"_attr = ident,
                       "error"_attr = status);
     }
 }
@@ -446,6 +453,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
     for (size_t retries = 1;; ++retries) {
         auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, timestamp);
         if (status != ErrorCodes::ObjectIsBusy) {
+            invariant(status != ErrorCodes::LockBusy);
             return status;
         }
 
@@ -511,50 +519,80 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
     auto status = std::visit(
         OverloadedVisitor{
             [&](const DropAsReplicatedPrimary&) -> Status {
-                // Return busy, not another error: the reaper leaves a busy ident drop-pending but
-                // treats any other failure as fatal.
                 if (MONGO_unlikely(skipCompletingReplicatedPrimaryIdentDrop.shouldFail())) {
+                    // ObjectIsBusy is the most "routine" error that leaves the ident drop pending
                     return Status(ErrorCodes::ObjectIsBusy,
                                   "skipCompletingReplicatedPrimaryIdentDrop failpoint enabled");
                 }
-                try {
-                    Lock::GlobalLock gl(opCtx, MODE_IX);
-                    WriteUnitOfWork wuow(opCtx);
-                    repl::OpTime reservedIdentDropTimestamp;
 
-                    // Call opObserver so that it generates an oplog entry.
+                // We cannot handle the case where the stepdown cutoff is set in between when we
+                // drop a table and when we commit, as we can't roll back the drop but we also can't
+                // replicate the drop at the correct timestamp. As a result we must block setting
+                // the stepdown cutoff for the entire drop process.
+                auto stepdownLock = _engine->lockStepDown();
+
+                WriteUnitOfWork wuow(opCtx);
+                repl::OpTime reservedIdentDropTimestamp;
+
+                try {
                     opCtx->getServiceContext()->getOpObserver()->onReplicatedIdentDrop(
                         opCtx, identInfo.identName, reservedIdentDropTimestamp);
                     invariant(!reservedIdentDropTimestamp.isNull());
-
-                    const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(
-                        reservedIdentDropTimestamp.getTimestamp());
-                    auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                                identInfo.identName,
-                                                ident::isCollectionIdent(identInfo.identName),
-                                                identInfo.onDrop,
-                                                schemaEpoch);
-                    if (s.isOK()) {
-                        wuow.commit();
-                    }
-                    return s;
                 } catch (const DBException& ex) {
+                    // Writing the oplog entry can transiently fail due to cache pressure or
+                    // interruption due to repl state changing. We haven't dropped the table yet, so
+                    // errors here can simply roll back the transaction and try again later.
                     return ex.toStatus();
                 }
+
+                const uint64_t schemaEpoch =
+                    provider.getSchemaEpochForTimestamp(reservedIdentDropTimestamp.getTimestamp());
+                const bool waitForLocks = false;
+                auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                            identInfo.identName,
+                                            ident::isCollectionIdent(identInfo.identName),
+                                            schemaEpoch,
+                                            waitForLocks);
+                if (!s.isOK()) {
+                    // Similarly dropIdent() is allowed to transiently fail due to things like a
+                    // reader still existing even though they should have all expired, or WiredTiger
+                    // internally touching the table as part of something like checkpointing.
+                    // dropIdent() is required to have not actually dropped anything if it returns
+                    // failure, so we can roll back and try again later.
+                    return s;
+                }
+
+                try {
+                    wuow.commit();
+                } catch (const DBException& ex) {
+                    // It should be impossible for commit() to fail: no write conflicts are possible
+                    // for a plain insert into the oplog, cache pressure manifests as an error when
+                    // opening a cursor and not on commit, we're blocking stepdown, and committing
+                    // doesn't check for interruption. If something does go wrong and the commit
+                    // fails, the only mechanism we have for rolling back the drop is aborting the
+                    // process and starting over from the most recent commit which still has the
+                    // ident.
+                    LOGV2_FATAL(
+                        13526300,
+                        "Committing a replicated drop unexpectedly failed. It should not be "
+                        "possible for this to happen, and this is not a recoverable state.",
+                        "ident"_attr = identInfo.identName,
+                        "error"_attr = ex);
+                }
+
+                return Status::OK();
             },
             [&](const DropAsReplicatedApply& mode) -> Status {
                 const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(mode.timestamp);
                 return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                           identInfo.identName,
                                           ident::isCollectionIdent(identInfo.identName),
-                                          identInfo.onDrop,
                                           schemaEpoch);
             },
             [&](const DropUnreplicated&) -> Status {
                 return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                           identInfo.identName,
                                           ident::isCollectionIdent(identInfo.identName),
-                                          identInfo.onDrop,
                                           boost::none);
             }},
         dropExecution);

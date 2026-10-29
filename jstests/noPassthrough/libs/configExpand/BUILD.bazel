@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -14,4 +15,10 @@ all_subpackage_javascript_files()
 py_binary(
     name = "reflect",
     srcs = ["reflect.py"],
+)
+
+py_binary(
+    name = "rest_server",
+    srcs = ["rest_server.py"],
+    main = "rest_server.py",
 )

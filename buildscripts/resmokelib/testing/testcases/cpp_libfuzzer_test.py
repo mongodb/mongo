@@ -53,6 +53,56 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
 
         interface.append_process_tracking_options(self.program_options, self._id)
 
+    def run_test(self):
+        """Run the test, then fail if any crash files were recorded in the corpus."""
+        try:
+            self.proc = self._make_process()
+            self._execute(self.proc)
+        except self.failureException:
+            raise
+        except:
+            self.logger.exception(
+                "Encountered an error running %s %s", self.test_kind, self.basename()
+            )
+            raise
+
+        # Centipede stores findings under <corpus>/<binary>/<test>/crashing/.
+        # Check every named FuzzTest as well as LLVMFuzzer.TestOneInput. Retained
+        # findings do not necessarily reproduce during an interrupted run or
+        # originate in the current build.
+        crash_files = self._get_crash_files()
+        if crash_files:
+            self.return_code = 1
+            msg = (
+                f"{self.short_description()} has {len(crash_files)} retained crash(es) "
+                f"in the corpus database: {', '.join(crash_files)}"
+            )
+            self.logger.error(msg)
+            raise self.failureException(msg)
+
+    def _get_crash_files(self) -> list[str]:
+        """Find retained inputs for this binary, without suppressing corpus access errors."""
+        binary_corpus = os.path.join(self.corpus_directory, self.short_name())
+        try:
+            tests = os.scandir(binary_corpus)
+        except FileNotFoundError:
+            return []
+
+        crash_files: list[str] = []
+        with tests:
+            for test in tests:
+                if not test.is_dir():
+                    continue
+
+                try:
+                    crashes = os.scandir(os.path.join(test.path, "crashing"))
+                except FileNotFoundError:
+                    continue
+
+                with crashes:
+                    crash_files.extend(crash.path for crash in crashes if crash.is_file())
+        return sorted(crash_files)
+
     def _make_process(self):
         default_args = [
             self.program_executable,

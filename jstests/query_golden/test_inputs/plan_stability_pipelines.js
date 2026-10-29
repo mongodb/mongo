@@ -3717,7 +3717,7 @@ export const pipelines = [
         },
         {"$sort": {"h_idx": 1}},
     ],
-    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE plan choice
     // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid
     // the simple IXSCAN on 'k_compound_1' + FETCH with a complex filter, and instead pick an OR plan on
     // indexes 'a_idx_1' & 'i_idx_1'. Note that it will examine slightly more documents and keys, but
@@ -5492,7 +5492,7 @@ export const pipelines = [
         },
         {"$skip": 70},
     ],
-    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE plan choice
     // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid the
     // simple IXSCAN on 'k_compound_1' + FETCH with a complex filter, and instead pick an OR plan on indexes
     // 'a_idx_1' & 'i_compound_1'. This should halve the number of examined keys.
@@ -5589,7 +5589,7 @@ export const pipelines = [
         {"$sort": {"a_idx": -1, "z_idx": -1}},
         {"$project": {"a_idx": 1}},
     ],
-    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE plan choice
     // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid
     // the simple IXSCAN on 'k_idx_1' + FETCH with a complex filter, and instead pick an OR + SORT plan
     // on indexes 'a_compound_1' & 'i_compound_1'. Note that it will examine slightly more documents and
@@ -14781,7 +14781,7 @@ export const pipelines = [
         },
         {"$sort": {"z_idx": 1}},
     ],
-    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // TODO SERVER-114546: [Cost Issue] Impacts samplingCE/histogramCE plan choice
     // Once we properly estimate the number of FETCH filter leaf estimations, the best plan should avoid the
     // simple IXSCAN on 'i_idx_1' + FETCH with a complex filter, and instead pick an OR plan on indexes
     // 'z_compound_1', 'z_idx_1' & 'c_compound_1'. Note that it will examine slightly more documents and keys,
@@ -15222,7 +15222,7 @@ export const pipelines = [
         {"$limit": 93},
         {"$project": {"a_idx": 1}},
     ],
-    // [CE Issue] Impacts samplingCE/histogramCE/automaticCE plan choice
+    // [CE Issue] Impacts samplingCE/histogramCE plan choice
     // Once we estimate the number of seeks, we should be able to choose the better plan here which
     // does an IXSCAN on 'z_compound_1' instead of 'i_compound_1_z_compound_1'. It should also
     // drastically reduce the number of examined keys.

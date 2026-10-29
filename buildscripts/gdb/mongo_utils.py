@@ -7,6 +7,7 @@ module while those scripts are sourced by .gdbinit.
 
 import re
 import sys
+from collections.abc import Sequence
 
 import gdb
 
@@ -38,6 +39,158 @@ def lookup_type(gdb_type_str: str) -> gdb.Type:
         exceptions.append(exc)
 
     raise gdb.error("Failed to get type, tried:\n%s" % "\n".join([str(exc) for exc in exceptions]))
+
+
+def lookup_symbol(
+    gdb_symbol_str: str,
+    function_pointer_type: str | None = None,
+    *,
+    function_signatures: Sequence[str] = (),
+) -> gdb.Symbol | gdb.Value | None:
+    """Look up a symbol in the current context and then in each loaded objfile.
+
+    ``gdb.lookup_symbol`` does not always search symbols from dynamically loaded
+    shared libraries.  Looking up the symbol on each objfile provides a fallback
+    for symbols which are visible to GDB's CLI but not to the global Python API.
+    The CLI fallback also handles non-debugging symbols, including C++ symbols
+    whose demangled name contains an ABI tag such as ``[abi:cxx11]``.
+
+    If ``function_pointer_type`` is provided, the result is cast to that function
+    pointer type and dereferenced. This makes stripped function symbols callable
+    when GDB has no debug information from which to infer their return type.
+
+    ``function_signatures`` can be provided for a function which is present only
+    in the binary's minimal symbol table. In that case, ``info address`` can
+    locate the symbol even when ``info functions`` cannot. Each signature should
+    be specific enough to select the desired overload. Multiple spellings allow
+    for GDB output that either preserves or resolves C++ typedefs.
+    """
+
+    def cast_function_symbol(symbol):
+        if function_pointer_type is None:
+            return symbol
+
+        symbol_value = getattr(symbol, "value", None)
+        if callable(symbol_value):
+            symbol_value = symbol_value()
+        else:
+            symbol_value = symbol
+
+        # A value resolved from an exact C++ expression already has the
+        # function's ABI-correct type, including its return type. In
+        # particular, do not force GDB to resolve ``std::string`` again: that
+        # can fail when split DWARF contains skeleton units that this GDB
+        # version cannot process.
+        symbol_type = getattr(symbol_value, "type", None)
+        if getattr(symbol_type, "code", None) == getattr(gdb, "TYPE_CODE_FUNC", None):
+            return symbol_value
+
+        pointer_type = gdb.parse_and_eval(f"({function_pointer_type})0").type
+        return symbol_value.cast(pointer_type).dereference()
+
+    def cast_function_address(address: int):
+        if function_pointer_type is None:
+            return gdb.Value(address)
+
+        pointer_type = gdb.parse_and_eval(f"({function_pointer_type})0").type
+        return gdb.Value(address).cast(pointer_type).dereference()
+
+    try:
+        symbol, _ = gdb.lookup_symbol(gdb_symbol_str)
+    except gdb.error:
+        symbol = None
+    if symbol is not None:
+        try:
+            return cast_function_symbol(symbol)
+        except gdb.error:
+            # Looking up a symbol and evaluating its value exercise different
+            # DWARF paths. A split-DWARF error while evaluating the symbol must
+            # not prevent the address-based fallbacks below.
+            pass
+
+    for objfile in gdb.objfiles():
+        try:
+            symbol = objfile.lookup_global_symbol(gdb_symbol_str)
+        except gdb.error:
+            # Some GDB versions reject split-DWARF skeleton units while using
+            # the Python symbol APIs. Keep going because the CLI symbol table
+            # queries below can still resolve the function's address.
+            continue
+        if symbol is not None:
+            try:
+                return cast_function_symbol(symbol)
+            except gdb.error:
+                continue
+
+    for function_signature in function_signatures:
+        try:
+            address_info = gdb.execute(
+                "info address " + function_signature,
+                to_string=True,
+            )
+        except gdb.error:
+            continue
+
+        # GDB uses "is at 0x..." for minimal symbols and "is a function at
+        # address 0x..." when debug information describes the function.
+        match = re.search(r"\bat(?: address)?\s+(0x[0-9a-fA-F]+)\b", address_info)
+        if match is not None:
+            try:
+                return cast_function_address(int(match.group(1), 16))
+            except gdb.error:
+                if function_pointer_type is not None:
+                    # The address identifies the overload, but constructing a
+                    # synthetic pointer type may fail when GDB cannot resolve
+                    # split-DWARF type information. Ask GDB to evaluate the
+                    # exact signature instead; this gives us the function's
+                    # native, ABI-correct type.
+                    try:
+                        function = gdb.parse_and_eval("'" + function_signature + "'")
+                        return cast_function_symbol(function)
+                    except gdb.error:
+                        pass
+
+    try:
+        functions = gdb.execute(
+            "info functions -q " + gdb_symbol_str,
+            to_string=True,
+        )
+    except gdb.error:
+        return None
+
+    for line in functions.splitlines():
+        match = re.match(r"\s*(0x[0-9a-fA-F]+)\s+(.+?)\s*$", line)
+        if match is None:
+            continue
+
+        address = int(match.group(1), 16)
+        candidate = match.group(2).removesuffix("@plt").removesuffix(";")
+        normalized_candidate = re.sub(r"\[abi:[^\]]+\]", "", candidate)
+        if not normalized_candidate.startswith(gdb_symbol_str + "("):
+            continue
+
+        if function_pointer_type is not None:
+            # Prefer the exact spelling from GDB. This preserves ABI tags such
+            # as ``[abi:cxx11]`` and lets GDB return a typed function value
+            # without requiring a second lookup of its return type. Keep the
+            # normalized spelling for GDB versions that do not accept ABI tags
+            # in expressions.
+            for expression in (candidate, normalized_candidate):
+                try:
+                    function = gdb.parse_and_eval("'" + expression + "'")
+                    return cast_function_symbol(function)
+                except gdb.error:
+                    continue
+
+        try:
+            # Use the address printed by GDB rather than asking it to resolve the
+            # demangled overload again. The latter can fail for ABI-tagged C++
+            # names even though ``info functions`` found the symbol.
+            return cast_function_address(address)
+        except gdb.error:
+            continue
+
+    return None
 
 
 def get_thread_id():
@@ -169,47 +322,58 @@ def get_boost_optional(optional):
     return storage.cast(value_ref_type).dereference()
 
 
-# Cache for types found via find_type_from_info_types as they can be expensive to look up.
+# Cache for resolved gdb.Type values as they can be expensive to look up.
 _type_cache: dict[str, gdb.Type] = {}
 
 
-# Helper to find the gdb.Type of the given symbol given by a regex.
-# This is useful when compilers disagree about the spelling of a symbol/template instantiation.
-# Uses `info types <regex>` gdb command to find the type, parses the output and then looks up the type.
-def find_type_from_info_types(regex):
-    if regex in _type_cache:
-        return _type_cache[regex]
+def _absl_namespace_prefix(type_name: str) -> str:
+    """Return the concrete absl namespace prefix from a public absl type name.
+    Abseil uses an inline namespace for versioning, so it may contain '::lts_20250512' in the middle of the symbol name.
+    Examples:
+      absl::flat_hash_map<...> -> absl
+      absl::lts_20250512::flat_hash_map<...> -> absl::lts_20250512
+    """
+    match = re.match(r"^(absl(?:::[A-Za-z0-9_]+)?)::", type_name)
+    if not match:
+        raise RuntimeError(f"Could not determine absl namespace from type: {type_name}")
+    return match.group(1)
 
-    output = gdb.execute(f"info types {regex}", to_string=True)
 
-    # Example output:
-    # All types matching regular expression "absl::lts_.*::container_internal::internal_compressed_tuple::Storage<absl::lts_.*::container_internal::CommonFields, 0.*, false>":
-    # File src/third_party/abseil-cpp/dist/absl/container/internal/compressed_tuple.h:
-    # 85:	absl::lts_20250512::container_internal::internal_compressed_tuple::Storage<absl::lts_20250512::container_internal::CommonFields, 0, false>;
+def _lookup_absl_common_fields_storage_type(val):
+    """Resolve the concrete CommonFields Storage type for an absl hash container."""
+    container_type_name = str(val.type.strip_typedefs().name)
+    ns = _absl_namespace_prefix(container_type_name)
+    cache_key = f"{ns}::container_internal::internal_compressed_tuple::Storage<CommonFields>"
+    if cache_key in _type_cache:
+        return _type_cache[cache_key]
 
-    # Regex looking for: number + colon + whitespace + capture group + semicolon
-    type_pattern = re.compile(r"^\s*\d+:\s+(.*?);$", re.MULTILINE)
+    # Clang and GCC may mangle the templates differently for the 0 size_t parameter, so we try both '0' and '0ul'.
+    candidates = (
+        f"{ns}::container_internal::internal_compressed_tuple::Storage<"
+        f"{ns}::container_internal::CommonFields, 0ul, false>",
+        f"{ns}::container_internal::internal_compressed_tuple::Storage<"
+        f"{ns}::container_internal::CommonFields, 0, false>",
+    )
 
-    match = re.search(type_pattern, output)
+    exceptions = []
+    for type_str in candidates:
+        try:
+            resolved = lookup_type(type_str)
+            _type_cache[cache_key] = resolved
+            return resolved
+        except Exception as exc:
+            exceptions.append(exc)
 
-    if match:
-        type_str = match.group(1)
-        res = gdb.lookup_type(type_str)
-        _type_cache[regex] = res
-        return res
-
-    raise RuntimeError(f"No types found for regex: {regex}")
+    raise gdb.error(
+        "Failed to resolve absl CommonFields storage type, tried:\n%s"
+        % "\n".join([str(exc) for exc in exceptions])
+    )
 
 
 def absl_get_settings(val):
     """Gets the settings_ field for abseil (flat/node)_hash_(map/set)."""
 
-    # Find the type of the CompressedTuple Storage template.
-    # Abseil uses an inline namespace for versioning, so it may contain '::lts_20250512' in the middle of the symbol name.
-    # Clang and GCC may mangle the templates differently for the 0 size_t parameter, so we use '0.*' to match both '0' and '0ul'.
-    common_fields_storage_type = find_type_from_info_types(
-        "absl.*::container_internal::internal_compressed_tuple::Storage<absl.*::container_internal::CommonFields, 0.*, false>",
-    )
+    common_fields_storage_type = _lookup_absl_common_fields_storage_type(val)
 
     # The Hash, Eq, or Alloc functors may not be zero-sized objects.
     # mongo::LogicalSessionIdHash is one such example. An explicit cast is needed to
@@ -221,6 +385,25 @@ def absl_container_size(settings):
     return settings["size_"]["data_"] >> 17
 
 
+# The capacity of a container using the small object optimization. Abseil only ever stores a
+# single element inline.
+_ABSL_SOO_CAPACITY = 1
+
+
+def _absl_soo_enabled(settings, slot_type):
+    """Returns whether an abseil container is eligible for the small object optimization (SOO).
+
+    This mirrors raw_hash_set::SooEnabled(). The logic is basically this: PolicyTraits::soo_enabled
+    AND a slot can fit in the heap_or_soo_ member. Every policy leaves PolicyTraits::soo_enabled(),
+    so eligibility is determined by the size and alignment of a slot.
+    """
+    heap_or_soo_type = settings["heap_or_soo_"].type
+    return (
+        slot_type.sizeof <= heap_or_soo_type.sizeof
+        and slot_type.alignof <= heap_or_soo_type.alignof
+    )
+
+
 def absl_get_nodes(val):
     """Return a generator of every node in absl::container_internal::raw_hash_set and derived classes."""
     settings = absl_get_settings(val)
@@ -230,11 +413,18 @@ def absl_get_nodes(val):
         return
 
     capacity = int(settings["capacity_"])
-    heap = settings["heap_or_soo_"]["heap"]
-    ctrl = heap["control"]
 
     # Derive the underlying type stored in the container.
     slot_type = lookup_type(str(val.type.strip_typedefs().name) + "::slot_type").strip_typedefs()
+
+    # A container using the small object optimization holds its only element inline, where
+    # the heap pointers would otherwise be.
+    if capacity == _ABSL_SOO_CAPACITY and _absl_soo_enabled(settings, slot_type):
+        yield settings["heap_or_soo_"].address.cast(slot_type.pointer()).dereference()
+        return
+
+    heap = settings["heap_or_soo_"]["heap"]
+    ctrl = heap["control"]
 
     # Using the array of ctrl bytes, search for in-use slots and return them
     # https://github.com/abseil/abseil-cpp/blob/8a3caf7dea955b513a6c1b572a2423c6b4213402/absl/container/internal/raw_hash_set.h#L2108-L2113

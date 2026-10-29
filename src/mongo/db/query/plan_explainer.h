@@ -1,45 +1,25 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
+
+#include <cstdint>
 
 namespace mongo {
 
@@ -51,6 +31,30 @@ namespace mongo {
 struct SolutionWithPlanStage {
     std::unique_ptr<QuerySolution> solution;
     std::unique_ptr<PlanStage> planStage;
+    // True when 'planStage' is the multi-planner's trial tree for this (rejected) candidate, so
+    // its counters are trial statistics. False for plans that never ran (e.g. CBR-rejected):
+    // their stage tree is built after the fact, for explain display only. Both kinds are stored
+    // in the same list (rejectedPlansWithStages), and this flag is the only thing that tells
+    // them apart short of guessing from the counter values.
+    //
+    // This flag describes stored rejected plans only. The V3 explain answers the same question
+    // - "did this plan run a trial?" - for the other kinds of plans from their own sources
+    // (the winning plan from its exported trial snapshot, candidates still inside a
+    // MultiPlanStage trivially so), and reports the per-plan answer, whatever its source, as
+    // ExplainPlanEntry::hasTrialStats.
+    bool ranTrial = false;
+    // The candidate's final ranking score (trial score plus tie-breaking heuristics bonuses),
+    // when the multi-planner's ranking decision covered this plan. Sorting by it descending
+    // reproduces PlanRankingDecision::candidateOrder; QuerySolution::score remains the displayed
+    // (bonus-free) trial score.
+    boost::optional<double> adjustedScore;
+    // How this plan's multi-planner trial period ended. Set exactly when 'ranTrial' is true; a plan
+    // that never ran has no stop condition to report.
+    boost::optional<MultiPlannerStopCondition> stopCondition;
+    // This plan's BaseCandidatePlan::estimatePhaseStats / estimatePhaseStopCondition, moved out
+    // of the candidate.
+    std::unique_ptr<PlanStageStats> estimateStats;
+    boost::optional<MultiPlannerStopCondition> estimateStopCondition;
 };
 
 struct PlanExplainerData {
@@ -58,12 +62,34 @@ struct PlanExplainerData {
     std::vector<SolutionWithPlanStage> rejectedPlansWithStages;
     std::unique_ptr<mongo::PlanStageStats> multiPlannerWinningPlanTrialStats;
     boost::optional<double> multiPlannerWinningPlanScore;
+    // How the winning plan's trial period ended. Populated alongside
+    // 'multiPlannerWinningPlanTrialStats', i.e. only when the multi-planner chose the winner.
+    boost::optional<MultiPlannerStopCondition> multiPlannerWinningPlanStopCondition;
+    // The winning plan's BaseCandidatePlan::estimatePhaseStats / estimatePhaseStopCondition,
+    // moved out of the candidate. Null when the trial had no capped phase or the query is not
+    // an explain.
+    std::unique_ptr<mongo::PlanStageStats> multiPlannerWinningPlanEstimateStats;
+    boost::optional<MultiPlannerStopCondition> multiPlannerWinningPlanEstimateStopCondition;
     stage_builder::PlanStageToQsnMap planStageQsnMap;
     cost_based_ranker::EstimateMap estimates;
     // Namespace-keyed map of sampling metadata emitted under queryPlanner.ceSamplingMetadata.
     // Populated on the explain path when CBR used a sampling estimator.
     StringMap<cost_based_ranker::SamplingMetadata> ceSamplingMetadata;
+    // Namespace-keyed persisted NDV statistics emitted under queryPlanner.fieldStatsMetadata.
+    // Only namespaces that served statistics have entries.
+    StringMap<std::vector<ce::PersistedNDVEntry>> fieldStatsMetadata;
     bool fromPlanCache = false;
+    // Hash of the join plan cache key. Populated on the explain path of a join eligible query.
+    boost::optional<uint32_t> joinPlanCacheKeyHash;
+    // The reason the deciding plan ranker was chosen, recorded by the ranking strategy at the
+    // branch point where it made its final decision. Emitted in V3 explain as the
+    // queryPlanner.rankerChoice.reason value. boost::none when no strategy recorded a decision.
+    // Explain derives "singlePlan" for the no-ranking (kNone) case instead.
+    boost::optional<PlanRankerReason> planRankerReason;
+    // Hash of the winning solution before it was extended with a pushed-down pipeline. Explain
+    // reports this as 'solutionHashUnstable'. This is required to allow forcedPlanSolutionHash to
+    // work, as that is applied before the winning solution is extended too.
+    boost::optional<size_t> preExtensionWinningPlanHash;
 };
 
 inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&& rhs) {
@@ -79,6 +105,16 @@ inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&&
                 "ceSamplingMetadata already has an entry for namespace during merge",
                 !lhs.ceSamplingMetadata.contains(ns));
         lhs.ceSamplingMetadata.emplace(ns, std::move(meta));
+    }
+    for (auto& [ns, entries] : rhs.fieldStatsMetadata) {
+        tassert(13176100,
+                "fieldStatsMetadata already has an entry for namespace during merge",
+                !lhs.fieldStatsMetadata.contains(ns));
+        lhs.fieldStatsMetadata.emplace(ns, std::move(entries));
+    }
+    // Keep the first set value: the strategy that made the ranking decision owns the field.
+    if (!lhs.planRankerReason) {
+        lhs.planRankerReason = rhs.planRankerReason;
     }
     return lhs;
 }
@@ -96,6 +132,99 @@ inline boost::optional<PlanExplainerData>& operator<<(boost::optional<PlanExplai
     return lhs;
 }
 
+/**
+ * The output shape produced by PlanExplainer::getPlanEntries().
+ *
+ * The format is an explicit parameter because it is deliberately not recoverable from the
+ * enumerator's other input, the ExplainPolicy: the V3 execStats policy is by design the same
+ * flag set as legacy allPlansExecution (that identity is what keeps the retained executionStats
+ * section information-identical to the legacy one), so "is this V3?" cannot be inferred from the
+ * policy. The caller, which has the verbosity, decides; passing the verbosity itself instead would
+ * re-derive content decisions from a verbosity inside content code, the coupling the ExplainPolicy
+ * seam exists to prevent.
+ *
+ * Not a transitional concept: legacy verbosities remain supported indefinitely and, since the
+ * per-plan accessor consolidation, obtain their legacy-shaped entries through this same
+ * enumerator as kLegacy.
+ */
+enum class PlanStatsFormat {
+    // The legacy explain node shape: structural fields and execution counters fused per node, the
+    // winner's tree read from the live root (post-execution at the execution verbosities), plans
+    // after the winner in enumeration order. Exactly the semantics of the legacy winning/rejected
+    // accessors.
+    kLegacy,
+    // The V3 node shape: per-node statistics{costBased, multiPlanEstimate, multiPlanFinalize}
+    // subobjects, the
+    // winner's tree sourced from the pre-execution trial snapshot (trial statistics, never
+    // final-execution statistics), plans after the winner ordered by the deciding ranker's metric.
+    kV3,
+};
+
+/**
+ * One entry per-plan returned by PlanExplainer::getPlanEntries(): a single candidate plan's
+ * serialized stats tree plus its optional summary. Unlike the winner/rejected- shaped accessors,
+ * plan entries form one sequence, which is the shape the V3 explain "plans[]" output is built
+ * over. The winning (or sole) plan is always the first entry - its position is the contract;
+ * there is no per-entry winner flag.
+ */
+struct ExplainPlanEntry {
+    // The plan's serialized stats tree, produced by the same per-plan formatting core as the legacy
+    // winning/rejected accessors.
+    BSONObj planStatsTree;
+    // Present when the explain policy requests execution stats; mirrors PlanStatsDetails::second.
+    boost::optional<PlanSummaryStats> summary;
+    // True when this plan ran a multi-planning trial: its stats tree carries trial counters and
+    // 'summary' holds the plan-level trial totals. This is the output-side contract the V3
+    // queryPlanner assembler consumes to emit the plan-level "multiPlanEstimateStats" /
+    // "multiPlanFinalizeStats" subobjects (it cannot be
+    // inferred from 'summary', which is also collected for never-ran plans). The enumeration
+    // derives it from one of three provenance sources per plan: the winner's trial snapshot,
+    // membership in an in-tree MultiPlanStage, or SolutionWithPlanStage::ranTrial for stored
+    // rejected plans.
+    bool hasTrialStats = false;
+    // Whether this plan is the one in the plan cache: the same
+    // 'cachedPlanHash == QuerySolution::hash()' comparison the legacy format computes, but where
+    // legacy emits the resulting "isCached" inside the plan's stats tree (its root node), the V3
+    // shape hoists it to the plan-object level - statsToBsonV3() does not emit it - so the
+    // value must cross this API for the assembler to place it.
+    bool isCached = false;
+    // The plan's QuerySolution hash, when known. Emitted as "solutionHashUnstable" at plan level
+    // in the V3 output when the forced-plan-by-hash knob is enabled.
+    boost::optional<size_t> solutionHash;
+    // How this plan's multi-planner trial ended. Set exactly when 'hasTrialStats' is true. Emitted
+    // as "stopCondition" inside the last plan-level phase subobject present (see below).
+    boost::optional<MultiPlannerStopCondition> stopCondition;
+    // The plan-level totals of the capped (estimate) trial phase, when the trial had one and the
+    // policy requests execution statistics. Emitted as the "multiPlanEstimateStats" subobject.
+    boost::optional<PlanSummaryStats> estimateSummary;
+    // How the capped (estimate) trial phase ended; set together with 'estimateSummary'.
+    boost::optional<MultiPlannerStopCondition> estimateStopCondition;
+    // The plan-level totals of the finalize trial phase, when the plan did work in it and the
+    // policy requests execution statistics. Emitted as the "multiPlanFinalizeStats" subobject.
+    // For a trial with a capped phase these are the increments accumulated after it (over the
+    // candidate's own subtree; 'summary' may also cover wrapper stages stacked above it for
+    // display). For a trial without one (pure multiplanning's single uncapped trial, or the
+    // finishing-up trial of a CBR-chosen plan) the whole trial is the finalize phase and these are
+    // the plan's cumulative totals.
+    boost::optional<PlanSummaryStats> finalizeSummary;
+    // The SBE virtual machine's view of this plan: the slot bindings and the stringified SBE stage
+    // tree (optionally with bytecode).
+    boost::optional<BSONObj> slotBasedPlan;
+    // The tree that actually executed, in the same node shape as 'planStatsTree', for the winning
+    // plan only. Set only when it differs from the ranked tree in 'planStatsTree'. This can happen
+    // with certain pipelines that are pushed down to SBE and rewritten *after* plan ranking.
+    boost::optional<BSONObj> executedPlanStages;
+    // A plan-level explain warning when the SBE plan is too large.
+    boost::optional<std::string> warning;
+    // TODO SERVER-134561: carry whether join optimization produced this plan. Legacy emits
+    // "usedJoinOptimization" whenever the join optimization knob is on; V3 emits nothing. The
+    // ticket has to settle where the value belongs - here at plan level, matching legacy's SBE
+    // placement, or once on "queryPlanner" alongside "joinPlanCacheKey", which is the scope it
+    // actually has today since it never varies across the plans of one explain.
+    // TODO SERVER-131545: attach additional per-plan data (e.g. planningResult,
+    // stopCondition, score) via a per-candidate record.
+};
+
 
 /**
  * This interface defines an API to provide information on the execution plans generated by the
@@ -107,7 +236,8 @@ public:
      * A version of the explain format:
      * - "1" is used for the classic engine
      * - "2" for SBE stagebuilders
-     * - "3" for CQF
+     * - "3" for the V3 explain format, requested via one of the V3 verbosity modes.
+     *   Unlike "1"/"2", "3" is not determined by the execution engine.
      */
     using ExplainVersion = std::string;
 
@@ -129,9 +259,27 @@ public:
     virtual ~PlanExplainer() = default;
 
     /**
-     * Returns a version of the explain format supported by this explainer.
+     * Returns 'true' if this explainer describes an SBE plan (explain version "2"), or 'false' for
+     * the classic engine (explain version "1").
      */
-    virtual const ExplainVersion& getVersion() const = 0;
+    virtual bool isSbeExplainer() const = 0;
+
+    /**
+     * Returns the explain version to report for the given 'verbosity'. When any of the V3 verbosity
+     * modes is requested this is "3"; otherwise it is the engine-determined version ("2" for SBE,
+     * "1" for the classic engine, as reported by isSbeExplainer()). Centralizing the decision here
+     * ensures the V3 rule cannot be bypassed by, or diverge across, explainer implementations.
+     */
+    const ExplainVersion& getVersion(ExplainOptions::Verbosity verbosity) const {
+        static const ExplainVersion kV1{"1"};
+        static const ExplainVersion kV2{"2"};
+        static const ExplainVersion kV3{"3"};
+
+        if (ExplainOptions::isV3Verbosity(verbosity)) {
+            return kV3;
+        }
+        return isSbeExplainer() ? kV2 : kV1;
+    }
 
     /**
      * Returns 'true' if this PlanExplainer can provide information on the winning plan and rejected
@@ -143,7 +291,7 @@ public:
     /**
      * Returns a short string, suitable for the logs, which summarizes the execution plan.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual std::string getPlanSummary() const = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual std::string getPlanSummary() const = 0;
 
     /**
      * Fills out 'statsOut' with summary stats collected during the execution of the underlying
@@ -153,7 +301,8 @@ public:
      * The summary stats are consumed by debug mechanisms such as the profiler and the slow query
      * log.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual void getSummaryStats(PlanSummaryStats* statsOut) const = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual void getSummaryStats(
+        PlanSummaryStats* statsOut) const = 0;
 
     /**
      * Fills out 'statsOut' for the secondary collection 'secondaryColl'. Subclasses may
@@ -164,16 +313,35 @@ public:
                                           PlanSummaryStats* statsOut) const {}
 
     /**
+     * Returns the strategy that selected the winning plan, or boost::none for explainers that never
+     * ranked one. The explainer is the authoritative store: it lives for the cursor's lifetime.
+     */
+    virtual boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const {
+        return boost::none;
+    }
+
+    /**
      * Returns statistics that detail the winning plan selected by the multi-planner, or, if no
      * multi-planning has been performed, for the single plan selected by the QueryPlanner.
      *
-     * The 'verbosity' level parameter determines the amount of information to be returned.
+     * Returns an empty stats object for explainers with no candidate plans to enumerate.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual PlanStatsDetails getWinningPlanStats(
-        ExplainOptions::Verbosity verbosity) const = 0;
+    PlanStatsDetails getWinningPlanStats(const ExplainPolicy& policy) const {
+        auto entries =
+            getPlanEntries(policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
+        if (entries.empty()) {
+            return {};
+        }
+        auto& winner = entries.front();
+        return {std::move(winner.planStatsTree), std::move(winner.summary)};
+    }
 
-    virtual PlanStatsDetails getWinningPlanStatsQueryPlanner(bool /*printBytecode*/) const {
-        return getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
+    /**
+     * Convenience overload for callers that have a verbosity rather than a policy.
+     */
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] PlanStatsDetails getWinningPlanStats(
+        ExplainOptions::Verbosity verbosity) const {
+        return getWinningPlanStats(explainPolicyFor(verbosity));
     }
 
     /**
@@ -184,11 +352,51 @@ public:
     /**
      * Returns statistics that detail candidate plans rejected by the multi-planner. If no
      * multi-planning has been performed, an empty vector is returned.
-     *
-     * The 'verbosity' level parameter determines the amount of information to be returned.
      */
-    virtual std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const = 0;
+    std::vector<PlanStatsDetails> getRejectedPlansStats(const ExplainPolicy& policy) const {
+        auto entries =
+            getPlanEntries(policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
+        std::vector<PlanStatsDetails> res;
+        if (entries.empty()) {
+            return res;
+        }
+        res.reserve(entries.size() - 1);
+        for (size_t i = 1; i < entries.size(); ++i) {
+            res.push_back({std::move(entries[i].planStatsTree), std::move(entries[i].summary)});
+        }
+        return res;
+    }
+
+    std::vector<PlanStatsDetails> getRejectedPlansStats(ExplainOptions::Verbosity verbosity) const {
+        return getRejectedPlansStats(explainPolicyFor(verbosity));
+    }
+
+    /**
+     * Returns a uniform per-plan view of the candidate plans: one ExplainPlanEntry per plan, the
+     * winning (or sole) plan first, followed by the remaining candidates. The content depends on
+     * 'policy' and the node shape, winner-tree source, and candidate ordering are selected by
+     * 'format' (see PlanStatsFormat).
+     *
+     * 'decidingPlanRanker' names the ranker that chose the winning plan and determines the kV3
+     * ordering of the plans after the winner: the deciding ranker's metric is the primary sort key
+     * (root cost estimate ascending when the cost-based ranker decided; trial score descending,
+     * then cost-only plans by cost ascending, when the multi-planner decided), with enumeration
+     * order breaking ties. It must be passed explicitly, never inferred from which statistics are
+     * present; callers get it from getPlanSelectionStrategy(). It is ignored in kLegacy format
+     * (enumeration order, exactly the legacy accessors' behavior); pass
+     * PlanSelectionStrategy::kSinglePlan when unknown (single plan, cached plan).
+     *
+     * This is the accessor the V3 explain output builds its "plans[]" array
+     * over. The default implementation returns no entries. Explainers without
+     * candidate plans (the pipeline explainer) inherit it. PlanExplainerImpl and
+     * PlanExplainerExpress provide real implementations.
+     */
+    virtual std::vector<ExplainPlanEntry> getPlanEntries(
+        const ExplainPolicy& policy,
+        PlanStatsFormat format,
+        PlanSelectionStrategy decidingPlanRanker) const {
+        return {};
+    }
 
     /**
      * Returns an object containing what query knobs the planner hit during plan enumeration. This
@@ -212,6 +420,36 @@ public:
      */
     virtual boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
         const {
+        return boost::none;
+    }
+
+    /**
+     * Returns the per-collection persisted NDV statistics used during planning, to be emitted
+     * under queryPlanner.fieldStatsMetadata in explain output. Returns boost::none if no such
+     * statistics were served.
+     */
+    virtual boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
+        const {
+        return boost::none;
+    }
+
+    /**
+     * Returns the reason the deciding plan ranker was chosen, as recorded by the ranking strategy
+     * at its decision site (see PlanExplainerData::planRankerReason). Returns boost::none when no
+     * strategy recorded a decision - explainers without classic ranking data (SBE, Express, the
+     * pipeline explainer) inherit this default. For express it is not a deferral: an express plan
+     * is a single plan that no strategy ranks, so there is no choice to explain and the V3
+     * rankerChoice reports "none"/"singlePlan".
+     */
+    virtual boost::optional<PlanRankerReason> getPlanRankerReason() const {
+        return boost::none;
+    }
+
+    /**
+     * Returns a hash of the join plan cache key. Returns boost::none if the query is not eligible
+     * for join optimization.
+     */
+    virtual boost::optional<uint32_t> getJoinPlanCacheKeyHash() const {
         return boost::none;
     }
 

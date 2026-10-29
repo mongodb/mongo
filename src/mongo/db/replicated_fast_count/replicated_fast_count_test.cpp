@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -55,35 +29,20 @@ namespace mongo::replicated_fast_count {
 namespace {
 
 using test_helpers::checkCommittedSizeCount;
+using test_helpers::checkUncommittedSizeCount;
+using test_helpers::waitForFlush;
 
-// Selects whether the fast count metadata is persisted through the collection-backed path or the
-// container-backed path. Used to parameterize tests so the same bodies exercise both paths.
-enum class FastCountStoreMode { kCollection, kContainer };
-
-/**
- * Shared test fixture for replicated fast count tests. Derived fixtures choose the persistence
- * mode by overriding `getMode()`, which drives whether the container-write feature flags are
- * enabled before `setUpReplicatedFastCount()` decides which backing store to provision.
- */
-class ReplicatedFastCountTestBase : public CatalogTestFixture {
+class ReplicatedFastCountTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountTestBase()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
-    virtual FastCountStoreMode getMode() const = 0;
-
     void setUp() override {
         CatalogTestFixture::setUp();
         _opCtx = operationContext();
-
-        if (getMode() == FastCountStoreMode::kContainer) {
-            _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
-                "featureFlagReplicatedFastCountDurability", true);
-            _ffContainerWrites = std::make_unique<unittest::ServerParameterGuard>(
-                "featureFlagContainerWrites", true);
-        }
 
         auto* registry = dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
         ASSERT(registry);
@@ -91,10 +50,6 @@ protected:
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
         _fastCountManager = &ReplicatedFastCountManager::get(_opCtx->getServiceContext());
-        // Allow for control over when we write to our internal collection for testing. We only
-        // write to the internal collection when we explicitly call
-        // ReplicatedFastCountManager::flushSync_ForTest().
-        _fastCountManager->disablePeriodicWrites_ForTest();
 
         setUpReplicatedFastCount(_opCtx);
 
@@ -126,12 +81,23 @@ protected:
     }
 
     /**
-     * Signals the fast count manager to shut down if it has not already done so.
+     * Shuts down the `ReplicatedFastCountManager`, joining its tailer and flusher threads before
+     * the ServiceContext is destroyed.
      */
     void shutdownFastCountManager() {
         if (_fastCountManager != nullptr) {
+            _fastCountManager->shutdown(_opCtx);
             _fastCountManager = nullptr;
         }
+    }
+
+    /**
+     * Requests a flush and blocks until the valid-as-of timestamp advances since this function was
+     * called.
+     */
+    void flush() {
+        const auto stores = _fastCountManager->getSizeCountStores_ForTest();
+        waitForFlush(_opCtx, *stores.second, [&] { _fastCountManager->flushAsync(); });
     }
 
     OperationContext* _opCtx;
@@ -150,42 +116,7 @@ protected:
 
     BSONObj sampleDocForInsert = BSON("_id" << 0 << "x" << 0);
     BSONObj sampleDocForUpdate = BSON("_id" << 0 << "x" << 0 << "y" << 0);
-
-    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
-    std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
-
-/**
- * Parameterized fixture that runs each test case in both collection-backed and container-backed
- * modes.
- */
-class ReplicatedFastCountTest : public ReplicatedFastCountTestBase,
-                                public ::testing::WithParamInterface<FastCountStoreMode> {
-protected:
-    FastCountStoreMode getMode() const override {
-        return GetParam();
-    }
-};
-
-/**
- * Collection-only fixture for tests that inherently depend on the collection-backed storage path
- * (e.g. tests that manipulate the internal fast count collection directly or validate the applyOps
- * payload layout emitted by the collection-backed flush path).
- */
-class ReplicatedFastCountCollectionOnlyTest : public ReplicatedFastCountTestBase {
-protected:
-    FastCountStoreMode getMode() const override {
-        return FastCountStoreMode::kCollection;
-    }
-};
-
-
-inline std::string modeToString(FastCountStoreMode mode) {
-    return mode == FastCountStoreMode::kCollection ? "Collection" : "Container";
-}
-
-const NamespaceString replicatedFastCountStoreNss =
-    NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
 
 const std::function<BSONObj(int)> docGeneratorForInsert = [](int i) {
     return BSON("_id" << i << "x" << i);
@@ -194,7 +125,7 @@ const std::function<BSONObj(int)> docGeneratorForUpdate = [](int i) {
     return BSON("_id" << i << "x" << i << "y" << i * 2);
 };
 
-TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnCommit) {
+TEST_F(ReplicatedFastCountTest, UncommittedChangesResetOnCommit) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const int numDocs = 5;
     test_helpers::insertDocs(_opCtx,
@@ -207,7 +138,7 @@ TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnCommit) {
                              sampleDocForInsert);
 }
 
-TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnRollback) {
+TEST_F(ReplicatedFastCountTest, UncommittedChangesResetOnRollback) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const int numDocs = 5;
     test_helpers::insertDocs(_opCtx,
@@ -221,7 +152,7 @@ TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnRollback) {
                              /*abortWithoutCommit=*/true);
 }
 
-TEST_P(ReplicatedFastCountTest, UpdatesAreCorrectlyAccountedFor) {
+TEST_F(ReplicatedFastCountTest, UpdatesAreCorrectlyAccountedFor) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
@@ -246,7 +177,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesAreCorrectlyAccountedFor) {
                              sampleDocForUpdate);
 }
 
-TEST_P(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
+TEST_F(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
@@ -254,8 +185,8 @@ TEST_P(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
                              _fastCountManager,
                              _nss1,
                              numDocs,
-                             /*startingSize=*/0,
                              /*startingCount=*/0,
+                             /*startingSize=*/0,
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
@@ -269,7 +200,7 @@ TEST_P(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
                                       sampleDocForInsert);
 }
 
-TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
+TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalContainer) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 5;
@@ -294,33 +225,29 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
                              sampleDocForInsert);
 
 
-    // Verify that the committed changes have not been written to the internal fast count collection
+    // Verify that the committed changes have not been written to the internal fast count container
     // yet.
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid1,
                                                         /*expectPersisted=*/false,
                                                         /*expectedCount=*/0,
                                                         /*expectedSize=*/0);
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid2,
                                                         /*expectPersisted=*/false,
                                                         /*expectedCount=*/0,
                                                         /*expectedSize=*/0);
 
-    // Manually trigger an iteration to write dirty metadata to the internal collection.
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    // Manually trigger an iteration to write dirty metadata to the internal container.
+    flush();
 
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid1,
                                                         /*expectPersisted=*/true,
                                                         numDocsColl1,
                                                         numDocsColl1 *
                                                             sampleDocForInsert.objsize());
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
                                                         _uuid2,
                                                         /*expectPersisted=*/true,
                                                         numDocsColl2,
@@ -328,7 +255,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
                                                             sampleDocForInsert.objsize());
 }
 
-TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
+TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 5;
@@ -352,7 +279,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntries = test_helpers::getApplyOpsForFastCountStore(_opCtx);
 
@@ -372,7 +299,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
                                                  });
 }
 
-TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
+TEST_F(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 10;
@@ -396,7 +323,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     // Now, dirty metadata for the same collections, and check that an applyOps entry with the
     // correct update information is generated.
@@ -431,7 +358,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
                              sampleDocForInsert,
                              sampleDocForUpdate);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -449,7 +376,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
         });
 }
 
-TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
+TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 25;
@@ -464,7 +391,7 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -492,7 +419,7 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss3));
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -511,7 +438,7 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
         });
 }
 
-TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
+TEST_F(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 5;
@@ -525,12 +452,12 @@ TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
     // We should detect that we dropped the collection _nss1 and delete the fast count entry for it.
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -538,7 +465,7 @@ TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
         applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
 
-TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
+TEST_F(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 5;
@@ -552,7 +479,7 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -565,7 +492,7 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -574,84 +501,6 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
     test_helpers::assertFastCountApplyOpsMatches(
         applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
-
-TEST_F(ReplicatedFastCountCollectionOnlyTest, StartupFailsIfFastCountCollectionNotPresent) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-
-    {
-        repl::UnreplicatedWritesBlock uwb(_opCtx);
-        ASSERT_OK(
-            storageInterface()->dropCollection(_opCtx,
-                                               NamespaceString::makeGlobalConfigCollection(
-                                                   NamespaceString::kReplicatedFastCountStore)));
-    }
-
-    ASSERT_THROWS_CODE(_fastCountManager->startup(_opCtx), DBException, 11718600);
-}
-
-TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-
-    const int64_t numInitialDocs = 5;
-    const int64_t initialSize = numInitialDocs * sampleDocForInsert.objsize();
-    const int64_t numExtraDocs = 5;
-    const int64_t numTotalDocs = numInitialDocs + numExtraDocs;
-    const int64_t totalSize = numTotalDocs * sampleDocForInsert.objsize();
-
-    test_helpers::insertDocs(_opCtx,
-                             _fastCountManager,
-                             _nss1,
-                             numInitialDocs,
-                             0,
-                             0,
-                             docGeneratorForInsert,
-                             sampleDocForInsert);
-
-    checkCommittedSizeCount(_opCtx, _uuid1, {.size = initialSize, .count = numInitialDocs});
-    stdx::thread iterThread;
-
-    {
-        FailPointEnableBlock fp("hangAfterReplicatedFastCountSnapshot");
-        auto initialTimesEntered = fp.initialTimesEntered();
-
-        iterThread = stdx::thread([this] {
-            auto clientForThread = getService()->makeClient("ReplicatedFastCountBackground");
-            auto opCtxHolder = clientForThread->makeOperationContext();
-            auto* opCtxForThread = opCtxHolder.get();
-            // Hang after we make a copy of the _metadata map which should include our initial
-            // inserts to the collection, but before we actually write to disk and change our dirty
-            // flag for the collection we wrote to.
-            _fastCountManager->flushSync_ForTest(opCtxForThread);
-        });
-
-        fp->waitForTimesEntered(initialTimesEntered + 1);
-
-        test_helpers::insertDocs(_opCtx,
-                                 _fastCountManager,
-                                 _nss1,
-                                 numExtraDocs,
-                                 numInitialDocs,
-                                 numInitialDocs * sampleDocForInsert.objsize(),
-                                 docGeneratorForInsert,
-                                 sampleDocForInsert);
-
-        checkCommittedSizeCount(_opCtx, _uuid1, {.size = totalSize, .count = numTotalDocs});
-        // Disable failpoint by letting it go out of scope.
-    }
-
-    iterThread.join();
-
-    // If the dirty metadata wasn't incorrectly cleared, this flush should persist our second batch
-    // of inserts.
-    _fastCountManager->flushSync_ForTest(_opCtx);
-
-    // Verify that all of our writes were persisted to disk.
-    test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx, _fastCountManager, _uuid1, true, numTotalDocs, totalSize);
-}
-
-// TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and
-// counts. Test for drop, create.
 
 /**
  * Helpers to build applyOps-style CRUD operations.
@@ -676,7 +525,7 @@ BSONObj makeApplyOpsDeleteOp(const NamespaceString& nss, const UUID& uuid, int i
                      << "ns" << nss.ns_forTest() << "ui" << uuid << "o" << BSON("_id" << id));
 }
 
-TEST_P(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
+TEST_F(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 3;
@@ -706,11 +555,11 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
     checkCommittedSizeCount(_opCtx, _uuid1, {.size = expectedSizeColl1, .count = numDocsColl1});
     checkCommittedSizeCount(_opCtx, _uuid2, {.size = expectedSizeColl2, .count = numDocsColl2});
 
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid2, 0, 0);
+    checkUncommittedSizeCount(_opCtx, _uuid1, {.size = 0, .count = 0});
+    checkUncommittedSizeCount(_opCtx, _uuid2, {.size = 0, .count = 0});
 }
 
-TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
+TEST_F(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 5;
@@ -746,10 +595,10 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
 
 
     checkCommittedSizeCount(_opCtx, _uuid1, {.size = expectedNewSize, .count = numDocs});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
+    checkUncommittedSizeCount(_opCtx, _uuid1, {.size = 0, .count = 0});
 }
 
-TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
+TEST_F(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
@@ -784,7 +633,7 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
     const int64_t expectedSize = startingSize - deletedSize;
 
     checkCommittedSizeCount(_opCtx, _uuid1, {.size = expectedSize, .count = expectedCount});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
+    checkUncommittedSizeCount(_opCtx, _uuid1, {.size = 0, .count = 0});
 }
 
 enum class CapType { kCount, kSize };
@@ -793,18 +642,12 @@ inline std::string capTypeToString(CapType type) {
     return type == CapType::kCount ? "Count" : "Size";
 }
 
-// Parameterized over (FastCountStoreMode, CapType) so the capped-collection eviction path is
-// exercised against both the collection-backed and container-backed fast count stores.
-class ReplicatedFastCountCappedCollectionTest
-    : public ReplicatedFastCountTestBase,
-      public ::testing::WithParamInterface<std::tuple<FastCountStoreMode, CapType>> {
+// Parameterized over CapType so both cap-by-count and cap-by-size eviction paths are exercised.
+class ReplicatedFastCountCappedCollectionTest : public ReplicatedFastCountTest,
+                                                public ::testing::WithParamInterface<CapType> {
 protected:
-    FastCountStoreMode getMode() const override {
-        return std::get<0>(GetParam());
-    }
-
     CapType getCapType() const {
-        return std::get<1>(GetParam());
+        return GetParam();
     }
 };
 
@@ -859,17 +702,14 @@ TEST_P(ReplicatedFastCountCappedCollectionTest, CorrectSizeCountAfterCapReached)
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    ,
-    ReplicatedFastCountCappedCollectionTest,
-    ::testing::Combine(::testing::Values(FastCountStoreMode::kCollection,
-                                         FastCountStoreMode::kContainer),
-                       ::testing::Values(CapType::kCount, CapType::kSize)),
-    [](const ::testing::TestParamInfo<std::tuple<FastCountStoreMode, CapType>>& info) {
-        return modeToString(std::get<0>(info.param)) + capTypeToString(std::get<1>(info.param));
-    });
+INSTANTIATE_TEST_SUITE_P(,
+                         ReplicatedFastCountCappedCollectionTest,
+                         ::testing::Values(CapType::kCount, CapType::kSize),
+                         [](const ::testing::TestParamInfo<CapType>& info) {
+                             return capTypeToString(info.param);
+                         });
 
-TEST_P(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections) {
+TEST_F(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections) {
     const NamespaceString internalNss =
         NamespaceString::createNamespaceString_forTest("local.coll");
     ASSERT_OK(createCollection(_opCtx, internalNss.dbName(), BSON("create" << internalNss.coll())));
@@ -882,31 +722,27 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
     const UUID internalUuid = internalColl.uuid();
     const long long docsToInsertCount = 10;
 
-    long long expectedSize = 0;
-    WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::nonAtomicGroup);
     for (size_t i = 0; i < docsToInsertCount; ++i) {
         const BSONObj document = docGeneratorForInsert(i);
         ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
-        expectedSize += document.objsize();
     }
 
     checkCommittedSizeCount(
         operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, internalUuid, {.size = 0, .count = 0});
 
     wuow.commit();
 
-    // Replicated fast count collection has no record of the writes to `internalColl`.
+    // Replicated fast count store has no record of the writes to `internalColl`.
     checkCommittedSizeCount(
         operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
-
-    // Size and count data for `internalColl` are still tracked through the record store.
-    EXPECT_EQ(internalColl.getCollectionPtr()->numRecords(_opCtx), docsToInsertCount);
-    EXPECT_EQ(internalColl.getCollectionPtr()->dataSize(_opCtx), expectedSize);
+    checkUncommittedSizeCount(_opCtx, internalUuid, {.size = 0, .count = 0});
+    EXPECT_EQ(internalColl.getCollectionPtr()->numRecords(_opCtx), 0);
+    EXPECT_EQ(internalColl.getCollectionPtr()->dataSize(_opCtx), 0);
 }
 
-TEST_P(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollections) {
+TEST_F(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollections) {
     for (const auto& internalDbName : {"config", "admin"}) {
         const NamespaceString internalNss =
             NamespaceString::createNamespaceString_forTest(internalDbName, "coll");
@@ -922,7 +758,7 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
         const long long docsToInsertCount = 10;
 
         long long expectedSize = 0;
-        WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::nonAtomicGroup);
         for (size_t i = 0; i < docsToInsertCount; ++i) {
             const BSONObj document = docGeneratorForInsert(i);
             ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
@@ -931,15 +767,15 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
 
         checkCommittedSizeCount(
             operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(
-            _opCtx, internalUuid, docsToInsertCount, expectedSize);
+        checkUncommittedSizeCount(
+            _opCtx, internalUuid, {.size = expectedSize, .count = docsToInsertCount});
 
         wuow.commit();
 
-        // Replicated fast count collection has record of the writes to `internalColl`.
+        // Replicated fast count store has record of the writes to `internalColl`.
         checkCommittedSizeCount(
             _opCtx, internalUuid, {.size = expectedSize, .count = docsToInsertCount});
-        test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
+        checkUncommittedSizeCount(_opCtx, internalUuid, {.size = 0, .count = 0});
     }
 }
 
@@ -1098,7 +934,7 @@ TEST_F(SizeMetadataLoggingTest, BasicGroupCommit) {
     const auto doc1 = BSON("_id" << 0 << "x" << 0);
     const auto doc2 = BSON("_id" << 1 << "abcdefg" << 1);
     {
-        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::nonAtomicGroup};
         ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc1));
         ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc2));
         wuow.commit();
@@ -1127,14 +963,6 @@ using ReplicatedFastCountDeathTest = ReplicatedFastCountTest;
 
 //     _fastCountManager->commit(changes, boost::none);
 // }
-
-INSTANTIATE_TEST_SUITE_P(,
-                         ReplicatedFastCountTest,
-                         ::testing::Values(FastCountStoreMode::kCollection,
-                                           FastCountStoreMode::kContainer),
-                         [](const ::testing::TestParamInfo<FastCountStoreMode>& info) {
-                             return modeToString(info.param);
-                         });
 
 }  // namespace
 

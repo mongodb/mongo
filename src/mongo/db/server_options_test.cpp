@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include <filesystem>
@@ -39,7 +13,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include <fmt/format.h>
 
 #ifndef _WIN32
@@ -86,6 +59,7 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -1543,81 +1517,177 @@ TEST_F(SetParameterOptionTest, ApplySetParameters) {
     ASSERT_EQ(p2->val, 666);
 }
 
-class ExtensionsSignaturePubKeyPathOptionTest : public unittest::Test {
-protected:
-    void setUp() override {
-        ASSERT_OK(addGeneralServerOptions(&options));
-    }
-
+/**
+ * ParseAndSetupStringPathParameterOptionTest is a helper base test class used to verify that a
+ * string configuration option is parsed/validated/setup correctly into the serverGlobalParams.
+ * Note, the configuration must belong to the 'processManagement' section of the configuration file.
+ */
+class ParseAndSetupStringPathParameterOptionTest : public unittest::Test {
 public:
-    std::filesystem::path touchTempPubKeyFile(std::string filename) {
-        pubKeyTempDir.emplace("ext_sig_pub_key_path_test");
-        auto p = std::filesystem::path(pubKeyTempDir->path()) / filename;
-        std::ofstream{p};
-        return p;
+    ~ParseAndSetupStringPathParameterOptionTest() = default;
+
+    void setUp() override {
+        ASSERT_OK(addGeneralServerOptions(&_options));
+        _tmpDir.emplace(_configName + "_test");
     }
 
-    /**
-     * 'yaml' determines if the server's argv input should specify the server options
-     * directly, or if it should look for a config yaml file.
-     *
-     * Returns 'extSigPubKeyPath'.
-     */
-    std::filesystem::path parseAndSetupServerOptions(std::filesystem::path extSigPubKeyPath,
-                                                     bool yaml) {
+protected:
+    ParseAndSetupStringPathParameterOptionTest(const std::string& configName)
+        : _configName(configName) {}
+
+    virtual const std::string& _readServerParam() = 0;
+
+    // Selects whether parseAndSetupServerOptions passes the option directly on the command line or
+    // via a YAML config file.
+    enum class ConfigSource { kCommandLine, kConfigFile };
+    struct ExpectedResult {
+        ErrorCodes::Error code{ErrorCodes::OK};
+        std::string errorMessage{};  // This value is optionally set for expected error cases.
+    };
+
+    void _testParseAndSetupServerOptions(const std::string& configValue,
+                                         ConfigSource source,
+                                         ExpectedResult expected) {
         std::vector<std::string> argv;
-        if (!yaml) {
-            argv = {"binaryname", "--extensionsSignaturePublicKeyPath", extSigPubKeyPath.string()};
-        } else {
-            argv = {"binaryname", "--config", "config.yaml"};
-            parser.setConfig("config.yaml",
-                             fmt::format("{}:\n"
-                                         "    {}: {}\n",
-                                         "processManagement",
-                                         "extensionsSignaturePublicKeyPath",
-                                         extSigPubKeyPath.string()));
+        switch (source) {
+            case ConfigSource::kCommandLine:
+                argv = {"binaryname", "--" + _configName, configValue};
+                break;
+            case ConfigSource::kConfigFile:
+                argv = {"binaryname", "--config", "config.yaml"};
+                _parser.setConfig("config.yaml",
+                                  fmt::format("{}:\n"
+                                              "    {}: {}\n",
+                                              "processManagement",
+                                              _configName,
+                                              configValue));
+                break;
         }
 
-        ASSERT_OK(parser.run(options, argv, &environment));
-        ASSERT_OK(validateServerOptions(environment));
-        ASSERT_OK(canonicalizeServerOptions(&environment));
+        ASSERT_OK(_parser.run(_options, argv, &_environment));
+        ASSERT_OK(validateServerOptions(_environment));
+        ASSERT_OK(canonicalizeServerOptions(&_environment));
         ASSERT_OK(setupServerOptions(argv));
 
-        return extSigPubKeyPath;
+        const auto storeOptionsStatus = storeServerOptions(_environment);
+        ASSERT_EQ(storeOptionsStatus, expected.code);
+
+        if (expected.code == ErrorCodes::OK) {
+            ASSERT_EQ(_readServerParam(), configValue);
+        } else {
+            if (!expected.errorMessage.empty()) {
+                ASSERT_STRING_CONTAINS(storeOptionsStatus.reason(), expected.errorMessage);
+            }
+        }
     }
 
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-    boost::optional<unittest::TempDir> pubKeyTempDir;
+    std::string _touchFile(std::string filename) {
+        auto p = std::filesystem::path(_tmpDir->path()) / filename;
+        std::ofstream{p};
+        return p.string();
+    }
+
+    OptionsParserTester _parser;
+    moe::Environment _environment;
+    moe::OptionSection _options;
+    boost::optional<unittest::TempDir> _tmpDir;
+
+private:
+    const std::string _configName;
+};
+
+// In secure compilation mode the option is not registered at all, so there is nothing left to
+// exercise here: the parser rejects it before any of the validation below can run.
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+class ExtensionsSignaturePubKeyPathOptionTest : public ParseAndSetupStringPathParameterOptionTest {
+public:
+    ExtensionsSignaturePubKeyPathOptionTest()
+        : ParseAndSetupStringPathParameterOptionTest("extensionsSignaturePublicKeyPath") {}
+
+private:
+    const std::string& _readServerParam() override {
+        return serverGlobalParams.extensionsSignaturePublicKeyPath;
+    }
 };
 
 TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathFromCLI) {
-    std::filesystem::path path =
-        parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.asc"), false);
-
-    ASSERT_OK(storeServerOptions(environment));
-    ASSERT_EQ(serverGlobalParams.extensionsSignaturePublicKeyPath, path);
+    _testParseAndSetupServerOptions(
+        _touchFile("ext_sig_key.asc"), ConfigSource::kCommandLine, {ErrorCodes::OK});
 }
 
 TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathFromConfigFile) {
-    std::filesystem::path path =
-        parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.asc"), true);
-
-    ASSERT_OK(storeServerOptions(environment));
-    ASSERT_EQ(serverGlobalParams.extensionsSignaturePublicKeyPath, path);
+    _testParseAndSetupServerOptions(
+        _touchFile("ext_sig_key.asc"), ConfigSource::kConfigFile, {ErrorCodes::OK});
 }
 
 TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathIsNotAsc) {
-    parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.txt"), false);
-
-    ASSERT_EQ(storeServerOptions(environment), ErrorCodes::BadValue);
+    _testParseAndSetupServerOptions(_touchFile("ext_sig_key.txt"),
+                                    ConfigSource::kCommandLine,
+                                    {ErrorCodes::BadValue, "the provided file is not a '.asc'"});
 }
 
-TEST_F(ExtensionsSignaturePubKeyPathOptionTest, NonexistantFile) {
-    parseAndSetupServerOptions("/dne/ext_sig_key.asc", false);
+TEST_F(ExtensionsSignaturePubKeyPathOptionTest, NonexistentFile) {
+    _testParseAndSetupServerOptions("/dne/ext_sig_key.asc",
+                                    ConfigSource::kCommandLine,
+                                    {ErrorCodes::BadValue, "the provided file does not exist"});
+}
 
-    ASSERT_EQ(storeServerOptions(environment), ErrorCodes::BadValue);
+#endif  // not MONGO_CONFIG_EXT_SIG_SECURE
+
+class ExtensionsConfigPathOptionTest : public ParseAndSetupStringPathParameterOptionTest {
+public:
+    ExtensionsConfigPathOptionTest()
+        : ParseAndSetupStringPathParameterOptionTest("extensionsConfigPath") {}
+
+    void tearDown() override {
+        serverGlobalParams.extensionsConfigPath.clear();
+    }
+
+protected:
+    const std::string& _readServerParam() override {
+        return serverGlobalParams.extensionsConfigPath;
+    }
+};
+
+TEST_F(ExtensionsConfigPathOptionTest, PathFromCLI) {
+    _testParseAndSetupServerOptions(_tmpDir->path(), ConfigSource::kCommandLine, {ErrorCodes::OK});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, PathFromConfigFile) {
+    _testParseAndSetupServerOptions(_tmpDir->path(), ConfigSource::kConfigFile, {ErrorCodes::OK});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, NonexistentPath) {
+    _testParseAndSetupServerOptions("/dne/extensions_config",
+                                    ConfigSource::kCommandLine,
+                                    {ErrorCodes::BadValue, "does not exist"});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, NonDirectoryPath) {
+    // The config path must be a directory; an existing regular file should be rejected at startup
+    // rather than failing later during extension loading.
+    const auto filePath = _touchFile("not_a_directory");
+    ASSERT_TRUE(std::filesystem::is_regular_file(filePath));
+    _testParseAndSetupServerOptions(
+        filePath, ConfigSource::kCommandLine, {ErrorCodes::BadValue, "not a directory"});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, EmptyPath) {
+    // An explicitly provided but empty path is rejected (distinct from the option being absent,
+    // which is allowed -- see OptionNotProvided).
+    _testParseAndSetupServerOptions(
+        "", ConfigSource::kCommandLine, {ErrorCodes::BadValue, "path was empty"});
+}
+
+TEST_F(ExtensionsConfigPathOptionTest, OptionNotProvided) {
+    std::vector<std::string> argv = {"binaryname"};
+    ASSERT_OK(_parser.run(_options, argv, &_environment));
+    ASSERT_OK(validateServerOptions(_environment));
+    ASSERT_OK(canonicalizeServerOptions(&_environment));
+    ASSERT_OK(setupServerOptions(argv));
+
+    ASSERT_OK(storeServerOptions(_environment));
+    ASSERT_TRUE(serverGlobalParams.extensionsConfigPath.empty());
 }
 
 }  // namespace

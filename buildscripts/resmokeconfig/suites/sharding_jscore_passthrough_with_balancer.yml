@@ -7,8 +7,6 @@ selector:
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-    # These tests use chunk migration, and they expect the balancer to be disabled.
-    - jstests/core_sharding/chunk_migration/*.js
     # These tests are run in sharded_jscore_txns.
     - jstests/core/txns/**/*.js
     # TODO SERVER-87108 re-enable all map reduce tests
@@ -94,6 +92,9 @@ executor:
       set_parameters:
         enableTestCommands: 1
         reshardingMinimumOperationDurationMillis: 0
+        # An idle change-streams monitor blocks one of the two donor service threads for a whole
+        # batch interval (default 5 min), stalling reshards that hold the DDL lock. See BF-44929.
+        reshardingVerificationChangeStreamsEventsBatchTimeLimitMillis: 5000
         useBatchedDeletesForRangeDeletion: true
     num_rs_nodes_per_shard: 1
     num_mongos: 3

@@ -18,7 +18,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
-        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+        await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
       global_vars:
         TestData:
           isMultiShardedClusterFixture: true
@@ -67,6 +67,8 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
     - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_sparse.js
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_wildcard.js
     - jstests/aggregation/explain/explain_limit.js
     - jstests/aggregation/sources/densify/generated_limit.js
     - jstests/aggregation/sources/unionWith/unionWith.js
@@ -94,4 +96,5 @@ selector:
     - requires_2_or_more_shards
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test

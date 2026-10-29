@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/base/status.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -46,7 +21,6 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -302,7 +276,7 @@ AggregateCommandRequest findAllShardsAggRequest(OperationContext* opCtx) {
  */
 void setInitializationMetadataOnPlacementHistory(OperationContext* opCtx,
                                                  Timestamp initializationTime,
-                                                 std::vector<ShardRef> clusterTopologyAtInitTime) {
+                                                 std::vector<ShardId> clusterTopologyAtInitTime) {
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
                                 ExecutorPtr txnExec) -> SemiFuture<void> {
         write_ops::DeleteCommandRequest deleteOldMetadata(
@@ -339,7 +313,7 @@ void setInitializationMetadataOnPlacementHistory(OperationContext* opCtx,
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
     txn.run(opCtx, transactionChain);
 
     LOGV2(7068807,
@@ -367,8 +341,8 @@ void bumpInitializationTimeOnPlacementHistory(OperationContext* opCtx,
                  << NamespacePlacementType::kShardsFieldName << BSONArray()),
             BSON("$set" << BSON(NamespacePlacementType::kTimestampFieldName
                                 << newInitializationTime)),
-            false /* upsert */,
-            true /* multi */);
+            /*upsert=*/false,
+            /*multi=*/true);
 
         auto updateResponse = txnClient.runCRUDOpSync(updateRequest, {});
         uassertStatusOK(updateResponse.toStatus());
@@ -399,7 +373,7 @@ void bumpInitializationTimeOnPlacementHistory(OperationContext* opCtx,
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
     txn.run(opCtx, transactionChain);
 
     LOGV2(10678201,
@@ -646,20 +620,20 @@ public:
         const std::string_view sourceField =
             isComputedPlacementAccurate ? "computedPlacement"sv : "placementAtInitTime"sv;
 
-        std::vector<ShardRef> shardRefs = [&]() {
-            // Extract all shard refs from the 'fieldName' field of 'result'. The 'sourceField'
-            // field value is expected to be an array of string or UUID values.
-            std::vector<ShardRef> shards;
+        std::vector<ShardId> shardIds = [&]() {
+            // Extract all shard ids from the 'fieldName' field of 'result'. The 'sourceField' field
+            // value is expected to be an array of string values.
+            std::vector<ShardId> shards;
             auto shardsArray = result.getField(sourceField).Obj();
             for (const auto& shardObj : shardsArray) {
-                shards.push_back(ShardRef::parse(shardObj));
+                shards.push_back(shardObj.String());
             }
             return shards;
         }();
 
         HistoricalPlacement historicalPlacementResult;
         historicalPlacementResult.setStatus(HistoricalPlacementStatus::OK);
-        historicalPlacementResult.setShards(std::move(shardRefs));
+        historicalPlacementResult.setShards(std::move(shardIds));
         return historicalPlacementResult;
     }
 
@@ -1017,11 +991,10 @@ private:
             _expCtx);
 
         // b. Merge the placement of each matched namespace into a single set field.
-        auto unwindShardsStage =
-            DocumentSourceUnwind::create(_expCtx,
-                                         std::string("shards"),
-                                         false /* preserveNullAndEmptyArrays */,
-                                         boost::none /* indexPath */);
+        auto unwindShardsStage = DocumentSourceUnwind::create(_expCtx,
+                                                              std::string("shards"),
+                                                              /*includeNullIfEmptyOrMissing=*/false,
+                                                              /*includeArrayIndex=*/boost::none);
 
         auto mergeAllGroupsInASingleShardListSpec =
             BSON("_id" << "" << "shards" << BSON("$addToSet" << "$shards"));
@@ -1081,25 +1054,21 @@ private:
         return Pipeline::create({std::move(facetStage), std::move(projectStage)}, _expCtx);
     }
 
-    // Removes all shard references from the 'HistoricalPlacement' that are not present in the
+    // Removes all shard ids from the 'HistoricalPlacement' that are not present in the
     // 'allAvailableShardIds' vector. The 'allAvailableShardIds' vector values must be sorted. Also
     // sets the 'anyRemovedShardDetected' value of the 'HistoricalPlacement' value as a side-effect.
-    //
-    // TODO(SERVER-127411): once change-stream routing is UUID-aware, update to also resolve UUID
-    // ShardRefs through the shard registry for the availability check.
     void _removeAllNonAvailableShards(HistoricalPlacement& historicalPlacementResult,
                                       const std::vector<ShardId>& allAvailableShardIds) {
         // Intentionally create a copy here, because we are about to remove shards from the vector.
-        auto shardRefs = historicalPlacementResult.getShards();
-        const size_t originalNumberOfShards = shardRefs.size();
-        std::erase_if(shardRefs, [&](const ShardRef& shardRef) {
-            const ShardId asShardId{shardRef.toString()};
+        auto shardIds = historicalPlacementResult.getShards();
+        const size_t originalNumberOfShards = shardIds.size();
+        std::erase_if(shardIds, [&](const ShardId& shardId) {
             return !std::binary_search(
-                allAvailableShardIds.begin(), allAvailableShardIds.end(), shardRef.getShardId());
+                allAvailableShardIds.begin(), allAvailableShardIds.end(), shardId);
         });
-        historicalPlacementResult.setAnyRemovedShardDetected(shardRefs.size() <
+        historicalPlacementResult.setAnyRemovedShardDetected(shardIds.size() <
                                                              originalNumberOfShards);
-        historicalPlacementResult.setShards(std::move(shardRefs));
+        historicalPlacementResult.setShards(std::move(shardIds));
     }
 
     // Builds a partial match expression to be used on the 'nss' field for a placement history query
@@ -1172,36 +1141,9 @@ private:
 
 }  // namespace
 
-Status ShardingCatalogManager::createIndexesForConfigPlacementHistory(OperationContext* opCtx) {
-    // Create a combined index on 'nss' (sorted ascending) and 'timestamp' (sorted descending).
-    // This is an idempotent operation and it won't fail if the index already exists.
-    Status status = createIndexOnConfigCollection(
-        opCtx,
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON(NamespacePlacementType::kNssFieldName
-             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
-        true /*unique*/);
-    if (status.isOK()) {
-        // Create another index with 'timestamp' first (sorted descending), then 'nss' (sorted
-        // ascending). This is necessary to cover queries to the placement history that are querying
-        // by time range. Note that this index does not need to be unique, as the uniqueness of
-        // every {timestamp, nss} combination is already ensured by the first index.
-        // If the creation of the second index fails, we leave the first index in place, as it is
-        // required for uniqueness and thus correctness of the placement history. The index creation
-        // failure will still be reported to the caller, who can retry index creation.
-        status =
-            createIndexOnConfigCollection(opCtx,
-                                          NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                          BSON(NamespacePlacementType::kTimestampFieldName
-                                               << -1 << NamespacePlacementType::kNssFieldName << 1),
-                                          false /*unique*/);
-    }
-    return status;
-}
-
 write_ops::InsertCommandRequest
 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-    const Timestamp& initializationTime, const std::vector<ShardRef>& defaultPlacement) {
+    const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement) {
     /*
      * The 'operational boundaries' of config.placementHistory are described through two 'metadata'
      * documents, both identified by the kConfigPlacementHistoryInitializationMarker namespace:
@@ -1251,9 +1193,9 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
         opCtx,
         shard_role_details::getLocker(opCtx),
         NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        "getHistoricalPlacement" /* reason */,
+        /*reason=*/"getHistoricalPlacement",
         MODE_IS,
-        true /*waitForRecovery*/);
+        /*waitForRecovery=*/true);
 
     // If 'atClusterTime' is greater than current config time, then we can not return correct
     // placement history and early exit with HistoricalPlacementStatus::FutureClusterTime.
@@ -1371,11 +1313,11 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
         findAllShardsReq.setUnwrappedReadPref({});
         findAllShardsReq.setReadConcern(snapshotReadConcern);
 
-        std::vector<ShardRef> shardsAtInitializationTime;
+        std::vector<ShardId> shardsAtInitializationTime;
         auto consumeBatchResponse = [&](const auto& batch, const boost::optional<BSONObj>&) {
             for (const auto& doc : batch) {
                 shardsAtInitializationTime.emplace_back(
-                    ShardRef(std::string(doc.getStringField(ShardType::name.name()))));
+                    ShardId(std::string(doc.getStringField(ShardType::name.name()))));
             }
 
             return true;

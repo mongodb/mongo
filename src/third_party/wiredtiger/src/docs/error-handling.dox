@@ -158,6 +158,21 @@ running live restore in the system.
 This sub-level error indicates that an operation or configuration conflicts with disaggregated
 storage.
 
+@par \c WT_STEP_DOWN
+This sub-level error indicates that a transaction was rolled back because it was in flight when the
+step-down timestamp was set.
+
+@par \c WT_TXN_TOO_LARGE_FOR_CACHE
+This sub-level error indicates that a single transaction has dirtied more cache than the eviction
+updates trigger or the eviction dirty trigger allows. Eviction cannot reclaim content pinned by an
+uncommitted transaction, so the transaction cannot succeed against the configured cache size and has
+been rolled back.
+
+@par \c WT_VERIFY_PAGE_ID_MISMATCH
+This sub-level error indicates that the disaggregated-storage verify pass found one or more page IDs
+present in the btree walk but absent from the page log (or vice versa), meaning a page was either
+leaked or discarded prematurely.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

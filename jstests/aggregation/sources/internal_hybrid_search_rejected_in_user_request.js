@@ -1,8 +1,7 @@
 // Tests that $_internalHybridSearch is not allowed in user requests.
 //
 // @tags: [
-//   featureFlagExtensionsInsideHybridSearch,
-//   requires_fcv_82,
+//   requires_fcv_90,
 // ]
 
 const coll = db[jsTestName()];

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
@@ -56,7 +30,9 @@ bool validateFieldPathForExprInRewrite(const ExpressionFieldPath& fieldPathExpr)
 
 template <bool wrapConstInArray>
 std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
-    const ExpressionFieldPath& fieldPathExpr, const ExpressionConstant& literalExpr) {
+    const ExpressionFieldPath& fieldPathExpr,
+    const ExpressionConstant& literalExpr,
+    const CollatorInterface* collator) {
     // Build expression BSON.
     auto fieldPath = fieldPathExpr.getFieldPath().tail().fullPath();
     BSONArray inArray;
@@ -77,6 +53,9 @@ std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
     // setEqualitiesArray takes the backing BSONObj by value and inObj is owned — no external
     // storage needed.
     auto inMatch = std::make_unique<InMatchExpression>(std::string_view(fieldPath));
+    // The collator must be set before the equalities, so that the list is built and sorted using
+    // the collation rather than having to be rebuilt afterwards.
+    inMatch->setCollator(collator);
     uassertStatusOK(inMatch->setEqualitiesArray(inArray));
 
     return inMatch;
@@ -365,8 +344,8 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
                     // We don't need to place additional restrictions on 'rhs' here, because $in
                     // would error out for a non-array value of 'rhs'- similarly, 'lhs' will become
                     // an array, so we don't need th same checks as in the case below.
-                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(*rhsFieldPath,
-                                                                                     *lhsConst);
+                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(
+                        *rhsFieldPath, *lhsConst, _collator);
                 }
             }
         }
@@ -408,6 +387,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
         }
     }
 
-    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(*lhsFieldPath, *rhsConst);
+    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(
+        *lhsFieldPath, *rhsConst, _collator);
 }
 }  // namespace mongo

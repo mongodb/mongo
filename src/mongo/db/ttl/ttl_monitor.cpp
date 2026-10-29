@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/ttl/ttl_monitor.h"
 
@@ -34,6 +8,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/in_progress_time_accumulator.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -84,7 +59,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/server_status_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -92,6 +67,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -184,7 +160,90 @@ auto& ttlInvalidTTLIndexSkips = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions =
          ServerStatusOptions{.dottedPath = "ttl.invalidTTLIndexSkips", .role = ClusterRole::None}});
 
+// Tracks how TTL deletion passes interact with execution control: time spent waiting for execution
+// tickets, time spent processing while holding them, and how many tickets were acquired (including
+// how many came from the low-priority pool when the TTL monitor runs as a background task).
+//
+// The accumulators below compute the total time TTL passes spend waiting for tickets / processing
+// while holding them, each including the in-progress time of a pass currently in that state.
+// Because that in-progress portion grows continuously while no ticket events fire, a periodic job
+// (installed in startTTLMonitor) samples the accumulators once a second on its own thread and
+// advances the 'ttlTimeQueuedForTickets'/'ttlTimeProcessingWithTickets' counters, so
+// serverStatus/FTDC reflects a stalled-or-processing pass within ~1s rather than only once it
+// completes.
+admission::execution_control::InProgressTimeAccumulator ttlTicketQueueAccumulator;
+admission::execution_control::InProgressTimeAccumulator ttlTicketProcessingAccumulator;
+auto& ttlTimeQueuedForTickets = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlTimeQueuedForTickets,
+    "The cumulative amount of time that TTL passes have spent queued waiting for execution "
+    "tickets.",
+    MetricUnit::kMicroseconds,
+    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "ttl.timeQueuedForTicketsMicros",
+                                                .role = ClusterRole::None}});
+auto& ttlTimeProcessingWithTickets = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlTimeProcessingWithTickets,
+    "The cumulative amount of time that TTL passes have spent processing while holding execution "
+    "tickets.",
+    MetricUnit::kMicroseconds,
+    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "ttl.timeProcessingWithTicketsMicros",
+                                                .role = ClusterRole::None}});
+auto& ttlTicketAdmissions = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlTicketAdmissions,
+    "The total number of execution tickets acquired by TTL passes.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.ticketAdmissions", .role = ClusterRole::None}});
+auto& ttlLowPriorityTicketAdmissions = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlLowPriorityTicketAdmissions,
+    "The number of low priority execution tickets acquired by TTL passes.",
+    MetricUnit::kCount,
+    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "ttl.lowPriorityTicketAdmissions",
+                                                .role = ClusterRole::None}});
+auto& ttlQueuedForTickets = MetricsService::instance().createInt64UpDownCounter(
+    MetricNames::kTtlQueuedForTickets,
+    "The number of TTL operations currently queued waiting for an execution ticket.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.queuedForTickets", .role = ClusterRole::None}});
+
+// Builds the recorder callback that mirrors a TTL pass's execution-ticket events into the ttl
+// serverStatus counters and accumulators as they happen. The queued/processing time accumulators
+// are sampled separately by the periodic job (see startTTLMonitor).
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::OnUpdateFn
+makeTtlTicketStatsUpdater() {
+    return [](const admission::execution_control::TicketAdmissionStats& delta) {
+        ttlTicketAdmissions.add(delta.admissions);
+        ttlLowPriorityTicketAdmissions.add(delta.lowPriorityAdmissions);
+        if (delta.startedQueueing || delta.finishedQueueing) {
+            ttlTicketQueueAccumulator.onCountChange(delta.startedQueueing - delta.finishedQueueing);
+            ttlQueuedForTickets.add(delta.startedQueueing - delta.finishedQueueing);
+        }
+        if (delta.admissions || delta.releases) {
+            ttlTicketProcessingAccumulator.onCountChange(delta.admissions - delta.releases);
+        }
+    };
+}
+
+// Returns the ticket stats accumulated so far by the recorder that _doTTLPass registers, to
+// attribute ticket time to individual deletions in the slow-op logs below.
+admission::execution_control::TicketAdmissionStats currentTicketStats(OperationContext* opCtx) {
+    auto* recorder = ExecutionAdmissionContext::get(opCtx).getTicketStatsRecorder();
+    return recorder ? recorder->stats() : admission::execution_control::TicketAdmissionStats{};
+}
+
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
+
+// State for the periodic job that advances the 'ttlTimeQueuedForTickets' /
+// 'ttlTimeProcessingWithTickets' counters from their accumulators (see startTTLMonitor). The
+// 'lastPushed*' values are the cumulative amounts already reflected in each counter; the job adds
+// the (non-negative, monotonic) delta each tick. Touched only by the job's thread. The
+// PeriodicJobAnchor stops the job when the ServiceContext is destroyed.
+struct TtlTicketTimeUpdater {
+    int64_t lastPushedQueuedMicros = 0;
+    int64_t lastPushedProcessingMicros = 0;
+    PeriodicJobAnchor job;
+};
+const auto getTtlTicketTimeUpdater = ServiceContext::declareDecoration<TtlTicketTimeUpdater>();
 
 // TODO (SERVER-64506): support change streams' pre- and post-images.
 bool isBatchingEnabled(const CollectionPtr& collectionPtr) {
@@ -233,7 +292,7 @@ Date_t safeExpirationDate(OperationContext* opCtx,
 RecordIdBound makeCollScanStartBound(const CollectionPtr& collection, const Date_t startDate) {
     if (collection->getTimeseriesOptions()) {
         auto startOID = OID();
-        startOID.init(startDate, false /* max */);
+        startOID.init(startDate, /*max=*/false);
         return RecordIdBound(record_id_helpers::keyForOID(startOID));
     }
 
@@ -246,7 +305,7 @@ RecordIdBound makeCollScanStartBound(const CollectionPtr& collection, const Date
 RecordIdBound makeCollScanEndBound(const CollectionPtr& collection, Date_t expirationDate) {
     if (collection->getTimeseriesOptions()) {
         auto endOID = OID();
-        endOID.init(expirationDate, true /* max */);
+        endOID.init(expirationDate, /*max=*/true);
         return RecordIdBound(record_id_helpers::keyForOID(endOID));
     }
 
@@ -299,7 +358,7 @@ const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
 }  // namespace
 
 TTLMonitor::TTLMonitor()
-    : BackgroundJob(false /* selfDelete */),
+    : BackgroundJob(/*selfDelete=*/false),
       _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {
 
     _metadataRefreshTaskExecutor = executor::ThreadPoolTaskExecutor::create(
@@ -448,6 +507,11 @@ void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
 
     // Increment the metric after the TTL work has been finished.
     ON_BLOCK_EXIT([&] { ttlPasses.add(1); });
+
+    // Keep the ticket metrics up to date as the pass acquires and releases execution tickets, so
+    // a pass stalled on ticket admission is visible in serverStatus/FTDC while it is stalled.
+    admission::execution_control::ScopedTicketAdmissionStatsRecorder ticketStatsRecorder(
+        opCtx, makeTtlTicketStatsUpdater());
 
     bool moreToDelete = true;
     while (moreToDelete) {
@@ -675,6 +739,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     const bool batchingEnabled = isBatchingEnabled(collection.getCollectionPtr());
 
     Timer timer;
+    const auto ticketStatsBase = currentTicketStats(opCtx);
     auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
                                                      collection,
                                                      std::move(params),
@@ -705,6 +770,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                                         duration_cast<Milliseconds>(duration),
                                         Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
+            const auto ticketStats = currentTicketStats(opCtx) - ticketStatsBase;
             LOGV2(5479200,
                   "Deleted expired documents using index",
                   logAttrs(collection.nss()),
@@ -713,7 +779,12 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                   "numKeysDeleted"_attr = numDeletedKeys,
                   "numKeysExamined"_attr = summaryStats.totalKeysExamined,
                   "numDocsExamined"_attr = summaryStats.totalDocsExamined,
-                  "duration"_attr = duration_cast<Milliseconds>(duration));
+                  "duration"_attr = duration_cast<Milliseconds>(duration),
+                  "timeQueuedForTicketsMicros"_attr = ticketStats.timeQueuedMicros,
+                  "timeProcessingWithTicketsMicros"_attr = ticketStats.timeProcessingMicros,
+                  "ticketAdmissions"_attr = ticketStats.admissions,
+                  "lowPriorityTicketAdmissions"_attr = ticketStats.lowPriorityAdmissions,
+                  "ticketQueueEntries"_attr = ticketStats.startedQueueing);
         }
 
         if (batchingEnabled) {
@@ -742,7 +813,7 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
     return _performDeleteExpiredWithCollscan(
-        opCtx, collection, startId, endId, /*forward*/ true, /*filter*/ nullptr);
+        opCtx, collection, startId, endId, /*forward=*/true, /*filter=*/nullptr);
 }
 
 bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
@@ -756,7 +827,7 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
     // performant to consider any bucket document. We instead run the deletion in two separate
     // batches: [epoch, at-expiry] and [2038, 2106]. The second range will include data prior to
     // the epoch unless they are too far from the epoch that cause then to be truncated into the
-    // [at-expiry, 2038] range that we don't consider for deletion. This is an acceptible tradeoff
+    // [at-expiry, 2038] range that we don't consider for deletion. This is an acceptable tradeoff
     // until we have a new _id format for time-series.
     LOGV2_DEBUG(9736801,
                 1,
@@ -782,7 +853,7 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
         const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
         passTargetMet |= _performDeleteExpiredWithCollscan(
-            opCtx, collection, startId, endId, /*forward*/ true, &filter);
+            opCtx, collection, startId, endId, /*forward=*/true, &filter);
     }
 
     // Delete from the end of the clustered _id index. In the typical case nothing should be
@@ -802,7 +873,7 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
             collectionPtr, Date_t::fromMillisSinceEpoch(static_cast<long long>(0xFFFFFFFF) * 1000));
 
         passTargetMet |= _performDeleteExpiredWithCollscan(
-            opCtx, collection, startId, endId, /*forward*/ false, &filter);
+            opCtx, collection, startId, endId, /*forward=*/false, &filter);
     }
     return passTargetMet;
 }
@@ -827,6 +898,7 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
     // Deletes records using a bounded collection scan from the beginning of time to the
     // expiration time (inclusive).
     Timer timer;
+    const auto ticketStatsBase = currentTicketStats(opCtx);
     auto exec = InternalPlanner::deleteWithCollectionScan(
         opCtx,
         collection,
@@ -858,6 +930,7 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
                                         duration_cast<Milliseconds>(duration),
                                         Milliseconds(serverGlobalParams.slowMS.load()))
                 .first) {
+            const auto ticketStats = currentTicketStats(opCtx) - ticketStatsBase;
             LOGV2(5400702,
                   "Deleted expired documents using clustered index scan",
                   logAttrs(collection.nss()),
@@ -867,7 +940,12 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
                   "numDocsExamined"_attr = summaryStats.totalDocsExamined,
                   "duration"_attr = duration_cast<Milliseconds>(duration),
                   "extendedRange"_attr =
-                      collection.getCollectionPtr()->getRequiresTimeseriesExtendedRangeSupport());
+                      collection.getCollectionPtr()->getRequiresTimeseriesExtendedRangeSupport(),
+                  "timeQueuedForTicketsMicros"_attr = ticketStats.timeQueuedMicros,
+                  "timeProcessingWithTicketsMicros"_attr = ticketStats.timeProcessingMicros,
+                  "ticketAdmissions"_attr = ticketStats.admissions,
+                  "lowPriorityTicketAdmissions"_attr = ticketStats.lowPriorityAdmissions,
+                  "ticketQueueEntries"_attr = ticketStats.startedQueueing);
         }
         if (batchingEnabled) {
             auto batchedDeleteStats = exec->getBatchedDeleteStats();
@@ -887,6 +965,37 @@ void startTTLMonitor(ServiceContext* serviceContext, bool setupOnly) {
     if (!setupOnly)
         ttlMonitor->go();
     TTLMonitor::set(serviceContext, std::move(ttlMonitor));
+
+    if (setupOnly) {
+        // Skip the sampler if we're only setting up the monitor for testing.
+        return;
+    }
+
+    // Sample the queued- and processing-time accumulators once a second and advance their counters
+    // by the elapsed delta. Runs on the PeriodicRunner (not the TTL thread) so a pass blocked
+    // waiting for a ticket, or holding one while processing, still has its in-progress time
+    // reflected in serverStatus/FTDC.
+    auto& updater = getTtlTicketTimeUpdater(serviceContext);
+
+    // startTTLMonitor() may be called again after shutdownTTLMonitor(), stop any previously
+    // installed job.
+    if (updater.job.isValid()) {
+        updater.job.stop();
+    }
+    updater.job = serviceContext->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
+        "TTLTicketTimeMetricUpdater",
+        [&updater](Client*) {
+            const int64_t queued = ttlTicketQueueAccumulator.totalMicros();
+            ttlTimeQueuedForTickets.add(queued - updater.lastPushedQueuedMicros);
+            updater.lastPushedQueuedMicros = queued;
+
+            const int64_t processing = ttlTicketProcessingAccumulator.totalMicros();
+            ttlTimeProcessingWithTickets.add(processing - updater.lastPushedProcessingMicros);
+            updater.lastPushedProcessingMicros = processing;
+        },
+        Seconds(1),
+        false /*isKillableByStepdown*/});
+    updater.job.start();
 }
 
 void shutdownTTLMonitor(ServiceContext* serviceContext) {

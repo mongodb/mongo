@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/migration_source_manager.h"
 
@@ -44,6 +18,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/commit_chunk_migration_gen.h"
 #include "mongo/db/global_catalog/ddl/shard_metadata_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard_collection.h"
@@ -77,6 +52,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
@@ -86,7 +62,7 @@
 #include "mongo/db/transaction/reclaimed_prepared_txn_tracker.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -206,8 +182,11 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
     uassertStatusOK(
         FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(opCtx, nss, boost::none));
 
-    // Complete any unfinished migration pending recovery
-    {
+    // Only the legacy path needs to drain migrations.
+    // On the authoritative path, migrations are already blocked and are drained during the setFCV
+    // upgrade.
+    if (managementMode == ManagementModeEnum::kStandalone) {
+        // Complete any unfinished migration pending recovery
         migrationutil::drainMigrationsPendingRecovery(opCtx);
 
         // Since the moveChunk command is holding the ActiveMigrationRegistry and we just drained
@@ -230,7 +209,7 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             const auto metadata = checkCollectionIdentity(opCtx,
                                                           nss,
-                                                          boost::none /* epoch */,
+                                                          /*expectedEpoch=*/boost::none,
                                                           args.getCollectionTimestamp(),
                                                           acquisition.getCollectionPtr(),
                                                           *scopedCsr);
@@ -248,7 +227,7 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
                                                owningChunk.getMax(),
                                                cm->getShardKeyPattern(),
                                                args.getMaxChunkSizeBytes(),
-                                               true /* needMaxBound */);
+                                               /*needMaxBound=*/true);
 
             args.getMoveRangeRequestBase().setMax(max);
         } else if (!args.getMin().has_value()) {
@@ -262,7 +241,7 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
                                                max,
                                                cm->getShardKeyPattern(),
                                                args.getMaxChunkSizeBytes(),
-                                               false /* needMaxBound */);
+                                               /*needMaxBound=*/false);
 
             args.getMoveRangeRequestBase().setMin(min);
         }
@@ -292,9 +271,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _stats(ShardingStatistics::get(_opCtx)),
       _managementMode(managementMode),
       _migrationId(std::move(migrationId)),
-      _critSecReason(BSON("command" << "moveChunk"
-                                    << "fromShard" << _args.getFromShard() << "toShard"
-                                    << _args.getToShard())),
+      _critSecReason(migrationutil::makeCriticalSectionReasonForMoveRange(
+          _args.getShardsvrMoveRangeRequest(), _migrationId)),
       _moveTimingHelper(_opCtx,
                         "from",
                         _args.getCommandParameter(),
@@ -325,7 +303,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         auto metadata = checkCollectionIdentity(_opCtx,
                                                 nss(),
-                                                boost::none /* epoch */,
+                                                /*expectedEpoch=*/boost::none,
                                                 _args.getCollectionTimestamp(),
                                                 *autoColl,
                                                 *scopedCsr);
@@ -348,10 +326,26 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         return std::make_pair(std::move(metadata), std::move(collectionUUID));
     }();
 
+    // At this point, if this is being called from a MoveRangeCoordinator, no other chunk operations
+    // or DDL operation that blocks migrations can be running concurrently.
+    //
+    // There are no concurrent DDL operations because:
+    //  - we already checked the allowChunkOperations flag, so it must be true at this point.
+    //  - we are running inside a MoveRangeCoordinator. DDL operations cannot successfully call
+    //    setAllowChunkOperations(false) until all MoveRangeCoordinators have been drained.
+    //
+    // There are no concurrent chunk migrations on this shard, and no concurrent split/merge on this
+    // namespace because:
+    //  - we hold an ActiveMigrationsRegistry slot.
+
+    const ChunkRange range(*_args.getMin(), *_args.getMax());
+
+    // First of all, reject retries targeting an old donor to ensure idempotency
+    checkRangeWithinChunk(_opCtx, nss(), collectionMetadata, range);
+
     // Drain the execution/cancellation of any existing range deletion task overlapping with the
     // targeted range (a task issued by a previous migration may still be present when the migration
     // gets interrupted post-commit).
-    const ChunkRange range(*_args.getMin(), *_args.getMax());
     const auto rangeDeletionWaitDeadline = opCtx->fastClockSource().now() +
         Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
     // CollectionShardingRuntime::waitForClean() allows to sync on tasks already registered on the
@@ -382,10 +376,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         opCtx->sleepFor(Milliseconds(1000));
     }
 
-    checkShardKeyPattern(
-        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
-    checkRangeWithinChunk(
-        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkShardKeyPattern(_opCtx, nss(), collectionMetadata, range);
 
     _collectionUUID = collectionUUID;
 
@@ -399,19 +390,22 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 }
 
 MigrationSourceManager::~MigrationSourceManager() {
-    // In standalone mode, all error paths arm a ScopeGuard that calls _cleanupOnError(), and the
-    // success path calls _cleanup() directly via commitChunkMetadataOnConfig(). Either way,
-    // _cloneDriver is always cleared before the MSM is destroyed, so the invariant holds.
+    // In standalone mode every path clears _cloneDriver before destruction (error paths via
+    // _cleanupOnError(), the success path via _cleanup()), so the invariant below holds.
     //
-    // MoveRangeCoordinator separates migrate() from commit() across a persistence boundary. A
-    // stepdown can kill the coordinator between phases, destroying the MSM without commit() — and
-    // thus _cleanup() — ever having been called. If _cloneDriver is still set here it is always
-    // because of an interruption, never a successful completion, so _cleanupOnError() is correct.
-    // The coordinator's recovery logic will drive the migration to a terminal state on the next
-    // step-up if cleanup fails.
+    // The MoveRangeCoordinator splits migrate() and commit() across a persistence boundary, so a
+    // stepdown can destroy the MSM without finishCommit() having run. A still-set _cloneDriver here
+    // therefore always means an interruption: log the error and run a best-effort cleanup (the
+    // coordinator's recovery drives the migration to a terminal state if this fails). Note
+    // _cleanupOnError() must not run on this path - see the tassert there.
     if (_managementMode == ManagementModeEnum::kMoveRangeCoordinator) {
         if (_cloneDriver) {
-            _cleanupOnError();
+            if (_state < kCommittingOnConfig) {
+                _logMoveChunkErrorToChangelog();
+            } else if (_commitRecorded) {
+                _moveTimingHelper.done(6);
+            }
+            auto ignored = _cleanup(false);
         }
     } else {
         invariant(!_cloneDriver);
@@ -434,7 +428,13 @@ MigrationSourceManager::~MigrationSourceManager() {
 void MigrationSourceManager::startClone() {
     invariant(!shard_role_details::getLocker(_opCtx)->isLocked());
     invariant(_state == kCreated);
-    ScopeGuard scopedGuard([&] { _cleanupOnError(); });
+    ScopeGuard scopedGuard([&] {
+        // The MoveRangeCoordinator drives cleanup through its own phase flow, so the standalone
+        // error cleanup must not run on that path.
+        if (_managementMode != ManagementModeEnum::kMoveRangeCoordinator) {
+            _cleanupOnError();
+        }
+    });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
     auto moveChunkDetails = BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from"
@@ -496,8 +496,23 @@ void MigrationSourceManager::startClone() {
         preparedTxnResolved.get(_opCtx);
     }
 
+    // Only the authoritative path (driven by the MoveRangeCoordinator) runs the recipient's
+    // shard-catalog PIT-reachability check, so the enclosing donor chunk is computed and sent only
+    // there. On the legacy path it stays unset and is omitted from the _recvChunkStart command.
+    boost::optional<ChunkRange> enclosingChunk;
+
     {
         const auto metadata = _getCurrentMetadataAndCheckForConflictingErrors();
+
+        if (_managementMode == ManagementModeEnum::kMoveRangeCoordinator) {
+            // The donor chunk that encloses the migrated range. For a moveRange that splits a chunk
+            // this is wider than [min, max); for a whole-chunk move it equals it.
+            const auto intersectingChunk =
+                metadata.getChunkManager()->findIntersectingChunkWithSimpleCollation(
+                    *_args.getMin());
+            enclosingChunk = ChunkRange(intersectingChunk.getMin().getOwned(),
+                                        intersectingChunk.getMax().getOwned());
+        }
 
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
 
@@ -507,6 +522,10 @@ void MigrationSourceManager::startClone() {
         // track changes to the chunk which needs to be transmitted to the recipient.
         _cloneDriver = std::make_shared<MigrationChunkClonerSource>(
             _opCtx, _args, _writeConcern, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
+
+        // Remember the donor's shard version before the migration. The coordinator persists it so
+        // the global-catalog commit can be re-sent from durable state after a failover.
+        _donorShardVersionPreMigration = metadata.getShardPlacementVersion();
 
         _coordinator.emplace(_migrationId,
                              _cloneDriver->getSessionId(),
@@ -537,10 +556,17 @@ void MigrationSourceManager::startClone() {
 
     _coordinator->startMigration(_opCtx);
 
+    // The authoritative path (MoveRangeCoordinator) installs the post-migration metadata into the
+    // shard catalog directly, so the recipient does not need to force a filtering-metadata refresh
+    // when it starts receiving the chunk.
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    const bool isAuthoritative = _managementMode == ManagementModeEnum::kMoveRangeCoordinator;
     auto startCloneStatus = _cloneDriver->startClone(_opCtx,
                                                      _coordinator->getMigrationId(),
                                                      _coordinator->getLsid(),
-                                                     _coordinator->getTxnNumber());
+                                                     _coordinator->getTxnNumber(),
+                                                     enclosingChunk,
+                                                     isAuthoritative);
     withChangelogErrMsg(startCloneStatus.reason(), [&] { uassertStatusOK(startCloneStatus); });
 
     // Refresh the collection routing information after starting the clone driver to have a
@@ -556,7 +582,7 @@ void MigrationSourceManager::startClone() {
         // If the chunk migration will cause the collection placement to be extended to a new
         // shard, persist the state so that it can be reported to change stream readers once the
         // operation gets committed.
-        if (!cm.getVersion(_opCtx, _args.getToShard()).isSet()) {
+        if (!cm.getVersion(_args.getToShard()).isSet()) {
             _coordinator->setTransfersFirstCollectionChunkToRecipient(_opCtx, true);
         }
     }
@@ -569,7 +595,13 @@ void MigrationSourceManager::startClone() {
 void MigrationSourceManager::awaitToCatchUp() {
     invariant(!shard_role_details::getLocker(_opCtx)->isLocked());
     invariant(_state == kCloning);
-    ScopeGuard scopedGuard([&] { _cleanupOnError(); });
+    ScopeGuard scopedGuard([&] {
+        // The MoveRangeCoordinator drives cleanup through its own phase flow, so the standalone
+        // error cleanup must not run on that path.
+        if (_managementMode != ManagementModeEnum::kMoveRangeCoordinator) {
+            _cleanupOnError();
+        }
+    });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
@@ -588,7 +620,13 @@ void MigrationSourceManager::awaitToCatchUp() {
 void MigrationSourceManager::enterCriticalSection() {
     invariant(!shard_role_details::getLocker(_opCtx)->isLocked());
     invariant(_state == kCloneCaughtUp);
-    ScopeGuard scopedGuard([&] { _cleanupOnError(); });
+    ScopeGuard scopedGuard([&] {
+        // The MoveRangeCoordinator drives cleanup through its own phase flow, so the standalone
+        // error cleanup must not run on that path.
+        if (_managementMode != ManagementModeEnum::kMoveRangeCoordinator) {
+            _cleanupOnError();
+        }
+    });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
@@ -601,26 +639,35 @@ void MigrationSourceManager::enterCriticalSection() {
                         logAttrs(nss()),
                         "migrationId"_attr = _coordinator->getMigrationId());
 
-    _critSec.emplace(_opCtx, nss(), _critSecReason);
+    if (_managementMode == ManagementModeEnum::kMoveRangeCoordinator) {
+        ShardingRecoveryService::get(_opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+            _opCtx,
+            nss(),
+            _critSecReason,
+            defaultMajorityWriteConcernDoNotUse(),
+            /*clearShardCatalogCache=*/false,
+            Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+    } else {
+        _critSec.emplace(_opCtx, nss(), _critSecReason);
+
+        // Signal secondaries that the critical section has been entered, so they refresh their
+        // routing table on next access and block behind the critical section. This preserves causal
+        // consistency: a stale mongos cannot read secondary data at a cluster time that already
+        // includes the migration commit. The write must happen after the critSec flag is set so the
+        // refresh stalls behind the flag.
+        auto shardCollectionsEntryUpdateStatus = shardmetadatautil::updateShardCollectionsEntry(
+            _opCtx,
+            BSON(ShardCollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())),
+            BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
+            /*upsert=*/false);
+        withChangelogErrMsg(shardCollectionsEntryUpdateStatus.reason(), [&] {
+            uassertStatusOKWithContext(shardCollectionsEntryUpdateStatus,
+                                       "Persist critical section signal for secondaries");
+        });
+    }
 
     _state = kCriticalSection;
-
-    // Persist a signal to secondaries that we've entered the critical section. This is will
-    // cause secondaries to refresh their routing table when next accessed, which will block
-    // behind the critical section. This ensures causal consistency by preventing a stale mongos
-    // with a cluster time inclusive of the migration config commit update from accessing
-    // secondary data. Note: this write must occur after the critSec flag is set, to ensure the
-    // secondary refresh will stall behind the flag.
-    auto shardCollectionsEntryUpdateStatus = shardmetadatautil::updateShardCollectionsEntry(
-        _opCtx,
-        BSON(ShardCollectionType::kNssFieldName
-             << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())),
-        BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
-        false /*upsert*/);
-    withChangelogErrMsg(shardCollectionsEntryUpdateStatus.reason(), [&] {
-        uassertStatusOKWithContext(shardCollectionsEntryUpdateStatus,
-                                   "Persist critical section signal for secondaries");
-    });
 
     LOGV2(22017,
           "Migration successfully entered critical section",
@@ -634,15 +681,24 @@ void MigrationSourceManager::commitChunkOnRecipient() {
     invariant(!shard_role_details::getLocker(_opCtx)->isLocked());
     invariant(_state == kCriticalSection);
     ScopeGuard scopedGuard([&] {
-        _cleanupOnError();
-        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx,
-                                                                   _args.getCommandParameter())
-            .thenRunOn(Grid::get(_opCtx)->getExecutorPool()->getFixedExecutor())
-            .getAsync([](auto) {});
+        // The MoveRangeCoordinator drives cleanup and migration recovery itself, so neither the
+        // error cleanup nor the legacy async recovery must run here for that path.
+        if (_managementMode != ManagementModeEnum::kMoveRangeCoordinator) {
+            _cleanupOnError();
+
+            migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx,
+                                                                       _args.getCommandParameter())
+                .thenRunOn(Grid::get(_opCtx)->getExecutorPool()->getFixedExecutor())
+                .getAsync([](auto) {});
+        }
     });
 
-    // Tell the recipient shard to fetch the latest changes.
-    auto commitCloneStatus = _cloneDriver->commitClone(_opCtx);
+    // Tell the recipient shard to fetch the latest changes. The legacy path must refresh its
+    // filtering metadata when releasing the critical section; the authoritative path must not,
+    // because it installs the post-migration metadata into the shard catalog directly.
+    const bool clearShardCatalogCache =
+        _managementMode != ManagementModeEnum::kMoveRangeCoordinator;
+    auto commitCloneStatus = _cloneDriver->commitClone(_opCtx, clearShardCatalogCache);
 
     if (MONGO_unlikely(failMigrationCommit.shouldFail()) && commitCloneStatus.isOK()) {
         commitCloneStatus = {ErrorCodes::InternalError,
@@ -661,9 +717,26 @@ void MigrationSourceManager::commitChunkOnRecipient() {
     scopedGuard.dismiss();
 }
 
+void MigrationSourceManager::_buildCommitChunkMigrationRequest(BSONObjBuilder* builder,
+                                                               const ChunkVersion& collVersion,
+                                                               bool isAuthoritative) {
+    auto migratedChunk = MigratedChunkType(*_chunkVersion, *_args.getMin(), *_args.getMax());
+    CommitChunkMigrationRequest request(
+        nss(), _args.getFromShard(), _args.getToShard(), migratedChunk, collVersion);
+    // Tell the config server which commit path to run. The legacy path leaves this unset.
+    if (isAuthoritative) {
+        request.setAuthoritative(true);
+    }
+    request.serialize(builder);
+    builder->append(kWriteConcernField, defaultMajorityWriteConcernDoNotUse().toBSON());
+}
+
 void MigrationSourceManager::commitChunkMetadataOnConfig() {
     invariant(!shard_role_details::getLocker(_opCtx)->isLocked());
     invariant(_state == kCloneCompleted);
+    tassert(12795302,
+            "commitChunkMetadataOnConfig must not run on the MoveRangeCoordinator path",
+            _managementMode != ManagementModeEnum::kMoveRangeCoordinator);
 
     ScopeGuard scopedGuard([&] {
         _cleanupOnError();
@@ -679,21 +752,14 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     {
         const auto metadata = _getCurrentMetadataAndCheckForConflictingErrors();
-
-        auto migratedChunk = MigratedChunkType(*_chunkVersion, *_args.getMin(), *_args.getMax());
-
-        CommitChunkMigrationRequest request(nss(),
-                                            _args.getFromShard(),
-                                            _args.getToShard(),
-                                            migratedChunk,
-                                            metadata.getCollPlacementVersion());
-
-        request.serialize(&builder);
-        builder.append(kWriteConcernField, defaultMajorityWriteConcernDoNotUse().toBSON());
+        _buildCommitChunkMigrationRequest(
+            &builder, metadata.getCollPlacementVersion(), /*isAuthoritative=*/false);
     }
 
     // Read operations must begin to wait on the critical section just before we send the commit
-    // operation to the config server
+    // operation to the config server. The coordinator path never reaches this function (see the
+    // tassert above); it promotes the recoverable critical section via
+    // promoteCriticalSectionToBlockReads() instead.
     _critSec->enterCommitPhase();
 
     _state = kCommittingOnConfig;
@@ -721,11 +787,6 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
                 scopedCsr->clearCollectionMetadata(_opCtx);
-                // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the
-                // feature flag. Migrations are a non-authoritative path, so the CSR must be reset
-                // to non-authoritative to avoid a stale authoritative state forcing the recovery
-                // refresh onto the authoritative path.
-                scopedCsr->setNonAuthoritative();
             });
         }
         scopedGuard.dismiss();
@@ -737,7 +798,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     }
 
     // Asynchronously tell the recipient to release its critical section
-    _coordinator->launchReleaseRecipientCriticalSection(_opCtx);
+    _coordinator->launchReleaseRecipientCriticalSection(_opCtx, true);
 
     hangBeforePostMigrationCommitRefresh.pauseWhileSet();
 
@@ -771,11 +832,6 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
                 scopedCsr->clearCollectionMetadata(_opCtx);
-                // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the
-                // feature flag. Migrations are a non-authoritative path, so the CSR must be reset
-                // to non-authoritative to avoid a stale authoritative state forcing the recovery
-                // refresh onto the authoritative path.
-                scopedCsr->setNonAuthoritative();
             });
         }
         scopedGuard.dismiss();
@@ -789,7 +845,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     {
         // Emit an oplog entry about the completion of the migration
         const bool noMoreCollectionChunksOnDonor =
-            !refreshedMetadata.getChunkManager()->getVersion(_opCtx, _args.getFromShard()).isSet();
+            !refreshedMetadata.getChunkManager()->getVersion(_args.getFromShard()).isSet();
         notifyChangeStreamsOnChunkMigrated(
             _opCtx,
             nss(),
@@ -868,11 +924,153 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     moveChunkHangAtStep6.pauseWhileSet();
 }
 
-void MigrationSourceManager::_cleanupOnError() {
+void MigrationSourceManager::promoteCriticalSectionToBlockReads() {
+    tassert(12795303,
+            "promoteCriticalSectionToBlockReads is only valid on the MoveRangeCoordinator path",
+            _managementMode == ManagementModeEnum::kMoveRangeCoordinator);
+    tassert(12795304,
+            "promoteCriticalSectionToBlockReads requires the clone to have completed",
+            _state == kCloneCompleted);
+    // Read operations must begin to wait on the critical section just before we send the commit
+    // operation to the config server.
+    ShardingRecoveryService::get(_opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        _opCtx,
+        nss(),
+        _critSecReason,
+        defaultMajorityWriteConcernDoNotUse(),
+        Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+
+    _commitPhaseTimer.reset();
+}
+
+void MigrationSourceManager::markCommitInProgress() {
+    tassert(12953601,
+            "markCommitInProgress is only valid on the MoveRangeCoordinator path",
+            _managementMode == ManagementModeEnum::kMoveRangeCoordinator);
+    tassert(12953602,
+            "markCommitInProgress requires the clone to have completed",
+            _state == kCloneCompleted);
+    tassert(12953603,
+            "markCommitInProgress requires the chunk cloner to have finished",
+            _cloneDriver && _cloneDriver->isDone());
+
+    // The commit is about to be sent. From here on the migration may already be committed, so move
+    // past kCloneCompleted: cleanup keys off this state and must not treat it as a clean abort.
+    _state = kCommittingOnConfig;
+}
+
+void MigrationSourceManager::recordCommitSuccess(OperationContext* opCtx) {
+    tassert(12795307,
+            "recordCommitSuccess is only valid on the MoveRangeCoordinator path",
+            _managementMode == ManagementModeEnum::kMoveRangeCoordinator);
+
+    // Idempotent across same-term retries of the commit phase.
+    if (_commitRecorded) {
+        return;
+    }
+
+    tassert(12795308,
+            "recordCommitSuccess requires the config commit to be in progress",
+            _state == kCommittingOnConfig);
+
+    // The config commit has happened but the donor's metadata is not yet refreshed/installed (a
+    // later coordinator phase does that). This mirrors the standalone pause point that tests use to
+    // exercise causally-consistent reads against still-stale donor metadata.
+    hangBeforePostMigrationCommitRefresh.pauseWhileSet();
+
+    // Read the post-commit placement from the catalog cache rather than refreshing the filtering
+    // metadata: the authoritative local shard catalog is installed later, while the critical
+    // section is still held.
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
+
+    // If the migration has succeeded, clear the BucketCatalog so that the buckets that got migrated
+    // out are no longer updatable.
+    if (cm.isTimeseriesCollection()) {
+        auto& bucketCatalog =
+            timeseries::bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
+        clear(bucketCatalog, _collectionUUID.get());
+    }
+
+    _coordinator->setMigrationDecision(DecisionEnum::kCommitted);
+    _commitRecorded = true;
+
+    // Record the commit in the sharding changelog for auditing and tooling.
+    ShardingLogging::get(_opCtx)->logChange(
+        _opCtx,
+        "moveChunk.commit",
+        nss(),
+        BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
+                   << "to" << _args.getToShard() << "counts" << *_recipientCloneCounts),
+        defaultMajorityWriteConcernDoNotUse());
+}
+
+void MigrationSourceManager::finishCommit() {
+    tassert(12795309,
+            "finishCommit is only valid on the MoveRangeCoordinator path",
+            _managementMode == ManagementModeEnum::kMoveRangeCoordinator);
+
+    // The kFinalizeMigration phase may be retried; _cleanup() can only run once (it asserts
+    // _state != kDone and moves the state to kDone). If it already ran, there is nothing more to do
+    // here.
     if (_state == kDone) {
         return;
     }
 
+    hangBeforeLeavingCriticalSection.pauseWhileSet();
+
+    // Whether the migration reached the config commit, captured before _cleanup() moves the state
+    // to kDone. MoveTimingHelper::done() requires strictly sequential steps, so step 6 may only be
+    // recorded on the committed path; on the abort path earlier steps may have been skipped.
+    const bool reachedConfigCommit = _state == kCommittingOnConfig;
+
+    // On the abort path, record the migration error in the change log before cleaning up, mirroring
+    // _cleanupOnError(). _errMsg, set by the failing migration step, is still populated here.
+    if (!reachedConfigCommit) {
+        _logMoveChunkErrorToChangelog();
+    } else {
+        _stats.totalCriticalSectionCommitTimeMillis.addAndFetch(_commitPhaseTimer.millis());
+    }
+
+    // Complete the migration coordinator (releases the recipient critical section, schedules range
+    // deletion, and forgets the coordinator document). The donor critical section was already
+    // released earlier in the kFinalizeMigration phase. When the commit result was uncertain,
+    // _coordinator has no in-memory decision, so this is a no-op and the coordinator drives
+    // completion from the persisted decision instead.
+    uassertStatusOK(_cleanup(true));
+
+    // waitForDelete is only honoured when completion scheduled range deletion (i.e.
+    // _cleanupCompleteFuture is set). On the abort path, or when completion was deferred to the
+    // persisted-decision path, there is no future to wait on.
+    if (_args.getWaitForDelete() && _cleanupCompleteFuture) {
+        const ChunkRange range(*_args.getMin(), *_args.getMax());
+        LOGV2(12795315,
+              "Waiting for migration cleanup after chunk commit",
+              logAttrs(nss()),
+              "migrationId"_attr = _migrationId,
+              "range"_attr = redact(range.toString()));
+
+        Status deleteStatus = _cleanupCompleteFuture->getNoThrow(_opCtx);
+        if (!deleteStatus.isOK()) {
+            uasserted(ErrorCodes::OrphanedRangeCleanUpFailed,
+                      str::stream()
+                          << "Moved chunks successfully but failed to clean up "
+                          << nss().toStringForErrorMsg() << " range " << redact(range.toString())
+                          << " due to: " << redact(deleteStatus));
+        }
+    }
+
+    // Mark the final migration step done and expose the end-of-commit pause point, so move-timing
+    // and existing tests behave the same as the standalone path. Like
+    // commitChunkMetadataOnConfig(), this only runs for a committed migration; the abort path does
+    // not pause here.
+    if (reachedConfigCommit) {
+        _moveTimingHelper.done(6);
+        moveChunkHangAtStep6.pauseWhileSet();
+    }
+}
+
+void MigrationSourceManager::_logMoveChunkErrorToChangelog() {
     BSONObjBuilder logDetails;
     logDetails.append("min", *_args.getMin())
         .append("max", *_args.getMax())
@@ -888,6 +1086,19 @@ void MigrationSourceManager::_cleanupOnError() {
                                             _args.getCommandParameter(),
                                             logDetails.obj(),
                                             defaultMajorityWriteConcernDoNotUse());
+}
+
+void MigrationSourceManager::_cleanupOnError() {
+    tassert(12795316,
+            "_cleanupOnError must not run on the MoveRangeCoordinator path; that path drives "
+            "cleanup and error logging through the coordinator's kFinalizeMigration phase",
+            _managementMode != ManagementModeEnum::kMoveRangeCoordinator);
+
+    if (_state == kDone) {
+        return;
+    }
+
+    _logMoveChunkErrorToChangelog();
 
     auto ignored = _cleanup(true);
 }
@@ -942,6 +1153,13 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflic
 Status MigrationSourceManager::_cleanup(bool completeMigration) {
     invariant(_state != kDone);
 
+    LOGV2_DEBUG_OPTIONS(12795301,
+                        2,
+                        {logv2::LogComponent::kShardMigrationPerf},
+                        "Running cleanup",
+                        "completeMigration"_attr = completeMigration);
+    auto cleanupResult = Status::OK();
+
     auto cloneDriver = [&]() {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
         if (_state != kCreated) {
@@ -950,27 +1168,38 @@ Status MigrationSourceManager::_cleanup(bool completeMigration) {
         return std::move(_cloneDriver);
     }();
 
-    // Exit the migration critical section.
-    _critSec.reset();
+    if (cloneDriver) {
+        _lastCloneStats = cloneDriver->getCloneStats();
+    }
 
-    if (_state == kCriticalSection || _state == kCloneCompleted || _state == kCommittingOnConfig) {
-        LOGV2_DEBUG_OPTIONS(4817403,
-                            2,
-                            {logv2::LogComponent::kShardMigrationPerf},
-                            "Finished critical section",
-                            logAttrs(nss()),
-                            "migrationId"_attr = _coordinator->getMigrationId());
+    // Exit the migration critical section. For the MoveRangeCoordinator path the donor critical
+    // section is a recoverable critical section released by the coordinator during its
+    // kFinalizeMigration phase, so _cleanup() must not touch it here.
+    if (_managementMode == ManagementModeEnum::kStandalone) {
+        _critSec.reset();
 
-        LOGV2(6107802,
-              "Finished critical section",
-              logAttrs(nss()),
-              "migrationId"_attr = _coordinator->getMigrationId(),
-              "durationMillis"_attr = _cloneAndCommitTimer.millis());
+        if (_state == kCriticalSection || _state == kCloneCompleted ||
+            _state == kCommittingOnConfig) {
+            LOGV2_DEBUG_OPTIONS(4817403,
+                                2,
+                                {logv2::LogComponent::kShardMigrationPerf},
+                                "Finished critical section",
+                                logAttrs(nss()),
+                                "migrationId"_attr = _coordinator->getMigrationId());
+
+            LOGV2(6107802,
+                  "Finished critical section",
+                  logAttrs(nss()),
+                  "migrationId"_attr = _coordinator->getMigrationId(),
+                  "durationMillis"_attr = _cloneAndCommitTimer.millis());
+        }
     }
 
     // The cleanup operations below are potentially blocking or acquire other locks, so perform
-    // them outside of the collection X lock
-
+    // them outside of the collection X lock.
+    //
+    // cancelClone() only signals the recipient to abort while the clone is still running. Once the
+    // clone has finished (the commit phase), it just tears down donor-side cloner state.
     if (cloneDriver) {
         cloneDriver->cancelClone(_opCtx);
     }
@@ -995,7 +1224,15 @@ Status MigrationSourceManager::_cleanup(bool completeMigration) {
                 // This can be called on an exception path after the OperationContext has been
                 // interrupted, so use a new OperationContext. Note, it's valid to call
                 // getServiceContext on an interrupted OperationContext.
-                _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
+
+                // Tell the recipient whether to refresh its filtering metadata when releasing its
+                // critical section. The legacy path must refresh; the authoritative path must not,
+                // because it installs the post-migration metadata into the shard catalog directly.
+                const bool clearCatalogCache =
+                    _managementMode != ManagementModeEnum::kMoveRangeCoordinator;
+
+                _cleanupCompleteFuture =
+                    _coordinator->completeMigration(newOpCtx, clearCatalogCache);
             }
         }
 
@@ -1012,15 +1249,10 @@ Status MigrationSourceManager::_cleanup(bool completeMigration) {
             // let the next op to recover.
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
             scopedCsr->clearCollectionMetadata(_opCtx);
-            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
-            // flag. Migrations are a non-authoritative path, so the CSR must be reset to
-            // non-authoritative to avoid a stale authoritative state forcing the recovery refresh
-            // onto the authoritative path.
-            scopedCsr->setNonAuthoritative();
         }
-        return ex.toStatus();
+        cleanupResult = ex.toStatus();
     }
-    return Status::OK();
+    return cleanupResult;
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport(

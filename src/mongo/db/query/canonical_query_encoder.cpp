@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -134,11 +108,8 @@ using AppendChar = decltype(std::declval<BuilderType>().appendChar(std::declval<
  */
 template <typename BuilderType>
 inline constexpr auto hasAppendChar = stdx::is_detected_exact_v<void, AppendChar, BuilderType>;
+}  // namespace
 
-/**
- * Encode user-provided string. Cache key delimiters seen in the user string are escaped with a
- * backslash.
- */
 template <class BuilderType>
 void encodeUserString(std::string_view s, BuilderType* builder) {
     for (size_t i = 0; i < s.size(); ++i) {
@@ -169,6 +140,10 @@ void encodeUserString(std::string_view s, BuilderType* builder) {
     }
 }
 
+template void encodeUserString<StringBuilder>(std::string_view, StringBuilder*);
+template void encodeUserString<BufBuilder>(std::string_view, BufBuilder*);
+
+namespace {
 /**
  * String encoding of MatchExpression::MatchType.
  */
@@ -723,6 +698,7 @@ void encodeKeyForDistinct(const boost::optional<CanonicalDistinct>& distinct,
     }
     encodeUserString(distinct->getKey(), keyBuilder);
     *keyBuilder << distinct->isDistinctScanDirectionFlipped();
+    *keyBuilder << distinct->unwindsArrays();
     if (distinct->getSortRequirement()) {
         const auto& sortPattern = distinct->getSortRequirement().get();
         auto delimiter = "";
@@ -1237,7 +1213,7 @@ void encodePipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 bufBuilder,
                 // We do not use explode for sort optimization for a $match stage, since it is not
                 // a part of index selection.
-                false /*hasSort*/);
+                /*hasSort=*/false);
         } else if (!search_helpers::encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
             encodeKeyForPipelineStage(documentSource, serializedArray, bufBuilder);
         }
@@ -1254,43 +1230,7 @@ CanonicalQuery::QueryShapeString encodePipeline(
     return base64::encode(std::string_view(bufBuilder.buf(), bufBuilder.len()));
 }
 
-void encodeLegacyGetExecutorSubplanningData(const CanonicalQuery& cq, StringBuilder* keyBuilder) {
-    tassert(12499601, "Expected keyBuilder to be non-null", keyBuilder);
-    // Encode a flag with three possible values:
-    // 1 ('c'): The cache entry is intended to use the classic code path completely. In this case
-    //            the entry stores 'works.'
-    // 2 ('s'): The cache entry was planned with the classic runtime planners, and we intend
-    //            to run it in SBE. In this case the entry stores 'reads.'
-    // 3 ('o'): The cache entry is used for sub-planning using the classic SubPlanner
-    //            and we intend to run it in SBE. In this case the entry stores 'works' but
-    //            since replanning doesn't happen for queries generated from subplanning,
-    //            the value has no meaning. TODO SERVER-90957: Update these entries to store a
-    //            placeholder instead.
-    //
-    // The third case is treated specially because the classic sub-planner stores and reads
-    // cache entries that cannot be executed with SBE. We use this extra flag to avoid the
-    // possibility of the sub planner writing a cache entry for a branch of $or which is then used
-    // by an independent query that doesn't subplan.
-    //
-    // For example, if the user runs an SBE-compatible query {$or: [{a:1,b:1}, {c:1,d:1}]} and a
-    // cache entry is written for each branch, we do NOT want thos cache entries to be re-used for
-    // a query {a:1,b:1} since the second query would expect the cache entry to store a "reads"
-    // value that can be used with SBE's cache recovery path.
-    //
-    // By incorporating 'forSubplanner' we eliminate this possibility.
-
-    if (cq.isSbeCompatible()) {
-        if (cq.forSubPlanner()) {
-            *keyBuilder << "o";  // Case 3: 'o' for "OR."
-        } else {
-            *keyBuilder << "s";  // Case 2: 's' for "SBE."
-        }
-    } else {
-        *keyBuilder << "c";  // Case 1: 'c' for "classic."
-    }
-}
-
-void encodeDeferredGetExecutorSubplanningData(const CanonicalQuery& cq, StringBuilder* keyBuilder) {
+void encodeSubplanningData(const CanonicalQuery& cq, StringBuilder* keyBuilder) {
     tassert(12499600, "Expected keyBuilder to be non-null", keyBuilder);
     // In the deferred get_executor, we cannot encode the engine choice because it is not known
     // during query optimization. We only encode whether the subplanner is used, to avoid the case
@@ -1318,17 +1258,7 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     const bool apiStrict =
         cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
     keyBuilder << (apiStrict ? "t" : "f");
-
-    // Encode the deferred engine selection feature flag so that cache entries cannot be shared when
-    // the flag is changed. This could lead to unpredictable scenarios.
-    const bool deferredGetExecutorEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
-        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
-    keyBuilder << (deferredGetExecutorEnabled ? "t" : "f");
-    if (deferredGetExecutorEnabled) {
-        encodeDeferredGetExecutorSubplanningData(cq, &keyBuilder);
-    } else {
-        encodeLegacyGetExecutorSubplanningData(cq, &keyBuilder);
-    }
+    encodeSubplanningData(cq, &keyBuilder);
     return keyBuilder.str();
 }
 
@@ -1430,6 +1360,21 @@ uint32_t computeHash(std::string_view key) {
     size_t seed = 0;
     simpleStringDataComparator.hash_combine(seed, key);
     return seed;
+}
+
+CanonicalQuery::QueryShapeString encodeCanonicalQueryForJoin(const CanonicalQuery& cq) {
+    tassert(
+        12926102, "join plan cache key: access path must not have a sort", !cq.getSortPattern());
+    tassert(12926103,
+            "join plan cache key: access path must not have a collation",
+            cq.getCollator() == nullptr);
+    tassert(
+        12926104, "join plan cache key: access path must not have a distinct", !cq.getDistinct());
+
+    StringBuilder keyBuilder;
+    encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
+    encodeKeyForProj(cq.getProj(), &keyBuilder);
+    return keyBuilder.str();
 }
 }  // namespace canonical_query_encoder
 }  // namespace mongo

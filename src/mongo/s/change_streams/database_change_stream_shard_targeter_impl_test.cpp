@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/change_streams/database_change_stream_shard_targeter_impl.h"
 
@@ -33,7 +7,6 @@
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/s/change_streams/change_stream_db_absent_state_event_handler.h"
 #include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
@@ -174,7 +147,7 @@ TEST_F(
     DatabaseChangeStreamShardTargeterImplStrictModeFixture,
     Given_ActiveShardsInPlacement_When_Initialize_Then_OpensDataShardCursorsAndEventHandlerSetToDbPresent) {
     Timestamp clusterTime(13, 5);
-    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
+    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -260,7 +233,7 @@ DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeF
 DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_OpenCursorAtBeforeAtClusterTime_When_StartChangeStreamSegment_Then_Throws,
                    "Tripwire assertion.*10922901") {
-    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
+    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
 
     Timestamp clusterTime(20, 1);
     HistoricalPlacement placement;
@@ -277,7 +250,7 @@ DEATH_TEST_REGEX_F(
     DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
     Given_NextPlacementChangedAtBeforeOpenCursorAt_When_StartChangeStreamSegment_Then_Throws,
     "Tripwire assertion.*10922902") {
-    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
+    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
 
     Timestamp clusterTime(20, 1);
     HistoricalPlacement placement;
@@ -341,7 +314,7 @@ TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
 
 TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
        Given_PlacementWithShards_When_StartChangeStreamSegment_Then_OpensCursorOnDataShards) {
-    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
+    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     Timestamp clusterTime(20, 1);
@@ -365,7 +338,7 @@ TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
 TEST_F(
     DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementWithShardsAndUnboundedSegmentInFuture_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
-    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardC")};
+    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardC")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     Timestamp clusterTime(20, 1);
@@ -391,7 +364,7 @@ TEST_F(
 TEST_F(
     DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementWithShardsAndBoundedSegment_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
-    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardC")};
+    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardC")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     Timestamp clusterTime(20, 1);
@@ -441,7 +414,7 @@ TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     // Simulate receiving a 'DatabaseCreated' event. This should close the cursor on the config
     // server and open the cursors on the data shards.
     {
-        std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
+        std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
         stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
         Timestamp clusterTime = Timestamp(21, 10);
         HistoricalPlacement placement;
@@ -470,7 +443,7 @@ TEST_F(
     Given_MultipleChangeStreamSegments_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
     // First invocation of 'startChangeStreamSegment()' opens cursors on three shards.
     {
-        std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB"), ShardRef("shardC")};
+        std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB"), ShardId("shardC")};
         stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
         Timestamp clusterTime(20, 1);
@@ -500,7 +473,7 @@ TEST_F(
 
     // Second invocation of 'startChangeStreamSegment()' opens cursors on different shards.
     {
-        std::vector<ShardRef> shards = {ShardRef("shardC"), ShardRef("shardD"), ShardRef("shardE")};
+        std::vector<ShardId> shards = {ShardId("shardC"), ShardId("shardD"), ShardId("shardE")};
         stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
         std::vector<ShardId> shardsToOpen{ShardId("shardD"), ShardId("shardE")};
         stdx::unordered_set<ShardId> shardsToOpenSet(shardsToOpen.begin(), shardsToOpen.end());

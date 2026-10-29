@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * Unit tests for ShardingWriteRouter's integration with LocalReshardingOperationsRegistry.
@@ -89,7 +63,7 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "foo");
-const ShardHandle kDonorShardHandle(ShardId("shard0"), UUID::gen());
+const ShardId kDonorShard("shard0");
 
 class ShardingWriteRouterRegistryTest : public unittest::Test {
 public:
@@ -125,21 +99,19 @@ public:
             ->setRecoveryCompleted({clusterId,
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    kDonorShardHandle.name()},
-                                   kDonorShardHandle.uuid().value());
+                                    kDonorShard});
 
         auto [chunks, chunkManager] = createSourceChunkManager();
+        _shardVersion = ShardVersionFactory::make(chunkManager, kDonorShard);
 
         {
             const auto client = _serviceContext->getService()->makeClient("test-setup-metadata");
             const auto opCtx = client->makeOperationContext();
-
-            _shardVersion =
-                ShardVersionFactory::make(opCtx.get(), chunkManager, kDonorShardHandle.name());
+            OperationShardingState::setShardRole(
+                opCtx.get(), kNss, _shardVersion, /*dbVersion=*/boost::none);
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
-                ->setCollectionMetadata(opCtx.get(),
-                                        CollectionMetadata(chunkManager, kDonorShardHandle.name()));
+                ->setCollectionMetadata(opCtx.get(), CollectionMetadata(chunkManager, kDonorShard));
         }
 
         {
@@ -151,11 +123,10 @@ public:
                 _tempReshardingNss,
                 CatalogCacheMock::makeCollectionRoutingInfoSharded(
                     _tempReshardingNss,
-                    kDonorShardHandle.name(),
+                    kDonorShard,
                     DatabaseVersion(),
                     BSON("y" << 1),
-                    {{ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)),
-                      kDonorShardHandle.name()}}));
+                    {{ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)), kDonorShard}}));
 
             auto mockNetwork = std::make_unique<executor::NetworkInterfaceMock>();
             auto const grid = Grid::get(opCtx.get());
@@ -184,7 +155,7 @@ public:
         const auto client = _serviceContext->getService()->makeClient("test-make-router");
         const auto opCtx = client->makeOperationContext();
         OperationShardingState::setShardRole(
-            opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
+            opCtx.get(), kNss, _shardVersion, /*dbVersion=*/boost::none);
 
         Lock::DBLock dbLock{opCtx.get(), kNss.dbName(), MODE_IX};
         Lock::CollectionLock collLock{opCtx.get(), kNss, MODE_IX};
@@ -201,7 +172,7 @@ protected:
         chunks.emplace_back(_sourceUUID,
                             ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)),
                             ChunkVersion({collEpoch, collTimestamp}, {1, 0}),
-                            kDonorShardHandle.name());
+                            kDonorShard);
 
         CurrentChunkManager cm(ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
             RoutingTableHistory::makeNew(kNss,
@@ -212,8 +183,8 @@ protected:
                                          false,
                                          collEpoch,
                                          collTimestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
                                          true,
                                          chunks)));
 
@@ -262,7 +233,7 @@ TEST_F(ShardingWriteRouterRegistryTest, DonorRoleRegisteredReturnsShardId) {
     auto router = makeRouter();
     auto result = router.getReshardingDestinedRecipient(BSON("_id" << 0 << "y" << 5));
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(*result, kDonorShardHandle.name());
+    ASSERT_EQ(*result, kDonorShard);
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, DonorAndRecipientRolesReturnsShardId) {
@@ -274,7 +245,7 @@ TEST_F(ShardingWriteRouterRegistryTest, DonorAndRecipientRolesReturnsShardId) {
     auto router = makeRouter();
     auto result = router.getReshardingDestinedRecipient(BSON("_id" << 0 << "y" << 5));
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(*result, kDonorShardHandle.name());
+    ASSERT_EQ(*result, kDonorShard);
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, OperationUnregisteredReturnsNone) {

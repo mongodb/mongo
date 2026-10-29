@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,7 +12,6 @@
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
@@ -59,6 +32,9 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
 class SbeStageBuilderTest : public SbeStageBuilderTestFixture {
 protected:
@@ -324,9 +300,9 @@ TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
         groupByExpression,
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["count"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     runTest(std::move(groupNode), BSON_ARRAY(BSON("_id" << BSONNULL << "count" << 3)));
 }
@@ -337,8 +313,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestLimitSkip) {
         BSON("a" << 1));
 
     auto node = std::make_unique<LimitNode>(
-        std::make_unique<SkipNode>(getScanNode(), 1 /* skip */, LimitSkipParameterization::Enabled),
-        1 /* limit */,
+        std::make_unique<SkipNode>(getScanNode(), /*skip=*/1, LimitSkipParameterization::Enabled),
+        /*limit=*/1,
         LimitSkipParameterization::Enabled);
     runTest(std::move(node), BSON_ARRAY(BSON("_id" << 1 << "a" << 2)));
 }
@@ -349,7 +325,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestSkipOnly) {
         BSON("a" << 1));
 
     auto node =
-        std::make_unique<SkipNode>(getScanNode(), 2 /* skip */, LimitSkipParameterization::Enabled);
+        std::make_unique<SkipNode>(getScanNode(), /*skip=*/2, LimitSkipParameterization::Enabled);
     runTest(std::move(node), BSON_ARRAY(BSON("_id" << 2 << "a" << 3)));
 }
 
@@ -363,9 +339,10 @@ TEST_F(GoldenSbeStageBuilderTest, TestSort) {
     // Build a collection scan node for uncovered sort.
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        BSON("a" << -1) /* pattern */,
-        -1 /* limit */,
-        LimitSkipParameterization::Disabled);
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/-1,
+        LimitSkipParameterization::Disabled,
+        kSortMaxMemoryUsageBytes);
     runTest(std::move(sortNode), expected);
 }
 
@@ -378,9 +355,10 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimit) {
     // Build a collection scan node for uncovered sort.
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        BSON("a" << -1) /* pattern */,
-        1 /* limit */,
-        LimitSkipParameterization::Enabled);
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/1,
+        LimitSkipParameterization::Enabled,
+        kSortMaxMemoryUsageBytes);
     runTest(std::move(sortNode), expected, {.limit = 1});
 }
 
@@ -393,14 +371,15 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimitSkip) {
     // Build a collection scan node for uncovered sort.
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        BSON("a" << -1) /* pattern */,
-        2 /* limit */,
-        LimitSkipParameterization::Enabled);
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/2,
+        LimitSkipParameterization::Enabled,
+        kSortMaxMemoryUsageBytes);
 
     auto limitSkipNode = std::make_unique<LimitNode>(
         std::make_unique<SkipNode>(
-            std::move(sortNode), 1 /* skip */, LimitSkipParameterization::Enabled),
-        1 /* limit */,
+            std::move(sortNode), /*skip=*/1, LimitSkipParameterization::Enabled),
+        /*limit=*/1,
         LimitSkipParameterization::Enabled);
     runTest(std::move(limitSkipNode), expected, {.limit = 1, .skip = 1});
 }
@@ -445,9 +424,10 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortCovered) {
     // Build an index scan node for covered sort.
     auto coveredSortNode = std::make_unique<SortNodeDefault>(
         makeIdxScanNode(_nss, makeIndexEntry(indexKeyPattern), "a", 1, 3),
-        BSON("a" << -1) /* pattern */,
-        -1 /* limit */,
-        LimitSkipParameterization::Disabled);
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/-1,
+        LimitSkipParameterization::Disabled,
+        kSortMaxMemoryUsageBytes);
 
     // Build covered projection so that sort stage doesn't need to return whole document and becomes
     // covered sort.
@@ -633,202 +613,4 @@ TEST_F(GoldenSbeStageBuilderTest, TestTextMatch) {
                                      << "a test")));
 }
 
-class SearchSbeStageBuilderTest : public GoldenSbeStageBuilderTest {
-public:
-    void setUp() override {
-        GoldenSbeStageBuilderTest::setUp();
-        _gctx->validateOnClose(true);
-        _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
-    }
-
-    void tearDown() override {
-        GoldenSbeStageBuilderTest::tearDown();
-    }
-
-    void runSearchTest(std::unique_ptr<QuerySolutionNode> root,
-                       const mongo::BSONArray& expectedValue) {
-        auto findCommand = std::make_unique<FindCommandRequest>(_nss);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = _expCtx,
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)},
-                                 .isSearchQuery = true});
-        auto* searchNode = static_cast<SearchNode*>(root.get());
-
-        // Mock a DocumentSourceSearch and set the cqPipeline in CanonicalQuery.
-        BSONObjBuilder builder;
-        builder.append("mongotQuery", searchNode->searchQuery);
-        if (searchNode->limit) {
-            builder.append("limit", *searchNode->limit);
-        }
-        auto elem = BSON("" << builder.obj());
-        cq->setCqPipeline({DocumentSourceSearch::createFromBson(elem.firstElement(), _expCtx)},
-                          false);
-
-        auto querySolution = makeQuerySolution(std::move(root));
-        // Translate the QuerySolution tree to an sbe::PlanStage.
-        auto localColl =
-            acquireCollection(operationContext(),
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  operationContext(), _nss, AcquisitionPrerequisites::kRead),
-                              MODE_IS);
-        MultipleCollectionAccessor colls(localColl);
-        _expCtx->setUUID(localColl.uuid());
-
-        auto [resultSlots, stage, data, _] = buildPlanStage(
-            std::move(querySolution), colls, false /*hasRecordId*/, {.expCtx = _expCtx});
-
-        boost::optional<Lock::GlobalLock> globalLock;
-        if (!shard_role_details::getLocker(operationContext())->isLocked()) {
-            globalLock.emplace(operationContext(), MODE_IS);
-        }
-
-        // Mock the mongot response.
-        auto remoteCursors = std::make_unique<RemoteCursorMap>();
-        remoteCursors->insert(
-            {kCursorIdResult, mockTaskExecutorCursor(operationContext(), 0, kSearchResultArray)});
-        remoteCursors->insert({kCursorIdStoredSource,
-                               mockTaskExecutorCursor(operationContext(), 0, kResultStoredSource)});
-
-        auto name = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
-        data.env->resetSlot(data.env->getSlot(name),
-                            sbe::value::TypeTags::bsonObject,
-                            sbe::value::bitcastFrom<const char*>(kSearchMeta.objdata()),
-                            false /* owned */);
-        ASSERT_NE(getYieldPolicy(), nullptr);
-        stage_builder::prepareSlotBasedExecutableTree(operationContext(),
-                                                      stage.get(),
-                                                      &data,
-                                                      *cq,
-                                                      colls,
-                                                      getYieldPolicy(),
-                                                      false,
-                                                      remoteCursors.get());
-        ASSERT_EQ(resultSlots.size(), 1u);
-        auto resultAccessor = stage->getAccessor(data.env.ctx, resultSlots[0]);
-
-        // Print the stage explain output and verify.
-        _gctx->outStream() << data.debugString() << std::endl;
-        sbe::DebugPrintInfo debugPrintInfo{};
-        auto explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
-        _gctx->outStream() << replaceUuid(explain, localColl.uuid());
-        _gctx->outStream() << std::endl;
-
-        stage->open(false);
-        // Execute the plan to verify explain output is correct.
-        auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-        sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
-
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
-        ASSERT_TRUE(
-            PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-            << "expected: " << std::make_pair(expectedTag, expectedVal)
-            << " but got: " << std::make_pair(resultsTag, resultsVal);
-    }
-
-protected:
-    std::unique_ptr<executor::TaskExecutorCursor> mockTaskExecutorCursor(
-        OperationContext* opCtx, CursorId cursorId, const BSONArray& firstBatch) {
-        auto networkInterface = std::make_unique<executor::NetworkInterfaceMock>();
-        auto testExecutor = executor::makeThreadPoolTestExecutor(std::move(networkInterface));
-        executor::RemoteCommandRequest req = executor::RemoteCommandRequest();
-        req.opCtx = opCtx;
-
-        std::vector<BSONObj> batchVec;
-        for (const auto& ele : firstBatch) {
-            batchVec.push_back(ele.Obj());
-        }
-
-        executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load(),
-                                                 /*batchSize*/ boost::none,
-                                                 /*preFetchNextBatch*/ false);
-        // When pinning is enabled, TaskExecutorCursor requires both executor and underlying
-        // executor; tests use the same executor for both since there is no real connection to pin.
-        return std::make_unique<executor::TaskExecutorCursor>(
-            testExecutor,
-            testExecutor /* underlyingExec: same as executor in tests */,
-            CursorResponse{NamespaceString::kEmpty, cursorId, batchVec},
-            req,
-            std::move(opts));
-    }
-
-    const size_t kCursorIdResult = 0;
-    const size_t kCursorIdStoredSource = 1;
-    const BSONObj kSearchMeta = BSON("count" << 2);
-    const BSONArray kSearchResultArray = BSON_ARRAY(fromjson(R"(
-{
-    "_id" : 0,
-    "metaA" : 0,
-    "a" : 1
-})") << fromjson(R"(
-{
-    "_id" : 1,
-    "metaA" : 2,
-    "a" : 2
-})"));
-
-    const BSONArray kResultStoredSource = BSON_ARRAY(fromjson(R"(
-{
-    "storedSource" : {
-        "a" : 1
-    },
-    "metaA" : 10
-})") << fromjson(R"(
-{
-    "storedSource" : {
-        "a" : 2
-    },
-    "metaA" : 20
-})"));
-};
-
-TEST_F(SearchSbeStageBuilderTest, TestSearch) {
-    createCollection({fromjson("{_id: 0, a: 1}"), fromjson("{_id: 1, a: 2}")}, boost::none);
-    // Test search meta.
-    {
-        _gctx->outStream() << "SearchMeta Test" << std::endl;
-        auto node =
-            std::make_unique<SearchNode>(_nss,
-                                         true /* isSearchMeta */,
-                                         BSON("query" << "test"
-                                                      << "path"
-                                                      << "a"),
-                                         boost::none /* limit */,
-                                         boost::none /* sortSpec */,
-                                         kCursorIdResult /* remoteCursorId */,
-                                         BSON("SEARCH_META" << kSearchMeta) /* remoteCursorVars*/);
-        runSearchTest(std::move(node), BSON_ARRAY(kSearchMeta));
-    }
-    // Test non-stored_source case.
-    {
-        _gctx->outStream() << "Search NonStoredSource Test" << std::endl;
-        auto node = std::make_unique<SearchNode>(_nss,
-                                                 false /* isSearchMeta */,
-                                                 BSON("query" << "test"
-                                                              << "path"
-                                                              << "a"),
-                                                 boost::none /* limit */,
-                                                 boost::none /* sortSpec */,
-                                                 kCursorIdResult /* remoteCursorId */,
-                                                 boost::none /* remoteCursorVars*/);
-        runSearchTest(std::move(node),
-                      BSON_ARRAY(BSON("_id" << 0 << "a" << 1) << BSON("_id" << 1 << "a" << 2)));
-    }
-    // Test stored_source case with limit.
-    {
-        _gctx->outStream() << "Search NonStoredSource Test" << std::endl;
-        auto node = std::make_unique<SearchNode>(_nss,
-                                                 false /* isSearchMeta */,
-                                                 BSON("query" << "test"
-                                                              << "path"
-                                                              << "a"
-                                                              << "returnStoredSource" << true),
-                                                 1 /* limit */,
-                                                 boost::none /* sortSpec */,
-                                                 kCursorIdStoredSource /* remoteCursorId */,
-                                                 boost::none /* remoteCursorVars*/);
-        runSearchTest(std::move(node), BSON_ARRAY(BSON("a" << 1)));
-    }
-}
 }  // namespace mongo

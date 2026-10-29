@@ -19,7 +19,7 @@
 ###
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load(
     "@rules_cc//cc:cc_toolchain_config_lib.bzl",
     "action_config",
@@ -35,6 +35,8 @@ load(
     "variable_with_value",
     "with_feature_set",
 )
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 # The values are populated from the following link:
 #    https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt?view=msvc-170
@@ -848,7 +850,7 @@ def _impl(ctx):
                                 # called lock that takes a mutex when one meant to create a guard object
                                 # called lock on the stack.
                                 "/we4930",
-                            ],
+                            ] + ctx.attr.default_compile_flags,
                         ),
                     ],
                 ),
@@ -1587,21 +1589,6 @@ def _impl(ctx):
             ],
         )
 
-        sasl_include_feature = feature(
-            name = "sasl_include",
-            enabled = True,
-            flag_sets = [
-                flag_set(
-                    actions = all_compile_actions,
-                    flag_groups = [
-                        flag_group(
-                            flags = ["-Iexternal/windows_sasl/include"],
-                        ),
-                    ],
-                ),
-            ],
-        )
-
         mongo_defines_feature = feature(
             name = "mongo_defines",
             enabled = True,
@@ -1695,7 +1682,6 @@ def _impl(ctx):
             stack_frame_error_checking_feature,
             pdb_page_size_feature,
             incremental_feature,
-            sasl_include_feature,
             mongo_defines_feature,
         ]
     else:

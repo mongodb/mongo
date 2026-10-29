@@ -1,37 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,6 +14,7 @@
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -58,7 +30,11 @@
 #include <string>
 #include <vector>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {
@@ -151,6 +127,22 @@ void ExternalRecordStoreTest::createNamedPipe(PipeWaiter* pw,
     }
 
     pipeWriter.close();
+}
+
+TEST_F(ExternalRecordStoreTest, NamedPipeOutputGetAbsolutePath) {
+    const auto pipeName = createPipeFilename("NamedPipeOutputGetAbsolutePathPipe");
+
+    // The default pipe directory is prepended to the relative path.
+    NamedPipeOutput defaultDirWriter(std::string{kDefaultPipePath}, pipeName, /*persistPipe=*/true);
+    ASSERT_EQ(defaultDirWriter.getAbsolutePath(), std::string{kDefaultPipePath} + pipeName);
+
+#ifndef _WIN32
+    // A custom pipe directory is prepended to the relative path. Windows ignores the pipe directory
+    // and always uses kDefaultPipePath, so this is POSIX-only.
+    const std::string pipeDir = "/tmp/named-pipe-test-dir/";
+    NamedPipeOutput customDirWriter(pipeDir, pipeName, /*persistPipe=*/true);
+    ASSERT_EQ(customDirWriter.getAbsolutePath(), pipeDir + pipeName);
+#endif
 }
 
 TEST_F(ExternalRecordStoreTest, NamedPipeBasicRead) {
@@ -594,5 +586,187 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
     ASSERT_EQ(objsRead, objsWritten)
         << fmt::format("Expected objsRead == {} but got {}", objsWritten, objsRead);
 }
+
+// A crafted document with a valid top-level size can embed a negative int32 as the size of a nested
+// array element. Make sure that we reject this when validating the BSON.
+TEST_F(ExternalRecordStoreTest, RejectsNegativeEmbeddedArraySize) {
+    // Minimal malformed BSON: total_size=12, array element "a" with embedded size=-4 (0xFFFFFFFC).
+    // clang-format off
+    static constexpr char kMalformedBson[] = {
+        '\x0C', '\x00', '\x00', '\x00',  // total_size = 12
+        '\x04',                          // type: array
+        '\x61', '\x00',                  // key: "a\0"
+        '\xFC', '\xFF', '\xFF', '\xFF',  // embedded array size = -4
+        '\x00',                          // top-level document terminator
+    };
+    // clang-format on
+    static_assert(sizeof(kMalformedBson) == 12);
+
+    PipeWaiter pw;
+    const auto pipePath = createPipeFilename("RejectsNegativeEmbeddedArraySizePipe");
+    stdx::thread producer([&] {
+        NamedPipeOutput pipeWriter(pipePath);
+        pw.notify();
+        pipeWriter.open();
+        pipeWriter.write(kMalformedBson, sizeof(kMalformedBson));
+        pipeWriter.close();
+    });
+    ON_BLOCK_EXIT([&] { producer.join(); });
+    pw.wait();
+
+    VirtualCollectionOptions vopts;
+    ExternalDataSourceMetadata meta(
+        fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePath),
+        StorageTypeEnum::pipe,
+        FileTypeEnum::bson);
+    vopts.dataSources.emplace_back(meta);
+    MultiBsonStreamCursor msbc(vopts);
+
+    ASSERT_THROWS_CODE(msbc.next(), DBException, 12849400);
+}
+
+// A negative top-level size is caught by the explicit size check, before validateBSON() sees it.
+TEST_F(ExternalRecordStoreTest, RejectsNegativeTopLevelSize) {
+    // clang-format off
+    static constexpr char kNegativeSizeBson[] = {
+        '\xFC', '\xFF', '\xFF', '\xFF',  // total_size = -4
+        '\x00',                          // one byte of body
+    };
+    // clang-format on
+
+    PipeWaiter pw;
+    const auto pipePath = createPipeFilename("RejectsNegativeTopLevelSizePipe");
+    stdx::thread producer([&] {
+        NamedPipeOutput pipeWriter(pipePath);
+        pw.notify();
+        pipeWriter.open();
+        pipeWriter.write(kNegativeSizeBson, sizeof(kNegativeSizeBson));
+        pipeWriter.close();
+    });
+    ON_BLOCK_EXIT([&] { producer.join(); });
+    pw.wait();
+
+    VirtualCollectionOptions vopts;
+    ExternalDataSourceMetadata meta(
+        fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePath),
+        StorageTypeEnum::pipe,
+        FileTypeEnum::bson);
+    vopts.dataSources.emplace_back(meta);
+    MultiBsonStreamCursor msbc(vopts);
+
+    ASSERT_THROWS_CODE(msbc.next(), DBException, 13251201);
+}
+
+// Appends 'value' to 'doc' as a little-endian int32, which is what BSON requires. Appending the
+// host representation instead would byte-swap it on big-endian platforms such as s390x, where the
+// cursor reads a size the test never intended (BF-45534).
+void appendLittleEndianInt32(std::string& doc, int32_t value) {
+    char buf[sizeof(int32_t)];
+    DataView(buf).write<LittleEndian<int32_t>>(value);
+    doc.append(buf, sizeof(buf));
+}
+
+// Builds a well-formed BSON document of exactly 'totalSize' bytes holding one string field "a".
+// Laid out by hand because BSONObjBuilder cannot produce sizes above BSONObjMaxUserSize:
+//   int32 totalSize | 0x02 (string) | "a\0" | int32 strLen | strLen bytes | 0x00 (doc terminator)
+std::string makeRawStringBson(int32_t totalSize) {
+    constexpr int32_t kOverhead = 12;
+    invariant(totalSize > kOverhead);
+    const int32_t strLen = totalSize - kOverhead;  // includes the string's own NUL terminator
+
+    std::string doc;
+    doc.reserve(totalSize);
+    appendLittleEndianInt32(doc, totalSize);
+    doc.push_back('\x02');
+    doc.append("a\0", 2);
+    appendLittleEndianInt32(doc, strLen);
+    doc.append(strLen - 1, 'x');
+    doc.push_back('\0');  // string terminator
+    doc.push_back('\0');  // document terminator
+    invariant(static_cast<int32_t>(doc.size()) == totalSize);
+
+    return doc;
+}
+
+// An oversized document must be rejected even when it fits in the cursor's buffer. Reaching that
+// case takes a specific sequence, since expandBuffer()'s check only fires when the buffer grows:
+//   1. A document at the limit grows the buffer to its maximum, making the block read size
+//      BSONObjMaxUserSize.
+//   2. A small document is consumed off the front of the next block read, leaving the oversized
+//      document near offset 0 with most of it already buffered.
+//   3. Its remainder fits in the buffer's free tail, so it is read without expanding again.
+// The overshoot must stay small enough for step 3 to hold; a larger one would force an expansion
+// and be caught by expandBuffer() instead.
+TEST_F(ExternalRecordStoreTest, RejectsDocumentLargerThanMaxUserSize) {
+    static constexpr int32_t kOvershoot = 4 * 1024 * 1024;
+    static_assert(kOvershoot > 0 && kOvershoot < BSONObjMaxUserSize);
+
+    const std::string maxSizeDoc = makeRawStringBson(BSONObjMaxUserSize);
+    const auto smallDoc = BSON("small" << 1);
+    const std::string oversizedDoc = makeRawStringBson(BSONObjMaxUserSize + kOvershoot);
+
+    // The cursor rejects the document partway through it and closes the read end, leaving the
+    // blocked producer with a broken pipe.
+    static constexpr int kExpectedWriteErrorCode =
+#ifdef _WIN32
+        7239301;
+#else
+        7239300;
+#endif
+    AtomicWord<int> producerWriteErrorCode{0};
+
+    PipeWaiter pw;
+    const auto pipePath = createPipeFilename("RejectsDocumentLargerThanMaxUserSizePipe");
+    stdx::thread producer([&] {
+        NamedPipeOutput pipeWriter(pipePath);
+        pw.notify();
+        pipeWriter.open();
+        try {
+            pipeWriter.write(maxSizeDoc.data(), maxSizeDoc.size());
+            pipeWriter.write(smallDoc.objdata(), smallDoc.objsize());
+            pipeWriter.write(oversizedDoc.data(), oversizedDoc.size());
+        } catch (const DBException& ex) {
+            // Recorded rather than asserted here: an assertion escaping this thread would terminate
+            // the test process. Verified on the main thread after the join below.
+            producerWriteErrorCode.store(ex.code());
+        }
+        pipeWriter.close();
+    });
+    ON_BLOCK_EXIT([&] {
+        if (producer.joinable()) {
+            producer.join();
+        }
+    });
+    pw.wait();
+
+    VirtualCollectionOptions vopts;
+    ExternalDataSourceMetadata meta(
+        fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePath),
+        StorageTypeEnum::pipe,
+        FileTypeEnum::bson);
+    vopts.dataSources.emplace_back(meta);
+
+    {
+        MultiBsonStreamCursor msbc(vopts);
+
+        // The first document is exactly at the limit, so it is accepted.
+        auto record = msbc.next();
+        ASSERT(record) << "Expected to read the BSONObjMaxUserSize document";
+        ASSERT_EQ(record->data.size(), BSONObjMaxUserSize);
+
+        record = msbc.next();
+        ASSERT(record) << "Expected to read the small document";
+        ASSERT_EQ(record->data.size(), smallDoc.objsize());
+
+        // The oversized document fits in the buffer but violates the max user size invariant. It is
+        // rejected by the size check.
+        ASSERT_THROWS_CODE(msbc.next(), DBException, 13251201);
+    }  // Closes the read end of the pipe, unblocking the producer with a broken pipe.
+
+    producer.join();
+    ASSERT_EQ(producerWriteErrorCode.load(), kExpectedWriteErrorCode)
+        << "Expected the producer to fail writing the remainder of the oversized document";
+}
+
 }  // namespace
 }  // namespace mongo

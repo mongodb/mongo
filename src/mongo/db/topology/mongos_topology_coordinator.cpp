@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/topology/mongos_topology_coordinator.h"
@@ -107,7 +81,7 @@ StatusOrStatusWith<T> futureGetNoThrowWithDeadline(OperationContext* opCtx,
  * ShutdownInProgress error message
  */
 
-constexpr std::string_view kQuiesceModeShutdownMessage =
+constexpr std::string_view kMongosQuiesceModeShutdownMessage =
     "Mongos is in quiesce mode and will shut down"sv;
 
 }  // namespace
@@ -137,7 +111,7 @@ std::shared_ptr<MongosHelloResponse> MongosTopologyCoordinator::_makeHelloRespon
     // Check that we are not in Quiesce Mode before returning a response to avoid responding with
     // a higher topology version, but no indication that we are shutting down.
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
-            kQuiesceModeShutdownMessage,
+            kMongosQuiesceModeShutdownMessage,
             !_inQuiesceMode);
 
     auto response = std::make_shared<MongosHelloResponse>(_topologyVersion);
@@ -153,7 +127,7 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
     // Fail all new hello requests with ShutdownInProgress if we've transitioned to Quiesce
     // Mode.
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
-            kQuiesceModeShutdownMessage,
+            kMongosQuiesceModeShutdownMessage,
             !_inQuiesceMode);
 
     // Respond immediately if:
@@ -255,7 +229,7 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
         _topologyVersion.setCounter(counter + 1);
         _promise->setError(
             Status(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
-                   kQuiesceModeShutdownMessage));
+                   kMongosQuiesceModeShutdownMessage));
 
         // Reset counter to 0 since we will respond to all waiting hello requests with an error.
         // All new hello requests will immediately fail with ShutdownInProgress.

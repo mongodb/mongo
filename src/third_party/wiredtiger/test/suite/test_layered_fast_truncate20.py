@@ -83,9 +83,9 @@ class test_layered_fast_truncate20(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.setup_leader(keys=range(self.nitems))
         self.setup_follower_with_knob(slow=True)
 
-        before = self.get_stat(self.conn, stat.conn.layered_curs_remove)
+        before = self.get_stat(stat.conn.layered_curs_remove, conn=self.conn)
         self.truncate(self.trunc_lo, self.trunc_hi)
-        after = self.get_stat(self.conn, stat.conn.layered_curs_remove)
+        after = self.get_stat(stat.conn.layered_curs_remove, conn=self.conn)
 
         expected = self.trunc_hi - self.trunc_lo + 1
         self.assertEqual(after - before, expected,
@@ -95,9 +95,9 @@ class test_layered_fast_truncate20(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.setup_leader(keys=range(self.nitems))
         self.setup_follower_with_knob(slow=False)
 
-        before = self.get_stat(self.conn, stat.conn.layered_curs_remove)
+        before = self.get_stat(stat.conn.layered_curs_remove, conn=self.conn)
         self.truncate(self.trunc_lo, self.trunc_hi)
-        after = self.get_stat(self.conn, stat.conn.layered_curs_remove)
+        after = self.get_stat(stat.conn.layered_curs_remove, conn=self.conn)
 
         self.assertEqual(after, before,
             'fast path should not call cursor->remove() (ingest table is empty)')

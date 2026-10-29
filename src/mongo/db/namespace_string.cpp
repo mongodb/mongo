@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/namespace_string.h"
 
@@ -61,6 +35,18 @@ static const absl::flat_hash_set<NamespaceString> globallyUniqueConfigDbCollecti
     NamespaceString::kConfigVersionNamespace,
     NamespaceString::kConfigMongosNamespace,
     NamespaceString::kLogicalSessionsNamespace};
+
+bool startsWithCollectionNameModel(std::string_view collectionName, std::string_view model) {
+    if (collectionName.size() < model.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < model.size(); ++i) {
+        if (model[i] != '%' && model[i] != collectionName[i]) {
+            return false;
+        }
+    }
+    return true;
+}
 
 }  // namespace
 
@@ -336,7 +322,7 @@ bool NamespaceString::isFLE2StateCollection(std::string_view coll) {
 }
 
 bool NamespaceString::isSystemStatsCollection() const {
-    return coll().starts_with(kStatisticsCollectionPrefix);
+    return coll().starts_with(kStatisticsCollectionPrefix) || isFieldStatsCollection();
 }
 
 bool NamespaceString::isOutStageTmpCollection() const {
@@ -345,6 +331,21 @@ bool NamespaceString::isOutStageTmpCollection() const {
     return coll().starts_with(kOutTmpCollectionPrefix) ||
         (isTimeseriesBucketsCollection() &&
          getTimeseriesViewNamespace().coll().starts_with(kOutTmpCollectionPrefix));
+}
+
+bool NamespaceString::isConvertToCappedTmpCollection() const {
+    const auto c = coll();
+    return c.size() > kConvertToCappedTmpCollectionModelPrefix.size() &&
+        startsWithCollectionNameModel(c, kConvertToCappedTmpCollectionModelPrefix);
+}
+
+bool NamespaceString::isRenameCollectionTmpCollection() const {
+    auto c = coll();
+    if (isTimeseriesBucketsCollection()) {
+        c.remove_prefix(kTimeseriesBucketsCollectionPrefix.size());
+    }
+    return c.size() == kRenameCollectionTmpCollectionModel.size() &&
+        startsWithCollectionNameModel(c, kRenameCollectionTmpCollectionModel);
 }
 
 // TODO SERVER-101784: Remove this once 9.0 is LTS and viewful time-series collections no longer

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -135,7 +109,7 @@ TEST(FLE2EncryptionPlaceholder, NonRangeAlgorithmWithSparsity) {
 }
 
 TEST(FLE2EncryptionPlaceholder, TextSearchRoundTrip) {
-    FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
+    FLE2TextSearchInsertSpec spec("foo", /*casefold=*/false, /*diacriticfold=*/true);
     spec.setSuffixSpec(FLE2SuffixInsertSpec(10, 1));
     spec.setPrefixSpec(FLE2PrefixInsertSpec(20, 2));
     spec.setSubstringSpec(FLE2SubstringInsertSpec(300, 30, 3));
@@ -418,7 +392,7 @@ TEST(FLE2RangeInsertSpec, PrecisionApplicability) {
 }
 
 TEST(FLE2TextSearchInsertSpec, MissingSubspec) {
-    FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
+    FLE2TextSearchInsertSpec spec("foo", /*casefold=*/false, /*diacriticfold=*/true);
     ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
                            spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
@@ -426,8 +400,9 @@ TEST(FLE2TextSearchInsertSpec, MissingSubspec) {
 }
 
 TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundLessThanLowerBound) {
-    FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
-    spec.setSubstringSpec(FLE2SubstringInsertSpec(100, 1 /*ub*/, 10 /*lb*/));
+    FLE2TextSearchInsertSpec spec("foo", /*casefold=*/false, /*diacriticfold=*/true);
+    spec.setSubstringSpec(
+        FLE2SubstringInsertSpec(100, /*maxQueryLength=*/1, /*minQueryLength=*/10));
     ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
                            spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
@@ -435,8 +410,9 @@ TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundLessThanLowerBound) {
 }
 
 TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundGreaterThanMaxLen) {
-    FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
-    spec.setSubstringSpec(FLE2SubstringInsertSpec(10 /*mlen*/, 100 /*ub*/, 1 /*lb*/));
+    FLE2TextSearchInsertSpec spec("foo", /*casefold=*/false, /*diacriticfold=*/true);
+    spec.setSubstringSpec(
+        FLE2SubstringInsertSpec(/*maxLength=*/10, /*maxQueryLength=*/100, /*minQueryLength=*/1));
     ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
                            spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
@@ -444,8 +420,8 @@ TEST(FLE2TextSearchInsertSpec, SubstringSpecUpperBoundGreaterThanMaxLen) {
 }
 
 TEST(FLE2TextSearchInsertSpec, SuffixSpecUpperBoundLessThanLowerBound) {
-    FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
-    spec.setSuffixSpec(FLE2SuffixInsertSpec(1 /*ub*/, 10 /*lb*/));
+    FLE2TextSearchInsertSpec spec("foo", /*casefold=*/false, /*diacriticfold=*/true);
+    spec.setSuffixSpec(FLE2SuffixInsertSpec(/*maxQueryLength=*/1, /*minQueryLength=*/10));
     ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
                            spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,
@@ -453,8 +429,8 @@ TEST(FLE2TextSearchInsertSpec, SuffixSpecUpperBoundLessThanLowerBound) {
 }
 
 TEST(FLE2TextSearchInsertSpec, PrefixSpecUpperBoundLessThanLowerBound) {
-    FLE2TextSearchInsertSpec spec("foo", false /*casefold*/, true /*diacriticfold*/);
-    spec.setPrefixSpec(FLE2PrefixInsertSpec(1 /*ub*/, 10 /*lb*/));
+    FLE2TextSearchInsertSpec spec("foo", /*casefold=*/false, /*diacriticfold=*/true);
+    spec.setPrefixSpec(FLE2PrefixInsertSpec(/*maxQueryLength=*/1, /*minQueryLength=*/10));
     ASSERT_THROWS_CODE(FLE2TextSearchInsertSpec::parse(
                            spec.toBSON(), IDLParserContext("FLE2TextSearchInsertSpec")),
                        DBException,

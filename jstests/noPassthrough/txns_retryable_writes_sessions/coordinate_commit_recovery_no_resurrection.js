@@ -15,6 +15,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -34,8 +35,10 @@ assert.commandWorked(
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
-assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 
 const shard0Primary = st.rs0.getPrimary();
 const shard0Pid = shard0Primary.pid;

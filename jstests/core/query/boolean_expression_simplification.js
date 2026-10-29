@@ -1,6 +1,7 @@
 /**
  * Tests boolean expression simplifier produces expected results.
  * @tags: [
+ * uses_explain,
  * requires_fcv_72,
  * # explain command, used by the test, does not support majority read concern.
  *  assumes_read_concern_local,

@@ -1,33 +1,25 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/logv2/file_rotate_sink.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/logv2/attribute_storage.h"
+#include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/demangle.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/quick_exit.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <exception>
@@ -50,30 +42,12 @@
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/errc.hpp"
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/json_formatter.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_tag.h"
-#include "mongo/logv2/log_truncation.h"
-#include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/demangle.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
 
 #ifdef _WIN32
 #include "mongo/logv2/log_util.h"
 #endif
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 namespace mongo::logv2 {
 namespace {
@@ -241,7 +215,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
                         "Writing to log file failed, aborting application",
                         TypeErasedAttributeStorage(attrs),
                         LogTag::kNone,
-                        std::string() /* tenantID */,
+                        /*tenant=*/std::string(),
                         LogTruncation::Disabled);
             // Commented out log line below to get validation of the log id with the errorcodes
             // linter LOGV2(4522200, "Writing to log file failed, aborting application");

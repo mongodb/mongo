@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,9 +16,9 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
@@ -58,6 +32,8 @@
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -76,7 +52,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
         ShardType shard;
-        shard.setHandle(ShardHandle{ShardId(_shardName), boost::none});
+        shard.setName(_shardName);
         shard.setHost(_shardName + ":12");
         setupShards({shard});
 
@@ -444,8 +420,6 @@ TEST_F(SplitChunkTest, RetryCommittedSplitSucceedsDuringFCVTransition) {
 
     ASSERT_OK(doSplit());
 
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -763,6 +737,221 @@ TEST_F(SplitChunkTest, SplitJumboChunkShouldUnsetJumboFlag) {
 
     ASSERT_EQ(false, chunkDocLeft.getValue().getJumbo());
     ASSERT_EQ(false, chunkDocRight.getValue().getJumbo());
+}
+
+// Returns the field names of 'obj' in sorted order. Used to compare the shape (not the values) of
+// two chunk documents.
+std::vector<std::string> sortedFieldNames(const BSONObj& obj) {
+    std::vector<std::string> names;
+    for (const auto& element : obj) {
+        names.push_back(element.fieldName());
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+class CommitSplitTest : public SplitChunkTest {
+protected:
+    // Returns the highest chunk version owned by 'shard', i.e. its shard placement version.
+    ChunkVersion getShardVersion(const UUID& collUuid,
+                                 const OID& collEpoch,
+                                 const Timestamp& collTimestamp,
+                                 const ShardId& shard) {
+        auto doc = uassertStatusOK(findOneOnConfigCollection(
+            operationContext(),
+            NamespaceString::kConfigsvrChunksNamespace,
+            BSON(ChunkType::collectionUUID << collUuid << ChunkType::shard(shard.toString())),
+            BSON(ChunkType::lastmod << -1)));
+        return uassertStatusOK(ChunkType::parseFromConfigBSON(doc, collEpoch, collTimestamp))
+            .getVersion();
+    }
+
+    std::vector<ChunkType> commitSplit(const NamespaceString& nss,
+                                       const ChunkVersion& shardVersionPreSplit,
+                                       const ChunkRange& range,
+                                       const std::vector<BSONObj>& splitPoints) {
+        return assertGet(
+            ShardingCatalogManager::get(operationContext())
+                ->commitSplit(
+                    operationContext(), nss, shardVersionPreSplit, range, splitPoints, _shardName));
+    }
+
+    boost::optional<ChunkType> findChangedChunkByMin(const std::vector<ChunkType>& chunks,
+                                                     const BSONObj& min) {
+        for (const auto& chunk : chunks) {
+            if (chunk.getMin().woCompare(min) == 0) {
+                return chunk;
+            }
+        }
+        return boost::none;
+    }
+
+    // Asserts two changed-chunks lists describe the same chunks. The order can differ between a
+    // commit and its idempotent retry, so the comparison is order-independent (keyed by chunk min).
+    void assertSameChangedChunks(std::vector<ChunkType> lhs, std::vector<ChunkType> rhs) {
+        ASSERT_EQ(lhs.size(), rhs.size());
+        const auto byMin = [](const ChunkType& l, const ChunkType& r) {
+            return l.getMin().woCompare(r.getMin()) < 0;
+        };
+        std::sort(lhs.begin(), lhs.end(), byMin);
+        std::sort(rhs.begin(), rhs.end(), byMin);
+        for (size_t i = 0; i < lhs.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(lhs[i].getMin(), rhs[i].getMin());
+            ASSERT_BSONOBJ_EQ(lhs[i].getMax(), rhs[i].getMax());
+            ASSERT_EQ(lhs[i].getShard(), rhs[i].getShard());
+            ASSERT_EQ(lhs[i].getVersion(), rhs[i].getVersion());
+        }
+    }
+
+    // Simulates a concurrent DDL disabling chunk operations on the collection by clearing the
+    // allowChunkOperations flag on its config.collections document.
+    void disallowChunkOperations(const NamespaceString& nss) {
+        DBDirectClient client(operationContext());
+        client.update(
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+            BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
+    }
+};
+
+TEST_F(CommitSplitTest, CommitSplitReturnsNewSubChunks) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+    const auto collUuid = UUID::gen();
+
+    const auto chunkMin = BSON("a" << 1);
+    const auto splitPoint = BSON("a" << 5);
+    const auto chunkMax = BSON("a" << 10);
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    const auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId(_shardName));
+    chunk.setRange({chunkMin, chunkMax});
+    setupCollection(_nss1, _keyPattern, {chunk});
+
+    auto changedChunks =
+        commitSplit(_nss1, origVersion, ChunkRange(chunkMin, chunkMax), {splitPoint});
+
+    ASSERT_EQ(2U, changedChunks.size());
+
+    auto left = findChangedChunkByMin(changedChunks, chunkMin);
+    ASSERT(left.has_value());
+    ASSERT_BSONOBJ_EQ(splitPoint, left->getMax());
+    ASSERT_EQ(ShardId(_shardName), left->getShard());
+
+    auto right = findChangedChunkByMin(changedChunks, splitPoint);
+    ASSERT(right.has_value());
+    ASSERT_BSONOBJ_EQ(chunkMax, right->getMax());
+    ASSERT_EQ(ShardId(_shardName), right->getShard());
+
+    // Both sub-chunks carry a version produced by the split, greater than the pre-split version.
+    ASSERT_EQ(std::partial_ordering::less, origVersion <=> left->getVersion());
+    ASSERT_EQ(std::partial_ordering::less, origVersion <=> right->getVersion());
+}
+
+TEST_F(CommitSplitTest, IdempotentRetryReturnsSameChangedChunks) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+    const auto collUuid = UUID::gen();
+
+    const auto chunkMin = BSON("a" << 1);
+    const auto splitPoint = BSON("a" << 5);
+    const auto chunkMax = BSON("a" << 10);
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    const auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId(_shardName));
+    chunk.setRange({chunkMin, chunkMax});
+    setupCollection(_nss1, _keyPattern, {chunk});
+
+    auto firstResult =
+        commitSplit(_nss1, origVersion, ChunkRange(chunkMin, chunkMax), {splitPoint});
+    const auto versionAfterFirst =
+        getShardVersion(collUuid, collEpoch, collTimestamp, ShardId(_shardName));
+
+    // Retry with the same arguments; the split is already committed.
+    auto secondResult =
+        commitSplit(_nss1, origVersion, ChunkRange(chunkMin, chunkMax), {splitPoint});
+
+    assertSameChangedChunks(firstResult, secondResult);
+
+    // The retry must not bump any version.
+    ASSERT_EQ(versionAfterFirst,
+              getShardVersion(collUuid, collEpoch, collTimestamp, ShardId(_shardName)));
+}
+
+// An idempotent retry of an already-applied commit must return OK even when chunk operations have
+// since been disallowed on the collection. The allowChunkOperations check runs only on the
+// non-retry path.
+TEST_F(CommitSplitTest, IdempotentRetrySucceedsWhenChunkOperationsDisallowed) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+    const auto collUuid = UUID::gen();
+
+    const auto chunkMin = BSON("a" << 1);
+    const auto splitPoint = BSON("a" << 5);
+    const auto chunkMax = BSON("a" << 10);
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    const auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId(_shardName));
+    chunk.setRange({chunkMin, chunkMax});
+    setupCollection(_nss1, _keyPattern, {chunk});
+
+    auto firstResult =
+        commitSplit(_nss1, origVersion, ChunkRange(chunkMin, chunkMax), {splitPoint});
+
+    disallowChunkOperations(_nss1);
+
+    auto secondResult =
+        commitSplit(_nss1, origVersion, ChunkRange(chunkMin, chunkMax), {splitPoint});
+
+    assertSameChangedChunks(firstResult, secondResult);
+}
+
+// The commit returns chunks that participants store alongside chunks they load from the global
+// catalog, so both must expose the same set of fields. This compares the field set (format), not
+// the values, of each commit chunk against the durable chunk for the same range.
+TEST_F(CommitSplitTest, ChangedChunksHaveSameFormatAsDurableChunks) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+    const auto collUuid = UUID::gen();
+
+    const auto chunkMin = BSON("a" << 1);
+    const auto splitPoint = BSON("a" << 5);
+    const auto chunkMax = BSON("a" << 10);
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    const auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId(_shardName));
+    chunk.setRange({chunkMin, chunkMax});
+    chunk.setOnCurrentShardSince(Timestamp(100, 0));
+    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId(_shardName))});
+    setupCollection(_nss1, _keyPattern, {chunk});
+
+    auto changedChunks =
+        commitSplit(_nss1, origVersion, ChunkRange(chunkMin, chunkMax), {splitPoint});
+    ASSERT_EQ(2U, changedChunks.size());
+
+    for (const auto& changed : changedChunks) {
+        auto fromCatalog = uassertStatusOK(
+            getChunkDoc(operationContext(), collUuid, changed.getMin(), collEpoch, collTimestamp));
+        ASSERT_EQ(sortedFieldNames(changed.toConfigBSON()),
+                  sortedFieldNames(fromCatalog.toConfigBSON()));
+    }
 }
 }  // namespace
 }  // namespace mongo

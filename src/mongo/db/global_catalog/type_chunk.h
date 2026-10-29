@@ -1,38 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_field.h"
@@ -46,7 +16,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
@@ -60,6 +30,11 @@
 #include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 namespace mongo {
 
 class BSONObjBuilder;
@@ -67,13 +42,13 @@ class Status;
 template <typename T>
 class StatusWith;
 
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkHistory : public ChunkHistoryBase {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkHistory : public ChunkHistoryBase {
 public:
     using ChunkHistoryBase::serialize;
     using ChunkHistoryBase::toBSON;
 
     ChunkHistory() : ChunkHistoryBase() {}
-    ChunkHistory(mongo::Timestamp ts, mongo::ShardRef shard) : ChunkHistoryBase() {
+    ChunkHistory(mongo::Timestamp ts, mongo::ShardId shard) : ChunkHistoryBase() {
         setValidAfter(std::move(ts));
         setShard(std::move(shard));
     }
@@ -125,7 +100,7 @@ public:
  * server's collection schema, but that will be future work when the new schema is stable and there
  * is time to do the extra work, as well as handle the backwards compatibility issues it poses.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkType {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkType {
 public:
     // Name of the chunks collection in the config server.
     static const NamespaceString ConfigNS;
@@ -148,7 +123,7 @@ public:
     static const BSONField<bool> historyIsAt40;
 
     ChunkType();
-    ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardRef shard);
+    ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId);
 
     /**
      * Constructs a new ChunkType object from BSON with the following format:
@@ -185,7 +160,8 @@ public:
      *
      * TODO SERVER-121075: See if this can be removed.
      */
-    MONGO_MOD_PRIVATE static ChunkType parse(const BSONObj& source, const IDLParserContext& ctxt) {
+    [[MONGO_MOD_PRIVATE]] static ChunkType parse(const BSONObj& source,
+                                                 const IDLParserContext& ctxt) {
         return uassertStatusOK(parseFromConfigBSON(source, OID(), Timestamp()));
     }
 
@@ -244,10 +220,10 @@ public:
     }
     void setVersion(const ChunkVersion& version);
 
-    const ShardRef& getShard() const {
+    const ShardId& getShard() const {
         return _shard.get();
     }
-    void setShard(const ShardRef& shard);
+    void setShard(const ShardId& shard);
 
     boost::optional<int64_t> getEstimatedSizeBytes() const {
         return _estimatedSizeBytes;
@@ -273,6 +249,22 @@ public:
     }
     const std::vector<ChunkHistory>& getHistory() const {
         return _history;
+    }
+
+    /**
+     * Returns true if the given shard currently owns this chunk or previously owned it, i.e. it
+     * appears anywhere in the chunk's ownership history.
+     */
+    bool isOwnedNowOrHistoricallyBy(const ShardId& shard) const {
+        if (getShard() == shard) {
+            return true;
+        }
+        for (const auto& entry : _history) {
+            if (entry.getShard() == shard) {
+                return true;
+            }
+        }
+        return false;
     }
 
     void addHistoryToBSON(BSONObjBuilder& builder) const;
@@ -307,7 +299,7 @@ private:
     // (M)(C)(S)  version of this chunk
     boost::optional<ChunkVersion> _version;
     // (M)(C)(S)  shard this chunk lives in
-    boost::optional<ShardRef> _shard;
+    boost::optional<ShardId> _shard;
     // (O)(C)     chunk size used for chunk merging operation
     boost::optional<int64_t> _estimatedSizeBytes;
     // (O)(C)     too big to move?

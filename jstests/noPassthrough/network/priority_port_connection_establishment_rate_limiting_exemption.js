@@ -108,7 +108,6 @@ describe("Tests for priority port exemption from connection (session) establishm
             nodeOptions: {
                 setParameter: {
                     ...this.kParamsConnectionEstablishmentRateLimiter,
-                    featureFlagRateLimitIngressConnectionEstablishment: true,
                 },
                 config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
             },
@@ -131,7 +130,6 @@ describe("Tests for priority port exemption from connection (session) establishm
         const opts = {
             setParameter: {
                 ...this.kParamsConnectionEstablishmentRateLimiter,
-                featureFlagRateLimitIngressConnectionEstablishment: true,
             },
             config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
         };

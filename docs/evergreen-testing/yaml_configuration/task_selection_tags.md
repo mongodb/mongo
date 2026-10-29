@@ -25,7 +25,7 @@ found [here](../../../etc/evergreen_lint.yml).
 - `no_commit_queue` - add this to tasks in development_critical that you do not want in the
   commit-queue
 
-- `release_critical` - these tasks should be green prior to the release. We run these tasks on all
+- `all_variants` - these tasks should be green prior to the release. We run these tasks on all
   release and development (required and suggested) variants. It should be uncommon to add tasks to
   this tag but if your task needs to run on many different OSes and it is extremely broad in
   coverage then you can add it to this tag.
@@ -34,8 +34,9 @@ found [here](../../../etc/evergreen_lint.yml).
   most significant development variants (required patches, tsan, aubsan, etc.). Use this tag if you
   are not sure which tag to use for your new task.
 
-- `non_deterministic` - these tasks depend significantly on randomization and we expect to see some
-  unique failures, e.g. fuzzers etc. We run these tasks on non-required development variants.
+- `non_required` - these tasks are not required to be green, e.g. fuzzers etc. that depend
+  significantly on randomization and where we expect to see some unique failures. We run these tasks
+  on non-required development variants.
 
 - `experimental` - these tasks are not running anywhere regularly. We do not use this tag for
   selecting tasks to run on variants. This tag could be used for tasks that you would like to run on
@@ -48,6 +49,25 @@ found [here](../../../etc/evergreen_lint.yml).
 
 **Important**: Do not change anything in this list without talking to
 [#ask-devprod-build](https://mongodb.enterprise.slack.com/archives/CR8SNBY0N).
+
+## Task classification tags
+
+In addition to the required task selection tag, tasks carry classification tags that describe if the
+task is blocking for releasing the server. These tags do not presently affect which tasks are
+selected to run.
+
+- `non_release_critical` - the task is not release-blocking. Every task that is not
+  `release_critical` is tagged with this by default, so teams should swap it for `release_critical`
+  as appropriate.
+
+- `release_critical` - a failure in this task blocks a release. Use this when, if the task were
+  failing in the waterfall and you could not inspect the specific failure, you would still be highly
+  confident that the commit contains a release-blocking issue.
+
+- `build_critical` - these tasks represent the absolute minimum that must pass in order for us to
+  build the server. Without them passing we have very low confidence that we can build on a given
+  platform / build variant, let alone release that version. Tasks tagged `build_critical` must also
+  be tagged `release_critical`, and must not be tagged `non_release_critical`.
 
 ## Optional task selection tags
 
@@ -69,6 +89,8 @@ task could be tagged with any number of the following tags:
 - `incompatible_all_feature_flags` - the task should be excluded from all-feature-flags variants.
 - `incompatible_development_variant` - the task should be excluded from the development variants.
 - `incompatible_oscrypto` - the task should be excluded from variants unsupported by oscrypto.
+- `incompatible_with_bazel_remote_test` - the task's Bazel suite cannot run on remote executors, so
+  tests must still run on an Evergreen host even though it has a Bazel target.
 - `requires_compile_variant` - the task can (or should) only run on variants that has compile
   releated expansions.
 - `requires_large_host` - the task requires a large host to run.

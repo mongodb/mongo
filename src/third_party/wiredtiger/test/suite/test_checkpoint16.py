@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 # that checkpoint.
 
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 

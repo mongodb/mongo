@@ -1,38 +1,17 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
+#include "mongo/util/lru_cache.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -40,6 +19,14 @@
 #include <memory>
 
 namespace mongo::query_stats {
+
+/**
+ * Value stored for one error code recently seen for a query shape.
+ */
+struct QueryStatsErrorEntry {
+    uint64_t count = 0;
+    Date_t latestSeenTimestamp;
+};
 
 struct CursorEntry {
     void toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const;
@@ -162,6 +149,11 @@ struct QueryPlannerEntry {
      * collected if includeCBRMetrics is true.
      */
     CostBasedRankerEntry costBasedRankerStats;
+
+    /**
+     * Aggregates the winning plan shapes observed across all executions of this query shape.
+     */
+    plan_shape_counters::PlanShapeCounts planShapeCounters;
 };
 
 struct WritesEntry {
@@ -223,12 +215,23 @@ struct WritesEntry {
  * as server status metrics.
  */
 struct QueryStatsEntry {
-    QueryStatsEntry(std::unique_ptr<const Key> key_)
-        : firstSeenTimestamp(Date_t::now()), key(std::move(key_)) {}
+    QueryStatsEntry(std::unique_ptr<const Key> key_, std::string userVisibleHash_)
+        : firstSeenTimestamp(Date_t::now()),
+          // 'internalQueryStatsMaxErrorCodesPerShape' is a startup-only knob, so the bound is fixed
+          // for the lifetime of the process and can be handed to the cache to enforce itself.
+          recentErrors(static_cast<size_t>(internalQueryStatsMaxErrorCodesPerShape.load())),
+          reservedErrorBudgetBytes(
+              feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()
+                  ? static_cast<size_t>(internalQueryStatsMaxErrorCodesPerShape.load()) *
+                      kApproxBytesPerRecentError
+                  : 0),
+          key(std::move(key_)),
+          userVisibleHash(std::move(userVisibleHash_)) {}
 
     BSONObj toBSON(bool buildSubsections = false,
                    bool includeWriteMetrics = false,
-                   bool includeCBRMetrics = false) const;
+                   bool includeCBRMetrics = false,
+                   bool includeErrorMetrics = false) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -246,9 +249,48 @@ struct QueryStatsEntry {
     uint64_t lastExecutionMicros = 0;
 
     /**
-     * Number of query executions.
+     * Number of successful query executions.
      */
     uint64_t execCount = 0;
+
+    /**
+     * Number of executions that completed with an error.
+     */
+    uint64_t execCountErrored = 0;
+
+    /**
+     * Records in 'recentErrors' that an execution of this shape failed with error code 'code',
+     * bumping 'execCountErrored'. The number of distinct codes retained is bounded by the
+     * 'internalQueryStatsMaxErrorCodesPerShape' startup parameter: once the cache is full, the
+     * least-recently-seen code is evicted.
+     */
+    void recordErrorCode(ErrorCodes::Error code);
+
+    /**
+     * The most recent distinct error codes seen for this shape, keyed by error code, ordered
+     * most-recently-seen first. Bounded to 'internalQueryStatsMaxErrorCodesPerShape' entries.
+     */
+    LRUCache<ErrorCodes::Error, QueryStatsErrorEntry> recentErrors;
+
+    /**
+     * Approximate heap cost of a single 'recentErrors' cache entry. LRUCache stores each entry in a
+     * std::list and additionally indexes it by key in an unordered_map, so each entry costs:
+     * - one std::list node holding the {code, {count, timestamp}} pair + the list link pointers.
+     * - one unordered_map node holding the key and an iterator into the list.
+     * - that element's share of the map's table. The table is open-addressed rather than chained,
+     *   costing one slot pointer plus one control byte per slot. Capacity is 2^k - 1 held to 7/8
+     *   load, so an element accounts for at most two slots.
+     */
+    static constexpr size_t kApproxBytesPerRecentError =
+        sizeof(std::pair<ErrorCodes::Error, QueryStatsErrorEntry>) + 2 * sizeof(void*) +  // list
+        sizeof(std::pair<const ErrorCodes::Error, void*>) +  // map node
+        2 * (sizeof(void*) + 1);                             // map slots
+
+    /**
+     * Worst-case memory reserved for 'recentErrors' in the store budget. Non-zero only if
+     'featureFlagQueryStatsErrors' was enabled when this entry was created.
+     */
+    const size_t reservedErrorBudgetBytes;
 
     /**
      * Aggregates the total time for execution including getMore requests.
@@ -284,6 +326,11 @@ struct QueryStatsEntry {
      * The Key that can generate the query stats key for this request.
      */
     std::shared_ptr<const Key> key;
+
+    /**
+     * The SHA256 user-visible hash of 'key', represented as a base64-encoded string.
+     */
+    std::string userVisibleHash;
 
     /**
      * Adds supplemental metric to supplementalStatsMap.

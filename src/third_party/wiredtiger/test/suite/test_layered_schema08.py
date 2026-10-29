@@ -204,9 +204,7 @@ class test_layered_schema08(checkpoint_util):
 
         # Snapshot the sweep counter before closing the session so that we detect the
         # increment that results specifically from the session2 close, not a stale one.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        sweep_baseline = stat_cursor[wiredtiger.stat.conn.dh_sweep_dead_close][2]
-        stat_cursor.close()
+        sweep_baseline = self.get_stat(wiredtiger.stat.conn.dh_sweep_dead_close)
 
         # Create the table in a separate session so that closing it drops the only
         # non-sweep reference to the dhandle.
@@ -215,13 +213,8 @@ class test_layered_schema08(checkpoint_util):
         session2.close()
 
         # Wait for the sweep to close the idle dhandle.
-        while True:
-            stat_cursor = self.session.open_cursor('statistics:', None, None)
-            sweep_closes = stat_cursor[wiredtiger.stat.conn.dh_sweep_dead_close][2]
-            stat_cursor.close()
-            if sweep_closes > sweep_baseline:
-                break
-            time.sleep(0.5)
+        self.assertStatGreaterSoon(wiredtiger.stat.conn.dh_sweep_dead_close, sweep_baseline,
+            timeout=60, msg='sweep server did not close the idle dhandle within 60 seconds')
 
         # Checkpoint to get the table into the shared metadata table.
         self.session.checkpoint()

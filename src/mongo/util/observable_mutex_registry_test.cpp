@@ -1,41 +1,18 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/observable_mutex_registry.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 #include <iterator>
 #include <string_view>
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 class DummyMutex {
 public:
@@ -101,16 +78,41 @@ public:
         _compare(options, stats, expected);
     }
 
+    void assertStatsPerTag(const StatsList& expected) {
+        auto stats = _registry.statsPerTag();
+
+        const size_t expectedSize = expected.size() + std::size(kInternalMutexTags);
+        ASSERT_EQ(stats.size(), expectedSize);
+
+        for (const auto& [tag, data, _] : expected) {
+            auto it = stats.find(tag);
+            ASSERT(it != stats.end()) << "Tag not found: " << tag;
+            const auto& ex = it->second.exclusiveAcquisitions;
+            const auto& sh = it->second.sharedAcquisitions;
+
+            EXPECT_EQ(ex.total, data.exclusiveAcquisitions.total) << "for tag " << tag;
+            EXPECT_EQ(ex.contentions, data.exclusiveAcquisitions.contentions) << "for tag " << tag;
+            EXPECT_EQ(ex.waitCycles, data.exclusiveAcquisitions.waitCycles) << "for tag " << tag;
+            EXPECT_EQ(sh.total, data.sharedAcquisitions.total) << "for tag " << tag;
+            EXPECT_EQ(sh.contentions, data.sharedAcquisitions.contentions) << "for tag " << tag;
+            EXPECT_EQ(sh.waitCycles, data.sharedAcquisitions.waitCycles) << "for tag " << tag;
+        }
+    }
+
 private:
     void _compare(Options options, BSONObj actual, StatsList expected) {
-        auto assertStats = [](BSONObj statObj, MutexAcquisitionStats expected) {
-            ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName),
-                      expected.total);
-            ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalContentionsFieldName),
-                      expected.contentions);
-            ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalWaitCyclesFieldName),
-                      expected.waitCycles);
-        };
+        auto assertStats =
+            [](BSONObj statObj, MutexAcquisitionStats expected, std::string_view tag) {
+                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName),
+                          expected.total)
+                    << "for tag " << tag;
+                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalContentionsFieldName),
+                          expected.contentions)
+                    << "for tag " << tag;
+                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalWaitCyclesFieldName),
+                          expected.waitCycles)
+                    << "for tag " << tag;
+            };
 
         const std::size_t expectedSize = options.skipInternalMutexes
             ? expected.size() + std::size(kInternalMutexTags)
@@ -126,9 +128,11 @@ private:
 
             auto tagStats = actual.getObjectField(tag);
             assertStats(tagStats.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
-                        data.exclusiveAcquisitions);
+                        data.exclusiveAcquisitions,
+                        tag);
             assertStats(tagStats.getObjectField(ObservableMutexRegistry::kSharedFieldName),
-                        data.sharedAcquisitions);
+                        data.sharedAcquisitions,
+                        tag);
 
             ASSERT_EQ(options.listAll, tagStats.hasField(ObservableMutexRegistry::kMutexFieldName));
             if (options.listAll) {
@@ -151,9 +155,11 @@ private:
                     }
 
                     assertStats(obj.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
-                                listAllData->at(i).data.exclusiveAcquisitions);
+                                listAllData->at(i).data.exclusiveAcquisitions,
+                                tag);
                     assertStats(obj.getObjectField(ObservableMutexRegistry::kSharedFieldName),
-                                listAllData->at(i).data.sharedAcquisitions);
+                                listAllData->at(i).data.sharedAcquisitions,
+                                tag);
                 }
             }
         }
@@ -183,35 +189,35 @@ TEST_F(ObservableMutexRegistryReportTest, ExternallyEmptyRegistry) {
 }
 
 TEST_F(ObservableMutexRegistryReportTest, ZeroStats) {
-    TaggedStats statsA = {"A", {{0, 0, 0}, {0, 0, 0}}};
+    TaggedStats statsA = {"a", {{0, 0, 0}, {0, 0, 0}}};
     auto mutex = makeMutexAndAddToRegistry(statsA);
 
     assertReport({statsA}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, NonZeroStats) {
-    TaggedStats statsA = {"A", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA = {"a", {{3, 2, 500}, {1, 0, 17}}};
     auto mutex = makeMutexAndAddToRegistry(statsA);
 
     assertReport({statsA}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, MultipleMutexes) {
-    TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
-    TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
-    TaggedStats statsB = {"B", {{7, 3, 1000}, {0, 0, 0}}};
+    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
+    TaggedStats statsB = {"b", {{7, 3, 1000}, {0, 0, 0}}};
 
     auto mutexA0 = makeMutexAndAddToRegistry(statsA0);
     auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
     auto mutexB = makeMutexAndAddToRegistry(statsB);
 
     // The stats for tag A should be aggregated.
-    TaggedStats statsA = {"A", statsA0.data + statsA1.data};
+    TaggedStats statsA = {"a", statsA0.data + statsA1.data};
     assertReport({statsA, statsB}, {.listAll = false, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, InvalidatingMutexBeforeVisitingStillEmitsStats) {
-    TaggedStats statsA = {"A", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA = {"a", {{3, 2, 500}, {1, 0, 17}}};
     auto mutex = makeMutexAndAddToRegistry(statsA);
 
     mutex->invalidate();
@@ -219,17 +225,17 @@ TEST_F(ObservableMutexRegistryReportTest, InvalidatingMutexBeforeVisitingStillEm
 }
 
 TEST_F(ObservableMutexRegistryReportTest, SomeMutexInvalidated) {
-    TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
-    TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
-    TaggedStats statsB = {"B", {{7, 3, 1000}, {0, 0, 0}}};
-    TaggedStats statsC = {"C", {{4012, 3552, 7886549}, {1, 1, 1}}};
+    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
+    TaggedStats statsB = {"b", {{7, 3, 1000}, {0, 0, 0}}};
+    TaggedStats statsC = {"c", {{4012, 3552, 7886549}, {1, 1, 1}}};
 
     auto mutexA0 = makeMutexAndAddToRegistry(statsA0);
     auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
     auto mutexB = makeMutexAndAddToRegistry(statsB);
     auto mutexC = makeMutexAndAddToRegistry(statsC);
 
-    TaggedStats statsA = {"A", statsA0.data + statsA1.data};
+    TaggedStats statsA = {"a", statsA0.data + statsA1.data};
     assertReport({statsA, statsB, statsC}, {.listAll = false, .skipInternalMutexes = true});
 
     // Invalidating a mutex should not remove its stats from the report when listAll is disabled.
@@ -242,28 +248,28 @@ TEST_F(ObservableMutexRegistryReportTest, SomeMutexInvalidated) {
 }
 
 TEST_F(ObservableMutexRegistryReportTest, ListAll) {
-    TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
-    TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
-    TaggedStats statsB = {"B", {{7, 3, 1000}, {0, 0, 0}}};
+    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
+    TaggedStats statsB = {"b", {{7, 3, 1000}, {0, 0, 0}}};
 
     auto mutexA0 = makeMutexAndAddToRegistry(statsA0);
     auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
     auto mutexB = makeMutexAndAddToRegistry(statsB);
 
-    TaggedStats statsA = {"A", statsA0.data + statsA1.data};
+    TaggedStats statsA = {"a", statsA0.data + statsA1.data};
     auto dummyTimestamp = Date_t::now();
 
     // These vectors represent the expected non-aggregated stats when listAll is enabled.
     std::vector<StatsRecord> listAllA = {{statsA0.data, 0 /* mutexId */, dummyTimestamp},
                                          {statsA1.data, 1 /* mutexId */, dummyTimestamp}};
     std::vector<StatsRecord> listAllB = {{statsB.data, 2 /* mutexId */, dummyTimestamp}};
-    assertReport({{"A", statsA.data, listAllA}, {"B", statsB.data, listAllB}},
+    assertReport({{"a", statsA.data, listAllA}, {"b", statsB.data, listAllB}},
                  {.listAll = true, .skipInternalMutexes = true});
 
     // Only valid mutexes should be included in the listAll portion of the report..
     mutexB->invalidate();
     listAllB.clear();
-    assertReport({{"A", statsA.data, listAllA}, {"B", statsB.data, listAllB}},
+    assertReport({{"a", statsA.data, listAllA}, {"b", statsB.data, listAllB}},
                  {.listAll = true, .skipInternalMutexes = true});
 
     // When listAll is disabled, we should still see stats for the invalidated mutex.
@@ -271,10 +277,10 @@ TEST_F(ObservableMutexRegistryReportTest, ListAll) {
 }
 
 TEST_F(ObservableMutexRegistryReportTest, ListAllWithInstanceLabel) {
-    TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
-    TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
+    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
 
-    auto mutexA0 = makeMutexAndAddToRegistry(statsA0, "my-pool"_sd);
+    auto mutexA0 = makeMutexAndAddToRegistry(statsA0, "my-pool"sv);
     auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
 
     auto dummyTimestamp = Date_t::now();
@@ -284,32 +290,68 @@ TEST_F(ObservableMutexRegistryReportTest, ListAllWithInstanceLabel) {
         {statsA1.data, 1, dummyTimestamp},
     };
 
-    assertReport({{"A", statsA0.data + statsA1.data, listAllA}},
+    assertReport({{"a", statsA0.data + statsA1.data, listAllA}},
                  {.listAll = true, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, MutexIdShouldNeverChangeAfterInvalidation) {
-    TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
-    TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
-    TaggedStats statsA2 = {"A", {{7, 3, 1000}, {0, 0, 0}}};
+    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
+    TaggedStats statsA2 = {"a", {{7, 3, 1000}, {0, 0, 0}}};
 
     auto mutexA0 = makeMutexAndAddToRegistry(statsA0);
     auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
     auto mutexA2 = makeMutexAndAddToRegistry(statsA2);
 
-    TaggedStats statsA = {"A", statsA0.data + statsA1.data + statsA2.data};
+    TaggedStats statsA = {"a", statsA0.data + statsA1.data + statsA2.data};
     auto dummyTimestamp = Date_t::now();
 
     // This vector represents the expected non-aggregated stats when listAll is enabled.
     std::vector<StatsRecord> listAllA = {{statsA0.data, 0 /* mutexId */, dummyTimestamp},
                                          {statsA1.data, 1 /* mutexId */, dummyTimestamp},
                                          {statsA2.data, 2 /* mutexId */, dummyTimestamp}};
-    assertReport({{"A", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
+    assertReport({{"a", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
 
     // mutexA2 should still have id 2 even after mutexA1 is invalidated.
     mutexA1->invalidate();
     listAllA.erase(listAllA.begin() + 1);
-    assertReport({{"A", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
+    assertReport({{"a", statsA.data, listAllA}}, {.listAll = true, .skipInternalMutexes = true});
+}
+
+TEST_F(ObservableMutexRegistryReportTest, StatsPerTagSingleMutex) {
+    TaggedStats statsA = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    auto mutex = makeMutexAndAddToRegistry(statsA);
+
+    assertStatsPerTag({statsA});
+}
+
+TEST_F(ObservableMutexRegistryReportTest, StatsPerTagAggregatesMultipleMutexesUnderSameTag) {
+    TaggedStats statsA0 = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"a", {{5, 1, 200}, {4, 2, 50}}};
+    TaggedStats statsB = {"b", {{7, 3, 1000}, {0, 0, 0}}};
+
+    auto mutexA0 = makeMutexAndAddToRegistry(statsA0);
+    auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
+    auto mutexB = makeMutexAndAddToRegistry(statsB);
+
+    TaggedStats statsA = {"a", statsA0.data + statsA1.data};
+    assertStatsPerTag({statsA, statsB});
+}
+
+TEST_F(ObservableMutexRegistryReportTest, StatsPerTagPreservesInvalidatedMutexStats) {
+    TaggedStats statsA = {"a", {{3, 2, 500}, {1, 0, 17}}};
+    auto mutex = makeMutexAndAddToRegistry(statsA);
+
+    mutex->invalidate();
+    assertStatsPerTag({statsA});
+}
+
+TEST_F(ObservableMutexRegistryReportTest, RejectsInvalidOtelTag) {
+    for (std::string_view tag :
+         {"", "Mutex", "1mutex", "my.mutex", "my_Mutex", "my_", "my__mutex"}) {
+        ASSERT_THROWS_CODE(
+            makeMutexAndAddToRegistry({tag, {}}), DBException, ErrorCodes::InvalidOptions);
+    }
 }
 
 }  // namespace

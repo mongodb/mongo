@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
@@ -43,6 +17,9 @@
 #include "mongo/db/index_builds/index_build_entry_helpers.h"
 #include "mongo/db/index_builds/index_build_knobs_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
+#include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/member_config.h"
@@ -62,13 +39,13 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -220,7 +197,7 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod() {
     // Change the 'setOnUpdate' function for the server parameter to signal the condition variable
     // when the value changes.
     using ParamT =
-        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>;
+        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Atomic<int>>;
     ServerParameterSet::getNodeParameterSet()
         ->get<ParamT>(kMaxNumActiveUserIndexBuildsServerParameterName)
         ->setOnUpdate([this](const int) -> Status {
@@ -250,11 +227,20 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
         _stepUpThread.join();
     }
 
+    // Nothing tracks primary-driven index builds once this coordinator is gone. Their on-disk state
+    // is untouched: the registry is repopulated from it on startup. Clearing before the wait below
+    // means the wait is left with the builds that actually have a thread to finish.
+    index_builds::primary_driven::registry(opCtx->getServiceContext()).clear();
+
     // Wait for all active builds to stop.
     activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
     // Wait for active threads to finish.
     pool.join();
+
+    // The handler holds a pointer to 'activeIndexBuilds', so it has to be discarded before this
+    // coordinator is destroyed.
+    index_builds::primary_driven::registry(opCtx->getServiceContext()).setOnChangeHandler({});
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
@@ -526,10 +512,24 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         updateCurOpOpDescription(opCtx.get(), nss, toIndexSpecs(replState->getIndexes()), opDesc);
 
         // Forward the forwardable operation metadata from the external client to this thread's
-        // client.
+        // client. The VersionContext carried by forwardableOpMetadata already has
+        // isLongRunningOperation=true, set by the top-level createIndexes command before
+        // constructing the ForwardableOperationMetadata.
         forwardableOpMetadata.setOn(opCtx.get());
 
-        while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {
+        // Restricts the hang to the builds named in the fail point's "buildUUIDs" array. Absent
+        // or empty, every build matches, which is how callers that set no data behave.
+        const auto matchesThisBuild = [&buildUUID](const BSONObj& data) {
+            auto buildUUIDs = data.getObjectField("buildUUIDs");
+            if (buildUUIDs.isEmpty()) {
+                return true;
+            }
+            return std::any_of(
+                buildUUIDs.begin(), buildUUIDs.end(), [&buildUUID](const auto& elem) {
+                    return UUID::parse(elem.String()) == buildUUID;
+                });
+        };
+        while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail(matchesThisBuild))) {
             sleepmillis(100);
         }
 
@@ -546,7 +546,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 startPromise.setError(status);
                 // Do not exit with an incomplete future, even if setup fails, we should still
                 // signal waiters.
-                invariant(replState->sharedPromise.getFuture().isReady());
+                invariant(replState->getOutcomeFuture().isReady());
                 return;
             }
         } else if (resumeInfo &&
@@ -555,8 +555,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 opCtx.get(), buildUUID, *resumeInfo, indexBuildOptions.indexBuildProtocol);
             if (!status.isOK()) {
                 startPromise.setError(status);
-                replState->sharedPromise.setError(status);
-                invariant(replState->sharedPromise.getFuture().isReady());
+                replState->fulfillOutcome(opCtx.get(), status);
+                invariant(replState->getOutcomeFuture().isReady());
                 return;
             }
         }
@@ -571,7 +571,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions, resumeInfo);
 
         // Do not exit with an incomplete future.
-        invariant(replState->sharedPromise.getFuture().isReady());
+        invariant(replState->getOutcomeFuture().isReady());
 
         try {
             // Logs the index build statistics if it took longer than the server parameter
@@ -590,12 +590,12 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // Waits until the index build has either been started or failed to start.
     // Ignore any interruption state in 'opCtx'.
     // If 'opCtx' is interrupted, the caller will be notified after startIndexBuild() returns when
-    // it checks the future associated with 'sharedPromise'.
+    // it checks the future associated with the index build outcome.
     auto status = startFuture.getNoThrow(Interruptible::notInterruptible());
     if (!status.isOK()) {
         return status;
     }
-    return replState->sharedPromise.getFuture();
+    return replState->getOutcomeFuture();
 }
 
 Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx,
@@ -719,10 +719,8 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     }
 
     // TODO SERVER-109664: use IndexBuildProtocol::kPrimaryDriven
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto& vCtx = VersionContext::getDecoration(opCtx);
-    const bool usingPrimaryDrivenIndexBuilds = fcv.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcv);
+    const bool usingPrimaryDrivenIndexBuilds = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (usingPrimaryDrivenIndexBuilds) {
         bool isPrimary = [&]() {

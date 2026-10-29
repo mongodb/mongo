@@ -1,0 +1,613 @@
+/**
+ * Tests that the analyze command with mode: "sample" correctly handles all sampling-related
+ * parameters: sampleSize, sampleRate, samplingMethod, numChunks, and mode.
+ *
+ * @tags: [
+ *   # Requires featureFlagPersistentStats for persisted samples.
+ *   featureFlagPersistentStats,
+ * ]
+ */
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+
+const conn = MongoRunner.runMongod({
+    setParameter: {
+        featureFlagPersistentStats: true,
+        // Explicitly disable for variants that enable this.
+        internalQuerySamplingByStrides: false,
+    },
+});
+const db = conn.getDB("test");
+
+// For future schema changes, set this value differently depending on the FCV.
+const expectedSchemaVersion = 1;
+
+const collName = jsTestName();
+const coll = db[collName];
+const samplesColl = PersistentSamplesUtils.getSamplesColl(db);
+
+const defaultSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
+const defaultNumChunks = PersistentSamplesUtils.defaultNumChunks(db);
+
+function cleanup() {
+    coll.drop();
+    PersistentSamplesUtils.dropSamplesColl(db);
+}
+
+function insertDocs(n) {
+    const docs = [];
+    for (let i = 0; i < n; i++) {
+        docs.push({a: i, b: "str" + i});
+    }
+    assert.commandWorked(coll.insertMany(docs));
+}
+
+// Runs an analyze command expected to succeed and asserts the persistent samples collection
+// created remains clustered on _id.
+function runAnalyze(analyzeCmd) {
+    assert.commandWorked(db.runCommand(analyzeCmd));
+    PersistentSamplesUtils.assertSamplesCollClustered(db);
+}
+
+const sourceDocFields = ["a", "b"];
+
+// =============================================================================
+// sampleSize parameter
+// =============================================================================
+
+// Custom sampleSize: collection (20) > sampleSize (10), so size == sampleSize exactly.
+cleanup();
+insertDocs(20);
+{
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 10,
+        samplingMethod: "random",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: 10,
+        actualSampleSize: 10,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// sampleSize larger than collection: clamped to numRecords (20), so size == 20 exactly.
+cleanup();
+insertDocs(20);
+{
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 100,
+        samplingMethod: "random",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: 100,
+        actualSampleSize: 20,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Re-run with the same sampleSize upserts (replaces) the existing sample document, and
+// createdAt is updated to a strictly later timestamp.
+cleanup();
+insertDocs(20);
+{
+    const analyzeCmd = {
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 10,
+        samplingMethod: "random",
+    };
+    runAnalyze(analyzeCmd);
+    const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
+    const expectedId = PersistentSamplesUtils.getExpectedId(
+        uuid,
+        "random",
+        10,
+        expectedSchemaVersion,
+    );
+    const firstCreatedAt = PersistentSamplesUtils.getSampleDoc(samplesColl, expectedId)[
+        PersistentSamplesUtils.sampleDocFieldNames.createdAtField
+    ];
+
+    // Re-running analyze against an already-clustered samples collection must be a no-op create.
+    runAnalyze(analyzeCmd);
+    const secondPages = PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: 10,
+        actualSampleSize: 10,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+    assert.gt(
+        secondPages[0][PersistentSamplesUtils.sampleDocFieldNames.createdAtField],
+        firstCreatedAt,
+        "timestamp should be later on second run of same analyze command",
+    );
+}
+
+// Sampling an empty collection produces a sample document with 0 docs
+cleanup();
+assert.commandWorked(db.createCollection(collName));
+{
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: 10,
+        samplingMethod: "random",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: 10,
+        actualSampleSize: 0,
+        expectedSchemaVersion: expectedSchemaVersion,
+    });
+}
+
+// Non-existent collection: analyze with sample mode fails with a "collection not found" uassert
+cleanup();
+assert.commandFailedWithCode(
+    db.runCommand({analyze: "no_such_coll", mode: "sample", samplingMethod: "random"}),
+    13097202,
+    "analyze on a non-existent collection should fail with 13097202",
+);
+
+// =============================================================================
+// Default sample size (neither sampleSize nor sampleRate provided)
+// =============================================================================
+
+// Large collection (> default): sampleSize equals the calculated default, not clamped.
+cleanup();
+insertDocs(500);
+{
+    runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: defaultSampleSize,
+        actualSampleSize: defaultSampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Small collection (< default): the actual sample size is clamped to numRecords, but the
+// requestedSampleSize and _id fields will encode the requested size
+cleanup();
+insertDocs(50);
+{
+    runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: defaultSampleSize,
+        actualSampleSize: 50,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// =============================================================================
+// internalSamplingSizeOverride knob
+// =============================================================================
+
+// The override knob takes precedence over the default size derived from samplingConfidenceInterval and
+// samplingMarginOfError when the command does not specify a sampleSize.
+cleanup();
+insertDocs(500);
+{
+    const overrideSize = 25;
+    assert.neq(
+        overrideSize,
+        defaultSampleSize,
+        "override size must differ from the derived default for this test to be meaningful",
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalSamplingSizeOverride: overrideSize}),
+    );
+    try {
+        runAnalyze({analyze: collName, mode: "sample", samplingMethod: "random"});
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: overrideSize,
+            actualSampleSize: overrideSize,
+            expectedSchemaVersion: expectedSchemaVersion,
+            expectedFields: sourceDocFields,
+        });
+    } finally {
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 0}));
+    }
+}
+
+// An explicit sampleSize on the command takes precedence over the override knob.
+cleanup();
+insertDocs(500);
+{
+    const explicitSampleSize = 40;
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 25}));
+    try {
+        runAnalyze({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: explicitSampleSize,
+            samplingMethod: "random",
+        });
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "random",
+            requestedSampleSize: explicitSampleSize,
+            actualSampleSize: explicitSampleSize,
+            expectedSchemaVersion: expectedSchemaVersion,
+            expectedFields: sourceDocFields,
+        });
+    } finally {
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalSamplingSizeOverride: 0}));
+    }
+}
+
+// =============================================================================
+// numChunks parameter
+// =============================================================================
+
+// samplingMethod: "chunk" with explicit numChunks succeeds.
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+        numChunks: 5,
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "chunk",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        numChunks: 5,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// samplingMethod: "chunk" without explicit numChunks succeeds with default numChunks value.
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "chunk",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        numChunks: defaultNumChunks,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// =============================================================================
+// samplingMethod parameter
+// =============================================================================
+
+// `random` and `chunk` success cases are exercised by the sampleSize
+// and numChunks sections above. Here we cover the default and IDL enum boundaries.
+
+// samplingMethod defaults to internalQuerySamplingCEMethodForPersistentSamples when omitted.
+cleanup();
+insertDocs(20);
+{
+    assert.commandWorked(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: 10,
+        }),
+    );
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "random",
+        requestedSampleSize: 10,
+        actualSampleSize: 10,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Confirms the default tracks the knob, not a hardcoded value.
+cleanup();
+insertDocs(20);
+{
+    const prevMethod = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQuerySamplingCEMethodForPersistentSamples: 1}),
+    ).internalQuerySamplingCEMethodForPersistentSamples;
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySamplingCEMethodForPersistentSamples: "chunk",
+        }),
+    );
+    try {
+        assert.commandWorked(
+            db.runCommand({
+                analyze: collName,
+                mode: "sample",
+                sampleSize: 10,
+            }),
+        );
+        PersistentSamplesUtils.validatePersistentSample(db, {
+            sampledCollName: collName,
+            samplingMethod: "chunk",
+            requestedSampleSize: 10,
+            actualSampleSize: 10,
+            numChunks: defaultNumChunks,
+            expectedSchemaVersion: expectedSchemaVersion,
+            expectedFields: sourceDocFields,
+        });
+    } finally {
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySamplingCEMethodForPersistentSamples: prevMethod,
+            }),
+        );
+    }
+}
+
+// Invalid mode values/types fail to parse.
+cleanup();
+insertDocs(20);
+{
+    // Unknown enum string for mode.
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: collName, mode: "bogus"}),
+        ErrorCodes.BadValue,
+        "unknown mode should fail to parse",
+    );
+    // Wrong BSON type for mode (expects a string).
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: collName, mode: 1}),
+        ErrorCodes.TypeMismatch,
+        "non-string mode should fail to parse",
+    );
+}
+
+// Invalid samplingMethod values and types are rejected by IDL parsing.
+cleanup();
+insertDocs(20);
+{
+    // Unknown enum string.
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: "bogus"}),
+        ErrorCodes.BadValue,
+        "unknown samplingMethod should fail to parse",
+    );
+    // Wrong BSON type for samplingMethod (expects a string).
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: collName, mode: "sample", sampleSize: 10, samplingMethod: 1}),
+        ErrorCodes.TypeMismatch,
+        "non-string samplingMethod should fail to parse",
+    );
+}
+
+// Invalid sample-mode inputs are rejected.
+cleanup();
+insertDocs(20);
+{
+    // sampleSize must be > 0.
+    assert.commandFailedWithCode(
+        db.runCommand({analyze: collName, mode: "sample", sampleSize: 0, samplingMethod: "random"}),
+        ErrorCodes.BadValue,
+        "sampleSize of 0 should fail the gt:0 validator",
+    );
+    // numChunks must be > 0.
+    assert.commandFailedWithCode(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: 10,
+            samplingMethod: "chunk",
+            numChunks: 0,
+        }),
+        ErrorCodes.BadValue,
+        "numChunks of 0 should fail the gt:0 validator",
+    );
+    // Wrong BSON type for sampleSize (expects an int).
+    assert.commandFailedWithCode(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: "ten",
+            samplingMethod: "random",
+        }),
+        ErrorCodes.TypeMismatch,
+        "non-numeric sampleSize should fail to parse",
+    );
+}
+
+// =============================================================================
+// timeseries collection
+// =============================================================================
+
+// TODO SERVER-127022: Update this once samplingCE supports timeseries
+// analyze should fail on a timeseries collection.
+cleanup();
+const tsCollName = jsTestName() + "_ts";
+db[tsCollName].drop();
+assert.commandWorked(db.createCollection(tsCollName, {timeseries: {timeField: "timestamp"}}));
+assert.commandFailedWithCode(
+    db.runCommand({analyze: tsCollName, mode: "sample", sampleSize: 10, samplingMethod: "random"}),
+    ErrorCodes.IllegalOperation,
+    "analyze on a timeseries collection should fail with IllegalOperation",
+);
+db[tsCollName].drop();
+
+// =============================================================================
+// Test-only sampling modes override specified samplingMethod
+// =============================================================================
+
+// Enable internalQuerySamplingBySequentialScan
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+);
+
+// Chunk sample when internalQuerySamplingBySequentialScan is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "seqScan",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Random sample when internalQuerySamplingBySequentialScan is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "random",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "seqScan",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Enable internalQuerySamplingByStrides
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: true}));
+
+// Random sample when both knobs are enabled (sequential scan overrides strides sampling)
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "random",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "seqScan",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Disable internalQuerySamplingBySequentialScan
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
+);
+
+// Chunk sample when internalQuerySamplingByStrides is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "chunk",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "strides",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Random sample when internalQuerySamplingByStrides is enabled
+cleanup();
+insertDocs(20);
+{
+    const sampleSize = 10;
+    runAnalyze({
+        analyze: collName,
+        mode: "sample",
+        sampleSize: sampleSize,
+        samplingMethod: "random",
+    });
+    PersistentSamplesUtils.validatePersistentSample(db, {
+        sampledCollName: collName,
+        samplingMethod: "strides",
+        requestedSampleSize: sampleSize,
+        actualSampleSize: sampleSize,
+        expectedSchemaVersion: expectedSchemaVersion,
+        expectedFields: sourceDocFields,
+    });
+}
+
+// Disable internalQuerySamplingByStrides
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: false}));
+
+MongoRunner.stopMongod(conn);
+
+// =============================================================================
+// featureFlagPersistentStats disabled
+// =============================================================================
+
+// When the feature flag is disabled, analyze with sample mode fails with CommandNotSupported.
+// Skip in environments where the flag is force-enabled for all mongods (e.g. all-feature-flags
+// suites, or suites passing --additionalFeatureFlags=featureFlagPersistentStats):
+// MongoRunner.runMongod() inherits such settings from TestData.setParameters, so the flag cannot
+// be made to appear off.
+
+// TODO SERVER-135439: Need to explicitly disable once the feature flag is enabled by default
+const conn2 = MongoRunner.runMongod({}); // flag off by default
+const db2 = conn2.getDB(jsTestName());
+if (!FeatureFlagUtil.isEnabled(db2, "PersistentStats")) {
+    assert.commandWorked(db2[collName].insert({a: 1}));
+    assert.commandFailedWithCode(
+        db2.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
+        ErrorCodes.CommandNotSupported,
+    );
+}
+MongoRunner.stopMongod(conn2);

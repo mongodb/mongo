@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/path.h"
 
@@ -595,5 +569,148 @@ TEST(SingleElementElementIterator, Simple1) {
     ASSERT_EQUALS(5, e.element().numberInt());
 
     ASSERT(!i.more());
+}
+
+TEST(Path, ResetAcrossScalars) {
+    ElementPath p{"a"};
+    BSONElementIterator cursor;
+
+    for (int expected : {5, 6, 7}) {
+        BSONObj doc = BSON("x" << 4 << "a" << expected);
+        cursor.reset(&p, doc);
+
+        ASSERT(cursor.more());
+        ASSERT_EQUALS(expected, cursor.next().element().numberInt());
+        ASSERT(!cursor.more());
+    }
+}
+
+TEST(Path, ResetAcrossArrays) {
+    ElementPath p{"a"};
+    BSONElementIterator cursor;
+
+    BSONObj first = BSON("a" << BSON_ARRAY(5 << 6));
+    cursor.reset(&p, first);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(5, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(6, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(BSONType::array, cursor.next().element().type());
+    ASSERT(!cursor.more());
+
+    BSONObj second = BSON("a" << BSON_ARRAY(7 << 8 << 9));
+    cursor.reset(&p, second);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(7, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(8, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(9, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(BSONType::array, cursor.next().element().type());
+    ASSERT(!cursor.more());
+}
+
+TEST(Path, ResetWhileMidIteration) {
+    ElementPath p{"a"};
+    BSONElementIterator cursor;
+
+    // Abandon iteration partway through, leaving the ArrayIterationState's BSONObjIterator engaged
+    // and pointing into 'first'. The next reset() must not read any of it.
+    BSONObj first = BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4));
+    cursor.reset(&p, first);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(1, cursor.next().element().numberInt());
+
+    BSONObj second = BSON("a" << BSON_ARRAY(10 << 20));
+    cursor.reset(&p, second);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(10, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(20, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(BSONType::array, cursor.next().element().type());
+    ASSERT(!cursor.more());
+}
+
+TEST(Path, ResetFromNestedArrayToScalar) {
+    ElementPath p{"a.b"};
+    BSONElementIterator cursor;
+
+    // A nested array of subdocuments forces a sub-iterator to be allocated. reset() disengages the
+    // optional but keeps the heap block, so the following document must not observe it.
+    BSONObj nested = fromjson("{a: [{b: 1}, {b: 2}]}");
+    cursor.reset(&p, nested);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(1, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(2, cursor.next().element().numberInt());
+    ASSERT(!cursor.more());
+
+    BSONObj scalar = fromjson("{a: {b: 42}}");
+    cursor.reset(&p, scalar);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(42, cursor.next().element().numberInt());
+    ASSERT(!cursor.more());
+}
+
+TEST(Path, ResetFromNestedArrayMidIterationToNestedArray) {
+    ElementPath p{"a.b"};
+    BSONElementIterator cursor;
+
+    // Abandon iteration with the sub-iterator still engaged on 'first'.
+    BSONObj first = fromjson("{a: [{b: 1}, {b: 2}, {b: 3}]}");
+    cursor.reset(&p, first);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(1, cursor.next().element().numberInt());
+
+    BSONObj second = fromjson("{a: [{b: 7}, {b: 8}]}");
+    cursor.reset(&p, second);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(7, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(8, cursor.next().element().numberInt());
+    ASSERT(!cursor.more());
+}
+
+TEST(Path, ResetToMissingPath) {
+    ElementPath p{"a"};
+    BSONElementIterator cursor;
+
+    BSONObj present = BSON("a" << BSON_ARRAY(1 << 2));
+    cursor.reset(&p, present);
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(1, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(2, cursor.next().element().numberInt());
+    ASSERT(cursor.more());
+    ASSERT_EQUALS(BSONType::array, cursor.next().element().type());
+    ASSERT(!cursor.more());
+
+    // 'a' is absent. The iterator should report a single EOO element rather than anything left over
+    // from the previous document.
+    BSONObj absent = BSON("z" << 1);
+    cursor.reset(&p, absent);
+    ASSERT(cursor.more());
+    ASSERT(cursor.next().element().eoo());
+    ASSERT(!cursor.more());
+}
+
+TEST(Path, ResetWithLongDottedPathReusesRestOfPath) {
+    // 'restOfPath' is a std::string assigned on each reset; a path long enough to exceed the small
+    // string optimization exercises the capacity-reuse path.
+    ElementPath p{"aaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbb"};
+    BSONElementIterator cursor;
+
+    for (int expected : {11, 22, 33}) {
+        BSONObj doc =
+            BSON("aaaaaaaaaaaaaaaaaaaa" << BSON_ARRAY(BSON("bbbbbbbbbbbbbbbbbbbb" << expected)));
+        cursor.reset(&p, doc);
+
+        ASSERT(cursor.more());
+        ASSERT_EQUALS(expected, cursor.next().element().numberInt());
+        ASSERT(!cursor.more());
+    }
 }
 }  // namespace mongo

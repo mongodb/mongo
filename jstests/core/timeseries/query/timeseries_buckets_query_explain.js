@@ -2,6 +2,7 @@
  * Tests explaining read operations over the buckets of a time-series collection (with rawData).
  *
  * @tags: [
+ *   uses_explain,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
@@ -18,7 +19,7 @@ import {
     isViewfulTimeseriesOnlySuite,
     isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getShardsFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 
@@ -64,7 +65,7 @@ const assertQueryPlannerNamespace = function (explain) {
             `Expected query planner namespace to be ${tojson(timeseriesNss)} but got ${tojson(explain)}`,
         );
     } else {
-        for (const shardPlan of explain.queryPlanner.winningPlan.shards) {
+        for (const shardPlan of getShardsFromExplain(explain)) {
             assert(
                 timeseriesNss.includes(shardPlan.namespace),
                 `Expected winning shard plan query planner namespace to be ${tojson(timeseriesNss)} but got ${tojson(shardPlan)}`,

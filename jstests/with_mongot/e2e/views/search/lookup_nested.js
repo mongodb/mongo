@@ -2,7 +2,7 @@
  * This test verifies that a nested $lookup with $search queries on both the outer, inner, and
  * top-level view applies the view definitions and returns results as expected.
  *
- * @tags: [ requires_fcv_81, featureFlagMongotIndexedViews ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

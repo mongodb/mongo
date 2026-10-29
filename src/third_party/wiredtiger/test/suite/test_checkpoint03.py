@@ -58,12 +58,6 @@ class test_checkpoint03(wttest.WiredTigerTestCase, suite_subprocess):
     def conn_config(self):
         return 'statistics=(all),' + self.ckpt_config
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_checkpoint_writes_to_hs(self):
         # Create a basic table.
         config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)

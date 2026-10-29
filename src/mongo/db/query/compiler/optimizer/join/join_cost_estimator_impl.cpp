@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 
@@ -106,13 +80,12 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId,
         }
     }
 
+    double numPagesInStorageEngineCache = _jCtx.catStats.numPagesInStorageEngineCache(nss);
     // Model the random IO performed by fetching documents from the collection.
-    auto [numRandIOsCollection, mlCase] =
-        estimateMackertLohmanRandIO(numPagesAccessedColl,
-                                    _jCtx.catStats.numPagesInStorageEngineCache(nss),
-                                    numLogicalPageRequests);
-    const auto sortedSparse =
-        estimateSortedSparseIO(numPagesAccessedColl, numLogicalPageRequests, mlCase);
+    auto [numRandIOsCollection, mlCase] = estimateMackertLohmanRandIO(
+        numPagesAccessedColl, numPagesInStorageEngineCache, numLogicalPageRequests);
+    const auto sortedSparse = estimateSortedSparseIO(
+        numPagesAccessedColl, numLogicalPageRequests, mlCase, numPagesInStorageEngineCache);
 
     numRandIOsCollection += sortedSparse.numRandIOs;
     numSeqIOs =
@@ -175,21 +148,23 @@ JoinCostEstimate JoinCostEstimatorImpl::costHashJoinFragment(const JoinPlanNode&
         overflowFactor = 1 - (spillingThreshold / buildSideBytesEstimate);
     }
 
+    // We attribute a double cost for overflow because those documents have to be both written away
+    // and read again.
     CardinalityEstimate numDocsProcessed =
-        buildDocs + probeDocs + overflowFactor * (buildDocs + probeDocs);
+        buildDocs + probeDocs + 2.0 * overflowFactor * (buildDocs + probeDocs);
 
     double buildBlocks = buildDocs.toDouble() * buildDocSize / blockSize;
     double probeBlocks = probeDocs.toDouble() * probeDocSize / blockSize;
 
     // Writing and reading of overflow partitions, will be 0 if no overflow.
-    CardinalityEstimate ioSeq{CardinalityType{2 * overflowFactor * (buildBlocks + probeBlocks)},
+    CardinalityEstimate ioSeq{CardinalityType{2.0 * overflowFactor * (buildBlocks + probeBlocks)},
                               EstimationSource::Sampling};
 
     JoinCostEstimate leftCost = getNodeCost(left);
     JoinCostEstimate rightCost = getNodeCost(right);
 
     return JoinCostEstimate(
-        numDocsProcessed, numDocsOutput, ioSeq, zeroCE /*numRandIOs*/, leftCost, rightCost);
+        numDocsProcessed, numDocsOutput, ioSeq, /*numRandIOs=*/zeroCE, leftCost, rightCost);
 }
 
 // The costing formula currently makes two assumptions:
@@ -212,12 +187,6 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
         _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset | rightSubset);
     CardinalityEstimate leftDocs = _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset);
 
-    // The INLJ will produce the join key for each document. The index probe, across all
-    // invocations, will produce the number of documents this join outputs.
-    CardinalityEstimate numDocsProcessed = leftDocs * 2 + numDocsOutput;
-    // Assume that sequential IO done by the index scan is negligible.
-    CardinalityEstimate numSeqIOs = zeroCE;
-
     // Model the random IO performed by doing the index probe and fetch.
     // TODO SERVER-117523: Integrate the height of the B-tree into the formula.
     const auto& nss = _jCtx.joinGraph.getNode(right).collectionName;
@@ -233,10 +202,23 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     // The latter term, (rightBaseCard * joinPredSel), corresponds to the number of documents that a
     // single probe will return.
     double numDocsReturnedFromProbe = numProbes * rightBaseCard * joinPredSel;
+
+    // The INLJ processes each left-side document twice: once when it receives the document and once
+    // when it sends the join key to the right side for probing.
+    //
+    // Use 'numDocsReturnedFromProbe' rather than 'numDocsOutput' because 'numDocsOutput' already
+    // includes right-side filters that are applied after the join.
+    CardinalityEstimate numDocsProcessed = leftDocs * 2.0 +
+        CardinalityEstimate{CardinalityType{numDocsReturnedFromProbe}, EstimationSource::Sampling};
+
+    // Assume that sequential IO done by the index scan is negligible.
+    CardinalityEstimate numSeqIOs = zeroCE;
+
     double numPagesAccessedColl = estimateYaoDistinctPages(numPagesColl, numDocsReturnedFromProbe);
+    double numPagesInStorageEngineCache = _jCtx.catStats.numPagesInStorageEngineCache(nss);
     auto [numRandIOsCollection, mlCase] = estimateMackertLohmanRandIO(
         numPagesAccessedColl,
-        _jCtx.catStats.numPagesInStorageEngineCache(nss),
+        numPagesInStorageEngineCache,
         // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
         // single index probe will read index keys for the same join key in RID order. Because
         // MongoDB collections are clustered on RID, each fetch is not performing a truly
@@ -245,10 +227,14 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
         // the sorted-sparse I/O cost separately.
         numProbes);
 
-    const auto sortedSparse = estimateSortedSparseIO(numPagesAccessedColl, numProbes, mlCase);
+    const auto sortedSparse = estimateSortedSparseIO(
+        numPagesAccessedColl, numProbes, mlCase, numPagesInStorageEngineCache);
     numRandIOsCollection += sortedSparse.numRandIOs;
     numSeqIOs =
         CardinalityEstimate{CardinalityType{sortedSparse.numSeqIOs}, EstimationSource::Sampling};
+
+    const auto& rhsCardBeforeJoinPred =
+        _jCtx.singleTableAccess.nodeCardinalitiesOriginalFilter[right];
 
     return JoinCostEstimate(
         numDocsProcessed,
@@ -257,7 +243,8 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
         CardinalityEstimate{CardinalityType{numRandIOsCollection}, EstimationSource::Sampling},
         getNodeCost(left),
         JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE),
-        mlCase);
+        mlCase,
+        rhsCardBeforeJoinPred);
 }
 
 JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left,
@@ -380,36 +367,62 @@ MackertLohmanResult estimateMackertLohmanRandIO(double numDistinctPagesNeededFro
 
 SortedSparseIO estimateSortedSparseIO(double numPagesAccessedColl,
                                       double numLogicalPageRequests,
-                                      MackertLohmanCase mlCase) {
+                                      MackertLohmanCase mlCase,
+                                      double numPagesInStorageEngineCache) {
     tassert(12226500,
             "estimateSortedSparseIO() expected numPagesAccessedColl >= 0",
             numPagesAccessedColl >= 0);
     tassert(12226501,
             "estimateSortedSparseIO() expected numLogicalPageRequests >= 0",
             numLogicalPageRequests >= 0);
+    tassert(12226502,
+            "estimateSortedSparseIO() expected numPagesInStorageEngineCache > 0",
+            numPagesInStorageEngineCache > 0);
+
+    // Guard against the case where the collection is empty, which would result in a division by 0
+    // in the sorted-sparse IO calculation below.
+    if (numPagesAccessedColl == 0) {
+        return {.numSeqIOs = 0.0, .numRandIOs = 0.0};
+    }
+
+    // M-L charges one random I/O per group (probe or distinct key); the remaining
+    // (numPagesAccessedColl - numLogicalPageRequests) accesses within each group follow RID order
+    // and are sorted-sparse: cheaper than random access, but costlier than a purely sequential
+    // scan.
     double numSortedSparseIOs = std::max(0.0, numPagesAccessedColl - numLogicalPageRequests);
 
-    // The cost of sorted-sparse I/Os depends on whether the working set fits in cache:
-    //  * If the whole collection fits in cache, the data is likely already in memory; charging
-    //  extra I/O would overestimate INLJ cost, so we charge nothing.
-    //  * If only the fetched pages fit in cache, sorted-sparse pages will end up in the cache.
-    //  Model them as sequential I/Os with a small premium (1.5x) to reflect that they are
-    //  slightly more expensive than purely sequential reads.
-    //  * Under cache eviction pressure, sorted-sparse pages may have been evicted between
-    //  accesses, so conservatively treat them as additional random I/Os. This probably leads to
-    //  a cost overestimate, but we accept this because index-based plans which cause cache pressure
-    //  can have catastrophic performance.
     switch (mlCase) {
         case MackertLohmanCase::kCollectionFitsCache:
+            // For the collection-fits-cache M-L case, do not charge sorted-sparse I/O. The accessed
+            // pages fit in cache, and the random I/O cost is already accounted for in the M-L
+            // formula.
             return {.numSeqIOs = 0.0, .numRandIOs = 0.0};
-        case MackertLohmanCase::kReturnedDocsFitCache: {
-            // Not calibrated: a small premium over sequential I/O to reflect that sorted-sparse
-            // access is slightly more expensive than purely sequential reads.
-            constexpr double sortedSparseIOMultiplier = 1.5;
-            return {.numSeqIOs = numSortedSparseIOs * sortedSparseIOMultiplier, .numRandIOs = 0.0};
+        case MackertLohmanCase::kReturnedDocsFitCache:
+        case MackertLohmanCase::kPartialEviction: {
+            // The returned-documents-fit-cache and partial-eviction M-L cases only apply when the
+            // number of pages accessed exceeds the cache size, so the overflow factor below is
+            // guaranteed to be non-negative.
+            tassert(
+                13290900,
+                "The returned-documents-fit-cache and partial-eviction M-L cases imply that the "
+                "number of pages accessed exceeds the cache size",
+                numPagesAccessedColl > numPagesInStorageEngineCache);
+
+            // The overflowFactor (0.0 to 1.0): what fraction of these pages overflow the buffer
+            // pool?
+            double overflowFactor = 1 - (numPagesInStorageEngineCache / numPagesAccessedColl);
+
+            // Apply the sorted spatial locality dampening curve. The square root function models
+            // diminishing returns from caching: it rises quickly for small overflow factors and
+            // flattens for larger overflow factors. The 0.5 factor caps the penalty because
+            // sorted-sparse accesses are partially cached and should not incur the full random I/O
+            // cost.
+            double dampedOverflowFactor = std::sqrt(overflowFactor) * 0.5;
+
+            // For cases 2 and 3, apply the dampening factor to avoid a separate case-specific set
+            // of arbitrary constants.
+            return {.numSeqIOs = 0.0, .numRandIOs = numSortedSparseIOs * dampedOverflowFactor};
         }
-        case MackertLohmanCase::kPartialEviction:
-            return {.numSeqIOs = 0.0, .numRandIOs = numSortedSparseIOs};
     }
     MONGO_UNREACHABLE;
 }

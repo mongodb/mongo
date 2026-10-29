@@ -338,7 +338,7 @@ which python
 **Reinstall packages:**
 
 ```bash
-poetry install --no-root --sync
+bash buildscripts/uv_sync.sh
 ```
 
 ### VS Code extensions aren't working
@@ -436,7 +436,7 @@ bazel build --jobs=N  # Replace N with fewer parallel jobs
 **Limit memory:**
 
 ```bash
-bazel build --local_ram_resources=HOST_RAM*0.5  # Use only 50% of available RAM
+bazel build --local_resources=memory=HOST_RAM*0.5  # Use only 50% of available RAM
 ```
 
 **Clear cache periodically:**

@@ -4,7 +4,7 @@
  *   - Source stages (e.g. $toast)
  *   - Transform stages (e.g. $extensionLimit)
  *
- * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
+ * @tags: [ featureFlagExtensionsAPI, requires_fcv_90 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

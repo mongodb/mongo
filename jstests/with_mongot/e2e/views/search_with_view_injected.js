@@ -2,7 +2,7 @@
  * This test checks that the server rejects any search query that attempts to inject a view into its
  * definition.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 

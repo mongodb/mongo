@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index/index_access_method.h"
 
@@ -34,6 +8,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -43,13 +18,17 @@
 #include "mongo/db/index/geo/s2_bucket_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/index_bulk_builder_metrics.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -66,7 +45,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -144,10 +122,147 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
 }
 
 namespace {
-auto& keysInsertedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
-    otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan,
-    "Total number of keys inserted to indexes from collection scan",
-    otel::metrics::MetricUnit::kEvents);
+
+/**
+ * Returns the interceptor recording writes for 'entry': the one installed on its catalog entry, or
+ * failing that the pending one created for a build that has yet to set itself up.
+ */
+std::shared_ptr<IndexBuildInterceptor> effectiveIndexBuildInterceptor(
+    OperationContext* opCtx, const IndexCatalogEntry* entry) {
+    if (auto installed = entry->indexBuildInterceptor()) {
+        return installed;
+    }
+    // A ready index does not need an interceptor.
+    if (entry->isReady()) {
+        return nullptr;
+    }
+    // Pending interceptors only apply to writes this node accepts as primary.
+    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+            opCtx, NamespaceString::kContainerNamespace)) {
+        return nullptr;
+    }
+    return index_builds::getPendingInterceptors(opCtx->getServiceContext()).find(entry->getIdent());
+}
+
+otel::metrics::AttributeDefinition<std::string_view> makeIndexBuildPhaseAttribute() {
+    return {.name = "phase",
+            .values = {idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+                       idl::serialize(IndexBuildPhaseEnum::kBulkLoad),
+                       idl::serialize(IndexBuildPhaseEnum::kDrainWrites)}};
+}
+
+auto& keysProcessedCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+        "Total number of index keys processed during index builds",
+        otel::metrics::MetricUnit::kCount,
+        makeIndexBuildPhaseAttribute(),
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "indexBuilds.keysProcessed",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
+
+auto& bytesProcessedCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+        "Total number of index key bytes processed during index builds",
+        otel::metrics::MetricUnit::kBytes,
+        makeIndexBuildPhaseAttribute(),
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "indexBuilds.bytesProcessed",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
+
+auto& indexBuildPhasesDurationCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
+        otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+        "The cumulative amount of time spent during index build phases.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        makeIndexBuildPhaseAttribute(),
+        otel::metrics::CounterOptions{
+            .serverStatusOptions =
+                otel::metrics::ServerStatusOptions{.dottedPath = "indexBuilds.phaseDurationMicros",
+                                                   .role = ClusterRole::None},
+            .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
+
+struct IndexBuildPhaseCounters {
+    Counter64& keysProcessed;
+    Counter64& bytesProcessed;
+    Counter64& phaseDurationMicros;
+};
+
+/*
+ * Create counters for the duration, number of bytes processed, and number of keys processed for a
+ * given index build phase.
+ */
+IndexBuildPhaseCounters makePhaseSSCounters(std::string_view phaseField) {
+    return {
+        *MetricBuilder<Counter64>{fmt::format("indexBuilds.{}.keysProcessed", phaseField)},
+        *MetricBuilder<Counter64>{fmt::format("indexBuilds.{}.bytesProcessed", phaseField)},
+        *MetricBuilder<Counter64>{fmt::format("indexBuilds.{}.phaseDurationMicros", phaseField)},
+    };
+}
+
+IndexBuildPhaseCounters collectionScanServerStatusCounters = makePhaseSSCounters("collectionScan");
+IndexBuildPhaseCounters bulkLoadServerStatusCounters = makePhaseSSCounters("bulkLoad");
+IndexBuildPhaseCounters drainWritesServerStatusCounters = makePhaseSSCounters("drainWrites");
+
+IndexBuildPhaseCounters& ssCountersForPhase(IndexBuildPhaseEnum phase) {
+    switch (phase) {
+        case IndexBuildPhaseEnum::kCollectionScan:
+            return collectionScanServerStatusCounters;
+        case IndexBuildPhaseEnum::kBulkLoad:
+            return bulkLoadServerStatusCounters;
+        case IndexBuildPhaseEnum::kDrainWrites:
+            return drainWritesServerStatusCounters;
+        case IndexBuildPhaseEnum::kInitialized:
+            break;
+    }
+    MONGO_UNREACHABLE;
+}
+
+/*
+ * Updates the duration, number of keys processed, and number of bytes processed for a given index
+ * build phase. Updates both serverStatus and OTel metrics.
+ */
+void updatePhaseStats(IndexBuildPhaseEnum phase,
+                      int64_t keysProcessed,
+                      int64_t bytesProcessed,
+                      int64_t durationMicros) {
+    auto attr = std::tuple{idl::serialize(phase)};
+    keysProcessedCounter.add(keysProcessed, attr);
+    bytesProcessedCounter.add(bytesProcessed, attr);
+    indexBuildPhasesDurationCounter.add(durationMicros, attr);
+
+    auto& serverStatusCounters = ssCountersForPhase(phase);
+    serverStatusCounters.keysProcessed.increment(keysProcessed);
+    serverStatusCounters.bytesProcessed.increment(bytesProcessed);
+    serverStatusCounters.phaseDurationMicros.increment(durationMicros);
+}
+
+constexpr int32_t kMetricUpdateIntervalKeyCount = 1000;
+constexpr int32_t kMetricUpdateIntervalBytes = 1024 * 1024;  // 1 MiB
+
+inline void updateProcessedMetrics(IndexBuildPhaseEnum phase,
+                                   const Timer& timer,
+                                   int64_t* const keysCounted,
+                                   int64_t* const bytesCounted,
+                                   Microseconds* const durationLastUpdated,
+                                   bool force = false) {
+    if (force || *keysCounted >= kMetricUpdateIntervalKeyCount ||
+        *bytesCounted >= kMetricUpdateIntervalBytes) {
+        auto timeElapsed = timer.elapsed();
+        updatePhaseStats(phase,
+                         *keysCounted,
+                         *bytesCounted,
+                         durationCount<Microseconds>(timeElapsed - *durationLastUpdated));
+        *durationLastUpdated = timeElapsed;
+        *keysCounted = 0;
+        *bytesCounted = 0;
+    }
+}
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
@@ -182,6 +297,13 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
 auto& insertFailedDueToDuplicateKeyError =
     *MetricBuilder<Counter64>{"operation.insertFailedDueToDuplicateKeyError"};
 
+void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed,
+                                              int64_t bytesProcessed,
+                                              Microseconds durationMicros) {
+    updatePhaseStats(
+        IndexBuildPhaseEnum::kDrainWrites, keysProcessed, bytesProcessed, durationMicros.count());
+}
+
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                                          std::unique_ptr<SortedDataInterface> btree)
     : _newInterface(std::move(btree)) {
@@ -195,8 +317,12 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
                                            const std::vector<BsonRecord>& bsonRecords,
                                            const InsertDeleteOptions& options,
                                            int64_t* numInserted) {
+    auto filter = entry->getFilterExpression();
     for (const auto& bsonRecord : bsonRecords) {
         invariant(bsonRecord.id != RecordId());
+        if (filter && !exec::matcher::matchesBSON(filter, *bsonRecord.docPtr)) {
+            continue;
+        }
 
         if (!bsonRecord.ts.isNull()) {
             Status status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(bsonRecord.ts);
@@ -224,6 +350,7 @@ Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
         Status status = _indexKeysOrWriteToSideTable(opCtx,
                                                      coll,
                                                      entry,
+                                                     bsonRecord.id,
                                                      *keys,
                                                      *multikeyMetadataKeys,
                                                      *multikeyPaths,
@@ -248,11 +375,16 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
                                          const InsertDeleteOptions& options,
                                          int64_t* numDeleted,
                                          CheckRecordId checkRecordId) {
-    auto& containerPool = PreallocatedContainerPool::get(opCtx);
+    if (auto filter = entry->getFilterExpression()) {
+        if (!exec::matcher::matchesBSON(filter, obj)) {
+            return;
+        }
+    }
 
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
+    auto& containerPool = PreallocatedContainerPool::get(opCtx);
     auto keys = containerPool.keys();
     getKeys(opCtx,
             coll,
@@ -267,7 +399,7 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
             loc);
 
     _unindexKeysOrWriteToSideTable(
-        opCtx, coll, entry, *keys, obj, logIfError, numDeleted, options, checkRecordId);
+        opCtx, coll, entry, loc, *keys, obj, logIfError, numDeleted, options, checkRecordId);
 }
 
 Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
@@ -282,14 +414,61 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                            int64_t* numInserted,
                                            int64_t* numDeleted) {
     UpdateTicket updateTicket;
-    prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket);
+    if (!_prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket)) {
+        return Status::OK();
+    }
 
     if (entry->indexBuildInterceptor() || !entry->isReady()) {
+        // A primary-driven index build carries the multikey state a write implies on the side write
+        // records that write produces, so it needs at least one record to carry it. An update whose
+        // new keys are all present already -- a scalar becoming a single-element array, say, where
+        // the key does not change at all -- has an empty difference and produces none, losing that
+        // state. Such an update therefore writes one of its surviving keys as a delete and an
+        // insert on top of the real difference: that leaves the index exactly as it was while
+        // giving the insert record something to carry the state
+        //
+        // `sideWrite` decides multikey from the keys it is handed, which for an update is the
+        // difference between the old and new keys. That answer can differ from the document's own:
+        // an index without path-level tracking is multikey purely because a document generates
+        // several keys, so growing a document from one indexed term to two adds a single key and
+        // the difference looks non-multikey.
+        bool documentIsMultikey = shouldMarkIndexAsMultikey(updateTicket.newKeys.size(),
+                                                            updateTicket.newMultikeyMetadataKeys,
+                                                            updateTicket.newMultikeyPaths);
+        bool recordsWillBeWritten =
+            !updateTicket.added.empty() || !updateTicket.newMultikeyMetadataKeys.empty();
+        bool recordsWouldConveyIt = recordsWillBeWritten &&
+            shouldMarkIndexAsMultikey(updateTicket.added.size(),
+                                      updateTicket.newMultikeyMetadataKeys,
+                                      updateTicket.newMultikeyPaths);
+
+        // TODO (SERVER-135300): Remove once a side write can carry multikey state on its own.
+        bool needsCarrierForMultikeyState =
+            effectiveIndexBuildInterceptor(opCtx, entry) && documentIsMultikey &&
+            !recordsWouldConveyIt && !updateTicket.newKeys.empty() &&
+            index_builds::primary_driven::enabled(
+                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        KeyStringSet carrierRemoved;
+        KeyStringSet carrierAdded;
+        if (needsCarrierForMultikeyState) {
+            // Carry one of the document's own keys alongside the real difference: written as both a
+            // delete and an insert it leaves the index as it was, while making the insert record
+            // describe enough of the document for `sideWrite` to reach the same answer as above.
+            const auto& carrier = *updateTicket.newKeys.begin();
+            carrierRemoved = updateTicket.removed;
+            carrierRemoved.insert(carrier);
+            carrierAdded = updateTicket.added;
+            carrierAdded.insert(carrier);
+        }
+        auto& keysRemoved = needsCarrierForMultikeyState ? carrierRemoved : updateTicket.removed;
+        auto& keysAdded = needsCarrierForMultikeyState ? carrierAdded : updateTicket.added;
+
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll,
                                        entry,
-                                       updateTicket.removed,
+                                       loc,
+                                       keysRemoved,
                                        oldDoc,
                                        logIfError,
                                        numDeleted,
@@ -298,7 +477,8 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
         return _indexKeysOrWriteToSideTable(opCtx,
                                             coll,
                                             entry,
-                                            updateTicket.added,
+                                            loc,
+                                            keysAdded,
                                             updateTicket.newMultikeyMetadataKeys,
                                             updateTicket.newMultikeyPaths,
                                             newDoc,
@@ -389,6 +569,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     int64_t numExistingKeys = 0;
+    boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg;
     for (const auto& keyString : keys) {
         std::variant<Status, SortedDataInterface::DuplicateKey> result = Status::OK();
         if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
@@ -412,11 +593,17 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 insertDup = true;
             }
 
+            if (!wg) {
+                wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                               assertCanAcceptContainerWrites(opCtx));
+            }
+
             result = container_write::insert(opCtx,
                                              ru,
                                              _newInterface->getContainer(),
                                              keyString.getView(),
-                                             keyString.getTypeBitsView());
+                                             keyString.getTypeBitsView(),
+                                             wg);
             if (auto status = std::get<Status>(result);
                 insertDup && status.isOK() && onDuplicateKey) {
                 result = onDuplicateKey(coll, keyString);
@@ -432,7 +619,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 invariant(unique);
 
                 result = _newInterface->insert(
-                    opCtx, ru, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
+                    opCtx, ru, keyString, /*dupsAllowed=*/true, includeDuplicateRecordId);
                 if (auto status = std::get_if<Status>(&result)) {
                     if (status->isOK() && onDuplicateKey) {
                         result = onDuplicateKey(coll, keyString);
@@ -561,7 +748,7 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                     keys.get(),
                     multikeyMetadataKeys,
                     multikeyPaths,
-                    boost::none /* loc */);
+                    /*id=*/boost::none);
             invariant(keys->size() == 1);
             const key_string::Value& actualKey = *keys->begin();
             dassert(key_string::decodeDiscriminator(actualKey.getView(),
@@ -652,20 +839,26 @@ pair<KeyStringSet, KeyStringSet> SortedDataIndexAccessMethod::setDifference(
     return {{std::move(outLeft)}, {std::move(outRight)}};
 }
 
-void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
-                                                const CollectionPtr& collection,
-                                                const IndexCatalogEntry* entry,
-                                                const BSONObj& from,
-                                                const BSONObj& to,
-                                                const RecordId& record,
-                                                const InsertDeleteOptions& options,
-                                                UpdateTicket* ticket) const {
+bool SortedDataIndexAccessMethod::_prepareUpdate(OperationContext* opCtx,
+                                                 const CollectionPtr& collection,
+                                                 const IndexCatalogEntry* entry,
+                                                 const BSONObj& from,
+                                                 const BSONObj& to,
+                                                 const RecordId& record,
+                                                 const InsertDeleteOptions& options,
+                                                 UpdateTicket* ticket) const {
     SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     const MatchExpression* indexFilter = entry->getFilterExpression();
-    if (!indexFilter || exec::matcher::matchesBSON(indexFilter, from)) {
+    bool fromMatches = !indexFilter || exec::matcher::matchesBSON(indexFilter, from);
+    bool toMatches = !indexFilter || exec::matcher::matchesBSON(indexFilter, to);
+    if (!fromMatches && !toMatches) {
+        return false;
+    }
+
+    if (fromMatches) {
         // Override key constraints when generating keys for removal. This only applies to keys
         // that do not apply to a partial filter expression.
-        const auto getKeysMode = entry->indexBuildInterceptor()
+        const auto getKeysMode = effectiveIndexBuildInterceptor(opCtx, entry)
             ? InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered
             : options.getKeysMode;
 
@@ -685,7 +878,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                 record);
     }
 
-    if (!indexFilter || exec::matcher::matchesBSON(indexFilter, to)) {
+    if (toMatches) {
         getKeys(opCtx,
                 collection,
                 entry,
@@ -705,6 +898,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     std::tie(ticket->removed, ticket->added) = setDifference(ticket->oldKeys, ticket->newKeys);
 
     ticket->_isValid = true;
+    return true;
 }
 
 Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
@@ -790,17 +984,42 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                                                              const InsertDeleteOptions& options,
                                                              KeyHandlerFn&& onDuplicateKey,
                                                              int64_t* const keysInserted,
-                                                             int64_t* const keysDeleted) {
+                                                             int64_t* const keysDeleted,
+                                                             int64_t* const bytesInserted,
+                                                             int64_t* const bytesDeleted) {
+    // Recover any multikey state the writer recorded alongside this key.
+    if (operation[IndexBuildInterceptor::kSideWriteMultikeyFieldName].trueValue()) {
+        if (auto interceptor = entry->indexBuildInterceptor()) {
+            MultikeyPaths multikeyPaths;
+            if (auto pathsElem = operation[IndexBuildInterceptor::kSideWriteMultikeyPathsFieldName];
+                pathsElem.type() == BSONType::object) {
+                auto swPaths = multikey_paths::parse(pathsElem.Obj());
+                if (!swPaths.isOK()) {
+                    return swPaths.getStatus();
+                }
+                multikeyPaths = std::move(swPaths.getValue());
+            }
+            interceptor->recordDrainedMultikeyPaths(multikeyPaths);
+        }
+    }
+
     auto opType = [&operation] {
         switch (operation.getStringField("op")[0]) {
             case 'i':
                 return IndexBuildInterceptor::Op::kInsert;
             case 'd':
                 return IndexBuildInterceptor::Op::kDelete;
+            case 'm':
+                return IndexBuildInterceptor::Op::kMultikey;
             default:
                 MONGO_UNREACHABLE;
         }
     }();
+
+    if (opType == IndexBuildInterceptor::Op::kMultikey) {
+        // TODO (SERVER-135300): Handle multikey side writes.
+        return Status::OK();
+    }
 
     // Deserialize the encoded key_string::Value.
     int keyLen;
@@ -813,12 +1032,10 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const KeyStringSet keySet{keyString};
+    const auto keySize = keyString.getSize();
 
-    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
+    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (opType == IndexBuildInterceptor::Op::kInsert) {
         int64_t numInserted;
         auto status = insertKeysAndUpdateMultikeyPaths(
@@ -833,15 +1050,18 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
             std::move(onDuplicateKey),
             &numInserted,
             IncludeDuplicateRecordId::kOff,
-            primaryDrivenFeatureFlagEnabled ? ContainerWriteBehavior::kReplicate
-                                            : ContainerWriteBehavior::kDoNotReplicate);
+            primaryDrivenIndexBuildEnabled ? ContainerWriteBehavior::kReplicate
+                                           : ContainerWriteBehavior::kDoNotReplicate);
         if (!status.isOK()) {
             return status;
         }
 
         *keysInserted += numInserted;
-        ru.onRollback(
-            [keysInserted, numInserted](OperationContext*) { *keysInserted -= numInserted; });
+        *bytesInserted += keySize;
+        ru.onRollback([keysInserted, bytesInserted, numInserted, keySize](OperationContext*) {
+            *keysInserted -= numInserted;
+            *bytesInserted -= keySize;
+        });
     } else {
         int64_t numDeleted;
         Status s =
@@ -852,14 +1072,18 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                        {keySet.begin(), keySet.end()},
                        options,
                        &numDeleted,
-                       primaryDrivenFeatureFlagEnabled ? ContainerWriteBehavior::kReplicate
-                                                       : ContainerWriteBehavior::kDoNotReplicate);
+                       primaryDrivenIndexBuildEnabled ? ContainerWriteBehavior::kReplicate
+                                                      : ContainerWriteBehavior::kDoNotReplicate);
         if (!s.isOK()) {
             return s;
         }
 
         *keysDeleted += numDeleted;
-        ru.onRollback([keysDeleted, numDeleted](OperationContext*) { *keysDeleted -= numDeleted; });
+        *bytesDeleted += keySize;
+        ru.onRollback([keysDeleted, bytesDeleted, numDeleted, keySize](OperationContext*) {
+            *keysDeleted -= numDeleted;
+            *bytesDeleted -= keySize;
+        });
     }
     return Status::OK();
 }
@@ -887,6 +1111,7 @@ public:
     using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
     using Spiller =
         sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
+    using OnBatchCommittedFn = IndexAccessMethod::OnBatchCommittedFn;
 
     BulkBuilderImpl(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
@@ -926,6 +1151,7 @@ public:
                   const RecordIdHandlerFn& onDuplicateRecord,
                   const YieldFn& yieldFn,
                   const OnNKeysLoadedFn& onNKeysLoaded,
+                  const OnBatchCommittedFn& onBatchCommitted,
                   int64_t onNKeysLoadedFnInterval,
                   size_t keyBatchSize,
                   size_t keyBatchBytes) final;
@@ -933,6 +1159,8 @@ public:
     IndexStateInfo getPersistedState() final;
 
     IndexStateInfo persistDataForShutdown() final;
+
+    void releaseSorter() final;
 
 protected:
     const MultikeyPaths& getMultikeyPaths() const final;
@@ -949,6 +1177,11 @@ protected:
 
     int64_t _keysInserted = 0;
 
+    int64_t _keysInsertedCounted = 0;
+    int64_t _bytesInsertedCounted = 0;
+    Timer _timer;
+    Microseconds _durationLastUpdated{0};
+
     SortedDataIndexAccessMethod* _iam;
 
 private:
@@ -957,10 +1190,25 @@ private:
         const SortOptions& opts,
         const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
 
-    void _addKeyForCommit(OperationContext* opCtx,
-                          RecoveryUnit& ru,
-                          const CollectionPtr& coll,
-                          const key_string::View& key);
+    /**
+     * Inserts key into the index. Returns true if successfully inserted, or false on a KeyExists
+     * error.
+     */
+    bool _addKeyForCommit(
+        OperationContext* opCtx,
+        RecoveryUnit& ru,
+        const CollectionPtr& coll,
+        const key_string::View& key,
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg = boost::none);
+
+    /**
+     * Inserts a range of keys into the index. Returns the number of keys inserted, which is less
+     * than 'keys.size()' if any of them was already present in the container.
+     */
+    int64_t _addKeysForCommit(OperationContext* opCtx,
+                              RecoveryUnit& ru,
+                              const CollectionPtr& coll,
+                              std::span<const key_string::Value> keys);
 
     void _debugEnsureSorted(const Data& data);
 
@@ -996,6 +1244,12 @@ private:
     // Once we're past any keys that already exist in the table, we can set this as a performance
     // optimization.
     boost::optional<container_write::NonexistentKeyGuarantee> _nonexistentKeyGuarantee;
+
+    // Scratch space for the batched container insert in _addKeysForCommit(), which needs the keys
+    // and their type bits as two parallel arrays of spans. Held as members purely so the storage is
+    // reused across batches rather than reallocated for every one.
+    std::vector<std::span<const char>> _batchedKeyViews;
+    std::vector<std::span<const char>> _batchedTypeBitsViews;
 };
 
 BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
@@ -1158,16 +1412,31 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
         }
     }
 
+    // Update the multikey state before adding any key, so that a spill triggered while closing the
+    // batch below persists it together with this document's position.
+    setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
+
+    // Ensure that a document's keys are not partially spilled, so that if this builder is later
+    // resumed it doesn't lose the keys beyond the spill boundary.
+    SorterBatchGuard batchGuard{*_sorter};
     for (const auto& keyString : *keys) {
         ++_keysInserted;
+        ++_keysInsertedCounted;
+        _bytesInsertedCounted += keyString.getSize();
         _sorter->add(keyString, mongo::NullValue());
     }
     for (const auto& keyString : multikeyMetadataKeys) {
         ++_keysInserted;
+        ++_keysInsertedCounted;
+        _bytesInsertedCounted += keyString.getSize();
         _sorter->add(keyString, mongo::NullValue());
     }
-
-    setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
+    batchGuard.finish();
+    updateProcessedMetrics(IndexBuildPhaseEnum::kCollectionScan,
+                           _timer,
+                           &_keysInsertedCounted,
+                           &_bytesInsertedCounted,
+                           &_durationLastUpdated);
 
     return Status::OK();
 }
@@ -1179,6 +1448,12 @@ void BulkBuilderImpl::done(bool forceSpill) {
         _sorter->spill();
     }
     _sortedIterator = _sorter->done();
+    updateProcessedMetrics(IndexBuildPhaseEnum::kCollectionScan,
+                           _timer,
+                           &_keysInsertedCounted,
+                           &_bytesInsertedCounted,
+                           &_durationLastUpdated,
+                           true);
 }
 
 Status BulkBuilderImpl::commit(OperationContext* opCtx,
@@ -1191,6 +1466,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
                                const RecordIdHandlerFn& onDuplicateRecord,
                                const YieldFn& yieldFn,
                                const OnNKeysLoadedFn& onNKeysLoaded,
+                               const OnBatchCommittedFn& onBatchCommitted,
                                const int64_t onNKeysLoadedFnInterval,
                                const size_t keyBatchSize,
                                const size_t keyBatchBytes) {
@@ -1198,6 +1474,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         ErrorCodes::BadValue, "onNKeysLoadedFnInterval must be >= 1", onNKeysLoadedFnInterval >= 1);
     tassert(12723201, "BulkBuilder::done must be called before commit", _sortedIterator);
     Timer timer;
+    const auto phase = IndexBuildPhaseEnum::kBulkLoad;
 
     _ns = entry->getNSSFromCatalog(opCtx);
     auto it = std::move(_sortedIterator);
@@ -1207,7 +1484,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         std::unique_lock<Client> lk(*opCtx->getClient());
         pm.set(lk,
                CurOp::get(opCtx)->setProgress(
-                   lk, _progressMessage, _keysInserted, 3 /* secondsBetween */),
+                   lk, _progressMessage, _keysInserted, /*secondsBetween=*/3),
                opCtx);
     }
 
@@ -1220,26 +1497,37 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     std::vector<key_string::Value> batch;
     size_t bytesInBatch = 0;
     int64_t nKeys = 0;
+    int64_t keysCounted = 0;
+    int64_t bytesCounted = 0;
+    Microseconds durationLastUpdated{0};
 
     auto commitBatch = [&]() {
         if (batch.empty()) {
             return;
         }
-        writeConflictRetry(opCtx, "addingKey", _ns, [&] {
+        auto keysInserted = writeConflictRetry(opCtx, "addingKey", _ns, [&] {
             WriteUnitOfWork wunit(opCtx);
-            for (auto&& key : batch) {
-                _addKeyForCommit(opCtx, ru, *collection, key);
-            }
+            int64_t keysAdded = _addKeysForCommit(opCtx, ru, *collection, batch);
             wunit.commit();
+            return keysAdded;
         });
-        nKeys += batch.size();
+        nKeys += keysInserted;
+        keysCounted += batch.size();
+        bytesCounted += bytesInBatch;
+        onBatchCommitted(static_cast<int64_t>(batch.size()), static_cast<int64_t>(bytesInBatch));
         batch.clear();
         bytesInBatch = 0;
+        updateProcessedMetrics(phase, timer, &keysCounted, &bytesCounted, &durationLastUpdated);
         if (nKeys >= onNKeysLoadedFnInterval) {
             onNKeysLoaded();
             nKeys = 0;
         }
     };
+
+    ON_BLOCK_EXIT([&] {
+        updateProcessedMetrics(
+            phase, timer, &keysCounted, &bytesCounted, &durationLastUpdated, true);
+    });
 
     while (it && it->more()) {
         opCtx->checkForInterrupt();
@@ -1373,35 +1661,92 @@ IndexStateInfo BulkBuilderImpl::persistDataForShutdown() {
     return makeIndexStateInfo(_sorter->persistDataForShutdown(), _keysInserted);
 }
 
-void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
-                                       RecoveryUnit& ru,
-                                       const CollectionPtr& coll,
-                                       const key_string::View& key) {
+void BulkBuilderImpl::releaseSorter() {
+    _sortedIterator.reset();
+    _sorter.reset();
+}
+
+bool BulkBuilderImpl::_addKeyForCommit(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionPtr& coll,
+    const key_string::View& key,
+    boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg) {
     if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
         auto status = container_write::insert(opCtx,
                                               ru,
                                               _iam->getSortedDataInterface()->getContainer(),
                                               key.getKeyAndRecordIdView(),
                                               key.getTypeBitsView(),
+                                              wg,
                                               _nonexistentKeyGuarantee);
         if (status == ErrorCodes::KeyExists) {
             // The key was already inserted by a previous bulk builder on this same container.
-            return;
+            return false;
         } else if (!_nonexistentKeyGuarantee && status.isOK()) {
             // We've reached the end of any keys previously inserted. From this point forward, we
             // can assume that the keys we're inserting do not already exist in the container.
             _nonexistentKeyGuarantee.emplace();
         }
         uassertStatusOK(status);
-        keysInsertedCounter.add(1);
-        return;
+        return true;
     }
 
     if (!_builder) {
         _builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
     }
     _builder->addKey(ru, key);
-    keysInsertedCounter.add(1);
+    return true;
+}
+
+int64_t BulkBuilderImpl::_addKeysForCommit(OperationContext* opCtx,
+                                           RecoveryUnit& ru,
+                                           const CollectionPtr& coll,
+                                           std::span<const key_string::Value> keys) {
+    int64_t keysAdded = 0;
+    size_t i = 0;
+    const auto writeGuarantee = _containerWriteBehavior == ContainerWriteBehavior::kReplicate
+        ? boost::make_optional(
+              container_write::CanAcceptContainerWritesGuarantee::assertCanAcceptContainerWrites(
+                  opCtx))
+        : boost::none;
+    // Until the NonexistentKeyGuarantee is established the keys have to go in one at a time, via
+    // the single-key path.
+    for (; !_nonexistentKeyGuarantee && i < keys.size(); ++i) {
+        if (_addKeyForCommit(opCtx, ru, coll, keys[i], writeGuarantee)) {
+            ++keysAdded;
+        }
+    }
+
+    // Early exit if this inserted all keys.
+    if (i == keys.size()) {
+        return keysAdded;
+    }
+
+    // Past that point the writes are blind, so the whole remaining range can go in as one batched
+    // insert sharing a single cursor.
+    _batchedKeyViews.clear();
+    _batchedTypeBitsViews.clear();
+    _batchedKeyViews.reserve(keys.size() - i);
+    _batchedTypeBitsViews.reserve(keys.size() - i);
+
+    for (const auto& key : keys.subspan(i)) {
+        // The View borrows from the Value, which lives in the caller's batch for the duration of
+        // this call, so the spans collected here stay valid through the insert below.
+        key_string::View view{key};
+        _batchedKeyViews.push_back(view.getKeyAndRecordIdView());
+        _batchedTypeBitsViews.push_back(view.getTypeBitsView());
+    }
+
+    uassertStatusOK(container_write::insert(opCtx,
+                                            ru,
+                                            _iam->getSortedDataInterface()->getContainer(),
+                                            _batchedKeyViews,
+                                            _batchedTypeBitsViews,
+                                            writeGuarantee,
+                                            _nonexistentKeyGuarantee));
+
+    return keysAdded + static_cast<int64_t>(_batchedKeyViews.size());
 }
 
 std::unique_ptr<BulkBuilderImpl::Sorter> BulkBuilderImpl::_makeSorter(
@@ -1560,6 +1905,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const IndexCatalogEntry* entry,
+    const RecordId& recordId,
     const KeyStringSet& keys,
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths,
@@ -1568,16 +1914,9 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
 
-    if (auto interceptor = entry->indexBuildInterceptor()) {
-        // The side table interface accepts only records that meet the criteria for this partial
-        // index.
-        // See SERVER-28975 and SERVER-39705 for details.
-        if (auto filter = entry->getFilterExpression()) {
-            if (!exec::matcher::matchesBSON(filter, obj)) {
-                return Status::OK();
-            }
-        }
-
+    if (auto interceptor = effectiveIndexBuildInterceptor(opCtx, entry)) {
+        // Group this record's side-table writes so the packer keeps them with its collection write.
+        BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t inserted = 0;
         status = interceptor->sideWrite(opCtx,
                                         coll,
@@ -1615,22 +1954,16 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const IndexCatalogEntry* entry,
+    const RecordId& recordId,
     const KeyStringSet& keys,
     const BSONObj& obj,
     bool logIfError,
     int64_t* const keysDeletedOut,
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
-    if (auto interceptor = entry->indexBuildInterceptor()) {
-        // The side table interface accepts only records that meet the criteria for this partial
-        // index.
-        // See SERVER-28975 and SERVER-39705 for details.
-        if (auto filter = entry->getFilterExpression()) {
-            if (!exec::matcher::matchesBSON(filter, obj)) {
-                return;
-            }
-        }
-
+    if (auto interceptor = effectiveIndexBuildInterceptor(opCtx, entry)) {
+        // Group this record's side-table writes so the packer keeps them with its collection write.
+        BatchedWriteContext::AtomicOperationGroup sideWriteGroup(opCtx, recordId);
         int64_t removed = 0;
         fassert(
             31155,

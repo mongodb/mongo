@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 
@@ -124,6 +98,12 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
     if (!spec.getUnique()) {
         return Status(ErrorCodes::Error(5979700),
                       "The clusteredIndex option requires unique: true to be specified");
+    }
+
+    if (const auto& name = spec.getName()) {
+        if (auto status = index_key_validate::validateIndexName(*name); !status.isOK()) {
+            return status.withContext("Invalid clusteredIndex name");
+        }
     }
 
     bool clusterKeyOnId =
@@ -303,7 +283,7 @@ Status renameOutOfTheWayForApplyOps(OperationContext* opCtx,
 
         Status status = writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName, [&] {
             WriteUnitOfWork wuow(opCtx);
-            Status status = db->renameCollection(opCtx, newCollName, tmpName, true /*stayTemp*/);
+            Status status = db->renameCollection(opCtx, newCollName, tmpName, /*stayTemp=*/true);
             if (!status.isOK())
                 return status;
             auto futureCollUuid = futureColl->uuid();
@@ -311,10 +291,10 @@ Status renameOutOfTheWayForApplyOps(OperationContext* opCtx,
                                            newCollName,
                                            tmpName,
                                            futureCollUuid,
-                                           {}, /*dropTargetUUID*/
-                                           0U, /*numRecords*/
-                                           true /*stayTemp*/,
-                                           false /*markFromMigrate*/,
+                                           /*dropTargetUUID=*/{},
+                                           /*numRecords=*/0U,
+                                           /*stayTemp=*/true,
+                                           /*markFromMigrate=*/false,
                                            preConditions.isViewlessTimeseriesCollection());
             wuow.commit();
             // Re-fetch collection after commit to get a valid pointer
@@ -359,7 +339,7 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
         auto [currentCollLock, newCollLock] =
             acquireCollLocksForRename(opCtx, currentName, newCollName);
         WriteUnitOfWork wuow(opCtx);
-        Status status = db->renameCollection(opCtx, currentName, newCollName, true /*stayTemp*/);
+        Status status = db->renameCollection(opCtx, currentName, newCollName, /*stayTemp=*/true);
         if (!status.isOK())
             return status;
         auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
@@ -368,10 +348,10 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
                                        currentName,
                                        newCollName,
                                        uuid,
-                                       {},   /*dropTargetUUID*/
-                                       0U,   /*numRecords*/
-                                       true, /*stayTemp*/
-                                       false /*markFromMigrate*/,
+                                       /*dropTargetUUID=*/{},
+                                       /*numRecords=*/0U,
+                                       /*stayTemp=*/true,
+                                       /*markFromMigrate=*/false,
                                        preConditions.isViewlessTimeseriesCollection());
         wuow.commit();
         return Status::OK();
@@ -548,7 +528,7 @@ Status _createViewNoRetry(OperationContext* opCtx,
                                        "fail point enabled."};
     }
 
-    Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
+    Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createDefaultIndexes=*/false);
     if (!status.isOK()) {
         return status;
     }
@@ -644,7 +624,7 @@ void checkExistingCollectionIsCompatible(OperationContext* opCtx,
                                                    *existingOptions.timeseries);
 
         existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
-            false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
+            /*includeUUID=*/false, timeseries::kAllowedCollectionCreationOptions)));
     }
 
     const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
@@ -1087,7 +1067,7 @@ Status _createCollection(
                 : db->userCreateNS(opCtx,
                                    nss,
                                    collectionOptions,
-                                   /*createIdIndex=*/false,
+                                   /*createDefaultIndexes=*/false,
                                    /*idIndex=*/BSONObj(),
                                    /*fromMigrate=*/false,
                                    catalogIdentifier,

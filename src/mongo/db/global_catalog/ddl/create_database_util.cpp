@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/create_database_util.h"
 
@@ -73,27 +47,24 @@ boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName)
     return boost::none;
 }
 
-boost::optional<ShardRef> resolvePrimaryShard(OperationContext* opCtx,
-                                              const boost::optional<ShardId>& optPrimaryShard) {
+boost::optional<ShardId> resolvePrimaryShard(OperationContext* opCtx,
+                                             const boost::optional<ShardId>& optPrimaryShard) {
     if (optPrimaryShard) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "invalid shard name: " << *optPrimaryShard,
                 optPrimaryShard->isValid());
-        return ShardRef{uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-            opCtx, *optPrimaryShard, true /* allowNonShardIdIdentifiers */))};
+        return uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+            opCtx, *optPrimaryShard, /*allowNonShardIdIdentifiers=*/true));
     }
     return boost::none;
 }
 
 BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
-                                    const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+                                    const boost::optional<ShardId>& optResolvedPrimaryShard) {
     BSONObjBuilder filterBuilder;
     filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
     if (optResolvedPrimaryShard) {
-        // TODO SERVER-128701: Apply an OR between UUID and ShardID and make sure to return only
-        // one.
-        filterBuilder.append(DatabaseType::kPrimaryFieldName,
-                             optResolvedPrimaryShard->getShardId());
+        filterBuilder.append(DatabaseType::kPrimaryFieldName, *optResolvedPrimaryShard);
     }
     return filterBuilder.obj();
 }
@@ -101,7 +72,7 @@ BSONObj constructDbMatchFilterExact(std::string_view dbNameStr,
 boost::optional<DatabaseType> findDatabaseExactMatch(
     OperationContext* opCtx,
     std::string_view dbNameStr,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+    const boost::optional<ShardId>& optResolvedPrimaryShard) {
     const auto dbMatchFilterExact = constructDbMatchFilterExact(dbNameStr, optResolvedPrimaryShard);
 
     DBDirectClient client(opCtx);
@@ -123,7 +94,7 @@ BSONObj constructDbMatchFilterCaseInsensitive(std::string_view dbNameStr) {
 
 void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
                                const DatabaseName& dbName,
-                               const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+                               const boost::optional<ShardId>& optResolvedPrimaryShard) {
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "can't have 2 databases that just differ on case "
                           << " have: " << existingDb.getDbName().toStringForErrorMsg()
@@ -133,14 +104,13 @@ void checkAgainstExistingDbDoc(const DatabaseType& existingDb,
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "database already created on a primary which is different from "
                           << optResolvedPrimaryShard,
-            !optResolvedPrimaryShard ||
-                optResolvedPrimaryShard->getShardId() == existingDb.getPrimary());
+            !optResolvedPrimaryShard || *optResolvedPrimaryShard == existingDb.getPrimary());
 }
 
 boost::optional<DatabaseType> checkForExistingDatabaseWithDifferentOptions(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard) {
+    const boost::optional<ShardId>& optResolvedPrimaryShard) {
     DBDirectClient client(opCtx);
     auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
     const auto dbNameStr =
@@ -178,10 +148,9 @@ bool checkIfDropPendingDB(OperationContext* opCtx, const DatabaseName& dbName) {
         .isEmpty();
 }
 
-// TODO SERVER-128701: Return ShardRef when ready
 ShardId getCandidatePrimaryShard(OperationContext* opCtx,
-                                 const boost::optional<ShardRef>& optResolvedPrimaryShard) {
-    return optResolvedPrimaryShard ? optResolvedPrimaryShard->getShardId()
+                                 const boost::optional<ShardId>& optResolvedPrimaryShard) {
+    return optResolvedPrimaryShard ? *optResolvedPrimaryShard
                                    : sharding_util::selectLeastLoadedNonDrainingShard(opCtx);
 }
 

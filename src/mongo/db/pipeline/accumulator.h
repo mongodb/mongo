@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -58,6 +31,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * This enum indicates which documents an accumulator needs to see in order to compute its output.
@@ -83,12 +57,13 @@ enum class AccumulatorDocumentsNeeded {
     kLastOutputDocument,
 };
 
-class MONGO_MOD_PUBLIC AccumulatorState : public RefCountable {
+class [[MONGO_MOD_PUBLIC]] AccumulatorState : public RefCountable {
 public:
     using Factory = std::function<boost::intrusive_ptr<AccumulatorState>()>;
 
     AccumulatorState(ExpressionContext* const expCtx,
-                     int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
+                     MemoryUsageLimit maxAllowedMemoryUsageBytes =
+                         MemoryUsageLimit{std::numeric_limits<int64_t>::max()})
         : _memUsageTracker(maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
 
     /** Marks the beginning of a new group. The input is the result of evaluating
@@ -189,14 +164,15 @@ protected:
 
     // Utility to check that memory limit isn't exceeded.
     void checkMemUsage() {
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream() << getOpName()
-                              << " used too much memory and spilling to disk cannot reduce memory "
-                                 "consumption any further. Used: "
-                              << _memUsageTracker.inUseTrackedMemoryBytes()
-                              << " bytes. Memory limit: "
-                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-                _memUsageTracker.withinMemoryLimit());
+        auto* opCtx = getExpressionContext()->getOperationContext();
+        // The withinMemoryLimit() check is redundant with the call to assertWithinMemoryLimit(),
+        // but the call to getOpName() is a virtual function call, which is expensive, whereas
+        // withinMemoryLimit() is inlined and cheap.  Since the common case is that we are
+        // within the limit, check withinMemoryLimit() first to avoid the virtual call in the
+        // common case.  This avoids a performance regression.
+        if (MONGO_unlikely(!_memUsageTracker.withinMemoryLimit(opCtx))) {
+            _memUsageTracker.assertWithinMemoryLimit(opCtx, getOpName());
+        }
     }
 
     /// subclasses are expected to update this as necessary
@@ -214,7 +190,7 @@ private:
 
 class AccumulatorAddToSet final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$addToSet"_sd;
+    static constexpr auto kName = "$addToSet"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -225,7 +201,7 @@ public:
      * the server parameter 'internalQueryMaxAddToSetBytes'.
      */
     AccumulatorAddToSet(ExpressionContext* expCtx,
-                        boost::optional<int> maxMemoryUsageBytes = boost::none);
+                        boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -245,7 +221,7 @@ private:
 
 class AccumulatorFirst final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$first"_sd;
+    static constexpr auto kName = "$first"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -268,7 +244,7 @@ private:
 
 class AccumulatorInternalConstructStats final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$_internalConstructStats"_sd;
+    static constexpr auto kName = "$_internalConstructStats"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -293,7 +269,7 @@ private:
 
 class AccumulatorLast final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$last"_sd;
+    static constexpr auto kName = "$last"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -315,7 +291,7 @@ private:
 
 class AccumulatorSum final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$sum"_sd;
+    static constexpr auto kName = "$sum"sv;
 
     /**
      * These aliases represent two possible sum states in AcculumatorSum:
@@ -405,7 +381,7 @@ private:
 
 class AccumulatorMax final : public AccumulatorMinMax {
 public:
-    static constexpr auto kName = "$max"_sd;
+    static constexpr auto kName = "$max"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -417,7 +393,7 @@ public:
 
 class AccumulatorMin final : public AccumulatorMinMax {
 public:
-    static constexpr auto kName = "$min"_sd;
+    static constexpr auto kName = "$min"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -429,7 +405,7 @@ public:
 
 class AccumulatorPush final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$push"_sd;
+    static constexpr auto kName = "$push"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -440,7 +416,7 @@ public:
      * server parameter 'internalQueryMaxPushBytes'.
      */
     AccumulatorPush(ExpressionContext* expCtx,
-                    boost::optional<int> maxMemoryUsageBytes = boost::none);
+                    boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
@@ -452,7 +428,7 @@ private:
 
 class AccumulatorAvg final : public AccumulatorState {
 public:
-    static constexpr auto kName = "$avg"_sd;
+    static constexpr auto kName = "$avg"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -503,7 +479,7 @@ private:
 
 class AccumulatorStdDevPop final : public AccumulatorStdDev {
 public:
-    static constexpr auto kName = "$stdDevPop"_sd;
+    static constexpr auto kName = "$stdDevPop"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -515,7 +491,7 @@ public:
 
 class AccumulatorStdDevSamp final : public AccumulatorStdDev {
 public:
-    static constexpr auto kName = "$stdDevSamp"_sd;
+    static constexpr auto kName = "$stdDevSamp"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -527,7 +503,7 @@ public:
 
 class AccumulatorMergeObjects : public AccumulatorState {
 public:
-    static constexpr auto kName = "$mergeObjects"_sd;
+    static constexpr auto kName = "$mergeObjects"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -545,7 +521,7 @@ private:
 
 class AccumulatorExpMovingAvg : public AccumulatorState {
 public:
-    static constexpr auto kName = "$expMovingAvg"_sd;
+    static constexpr auto kName = "$expMovingAvg"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -566,7 +542,7 @@ private:
 
 class AccumulatorConcatArrays : public AccumulatorState {
 public:
-    static constexpr auto kName = "$concatArrays"_sd;
+    static constexpr auto kName = "$concatArrays"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -577,7 +553,7 @@ public:
      * the value of the server parameter 'internalQueryMaxConcatArraysBytes'.
      */
     AccumulatorConcatArrays(ExpressionContext* expCtx,
-                            boost::optional<int> maxMemoryUsageBytes = boost::none);
+                            boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool) final;
@@ -590,7 +566,7 @@ private:
 
 class AccumulatorSetUnion : public AccumulatorState {
 public:
-    static constexpr auto kName = "$setUnion"_sd;
+    static constexpr auto kName = "$setUnion"sv;
 
     const char* getOpName() const final {
         return kName.data();
@@ -601,7 +577,7 @@ public:
      * value of the server parameter 'internalQueryMaxSetUnionBytes'.
      */
     AccumulatorSetUnion(ExpressionContext* expCtx,
-                        boost::optional<int> maxMemoryUsageBytes = boost::none);
+                        boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = boost::none);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;

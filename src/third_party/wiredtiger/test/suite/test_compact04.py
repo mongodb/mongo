@@ -89,11 +89,6 @@ class test_compact04(compact_util):
             bytes_written_compact_inmem = conn_stat[stat.conn.session_table_compact_bytes_rewrite_inmem][2]
             conn_stat.close()
 
-            # Compact stats can be retrieved with tiered storage but they're not meaningful.
-            # So if we're running tiered gather the stats but return before all the computation.
-            if self.runningHook('tiered'):
-                return
-
             self.assertGreater(pages_rewritten, 0)
             self.assertGreater(pages_rewritten_expected, 0)
             self.assertGreater(pages_selected_inmem, 0)

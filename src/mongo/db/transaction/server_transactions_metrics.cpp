@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/transaction/server_transactions_metrics.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
@@ -95,51 +70,103 @@ void ServerTransactionsMetrics::incrementCurrentOpen() {
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalStarted() const {
-    return _totalStarted.loadRelaxed();
+    return _totalStartedInternal.loadRelaxed() + _totalStartedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalStarted() {
-    _totalStarted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalStartedInternal() const {
+    return _totalStartedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalStartedExternal() const {
+    return _totalStartedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalStarted(bool isServerInitiated) {
+    (isServerInitiated ? _totalStartedInternal : _totalStartedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalAborted() const {
-    return _totalAborted.loadRelaxed();
+    return _totalAbortedInternal.loadRelaxed() + _totalAbortedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalAborted() {
-    _totalAborted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalAbortedInternal() const {
+    return _totalAbortedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalAbortedExternal() const {
+    return _totalAbortedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalAborted(bool isServerInitiated) {
+    (isServerInitiated ? _totalAbortedInternal : _totalAbortedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalCommitted() const {
-    return _totalCommitted.loadRelaxed();
+    return _totalCommittedInternal.loadRelaxed() + _totalCommittedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalCommitted() {
-    _totalCommitted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalCommittedInternal() const {
+    return _totalCommittedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalCommittedExternal() const {
+    return _totalCommittedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalCommitted(bool isServerInitiated) {
+    (isServerInitiated ? _totalCommittedInternal : _totalCommittedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPrepared() const {
-    return _totalPrepared.loadRelaxed();
+    return _totalPreparedInternal.loadRelaxed() + _totalPreparedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalPrepared() {
-    _totalPrepared.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalPreparedInternal() const {
+    return _totalPreparedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalPreparedExternal() const {
+    return _totalPreparedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalPrepared(bool isServerInitiated) {
+    (isServerInitiated ? _totalPreparedInternal : _totalPreparedExternal).fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPreparedThenCommitted() const {
-    return _totalPreparedThenCommitted.loadRelaxed();
+    return _totalPreparedThenCommittedInternal.loadRelaxed() +
+        _totalPreparedThenCommittedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalPreparedThenCommitted() {
-    _totalPreparedThenCommitted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalPreparedThenCommittedInternal() const {
+    return _totalPreparedThenCommittedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalPreparedThenCommittedExternal() const {
+    return _totalPreparedThenCommittedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalPreparedThenCommitted(bool isServerInitiated) {
+    (isServerInitiated ? _totalPreparedThenCommittedInternal : _totalPreparedThenCommittedExternal)
+        .fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getTotalPreparedThenAborted() const {
-    return _totalPreparedThenAborted.loadRelaxed();
+    return _totalPreparedThenAbortedInternal.loadRelaxed() +
+        _totalPreparedThenAbortedExternal.loadRelaxed();
 }
 
-void ServerTransactionsMetrics::incrementTotalPreparedThenAborted() {
-    _totalPreparedThenAborted.fetchAndAddRelaxed(1);
+unsigned long long ServerTransactionsMetrics::getTotalPreparedThenAbortedInternal() const {
+    return _totalPreparedThenAbortedInternal.loadRelaxed();
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalPreparedThenAbortedExternal() const {
+    return _totalPreparedThenAbortedExternal.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementTotalPreparedThenAborted(bool isServerInitiated) {
+    (isServerInitiated ? _totalPreparedThenAbortedInternal : _totalPreparedThenAbortedExternal)
+        .fetchAndAddRelaxed(1);
 }
 
 unsigned long long ServerTransactionsMetrics::getCurrentPrepared() const {
@@ -186,12 +213,44 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, bool inclu
     stats->setCurrentActive(_currentActive.loadRelaxed());
     stats->setCurrentInactive(_currentInactive.loadRelaxed());
     stats->setCurrentOpen(_currentOpen.loadRelaxed());
-    stats->setTotalAborted(_totalAborted.loadRelaxed());
-    stats->setTotalCommitted(_totalCommitted.loadRelaxed());
-    stats->setTotalStarted(_totalStarted.loadRelaxed());
-    stats->setTotalPrepared(_totalPrepared.loadRelaxed());
-    stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.loadRelaxed());
-    stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.loadRelaxed());
+    // Load each counter once so the aggregate always equals the sum of its split fields.
+    const auto abortedInternal = _totalAbortedInternal.loadRelaxed();
+    const auto abortedExternal = _totalAbortedExternal.loadRelaxed();
+    stats->setTotalAborted(abortedInternal + abortedExternal);
+    stats->setTotalAbortedInternal(abortedInternal);
+    stats->setTotalAbortedExternal(abortedExternal);
+
+    const auto committedInternal = _totalCommittedInternal.loadRelaxed();
+    const auto committedExternal = _totalCommittedExternal.loadRelaxed();
+    stats->setTotalCommitted(committedInternal + committedExternal);
+    stats->setTotalCommittedInternal(committedInternal);
+    stats->setTotalCommittedExternal(committedExternal);
+
+    const auto startedInternal = _totalStartedInternal.loadRelaxed();
+    const auto startedExternal = _totalStartedExternal.loadRelaxed();
+    stats->setTotalStarted(startedInternal + startedExternal);
+    stats->setTotalStartedInternal(startedInternal);
+    stats->setTotalStartedExternal(startedExternal);
+
+    const auto preparedInternal = _totalPreparedInternal.loadRelaxed();
+    const auto preparedExternal = _totalPreparedExternal.loadRelaxed();
+    stats->setTotalPrepared(preparedInternal + preparedExternal);
+    stats->setTotalPreparedInternal(preparedInternal);
+    stats->setTotalPreparedExternal(preparedExternal);
+
+    const auto preparedThenCommittedInternal = _totalPreparedThenCommittedInternal.loadRelaxed();
+    const auto preparedThenCommittedExternal = _totalPreparedThenCommittedExternal.loadRelaxed();
+    stats->setTotalPreparedThenCommitted(preparedThenCommittedInternal +
+                                         preparedThenCommittedExternal);
+    stats->setTotalPreparedThenCommittedInternal(preparedThenCommittedInternal);
+    stats->setTotalPreparedThenCommittedExternal(preparedThenCommittedExternal);
+
+    const auto preparedThenAbortedInternal = _totalPreparedThenAbortedInternal.loadRelaxed();
+    const auto preparedThenAbortedExternal = _totalPreparedThenAbortedExternal.loadRelaxed();
+    stats->setTotalPreparedThenAborted(preparedThenAbortedInternal + preparedThenAbortedExternal);
+    stats->setTotalPreparedThenAbortedInternal(preparedThenAbortedInternal);
+    stats->setTotalPreparedThenAbortedExternal(preparedThenAbortedExternal);
+
     stats->setCurrentPrepared(_currentPrepared.loadRelaxed());
 
     std::lock_guard<std::mutex> lg(_mutex);
@@ -242,7 +301,15 @@ public:
             stats.setPreciseCheckpointRecovery(recoveryStats);
         }
 
-        return stats.toBSON();
+        // Append the retry-delay latency histogram alongside the IDL-generated TransactionsStats
+        // fields. A variable-length histogram isn't expressible as a fixed strict IDL field, so
+        // it is added as an extra field on the outer "transactions" BSON object.
+        auto retryStats = RetryableWritesStats::get(opCtx);
+        BSONObjBuilder result;
+        result.appendElements(stats.toBSON());
+        retryStats->appendRetriedWriteStats(result);
+
+        return result.obj();
     }
 };
 auto& transactionsSSS = *ServerStatusSectionBuilder<TransactionsSSS>("transactions").forShard();

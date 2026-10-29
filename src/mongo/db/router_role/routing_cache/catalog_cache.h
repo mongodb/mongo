@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
@@ -42,7 +15,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/modules.h"
@@ -61,18 +34,19 @@
 #include <boost/smart_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ComparableDatabaseVersion;
 
-using DatabaseTypeCache MONGO_MOD_PRIVATE = ReadThroughCache<DatabaseName,
-                                                             DatabaseType,
-                                                             ComparableDatabaseVersion,
-                                                             ObservableMutex<std::mutex>>;
-using DatabaseTypeValueHandle MONGO_MOD_USE_REPLACEMENT(CachedDatabaseInfo) =
+using DatabaseTypeCache [[MONGO_MOD_PRIVATE]] = ReadThroughCache<DatabaseName,
+                                                                 DatabaseType,
+                                                                 ComparableDatabaseVersion,
+                                                                 ObservableMutex<std::mutex>>;
+using DatabaseTypeValueHandle [[MONGO_MOD_USE_REPLACEMENT(CachedDatabaseInfo)]] =
     DatabaseTypeCache::ValueHandle;
-using CachedDatabaseInfo MONGO_MOD_PUBLIC = DatabaseTypeValueHandle;
+using CachedDatabaseInfo [[MONGO_MOD_PUBLIC]] = DatabaseTypeValueHandle;
 
-class MONGO_MOD_PUBLIC CollectionRoutingInfo {
+class [[MONGO_MOD_PUBLIC]] CollectionRoutingInfo {
 public:
     CollectionRoutingInfo(CurrentChunkManager&& chunkManager, CachedDatabaseInfo&& dbInfo)
         : _dbInfo(std::move(dbInfo)), _cm(std::move(chunkManager)) {}
@@ -222,27 +196,12 @@ public:
     }
 
     ShardVersion getCollectionVersion() const;
-    ShardVersion getShardVersion(OperationContext* opCtx, const ShardId& shardId) const;
+    ShardVersion getShardVersion(const ShardId& shardId) const;
 
     const CachedDatabaseInfo& getDatabaseInfo() const {
         return _dbInfo;
     }
-    /**
-     * Returns the primary shard ID for the database.
-     *
-     * @return The primary shard ID for the database.
-     *
-     * @deprecated Use getDbPrimaryShardRef() instead.
-     * TODO SERVER-127411: Check if this method is still used and if so, migrate the callers to use
-     * getDbPrimaryShardRef().
-     */
     const ShardId& getDbPrimaryShardId() const;
-    /**
-     * Returns the primary shard reference for the database.
-     *
-     * @return The primary shard reference for the database.
-     */
-    const ShardRef& getDbPrimaryShardRef() const;
     const DatabaseVersion& getDbVersion() const;
     // When set to true, the ShardVersions returned by this object will have the
     // 'ignoreCollectionUuidMismatch' flag set, thus instructing the receiving shards to ignore
@@ -260,7 +219,7 @@ private:
  *  - a sequence number to allow for forced catalog cache refreshes
  *  - a sequence number to disambiguate scenarios in which the DatabaseVersion isn't valid
  */
-class MONGO_MOD_PARENT_PRIVATE ComparableDatabaseVersion {
+class [[MONGO_MOD_PARENT_PRIVATE]] ComparableDatabaseVersion {
 public:
     /**
      * Creates a ComparableDatabaseVersion that wraps the given DatabaseVersion.
@@ -314,8 +273,8 @@ public:
 private:
     friend class CatalogCache;
 
-    static AtomicWord<uint64_t> _disambiguatingSequenceNumSource;
-    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
+    static Atomic<uint64_t> _disambiguatingSequenceNumSource;
+    static Atomic<uint64_t> _forcedRefreshSequenceNumSource;
 
     ComparableDatabaseVersion(boost::optional<DatabaseVersion> version,
                               uint64_t disambiguatingSequenceNum,
@@ -337,7 +296,7 @@ private:
  * in the sense that it only reads from the persistent store, but never writes to it. Instead
  * writes happen through the ShardingCatalogManager and the cache hierarchy needs to be invalidated.
  */
-class MONGO_MOD_PUBLIC CatalogCache {
+class [[MONGO_MOD_PUBLIC]] CatalogCache {
     CatalogCache(const CatalogCache&) = delete;
     CatalogCache& operator=(const CatalogCache&) = delete;
 
@@ -355,7 +314,7 @@ public:
                  std::shared_ptr<CatalogCacheLoader> collectionCacheLoader,
                  bool cascadeDatabaseCacheLoaderShutdown = true,
                  bool cascadeCollectionCacheLoaderShutdown = true,
-                 std::string_view kind = ""_sd);
+                 std::string_view kind = ""sv);
 
     /**
      * Constructs a CatalogCache using a single cache loader for both database and collection
@@ -363,7 +322,7 @@ public:
      */
     CatalogCache(ServiceContext* service,
                  std::shared_ptr<CatalogCacheLoader> cacheLoader,
-                 std::string_view kind = ""_sd);
+                 std::string_view kind = ""sv);
 
     virtual ~CatalogCache();
 
@@ -504,6 +463,7 @@ private:
                       ThreadPoolInterface& threadPool,
                       std::shared_ptr<CatalogCacheLoader> catalogCacheLoader);
 
+        void reportStats(BSONObjBuilder* builder) const;
         void shutDown() {
             _catalogCacheLoader->shutDown();
         }
@@ -516,6 +476,27 @@ private:
 
         std::shared_ptr<CatalogCacheLoader> _catalogCacheLoader;
         ObservableMutex<std::mutex> _mutex;
+
+        // TODO (SERVER-34164): Potentially rework database refreshes stats
+        struct Stats {
+            // Tracks how many full refreshes are waiting to complete currently
+            Atomic<long long> numActiveDatabaseFullRefreshes{0};
+
+            // Cumulative, always-increasing counter of how many full refreshes have been kicked off
+            Atomic<long long> countDatabaseFullRefreshesStarted{0};
+
+            // Cumulative, always-increasing counter of how many full or incremental refreshes
+            // failed for whatever reason
+            Atomic<long long> countFailedDatabaseRefreshes{0};
+
+            /**
+             * Reports the accumulated statistics for serverStatus.
+             */
+            void report(BSONObjBuilder* builder) const;
+
+        } _stats;
+
+        void _updateRefreshesStats(bool add);
     };
 
     class CollectionCache : public RoutingTableHistoryCache {
@@ -541,21 +522,21 @@ private:
 
         struct Stats {
             // Tracks how many incremental refreshes are waiting to complete currently
-            AtomicWord<long long> numActiveIncrementalRefreshes{0};
+            Atomic<long long> numActiveIncrementalRefreshes{0};
 
             // Cumulative, always-increasing counter of how many incremental refreshes have been
             // kicked off
-            AtomicWord<long long> countIncrementalRefreshesStarted{0};
+            Atomic<long long> countIncrementalRefreshesStarted{0};
 
             // Tracks how many full refreshes are waiting to complete currently
-            AtomicWord<long long> numActiveFullRefreshes{0};
+            Atomic<long long> numActiveFullRefreshes{0};
 
             // Cumulative, always-increasing counter of how many full refreshes have been kicked off
-            AtomicWord<long long> countFullRefreshesStarted{0};
+            Atomic<long long> countFullRefreshesStarted{0};
 
             // Cumulative, always-increasing counter of how many full or incremental refreshes
             // failed for whatever reason
-            AtomicWord<long long> countFailedRefreshes{0};
+            Atomic<long long> countFailedRefreshes{0};
 
             /**
              * Reports the accumulated statistics for serverStatus.
@@ -595,6 +576,9 @@ private:
     // Executor on which the caches below will execute their blocking work
     ThreadPool _executor;
 
+    // Used to make the shutdowns idempotent.
+    Atomic<bool> _hasShutDownAndJoined{false};
+
     // Flags set at construction time to determine whether the database and collection catalog cache
     // loaders should be shut down at destruction time. This allows for independent control if they
     // do not share the same loader instance.
@@ -611,11 +595,11 @@ private:
     struct Stats {
         // Counts how many times threads hit stale config exception (which is what triggers metadata
         // refreshes)
-        AtomicWord<long long> countStaleConfigErrors{0};
+        Atomic<long long> countStaleConfigErrors{0};
 
         // Cumulative, always-increasing counter of how much time threads waiting for refresh
         // combined
-        AtomicWord<long long> totalRefreshWaitTimeMicros{0};
+        Atomic<long long> totalRefreshWaitTimeMicros{0};
 
         /**
          * Reports the accumulated statistics for serverStatus.
@@ -633,7 +617,7 @@ private:
  *
  * This is only meant to be used for inconsistency-recovery situations.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RouterRelaxCollectionUUIDConsistencyCheckBlock {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RouterRelaxCollectionUUIDConsistencyCheckBlock {
 public:
     RouterRelaxCollectionUUIDConsistencyCheckBlock(OperationContext* opCtx);
     RouterRelaxCollectionUUIDConsistencyCheckBlock(

@@ -32,13 +32,14 @@
 # step-up, which uses the metadata operation queue populated while the node
 # was a follower.
 
+import os
 import wiredtiger, wttest
-from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
+class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggSchemaEpochMixin):
     test_name = __qualname__
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader",lose_all_my_data=true)'
@@ -55,72 +56,6 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
     #
     # Helper methods
     #
-
-    def set_stable_epoch(self, epoch, conn=None):
-        if conn is None:
-            conn = self.conn
-        conn.set_timestamp(
-            'stable_disaggregated_schema_epoch=' + self.timestamp_str(epoch))
-
-    def leader_checkpoint(self, stable_ts, conn=None, session=None):
-        if conn is None:
-            conn = self.conn
-        if session is None:
-            session = self.session
-        conn.set_timestamp(
-            'stable_timestamp=' + self.timestamp_str(stable_ts) +
-            ',oldest_timestamp=' + self.timestamp_str(1))
-        session.checkpoint()
-
-    def publish(self, uri, epoch, session=None):
-        if session is None:
-            session = self.session
-        session.publish(uri, 'disaggregated=(schema_epoch=' + self.timestamp_str(epoch) + ')')
-
-    def stable_uri(self, uri):
-        """Return the stable component URI for a given layered table URI."""
-        tablename = uri[len('layered:'):]
-        return 'file:' + tablename + '.wt_stable'
-
-    def uri_in_shared_metadata(self, conn, stable_uri):
-        """
-        Return True if stable_uri is present in the shared metadata table.
-        """
-        session = conn.open_session('')
-        cursor = session.open_cursor('file:WiredTigerShared.wt_stable', None, None)
-        cursor.set_key(stable_uri)
-        found = cursor.search() == 0
-        cursor.close()
-        session.close()
-        return found
-
-    def uri_in_local_metadata(self, conn, uri):
-        """Return True if uri is present in the local metadata (cursor open succeeds)."""
-        session = conn.open_session('')
-        exists = True
-        try:
-            c = session.open_cursor(uri)
-            c.close()
-        except wiredtiger.WiredTigerError:
-            exists = False
-        session.close()
-        return exists
-
-    def assertInLocal(self, conn, uri):
-        """Assert that uri's stable constituent is present in conn's local metadata."""
-        self.assertTrue(self.uri_in_local_metadata(conn, self.stable_uri(uri)))
-
-    def assertNotInLocal(self, conn, uri):
-        """Assert that uri's stable constituent is absent from conn's local metadata."""
-        self.assertFalse(self.uri_in_local_metadata(conn, self.stable_uri(uri)))
-
-    def assertInShared(self, conn, uri):
-        """Assert that uri's stable constituent is present in the shared metadata table."""
-        self.assertTrue(self.uri_in_shared_metadata(conn, self.stable_uri(uri)))
-
-    def assertNotInShared(self, conn, uri):
-        """Assert that uri's stable constituent is absent from the shared metadata table."""
-        self.assertFalse(self.uri_in_shared_metadata(conn, self.stable_uri(uri)))
 
     def setup_leader_with_epoch(self):
         """
@@ -142,15 +77,19 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.reconfigure('disaggregated=(role="follower")')
         conn_follower.reconfigure('disaggregated=(role="leader")')
 
-    def open_follower(self):
-        """Open a follower, pick up the latest leader checkpoint, and open a session on it."""
-        conn = self.wiredtiger_open(
-            'follower',
-            self.extensionsConfig() + ',create,' + self.conn_config_follower)
-        self.ignoreStdoutPattern('WT_VERB_RTS|(wiredtiger_open:.*WT_VERB_METADATA)')
-        self.disagg_advance_checkpoint(conn)
-        session = conn.open_session('')
-        return conn, session
+    def assert_panicked(self, subdir, funcname, expected):
+        """
+        Run funcname in a subprocess and assert it panicked with the expected message.
+
+        Checking the message matters: an abort anywhere earlier in the body also exits non-zero,
+        so a return code alone cannot tell a reached panic from a mis-set up test.
+        """
+        [returncode, home] = self.run_subprocess_function(subdir,
+            f'{self.test_name}.{self.test_name}.{funcname}', silent=True)
+        self.assertNotEqual(returncode, 0)
+        with open(os.path.join(home, 'stderr.txt'), 'r') as f:
+            stderr = f.read()
+        self.assertIn(expected, stderr)
 
     def checkpoint_and_advance(self, epoch, stable_ts, conn_leader):
         """
@@ -171,7 +110,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """A table created and published on a follower is accessible after a role swap."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -180,20 +119,20 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         # Pre-swap state:
         # Shared metadata: empty (no schema operations on the initial leader).
         # Follower: uri layered table present; metadata queue holds CREATE uri at epoch 20.
-        self.assertNotInLocal(conn_follow, self.uri)
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
         self.swap_roles(conn_follow)
 
         # After step-up: uri stable constituent created locally; shared metadata unchanged.
-        self.assertNotInShared(conn_follow, self.uri)
-        self.assertInLocal(conn_follow, self.uri)
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
 
         self.checkpoint_and_advance(15, 2, conn_follow)
         # After checkpoint at epoch=15: CREATE (epoch=20) deferred; uri absent from self.conn.
-        self.assertNotInLocal(self.conn, self.uri)
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
 
         self.checkpoint_and_advance(20, 3, conn_follow)
         # After checkpoint at epoch=20: CREATE flushed; uri's stable constituent visible to self.conn.
-        self.assertInLocal(self.conn, self.uri)
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
 
         session_follow = conn_follow.open_session('')
         c = session_follow.open_cursor(self.uri)
@@ -209,7 +148,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """A table created then dropped on a follower must not exist after a role swap."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -222,12 +161,12 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         # Follower: uri was created then immediately dropped; the layered table no longer
         #   exists; no stable constituent was ever created (skipped on create, moot on drop);
         #   queue holds CREATE uri (epoch 20) then REMOVE uri (epoch 30).
-        self.assertNotInLocal(conn_follow, self.uri)
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
         self.swap_roles(conn_follow)
 
         # After step-up: net create+drop leaves no trace in either metadata store.
-        self.assertNotInShared(conn_follow, self.uri)
-        self.assertNotInLocal(conn_follow, self.uri)
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -238,7 +177,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -255,22 +194,22 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         #   operations on the initial leader; uri created on the follower, never checkpointed).
         # Follower: uri layered table present with committed data; metadata queue holds
         #   CREATE uri at epoch 20.
-        self.assertNotInShared(self.conn, self.uri)
-        self.assertNotInLocal(conn_follow, self.uri)
+        self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
         self.swap_roles(conn_follow)
 
         # After step-up: uri stable constituent created locally; shared metadata unchanged.
         # self.conn has not yet picked up any new checkpoint.
-        self.assertNotInShared(conn_follow, self.uri)
-        self.assertInLocal(conn_follow, self.uri)
-        self.assertNotInShared(self.conn, self.uri)
-        self.assertNotInLocal(self.conn, self.uri)
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertFalse(self.uri_in_shared_metadata(self.conn, self.uri))
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
 
         self.checkpoint_and_advance(20, 100, conn_follow)
         # After checkpoint at epoch=20: CREATE flushed; conn_follow (leader) sees the update
         # in shared metadata; self.conn (follower) sees it via local metadata after pickup.
-        self.assertInShared(conn_follow, self.uri)
-        self.assertInLocal(self.conn, self.uri)
+        self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -278,7 +217,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """Tables published at different epochs are flushed to shared metadata independently."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         session_follow.create(self.uri2, self.table_config)
@@ -290,23 +229,23 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         # Shared metadata: empty (no schema operations on the initial leader).
         # Follower: uri and uri2 layered tables present; queue holds CREATE uri (epoch 20)
         #   and CREATE uri2 (epoch 30).
-        self.assertNotInLocal(conn_follow, self.uri)
-        self.assertNotInLocal(conn_follow, self.uri2)
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri2))
         self.swap_roles(conn_follow)
 
         # After step-up: both stable constituents created locally.
-        self.assertInLocal(conn_follow, self.uri)
-        self.assertInLocal(conn_follow, self.uri2)
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri2))
 
         self.checkpoint_and_advance(20, 2, conn_follow)
         # After checkpoint at epoch=20: CREATE uri flushed; CREATE uri2 (epoch=30) deferred.
-        self.assertInLocal(self.conn, self.uri)
-        self.assertNotInLocal(self.conn, self.uri2)
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri2))
 
         self.checkpoint_and_advance(30, 3, conn_follow)
         # After checkpoint at epoch=30: CREATE uri2 flushed; both tables visible to self.conn.
-        self.assertInLocal(self.conn, self.uri)
-        self.assertInLocal(self.conn, self.uri2)
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri2))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -323,7 +262,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         self.set_stable_epoch(15)
         self.leader_checkpoint(2)
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         # Drop uri on the follower and publish the drop at epoch 25.
         # The REMOVE queue entry captures the current metadata values before deletion.
@@ -334,19 +273,19 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         # Pre-swap state:
         # Shared metadata: uri (epoch 15), from the leader checkpoint; the follower picked it up.
         # Follower: uri was dropped; queue holds REMOVE uri at epoch 25.
-        self.assertInShared(conn_follow, self.uri)
+        self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
         self.swap_roles(conn_follow)
 
         # After step-up: REMOVE queued; shared metadata still reflects the last checkpoint.
-        self.assertInShared(conn_follow, self.uri)
+        self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
 
         self.checkpoint_and_advance(20, 3, conn_follow)
         # After checkpoint at epoch=20: REMOVE (epoch=25) deferred; uri still in shared metadata.
-        self.assertInShared(conn_follow, self.uri)
+        self.assertTrue(self.uri_in_shared_metadata(conn_follow, self.uri))
 
         self.checkpoint_and_advance(25, 4, conn_follow)
         # After checkpoint at epoch=25: REMOVE flushed; uri gone from shared metadata.
-        self.assertNotInShared(conn_follow, self.uri)
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -354,7 +293,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """Subprocess body for the split-epochs panic test; expected to panic/abort."""
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -370,8 +309,8 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
 
         # After step-up: CREATE followed by REMOVE causes step-up to skip stable constituent
         # creation, leaving no local trace.
-        self.assertNotInLocal(conn_follow, self.uri)
-        self.assertNotInShared(conn_follow, self.uri)
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
 
         # Checkpoint at epoch=20: the stable epoch falls between CREATE (epoch=20) and
         # DROP (epoch=30), so the table must be visible in shared metadata at this checkpoint.
@@ -395,12 +334,104 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         # Initialize self.conn so the test fixture can close it cleanly; the real test runs
         # in a subprocess so that the panic/abort does not kill the test runner.
         self.setup_leader_with_epoch()
-        subdir = 'SUBPROCESS_create_drop_split_epochs'
-        [returncode, _] = self.run_subprocess_function(subdir,
-            f'{self.test_name}.{self.test_name}.subprocess_create_drop_split_epochs',
-            silent=True)
-        self.assertNotEqual(returncode, 0)
+        self.assert_panicked('SUBPROCESS_create_drop_split_epochs',
+            'subprocess_create_drop_split_epochs',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
+            'epoch 30')
 
+    def subprocess_create_unpublished_drop(self):
+        """Subprocess body for the unpublished-drop panic test; expected to panic/abort."""
+        self.setup_leader_with_epoch()
+
+        conn_follow, session_follow = self.open_follower_epoch()
+
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 20, session_follow)
+        # Drop without publishing: this is the state a peer inherits when the leader that would
+        # have published the drop is killed between relaying the drop and relaying its publish.
+        session_follow.drop(self.uri)
+        session_follow.close()
+
+        # Pre-swap state:
+        # Shared metadata: empty (no schema operations on the initial leader).
+        # Follower: uri was created then dropped; queue holds CREATE uri (epoch 20) followed
+        #   by REMOVE uri at the unpublished sentinel epoch.
+        self.swap_roles(conn_follow)
+
+        # After step-up: the REMOVE makes step-up skip the stable constituent whatever the
+        # REMOVE's epoch, so the CREATE keeps no stable value.
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
+
+        # Checkpoint at epoch=20: the CREATE is at the checkpoint's epoch, so the table must be
+        # visible in shared metadata. The REMOVE sits at the unpublished sentinel, above every
+        # finite epoch, so it is deferred and can never cancel the CREATE. The stable constituent
+        # was never created, so WiredTiger panics.
+        self.set_stable_epoch(20, conn_follow)
+        conn_follow.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(2) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        session_ck = conn_follow.open_session('')
+        session_ck.checkpoint()  # Expected to panic.
+
+    def subprocess_recreated_drop_split_epochs(self):
+        """Subprocess body for the recreated-table panic test; expected to panic/abort."""
+        self.setup_leader_with_epoch()
+
+        conn_follow, session_follow = self.open_follower_epoch()
+
+        # Two incarnations of the same name, so the queue holds CREATE, REMOVE, CREATE, REMOVE.
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 20, session_follow)
+        session_follow.drop(self.uri)
+        self.publish(self.uri, 30, session_follow)
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 40, session_follow)
+        session_follow.drop(self.uri)
+        self.publish(self.uri, 50, session_follow)
+        session_follow.close()
+
+        self.swap_roles(conn_follow)
+
+        # Checkpoint at epoch=25: only the first CREATE is at or below it, so only it is parked.
+        # The DROP blocking it is the first incarnation's, at epoch 30, not the second's at 50.
+        self.set_stable_epoch(25, conn_follow)
+        conn_follow.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(2) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        session_ck = conn_follow.open_session('')
+        session_ck.checkpoint()  # Expected to panic.
+
+    def test_recreated_drop_split_epochs(self):
+        """
+        The reported DROP is the one that blocks the parked CREATE, not the table's newest.
+
+        With two incarnations queued the table has two DROPs above the checkpoint's epoch. Only the
+        first incarnation's CREATE is parked, so only its own DROP explains the violation.
+        """
+        self.setup_leader_with_epoch()
+        self.assert_panicked('SUBPROCESS_recreated_drop_split_epochs',
+            'subprocess_recreated_drop_split_epochs',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
+            'epoch 30')
+
+    def test_create_unpublished_drop(self):
+        """
+        A step-up that inherits an unpublished DROP panics its first covering checkpoint.
+
+        The CREATE is published at epoch 20 and the DROP is never published, so the checkpoint at
+        epoch 20 must include the table in shared metadata while the DROP, parked at the
+        unpublished sentinel, can never cancel it. Unlike the published-DROP case the application
+        has no epoch it could have published the DROP at to avoid the window: a node inheriting
+        the window from a killed peer cannot publish for the term that opened it.
+        """
+        # Initialize self.conn so the test fixture can close it cleanly; the real test runs
+        # in a subprocess so that the panic/abort does not kill the test runner.
+        self.setup_leader_with_epoch()
+        self.assert_panicked('SUBPROCESS_create_unpublished_drop',
+            'subprocess_create_unpublished_drop',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP was '
+            'never published')
     def test_unpublished_create_not_flushed(self):
         """
         A table created on a follower but never published does not appear in shared metadata
@@ -408,7 +439,9 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        # Open the follower and set an initial stable epoch, so that we enable the epoch-based
+        # semantics when we create missing stable tables during step up.
+        conn_follow, session_follow = self.open_follower_epoch(10)
 
         # Create uri but do not call publish.
         session_follow.create(self.uri, self.table_config)
@@ -418,21 +451,52 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         # Shared metadata: empty (no schema operations on the initial leader).
         # Follower: uri layered table present; metadata queue holds CREATE uri with the
         #   unpublished sentinel epoch, which is deferred past any finite stable schema epoch.
-        self.assertNotInLocal(conn_follow, self.uri)
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
         self.swap_roles(conn_follow)
 
         # After step-up: stable constituent created locally; shared metadata unchanged
         # (and will never contain uri because the sentinel epoch can never be reached).
-        self.assertInLocal(conn_follow, self.uri)
-        self.assertNotInShared(conn_follow, self.uri)
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
+        self.assertFalse(self.uri_in_shared_metadata(conn_follow, self.uri))
 
         self.checkpoint_and_advance(20, 2, conn_follow)
         # After checkpoint at epoch=20: unpublished CREATE deferred; uri absent from self.conn.
-        self.assertNotInLocal(self.conn, self.uri)
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
 
         self.checkpoint_and_advance(100, 3, conn_follow)
         # After checkpoint at epoch=100: still deferred; uri absent from self.conn.
-        self.assertNotInLocal(self.conn, self.uri)
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
+
+        conn_follow.close('debug=(skip_checkpoint=true)')
+
+    def test_stepup_no_prior_follower_checkpoint(self):
+        """A table published on a follower is accessible after step-up when the follower has no completed checkpoint."""
+        # Leader checkpoint carries schema_epoch == 0 (no epoch set).
+        self.leader_checkpoint(1)
+
+        conn_follow, session_follow = self.open_follower()
+        # Set the stable epoch on the follower before publishing. The leader checkpoint carries no
+        # epoch, so the follower connection starts without one; publish requires it to be set.
+        self.set_stable_epoch(1, conn_follow)
+
+        session_follow.create(self.uri, self.table_config)
+        self.publish(self.uri, 20, session_follow)
+        session_follow.close()
+
+        # Follower queue holds CREATE uri at epoch 20. No follower checkpoint has completed.
+        self.assertFalse(self.uri_stable_exists(conn_follow, self.uri))
+        self.swap_roles(conn_follow)
+
+        # After step-up: uri stable constituent created locally.
+        self.assertTrue(self.uri_stable_exists(conn_follow, self.uri))
+
+        self.checkpoint_and_advance(15, 2, conn_follow)
+        # Stable epoch 15 has not reached the publish epoch so CREATE is still pending.
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
+
+        self.checkpoint_and_advance(20, 3, conn_follow)
+        # Stable epoch 20 matches the publish epoch so CREATE is flushed and uri is visible.
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
 
         conn_follow.close('debug=(skip_checkpoint=true)')
 
@@ -442,7 +506,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         """
         self.setup_leader_with_epoch()
 
-        conn_follow, session_follow = self.open_follower()
+        conn_follow, session_follow = self.open_follower_epoch()
 
         session_follow.create(self.uri, self.table_config)
         self.publish(self.uri, 20, session_follow)
@@ -462,7 +526,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         session_follow.checkpoint()
         self.disagg_advance_checkpoint(self.conn, conn_follow)
         # After checkpoint at epoch=15: CREATE (epoch=20) deferred; uri absent from self.conn.
-        self.assertNotInLocal(self.conn, self.uri)
+        self.assertFalse(self.uri_stable_exists(self.conn, self.uri))
 
         # Advance ONLY the stable schema epoch to 20; stable_timestamp stays at 2.
         # The checkpoint must NOT be skipped because the schema epoch changed, even though no
@@ -471,7 +535,7 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess):
         session_follow.checkpoint()
         self.disagg_advance_checkpoint(self.conn, conn_follow)
         # After checkpoint at epoch=20: CREATE flushed; uri visible to self.conn.
-        self.assertInLocal(self.conn, self.uri)
+        self.assertTrue(self.uri_stable_exists(self.conn, self.uri))
 
         session_follow.close()
         conn_follow.close('debug=(skip_checkpoint=true)')

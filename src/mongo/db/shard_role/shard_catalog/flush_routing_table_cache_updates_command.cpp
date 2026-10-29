@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
@@ -37,6 +11,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -46,6 +21,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -131,6 +107,38 @@ public:
                                   << " on collections",
                     !ns().coll().empty());
 
+            if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                    kVersionContextIgnored_UNSAFE,
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                // When the `AuthoritativeShardsCRUD` feature flag is enabled, this method
+                // should no longer be used, as nodes start relying on the `config.shard.catalog`
+                // authoritative collections rather than the config server (primary node) or
+                // contacting the primary to replicate filtering metadata in the `config.cache`
+                // collections (secondary nodes).
+                //
+                // However, there is a scenario where a lagging secondary node attempts to contact
+                // the primary node of the replica set while the secondary is still operating
+                // under 8.0 FCV, but the primary has already transitioned to 9.0 FCV. In this case,
+                // the lagging secondary will attempt to refresh using this command as part of the
+                // old protocol.
+                //
+                // In that situation, we will first make the secondary node wait for the latest
+                // opTime so that it becomes aware of the FCV change. This is no worse than the
+                // current behavior, as the existing protocol also relies on the `config.cache`
+                // collections for replication.
+                //
+                // After that, the command will fail, making the secondary aware that it needs
+                // to switch to the authoritative model.
+
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+
+                uasserted(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+                          "This command is deprecated, as shards are authoritative for collection "
+                          "metadata. The secondary node must transition to the authoritative "
+                          "refresh model.");
+            }
+
             boost::optional<CriticalSectionSignal> criticalSectionSignal;
 
             {
@@ -148,16 +156,6 @@ public:
                 criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
-                {
-                    const auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, ns());
-                    if (scopedCsr->getAuthoritativeState() ==
-                        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                        // This command is used as part of non-authoritative DDLs which means we're
-                        // flipping from authoritative to non-authoritative.
-                        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-                        scopedCsr->setNonAuthoritative();
-                    }
-                }
                 LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
                 uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
                     opCtx, ns(), boost::none));

@@ -2,6 +2,7 @@
  * Tests that the internal parameter "$_resumeAfter" validates the type of the 'recordId' for
  * clustered and non clustered collections.
  * @tags: [
+ *   uses_explain,
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
  *   cannot_run_during_upgrade_downgrade,

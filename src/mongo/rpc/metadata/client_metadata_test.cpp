@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/rpc/metadata/client_metadata.h"
 
@@ -36,10 +10,17 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/rpc/metadata/client_metadata_server_parameters_gen.h"
+#include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/tick_source_mock.h"
 
 #include <memory>
 #include <string>
@@ -64,6 +45,7 @@ constexpr auto kArchitecture = "architecture"sv;
 constexpr auto kMongos = "mongos"sv;
 constexpr auto kClient = "client"sv;
 constexpr auto kHost = "host"sv;
+constexpr auto kCid = "cid"sv;
 
 constexpr auto kUnknown = "unkown"sv;
 
@@ -437,6 +419,199 @@ TEST(ClientMetadataTest, InternalClientLimit) {
 
     // Succeeds because internal client allows 1024
     ASSERT_DOES_NOT_THROW(ClientMetadata::setFromMetadata(client.get(), el, true));
+}
+
+// clientUpdate validation tests
+TEST(ClientMetadataTest, TestClientUpdateValidDoc) {
+    ASSERT_OK(ClientMetadata::validateClientMetadataUpdate(BSON(kCid << "test-uuid")));
+}
+
+TEST(ClientMetadataTest, TestClientUpdateExtraFieldsAllowed) {
+    auto doc = BSON(kCid << "test-uuid" << kDriver << BSON(kName << "n1" << kVersion << "v1")
+                         << "config" << BSON("timeout" << 5000));
+    ASSERT_OK(ClientMetadata::validateClientMetadataUpdate(doc));
+}
+
+TEST(ClientMetadataTest, TestClientUpdateEmptyDoc) {
+    ASSERT_OK(ClientMetadata::validateClientMetadataUpdate(BSONObj()));
+}
+
+TEST(ClientMetadataTest, TestClientUpdateMissingCid) {
+    auto doc = BSON(kDriver << BSON(kName << "n1" << kVersion << "v1"));
+    ASSERT_OK(ClientMetadata::validateClientMetadataUpdate(doc));
+}
+
+TEST(ClientMetadataTest, TestClientUpdateApplicationAllowed) {
+    ASSERT_OK(ClientMetadata::validateClientMetadataUpdate(
+        BSON(kCid << "test-uuid" << kApplication << BSON(kName << "app1"))));
+}
+
+TEST(ClientMetadataTest, TestClientUpdateOsAllowed) {
+    ASSERT_OK(ClientMetadata::validateClientMetadataUpdate(
+        BSON(kCid << "test-uuid" << kOperatingSystem << BSON(kType << "Linux"))));
+}
+
+TEST(ClientMetadataTest, TestClientUpdateCidWrongType) {
+    auto status = ClientMetadata::validateClientMetadataUpdate(BSON(kCid << 123));
+    ASSERT_EQUALS(status.code(), ErrorCodes::TypeMismatch);
+    ASSERT_STRING_CONTAINS(
+        status.reason(), "The 'cid' field must be a string in the client metadata update document");
+}
+
+
+TEST(ClientMetadataTest, TestClientUpdateTooLarge) {
+    std::string largeStr(1024, 'x');
+    auto status = ClientMetadata::validateClientMetadataUpdate(BSON(kCid << largeStr));
+    ASSERT_EQUALS(status.code(), ErrorCodes::ClientMetadataDocumentTooLarge);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "The client metadata update document must be less than or equal to");
+}
+
+class ClientMetadataUpdateLogRateLimiterFixture : public unittest::Test {
+public:
+    void setUp() override {
+        _svcCtxClock = std::make_shared<ClockSourceMock>();
+        _svcCtx = ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(_svcCtxClock),
+                                       std::make_unique<SharedClockSourceAdapter>(_svcCtxClock),
+                                       std::make_unique<TickSourceMock<>>());
+        _originalRatePerSec = gClientMetadataUpdateLogRatePerSec;
+        _originalThrottleSecs = gClientMetadataUpdateLogPerConnectionThrottlingSecs.load();
+        _originalNetworkSeverity =
+            getGlobalLogSettings().getMinimumLogSeverity(logv2::LogComponent::kNetwork);
+    }
+
+    void tearDown() override {
+        gClientMetadataUpdateLogRatePerSec = _originalRatePerSec;
+        gClientMetadataUpdateLogPerConnectionThrottlingSecs.store(_originalThrottleSecs);
+        getGlobalLogSettings().setMinimumLoggedSeverity(logv2::LogComponent::kNetwork,
+                                                        _originalNetworkSeverity);
+        ClientMetadata::setUpdateLogSuppressorClockSource_forTest(nullptr);
+    }
+
+protected:
+    static void setGlobalClientUpdateLogRatePerSec(int32_t v) {
+        gClientMetadataUpdateLogRatePerSec = v;
+    }
+    static void setPerConnectionClientUpdateLogThrottleSecs(int32_t v) {
+        gClientMetadataUpdateLogPerConnectionThrottlingSecs.store(v);
+    }
+    static void setNetworkLogSeverity(logv2::LogSeverity s) {
+        getGlobalLogSettings().setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, s);
+    }
+    ClockSourceMock& getServiceContextClockMock() {
+        return *_svcCtxClock;
+    }
+
+    ServiceContext::UniqueClient makeClient(std::string name = "TestClient") {
+        return _svcCtx->getService()->makeClient(std::move(name), _transportMock.createSession());
+    }
+    static void logClientMetadataUpdate(Client* c) {
+        static const BSONObj kDoc = BSON("driver" << BSON("name" << "T" << "version" << "1"));
+        ClientMetadata::logClientMetadataUpdate(c, kDoc);
+    }
+    int64_t clientUpdateLogCount() {
+        return _logs.countBSONContainingSubset(BSON("id" << 51817));
+    }
+
+private:
+    static logv2::LogComponentSettings& getGlobalLogSettings() {
+        return logv2::LogManager::global().getGlobalSettings();
+    }
+
+    std::shared_ptr<ClockSourceMock> _svcCtxClock;
+    ServiceContext::UniqueServiceContext _svcCtx;
+    transport::TransportLayerMock _transportMock;
+    unittest::LogCaptureGuard _logs;
+
+    int32_t _originalRatePerSec{};
+    int32_t _originalThrottleSecs{};
+    logv2::LogSeverity _originalNetworkSeverity{logv2::LogSeverity::Info()};
+};
+
+TEST_F(ClientMetadataUpdateLogRateLimiterFixture, GlobalRateLimiterZeroLogsAll) {
+    setGlobalClientUpdateLogRatePerSec(0);
+    setPerConnectionClientUpdateLogThrottleSecs(0);
+    setNetworkLogSeverity(logv2::LogSeverity::Info());
+
+    auto client = makeClient();
+    logClientMetadataUpdate(client.get());
+    logClientMetadataUpdate(client.get());
+    logClientMetadataUpdate(client.get());
+
+    ASSERT_EQ(clientUpdateLogCount(), 3);
+}
+
+TEST_F(ClientMetadataUpdateLogRateLimiterFixture, GlobalRateLimiterSuppressesAtInfoVerbosity) {
+    setGlobalClientUpdateLogRatePerSec(1);
+    setPerConnectionClientUpdateLogThrottleSecs(0);
+    setNetworkLogSeverity(logv2::LogSeverity::Info());
+
+    ClockSourceMock suppressorClock;
+    ClientMetadata::setUpdateLogSuppressorClockSource_forTest(&suppressorClock);
+
+    auto client = makeClient();
+
+    logClientMetadataUpdate(client.get());
+    ASSERT_EQ(clientUpdateLogCount(), 1);
+
+    // suppressed to Debug(2), invisible
+    logClientMetadataUpdate(client.get());
+    ASSERT_EQ(clientUpdateLogCount(), 1);
+
+    // next period
+    suppressorClock.advance(Milliseconds{1001});
+    logClientMetadataUpdate(client.get());
+    ASSERT_EQ(clientUpdateLogCount(), 2);
+}
+
+TEST_F(ClientMetadataUpdateLogRateLimiterFixture, GlobalRateLimiterSuppressedVisibleAtDebug) {
+    setGlobalClientUpdateLogRatePerSec(1);
+    setPerConnectionClientUpdateLogThrottleSecs(0);
+    setNetworkLogSeverity(logv2::LogSeverity::Debug(5));
+
+    ClockSourceMock suppressorClock;
+    ClientMetadata::setUpdateLogSuppressorClockSource_forTest(&suppressorClock);
+
+    auto client = makeClient();
+    logClientMetadataUpdate(client.get());
+    logClientMetadataUpdate(client.get());
+    logClientMetadataUpdate(client.get());
+
+    ASSERT_EQ(clientUpdateLogCount(), 3);
+}
+
+TEST_F(ClientMetadataUpdateLogRateLimiterFixture, PerConnectionThrottleSkipsWithinInterval) {
+    setGlobalClientUpdateLogRatePerSec(0);
+    setPerConnectionClientUpdateLogThrottleSecs(1800);
+
+    // First per-connection check compares against epoch 0; skip past it.
+    getServiceContextClockMock().advance(Seconds{2000});
+    auto client = makeClient();
+
+    logClientMetadataUpdate(client.get());
+    ASSERT_EQ(clientUpdateLogCount(), 1);
+
+    // interval not elapsed
+    getServiceContextClockMock().advance(Seconds{100});
+    logClientMetadataUpdate(client.get());
+    ASSERT_EQ(clientUpdateLogCount(), 1);
+
+    // interval elapsed
+    getServiceContextClockMock().advance(Seconds{1701});
+    logClientMetadataUpdate(client.get());
+    ASSERT_EQ(clientUpdateLogCount(), 2);
+}
+
+TEST_F(ClientMetadataUpdateLogRateLimiterFixture, PerConnectionThrottleZeroLogsEveryUpdate) {
+    setGlobalClientUpdateLogRatePerSec(0);
+    setPerConnectionClientUpdateLogThrottleSecs(0);
+
+    auto client = makeClient();
+    logClientMetadataUpdate(client.get());
+    logClientMetadataUpdate(client.get());
+    logClientMetadataUpdate(client.get());
+
+    ASSERT_EQ(clientUpdateLogCount(), 3);
 }
 
 }  // namespace mongo

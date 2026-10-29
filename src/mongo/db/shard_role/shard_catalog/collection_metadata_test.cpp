@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 
@@ -35,10 +9,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/type_chunk.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -113,7 +85,7 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
                                      false,
                                      epoch,
                                      timestamp,
-                                     boost::none /* timeseriesFields */,
+                                     /*timeseriesFields=*/boost::none,
                                      std::move(reshardingFields),
                                      true,
                                      allChunks));
@@ -178,8 +150,8 @@ CollectionMetadata makeGappedCollectionMetadata(
                                                  false,
                                                  epoch,
                                                  timestamp,
-                                                 boost::none /* timeseriesFields */,
-                                                 boost::none /* reshardingFields */,
+                                                 /*timeseriesFields=*/boost::none,
+                                                 /*reshardingFields=*/boost::none,
                                                  true,
                                                  chunks));
     return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);
@@ -190,22 +162,7 @@ struct ConstructedRangeMap : public RangeMap {
         : RangeMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 };
 
-class CollectionMetadataTestFixture : public ServiceContextTest {
-protected:
-    void setUp() override {
-        ServiceContextTest::setUp();
-        _opCtx = makeOperationContext();
-    }
-
-    OperationContext* opCtx() const {
-        return _opCtx.get();
-    }
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
-};
-
-class NoChunkFixture : public CollectionMetadataTestFixture {
+class NoChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata(
         UUID existingUuid = UUID::gen(),
@@ -303,7 +260,7 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class SingleChunkFixture : public CollectionMetadataTestFixture {
+class SingleChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
@@ -378,8 +335,8 @@ TEST_F(SingleChunkFixture, CurrentChunkManagerMakeUpdatedAppliesChangedChunks) {
     auto updatedChunkManager = metadata.getCurrentChunkManager()->makeUpdated({changedChunk});
 
     ASSERT_EQ(changedChunk.getVersion(), updatedChunkManager.getVersion());
-    ASSERT(!updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kThisShard));
-    ASSERT(updatedChunkManager.keyBelongsToShard(opCtx(), BSON("a" << 15), kOtherShard));
+    ASSERT(!updatedChunkManager.keyBelongsToShard(BSON("a" << 15), kThisShard));
+    ASSERT(updatedChunkManager.keyBelongsToShard(BSON("a" << 15), kOtherShard));
 }
 
 TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedAppliesChangedChunks) {
@@ -494,7 +451,7 @@ TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedSelectsMaxVersionRegardl
               reappliedMetadata.getChunkManager()->numChunks());
 }
 
-class GappedChunksFixture : public CollectionMetadataTestFixture {
+class GappedChunksFixture : public unittest::Test {
 protected:
     CollectionMetadata makeGappedMetadata(
         const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) const {
@@ -531,7 +488,7 @@ TEST_F(GappedChunksFixture, MakeUpdatedPreservesGapsWithNonAdjacentChunk) {
  * Fixture with single chunk containing:
  * [(min, min)->(max, max))
  */
-class SingleChunkMinMaxCompoundKeyFixture : public CollectionMetadataTestFixture {
+class SingleChunkMinMaxCompoundKeyFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         const KeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
@@ -556,7 +513,7 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, KeyBelongsToMe) {
  * Fixture with chunks:
  * [(10, 0)->(20, 0)), [(30, 0)->(40, 0))
  */
-class TwoChunksWithGapCompoundKeyFixture : public CollectionMetadataTestFixture {
+class TwoChunksWithGapCompoundKeyFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
@@ -593,7 +550,7 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
  * Fixture with chunk containing:
  * [min->10) , [10->20) , <gap> , [30->max)
  */
-class ThreeChunkWithRangeGapFixture : public CollectionMetadataTestFixture {
+class ThreeChunkWithRangeGapFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(
@@ -664,7 +621,7 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromLast) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class StaleChunkFixture : public CollectionMetadataTestFixture {
+class StaleChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeTrackedCollectionMetadata() const {
         return makeTrackedCollectionMetadataImpl(

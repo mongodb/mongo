@@ -4,6 +4,8 @@
  * error.
  *
  * @tags: [
+ *   # Exercises mapReduce with JS map/reduce functions, which requires server-side scripting.
+ *   requires_scripting,
  *   # The test runs commands that are not allowed with security token: mapReduce.
  *   not_allowed_with_signed_security_token,
  *   assumes_write_concern_unchanged,

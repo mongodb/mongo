@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -61,12 +35,12 @@ class CollectionCatalog;
 
 namespace auto_get_collection {
 
-enum class MONGO_MOD_USE_REPLACEMENT(acquireCollection) ViewMode {
+enum class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] ViewMode {
     kViewsPermitted,
     kViewsForbidden
 };
 
-struct MONGO_MOD_USE_REPLACEMENT(acquireCollection) Options {
+struct [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] Options {
     Options viewMode(ViewMode viewMode) {
         _viewMode = viewMode;
         return std::move(*static_cast<Options*>(this));
@@ -106,7 +80,7 @@ struct MONGO_MOD_USE_REPLACEMENT(acquireCollection) Options {
  * It is guaranteed that the lock will be released when this object goes out of scope, therefore
  * the database reference returned by this class should not be retained.
  */
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) AutoGetDb {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] AutoGetDb {
     AutoGetDb(const AutoGetDb&) = delete;
     AutoGetDb& operator=(const AutoGetDb&) = delete;
 
@@ -197,7 +171,7 @@ private:
  * there must be some additional concurrency checks around resolving the UUID to a namespace and
  * then subsequently acquiring the lock.
  */
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionNamespaceOrUUIDLock {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] CollectionNamespaceOrUUIDLock {
 public:
     CollectionNamespaceOrUUIDLock(OperationContext* opCtx,
                                   const NamespaceStringOrUUID& nsOrUUID,
@@ -232,7 +206,7 @@ private:
  * Any acquired locks may be released when this object goes out of scope, therefore the database
  * and the collection references returned by this class should not be retained.
  */
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) AutoGetCollection {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] AutoGetCollection {
     AutoGetCollection(const AutoGetCollection&) = delete;
     AutoGetCollection& operator=(const AutoGetCollection&) = delete;
 
@@ -320,7 +294,7 @@ class ScopedLocalCatalogWriteFence;
  * It is safe to re-use an instance for multiple WriteUnitOfWorks. It is not safe to destroy it
  * before the active WriteUnitOfWork finishes.
  */
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionWriter final {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] CollectionWriter final {
 public:
     // This constructor indicates to the shard role subsystem that the subsequent code enters into
     // local DDL land and that the content of the local collection should not be trusted until it
@@ -416,7 +390,7 @@ private:
 /**
  * Writes to system.views need to use a stronger lock to prevent inconsistencies like view cycles.
  */
-MONGO_MOD_USE_REPLACEMENT(acquireCollection)
+[[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]]
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode);
 
 /**
@@ -425,7 +399,7 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
  * Snapshot is abandoned in constructor and destructor, so it can only be used before
  * the recovery unit becomes active or when the existing snapshot is no longer needed.
  */
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) ReadSourceScope {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] ReadSourceScope {
 public:
     ReadSourceScope(OperationContext* opCtx,
                     RecoveryUnit::ReadSource readSource,
@@ -463,14 +437,18 @@ private:
  * The catalog resources are released when this object goes out of scope, therefore the oplog
  * collection reference returned by this class should not be retained.
  */
-enum class MONGO_MOD_USE_REPLACEMENT(acquireCollection) OplogAccessMode { kRead, kWrite, kLogOp };
+enum class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] OplogAccessMode {
+    kRead,
+    kWrite,
+    kLogOp
+};
 
-struct MONGO_MOD_NEEDS_REPLACEMENT AutoGetOplogFastPathOptions {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] AutoGetOplogFastPathOptions {
     bool skipRSTLLock = false;
     boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT AutoGetOplogFastPath {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AutoGetOplogFastPath {
     AutoGetOplogFastPath(const AutoGetOplogFastPath&) = delete;
     AutoGetOplogFastPath& operator=(const AutoGetOplogFastPath&) = delete;
 
@@ -498,11 +476,12 @@ public:
 private:
     boost::optional<Lock::GlobalLock> _globalLock;
     LocalOplogInfo* _oplogInfo;
-    CollectionPtr _oplog;
 
-    // Retain the CollectionCatalog snapshot since this fast-path acquisition skips acquiring the
-    // oplog collection lock.
-    std::shared_ptr<const CollectionCatalog> _stashedCatalog;
+    // Retain the oplog collection since this fast-path acquisition skips acquiring the oplog
+    // collection lock. Declared before '_oplog', which points into it.
+    std::shared_ptr<const Collection> _oplogCollection;
+
+    CollectionPtr _oplog;
 };
 
 }  // namespace mongo

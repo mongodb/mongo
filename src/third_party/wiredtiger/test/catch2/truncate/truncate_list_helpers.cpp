@@ -34,7 +34,7 @@ as_view(const WT_ITEM &item)
 WT_TRUNCATE *
 truncate_list_head(WT_LAYERED_TABLE &table)
 {
-    return TAILQ_FIRST(&table.truncateqh);
+    return TAILQ_FIRST(&table.truncate_list.qh);
 }
 
 size_t
@@ -43,7 +43,7 @@ truncate_list_size(const WT_LAYERED_TABLE &table)
     size_t count = 0;
     WT_TRUNCATE *entry = nullptr;
 
-    TAILQ_FOREACH (entry, &table.truncateqh, q) {
+    TAILQ_FOREACH (entry, &table.truncate_list.qh, q) {
         ++count;
     }
 
@@ -53,10 +53,10 @@ truncate_list_size(const WT_LAYERED_TABLE &table)
 bool
 lock_is_released(WT_SESSION_IMPL &session, WT_LAYERED_TABLE &table)
 {
-    if (__wt_try_writelock(&session, &table.truncate_lock) != 0)
+    if (__wt_try_writelock(&session, &table.truncate_list.lock) != 0)
         return false;
 
-    __wt_writeunlock(&session, &table.truncate_lock);
+    __wt_writeunlock(&session, &table.truncate_list.lock);
     return true;
 }
 
@@ -71,8 +71,8 @@ truncate_list_fixture::truncate_list_fixture()
     : _mock(mock_session::build_test_mock_session()), _session(_mock->get_wt_session_impl())
 {
     _table.iface.name = "layered:truncate_list_fixture";
-    TAILQ_INIT(&_table.truncateqh);
-    CHECK(__wt_rwlock_init(_session, &_table.truncate_lock) == 0);
+    TAILQ_INIT(&_table.truncate_list.qh);
+    CHECK(__wt_rwlock_init(_session, &_table.truncate_list.lock) == 0);
     CHECK(truncate_list_size(_table) == 0);
 }
 
@@ -80,17 +80,17 @@ truncate_list_fixture::~truncate_list_fixture()
 {
     WT_TRUNCATE *entry = nullptr;
 
-    const bool had_data = !TAILQ_EMPTY(&_table.truncateqh);
+    const bool had_data = !TAILQ_EMPTY(&_table.truncate_list.qh);
 
-    while ((entry = TAILQ_FIRST(&_table.truncateqh)) != nullptr) {
-        TAILQ_REMOVE(&_table.truncateqh, entry, q);
+    while ((entry = TAILQ_FIRST(&_table.truncate_list.qh)) != nullptr) {
+        TAILQ_REMOVE(&_table.truncate_list.qh, entry, q);
         __wt_free(_session, entry);
     }
 
     if (had_data)
         WT_DHANDLE_RELEASE(&_table.iface);
 
-    __wt_rwlock_destroy(_session, &_table.truncate_lock);
+    __wt_rwlock_destroy(_session, &_table.truncate_list.lock);
 }
 
 WT_TRUNCATE *
@@ -101,7 +101,7 @@ truncate_list_fixture::add_entry(const WT_ITEM &start, const WT_ITEM &stop)
 
     entry->layered_table = &_table;
 
-    if (TAILQ_EMPTY(&_table.truncateqh))
+    if (TAILQ_EMPTY(&_table.truncate_list.qh))
         WT_DHANDLE_ACQUIRE(&_table.iface);
 
     // This is a shallow copy. For the purposes of the tests, we are assuming that the WT_ITEMs are
@@ -111,7 +111,7 @@ truncate_list_fixture::add_entry(const WT_ITEM &start, const WT_ITEM &stop)
 
     const auto initial_size = truncate_list_size(_table);
 
-    TAILQ_INSERT_TAIL(&_table.truncateqh, entry, q);
+    TAILQ_INSERT_TAIL(&_table.truncate_list.qh, entry, q);
 
     const auto expected_size = initial_size + 1;
     CHECK(truncate_list_size(_table) == expected_size);

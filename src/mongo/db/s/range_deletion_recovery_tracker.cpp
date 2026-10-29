@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/range_deletion_recovery_tracker.h"
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/observable_mutex_registry.h"
 
+#include <algorithm>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
@@ -54,10 +29,10 @@ std::unique_ptr<ActiveTerm> RangeDeletionRecoveryTracker::notifyStartOfTerm(Term
 }
 
 RangeDeletionRecoveryTracker::RangeDeletionRecoveryTracker() {
-    ObservableMutexRegistry::get().add("RangeDeletionRecoveryTracker::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("rangeDeletionRecoveryTrackerMutex", _mutex);
 }
 
-void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
+void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term, RecoveryJob job) {
     std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
@@ -66,24 +41,23 @@ void RangeDeletionRecoveryTracker::registerRecoveryJob(Term term) {
     tassert(11420101,
             "Recovery job already completed",
             !state->recoveryCompletePromise.getFuture().isReady());
-    auto& count = state->remainingJobCount;
-    count = count.value_or(0) + 1;
+    state->recoveryJobs.insert(job);
+
+    LOGV2_INFO(13226801, "Recovery job registered", "job"_attr = toString(job), "term"_attr = term);
 }
 
-void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term) {
+void RangeDeletionRecoveryTracker::notifyRecoveryJobComplete(Term term, RecoveryJob job) {
     std::lock_guard guard(_mutex);
     auto state = getStateForTerm(guard, term);
     if (!state) {
         return;
     }
-    auto& [count, promise] = *state;
-    if (!isRemainingJobCountValid(count)) {
-        return;
+
+    if (state->recoveryJobs.erase(job) && state->recoveryJobs.empty()) {
+        ensurePromiseSet(state->recoveryCompletePromise, Outcome::kComplete);
     }
-    (*count)--;
-    if (*count == 0) {
-        ensurePromiseSet(promise, Outcome::kComplete);
-    }
+
+    LOGV2_INFO(13226802, "Recovery job complete", "job"_attr = toString(job), "term"_attr = term);
 }
 
 void RangeDeletionRecoveryTracker::notifyEndOfTerm(Term term) {
@@ -127,17 +101,6 @@ bool RangeDeletionRecoveryTracker::isTermTooOld(WithLock, Term term) {
     return _highestEndedTerm.has_value() && *_highestEndedTerm >= term;
 }
 
-bool RangeDeletionRecoveryTracker::isRemainingJobCountValid(const boost::optional<int8_t>& count) {
-    try {
-        tassert(1079600,
-                "More jobs notified as complete than registered as started",
-                count.has_value() && *count > 0);
-        return true;
-    } catch (const AssertionException&) {
-        return false;
-    }
-}
-
 void RangeDeletionRecoveryTracker::cleanUpOldTerms(WithLock) {
     invariant(_highestEndedTerm.has_value());
     auto it = _termStates.begin();
@@ -157,6 +120,18 @@ void RangeDeletionRecoveryTracker::ensurePromiseSet(SharedPromise<Outcome>& prom
         return;
     }
     promise.emplaceValue(outcome);
+}
+
+constexpr std::string_view toString(RecoveryJob job) {
+    switch (job) {
+        case RecoveryJob::kLegacyMigration:
+            return "LegacyMigration";
+        case RecoveryJob::kMoveRangeCoordinator:
+            return "MoveRangeCoordinator";
+        case RecoveryJob::kRangeDeleter:
+            return "RangeDeleter";
+    }
+    return "Unknown";
 }
 
 }  // namespace mongo

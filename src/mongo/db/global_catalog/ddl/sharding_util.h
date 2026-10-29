@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -51,7 +26,7 @@ namespace sharding_util {
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
  * shards fails to refresh.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void tellShardsToRefreshCollection(
     OperationContext* opCtx,
     const std::vector<ShardId>& shardIds,
     const NamespaceString& nss,
@@ -61,14 +36,14 @@ MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Does not wait for or
  * check the responses from the shards.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void triggerFireAndForgetShardRefreshes(
-    OperationContext* opCtx, const std::vector<ShardRef>& shardRefs, const NamespaceString& nss);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void triggerFireAndForgetShardRefreshes(
+    OperationContext* opCtx, const std::vector<ShardId>& shardIds, const NamespaceString& nss);
 
 /**
  * Process the responses received from a set of requests sent to the shards. If `throwOnError=true`,
  * throws in case one of the commands fails.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> processShardResponses(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
@@ -80,7 +55,7 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> processSh
  * Generic utility to send a command to a list of shards. If `throwOnError=true`, throws in case one
  * of the commands fails.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const BSONObj& command,
@@ -89,16 +64,30 @@ MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response> sendComma
     bool throwOnError = true);
 
 /**
- * Helper function to create an index on a collection locally.
+ * Creates a list of indexes via DBDirectClient under an alternative client region.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status createIndexOnCollection(OperationContext* opCtx,
-                                                           const NamespaceString& ns,
-                                                           const BSONObj& keys,
-                                                           bool unique);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status createIndexesOnCollectionForWritablePrimary(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const std::vector<IndexSpec_ForCatalog>& specs);
+
+/**
+ * Creates a list of indexes on a local collection during step-up, creating the collection first if
+ * it does not exist. This must only be called during onStepUpComplete, otherwise
+ * createIndexesOnCollectionForWritablePrimary must be used instead.
+ *
+ * Empty collections get indexes built synchronously under the collection lock. On non-empty
+ * collections, missing indexes trigger a tripwire assertion that fails step-up and causes a fatal
+ * assertion.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status createIndexesOnCollectionAtStepUp(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const std::vector<IndexSpec_ForCatalog>& specs);
 /**
  * Helper function to send a command to one shard
  */
-MONGO_MOD_NEEDS_REPLACEMENT void invokeCommandOnShardWithIdempotentRetryPolicy(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void invokeCommandOnShardWithIdempotentRetryPolicy(
     OperationContext* opCtx,
     const ShardId& recipientId,
     const DatabaseName& dbName,
@@ -115,7 +104,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void invokeCommandOnShardWithIdempotentRetryPolicy(
  * Requirements:
  * - doWork must be idempotent.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     OperationContext* opCtx,
     std::string_view taskDescription,
     std::function<void(OperationContext*)> doWork,
@@ -126,6 +115,19 @@ MONGO_MOD_NEEDS_REPLACEMENT void retryIdempotentWorkAsPrimaryUntilSuccessOrStepd
  * shard registry. Considers only shards that are not currently draining. Will return ShardNotFound
  * if no shard is found.
  */
-MONGO_MOD_NEEDS_REPLACEMENT ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx);
+
+/**
+ * Returns true if 'bucketNss' is a tracked timeseries buckets collection, i.e. it has a sharding
+ * catalog entry with timeseries fields. Returns false if the namespace is not tracked.
+ */
+[[MONGO_MOD_PUBLIC]] bool isTrackedTimeseries(OperationContext* opCtx,
+                                              const NamespaceString& bucketNss);
+
+/**
+ * Returns true iff the MaxKey detection scans should run, i.e. if either the enableMaxKeyDetection
+ * server parameter or featureFlagMaxKeyDetection is enabled.
+ */
+[[MONGO_MOD_PUBLIC]] bool isMaxKeyDetectionEnabled();
 }  // namespace sharding_util
 }  // namespace mongo

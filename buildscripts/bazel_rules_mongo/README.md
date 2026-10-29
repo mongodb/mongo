@@ -2,10 +2,37 @@
 
 This directory is a bazel rule we use to ship common code between bazel repos
 
+## Python dependencies
+
+This package has no lockfile of its own. Its python deps (`pyyaml`, `retry`, `gitpython`,
+`requests`, `structlog`) live in the mongo repo's top-level `pyproject.toml` / `uv.lock` as the
+`bazel_rules_mongo` dependency group.
+
+The BUILD files here reference python deps through the `dependency()` shim in `bazel/uv/defs.bzl`,
+which emits labels of the form `@pypi//:<pkg>`, where `<pkg>` is the PEP 503 normalized distribution
+name (`@pypi//:pyyaml`, `@pypi//:gitpython`, ...). The hub name is the `PYPI_HUB` constant in that
+file — that constant is the single seam if your workspace names its hub something else.
+
+This package is a Bzlmod module (see its `MODULE.bazel`) and reaches that hub with:
+
+```python
+lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
+use_repo(lock_repos, "pypi")
+```
+
+`lock_repos` is a single global extension instance, so the hub is populated by whichever module in
+the graph imports a lock into a repo named `pypi`. The consuming **root** module must do that.
+
+- Inside the mongo repo this happens automatically: `//MODULE.bazel` declares
+  `bazel_dep(name = "bazel_rules_mongo")` + `local_path_override`, and its
+  `lock_import.import_uv(repo = "pypi", lock_file = "//:uv.lock", ...)` builds the hub from the
+  top-level `uv.lock`.
+- Standalone consumers must import an equivalent lock into a repo named `pypi` (see below).
+
 # Using in your repo
 
 1. Look at the latest version in
-   [this](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/pyproject.toml)
+   [this](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/version.txt)
    file
 
 2. Get the sha of the latest release at
@@ -14,46 +41,59 @@ This directory is a bazel rule we use to ship common code between bazel repos
 3. Get the link to the latest version at
    https://mdb-build-public.s3.amazonaws.com/bazel_rules_mongo/{version}/bazel_rules_mongo.tar.gz
 
-4. Add this as a http archive to your repo and implement the dependencies listed in the
-   [WORKSPACE](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/WORKSPACE.bazel)
-   file. It will look something like this
+4. Wire it into your `MODULE.bazel`. This package is a Bzlmod module and is not published to the
+   Bazel Central Registry, so use `archive_override`. You must also import a python lock into a hub
+   repo named `pypi` containing this package's deps:
+
+```python
+bazel_dep(name = "bazel_rules_mongo", version = "0.0.0")
+archive_override(
+    module_name = "bazel_rules_mongo",
+    integrity = "sha256-<...>",  # from the .sha256 URL in step 2, base64-encoded
+    strip_prefix = "bazel_rules_mongo",
+    urls = ["https://mdb-build-public.s3.amazonaws.com/bazel_rules_mongo/{version}/bazel_rules_mongo.tar.gz"],
+)
+
+# The hub this package's BUILD files resolve `@pypi//:<pkg>` against. Your lock
+# must contain: pyyaml, retry, gitpython, requests, structlog (see the
+# `bazel_rules_mongo` dependency group in the mongo repo's top-level
+# pyproject.toml for known-good ranges).
+bazel_dep(name = "rules_pycross", version = "0.8.3")
+
+lock_import = use_extension("@rules_pycross//pycross/extensions:lock_import.bzl", "lock_import")
+lock_import.import_uv(
+    lock_file = "//:uv.lock",
+    repo = "pypi",
+    target_environments = ["//:environments"],
+)
+
+lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
+use_repo(lock_repos, "pypi")
+
+codeowners_validator_extension = use_extension("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator_extension")
+use_repo(codeowners_validator_extension, "codeowners_validator")
+
+codeowners_binary_extension = use_extension("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary_extension")
+use_repo(codeowners_binary_extension, "codeowners_binary")
+```
+
+If you source python deps some other way (rules_python's `pip.parse`, a vendored hub, ...), the hub
+must expose one `py_library`-compatible target per package at the repo root, named by PEP 503
+normalized distribution name. If yours has a different shape (e.g. `//<pkg>:pkg`), add a small repo
+of `alias()` targets, name it `pypi`, or vendor this package and change `PYPI_HUB` in
+`bazel/uv/defs.bzl`.
+
+Alternatively, the codeowners repository rules can be pulled in directly with `use_repo_rule`
+instead of the module extensions
 
 ```
-# Poetry rules for managing Python dependencies
-http_archive(
-    name = "rules_poetry",
-    sha256 = "533a0178767be4d79a67ae43890970485217f031adf090ef28c5c18e8fd337d8",
-    strip_prefix = "rules_poetry-092d43107d13e711ac4ac92050d8b570bcc8ef43",
-    urls = [
-        "https://github.com/mongodb-forks/rules_poetry/archive/092d43107d13e711ac4ac92050d8b570bcc8ef43.tar.gz",
-    ],
-)
+codeowners_validator_repository = use_repo_rule("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator_repository")
 
-load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
+codeowners_validator_repository(name = "codeowners_validator")
 
-http_archive(
-    name = "bazel_rules_mongo",
-    repo_mapping = {"@poetry": "@poetry_bazel_rules_mongo"},
-    sha256 = "bb2c2dafc82d905422a12ebef41637b0a1160adffc8a5009dcd1c3d1f81b4056",
-    strip_prefix = "bazel_rules_mongo",
-    urls = [
-        "https://mdb-build-public.s3.amazonaws.com/bazel_rules_mongo/0.1.1/bazel_rules_mongo.tar.gz",
-    ],
-)
+codeowners_binary_repository = use_repo_rule("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary_repository")
 
-load("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator")
-
-codeowners_validator()
-
-load("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary")
-
-codeowners_binary()
-
-poetry(
-    name = "poetry_bazel_rules_mongo",
-    lockfile = "@bazel_rules_mongo//:poetry.lock",
-    pyproject = "@bazel_rules_mongo//:pyproject.toml",
-)
+codeowners_binary_repository(name = "codeowners_binary")
 ```
 
 5. Use the rule however you see fit! For example to add `bazel run codeowners` to your repo you can
@@ -69,6 +109,6 @@ alias(
 # Deploying
 
 When you are ready for a new version to be released, bump the version in the
-[pyproject.toml](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/pyproject.toml)
+[version.txt](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/version.txt)
 file. This will be deployed the next time the `package_bazel_rules_mongo` task runs (nightly). You
 can schedule this earlier in the waterfall when your pr is merged if you want it quicker.

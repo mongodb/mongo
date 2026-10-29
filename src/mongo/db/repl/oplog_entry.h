@@ -1,42 +1,16 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -69,7 +43,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUB repl {
+namespace [[MONGO_MOD_PUBLIC]] repl {
 
 /**
  * The first oplog entry is a no-op with this message in its "msg" field.
@@ -234,6 +208,17 @@ public:
     }
 
     /**
+     * In-memory only (not serialized): the record id of the group this operation belongs to. Lets
+     * the applyOps packer keep a group's operations in one entry.
+     */
+    boost::optional<RecordId> getGroupRecordId() const {
+        return _groupRecordId;
+    }
+    void setGroupRecordId(boost::optional<RecordId> value) {
+        _groupRecordId = std::move(value);
+    }
+
+    /**
      * Sets the statement ids for this ReplOperation to 'stmtIds' if it does not contain any
      * kUninitializedStmtId (i.e. placeholder statement id).
      */
@@ -300,6 +285,9 @@ private:
     // Whether a pre-image must be recorded for this operation since it is in a retryable internal
     // transaction.
     bool _preImageRecordedForRetryableInternalTransaction{false};
+
+    // Record id saved to identify this operation's group during applyOps packing.
+    boost::optional<RecordId> _groupRecordId;
 };
 
 /**
@@ -386,10 +374,6 @@ public:
 
     void setSizeMetadata(boost::optional<OplogEntrySizeMetadata> value) & {
         getDurableReplOperation().setSizeMetadata(std::move(value));
-    }
-
-    void setDocHash(boost::optional<int32_t> value) & {
-        getDurableReplOperation().setDocHash(std::move(value));
     }
 
     void setRecordId(RecordId rid) & {
@@ -564,7 +548,6 @@ public:
     using MutableOplogEntry::getCheckExistenceForDiffInsert;
     using MutableOplogEntry::getContainer;
     using MutableOplogEntry::getDestinedRecipient;
-    using MutableOplogEntry::getDocHash;
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getIsTimeseries;
@@ -637,9 +620,10 @@ public:
     bool isCommand() const;
 
     /**
-     * Returns if the applyOps oplog entry is linked through its prevOpTime field as part of a
-     * transaction, rather than as a retryable write or stand-alone applyOps.  Valid only for
-     * applyOps entries.
+     * Returns if the applyOps oplog entry has a prevOpTime link to follow, i.e. prevOpTime is set
+     * and this is not a stand-alone kApplyOpsAppliedSeparately entry.  Valid only for applyOps
+     * entries.  A true result does not mean the linked entry belongs to the same unit of work: a
+     * retryable batch's first entry links to the previous statement.
      */
     bool applyOpsIsLinkedTransactionally() const;
 
@@ -901,7 +885,6 @@ public:
     const mongo::BSONObj& getObject() const;
     const boost::optional<mongo::BSONObj>& getObject2() const;
     boost::optional<bool> getIsTimeseries() const;
-    boost::optional<std::int32_t> getDocHash() const;
     const boost::optional<mongo::repl::OplogEntrySizeMetadata>& getSizeMetadata() const;
     boost::optional<bool> getUpsert() const;
     const boost::optional<mongo::repl::OpTime>& getPreImageOpTime() const;
@@ -1086,5 +1069,5 @@ bool operator==(const OplogEntry& lhs, const OplogEntry& rhs);
 
 std::ostream& operator<<(std::ostream& s, const ReplOperation& o);
 
-}  // namespace MONGO_MOD_PUB repl
+}  // namespace repl
 }  // namespace mongo

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -63,7 +37,7 @@
 
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::timeseries::bucket_catalog {
 
 using StripeNumber = std::uint8_t;
@@ -186,7 +160,7 @@ public:
     tracking::unordered_map<UUID, tracking::shared_ptr<ExecutionStats>> executionStats;
 
     // Atomic mirror of executionStats.size() — updated under 'mutex', read lock-free by FTDC.
-    AtomicWord<int32_t> numExecutionStatsEntries{0};
+    Atomic<int32_t> numExecutionStatsEntries{0};
 
     // Global execution stats used to report aggregated metrics in server status.
     ExecutionStats globalExecutionStats;
@@ -551,42 +525,72 @@ std::vector<BatchedInsertContext> buildBatchedInsertContexts(
  * been staged into an eligible bucket. When there is any RolloverReason that isn't kNone when
  * attempting to stage a measurement into a bucket, the function will find another eligible
  * buckets until all measurements are inserted.
+ *
+ * Each write batch is appended to 'writeBatches' as soon as it has been staged into. If this
+ * throws, the batches appended so far are still registered in their buckets and it is the caller's
+ * responsibility to abort everything in 'writeBatches'; see abortWriteBatches().
  */
-TimeseriesWriteBatches stageInsertBatch(
-    OperationContext* opCtx,
-    BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const OperationId& opId,
-    const StringDataComparator* comparator,
-    uint64_t storageCacheSizeBytes,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    AllowQueryBasedReopening allowQueryBasedReopening,
-    BatchedInsertContext& batch);
+void stageInsertBatch(OperationContext* opCtx,
+                      BucketCatalog& bucketCatalog,
+                      const Collection* bucketsColl,
+                      const OperationId& opId,
+                      const StringDataComparator* comparator,
+                      uint64_t storageCacheSizeBytes,
+                      const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                      AllowQueryBasedReopening allowQueryBasedReopening,
+                      BatchedInsertContext& batch,
+                      TimeseriesWriteBatches& writeBatches);
 
 /**
- * Stages compatible measurements into appropriate bucket(s).
- * Returns a non-success status if any measurements are malformed, and further
- * returns the index into 'userMeasurementsBatch' of each failure in 'errorsAndIndices'.
- * Returns a write batch per bucket that the measurements are staged to.
- * 'earlyReturnOnError' decides whether or not staging should happen in the case of any malformed
- * measurements.
+ * Aborts every batch in 'writeBatches' with 'status', taking each batch's stripe lock in turn.
+ * Null entries (batches whose ownership the caller has already handed off, e.g. by committing
+ * them) and batches that have already finished are skipped, so this is safe to run unconditionally
+ * over a partially-committed vector.
+ *
+ * All operations which have staged batches into a bucket with any batches to abort will be aborted,
+ * and the other operations will retry. Aborting staged write batches should be a sufficiently rare
+ * occurrence that it is not worth trying to unstage only the failed batches.
+ *
+ * Must not be called while holding a stripe lock, as this takes each batch's stripe lock itself.
  */
-StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
-    OperationContext* opCtx,
-    BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const TimeseriesOptions& timeseriesOptions,
-    OperationId opId,
-    const StringDataComparator* comparator,
-    uint64_t storageCacheSizeBytes,
-    bool earlyReturnOnError,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    const std::vector<BSONObj>& userMeasurementsBatch,
-    size_t startIndex,
-    size_t numDocsToStage,
-    const std::vector<size_t>& indices,
-    AllowQueryBasedReopening allowQueryBasedReopening,
-    std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
+void abortWriteBatches(BucketCatalog& bucketCatalog,
+                       const TimeseriesWriteBatches& writeBatches,
+                       const Status& status);
+
+/**
+ * Sort `writeBatches` by bucket to ensure that concurrent committers acquire locks in the same
+ * order and cannot deadlock by trying to write to the same buckets but in different orders.
+ */
+void sortBatchesForCommit(TimeseriesWriteBatches& writeBatches);
+
+/**
+ * Stages compatible measurements into appropriate bucket(s), appending a write batch per bucket to
+ * the caller-owned 'writeBatches'.
+ *
+ * Returns a non-success status if any measurements are malformed, and further returns the index
+ * into 'userMeasurementsBatch' of each failure in 'errorsAndIndices'. 'earlyReturnOnError' decides
+ * whether or not staging should happen in the case of any malformed measurements.
+ *
+ * A non-OK Status return indicates that nothing is staged and no cleanup is required,  but if this
+ * throws, the batches appended so far are registered in their buckets and the caller must abort
+ * them; see abortWriteBatches().
+ */
+Status prepareInsertsToBuckets(OperationContext* opCtx,
+                               BucketCatalog& bucketCatalog,
+                               const Collection* bucketsColl,
+                               const TimeseriesOptions& timeseriesOptions,
+                               OperationId opId,
+                               const StringDataComparator* comparator,
+                               uint64_t storageCacheSizeBytes,
+                               bool earlyReturnOnError,
+                               const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                               const std::vector<BSONObj>& userMeasurementsBatch,
+                               size_t startIndex,
+                               size_t numDocsToStage,
+                               const std::vector<size_t>& indices,
+                               AllowQueryBasedReopening allowQueryBasedReopening,
+                               std::vector<WriteStageErrorAndIndex>& errorsAndIndices,
+                               TimeseriesWriteBatches& writeBatches);
 
 /**
  * Extracts the information from the input 'doc' that is used to map the document to a bucket.

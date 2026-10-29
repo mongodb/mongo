@@ -10,7 +10,7 @@
  * This test ensures the ordering of stages is correct for a $lookup.$search query where the foreign
  * coll is a view.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";

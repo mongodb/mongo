@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/curop.h"
 
@@ -36,21 +10,32 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context_options_gen.h"
+#include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/mock_key.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/storage/storage_stats.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
 #include <initializer_list>
 #include <mutex>
+#include <thread>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -58,6 +43,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 TEST(CurOpTest, CopyConstructors) {
     OpDebug::AdditiveMetrics a, b;
@@ -74,6 +60,10 @@ TEST(CurOpTest, CopyConstructors) {
 }
 
 TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
+    using plan_shape_counters::AccessPathCounter;
+    using plan_shape_counters::PlanShapeCounter;
+    using plan_shape_counters::QsnNodeCounter;
+
     OpDebug::AdditiveMetrics currentAdditiveMetrics = OpDebug::AdditiveMetrics();
     OpDebug::AdditiveMetrics additiveMetricsToAdd = OpDebug::AdditiveMetrics();
 
@@ -138,6 +128,14 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.peakTrackedMemBytes = 3000;
     currentAdditiveMetrics.clusterPeakTrackedMemBytes = 2048;
     additiveMetricsToAdd.clusterPeakTrackedMemBytes = 2000;
+    currentAdditiveMetrics.planShapeCounts.increment(PlanShapeCounter::kCollscan, 3);
+    currentAdditiveMetrics.planShapeCounts.increment(PlanShapeCounter::kIxscanFetch, 5);
+    currentAdditiveMetrics.planShapeCounts.increment(QsnNodeCounter::kCollscanWithFilter, 3);
+    currentAdditiveMetrics.planShapeCounts.increment(AccessPathCounter::kCollscan, 3);
+    additiveMetricsToAdd.planShapeCounts.increment(PlanShapeCounter::kIxscanFetch, 2);
+    additiveMetricsToAdd.planShapeCounts.increment(PlanShapeCounter::kIxscanProject, 7);
+    additiveMetricsToAdd.planShapeCounts.increment(QsnNodeCounter::kCollscanWithFilter, 4);
+    additiveMetricsToAdd.planShapeCounts.increment(AccessPathCounter::kBtreeIxscan, 6);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -215,6 +213,26 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(*currentAdditiveMetrics.clusterPeakTrackedMemBytes,
               std::max(*additiveMetricsBeforeAdd.clusterPeakTrackedMemBytes,
                        *additiveMetricsToAdd.clusterPeakTrackedMemBytes));
+    // Plan shape counters should be summed per shape, including shapes present in only one object.
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kCollscan),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kCollscan) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kCollscan));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kIxscanFetch),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanFetch) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanFetch));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(PlanShapeCounter::kIxscanProject));
+    ASSERT_EQ(
+        currentAdditiveMetrics.planShapeCounts.getCount(QsnNodeCounter::kCollscanWithFilter),
+        additiveMetricsBeforeAdd.planShapeCounts.getCount(QsnNodeCounter::kCollscanWithFilter) +
+            additiveMetricsToAdd.planShapeCounts.getCount(QsnNodeCounter::kCollscanWithFilter));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(AccessPathCounter::kCollscan),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(AccessPathCounter::kCollscan) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(AccessPathCounter::kCollscan));
+    ASSERT_EQ(currentAdditiveMetrics.planShapeCounts.getCount(AccessPathCounter::kBtreeIxscan),
+              additiveMetricsBeforeAdd.planShapeCounts.getCount(AccessPathCounter::kBtreeIxscan) +
+                  additiveMetricsToAdd.planShapeCounts.getCount(AccessPathCounter::kBtreeIxscan));
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -382,16 +400,17 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.keysDeleted = 1;
     additiveMetrics.planningTime = Microseconds(100);
     additiveMetrics.nDocsSampled = 10;
+    additiveMetrics.planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 1);
 
-    CursorMetrics cursorMetrics(3 /* keysExamined */,
-                                4 /* docsExamined */,
-                                10 /* bytesRead */,
-                                11 /* readingTimeMicros */,
-                                5 /* workingTimeMillis */,
-                                true /* hasSortStage */,
-                                false /* usedDisk */,
-                                true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+    CursorMetrics cursorMetrics(/*keysExamined=*/3,
+                                /*docsExamined=*/4,
+                                /*bytesRead=*/10,
+                                /*readingTimeMicros=*/11,
+                                /*workingTimeMillis=*/5,
+                                /*hasSortStage=*/true,
+                                /*usedDisk=*/false,
+                                /*fromMultiPlanner=*/true,
+                                /*fromPlanCache=*/false);
     cursorMetrics.setPlanningTimeMicros(150);
     cursorMetrics.setNDocsSampled(15);
     cursorMetrics.setCpuNanos(9);
@@ -406,6 +425,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     CardinalityEstimationMethods ceMethods1;
     ceMethods1.setHistogram(1);
     ceMethods1.setSampling(1);
+    ceMethods1.setHyperLogLog(2);
     cursorMetrics.setCardinalityEstimationMethods(ceMethods1);
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
@@ -416,6 +436,24 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     cursorMetrics.setWasLoadShed(true);
     cursorMetrics.setWasDeprioritized(true);
     cursorMetrics.setWasMarkedNonDeprioritizable(true);
+    plan_shape_counters::PlanShapeCounts planShapeCounts;
+    planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 2);
+    planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kIxscanFetch, 1);
+    planShapeCounts.increment(plan_shape_counters::QsnNodeCounter::kCollscanWithFilter, 2);
+    planShapeCounts.increment(plan_shape_counters::AccessPathCounter::kCollscan, 2);
+    cursorMetrics.setPlanShapeCounts(planShapeCounts);
+
+    // Assert that every field in cursor metrics is initialized.
+    BSONObj serializedCursorMetrics = cursorMetrics.toBSON();
+    for (const auto& fieldName : CursorMetrics::fieldNames) {
+        if (fieldName == "serialization_context") {
+            // This field is unrelated to cursor metric logic and is needed by IDL.
+            continue;
+        }
+        ASSERT_TRUE(serializedCursorMetrics.hasField(fieldName))
+            << "CursorMetrics field '" << fieldName
+            << "' was not populated by this test; serialized: " << serializedCursorMetrics;
+    }
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -451,7 +489,20 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHyperLogLog().value_or(0), 2);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
+    ASSERT_EQ(
+        additiveMetrics.planShapeCounts.getCount(plan_shape_counters::PlanShapeCounter::kCollscan),
+        3);
+    ASSERT_EQ(additiveMetrics.planShapeCounts.getCount(
+                  plan_shape_counters::PlanShapeCounter::kIxscanFetch),
+              1);
+    ASSERT_EQ(additiveMetrics.planShapeCounts.getCount(
+                  plan_shape_counters::QsnNodeCounter::kCollscanWithFilter),
+              2);
+    ASSERT_EQ(
+        additiveMetrics.planShapeCounts.getCount(plan_shape_counters::AccessPathCounter::kCollscan),
+        2);
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -460,15 +511,15 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
 
     additiveMetrics.cpuNanos = Nanoseconds(-1);
 
-    CursorMetrics cursorMetrics(1 /* keysExamined */,
-                                2 /* docsExamined */,
-                                3 /* bytesRead */,
-                                10 /* workingTimeMillis */,
-                                11 /* readingTimeMicros */,
-                                true /* hasSortStage */,
-                                false /* usedDisk */,
-                                true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+    CursorMetrics cursorMetrics(/*keysExamined=*/1,
+                                /*docsExamined=*/2,
+                                /*bytesRead=*/3,
+                                /*readingTimeMicros=*/10,
+                                /*workingTimeMillis=*/11,
+                                /*hasSortStage=*/true,
+                                /*usedDisk=*/false,
+                                /*fromMultiPlanner=*/true,
+                                /*fromPlanCache=*/false);
     cursorMetrics.setPlanningTimeMicros(12);
     cursorMetrics.setNDocsSampled(15);
     cursorMetrics.setCpuNanos(-1);
@@ -492,15 +543,15 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
     additiveMetrics.planningTime = boost::none;
     additiveMetrics.nDocsSampled = boost::none;
 
-    CursorMetrics cursorMetrics(1 /* keysExamined */,
-                                2 /* docsExamined */,
-                                3 /* bytesRead */,
-                                10 /* workingTimeMillis */,
-                                11 /* readingTimeMicros */,
-                                true /* hasSortStage */,
-                                false /* usedDisk */,
-                                true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+    CursorMetrics cursorMetrics(/*keysExamined=*/1,
+                                /*docsExamined=*/2,
+                                /*bytesRead=*/3,
+                                /*readingTimeMicros=*/10,
+                                /*workingTimeMillis=*/11,
+                                /*hasSortStage=*/true,
+                                /*usedDisk=*/false,
+                                /*fromMultiPlanner=*/true,
+                                /*fromPlanCache=*/false);
     cursorMetrics.setPlanningTimeMicros(100);
     cursorMetrics.setNDocsSampled(15);
     cursorMetrics.setCpuNanos(10);
@@ -541,6 +592,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.planningTime = Microseconds(100);
     additiveMetrics.cardinalityEstimationMethods.setHeuristics(2);
+    additiveMetrics.cardinalityEstimationMethods.setHyperLogLog(1);
     additiveMetrics.nDocsSampled = 10;
     additiveMetrics.clusterPeakTrackedMemBytes = 1000;
 
@@ -565,6 +617,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.cardinalityEstimationMethods.setHeuristics(1);
     remoteMetrics.cardinalityEstimationMethods.setHistogram(1);
     remoteMetrics.cardinalityEstimationMethods.setSampling(1);
+    remoteMetrics.cardinalityEstimationMethods.setHyperLogLog(2);
     remoteMetrics.nDocsSampled = 15;
     remoteMetrics.clusterPeakTrackedMemBytes = 2048;
 
@@ -593,6 +646,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHyperLogLog().value_or(0), 3);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
     ASSERT_EQ(*additiveMetrics.clusterPeakTrackedMemBytes, 3048);
 }
@@ -663,11 +717,13 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
                                          "command",
                                          "opid",
                                          "numYield",
+                                         "numInterruptChecks",
                                          "locks",
                                          "millis",
                                          "micros",
                                          "flowControl",
-                                         "planRanker"};
+                                         "planRanker",
+                                         "queues"};
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -691,7 +747,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 
     BSONObjBuilder builder;
-    od.append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+    od.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
     auto bs = builder.done();
 
     // Append should always include these basic fields.
@@ -707,7 +763,60 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 }
 
-TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
+TEST(CurOpTest, QuerySettingsAppendedToProfilerOutput) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto& opDebug = CurOp::get(*opCtx)->debug();
+
+    query_settings::QuerySettings settings;
+    settings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    opDebug.setQuerySettings(opCtx.get(), settings);
+
+    BSONObjBuilder builder;
+    opDebug.append(opCtx.get(), {}, {}, {}, 0, false /*omitCommand*/, builder);
+    ASSERT_BSONOBJ_EQ(builder.obj().getObjectField("querySettings"), settings.toBSON());
+}
+
+TEST(CurOpTest, AppendReportsUserAcquisitionAndLDAPOperationStatsAsDistinctObjects) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    const OpDebug& od = curop->debug();
+
+    // Record one user-cache acquisition (authorization)and one LDAP bind (LDAPOperations) so that
+    // both sets of stats report.
+    auto userAcquisitionStats = curop->getUserAcquisitionStats();
+    auto* tickSource = opCtx->getServiceContext()->getTickSource();
+    {
+        UserAcquisitionStatsHandle handle(userAcquisitionStats.get(), tickSource, kCache);
+    }
+    {
+        UserAcquisitionStatsHandle handle(userAcquisitionStats.get(), tickSource, kBind);
+    }
+    ASSERT_TRUE(userAcquisitionStats->shouldReportUserCacheAccessStats());
+    ASSERT_TRUE(userAcquisitionStats->shouldReportLDAPOperationStats());
+
+    BSONObjBuilder builder;
+    od.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
+    BSONObj bs = builder.done();
+
+    ASSERT_TRUE(bs.hasField("authorization")) << bs;
+    ASSERT_EQ(bs["authorization"].type(), BSONType::object) << bs;
+    ASSERT_FALSE(bs.getObjectField("authorization").isEmpty()) << bs;
+
+    ASSERT_TRUE(bs.hasField("LDAPOperations")) << bs;
+    ASSERT_EQ(bs["LDAPOperations"].type(), BSONType::object) << bs;
+    BSONObj ldapObj = bs.getObjectField("LDAPOperations");
+    ASSERT_TRUE(ldapObj.hasField("LDAPNumberOfReferrals")) << ldapObj;
+    ASSERT_TRUE(ldapObj.hasField("bindStats")) << ldapObj;
+
+    // The two objects are distinct top-level fields.
+    ASSERT_BSONOBJ_NE(bs.getObjectField("authorization"), bs.getObjectField("LDAPOperations"));
+}
+
+TEST(CurOpTest, PlanSelectionStrategyAppendedToProfilerOutput) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     SingleThreadedLockStats ls;
@@ -727,7 +836,7 @@ TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
 
     auto appendAndGetPlanRanker = [&]() -> boost::optional<std::string> {
         BSONObjBuilder builder;
-        curop->debug().append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
         auto bs = builder.done();
         if (auto elem = bs["planRanker"]) {
             return elem.String();
@@ -735,18 +844,27 @@ TEST(CurOpTest, PlanRankerMethodAppendedToProfilerOutput) {
         return boost::none;
     };
 
-    // 'kNone' (the default) should always emit "none" so readers can distinguish "no ranking
-    // occurred" from "field missing / old server".
+    // An unset strategy emits "none", and the field is always present so readers can distinguish
+    // "no plan was selected" from "field missing / old server".
     ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "none");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "mp");
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "singlePlan");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
-    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "cbr");
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "multiPlanning");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCostBasedRanker;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "costBased");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "cachedPlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kExpress;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "express");
 }
 
-TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
+TEST(CurOpTest, PlanSelectionStrategyInSlowQueryLogReport) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     SingleThreadedLockStats ls;
@@ -771,24 +889,33 @@ TEST(CurOpTest, PlanRankerMethodInSlowQueryLogReport) {
         curop->debug().report(opCtx.get(), &ls, {}, 0, &deadline, &pAttrs);
         logv2::TypeErasedAttributeStorage attrs{pAttrs};
         for (auto it = attrs.begin(); it != attrs.end(); ++it) {
-            if (it->name == "planRanker"_sd) {
+            if (it->name == "planRanker"sv) {
                 return std::string(std::get<std::string_view>(it->value));
             }
         }
         return boost::none;
     };
 
-    // report() should always emit planRanker for all three values.
+    // report() should always emit planRanker for every strategy.
     ASSERT_EQ(getPlanRankerAttr().value_or(""), "none");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-    ASSERT_EQ(getPlanRankerAttr().value_or(""), "mp");
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "singlePlan");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
-    ASSERT_EQ(getPlanRankerAttr().value_or(""), "cbr");
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "multiPlanning");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCostBasedRanker;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "costBased");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "cachedPlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kExpress;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "express");
 }
 
-TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
+TEST(CurOpTest, PlanSelectionStrategyInProfileFilterAppendStaged) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
@@ -805,7 +932,7 @@ TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
     }
 
     auto stagedAndGetPlanRanker = [&]() -> boost::optional<std::string> {
-        auto fn = OpDebug::appendStaged(opCtx.get(), {"planRanker"}, false /*needWholeDocument*/);
+        auto fn = OpDebug::appendStaged(opCtx.get(), {"planRanker"}, /*needWholeDocument=*/false);
         OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
         BSONObj result = fn(args);
         if (auto elem = result["planRanker"]) {
@@ -817,11 +944,187 @@ TEST(CurOpTest, PlanRankerMethodInProfileFilterAppendStaged) {
     // appendStaged() is used for profile filter evaluation; planRanker must be accessible there.
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "none");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "mp");
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kSinglePlan;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "singlePlan");
 
-    curop->debug().planRankerMethod = PlanRankerMethod::kCostBasedRanker;
-    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "cbr");
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "multiPlanning");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCostBasedRanker;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "costBased");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "cachedPlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kExpress;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "express");
+}
+
+TEST(CurOpTest, UsedJoinOptimizationExposedInAllOutputs) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    BSONObj command = BSON("a" << 3);
+    {
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest("myDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
+    curop->ensureStarted();
+    curop->done();
+
+    // Profiler output.
+    auto appendAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
+        BSONObjBuilder builder;
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
+        auto bs = builder.done();
+        if (auto elem = bs["usedJoinOptimization"]) {
+            return elem.Bool();
+        }
+        return boost::none;
+    };
+
+    // Slow query log output.
+    auto reportAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
+        logv2::DynamicAttributes pAttrs;
+        Date_t deadline = opCtx->getDeadline();
+        curop->debug().report(opCtx.get(), &ls, {}, 0, &deadline, &pAttrs);
+        logv2::TypeErasedAttributeStorage attrs{pAttrs};
+        for (auto it = attrs.begin(); it != attrs.end(); ++it) {
+            if (it->name == "usedJoinOptimization"sv) {
+                return std::get<bool>(it->value);
+            }
+        }
+        return boost::none;
+    };
+
+    // Profile filter evaluation.
+    auto stagedAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
+        auto fn = OpDebug::appendStaged(
+            opCtx.get(), {"usedJoinOptimization"}, /*needWholeDocument=*/false);
+        OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
+        BSONObj result = fn(args);
+        if (auto elem = result["usedJoinOptimization"]) {
+            return elem.Bool();
+        }
+        return boost::none;
+    };
+
+    // The field is omitted when the join optimizer was not used, so that the vast majority of
+    // queries don't pay for an extra field.
+    ASSERT_FALSE(appendAndGetUsedJoinOptimization().has_value());
+    ASSERT_FALSE(reportAndGetUsedJoinOptimization().has_value());
+    ASSERT_FALSE(stagedAndGetUsedJoinOptimization().has_value());
+
+    curop->debug().usedJoinOptimization = true;
+    ASSERT_EQ(appendAndGetUsedJoinOptimization().value_or(false), true);
+    ASSERT_EQ(reportAndGetUsedJoinOptimization().value_or(false), true);
+    ASSERT_EQ(stagedAndGetUsedJoinOptimization().value_or(false), true);
+}
+
+TEST(CurOpTest, JoinOptimizationFallbackReasonExposedInAllOutputs) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    BSONObj command = BSON("a" << 3);
+    {
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
+        curop->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest("myDb.coll"),
+            nullptr,
+            command,
+            NetworkOp::dbQuery);
+    }
+    curop->ensureStarted();
+    curop->done();
+
+    auto setFallbackReason = [&](join_ordering::JoinFallbackReason reason) {
+        curop->debug().joinOptimizationMetrics.emplace();
+        curop->debug().joinOptimizationMetrics->fallbackReason = reason;
+    };
+
+    auto appendAndGetFallbackReason = [&]() -> boost::optional<std::string> {
+        BSONObjBuilder builder;
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
+        auto bs = builder.done();
+        if (auto elem = bs["fallbackReason"]) {
+            return elem.String();
+        }
+        return boost::none;
+    };
+
+    auto reportAndGetFallbackReason = [&]() -> boost::optional<std::string> {
+        logv2::DynamicAttributes pAttrs;
+        Date_t deadline = opCtx->getDeadline();
+        curop->debug().report(opCtx.get(), &ls, {}, 0, &deadline, &pAttrs);
+        logv2::TypeErasedAttributeStorage attrs{pAttrs};
+        for (auto it = attrs.begin(); it != attrs.end(); ++it) {
+            if (it->name == "fallbackReason"sv) {
+                return std::string{std::get<std::string_view>(it->value)};
+            }
+        }
+        return boost::none;
+    };
+
+    auto stagedAndGetFallbackReason = [&]() -> boost::optional<std::string> {
+        auto fn =
+            OpDebug::appendStaged(opCtx.get(), {"fallbackReason"}, /*needWholeDocument=*/false);
+        OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
+        BSONObj result = fn(args);
+        if (auto elem = result["fallbackReason"]) {
+            return elem.String();
+        }
+        return boost::none;
+    };
+
+    ASSERT_FALSE(appendAndGetFallbackReason().has_value());
+    ASSERT_FALSE(reportAndGetFallbackReason().has_value());
+    ASSERT_FALSE(stagedAndGetFallbackReason().has_value());
+
+    setFallbackReason(join_ordering::JoinFallbackReason::kGraphDisconnected);
+    ASSERT_EQ(appendAndGetFallbackReason().value_or(""), "graphDisconnected");
+    ASSERT_EQ(reportAndGetFallbackReason().value_or(""), "graphDisconnected");
+    ASSERT_EQ(stagedAndGetFallbackReason().value_or(""), "graphDisconnected");
+}
+
+TEST(CurOpTest, UsedJoinOptimizationPropagatedFromPlanSummaryStats) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    ASSERT_FALSE(curop->debug().usedJoinOptimization);
+
+    {
+        PlanSummaryStats stats;
+        stats.usedJoinOptimization = false;
+        curop->debug().setPlanSummaryMetrics(std::move(stats));
+    }
+    ASSERT_FALSE(curop->debug().usedJoinOptimization);
+
+    {
+        PlanSummaryStats stats;
+        stats.usedJoinOptimization = true;
+        curop->debug().setPlanSummaryMetrics(std::move(stats));
+    }
+    ASSERT_TRUE(curop->debug().usedJoinOptimization);
+
+    // Once any part of the operation used the join optimizer, a subsequent plan which did not must
+    // not clear the flag.
+    {
+        PlanSummaryStats stats;
+        stats.usedJoinOptimization = false;
+        curop->debug().setPlanSummaryMetrics(std::move(stats));
+    }
+    ASSERT_TRUE(curop->debug().usedJoinOptimization);
 }
 
 TEST(CurOpTest, ShouldUpdateMemoryStats) {
@@ -833,19 +1136,79 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
 
-    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
     ASSERT_EQ(10, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(15, curop->getPeakTrackedMemoryBytes());
 
     // The max memory usage is updated if the new max is greater than the current max.
-    curop->setMemoryTrackingStats(21 /*inUseTrackedMemoryBytes*/, 20 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/21, /*peakTrackedMemBytes=*/20);
     ASSERT_EQ(21, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
 
     // The max memory usage is not updated if the new max is not greater than the current max.
-    curop->setMemoryTrackingStats(31 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/31, /*peakTrackedMemBytes=*/15);
     ASSERT_EQ(31, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
+}
+
+TEST(CurOpTest, SystemWidePeakMemoryUsageOperationMetric) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+
+    // Reads the system-wide metrics.query.peakMemoryUsageOperation value out of the serverStatus
+    // metric tree. We navigate to and serialize only this one metric (rather than appending the
+    // entire tree) since other registered metrics may require a running global ServiceContext.
+    // Returns none when the metric is absent, e.g. on build variants without OpenTelemetry.
+    auto readSystemPeak = []() -> boost::optional<long long> {
+        const MetricTree::ChildMap* children = &globalMetricTreeSet()[ClusterRole::None].children();
+        const MetricTree::TreeNode* leaf = nullptr;
+        for (std::string_view component : {"metrics"sv, "query"sv, "peakMemoryUsageOperation"sv}) {
+            auto it = children->find(component);
+            if (it == children->end()) {
+                return boost::none;
+            }
+            if (component == "peakMemoryUsageOperation"sv) {
+                leaf = &it->second;
+                break;
+            }
+            if (!it->second.isSubtree()) {
+                return boost::none;
+            }
+            children = &it->second.getSubtree()->children();
+        }
+        if (!leaf || leaf->isSubtree()) {
+            return boost::none;
+        }
+
+        BSONObjBuilder bob;
+        leaf->getMetric()->appendTo(bob, "peakMemoryUsageOperation");
+        BSONObj obj = bob.obj();
+        BSONElement el = obj.getField("peakMemoryUsageOperation");
+        if (el.eoo()) {
+            return boost::none;
+        }
+        return el.Long();
+    };
+
+    auto before = readSystemPeak();
+    if (!before) {
+        // serverStatus surfacing of OpenTelemetry metrics is unavailable on this build variant.
+        return;
+    }
+
+    // The metric is process-wide and monotonically non-decreasing, so it may already reflect peaks
+    // observed by other operations/tests. Establish a new maximum well above anything else sets.
+    const int64_t newPeak = *before + (1LL << 30);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/1,
+                                  /*peakTrackedMemBytes=*/newPeak);
+    ASSERT_EQ(*readSystemPeak(), newPeak);
+
+    // A smaller per-operation peak must not lower the system-wide high-water mark.
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/1,
+                                  /*peakTrackedMemBytes=*/newPeak - 100);
+    ASSERT_EQ(*readSystemPeak(), newPeak);
 }
 
 TEST(CurOpTest, CanReadMemoryStatsWithoutFeatureFlag) {
@@ -863,7 +1226,7 @@ DEATH_TEST(CurOpTestDeathTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "ta
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);
     unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
-    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
 }
 
 /**
@@ -881,7 +1244,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bob);
 
     // If the memory tracker has not updated CurOp, the memory tracking stat should not appear in
     // the profiler output.
@@ -889,9 +1252,9 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
     ASSERT_FALSE(res.hasField("peakTrackedMemBytes"));
 
-    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
     BSONObjBuilder bobWithMemStats;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bobWithMemStats);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bobWithMemStats);
     res = bobWithMemStats.done();
 
     ASSERT_EQ(15, curop->getPeakTrackedMemoryBytes());
@@ -983,6 +1346,103 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
                   200 - interval.count());
         ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
                   200 - interval.count());
+    }
+}
+
+TEST(CurOpTest, AppendIncludesDelinquentStatsIfNonZero) {
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
+
+    QueryTestServiceContext serviceContext;
+    auto tickSourcePtr = dynamic_cast<TickSourceMock<Nanoseconds>*>(
+        serviceContext.getServiceContext()->getTickSource());
+    tickSourcePtr->advance(Milliseconds{100});
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+    curOp->setTickSource_forTest(tickSourcePtr);
+    curOp->setNS(WithLock::withoutLock(),
+                 NamespaceString::createNamespaceString_forTest("test", "foo"));
+    curOp->ensureStarted();
+
+    auto appendProfileDoc = [&]() {
+        BSONObjBuilder bob;
+        curOp->debug().append(opCtx.get(),
+                              SingleThreadedLockStats{},
+                              FlowControlTicketholder::CurOp{},
+                              SingleThreadedStorageMetrics{},
+                              /*prepareReadConflicts=*/0,
+                              /*omitCommand=*/true,
+                              bob);
+        return bob.obj();
+    };
+
+    // If the delinquent stats are zero, they are *not* included in the profile document.
+    {
+        BSONObj doc = appendProfileDoc();
+        ASSERT_FALSE(doc.hasField("delinquencyInfo"));
+        ASSERT_TRUE(doc.hasField("numInterruptChecks"));
+    }
+
+    // If the delinquent stats are not zero, they *are* included in the profile document.
+    {
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(20));
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(10));
+        BSONObj doc = appendProfileDoc();
+        ASSERT_TRUE(doc.hasField("delinquencyInfo"));
+        ASSERT_EQ(doc["delinquencyInfo"]["totalDelinquentAcquisitions"].Long(), 2);
+        ASSERT_EQ(doc["delinquencyInfo"]["totalAcquisitionDelinquencyMillis"].Long(), 30);
+        ASSERT_EQ(doc["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
+    }
+
+    {
+        tickSourcePtr->advance(Milliseconds{200});
+        opCtx->checkForInterrupt();
+        BSONObj doc = appendProfileDoc();
+
+        const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+
+        ASSERT_TRUE(doc.hasField("numInterruptChecks")) << doc.toString();
+        ASSERT_EQ(doc["numInterruptChecks"].Number(), 1);
+
+        ASSERT_TRUE(doc.hasField("delinquencyInfo"));
+        ASSERT_EQ(doc["delinquencyInfo"]["overdueInterruptChecks"].Number(), 1);
+        ASSERT_EQ(doc["delinquencyInfo"]["overdueInterruptTotalMillis"].Number(),
+                  200 - interval.count());
+        ASSERT_EQ(doc["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
+                  200 - interval.count());
+    }
+}
+
+TEST(CurOpTest, AppendStagedIncludesDelinquentFields) {
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto* curop = CurOp::get(*opCtx);
+
+    // profile_filter.js requires every field append() emits to be filterable via appendStaged().
+    StringSet requestedFields = {"numInterruptChecks", "delinquencyInfo"};
+    auto makeDoc = OpDebug::appendStaged(opCtx.get(), requestedFields, /*needWholeDocument=*/false);
+    auto stagedDoc = [&]() {
+        return makeDoc(OpDebug::AppendArgs{opCtx.get(), curop->debug(), *curop});
+    };
+
+    {
+        BSONObj doc = stagedDoc();
+        ASSERT_TRUE(doc.hasField("numInterruptChecks"));
+        ASSERT_FALSE(doc.hasField("delinquencyInfo"));
+    }
+
+    {
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(20));
+        BSONObj doc = stagedDoc();
+        ASSERT_TRUE(doc.hasField("delinquencyInfo"));
+        ASSERT_EQ(doc["delinquencyInfo"]["totalDelinquentAcquisitions"].Long(), 1);
+        ASSERT_EQ(doc["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
     }
 }
 
@@ -1356,7 +1816,7 @@ TEST(CurOpTest, KilledOperationReportsLatency) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bob);
 
     auto res = bob.done();
     ASSERT_TRUE(res.hasField("interruptLatencyNanos")) << res.toString();
@@ -1374,7 +1834,7 @@ TEST(CurOpTest, ShouldReportDeadline) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bob);
 
     auto res = bob.done();
     ASSERT_TRUE(res.hasField("deadline")) << res.toString();
@@ -1386,7 +1846,7 @@ TEST(CurOpTest, ShouldReportDeadline) {
                                    nullptr,
                                    boost::none,
                                    boost::none,
-                                   true /*forceLog*/);
+                                   /*forceLog=*/true);
 
 
     static constexpr long long kSlowQueryLogId = 51803;
@@ -1598,6 +2058,35 @@ TEST(CurOpTest, SetEndOfOpMetricsForBatchWritesPopulatesAllMetrics) {
     ASSERT_EQ(metrics1.overdueInterruptApproxMax, metrics2.overdueInterruptApproxMax);
 }
 
+#if defined(__linux__)
+void burnCpu(OperationContext* opCtx, Nanoseconds cpuTime) {
+    auto timer = OperationCPUTimers::get(opCtx)->makeTimer();
+    timer.start();
+    while (timer.getElapsed() < cpuTime) {
+        // Busy wait.
+    }
+}
+
+TEST(CurOpTest, CalculateCpuTimeRecalculatesOnEveryCall) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    CurOp* curOp = CurOp::get(*opCtx);
+    curOp->ensureStarted();
+
+    const auto firstCpuTime = curOp->calculateCpuTime();
+    ASSERT_GTE(firstCpuTime, Nanoseconds(0));
+    ASSERT_EQ(curOp->debug().cpuTime, firstCpuTime);
+
+    burnCpu(opCtx.get(), Microseconds(1));
+
+    // A later call must observe the CPU time spent since the first call, rather than returning
+    // the previously calculated value.
+    const auto secondCpuTime = curOp->calculateCpuTime();
+    ASSERT_GTE(secondCpuTime, firstCpuTime + Microseconds(1));
+    ASSERT_EQ(curOp->debug().cpuTime, secondCpuTime);
+}
+#endif  // defined(__linux__)
+
 /**
  * Verify that setEndOfOpMetricsForBatchWrites is a no-op when there are no batch write entries.
  */
@@ -1699,6 +2188,229 @@ TEST(CurOpTest, ExecutionTimeMicrosPreservesSubMillisecondPrecision) {
     // The microsecond value must not be a round multiple of 1,000 (which would indicate it was
     // derived from a millisecond value rather than stored directly).
     ASSERT_NE(bson["durationMicros"].safeNumberLong() % 1'000, 0LL);
+}
+
+// A mock command with one redacted field, used to verify that reportState() applies the command's
+// field-level redaction (the same the slow-query log uses) to its output.
+class CurOpMockCmd : public BasicCommand {
+public:
+    CurOpMockCmd() : BasicCommand("curOpMockCmd") {}
+
+    std::set<std::string_view> sensitiveFieldNames() const final {
+        return {"field"};
+    }
+    bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
+        return true;
+    }
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return false;
+    }
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+};
+
+TEST(CurOpTest, ReportStateRedactsCommandFields) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    CurOpMockCmd cmd;
+    BSONObj cmdObj = BSON("curOpMockCmd" << 1 << "field"
+                                         << "value"
+                                         << "$db"
+                                         << "admin");
+    {
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
+        curOp->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest("admin.$cmd"),
+            &cmd,
+            cmdObj,
+            NetworkOp::dbQuery);
+    }
+
+    BSONObjBuilder bob;
+    curOp->reportState(&bob, SerializationContext{});
+    BSONObj state = bob.obj();
+
+    ASSERT_TRUE(state.hasField("command"));
+    BSONObj command = state["command"].Obj();
+    ASSERT_TRUE(command.hasField("field"));
+    // A field the command marks for redaction is scrubbed in the output, the
+    // same as the slow-query log.
+    ASSERT_EQ(command["field"].str(), "xxx");
+}
+
+TEST(CurOpTest, ReportStateReportsUnrecognizedCommand) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    // A command op with no resolved Command* (unrecognized command).
+    BSONObj cmdObj = BSON("someUnknownCommand" << 1 << "field"
+                                               << "value"
+                                               << "$db"
+                                               << "admin");
+    {
+        std::lock_guard<Client> clientLock(*opCtx->getClient());
+        curOp->setGenericOpRequestDetails(
+            clientLock,
+            NamespaceString::createNamespaceString_forTest("admin.$cmd"),
+            /*command=*/nullptr,
+            cmdObj,
+            NetworkOp::dbQuery);
+    }
+
+    BSONObjBuilder bob;
+    curOp->reportState(&bob, SerializationContext{});
+    BSONObj state = bob.obj();
+
+    // With no Command*, the request is reported as "unrecognized" rather than echoed, consistent
+    // with the slow-query log.
+    ASSERT_EQ(state["command"].str(), "unrecognized");
+}
+
+// A minimal StorageStats implementation so the test can populate CurOp's storage statistics
+// without depending on a storage engine. Only toBSON()/bytesRead() are exercised here.
+class MockStorageStats : public StorageStats {
+public:
+    explicit MockStorageStats(uint64_t bytesRead) : _bytesRead(bytesRead) {}
+
+    void appendToBsonObjBuilder(BSONObjBuilder& builder) const override {
+        BSONObjBuilder dataSection(builder.subobjStart("data"));
+        dataSection.append("bytesRead", static_cast<long long>(_bytesRead));
+    }
+
+    BSONObj toBSON() const override {
+        BSONObjBuilder builder;
+        appendToBsonObjBuilder(builder);
+        return builder.obj();
+    }
+
+    uint64_t bytesRead() const override {
+        return _bytesRead;
+    }
+    Microseconds readingTime() const override {
+        return Microseconds{0};
+    }
+    std::unique_ptr<StorageStats> clone() const override {
+        return std::make_unique<MockStorageStats>(_bytesRead);
+    }
+    StorageStats& operator+=(const StorageStats&) override {
+        return *this;
+    }
+    StorageStats& operator-=(const StorageStats&) override {
+        return *this;
+    }
+
+private:
+    uint64_t _bytesRead;
+};
+
+TEST(CurOpTest, ReportDebugInfoIncludesCurOpState) {
+    QueryTestServiceContext serviceContext;
+
+    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
+    // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
+    // not-started timer.
+    tickSourceMock->advance(Milliseconds{100});
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->setTickSource_forTest(tickSourceMock.get());
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const BSONObj command = BSON("find" << "coll");
+    {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->setNS(lk, nss);
+        curop->setOpDescription(lk, command);
+        curop->setPlanSummary(lk, std::string{"COLLSCAN"});
+    }
+    curop->ensureStarted();
+    // Advance beyond one second so that 'secs_running' rounds to a non-zero value.
+    tickSourceMock->advance(Seconds{2});
+
+    curop->debug().planCacheShapeHash = 12345u;
+    curop->debug().planCacheKey = 67890u;
+    curop->debug().storageStats = std::make_unique<MockStorageStats>(4096);
+    curop->yielded(3);
+
+    BSONObjBuilder builder;
+    {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportDebugInfo(&builder);
+    }
+    auto bsonObj = builder.done();
+
+    // ns
+    ASSERT_EQ(bsonObj.getStringField("ns"),
+              NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    // redacted command
+    ASSERT_TRUE(bsonObj.hasField("command"));
+    ASSERT_EQ(bsonObj["command"].Obj().firstElementFieldName(), std::string{"find"});
+    // planCacheShapeHash (formerly 'queryHash') and planCacheKey
+    ASSERT_EQ(bsonObj.getStringField("planCacheShapeHash"), zeroPaddedHex(12345u));
+    ASSERT_EQ(bsonObj.getStringField("planCacheKey"), zeroPaddedHex(67890u));
+    // planSummary
+    ASSERT_EQ(bsonObj.getStringField("planSummary"), "COLLSCAN");
+    // secs_running
+    ASSERT_EQ(bsonObj["secs_running"].numberLong(), 2);
+    // numYields
+    ASSERT_EQ(bsonObj["numYields"].numberInt(), 3);
+    // storage.data.bytesRead
+    ASSERT_EQ(bsonObj["storage"]["data"]["bytesRead"].numberLong(), 4096);
+}
+
+// Mutating the cross-thread-readable OpDebug members while another thread calls
+// reportDebugInfo() must be synchronized via lockCrossThreadDebugInfo().
+TEST(CurOpTest, ReportDebugInfoIsSynchronizedWithCrossThreadDebugInfoMutations) {
+    QueryTestServiceContext serviceContext;
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->ensureStarted();
+
+    AtomicWord<bool> stop{false};
+    std::thread writer([&] {
+        while (!stop.load()) {
+            auto debugInfoLock = curop->lockCrossThreadDebugInfo();
+            curop->debug().planCacheShapeHash = 12345u;
+            curop->debug().planCacheKey = 67890u;
+            if (curop->debug().storageStats) {
+                *curop->debug().storageStats += MockStorageStats(4096);
+            } else {
+                curop->debug().storageStats = std::make_unique<MockStorageStats>(4096);
+            }
+        }
+    });
+
+    ON_BLOCK_EXIT([&] {
+        stop.store(true);
+        writer.join();
+    });
+
+    for (int i = 0; i < 1000; ++i) {
+        BSONObjBuilder builder;
+        // The Client lock is required to call reportDebugInfo() from another thread.
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportDebugInfo(&builder);
+        auto bsonObj = builder.done();
+        // Whatever values reportDebugInfo() observed, it must see them consistently.
+        if (bsonObj.hasField("planCacheShapeHash")) {
+            ASSERT_EQ(bsonObj.getStringField("planCacheShapeHash"), zeroPaddedHex(12345u));
+            ASSERT_EQ(bsonObj.getStringField("planCacheKey"), zeroPaddedHex(67890u));
+        }
+        if (bsonObj.hasField("storage")) {
+            ASSERT_EQ(bsonObj["storage"]["data"]["bytesRead"].numberLong(), 4096);
+        }
+    }
 }
 
 }  // namespace

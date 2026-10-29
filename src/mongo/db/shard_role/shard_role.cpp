@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_role.h"
 
@@ -34,8 +8,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/backoff_with_jitter.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -61,6 +37,8 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/feature_document_util.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -904,6 +882,35 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
         !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
+Lock::GlobalLock* getIntentOwningGlobalLock(TransactionResources& transactionResources) {
+    // Every acquisition points at that same global lock, so consulting the first one suffices.
+    // 'globalLock' is only set for lock-free acquisitions; otherwise it is held by 'dbLock'.
+    auto globalLockFor = [](shard_role_details::AcquiredBase& acquisition) {
+        return acquisition.dbLock ? acquisition.dbLock->getGlobalLock()
+                                  : acquisition.globalLock.get();
+    };
+    if (!transactionResources.acquiredCollections.empty()) {
+        return globalLockFor(transactionResources.acquiredCollections.front());
+    }
+    if (!transactionResources.acquiredViews.empty()) {
+        return globalLockFor(transactionResources.acquiredViews.front());
+    }
+    return nullptr;
+}
+
+void yieldLocksAndIntents(OperationContext* opCtx, TransactionResources& transactionResources) {
+    Locker::LockSnapshot lockSnapshot;
+    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
+
+    boost::optional<rss::consensus::IntentRegistry::Intent> yieldedIntent;
+    if (auto* globalLock = getIntentOwningGlobalLock(transactionResources)) {
+        yieldedIntent = globalLock->releaseIntent();
+    }
+
+    transactionResources.yielded.emplace(
+        TransactionResources::YieldedStateHolder{std::move(lockSnapshot), yieldedIntent});
+}
+
 StashedTransactionResources buildStashedTransactionResourcesAndDetachFromOpCtx(
     OperationContext* opCtx) {
     auto& transactionResources = TransactionResources::get(opCtx);
@@ -1556,7 +1563,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
     // Open a consistent catalog snapshot if needed.
     bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
     auto catalogAtReadSource =
-        getConsistentCatalog(opCtx, acquisitionRequests, false /* isWriteAcquisition */);
+        getConsistentCatalog(opCtx, acquisitionRequests, /*isWriteAcquisition=*/false);
 
     auto& txnResources = TransactionResources::get(opCtx);
     // No need to validate against the snapshot policy if this is the first collection acquisition.
@@ -1925,7 +1932,7 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
         // fetched from the in-memory catalog and not from the durable catalog and no temporary
         // objects will be stored in the snapshot.
         auto collection = catalog->establishConsistentCollection(
-            opCtx, acquiredCollection->prerequisites.nss, boost::none /*readTimestamp*/);
+            opCtx, acquiredCollection->prerequisites.nss, /*readTimestamp=*/boost::none);
         checkCollectionUUIDMismatch(
             opCtx, nss, collection.get(), acquiredCollection->prerequisites.uuid);
         if (!acquiredCollection->collectionPtr && collection.get()) {
@@ -2012,10 +2019,7 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
     // Stash the locker state, only if we have any active acquisition. Don't do it when we don't, as
     // it is illegal to call saveLockStateAndUnlock without actually holding any locks.
     if (transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE) {
-        Locker::LockSnapshot lockSnapshot;
-        shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-        transactionResources.yielded.emplace(
-            TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+        yieldLocksAndIntents(opCtx, transactionResources);
     }
 
     auto originalState = std::exchange(transactionResources.state,
@@ -2051,6 +2055,17 @@ void restoreTransactionResourcesToOperationContext(
         // Reacquire locks. External yields do not have a lock snapshot so we only restore for
         // internal yields.
         if (auto ptr = transactionResources.yielded.get_ptr()) {
+            // Re-declare the intent released on yield before reacquiring the locks, mirroring the
+            // acquisition order. This throws if the intent is no longer compatible with the
+            // replication state - for instance a Write intent after a stepdown - which correctly
+            // prevents the operation from resuming. 'yielded' is left intact in that case, so the
+            // operation stays in a consistent yielded state.
+            if (ptr->yieldedIntent) {
+                auto* globalLock = getIntentOwningGlobalLock(transactionResources);
+                tassert(13407001, "Missing global lock for a yielded intent", globalLock);
+                globalLock->reacquireIntent(*ptr->yieldedIntent);
+            }
+
             shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, ptr->yieldedLocker);
             transactionResources.yielded.reset();
         }
@@ -2147,7 +2162,7 @@ void restoreTransactionResourcesToOperationContext(
                 // because they have already established a ScopedCollectionFilter that acts as
                 // RangePreserver.
                 auto collOrView = acquireLocalCollectionOrView(
-                    opCtx, *catalog, prerequisites, true /* forRestore */);
+                    opCtx, *catalog, prerequisites, /*forRestore=*/true);
 
                 if (!holds_alternative<CollectionPtr>(collOrView)) {
                     uassertedCollectionIsAViewAfterRestore();
@@ -2167,7 +2182,7 @@ void restoreTransactionResourcesToOperationContext(
                 }
 
                 auto reacquiredServicesSnapshot =
-                    acquireServicesSnapshot(opCtx, *catalog, prerequisites, true /* forRestore */);
+                    acquireServicesSnapshot(opCtx, *catalog, prerequisites, /*forRestore=*/true);
 
                 if (!holds_alternative<CollectionPtr>(
                         reacquiredServicesSnapshot.collectionPtrOrView)) {
@@ -2210,7 +2225,7 @@ void restoreTransactionResourcesToOperationContext(
         for (auto& acquiredView : transactionResources.acquiredViews) {
             const auto& prerequisites = acquiredView.prerequisites;
             auto collOrView =
-                acquireLocalCollectionOrView(opCtx, *catalog, prerequisites, true /* forRestore */);
+                acquireLocalCollectionOrView(opCtx, *catalog, prerequisites, /*forRestore=*/true);
 
             uassert(ErrorCodes::QueryPlanKilled,
                     str::stream() << "Namespace '" << prerequisites.nss.toStringForErrorMsg()
@@ -2255,11 +2270,8 @@ void restoreTransactionResourcesToOperationContext(
                     // means holding the session checked in while we wait, which can lead to
                     // deadlocks. Also retryable writes will safely be retried by a higher layer in
                     // case of StaleConfig.
-                    Locker::LockSnapshot lockSnapshot;
                     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-                    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-                    transactionResources.yielded.emplace(
-                        TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                    yieldLocksAndIntents(opCtx, transactionResources);
                     // Wait for the critical section to finish.
                     refresh_util::waitForCriticalSectionToComplete(opCtx,
                                                                    *ex->getCriticalSectionSignal())
@@ -2282,11 +2294,8 @@ void restoreTransactionResourcesToOperationContext(
                     PlanYieldPolicy::throwCollectionDroppedError(extraInfo->collectionUUID());
                 }
             } catch (const StorageUnavailableException& ex) {
-                Locker::LockSnapshot lockSnapshot;
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-                shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-                transactionResources.yielded.emplace(
-                    TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                yieldLocksAndIntents(opCtx, transactionResources);
 
                 logAndRecordWriteConflictAndBackoff(opCtx,
                                                     attempts,
@@ -2308,11 +2317,8 @@ void restoreTransactionResourcesToOperationContext(
                     throw;
                 }
                 // Release locks
-                Locker::LockSnapshot lockSnapshot;
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-                shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-                transactionResources.yielded.emplace(
-                    TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+                yieldLocksAndIntents(opCtx, transactionResources);
                 const auto refreshInfo = ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
                 const auto refreshStatus = Grid::get(opCtx)
                                                ->catalogCache()
@@ -2658,16 +2664,67 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
     }
 }
 
-NamespaceString shard_role_nocheck::resolveNssWithoutAcquisition(OperationContext* opCtx,
-                                                                 const DatabaseName& dbName,
-                                                                 const UUID& uuid) {
-    return CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
-        opCtx, dbName, uuid);
+NamespaceString shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(OperationContext* opCtx,
+                                                                         const DatabaseName& dbName,
+                                                                         const UUID& uuid) {
+    boost::optional<BackoffWithJitter> backoff;
+
+    while (true) {
+        try {
+            return CollectionCatalog::latest(opCtx)
+                ->resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(opCtx, dbName, uuid);
+        } catch (const ExceptionFor<ErrorCodes::CommitPendingNamespaceOrUUID>&) {
+            if (!backoff) {
+                backoff.emplace(Milliseconds{1}, Milliseconds{10});
+            }
+            // Unless there's at least 1 attempt, the backoff is 0. Increment first.
+            backoff->incrementAttemptCount();
+            opCtx->sleepFor(backoff->getBackoffDelay());
+        }
+    }
 }
 
 boost::optional<NamespaceString> shard_role_nocheck::lookupNssWithoutAcquisition(
     OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
+}
+
+void shard_role_nocheck::iterateDurableCatalog(
+    OperationContext* opCtx,
+    const std::function<void(const NamespaceString& ns, const BSONObj& catalogEntry)>& visitor) {
+    tassert(9724500,
+            "iterateDurableCatalog requires at least a global IS lock",
+            shard_role_details::getLocker(opCtx)->isReadLocked());
+
+    // When no snapshot is open yet, set the read source so that secondaries with rc:local
+    // read at kLastApplied instead of kNoTimestamp.
+    if (!shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+        auto readSourceInfo =
+            SnapshotHelper::getReadSourceForSecondaryReadsIfNeeded(opCtx, boost::none);
+        if (readSourceInfo) {
+            SnapshotHelper::updateReadSourceTimestampForSecondaryReadsIfPossible(
+                opCtx, boost::none, *readSourceInfo);
+        }
+    }
+
+    auto cursor = MDBCatalog::get(opCtx)->getCursor(opCtx);
+    if (!cursor) {
+        return;
+    }
+
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+
+        // For backwards compatibility where older versions have a written feature document.
+        // See SERVER-57125.
+        if (feature_document_util::isFeatureDocument(obj)) {
+            continue;
+        }
+
+        NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj.getStringField("ns")));
+        visitor(ns, obj);
+    }
 }
 
 }  // namespace mongo

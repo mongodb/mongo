@@ -8,7 +8,6 @@ selector:
     - jstests/noPassthroughWithMongod/query/lookup_with_limit.js
     - jstests/noPassthroughWithMongod/query/lookup_match_pushdown.js
     - jstests/noPassthroughWithMongod/query/plan_selection_no_results.js
-    - jstests/noPassthroughWithMongod/query/plan_ranking/cbrForNoMPResults.js
     # Unrelated test times out for an unrelated reason
     - jstests/noPassthroughWithMongod/ttl/ttl1.js
 
@@ -29,4 +28,6 @@ executor:
         internalEnableJoinOptimization: true
         # Path arrayness is required for join optimization.
         featureFlagPathArrayness: true
+        # Join optimization needs samplingCE for cardinality estimation
+        featureFlagCostBasedRanker: true
         internalQuerySamplingBySequentialScan: true

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/shard_key_pattern_query_util.h"
 
@@ -432,11 +406,11 @@ boost::optional<IndexBounds> getIndexBoundsForQuery(const BSONObj& key,
                           MultikeyPaths{},
                           // Empty multikey path set, since the shard key index cannot be multikey.
                           {},
-                          false /* sparse */,
-                          false /* unique */,
+                          /*sp=*/false,
+                          /*unq=*/false,
                           IndexEntry::Identifier{"shardkey"},
                           BSONObj(),
-                          nullptr /* projExec */);
+                          /*wildcardProjection=*/nullptr);
     ;
 
     auto statusWithMultiPlanSolns =
@@ -512,21 +486,18 @@ void getShardIdsAndChunksForQuery(boost::intrusive_ptr<ExpressionContext> expCtx
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
 
-    getShardIdsAndChunksForCanonicalQuery(
-        expCtx->getOperationContext(), *cq, cm, shardIds, info, bypassIsFieldHashedCheck);
+    getShardIdsAndChunksForCanonicalQuery(*cq, cm, shardIds, info, bypassIsFieldHashedCheck);
 }
 
-void getShardIdsForCanonicalQuery(OperationContext* opCtx,
-                                  const CanonicalQuery& query,
+void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
                                   const ChunkManager& cm,
                                   std::set<ShardId>* shardIds,
                                   bool bypassIsFieldHashedCheck) {
     return getShardIdsAndChunksForCanonicalQuery(
-        opCtx, query, cm, shardIds, nullptr, bypassIsFieldHashedCheck);
+        query, cm, shardIds, nullptr, bypassIsFieldHashedCheck);
 }
 
-void getShardIdsAndChunksForCanonicalQuery(OperationContext* opCtx,
-                                           const CanonicalQuery& query,
+void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
                                            const ChunkManager& cm,
                                            std::set<ShardId>* shardIds,
                                            QueryTargetingInfo* info,
@@ -579,7 +550,7 @@ void getShardIdsAndChunksForCanonicalQuery(OperationContext* opCtx,
             tassert(9607300,
                     "Shard targeting index bounds are not in the expected order",
                     SimpleBSONObjComparator::kInstance.evaluate(min <= max));
-            cm.getShardIdsForRange(opCtx, min, max, shardIds, info ? &info->chunkRanges : nullptr);
+            cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
 
             // Once we know we need to visit all shards no need to keep looping.
             // However, this optimization does not apply when we are reading from a snapshot
@@ -592,8 +563,8 @@ void getShardIdsAndChunksForCanonicalQuery(OperationContext* opCtx,
             // Uses getAproxNShardsOwningChunks() as getNShardsOwningChunks() is only available on
             // CurrentChunkManager, but both currently share the same implementation.
             // TODO SERVER-114823 Review the usage of getAproxNShardsOwningChunks here.
-            if (!cm.isAtPointInTime() &&
-                shardIds->size() == cm.getAproxNShardsOwningChunks(opCtx) && !info) {
+            if (!cm.isAtPointInTime() && shardIds->size() == cm.getAproxNShardsOwningChunks() &&
+                !info) {
                 break;
             }
         }

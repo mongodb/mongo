@@ -93,13 +93,12 @@ assert.commandWorked(
         _waitForDelete: true,
     }),
 );
-assert.commandWorked(st.s1.adminCommand({split: "test.user", middle: {_id: -900}}));
 assert.commandWorked(
     st.s1.adminCommand({
-        moveChunk: "test.user",
-        find: {_id: -900},
-        to: shard0,
-        _waitForDelete: true,
+        moveRange: "test.user",
+        min: {_id: -900},
+        toShard: shard0,
+        waitForDelete: true,
     }),
 );
 assert.commandWorked(

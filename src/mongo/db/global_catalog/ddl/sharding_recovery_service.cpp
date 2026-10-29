@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
@@ -45,6 +19,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -56,6 +31,7 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -86,6 +62,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(pauseShardingRecoveryServiceAfterLockBegin);
+MONGO_FAIL_POINT_DEFINE(forceTriggerShardingRecoveryRollbackReset);
 
 namespace {
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
@@ -111,7 +88,7 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nssBeingReleased);
     if (_includeStepsForNamespaceDropped) {
-        scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
+        scopedCsr->clearCollectionMetadata(opCtx, /*collIsDropped=*/true);
     } else {
         scopedCsr->clearCollectionMetadata(opCtx);
     }
@@ -239,7 +216,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // CS.
         // - Otherwise this call will fail and the CS won't be taken (neither persisted nor
         // in-mem)
-        CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
+        CollectionCriticalSectionDocument newDoc(nss, reason, /*blockReads=*/false);
         newDoc.setClearShardCatalogCache(clearShardCatalogCache);
 
         const auto commandResponse = dbClient.runCommand([&] {
@@ -411,6 +388,19 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                 "writeConcern"_attr = writeConcern);
 }
 
+bool ShardingRecoveryService::isCriticalSectionHeld(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const BSONObj& reason) {
+    DBDirectClient dbClient(opCtx);
+    FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
+    findRequest.setLimit(1);
+    findRequest.setFilter(
+        BSON(CollectionCriticalSectionDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+             << CollectionCriticalSectionDocument::kReasonFieldName << reason));
+    return dbClient.find(std::move(findRequest))->more();
+}
+
 void ShardingRecoveryService::releaseRecoverableCriticalSection(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -548,7 +538,9 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
 }
 
 void ShardingRecoveryService::onReplicationRollback(
-    OperationContext* opCtx, const std::set<NamespaceString>& rollbackNamespaces) {
+    OperationContext* opCtx,
+    const std::set<NamespaceString>& rollbackNamespaces,
+    const StringMap<long long>& rollbackCommandCounts) {
     // TODO (SERVER-91926): Move these recovery services to onConsistentDataAvailable interface once
     // it offers a way to know which nss were impacted by the rollback event.
 
@@ -558,10 +550,28 @@ void ShardingRecoveryService::onReplicationRollback(
         NamespaceString::kConfigShardCatalogChunksNamespace,
         NamespaceString::kCollectionCriticalSectionsNamespace,
     };
-    if (std::ranges::any_of(kShardingRecoveryTriggerNamespaces, [&](const NamespaceString& nss) {
-            return rollbackNamespaces.contains(nss);
-        })) {
-        _resetInMemoryStates(opCtx);
+    const auto rolledBack = [&](const NamespaceString& nss) {
+        return rollbackNamespaces.contains(nss);
+    };
+
+    // The oplog 'c' entries maintain the CSR/DSR in the authoritative shard catalog model. If any
+    // of these were rolled back, we need to reset all of the CSRs/DSRs.
+    static const std::array kCsrMaintenanceCommands{
+        repl::CommandTypeEnum::kCreateDatabaseMetadata,
+        repl::CommandTypeEnum::kDropDatabaseMetadata,
+        repl::CommandTypeEnum::kInvalidateCollectionMetadata,
+        repl::CommandTypeEnum::kSetAllowChunkOperations,
+        repl::CommandTypeEnum::kUpdateCollectionMetadata,
+    };
+    const auto commandRolledBack = [&](repl::CommandTypeEnum cmd) {
+        auto it = rollbackCommandCounts.find(idl::serialize(cmd));
+        return it != rollbackCommandCounts.end() && it->second > 0;
+    };
+
+    if (MONGO_unlikely(forceTriggerShardingRecoveryRollbackReset.shouldFail()) ||
+        std::ranges::any_of(kShardingRecoveryTriggerNamespaces, rolledBack) ||
+        std::ranges::any_of(kCsrMaintenanceCommands, commandRolledBack)) {
+        _resetInMemoryStates(opCtx, gClearCollectionShardingRuntimesOnRecovery.load());
         _recoverDatabaseShardingState(opCtx);
         _recoverAllowChunkOperations(opCtx);
         _recoverRecoverableCriticalSections(opCtx);
@@ -658,14 +668,24 @@ void ShardingRecoveryService::_recoverAllowChunkOperations(OperationContext* opC
     LOGV2_DEBUG(12120910, 2, "Recovered setAllowChunkOperations from the shard catalog");
 }
 
-void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
-    LOGV2_DEBUG(10371108, 2, "Resetting all in-memory sharding states");
+void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx,
+                                                   bool clearCollectionShardingRuntimes) {
+    bool resetCsr = clearCollectionShardingRuntimes &&
+        feature_flags::gAuthoritativeShardsDDL.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    LOGV2_DEBUG(10371108,
+                resetCsr ? 0 : 2,
+                "Resetting all in-memory sharding states",
+                "resetCollectionShardingRuntimes"_attr = resetCsr);
 
-    // Release all in-memory critical sections
+    // Release all in-memory critical sections and optionally all the CSRs.
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         scopedCsr->exitCriticalSectionNoChecks(opCtx);
-        scopedCsr->clearCollectionMetadata(opCtx);
+        if (resetCsr) {
+            scopedCsr->clearCollectionMetadata(opCtx);
+        }
     }
 
     // ShardingRecoveryService can bypass the critical section to recover database metadata as there
@@ -679,7 +699,10 @@ void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
         scopedDsr->clearDbMetadata(opCtx);
     }
 
-    LOGV2_DEBUG(10371109, 2, "Reset all in-memory sharding states");
+    LOGV2_DEBUG(10371109,
+                resetCsr ? 0 : 2,
+                "Reset all in-memory sharding states",
+                "resetCollectionShardingRuntimes"_attr = resetCsr);
 }
 
 }  // namespace mongo

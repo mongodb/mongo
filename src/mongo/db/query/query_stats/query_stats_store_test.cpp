@@ -1,32 +1,7 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,21 +18,27 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -66,6 +47,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 
 #include <absl/hash/hash.h>
 #include <boost/cstdint.hpp>
@@ -82,18 +64,58 @@ int countAllEntries(const QueryStatsStore& store) {
     return numKeys;
 }
 
+BSONObj buildLargeAndFilter(int numClauses) {
+    BSONObjBuilder bob;
+    BSONArrayBuilder andBob(bob.subarrayStart("$and"));
+    for (int i = 1; i <= numClauses; i++) {
+        andBob.append(BSON("x" << BSON("$lt" << i << "$gte" << i)));
+    }
+    andBob.doneFast();
+    return bob.obj();
+}
+
 static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static std::unique_ptr<const Key> makeFindKeyFromQuery(BSONObj filter) {
+    static std::pair<std::unique_ptr<const Key>, boost::intrusive_ptr<ExpressionContextForTest>>
+    makeFindKeyAndExpCtx(BSONObj filter) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(filter.getOwned());
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
         auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
-        return std::make_unique<FindKey>(
+        auto key = std::make_unique<FindKey>(
             expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+        return {std::move(key), expCtx};
+    }
+
+    static std::unique_ptr<const Key> makeFindKeyFromQuery(BSONObj filter) {
+        return makeFindKeyAndExpCtx(std::move(filter)).first;
+    }
+
+    // Like makeFindKeyFromQuery, but also returns the entry's SHA256 keyHash, for tests that build
+    // a QueryStatsEntry directly and must supply the hash.
+    static std::pair<std::unique_ptr<const Key>, std::string> makeFindKeyAndHashFromQuery(
+        BSONObj filter) {
+        auto [key, expCtx] = makeFindKeyAndExpCtx(std::move(filter));
+        auto userVisibleHash = computeUserVisibleHash(expCtx->getOperationContext(), *key);
+        return {std::move(key), std::move(userVisibleHash)};
+    }
+
+    // Like makeFindKeyAndHashFromQuery, but sets 'hint' on the find request.
+    static std::pair<std::unique_ptr<const Key>, std::string> makeHintedFindKeyAndHash(
+        BSONObj filter, BSONObj hint) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        fcr->setHint(hint.getOwned());
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        auto key = std::make_unique<FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+        auto userVisibleHash = computeUserVisibleHash(expCtx->getOperationContext(), *key);
+        return {std::move(key), std::move(userVisibleHash)};
     }
 
     static constexpr auto collectionType = query_shape::CollectionType::kCollection;
@@ -148,11 +170,12 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
     };
 
     auto collectMetrics = [&](BSONObj query) {
-        auto key = makeFindKeyFromQuery(query);
+        auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
         auto lookupHash = absl::HashOf(key);
         auto lookupResult = queryStatsStore.lookup(lookupHash);
         if (!lookupResult.isOK()) {
-            queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+            queryStatsStore.put(lookupHash,
+                                QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
             lookupResult = queryStatsStore.lookup(lookupHash);
         }
         auto metrics = lookupResult.getValue();
@@ -198,14 +221,15 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     // behavior with very large queries.
     // Add an entry that is smaller than the max partition size.
     auto query = BSON("query" << 1 << "xEquals" << 42);
-    auto key = makeFindKeyFromQuery(query);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
 
-    const size_t cacheSize = key->size() + sizeof(QueryStatsEntry) + 100;
+    auto hash = absl::HashOf(key);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
+    const size_t cacheSize = QueryStatsStoreEntryBudgetor{}(hash, entry) + 100;
     const auto numPartitions = 1;
     QueryStatsStore queryStatsStore{cacheSize, numPartitions};
 
-    auto hash = absl::HashOf(key);
-    queryStatsStore.put(hash, QueryStatsEntry{std::move(key)});
+    queryStatsStore.put(hash, std::move(entry));
     ASSERT_EQ(countAllEntries(queryStatsStore), 1);
 
     // We'll do this again later so save this as a helper function.
@@ -241,18 +265,19 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
         auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
 
-        key = std::make_unique<query_stats::FindKey>(
+        auto largeKey = std::make_unique<query_stats::FindKey>(
             expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
-        auto lookupHash = absl::HashOf(key);
-        QueryStatsEntry testMetrics{std::move(key)};
-        queryStatsStore.put(lookupHash, testMetrics);
+        auto lookupHash = absl::HashOf(largeKey);
+        auto userVisibleHash = computeUserVisibleHash(opCtx.get(), *largeKey);
+        queryStatsStore.put(lookupHash,
+                            QueryStatsEntry{std::move(largeKey), std::move(userVisibleHash)});
     };
 
     addLargeEntry(queryStatsStore);
     ASSERT_EQ(countAllEntries(queryStatsStore), 0);
 
     // This creates a queryStats store where each partition has a max size of 500 bytes.
-    QueryStatsStore queryStatsStoreTwo{/*cacheSize*/ cacheSize * 3, /*numPartitions*/ 3};
+    QueryStatsStore queryStatsStoreTwo{/*cacheSize=*/cacheSize * 3, /*numPartitions=*/3};
     // Adding a queryStats store entry that is smaller than the overal cache size but larger
     // than a single partition max size, will cause an eviction. testMetrics is larger than 500
     // bytes and thus over budget for the partitions of this cache.
@@ -260,28 +285,405 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     ASSERT_EQ(countAllEntries(queryStatsStoreTwo), 0);
 }
 
-TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
+TEST_F(QueryStatsStoreTest, RecordErrorCodeBasic) {
+    auto query = BSON("query" << 1);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
+    entry.recordErrorCode(ErrorCodes::BadValue);
+
+    ASSERT_EQ(entry.execCountErrored, 1);
+    ASSERT_EQ(entry.recentErrors.size(), 1);
+    auto [code, stats] = *entry.recentErrors.begin();
+    ASSERT_EQ(code, ErrorCodes::BadValue);
+    ASSERT_EQ(stats.count, 1);
+}
+
+TEST_F(QueryStatsStoreTest, RecordErrorCodeUpdatesExistingEntry) {
+    auto query = BSON("query" << 1);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
+
+    entry.recordErrorCode(ErrorCodes::BadValue);
+    entry.recordErrorCode(ErrorCodes::BadValue);
+
+    ASSERT_EQ(entry.execCountErrored, 2);
+    ASSERT_EQ(entry.recentErrors.size(), 1);
+    auto [code, stats] = *entry.recentErrors.begin();
+    ASSERT_EQ(code, ErrorCodes::BadValue);
+    ASSERT_EQ(stats.count, 2);
+}
+
+TEST_F(QueryStatsStoreTest, RecordErrorCodeEvictsLeastRecentlySeen) {
+    // Pin the bound to the lowest value the knob's validator accepts, so that the eviction path is
+    // exercised with a configuration production could actually run with.
+    const size_t maxRecentErrors = 5;
+    const auto originalMax = internalQueryStatsMaxErrorCodesPerShape.load();
+    ON_BLOCK_EXIT([&] { internalQueryStatsMaxErrorCodesPerShape.store(originalMax); });
+    internalQueryStatsMaxErrorCodesPerShape.store(static_cast<int>(maxRecentErrors));
+
+    auto query = BSON("query" << 1);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
+
+    entry.recordErrorCode(ErrorCodes::BadValue);
+    entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
+    entry.recordErrorCode(ErrorCodes::NoSuchKey);
+    entry.recordErrorCode(ErrorCodes::Unauthorized);
+    entry.recordErrorCode(ErrorCodes::HostUnreachable);
+    // A sixth distinct code should evict BadValue, since it is the least-recently-seen.
+    entry.recordErrorCode(ErrorCodes::NetworkTimeout);
+
+    ASSERT_EQ(entry.recentErrors.size(), maxRecentErrors);
+    // execCountErrored still reflects all 6 errors.
+    ASSERT_EQ(entry.execCountErrored, 6);
+
+    ASSERT_FALSE(entry.recentErrors.hasKey(ErrorCodes::BadValue));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::MaxTimeMSExpired));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::NoSuchKey));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::Unauthorized));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::HostUnreachable));
+    ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::NetworkTimeout));
+
+    // Re-recording the evicted code does not merge with its pre-eviction count.
+    entry.recordErrorCode(ErrorCodes::BadValue);
+    ASSERT_EQ(entry.execCountErrored, 7);
+    ASSERT_EQ(entry.recentErrors.size(), maxRecentErrors);
+    auto [code, stats] = *entry.recentErrors.begin();
+    ASSERT_EQ(code, ErrorCodes::BadValue);
+    ASSERT_EQ(stats.count, 1);
+}
+
+TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFlag) {
+    const bool originalFlagValue = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
+    ON_BLOCK_EXIT([&] {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(originalFlagValue);
+    });
+
+    auto opCtx = makeOperationContext();
+    auto makeMutableFindKey = [&](BSONObj filter) -> std::unique_ptr<Key> {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        return std::make_unique<FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+    };
+
+    QueryStatsSnapshot erroredSnapshot{};
+    erroredSnapshot.errorCode = ErrorCodes::BadValue;
+
+    // With the flag disabled, an errored execution must leave the shape's error-related counters
+    // untouched and execCount must stay zero'd out.
+    {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(false);
+        auto query = BSON("query" << 1 << "flag" << "disabled");
+        auto key = makeMutableFindKey(query);
+        auto keyHash = absl::HashOf(*key);
+        query_stats::writeQueryStats(opCtx.get(), keyHash, std::move(key), erroredSnapshot);
+
+        auto& queryStatsStore = getQueryStatsStore(opCtx.get());
+        auto lookupResult = queryStatsStore.lookup(keyHash);
+        ASSERT_OK(lookupResult);
+        auto& entry = *lookupResult.getValue();
+        ASSERT_EQ(entry.execCount, 0);
+        ASSERT_EQ(entry.execCountErrored, 0);
+        ASSERT_TRUE(entry.recentErrors.empty());
+    }
+
+    // With the flag enabled, an errored execution increments 'execCountErrored' and records the
+    // error code.
+    {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(true);
+        auto query = BSON("query" << 1 << "flag" << "enabled");
+        auto keyHash = [&] {
+            auto key = makeMutableFindKey(query);
+            return absl::HashOf(*key);
+        }();
+
+        query_stats::writeQueryStats(
+            opCtx.get(), keyHash, makeMutableFindKey(query), erroredSnapshot);
+
+        auto& queryStatsStore = getQueryStatsStore(opCtx.get());
+        {
+            auto lookupResult = queryStatsStore.lookup(keyHash);
+            ASSERT_OK(lookupResult);
+            auto& entry = *lookupResult.getValue();
+            ASSERT_EQ(entry.execCount, 0);
+            ASSERT_EQ(entry.execCountErrored, 1);
+            ASSERT_EQ(entry.recentErrors.size(), 1);
+            ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::BadValue));
+        }
+    }
+}
+
+class KeyHashIndexTest : public QueryStatsStoreTest {
+public:
+    static void insert(KeyHashIndex& index, const std::string& keyHash, std::size_t storeKey) {
+        index._insert(keyHash, storeKey);
+    }
+
+    static bool hasHash(KeyHashIndex& index, const std::string& keyHash) {
+        return index._lookup(keyHash).has_value();
+    }
+
+    static bool hasKey(KeyHashIndex& index, const std::string& keyHash, std::size_t storeKey) {
+        auto storeKeys = index._lookup(keyHash);
+        return storeKeys && storeKeys->contains(storeKey);
+    }
+
+    static void erase(KeyHashIndex& index, const std::string& keyHash, std::size_t storeKey) {
+        index._erase(keyHash, storeKey);
+    }
+
+    static size_t numUserVisibleHashes(const KeyHashIndex& index) {
+        return index._numUserVisibleHashes_forTest();
+    }
+
+    static size_t numMappings(KeyHashIndex& index) {
+        return index._numMappings_forTest();
+    }
+};
+
+TEST_F(KeyHashIndexTest, BasicOps) {
+    // 'KeyHashIndex' maps the user-visible SHA256 keyHash (base64) to the set of absl::HashOf store
+    // keys indexed under it.
+    KeyHashIndex index{/*numPartitions*/ 4};
+
+    const std::string userVisibleHashA(64, 'a');
+    const std::string userVisibleHashB(64, 'b');
+
+    // Unknown lookups return none.
+    ASSERT_FALSE(hasHash(index, userVisibleHashA));
+
+    insert(index, userVisibleHashA, /*storeKey*/ 111);
+    insert(index, userVisibleHashB, /*storeKey*/ 222);
+
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 111));
+    ASSERT_TRUE(hasKey(index, userVisibleHashB, 222));
+    ASSERT_EQ(numUserVisibleHashes(index), 2);
+
+    // A second store key under the same keyHash coexists (1:N).
+    insert(index, userVisibleHashA, /*storeKey*/ 333);
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 111));
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 333));
+    ASSERT_EQ(numUserVisibleHashes(index), 2);
+    // The two store keys under 'userVisibleHashA' are two mappings under one keyHash.
+    ASSERT_EQ(numMappings(index), 3);
+
+    // Erasing removes only the given store key.
+    erase(index, userVisibleHashA, 111);
+    ASSERT_FALSE(hasKey(index, userVisibleHashA, 111));
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 333));
+
+    // Erasing the last store key under a keyHash drops the keyHash entirely.
+    erase(index, userVisibleHashA, 333);
+    ASSERT_FALSE(hasHash(index, userVisibleHashA));
+    ASSERT_TRUE(hasHash(index, userVisibleHashB));
+
+    // Erasing an absent key is a no-op.
+    erase(index, userVisibleHashA, 999);
+    ASSERT_TRUE(hasHash(index, userVisibleHashB));
+    ASSERT_EQ(numUserVisibleHashes(index), 1);
+}
+
+namespace {
+
+/**
+ * Inserts an entry for 'key' into 'manager's store under 'storeKey', caching 'userVisibleHash' on
+ * the entry, so the store and the keyHash index are populated together.
+ */
+void insertEntryWithKeyHash(QueryStatsStoreManager& manager,
+                            std::unique_ptr<const Key> key,
+                            std::size_t storeKey,
+                            const std::string& userVisibleHash) {
+    auto& store = manager.getQueryStatsStore();
+    auto&& [statusWithMetrics, partitionLock] = store.getWithPartitionLock(storeKey);
+    store.put(storeKey, QueryStatsEntry(std::move(key), userVisibleHash), partitionLock);
+}
+
+/**
+ * Adds an entry for the find shape 'filter' produces to 'manager's store, so the store
+ * and the keyHash index are populated together. Returns its userVisibleHash and store key.
+ */
+std::pair<std::string, std::size_t> insertIndexedEntry(QueryStatsStoreManager& manager,
+                                                       OperationContext* opCtx,
+                                                       BSONObj filter) {
+    auto key = QueryStatsStoreTest::makeFindKeyFromQuery(std::move(filter));
+    const auto userVisibleHash = computeUserVisibleHash(opCtx, *key);
+    const std::size_t storeKey = absl::HashOf(*key);
+    insertEntryWithKeyHash(manager, std::move(key), storeKey, userVisibleHash);
+    return {userVisibleHash, storeKey};
+}
+
+/**
+ * Whether 'userVisibleHash' resolves to 'storeKey' through the manager's keyHash index.
+ */
+bool isIndexed(QueryStatsStoreManager& manager,
+               const std::string& userVisibleHash,
+               std::size_t storeKey) {
+    const auto locations = manager.findStoreKeysByUserHash({userVisibleHash});
+    return locations.size() == 1 && locations[0].second == storeKey;
+}
+
+/**
+ * All store keys 'userVisibleHash' resolves to, sorted.
+ */
+std::vector<std::size_t> resolvedStoreKeys(QueryStatsStoreManager& manager,
+                                           const std::string& userVisibleHash) {
+    std::vector<std::size_t> storeKeys;
+    for (const auto& location : manager.findStoreKeysByUserHash({userVisibleHash})) {
+        storeKeys.push_back(location.second);
+    }
+    std::sort(storeKeys.begin(), storeKeys.end());
+    return storeKeys;
+}
+
+}  // namespace
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexRetainsEntriesRetainedByResetSize) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 4};
+    auto opCtx = makeOperationContext();
+
+    // insertIndexedEntry() populates the store and the index together.
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 1);
+    ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
+
+    // Growing the store evicts nothing.
+    manager.resetSize(200000);
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 1);
+    ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 1);
+}
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexPrunedForEntriesEvictedByResetSize) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 1};
+    auto opCtx = makeOperationContext();
+
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
+
+    // A budget of zero evicts everything, so reset()'s evictions erase the mapping from the index
+    // through the store's eviction listener.
+    manager.resetSize(0);
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 0);
+    ASSERT_FALSE(isIndexed(manager, userVisibleHash, storeKey));
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 0);
+}
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexResolvesAndEvictsMultipleStoreKeysPerKeyHash) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    // One partition so both store keys resolve under it.
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 1};
+
+    // An object-valued '$hint' is redacted in the representative shape (the keyHash) but hashed raw
+    // into the store key, so these two finds share a keyHash yet land on different store keys.
+    auto [keyA, userVisibleHashA] =
+        makeHintedFindKeyAndHash(BSON("a" << 1), BSON("$hint" << BSON("x" << 1)));
+    auto [keyB, userVisibleHashB] =
+        makeHintedFindKeyAndHash(BSON("a" << 1), BSON("$hint" << BSON("y" << 1)));
+
+    ASSERT_EQ(userVisibleHashA, userVisibleHashB);
+    const std::size_t storeKeyA = absl::HashOf(*keyA);
+    const std::size_t storeKeyB = absl::HashOf(*keyB);
+    ASSERT_NE(storeKeyA, storeKeyB);
+
+    insertEntryWithKeyHash(manager, std::move(keyA), storeKeyA, userVisibleHashA);
+    insertEntryWithKeyHash(manager, std::move(keyB), storeKeyB, userVisibleHashA);
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 2);
+
+    // The one keyHash resolves to both store keys, and the index holds a single keyHash.
+    auto expected = std::vector<std::size_t>{storeKeyA, storeKeyB};
+    std::sort(expected.begin(), expected.end());
+    ASSERT_EQ(resolvedStoreKeys(manager, userVisibleHashA), expected);
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 1);
+
+    // Evicting one store key leaves the other under the same keyHash.
+    manager.getQueryStatsStore().remove(storeKeyA);
+    ASSERT_EQ(resolvedStoreKeys(manager, userVisibleHashA), (std::vector<std::size_t>{storeKeyB}));
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 1);
+
+    // Evicting the last store key drops the keyHash from the index, so this resolves to nothing.
+    manager.getQueryStatsStore().remove(storeKeyB);
+    ASSERT_TRUE(manager.findStoreKeysByUserHash({userVisibleHashA}).empty());
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 0);
+}
+
+TEST_F(QueryStatsStoreTest, EvictionKeepsLocalManagerIndexInSync) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    // Fill a local manager's store past its budget so entries are evicted; the keyHash index must
+    // shrink in lockstep. The manager under test is local (not the service decoration), so an
+    // eviction that reached a global manager would leave the index over-counted.
+    QueryStatsStoreManager manager{/*cacheSize*/ 20000, /*numPartitions*/ 1};
+    auto opCtx = makeOperationContext();
+
+    for (int i = 0; i < 200; ++i) {
+        insertIndexedEntry(manager, opCtx.get(), BSON("field" << i));
+    }
+
+    // Enough inserts must have been evicted for the equality assertion to be meaningful.
+    ASSERT_LT(countAllEntries(manager.getQueryStatsStore()), 200);
+    ASSERT_EQ(manager.numMappings_forTest(),
+              static_cast<size_t>(countAllEntries(manager.getQueryStatsStore())));
+}
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexDisabledByKnob) {
+    // The shared knob defaults to off; keep the guard explicit so this test is robust to the
+    // default flipping on.
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             false);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 4};
+    auto opCtx = makeOperationContext();
+
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    insertIndexedEntry(manager, opCtx.get(), BSON("b" << 1));
+
+    // The store fills normally but no mapping is maintained, so nothing resolves.
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 2);
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 0);
+    ASSERT_TRUE(manager.findStoreKeysByUserHash({userVisibleHash}).empty());
+}
+
+TEST_F(QueryStatsStoreTest, InsertedEntryCachesKeyHash) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 4};
+    auto opCtx = makeOperationContext();
+
+    // insertIndexedEntry() computes the userVisibleHash once; the stored entry must cache the same
+    // value so $queryStats output and index erasure reuse it rather than recompute it.
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    auto&& [entryStatus, partitionLock] =
+        manager.getQueryStatsStore().getWithPartitionLock(storeKey);
+    ASSERT_OK(entryStatus.getStatus());
+    const auto& entry = *entryStatus.getValue();
+    ASSERT_EQ(entry.userVisibleHash, userVisibleHash);
+}
+
+TEST_F(QueryStatsStoreTest, RegisterRequestSkipsShapeExceedingMaxUserSize) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
     FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
     // This creates a query that is just below the 16 MB memory limit.
     int limit = 225500;
-    BSONObjBuilder bob;
-    BSONArrayBuilder andBob(bob.subarrayStart("$and"));
-    for (int i = 1; i <= limit; i++) {
-        BSONObjBuilder childrenBob;
-        childrenBob.append("x", BSON("$lt" << i << "$gte" << i));
-        andBob.append(childrenBob.obj());
-    }
-    andBob.doneFast();
-    fcr.setFilter(bob.obj());
+    fcr.setFilter(buildLargeAndFilter(limit));
     auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
     auto opCtx = makeOperationContext();
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
-    unittest::ServerParameterGuard controller("featureFlagQueryStats", true);
 
-    auto&& globalQueryStatsStoreManager = QueryStatsStoreManager::get(opCtx->getServiceContext());
-    globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
+    QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext())
+        .configureSampleBased(1000, 0);
 
     // The shapification process will bloat the input query over the 16 MB memory limit. Assert
     // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
@@ -301,6 +703,42 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     })());
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.getQueryStatsInfo().keyHash, boost::none);
+}
+
+TEST_F(QueryStatsStoreTest, RegisterRequestSkipsKeyExceedingMaxUserSize) {
+    // The shapified filter is under BSONObjMaxUserSize, but the full key exceeds it, so
+    // registerRequest() must not record it.
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+    FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
+    // ~100000 clauses shapify to a filter of ~7.5MB, which is under BSONObjMaxUserSize.
+    fcr.setFilter(buildLargeAndFilter(100000));
+    // Inflate the key with a large hint so the serialized key exceeds BSONObjMaxUserSize while the
+    // query shape stays under it.
+    BSONObjBuilder hintBob;
+    for (int i = 0; i < 800000; i++) {
+        hintBob.append("f" + std::to_string(i), 1);
+    }
+    fcr.setHint(hintBob.obj());
+    auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
+
+    QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext())
+        .configureSampleBased(1000, 0);
+
+    auto statusWithShape =
+        shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+    ASSERT_OK(statusWithShape.getStatus());
+    ASSERT_DOES_NOT_THROW(([&]() {
+        query_stats::registerRequest(opCtx.get(), nss, [&]() {
+            return std::make_unique<query_stats::FindKey>(expCtx,
+                                                          *parsedFind->findCommandRequest,
+                                                          std::move(statusWithShape.getValue()),
+                                                          query_shape::CollectionType::kCollection);
+        });
+    })());
+    ASSERT_EQ(CurOp::get(*opCtx)->debug().getQueryStatsInfo().keyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
@@ -1361,6 +1799,109 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
         shapified);  // NOLINT (test auto-update)
 }
 
+TEST_F(QueryStatsStoreTest, AggKeyWithInternalOnlyExpressionIsSerializableByExternalClient) {
+    // Because we now collect query stats for internal clients, we may end up trying to re-parse a
+    // pipeline using an internal-client-only expression (i.e '$_internalIndexKey') when collecting
+    // query stats. Collecting query stats is done via an external-client context, so we must not
+    // apply the internal-client restriction to the stored shape.
+    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    auto rawPipeline = {fromjson(R"({
+            $replaceRoot: {newRoot: {
+                k: {$_internalIndexKey: {doc: '$$ROOT', spec: {key: {a: 1}, name: 'a_1'}}}
+            }}
+        })")};
+    acr.setPipeline(rawPipeline);
+    // The default test client has no transport session, so it counts as internal and this initial
+    // parse is permitted.
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+
+    auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+        acr, acr.getNamespace(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+
+    // Assert the stored form explicitly, rather than relying on the constructor happening to
+    // serialize the pipeline. This is all the shape retains: the Pipeline built above is discarded,
+    // so what gets re-parsed below is this BSON and nothing else. Requesting the representative
+    // options returns that stored copy directly, without a re-parse.
+    auto stored = aggShape->toBson(
+        expCtx->getOperationContext(),
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+        SerializationContext::stateDefault());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "aggregate",
+            "pipeline": [
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "k": {
+                                "$_internalIndexKey": {
+                                    "doc": "$$ROOT",
+                                    "spec": {
+                                        "key": {
+                                            "a": 1
+                                        },
+                                        "name": "a_1"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        })",
+        stored);
+
+    auto aggKey = std::make_unique<AggKey>(
+        expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto readClient = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*tl=*/nullptr));
+    auto readOpCtx = readClient->makeOperationContext();
+    auto shapified =
+        aggKey->toBson(readOpCtx.get(),
+                       query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                       SerializationContext::stateDefault());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "command": "aggregate",
+                "pipeline": [
+                    {
+                        "$replaceRoot": {
+                            "newRoot": {
+                                "HASH<k>": {
+                                    "$_internalIndexKey": {
+                                        "doc": "$$ROOT",
+                                        "spec": {
+                                            "key": {
+                                                "a": 1
+                                            },
+                                            "name": "a_1"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "collectionType": "collection"
+        })",
+        shapified);
+}
+
 TEST_F(QueryStatsStoreTest,
        CorrectlyTokenizesAggregateCommandRequestPipelineWithSecondaryNamespaces) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
@@ -1551,8 +2092,11 @@ struct QueryStatsBSONParams {
     bool useSubsections = false;
     bool includeWriteMetrics = false;
     bool includeCBRMetrics = false;
+    bool includeErrorMetrics = false;
     long long lastExecutionMicros = 0LL;
     long long execCount = 0LL;
+    long long execCountErrored = 0LL;
+    std::vector<BSONObj> errors = {};
     BSONObj hasSortStage = boolMetricBson(0, 0);
     BSONObj usedDisk = boolMetricBson(0, 0);
     BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
@@ -1567,14 +2111,26 @@ struct QueryStatsBSONParams {
     BSONObj peakTrackedMemBytes = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj clusterPeakTrackedMemBytes =
         intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj planShapeCounters = BSONObj();
 };
 
 void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& params = {}) {
     const BSONObj emptyIntMetric = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObjBuilder testBuilder{};
     testBuilder.appendNumber("lastExecutionMicros", params.lastExecutionMicros)
-        .appendNumber("execCount", params.execCount)
-        .append("totalExecMicros", emptyIntMetric)
+        .appendNumber("execCount", params.execCount);
+
+    if (params.includeErrorMetrics) {
+        testBuilder.appendNumber("execCountErrored", params.execCountErrored);
+        if (!params.errors.empty()) {
+            BSONArrayBuilder errorsBuilder{testBuilder.subarrayStart("errors")};
+            for (const auto& error : params.errors) {
+                errorsBuilder.append(error);
+            }
+        }
+    }
+
+    testBuilder.append("totalExecMicros", emptyIntMetric)
         .append("cpuNanos", emptyIntMetric)
         .append("workingTimeMillis", emptyIntMetric);
 
@@ -1621,6 +2177,10 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         .append("fromMultiPlanner", boolMetricBson(0, 0))
         .append("fromPlanCache", boolMetricBson(0, 0));
 
+    if (!params.planShapeCounters.isEmpty()) {
+        subsectionBuilder->append("planShapeCounters", params.planShapeCounters);
+    }
+
     if (params.includeCBRMetrics) {
         subsectionBuilder->append("planningTimeMicros", params.planningTimeMicros);
 
@@ -1635,6 +2195,7 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         ceMethods.setMixed(params.cardinalityEstimationMethods.getMixed().value_or(0));
         ceMethods.setMetadata(params.cardinalityEstimationMethods.getMetadata().value_or(0));
         ceMethods.setCode(params.cardinalityEstimationMethods.getCode().value_or(0));
+        ceMethods.setHyperLogLog(params.cardinalityEstimationMethods.getHyperLogLog().value_or(0));
         ceMethods.serialize(&methodsBuilder);
         methodsBuilder.done();
 
@@ -1666,9 +2227,11 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
     testBuilder.append("firstSeenTimestamp", qse.firstSeenTimestamp)
         .append("latestSeenTimestamp", Date_t());
 
-    ASSERT_BSONOBJ_EQ(
-        qse.toBSON(params.useSubsections, params.includeWriteMetrics, params.includeCBRMetrics),
-        testBuilder.obj());
+    ASSERT_BSONOBJ_EQ(qse.toBSON(params.useSubsections,
+                                 params.includeWriteMetrics,
+                                 params.includeCBRMetrics,
+                                 params.includeErrorMetrics),
+                      testBuilder.obj());
 }
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
@@ -1685,11 +2248,12 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
         };
 
         auto collectMetricsBase = [&](BSONObj query) {
-            auto key = makeFindKeyFromQuery(query);
+            auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
             auto lookupHash = absl::HashOf(key);
             auto lookupResult = queryStatsStore.lookup(lookupHash);
             if (!lookupResult.isOK()) {
-                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                queryStatsStore.put(lookupHash,
+                                    QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
                 lookupResult = queryStatsStore.lookup(lookupHash);
             }
 
@@ -1758,6 +2322,50 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
     }
 }
 
+TEST_F(QueryStatsStoreTest, BasicErrorMetricsBSON) {
+    QueryStatsStore queryStatsStore{5000000, 1000};
+    auto query1 = BSON("query" << 1);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query1);
+    auto lookupHash = absl::HashOf(key);
+    queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
+    auto lookupResult = queryStatsStore.lookup(lookupHash);
+    ASSERT_OK(lookupResult);
+    auto& entry = *lookupResult.getValue();
+
+    // No errors recorded yet so 'errors' should be absent and 'execCountErrored' zero.
+    verifyQueryStatsBSON(entry, {.includeErrorMetrics = true});
+
+    // Defaults to 'includeErrorMetrics=false', so 'execCountErrored'/'errors' should be absent,
+    // matching pre-existing toBSON() shape.
+    ASSERT_FALSE(entry.toBSON().hasField("execCountErrored"));
+    ASSERT_FALSE(entry.toBSON().hasField("errors"));
+
+    entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
+    entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
+    const auto unnamedCode = static_cast<ErrorCodes::Error>(1234500);
+    entry.recordErrorCode(unnamedCode);
+
+    ASSERT_EQ(entry.recentErrors.size(), 2);
+    auto it = entry.recentErrors.begin();
+
+    ASSERT_EQ(it->first, unnamedCode);
+    BSONObj unnamedErrorBson =
+        BSON("code" << static_cast<int32_t>(unnamedCode) << "codeName"
+                    << ErrorCodes::errorString(unnamedCode) << "count" << 1LL
+                    << "latestSeenTimestamp" << it->second.latestSeenTimestamp);
+    ++it;
+    ASSERT_EQ(it->first, ErrorCodes::MaxTimeMSExpired);
+    BSONObj namedErrorBson =
+        BSON("code" << static_cast<int32_t>(ErrorCodes::MaxTimeMSExpired) << "codeName"
+                    << ErrorCodes::errorString(ErrorCodes::MaxTimeMSExpired) << "count" << 2LL
+                    << "latestSeenTimestamp" << it->second.latestSeenTimestamp);
+
+    verifyQueryStatsBSON(entry,
+                         {.includeErrorMetrics = true,
+                          .execCountErrored = 3LL,
+                          .errors = {unnamedErrorBson, namedErrorBson}});
+}
+
 TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
     // TODO SERVER-112150 Remove useSubsections.
     for (bool useSubsections : {false, true}) {
@@ -1771,11 +2379,12 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
         };
 
         auto collectMetricsBase = [&](BSONObj query) {
-            auto key = makeFindKeyFromQuery(query);
+            auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
             auto lookupHash = absl::HashOf(key);
             auto lookupResult = queryStatsStore.lookup(lookupHash);
             if (!lookupResult.isOK()) {
-                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                queryStatsStore.put(lookupHash,
+                                    QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
                 lookupResult = queryStatsStore.lookup(lookupHash);
             }
             return lookupResult.getValue();
@@ -1844,6 +2453,88 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
                                      .planningTimeMicros = intMetricBson(800, 300, 500, 340000),
                                      .cardinalityEstimationMethods = expectedCE,
                                      .nDocsSampled = intMetricBson(15, 15, 15, 225),
+                                 });
+        }
+    }
+}
+
+TEST_F(QueryStatsStoreTest, BasicPlanShapeCounters) {
+    using plan_shape_counters::AccessPathCounter;
+    using plan_shape_counters::PlanShapeCounter;
+    using plan_shape_counters::PlanShapeCounts;
+    using plan_shape_counters::QsnNodeCounter;
+    PlanShapeCounts collscan;
+    collscan.increment(PlanShapeCounter::kCollscan);
+    collscan.increment(QsnNodeCounter::kCollscanWithFilter);
+    collscan.increment(AccessPathCounter::kCollscan);
+    PlanShapeCounts ixscanFetch;
+    ixscanFetch.increment(PlanShapeCounter::kIxscanFetch);
+    ixscanFetch.increment(QsnNodeCounter::kIxscanNoFilter);
+    ixscanFetch.increment(QsnNodeCounter::kFetchNoFilter);
+    ixscanFetch.increment(AccessPathCounter::kIxscanFetch);
+    ixscanFetch.increment(AccessPathCounter::kBtreeIxscan);
+    for (bool useSubsections : {false, true}) {
+        QueryStatsStore queryStatsStore{5000000, 1000};
+
+        auto getMetrics = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            ASSERT_OK(lookupResult);
+            return *lookupResult.getValue();
+        };
+
+        auto collectMetricsBase = [&](BSONObj query) {
+            auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+            auto lookupHash = absl::HashOf(key);
+            auto lookupResult = queryStatsStore.lookup(lookupHash);
+            if (!lookupResult.isOK()) {
+                queryStatsStore.put(lookupHash,
+                                    QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
+                lookupResult = queryStatsStore.lookup(lookupHash);
+            }
+            return lookupResult.getValue();
+        };
+
+        BSONObj query = BSON("query" << BSON("a" << 1));
+
+        // With no observed plan shapes, the planShapeCounters field is omitted entirely.
+        {
+            auto metrics = collectMetricsBase(query);
+            metrics->execCount += 1;
+            metrics->queryPlannerStats.planShapeCounters.add(PlanShapeCounts{});
+        }
+        {
+            auto qse = getMetrics(query);
+            verifyQueryStatsBSON(qse, {.useSubsections = useSubsections, .execCount = 1LL});
+        }
+
+        // Observed shapes accumulate and are reported, with zero-count shapes omitted.
+        {
+            auto metrics = collectMetricsBase(query);
+            metrics->execCount += 1;
+            metrics->queryPlannerStats.planShapeCounters.add(collscan);
+            metrics->queryPlannerStats.planShapeCounters.add(collscan);
+            metrics->queryPlannerStats.planShapeCounters.add(ixscanFetch);
+        }
+        {
+            auto qse = getMetrics(query);
+            verifyQueryStatsBSON(qse,
+                                 {
+                                     .useSubsections = useSubsections,
+                                     .execCount = 2LL,
+                                     .planShapeCounters = fromjson(R"({
+                        patterns: {collscan: NumberLong(2), ixscanFetch: NumberLong(1)},
+                        nodes: {
+                            collscanWithFilter: NumberLong(2),
+                            ixscanNoFilter: NumberLong(1),
+                            fetchNoFilter: NumberLong(1)
+                        },
+                        accessPaths: {
+                            collscan: NumberLong(2),
+                            ixscanFetch: NumberLong(1),
+                            btreeIxscan: NumberLong(1)
+                        }
+                    })"),
                                  });
         }
     }

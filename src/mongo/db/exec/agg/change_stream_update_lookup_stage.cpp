@@ -1,47 +1,33 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
+#include <utility>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo::exec::agg {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeChangeStreamUpdateLookup);
+
 namespace {
+using namespace std::literals::string_view_literals;
 Value assertFieldHasType(const Document& fullDoc,
                          std::string_view fieldName,
                          BSONType expectedType) {
@@ -60,8 +46,8 @@ NamespaceString parseNss(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     auto namespaceObject =
         assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::object)
             .getDocument();
-    auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::string);
-    auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::string);
+    auto dbName = assertFieldHasType(namespaceObject, "db"sv, BSONType::string);
+    auto collectionName = assertFieldHasType(namespaceObject, "coll"sv, BSONType::string);
     NamespaceString nss(NamespaceStringUtil::deserialize(expCtx->getNamespaceString().tenantId(),
                                                          dbName.getStringData(),
                                                          collectionName.getStringData(),
@@ -115,27 +101,48 @@ Timestamp getClusterTime(const Document& updateOp) {
 
 /**
  * Returns the collection UUID to match against the lookup target, or boost::none. The UUID is only
- * required for the internal 'matchCollectionUUID' flag and is only obtainable from the resume
- * token, so we decode the token lazily -- only when the flag is set.
+ * required for the internal 'matchCollectionUUID' flag. When the flag is set, the event transform
+ * mirrors the resume token's UUID in the event's 'collectionUUID' field, so we read it directly
+ * instead of decoding the resume token keystring.
  */
 boost::optional<UUID> getCollectionUUID(const Document& updateOp, bool shouldMatchCollectionUUID) {
     if (!shouldMatchCollectionUUID) {
         return boost::none;
     }
-    return ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument())
-        .getData()
-        .uuid;
+    auto uuidVal = updateOp[DocumentSourceChangeStream::kCollectionUuidField];
+    tassert(12888200,
+            str::stream() << "expected the event transform to emit the '"
+                          << DocumentSourceChangeStream::kCollectionUuidField
+                          << "' field on update events when matching the collection UUID, full "
+                             "object: "
+                          << updateOp.toString(),
+            uuidVal.getType() == BSONType::binData);
+    auto uuid = uuidVal.getUuid();
+    dassert(ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument())
+                .getData()
+                .uuid == uuid);
+    return uuid;
 }
 }  // namespace
 
 ChangeStreamUpdateLookupStage::ChangeStreamUpdateLookupStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor)
-    : Stage(stageName, pExpCtx),
+    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
+    Limits limits,
+    BatchedEnrichmentStatsRecorder batchStatsRecorder)
+    : BatchedEnrichmentStage(stageName, pExpCtx, limits, std::move(batchStatsRecorder)),
       _lookupExecutor(std::move(lookupExecutor)),
       _changeStream(ChangeStream::buildFromExpressionContext(pExpCtx)) {
     tassert(12841000, "SingleDocumentLookupExecutor must be provided", _lookupExecutor);
+}
+
+void ChangeStreamUpdateLookupStage::beginBatch() {
+    _batch.emplace(*_lookupExecutor);
+}
+
+void ChangeStreamUpdateLookupStage::closeBatch() noexcept {
+    _batch.reset();
 }
 
 boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
@@ -147,6 +154,17 @@ boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
                                           DocumentSourceChangeStream::kDocumentKeyField,
                                           BSONType::object)
                            .getDocument();
+
+    if (MONGO_unlikely(hangBeforeChangeStreamUpdateLookup.shouldFail())) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangBeforeChangeStreamUpdateLookup,
+            pExpCtx->getOperationContext(),
+            "hangBeforeChangeStreamUpdateLookup",
+            []() {
+                LOGV2(13458100,
+                      "Hanging aggregation due to 'hangBeforeChangeStreamUpdateLookup' failpoint");
+            });
+    }
 
     try {
         auto result = _lookupExecutor->performLookup(
@@ -161,26 +179,25 @@ boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
     }
 }
 
-GetNextResult ChangeStreamUpdateLookupStage::doGetNext() {
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
+boost::optional<Document> ChangeStreamUpdateLookupStage::enrich(Document event) {
     auto opTypeVal = assertFieldHasType(
-        input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
+        event, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
     if (opTypeVal.getStringData() != DocumentSourceChangeStream::kUpdateOpType) {
-        return input;
+        return event;
     }
 
     // Create a mutable output document from the input document.
-    MutableDocument output(input.releaseDocument());
+    MutableDocument output(std::move(event));
     const auto postImageDoc = performPostImageLookup(output.peek());
 
     // Even if no post-image was found, we have to populate the 'fullDocument' field.
     output[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName] =
         (postImageDoc ? Value(*postImageDoc) : Value(BSONNULL));
 
+    // Remove the 'collectionUUID' field unless it is a user-visible field of this stream's events.
+    if (!change_stream::shouldEmitCollectionUUIDForChangeEvent(*pExpCtx->getChangeStreamSpec())) {
+        output.remove(DocumentSourceChangeStream::kCollectionUuidField);
+    }
     return output.freeze();
 }
 

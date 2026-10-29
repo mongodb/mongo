@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,6 +8,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <string_view>
 
 namespace mongo {
@@ -41,7 +16,7 @@ namespace mongo {
 /**
  * Mock storage engine.
  */
-class MONGO_MOD_OPEN StorageEngineMock : public StorageEngine {
+class [[MONGO_MOD_OPEN]] StorageEngineMock : public StorageEngine {
 public:
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return nullptr;
@@ -98,7 +73,7 @@ public:
         return {};
     }
 
-    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) final {
+    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) override {
         _droppedSpillIdents.emplace_back(ident);
     };
 
@@ -140,20 +115,35 @@ public:
     }
 
     void setLastMaterializedLsn(uint64_t lsn) final {
+        if (lsn <= _lastSetMaterializedLsn) {
+            return;
+        }
         _lastSetMaterializedLsn = lsn;
+        _operations.push_back("setLastMaterializedLsn");
     }
 
-    void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final {
+    Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) final {
         _operations.push_back("setRecoveryCheckpointMetadata");
+        auto status = _nextRecoveryCheckpointMetadataStatus;
+        _nextRecoveryCheckpointMetadataStatus = Status::OK();
+        return status;
     }
 
-    void promoteToLeader() final {}
+    void failNextSetRecoveryCheckpointMetadata(Status status) {
+        _nextRecoveryCheckpointMetadataStatus = std::move(status);
+    }
 
-    void demoteFromLeader() final {}
+    void promoteToLeader() final {
+        _operations.push_back("promoteToLeader");
+    }
 
-    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {}
+    void demoteToFollower() final {}
+
+    void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {
+        _stableTimestamp = stableTimestamp;
+    }
     Timestamp getStableTimestamp() const override {
-        return Timestamp();
+        return _stableTimestamp;
     }
     void setInitialDataTimestamp(Timestamp timestamp) final {}
     Timestamp getInitialDataTimestamp() const override {
@@ -167,11 +157,21 @@ public:
     Timestamp getOldestTimestamp() const final {
         return {};
     };
+    void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) override {
+        _stepDownTimestamp = stepDownTimestamp;
+        ++_setStepDownTimestampCount;
+    }
+    std::unique_lock<std::mutex> lockStepDown() override {
+        return std::unique_lock(_stepdownMutex);
+    }
+    Timestamp getStepDownTimestamp() const override {
+        return _stepDownTimestamp;
+    }
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
 
     Timestamp getAllDurableTimestamp() const final {
-        return {};
+        return _allDurableTimestamp;
     }
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
@@ -189,9 +189,7 @@ public:
     void dropIdentTimestamped(OperationContext* opCtx,
                               std::string_view ident,
                               Timestamp timestamp) final {}
-    void addDropPendingIdent(const DropTime& dropTime,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) final {}
+    void addDropPendingIdent(const DropTime& dropTime, std::shared_ptr<Ident> ident) final {}
     void dropUnknownIdent(RecoveryUnit& ru,
                           const Timestamp& stableTimestamp,
                           std::string_view ident) final {}
@@ -206,7 +204,9 @@ public:
     void stopTimestampMonitor() final {}
     void restartTimestampMonitor() final {}
 
-    void checkpoint() final {}
+    void checkpoint() final {
+        ++_checkpointCount;
+    }
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const final {
         return StorageEngine::CheckpointIteration{0};
@@ -325,6 +325,14 @@ public:
         return false;
     }
 
+    bool isInLeaderMode() final {
+        return _isInLeaderMode;
+    }
+
+    void setIsInLeaderMode(bool isLeader) {
+        _isInLeaderMode = isLeader;
+    }
+
     uint64_t getLastSetMaterializedLsn() const {
         return _lastSetMaterializedLsn;
     }
@@ -341,12 +349,32 @@ public:
         return _operations;
     }
 
+    int getSetStepDownTimestampCount() const {
+        return _setStepDownTimestampCount;
+    }
+
+    void setAllDurableTimestamp(Timestamp allDurableTimestamp) {
+        _allDurableTimestamp = allDurableTimestamp;
+    }
+
+    int getCheckpointCount() const {
+        return _checkpointCount;
+    }
+
 private:
-    uint64_t _lastSetMaterializedLsn;
+    bool _isInLeaderMode = false;
+    uint64_t _lastSetMaterializedLsn = 0;
     std::vector<std::string> _droppedSpillIdents;
     Timestamp _lastSetOldestTimestamp;
     bool _lastSetOldestTimestampForce = false;
+    Timestamp _stableTimestamp;
+    Timestamp _stepDownTimestamp;
+    std::mutex _stepdownMutex;
+    Timestamp _allDurableTimestamp;
+    int _setStepDownTimestampCount = 0;
+    int _checkpointCount = 0;
     std::vector<std::string> _operations;
+    Status _nextRecoveryCheckpointMetadataStatus = Status::OK();
 };
 
 }  // namespace mongo

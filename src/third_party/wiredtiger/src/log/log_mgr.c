@@ -398,8 +398,10 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
      * backup or the checkpoint LSN. Otherwise we want the minimum of the last log file written to
      * disk and the checkpoint LSN.
      */
-    min_lognum = backup_file == 0 ? WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file) :
-                                    WT_MIN(log->ckpt_lsn.l.file, backup_file);
+    uint32_t ckpt_file = __wt_lsn_file(&log->ckpt_lsn);
+    uint32_t sync_file = __wt_lsn_file(&log->sync_lsn);
+
+    min_lognum = backup_file == 0 ? WT_MIN(ckpt_file, sync_file) : WT_MIN(ckpt_file, backup_file);
 
     __wt_readlock(session, &conn->log_mgr.debug_log_retention_lock);
 
@@ -418,13 +420,18 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
          *
          * Check for N+1, that is, we retain N full log files, and one partial.
          */
-        if ((conn->debug.log_cnt + 1) >= log->fileid)
+        uint32_t fileid = __wt_atomic_load_uint32_relaxed(&log->fileid);
+        if ((conn->debug.log_cnt + 1) >= fileid)
             min_lognum = 0;
         else if (WT_IS_INIT_LSN(&log->ckpt_lsn))
-            min_lognum = log->fileid - (conn->debug.log_cnt + 1);
+            min_lognum = fileid - (conn->debug.log_cnt + 1);
         else
-            min_lognum = WT_MIN(log->fileid - (conn->debug.log_cnt + 1), min_lognum);
-    }
+            min_lognum = WT_MIN(fileid - (conn->debug.log_cnt + 1), min_lognum);
+    } else
+        /*
+         * Checkpoint log must maintain, violation is always data loss.
+         */
+        WT_ASSERT(session, min_lognum <= ckpt_file);
 
     __wt_readunlock(session, &conn->log_mgr.debug_log_retention_lock);
 #ifdef HAVE_DIAGNOSTIC
@@ -435,8 +442,8 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
           " sync file %" PRIu32 " backup_file %" PRIu32 " debug_log count%" PRIu32
           " old min %" PRIu32,
           (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / WT_THOUSAND, min_lognum,
-          log->ckpt_lsn.l.file, log->sync_lsn.l.file, backup_file, conn->debug.log_cnt,
-          log->min_fileid));
+          __wt_lsn_file(&log->ckpt_lsn), __wt_lsn_file(&log->sync_lsn), backup_file,
+          conn->debug.log_cnt, log->min_fileid));
         log->min_fileid = min_lognum;
     }
 
@@ -605,7 +612,7 @@ __wt_log_truncate_files(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool force)
         WT_ASSERT(session, force == false);
         backup_file = WT_CURSOR_BACKUP_ID(cursor);
     }
-    WT_ASSERT(session, backup_file <= log->alloc_lsn.l.file);
+    WT_ASSERT(session, backup_file <= __wt_lsn_file(&log->alloc_lsn));
     __wt_verbose(
       session, WT_VERB_LOG, "log_truncate_files: remove once up to %" PRIu32, backup_file);
 
@@ -643,7 +650,7 @@ __log_file_server(void *arg)
          * Writers will set the log close lsn first and then the log close file handle, so we need
          * to read them in the reverse order to see a consistent state.
          */
-        WT_ACQUIRE_READ_WITH_BARRIER(close_fh, log->log_close_fh);
+        close_fh = __wt_atomic_load_ptr_acquire(&log->log_close_fh);
         if (close_fh != NULL) {
             WT_ERR(__wti_log_extract_lognum(session, close_fh->name, &filenum));
             /*
@@ -897,7 +904,7 @@ __log_wrlsn_server(void *arg)
             __wti_log_wrlsn(session, &yield);
         else
             WT_STAT_CONN_INCR(session, log_write_lsn_skip);
-        prev = log->alloc_lsn;
+        WT_ASSIGN_LSN(&prev, &log->alloc_lsn);
         did_work = (yield == 0);
 
         /*
@@ -1076,7 +1083,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session)
     WT_INIT_LSN(&log->trunc_lsn);
     WT_INIT_LSN(&log->write_lsn);
     WT_INIT_LSN(&log->write_start_lsn);
-    log->fileid = 0;
+    __wt_atomic_store_uint32_relaxed(&log->fileid, 0);
     WT_RET(__logmgr_version(session, false));
 
     WT_RET(__wt_cond_alloc(session, "log sync", &log->log_sync_cond));

@@ -1,37 +1,7 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -77,6 +47,11 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -968,10 +943,10 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     // As we have set the cluster-wide write concern, the reconfig should succeed.
@@ -1027,10 +1002,10 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     // As we have set the cluster-wide write concern, the reconfig should succeed.
@@ -1088,13 +1063,13 @@ TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtW1WithoutCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(4);
     hbArgs.setSenderHost(HostAndPort("node4", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
@@ -1144,10 +1119,10 @@ TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtWMajWithoutCWWCSetPasses) {
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     hbArgs.setSenderId(3);
     hbArgs.setSenderHost(HostAndPort("node3", 12345));
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
     replyToReceivedHeartbeatV1();
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
@@ -1544,7 +1519,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentTimesOutIfConfigIsNotCommit
     const auto opCtx = makeOperationContext();
     Status status(ErrorCodes::InternalError, "Not Set");
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 
     opCtx->setDeadlineAfterNowBy(Milliseconds(1), ErrorCodes::MaxTimeMSExpired);
     stdx::thread reconfigThread = stdx::thread([&] {
@@ -1584,7 +1559,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentReturnsOKIfConfigIsCommitte
     // Do a first reconfig that should succeed since the current config is committed.
     const auto opCtx = makeOperationContext();
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 
     // Replicate op to ensure config is committed.
     replicateOpTo(2, commitPoint);
@@ -1616,16 +1591,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1656,16 +1631,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(3, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1695,16 +1670,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/2));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/2));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1737,16 +1712,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1900,7 +1875,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     unittest::LogCaptureGuard logs;
-    Status status = doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2);
     ASSERT_OK(status);
     logs.stop();
 
@@ -1929,7 +1904,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
                                                    << "votes" << 0 << "priority" << 0));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1953,7 +1928,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHos
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "newHostName:12345"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/1));
 
     logs.stop();
 
@@ -1978,7 +1953,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
     const auto members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/1));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2001,7 +1976,7 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2128,7 +2103,7 @@ TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafe
                                                                     << "newlyAdded" << true));
 
     unittest::LogCaptureGuard logs;
-    Status status = doSafeReconfig(opCtx.get(), 2, members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/0);
     logs.stop();
 
     ASSERT_EQ(ErrorCodes::InvalidReplicaSetConfig, status);
@@ -2155,7 +2130,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2178,7 +2153,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1"));
 
     logs.start();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2201,7 +2176,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2226,7 +2201,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     logs.start();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/3));
     logs.stop();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2250,7 +2225,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2282,7 +2257,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     ASSERT_EQUALS(
@@ -2314,7 +2289,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     logs.start();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/3));
     logs.stop();
 
     ASSERT_EQUALS(
@@ -2351,7 +2326,7 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
                                                               << "arbiterOnly" << true));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2431,7 +2406,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &response));
 
     // No requests should have been scheduled.
     getNet()->enterNetwork();
@@ -2453,7 +2428,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {
     hbArgs.setTerm(0);
     ASSERT(hbArgs.isInitialized());
 
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &response));
 
     // Schedule a response with a newer config.
     auto newerConfigVersion = 3;
@@ -2532,7 +2507,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx.get(), hbArgs, &response));
 
     // Schedule a response with a newer config.
     auto newerConfigVersion = 3;
@@ -2576,7 +2551,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
 
         // For force reconfigs, we do allow them to proceed even if we are in drain mode, so make
         // sure it is in progress, stuck at the failpoint before completion.
-        fpb->waitForTimesEntered(1);
+        fpb.waitForOneNewEntry();
 
         // At this point the heartbeat reconfig should be in progress but blocked from completion by
         // the failpoint. We now let drain mode complete. The step up reconfig should be interrupted

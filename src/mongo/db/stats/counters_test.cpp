@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/stats/counters.h"
 
@@ -81,6 +55,46 @@ TEST(NetworkCounterOtelTest, IngressCountersAreExported) {
     EXPECT_EQ(2, capturer.readInt64Counter(MetricNames::kNetworkIngressNumRequests));
 }
 
+TEST(NetworkCounterOtelTest, ReplicationEgressCountersAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kReplicationSecondaryLogicalBytesIn));
+    // replication metrics should still be counted towards total
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesIn));
+    EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
+}
+
+TEST(NetworkCounterOtelTest, ReplicationIngressCountersAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.hitLogicalOut(
+        NetworkCounter::ConnectionType::kIngress, 200, ConnectionPurpose::kReplication, 0);
+
+    EXPECT_EQ(200,
+              capturer.readInt64Counter(MetricNames::kReplicationPrimaryLogicalBytesOut,
+                                        std::make_tuple(int64_t{0})));
+    // replication metrics should still be counted towards total
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkIngressBytesOut));
+
+    nc.hitPhysicalOut(
+        NetworkCounter::ConnectionType::kIngress, 200, ConnectionPurpose::kReplication, 0);
+    EXPECT_EQ(200,
+              capturer.readInt64Counter(MetricNames::kReplicationPrimaryPhysicalBytesOut,
+                                        std::make_tuple(int64_t{0})));
+}
+
 TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
@@ -92,6 +106,8 @@ TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     nc.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, 200);
     nc.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, 80);
 
+    // ensure that the replication counters aren't affected by regular connections
+    EXPECT_EQ(0, capturer.readInt64Counter(MetricNames::kReplicationSecondaryLogicalBytesIn));
     EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesIn));
     EXPECT_EQ(80, capturer.readInt64Counter(MetricNames::kNetworkEgressBytesOut));
     EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
@@ -158,6 +174,20 @@ TEST(NetworkCounterBsonTest, EgressSubObject) {
     EXPECT_EQ(400, egress["bytesIn"].numberLong());
     EXPECT_EQ(100, egress["bytesOut"].numberLong());
     EXPECT_EQ(1, egress["numRequests"].numberLong());
+}
+
+TEST(NetworkCounterBsonTest, ReplSecondarySubObject) {
+    NetworkCounter nc;
+    nc.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+    nc.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress, 200, ConnectionPurpose::kReplication);
+
+    BSONObj obj = getNetworkBson(nc);
+    ASSERT_TRUE(obj.hasField("repl"));
+    BSONObj repl = obj["repl"].Obj();
+    ASSERT_TRUE(repl.hasField("secondary"));
+    BSONObj replSecondary = repl["secondary"].Obj();
+    EXPECT_EQ(200, replSecondary["physicalBytesIn"].numberLong());
+    EXPECT_EQ(200, replSecondary["bytesIn"].numberLong());
 }
 
 TEST(NetworkCounterBsonTest, NumSlowDNSOperations) {

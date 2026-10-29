@@ -1,40 +1,6 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -131,7 +97,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -163,6 +129,15 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -279,42 +254,18 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
     }
 }
 
-Status ShardingCatalogManager::createIndexForConfigShards(OperationContext* opCtx,
-                                                          bool checkPreconditions) {
-    const auto performCreation = [&]() {
-        if (!checkPreconditions) {
-            return true;
-        }
-
-        // Note that we can check the feature flag here without a fixed FCV region because the
-        // caller is either setFCV itself, or onStepUpComplete in which the primary is not yet
-        // writable, thus there's no 'concurrent setFCV' race.
-        const bool useUUID = feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.isEnabled(
+Status ShardingCatalogManager::createIndexOnUuidForConfigShards(OperationContext* opCtx) {
+    const auto performCreation =
+        feature_flags::gFeatureFlagAssignUUIDToShard.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-        if (!useUUID) {
-            return false;
-        }
-
-        // A regular index can only be created once the FCV upgrade has generated a UUID value for
-        // each existing document in the collection. This can be indirectly verified by inspecting
-        // the content of the config server's shard identity, which only receives a UUID value on a
-        // later stage.
-        PersistentTaskStore<ShardType> store(NamespaceString::kServerConfigurationNamespace);
-        return store.count(opCtx,
-                           BSON("_id" << ShardIdentityType::IdName
-                                      << ShardIdentityType::kUuidFieldName
-                                      << BSON("$exists" << true))) > 0;
-    }();
-
     if (performCreation) {
         const bool unique = true;
-        const auto result =
-            createIndexOnConfigCollection(opCtx,
-                                          NamespaceString::kConfigsvrShardsNamespace,
-                                          BSON(ShardType::uuid() << 1),
-                                          unique);
+        const auto result = sharding_util::createIndexesOnCollectionAtStepUp(
+            opCtx,
+            NamespaceString::kConfigsvrShardsNamespace,
+            {IndexSpec_ForCatalog{BSON(ShardType::uuid() << 1), unique}});
         if (!result.isOK()) {
             return result.withContext("couldn't create uuid_1 index on config.shards");
         }
@@ -327,17 +278,16 @@ Status ShardingCatalogManager::createIndexForConfigShards(OperationContext* opCt
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx,
                                                                 bool deferShardingInitialization) {
     // Note that we can check the feature flag here without a fixed FCV region because the caller
-    // is part of onStepUpComplete in which the primary is not yet writable, thus there's no
-    // 'concurrent setFCV' race.
+    // is part of onStepUpComplete in which the primary is not yet writable, thus setFCV cannot run.
     // TODO (SERVER-126212): Always generate a UUID for the config server.
-    const bool uniqueShardIdsEnabled = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
+    const bool generateShardUuid = feature_flags::gFeatureFlagAssignUUIDToShard.isEnabled(
         VersionContext::getDecoration(opCtx),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     invariant(!ShardingState::get(opCtx)->enabled());
     auto identity = topology_change_helpers::createShardIdentity(
         opCtx,
         ShardId::kConfigServerId,
-        uniqueShardIdsEnabled ? boost::make_optional(UUID::gen()) : boost::none);
+        generateShardUuid ? boost::make_optional(ShardType::kConfigServerUuid) : boost::none);
     if (deferShardingInitialization) {
         identity.setDeferShardingInitialization(true);
     }
@@ -412,8 +362,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
     // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the add shard operation since setting a
-    // cluster parameter requires taking this lock.
+    // _configsvrSetClusterParameter command after finishing the add shard operation so the
+    // exclusive lock is not held across that distributed update.
     auto clusterCardinalityParameterLock =
         acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
     auto shardMembershipLock = acquireShardMembershipLockForTopologyChange(opCtx);
@@ -442,8 +392,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // committed snapshot.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
-        // Release the shard membership lock since the set cluster parameter operation below
-        // require taking this lock.
+        // Release the shard membership lock so it is not held across the distributed cluster
+        // parameter update below.
         shardMembershipLock.unlock();
         auto updateStatus = _updateClusterCardinalityParameterAfterAddShardIfNeeded(
             clusterCardinalityParameterLock, opCtx);
@@ -493,8 +443,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     for (const auto& dbName : dbNamesStatus.getValue()) {
         try {
-            auto dbt = _localCatalogClient->getDatabase(
-                opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
+            auto dbt =
+                _localCatalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kLocal);
             return Status(ErrorCodes::OperationFailed,
                           str::stream()
                               << "can't add shard "
@@ -582,7 +532,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
     ShardType shardType;
-    shardType.setHandle(ShardHandle(ShardId(shardName), boost::none));
+    shardType.setName(shardName);
     shardType.setHost(targeter->connectionString().toString());
     shardType.setTopologyTime(newTopologyTime.asTimestamp());
 
@@ -648,12 +598,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     shardRegistry->reload(opCtx);
     tassert(9870600,
             "Shard not found in ShardRegistry after committing addShard",
-            shardRegistry->getShard(opCtx, ShardRef(shardType.getName())).isOK());
+            shardRegistry->getShard(opCtx, shardType.getName()).isOK());
 
     topology_change_helpers::hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
 
-    // Release the shard membership lock since the set cluster parameter operation below requires
-    // taking this lock.
+    // Release the shard membership lock so it is not held across the distributed cluster
+    // parameter update below.
     shardMembershipLock.unlock();
 
     // Unblock ShardingDDLCoordinators on the cluster.
@@ -705,9 +655,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
-    // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the remove shard operation since
-    // setting a cluster parameter requires taking this lock.
+    // interleave with starting drain below.
     Lock::ExclusiveLock clusterCardinalityParameterLock =
         acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
     Lock::ExclusiveLock shardMembershipLock =
@@ -715,8 +663,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
 
     auto optShard = topology_change_helpers::getShardIfExists(opCtx, _localConfigShard, shardId);
     if (!optShard) {
-        // Release the shard membership lock since the set cluster parameter operation below
-        // requires taking this lock.
+        // The shard is already absent, so release the membership lock and report completion.
         shardMembershipLock.unlock();
 
         return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
@@ -785,9 +732,7 @@ void ShardingCatalogManager::stopDrain(OperationContext* opCtx, const ShardId& s
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
-    // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the remove shard operation since
-    // setting a cluster parameter requires taking this lock.
+    // interleave with stopping drain below.
     Lock::ExclusiveLock clusterCardinalityParameterLock =
         acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
     Lock::ExclusiveLock shardMembershipLock =
@@ -969,8 +914,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         FixedFCVRegion fcvRegion(opCtx);
 
         if (shardId == ShardId::kConfigServerId) {
-            auto trackedDBs =
-                _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+            auto trackedDBs = _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernArgs::kLocal);
 
             if (auto pendingCleanupState =
                     topology_change_helpers::dropLocalCollectionsAndDatabases(
@@ -1006,8 +950,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             shardName,
             Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
-        // Release the shard membership lock since the set cluster parameter operation below
-        // require taking this lock.
+        // Release the shard membership lock so it is not held across the distributed cluster
+        // parameter update below.
         shardMembershipLock.unlock();
 
         // Release also the fixedFCVRegion since it is not needed after this and prevents us from
@@ -1138,10 +1082,6 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
     shardDrainingStatus.serialize(&result);
 }
 
-Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
-    return Lock::SharedLock(opCtx, _kShardMembershipLock);
-}
-
 Lock::ExclusiveLock ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(
     OperationContext* opCtx) {
     return Lock::ExclusiveLock(opCtx, _kShardMembershipLock);
@@ -1164,7 +1104,7 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
     auto shardsDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrShardsNamespace,
         BSONObj(),
         BSONObj(),

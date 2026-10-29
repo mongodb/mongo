@@ -41,11 +41,11 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
-    name = "attached_persistence_provider_oplog_test",
+    name = "attached_persistence_provider_test",
     srcs = [
-        "attached_persistence_provider_oplog_test.cpp",
+        "attached_persistence_provider_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = ["mongo_unittest_first_group"],
     deps = [
         ":attached_persistence_provider",
         "//src/mongo/unittest",

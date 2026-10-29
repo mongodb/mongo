@@ -93,6 +93,22 @@ check_fast_mode_flag() {
   fi
 }
 
+# Locate the clang-format executable. Prefer one on PATH; otherwise, if clang is
+# available, fall back to the one shipped with the clang toolchain. Exits with an
+# error if no usable binary is found. Sets the `clang_format` variable on success.
+check_clang_format() {
+  clang_format=`command -v clang-format`
+  if [[ -z "$clang_format" ]]; then
+    if command -v clang &> /dev/null; then
+      clang_format=`clang -print-prog-name=clang-format`
+    fi
+    if [[ ! -x "$clang_format" ]]; then
+      echo "error: clang-format not found; please install it and ensure it is on PATH" >&2
+      exit 1
+    fi
+  fi
+}
+
 # Get the earliest common commit from the dev branch.
 last_commit_from_dev() { python3 "$DIST_DIR"/common_functions.py last_commit_from_dev; }
 

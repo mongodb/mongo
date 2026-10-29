@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/grpc/mock_client_stream.h"
 
@@ -56,7 +30,7 @@ void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry
     // sent before setting that status, so only return early here if the RPC was cancelled.
     // Otherwise, try to read whatever messages are in the queue.
     if (_rpcCancellationState->isCancelled()) {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
         return;
     }
 
@@ -65,24 +39,24 @@ void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry
 
     if (res.has_value()) {
         *msg = res.get();
-        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
     } else {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
     }
 }
 
 void MockClientStream::write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) {
     if (_rpcCancellationState->isCancelled() || _rpcReturnStatus.isReady()) {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
         return;
     }
 
     auto res = runWithDeadline<bool>(_rpcCancellationState->getDeadline(),
                                      [&](Interruptible* i) { return _pipe.write(msg, i); });
     if (res) {
-        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
     } else {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
     }
 }
 
@@ -100,32 +74,32 @@ void MockClientStream::finish(::grpc::Status* status, GRPCReactor::CompletionQue
     if (auto cancellationStatus = _rpcCancellationState->getCancellationStatus();
         cancellationStatus.has_value()) {
         *status = *cancellationStatus;
-        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
         return;
     }
 
     *status = _rpcReturnStatus.get();
-    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+    _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
 }
 
 void MockClientStream::writesDone(GRPCReactor::CompletionQueueEntry* tag) {
-    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+    _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
 }
 
 void MockClientStream::startCall(GRPCReactor::CompletionQueueEntry* tag) {
     if (MONGO_unlikely(grpcHangOnStreamEstablishment.shouldFail())) {
         _rpcCancellationState->onCancel().thenRunOn(_reactor).getAsync(
             [reactor = _reactor, tag](Status s) {
-                reactor->_processCompletionQueueNotification(tag, false /* ok */);
+                reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
             });
 
         return;
     } else if (MONGO_unlikely(grpcFailStreamEstablishment.shouldFail())) {
         _cancel();
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
         return;
     }
-    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+    _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
 }
 
 boost::optional<SharedBuffer> MockClientStream::syncRead(

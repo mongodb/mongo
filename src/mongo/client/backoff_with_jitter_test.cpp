@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/client/backoff_with_jitter.h"
 
@@ -35,6 +9,9 @@
 
 #include <cmath>
 #include <cstdint>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -92,6 +69,57 @@ TEST_F(BackoffWithJitterTest, BackoffWithJitterNoOverflow) {
     backoffWithJitter.setAttemptCount_forTest(veryLargeTime.count());
 
     ASSERT_LTE(backoffWithJitter.getBackoffDelay(), veryLargeTime);
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideFirstAttemptDoublesOverrideValue) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{1000};
+    backoffWithJitter.setAttemptCount_forTest(1);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, std::min(kMaxBackoff, Milliseconds{kOverride.count() * 2}));
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideSecondAttemptQuadruplesOverrideValue) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{1000};
+    backoffWithJitter.setAttemptCount_forTest(2);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, std::min(kMaxBackoff, Milliseconds{kOverride.count() * 4}));
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideZeroAttemptCountReturnsZero) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{1000};
+    backoffWithJitter.setAttemptCount_forTest(0);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, Milliseconds{0});
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideNoneMatchesNoArgOverload) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    backoffWithJitter.setAttemptCount_forTest(3);
+
+    const auto noArgResult = backoffWithJitter.getBackoffDelay();
+    const auto overloadResult = backoffWithJitter.getBackoffDelay(boost::none);
+    ASSERT_EQ(noArgResult, overloadResult);
+    ASSERT_EQ(overloadResult, Milliseconds{800});
+}
+
+TEST_F(BackoffWithJitterTest, BackoffOverrideCapsAtMaxBackoff) {
+    auto _ = FailPointEnableBlock{"returnMaxBackoffDelay"};
+
+    constexpr Milliseconds kOverride{10000};
+    backoffWithJitter.setAttemptCount_forTest(5);
+
+    const auto backoff = backoffWithJitter.getBackoffDelay(kOverride);
+    ASSERT_EQ(backoff, kMaxBackoff);
 }
 
 }  // namespace

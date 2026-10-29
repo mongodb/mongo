@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -34,12 +8,13 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/util/cartesian_product.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -885,6 +860,59 @@ TEST_F(QueryPlannerTest, TooManyToExplode) {
     assertSolutionExists(
         "{fetch: {node: {sort: {pattern: {d: 1}, limit: 1, type: 'default', node: {ixscan: "
         "{pattern: {a: 1, b: 1, c:1, d:1}}}}}}}");
+}
+
+// The number of index scans explodeForSort would create is the product of the per-field point
+// counts. When that product overflows size_t it can wrap to a small value (e.g. 65536^4 == 2^64
+// == 0), bypassing the maxScansToExplode guard. We cap the scan count to prevent this and fall
+// back to a blocking sort.
+TEST_F(QueryPlannerTest, ExplodeScanCountDoesNotOverflow) {
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1));
+
+    BSONObjBuilder queryBob;
+    for (std::string_view field : {"a", "b", "c", "d"}) {
+        BSONObjBuilder fieldBob(queryBob.subobjStart(field));
+        BSONArrayBuilder inArr(fieldBob.subarrayStart("$in"));
+        for (int i = 0; i < 65536; ++i) {
+            inArr.append(i);
+        }
+    }
+
+    runQuerySortProj(queryBob.obj(), BSON("e" << 1), BSONObj());
+
+    // The planner must cap here: a collection scan with a blocking sort, and a single index scan
+    // with a blocking sort. Crucially, no mergeSort.
+    assertNumSolutions(2U);
+    assertSolutionExists(R"(
+        {
+            sort: {
+                pattern: {e: 1},
+                limit: 0,
+                type: 'simple',
+                node: {
+                    cscan: {dir: 1}
+                }
+            }
+        }
+    )");
+    assertSolutionExists(R"(
+        {
+            fetch: {
+                node: {
+                    sort: {
+                        pattern: {e: 1},
+                        limit: 0,
+                        type: 'default',
+                        node: {
+                            ixscan: {
+                                pattern: {a: 1, b: 1, c: 1, d: 1, e: 1}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )");
 }
 
 // SERVER-13618: test that exploding scans for sort works even
@@ -3035,29 +3063,168 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumer
     )");
 }
 
+// Lockstep OR enumeration composes with index intersection: each $or branch enumerates its
+// single-index plans as well as an intersection plan, and lockstep iteration walks all
+// combinations, including one where every branch uses an intersection.
+TEST_F(QueryPlannerTest, LockstepOrEnumerationWithIndexIntersection) {
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN |
+        QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+    addIndex(BSON("d" << 1));
+
+    runQuery(fromjson("{$or: [{a: 1, b: 1}, {c: 1, d: 1}]}"));
+
+    // Each branch has three choices (index on the first field, index on the second field, and an
+    // andSorted intersection of both), giving 3 * 3 = 9 combinations, all within the OR
+    // enumeration limit.
+    assertNumSolutions(9U);
+
+    // The lockstep-prioritized "both branches use their first index" plan.
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {b: 1}, node: {ixscan: {filter: null, pattern: {a: 1}}}}},"
+        "{fetch: {filter: {d: 1}, node: {ixscan: {filter: null, pattern: {c: 1}}}}}]}}");
+
+    // Both branches use an index intersection.
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {a: 1, b: 1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a: 1}}},"
+        "{ixscan: {filter: null, pattern: {b: 1}}}]}}}},"
+        "{fetch: {filter: {c: 1, d: 1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {c: 1}}},"
+        "{ixscan: {filter: null, pattern: {d: 1}}}]}}}}]}}");
+
+    // A mixed combination: one branch intersected, the other on a single index.
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {a: 1, b: 1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a: 1}}},"
+        "{ixscan: {filter: null, pattern: {b: 1}}}]}}}},"
+        "{fetch: {filter: {d: 1}, node: {ixscan: {filter: null, pattern: {c: 1}}}}}]}}");
+}
+
 TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
-    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
-    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
-    internalQueryEnumerationMaxOrSolutions.store(0);
     addIndex(BSON("one" << 1));
     addIndex(BSON("two" << 1));
-    runQuery(BSON(
-        "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{cscan: {"
-        "    filter:"
-        "        {'$or': ["
-        "            {'$and': [{one: {$eq: 0}}, {two: {$eq: 0}}]},"
-        "            {'$and': [{one: {$eq: 1}}, {two: {$eq: 1}}]}"
-        "        ]},"
-        "    collation: {},"
-        "    dir: 1}}");
+    {
+        QueryKnobGuardForTest maxOrSolutions{
+            opCtx.get(), "internalQueryEnumerationMaxOrSolutions", 0};
+        runQuery(BSON(
+            "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
+        assertNumSolutions(1U);
+        assertSolutionExists(
+            "{cscan: {"
+            "    filter:"
+            "        {'$or': ["
+            "            {'$and': [{one: {$eq: 0}}, {two: {$eq: 0}}]},"
+            "            {'$and': [{one: {$eq: 1}}, {two: {$eq: 1}}]}"
+            "        ]},"
+            "    collation: {},"
+            "    dir: 1}}");
+    }
     // Ensure that when set to 1 we get a different result.
-    internalQueryEnumerationMaxOrSolutions.store(1);
+    QueryKnobGuardForTest maxOrSolutions{opCtx.get(), "internalQueryEnumerationMaxOrSolutions", 1};
     runQuery(BSON(
         "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
     assertNumSolutions(2U);
+}
+
+TEST_F(QueryPlannerTest, HitIndexedOrLimitIsReportedOnAllSolutions) {
+    QueryKnobGuardForTest maxOrSolutions{opCtx.get(), "internalQueryEnumerationMaxOrSolutions", 2};
+
+    // Each $or branch can be satisfied by more than one index, so the enumerator has several
+    // combinations to walk through and will exceed the OR enumeration limit.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+    addIndex(BSON("d" << 1));
+
+    runQuery(fromjson("{$or: [{a: 1, b: 1}, {c: 1, d: 1}]}"));
+
+    // Two IndexedOr plans plus a fallback collection scan were generated.
+    assertNumSolutions(3U);
+
+    // Every generated solution must report that the indexed OR limit was reached, including ones
+    // enumerated before the limit was actually tripped.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitIndexedOrLimit)
+            << "solution did not report hitIndexedOrLimit: " << soln->toString();
+    }
+}
+
+TEST_F(QueryPlannerTest, HitIndexedAndLimitIsReportedOnAllSolutions) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
+
+    QueryKnobGuardForTest maxIntersectPerAnd{
+        opCtx.get(), "internalQueryEnumerationMaxIntersectPerAnd", 1};
+
+    // Three single-field indexes give the enumerator three candidate intersection pairs, which
+    // exceeds the limit of one.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQuery(fromjson("{a: 1, b: 1, c: 1}"));
+
+    // Several indexed plans plus a fallback collection scan were generated.
+    ASSERT_GT(getNumSolutions(), 1U);
+
+    // Every generated solution must report that the indexed AND limit was reached, including the
+    // collection scan, which is built outside the indexed plan enumeration loop.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitIndexedAndLimit)
+            << "solution did not report hitIndexedAndLimit: " << soln->toString();
+    }
+}
+
+TEST_F(QueryPlannerTest, PrunedAnyIndexesIsReportedOnAllSolutions) {
+    unittest::ServerParameterGuard pruningController("internalQueryPlannerEnableIndexPruning",
+                                                     true);
+
+    // {a: 1, b: 1} is interchangeable with {a: 1} for the query {a: 1}, so one gets pruned.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQuery(fromjson("{a: 1}"));
+
+    // One indexed plan plus a fallback collection scan were generated.
+    assertNumSolutions(2U);
+
+    // Every generated solution must report that indexes were pruned, including the collection scan,
+    // which is built outside the indexed plan enumeration loop.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.prunedAnyIndexes)
+            << "solution did not report prunedAnyIndexes: " << soln->toString();
+    }
+}
+
+TEST_F(QueryPlannerTest, HitScanLimitIsReportedOnAllSolutions) {
+    QueryKnobGuardForTest maxScansController{opCtx.get(), "internalQueryMaxScansToExplode", 2};
+    // explodeForSort handles "filter on the leading key, sort on a trailing key" query shape (eg
+    // {a: {$in: [1, 2, 3]}}, {b: 1} where `a` is the filter and `b` is the sort). More
+    // specifically, explodeForSort() rewrites an index scan over point intervals on one field into
+    // multiple scans so it can preserve a sort on the later indexed field. So in order to trigger
+    // scan explosion, we need to create a compound index on the filtered field (a) and the trailing
+    // sort field (b)
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // Three $in values would require 3 index scans when exploded for sort on the trailing field
+    // 'b', exceeding the limit of 2.
+    runQuerySortProj(fromjson("{a: {$in: [1, 2, 3]}}"), fromjson("{b: 1}"), BSONObj());
+
+    // One indexed plan plus a fallback collection scan were generated.
+    assertNumSolutions(2U);
+
+    // Every generated solution must report that the scan limit was reached, including the
+    // collection scan, which is built outside the indexed plan enumeration loop and does not
+    // go through explodeForSort.
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitScanLimit)
+            << "solution did not report hitScanLimit: " << soln->toString();
+    }
 }
 
 TEST_F(QueryPlannerTest, EOFForAlwaysFalsePredicates) {

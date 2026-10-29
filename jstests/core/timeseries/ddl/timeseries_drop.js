@@ -6,6 +6,8 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_fcv_90,
  *   featureFlagCreateViewlessTimeseriesCollections,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

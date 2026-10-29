@@ -1,5 +1,6 @@
 // SERVER-1932 Test unindexed matching of a range that is only valid in a multikey context.
 // @tags: [
+//   uses_explain,
 //   requires_getmore
 // ]
 

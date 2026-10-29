@@ -65,6 +65,12 @@ filters:
   - "bazel_burn_in.py":
     approvers:
       - 10gen/devprod-test-infrastructure
-  - "sbom_linter.py":
+  - "benchmark_profiler.py":
     approvers:
-      - 10gen/code-review-team-ssdlc
+      - 10gen/performance
+  - "lint_resmoke_suite_tests.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+  - "jira_cve_links.py":
+    approvers:
+      - 10gen/server-release

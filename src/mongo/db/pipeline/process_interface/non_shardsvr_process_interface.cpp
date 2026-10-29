@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
@@ -41,6 +15,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
@@ -136,7 +111,7 @@ std::vector<DatabaseName> NonShardServerProcessInterface::getAllDatabases(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     DBDirectClient dbClient(opCtx);
     auto databasesResponse = dbClient.getDatabaseInfos(
-        BSONObj() /* filter */, true /* nameOnly */, false /* authorizedDatabases */);
+        /*filter=*/BSONObj(), /*nameOnly=*/true, /*authorizedDatabases=*/false);
 
     std::vector<DatabaseName> databases;
     databases.reserve(databasesResponse.size());
@@ -319,8 +294,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
 
             WriteUnitOfWork wuow(opCtx);
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collectionWriter, filteredIndexes, false  // fromMigrate
-            );
+                opCtx, collectionWriter, filteredIndexes, /*fromMigrate=*/false);
             wuow.commit();
         });
 }
@@ -335,8 +309,8 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     RenameCollectionOptions options;
     options.dropTarget = dropTarget;
     options.stayTemp = stayTemp;
-    options.originalCollectionOptions = originalCollectionOptions;
-    options.originalIndexes = originalIndexes;
+    options.expectedCollectionOptions = originalCollectionOptions;
+    options.expectedIndexes = originalIndexes;
     // skip sharding validation on non sharded servers
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx, sourceNs, targetNs, options);
 }
@@ -390,11 +364,12 @@ BSONObj NonShardServerProcessInterface::finalizePipelineAndExplain(
     std::vector<Value> pipelineVec;
     auto firstStage = pipeline->peekFront();
     auto opts = query_shape::SerializationOptions{.verbosity = verbosity};
+    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     // If the pipeline already has a cursor explain with that one, otherwise attach a new one like
     // we would for a normal execution and explain that.
     if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {
         // If we need execution stats, this runs the plan in order to gather the stats.
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             auto managedExecPipeline = exec::agg::buildPipeline(pipeline->freeze());
             pipelineVec = mergeExplains(*pipeline, *managedExecPipeline, opts);
         } else {
@@ -405,7 +380,7 @@ BSONObj NonShardServerProcessInterface::finalizePipelineAndExplain(
         auto pipelineWithCursor = finalizeAndAttachCursorToPipelineForLocalRead(
             pipelineCtx, std::move(pipeline), true, optimizePipeline);
         // If we need execution stats, this runs the plan in order to gather the stats.
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (explainPolicy.hasExecStats()) {
             auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());
             while (execPipelineWithCursor->getNext()) {
             }

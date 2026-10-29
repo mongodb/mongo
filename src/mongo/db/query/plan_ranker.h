@@ -1,48 +1,16 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/util/modules.h"
-
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/base/status.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
@@ -50,6 +18,9 @@
 #include <deque>
 #include <memory>
 #include <string>
+
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -153,7 +124,7 @@ public:
             }());
 
 
-        if (internalQueryForceIntersectionPlans.load()) {
+        if (cq.getExpCtx()->getQueryKnobConfiguration().getForceIntersectionPlans()) {
             if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
                 // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
                 // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
@@ -211,9 +182,17 @@ struct BaseCandidatePlan {
     PlanStageType root;
     // Any auxiliary data required to run the execution tree.
     Data data;
-    // Indicates whether this candidate plan has completed the trial run early by achieving one
-    // of the trial run metrics.
-    bool exitedEarly{false};
+    // How this candidate's trial period ended, set once the candidate has run a trial. Remains
+    // boost::none for a candidate that never ran a trial (e.g. one constructed directly from a
+    // cached plan, or a plan the cost-based ranker rejected without executing).
+    boost::optional<MultiPlannerStopCondition> stopCondition;
+    // Snapshot of this candidate's stats tree taken at the end of a capped trial phase, before a
+    // resumed phase keeps adding to the same counters. Captured only for explain-planned queries,
+    // and only by a capped-phase runTrials().
+    std::unique_ptr<PlanStageStats> estimatePhaseStats;
+    // Multiplanner stop condition recorded for the capped trial phase. Snapshotted together with
+    // 'estimatePhaseStats' before a resumed phase can overwrite 'stopCondition'.
+    boost::optional<MultiPlannerStopCondition> estimatePhaseStopCondition;
     // If the candidate plan has failed in a recoverable fashion during the trial run, contains a
     // non-OK status.
     Status status{Status::OK()};
@@ -223,6 +202,14 @@ struct BaseCandidatePlan {
     bool fromPlanCache{false};
     // Any results produced during the plan's execution prior to scoring are retained here.
     std::deque<ResultType> results;
+    // The plan's final ranking score - the trial score (QuerySolution::score) plus any
+    // tie-breaking heuristics bonuses - set by pickBestPlan() when it ranks the candidates.
+    // Sorting by it descending reproduces PlanRankingDecision::candidateOrder. Kept separate from
+    // QuerySolution::score, which explain displays: the bonuses participate in the ranking but are
+    // not part of the displayed trial score.
+    // TODO SERVER-131545 Refactor QuerySolution::score into BaseCandidatePlan and unify it with
+    // this field as one per-candidate scores record.
+    boost::optional<double> adjustedScore;
 };
 
 using CandidatePlan = BaseCandidatePlan<PlanStage*, WorkingSetID, WorkingSet*>;

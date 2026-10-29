@@ -1,6 +1,8 @@
 // Test various user operations against "system.profile" collection.  SERVER-18111.
 //
 // @tags: [
+//   # Uses mapReduce with JS map/reduce functions, which requires server-side scripting.
+//   requires_scripting,
 //   # The test runs commands that are not allowed with security token: convertToCapped, mapReduce,
 //   # profile.
 //   not_allowed_with_signed_security_token,

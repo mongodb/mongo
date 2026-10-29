@@ -37,5 +37,34 @@ class TestFindTestsInGitDiff(unittest.TestCase):
         self.assertCountEqual([], result)
 
 
+class TestGetTestsWithStaleFeatureFlagTag(unittest.TestCase):
+    def test_stale_tag_reported(self):
+        tests = ["dummy_jstest_file.js"]
+        with patch.object(
+            feature_flag_tags_check.jscomment, "get_tags", return_value=["featureFlagToaster"]
+        ):
+            result = feature_flag_tags_check.get_tests_with_stale_feature_flag_tag(
+                tests, ["featureFlagToaster", "featureFlagSpoon"]
+            )
+        self.assertCountEqual(["dummy_jstest_file.js: featureFlagToaster"], result)
+
+    def test_tag_removed(self):
+        tests = ["dummy_jstest_file.js"]
+        with patch.object(
+            feature_flag_tags_check.jscomment, "get_tags", return_value=["requires_fcv_51"]
+        ):
+            result = feature_flag_tags_check.get_tests_with_stale_feature_flag_tag(
+                tests, ["featureFlagToaster"]
+            )
+        self.assertCountEqual([], result)
+
+    def test_test_file_deleted(self):
+        tests = ["some/non/existent/jstest_file.js"]
+        result = feature_flag_tags_check.get_tests_with_stale_feature_flag_tag(
+            tests, ["featureFlagToaster"]
+        )
+        self.assertCountEqual([], result)
+
+
 if __name__ == "__main__":
     unittest.main()

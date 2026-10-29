@@ -1,37 +1,13 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/change_stream_ensure_resume_token_present_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/high_water_mark_provider.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -87,12 +63,25 @@ GetNextResult ChangeStreamEnsureResumeTokenPresentStage::doGetNext() {
         // the next time the getNext method is called. If we hit EOF, then we cannot have surpassed
         // the resume token on this iteration.
         if (!nextInput.isAdvanced()) {
-            invariant(_resumeStatus != ResumeStatus::kSurpassedToken);
+            tassert(9047701,
+                    "expecting _resumeStatus to be != kSurpassedToken",
+                    _resumeStatus != ResumeStatus::kSurpassedToken);
+
+            if (nextInput.isEOF()) {
+                // A stream whose filter is very narrow may not produce any event for an
+                // indeterminate amount of time, so waiting for one before we can conclude that the
+                // resume point is absent is not good enough. Consult the high water mark of the
+                // underlying scan instead, which advances even while the stream is producing no
+                // events at all.
+                _assertResumePointIsStillReachable();
+            }
             return nextInput;
         }
 
         // When we reach here, we have either found the resume token or surpassed it.
-        invariant(_resumeStatus != ResumeStatus::kCheckNextDoc);
+        tassert(9047703,
+                "expecting _resumeStatus to be != kCheckNextDoc",
+                _resumeStatus != ResumeStatus::kCheckNextDoc);
 
         // If the resume status is kFoundToken, record the fact that we have seen the token. When we
         // have surpassed the resume token, we will assert that we saw the token before doing so. We
@@ -110,8 +99,61 @@ GetNextResult ChangeStreamEnsureResumeTokenPresentStage::doGetNext() {
 
 
     // At this point, we have seen the token and swallowed it. Return the next event to the client.
-    invariant(_hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);
+    tassert(9047704,
+            "expecting to have surpassed the resume token",
+            _hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);
     return nextInput;
+}
+
+void ChangeStreamEnsureResumeTokenPresentStage::_assertResumePointIsStillReachable() {
+    // If we have already observed the token then the resume point was present; we are merely
+    // waiting for the event which follows it.
+    if (_hasSeenResumeToken) {
+        return;
+    }
+
+    auto highWaterMarkClusterTime = _getSourceHighWaterMarkClusterTime();
+
+    // We can only conclude the resume point is unreachable once a high water mark exists and has
+    // moved strictly beyond it. A high water mark at cluster time 'T' only guarantees that events
+    // before 'T' have been produced, so events at 'T' itself (including the one we seek) may still
+    // be in flight. Without a high water mark this check is a no-op optimization: we fall back to
+    // failing the stream once we observe an event which surpasses the resume token. On a router the
+    // high water mark only advances once every shard has reported progress, so with an idle shard
+    // how quickly we fail depends on that shard emitting periodic noops.
+    if (!highWaterMarkClusterTime || *highWaterMarkClusterTime <= _tokenFromClient.clusterTime) {
+        return;
+    }
+
+    uasserted(ErrorCodes::ChangeStreamFatalError,
+              str::stream() << "cannot resume stream; the stream has advanced to cluster time "
+                            << highWaterMarkClusterTime->toString()
+                            << ", which is past the resume point "
+                            << ResumeToken(_tokenFromClient).toDocument().toString());
+}
+
+boost::optional<Timestamp>
+ChangeStreamEnsureResumeTokenPresentStage::_getSourceHighWaterMarkClusterTime() {
+    boost::optional<Timestamp> highWaterMarkClusterTime;
+    bool hasCalledHighWaterMarkProvider = false;
+
+    forEachSourceStage([&](Stage& source) {
+        if (auto* provider = dynamic_cast<HighWaterMarkProvider*>(&source)) {
+            highWaterMarkClusterTime = provider->getHighWaterMarkClusterTime();
+            hasCalledHighWaterMarkProvider = true;
+            return false;
+        }
+
+        // Continue pipeline traversal if we haven't found the source stage.
+        return true;
+    });
+
+    // Expect that the HighWaterMarkProvider was asked for its cluster time. The returned cluster
+    // time from the provider can still be boost::none.
+    tassert(9047702,
+            "expecting HighWaterMarkProvider to have been called",
+            hasCalledHighWaterMarkProvider);
+    return highWaterMarkClusterTime;
 }
 
 GetNextResult ChangeStreamEnsureResumeTokenPresentStage::_tryGetNext() {

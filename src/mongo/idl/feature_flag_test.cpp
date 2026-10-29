@@ -1,44 +1,42 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/feature_flag.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/feature_flag_test_gen.h"
+#include "mongo/db/ifr_unrecognized_flag_info.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/ifr_sender_version.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
+
+#include <array>
+#include <charconv>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
 namespace {
+
+// Builds an IFRSenderVersion representing 'fcv' at (major, minor, 0, 0). Sufficient for the
+// fromWire tests below, whose semantics only depend on the (major, minor) prefix.
+std::unique_ptr<IFRSenderVersion> senderVersionFromFcv(
+    multiversion::FeatureCompatibilityVersion fcv) {
+    auto v = std::make_unique<IFRSenderVersion>();
+    v->setMajor(multiversion::majorVersion(fcv));
+    v->setMinor(multiversion::minorVersion(fcv));
+    v->setPatch(0);
+    v->setExtra(0);
+    return v;
+}
 
 ServerParameter* getServerParameter(const std::string& name) {
     return ServerParameterSet::getNodeParameterSet()->get(name);
@@ -84,6 +82,16 @@ boost::optional<multiversion::FeatureCompatibilityVersion> getFeatureFlagVersion
     }
 
     return multiversion::parseVersionForFeatureFlags(version.checkAndGetStringData());
+}
+
+// As senderVersionFromFcv, but with explicit patch and extra components, to express a sender in
+// the same release series as an FCV but at a specific patch / pre-release build.
+std::unique_ptr<IFRSenderVersion> senderVersionFromFcvWith(
+    multiversion::FeatureCompatibilityVersion fcv, int patch, int extra) {
+    auto v = senderVersionFromFcv(fcv);
+    v->setPatch(patch);
+    v->setExtra(extra);
+    return v;
 }
 
 // Sanity check feature flags
@@ -460,6 +468,8 @@ TEST(IDLFeatureFlag, IncrementalRolloutFeatureFlag) {
                                     .append("falseChecks", 1)
                                     .append("trueChecks", 2)
                                     .append("numToggles", 1)
+                                    .append("trueWireInstalls", 0)
+                                    .append("falseWireInstalls", 0)
                                     .obj());
 
     // Check the flag's stats again, to ensure that we did not alter their state by observing them.
@@ -492,6 +502,8 @@ TEST(IDLFeatureFlag, ReleaseIncrementalRolloutFeatureFlag) {
                                     .append("falseChecks", 1)
                                     .append("trueChecks", 2)
                                     .append("numToggles", 1)
+                                    .append("trueWireInstalls", 0)
+                                    .append("falseWireInstalls", 0)
                                     .obj());
 
     // Check the flag's stats again, to ensure that we did not alter their state by observing them.
@@ -564,19 +576,6 @@ TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyFalse) {
     ASSERT_FALSE(ifrContext.getSavedFlagValue(developmentFeatureFlag));
 }
 
-TEST(IDLFeatureFlag, SerializeFlagValues) {
-    auto& releaseFeatureFlag = feature_flags::gFeatureFlagReleaseForTest;
-    releaseFeatureFlag.setForServerParameter(true);
-
-    IncrementalFeatureRolloutContext ifrContext;
-
-    const auto& serializedResult = ifrContext.serializeFlagValues(
-        std::vector<IncrementalRolloutFeatureFlag*>{&releaseFeatureFlag});
-    ASSERT_EQ(serializedResult.size(), 1U);
-    ASSERT_EQ(serializedResult[0]["name"].String(), "featureFlagReleaseForTest");
-    ASSERT_TRUE(serializedResult[0]["value"].Bool());
-}
-
 TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsFalse) {
     ASSERT_FALSE(
         feature_flags::gFeatureFlagInDevelopmentForTest.shouldSerializeOnOutgoingRequests());
@@ -586,18 +585,455 @@ TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsTrue) {
     ASSERT_TRUE(feature_flags::gFeatureFlagSerializeForTest.shouldSerializeOnOutgoingRequests());
 }
 
-TEST(IDLFeatureFlag, GetFlagsForOutgoingRequestsWithLatestFCV) {
-    // (Generic FCV reference): Used for testing.
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-    auto flags = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
-    // All returned flags must have declared an FCV for serialization.
-    for (auto* flag : flags) {
-        ASSERT_TRUE(flag->shouldSerializeOnOutgoingRequests());
+// ---- fromWire tests ----
+
+TEST(IDLFeatureFlag, FromWireContextIsMarkedFromWire) {
+    auto wireCtx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
+    ASSERT_TRUE(wireCtx->isInstalledFromWire());
+
+    IncrementalFeatureRolloutContext localCtx;
+    ASSERT_FALSE(localCtx.isInstalledFromWire());
+}
+
+TEST(IDLFeatureFlag, FromWireEmptyPayload) {
+    auto ctx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+}
+
+TEST(IDLFeatureFlag, FromWireRecognizedFlagStoredAtWireValue) {
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(false);
+
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"featureFlagSerializeForTest", true}};
+    auto ctx = IncrementalFeatureRolloutContext::fromWireForTest(payload);
+
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    // Wire value (true) overrides the local default (false set above).
+    ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+// Death tests live in a separate suite because gtest forbids mixing TEST and
+// TEST_F (which DEATH_TEST_REGEX expands to) in the same suite. The regex is matched against the
+// "Tripwire assertion" log line, which includes the thrown Status's reason — so it pins the error
+// identity. (The extra-info *contents* are asserted directly, off the tripwire path, in
+// UnrecognizedIFRFlagInfo's MakeStatus* tests; assertions placed inside a death-test body would
+// not fail the test because the tripwire line is logged before they run.)
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 FromWireUnknownFlagSameSenderVersionErrors,
+                 "Tripwire assertion.*Received unknown IFR flag 'unknownIfrFlagForTest9'") {
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"unknownIfrFlagForTest9", true}};
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 FromWireMultipleUnknownFlagsReportsAll,
+                 "Tripwire assertion.*Received 2 unknown IFR flags") {
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{"unknownIfrFlagForTest9", true},
+        IFRFlagWireEntry{"anotherUnknownIfrFlagForTest", false},
+    };
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+// A sender specifying the same flag twice in one payload is a malformed request; the fromWire
+// accumulation loop tripwires rather than silently collapsing. Covers both the unrecognized
+// (scenario 3) and recognized (scenario 1) branches.
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 FromWireDuplicateUnknownFlagTasserts,
+                 "Tripwire assertion.*specified IFR flag 'unknownIfrFlagForTest9' more than once") {
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{"unknownIfrFlagForTest9", true},
+        IFRFlagWireEntry{"unknownIfrFlagForTest9", false},
+    };
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 WireInstallCounterIncrementsEvenOnProtocolError,
+                 "Tripwire assertion") {
+    const auto before = IncrementalRolloutFeatureFlag::getWireInstallsCount();
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"unknownIfrFlagForTest9", true}};
+    try {
+        IncrementalFeatureRolloutContext::fromWireForTest(payload);
+        FAIL("Expected exception");
+    } catch (const ExceptionFor<ErrorCodes::UnrecognizedIFRFlag>&) {
+        // The counter reflects attempted, not successful, constructions — it increments at ctor
+        // entry, before per-flag processing, so it stays in step with the per-flag wire-install
+        // counters (which are also retained on partial failure).
+        ASSERT_EQ(IncrementalRolloutFeatureFlag::getWireInstallsCount(), before + 1);
     }
-    // The test flag with serialize_on_outgoing_requests: kLatest should be present.
+}
+
+DEATH_TEST_REGEX(IDLFeatureFlagDeathTests,
+                 UnknownWireFlagErrorsIncrementsOnProtocolError,
+                 "Tripwire assertion") {
+    const auto before = IncrementalRolloutFeatureFlag::getUnknownWireFlagErrorsCount();
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{"unknownIfrFlagForTest9", true}};
+    try {
+        IncrementalFeatureRolloutContext::fromWireForTest(payload);
+        FAIL("Expected exception");
+    } catch (const ExceptionFor<ErrorCodes::UnrecognizedIFRFlag>&) {
+        ASSERT_EQ(IncrementalRolloutFeatureFlag::getUnknownWireFlagErrorsCount(), before + 1);
+    }
+}
+
+DEATH_TEST_REGEX(
+    IDLFeatureFlagDeathTests,
+    FromWireDuplicateRecognizedFlagTasserts,
+    "Tripwire assertion.*specified IFR flag 'featureFlagSerializeForTest' more than once") {
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{"featureFlagSerializeForTest", true},
+        IFRFlagWireEntry{"featureFlagSerializeForTest", false},
+    };
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+}
+
+TEST(IDLFeatureFlag, FromWireMalformedNonStringName) {
+    // Wire-form type validation now lives in the generated IFRFlagWireEntry parser (fromWire
+    // consumes already-parsed entries), so a non-string 'name' is rejected at parse time.
+    ASSERT_THROWS_CODE(IFRFlagWireEntry::parse(BSON("name" << 42 << "value" << true),
+                                               IDLParserContext{"ifrFlags"}),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST(IDLFeatureFlag, FromWireMalformedNonBoolValue) {
+    // Wire-form type validation now lives in the generated IFRFlagWireEntry parser (fromWire
+    // consumes already-parsed entries), so a non-bool 'value' is rejected at parse time.
+    ASSERT_THROWS_CODE(
+        IFRFlagWireEntry::parse(BSON("name" << "featureFlagSerializeForTest" << "value" << "yes"),
+                                IDLParserContext{"ifrFlags"}),
+        DBException,
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(IDLFeatureFlag, FromWireAbsentFlagOlderSenderDisabled) {
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    // (Generic FCV reference): Used for testing — simulates an older sender that predates the
+    // flag.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                                          std::move(senderVersion));
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+TEST(IDLFeatureFlag, FromWireOmittedOutgoingFlagDisabledWhenSenderPredatesIntro) {
+    // Mixed payload: one flag is present on the wire and one active outgoing flag is omitted.
+    // With a sender predating the omitted flag's introduction, the omitted flag must resolve to
+    // false regardless of the local default, while the received flag retains its wire value and
+    // the local checkEnabled() is unaffected.
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+    feature_flags::gFeatureFlagReleaseForTest.setForServerParameter(true);
+
+    std::vector<IFRFlagWireEntry> payload = {
+        IFRFlagWireEntry{feature_flags::gFeatureFlagReleaseForTest.getName(), true}};
+    // (Generic FCV reference): Used for testing — sender predates the kLatest-introduced flag.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(payload, std::move(senderVersion));
+
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagReleaseForTest));
+    ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSerializeForTest.checkEnabled());
+}
+
+TEST(IDLFeatureFlag, FromWireAbsentFlagSameSenderUsesLocalDefault) {
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    // (Generic FCV reference): Used for testing — sender is at the same FCV as the receiver.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLatest);
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                                          std::move(senderVersion));
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+TEST(IDLFeatureFlag, FromWireAbsentFlagPatchNewerSenderUsesLocalDefault) {
+    // A sender in the same release series as the flag's introduction FCV but at a later patch
+    // (e.g. 9.0.5 vs a 9.0-introduced flag) knows the flag. The absent flag must resolve to the
+    // local default, not to false.
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    auto senderVersion = std::make_unique<IFRSenderVersion>(makeLocalIFRSenderVersion());
+    senderVersion->setPatch(senderVersion->getPatch() + 1);
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                                          std::move(senderVersion));
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+TEST(IDLFeatureFlag, FromWireAbsentFlagPreReleaseSenderUsesLocalDefault) {
+    // A release-candidate build of the introduction series (extra < 0, e.g. 9.0.0-rc2) is still a
+    // 9.0 binary and knows the flag.
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    // (Generic FCV reference): Used for testing — sender is a pre-release build of the same FCV
+    // series.
+    auto senderVersion = std::make_unique<IFRSenderVersion>(makeLocalIFRSenderVersion());
+    senderVersion->setExtra(-23);
+    auto ctx = IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                                          std::move(senderVersion));
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+TEST(IDLFeatureFlag, FromWireAbsentFlagNoSenderVersionDisabled) {
+    // A sender that predates the wire protocol supplies no version, so an absent flag it cannot
+    // know about must resolve to false.
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    auto ctx =
+        IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{}, nullptr);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+// ---- wire-install metrics tests ----
+
+TEST(IDLFeatureFlag, WireInstallCounterIncrementsOnSuccess) {
+    const auto before = IncrementalRolloutFeatureFlag::getWireInstallsCount();
+    IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
+    ASSERT_EQ(IncrementalRolloutFeatureFlag::getWireInstallsCount(), before + 1);
+}
+
+TEST(IDLFeatureFlag, TrueWireInstallsIncrementsOnTrueWireValue) {
+    auto& flag = feature_flags::gFeatureFlagSerializeForTest;
+    const auto before = readStatsFromFlag(flag);
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{flag.getName(), true}};
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+    const auto after = readStatsFromFlag(flag);
+    ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
+              before["trueWireInstalls"].safeNumberLong() + 1);
+    ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
+              before["falseWireInstalls"].safeNumberLong());
+}
+
+TEST(IDLFeatureFlag, FalseWireInstallsIncrementsOnFalseWireValue) {
+    auto& flag = feature_flags::gFeatureFlagSerializeForTest;
+    const auto before = readStatsFromFlag(flag);
+    std::vector<IFRFlagWireEntry> payload = {IFRFlagWireEntry{flag.getName(), false}};
+    IncrementalFeatureRolloutContext::fromWireForTest(payload);
+    const auto after = readStatsFromFlag(flag);
+    ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
+              before["falseWireInstalls"].safeNumberLong() + 1);
+    ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
+              before["trueWireInstalls"].safeNumberLong());
+}
+
+TEST(IDLFeatureFlag, AbsentFlagDoesNotIncrementWireInstalls) {
+    auto& flag = feature_flags::gFeatureFlagSerializeForTest;
+    flag.setForServerParameter(true);
+    const auto before = readStatsFromFlag(flag);
+    // Empty payload from an older sender: scenario 4 resolves the flag but must not count as a
+    // per-flag wire install.
+    // (Generic FCV reference): Used for testing — an older sender predating the flags.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
+    IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                               std::move(senderVersion));
+    const auto after = readStatsFromFlag(flag);
+    ASSERT_EQ(after["trueWireInstalls"].safeNumberLong(),
+              before["trueWireInstalls"].safeNumberLong());
+    ASSERT_EQ(after["falseWireInstalls"].safeNumberLong(),
+              before["falseWireInstalls"].safeNumberLong());
+}
+
+TEST(IDLFeatureFlag, AbsentFlagIncrementsConservativeFalseCounter) {
+    // An older sender with an empty payload predates every kLatest-introduced flag, so scenario 4
+    // resolves each one to false. getFlagsIntroducedSinceLastLTS() contains exactly those flags.
+    const auto expectedDelta = static_cast<int64_t>(
+        IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS().size());
+    const auto before = IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount();
+    // (Generic FCV reference): Used for testing — an older sender predating the flags.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLastLTS);
+    IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                               std::move(senderVersion));
+    ASSERT_EQ(IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount(),
+              before + expectedDelta);
+}
+
+TEST(IDLFeatureFlag, AbsentFlagIncrementsLocalDefaultCounter) {
+    // A same-version sender with an empty payload knows every kLatest-introduced flag, so scenario
+    // 4 resolves each to the local default.
+    const auto expectedDelta = static_cast<int64_t>(
+        IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS().size());
+    const auto before = IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount();
+    // (Generic FCV reference): Used for testing — a same-version sender.
+    auto senderVersion = senderVersionFromFcv(multiversion::GenericFCV::kLatest);
+    IncrementalFeatureRolloutContext::fromWire(std::span<const IFRFlagWireEntry>{},
+                                               std::move(senderVersion));
+    ASSERT_EQ(IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount(),
+              before + expectedDelta);
+}
+
+// ---- getFlagsIntroducedSinceLastLTS / installForRequestWithoutIfrFlags tests ----
+
+TEST(IDLFeatureFlag, GetFlagsIntroducedSinceLastLTSIncludesLatestSerializedFlag) {
+    auto flags = IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS();
     ASSERT_TRUE(std::any_of(flags.begin(), flags.end(), [](auto* flag) {
         return flag->getName() == "featureFlagSerializeForTest";
     }));
+    // Flags without a serialize_on_outgoing_requests version are never returned.
+    ASSERT_FALSE(std::any_of(flags.begin(), flags.end(), [](auto* flag) {
+        return flag->getName() == "featureFlagInDevelopmentForTest";
+    }));
+}
+
+// ---- opCtx decoration tests ----
+
+class IFRContextOpCtxTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = cc().makeOperationContext();
+    }
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+TEST_F(IFRContextOpCtxTest, InstallForRequestWithoutIfrFlagsOnShardServerDisablesLatestFlags) {
+    const auto origRole = serverGlobalParams.clusterRole;
+    ScopeGuard restoreRole([origRole] { serverGlobalParams.clusterRole = origRole; });
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    // Local default is on — but a shard must not turn a release@latest feature on when no router
+    // coordinated a value, so it is disabled.
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    IncrementalFeatureRolloutContext::installForRequestWithoutIfrFlags(_opCtx.get());
+    auto ctx = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_FALSE(ctx->isInstalledFromWire());
+    ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+TEST_F(IFRContextOpCtxTest, InstallForRequestWithoutIfrFlagsOnShardServerDefersUntilConsulted) {
+    const auto origRole = serverGlobalParams.clusterRole;
+    ScopeGuard restoreRole([origRole] { serverGlobalParams.clusterRole = origRole; });
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    IncrementalFeatureRolloutContext::installForRequestWithoutIfrFlags(_opCtx.get());
+    // Deferred: until something consults a flag, the context is unmaterialized and treated as
+    // absent, so no ifrFlags would be forwarded downstream.
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::isInstalled(_opCtx.get()));
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+    // Consulting via get() materializes the shard-default (release@latest flag forced off).
+    auto ctx = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_FALSE(ctx->isInstalledFromWire());
+    ASSERT_FALSE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+    ASSERT_TRUE(IncrementalFeatureRolloutContext::isInstalled(_opCtx.get()));
+}
+
+TEST_F(IFRContextOpCtxTest, InstallForRequestWithoutIfrFlagsOnReplicaSetUsesLocalDefaults) {
+    const auto origRole = serverGlobalParams.clusterRole;
+    ScopeGuard restoreRole([origRole] { serverGlobalParams.clusterRole = origRole; });
+    // A standalone / plain replica set has no sibling nodes to diverge from.
+    serverGlobalParams.clusterRole = ClusterRole::None;
+    feature_flags::gFeatureFlagSerializeForTest.setForServerParameter(true);
+
+    IncrementalFeatureRolloutContext::installForRequestWithoutIfrFlags(_opCtx.get());
+    auto ctx = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_FALSE(ctx->isInstalledFromWire());
+    // No saved value pinned — a checkEnabled() fallback returns the local default (true).
+    ASSERT_TRUE(ctx->getSavedFlagValue(feature_flags::gFeatureFlagSerializeForTest));
+}
+
+TEST_F(IFRContextOpCtxTest, TryGetOnFreshOpCtxReturnsNull) {
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+}
+
+TEST_F(IFRContextOpCtxTest, GetOnFreshOpCtxLazilyConstructs) {
+    auto ctx = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_FALSE(ctx->isInstalledFromWire());
+}
+
+TEST_F(IFRContextOpCtxTest, GetOnFreshOpCtxMakesTryGetNonNull) {
+    IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_TRUE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+}
+
+TEST_F(IFRContextOpCtxTest, SetAndGetRoundTrip) {
+    auto wireCtx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
+    IncrementalFeatureRolloutContext::set(_opCtx.get(), wireCtx);
+
+    auto retrieved = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_EQ(retrieved, wireCtx);
+    ASSERT_TRUE(retrieved->isInstalledFromWire());
+}
+
+TEST_F(IFRContextOpCtxTest, TryGetAfterSetReturnsSameContext) {
+    auto wireCtx =
+        IncrementalFeatureRolloutContext::fromWireForTest(std::span<const IFRFlagWireEntry>{});
+    IncrementalFeatureRolloutContext::set(_opCtx.get(), wireCtx);
+
+    ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), wireCtx);
+}
+
+// A "version: latest" flag is off once the binary's latest FCV is ahead of the (pinned) cluster
+// FCV. Lowering the FCV floor keeps it on regardless of FCV.
+TEST_F(FeatureFlagTest, LoweringFCVFloorKeepsLatestFlagEnabledBelowVersion) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag flag{true /* enabled */,
+                                    multiversion::toString(multiversion::GenericFCV::kLatest),
+                                    false /* enableOnTransitionalFCV */};
+
+    ASSERT_FALSE(flag.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+
+    ASSERT_TRUE(flag.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(
+        flag.isEnabledUseLastLTSFCVWhenUninitialized(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(
+        flag.isEnabledUseLatestFCVWhenUninitialized(kNoVersionContext, kLastLTSFCVSnapshot));
+    ASSERT_TRUE(flag.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_TRUE(flag.isEnabled(kNoVersionContext, kDowngradingFromLatestToLastLTSFCVSnapshot));
+}
+
+// The _enabled guard precedes the version check: lowering the floor on a disabled flag leaves it
+// disabled.
+TEST_F(FeatureFlagTest, LoweringFCVFloorDoesNotEnableDisabledFlag) {
+    mongo::FCVGatedFeatureFlag flag{false /* enabled */, "" /* no version */};
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+    ASSERT_FALSE(flag.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
+    ASSERT_FALSE(flag.isEnabled(kNoVersionContext, kLastLTSFCVSnapshot));
+}
+
+// Check that lowering the FCV floor also applies to the isEnabledOnVersion method, which is
+// not otherwise directly tested.
+TEST_F(FeatureFlagTest, LoweringFCVFloorAppliesToIsEnabledOnVersion) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag flag{true /* enabled */,
+                                    multiversion::toString(multiversion::GenericFCV::kLatest)};
+    ASSERT_FALSE(flag.isEnabledOnVersion(multiversion::GenericFCV::kLastLTS));
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+    ASSERT_TRUE(flag.isEnabledOnVersion(multiversion::GenericFCV::kLastLTS));
+}
+
+TEST_F(FeatureFlagTest, LoweringFCVFloorMakesTransitionChecksConsistent) {
+    // (Generic FCV reference): feature flag test
+    mongo::FCVGatedFeatureFlag flag{true /* enabled */,
+                                    multiversion::toString(multiversion::GenericFCV::kLatest),
+                                    false /* enableOnTransitionalFCV */};
+
+    // (Generic FCV reference): feature flag test
+    const auto lastLTS = multiversion::GenericFCV::kLastLTS;
+    // (Generic FCV reference): feature flag test
+    const auto latest = multiversion::GenericFCV::kLatest;
+
+    // Before lowering the floor, a downgrade from latest to lastLTS flips the flag off.
+    ASSERT_TRUE(flag.isDisabledOnTargetFCVButEnabledOnOriginalFCV(lastLTS, latest));
+    ASSERT_TRUE(flag.isEnabledOnTargetFCVButDisabledOnOriginalFCV(latest, lastLTS));
+
+    flag.setEnabledRegardlessOfFCV_UNSAFE();
+
+    // After lowering the floor, the flag is enabled on both FCVs, so neither transition check
+    // fires.
+    ASSERT_FALSE(flag.isDisabledOnTargetFCVButEnabledOnOriginalFCV(lastLTS, latest));
+    ASSERT_FALSE(flag.isEnabledOnTargetFCVButDisabledOnOriginalFCV(latest, lastLTS));
 }
 
 }  // namespace

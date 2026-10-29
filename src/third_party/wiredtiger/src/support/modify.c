@@ -398,6 +398,108 @@ err:
     return (ret);
 }
 
+/* A tracked result byte that does not exist yet or has unknown provenance. */
+#define WT_MODIFY_BYTE_UNKNOWN (-1)
+
+/*
+ * Read one byte of an item for the marker tracking. The unsigned cast is load-bearing: it keeps
+ * every real byte in 0..255 so none collides with WT_MODIFY_BYTE_UNKNOWN; a signed cast would
+ * sign-extend 0xff into the sentinel.
+ */
+#define WT_MODIFY_GET_BYTE(item, i) ((int32_t)((const uint8_t *)(item)->data)[i])
+
+/*
+ * __wt_modify_result_may_be_in_tombstone_namespace --
+ *     Predict whether applying a modify vector to the base value yields a result in the layered
+ *     tombstone namespace, without materializing the result. The answer errs toward true when an
+ *     entry's effect on the marker positions is not tracked exactly, so it can report a result that
+ *     is not in the namespace, but never misses one that is.
+ */
+bool
+__wt_modify_result_may_be_in_tombstone_namespace(WT_SESSION_IMPL *session, const char *value_format,
+  const WT_ITEM *base, const WT_MODIFY *entries, int nentries)
+{
+    const WT_MODIFY *mod;
+    size_t len, pos;
+    int32_t head[2], pad_byte;
+    int i;
+    bool append, in_namespace, sformat;
+
+    WT_ASSERT(session, __wt_tombstone.size == WT_ELEMENTS(head));
+    WT_ASSERT(session, value_format[1] == '\0');
+    sformat = value_format[0] == 'S';
+    pad_byte = sformat ? ' ' : __wt_process.modify_pad_byte;
+
+    /* The string format's trailing nul is not part of the modified content. */
+    WT_ASSERT(session, !sformat || base->size > 0);
+    len = base->size - (sformat ? 1 : 0);
+
+    /*
+     * Track two things across one pass over the entries, never touching the value bytes: the
+     * content length, replaying each entry's length arithmetic, and the bytes that end up at the
+     * marker positions. A marker position keeps its byte when an entry cannot touch it (an append
+     * writes only at or past the old end, a replace only at or past its offset), takes a literal
+     * when the entry's data covers it, takes the pad byte in the gap an append leaves below its
+     * offset, and otherwise becomes unknown. An unknown byte counts as a possible marker byte, so
+     * the answer only ever errs toward true.
+     */
+    head[0] = len > 0 ? WT_MODIFY_GET_BYTE(base, 0) : WT_MODIFY_BYTE_UNKNOWN;
+    head[1] = len > 1 ? WT_MODIFY_GET_BYTE(base, 1) : WT_MODIFY_BYTE_UNKNOWN;
+
+    for (i = 0; i < nentries; ++i) {
+        mod = &entries[i];
+        append = mod->offset >= len;
+
+        for (pos = 0; pos < WT_ELEMENTS(head); ++pos) {
+            /* An append leaves existing bytes in place. A replace leaves those below its offset in
+             * place. */
+            if (pos < (append ? len : mod->offset))
+                continue;
+
+            if (pos >= mod->offset && pos - mod->offset < mod->data.size)
+                head[pos] = WT_MODIFY_GET_BYTE(&mod->data, pos - mod->offset);
+            else if (append && pos < mod->offset)
+                /* The gap between the old end and the offset is pad bytes. */
+                head[pos] = pad_byte;
+            else
+                head[pos] = WT_MODIFY_BYTE_UNKNOWN;
+        }
+
+        if (append)
+            len = mod->offset + mod->data.size;
+        else
+            /* The replace size truncates at the old end. */
+            len = len + mod->data.size - WT_MIN(mod->size, len - mod->offset);
+    }
+
+    in_namespace = len >= __wt_tombstone.size;
+    for (pos = 0; pos < WT_ELEMENTS(head); ++pos)
+        if (head[pos] != WT_MODIFY_BYTE_UNKNOWN &&
+          head[pos] != WT_MODIFY_GET_BYTE(&__wt_tombstone, pos))
+            in_namespace = false;
+
+    return (in_namespace);
+}
+
+/*
+ * __wt_update_list_print --
+ *     Print the contents of an update chain, one message per update.
+ */
+void
+__wt_update_list_print(WT_SESSION_IMPL *session, WT_UPDATE *head)
+{
+    WT_UPDATE *upd;
+    uint64_t pos;
+
+    for (upd = head, pos = 0; upd != NULL; upd = upd->next, ++pos)
+        WT_IGNORE_RET(__wt_msg(session,
+          "  upd[%" PRIu64 "]=%p type=%d txnid=%" PRIu64 " start_ts=%" PRIu64 " durable_ts=%" PRIu64
+          " prepare_state=%d flags=%#" PRIx16 " size=%" PRIu32,
+          pos, (void *)upd, (int)upd->type, __wt_atomic_load_uint64_v_acquire(&upd->txnid),
+          upd->upd_start_ts, upd->upd_durable_ts,
+          (int)__wt_atomic_load_uint8_v_acquire(&upd->prepare_state), upd->flags, upd->size));
+}
+
 /*
  * __wt_modify_reconstruct_from_upd_list --
  *     Takes an in-memory modify and populates an update value with the reconstructed full value.
@@ -484,6 +586,25 @@ retry:
          * required by a previous modify update). Assert the case.
          */
         WT_ASSERT(session, cbt->slot != UINT32_MAX);
+
+        /*
+         * We need the on-page value as the base, so the page must be present. If it isn't, an
+         * update chain is referencing a page that was never instantiated or has gone away; dump the
+         * ref, cursor, and update-chain state to show why no full update was found.
+         */
+        if (cbt->ref == NULL || cbt->ref->page == NULL)
+            __wt_update_list_print(session, modify);
+
+        WT_ERR_ASSERT(session, WT_DIAGNOSTIC_TXN_VISIBILITY,
+          cbt->ref != NULL && cbt->ref->page != NULL, WT_ERROR,
+          "modify reconstruct with missing base page: dhandle=%s ref=%p state=%d page_del=%p "
+          "slot=%" PRIu32 " ins_head=%p ins=%p modify.type=%d modify.txnid=%" PRIu64
+          " modify.prepare_state=%d",
+          session->dhandle == NULL ? "(null)" : session->dhandle->name, (void *)cbt->ref,
+          cbt->ref == NULL ? -1 : (int)WT_REF_GET_STATE(cbt->ref),
+          cbt->ref == NULL ? NULL : (void *)cbt->ref->page_del, cbt->slot, (void *)cbt->ins_head,
+          (void *)cbt->ins, (int)modify->type, __wt_atomic_load_uint64_v_acquire(&modify->txnid),
+          (int)__wt_atomic_load_uint8_v_acquire(&modify->prepare_state));
 
         WT_ERR_ERROR_OK(
           __wt_value_return_buf(cbt, cbt->ref, &upd_value->buf, &tw), WT_RESTART, true);

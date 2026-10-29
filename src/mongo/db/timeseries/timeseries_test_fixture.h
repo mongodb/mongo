@@ -1,37 +1,13 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -39,16 +15,18 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
+#include <cstring>
 #include <functional>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::timeseries {
-class MONGO_MOD_OPEN TimeseriesTestFixture : public CatalogTestFixture {
+class [[MONGO_MOD_OPEN]] TimeseriesTestFixture : public CatalogTestFixture {
 public:
     static constexpr uint64_t kDefaultStorageCacheSizeBytes = 1024 * 1024 * 1024;
     static constexpr uint64_t kLimitedStorageCacheSizeBytes = 1024;
@@ -311,4 +289,81 @@ protected:
     BSONObj _codeWScopeMeta = BSON(_metaField << BSONCodeWScope(_metaValue, BSON("x" << 1)));
     BSONObj _stringMeta = BSON(_metaField << _metaValue);
 };
+/**
+ * Predicts the OID that the next generateBucketOID call will produce, given an OID returned by
+ * the most recent call. The counter embedded in the non-timestamp portion is stored as a big-endian
+ * uint64 split across the InstanceUnique (5 bytes) and Increment (3 bytes) fields, and increments
+ * by 1 on each call.
+ */
+inline OID predictNextBucketOID(const OID& oid) {
+    uint8_t bits[8];
+    OID::InstanceUnique instance = oid.getInstanceUnique();
+    OID::Increment increment = oid.getIncrement();
+    std::memcpy(bits, instance.bytes, OID::kInstanceUniqueSize);
+    std::memcpy(bits + OID::kInstanceUniqueSize, increment.bytes, OID::kIncrementSize);
+
+    for (int i = 7; i >= 0; --i)
+        if (++bits[i] != 0)
+            break;
+
+    OID next;
+    next.setTimestamp(oid.getTimestamp());
+    OID::InstanceUnique newInstance;
+    std::memcpy(newInstance.bytes, bits, OID::kInstanceUniqueSize);
+    next.setInstanceUnique(newInstance);
+    OID::Increment newIncrement;
+    std::memcpy(newIncrement.bytes, bits + OID::kInstanceUniqueSize, OID::kIncrementSize);
+    next.setIncrement(newIncrement);
+    return next;
+}
+
+namespace bucket_catalog {
+inline StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
+    OperationContext* opCtx,
+    BucketCatalog& bucketCatalog,
+    const Collection* bucketsColl,
+    const TimeseriesOptions& timeseriesOptions,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    bool earlyReturnOnError,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
+    AllowQueryBasedReopening allowQueryBasedReopening,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+    TimeseriesWriteBatches writeBatches;
+
+    try {
+        auto status = prepareInsertsToBuckets(opCtx,
+                                              bucketCatalog,
+                                              bucketsColl,
+                                              timeseriesOptions,
+                                              opId,
+                                              comparator,
+                                              storageCacheSizeBytes,
+                                              earlyReturnOnError,
+                                              compressAndWriteBucketFunc,
+                                              userMeasurementsBatch,
+                                              startIndex,
+                                              numDocsToStage,
+                                              indices,
+                                              allowQueryBasedReopening,
+                                              errorsAndIndices,
+                                              writeBatches);
+        if (!status.isOK()) {
+            // Nothing is staged when a non-OK status is returned, so there is nothing to abort.
+            return status;
+        }
+    } catch (...) {
+        abortWriteBatches(bucketCatalog, writeBatches, exceptionToStatus());
+        throw;
+    }
+
+    return std::move(writeBatches);
+}
+}  // namespace bucket_catalog
+
 }  // namespace mongo::timeseries

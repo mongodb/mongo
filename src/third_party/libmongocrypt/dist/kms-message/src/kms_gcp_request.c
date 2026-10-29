@@ -20,6 +20,8 @@
 #include "kms_message_private.h"
 #include "kms_request_opt_private.h"
 
+#include <ctype.h>
+
 /* Set a default expiration of 5 minutes for JSON Web Tokens (GCP allows up to
  * one hour) */
 #define JWT_EXPIRATION_SECS 5 * 60
@@ -145,6 +147,38 @@ done:
    return req;
 }
 
+/* _check_key_identifier returns true if `value` is safe to use as a URL path segment.
+ *
+ * Key identifiers may originate from key vault documents or caller-supplied options. They are
+ * formatted into the request path, so an unescaped '/', '?', '#', space, or CR/LF would rewrite
+ * the request target or inject header lines into the request.
+ *
+ * Only the RFC 3986 unreserved characters are permitted. This is a superset of what GCP itself
+ * accepts, so it does not reject any identifier that would otherwise work:
+ * - keyRing and keyName must match `[a-zA-Z0-9_-]{1,63}`. See
+ *   https://cloud.google.com/kms/docs/reference/rest/v1/projects.locations.keyRings/create and
+ *   https://cloud.google.com/kms/docs/reference/rest/v1/projects.locations.keyRings.cryptoKeys/create
+ * - projectId is 6-30 characters of lowercase letters, numbers, and hyphens. See
+ *   https://cloud.google.com/resource-manager/docs/creating-managing-projects
+ * - location is a Cloud location name (e.g. "global", "us-east1").
+ * - keyVersion is a positive integer.
+ *
+ * `value` is not included in the error message: it is untrusted, and the error may be logged. */
+static bool
+_check_key_identifier (kms_request_t *req, const char *name, const char *value)
+{
+   const char *c;
+
+   for (c = value; *c != '\0'; c++) {
+      if (!isalnum ((unsigned char) *c) && *c != '-' && *c != '.' && *c != '_' &&
+          *c != '~') {
+         KMS_ERROR (req, "Invalid character in GCP KMS key identifier: %s", name);
+         return false;
+      }
+   }
+   return true;
+}
+
 static kms_request_t *
 _encrypt_decrypt_common (const char *encrypt_decrypt,
                          const char *host,
@@ -189,6 +223,14 @@ _encrypt_decrypt_common (const char *encrypt_decrypt,
    }
 
    if (kms_request_get_error (req)) {
+      goto done;
+   }
+
+   if (!_check_key_identifier (req, "projectId", project_id) ||
+       !_check_key_identifier (req, "location", location) ||
+       !_check_key_identifier (req, "keyRing", key_ring_name) ||
+       !_check_key_identifier (req, "keyName", key_name) ||
+       (key_version && !_check_key_identifier (req, "keyVersion", key_version))) {
       goto done;
    }
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 
@@ -72,6 +46,37 @@ TEST_F(CatalogStatsTest, FieldsAreUnique) {
     ASSERT_FALSE(fieldsAreUnique({"baz", "qux.subfield"}, uniqueFields));
 }
 
+TEST_F(CatalogStatsTest, NumPagesPrefersStorageEngineLeafPageCount) {
+    // A positive leaf page count is used regardless of the on-disk size, quantized to the nearest
+    // power of 2^(1/4).
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 4096.0).numPages(), 4096.0);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 4140.0).numPages(), 4096.0);
+
+    // Absent or non-positive counts fall back to the size-based estimate.
+    const double sizeBasedPages = CollectionStats(1000, 500, 100).numPages();
+    ASSERT_GT(sizeBasedPages, 0);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, boost::none).numPages(), sizeBasedPages);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 0.0).numPages(), sizeBasedPages);
+    ASSERT_EQ(CollectionStats(1000, 500, 100, -1.0).numPages(), sizeBasedPages);
+
+    // hasApproxNumLeafPages() reports whether the size-based fallback was avoided.
+    ASSERT_TRUE(CollectionStats(1000, 500, 100, 4096.0).hasApproxNumLeafPages());
+    ASSERT_FALSE(CollectionStats(1000, 500, 100, boost::none).hasApproxNumLeafPages());
+    ASSERT_FALSE(CollectionStats(1000, 500, 100, 0.0).hasApproxNumLeafPages());
+    ASSERT_FALSE(CollectionStats(1000, 500, 100, -1.0).hasApproxNumLeafPages());
+
+    // Both paths are quantized, so values within the same 2^(1/4) bucket produce identical
+    // results.
+    ASSERT_EQ(CollectionStats(1000, 500, 100).numPages(),
+              CollectionStats(1000, 515, 100).numPages());
+    ASSERT_EQ(CollectionStats(1000, 500, 100, 500.0).numPages(),
+              CollectionStats(1000, 500, 100, 515.0).numPages());
+
+    // Counter values far enough apart land in different buckets.
+    ASSERT_NE(CollectionStats(1000, 500, 100, 500.0).numPages(),
+              CollectionStats(1000, 500, 100, 600.0).numPages());
+}
+
 TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
     const auto nss = makeNSS("coll");
 
@@ -89,9 +94,9 @@ TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
 
     // A larger cache should fit more pages.
     ASSERT_GT(numPages(CollectionStats{1000, 500, 100},
-                       /*cacheBytes*/ 2000),
+                       /*cacheBytes=*/2000),
               numPages(CollectionStats{1000, 500, 100},
-                       /*cacheBytes*/ 1000));
+                       /*cacheBytes=*/1000));
 
     // Smaller on-disk page size → more pages on disk → smaller average in-memory page size →
     // more pages fit in the cache.
@@ -108,7 +113,7 @@ TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
     // When the cache is smaller than the average in-memory page size, fewer than 1 page fits.
     // The result should again be a positive fraction.
     const double tinyCachePages = numPages(CollectionStats{1000, 500, 100},
-                                           /*cacheBytes*/ 50);
+                                           /*cacheBytes=*/50);
     ASSERT_GT(tinyCachePages, 0);
     ASSERT_LT(tinyCachePages, 1);
 

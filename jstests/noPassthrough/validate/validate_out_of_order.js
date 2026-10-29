@@ -22,6 +22,13 @@ assert.commandWorked(
 );
 let res = assert.commandWorked(coll.validate());
 assert(!res.valid);
+// The out-of-order record store error must be disambiguated with the log id (12890000) of the
+// entry that carries the offending record details.
+assert(
+    res.errors.some((e) => e.includes("out-of-order") && e.includes("12890000")),
+    "Expected disambiguated out-of-order error referencing log id 12890000",
+    {errors: res.errors},
+);
 assert.commandWorked(
     primary.adminCommand({configureFailPoint: "failRecordStoreTraversal", mode: "off"}),
 );

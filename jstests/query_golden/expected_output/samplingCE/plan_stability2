@@ -4,12 +4,6 @@
 [jsTest] See README.plan_stability.md for more information.
 [jsTest] ----
 
-
-
-[jsTest] ----
-[jsTest] Found python 3.13 by default. Likely this is because we are using a virtual environment.
-[jsTest] ----
-
 {">>>pipelines":[
 {">>>pipeline": [{"$match":{"$nor":[{"field18_bool_idx":{"$eq":true},"field7_str_idx":{"$eq":"w"}},{"field47_Timestamp":{"$gte":{"$timestamp":{"t":1713770379,"i":0}}},"field42_mixed":{"$gte":true},"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"2.6"}}}],"$and":[{"$or":[{"$or":[{"field26_int_idx":{"$eq":1369},"field10_datetime_idx":{"$eq":"2025-03-20T00:00:00.000Z"},"field43_str":{"$gte":"n"}},{"field23_dict_idx":{"$eq":{"d":2,"b":1}},"field19_datetime_idx":{"$gte":"2024-02-20T00:00:00.000Z"}}]},{"field5_dict_idx":{"$eq":{"b":15}},"field0_bool_idx":{"$lt":true}},{"field46_datetime":{"$type":"date"},"field5_dict_idx":{"$gte":{"b":2}}}]},{"field27_bool_idx":{"$lte":false},"field44_int":{"$gt":33}}],"$or":[{"$and":[{"$or":[{"field30_Decimal128_idx":{"$lte":{"$numberDecimal":"100.3"}},"field22_list_idx":{"$nin":[5]},"field4_list_idx":{"$ne":"f"}},{"field21_Decimal128_idx":{"$lte":{"$numberDecimal":"7.2"}},"field40_list":[],"field14_dict_idx":{"$eq":{"i":1,"b":4}},"field19_datetime_idx":{"$exists":true}},{"field12_Decimal128_idx":{"$lte":{"$numberDecimal":"5.4"}},"field4_list_idx":{"$elemMatch":{"$lt":26,"$size":15,"$ne":"e"}},"field31_list_idx":{"$elemMatch":{"$lte":74,"$size":11}}}]},{"field26_int_idx":{"$lte":3581},"field44_int":{"$gte":84},"field27_bool_idx":{"$eq":false}},{"$or":[{"field32_dict_idx":{"$lte":{"b":2,"h":1}},"field6_mixed_idx":{"$ne":39688}},{"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"1.1"}},"field40_list":{"$lte":"q"},"field15_mixed_idx":{"$lte":"2024-02-03T00:00:00.000Z"},"field43_str":{"$gte":"r"},"field14_dict_idx":{"$eq":{"t":1}}},{"field36_bool":{"$type":"bool"},"field6_mixed_idx":{"$eq":10161},"field44_int":{"$ne":56}},{"field19_datetime_idx":{"$eq":"2024-01-26T00:00:00.000Z"},"field0_bool_idx":{"$lt":true}},{"field7_str_idx":{"$regex":{"$regex":"^XKQ","$options":""}},"field6_mixed_idx":{"$regex":{"$regex":"^e","$options":""}}}]}]},{"field24_mixed_idx":{"$in":[]}}]}},{"$project":{"field24_mixed_idx":1}}],
     "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field5_dict_idx_-1","indexBounds":{"field5_dict_idx":["[{ b: 15.0 }, { b: 15.0 }]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field5_dict_idx_-1","indexBounds":{"field5_dict_idx":["([], { b: 2.0 }]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field23_dict_idx_1","indexBounds":{"field23_dict_idx":["[{ d: 2.0, b: 1.0 }, { d: 2.0, b: 1.0 }]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field26_int_idx_-1_field21_Decimal128_idx_-1","indexBounds":{"field26_int_idx":["[1369.0, 1369.0]"],"field21_Decimal128_idx":["[MaxKey, MinKey]"]}}}]}}},
@@ -3700,9 +3694,9 @@
     "rows" :    458},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field28_datetime_idx":{"$gt":"2024-02-13T00:00:00.000Z"},"field40_list":{"$lte":"m"},"field43_str":{"$ne":"t"}},{"$or":[{"field35_int_idx":{"$lt":5562},"field26_int_idx":{"$gte":78}},{"field10_datetime_idx":{"$ne":"2024-03-22T00:00:00.000Z"},"field18_bool_idx":{"$ne":true},"field6_mixed_idx":{"$size":9},"field22_list_idx":{"$elemMatch":{"$size":7}},"field25_str_idx":{"$gt":"Dz"}},{"field45_bool":{"$gte":true},"field30_Decimal128_idx":{"$eq":{"$numberDecimal":"10.3"}},"field20_Timestamp_idx":{"$gt":{"$timestamp":{"t":1762314939,"i":0}}}}]}],"field17_int_idx":{"$eq":528},"field31_list_idx":19,"field13_list_idx":{"$elemMatch":{"$lt":51}},"$or":[{"field27_bool_idx":{"$eq":false},"field24_mixed_idx":{"$eq":{"$timestamp":{"t":1767139200,"i":0}}},"field19_datetime_idx":{"$eq":"2024-02-27T00:00:00.000Z"},"field32_dict_idx":{"$ne":{"t":1,"b":1}}},{"field18_bool_idx":{"$eq":false},"field42_mixed":{"$ne":{"d":2,"b":1}}}]}}],
-    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field17_int_idx_-1","indexBounds":{"field17_int_idx":["[528.0, 528.0]"]}}},
-    "keys" :     90,
-    "docs" :     90,
+    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field31_list_idx_-1_field7_str_idx_-1","indexBounds":{"field31_list_idx":["[19.0, 19.0]"],"field7_str_idx":["[MaxKey, MinKey]"]}}},
+    "keys" :     36,
+    "docs" :     36,
     "sorts":      0,
     "plans":      8,
     "rows" :      1},
@@ -5692,9 +5686,9 @@
     "rows" :  42817},
 
 {">>>pipeline": [{"$match":{"$and":[{"field21_Decimal128_idx":{"$lte":{"$numberDecimal":"1.13"}},"field10_datetime_idx":{"$gte":"2024-01-21T00:00:00.000Z"},"field13_list_idx":{"$gt":42}},{"$or":[{"field10_datetime_idx":{"$gt":"2024-02-03T00:00:00.000Z"},"field39_Decimal128":{"$gt":{"$numberDecimal":"3.1"}}},{"field34_str_idx":{"$ne":"g"},"field7_str_idx":{"$gt":"OF"},"field9_bool_idx":{"$ne":true}}]}],"$or":[{"field8_int_idx":{"$ne":348},"field22_list_idx":{"$size":16}},{"$nor":[{"field32_dict_idx":{"$ne":{"c":1,"b":1}},"field22_list_idx":{"$lte":27},"field9_bool_idx":{"$gt":true},"field7_str_idx":{"$ne":"sCG"}},{"field15_mixed_idx":{"$type":"int"},"field34_str_idx":{"$regex":{"$regex":"i","$options":""}},"field45_bool":{"$lt":false},"field43_str":{"$gte":"l"}},{"$and":[{"field24_mixed_idx":{"$lt":475},"field1_datetime_idx":{"$lte":"2024-03-08T00:00:00.000Z"}},{"field15_mixed_idx":{"$gte":"2024-04-24T00:00:00.000Z"},"field30_Decimal128_idx":{"$eq":{"$numberDecimal":"40.1"}}}]}]},{"$nor":[{"field22_list_idx":{"$lt":69},"field35_int_idx":{"$gte":7646}},{"$and":[{"field31_list_idx":111,"field43_str":{"$eq":"p"}},{"field26_int_idx":{"$eq":90},"field31_list_idx":35,"field12_Decimal128_idx":{"$lte":{"$numberDecimal":"1.55"}}}]}]},{"field19_datetime_idx":{"$gte":"2024-03-01T00:00:00.000Z"},"field11_Timestamp_idx":{"$lte":{"$timestamp":{"t":1719747827,"i":0}}},"field9_bool_idx":{"$ne":false}},{"field5_dict_idx":{"$gte":{"b":1,"e":1}},"field22_list_idx":{"$elemMatch":{"$all":[55,36,91,24,23,33,167]}},"field2_Timestamp_idx":{"$gt":{"$timestamp":{"t":1728150211,"i":0}}},"field31_list_idx":{"$size":15}}]}},{"$project":{"field31_list_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field10_datetime_idx_1","indexBounds":{"field10_datetime_idx":["[new Date(1705795200000), new Date(9223372036854775807)]"]}}}},
-    "keys" :    251,
-    "docs" :    251,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field13_list_idx_1_field28_datetime_idx_-1","indexBounds":{"field13_list_idx":["(42.0, inf]"],"field28_datetime_idx":["[MaxKey, MinKey]"]}}}},
+    "keys" :     75,
+    "docs" :     75,
     "sorts":      0,
     "plans":      6,
     "rows" :      1},
@@ -6500,9 +6494,9 @@
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"field24_mixed_idx":{"$gte":{"$timestamp":{"t":1704067200,"i":0}}},"field31_list_idx":{"$lt":37},"field4_list_idx":{"$lte":56},"field10_datetime_idx":{"$exists":true},"field1_datetime_idx":{"$ne":"2024-02-15T00:00:00.000Z"},"field40_list":{"$lt":555},"field28_datetime_idx":{"$gte":"2024-01-09T00:00:00.000Z"},"field22_list_idx":{"$nin":[36,31,106,20]},"$nor":[{"field22_list_idx":{"$elemMatch":{"$size":11}},"field16_str_idx":{"$gt":"T"},"field35_int_idx":{"$eq":5562}},{"field20_Timestamp_idx":{"$gte":{"$timestamp":{"t":1759419570,"i":0}}},"field35_int_idx":{"$lte":9588},"field27_bool_idx":{"$gte":false}}]}},{"$project":{"field47_Timestamp":1,"field40_list":1,"field29_Timestamp_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field28_datetime_idx_1_field23_dict_idx_1","indexBounds":{"field28_datetime_idx":["[new Date(1704758400000), new Date(9223372036854775807)]"],"field23_dict_idx":["[MinKey, MaxKey]"]}}}},
-    "keys" :     85,
-    "docs" :     85,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field24_mixed_idx_-1_field28_datetime_idx_1","indexBounds":{"field24_mixed_idx":["[Timestamp(4294967295, 4294967295), Timestamp(1704067200, 0)]"],"field28_datetime_idx":["[new Date(1704758400000), new Date(9223372036854775807)]"]}}}},
+    "keys" :     65,
+    "docs" :     62,
     "sorts":      0,
     "plans":      7,
     "rows" :     27},
@@ -6756,9 +6750,9 @@
     "rows" :      4},
 
 {">>>pipeline": [{"$match":{"field31_list_idx":{"$gte":64},"field16_str_idx":{"$type":"string"},"$or":[{"field30_Decimal128_idx":{"$exists":true},"field38_Timestamp":{"$gte":{"$timestamp":{"t":1704067200,"i":0}}}},{"field24_mixed_idx":{"$regex":{"$regex":"^v","$options":""}},"field38_Timestamp":{"$gt":{"$timestamp":{"t":1767139200,"i":0}}},"field27_bool_idx":{"$lt":false}},{"field27_bool_idx":{"$gt":false},"field9_bool_idx":{"$lte":true}},{"field3_Decimal128_idx":{"$lt":{"$numberDecimal":"3.3"}},"field42_mixed":{"$ne":{"h":1}}},{"field9_bool_idx":{"$eq":false},"field8_int_idx":{"$exists":false},"field11_Timestamp_idx":{"$ne":{"$timestamp":{"t":1732456719,"i":0}}},"field3_Decimal128_idx":{"$gt":{"$numberDecimal":"2.7"}},"field7_str_idx":{"$gt":"vZuw"},"field20_Timestamp_idx":{"$ne":{"$timestamp":{"t":1765753819,"i":0}}}}],"field13_list_idx":{"$lt":45},"field14_dict_idx":{"$lt":{"t":1}},"field15_mixed_idx":{"$lte":{"$timestamp":{"t":1731746046,"i":0}}}}},{"$project":{"field30_Decimal128_idx":1,"field44_int":1,"field3_Decimal128_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field15_mixed_idx_1","indexBounds":{"field15_mixed_idx":["[Timestamp(0, 0), Timestamp(1731746046, 0)]"]}}}},
-    "keys" :    126,
-    "docs" :    126,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field31_list_idx_-1_field7_str_idx_-1","indexBounds":{"field31_list_idx":["[inf, 64.0]"],"field7_str_idx":["[MaxKey, MinKey]"]}}}},
+    "keys" :     48,
+    "docs" :     48,
     "sorts":      0,
     "plans":     12,
     "rows" :      1},
@@ -8268,8 +8262,8 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 28050430, "docs": 27176298, "sorts": 8159581, "rows": 10011323, "errors":      0},
-">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
+">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 28050102, "docs": 27175967, "sorts": 8159581, "rows": 10011323, "errors":      0},
+">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"costBased","internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 
 [jsTest] ----

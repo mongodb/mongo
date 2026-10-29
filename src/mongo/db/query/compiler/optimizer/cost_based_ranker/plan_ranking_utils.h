@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -69,20 +43,41 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
                                   NamespaceString nss);
 
 /**
+ * Run cost-based ranking for the query 'cq' and return all solutions it produced: a single
+ * winner when CBR could estimate every plan, or otherwise the best estimable plan (if any)
+ * followed by the plans it could not estimate.
+ *
+ * If 'originalPlanHashes' is set, it is filled with the hashes of the candidate plans in the
+ * order the planner produced them, before CBR saw them. Callers use it to assert that CBR
+ * preserved the order of the plans it could not estimate.
+ */
+std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
+    CanonicalQuery* cq,
+    size_t numDocs,
+    OperationContext& opCtx,
+    int sampleSize,
+    NamespaceString nss,
+    SamplingCEMethodEnum samplingStyle = SamplingCEMethodEnum::kRandom,
+    boost::optional<int> numChunks = boost::none,
+    boost::optional<PlanningTimeProfile&> times = boost::none,
+    boost::optional<std::vector<size_t>&> originalPlanHashes = boost::none);
+
+/**
  * Use the cost-based ranker (CBR) to find an optimal plan for the query 'cq'.
  * It is expected that the tests using this function ensure that CBR always
- * finds an optimal plan. In this case the method returns a pointer tp that
+ * finds an optimal plan. In this case the method returns a pointer to that
  * optimal plan.
  */
-const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
-                                 size_t numDocs,
-                                 OperationContext& opCtx,
-                                 int sampleSize,
-                                 std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
-                                 NamespaceString nss,
-                                 SamplingCEMethodEnum samplingStyle = SamplingCEMethodEnum::kRandom,
-                                 boost::optional<int> numChunks = boost::none,
-                                 boost::optional<PlanningTimeProfile&> times = boost::none);
+const QuerySolution* bestCBRPlan(
+    CanonicalQuery* cq,
+    size_t numDocs,
+    OperationContext& opCtx,
+    int sampleSize,
+    std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
+    NamespaceString nss,
+    SamplingCEMethodEnum onTheFlySamplingMethod = SamplingCEMethodEnum::kRandom,
+    boost::optional<int> numChunks = boost::none,
+    boost::optional<PlanningTimeProfile&> times = boost::none);
 
 }  // namespace plan_ranking_tests
 }  // namespace mongo

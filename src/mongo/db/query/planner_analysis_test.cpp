@@ -1,46 +1,26 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/planner_analysis.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <map>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -56,14 +36,16 @@ using namespace std::literals::string_view_literals;
 /**
  * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
  */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp, WildcardProjection* wcProjection = nullptr) {
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp,
+                                 WildcardProjection* wcProjection = nullptr,
+                                 bool sparse = false) {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
             IndexConfig::kLatestIndexVersion,
             false,
             {},
             {},
-            false,
+            sparse,
             false,
             CoreIndexInfo::Identifier("test_foo"),
             {},
@@ -71,6 +53,12 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp, WildcardProjection* wcProjec
 }
 
 TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+    const auto kNss = NamespaceString::createNamespaceString_forTest("test.test");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+        new ExpressionContextForTest(opCtx.get(), kNss);
+
     std::string foreignField = "b";
     std::vector<IndexEntry> indexList;
     BSONObj keyPattern = BSON("$**" << 1);
@@ -82,40 +70,74 @@ TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
         WildcardKeyGenerator::createProjectionExecutor(keyPattern, BSON("b" << 0));
     auto incompatibleWcIndex = buildSimpleIndexEntry(keyPattern, &wcProjectionExclude);
 
+    BSONObj compoundKeyPattern = BSON("a" << 1 << "$**" << 1);
+    auto compoundWcProjection =
+        WildcardKeyGenerator::createProjectionExecutor(compoundKeyPattern, BSONObj());
+    auto compoundWcIndex = buildSimpleIndexEntry(compoundKeyPattern, &compoundWcProjection);
+
+    // A partial single-path wildcard index covering the foreign field is still classic-only:
+    // DILJ's runtime guards don't account for documents excluded by a partial filter.
+    AlwaysTrueMatchExpression partialFilterExpr;
+    auto partialWcIndex = buildSimpleIndexEntry(keyPattern, &wcProjection);
+    partialWcIndex.filterExpr = &partialFilterExpr;
+
     auto sbeIndex = buildSimpleIndexEntry(BSON("b" << 1));
 
     // There are no indexes.
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
-    // A single index that is wildcard index that can be used only in classic.
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
+    // A single-path wildcard index covering the foreign field can now be used in SBE via the
+    // dynamic indexed loop join, so it must NOT force the $lookup into the classic engine.
     indexList.push_back(compatibleWcIndex);
-    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                   indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
+
+    // A compound wildcard index covering the foreign field is still classic-only: SBE only
+    // supports single-path wildcard indexes for $lookup pushdown.
+    indexList.clear();
+    indexList.push_back(compoundWcIndex);
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
+
+    // A partial wildcard index covering the foreign field is also classic-only.
+    indexList.clear();
+    indexList.push_back(partialWcIndex);
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A single index that is a  wildcard index that excludes the foreignField, thus it is not
     // eligible for the query.
     indexList.clear();
     indexList.push_back(incompatibleWcIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A second index that can be used in SBE.
     indexList.push_back(sbeIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
-    // A wildcard index that can be used in classic and a second index that can be used in SBE.
+    // A compound wildcard index that can only be used in classic, plus a second index that can be
+    // used in SBE.
     indexList.clear();
-    indexList.push_back(compatibleWcIndex);
+    indexList.push_back(compoundWcIndex);
     indexList.push_back(sbeIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 
     // A single index that can be used in SBE.
     indexList.clear();
     indexList.push_back(sbeIndex);
-    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(foreignField,
-                                                                                    indexList));
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
+
+    // A sparse (non-partial) index on the foreign field can now be used in SBE via the dynamic
+    // indexed loop join, so it must NOT force the $lookup into the classic engine.
+    auto sparseIndex = buildSimpleIndexEntry(BSON("b" << 1), nullptr, /*sparse=*/true);
+    indexList.clear();
+    indexList.push_back(sparseIndex);
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
+        expCtx, foreignField, indexList));
 }
 
 TEST(QueryPlannerAnalysis, GetSortPatternBasic) {
@@ -255,10 +277,13 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     auto differentFieldIndex = buildSimpleIndexEntry(fromjson("{'geometry.blah': '2dsphere'}"));
     auto compoundIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere', 'a': -1}"));
     auto unsupportedIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
+    auto partialIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
 
     relevantIndex.infoObj = irrelevantIndex.infoObj = differentFieldIndex.infoObj =
-        compoundIndex.infoObj = supportedVersion;
+        compoundIndex.infoObj = partialIndex.infoObj = supportedVersion;
     unsupportedIndex.infoObj = unsupportedVersion;
+    auto partialFilter = std::make_unique<AndMatchExpression>();
+    partialIndex.filterExpr = partialFilter.get();
 
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
 
@@ -340,6 +365,151 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     QueryPlannerAnalysis::analyzeGeo(params, &orNode);
     ASSERT_EQ(expr->getCanSkipValidation(), true);
+
+    // We should not skip validation if the only relevant 2dsphere index is a partial index.
+    params.mainCollectionInfo.indexes.clear();
+    params.mainCollectionInfo.indexes.push_back(partialIndex);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, &orNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+    // A non-partial relevant 2dsphere index still enables skip validation even when a partial
+    // index on the same field is also present.
+    params.mainCollectionInfo.indexes.push_back(relevantIndex);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, fetchNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), true);
+
+    expr->setCanSkipValidation(false);
+    QueryPlannerAnalysis::analyzeGeo(params, &orNode);
+    ASSERT_EQ(expr->getCanSkipValidation(), true);
+}
+
+TEST(QueryPlannerAnalysis, GeoSkipValidationOnGeoNearDocFilter) {
+    auto relevantIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
+    relevantIndex.infoObj = fromjson("{'2dsphereIndexVersion': 3}");
+    auto differentFieldIndex = buildSimpleIndexEntry(fromjson("{'geometry.blah': '2dsphere'}"));
+    differentFieldIndex.infoObj = fromjson("{'2dsphereIndexVersion': 3}");
+
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
+    // A geo predicate that has been pushed into the $geoNear node as its residual document filter
+    // must be treated exactly like a filter on a fetched node: validation can be skipped when a
+    // relevant 2dsphere index exists.
+    const auto makeGeoNear2DSphereNodeWithDocFilter = [&](GeoMatchExpression** exprOut) {
+        auto node = std::make_unique<GeoNear2DSphereNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}")));
+        auto exprPtr = std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
+        *exprOut = exprPtr.get();
+        node->residualFilter = std::move(exprPtr);
+        return node;
+    };
+
+    {
+        GeoMatchExpression* expr = nullptr;
+        auto node = makeGeoNear2DSphereNodeWithDocFilter(&expr);
+
+        // No indexes: no skipping.
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+        // A 2dsphere index on a different field: no skipping.
+        params.mainCollectionInfo.indexes.push_back(differentFieldIndex);
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), false);
+
+        // A relevant 2dsphere index: skip validation.
+        params.mainCollectionInfo.indexes.push_back(relevantIndex);
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), true);
+    }
+
+    // The same holds for a $geoNear node nested below another node, and for a node that carries
+    // both a 'filter' and a 'residualFilter'.
+    {
+        GeoMatchExpression* residualFilterExpr = nullptr;
+        auto geoNode = makeGeoNear2DSphereNodeWithDocFilter(&residualFilterExpr);
+
+        auto filterPtr =
+            std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
+        GeoMatchExpression* filterExpr = filterPtr.get();
+        geoNode->filter = std::move(filterPtr);
+
+        ShardingFilterNode shardFilterNode;
+        shardFilterNode.children.push_back(std::move(geoNode));
+
+        QueryPlannerAnalysis::analyzeGeo(params, &shardFilterNode);
+        ASSERT_EQ(filterExpr->getCanSkipValidation(), true);
+        ASSERT_EQ(residualFilterExpr->getCanSkipValidation(), true);
+    }
+
+    // A GeoNear2DNode's 'residualFilter' is handled as well.
+    {
+        auto node = std::make_unique<GeoNear2DNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{'geometry.field': '2d'}")));
+        auto exprPtr = std::make_unique<GeoMatchExpression>("geometry.field"sv, nullptr, BSONObj());
+        GeoMatchExpression* expr = exprPtr.get();
+        node->residualFilter = std::move(exprPtr);
+
+        QueryPlannerAnalysis::analyzeGeo(params, node.get());
+        ASSERT_EQ(expr->getCanSkipValidation(), true);
+    }
+}
+
+TEST(QueryPlannerAnalysis, GeoNearNodeClonePreservesDocFilter) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    const BSONObj kThree = BSON("" << 3);
+    // appendToString() dereferences 'nq', so the nodes need a near query even though its contents
+    // are irrelevant here.
+    const GeoNearExpression nearExpr("a");
+
+    const auto assertClonedDocFilter = [](const auto& original) {
+        auto clone = original->clone();
+        auto* clonedNode = dynamic_cast<decltype(original.get())>(clone.get());
+        ASSERT(clonedNode);
+        ASSERT(clonedNode->residualFilter);
+        // The clone must own a separate copy of the predicate, not alias the original's.
+        ASSERT_NOT_EQUALS(clonedNode->residualFilter.get(), original->residualFilter.get());
+        ASSERT_BSONOBJ_EQ(clonedNode->residualFilter->serialize(),
+                          original->residualFilter->serialize());
+        // The predicate is part of the node's string representation, which explain and log output
+        // rely on.
+        ASSERT_STRING_CONTAINS(clone->toString(), "residualFilter");
+    };
+
+    {
+        auto node =
+            std::make_unique<GeoNear2DNode>(testNss, buildSimpleIndexEntry(fromjson("{a: '2d'}")));
+        node->nq = &nearExpr;
+        node->residualFilter = std::make_unique<GTMatchExpression>("b"sv, kThree.firstElement());
+        assertClonedDocFilter(node);
+    }
+
+    {
+        auto node = std::make_unique<GeoNear2DSphereNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{a: '2dsphere'}")));
+        node->nq = &nearExpr;
+        node->residualFilter = std::make_unique<GTMatchExpression>("b"sv, kThree.firstElement());
+        assertClonedDocFilter(node);
+    }
+
+    // A node without a 'residualFilter' clones into a node without one, and does not mention it in
+    // its string representation.
+    {
+        auto node = std::make_unique<GeoNear2DSphereNode>(
+            testNss, buildSimpleIndexEntry(fromjson("{a: '2dsphere'}")));
+        node->nq = &nearExpr;
+        auto clone = node->clone();
+        ASSERT_FALSE(static_cast<GeoNear2DSphereNode*>(clone.get())->residualFilter);
+        ASSERT_STRING_OMITS(clone->toString(), "residualFilter");
+    }
 }
 
 TEST_F(QueryPlannerTest, ExprQueryHasImprecisePredicatesRemoved) {
@@ -556,5 +726,33 @@ TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_InvalidData) {
     // Non-number sort direction
     ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
         makeTraversalPreference(fromjson("{a: 'foo'}")), fromjson("{a: 'foo'}"), {}));
+}
+
+TEST_F(QueryPlannerTest,
+       DetermineLookupStrategyLogsRejectionWhenForeignCollectionExceedsScanBytes) {
+    // determineLookupStrategy() has its own COLLECTION_EXCEEDS_SCAN_BYTES rejection path, separate
+    // from the ones in query_planner.cpp, with its own LOGV2 id.
+    runQuery(fromjson("{}"));
+
+    auto foreignNss = NamespaceString::createNamespaceString_forTest("test.foreign");
+    std::map<NamespaceString, CollectionInfo> secondaryCollInfos;
+    auto& foreignInfo = secondaryCollInfos[foreignNss];
+    foreignInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    foreignInfo.maxEstimatedScanBytesCollectionSize = 4000;
+    foreignInfo.maxEstimatedScanBytesThreshold = 2000;
+    // No index on the foreign field, so neither an indexed nor a hash join is eligible and the
+    // nested loop join path evaluates and rejects the unbounded foreign COLLSCAN.
+
+    unittest::LogCaptureGuard logs;
+    ASSERT_THROWS_CODE(
+        QueryPlannerAnalysis::determineLookupStrategy(*cq, foreignNss, "b", secondaryCollInfos),
+        DBException,
+        ErrorCodes::NoQueryExecutionPlans);
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466403)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.foreign" << "estimatedSize" << 4000
+                                                  << "threshold" << 2000))),
+              1);
 }
 }  // namespace

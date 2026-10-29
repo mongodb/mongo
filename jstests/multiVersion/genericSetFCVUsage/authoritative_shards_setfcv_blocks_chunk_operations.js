@@ -10,6 +10,10 @@
  *   3. The block persists across a shard primary stepdown (it is not in-memory state).
  *   4. An operation that started before the transition cannot commit its placement change
  *      once the FCV has gone transitional.
+ *   5. setFCV drains an in-flight authoritative chunk operation that has created its coordinator
+ *      but has not yet registered in the ActiveMigrationsRegistry.
+ *   6. setFCV drains an in-flight chunk command that has decided its authoritativeness but not
+ *      yet registered in the ActiveMigrationsRegistry nor created a coordinator.
  *
  * TODO (SERVER-98118): Remove this test.
  */
@@ -17,6 +21,7 @@
 import {configureFailPoint, configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -487,5 +492,97 @@ describe("setFCV blocks chunk operations for authoritative shards", function () 
                 // Drive the FCV back to a stable, fully-upgraded state before the next operation.
                 setStableFCV(latestFCV);
             });
+    });
+
+    it("drains an in-flight chunk op coordinator that has not yet registered the migration", function () {
+        setStableFCV(latestFCV);
+        const {ns} = setupShardedCollection("drain_chunk_coordinator");
+
+        // Pause the coordinator after it registers with the sharding coordinator service but before
+        // it runs, so only the coordinator drain (not the ActiveMigrationsRegistry) can observe it.
+        const hangSplit = configureFailPoint(
+            st.rs0.getPrimary(),
+            "PrimaryOnlyServiceHangBeforeRunningInstance",
+        );
+        const splitThread = new Thread(
+            (mongosHost, ns) => {
+                return new Mongo(mongosHost).getDB("admin").runCommand({split: ns, middle: {x: 0}});
+            },
+            st.s.host,
+            ns,
+        );
+        splitThread.start();
+        hangSplit.wait();
+
+        // setFCV drains the still-paused coordinator, so we expect a timeout.
+        assert.commandFailedWithCode(
+            st.s.adminCommand({
+                setFeatureCompatibilityVersion: lastLTSFCV,
+                confirm: true,
+                maxTimeMS: 5000,
+            }),
+            ErrorCodes.MaxTimeMSExpired,
+        );
+        assert(!isFCVEqual(st.rs0.getPrimary().getDB("admin"), lastLTSFCV));
+
+        // Releasing the coordinator lets it finish; the split may commit or conflict depending on
+        // how far setFCV reached, either is fine.
+        hangSplit.off();
+        splitThread.join();
+        assert.commandWorkedOrFailedWithCode(
+            splitThread.returnData(),
+            ErrorCodes.ConflictingOperationInProgress,
+        );
+
+        // Finish the interrupted downgrade now that nothing is draining, leaving a stable FCV.
+        setStableFCV(lastLTSFCV);
+    });
+
+    it("drains an in-flight legacy migration before reaching the transitional FCV", function () {
+        setStableFCV(lastLTSFCV);
+        const {ns} = setupShardedCollection("drain_chunk_command");
+
+        // Pause the legacy moveRange right before it registers in the ActiveMigrationsRegistry.
+        const hangMoveRange = configureFailPoint(
+            st.rs0.getPrimary(),
+            "hangBeforeLegacyRegisterDonateChunk",
+        );
+        const moveRangeThread = new Thread(
+            (mongosHost, ns, toShard) => {
+                return new Mongo(mongosHost).getDB("admin").runCommand({
+                    moveRange: ns,
+                    min: {x: MinKey},
+                    toShard,
+                });
+            },
+            st.s.host,
+            ns,
+            st.shard1.shardName,
+        );
+        moveRangeThread.start();
+        hangMoveRange.wait();
+
+        // setFCV drains it, so we expect a timeout.
+        assert.commandFailedWithCode(
+            st.s.adminCommand({
+                setFeatureCompatibilityVersion: latestFCV,
+                confirm: true,
+                maxTimeMS: 3000,
+            }),
+            ErrorCodes.MaxTimeMSExpired,
+        );
+        checkFCV(st.rs0.getPrimary().getDB("admin"), lastLTSFCV);
+
+        // Releasing the coordinator lets it finish; the split may commit or conflict depending on
+        // how far setFCV reached, either is fine.
+        hangMoveRange.off();
+        moveRangeThread.join();
+        assert.commandWorkedOrFailedWithCode(
+            moveRangeThread.returnData(),
+            ErrorCodes.ConflictingOperationInProgress,
+        );
+
+        // Finish the interrupted upgrade now that nothing is draining, leaving a stable FCV.
+        setStableFCV(latestFCV);
     });
 });

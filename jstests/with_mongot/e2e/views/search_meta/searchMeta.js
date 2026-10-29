@@ -4,7 +4,7 @@
  * themselves. On an implementation level, $searchMeta doesn't desugar to $_internalSearchIdLookup
  * (which performs view transforms for other mongot operators).
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {

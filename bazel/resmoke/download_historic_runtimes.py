@@ -12,7 +12,7 @@ S3_BASE = "https://mongo-test-stats.s3.amazonaws.com"
 
 # If run outside of CI, use the following defaults as they should provide reasonably close runtimes.
 DEFAULT_PROJECT = "mongodb-mongo-master"
-DEFAULT_BUILD_VARIANT = "linux-64-debug-required"
+DEFAULT_BUILD_VARIANT = "linux-arm64-debug-required"
 
 
 def parse_volatile_status(path):
@@ -73,12 +73,16 @@ def main():
             f"{S3_BASE}/{project}/{build_variant}/{args.suite}",
             f"{S3_BASE}/{project}/{build_variant}/{short_name(args.suite)}",
             f"{S3_BASE}/{DEFAULT_PROJECT}/{build_variant}/{args.suite}",
+            f"{S3_BASE}/{DEFAULT_PROJECT}/enterprise-amazon-linux2023-arm64-all-feature-flags/{short_name(args.suite)}",
         ]:
             if url not in seen:
                 seen.add(url)
                 urls.append(url)
     else:
-        urls = [f"{S3_BASE}/{DEFAULT_PROJECT}/{DEFAULT_BUILD_VARIANT}/{args.suite}"]
+        urls = [
+            f"{S3_BASE}/{DEFAULT_PROJECT}/{DEFAULT_BUILD_VARIANT}/{args.suite}",
+            f"{S3_BASE}/{DEFAULT_PROJECT}/enterprise-amazon-linux2023-arm64-all-feature-flags/{short_name(args.suite)}",
+        ]
 
     stats = None
     for url in urls:

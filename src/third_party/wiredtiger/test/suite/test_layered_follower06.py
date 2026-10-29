@@ -69,24 +69,27 @@ class test_layered_follower06(wttest.WiredTigerTestCase):
         # Advance to the latest checkpoint
         self.disagg_advance_checkpoint(conn_follow)
 
+        # The read timestamp must not fall behind the oldest timestamp of any checkpoint adopted
+        # while the transaction is active.
         cursor_follow = session_follow.open_cursor(self.uri, None, None)
-        session_follow.begin_transaction(f'read_timestamp={self.timestamp_str(2)}')
+        session_follow.begin_transaction(f'read_timestamp={self.timestamp_str(3)}')
         self.assertEqual(cursor_follow["1"], "value1")
 
-        # Update the value with timestamp 4
+        # Update both values with timestamp 4: the old version of "1" is now history the
+        # spanning reader depends on.
         self.session.begin_transaction()
+        cursor["1"] = "value1b"
         cursor["2"] = "value3"
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(4)}')
 
-        # Make the first version obsolete
         self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(4)}, oldest_timestamp={self.timestamp_str(3)}')
         self.session.checkpoint()
 
         # Advance to the latest checkpoint
         self.disagg_advance_checkpoint(conn_follow)
 
-        # Verify we can read the correct value from the history store
+        # Verify we can read the correct value from the history store: the new checkpoint's
+        # newest version of "1" is value1b, so the read at timestamp 3 is served from history.
         cursor_follow.reset()
-        # Cursor should still see the old value at timestamp 2 as it has the history store dhandle pinned
         self.assertEqual(cursor_follow["1"], "value1")
         session_follow.rollback_transaction()

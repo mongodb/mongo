@@ -1,5 +1,6 @@
 // check that we don't scan $ne values
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 // ]
 

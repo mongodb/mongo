@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import random, wttest
+import wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -90,21 +90,12 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
         extlist.extension('encryptors', self.encryptor)
         DisaggConfigMixin.conn_extensions(self, extlist)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def insert(self, kv, ts=None):
         cursor = self.session.open_cursor(self.uri, None, None)
         for k, v in kv.items():
             self.session.begin_transaction()
             cursor[k] = v
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(ts))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(ts))
         cursor.close()
 
     def verify(self, expected_kv, expected_initial_val):
@@ -119,7 +110,17 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
                 self.assertEqual(cursor.get_value(), expected_initial_val)
         cursor.close()
 
-    def test_internal_page_delta_random(self):
+    # Keys to update one at a time, each its own checkpoint. They are spread evenly across
+    # the key range so that distinct leaf pages (and their ancestor internal pages) each pick
+    # up a change; a single-key overwrite of an already-written page never grows it, so
+    # reconciliation always takes the single-page, non-split path a delta requires.
+    num_updates = 20
+
+    def update_keys(self):
+        step = self.nitems // self.num_updates
+        return [str(1 + i * step) for i in range(self.num_updates)]
+
+    def test_internal_page_delta(self):
         self.session.create(self.uri, self.session_create_config())
 
         # Populate the table with nitems.
@@ -133,19 +134,14 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.reopen_disagg_conn(self.conn_config())
 
         kv_modfied = {}
-        num_deltas = random.randint(1, 10)
-        for i in range(1, num_deltas + 1):
-            # Generate a random number of keys to insert.
-            random_key_range = random.randint(10, 2000)
-            kv = {
-                str(random.randint(1, self.nitems)): f"{i + j * i}abc"
-                for j in range(random_key_range)
-            }
-            # Insert random keys into the table.
-            self.insert(kv, inital_ts + i)
+        update_keys = self.update_keys()
+        ts = inital_ts
+        for key in update_keys:
+            ts += 1
+            kv = {key: f"{ts}abc"}
+            self.insert(kv, ts)
             # Perform a checkpoint to write out a delta.
             self.session.checkpoint()
-            # Merge kv into our cumulative dictionary
             kv_modfied.update(kv)
 
         # Assert that we have written at least one internal page delta.
@@ -163,7 +159,8 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Verify the updated values in the table.
         self.verify(kv_modfied, inital_value)
 
-        # Assert that we have constructed at least one internal page delta.
+        # Assert that we have constructed at least one internal page delta. See update_keys():
+        # single-key overwrites guarantee a delta chain here.
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
             self.assertGreater(self.get_stat(stat.conn.cache_read_internal_delta), 0)
         else:
@@ -178,6 +175,6 @@ class test_layered_delta15(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         # Assert that we have constructed at least one internal page delta.
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.cache_read_internal_delta), 0)
+            self.assertStatGreaterSoon(stat.conn.cache_read_internal_delta, 0)
         else:
             self.assertEqual(self.get_stat(stat.conn.cache_read_internal_delta), 0)

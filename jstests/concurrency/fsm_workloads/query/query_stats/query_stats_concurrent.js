@@ -94,19 +94,19 @@ export const $config = (function () {
         };
     })();
 
-    let internalQueryStatsRateLimit;
     let internalQueryStatsCacheSize;
+    let internalQueryStatsSampleRate;
 
     let setup = function (db, collName, cluster) {
-        internalQueryStatsRateLimit = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryStatsRateLimit",
-            newValue: -1,
-        });
         internalQueryStatsCacheSize = setParameterOnAllNodes({
             cluster: cluster,
             paramName: "internalQueryStatsCacheSize",
             newValue: "1MB",
+        });
+        internalQueryStatsSampleRate = setParameterOnAllNodes({
+            cluster: cluster,
+            paramName: "internalQueryStatsSampleRate",
+            newValue: 1,
         });
 
         assert.commandWorked(db[collName].createIndex({i: 1}));
@@ -120,13 +120,13 @@ export const $config = (function () {
     let teardown = function (db, collName, cluster) {
         setParameterOnAllNodes({
             cluster: cluster,
-            paramName: "internalQueryStatsRateLimit",
-            newValue: internalQueryStatsRateLimit,
+            paramName: "internalQueryStatsCacheSize",
+            newValue: internalQueryStatsCacheSize,
         });
         setParameterOnAllNodes({
             cluster: cluster,
-            paramName: "internalQueryStatsCacheSize",
-            newValue: internalQueryStatsCacheSize,
+            paramName: "internalQueryStatsSampleRate",
+            newValue: internalQueryStatsSampleRate,
         });
 
         db[collName].drop();

@@ -6,7 +6,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Override all commands to explicitly set 'apiVersion'.
-import("jstests/libs/override_methods/set_api_version.js");
+import("jstests/libs/override_methods/query/set_api_version.js");
 
 const dbName = "prepare_txn_with_api";
 const collName = "test";
@@ -48,8 +48,10 @@ const runTest = function (failover, commit) {
     if (failover) {
         session = new _DelegatingDriverSession(secondary, session);
     } else {
-        // Restart the primary.
-        rst.restart(primary);
+        // Restart the primary. restart() replaces this node's entry in rst.nodes, so take the
+        // connection it returns rather than continuing to use the pre-restart one.
+        primary = rst.restart(primary);
+        session = new _DelegatingDriverSession(primary, session);
         rst.stepUp(primary);
         rst.waitForState(primary, ReplSetTest.State.PRIMARY);
         rst.awaitSecondaryNodes(null, [secondary]);

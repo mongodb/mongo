@@ -24,12 +24,35 @@ overrides:
     - task: sharded_collections_jscore_passthrough_rate_limited
       exec_timeout: 180 # 3 hours
 
+  # The historic per-test runtimes vastly underestimate this suite because most of its runtime
+  # comes from the DisaggPeriodicPITRestore hook, which is not accounted for at the test level.
+  enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps:
+    - task: ^disagg_backup_restore_jscore_passthrough$
+      exec_timeout: 80 # 1 hour 20 minutes
+      idle_timeout: 16
+
+  enterprise-amazon-linux2023-arm64-disagg-no-feature-flags-extra-system-deps:
+    - task: ^disagg_backup_restore_jscore_passthrough$
+      exec_timeout: 80 # 1 hour 20 minutes
+      idle_timeout: 16
+
+  # The weekly verifier restores every snapshot in the format-matrix archive, so its runtime grows
+  # along with the archive. The historic estimate is derived from the previous passing run, so
+  # the timeout may fall short when the archive grows significantly between restore runs.
+  enterprise-amazon-linux2023-arm64-format-matrix-restore-verifier:
+    - task: ^disagg_format_snapshot_restore$
+      # TODO(SERVER-137365): Revisit restore sampling heuristics if runtime exceeds the default 3hrs
+      exec_timeout: 180 # 3 hours
+      idle_timeout: 180
+
   amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-replica-sets:
     - task: ^disagg_replica_sets_.*
       exec_timeout: 210 # 3.5 hours
     - task: ^disagg_change_streams_.*
       exec_timeout: 210 # 3.5 hours
     - task: .*_disagg_override$
+      exec_timeout: 210 # 3.5 hours
+    - task: disagg_repl_jscore_passthrough.*
       exec_timeout: 210 # 3.5 hours
 
   amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-sharded-clusters:
@@ -62,6 +85,8 @@ overrides:
   atlas-amazon2023:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
+    - task: ^no_passthrough_disagg_override_replsets
+      exec_timeout: 80 # 80min (preserved from previous task-level exec_timeout_secs)
 
   enterprise-amazon2023-arm64:
     - task: aggregation_blockprocessing_fuzzer
@@ -161,6 +186,22 @@ overrides:
     - task: ^unit_test_group.*
       exec_timeout: 840 # 14 hours
 
+  enterprise-rhel-10-s390x:
+    - task: ^archive_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^compile_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^unit_test_group.*
+      exec_timeout: 840 # 14 hours
+
+  enterprise-rhel-10-s390x-dynamic:
+    - task: ^archive_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^compile_.*
+      exec_timeout: 840 # 14 hours
+    - task: ^unit_test_group.*
+      exec_timeout: 840 # 14 hours
+
   rhel-8-arm64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
@@ -198,6 +239,10 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: update_timeseries_fuzzer
       exec_timeout: 600 # 10 hours
+    - task: query_fuzzer_plan_cache
+      exec_timeout: 600 # 10 hours
+    - task: concurrency_sharded_replication_rate_limited
+      exec_timeout: 180 # 3 hours
     - task: read_concern_linearizable_passthrough
       exec_timeout: 270 # 4.5 hours
     - task: sharding
@@ -213,7 +258,7 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
-  linux-64-debug-required:
+  linux-arm64-debug-required:
     - task: sharded_collections_jscore_passthrough_rate_limited
       exec_timeout: 180 # 3 hours
 
@@ -254,6 +299,22 @@ overrides:
       exec_timeout: 600 # 10 hours
 
   enterprise-ubuntu2404-arm64:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  ubuntu2604:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  ubuntu2604-arm64:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2604:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-ubuntu2604-arm64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
@@ -352,3 +413,11 @@ overrides:
   enterprise-rhel8-debug-tsan-all-non-rollback-feature-flags:
     - task: concurrency_simultaneous
       exec_timeout: 180 # 3 hours
+
+  enterprise-amazon2023-linux-x86-debug-tsan-all-feature-flags:
+    - task: ^no_passthrough_disagg_override_replsets
+      exec_timeout: 120 # 2 hours
+
+  atlas-ubuntu2204-arm64:
+    - task: ^no_passthrough_disagg_override_replsets
+      exec_timeout: 80 # 80min (preserved from previous task-level exec_timeout_secs)

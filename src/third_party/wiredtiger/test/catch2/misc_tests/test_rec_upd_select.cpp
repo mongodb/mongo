@@ -395,3 +395,132 @@ TEST_CASE_METHOD(RecUpdSelectFixture, "rec_upd_select: Skip writing aborted and 
     if (r.supd)
         __wt_free(session, r.supd);
 }
+
+TEST_CASE_METHOD(RecUpdSelectFixture,
+  "rec_upd_select: precise checkpoint snapshot improves eviction visibility",
+  "[reconcile][rec_upd_select][precise_checkpoint]")
+{
+    /*
+     * Simulate eviction under a precise checkpoint: the checkpoint snapshot has been copied into
+     * snapshot_data before reconciliation begins.
+     *
+     * Snapshot: snap_min=100, snap_max=200, one in-flight transaction (txnid=150). txnid=120 is
+     * inside [snap_min, snap_max) but not in the in-flight array; it committed before the
+     * checkpoint snapshot was taken and is visible. txnid=150 was in-flight and is not visible.
+     *
+     * The contrast with the pinned-id fallback: rec_start_pinned_id=100 <= 120 is true, so the
+     * pinned-id path would conservatively treat txnid=120 as not-yet-committed and skip it.
+     */
+    const uint64_t SNAP_MIN = 100, SNAP_MAX = 200;
+    const uint32_t SNAP_COUNT = 1;
+    uint64_t snap_array[1] = {150};
+
+    /* Wire up the session transaction snapshot. */
+    session->txn->snapshot_data.snap_min = SNAP_MIN;
+    session->txn->snapshot_data.snap_max = SNAP_MAX;
+    session->txn->snapshot_data.snapshot_count = SNAP_COUNT;
+    session->txn->snapshot_data.snapshot = snap_array;
+    F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
+    session->txn->time_point.id = 50;
+    session->txn->isolation = WT_ISO_SNAPSHOT;
+    F_CLR(session->dhandle, WT_DHANDLE_HS);
+    F_CLR(S2BT(session), WT_BTREE_IN_MEMORY);
+
+    WTI_RECONCILE r;
+    setup_reconcile_context(&r, page, WT_TXN_NONE, 0);
+    F_SET(&r, WT_REC_EVICT);
+
+    SECTION("committed update outside the in-flight set is visible via session snapshot")
+    {
+        /* Updates newest-first: in-flight (not visible) then committed-in-range (visible). */
+        std::vector<
+          std::tuple<const char *, uint8_t, uint64_t, wt_timestamp_t, wt_timestamp_t, uint8_t>>
+          updates = {
+            std::make_tuple("in_flight_value", (uint8_t)WT_UPDATE_STANDARD, (uint64_t)150,
+              (wt_timestamp_t)0, (wt_timestamp_t)0, (uint8_t)0),
+            std::make_tuple("committed_value", (uint8_t)WT_UPDATE_STANDARD, (uint64_t)120,
+              (wt_timestamp_t)0, (wt_timestamp_t)0, (uint8_t)0),
+          };
+
+        WT_UPDATE *chain = create_update_chain(session, updates);
+        REQUIRE(chain != NULL);
+        WT_INSERT *ins = create_test_insert(session, chain);
+        REQUIRE(ins != NULL);
+
+        WTI_UPDATE_SELECT upd_select;
+        WTI_UPDATE_SELECT_INIT(&upd_select);
+        int ret = __wti_rec_upd_select(session, &r, ins, NULL, NULL, &upd_select);
+
+        REQUIRE(ret == 0);
+        /* txnid=120 is between snap_min and snap_max but not in-flight: visible. */
+        REQUIRE(upd_select.upd != NULL);
+        REQUIRE(upd_select.upd->txnid == 120);
+
+        cleanup_test_data(session, ins);
+        if (r.supd)
+            __wt_free(session, r.supd);
+    }
+
+    SECTION("pinned_id fallback conservatively excludes a committed update in the same range")
+    {
+        /*
+         * Without a session snapshot (WT_REC_VISIBLE_NO_SNAPSHOT set), the fallback uses
+         * rec_start_pinned_id. pinned_id(100) <= txnid(120) means the update looks not-yet-visible,
+         * so it is skipped - a conservative false-negative that the snapshot path avoids.
+         */
+        F_CLR(session->txn, WT_TXN_HAS_SNAPSHOT);
+        F_SET(&r, WT_REC_VISIBLE_NO_SNAPSHOT);
+        r.rec_start_pinned_id = SNAP_MIN; /* 100 */
+
+        std::vector<
+          std::tuple<const char *, uint8_t, uint64_t, wt_timestamp_t, wt_timestamp_t, uint8_t>>
+          updates = {
+            std::make_tuple("committed_value", (uint8_t)WT_UPDATE_STANDARD, (uint64_t)120,
+              (wt_timestamp_t)0, (wt_timestamp_t)0, (uint8_t)0),
+          };
+
+        WT_UPDATE *chain = create_update_chain(session, updates);
+        REQUIRE(chain != NULL);
+        WT_INSERT *ins = create_test_insert(session, chain);
+        REQUIRE(ins != NULL);
+
+        WTI_UPDATE_SELECT upd_select;
+        WTI_UPDATE_SELECT_INIT(&upd_select);
+        int ret = __wti_rec_upd_select(session, &r, ins, NULL, NULL, &upd_select);
+
+        REQUIRE(ret == 0);
+        /* pinned_id(100) <= txnid(120): conservatively treated as not yet visible. */
+        REQUIRE(upd_select.upd == NULL);
+
+        cleanup_test_data(session, ins);
+        if (r.supd)
+            __wt_free(session, r.supd);
+    }
+
+    SECTION("in-flight transaction is correctly excluded via session snapshot")
+    {
+        std::vector<
+          std::tuple<const char *, uint8_t, uint64_t, wt_timestamp_t, wt_timestamp_t, uint8_t>>
+          updates = {
+            std::make_tuple("in_flight_value", (uint8_t)WT_UPDATE_STANDARD, (uint64_t)150,
+              (wt_timestamp_t)0, (wt_timestamp_t)0, (uint8_t)0),
+          };
+
+        WT_UPDATE *chain = create_update_chain(session, updates);
+        REQUIRE(chain != NULL);
+        WT_INSERT *ins = create_test_insert(session, chain);
+        REQUIRE(ins != NULL);
+
+        WTI_UPDATE_SELECT upd_select;
+        WTI_UPDATE_SELECT_INIT(&upd_select);
+        int ret = __wti_rec_upd_select(session, &r, ins, NULL, NULL, &upd_select);
+
+        REQUIRE(ret == 0);
+        /* txnid=150 is in the snapshot in-flight array: not visible to the checkpoint. */
+        REQUIRE(upd_select.upd == NULL);
+
+        cleanup_test_data(session, ins);
+        if (r.supd)
+            __wt_free(session, r.supd);
+    }
+}

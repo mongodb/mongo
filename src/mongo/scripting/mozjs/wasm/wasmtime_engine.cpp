@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 
@@ -38,8 +12,11 @@
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
+#include "mongo/util/timer.h"
 
+#include <algorithm>
 #include <mutex>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -73,35 +50,50 @@ void ScriptEngine::setup(ExecutionEnvironment environment) {
 }
 
 namespace {
-// Decoration that keeps track of which WasmtimeImplScope is active on an OperationContext.
-// Stored as a struct rather than a raw pointer so the destructor can clear scope->_opCtx before
-// the OperationContext's memory is freed, preventing ~WasmtimeImplScope() from reading freed
-// memory when it calls unregisterOperation().
-struct WasmtimeScopeRef {
-    mozjs::WasmtimeImplScope* scope = nullptr;
+// Decoration that keeps track of which WasmtimeImplScopes are active on an OperationContext.
+// An operation can have several scopes registered with overlapping lifetimes (e.g. a JsExecution
+// scope registered for the whole operation while a $where JsFunction re-registers a pooled scope
+// per predicate call), so this holds one entry per live registrant rather than a single slot: a
+// single slot silently displaces the earlier scope, losing both its interrupt delivery (a stuck-JS
+// hang) and its teardown (a use-after-free of the opCtx in ~WasmtimeImplScope()).
+//
+// The struct (rather than raw pointers) exists so the destructor can clear each scope's _opCtx
+// before the OperationContext's memory is freed, preventing ~WasmtimeImplScope() from reading
+// freed memory when it calls unregisterOperation().
+struct WasmtimeScopeRegistry {
+    struct ScopeEntry {
+        mozjs::WasmtimeImplScope* scope;
+        // Clears the scope's _opCtx back-pointer; invoked when the opCtx is torn down.
+        std::function<void()> onTeardown;
+    };
+    // Small: at most a handful of scopes are ever live on one operation.
+    std::vector<ScopeEntry> scopeEntries;
     // Stored at registerOperation() time.  The Client outlives the OperationContext, so it is
     // safe to dereference here even though the OperationContext is being destroyed.
     Client* client = nullptr;
-    std::function<void()> onTeardown;
 
-    ~WasmtimeScopeRef() {
-        if (!scope || !client)
+    ~WasmtimeScopeRegistry() {
+        if (scopeEntries.empty() || !client)
             return;
         // Take the Client lock before touching the decoration so we serialise with both
-        // interrupt() (which reads scope under the lock) and unregisterOperation() (which
-        // clears the decoration under the lock).  Clear the decoration pointer first so
-        // interrupt() cannot call kill() on a scope whose bridge may be concurrently
-        // destroyed.  Then zero _opCtx in the scope atomically so that
-        // ~WasmtimeImplScope()'s unregisterOperation() call will see null and skip the
-        // engine->unregisterOperation(opCtx) call that would read freed memory.
+        // interrupt() (which reads the entries under the lock) and unregisterOperation() (which
+        // erases entries under the lock).  Clear the entries first so interrupt() cannot call
+        // kill() on a scope whose bridge may be concurrently destroyed.  Then zero _opCtx in
+        // each scope atomically so that ~WasmtimeImplScope()'s unregisterOperation() call will
+        // see null and skip the engine->unregisterOperation(opCtx) call that would read freed
+        // memory.
         std::lock_guard lk(*client);
-        scope = nullptr;
+        auto detached = std::move(scopeEntries);
+        scopeEntries.clear();
         client = nullptr;
-        onTeardown();
+        for (auto& e : detached) {
+            e.onTeardown();
+        }
     }
 };
 
-auto operationWasmtimeScopeDecoration = OperationContext::declareDecoration<WasmtimeScopeRef>();
+auto operationWasmtimeScopeDecoration =
+    OperationContext::declareDecoration<WasmtimeScopeRegistry>();
 }  // namespace
 
 namespace mozjs {
@@ -114,33 +106,26 @@ WasmtimeScriptEngine::WasmtimeScriptEngine() {}
 
 WasmtimeScriptEngine::~WasmtimeScriptEngine() {}
 
-std::shared_ptr<wasm::WasmEngineContext> WasmtimeScriptEngine::createWasmEngineContext() const {
-    // Serialise all context creation (pool hit and fallback) under a single lock.
-    // Concurrent wasmtime_component_deserialize calls on the same pre-compiled bytes share
-    // internal JIT allocations without Arc protection, causing an ASAN double-free when the
-    // resulting WasmEngineContexts are later destroyed on separate threads.
-    // Holding the pool mutex for the fallback is acceptable: the hot path (pool hit) is a fast
-    // vector pop, and the cold path (fresh deserialise) is bounded by the number of concurrent
-    // threads that have simultaneously exhausted their idle-bridge slot.
+std::shared_ptr<wasm::WasmEngineContext> WasmtimeScriptEngine::getWasmEngineContext() const {
+    // Deserialize the Engine + Component + Linker exactly once and share the resulting
+    // WasmEngineContext with every scope. A context is immutable after construction and is designed
+    // to back many bridges (each MozJSWasmBridge instantiates its own Store/Instance from the
+    // shared component under wasmLifecycleMutex()).
     //
-    // Pool is filled lazily on the first JS scope request so that workloads that never execute
-    // JS (e.g. top_ten_queries_locust) pay no upfront memory cost (BF-44070).
-    std::call_once(_poolOnce, [this] {
+    // Deserializing once also sidesteps the concurrent-deserialise ASAN double-free and the
+    // cross-thread destruction hazard the previous pool guarded against: the shared context is
+    // built once (under call_once) and destroyed once at engine teardown.
+    //
+    // Built lazily on the first JS scope request so workloads that never execute JS pay no upfront
+    // memory cost.
+    std::call_once(_wasmContextOnce, [this] {
         auto [data, size] = wasm::getEmbeddedWasmResource();
-        std::lock_guard<std::mutex> lk(_contextPoolMutex);
-        _contextPool.reserve(kContextPoolSize);
-        for (size_t i = 0; i < kContextPoolSize; ++i) {
-            _contextPool.push_back(wasm::WasmEngineContext::createFromPrecompiled(data, size));
-        }
+        Timer timer;
+        _wasmContext = wasm::WasmEngineContext::createFromPrecompiled(data, size);
+        LOGV2(
+            11600003, "Initialized shared WASM engine context", "durationMs"_attr = timer.millis());
     });
-    std::lock_guard<std::mutex> lk(_contextPoolMutex);
-    if (!_contextPool.empty()) {
-        auto ctx = std::move(_contextPool.back());
-        _contextPool.pop_back();
-        return ctx;
-    }
-    auto [data, size] = wasm::getEmbeddedWasmResource();
-    return wasm::WasmEngineContext::createFromPrecompiled(data, size);
+    return _wasmContext;
 }
 
 mongo::Scope* WasmtimeScriptEngine::createScope() {
@@ -221,7 +206,7 @@ mongo::Scope* WasmtimeScriptEngine::createScopeForCurrentThread(
     tl_idleBridge = {};
     LOGV2_DEBUG(
         11542379, 2, "WASM scope creating fresh bridge", "heapLimitMB"_attr = resolvedLimit);
-    return new WasmtimeImplScope(createWasmEngineContext(), resolvedLimit);
+    return new WasmtimeImplScope(getWasmEngineContext(), resolvedLimit);
 }
 
 void WasmtimeScriptEngine::parkBridgeForCurrentThread(std::unique_ptr<wasm::MozJSWasmBridge> bridge,
@@ -272,9 +257,88 @@ bool WasmtimeScriptEngine::hasIdleBridgeForTest() {
     return static_cast<bool>(tl_idleBridge.bridge);
 }
 
+namespace {
+// Near-equivalent of OperationContext::hasDeadlineExpired() (which is private), built from
+// public API: getRemainingMaxTimeMillis() returns Milliseconds::max() when there is no deadline
+// and clamps to zero once the deadline has passed. The maxTimeNeverTimeOut/maxTimeAlwaysTimeOut
+// failpoints suppress/force deadline expiry exactly as they do there (both only apply to ops
+// that actually have a deadline).
+//
+// One deliberate divergence: hasDeadlineExpired() compares against the *extended* deadline
+// (OverrideDeadlineGuard), while getRemainingMaxTimeMillis() uses the base deadline. The guard
+// is only armed around egress RPCs (see network_interface_tl.cpp), which an op executing JS on
+// its own thread is never inside, so the extension cannot be active when this decides a JS kill
+// reason; at worst an extended op would be attributed its timeout error marginally early.
+bool opCtxDeadlineHasExpired(OperationContext* opCtx) {
+    const auto remaining = opCtx->getRemainingMaxTimeMillis();
+    if (remaining == Milliseconds::max()) {
+        return false;  // No deadline.
+    }
+    if (MONGO_unlikely(maxTimeNeverTimeOut.shouldFail())) {
+        return false;
+    }
+    if (MONGO_unlikely(maxTimeAlwaysTimeOut.shouldFail())) {
+        return true;
+    }
+    return remaining == Milliseconds::zero();
+}
+}  // namespace
+
+ErrorCodes::Error scriptKillReasonFor(OperationContext* opCtx) {
+    // An expired deadline outranks the recorded kill status, matching
+    // checkForInterruptNoAssert() priority (see BF-44481: a late external kill on a timed-out op
+    // must still surface as the deadline error).
+    if (opCtxDeadlineHasExpired(opCtx)) {
+        return opCtx->getTimeoutError();
+    }
+    if (auto killStatus = opCtx->getKillStatus(); killStatus != ErrorCodes::OK) {
+        return killStatus;
+    }
+    // SERVER-130767: nothing proactively kills an operation whose client disconnected -- the
+    // disconnect is only discovered inside checkForInterruptNoAssert() on the operation's own
+    // thread, which a thread stuck inside JS never reaches. Check the session directly, exactly
+    // as _checkClientConnected() does (Client::session() is immutable after Client construction
+    // and Session::isConnected() is called from non-operation threads in production, so this is
+    // safe from the DeadlineMonitor thread).
+    //
+    // One divergence from checkForInterruptNoAssert(): that path only consults the session when
+    // the op opted in via markKillOnClientDisconnect(), but that flag has no public getter, so
+    // this checks unconditionally. That is the desired behavior for the JS path -- a $where/
+    // $function stuck in a loop after its client vanished is exactly the SERVER-130767 hang we
+    // want to break -- but it does mean a JS op that deliberately did not opt into
+    // disconnect-kill is still stopped on socket close.
+    auto client = opCtx->getClient();
+    if (!client->isInDirectClient()) {
+        if (const auto& session = client->session(); session && !session->isConnected()) {
+            return client->getDisconnectErrorCode();
+        }
+    }
+    return ErrorCodes::OK;
+}
+
 void WasmtimeScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
-    if (opCtx && (*opCtx)[operationWasmtimeScopeDecoration].scope) {
-        (*opCtx)[operationWasmtimeScopeDecoration].scope->kill();
+    if (opCtx && !(*opCtx)[operationWasmtimeScopeDecoration].scopeEntries.empty()) {
+        // ServiceContext::killOperation() has already called opCtx->markKilled(killCode) by the
+        // time it notifies us -- on this same thread, in the same call -- so the real reason is
+        // known with certainty right here. Pass it straight through instead of losing it behind
+        // a reason-less kill() and reconstructing it later from (possibly stale) opCtx state.
+        //
+        // One exception, mirroring checkForInterruptNoAssert() priority: if the opCtx's own
+        // deadline has already expired, the deadline error (e.g. MaxTimeMSExpired) outranks the
+        // killer's code. An op stuck inside JS never observes its deadline via
+        // checkForInterrupt(), so the first kill it sees may be a later external one (e.g. a
+        // killCursors after mongos gave up) -- reporting that code instead of MaxTimeMSExpired
+        // breaks callers that dispatch on it, such as allowPartialResults (BF-44481).
+        // killOperation() guarantees a kill status is recorded, so scriptKillReasonFor() cannot
+        // return OK here; Interrupted is a defensive fallback (killWithReason() rejects OK).
+        auto reason = scriptKillReasonFor(opCtx);
+        // Fan the kill out to every scope registered on this operation: several scopes can have
+        // overlapping registrations (e.g. a JsExecution scope plus a $where predicate scope),
+        // and each of them may be the one currently executing JS.
+        for (auto& entry : (*opCtx)[operationWasmtimeScopeDecoration].scopeEntries) {
+            entry.scope->killWithReason(reason != ErrorCodes::OK ? reason
+                                                                 : ErrorCodes::Interrupted);
+        }
         LOGV2_DEBUG(11542360, 2, "Interrupting Wasmtime op", "opId"_attr = opCtx->getOpID());
     }
 }
@@ -283,8 +347,18 @@ void WasmtimeScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
     while (auto client = cursor.next()) {
         std::lock_guard lk(*client);
         if (auto opCtx = client->getOperationContext();
-            opCtx && (*opCtx)[operationWasmtimeScopeDecoration].scope) {
-            (*opCtx)[operationWasmtimeScopeDecoration].scope->kill();
+            opCtx && !(*opCtx)[operationWasmtimeScopeDecoration].scopeEntries.empty()) {
+            // By the time ServiceContext broadcasts interruptAll() to listeners, every opCtx has
+            // already been through killOperation(InterruptedAtShutdown) in
+            // interruptOperations(), except clients excluded from that per-op loop
+            // (shouldExcludeFromInterruptAtShutdown()). Fall back to InterruptedAtShutdown for
+            // those rather than propagating a stale OK as the kill reason.
+            // Same deadline-outranks-killer rule as interrupt() above.
+            auto reason = scriptKillReasonFor(opCtx);
+            for (auto& entry : (*opCtx)[operationWasmtimeScopeDecoration].scopeEntries) {
+                entry.scope->killWithReason(
+                    reason != ErrorCodes::OK ? reason : ErrorCodes::InterruptedAtShutdown);
+            }
         }
     }
 }
@@ -292,20 +366,41 @@ void WasmtimeScriptEngine::registerOperation(OperationContext* opCtx,
                                              WasmtimeImplScope* scope,
                                              std::function<void()> onTeardown) {
     std::lock_guard lk(*opCtx->getClient());
-    auto& ref = (*opCtx)[operationWasmtimeScopeDecoration];
-    ref.scope = scope;
-    ref.client = opCtx->getClient();
-    ref.onTeardown = std::move(onTeardown);
+    auto& reg = (*opCtx)[operationWasmtimeScopeDecoration];
+    reg.client = opCtx->getClient();
+    // Re-registration of an already-registered scope (e.g. defensive double-registration)
+    // just refreshes its teardown; otherwise add a new entry alongside any existing ones so
+    // overlapping registrants (JsExecution scope + $where predicate scope) each keep their own
+    // interrupt delivery and teardown.
+    auto it = std::find_if(reg.scopeEntries.begin(), reg.scopeEntries.end(), [&](const auto& e) {
+        return e.scope == scope;
+    });
+    if (it != reg.scopeEntries.end()) {
+        it->onTeardown = std::move(onTeardown);
+    } else {
+        reg.scopeEntries.push_back({scope, std::move(onTeardown)});
+    }
 
+    // If the opCtx is already interrupted (e.g. maxTimeMS expired between the previous
+    // predicate call and this one -- see JsFunction::runAsPredicate(), which re-registers on
+    // every document), kill the scope now so the next invoke() traps immediately. Forward the
+    // real reason: this runs synchronously on the operation's own thread, so status.code() is
+    // exactly as authoritative as opCtx's kill code in WasmtimeScriptEngine::interrupt() above --
+    // there is nothing to reconstruct later if we don't discard it here.
     if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
-        scope->kill();
+        scope->killWithReason(status.code());
     }
 }
-void WasmtimeScriptEngine::unregisterOperation(OperationContext* opCtx) {
+void WasmtimeScriptEngine::unregisterOperation(OperationContext* opCtx, WasmtimeImplScope* scope) {
     std::lock_guard lk(*opCtx->getClient());
-    auto& ref = (*opCtx)[operationWasmtimeScopeDecoration];
-    ref.scope = nullptr;
-    ref.client = nullptr;
+    auto& reg = (*opCtx)[operationWasmtimeScopeDecoration];
+    // Remove only the calling scope's entry. Other scopes with overlapping registrations must
+    // keep theirs: blanket-nulling would lose their interrupt delivery (stuck-JS hang) and
+    // orphan their _opCtx cleanup (use-after-free).
+    std::erase_if(reg.scopeEntries, [&](const auto& e) { return e.scope == scope; });
+    if (reg.scopeEntries.empty()) {
+        reg.client = nullptr;
+    }
 }
 
 void WasmtimeScriptEngine::enableJavaScriptProtection(bool value) {

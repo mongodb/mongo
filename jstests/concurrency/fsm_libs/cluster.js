@@ -269,6 +269,15 @@ export const Cluster = function (clusterOptions, sessionOptions) {
                 clusterOptions.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
             };
 
+            // Re-establish the primary connection after a failover.
+            this.reestablishConnectionsAfterFailover = function () {
+                conn = rst.getPrimary();
+                secondaryConns = rst.getSecondaries();
+                if (session) {
+                    session = conn.startSession(sessionOptions);
+                }
+            };
+
             this._addReplicaSetConns(rst);
         } else {
             // standalone server
@@ -640,7 +649,11 @@ export const Cluster = function (clusterOptions, sessionOptions) {
     };
 
     this.shouldPerformContinuousStepdowns = function shouldPerformContinuousStepdowns() {
-        return this.isSharded() && typeof clusterOptions.sharded.stepdownOptions !== "undefined";
+        if (this.isSharded()) {
+            return typeof clusterOptions.sharded.stepdownOptions !== "undefined";
+        }
+
+        return Boolean(TestData.runningWithStepdowns);
     };
 
     /*
@@ -660,6 +673,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
 
     this.isSteppingDownConfigServers = function isSteppingDownConfigServers() {
         return (
+            this.isSharded() &&
             this.shouldPerformContinuousStepdowns() &&
             clusterOptions.sharded.stepdownOptions.configStepdown
         );
@@ -667,6 +681,7 @@ export const Cluster = function (clusterOptions, sessionOptions) {
 
     this.isSteppingDownShards = function isSteppingDownShards() {
         return (
+            this.isSharded() &&
             this.shouldPerformContinuousStepdowns() &&
             clusterOptions.sharded.stepdownOptions.shardStepdown
         );

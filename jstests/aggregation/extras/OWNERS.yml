@@ -12,4 +12,5 @@ filters:
       - 10gen/query-integration-staff-leads
   - "window_function_helpers.js":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization

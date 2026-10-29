@@ -40,7 +40,7 @@ structs:
                 description: "The version of checksum that dictates what hash was used to calculate it."
                 type: SorterChecksumVersion
                 optional: true
-        mod_visibility: pub
+        mod_visibility: public
 
 server_parameters:
     maxIteratorsMemoryUsagePercentage:
@@ -51,7 +51,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: maxIteratorsMemoryUsagePercentage
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.1
         validator:
             gte: 0.0

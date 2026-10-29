@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/post_resharding_placement.h"
 
@@ -36,46 +10,66 @@ namespace mongo {
 PostReshardingCollectionPlacement::PostReshardingCollectionPlacement(
     OperationContext* opCtx, const ScopedCollectionDescription& collectionDescription) {
     _reshardingKeyPattern = collectionDescription.getReshardingKeyIfShouldForwardOps();
-    tassert(11178200,
-            "Attempting to create a PostReshardingCollectionPlacement without reshardingKeyPattern",
-            _reshardingKeyPattern);
+    if (!_reshardingKeyPattern) {
+        _invalidReason = "PostReshardingCollectionPlacement created without reshardingKeyPattern";
+        return;
+    }
+
     const auto& reshardingFields = collectionDescription.getReshardingFields();
-    tassert(11178201,
-            "Found a sharded collection with a resharding key pattern but not the "
-            "resharding fields",
-            reshardingFields);
+
+    if (!reshardingFields) {
+        _invalidReason =
+            "Found a sharded collection with a resharding key pattern but not the resharding "
+            "fields";
+        return;
+    }
+
     const auto& donorFields = reshardingFields->getDonorFields();
-    tassert(11178202,
-            "Found a sharded collection with a resharding key pattern and the resharding "
-            "fields but not the donor fields",
-            donorFields);
+    if (!donorFields) {
+        _invalidReason =
+            "Found a sharded collection with a resharding key pattern and the resharding fields "
+            "but not the donor fields";
+        return;
+    }
+
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     invariant(catalogCache);
     auto tmpNssRoutingInfoWithStatus = catalogCache->getCollectionRoutingInfo(
-        opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */);
+        opCtx, donorFields->getTempReshardingNss(), /*allowLocks=*/true);
     uassertStatusOK(tmpNssRoutingInfoWithStatus);
-    tassert(11178203,
-            "Routing information for the temporary resharding collection is stale",
-            tmpNssRoutingInfoWithStatus.getValue().hasRoutingTable());
+
+    if (!tmpNssRoutingInfoWithStatus.getValue().hasRoutingTable()) {
+        _invalidReason = "Routing information for the temporary resharding collection is stale";
+        return;
+    }
+
     _tmpReshardingCollectionChunkManager =
         tmpNssRoutingInfoWithStatus.getValue().getCurrentChunkManager();
 }
 
-const ShardRef& PostReshardingCollectionPlacement::getReshardingDestinedRecipient(
+const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipient(
     const BSONObj& fullDocument) const {
+    _checkIsValid();
     auto newShardKey = extractReshardingKeyFromDocument(fullDocument);
     return getReshardingDestinedRecipientFromShardKey(newShardKey);
 }
 
 BSONObj PostReshardingCollectionPlacement::extractReshardingKeyFromDocument(
     const BSONObj& fullDocument) const {
+    _checkIsValid();
     return _reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
 }
 
-const ShardRef& PostReshardingCollectionPlacement::getReshardingDestinedRecipientFromShardKey(
+const ShardId& PostReshardingCollectionPlacement::getReshardingDestinedRecipientFromShardKey(
     const BSONObj& reshardingKey) const {
+    _checkIsValid();
     return _tmpReshardingCollectionChunkManager
         ->findIntersectingChunkWithSimpleCollation(reshardingKey)
-        .getShardRef();
+        .getShardId();
 }
+
+void PostReshardingCollectionPlacement::_checkIsValid() const {
+    tassert(13150300, _invalidReason, _invalidReason.empty());
+}
+
 }  // namespace mongo

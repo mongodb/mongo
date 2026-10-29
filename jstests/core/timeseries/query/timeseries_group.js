@@ -1,6 +1,7 @@
 /**
  * Tests $group usage of block processing for time series.
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
  *   # During fcv upgrade/downgrade the engine might not be what we expect.
@@ -127,15 +128,13 @@ TimeseriesTest.run((insert) => {
         insert(collNotTs, documents);
     }
 
-    // Block based $group is guarded behind (SbeFull || SbeBlockHashAgg) && TimeSeriesInSbe.
+    // Block based $group is guarded behind (SbeFull || SbeBlockHashAgg).
     const sbeStatus = checkSbeStatus(db);
 
     const sbeFullyEnabled = checkSbeFullFeatureFlagEnabled(db);
     const featureFlagsAllowBlockHashAgg =
         // SBE can't be disabled altogether.
         sbeStatus != kSbeDisabled &&
-        // We have to allow time series queries to run in SBE.
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe") &&
         // Either we have SBE full or the SBE BlockHashAgg flag.
         (sbeStatus == kSbeFullyEnabled ||
             FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SbeBlockHashAgg"));

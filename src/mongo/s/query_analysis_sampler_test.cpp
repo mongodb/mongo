@@ -1,37 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query_analysis_sampler.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -69,6 +40,10 @@
 #include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
@@ -79,13 +54,9 @@ using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
 class QueryAnalysisSamplerRateLimiterTest : public ServiceContextTest {
 public:
-    QueryAnalysisSamplerRateLimiterTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
-
-    void setUp() override {
-        ServiceContextTest::setUp();
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()));
     }
 
 protected:
@@ -420,11 +391,13 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, NanosecondsResolution) {
 
 class QueryAnalysisSamplerTest : public ShardingTestFixture {
 public:
-    QueryAnalysisSamplerTest()
-        : ShardingTestFixture(
-              false /* withMockCatalogCache */,
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+    QueryAnalysisSamplerTest() : ShardingTestFixture(/*withMockCatalogCache=*/false) {}
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()),
+            shouldSetupTransportLayer());
+    }
 
     void setUp() override {
         ShardingTestFixture::setUp();
@@ -554,7 +527,7 @@ TEST_F(QueryAnalysisSamplerTest, CanGetOnConfigServer) {
 
 using QueryAnalysisSamplerTestDeathTest = QueryAnalysisSamplerTest;
 DEATH_TEST_F(QueryAnalysisSamplerTestDeathTest, CannotGetOnStandaloneMongod, "invariant") {
-    setUpRole({ClusterRole::None}, false /* isReplEnabled */);
+    setUpRole({ClusterRole::None}, /*isReplEnabled=*/false);
     QueryAnalysisSampler::get(operationContext());
 }
 
@@ -699,160 +672,160 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest, InitialCount) {
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_NotCountInsertsTrackedByOpCounters) {
-    testInsertsTrackedByOpCounters(false /* shouldCount */, ClusterRole::RouterServer);
+    testInsertsTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_CountUpdatesTrackedByOpCounters) {
-    testUpdatesTrackedByOpCounters(true /* shouldCount */, ClusterRole::RouterServer);
+    testUpdatesTrackedByOpCounters(/*shouldCount=*/true, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_CountDeletesTrackedByOpCounters) {
-    testDeletesTrackedByOpCounters(true /* shouldCount */, ClusterRole::RouterServer);
+    testDeletesTrackedByOpCounters(/*shouldCount=*/true, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountFindAndModify) {
-    testFindAndModify(true /* shouldCount */);
+    testFindAndModify(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_CountQueriesTrackedByOpCounters) {
-    testQueriesTrackedByOpCounters(true /* shouldCount */, ClusterRole::RouterServer);
+    testQueriesTrackedByOpCounters(/*shouldCount=*/true, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_NotCountCommandsTrackedByOpCounters) {
-    testCommandsTrackedByOpCounters(false /* shouldCount */, ClusterRole::RouterServer);
+    testCommandsTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountAggregates) {
-    testAggregates(true /* shouldCount */);
+    testAggregates(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountCounts) {
-    testCounts(true /* shouldCount */);
+    testCounts(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsMongos_CountDistincts) {
-    testDistincts(true /* shouldCount */);
+    testDistincts(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsMongos_NotCountNestedAggregatesTrackedByOpCounters) {
-    testNestedAggregates(false /* shouldCount */, ClusterRole::RouterServer);
+    testNestedAggregates(/*shouldCount=*/false, ClusterRole::RouterServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountInsertsTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testInsertsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testInsertsTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountUpdatesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testUpdatesTrackedByOpCounters(true /* shouldCount */, ClusterRole::ShardServer);
+    testUpdatesTrackedByOpCounters(/*shouldCount=*/true, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountFindAndModify) {
     setUpRole({ClusterRole::None});
-    testFindAndModify(true /* shouldCount */);
+    testFindAndModify(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountDeletesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testDeletesTrackedByOpCounters(true /* shouldCount */, ClusterRole::ShardServer);
+    testDeletesTrackedByOpCounters(/*shouldCount=*/true, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountQueriesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testQueriesTrackedByOpCounters(true /* shouldCount */, ClusterRole::ShardServer);
+    testQueriesTrackedByOpCounters(/*shouldCount=*/true, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountCommandsTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testCommandsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testCommandsTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountAggregates) {
     setUpRole({ClusterRole::None});
-    testAggregates(true /* shouldCount */);
+    testAggregates(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountCounts) {
     setUpRole({ClusterRole::None});
-    testCounts(true /* shouldCount */);
+    testCounts(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountDistincts) {
     setUpRole({ClusterRole::None});
-    testDistincts(true /* shouldCount */);
+    testDistincts(/*shouldCount=*/true);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountNestedAggregatesTrackedByOpCounters) {
     setUpRole({ClusterRole::None});
-    testNestedAggregates(false /* shouldCount */, ClusterRole::ShardServer);
+    testNestedAggregates(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountInsertsTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testInsertsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testInsertsTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountUpdatesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testUpdatesTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testUpdatesTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountDeletesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testDeletesTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testDeletesTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountFindAndModify) {
     setUpRole({ClusterRole::ShardServer});
-    testFindAndModify(false /* shouldCount */);
+    testFindAndModify(/*shouldCount=*/false);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountQueriesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testQueriesTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testQueriesTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountCommandsTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testCommandsTrackedByOpCounters(false /* shouldCount */, ClusterRole::ShardServer);
+    testCommandsTrackedByOpCounters(/*shouldCount=*/false, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountAggregates) {
     setUpRole({ClusterRole::ShardServer});
-    testAggregates(false /* shouldCount */);
+    testAggregates(/*shouldCount=*/false);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountCounts) {
     setUpRole({ClusterRole::ShardServer});
-    testCounts(false /* shouldCount */);
+    testCounts(/*shouldCount=*/false);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountDistincts) {
     setUpRole({ClusterRole::ShardServer});
-    testDistincts(false /* shouldCount */);
+    testDistincts(/*shouldCount=*/false);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_CountNestedAggregatesTrackedByOpCounters) {
     setUpRole({ClusterRole::ShardServer});
-    testNestedAggregates(true /* shouldCount */, ClusterRole::ShardServer);
+    testNestedAggregates(/*shouldCount=*/true, ClusterRole::ShardServer);
 }
 
 TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {

@@ -15,6 +15,7 @@ import {
     checkPlatformCompatibleWithExtensions,
     generateExtensionConfigWithOptions,
     deleteExtensionConfigs,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -30,6 +31,7 @@ mongotMock.start();
 const conn = MongoRunner.runMongod({
     setParameter: {mongotHost: mongotMock.getConnection().host},
     loadExtensions: [extensionName],
+    extensionsConfigPath: getExtensionConfDir(),
 });
 const adminDb = conn.getDB("admin");
 const testDB = conn.getDB(dbName);
@@ -98,7 +100,25 @@ function testLegacyVectorSearch() {
     );
 }
 
+function assertFlagValue(expected) {
+    assert.eq(
+        assert.commandWorked(
+            adminDb.runCommand({getParameter: 1, featureFlagVectorSearchExtension: 1}),
+        ).featureFlagVectorSearchExtension.value,
+        expected,
+        `featureFlagVectorSearchExtension should be ${expected}`,
+    );
+}
+
 try {
+    // The flag now ships enabled by default; verify that, then reset to the disabled state and
+    // confirm it took effect so the cases below run from a known starting point.
+    assertFlagValue(true);
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
+    assertFlagValue(false);
+
     testExtensionVectorSearch();
     testLegacyVectorSearch();
 } finally {

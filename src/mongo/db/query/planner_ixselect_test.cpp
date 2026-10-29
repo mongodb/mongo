@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for mongo/db/query/planner_ixselect.cpp
@@ -33,19 +7,6 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-#include <algorithm>
-#include <memory>
-#include <set>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <absl/strings/str_split.h>
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -65,7 +26,20 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <absl/strings/str_split.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 using namespace mongo;
 
@@ -1089,8 +1063,8 @@ TEST(QueryPlannerIXSelectTest, ModUnderNotCannotUseIndex) {
                     indices,
                     "a,a",
                     expectedIndices,
-                    false /* mustUseIndexedPlan */,
-                    true /* shouldNormalize */);
+                    /*mustUseIndexedPlan=*/false,
+                    /*shouldNormalize=*/true);
 }
 
 /**
@@ -1145,8 +1119,8 @@ TEST(QueryPlannerIXSelectTest, TypeUnderNotCannotUseIndex) {
                     indices,
                     "a,a",
                     expectedIndices,
-                    false /* mustUseIndexedPlan */,
-                    true /* shouldNormalize */);
+                    /*mustUseIndexedPlan=*/false,
+                    /*shouldNormalize=*/true);
 }
 
 // Helper which constructs an IndexEntry and returns it along with an owned ProjectionExecutor,
@@ -1878,8 +1852,8 @@ TEST(QueryPlannerIXSelectTest, SparseIndexCannotBeUsedInALookup) {
     std::vector<IndexEntry> result =
         QueryPlannerIXSelect::expandIndexes(fields,
                                             {wildcardIndexEntry.first, sparseIndex},
-                                            false /* hintedIndexBson */,
-                                            true /* inLookup */);
+                                            /*hintedIndexBson=*/false,
+                                            /*inLookup=*/true);
     // Sparse indexes and wildcard indexes cannot be used for the inner side of a $lookup.
     std::vector<BSONObj> expectedKeyPatterns;
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));

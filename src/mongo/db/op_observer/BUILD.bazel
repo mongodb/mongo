@@ -71,6 +71,7 @@ mongo_cc_library(
     deps = [
         ":op_observer",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/topology/user_write_block:user_writes_recoverable_critical_section",
     ],
 )
@@ -142,7 +143,8 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/index_builds:commit_quorum_options",
-        "//src/mongo/db/index_builds/primary_driven:tearable_side_write_redo_state",
+        "//src/mongo/db/index_builds/primary_driven:enabled",
+        "//src/mongo/db/repl:internode_validation_hash_utils",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:set_multikey_metadata_oplog_entry_idl",
         "//src/mongo/db/repl:truncate_range_oplog_entry_idl",
@@ -158,6 +160,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/s:grid",
     ],
 )
@@ -226,10 +229,11 @@ mongo_cc_unit_test(
         "//src/mongo/db:read_write_concern_defaults",
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/commands:create_command",
-        "//src/mongo/db/index_builds/primary_driven:tearable_side_write_redo_state",
         "//src/mongo/db/repl:image_collection_entry",
+        "//src/mongo/db/repl:internode_validation_hash_utils",
         "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:oplog_interface_local",
@@ -239,12 +243,15 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+        "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/storage:recovery_unit_base",
+        "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/topology/user_write_block:replica_set_write_block_bypass",
         "//src/mongo/db/topology/user_write_block:user_write_block_bypass",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
@@ -271,6 +278,21 @@ mongo_cc_unit_test(
     ],
     tags = [
         "mongo_unittest_third_group",
+        "server-storage-engine-integration",
+    ],
+    deps = [
+        ":op_observer",
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "op_observer_noop_test",
+    srcs = [
+        "op_observer_noop_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
         "server-storage-engine-integration",
     ],
     deps = [
@@ -314,6 +336,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/auth:authserver",
         "//src/mongo/db/repl:primary_only_service",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/timeseries:timeseries_op_observer",

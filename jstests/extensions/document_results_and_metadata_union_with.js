@@ -3,32 +3,30 @@
  *
  * @tags: [
  *  featureFlagExtensionsAPI,
- *  featureFlagExtensionsInsideHybridSearch,
+ *  requires_fcv_90,
  * ]
  */
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
+import {
+    getDrmShardInfo,
+    kSimpleExpectedMeta,
+    makeCountMergeSetup,
+    setupDrmCollection,
+} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
-const outerMeta = {count: {lowerBound: 42}, scope: "outer"};
+const outerMeta = {...kSimpleExpectedMeta, scope: "outer"};
 const innerMeta = {count: {lowerBound: 7}, scope: "inner"};
 
 describe("$_internalDocumentResultsAndMetadata in $unionWith", function () {
     let coll;
     let nShards;
+    let isSharded;
+    let shardIds;
 
     before(function () {
         coll = db[jsTestName()];
-        assertDropCollection(db, coll.getName());
-        if (FixtureHelpers.isMongos(db)) {
-            assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
-            );
-        } else {
-            assert.commandWorked(coll.insertOne({_id: 0}));
-        }
-        nShards = FixtureHelpers.numberOfShardsForCollection(coll);
+        setupDrmCollection(db, coll);
+        ({nShards, shardIds, isSharded} = getDrmShardInfo(db, coll));
     });
 
     it("unions outer collection scan with DRM subpipeline binding $$SEARCH_META", function () {
@@ -110,8 +108,40 @@ describe("$_internalDocumentResultsAndMetadata in $unionWith", function () {
         );
     });
 
+    it("[sharded] merges differing per-shard metadata in a $unionWith DRM subpipeline", function () {
+        if (!isSharded || shardIds.length < 2) return;
+        const {byShard, mergePipeline, expectedMeta: mergedMeta} = makeCountMergeSetup(shardIds);
+        const result = coll
+            .aggregate([
+                {
+                    $unionWith: {
+                        coll: coll.getName(),
+                        pipeline: [
+                            {
+                                $extensionMultiStream: {
+                                    numDocs: 3,
+                                    meta: {count: {lowerBound: 0}},
+                                    byShard,
+                                    mergePipeline,
+                                },
+                            },
+                            {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+                        ],
+                    },
+                },
+            ])
+            .toArray();
+
+        const subDocs = result.filter((d) => d.hasOwnProperty("meta"));
+        assert.gt(subDocs.length, 0, {result, byShard});
+        for (const doc of subDocs) {
+            assert.docEq(doc.meta, mergedMeta, {doc, byShard});
+            assert(doc.hasOwnProperty("name"), {doc});
+        }
+    });
+
     it("[sharded] propagates DRM subpipeline metadata correctly across shards", function () {
-        if (!FixtureHelpers.isMongos(db)) return;
+        if (!isSharded) return;
         const numDocs = 4;
         const result = coll
             .aggregate([

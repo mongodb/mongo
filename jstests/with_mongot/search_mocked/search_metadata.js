@@ -1,6 +1,7 @@
 /**
  * Tests that "searchScore", "searchHighlights", and "searchScoreDetails" metadata is properly
  * plumbed through the $search agg stage.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite. Note that the null/missing-metadata response-injection cases below are not covered by the e2e version.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";

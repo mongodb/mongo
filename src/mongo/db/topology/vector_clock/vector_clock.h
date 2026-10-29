@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -55,7 +29,7 @@ namespace mongo {
  * The VectorClock service provides a collection of cluster-wide logical clocks (including the
  * clusterTime), that are used to provide causal-consistency to various other services.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT VectorClock {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] VectorClock {
 protected:
     enum class Component : uint8_t {
         ClusterTime = 0,
@@ -373,7 +347,7 @@ protected:
     // VectorClock mutex is held.
     mutable ObservableMutex<std::mutex> _mutex;
 
-    AtomicWord<bool> _isEnabled{true};
+    Atomic<bool> _isEnabled{true};
 
     LogicalTimeArray _vectorTime = {
         kInitialComponentTime, kInitialComponentTime, kInitialComponentTime};
@@ -382,7 +356,7 @@ protected:
     // Written under _mutex whenever _vectorTime is updated.
     // Initialized to kInitialComponentTime in the constructor.
     alignas(std::hardware_destructive_interference_size)
-        ComponentArray<AtomicWord<unsigned long long>> _vectorTimeShadow;
+        ComponentArray<Atomic<unsigned long long>> _vectorTimeShadow;
 
 private:
     class PlainComponentFormat;

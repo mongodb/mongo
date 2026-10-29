@@ -4,7 +4,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 set -o errexit
 set -o verbose
 
-python_loc=$(which ${python})
+python_loc=$(command -v "$python")
 pushd venv
 venv_dir=$(pwd)
 popd
@@ -28,6 +28,10 @@ if [[ "$ARCH" == "ppc64le" ]]; then
 else
     # Update virtual env directory in activate script
     if [ "Windows_NT" = "$OS" ]; then
+        # Windows venv launchers use the absolute base runtime in pyvenv.cfg.
+        # The build host's Bazel runtime may not exist here. Refresh launchers
+        # and configuration from this host's runtime, preserving dependencies.
+        "$python_loc" -m venv --upgrade --without-pip "$(cygpath -w "$venv_dir")"
         # Update VIRTUAL_ENV paths in activate script
         # Python 3.10 format: VIRTUAL_ENV="C:\path\to\venv"
         # Python 3.13 format: VIRTUAL_ENV=$(cygpath 'C:\path\to\venv') and export VIRTUAL_ENV='C:\path\to\venv'

@@ -1,39 +1,45 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/topology/shard_registry.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 
+#include <utility>
+
 namespace mongo::exec::agg {
+
+namespace {
+// Ensure the ShardRegistry knows every shard we hold a cursor on before the merger opens its first
+// getMore egress connection.
+void validateShardIds(OperationContext* opCtx, const std::vector<RemoteCursor>& remotes) {
+    auto* grid = opCtx ? Grid::get(opCtx) : nullptr;
+    if (!grid || !grid->isInitialized()) {
+        // No ShardRegistry wired up (e.g. a non-sharded context or some unit tests); nothing to do.
+        return;
+    }
+    auto* shardRegistry = grid->shardRegistry();
+
+    // Deduplicate shardIds: the registry cache is a single whole-registry entry, so the first
+    // resolve warms every shard; the rest are cache hits.
+    stdx::unordered_set<ShardId> seen;
+    seen.reserve(remotes.size());
+    for (const auto& remote : remotes) {
+        ShardId shardId{std::string{remote.getShardId()}};
+        if (!seen.insert(shardId).second) {
+            continue;
+        }
+        // 'getShard()' also resolves the config shard (which 'getAllShardIds()' omits) and retries
+        // via a forced reload on a miss, making this resilient to add/remove-shard churn.
+        uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+    }
+}
+}  // namespace
 
 boost::intrusive_ptr<MergeCursorsStage> documentSourceMergeCursorsToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -42,8 +48,13 @@ boost::intrusive_ptr<MergeCursorsStage> documentSourceMergeCursorsToStageFn(
 
     tassert(10561401, "expected 'DocumentSourceMergeCursors' type", mergeCursorsDocumentSource);
 
+    auto blockingResultsMerger = mergeCursorsDocumentSource->populateMerger();
+
+    validateShardIds(mergeCursorsDocumentSource->getExpCtx()->getOperationContext(),
+                     blockingResultsMerger->asyncResultsMergerParams().getRemotes());
+
     return make_intrusive<MergeCursorsStage>(mergeCursorsDocumentSource->getExpCtx(),
-                                             mergeCursorsDocumentSource->populateMerger());
+                                             std::move(blockingResultsMerger));
 }
 
 REGISTER_AGG_STAGE_MAPPING(mergeCursors,
@@ -88,6 +99,7 @@ GetNextResult MergeCursorsStage::doGetNext() {
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
     }
+
     Document doc = Document::fromBsonWithMetaData(*next.getResult());
     if (MONGO_unlikely(doc.metadata().isChangeStreamControlEvent())) {
         // Special handling needed for control events here to avoid an assertion failure in the
@@ -98,7 +110,9 @@ GetNextResult MergeCursorsStage::doGetNext() {
 }
 
 void MergeCursorsStage::doDispose() {
-    _blockingResultsMerger->kill(getContext()->getOperationContext());
+    auto* opCtx = getContext()->getOperationContext();
+    tassert(13159600, "requires a valid operation context", opCtx);
+    _blockingResultsMerger->kill(opCtx);
 }
 
 void MergeCursorsStage::doForceSpill() {
@@ -118,6 +132,23 @@ std::size_t MergeCursorsStage::getNumRemotes() const {
 
 BSONObj MergeCursorsStage::getHighWaterMark() {
     return _blockingResultsMerger->getHighWaterMark();
+}
+
+BSONObj MergeCursorsStage::getHighWaterMarkForClient() {
+    return _blockingResultsMerger->getHighWaterMarkForClient();
+}
+
+boost::optional<Timestamp> MergeCursorsStage::getHighWaterMarkClusterTime() {
+    BSONObj highWaterMark = getHighWaterMark();
+
+    // The results merger tracks a high water mark for any sorted tailable cursor, but it is only a
+    // change stream resume token, and therefore only carries a cluster time, when the cursors being
+    // merged are change stream cursors. Report no high water mark for anything else rather than
+    // failing to parse it as a resume token.
+    if (!highWaterMark.hasField(ResumeToken::kDataFieldName)) {
+        return boost::none;
+    }
+    return ResumeToken::extractClusterTime(highWaterMark);
 }
 
 bool MergeCursorsStage::remotesExhausted() const {
@@ -157,6 +188,14 @@ void MergeCursorsStage::recognizeControlEvents() {
 
 void MergeCursorsStage::setHighWaterMark(const BSONObj& highWaterMark) {
     _blockingResultsMerger->setHighWaterMark(highWaterMark);
+}
+
+void MergeCursorsStage::disablePromisedSortKeyHighWaterMarkAdvancement() {
+    _blockingResultsMerger->disablePromisedSortKeyHighWaterMarkAdvancement();
+}
+
+void MergeCursorsStage::enablePromisedSortKeyHighWaterMarkAdvancement() {
+    _blockingResultsMerger->enablePromisedSortKeyHighWaterMarkAdvancement();
 }
 
 void MergeCursorsStage::setNextHighWaterMarkDeterminingStrategy(

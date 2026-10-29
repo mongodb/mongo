@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/rollback_impl.h"
 
@@ -94,7 +68,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -461,6 +435,10 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     // Wait for all background operations to complete by waiting on each database. Single-phase
     // index builds are not stopped before rollback, so we must wait for these index builds to
     // complete.
+    //
+    // Only the index builds this node is running are waited for. Primary-driven index builds that
+    // are merely registered have no thread of their own, and their registry entries are cleared and
+    // repopulated from disk by closeCatalog()/openCatalog() below, so there is nothing to wait for.
     std::vector<DatabaseName> dbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
     for (const auto& dbName : dbNames) {
@@ -471,7 +449,8 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
                         "Waiting for background operations to complete",
                         "numBackgroundOperationsInProgress"_attr = numInProg,
                         logAttrs(dbName));
-            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, dbName);
+            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(
+                opCtx, dbName, {IndexBuildProtocol::kSinglePhase});
         }
     }
 
@@ -548,7 +527,7 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             case OplogEntry::CommandType::kTruncateRange:
             case OplogEntry::CommandType::kInvalidateCollectionMetadata:
             case OplogEntry::CommandType::kSetAllowChunkOperations:
-            case OplogEntry::CommandType::kApplyCollectionShardingStateDelta:
+            case OplogEntry::CommandType::kUpdateCollectionMetadata:
             case OplogEntry::CommandType::kSetMultikeyMetadata: {
                 // For all other command types, we should be able to parse the collection name from
                 // the first command argument.
@@ -565,6 +544,8 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             case OplogEntry::CommandType::kAbortTransaction:
             case OplogEntry::CommandType::kCreateDatabaseMetadata:
             case OplogEntry::CommandType::kDropDatabaseMetadata:
+            case OplogEntry::CommandType::kInvalidateAllCollectionMetadata:
+            case OplogEntry::CommandType::kInvalidateAllDatabaseMetadata:
             case OplogEntry::CommandType::kInitReplicatedFastCount:
             case OplogEntry::CommandType::kDropIdent: {
                 // There is no specific namespace to save for these operations.

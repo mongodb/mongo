@@ -95,4 +95,5 @@ To install dependencies on Debian or Ubuntu systems:
 
 Install Xcode 16.4 or newer. Make sure macOS 15.5 platform is installed.
 
-Install llvm and lld, version 19 from brew: brew install llvm@19 lld@19
+The LLVM toolchain is downloaded automatically by Bazel. To use a local LLVM installation instead,
+set `LLVM_PATH` to its install prefix: `bazel build --repo_env=LLVM_PATH=/path/to/llvm ...`

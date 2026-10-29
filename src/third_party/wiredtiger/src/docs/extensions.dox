@@ -2,8 +2,8 @@
 
 WiredTiger can be extended in various ways, including:
 
-- adding @ref compression_custom, @ref encryption_custom,
-- @ref custom_data_sources, and @ref custom_storage_sources,
+- adding @ref compression_custom, @ref encryption_custom
+- @ref custom_data_sources
 - @ref WT_COLLATOR "by implementing the WT_COLLATOR interface".
 
 Code that implements these interfaces can use the @ref wt_ext.

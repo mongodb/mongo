@@ -1,0 +1,87 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "_id": true,
+                        "renamedField": "$b",
+                        "renamedAlso": "$b",
+                        "xRename": "$b",
+                        "yRename": "$b"
+                    }
+                },
+                "embedPath": "fromA"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "exprEq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "underlyingFieldPath": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "underlyingFieldPath": "b",
+            "fieldPathAfterRenames": "renamedField"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "let": {},
+                "pipeline": [
+                    {
+                        "$project": {
+                            "_id": true,
+                            "renamedField": "$b",
+                            "renamedAlso": "$b",
+                            "xRename": "$b",
+                            "yRename": "$b"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$a",
+                        "$fromA.renamedField"
+                    ]
+                }
+            }
+        }
+    ],
+    "suffix": []
+}

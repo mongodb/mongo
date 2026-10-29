@@ -118,7 +118,12 @@ function testStepUp(rst) {
 const st = new ShardingTest({
     shards: 1,
     rs: {
-        nodes: 2,
+        // TODO: SERVER-122925 remove once we stop setting priority to 0 in dsc.
+        // The test relies on the standby taking over after the primary steps down, so make the
+        // second node electable. This is a no-op for the default (ASC) topology, but is required
+        // under the disaggregated storage suite override, which defaults non-first members to
+        // priority 0 and would otherwise leave the replica set with no primary.
+        nodes: [{}, {rsConfig: {priority: 1}}],
         // Make the periodic job for writing sampled queries have a period of 1 second to speed up
         // the test.
         setParameter: {queryAnalysisWriterIntervalSecs: 1},

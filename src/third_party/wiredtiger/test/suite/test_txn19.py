@@ -273,6 +273,8 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         # Then does a restart with recovery, then starts again with salvage,
         # and finally starts again with recovery (adding new records).
 
+        self.ignoreStdoutPattern('log_slot_destroy: failed to write slot')
+
         create_params = 'key_format=i,value_format=S'.format(self.key_format)
         self.session.create(self.uri, create_params)
         self.inserts([x for x in range(0, self.nrecords)])
@@ -316,6 +318,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
             #   salvage: log file x truncated at beginning
             #   salvage: log file x truncated
             #   salvage: log file x removed
+            #   salvage: log scan truncated at ...
             #
             # The removal case may not give an informational error because
             # the log file is already missing, so salvage itself is not
@@ -323,7 +326,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
             # much as it can.
             #
             if self.kind == 'removal':
-                outpat = '^$'
+                outpat = 'salvage: log scan truncated'
             else:
                 outpat = 'salvage: log file'
         else:
@@ -512,6 +515,8 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
         newdir2 = "RESTART2"
         expect = list(range(1, self.nrecords + 1))
         salvage_config = self.base_config + ',salvage=true'
+
+        self.ignoreStdoutPattern('log_slot_destroy: failed to write slot')
 
         create_params = 'key_format={},value_format=S'.format(self.key_format)
         for suffix in self.suffixes:

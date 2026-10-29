@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -44,7 +18,6 @@
 #include <string>
 
 namespace mongo {
-
 /**
  * A KeyPattern is an expression describing a transformation of a document into a
  * document key.  Document keys are used to store documents in indices and to target
@@ -58,7 +31,7 @@ namespace mongo {
  *    { a : 1 , b  : -1 }
  *    { a : "hashed" }
  */
-class MONGO_MOD_PUBLIC KeyPattern {
+class [[MONGO_MOD_PUBLIC]] KeyPattern {
 public:
     /**
      * Is the provided key pattern ordered increasing or decreasing or not?
@@ -120,13 +93,15 @@ public:
      */
     static std::string toString(const BSONObj& keyPattern) {
         StringBuilder sb;
-        return addToStringBuilder(sb, keyPattern).str();
+        return _addToStringBuilder(sb, keyPattern).str();
     }
 
     /**
      * Writes to 'sb' a string representation of this KeyPattern.
      */
     friend StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern);
+    friend StackStringBuilder& operator<<(StackStringBuilder& sb, const KeyPattern& keyPattern);
+
 
     /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
      * outputs a new bound with MinKey values appended to match the fields in this keyPattern
@@ -180,7 +155,8 @@ public:
     bool isGlobalMax(const BSONObj& bound) const;
 
 private:
-    static StringBuilder& addToStringBuilder(StringBuilder& sb, const BSONObj& pattern);
+    template <typename SB>
+    static SB& _addToStringBuilder(SB& sb, const BSONObj& pattern);
     BSONObj _pattern;
 };
 

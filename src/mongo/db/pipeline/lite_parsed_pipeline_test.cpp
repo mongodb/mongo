@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_internal_hybrid_search.h"
@@ -270,7 +245,7 @@ TEST(LiteParsedPipelineTest, ReplaceStageWithOwnsUnownedClonedSubpipelineStages)
     LiteParsedPipeline pipeline(kTestNss, std::vector<BSONObj>{unionSpec});
 
     // Unowned clones backed by the $unionWith stage's OwnedLiteParsedPipeline.
-    const auto* subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    const auto subPipelines = pipeline.getStages()[0]->getSubPipelines();
     ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1U);
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> replacements;
@@ -329,7 +304,7 @@ TEST(LiteParsedPipelineTest, ReplaceStageWithNestedPipelineReplacementOwnsSubSta
 
     const auto& stages = pipeline.getStages();
     ASSERT_EQ(stages.size(), 1U);
-    const auto* subPipelines = stages[0]->getSubPipelines();
+    const auto subPipelines = stages[0]->getSubPipelines();
     ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1U);
     const auto& subStages = (*subPipelines)[0]->getStages();
@@ -341,6 +316,18 @@ TEST(LiteParsedPipelineTest, GetParseNssMatchesConstructorNss) {
     std::vector<BSONObj> stages = {BSON("$match" << BSON("x" << 1))};
     LiteParsedPipeline pipeline(kTestNss, stages);
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
+}
+
+TEST(LiteParsedPipelineTest, RejectableStagesDoNotBypassQuerySettingsRejection) {
+    LiteParsedPipeline pipeline(kTestNss, {fromjson("{$match: {x: 1}}"), fromjson("{$limit: 10}")});
+    ASSERT_FALSE(pipeline.shouldBypassQuerySettingsRejection());
+}
+
+TEST(LiteParsedPipelineTest, RejectionIncompatibleStageBypassesQuerySettingsRejection) {
+    // A single rejection-incompatible ("system") stage exempts the whole pipeline.
+    LiteParsedPipeline pipeline(kTestNss,
+                                {fromjson("{$indexStats: {}}"), fromjson("{$match: {x: 1}}")});
+    ASSERT_TRUE(pipeline.shouldBypassQuerySettingsRejection());
 }
 
 TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollection) {
@@ -356,9 +343,9 @@ TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollecti
 
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
 
-    auto* subPipelinesPtr = pipeline.getStages()[0]->getSubPipelines();
-    ASSERT_NE(subPipelinesPtr, nullptr);
-    const auto& subPipelines = *subPipelinesPtr;
+    auto subPipelinesOpt = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT(subPipelinesOpt);
+    const auto& subPipelines = *subPipelinesOpt;
     ASSERT_EQ(subPipelines.size(), 1U);
     ASSERT_EQ(subPipelines[0]->getOriginalParseNss(), kForeignNss);
 }
@@ -377,8 +364,8 @@ TEST(LiteParsedPipelineTest, NestedMergeSubpipelineGetParseNssIsTargetCollection
 
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
 
-    const auto* subPipelines = pipeline.getStages()[0]->getSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    const auto subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1U);
     ASSERT_EQ((*subPipelines)[0]->getOriginalParseNss(), kTargetNss);
 }
@@ -446,6 +433,119 @@ protected:
     std::string _defaultStageName;
     std::string _doNothingStageName;
 };
+
+/**
+ * Builds one lite-parsed stage of 'stageName' for use with replaceStageWith().
+ */
+std::vector<std::unique_ptr<LiteParsedDocumentSource>> makeStages(
+    const std::vector<BSONObj>& specs) {
+    std::vector<std::unique_ptr<LiteParsedDocumentSource>> out;
+    for (const auto& spec : specs) {
+        out.push_back(LiteParsedDocumentSource::parse(kTestNss, spec, LiteParserOptions{}));
+    }
+    return out;
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, UserFirstStagePolicySkipsPrependedViewStages) {
+    // handleView() prepends the view definition, so getStages().front() is a view stage. The user
+    // policy accessor must look past it and report the user's own first stage.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({doNothingStageSpec()}), {});
+
+    ASSERT_EQ(pipeline.getStages().front()->getParseTimeName(), _doNothingStageName);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, UserFirstStagePolicyDefaultsWhenOnlyViewStages) {
+    // A pipeline consisting entirely of prepended view stages has no user stage to consult.
+    std::vector<BSONObj> userStages = {};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({doNothingStageSpec()}), {});
+
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, ReplaceStageWithGrowsViewPrefixWhenExpandingViewStage) {
+    // Desugaring a prepended VIEW stage into 3 stages must move the view/user boundary by +2, so
+    // the user's own stage is still identified correctly.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({doNothingStageSpec()}), {});
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+
+    pipeline.replaceStageWith(0,
+                              makeStages({BSON("$match" << BSON("a" << 1)),
+                                          BSON("$match" << BSON("b" << 1)),
+                                          BSON("$match" << BSON("c" << 1))}));
+
+    ASSERT_EQ(pipeline.getStages().size(), 4U);
+    ASSERT_EQ(pipeline.getStages()[3]->getParseTimeName(), _defaultStageName);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, ReplaceStageWithLeavesViewPrefixWhenExpandingUserStage) {
+    // Desugaring a USER stage must NOT move the view/user boundary (index >= prefix length). The
+    // user pipeline must start with kDefaultPrepend, or handleView() would not prepend at all and
+    // there would be no prefix to test.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({BSON("$match" << BSON("x" << 1))}), {});
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+
+    // Expand the user stage (index 1) into [kDoNothing, $match]. If the boundary wrongly advanced,
+    // the accessor would read the trailing $match (kDefaultPrepend) instead of the kDoNothing
+    // stage.
+    pipeline.replaceStageWith(1,
+                              makeStages({doNothingStageSpec(), BSON("$match" << BSON("y" << 1))}));
+
+    ASSERT_EQ(pipeline.getStages().size(), 3U);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, ReplaceStageWithHandlesOneForOneViewStageExpansion) {
+    // numInserted == 1 must leave the boundary unchanged (+1 - 1 == 0).
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({BSON("$match" << BSON("x" << 1))}), {});
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+
+    // Replace the single VIEW stage with exactly one stage. If the boundary wrongly moved to 0, the
+    // accessor would read that replacement (kDoNothing) rather than the user's stage.
+    pipeline.replaceStageWith(0, makeStages({doNothingStageSpec()}));
+
+    ASSERT_EQ(pipeline.getStages().size(), 2U);
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(LiteParsedPipelineViewPolicyTest, CopyAndAssignmentPreserveViewPrefixBoundary) {
+    // The view/user boundary is part of the class invariant, so copying or assigning a stitched
+    // pipeline must carry it along. If it resets to 0, the accessor reads the prepended view stage
+    // and the view gets dropped from the join.
+    std::vector<BSONObj> userStages = {defaultStageSpec()};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestView({BSON("$match" << BSON("x" << 1))}), {});
+    // Make the user's own first stage kDoNothing, so it is distinguishable from the prepended
+    // $match's kDefaultPrepend.
+    pipeline.replaceStageWith(1, makeStages({doNothingStageSpec()}));
+    ASSERT_EQ(pipeline.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+
+    auto cloned = pipeline.clone();
+    ASSERT_EQ(std::string{cloned.getStages().front()->getParseTimeName()}, "$match");
+    ASSERT_EQ(cloned.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+
+    LiteParsedPipeline assigned(kTestNss, std::vector<BSONObj>{});
+    assigned = pipeline.clone();
+    ASSERT_EQ(assigned.getUserFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
+}
 
 TEST_F(LiteParsedPipelineViewPolicyTest, FirstDoNothingSuppressesPrepend) {
     std::vector<BSONObj> userStages = {doNothingStageSpec(), defaultStageSpec()};

@@ -1,41 +1,131 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
+
+#include <utility>
 
 namespace mongo::transport {
 
 /** Build a `DbResponse` carrying a rate-limit-rejection error for `message`. */
 DbResponse makeDbResponseErrorForRateLimiting(const Message& message);
+
+/**
+ * Per-session `Interruptible` used to throttle IRRL rejection replies on the egress response
+ * rate-limiter path. The rejection path has no `OperationContext`, so it cannot use
+ * `markKillOnClientDisconnect()`. Instead, this class composes two cancellation conditions in a
+ * sliced wait loop:
+ *   1. Shutdown: `shutdownToken` from `SessionManager::getShutdownToken()` is polled at each slice
+ *      boundary.
+ *   2. Client disconnect: each slice is a blocking `Session::waitForPeerDisconnectUntil()`. On
+ *      Asio sessions that is a `poll(2)` for POLLRDHUP/POLLHUP on the session's socket, so the
+ *      worker becomes runnable as soon as the client's FIN/RST arrives. Sessions without an
+ *      optimized override (gRPC, handoff) use `Session`'s default, which samples `isConnected()`,
+ *      and so observe a disconnect only at the next slice boundary.
+ *
+ * Each slice is capped at `kMaxPollInterval` (500ms) so a parked waiter notices shutdown within
+ * that bound.
+ *
+ * Returns `InterruptedAtShutdown` on shutdown, `ClientDisconnect` on peer disconnect.
+ */
+class DisconnectShutdownAwareInterruptible final : public Interruptible {
+public:
+    DisconnectShutdownAwareInterruptible(CancellationToken shutdownToken,
+                                         Session* session,
+                                         ClockSource* clockSource)
+        : _shutdownToken(std::move(shutdownToken)), _session(session), _clockSource(clockSource) {}
+
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
+        stdx::condition_variable& callerCv,
+        BasicLockableAdapter callerM,
+        Date_t deadline) noexcept override {
+        // `callerCv` and `callerM` are intentionally ignored. The only consumer is the
+        // EgressResponseRateLimiter's sleepUntil()-style wait, whose local CV is never notified.
+
+        if (auto s = _checkShutdown(); !s.isOK()) {
+            return s;
+        }
+
+        while (true) {
+            const auto now = _clockSource->now();
+            if (now >= deadline) {
+                return stdx::cv_status::timeout;
+            }
+
+            const auto sliceDeadline = std::min(deadline, now + kMaxPollInterval);
+            const bool disconnected = _session->waitForPeerDisconnectUntil(sliceDeadline);
+            if (auto s = _checkShutdown(); !s.isOK()) {
+                return s;
+            }
+
+            if (disconnected) {
+                return Status(ErrorCodes::ClientDisconnect,
+                              "client disconnected while waiting in egress response rate limiter "
+                              "queue");
+            }
+        }
+    }
+
+    Date_t getDeadline() const override {
+        return Date_t::max();
+    }
+
+    Status checkForInterruptNoAssert() noexcept override {
+        if (auto s = _checkShutdown(); !s.isOK()) {
+            return s;
+        }
+        if (!_session->isConnected()) {
+            return Status(
+                ErrorCodes::ClientDisconnect,
+                "client disconnected while waiting in egress response rate limiter queue");
+        }
+        return Status::OK();
+    }
+
+    Status checkForDeadlineExpiredNoAssert(Date_t) noexcept override {
+        return Status::OK();
+    }
+
+    // The only caller (sleepUntil-style wait) never installs a DeadlineGuard, so wiring one up is
+    // a programming error; fail loudly rather than silently ignoring an unenforced deadline.
+    DeadlineState pushArtificialDeadline(Date_t, ErrorCodes::Error) override {
+        MONGO_UNREACHABLE_TASSERT(9297601);
+    }
+
+    void popArtificialDeadline(DeadlineState) override {
+        MONGO_UNREACHABLE_TASSERT(9297602);
+    }
+
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
+        return _clockSource->now() + waitFor;
+    }
+
+private:
+    Status _checkShutdown() noexcept {
+        if (_shutdownToken.isCanceled()) {
+            return Status(ErrorCodes::InterruptedAtShutdown,
+                          "egress response interrupted at shutdown");
+        }
+        return Status::OK();
+    }
+
+    CancellationToken _shutdownToken;
+    Session* const _session;
+    ClockSource* const _clockSource;
+
+    // Upper bound on how long a parked waiter can take to notice SessionManager shutdown.
+    static constexpr Milliseconds kMaxPollInterval{500};
+};
 
 }  // namespace mongo::transport

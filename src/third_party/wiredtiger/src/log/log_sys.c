@@ -191,7 +191,8 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
         FLD_ISSET(log_mgr->txn_logsync, WT_LOG_FSYNC)       ? "fsync to disk" :
                                                               "unknown sync setting"));
     WT_RET(__wt_msg(session, "Log record allocation alignment: %" PRId32, WTI_LOG_ALIGN));
-    WT_RET(__wt_msg(session, "Current log file number: %" PRIu32, log->fileid));
+    WT_RET(__wt_msg(
+      session, "Current log file number: %" PRIu32, __wt_atomic_load_uint32_relaxed(&log->fileid)));
     WT_RET(__wt_msg(session, "Current log version number: %" PRIu16, log->log_version));
     WT_RET(WTI_LSN_MSG(&log->alloc_lsn, "Next allocation"));
     WT_RET(WTI_LSN_MSG(&log->ckpt_lsn, "Last checkpoint"));

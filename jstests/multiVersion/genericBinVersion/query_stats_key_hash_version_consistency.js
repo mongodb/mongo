@@ -19,7 +19,7 @@ const rst = new ReplSetTest({
 });
 
 // Turn on the collecting of query stats metrics.
-rst.startSet(getQueryStatsServerParameters());
+rst.startSet({setParameter: {internalQueryStatsSampleRate: 1}});
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let conn = rst.getPrimary();

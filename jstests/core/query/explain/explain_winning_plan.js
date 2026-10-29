@@ -3,6 +3,7 @@
 //
 // This test is not prepared to handle explain output for sharded collections.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   assumes_against_mongod_not_mongos,
 //   # Does not support multiplanning, because it changes allPlansExecution explain output

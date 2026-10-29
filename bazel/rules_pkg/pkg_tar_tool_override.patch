@@ -1,0 +1,41 @@
+Linux cross-RBE fix: allow pkg_tar callers to override the helper executable.
+
+This is the rules_pkg rule-side companion to pkg_tar_host_tool.patch. MongoDB
+uses the new attribute only for install archives whose actions are constrained
+to the client host.
+
+Applied via `single_version_override(patches=...)` on rules_pkg in
+//MODULE.bazel. Candidate for upstreaming to bazelbuild/rules_pkg.
+
+--- a/pkg/private/tar/tar.bzl
++++ b/pkg/private/tar/tar.bzl
+@@ -192,12 +192,13 @@
+         transitive = mapping_context.file_deps,
+     )
+-
++
++    build_tar = ctx.executable.build_tar_tool or ctx.executable._build_tar
+     ctx.actions.run(
+         mnemonic = "PackageTar",
+         progress_message = "Writing: %s" % output_file.path,
+         inputs = inputs,
+         tools = [ctx.executable.compressor] if ctx.executable.compressor else [],
+-        executable = ctx.executable._build_tar,
++        executable = build_tar,
+         arguments = [args],
+         outputs = [output_file],
+         env = {
+@@ -326,6 +327,12 @@
+         # Is --stamp set on the command line?
+         # TODO(https://github.com/bazelbuild/rules_pkg/issues/340): Remove this.
+         "private_stamp_detect": attr.bool(default = False),
+-
++
++        "build_tar_tool": attr.label(
++            doc = "Optional build_tar executable override.",
++            cfg = "exec",
++            executable = True,
++            allow_files = True,
++        ),
+         # Implicit dependencies.
+         "_build_tar": attr.label(

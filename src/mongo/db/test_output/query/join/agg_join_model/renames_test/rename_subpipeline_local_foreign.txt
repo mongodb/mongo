@@ -1,0 +1,73 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "_id": true,
+                        "renamedField": "$b"
+                    }
+                },
+                "embedPath": "fromA"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "underlyingFieldPath": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "underlyingFieldPath": "b",
+            "fieldPathAfterRenames": "renamedField"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "a",
+                "foreignField": "b",
+                "let": {},
+                "pipeline": [
+                    {
+                        "$project": {
+                            "_id": true,
+                            "renamedField": "$b"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        }
+    ],
+    "suffix": []
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Output a doxgen version of the wtperf configuration options. '''
+''' Output a doxygen version of the wtperf configuration options. '''
 import sys
 
 for line in sys.stdin:

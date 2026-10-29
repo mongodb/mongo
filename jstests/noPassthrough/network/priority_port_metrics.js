@@ -55,6 +55,25 @@ describe("Tests metrics and logging for connections via the priority port", func
         this.host = this.conn.hostNoPort;
         this.mainPort = this.conn.port;
         this.priorityPort = this.conn.priorityPort;
+
+        // Ensure that the priority port is listening before proceeding with the tests.
+        assert.soon(
+            () => {
+                try {
+                    let conn = new Mongo(this.host + ":" + this.priorityPort);
+                    conn.close();
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            },
+            "Failed to connect to priority port " + this.priorityPort,
+            30 * 1000,
+        );
+
+        // Drop the log lines from the probe connection above so they don't interfere with the
+        // assertions in the tests below.
+        assert.commandWorked(this.conn.adminCommand({clearLog: "global"}));
     });
 
     after(() => {

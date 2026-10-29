@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,7 +22,7 @@ LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
     : PlanStage(!skip ? "limit"sv : "limitskip"sv,
-                nullptr /* yieldPolicy */,
+                /*yieldPolicy=*/nullptr,
                 planNodeId,
                 participateInTrialRunTracking),
       _limitExpr(std::move(limit)),
@@ -67,6 +42,7 @@ std::unique_ptr<PlanStage> LimitSkipStage::clone() const {
 }
 
 void LimitSkipStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
     if (_limitExpr) {
         _limitCode = _limitExpr->compile(ctx);
@@ -154,8 +130,8 @@ void LimitSkipStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     DebugPrinter::addNewLine(ret);
 
     if (debugPrintInfo.printBytecode) {
-        PlanStage::debugPrintBytecode(ret, _limitCode, "LIMIT" /*title*/);
-        PlanStage::debugPrintBytecode(ret, _skipCode, "SKIP" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _limitCode, /*title=*/"LIMIT");
+        PlanStage::debugPrintBytecode(ret, _skipCode, /*title=*/"SKIP");
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
@@ -175,7 +151,7 @@ boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragm
         return boost::none;
     }
 
-    value::TagValueMaybeOwned res = _bytecode.run(code);
+    value::TagValueMaybeOwned res = _bytecode->run(code);
     tassert(8349200,
             "Expect limit or skip code to return an int64",
             res.tag() == value::TypeTags::NumberInt64);

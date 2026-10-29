@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/auth/authorization_backend_local.h"
 
@@ -263,10 +237,10 @@ ResolveRoleOption makeResolveRoleOption(PrivilegeFormat showPrivileges,
                                         AuthenticationRestrictionsFormat showRestrictions) {
     auto option = ResolveRoleOption::kRoles();
     if (showPrivileges != PrivilegeFormat::kOmit) {
-        option.setPrivileges(true /* shouldEnable */);
+        option.setPrivileges(/*shouldEnable=*/true);
     }
     if (showRestrictions != AuthenticationRestrictionsFormat::kOmit) {
-        option.setRestrictions(true /* shouldEnable */);
+        option.setRestrictions(/*shouldEnable=*/true);
     }
 
     return option;
@@ -517,7 +491,7 @@ StatusWith<User> AuthorizationBackendLocal::getUserObject(
 
         // Update ResolveRoleOption to skip emitting warning logs for unknown roles, since they came
         // from an external source.
-        options.setIgnoreUnknown(true /* shouldEnable */);
+        options.setIgnoreUnknown(/*shouldEnable=*/true);
     }
 
     if (auto tenant = userName.tenantId()) {
@@ -572,7 +546,7 @@ Status AuthorizationBackendLocal::getUserDescription(
     } else {
         // Set ResolveRoleOption to include the ignoreUnknownFlag so that external roles that don't
         // exist do not generate warning logs.
-        options.setIgnoreUnknown(true /* shouldEnable */);
+        options.setIgnoreUnknown(/*shouldEnable=*/true);
 
         uassert(ErrorCodes::BadValue,
                 "Illegal combination of pre-defined roles with tenant identifier",

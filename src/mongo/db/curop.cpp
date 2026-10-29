@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // CHECK_LOG_REDACTION
 
@@ -45,10 +19,13 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop_bson_helpers.h"
 #include "mongo/db/database_name_util.h"
+#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -59,7 +36,13 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
@@ -69,12 +52,14 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 #include <tuple>
 
@@ -125,6 +110,21 @@ auto& overdueInterruptApproxMaxTimeMillis =
 
 // The total number of slow queries logged.
 auto& totalSlowQueryLogs = *MetricBuilder<Counter64>("query.totalSlowQueryLogs");
+
+// System-wide high-water mark of the largest amount of memory (in bytes) ever tracked for a single
+// operation since process startup. This is a single metric exposed on two surfaces: the
+// `serverStatusOptions` below publishes it in serverStatus as
+// `metrics.query.peakMemoryUsageOperation`, and the same value is exported over OpenTelemetry.
+auto& peakMemoryUsageOperationBytes = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kQueryPeakMemoryUsageOperation,
+    "Largest amount of memory (in bytes) tracked for a single operation since process startup",
+    otel::metrics::MetricUnit::kBytes,
+    {.serverStatusOptions = otel::metrics::ServerStatusOptions{
+         .dottedPath = "query.peakMemoryUsageOperation", .role = ClusterRole::None}});
+
+// A plain gauge only supports set(), so we track the running maximum here and publish increases to
+// the gauge above. Persists for the life of the process.
+AtomicWord<int64_t> peakMemoryUsageOperationHighWaterMark{0};
 
 /*
  * Helper for reporting stats on an operation that was sampled for interrupt check tracking.
@@ -179,6 +179,25 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                               dbName, SerializationContext::stateCommandReply(sc)))
                                          .firstElement());
     return newCmdObj;
+}
+
+struct AggregateAdmissionStats {
+    std::int32_t admissions = 0;
+    std::int32_t lowPriorityAdmissions = 0;
+    Microseconds totalTimeQueued{0};
+    bool loadShed = false;
+};
+
+AggregateAdmissionStats sumAdmissionStatsAcrossGates(OperationContext* opCtx) {
+    AggregateAdmissionStats stats;
+    for (auto&& [queueType, lookup] : TicketHolderQueueStats::getQueueMetricsRegistry()) {
+        const AdmissionContext* admCtx = lookup(opCtx);
+        stats.admissions += admCtx->getAdmissions();
+        stats.lowPriorityAdmissions += admCtx->getLowAdmissions();
+        stats.totalTimeQueued += admCtx->totalTimeQueuedMicros();
+        stats.loadShed = stats.loadShed || admCtx->getLoadShed();
+    }
+    return stats;
 }
 }  // namespace
 
@@ -265,9 +284,7 @@ private:
         // of the current operation. Also store the current ticket wait time as the base ticket
         // wait time.
         if (_top) {
-            const boost::optional<ExecutionAdmissionContext> admCtx =
-                ExecutionAdmissionContext::get(opCtx());
-            curOp->_resourceStatsBase = curOp->getAdditiveResourceStats(admCtx);
+            curOp->_resourceStatsBase = curOp->getAdditiveResourceStats();
         }
 
         _top = curOp;
@@ -473,16 +490,21 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal) {
                             Lock::GlobalLockOptions{.skipRSTLLock = true});
         auto storageStats =
             shard_role_details::getRecoveryUnit(opCtx)->computeOperationStatisticsSinceLastCall();
-        if (_debug.storageStats == nullptr) {
-            _debug.storageStats = std::move(storageStats);
-        } else if (storageStats != nullptr) {
-            *_debug.storageStats += *storageStats;
+        {
+            auto debugInfoLock = lockCrossThreadDebugInfo();
+            if (_debug.storageStats == nullptr) {
+                _debug.storageStats = std::move(storageStats);
+            } else if (storageStats != nullptr) {
+                *_debug.storageStats += *storageStats;
+            }
         }
+        // Only accessed by the operation's own thread, so it is not guarded by the cross-thread
+        // debug info lock.
         _allowStorageStatsUpdate = !isFinal;
     }
 }
 
-void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
+void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics, Nanoseconds cpuTime) {
     auto elapsed = elapsedTimeExcludingPauses();
     // We don't strictly need to record executionTime unless keyHash is non-none, but there's
     // no harm in recording it since we've already computed the value.
@@ -492,8 +514,7 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
     metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
         std::max(Milliseconds(0), workingMillis);
 
-    calculateCpuTime();
-    metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
+    metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + cpuTime;
 
     if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
         !opCtx()->inMultiDocumentTransaction() && !parent()) {
@@ -514,20 +535,22 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
                          admCtx.getMaxAcquisitionDelinquencyMillis())};
         }
 
-        if (admCtx.getAdmissions() > 0) {
+        const auto admissionStats = sumAdmissionStatsAcrossGates(opCtx());
+        if (admissionStats.admissions > 0) {
             metrics.totalTimeQueuedMicros =
                 metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
-                admCtx.totalTimeQueuedMicros();
-            metrics.totalAdmissions = metrics.totalAdmissions.value_or(0) + admCtx.getAdmissions();
+                admissionStats.totalTimeQueued;
+            metrics.totalAdmissions =
+                metrics.totalAdmissions.value_or(0) + admissionStats.admissions;
             // Low priority admissions come from AdmissionContext::getLowAdmissions().
             // Normal priority admissions = total - low.
-            auto lowAdmissions = admCtx.getLowAdmissions();
-            auto normalAdmissions = admCtx.getAdmissions() - lowAdmissions;
+            auto lowAdmissions = admissionStats.lowPriorityAdmissions;
+            auto normalAdmissions = admissionStats.admissions - lowAdmissions;
             metrics.totalNormalPriorityAdmissions =
                 metrics.totalNormalPriorityAdmissions.value_or(0) + normalAdmissions;
             metrics.totalLowPriorityAdmissions =
                 metrics.totalLowPriorityAdmissions.value_or(0) + lowAdmissions;
-            metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
+            metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admissionStats.loadShed;
             metrics.wasDeprioritized =
                 metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();
             metrics.wasMarkedNonDeprioritizable =
@@ -588,15 +611,17 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     // completeAndLogOperation.
     const auto& info = _debug.getQueryStatsInfo();
     if (info.keyHash || info.metricsRequested) {
-        _setEndOfOpMetrics(_debug.getAdditiveMetrics());
+        _setEndOfOpMetrics(_debug.getAdditiveMetrics(), calculateCpuTime());
     }
 }
 
 void CurOp::setEndOfOpMetricsForBatchWrites() {
     if (_debug.hasBatchWriteMetrics()) {
+        // Read the CPU timer once for the whole batch rather than once per write for performance.
+        const auto cpuTime = calculateCpuTime();
         _debug.forEachQueryStatsInfoForBatchWrites(
             [&](size_t opIndex, OpDebug::QueryStatsInfo& qsi) {
-                _setEndOfOpMetrics(qsi.additiveMetrics);
+                _setEndOfOpMetrics(qsi.additiveMetrics, cpuTime);
             });
     }
 }
@@ -630,7 +655,7 @@ void CurOp::updateStatsOnTransactionUnstash(WithLock) {
     // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
     // reporting on this operation.
     _initializeResourceStatsBaseIfNecessary();
-    _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
+    _resourceStatsBase->addForUnstash(getAdditiveResourceStats());
 }
 
 void CurOp::updateStatsOnTransactionStash(WithLock) {
@@ -639,7 +664,7 @@ void CurOp::updateStatsOnTransactionStash(WithLock) {
     // stats which includes the snapshot of stats when it was unstashed. This stats delta on
     // stashing is added when reporting on this operation.
     _initializeResourceStatsBaseIfNecessary();
-    _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
+    _resourceStatsBase->subtractForStash(getAdditiveResourceStats());
 }
 
 void CurOp::setMemoryTrackingStats(const int64_t inUseTrackedMemoryBytes,
@@ -657,6 +682,15 @@ void CurOp::setMemoryTrackingStats(const int64_t inUseTrackedMemoryBytes,
     }
 
     _inUseTrackedMemoryBytes.store(inUseTrackedMemoryBytes);
+
+    // Advance the system-wide peak operation memory high-water mark if this operation has observed
+    // a new maximum, and publish the running max to the serverStatus/OpenTelemetry gauge.
+    auto observedPeak = peakMemoryUsageOperationHighWaterMark.loadRelaxed();
+    while (peakTrackedMemoryBytes > observedPeak &&
+           !peakMemoryUsageOperationHighWaterMark.compareAndSwap(&observedPeak,
+                                                                 peakTrackedMemoryBytes)) {
+    }
+    peakMemoryUsageOperationBytes.set(peakMemoryUsageOperationHighWaterMark.loadRelaxed());
 }
 
 void CurOp::setNS(WithLock, NamespaceString nss) {
@@ -705,10 +739,11 @@ void CurOp::done() {
     _end = _tickSource->getTicks();
 }
 
-void CurOp::calculateCpuTime() {
-    if (_cpuTimer && _debug.cpuTime < Nanoseconds::zero()) {
+Nanoseconds CurOp::calculateCpuTime() {
+    if (_cpuTimer) {
         _debug.cpuTime = _cpuTimer->getElapsed();
     }
+    return _debug.cpuTime;
 }
 
 Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
@@ -729,16 +764,16 @@ Milliseconds CurOp::_sumBlockedTimeTotal() {
                                              ->getPrepareConflictTracker()
                                              .getThisOpPrepareConflictDuration();
     auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
-    auto timeQueuedForTickets = ExecutionAdmissionContext::get(opCtx()).totalTimeQueuedMicros();
+    auto timeQueuedForAdmission = AdmissionContext::getTotalTimeQueuedForAdmission(opCtx());
     auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
     if (_resourceStatsBase) {
         cumulativeLockWaitTime -= _resourceStatsBase->cumulativeLockWaitTime;
-        timeQueuedForTickets -= _resourceStatsBase->timeQueuedForTickets;
+        timeQueuedForAdmission -= _resourceStatsBase->timeQueuedForAdmission;
         timeQueuedForFlowControl -= _resourceStatsBase->timeQueuedForFlowControl;
     }
 
-    return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForTickets +
+    return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForAdmission +
                                        timeQueuedForFlowControl + prepareConflictDurationMicros);
 }
 
@@ -796,12 +831,12 @@ void CurOp::_updateExecutionTimers() {
 CurOp::ShouldProfileQuery CurOp::_shouldProfileAtLevel1AndLogSlowQuery(
     const logv2::LogOptions& logOptions,
     Milliseconds slowms,
-    std::shared_ptr<const ProfileFilter> filter) {
+    std::shared_ptr<const ProfileFilter> filter,
+    function_ref<Nanoseconds()> getCpuTime) {
     if (filter) {
-        // Calculate this operation's CPU time before deciding whether logging/profiling is
-        // necessary only if it is needed for filtering.
+        // Populate this operation's CPU time before matching in case the filter depends on it.
         if (filter->dependsOn("cpuNanos")) {
-            calculateCpuTime();
+            getCpuTime();
         }
 
         const bool passesFilter = filter->matches(opCtx(), _debug, *this);
@@ -870,19 +905,23 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     _updateExecutionTimers();
 
+    // Calculating 'cpuNanos' is relatively expensive, only calculate it once in this function.
+    Deferred getCpuTime{[this] {
+        return calculateCpuTime();
+    }};
+
     // Record execution and delinquency stats for the top-level operation only. We don't want to
     // double count stats from child operations (e.g., bulk writes, sub-operations in aggregations)
     // that share the same ExecutionAdmissionContext.
     if (!parent()) {
         if (auto ticketingSystem =
                 admission::execution_control::TicketingSystem::get(opCtx->getServiceContext())) {
-            calculateCpuTime();
             auto start = _start.load();
             auto end = _end.load();
             ticketingSystem->finalizeOperationStats(
                 opCtx,
                 start != 0 ? durationCount<Microseconds>(computeElapsedTimeTotal(start, end)) : 0,
-                durationCount<Microseconds>(_debug.cpuTime));
+                durationCount<Microseconds>(getCpuTime()));
         }
     }
 
@@ -905,13 +944,13 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     const auto [shouldProfileAtLevel1, shouldLogSlowOp] = _shouldProfileAtLevel1AndLogSlowQuery(
         logOptions,
         Milliseconds(slowMsOverride.value_or(serverGlobalParams.slowMS.load())),
-        std::move(filter));
+        std::move(filter),
+        getCpuTime);
 
-    // Defer calculating the CPU time until we know that we actually are going to write it to
-    // the logs or profiler. The CPU time may have been determined earlier if it was a
-    // dependency of 'filter' in which case this is a no-op.
+    // Calculate or read the cached value of CPU time only if we actually  are going to write it to
+    // the logs or profiler.
     if (forceLog || shouldLogSlowOp || _dbprofile >= 2) {
-        calculateCpuTime();
+        getCpuTime();
     }
 
     if (forceLog || shouldLogSlowOp) {
@@ -946,17 +985,24 @@ void CurOp::logLongRunningOperationIfNeeded() {
 
     _updateExecutionTimers();
 
+    // Calculating 'cpuNanos' is relatively expensive, only calculate it once in this function.
+    Deferred getCpuTime{[this] {
+        return calculateCpuTime();
+    }};
+
     auto profileSettings = DatabaseProfileSettings::get(opCtx()->getServiceContext())
                                .getDatabaseProfileSettings(getNSS().dbName());
     const bool shouldLogSlowOp =
-        _shouldProfileAtLevel1AndLogSlowQuery(
-            kLogOptions, profileSettings.slowOpInProgressThreshold, profileSettings.filter)
+        _shouldProfileAtLevel1AndLogSlowQuery(kLogOptions,
+                                              profileSettings.slowOpInProgressThreshold,
+                                              profileSettings.filter,
+                                              getCpuTime)
             .shouldLogSlowQuery;
     if (!shouldLogSlowOp) {
         return;
     }
 
-    calculateCpuTime();
+    getCpuTime();
     Date_t deadline = opCtx()->getDeadline();
     logv2::DynamicAttributes attr = _reportDebugAndStats(kLogOptions, &deadline, false);
     LOGV2_OPTIONS(1794200, kLogOptions, "Slow in-progress query", attr);
@@ -1129,6 +1175,17 @@ void CurOp::reportState(BSONObjBuilder* builder,
 
         curop_bson_helpers::appendObjectTruncatingAsNecessary(
             "command", redactedCommandBuilder.done(), maxQuerySize, *builder);
+    } else if (_command) {
+        // Apply the command's own field-level redaction (the same the slow-query log uses) so this
+        // diagnostic output stays consistent with the log.
+        mutablebson::Document cmdToLog(obj, mutablebson::Document::kInPlaceDisabled);
+        _command->snipForLogging(&cmdToLog);
+        curop_bson_helpers::appendObjectTruncatingAsNecessary(
+            "command", cmdToLog.getObject(), maxQuerySize, *builder);
+    } else if (isCommand()) {
+        // No resolved Command* for this command; report it as "unrecognized" rather than echoing
+        // the request, consistent with the slow-query log.
+        builder->append("command", "unrecognized");
     } else {
         curop_bson_helpers::appendObjectTruncatingAsNecessary(
             "command", obj, maxQuerySize, *builder);
@@ -1231,10 +1288,11 @@ void CurOp::reportState(BSONObjBuilder* builder,
             BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
             OpDebug::appendDelinquentInfo(opCtx, sub);
         }
-        if (admCtx.getAdmissions() > 0) {
-            builder->append("totalTimeQueuedMicros", admCtx.totalTimeQueuedMicros().count());
-            builder->append("totalAdmissions", admCtx.getAdmissions());
-            builder->append("wasLoadShed", admCtx.getLoadShed());
+        const auto admissionStats = sumAdmissionStatsAcrossGates(opCtx);
+        if (admissionStats.admissions > 0) {
+            builder->append("totalTimeQueuedMicros", admissionStats.totalTimeQueued.count());
+            builder->append("totalAdmissions", admissionStats.admissions);
+            builder->append("wasLoadShed", admissionStats.loadShed);
             builder->append("wasDeprioritized", admCtx.getPriorityLowered());
         }
     }
@@ -1244,10 +1302,67 @@ void CurOp::reportState(BSONObjBuilder* builder,
     if (auto&& queryShapeHash = _debug.getQueryShapeHash()) {
         builder->append("queryShapeHash", queryShapeHash->toHexString());
     }
+
+    if (const auto settings = _debug.getQuerySettings().toBSON(); !settings.isEmpty()) {
+        builder->append("querySettings", settings);
+    }
 }
 
-CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
-    const boost::optional<ExecutionAdmissionContext>& admCtx) {
+void CurOp::reportDebugInfo(BSONObjBuilder* builder) {
+    builder->append("ns",
+                    NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
+
+    // Report the redacted command, snipped for logging in the same way as the slow-op log line.
+    auto query = curop_bson_helpers::appendCommentField(opCtx(), _opDescription);
+    if (!query.isEmpty()) {
+        if (_isCommand) {
+            if (const Command* curCommand = getCommand()) {
+                builder->append("command", redact(snipCommandForLogging(curCommand, query)));
+            } else {
+                // We don't know what the request payload is intended to be, so it might be
+                // sensitive, and we don't know how to redact it properly without a 'Command*'.
+                builder->append("command", "unrecognized");
+            }
+        } else {
+            builder->append("command", redact(query));
+        }
+    }
+
+    {
+        // These OpDebug members may be mutated on the operation's thread; read them under the
+        // cross-thread debug info lock. Keep the critical section narrow, as this runs while the
+        // lock manager buckets are held, and mutators on the operation's thread block on it.
+        auto debugInfoLock = lockCrossThreadDebugInfo();
+        if (_debug.planCacheShapeHash) {
+            builder->append("planCacheShapeHash", zeroPaddedHex(*_debug.planCacheShapeHash));
+        }
+        if (_debug.planCacheKey) {
+            builder->append("planCacheKey", zeroPaddedHex(*_debug.planCacheKey));
+        }
+    }
+
+    if (!_planSummary.empty()) {
+        builder->append("planSummary", _planSummary);
+    }
+
+    if (auto start = _start.load()) {
+        auto elapsedTimeTotal = computeElapsedTimeTotal(start, _end.load());
+        builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal));
+    }
+
+    builder->append("numYields", _numYields.load());
+
+    // Only report storage statistics that have already been gathered; do not call into the storage
+    // engine from here, as this runs while the lock manager buckets are held.
+    {
+        auto debugInfoLock = lockCrossThreadDebugInfo();
+        if (_debug.storageStats) {
+            builder->append("storage", _debug.storageStats->toBSON());
+        }
+    }
+}
+
+CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats() {
     CurOp::AdditiveResourceStats stats;
 
     auto locker = shard_role_details::getLocker(opCtx());
@@ -1256,15 +1371,31 @@ CurOp::AdditiveResourceStats CurOp::getAdditiveResourceStats(
     stats.timeQueuedForFlowControl =
         Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
 
-    if (admCtx != boost::none) {
-        stats.timeQueuedForTickets = admCtx->totalTimeQueuedMicros();
-    }
+    // Snapshot the admission wait time over the same set of queues that _sumBlockedTimeTotal sums,
+    // so that a sub-operation's base does not leave the enclosing operation's queueing time
+    // attributed to it.
+    stats.timeQueuedForAdmission = AdmissionContext::getTotalTimeQueuedForAdmission(opCtx());
 
     return stats;
 }
 
 SingleThreadedStorageMetrics CurOp::getOperationStorageMetrics() const {
     return StorageExecutionContext::get(opCtx())->getStorageMetrics();
+}
+
+const StorageStats* CurOp::getOperationStorageStats() {
+    try {
+        // Fetch with isFinal=false so that later slow-op logging / query stats collection can still
+        // accumulate any remaining deltas into '_debug.storageStats'.
+        _fetchStorageStatsIfNecessary(Date_t::max(), false);
+    } catch (const DBException& ex) {
+        LOGV2(12236300,
+              "Failed to gather storage statistics for change stream throughput metrics",
+              "opId"_attr = opCtx()->getOpID(),
+              "error"_attr = redact(ex));
+        return nullptr;
+    }
+    return _debug.storageStats.get();
 }
 
 long long CurOp::getPrepareReadConflicts() const {
@@ -1288,13 +1419,13 @@ void CurOp::AdditiveResourceStats::addForUnstash(const CurOp::AdditiveResourceSt
     lockStats.append(other.lockStats);
     cumulativeLockWaitTime += other.cumulativeLockWaitTime;
     timeQueuedForFlowControl += other.timeQueuedForFlowControl;
-    // timeQueuedForTickets is intentionally excluded as it is tracked separately
+    // timeQueuedForAdmission is intentionally excluded as it is tracked separately
 }
 
 void CurOp::AdditiveResourceStats::subtractForStash(const CurOp::AdditiveResourceStats& other) {
     lockStats.subtract(other.lockStats);
     cumulativeLockWaitTime -= other.cumulativeLockWaitTime;
     timeQueuedForFlowControl -= other.timeQueuedForFlowControl;
-    // timeQueuedForTickets is intentionally excluded as it is tracked separately
+    // timeQueuedForAdmission is intentionally excluded as it is tracked separately
 }
 }  // namespace mongo

@@ -2,11 +2,8 @@
  * Verify that queries where no results are returned are handled by CBR, and that queries
  * with results or EOF are handled by the multi-planner.
  *
- * On sharded topologies, SHARDING_FILTER is inestimable by CBR's sampling estimator, so CBR
- * never triggers. The test still runs to exercise the planning flow; strict costed/not-costed
- * assertions are only enforced on non-sharded topologies.
- *
  * @tags: [
+ *    uses_explain,
  *    # setParameter calls to enable CBR will fail if a stepdown happens in between.
  *    does_not_support_stepdowns,
  *    # Timeseries bucket collections don't have user-created indexes, leading to COLLSCAN.
@@ -17,21 +14,29 @@
  *    incompatible_with_initial_sync,
  *    # Explain calls will fail if a migration is going on.
  *    assumes_balancer_off,
+ *    # The test uses explain("allPlansExecution") with samplingCE and asserts on the exact number
+ *    # of costed vs. non-costed rejected plans per shard. In causally consistent sessions the
+ *    # session state interacts with how samplingCE estimates are propagated across shards,
+ *    # causing the explain output to differ from the expected plan structure.
+ *    does_not_support_causal_consistency,
  * ]
  */
+
 import {
     getWinningPlanFromExplain,
     getEngine,
     getRejectedPlans,
     getPlanStage,
-    getPlanStages,
+    assertChosenRanker,
+    ChosenRanker,
+    PlanRankerReason,
 } from "jstests/libs/query/analyze_plan.js";
 import {
     assertPlanCosted,
     assertPlanNotCosted,
     isPlanCosted,
-    getCBRConfig,
-    setCBRConfigOnAllNonConfigNodes,
+    getPlanRankerConfig,
+    setPlanRankerConfigOnAllNonConfigNodes,
 } from "jstests/libs/query/cbr_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -63,10 +68,6 @@ function isExecutionSplitInShards(explain) {
     );
 }
 
-function shardsHaveShardingFilter(explain) {
-    return getPlanStages(explain, "SHARDING_FILTER").length > 0;
-}
-
 function hasV1Index(winningPlan) {
     return getPlanStage(winningPlan, "IXSCAN")?.indexVersion === 1;
 }
@@ -82,8 +83,22 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
+// The multi-planner works each candidate plan up to a per-plan trial budget of
+// max(internalQueryPlanEvaluationWorks, internalQueryPlanEvaluationCollFraction * numRecords)
+// (the coll fraction is 0.3 for these two-plan queries). For NoMultiplanningResults to
+// engage on the no-results query below, no candidate plan may hit EOF (or return results) within
+// that budget on any single shard. If a plan finishes first, earlyExit is set to true and CBR is
+// not considered.
+//
+// We keep internalQueryPlanEvaluationWorks small (see kPlanEvaluationWorks below) so the budget
+// floor is low, then size the collection so that the number of matching index entries per shard
+// comfortably exceeds the budget even when the fixture spreads the data across many shards. With
+// docs-per-shard >> max(kPlanEvaluationWorks, 0.3 * docs-per-shard) the plans never exhaust their
+// index scan during the trial. 2000 docs keeps this true down to ~10 shards while being 50x
+// cheaper to load than the previous 100000.
+const kPlanEvaluationWorks = 100;
 const docs = [];
-for (let i = 0; i < 10000; i++) {
+for (let i = 0; i < 2000; i++) {
     docs.push({a: i, b: i});
 }
 assert.commandWorked(coll.insertMany(docs));
@@ -97,50 +112,48 @@ function testNoResultsQueryIsPlannedWithCBR() {
     if (getEngine(explain) !== "classic") {
         return;
     }
+
     const winningPlan = getWinningPlanFromExplain(explain);
     const rejectedPlans = getRejectedPlans(explain);
+    // MP produced no results within its trial budget, so CBR was engaged to rank the plans.
     if (isExecutionSplitInShards(explain)) {
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kCostBased,
+            PlanRankerReason.kNoMultiplanningResults,
+        );
         const numShards = getNumShardsFromExplain(explain);
-        if (shardsHaveShardingFilter(explain)) {
-            // SHARDING_FILTER is inestimable by CBR's sampling estimator, so CBR cannot pick a
-            // single winner. All plans end up not costed. At least 1 rejected per shard.
-            assertPlanNotCosted(winningPlan);
-            assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
-            for (const plan of rejectedPlans) {
+        // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
+        assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
+        let numCosted = 0;
+        for (const plan of rejectedPlans) {
+            if (isPlanCosted(plan)) {
+                assertPlanCosted(plan);
+                numCosted++;
+            } else {
                 assertPlanNotCosted(plan);
             }
-        } else {
-            assertPlanCosted(winningPlan);
-            // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
-            assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
-            let numCosted = 0;
-            for (const plan of rejectedPlans) {
-                if (isPlanCosted(plan)) {
-                    assertPlanCosted(plan);
-                    numCosted++;
-                } else {
-                    assertPlanNotCosted(plan);
-                }
-            }
-            assert.eq(numCosted, numShards, toJsonForLog(explain));
         }
-    } else if (winningPlan.stage === "SHARDING_FILTER") {
-        // Shard-local but SHARDING_FILTER still present: 1 from MP + 2 from CBR, all not costed.
-        assertPlanNotCosted(winningPlan);
-        assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
-        for (const plan of rejectedPlans) {
-            assertPlanNotCosted(plan);
-        }
+        assert.eq(numCosted, numShards, toJsonForLog(explain));
     } else if (hasV1Index(winningPlan)) {
-        // v1 indexes are inestimable by CBR: 1 from MP + 2 from CBR, all not costed.
-        assertPlanNotCosted(winningPlan);
+        // v1 indexes are inestimable by CBR, so it fell back to MP: 1 from MP + 2 from CBR, all
+        // not costed.
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kMultiPlanning,
+            PlanRankerReason.kNoMultiplanningResults,
+        );
         assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
         for (const plan of rejectedPlans) {
             assertPlanNotCosted(plan);
         }
     } else {
         // CBR chose the winning plan — it should be costed.
-        assertPlanCosted(winningPlan);
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kCostBased,
+            PlanRankerReason.kNoMultiplanningResults,
+        );
         // 2 rejected plans: 1 from MP (not costed) + 1 from CBR (costed).
         assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));
         assertPlanNotCosted(rejectedPlans[0]);
@@ -154,9 +167,8 @@ function testResultsQueryIsPlannedWithMultiPlanner() {
     if (getEngine(explain) !== "classic") {
         return;
     }
-    const winningPlan = getWinningPlanFromExplain(explain);
-    assertPlanNotCosted(winningPlan);
-    // MP found results, so CBR was not invoked. 1 rejected plan per shard (the MP loser).
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExit);
+    // 1 rejected plan per shard (the MP loser).
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
         const numShards = getNumShardsFromExplain(explain);
@@ -172,8 +184,8 @@ function testResultsQueryIsPlannedWithMultiPlanner() {
 function testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking() {
     jsTest.log.info("Running testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking");
     const explain = coll.find({c: 1}).explain("allPlansExecution");
-    const winningPlan = getWinningPlanFromExplain(explain);
-    assertPlanNotCosted(winningPlan);
+    // Only one candidate plan, so no ranking was needed.
+    assertChosenRanker(explain, ChosenRanker.kSinglePlan, PlanRankerReason.kSinglePlan);
     const rejectedPlans = getRejectedPlans(explain);
     assert.eq(rejectedPlans.length, 0, toJsonForLog(explain));
 }
@@ -184,9 +196,9 @@ function testEOFIsPlannedWithMultiPlanner() {
     if (getEngine(explain) !== "classic") {
         return;
     }
-    const winningPlan = getWinningPlanFromExplain(explain);
-    assertPlanNotCosted(winningPlan);
-    // MP early-exited (EOF). 1 rejected plan per shard (the MP loser).
+    // MP early-exited (EOF), so it picked the winner without engaging CBR.
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kMpEarlyExit);
+    // 1 rejected plan per shard (the MP loser).
     const rejectedPlans = getRejectedPlans(explain);
     if (isExecutionSplitInShards(explain)) {
         const numShards = getNumShardsFromExplain(explain);
@@ -209,18 +221,18 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         if (getEngine(explain) !== "classic") {
             return;
         }
-        assertPlanNotCosted(getWinningPlanFromExplain(explain));
+        // No MP results, so CBR was engaged, but every plan is inestimable due to RETURN_KEY, so
+        // CBR fell back to MP.
+        assertChosenRanker(
+            explain,
+            ChosenRanker.kMultiPlanning,
+            PlanRankerReason.kCBRInestimableNode,
+        );
         const rejectedPlans = getRejectedPlans(explain);
         if (isExecutionSplitInShards(explain)) {
             const numShards = getNumShardsFromExplain(explain);
-            if (shardsHaveShardingFilter(explain)) {
-                // ReturnKey + SHARDING_FILTER: all inestimable. At least 1 rejected per shard.
-                assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
-            } else {
-                // ReturnKey inestimable: numShards MP losers + at least 2 from CBR.
-                assert.gte(rejectedPlans.length, numShards + 2, toJsonForLog(explain));
-            }
-            // ReturnKey makes all plans inestimable regardless of SHARDING_FILTER.
+            // numShards MP losers + at least 2 from CBR (all not costed due to RETURN_KEY).
+            assert.gte(rejectedPlans.length, numShards + 2, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
@@ -241,46 +253,45 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
         }
         const winningPlan = getWinningPlanFromExplain(explain);
         const rejectedPlans = getRejectedPlans(explain);
+        // MP produced no results within its trial budget, so CBR was engaged to rank the plans.
         if (isExecutionSplitInShards(explain)) {
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kCostBased,
+                PlanRankerReason.kNoMultiplanningResults,
+            );
             const numShards = getNumShardsFromExplain(explain);
-            if (shardsHaveShardingFilter(explain)) {
-                assertPlanNotCosted(winningPlan);
-                assert.gte(rejectedPlans.length, numShards, toJsonForLog(explain));
-                for (const plan of rejectedPlans) {
+            // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
+            assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
+            let numCosted = 0;
+            for (const plan of rejectedPlans) {
+                if (isPlanCosted(plan)) {
+                    assertPlanCosted(plan);
+                    numCosted++;
+                } else {
                     assertPlanNotCosted(plan);
                 }
-            } else {
-                assertPlanCosted(winningPlan);
-                // Each shard contributes 1 not-costed (MP) + 1 costed (CBR) rejected plan.
-                assert.eq(rejectedPlans.length, 2 * numShards, toJsonForLog(explain));
-                let numCosted = 0;
-                for (const plan of rejectedPlans) {
-                    if (isPlanCosted(plan)) {
-                        assertPlanCosted(plan);
-                        numCosted++;
-                    } else {
-                        assertPlanNotCosted(plan);
-                    }
-                }
-                assert.eq(numCosted, numShards, toJsonForLog(explain));
             }
-        } else if (winningPlan.stage === "SHARDING_FILTER") {
-            // Shard-local but SHARDING_FILTER still present: 1 from MP + 2 from CBR, all not
-            // costed.
-            assertPlanNotCosted(winningPlan);
-            assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
-            for (const plan of rejectedPlans) {
-                assertPlanNotCosted(plan);
-            }
+            assert.eq(numCosted, numShards, toJsonForLog(explain));
         } else if (hasV1Index(winningPlan)) {
-            // v1 indexes are inestimable by CBR: 1 from MP + 2 from CBR, all not costed.
-            assertPlanNotCosted(winningPlan);
+            // v1 indexes are inestimable by CBR, so it fell back to MP: 1 from MP + 2 from CBR,
+            // all not costed.
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kMultiPlanning,
+                PlanRankerReason.kNoMultiplanningResults,
+            );
             assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
             for (const plan of rejectedPlans) {
                 assertPlanNotCosted(plan);
             }
         } else {
             // CBR chose the winning plan — it should be costed.
+            assertChosenRanker(
+                explain,
+                ChosenRanker.kCostBased,
+                PlanRankerReason.kNoMultiplanningResults,
+            );
             assertPlanCosted(winningPlan);
             // 2 rejected plans: 1 from MP (not costed) + 1 from CBR (costed).
             assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));
@@ -291,12 +302,16 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
 }
 
 const mongodDb = getMongodDb(db);
-const prevCBRConfig = getCBRConfig(mongodDb);
+// TODO: SERVER-130178 Fix CBR-test utils to work in sharded environment.
+// This utility function assumes direct communication to mongod. Check and extend it to work in sharded environment.
+// Check if the tag does_not_support_causal_consistency is still needed after SERVER-130178 is fixed.
+const prevPlanRankerConfig = getPlanRankerConfig(mongodDb);
 
-setCBRConfigOnAllNonConfigNodes(db.getMongo(), {
+setPlanRankerConfigOnAllNonConfigNodes(db.getMongo(), {
     featureFlagCostBasedRanker: true,
-    internalQueryCBRCEMode: "automaticCE",
-    automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+    internalQueryPlanRanker: "mixed",
+    internalQueryCBRCEMode: "samplingCE",
+    internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
 });
 
 // Deterministic sample generation to ensure plan selection stability.
@@ -311,16 +326,28 @@ const prevExecYieldIterations = assert.commandWorked(
 ).was;
 setParameterOnAllNodes(db, {internalQueryExecYieldIterations: 1});
 
+// Keep the per-plan trial budget floor low so the collection above can stay small while still
+// preventing any plan from hitting EOF during the trial (see the comment on 'docs').
+const prevPlanEvaluationWorks = assert.commandWorked(
+    mongodDb.adminCommand({
+        setParameter: 1,
+        internalQueryPlanEvaluationWorks: kPlanEvaluationWorks,
+    }),
+).was;
+setParameterOnAllNodes(db, {internalQueryPlanEvaluationWorks: kPlanEvaluationWorks});
+
 try {
     testNoResultsQueryIsPlannedWithCBR();
     testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking();
     testResultsQueryIsPlannedWithMultiPlanner();
     testEOFIsPlannedWithMultiPlanner();
     testReturnKeyIsPlannedWithMultiPlanner();
+    // TODO SERVER-115714 For posterity add a test case for small collections that use MP only.
 } finally {
-    setCBRConfigOnAllNonConfigNodes(db.getMongo(), prevCBRConfig);
+    setPlanRankerConfigOnAllNonConfigNodes(db.getMongo(), prevPlanRankerConfig);
     setParameterOnAllNodes(db, {
         internalQuerySamplingBySequentialScan: prevSequentialSamplingScan,
         internalQueryExecYieldIterations: prevExecYieldIterations,
+        internalQueryPlanEvaluationWorks: prevPlanEvaluationWorks,
     });
 }

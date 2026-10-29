@@ -148,7 +148,7 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
 {
     WT_DECL_RET;
 
-    if (F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_NO_SYNC))
+    if (F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_NO_LOCAL_DURABILITY))
         return (0);
 
 #if defined(F_FULLFSYNC)
@@ -625,7 +625,7 @@ __posix_file_sync_nowait(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
     session = (WT_SESSION_IMPL *)wt_session;
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-    if (F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_NO_SYNC))
+    if (F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_NO_LOCAL_DURABILITY))
         return (0);
 
     /* See comment in __posix_sync(): sync cannot be retried or fail. */
@@ -887,11 +887,8 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
 
     /* Create/Open the file. */
     WT_SYSCALL_RETRY(((pfh->fd = open(name, f, mode)) == -1 ? -1 : 0), ret);
-    if (ret != 0) {
-        if (F_ISSET(session, WT_SESSION_QUIET_OPEN_FILE))
-            WT_ERR(ret);
+    if (ret != 0)
         WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
-    }
 
 #ifdef __linux__
     /*

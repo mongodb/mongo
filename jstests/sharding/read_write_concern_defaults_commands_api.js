@@ -7,9 +7,6 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// This test requires running commands directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
-
 function verifyFields(res, {expectRC, expectWC, isPersistedDocument}, isImplicitDefaultWCMajority) {
     // These fields are always set once a read or write concern has been set at least once.
     let expectedFields = ["updateOpTime", "updateWallClockTime", "localUpdateWallClockTime"];

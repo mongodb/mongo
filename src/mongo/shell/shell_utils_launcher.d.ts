@@ -181,8 +181,15 @@ declare function runProgram(program: string, ...args: string[]): number;
  * Sends a signal to terminate a program identified by its process ID.
  * @param pid Process ID to stop
  * @param signal Optional signal number (default: SIGTERM/15)
+ * @param opts Optional shutdown options
+ * @param waitPid Whether to wait for the process to exit (default: true)
  */
-declare function stopMongoProgramByPid(pid: number, signal?: number): void;
+declare function stopMongoProgramByPid(
+    pid: number,
+    signal?: number,
+    opts?: object,
+    waitPid?: boolean,
+): void;
 
 /**
  * Wait for a MongoDB program on the specified port to exit.

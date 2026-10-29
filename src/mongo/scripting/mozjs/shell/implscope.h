@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,12 +11,14 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/error.h"
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/global.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
+#include "mongo/scripting/mozjs/common/print_budget.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/types/code.h"
@@ -131,9 +107,9 @@ const std::string_view kUnknownError = "Unknown Failure from JSInterpreter";
  *
  * For more information about overriden fields, see mongo::Scope
  */
-class MONGO_MOD_PUB MozJSImplScope final : public Scope,
-                                           public MozJSShellRuntimeInterface,
-                                           public MozJSCommonRuntimeInterface {
+class [[MONGO_MOD_PUBLIC]] MozJSImplScope final : public Scope,
+                                                  public MozJSShellRuntimeInterface,
+                                                  public MozJSCommonRuntimeInterface {
     MozJSImplScope(const MozJSImplScope&) = delete;
     MozJSImplScope& operator=(const MozJSImplScope&) = delete;
 
@@ -262,6 +238,7 @@ public:
     void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
     void setFunction(const char* field, const char* code) override;
+    void deleteGlobal(std::string_view name) override;
 
     int type(const char* field) override;
 
@@ -454,7 +431,13 @@ public:
     static const char* const kInvokeResult;
 
     static MozJSImplScope* getThreadScope();
+
+    /**
+     * Handles an out-of-memory condition this scope cannot come back from: marks the scope
+     * poisoned and interrupts execution.
+     */
     void setOOM();
+
     void setParentStack(std::string);
     const std::string& getParentStack() const;
 
@@ -465,6 +448,8 @@ public:
     void requireOwnedObjects() override;
 
     bool requiresOwnedObjects() const override;
+
+    JSPrintBudget* printBudget() override;
 
     JS::HandleId getInternedStringId(InternedString name) override {
         return _internedStrings.getInternedString(name);
@@ -543,7 +528,14 @@ public:
 
     void setStatus(Status status) override;
 
-    ModuleLoader* getModuleLoader() const;
+    ModuleLoader& getModuleLoader() const;
+
+    /**
+     * JavaScript module loading is a shell-only feature. It is not supported in the server
+     * execution environment, where it would let server-side JavaScript (e.g. $function) read
+     * arbitrary host files via import().
+     */
+    bool supportsModules() const;
 
     // Register a process-global hook that runs in ~MozJSImplScope() before _context is
     // destroyed (i.e., before JS_DestroyContext). This is last-writer-wins: a second
@@ -596,12 +588,28 @@ private:
 
     static bool _interruptCallback(JSContext* cx);
     static void _gcCallback(JSContext* rt, JSGCStatus status, JS::GCReason reason, void* data);
+
+    /**
+     * Invoked when SpiderMonkey reports an out-of-memory condition it cannot recover from.
+     */
+    static void _outOfMemoryCallback(JSContext* cx, void* data);
+
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
+
     Status _checkForPendingException();
+
+    /**
+     * Returns true if a failed script compilation/execution should be retried as an ES module,
+     * based on the pending exception (a SyntaxError, or a top-level-await ReferenceError). Always
+     * false for the interactive shell. Note, returns false if modules are not supported (i.e in the
+     * server).
+     */
+    bool _shouldTryExecAsModule(const std::string& name, bool success) const;
 
     void installDBAccess();
     void installBSONTypes();
     void installFork();
+    void _setupScripts();
 
     void setCompileOptions(JS::CompileOptions* co);
 
@@ -639,10 +647,38 @@ private:
     std::string _parentStack;
     std::size_t _generation;
     bool _requireOwnedObjects;
-    std::string _baseURL;
+    Deferred<std::string (*)(const MozJSImplScope&)> _baseURL;
     bool _hasOutOfMemoryException;
 
-    std::unique_ptr<ModuleLoader> _moduleLoader;
+    // Engaged only for mongod/mongos scopes, where JS output is user-controlled and must be
+    // bounded; the shell keeps print() unbounded.
+    boost::optional<JSPrintBudget> _printBudget;
+
+    // Host-supplied BSON bytes pinned by live BSONHolder proxies since the last GC.
+    // ValueReader wraps the argument/global BSON in lazy proxies whose holders keep the
+    // owned buffer alive until the proxy is finalized -- which only happens at GC.
+    // SpiderMonkey never sees those malloc bytes (no JS::AddAssociatedMemory accounting)
+    // so without help the GC feels no pressure and dead proxies pin their buffers
+    // indefinitely. So we count the bytes ourselves and force a GC at the threshold below.
+    // See _notePinnedHostBytes().
+    int64_t _pinnedHostBytesSinceGc = 0;
+
+    // Force a GC once this many bytes have been pinned.
+    // 32 MB keeps the worst-case backlog under 3% of the 1100 MB jsHeapLimitMB cap while amortising
+    // the cost of a full GC over many invocations (depending on document size).
+    static constexpr int64_t kPinnedBytesGcThreshold = 32 * 1024 * 1024;
+
+    // Force a GC in reset() if this much pinned garbage exists, so reused pooled scopes
+    // return to a clean floor between requests.
+    static constexpr int64_t kPinnedBytesResetGcThreshold = 1024 * 1024;
+
+    // Adds nbytes to the pinned counter and runs a full GC at kPinnedBytesGcThreshold.
+    void _notePinnedHostBytes(int64_t nbytes);
+
+    // Checks whether _pinnedHostBytesSinceGc exceeds the threshold and performs a GC if so.
+    void _checkPinnedHostBytesAndGc(int64_t threshold);
+
+    const std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
     // _promiseResult must be a persistentRootedValue (instead of a simple RootedValue). Using a
     // simple RootedValue here affects the stack cleanup conditions in the promise's execution
@@ -680,7 +716,7 @@ private:
     WrapType<URIInfo> _uriProto;
 };
 
-MONGO_MOD_PUB inline MozJSImplScope* getScope(JSContext* cx) {
+[[MONGO_MOD_PUBLIC]] inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(getCommonRuntime(cx));
 }
 

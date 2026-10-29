@@ -69,3 +69,29 @@ export const groupArb = fc
         const groupSpec = Object.assign({_id: gbField}, ...accumulatedFields);
         return {$group: groupSpec};
     });
+
+export const groupMinMaxNArb = fc
+    .record({
+        acc: fc.constantFrom("$minN", "$maxN"),
+        gbField: dollarFieldArb,
+        input: dollarFieldArb,
+        output: getAssignableFieldArb(false /*allowEmpty*/),
+        objectKey: fc.boolean(),
+        n: oneof(
+            fc.integer({min: 1, max: 3}),
+            fc
+                .record({
+                    condField: dollarFieldArb,
+                    condVal: fc.integer({min: -1, max: 1}),
+                    then: fc.integer({min: 1, max: 3}),
+                    else: fc.integer({min: 1, max: 3}),
+                })
+                .map(({condField, condVal, then, else: elseN}) => {
+                    return {$cond: {if: {$eq: [condField, condVal]}, then, else: elseN}};
+                }),
+        ),
+    })
+    .map(({acc, gbField, input, output, objectKey, n}) => {
+        const id = objectKey ? {minMaxNKey: gbField} : gbField;
+        return {$group: {_id: id, [output]: {[acc]: {input, n}}}};
+    });

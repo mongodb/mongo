@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -33,7 +7,7 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticket_semaphore.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
@@ -58,7 +32,7 @@ class Ticket;
  * Additionally, it tracks queue and processing statistics (wait times, queue depth, cancellations,
  * peak usage) and fires observer callbacks on acquisition, release, and delinquent operations.
  */
-class MONGO_MOD_PUBLIC TicketHolder {
+class [[MONGO_MOD_PUBLIC]] TicketHolder {
     friend class Ticket;
 
 public:
@@ -66,6 +40,7 @@ public:
     using AcquisitionCallback = std::function<void(AdmissionContext*, AdmissionContext::Priority)>;
     using WaitedAcquisitionCallback = std::function<void(AdmissionContext*, Microseconds)>;
     using ReleaseCallback = std::function<void(AdmissionContext*, Microseconds)>;
+    using StartQueueingCallback = std::function<void(AdmissionContext*)>;
 
     /**
      * Describes the algorithm used to update the TicketHolder when the size of the ticket pool
@@ -104,6 +79,7 @@ public:
                  AcquisitionCallback acquisitionCallback = nullptr,
                  WaitedAcquisitionCallback waitedAcquisitionCallback = nullptr,
                  ReleaseCallback releaseCallback = nullptr,
+                 StartQueueingCallback startQueueingCallback = nullptr,
                  ResizePolicy resizePolicy = ResizePolicy::kGradual,
                  SemaphoreType semaphore = SemaphoreType::kCompeting);
 
@@ -194,9 +170,9 @@ public:
      */
     int64_t numFinishedProcessing() const;
 
-    MONGO_MOD_PRIVATE void setNumFinishedProcessing_forTest(int64_t numFinishedProcessing);
+    [[MONGO_MOD_PRIVATE]] void setNumFinishedProcessing_forTest(int64_t numFinishedProcessing);
 
-    MONGO_MOD_PRIVATE void setPeakUsed_forTest(int used);
+    [[MONGO_MOD_PRIVATE]] void setPeakUsed_forTest(int used);
 
     /**
      * Appends all queue and delinquency stats.
@@ -220,6 +196,14 @@ public:
      */
     void incrementDelinquencyStats(const admission::execution_control::DelinquencyStats& newStats);
 
+    /**
+     * Records a single per-operation sample into this queue's wait-time histogram, equal to the
+     * total time the operation spent waiting in this queue across all of its acquisitions (0 if it
+     * acquired without ever waiting). Intended to be called once per operation, per queue it used,
+     * when the operation completes.
+     */
+    void recordQueueWaitTime(Microseconds queueWaitTime);
+
 private:
     /**
      * Statistics for queueing mechanisms in the TicketHolder implementations. The term "Queue" is a
@@ -227,17 +211,17 @@ private:
      * tickets.
      */
     struct QueueStats {
-        AtomicWord<std::int64_t> totalAddedQueue{0};
-        AtomicWord<std::int64_t> totalRemovedQueue{0};
-        AtomicWord<std::int64_t> totalFinishedProcessing{0};
-        AtomicWord<std::int64_t> totalNewAdmissions{0};
-        AtomicWord<std::int64_t> totalTimeProcessingMicros{0};
-        AtomicWord<std::int64_t> totalStartedProcessing{0};
-        AtomicWord<std::int64_t> totalCanceled{0};
-        AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
+        Atomic<std::int64_t> totalAddedQueue{0};
+        Atomic<std::int64_t> totalRemovedQueue{0};
+        Atomic<std::int64_t> totalFinishedProcessing{0};
+        Atomic<std::int64_t> totalNewAdmissions{0};
+        Atomic<std::int64_t> totalTimeProcessingMicros{0};
+        Atomic<std::int64_t> totalStartedProcessing{0};
+        Atomic<std::int64_t> totalCanceled{0};
+        Atomic<std::int64_t> totalTimeQueuedMicros{0};
         // Instantaneous sum of the admission counts (i.e. number of yields) of all operations
         // currently waiting in the queue.
-        AtomicWord<std::int64_t> queuedOperationsTotalAdmissions{0};
+        Atomic<std::int64_t> queuedOperationsTotalAdmissions{0};
     };
 
     /**
@@ -290,7 +274,10 @@ private:
     AcquisitionCallback _reportAcquisitionOpCallback{nullptr};
     WaitedAcquisitionCallback _reportWaitedAcquisitionOpCallback{nullptr};
     ReleaseCallback _reportReleaseOpCallback{nullptr};
+    StartQueueingCallback _reportStartQueueingOpCallback{nullptr};
     mongo::admission::execution_control::DelinquencyStats _delinquencyStats;
+
+    mongo::admission::execution_control::QueueWaitTimeHistogram _queueWaitTimeHistogram;
 
     // Synchronization mechanism for waiters.
     std::unique_ptr<TicketSemaphore> _semaphore;
@@ -300,7 +287,7 @@ private:
  * RAII-style movable token that gets generated when a ticket is acquired and is automatically
  * released when going out of scope.
  */
-class MONGO_MOD_PUBLIC Ticket {
+class [[MONGO_MOD_PUBLIC]] Ticket {
     Ticket(const Ticket&) = delete;
     Ticket& operator=(const Ticket&) = delete;
 

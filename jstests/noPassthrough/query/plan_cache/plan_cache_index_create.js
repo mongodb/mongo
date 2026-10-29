@@ -109,9 +109,33 @@ function runTest({rst, readDB, writeDB}) {
     // Confirm that there are no cached plans post index build start.
     assertDoesNotHaveCachedPlan(readColl, filter);
 
-    // Execute a find and confirm that a previously built index is the cached plan.
-    assert.eq(readColl.find(filter).itcount(), 1);
-    assert.eq("less_selective", getIndexNameForCachedPlan(readColl, filter));
+    // Execute a find and confirm that the cached plan uses the previously built index. The concurrent
+    // in-progress index build may still be finishing its setup on this node (its catalog change
+    // clears the plan cache again after 'waitForIndexBuildToStart' returns), so retry the find
+    // until the plan cache is stably populated.
+    let cachedIndexName;
+    assert.soon(
+        () => {
+            assert.eq(readColl.find(filter).itcount(), 1);
+            const plans = readColl
+                .getPlanCache()
+                .list([{$match: {"createdFromQuery.query": filter}}]);
+            if (plans.length !== 1 || !plans[0].hasOwnProperty("cachedPlan")) {
+                return false;
+            }
+            const cachedPlan = getCachedPlan(plans[0].cachedPlan);
+            assert(cachedPlan.hasOwnProperty("inputStage"), plans);
+            assert(cachedPlan.inputStage.hasOwnProperty("indexName"), plans);
+            cachedIndexName = cachedPlan.inputStage.indexName;
+            return true;
+        },
+        () =>
+            "Expected exactly one cached plan for query " +
+            tojson(filter) +
+            ", but found: " +
+            tojson(readColl.getPlanCache().list()),
+    );
+    assert.eq("less_selective", cachedIndexName);
 
     // Disable the hang and wait for the index build to complete.
     assert.commandWorked(

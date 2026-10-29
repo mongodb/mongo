@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/exec/classic/multi_plan.h"
@@ -46,13 +20,14 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
@@ -154,7 +129,7 @@ auto& multiPlannerAllPlansHitMemoryLimitTotal =
 
 /**
  * Aggregation of the total number of times multiplanning chose the winning plan. With the
- * introduction of automaticCE mode, this may differ from the number of times multiplanning is
+ * introduction of the mixed plan ranker, this may differ from the number of times multiplanning is
  * invoked.
  */
 auto& multiPlannerChoseWinningPlan =
@@ -361,9 +336,50 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
             multiPlannerHitWorksLimitTotal.incrementRelaxed();
         }
 
-        int numDocsFound = 0;
-        for (const auto& candidate : _candidates) {
+        // The condition for candidates that met no early-exit condition of their own. 'moreToDo'
+        // distinguishes the two reasons the works loop above can end: still true means it ran to
+        // the per-plan budget, false means some candidate exited early and stopped the trial for
+        // everyone, leaving the rest with budget to spare. This is the same discriminator the
+        // 'multiPlannerHitWorksLimitTotal' counter uses.
+        const auto noEarlyExitCondition = moreToDo ? MultiPlannerStopCondition::kExhaustedBudget
+                                                   : MultiPlannerStopCondition::kTrialEndedEarly;
+
+        // Count the results this trial phase produced and set the stop condition of each
+        // candidate that ran it. This loop and the capped-phase-stats loop below cover only
+        // _candidates[0..childrenSize) - the non-rejected set workAllPlans() iterates; a candidate
+        // rejected before this phase (e.g. abandoned when CBR chose the winner) keeps the stop
+        // condition its own trial ended with.
+        size_t numDocsFound = 0;
+        for (size_t i = 0; i < childrenSize; ++i) {
+            auto& candidate = _candidates[i];
             numDocsFound += candidate.results.size();
+            // Every candidate of this phase now has a stop condition. A candidate that ended its
+            // own trial - by reaching EOF or filling the batch - keeps the reason workAllPlans()
+            // recorded. Other candidates that did not end their trial early will get the "no early
+            // exit" reason. In the capped trial flow this may set a no-early-exit condition for a
+            // candidate that a later trial phase resumes and exits early - that phase overwrites it
+            // with the real reason. The capped phase's own value is saved below
+            // ('estimatePhaseStopCondition'). A candidate that failed in a recoverable fashion
+            // already recorded kFailed at the moment it failed - so the status check preserves that
+            // reason rather than overwriting it.
+            const bool endedItsOwnTrial =
+                candidate.stopCondition == MultiPlannerStopCondition::kEof ||
+                candidate.stopCondition == MultiPlannerStopCondition::kFullBatch;
+            if (!endedItsOwnTrial && candidate.status.isOK()) {
+                candidate.stopCondition = noEarlyExitCondition;
+            }
+        }
+
+        // At the end of a capped trial phase, save a copy of each candidate's stats and stop
+        // condition before a resumed phase keeps adding to the same counters. V3 explain reports
+        // the capped phase's stats as the estimate phase and computes the finalize phase as the
+        // cumulative counters minus the capped phase's.
+        if (trialConfig.isCappedTrialPhase && _query->getExplain()) {
+            for (size_t i = 0; i < childrenSize; ++i) {
+                auto& candidate = _candidates[i];
+                candidate.estimatePhaseStats = candidate.root->getStats();
+                candidate.estimatePhaseStopCondition = candidate.stopCondition;
+            }
         }
 
         _specificStats.totalWorks += totalWorks;
@@ -427,7 +443,10 @@ trial_period::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
         trial_period::getCollFractionPerCandidatePlan(*_query, _candidates.size());
 
     const size_t numWorks = trial_period::getTrialPeriodMaxWorks(
-        opCtx(), collectionPtr(), internalQueryPlanEvaluationWorks.load(), collFraction);
+        opCtx(),
+        collectionPtr(),
+        _query->getExpCtx()->getQueryKnobConfiguration().getPlanEvaluationWorks(),
+        collFraction);
 
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
     return {numWorks, numResults};
@@ -495,8 +514,7 @@ Status MultiPlanStage::pickBestPlan() {
 
     // Increment the server status metric when MP genuinely chose the winner. Skip for CBR-chosen
     // plans (where MP is only used for plan-cache hydration) and for branch planners.
-    // Note: planRankerMethod is recorded by the plan ranking strategy or runtime planner at the
-    // point where it is known that MP selected the winner, not here.
+    // Note: planSelectionStrategy is decided by the plan ranking strategy, not here.
     if (!_shouldNotCollectMetrics && !_isBranchPlanner) {
         multiPlannerChoseWinningPlan.increment();
     }
@@ -527,6 +545,11 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // as a whole only fails if _all_ candidates hit their resource consumption limit, or if
             // a different, query-fatal error code is thrown.
             candidate.status = ex.toStatus();
+            // The failure is what ended this candidate's trial. Recording it keeps every candidate
+            // that ran a trial reporting a stop condition: a failed candidate is ranked out but
+            // still displayed among the rejected plans, carrying the counters it accumulated
+            // before failing.
+            candidate.stopCondition = MultiPlannerStopCondition::kFailed;
             ++_failureCount;
 
             // If all children have failed, then rethrow. Otherwise, swallow the error and move onto
@@ -550,8 +573,12 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             candidate.results.push_back(id);
 
             // Once a plan returns enough results, stop working.
-            if (candidate.results.size() >= numResults || candidate.root->isEOF()) {
-                candidate.exitedEarly = true;
+            const bool isEof = candidate.root->isEOF();
+            if (candidate.results.size() >= numResults || isEof) {
+                // Reaching EOF on the same work() call that produced a result is an EOF exit, even
+                // when the result also completed the batch: the plan is out of results either way.
+                candidate.stopCondition =
+                    isEof ? MultiPlannerStopCondition::kEof : MultiPlannerStopCondition::kFullBatch;
                 doneWorking = true;
 
                 if (!_shouldNotCollectMetrics) {
@@ -562,7 +589,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // First plan to hit EOF wins automatically.  Stop evaluating other plans.
             // Assumes that the ranking will pick this plan.
             doneWorking = true;
-            candidate.exitedEarly = true;
+            candidate.stopCondition = MultiPlannerStopCondition::kEof;
 
             if (!_shouldNotCollectMetrics) {
                 multiPlannerHitEofTotal.incrementRelaxed();
@@ -659,13 +686,28 @@ bool MultiPlanStage::hasBackupPlan() const {
         planExplainerData.multiPlannerWinningPlanTrialStats =
             _candidates[_bestPlanIdx].root->getStats();
         planExplainerData.multiPlannerWinningPlanScore = getCandidateScore(_bestPlanIdx);
+        planExplainerData.multiPlannerWinningPlanStopCondition =
+            _candidates[_bestPlanIdx].stopCondition;
+        // The capped phase's stats are moved, not cloned: this extraction is their only consumer.
+        planExplainerData.multiPlannerWinningPlanEstimateStats =
+            std::move(_candidates[_bestPlanIdx].estimatePhaseStats);
+        planExplainerData.multiPlannerWinningPlanEstimateStopCondition =
+            _candidates[_bestPlanIdx].estimatePhaseStopCondition;
     }
 
     for (size_t i = 0; i < _rejected.size(); ++i) {
+        // Rejected plans are reordered after the non-rejected plans in the _candidates vector.
+        // See _candidates and _rejected. These stage trees ran a multi-planning trial, so
+        // their counters are trial statistics ('ranTrial').
+        auto& candidate = _candidates[i + _children.size()];
         planExplainerData.rejectedPlansWithStages.push_back(
-            // Rejected plans are reordered after the non-rejected plans in the _candidates vector.
-            // See _candidates and _rejected.
-            {std::move(_candidates[i + _children.size()].solution), std::move(_rejected[i])});
+            {std::move(candidate.solution),
+             std::move(_rejected[i]),
+             /*ranTrial*/ true,
+             candidate.adjustedScore,
+             candidate.stopCondition,
+             std::move(candidate.estimatePhaseStats),
+             candidate.estimatePhaseStopCondition});
     }
     _rejected.clear();
     return planExplainerData;

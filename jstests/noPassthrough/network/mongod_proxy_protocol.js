@@ -11,7 +11,15 @@ if (_isWindows()) {
 }
 import {
     emptyMessageTest,
+    failX509Auth,
     fuzzingTest,
+    caFile,
+    keyfile,
+    newTLSMongo,
+    runAsAdminUser,
+    serverCertFile,
+    setupAuth,
+    succeedX509Auth,
     testProxyProtocolReplicaSet,
     testProxyProtocolReplicaSetWithProxyUnixSocket,
     testClientMetadataLogOverUnixSocket,
@@ -21,36 +29,35 @@ import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
 function sendHelloMaybeLB(node, port, loadBalanced, count) {
     const kLoadBalancerNoOpMessage = 10107800;
-    let uri = `mongodb://127.0.0.1:${port}`;
-    if (typeof loadBalanced != "undefined") {
-        uri += `/?loadBalanced=${loadBalanced}`;
-    }
-    const conn = new Mongo(uri);
+    const conn = newTLSMongo(
+        `127.0.0.1:${port}`,
+        typeof loadBalanced != "undefined" ? [`loadBalanced=${loadBalanced}`] : [],
+    );
     assert.neq(null, conn, "Client was unable to connect to the load balancer port");
     assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 
     if (loadBalanced) {
-        assert(
-            checkLog.checkContainsWithCountJson(
-                node,
-                kLoadBalancerNoOpMessage,
-                {},
-                count,
-                undefined,
-                true,
-            ),
-            `Did not find log id ${kLoadBalancerNoOpMessage} ${tojson(count)} times in the log`,
-        );
+        runAsAdminUser(node, (connection) => {
+            assert(
+                checkLog.checkContainsWithCountJson(
+                    connection,
+                    kLoadBalancerNoOpMessage,
+                    {},
+                    count,
+                    undefined,
+                    true,
+                ),
+                `Did not find log id ${kLoadBalancerNoOpMessage} ${tojson(count)} times in the log`,
+            );
+        });
     }
 }
 
 function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
-    let uri = `mongodb://127.0.0.1:${port}`;
-    if (typeof loadBalanced != "undefined") {
-        uri += `/?loadBalanced=${tojson(loadBalanced)}`;
-    }
+    const options =
+        typeof loadBalanced != "undefined" ? [`loadBalanced=${tojson(loadBalanced)}`] : [];
     try {
-        new Mongo(uri);
+        newTLSMongo(`127.0.0.1:${port}`, options);
         assert(false, "Client was unable to connect to the load balancer port");
     } catch (err) {
         let actualCount;
@@ -60,18 +67,20 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
             actualCount = actual;
             return actual === expected;
         };
-        assert(
-            checkLog.checkContainsWithCountJson(
-                node,
-                id,
-                attrs,
-                count,
-                undefined,
-                true,
-                compareCounts,
-            ),
-            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} in the log the expected number of times. Expected to see it ${count} times but saw it ${actualCount} times. This assertion failed while handling an expected error. The error was: ${tojson(err)}`,
-        );
+        runAsAdminUser(node, (connection) => {
+            assert(
+                checkLog.checkContainsWithCountJson(
+                    connection,
+                    id,
+                    attrs,
+                    count,
+                    undefined,
+                    true,
+                    compareCounts,
+                ),
+                `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} in the log the expected number of times. Expected to see it ${count} times but saw it ${actualCount} times. This assertion failed while handling an expected error. The error was: ${tojson(err)}`,
+            );
+        });
     }
 }
 
@@ -100,7 +109,17 @@ function basicTest(ingressPort, egressPort, node) {
 }
 
 function standardPortTest(ingressPort, egressPort, version) {
-    const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
+    const rs = new ReplSetTest({
+        nodes: 1,
+        nodeOptions: {
+            "proxyPort": egressPort,
+            tlsCertificateKeyFile: serverCertFile,
+            tlsCAFile: caFile,
+            tlsMode: "allowTLS",
+            tlsAllowInvalidHostnames: "",
+        },
+        keyFile: keyfile,
+    });
     rs.startSet({
         setParameter: {
             featureFlagMongodProxyProtocolSupport: true,
@@ -112,7 +131,11 @@ function standardPortTest(ingressPort, egressPort, version) {
     rs.initiate();
 
     const node = rs.getPrimary();
-    const proxy_server = new ProxyProtocolServer(ingressPort, node.port, version);
+    setupAuth(node);
+    const proxy_server = new ProxyProtocolServer(ingressPort, node.port, version, {
+        ingressTLSCert: serverCertFile,
+        ingressTLSCA: caFile,
+    });
     proxy_server.start();
     const attrs = {
         "error": {
@@ -143,4 +166,13 @@ testProxyProtocolReplicaSet(ingressPort, egressPort, 2, emptyMessageTest);
 testProxyProtocolReplicaSet(ingressPort, egressPort, 1, fuzzingTest);
 testProxyProtocolReplicaSet(ingressPort, egressPort, 2, fuzzingTest);
 
+// Mongod should accept connections presenting Proxy Protocol v2
+// headers with SSL TLVs via the proxy port but ignore parsing the TLVs.
+// Subsequently, X.509 auth will fail.
+testProxyProtocolReplicaSet(ingressPort, egressPort, 2, failX509Auth);
+
 testProxyProtocolReplicaSetWithProxyUnixSocket(ingressPort, testClientMetadataLogOverUnixSocket);
+
+// Mongod should successfully parse SSL TLVs via the proxy UDS, allowing
+// for X.509 auth.
+testProxyProtocolReplicaSetWithProxyUnixSocket(ingressPort, succeedX509Auth);

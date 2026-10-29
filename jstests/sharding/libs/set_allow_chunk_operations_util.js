@@ -82,6 +82,20 @@ export function setAllowChunkOperations(st, ns, allow, opts = {}) {
     }
 }
 
+// Flips the collection's allowChunkOperations flag directly on the config server. The config-only
+// command just updates the metadata without draining in-flight chunk operations, so a migration
+// that is paused mid-flight keeps running until it tries to commit, at which point the commit is
+// rejected with ConflictingOperationInProgress.
+export function setAllowChunkOperationsOnConfigsvr(st, ns, allow) {
+    assert.commandWorked(
+        st.configRS.getPrimary().adminCommand({
+            _configsvrSetAllowChunkOperations: ns,
+            allowChunkOperations: allow,
+            writeConcern: {w: "majority"},
+        }),
+    );
+}
+
 /**
  * Reads config.collections.<ns>.allowChunkOperations. Returns undefined when the field is absent,
  * which is how the config server records the "allowed" state.

@@ -741,7 +741,7 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
     $config.data.assertReadWriteDistributionMetrics = function assertReadWriteDistributionMetrics(
         res,
         isFinal,
-        duration,
+        durationMS,
     ) {
         AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res);
 
@@ -802,17 +802,21 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
                 res.readDistribution.percentageOfScatterGatherReads,
                 this.readDistribution.percentageOfScatterGatherReads,
             );
-            try {
-                assert.eq(
-                    res.readDistribution.numReadsByRange.length,
-                    this.analyzeShardKeyNumRanges,
-                );
-            } catch (e) {
-                if (duration <= this.splitPointExpirationSecs) {
-                    // Ignore errors if the duration of analyzeShardKey is greater than
-                    // splitPointExpirationSecs because the TTL monitor may have deleted split point
-                    // documents before numReadsByRange metrics were calculated.
-                    throw e;
+            // 'analyzeShardKeyNumRanges' is re-fuzzed periodically and this assertion is only
+            // valid for non-fuzzed suites.
+            if (!TestData.fuzzRuntimeParams) {
+                try {
+                    assert.eq(
+                        res.readDistribution.numReadsByRange.length,
+                        this.analyzeShardKeyNumRanges,
+                    );
+                } catch (e) {
+                    if (durationMS <= this.splitPointExpirationSecs * 1000) {
+                        // Ignore errors if the duration of analyzeShardKey is greater than
+                        // splitPointExpirationSecs because the TTL monitor may have deleted split
+                        // point documents before numReadsByRange metrics were calculated.
+                        throw e;
+                    }
                 }
             }
         }
@@ -842,17 +846,20 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
                 res.writeDistribution.percentageOfMultiWritesWithoutShardKey,
                 this.writeDistribution.percentageOfMultiWritesWithoutShardKey,
             );
-            try {
-                assert.eq(
-                    res.writeDistribution.numWritesByRange.length,
-                    this.analyzeShardKeyNumRanges,
-                );
-            } catch (e) {
-                if (duration <= this.splitPointExpirationSecs) {
-                    // Ignore errors if the duration of analyzeShardKey is greater than
-                    // splitPointExpirationSecs because the TTL monitor may have deleted split point
-                    // documents before numReadsByRange metrics were calculated.
-                    throw e;
+            // See the comment for the corresponding numReadsByRange check above.
+            if (!TestData.fuzzRuntimeParams) {
+                try {
+                    assert.eq(
+                        res.writeDistribution.numWritesByRange.length,
+                        this.analyzeShardKeyNumRanges,
+                    );
+                } catch (e) {
+                    if (durationMS <= this.splitPointExpirationSecs * 1000) {
+                        // Ignore errors if the duration of analyzeShardKey is greater than
+                        // splitPointExpirationSecs because the TTL monitor may have deleted split
+                        // point documents before numWritesByRange metrics were calculated.
+                        throw e;
+                    }
                 }
             }
         }

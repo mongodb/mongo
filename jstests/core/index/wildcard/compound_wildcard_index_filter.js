@@ -3,6 +3,7 @@
  * Compound Wildcard Indexes objey index filters.
  *
  * @tags: [
+ *   uses_explain,
  *   not_allowed_with_signed_security_token,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/expression_algo.h"
 
@@ -798,7 +772,7 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
                 return me->clone();
             }
             uassert(7040600, "Should have exactly one path under $not", outSub.size() == 1);
-            return tryAddExpr(outSub.begin()->first /* path */, me, pending);
+            return tryAddExpr(/*path=*/outSub.begin()->first, me, pending);
         }
 
         // We don't currently handle any of these cases, but some may be possible in the future.
@@ -916,7 +890,7 @@ namespace expression {
 bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
                          const OrderedPathSet& paths) {
-    return hasPredicateOnPathsHelper(expr, searchType, paths, boost::none /* parentPath */);
+    return hasPredicateOnPathsHelper(expr, searchType, paths, /*parentPath=*/boost::none);
 }
 
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
@@ -1294,6 +1268,22 @@ OrderedPathSet makeIndependent(OrderedPathSet testSet, const OrderedPathSet& toR
     return testSet;
 }
 
+/**
+ * Returns true if any of 'dependencies' is an ancestor of the new name of one of 'renames'.
+ * Dependency must be on a strict prefix, not the full path.
+ */
+static bool dependencyIsPrefixOfRename(const OrderedPathSet& dependencies,
+                                       const StringMap<std::string>& renames) {
+    for (const auto& [newPath, _] : renames) {
+        for (const auto& dep : dependencies) {
+            if (isPathPrefixOf(dep, newPath)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 template <typename E, typename... Args>
 requires ConstTraverseMatchExpression<E, Args...> || MutableTraverseMatchExpression<E, Args...>
 bool isIndependentOfImpl(E&& expr,
@@ -1333,6 +1323,10 @@ bool isIndependentOfImpl(E&& expr,
     dependency_analysis::addDependencies(&expr, &depsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
     if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
+        return false;
+    }
+
+    if (dependencyIsPrefixOfRename(depsTracker.fields, renames)) {
         return false;
     }
 
@@ -1404,14 +1398,15 @@ ShouldSplitExprResult exprDependenceAnalysisHelper(boost::intrusive_ptr<Expressi
         return ShouldSplitExprResult{};
     }
 
+    // A dotted path rename materializes the missing ancestors of its new name, so it is not value
+    // preserving with respect to those ancestors. For instance, if the expression depends on "a"
+    // but "a.b" is the result of a rename, then this expression is not independent.
+    if (dependencyIsPrefixOfRename(deps.fields, renames)) {
+        return ShouldSplitExprResult{};
+    }
+
     // Analyze renames. If any of the renames are equal to or a prefix of a dependency, a rename is
     // required.
-    //
-    // If in the future we add support for complex renames where the new name contains multiple path
-    // components (as in the rename mapping "a.b" -> "c"), then this code will need to be enhanced
-    // to handle the case where the renamed path is deeper than the dependency. For instance, if the
-    // expression depends on "a" but "a.b" is the result of a rename, then the expression cannot be
-    // split out.
     bool requiresRename = false;
     for (const auto& dep : deps.fields) {
         for (const auto& [renamedPath, _] : renames) {
@@ -1505,6 +1500,12 @@ bool isOnlyDependentOnImpl(E&& expr,
     dependency_analysis::addDependencies(&expr, &exprDepsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
     if (exprDepsTracker.needRandomGenerator) {
+        return false;
+    }
+
+    // A dotted path rename materializes the missing ancestors of its new name, so match expressions
+    // that depend on an ancestor of a dotted path rename can't be safely split out.
+    if (dependencyIsPrefixOfRename(exprDepsTracker.fields, renames)) {
         return false;
     }
 

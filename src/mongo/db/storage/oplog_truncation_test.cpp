@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/oplog_truncation.h"
 
@@ -53,6 +27,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -60,6 +35,7 @@
 #include <limits>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
@@ -131,6 +107,38 @@ protected:
         _storage.setInitialDataTimestamp(service, newTimestamp);
         _storage.setStableTimestamp(service, newTimestamp, true);
         service->getStorageEngine()->checkpoint();
+    }
+
+    struct FourMarkerOplog {
+        RecordStore* rs;
+        std::shared_ptr<OplogTruncateMarkers> truncateMarkers;
+        RecordId mayTruncateUpTo;
+    };
+
+    /**
+     * Sets up an oplog holding three full truncate markers, plus a fourth so that the oldest three
+     * may all be truncated, and advances the stable timestamp past all of them.
+     */
+    FourMarkerOplog setUpFourMarkers() {
+        auto opCtx = getOperationContext();
+        auto* rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+        auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+        EXPECT_TRUE(truncateMarkers != nullptr);
+
+        EXPECT_TRUE(rs->oplog()->updateSize(230).isOK());
+        truncateMarkers->setMinBytesPerMarker(100);
+
+        insertOplog(1, 100);
+        insertOplog(2, 110);
+        insertOplog(3, 120);
+        insertOplog(4, 130);
+        EXPECT_EQ(4U, truncateMarkers->numMarkers());
+
+        advanceStableTimestamp(Timestamp(1, 4));
+        auto mayTruncateUpTo =
+            RecordId(getServiceContext()->getStorageEngine()->getPinnedOplog().asULL());
+
+        return {rs, std::move(truncateMarkers), mayTruncateUpTo};
     }
 
 private:
@@ -368,7 +376,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
             rs->capped()->truncateAfter(opCtx,
                                         *shard_role_details::getRecoveryUnit(opCtx),
                                         RecordId(1, 8),
-                                        true /* inclusive */);
+                                        /*inclusive=*/true);
         wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
@@ -389,7 +397,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
             rs->capped()->truncateAfter(opCtx,
                                         *shard_role_details::getRecoveryUnit(opCtx),
                                         RecordId(1, 6),
-                                        true /* inclusive */);
+                                        /*inclusive=*/true);
         wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
@@ -631,6 +639,116 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
     }
 }
 
+// The truncation statistics are updated once per individual marker truncated, so that an
+// observer polling them sees progress while a backlog of expired oplog is being truncated.
+TEST_F(OplogTruncationTest, TruncationStatsUpdatedOncePerMarkerTruncated) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
+
+    auto opCtx = getOperationContext();
+    auto [rs, oplogTruncateMarkers, mayTruncateUpTo] = setUpFourMarkers();
+
+    const auto startingTruncateCount = oplog_truncation::getTruncateCount();
+    const auto startingTimeTruncating = oplog_truncation::getTotalTimeTruncatingMicros();
+
+    // Spend a known amount of time truncating each marker. Without this, truncating a marker in
+    // this test can complete in well under a microsecond.
+    constexpr Milliseconds kTimePerMarker{1};
+    const auto kMicrosPerMarker = durationCount<Microseconds>(kTimePerMarker);
+
+    // Record the statistics observed at the start of each individual marker truncation.
+    std::vector<int64_t> truncateCountPerMarker;
+    std::vector<int64_t> timeTruncatingPerMarker;
+    oplog_truncation::truncateByMarkerQueue(
+        opCtx,
+        *rs,
+        mayTruncateUpTo,
+        [&](OperationContext*, const CollectionTruncateMarkers::Marker&) {
+            truncateCountPerMarker.push_back(oplog_truncation::getTruncateCount());
+            timeTruncatingPerMarker.push_back(oplog_truncation::getTotalTimeTruncatingMicros());
+            sleepFor(kTimePerMarker);
+            return true;
+        });
+
+    ASSERT_EQ(3U, truncateCountPerMarker.size());
+    ASSERT_EQ(startingTruncateCount, truncateCountPerMarker[0]);
+    ASSERT_EQ(startingTruncateCount + 1, truncateCountPerMarker[1]);
+    ASSERT_EQ(startingTruncateCount + 2, truncateCountPerMarker[2]);
+    ASSERT_EQ(startingTruncateCount + 3, oplog_truncation::getTruncateCount());
+
+    // Each callback samples from inside the marker truncation it is timing, which is recorded only
+    // once that truncation returns. The first marker sees nothing accumulated, and each one after
+    // it sees at least the time spent on every preceding marker.
+    ASSERT_EQ(3U, timeTruncatingPerMarker.size());
+    ASSERT_EQ(startingTimeTruncating, timeTruncatingPerMarker[0]);
+    ASSERT_GTE(timeTruncatingPerMarker[1], startingTimeTruncating + kMicrosPerMarker);
+    ASSERT_GTE(timeTruncatingPerMarker[2], startingTimeTruncating + 2 * kMicrosPerMarker);
+    ASSERT_GTE(oplog_truncation::getTotalTimeTruncatingMicros(),
+               startingTimeTruncating + 3 * kMicrosPerMarker);
+}
+
+// Shutting down the oplog cap maintainer thread clears the truncate markers while a truncation pass
+// may still be running. A pass must notice they are gone and stop.
+TEST_F(OplogTruncationTest, TruncationPassStopsWhenTruncateMarkersCleared) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
+
+    auto opCtx = getOperationContext();
+    auto [rs, oplogTruncateMarkers, mayTruncateUpTo] = setUpFourMarkers();
+
+    // Kill markers between two iterations of truncation. shutdown() clears the truncate markers
+    // before it kills the opCtx. The opCtx is deliberately left uninterrupted so that the cleared
+    // markers is what stops the truncation pass.
+    int64_t truncateCalls = 0;
+    oplog_truncation::truncateByMarkerQueue(
+        opCtx,
+        *rs,
+        mayTruncateUpTo,
+        [&](OperationContext* opCtx, const CollectionTruncateMarkers::Marker&) {
+            if (++truncateCalls == 1) {
+                oplogTruncateMarkers->kill();
+                LocalOplogInfo::get(opCtx)->setTruncateMarkers(nullptr);
+            }
+            return true;
+        });
+
+    // The pass observed the cleared markers on its next iteration and stopped.
+    ASSERT_EQ(1, truncateCalls);
+    ASSERT_FALSE(LocalOplogInfo::get(opCtx)->getTruncateMarkers());
+}
+
+// A truncation pass leaves the marker queue at a marker boundary once its opCtx is killed, rather
+// than starting another truncation it cannot finish. The cap maintainer thread's opCtx is killed on
+// every shutdown of the thread (e.g. stepdown).
+TEST_F(OplogTruncationTest, TruncationPassStopsWhenInterrupted) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
+
+    auto opCtx = getOperationContext();
+    auto [rs, oplogTruncateMarkers, mayTruncateUpTo] = setUpFourMarkers();
+
+    // Simulate shutdown() while the first marker is being truncated by killing the markers and
+    // opCtx.
+    int64_t truncateCalls = 0;
+    ASSERT_THROWS_CODE(oplog_truncation::truncateByMarkerQueue(
+                           opCtx,
+                           *rs,
+                           mayTruncateUpTo,
+                           [&](OperationContext* opCtx, const CollectionTruncateMarkers::Marker&) {
+                               ++truncateCalls;
+                               oplogTruncateMarkers->kill();
+                               opCtx->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+                               return true;
+                           }),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+
+    // The in-flight marker was truncated and popped, and the pass then stopped instead of starting
+    // a second truncation.
+    ASSERT_EQ(1, truncateCalls);
+    ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+}
+
 /**
  * Verify that oplog truncate marker reclaim is a no-op if the rs has been truncated.
  */
@@ -714,7 +832,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
                                                                        false);
 
     unittest::ServerParameterGuard minMarkerCountController("minOplogTruncationPoints", 30);
-    unittest::ServerParameterGuard maxMarkerCountController("maxOplogTruncationPointsAfterStartup",
+    unittest::ServerParameterGuard maxMarkerCountController("maxOplogTruncationPointsDuringStartup",
                                                             30);
 
     auto opCtx = getOperationContext();
@@ -933,6 +1051,92 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NewestExpiredWallTime) {
     EXPECT_NEAR(expected.toMillisSinceEpoch(), actual.toMillisSinceEpoch(), 1000);
     storageGlobalParams.oplogMinRetentionHours.store(0.0);
     EXPECT_EQ(Date_t(), OplogTruncateMarkers::newestExpiredWallTime(getOperationContext()));
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeCapsTheComputedMarkerSize) {
+    // A 100MB oplog would otherwise be divided into 10MB markers.
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 100 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), 1024 * 1024);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeLeavesSmallerMarkersAlone) {
+    // The 1MB oplog below yields markers well under the cap.
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    // Below ~168MB the marker count pins at minOplogTruncationPoints, so the marker size is just
+    // the oplog size divided by that count, rounded up.
+    ASSERT_EQ(markers->minBytesPerMarker(), (maxSize + 9) / 10);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeOfZeroLeavesMarkerSizeUncapped) {
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 0);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 100 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), maxSize / 10);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_MaxMarkerSizeOverridesTheTargetMarkerCount) {
+    unittest::ServerParameterGuard maxMarkerCount("maxOplogTruncationPointsAfterStartup", 100);
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1024);
+
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    // Divided into the target count of 100 this oplog would need 2GB markers, so the cap binds and
+    // the oplog is instead covered by 200 markers of 1GB.
+    const int64_t maxSize = 200LL * 1024 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), 1024LL * 1024 * 1024);
+}
+
+TEST_F(OplogTruncationTest, OplogTruncateMarkers_LoweringMaxMarkerSizeTakesEffectOnAdjust) {
+    auto opCtx = getOperationContext();
+    auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+    ASSERT(markers);
+
+    const int64_t maxSize = 100 * 1024 * 1024;
+    ASSERT_OK(rs->oplog()->updateSize(maxSize));
+    markers->adjust(*rs);
+    ASSERT_EQ(markers->minBytesPerMarker(), maxSize / 10);
+
+    // Setting the cap at runtime is the escape hatch for a cluster already producing oversized
+    // truncates, so it must take effect on an existing marker set.
+    unittest::ServerParameterGuard maxMarkerSize("maxOplogTruncationPointSizeMB", 1);
+    markers->adjust(*rs);
+
+    ASSERT_EQ(markers->minBytesPerMarker(), 1024 * 1024);
 }
 
 }  // namespace repl

@@ -4,10 +4,6 @@ The fmt library is extensible, but to avoid user extensions interfering with
 each other we want to be disciplined in how we use the extension points. For
 now, please discuss extension use cases with the #server-programmability team.
 
-Our `mongo::StringData` is usable wherever a string-like type can be used in
-`fmt` library calls.  This was done by adding a special function to
-`string_data.h`. More types will be added as we figure out which to support.
-
 Basic Usage:
 
     s = fmt::format("{}, {}, {}, ... {}!", 1, '2', "three", kInf);

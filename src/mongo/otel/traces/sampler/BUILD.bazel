@@ -10,12 +10,18 @@ exports_files(
 
 mongo_cc_library(
     name = "sampler",
-    srcs = ["sampler.cpp"],
+    srcs = [
+        "sampler.cpp",
+        "sampler_server_status_section.cpp",
+    ],
     deps = [
         ":sampling_config",
         "//src/mongo:base",
         "//src/mongo/db/admission:rate_limiter",
-        "//src/mongo/otel/traces/span:span_names",
+        "//src/mongo/db/admission:rate_limiter_otel_metrics_recorder",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/otel/traces/span:span_name",
     ],
 )
 
@@ -29,6 +35,8 @@ mongo_cc_unit_test(
     deps = [
         ":sampler",
         ":sampling_config",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/traces/span:span_names",
     ],
 )
 

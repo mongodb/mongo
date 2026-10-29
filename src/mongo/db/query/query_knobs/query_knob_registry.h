@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,6 +8,7 @@
 #include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
@@ -54,13 +29,15 @@ namespace mongo {
  * thereafter. Indexed by a dense id for the hot read path, and by wire name
  * for the rare setQuerySettings write path.
  */
-class QueryKnobRegistry {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobRegistry {
 public:
     struct Entry {
         using ReadGlobalFn = std::function<QueryKnobValue()>;
         using FromBSONFn = QueryKnobValue (*)(const BSONElement&);
         using ToBSONFn = void (*)(BSONObjBuilder&, std::string_view, const QueryKnobValue&);
         using AttachOnUpdateFn = std::function<void(const QueryKnobChangeNotifier*)>;
+        using AppendTypeFn = void (*)(BSONObjBuilder*);
+        using AppendConstraintsFn = std::function<void(BSONObjBuilder*)>;
 
         template <auto& global, typename T>
         requires AtomicLoadable<decltype(global)>
@@ -77,6 +54,8 @@ public:
                 dynamic_cast<SPT*>(ServerParameterSet::getNodeParameterSet()->getIfExists(name));
             FromBSONFn fromBSON = detail::ConverterTraits<T>::fromBSON;
             ToBSONFn toBSON = detail::ConverterTraits<T>::toBSON;
+            AppendTypeFn appendType = detail::ConverterTraits<T>::appendType;
+            AppendConstraintsFn appendConstraints = nullptr;
             ReadGlobalFn readGlobal = nullptr;
             AttachOnUpdateFn attachOnUpdate =
                 [param, id = knob.id](const QueryKnobChangeNotifier* notifier) {
@@ -86,18 +65,33 @@ public:
                 readGlobal = [param]() -> QueryKnobValue {
                     return static_cast<int>(param->_data.get());
                 };
+                appendConstraints = [](BSONObjBuilder* bob) {
+                    // cpp_type parameters do not have standardised validators.
+                };
             } else {
                 readGlobal = [param]() -> QueryKnobValue {
-                    return param->getValue(boost::none /* tenantId */);
+                    return param->getValue(/*tenantId=*/boost::none);
+                };
+                appendConstraints = [param](BSONObjBuilder* bob) {
+                    param->appendConstraints(bob);
                 };
             }
-            return Entry(knob.id, param, fromBSON, toBSON, readGlobal, attachOnUpdate);
+            return Entry(knob.id,
+                         param,
+                         fromBSON,
+                         toBSON,
+                         appendType,
+                         appendConstraints,
+                         readGlobal,
+                         attachOnUpdate);
         }
 
         explicit Entry(QueryKnobId id,
                        ServerParameter* param,
                        FromBSONFn fromBSONFn,
                        ToBSONFn toBSONFn,
+                       AppendTypeFn appendTypeFn,
+                       AppendConstraintsFn appendConstraintsFn,
                        ReadGlobalFn readGlobalFn,
                        AttachOnUpdateFn attachOnUpdateFn);
 
@@ -107,6 +101,8 @@ public:
         // Global-value reader and serializers, baked from ConverterTraits<T> at registration.
         FromBSONFn fromBSON = nullptr;
         ToBSONFn toBSON = nullptr;
+        AppendTypeFn appendType = nullptr;
+        AppendConstraintsFn appendConstraints = nullptr;
         ReadGlobalFn readGlobal = nullptr;
         AttachOnUpdateFn attachOnUpdate = nullptr;
 

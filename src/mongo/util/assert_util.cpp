@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/assert_util.h"
 
@@ -42,6 +16,7 @@
 #include "mongo/util/str.h"
 
 #include <csignal>
+#include <cstdio>
 #include <exception>
 #include <ostream>
 #include <string_view>
@@ -96,7 +71,8 @@ MONGO_COMPILER_NORETURN void callAbort() {
     if (reentry++)
         endProcessWithSignal(SIGABRT);
 
-    [[maybe_unused]] static auto initOnce = (std::abort(), 0);
+    [[maybe_unused]] static auto initOnce =
+        (std::fflush(stdout), std::fflush(stderr), std::abort(), 0);
     MONGO_COMPILER_UNREACHABLE;
 }
 }  // namespace
@@ -114,8 +90,6 @@ bool getScopedDebugInfoStackEnabled() {
 }
 
 AssertionCount assertionCount;
-
-AssertionCount::AssertionCount() : regular(0), warning(0), msg(0), user(0), rollovers(0) {}
 
 namespace {
 Atomic<AssertionIncrementObserver> gAssertionIncrementObserver{nullptr};
@@ -181,46 +155,53 @@ void DBException::traceIfNeeded(const DBException& e) {
 }
 
 namespace {
-MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr, auto loc) noexcept {
-    LOGV2_FATAL_CONTINUE(23079, "Invariant failure", "expr"_attr = expr, "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
+MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr, auto loc) {
+    try {
+        LOGV2_FATAL_CONTINUE(23079, "Invariant failure", "expr"_attr = expr, "location"_attr = loc);
+        breakpoint();
+        LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
+    } catch (...) {
+    }
     callAbort();
 }
 
 MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr,
                                                  const std::string& msg,
-                                                 auto loc) noexcept {
-    LOGV2_FATAL_CONTINUE(
-        23081, "Invariant failure", "expr"_attr = expr, "msg"_attr = msg, "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23082, "\n\n***aborting after invariant() failure\n\n");
+                                                 auto loc) {
+    try {
+        LOGV2_FATAL_CONTINUE(23081,
+                             "Invariant failure",
+                             "expr"_attr = expr,
+                             "msg"_attr = msg,
+                             "location"_attr = loc);
+        breakpoint();
+        LOGV2_FATAL_CONTINUE(23082, "\n\n***aborting after invariant() failure\n\n");
+    } catch (...) {
+    }
     callAbort();
 }
 }  // namespace
 
 namespace error_details {
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
-MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
-                                             WrappedStdSourceLocation loc) noexcept {
+MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr, WrappedStdSourceLocation loc) {
     invariantFailedImpl(expr, loc);
 }
 
 MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
                                                     const std::string& msg,
-                                                    WrappedStdSourceLocation loc) noexcept {
+                                                    WrappedStdSourceLocation loc) {
     invariantFailedImpl(expr, msg, loc);
 }
 #endif  // MONGO_SOURCE_LOCATION_HAVE_STD
 
-MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
-                                             SyntheticSourceLocation loc) noexcept {
+MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr, SyntheticSourceLocation loc) {
     invariantFailedImpl(expr, loc);
 }
 
 MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
                                                     const std::string& msg,
-                                                    SyntheticSourceLocation loc) noexcept {
+                                                    SyntheticSourceLocation loc) {
     invariantFailedImpl(expr, msg, loc);
 }
 
@@ -243,7 +224,7 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, SourceLocation loc) 
 
 MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
                                                const Status& status,
-                                               SourceLocation loc) noexcept {
+                                               SourceLocation loc) {
     LOGV2_FATAL_CONTINUE(23083,
                          "Invariant failure",
                          "expr"_attr = expr,
@@ -257,7 +238,7 @@ MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
 MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
                                                       const Status& status,
                                                       const std::string& msg,
-                                                      SourceLocation loc) noexcept {
+                                                      SourceLocation loc) {
     LOGV2_FATAL_CONTINUE(23085,
                          "Invariant failure",
                          "expr"_attr = expr,
@@ -269,8 +250,7 @@ MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
     callAbort();
 }
 
-MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
-                                                     SourceLocation loc) noexcept {
+MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status, SourceLocation loc) {
     LOGV2_FATAL_CONTINUE(
         23087, "Invariant failure", "error"_attr = redact(status), "location"_attr = loc);
     breakpoint();
@@ -340,12 +320,16 @@ void iassertFailed(const Status& status, SourceLocation loc) {
     error_details::throwExceptionForStatus(status);
 }
 
-void tassertFailed(const Status& status, SourceLocation loc) {
+void tassertNoThrowFailed(const Status& status, SourceLocation loc) {
     bumpAssertion(AssertionKind::kTripwire);
     LOGV2_ERROR(
         TRIPWIRE_ASSERTION_ID, "Tripwire assertion", "error"_attr = status, "location"_attr = loc);
     logErrorBlock();
     breakpoint();
+}
+
+void tassertFailed(const Status& status, SourceLocation loc) {
+    tassertNoThrowFailed(status, loc);
     error_details::throwExceptionForStatus(status);
 }
 

@@ -9,7 +9,7 @@
  *
  * Do not run in sharding suites because the first transaction statement is expect to succeed
  * unconditionally, which need not be true in a sharded cluster.
- * @tags: [uses_transactions, requires_replication]
+ * @tags: [assumes_against_mongod_not_mongos, uses_transactions, requires_replication]
  */
 
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
@@ -180,7 +180,14 @@ export const $config = (function () {
         function createIndex(db, collName) {
             assert.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}),
-                [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument],
+                [
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                    // createIndexes fails with ConflictingOperationInProgress after exhausting
+                    // its retries when the collection keeps being dropped and recreated
+                    // concurrently.
+                    ErrorCodes.ConflictingOperationInProgress,
+                ],
             );
         }
 

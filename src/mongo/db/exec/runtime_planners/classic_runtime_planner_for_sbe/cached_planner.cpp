@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
@@ -34,7 +8,9 @@
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/replanning_required_info.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -51,7 +27,8 @@ namespace {
 class ValidCandidatePlanner : public PlannerBase {
 public:
     ValidCandidatePlanner(PlannerDataForSBE plannerData, sbe::plan_ranker::CandidatePlan candidate)
-        : PlannerBase(std::move(plannerData)), _candidate(std::move(candidate)) {}
+        : PlannerBase(std::move(plannerData), PlanSelectionStrategy::kCachedPlan),
+          _candidate(std::move(candidate)) {}
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
         std::unique_ptr<CanonicalQuery> canonicalQuery) override {
@@ -70,16 +47,13 @@ public:
                                            std::move(nss),
                                            extractSbeYieldPolicy(),
                                            std::move(remoteCursors),
-                                           std::move(remoteExplains));
+                                           std::move(remoteExplains),
+                                           /*cachedPlanHash=*/boost::none,
+                                           planSelectionStrategy());
     }
 
 
     PlanRankingResult extractPlanRankingResult() override {
-        tassert(11756604,
-                "Expected `extractPlanRankingResult` to only be called with get executor deferred "
-                "feature flag enabled.",
-                cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                    feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
         std::vector<std::unique_ptr<QuerySolution>> v;
         v.push_back(std::move(_candidate.solution));
         return PlanRankingResult{
@@ -89,7 +63,8 @@ public:
                                                      .sbeYieldPolicy = extractSbeYieldPolicy()}},
             .plannerParams = extractPlannerParams(),
             .cachedPlanHash = cachedPlanHash(),
-            .engineSelection = EngineChoice::kSbe};
+            .engineSelection = EngineChoice::kSbe,
+            .planSelectionStrategy = planSelectionStrategy()};
     }
 
 private:
@@ -135,12 +110,12 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     const size_t maxTrialResultsFromPlanningRoot =
         plannerData.cq->cqPipeline().empty() ? 0 : maxNumResults;
 
-    sbe::plan_ranker::CandidatePlan candidate{std::move(solution),
-                                              std::move(root),
-                                              sbe::plan_ranker::CandidatePlanData{std::move(data)},
-                                              false /* exitedEarly*/,
-                                              Status::OK(),
-                                              true /*isCachedPlan*/};
+    sbe::plan_ranker::CandidatePlan candidate{
+        .solution = std::move(solution),
+        .root = std::move(root),
+        .data = sbe::plan_ranker::CandidatePlanData{std::move(data)},
+        .status = Status::OK(),
+        .fromPlanCache = true};
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 
     // Callback for the tracker when it exceeds any of the tracked metrics. If the tracker exceeds
@@ -159,19 +134,23 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
                 MONGO_UNREACHABLE;
         }
     };
-    candidate.data.tracker = std::make_unique<TrialRunTracker>(
-        std::move(onMetricReached), maxTrialResultsFromPlanningRoot, maxTrialPeriodNumReads);
+    candidate.data.tracker = std::make_unique<TrialRunTracker>(std::move(onMetricReached),
+                                                               maxTrialResultsFromPlanningRoot,
+                                                               maxTrialPeriodNumReads,
+                                                               boost::none,
+                                                               boost::none);
     candidate.root->attachToTrialRunTracker(
         candidate.data.tracker.get(),
         candidate.data.stageData.staticData->runtimePlanningRootNodeId);
 
-    sbe::TrialRuntimeExecutor{
-        plannerData.opCtx,
-        plannerData.collections,
-        *plannerData.cq,
-        plannerData.sbeYieldPolicy.get(),
-        indexExistenceChecker,
-        static_cast<size_t>(internalQuerySBEPlanEvaluationMaxMemoryBytes.load())}
+    sbe::TrialRuntimeExecutor{plannerData.opCtx,
+                              plannerData.collections,
+                              *plannerData.cq,
+                              plannerData.sbeYieldPolicy.get(),
+                              indexExistenceChecker,
+                              static_cast<size_t>(plannerData.cq->getExpCtx()
+                                                      ->getQueryKnobConfiguration()
+                                                      .getSbePlanEvaluationMaxMemoryBytes())}
         .executeCachedCandidateTrial(&candidate, maxTrialResults);
 
     return candidate;
@@ -208,7 +187,10 @@ std::unique_ptr<PlannerInterface> replan(
                     "query"_attr = redact(plannerData.cq->toStringShort()),
                     "shouldCache"_attr = (shouldCache ? "yes" : "no"));
         return std::make_unique<SingleSolutionPassthroughPlanner>(
-            std::move(plannerData), std::move(solutions[0]), std::move(replanReason));
+            std::move(plannerData),
+            std::move(solutions[0]),
+            PlanSelectionStrategy::kSinglePlan,
+            std::move(replanReason));
     }
 
     // Multiple solutions. Resort to multiplanning.
@@ -221,7 +203,8 @@ std::unique_ptr<PlannerInterface> replan(
                                           std::move(solutions),
                                           shouldCache,
                                           incrementReplannedPlanIsCachedPlanCounterCb,
-                                          std::move(replanReason));
+                                          std::move(replanReason),
+                                          PlanSelectionStrategy::kMultiPlanner);
 }
 
 std::unique_ptr<PlannerInterface> attemptToUsePlan(
@@ -260,9 +243,6 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
             .planSummary;
     };
 
-    const bool deferredExecutorEnabled =
-        plannerData.cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
@@ -275,16 +255,14 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
         std::string replanReason = str::stream() << "cached plan returned: " << candidate.status;
         recoverWhereExpression(plannerData.cq, std::move(candidate));
 
-        if (deferredExecutorEnabled) {
-            // If we're using the deferred get_executor, we throw an exception which is caught be a
-            // higher level replanning try/catch, and will reuse the top-level planning path. If
-            // we're using the regular get_executor, this counter is incremented in `replan`.
-            incrementReplanCounterCb();
-            uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::NeverCache,
-                                                          *plannerData.cachedPlanSolutionHash),
-                                   std::move(replanReason)));
-        }
-
+        // TODO SERVER-119036 update comment and simplify this function.
+        // If we're using the deferred get_executor, we throw an exception which is caught be a
+        // higher level replanning try/catch, and will reuse the top-level planning path. If
+        // we're using the regular get_executor, this counter is incremented in `replan`.
+        incrementReplanCounterCb();
+        uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::NeverCache,
+                                                      *plannerData.cachedPlanSolutionHash),
+                               std::move(replanReason)));
         return replan(std::move(plannerData),
                       indexExistenceChecker,
                       std::move(replanReason),  // NOLINT(bugprone-use-after-move)
@@ -293,7 +271,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                       incrementReplannedPlanIsCachedPlanCounterCb);
     }
 
-    if (candidate.exitedEarly) {
+    if (candidate.stopCondition == MultiPlannerStopCondition::kExhaustedBudget) {
         // The trial period took more than 'maxReadsBeforeReplan' physical reads. This plan may not
         // be efficient any longer, so we replan from scratch.
         auto numReads =
@@ -316,12 +294,11 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
             << decisionReads << " reads but it took at least " << numReads << " reads";
         recoverWhereExpression(plannerData.cq, std::move(candidate));
 
-        if (deferredExecutorEnabled) {
-            incrementReplanCounterCb();
-            uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::AlwaysCache,
-                                                          *plannerData.cachedPlanSolutionHash),
-                                   std::move(replanReason)));  // NOLINT(bugprone-use-after-move)
-        }
+        // TODO SERVER-119036 update comment and simplify this function.
+        incrementReplanCounterCb();
+        uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::AlwaysCache,
+                                                      *plannerData.cachedPlanSolutionHash),
+                               std::move(replanReason)));
         return replan(std::move(plannerData),
                       indexExistenceChecker,
                       std::move(replanReason),  // NOLINT(bugprone-use-after-move)
@@ -411,7 +388,9 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
                     collectionInfo != secondaryCollectionsInfo.end());
             tassert(8832901, "Foreign collection must exist", collectionInfo->second.exists);
 
-            if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
+            if (!QueryPlannerAnalysis::isEligibleForHashJoin(
+                    _plannerData.cq->getExpCtx()->getQueryKnobConfiguration(),
+                    collectionInfo->second)) {
                 return replan(
                     std::move(_plannerData),
                     indexExistenceChecker,

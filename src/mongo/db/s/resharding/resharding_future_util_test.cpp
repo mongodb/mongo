@@ -1,35 +1,9 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -71,8 +45,8 @@ TEST_F(ReshardingFutureUtilTest, CancelWhenAnyErrorThenQuiesceDuringExecutorShut
     CancellationSource cancelSource;
     auto token = cancelSource.token();
     PromiseAndFuture<void> taskThreadsReady;
-    AtomicWord<int> tasksRunningCount{0};
-    AtomicWord<bool> taskWasCancelled{false};
+    Atomic<int> tasksRunningCount{0};
+    Atomic<bool> taskWasCancelled{false};
     auto checkSignalReady = [&]() {
         auto running = tasksRunningCount.addAndFetch(1);
         if (running == 2) {
@@ -105,6 +79,25 @@ TEST_F(ReshardingFutureUtilTest, CancelWhenAnyErrorThenQuiesceDuringExecutorShut
     auto status = quiesced.getNoThrow();
     ASSERT_EQ(status.code(), 6791600);
     ASSERT_TRUE(taskWasCancelled.load());
+}
+
+TEST_F(ReshardingFutureUtilTest, IncludeReplicaSetWritesBlockedPredicateRetriesOnWriteBlock) {
+    auto writeBlockError = Status(ErrorCodes::ReplicaSetWritesBlocked, "foo");
+    // The dedicated predicate treats ReplicaSetWritesBlocked as retryable, while the predicate it
+    // builds upon does not.
+    ASSERT_TRUE(
+        resharding::
+            kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndLockTimeoutAndWriteConcern(
+                writeBlockError));
+    ASSERT_FALSE(
+        resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern(writeBlockError));
+
+    // It still retries on everything the base predicate considers retryable.
+    auto lockTimeoutError = Status(ErrorCodes::LockTimeout, "bar");
+    ASSERT_TRUE(
+        resharding::
+            kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndLockTimeoutAndWriteConcern(
+                lockTimeoutError));
 }
 }  // namespace
 }  // namespace mongo

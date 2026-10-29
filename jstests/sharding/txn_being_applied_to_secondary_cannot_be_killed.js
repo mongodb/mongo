@@ -6,6 +6,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkDecisionIs} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
@@ -52,9 +53,11 @@ st.refreshCatalogCacheForNs(st.s, ns);
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
 // from the shards starting, aborting, and restarting the transaction due to needing to
 // refresh after the transaction has started.
-assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(participant1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(participant2.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(coordinator, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(participant1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(participant2.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 
 // Start a new session and start a transaction on that session.
 const session = st.s.startSession();

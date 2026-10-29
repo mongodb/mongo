@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/validate/validate_results.h"
 
@@ -42,8 +16,6 @@ using namespace std::literals::string_view_literals;
 
 namespace {
 
-// Up to 1MB of "inconsistency" errors will be kept, i.e. missing/extra index fields.
-static constexpr int kMaxIndexInconsistencySize = 1 * 1024 * 1024;
 // Reserving 4MB for index details' error and warning messages.
 static constexpr size_t kMaxIndexDetailsSizeBytes = 4 * 1024 * 1024;
 
@@ -52,23 +24,6 @@ struct LargestObjsPopFirstCmp {
         return l.objsize() < r.objsize();
     }
 };
-
-// Helper for adding |obj| to a list of bson objs, where only the smallest objects up to a limit
-// will be kept. At least 1 object will always be kept. Returns true if an element was removed.
-bool addWithSizeLimit(const BSONObj& obj, std::vector<BSONObj>& dst, size_t& usedBytes) {
-    invariant(obj.objsize() > 0);
-    usedBytes += static_cast<size_t>(obj.objsize());
-    dst.push_back(std::move(obj));
-    std::push_heap(dst.begin(), dst.end(), LargestObjsPopFirstCmp{});
-    if (usedBytes <= kMaxIndexInconsistencySize || dst.size() <= 1) {
-        return false;
-    }
-    std::pop_heap(dst.begin(), dst.end(), LargestObjsPopFirstCmp{});
-    usedBytes -= dst.back().objsize();
-    dst.pop_back();
-    return true;
-}
-
 
 // Builds an array inside output containing the entries up to a given max size per entry.
 void buildFixedSizedArray(BSONObjBuilder& output,
@@ -100,16 +55,15 @@ void ValidateResultsIf::_mergeBase(const ValidateResultsIf& other) {
 }
 
 void ValidateResults::addExtraIndexEntry(BSONObj entry) {
-    if (addWithSizeLimit(std::move(entry), _extraIndexEntries, _extraIndexEntriesUsedBytes)) {
-        addError("Not all extra index entry inconsistencies are listed due to size limitations.",
-                 false);
+    if (_extraIndexEntries.add(std::move(entry))) {
+        addWarning("Not all extra index entry inconsistencies are listed due to size limitations.");
     }
 }
 
 void ValidateResults::addMissingIndexEntry(BSONObj entry) {
-    if (addWithSizeLimit(std::move(entry), _missingIndexEntries, _missingIndexEntriesUsedBytes)) {
-        addError("Not all missing index entry inconsistencies are listed due to size limitations.",
-                 false);
+    if (_missingIndexEntries.add(std::move(entry))) {
+        addWarning(
+            "Not all missing index entry inconsistencies are listed due to size limitations.");
     }
 }
 
@@ -125,6 +79,44 @@ void ValidateResults::setRepairMode(collection_validation::RepairMode mode) {
             _repairMode = "AdjustMultikey";
             break;
     }
+}
+
+std::string_view toString(ValidateResults::HashComparison comparison) {
+    switch (comparison) {
+        case ValidateResults::HashComparison::kNotTracked:
+            return "notTracked";
+        case ValidateResults::HashComparison::kPinnedReadTimestamp:
+            return "pinnedReadTimestamp";
+        case ValidateResults::HashComparison::kNoPersistedEntry:
+            return "noPersistedEntry";
+        case ValidateResults::HashComparison::kNoPersistedHash:
+            return "noPersistedHash";
+        case ValidateResults::HashComparison::kIncompleteDelta:
+            return "incompleteDelta";
+        case ValidateResults::HashComparison::kComparisonFailed:
+            return "comparisonFailed";
+        case ValidateResults::HashComparison::kComparable:
+            return "comparable";
+        case ValidateResults::HashComparison::kMatched:
+            return "matched";
+        case ValidateResults::HashComparison::kMismatched:
+            return "mismatched";
+    }
+    MONGO_UNREACHABLE;
+}
+
+bool ValidateResults::recordHashComparison(uint64_t accumulated, int64_t expected) {
+    const bool matches = static_cast<int64_t>(accumulated) == expected;
+    setExpectedXxh3CollectionHash(expected);
+    setHashComparison(matches ? HashComparison::kMatched : HashComparison::kMismatched);
+    // TODO SERVER-134248: Change this to an error after we get confidence in the persisted
+    // collection hashes.
+    if (!matches) {
+        addWarning(
+            "The collection hash does not match the hash accumulated by continuous internode "
+            "validation.");
+    }
+    return matches;
 }
 
 void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
@@ -196,9 +188,39 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     if (_numRecords.has_value()) {
         resultObj->appendNumber("nrecords", _numRecords.value());
     }
+    if (_dataSize.has_value()) {
+        resultObj->appendNumber("dataSize", _dataSize.value());
+    }
+    // Only present when the record store traversal was split across slices, so that the output of a
+    // single-threaded validation is unchanged.
+    if (_numRecordStoreSlices.has_value()) {
+        resultObj->appendNumber("nParallelSlices", _numRecordStoreSlices.value());
+    }
 
     if (_collectionHash.has_value()) {
         resultObj->append("all", _collectionHash->toHexString());
+    }
+
+    if (_xxh3CollectionHash.has_value()) {
+        resultObj->append("xxh3All", static_cast<long long>(_xxh3CollectionHash.value()));
+    }
+
+    if (_expectedXxh3CollectionHash.has_value()) {
+        resultObj->append("expectedXxh3All",
+                          static_cast<long long>(_expectedXxh3CollectionHash.value()));
+    }
+
+    // The diff is what a repairReplicatedMetadata command folds into the replicated metadata
+    // system's hash to yield the accumulated one.
+    if (_hashComparison == HashComparison::kMismatched && _expectedXxh3CollectionHash.has_value() &&
+        _xxh3CollectionHash.has_value()) {
+        resultObj->append("xxh3AllDiff",
+                          static_cast<long long>(*_expectedXxh3CollectionHash) ^
+                              static_cast<long long>(*_xxh3CollectionHash));
+    }
+
+    if (_hashComparison.has_value()) {
+        resultObj->append("hashComparison", toString(_hashComparison.value()));
     }
 
     if (_metadataHash.has_value()) {
@@ -241,6 +263,7 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         bob.appendBool("valid", ivr.isValid());
         bob.append("spec", ivr.getSpec());
         bob.appendBool("isMultikey", ivr.isMultikey());
+        bob.appendNumber("keyBytes", static_cast<long long>(ivr.getKeyBytesTraversed()));
 
         if (!ivr.getWarnings().empty()) {
             buildFixedSizedArray(bob, "warnings", ivr.getWarnings(), maxSizePerEntry);
@@ -281,6 +304,10 @@ void ValidateResults::merge(const ValidateResults& other) {
 
     ValidateResults tmp = *this;
 
+    // Increment the number of slices. When using parallel validation and merging results, this
+    // tracks the number of constituent slices for debugging and test.
+    tmp._numRecordStoreSlices = tmp._numRecordStoreSlices.value_or(0) + 1;
+
     // Per-index results. Indexes absent from this result are copied in wholesale; shared indexes
     // have their errors, warnings and counters combined via the public interface. The per-index
     // continuation/fatal flags have no public setter and aren't produced during the record-store
@@ -298,6 +325,7 @@ void ValidateResults::merge(const ValidateResults& other) {
         ivr.getWarningsUnsafe()->insert(otherIvr.getWarnings().begin(),
                                         otherIvr.getWarnings().end());
         ivr.addKeysTraversed(otherIvr.getKeysTraversed());
+        ivr.addKeyBytesTraversed(otherIvr.getKeyBytesTraversed());
         ivr.addKeysRemovedFromRecordStore(otherIvr.getKeysRemovedFromRecordStore());
         ivr.setHasStructuralDamage(ivr.hasStructuralDamage() || otherIvr.hasStructuralDamage());
         ivr.setIsMultikey(ivr.isMultikey() || otherIvr.isMultikey());
@@ -307,10 +335,10 @@ void ValidateResults::merge(const ValidateResults& other) {
                     ivr.getSpec().binaryEqual(otherIvr.getSpec()));
     }
 
-    for (const auto& eia : other._extraIndexEntries) {
+    for (const auto& eia : other._extraIndexEntries.entries()) {
         tmp.addExtraIndexEntry(eia);
     }
-    for (const auto& mie : other._missingIndexEntries) {
+    for (const auto& mie : other._missingIndexEntries.entries()) {
         tmp.addMissingIndexEntry(mie);
     }
 
@@ -336,6 +364,7 @@ void ValidateResults::merge(const ValidateResults& other) {
     addOptional(tmp._numInvalidDocuments, other._numInvalidDocuments);
     addOptional(tmp._numNonCompliantDocuments, other._numNonCompliantDocuments);
     addOptional(tmp._numRecords, other._numRecords);
+    addOptional(tmp._dataSize, other._dataSize);
 
     tmp._numRemovedCorruptRecords += other._numRemovedCorruptRecords;
     tmp._numRemovedExtraIndexEntries += other._numRemovedExtraIndexEntries;
@@ -345,13 +374,19 @@ void ValidateResults::merge(const ValidateResults& other) {
 
     tmp._recordTimestamps.insert(other._recordTimestamps.begin(), other._recordTimestamps.end());
 
-    // The collection and partial hashes are order-independent XORs of per-record SHA256 blocks and
-    // must be combined at the SHA256Block level before being stringified, so merge() only adopts a
-    // value when this result doesn't already have one.
+    // The collection and partial hashes are order-independent XORs of per-record hashes and must be
+    // combined at the hash level before being stringified, so merge() only adopts a value when this
+    // result doesn't already have one.
     if (!tmp._collectionHash) {
         tmp._collectionHash = other._collectionHash;
     } else if (other._collectionHash) {
         tmp._collectionHash->xorInline(*other._collectionHash);
+    }
+
+    if (!tmp._xxh3CollectionHash) {
+        tmp._xxh3CollectionHash = other._xxh3CollectionHash;
+    } else if (other._xxh3CollectionHash) {
+        tmp._xxh3CollectionHash = (*tmp._xxh3CollectionHash) ^ (*other._xxh3CollectionHash);
     }
 
     if (!tmp._metadataHash) {

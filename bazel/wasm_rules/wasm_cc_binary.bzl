@@ -5,8 +5,10 @@ the WASI CC toolchain. Sources should be in cc_library targets listed as deps,
 not compiled directly by this rule.
 """
 
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("//bazel/toolchains/cc/mongo_wasm/toolchain:wasi_transition.bzl", "wasi_transition")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 # Flags that leak from host-oriented deps but are invalid for WASI linking.
 _WASI_INVALID_LINK_FLAGS = ["-pthread", "-ldl", "-lrt", "-lm"]
@@ -30,7 +32,7 @@ def _filter_linking_contexts(ctx, linking_contexts):
     )
 
 def _wasm_cc_binary_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
         cc_toolchain = cc_toolchain,
@@ -98,7 +100,7 @@ wasm_cc_binary = rule(
         ),
     },
     cfg = wasi_transition,
-    toolchains = use_cpp_toolchain(),
+    toolchains = use_cc_toolchain(),
     fragments = ["cpp"],
     doc = "Links a WASM binary from cc_library deps under the WASI toolchain.",
 )

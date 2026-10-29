@@ -10,7 +10,7 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
- *   featureFlagExtensionsInsideHybridSearch,
+ *   requires_fcv_90,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

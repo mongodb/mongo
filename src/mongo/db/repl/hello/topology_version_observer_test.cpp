@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/hello/topology_version_observer.h"
@@ -70,9 +44,14 @@ namespace {
 /**
  * Sets up and tears down the test environment for `TopologyVersionObserver`
  */
-class TopologyVersionObserverTest : public ReplCoordTest {
+class BasicTopologyVersionObserverTest : public ReplCoordTest {
 protected:
-    BSONObj getConfigObj() {
+    void setUp() override {
+        ReplCoordTest::setUp();
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    }
+
+    const BSONObj configObj{[] {
         BSONObjBuilder configBuilder;
         configBuilder << "_id"
                       << "mySet";
@@ -84,12 +63,16 @@ protected:
                                                   << "node2:12345"));
         configBuilder << "protocolVersion" << 1;
         return configBuilder.obj();
-    }
+    }()};
 
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
+                                                       logv2::LogSeverity::Debug(4)};
+};
+
+class TopologyVersionObserverTest : public BasicTopologyVersionObserverTest {
 public:
     void setUp() override {
-        auto configObj = getConfigObj();
-        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+        BasicTopologyVersionObserverTest::setUp();
         ReplSetConfig config = assertMakeRSConfig(configObj);
         replCoord = getReplCoord();
 
@@ -112,6 +95,7 @@ public:
         observer->shutdown();
         ASSERT(observer->isShutdown());
         observer.reset();
+        BasicTopologyVersionObserverTest::tearDown();
     }
 
     auto getObserverCache() {
@@ -144,14 +128,11 @@ public:
     }
 
 protected:
-    ReplicationCoordinatorImpl* replCoord;
+    ReplicationCoordinatorImpl* replCoord{};
 
     const Milliseconds sleepTime = Milliseconds(100);
 
     std::unique_ptr<TopologyVersionObserver> observer;
-
-    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
-                                                       logv2::LogSeverity::Debug(4)};
 };
 
 
@@ -239,7 +220,7 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
         // Kill the operation waiting on the `isMaster` future to make it throw
         if (!tryKillOperation()) {
             // If we weren't able to kill, then block until there is an opCtx again.
-            failBlock->waitForTimesEntered(failBlock.initialTimesEntered() + 1);
+            failBlock.waitForOneNewEntry();
 
             // Try again to kill now that we've waited for the failpoint.
             ASSERT(tryKillOperation()) << "Unable to acquire and kill observer OpCtx";
@@ -278,22 +259,14 @@ TEST_F(TopologyVersionObserverTest, HandleQuiesceMode) {
     }
 
     // Wait for the background thread to fully shutdown.
-    failBlock->waitForTimesEntered(failBlock.initialTimesEntered() + 1);
+    failBlock.waitForOneNewEntry();
 
     // In quiescence, the observer should be shutdown and have nothing in cache.
     ASSERT(!observer->getCached());
     ASSERT(observer->isShutdown());
 }
 
-class TopologyVersionObserverInterruptedTest : public TopologyVersionObserverTest {
-public:
-    void setUp() override {
-        auto configObj = getConfigObj();
-        assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    }
-
-    void tearDown() override {}
-};
+class TopologyVersionObserverInterruptedTest : public BasicTopologyVersionObserverTest {};
 
 TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOperation) {
 
@@ -307,7 +280,7 @@ TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOpe
         observer = std::make_unique<TopologyVersionObserver>();
         observer->init(getServiceContext(), getReplCoord());
 
-        workerFailBlock->waitForTimesEntered(workerFailBlock.initialTimesEntered() + 1);
+        workerFailBlock.waitForOneNewEntry();
         blockerThread = stdx::thread([&] {
             FailPointEnableBlock requestFailBlock("topologyVersionObserverExpectsInterruption");
             b1.countDownAndWait();
@@ -319,7 +292,7 @@ TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOpe
             FailPointEnableBlock shutdownFailBlock("topologyVersionObserverShutdownShouldWait");
             observerThread = stdx::thread([&] { observer->shutdown(); });
 
-            shutdownFailBlock->waitForTimesEntered(shutdownFailBlock.initialTimesEntered() + 1);
+            shutdownFailBlock.waitForOneNewEntry();
         }
     }
     observerThread->join();

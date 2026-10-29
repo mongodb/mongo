@@ -18,6 +18,9 @@ filters:
   - "/generate_evergreen_bazelrc.sh":
     approvers:
       - 10gen/devprod-build
+  - "/native_toolchain_setup.sh":
+    approvers:
+      - 10gen/devprod-build
   - "get_custom_build_promotion_expansions.sh":
     approvers:
       - 10gen/devprod-release-infrastructure
@@ -31,6 +34,9 @@ filters:
     approvers:
       - 10gen/devprod-build
   - "validate_compile_commands.py":
+    approvers:
+      - 10gen/devprod-build
+  - "validate_compile_commands_test.py":
     approvers:
       - 10gen/devprod-build
   - "packager_crypt_py_run.sh":
@@ -48,6 +54,9 @@ filters:
   - "generate_sast_report.sh":
     approvers:
       - 10gen/devprod-release-infrastructure
+  - "waterfall_gpg_sign.sh":
+    approvers:
+      - 10gen/devprod-release-infrastructure
   - "write_sast_report_env_file.sh":
     approvers:
       - 10gen/devprod-release-infrastructure
@@ -63,3 +72,6 @@ filters:
   - "fetch_mongodb_database_tools.sh":
     approvers:
       - 10gen/query-optimization-correctness
+  - "remote_execution_containers_generate.sh":
+    approvers:
+      - 10gen/devprod-build

@@ -367,11 +367,24 @@ describe("Comparative PBT for timeseries bucket rollover conditions", () => {
                 3, // maxFields
                 0, // minDocs (overridden to 1001 by countRollover)
                 50, // maxDocs (overridden to 1010 by countRollover)
-                {rolloverConditions: {countRollover: true}},
+                {
+                    rolloverConditions: {countRollover: true},
+                    // Pin the command kind.  With the full command pool a short sequence
+                    // usually draws a single-doc insert or a delete, and the run exercises no
+                    // count rollover at all.
+                    commandTypes: ["batchInsert"],
+                },
                 undefined,
                 fcParams.replayPath,
             ),
             countAssertArgs,
+        );
+
+        assert.gt(
+            stats.rollover.countRolloverBatches,
+            0,
+            "kCount case ran without ever inserting a batch large enough to roll a bucket over",
+            {stats},
         );
     });
 

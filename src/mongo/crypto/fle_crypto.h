@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -53,7 +26,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -72,7 +45,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * ESC Collection schema
@@ -184,7 +157,7 @@ struct ESCDocument {
 /**
  * Basic set of functions to read/query data from state collections to perform EmuBinary.
  */
-class MONGO_MOD_OPEN FLETagQueryInterface {
+class [[MONGO_MOD_OPEN]] FLETagQueryInterface {
 public:
     enum class TagQueryType { kInsert, kQuery, kCompact, kCleanup, kPadding };
 
@@ -214,7 +187,7 @@ public:
 /**
  * Interface for reading from a collection for the "EmuBinary" algorithm
  */
-class MONGO_MOD_OPEN FLEStateCollectionReader {
+class [[MONGO_MOD_OPEN]] FLEStateCollectionReader {
 public:
     virtual ~FLEStateCollectionReader() = default;
 
@@ -448,7 +421,7 @@ public:
  *
  * Keys are identified by UUID in the key vault.
  */
-class MONGO_MOD_OPEN FLEKeyVault {
+class [[MONGO_MOD_OPEN]] FLEKeyVault {
 public:
     virtual ~FLEKeyVault();
 
@@ -825,10 +798,10 @@ private:
  * struct {
  *   uint8_t fle_blob_subtype = 17;
  *   uint8_t key_uuid[16];
- *   uint8_t original_bson_type;
- *   uint8_t total_tag_count;
- *   uint8_t substring_tag_count;
- *   uint8_t suffix_tag_count;
+ *   uint8_t bson_type;
+ *   uint32_t total_tag_count;
+ *   uint32_t substring_tag_count;
+ *   uint32_t suffix_tag_count;
  *   ciphertext[ciphertext_length];
  *   metadataBlock exact_metadata;
  *   array<metadataBlock> substring_metadata;
@@ -865,6 +838,8 @@ public:
 
 private:
     FLE2IndexedTextEncryptedValue();
+    void verifyTotalTagCountIsWithinLimit(ConstDataRange toParse);
+
     UniqueMCFLE2IndexedEncryptedValueV2 _value;
     // Cached parsed values
     mutable boost::optional<std::vector<uint8_t>> _cachedSerializedPayload;
@@ -1106,6 +1081,19 @@ public:
      *       greater than kSubstringPreviewMaxLengthMax.
      */
     static void checkSubstringPreviewParameterLimitsNotExceeded(const EncryptedFieldConfig& ef);
+
+    static constexpr int64_t kFLEMaxContentionFactor = 200'000;
+
+    /**
+     * Throws BadValue if any queryable field in ef has a contention factor exceeding
+     * kFLEMaxContentionFactor.
+     */
+    static void checkMaxContentionFactorNotExceeded(const EncryptedFieldConfig& ef);
+
+    /**
+     * Throws BadValue if contention exceeds kFLEMaxContentionFactor.
+     */
+    static void checkMaxContentionFactorNotExceeded(int64_t contention);
 };
 
 /**
@@ -1241,6 +1229,10 @@ struct ParsedFindTextSearchPayload {
     ESCDerivedFromDataToken esc;
 
     ServerDerivedFromDataToken server;
+
+    boost::optional<std::int32_t> minQueryLength;  // lb
+    boost::optional<std::int32_t> maxQueryLength;  // ub
+    boost::optional<std::int32_t> maxLength;       // mlen, substring only
 };
 
 
@@ -1384,7 +1376,7 @@ ConstDataRange binDataToCDR(BSONElement element);
 template <typename T>
 T parseFromCDR(ConstDataRange cdr) {
     ConstDataRangeCursor cdc(cdr);
-    auto obj = cdc.readAndAdvance<Validated<BSONObj>>();
+    BSONObj obj{cdc.readAndAdvance<rpc::ValidatedBSONObj>()};
 
     IDLParserContext ctx("root");
     return T::parse(obj, ctx);
@@ -1403,6 +1395,12 @@ using QueryTypeMatchFn = std::function<bool(QueryTypeEnum)>;
 bool hasQueryTypeMatching(const EncryptedField& field, const QueryTypeMatchFn& matcher);
 bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMatchFn& matcher);
 
+// Returns the first QueryTypeConfig whose query type satisfies matcher, or none if no config does.
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedField& field,
+                                                      const QueryTypeMatchFn& matcher);
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedFieldConfig& config,
+                                                      const QueryTypeMatchFn& matcher);
+
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);
 
@@ -1413,4 +1411,4 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
  * sparsity
  */
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity);
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

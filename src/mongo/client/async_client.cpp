@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/client/async_client.h"
@@ -52,6 +26,8 @@
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -69,6 +45,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
+#include <limits>
 #include <memory>
 #include <ratio>
 #include <type_traits>
@@ -94,6 +71,48 @@ auto& totalTimeForEgressConnectionAcquiredToWireMicros =
 
 MONGO_FAIL_POINT_DEFINE(asyncConnectReturnsConnectionError);
 
+boost::optional<TelemetryContextSection> AsyncDBClient::makeEgressTelemetrySection(
+    const executor::RemoteCommandRequest& request, int maxWireVersion) {
+    // std::numeric_limits<int>::max() is the StreamableReplicaSetMonitor sentinel for an unknown
+    // topology; do not send the telemetry section in that case.
+    if (maxWireVersion < WireVersion::WIRE_VERSION_90 ||
+        maxWireVersion == std::numeric_limits<int>::max()) {
+        return boost::none;
+    }
+    return otel::traces::TelemetryContextSerializer::toSection(request.telemetryContext.get());
+}
+
+otel::traces::Span AsyncDBClient::startEgressSpan(
+    std::shared_ptr<otel::TelemetryContext>& telemetryContext,
+    std::string_view commandName,
+    bool fireAndForget) {
+    otel::traces::SpanKind spanKind =
+        fireAndForget ? otel::traces::SpanKind::kProducer : otel::traces::SpanKind::kClient;
+    return otel::traces::Span::startEgressSpan(
+        telemetryContext,
+        otel::traces::getOrRegisterCommandSpanName(commandName),
+        otel::traces::SpanOptions{.kind = spanKind});
+}
+
+bool AsyncDBClient::maybeEndExhaustSpan(boost::optional<otel::traces::Span>& span,
+                                        bool isMoreToComeSet,
+                                        const Status& status) {
+    if (isMoreToComeSet || !span) {
+        return false;
+    }
+    span->setStatus(status);
+    span.reset();
+    return true;
+}
+
+std::shared_ptr<AsyncDBClient> AsyncDBClient::create(HostAndPort peer,
+                                                     std::shared_ptr<transport::Session> session,
+                                                     ServiceContext* svcCtx,
+                                                     transport::ReactorHandle reactor) {
+    return std::shared_ptr<AsyncDBClient>(
+        new AsyncDBClient(std::move(peer), std::move(session), svcCtx, std::move(reactor)));
+}
+
 Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
     transport::ConnectSSLMode sslMode,
@@ -114,7 +133,7 @@ Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
                        std::move(connectionMetrics),
                        std::move(transientSSLContext))
         .then([peer, context, reactor](std::shared_ptr<transport::Session> session) {
-            return std::make_shared<AsyncDBClient>(peer, std::move(session), context, reactor);
+            return AsyncDBClient::create(peer, std::move(session), context, reactor);
         });
 }
 
@@ -167,6 +186,8 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
                                 << validateStatus.reason());
     }
 
+    _negotiatedMaxWireVersion = replyWireVersion.maxWireVersion;
+
     auto& egressConnectionCloserManager = executor::EgressConnectionCloserManager::get(_svcCtx);
     // Mark outgoing connection to keep open so it can be kept open on FCV upgrade if it is
     // not to a server with a lower binary version.
@@ -184,7 +205,7 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
 
 auth::RunCommandHook AsyncDBClient::_makeAuthRunCommandHook() {
     return [this](OpMsgRequest request) {
-        return runCommand(std::move(request)).then([](rpc::UniqueReply reply) -> Future<BSONObj> {
+        return _runCommand(std::move(request)).then([](rpc::UniqueReply reply) -> Future<BSONObj> {
             auto status = getStatusFromCommandResult(reply->getCommandReply());
             if (!status.isOK()) {
                 return status;
@@ -350,20 +371,12 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
         });
 }
 
-Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
-                                                   const BatonHandle& baton,
-                                                   bool fireAndForget,
-                                                   std::shared_ptr<Timer> fromConnAcquiredTimer,
-                                                   const CancellationToken& token) {
+Future<rpc::UniqueReply> AsyncDBClient::_runCommand(OpMsgRequest request,
+                                                    const BatonHandle& baton,
+                                                    bool fireAndForget,
+                                                    std::shared_ptr<Timer> fromConnAcquiredTimer,
+                                                    const CancellationToken& token) {
     auto msgId = nextMessageId();
-    LOGV2_DEBUG(9484002,
-                4,
-                "Sending command to peer",
-                "peer"_attr = _peer,
-                "sessionId"_attr = _session->id(),
-                "msgId"_attr = msgId,
-                "request"_attr = redact(request.body),
-                "fireAndForget"_attr = fireAndForget);
     auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
@@ -425,15 +438,32 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     const CancellationToken& token) {
     auto startTimer = Timer();
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    auto span = startEgressSpan(
+        request.telemetryContext, opMsgRequest.getCommandName(), request.fireAndForget);
+    opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
 
-    return runCommand(std::move(opMsgRequest),
-                      baton,
-                      request.fireAndForget,
-                      std::move(fromConnAcquiredTimer),
-                      token)
-        .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
-            return executor::RemoteCommandResponse(
-                _peer, response->getCommandReply(), startTimer.elapsed());
+    return _runCommand(std::move(opMsgRequest),
+                       baton,
+                       request.fireAndForget,
+                       std::move(fromConnAcquiredTimer),
+                       token)
+        .onCompletion([this, startTimer = std::move(startTimer), span = std::move(span)](
+                          StatusWith<rpc::UniqueReply> swResponse) mutable
+                          -> StatusWith<executor::RemoteCommandResponse> {
+            // This callback may not be destroyed immediately after this function returns, so we
+            // move the span to a local variable to ensure it ends when this function returns. Note
+            // that onCompletion includes the cancellation case.
+            auto endedSpan = std::move(span);
+            if (!swResponse.isOK()) {
+                endedSpan.setStatus(swResponse.getStatus());
+                return swResponse.getStatus();
+            }
+            // A successful round-trip can still carry a command-level error (e.g. {ok: 0}) in the
+            // reply body, so derive the span status from the command result rather than assuming
+            // OK just because the transport layer succeeded.
+            auto& commandReply = swResponse.getValue()->getCommandReply();
+            endedSpan.setStatus(getStatusFromCommandResult(commandReply));
+            return executor::RemoteCommandResponse(_peer, commandReply, startTimer.elapsed());
         });
 }
 
@@ -443,7 +473,14 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustRe
     const BatonHandle& baton,
     const CancellationToken& token) {
     return _waitForResponse(msgId, baton, token)
-        .then([stopwatch, msgId, baton, this](Message responseMsg) mutable {
+        .onCompletion([stopwatch, this](StatusWith<Message> swResponseMsg) mutable
+                          -> StatusWith<executor::RemoteCommandResponse> {
+            if (!swResponseMsg.isOK()) {
+                maybeEndExhaustSpan(
+                    _exhaustSpan, /*isMoreToComeSet=*/false, swResponseMsg.getStatus());
+                return swResponseMsg.getStatus();
+            }
+            Message responseMsg = std::move(swResponseMsg.getValue());
             bool isMoreToComeSet = OpMsg::isFlagSet(responseMsg, OpMsg::kMoreToCome);
             rpc::UniqueReply response = rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
             auto rcResponse =
@@ -451,6 +488,9 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustRe
                                                 response->getCommandReply(),
                                                 duration_cast<Milliseconds>(stopwatch.elapsed()),
                                                 isMoreToComeSet);
+            maybeEndExhaustSpan(_exhaustSpan,
+                                isMoreToComeSet,
+                                getStatusFromCommandResult(response->getCommandReply()));
             return rcResponse;
         });
 }
@@ -460,22 +500,21 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::awaitExhaustCommand(
     return _continueReceiveExhaustResponse(ClockSource::StopWatch(), boost::none, baton, token);
 }
 
-Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(
+Future<executor::RemoteCommandResponse> AsyncDBClient::_runExhaustCommand(
     OpMsgRequest request, const BatonHandle& baton, const CancellationToken& token) {
     auto msgId = nextMessageId();
-    LOGV2_DEBUG(9484004,
-                4,
-                "Sending exhaust command to peer",
-                "peer"_attr = _peer,
-                "sessionId"_attr = _session->id(),
-                "msgId"_attr = msgId,
-                "request"_attr = redact(request.body));
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kExhaustSupported);
 
     return _call(std::move(requestMsg), msgId, baton, token)
         .then([msgId, baton, this, token]() mutable {
             return _continueReceiveExhaustResponse(ClockSource::StopWatch(), msgId, baton, token);
+        })
+        .onError([this](Status s) -> StatusWith<executor::RemoteCommandResponse> {
+            // Covers the case where `_call` itself fails, before
+            // `_continueReceiveExhaustResponse` (and its own span-ending logic) ever runs.
+            maybeEndExhaustSpan(_exhaustSpan, /*isMoreToComeSet=*/false, s);
+            return s;
         });
 }
 
@@ -484,7 +523,10 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
     const BatonHandle& baton,
     const CancellationToken& token) {
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-    return runExhaustCommand(std::move(opMsgRequest), baton, token);
+    _exhaustSpan = startEgressSpan(
+        request.telemetryContext, opMsgRequest.getCommandName(), /*fireAndForget=*/false);
+    opMsgRequest.telemetryContext = makeEgressTelemetrySection(request, _negotiatedMaxWireVersion);
+    return _runExhaustCommand(std::move(opMsgRequest), baton, token);
 }
 
 void AsyncDBClient::cancel(const BatonHandle& baton) {

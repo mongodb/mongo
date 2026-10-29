@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -55,7 +29,7 @@ namespace mongo {
 /**
  * Decoration on Snapshot to store cloned Collections until they are committed or rolled back.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT UncommittedCatalogUpdates {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] UncommittedCatalogUpdates {
 public:
     struct Entry {
         enum class Action {
@@ -78,10 +52,11 @@ public:
         };
 
         boost::optional<UUID> uuid() const {
-            if (action == Action::kCreatedCollection || action == Action::kWritableCollection ||
-                action == Action::kRenamedCollection)
+            if (collection)
                 return collection->uuid();
-            return externalUUID;
+            if (droppedCollection)
+                return droppedCollection->uuid();
+            return boost::none;
         }
 
         // Type of action this entry has stored. Members below may or may not be set depending on
@@ -96,10 +71,6 @@ public:
         // Store namespace separately to handle rename and drop without making writable first.
         // Set for all actions.
         NamespaceString nss;
-
-        // External uuid when not accessible via collection.
-        // Set for actions kDroppedCollection, kRecreatedCollection. boost::none otherwise.
-        boost::optional<UUID> externalUUID;
 
         // New namespace this collection has been renamed to.
         // Set for action kRenamedCollection. Default constructed otherwise.
@@ -311,7 +282,7 @@ private:
  * Decoration on Snapshot to store Collections instantiated from durable catalog data. Lifetime tied
  * to Snapshot lifetime.
  */
-class MONGO_MOD_PRIVATE OpenedCollections {
+class [[MONGO_MOD_PRIVATE]] OpenedCollections {
 public:
     static OpenedCollections& get(OperationContext* opCtx);
 

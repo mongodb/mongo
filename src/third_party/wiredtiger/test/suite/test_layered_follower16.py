@@ -27,8 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # The stable cursor on a follower must not open until the first read after the
-# follower has picked up a checkpoint. Writes with default overwrite must never
-# open stable; non-overwrite writes and all reads must open it.
+# follower has picked up a checkpoint. Insert, update, and remove with overwrite=true
+# must never open stable; all other writes and all reads must open it.
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
@@ -64,7 +64,12 @@ def _op_prev(cursor):
     return cursor.prev()
 
 def _op_remove(cursor):
-    cursor.set_key('key_0')
+    # A follower's overwrite=true remove asserts the key is still live, so repeat calls (this test
+    # calls do_op twice, before and after the checkpoint) must each target a distinct, still-live
+    # key rather than removing the same key twice; insert_keys populates key_0 through key_4.
+    idx = getattr(cursor, '_remove_key_idx', 0)
+    cursor.set_key(f'key_{idx}')
+    cursor._remove_key_idx = idx + 1
     return cursor.remove()
 
 def _op_reserve(cursor):
@@ -117,15 +122,8 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
     def follower_config(self):
-        return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="follower")'
-
-    def get_stat(self, session, stat_key):
-        stat_cursor = session.open_cursor('statistics:')
-        stat_cursor.set_key(stat_key)
-        stat_cursor.search()
-        val = stat_cursor.get_value()[2]
-        stat_cursor.close()
-        return val
+        return self.extensionsConfig() + self.conn_base_config + \
+            'disaggregated=(role="follower")'
 
     def insert_keys(self, session, nkeys, ts):
         cursor = session.open_cursor(self.uri)
@@ -135,11 +133,11 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
             session.commit_transaction(f'commit_timestamp={self.timestamp_str(ts)}')
         cursor.close()
 
-    def end_txn(self, session):
+    def end_txn(self, session, commit_ts=10):
         if self.txn_mode == 'rollback':
             session.rollback_transaction()
         else:
-            session.commit_transaction(f'commit_timestamp={self.timestamp_str(10)}')
+            session.commit_transaction(f'commit_timestamp={self.timestamp_str(commit_ts)}')
 
     def test_stable_deferred_until_checkpoint(self):
         """
@@ -157,14 +155,15 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         # Replicate the leader's writes to the follower's ingest.
         self.insert_keys(session_follow, 5, 10)
 
-        # Open the follower cursor.
-        cursor_config = 'overwrite=false' if not self.overwrite else None
+        # Explicitly configure overwrite=true to gate the skip-stable path for every write --
+        # insert, update, and remove alike.
+        cursor_config = 'overwrite=true' if self.overwrite else 'overwrite=false'
         cursor_follow = session_follow.open_cursor(self.uri, None, cursor_config)
 
         # Any operation before a checkpoint must not open stable.
         session_follow.begin_transaction()
         self.do_op(cursor_follow)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 0)
 
         if self.txn_mode != 'survive':
             self.end_txn(session_follow)
@@ -174,16 +173,37 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
 
         if self.txn_mode != 'survive':
+            # The counts below need a stable constituent to bind, so wait for the adoption:
+            # a delivery is not necessarily adopted by the time it returns.
+            self.disagg_wait_for_adoption(conn_follow)
             session_follow.begin_transaction()
+        # The survive scenario keeps its transaction open across the pickup, deferring the
+        # adoption indefinitely: waiting there would hang.
 
-        opens_stable = not (self.overwrite and self.do_op in (_op_insert, _op_update))
+        # Only the operations that must consult stable open it. An exact search and a write defer
+        # the follower's stable open until the ingest lookup misses, which for these keys happens
+        # only for a non-overwrite insert of a brand-new key; search_near, iteration and largest_key
+        # merge the constituents, so they always open stable.
+        if self.do_op in (_op_search_near, _op_next, _op_prev, _op_largest_key):
+            opens_stable = 1
+        elif self.do_op is _op_insert and not self.overwrite:
+            opens_stable = 1
+        else:
+            opens_stable = 0
 
-        # After the checkpoint arrives, repeat the same operation.
-        self.do_op(cursor_follow)
-        self.end_txn(session_follow)
+        # After the checkpoint arrives, repeat the same operation. A transaction that survived the
+        # pickup has a snapshot that predates it, so the adoption is deferred while it runs: the
+        # operation keeps reading the ingest content and finds no stable checkpoint to bind.
+        if self.txn_mode == 'survive':
+            self.do_op(cursor_follow)
+            session_follow.rollback_transaction()
+            opens_stable = 0
+        else:
+            self.do_op(cursor_follow)
+            self.end_txn(session_follow, commit_ts=11)
 
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_open_stable), opens_stable)
-        self.assertEqual(self.get_stat(session_follow, wiredtiger.stat.conn.layered_curs_reopen_stable), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), opens_stable)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable, session=session_follow), 0)
 
         cursor_follow.close()
         conn_follow.close()

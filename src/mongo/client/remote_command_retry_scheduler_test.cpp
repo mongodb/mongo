@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
@@ -132,10 +106,13 @@ public:
         : _underlyingStrategy(std::move(retryStrategy)),
           _testBaseBackoffMillis(testBaseBackoffMillis) {}
 
-    bool recordFailureAndEvaluateShouldRetry(Status s,
-                                             const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
-        return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+    bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& target,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS = boost::none) override {
+        return _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+            s, target, errorLabels, baseBackoffMS);
     }
 
     void recordSuccess(const boost::optional<HostAndPort>& target) override {
@@ -245,7 +222,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryStrategy) {
             continue;
         }
         const auto status = Status(error, ""sv);
-        ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+        ASSERT_FALSE(
+            strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}, boost::none));
     }
 }
 
@@ -260,13 +238,16 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategyMaxResponse) {
         if (ErrorCodes::isA<ErrorCategory::RetriableError>(error)) {
             errorCounter++;
             if (errorCounter <= 15) {
-                ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+                ASSERT_TRUE(strategy.recordFailureAndEvaluateShouldRetry(
+                    status, boost::none, {}, boost::none));
             } else {
-                ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+                ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(
+                    status, boost::none, {}, boost::none));
             }
             continue;
         }
-        ASSERT_FALSE(strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+        ASSERT_FALSE(
+            strategy.recordFailureAndEvaluateShouldRetry(status, boost::none, {}, boost::none));
     }
 }
 
@@ -278,11 +259,13 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryStrategy) {
         }
         auto status = Status(error, "test");
         if (ErrorCodes::isA<ErrorCategory::RetriableError>(error)) {
-            ASSERT_TRUE(strategy->recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+            ASSERT_TRUE(strategy->recordFailureAndEvaluateShouldRetry(
+                status, boost::none, {}, boost::none));
             strategy->recordSuccess(boost::none);
             continue;
         }
-        ASSERT_FALSE(strategy->recordFailureAndEvaluateShouldRetry(status, boost::none, {}));
+        ASSERT_FALSE(
+            strategy->recordFailureAndEvaluateShouldRetry(status, boost::none, {}, boost::none));
     }
 }
 

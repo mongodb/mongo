@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -48,35 +22,33 @@ namespace mongo::sbe {
 using SortStageTest = PlanStageTestFixture;
 
 TEST_F(SortStageTest, SortNumbersTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(12LL << "A") << BSON_ARRAY(2.5 << "B") << BSON_ARRAY(7 << "C")
-                                           << BSON_ARRAY(Decimal128(4) << "D")));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+                                           << BSON_ARRAY(Decimal128(4) << "D"))));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(2.5 << "B") << BSON_ARRAY(Decimal128(4) << "D")
-                                          << BSON_ARRAY(7 << "C") << BSON_ARRAY(12LL << "A")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                                          << BSON_ARRAY(7 << "C") << BSON_ARRAY(12LL << "A"))));
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         // Create a SortStage that sorts by slot0 in ascending order.
-        auto sortStage =
-            makeS<SortStage>(std::move(scanStage),
-                             makeSV(scanSlots[0]),
-                             std::vector<value::SortDirection>{value::SortDirection::Ascending},
-                             makeSV(scanSlots[1]),
-                             makeE<EConstant>(value::TypeTags::NumberInt64,
-                                              value::bitcastFrom<int64_t>(4)) /*limit*/,
-                             204857600,
-                             false /* allowDiskUse */,
-                             nullptr /* yieldPolicy */,
-                             kEmptyPlanNodeId);
+        auto sortStage = makeS<SortStage>(
+            std::move(scanStage),
+            makeSV(scanSlots[0]),
+            std::vector<value::SortDirection>{value::SortDirection::Ascending},
+            makeSV(scanSlots[1]),
+            /*limit=*/
+            makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4)),
+            204857600,
+            /*allowDiskUse=*/false,
+            /*yieldPolicy=*/nullptr,
+            kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -96,7 +68,8 @@ makeExpectedAndInputDataForSpillingTest() {
         expectedBuilder.append(e);
     }
     auto expected = stage_builder::makeValue(expectedBuilder.arr());
-    value::ValueGuard expectedGuard{expected.first, expected.second};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(expected.first, expected.second);
 
     std::reverse(data.begin(), data.end());
 
@@ -105,17 +78,17 @@ makeExpectedAndInputDataForSpillingTest() {
         inputBuilder.append(e);
     }
     auto input = stage_builder::makeValue(inputBuilder.arr());
-    value::ValueGuard inputGuard{input.first, input.second};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(input.first, input.second);
 
-    expectedGuard.reset();
-    inputGuard.reset();
+    expectedOwned.reset();
+    inputOwned.reset();
     return {expected, input};
 }
 
 TEST_F(SortStageTest, SortStringsWithSpillingTest) {
-    auto [expected, input] = makeExpectedAndInputDataForSpillingTest();
-    value::ValueGuard expectedGuard{expected.first, expected.second};
-    value::ValueGuard inputGuard{input.first, input.second};
+    auto [expectedRaw, inputRaw] = makeExpectedAndInputDataForSpillingTest();
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(expectedRaw);
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(inputRaw);
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         auto sortStage =
@@ -123,10 +96,10 @@ TEST_F(SortStageTest, SortStringsWithSpillingTest) {
                              makeSV(scanSlots[0]),
                              std::vector<value::SortDirection>{value::SortDirection::Ascending},
                              makeSV(scanSlots[1]),
-                             nullptr /*limit*/,
-                             10 * 1024 * 1024 /* memoryLimit */,
-                             true /* allowDiskUse */,
-                             nullptr /* yieldPolicy */,
+                             /*limit=*/nullptr,
+                             /*memoryLimit=*/10 * 1024 * 1024,
+                             /*allowDiskUse=*/true,
+                             /*yieldPolicy=*/nullptr,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));
@@ -144,22 +117,16 @@ TEST_F(SortStageTest, SortStringsWithSpillingTest) {
         ASSERT_GT(sortStats->peakTrackedMemBytes, 0);
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTestMulti(2,
-                 input.first,
-                 input.second,
-                 expected.first,
-                 expected.second,
-                 makeStageFn,
-                 false,
-                 assertStageStats);
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
+    runTestMulti(
+        2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn, false, assertStageStats);
 }
 
 TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
-    auto [expected, input] = makeExpectedAndInputDataForSpillingTest();
-    value::ValueGuard expectedGuard{expected.first, expected.second};
-    value::ValueGuard inputGuard{input.first, input.second};
+    auto [expectedRaw, inputRaw] = makeExpectedAndInputDataForSpillingTest();
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(expectedRaw);
+    value::TagValueOwned input = value::TagValueOwned::fromRaw(inputRaw);
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         auto sortStage =
@@ -167,10 +134,10 @@ TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
                              makeSV(scanSlots[0]),
                              std::vector<value::SortDirection>{value::SortDirection::Ascending},
                              makeSV(scanSlots[1]),
-                             nullptr /*limit*/,
-                             100 * 1024 * 1024 /* memoryLimit */,
-                             true /* allowDiskUse */,
-                             nullptr /* yieldPolicy */,
+                             /*limit=*/nullptr,
+                             /*memoryLimit=*/100 * 1024 * 1024,
+                             /*allowDiskUse=*/true,
+                             /*yieldPolicy=*/nullptr,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));
@@ -188,16 +155,10 @@ TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
         ASSERT_GT(sortStats->peakTrackedMemBytes, 0);
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
-    runTestMulti(2,
-                 input.first,
-                 input.second,
-                 expected.first,
-                 expected.second,
-                 makeStageFn,
-                 true,
-                 assertStageStats);
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
+    runTestMulti(
+        2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn, true, assertStageStats);
 }
 
 }  // namespace mongo::sbe

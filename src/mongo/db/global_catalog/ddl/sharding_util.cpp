@@ -1,44 +1,27 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
-#include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/repl/always_allow_non_local_writes.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/shard_role/ddl/create_indexes_gen.h"
 #include "mongo/db/shard_role/ddl/list_databases_gen.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -50,6 +33,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
@@ -87,15 +72,15 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
-                                        const std::vector<ShardRef>& shardRefs,
+                                        const std::vector<ShardId>& shardIds,
                                         const NamespaceString& nss) {
     auto cmd = FlushRoutingTableCacheUpdates(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
 
-    for (const auto& shardRef : shardRefs) {
+    for (const auto& shardId : shardIds) {
         auto recipientShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardRef));
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
         recipientShard->runFireAndForgetCommand(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -125,8 +110,8 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
                                 requests,
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                 Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
-                                nullptr /* resourceYielder */,
-                                {} /* designatedHostsMap */);
+                                /*resourceYielder=*/nullptr,
+                                /*designatedHostsMap=*/{});
 
         while (!ars.done()) {
             // Retrieve the responses and throw at the first failure.
@@ -136,7 +121,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
                 auto errorContext = fmt::format("Failed command {} for database '{}' on shard '{}'",
                                                 command.toString(),
                                                 dbName.toStringForErrorMsg(),
-                                                std::string_view{ShardId(response.shardId)});
+                                                std::string_view{response.shardId});
 
                 uassertStatusOKWithContext(response.swResponse.getStatus(), errorContext);
                 const auto& respBody = response.swResponse.getValue().data;
@@ -169,70 +154,125 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
 }
 
-Status createIndexOnCollection(OperationContext* opCtx,
-                               const NamespaceString& ns,
-                               const BSONObj& keys,
-                               bool unique) {
+Status createIndexesOnCollectionForWritablePrimary(OperationContext* opCtx,
+                                                   const NamespaceString& ns,
+                                                   const std::vector<IndexSpec_ForCatalog>& specs) {
+    // We use an AlternativeClientRegion to avoid any possible side effects on the original opCtx.
+    auto alternativeClient = opCtx->getServiceContext()->getService()->makeClient(
+        "CreateIndexesOnCollectionForWritablePrimary");
+    AlternativeClientRegion acr(alternativeClient);
+    auto alternativeOpCtx = CancelableOperationContext(
+        cc().makeOperationContext(),
+        opCtx->getCancellationToken(),
+        Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
+    alternativeOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    alternativeOpCtx->setWriteConcern(opCtx->getWriteConcern());
+    auto opMetadata = ForwardableOperationMetadata(opCtx);
+    opMetadata.setOn(alternativeOpCtx.get());
+    DBDirectClient dbClient(alternativeOpCtx.get());
+
+    // Convert the IndexSpec_ForCatalog to BSONObj.
+    std::vector<BSONObj> indexSpecs;
+    for (const auto& spec : specs) {
+        IndexSpec index;
+        index.addKeys(spec.keys);
+        index.unique(spec.unique);
+        index.version(int(IndexConfig::kLatestIndexVersion));
+        indexSpecs.emplace_back(index.toBSON());
+    }
+
+    // Issue all index creations in a single command. Either all indexes are created or none are.
+    BSONObj response;
+    CreateIndexesCommand createIndexesCmd(ns);
+    createIndexesCmd.setIndexes(indexSpecs);
+    dbClient.runCommand(ns.dbName(), createIndexesCmd.toBSON(), response);
+    auto status = getStatusFromCommandResult(response);
+    if (!status.isOK()) {
+        return status;
+    }
+    auto wcStatus = getWriteConcernStatusFromCommandResult(response);
+    if (!wcStatus.isOK()) {
+        return wcStatus;
+    }
+    return Status::OK();
+}
+
+Status createIndexesOnCollectionAtStepUp(OperationContext* opCtx,
+                                         const NamespaceString& ns,
+                                         const std::vector<IndexSpec_ForCatalog>& specs) {
+    // This check validates that we are in onStepUpComplete (we are not yet primary, so
+    // canAcceptNonLocalWrites is false but onStepUpComplete is run under an
+    // AllowNonLocalWritesBlock).
+    dassert(!repl::ReplicationCoordinator::get(opCtx)->canAcceptNonLocalWrites() &&
+            repl::alwaysAllowNonLocalWrites(opCtx));
     try {
         auto acquisition = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
             MODE_X);
+        // Create the collection if it doesn't exist.
         if (!acquisition.exists()) {
             CollectionOptions options;
             options.uuid = UUID::gen();
-            writeConflictRetry(opCtx, "createIndexOnCollection", ns, [&] {
+            writeConflictRetry(opCtx, "createIndexesOnCollectionAtStepUp", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 AutoGetDb autodb(opCtx, ns.dbName(), MODE_IX);
                 ScopedLocalCatalogWriteFence fence(opCtx, &acquisition);
                 auto db = autodb.ensureDbExists(opCtx);
                 auto collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
-                          str::stream() << "Failed to create collection "
-                                        << ns.toStringForErrorMsg() << " for indexes: " << keys);
+                          str::stream()
+                              << "Failed to create collection " << ns.toStringForErrorMsg()
+                              << " for index build at step up.");
                 wunit.commit();
             });
         }
+        // Remove any existing indexes.
+        std::vector<BSONObj> indexSpecs;
+        for (const auto& spec : specs) {
+            IndexSpec index;
+            index.addKeys(spec.keys);
+            index.unique(spec.unique);
+            index.version(int(IndexConfig::kLatestIndexVersion));
+            indexSpecs.push_back(index.toBSON());
+        }
         auto indexCatalog = acquisition.getCollectionPtr()->getIndexCatalog();
-        IndexSpec index;
-        index.addKeys(keys);
-        index.unique(unique);
-        index.version(int(IndexConfig::kLatestIndexVersion));
         auto removeIndexBuildsToo = false;
-        auto indexSpecs = indexCatalog->removeExistingIndexes(
+        auto remainingIndexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,
             acquisition.getCollectionPtr(),
             uassertStatusOK(
                 acquisition.getCollectionPtr()->addCollationDefaultsToIndexSpecsForCreate(
-                    opCtx, std::vector<BSONObj>{index.toBSON()})),
+                    opCtx, indexSpecs)),
             removeIndexBuildsToo);
 
-        if (indexSpecs.empty()) {
+        if (remainingIndexSpecs.empty()) {
             return Status::OK();
         }
 
-        auto fromMigrate = false;
-        if (!acquisition.getCollectionPtr()->isEmpty(opCtx)) {
-            // We typically create indexes on config/admin collections for sharding while setting up
-            // a sharded cluster, so we do not expect to see data in the collection.
-            // Therefore, it is ok to log this index build.
-            const auto& indexSpec = indexSpecs[0];
-            LOGV2(5173300,
-                  "Creating index on sharding collection with existing data",
-                  logAttrs(ns),
-                  "uuid"_attr = acquisition.uuid(),
-                  "index"_attr = indexSpec);
-            auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
-            IndexBuildsCoordinator::get(opCtx)->createIndex(
-                opCtx, acquisition.uuid(), indexSpec, indexConstraints, fromMigrate);
-        } else {
-            writeConflictRetry(opCtx, "createIndexOnConfigCollection", ns, [&] {
+        // Check if the collection is empty. If so, build the indexes. Otherwise, tripwire unless
+        // allowDeferredInternalCatalogIndexBuildOnNonEmptyCollectionDuringStepUp is enabled.
+        if (acquisition.getCollectionPtr()->isEmpty(opCtx)) {
+            auto fromMigrate = false;
+            writeConflictRetry(opCtx, "createIndexesOnEmptyCollection", ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
                 CollectionWriter collWriter(opCtx, &acquisition);
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                    opCtx, collWriter, indexSpecs, fromMigrate);
+                    opCtx, collWriter, remainingIndexSpecs, fromMigrate);
                 wunit.commit();
             });
+        } else {
+            BSONArrayBuilder specsForLogging;
+            for (const auto& spec : remainingIndexSpecs) {
+                specsForLogging.append(spec);
+            }
+            tassert(12352501,
+                    str::stream() << "Illegal attempt to create an index on a non-empty collection "
+                                  << "during step-up. This requires the shard to be restarted as a "
+                                  << "plain replica set and the index to be created manually. "
+                                  << "Collection: '" << ns.toStringForErrorMsg() << "' Indexes: '"
+                                  << specsForLogging.arr().toString() << "'.",
+                    gAllowDeferredInternalCatalogIndexBuildOnNonEmptyCollectionDuringStepUp.load());
         }
     } catch (const DBException& e) {
         return e.toStatus();
@@ -316,8 +356,8 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
         try {
             return Grid::get(opCtx)->catalogClient()->getAllShards(
                 opCtx,
-                repl::ReadConcernLevel::kSnapshotReadConcern,
-                BSON(ShardType::draining.ne(true)) /* excludeDraining */);
+                repl::ReadConcernArgs::kSnapshot,
+                /*filter=*/BSON(ShardType::draining.ne(true)));
         } catch (DBException& ex) {
             ex.addContext("Cannot retrieve updated shard list from config server");
             throw;
@@ -346,7 +386,7 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
                                                                   command.toBSON(),
                                                                   shardIds,
                                                                   executor,
-                                                                  false /* throwOnError */);
+                                                                  /*throwOnError=*/false);
 
     auto candidateShardId = shardIds.front();
     auto candidateSize = std::numeric_limits<long long>::max();
@@ -373,6 +413,21 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
     }
 
     return candidateShardId;
+}
+
+bool isTrackedTimeseries(OperationContext* opCtx, const NamespaceString& bucketNss) {
+    try {
+        const auto bucketColl = Grid::get(opCtx)->catalogClient()->getCollection(
+            opCtx, bucketNss, repl::ReadConcernArgs::kMajority);
+        return bucketColl.getTimeseriesFields().has_value();
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If we don't find the bucket nss it means the collection is not tracked.
+        return false;
+    }
+}
+
+bool isMaxKeyDetectionEnabled() {
+    return gEnableMaxKeyDetection.load() || feature_flags::gMaxKeyDetection.isEnabled();
 }
 
 }  // namespace sharding_util

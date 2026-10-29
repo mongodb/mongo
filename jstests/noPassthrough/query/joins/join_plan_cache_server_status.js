@@ -1,0 +1,200 @@
+/**
+ * End to end test for the join plan cache serverStatus metrics.
+ *
+ * @tags: [
+ *   requires_fcv_91,
+ *   requires_sbe,
+ * ]
+ */
+
+import {assertAllJoinsUseMethod, assertJoinPlanCacheStats} from "jstests/libs/query/join_utils.js";
+import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+
+describe("join plan cache serverStatus metrics", function () {
+    beforeEach(function () {
+        this.conn = MongoRunner.runMongod({
+            setParameter: {
+                internalEnableJoinOptimization: true,
+                internalEnableJoinPlanCache: true,
+            },
+        });
+
+        const db = this.conn.getDB(jsTestName());
+        this.db = db;
+        this.baseColl = db[jsTestName()];
+        this.foreignColl = db[jsTestName() + "_a"];
+
+        assert.commandWorked(
+            this.baseColl.insertMany([
+                {a: 1, b: 1, d: 1},
+                {a: 1, b: 2, d: 2},
+                {a: 2, b: 1, d: 1},
+                {a: 2, b: 2, d: 2},
+            ]),
+        );
+        // Add index for multikeyness info for path arrayness.
+        assert.commandWorked(this.baseColl.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
+
+        assert.commandWorked(
+            this.foreignColl.insertMany([
+                {a: 1, c: "foo", d: 1},
+                {a: 1, c: "bar", d: 2},
+                {a: 2, c: "baz", d: 1},
+                {a: 2, c: "qux", d: 2},
+            ]),
+        );
+        // Add index for multikeyness info for path arrayness.
+        assert.commandWorked(this.foreignColl.createIndex({dummy: 1, a: 1, c: 1, d: 1}));
+
+        this.pipeline = [
+            {$match: {a: {$gt: 0}}},
+            {
+                $lookup: {
+                    from: this.foreignColl.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    as: "foreignColl",
+                },
+            },
+            {$unwind: "$foreignColl"},
+        ];
+    });
+
+    afterEach(function () {
+        MongoRunner.stopMongod(this.conn);
+    });
+
+    it("increments misses on the first run and hits on the second run", function () {
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+            },
+            expectedHits: 0,
+            expectedMisses: 1,
+        });
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+            },
+            expectedHits: 1,
+            expectedMisses: 0,
+        });
+    });
+
+    it("different query shape increments misses", function () {
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+            },
+            expectedHits: 0,
+            expectedMisses: 1,
+        });
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                const differentShapePipeline = [
+                    // change match expression predicate field to 'b' instead of 'a'
+                    {$match: {b: {$gt: 0}}},
+                    {
+                        $lookup: {
+                            from: this.foreignColl.getName(),
+                            localField: "a",
+                            foreignField: "a",
+                            as: "foreignColl",
+                        },
+                    },
+                    {$unwind: "$foreignColl"},
+                ];
+                assert.eq(this.baseColl.aggregate(differentShapePipeline).toArray().length, 8);
+            },
+            expectedHits: 0,
+            expectedMisses: 1,
+        });
+    });
+
+    it("plan cache disabled doesn't increment hits or misses", function () {
+        // Disable the join plan cache.
+        assert.commandWorked(
+            this.db.adminCommand({setParameter: 1, internalEnableJoinPlanCache: false}),
+        );
+
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: () => {
+                assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+            },
+            expectedHits: 0,
+            expectedMisses: 0,
+        });
+    });
+
+    it("increments invalidations when a new index the plan may use is added", function () {
+        const run = () => assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+
+        // Prime the cache: miss, then hit.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 0, expectedMisses: 1});
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+
+        // Add an index on the join field that could enable an INLJ plan.
+        assert.commandWorked(this.foreignColl.createIndex({a: 1}));
+
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: run,
+            expectedHits: 0,
+            expectedMisses: 1,
+            expectedInvalidations: 1,
+        });
+
+        // The replan re-cached the shape, so the next run hits and invalidates nothing.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+    });
+
+    it("increments invalidations when an index the plan uses is removed", function () {
+        const run = () => assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+
+        // Add an index on the join field to enable INLJ plan.
+        assert.commandWorked(this.foreignColl.createIndex({a: 1}));
+
+        // Force INLJ plan with {a: 1}.
+        assert.commandWorked(this.db.adminCommand({setParameter: 1, internalJoinMethod: "INLJ"}));
+
+        // Prime the cache: miss, then hit.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 0, expectedMisses: 1});
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+
+        // Ensure INLJ was used.
+        assertAllJoinsUseMethod(this.baseColl.explain().aggregate(this.pipeline), "INLJ");
+        assert.commandWorked(this.db.adminCommand({setParameter: 1, internalJoinMethod: "any"}));
+
+        // Drop index {a: 1} to force invalidation.
+        assert.commandWorked(this.foreignColl.dropIndex({a: 1}));
+
+        assertJoinPlanCacheStats({
+            db: this.db,
+            fn: run,
+            expectedHits: 0,
+            expectedMisses: 1,
+            expectedInvalidations: 1,
+        });
+
+        // The replan re-cached the shape, so the next run hits and invalidates nothing.
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+    });
+
+    it("does not increment invalidations when a collection version bump is revalidated", function () {
+        const run = () => assert.eq(this.baseColl.aggregate(this.pipeline).toArray().length, 8);
+
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 0, expectedMisses: 1});
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+
+        // An index on a field no node references bumps the collection version but leaves every
+        // node's relevant-index fingerprint intact, so the entry is revalidated.
+        assert.commandWorked(this.foreignColl.createIndex({e: 1}));
+
+        assertJoinPlanCacheStats({db: this.db, fn: run, expectedHits: 1, expectedMisses: 0});
+    });
+});

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/database_holder_impl.h"
 
@@ -53,7 +27,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/icu.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -64,6 +37,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <boost/algorithm/string.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -154,28 +128,19 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
         }
     });
 
+    // Check casing in lock to avoid transient duplicates.
+    auto duplicate = _getNameWithConflictingCasing_inlock(dbName);
+    uassert(ErrorCodes::DatabaseDifferCase,
+            str::stream() << "db already exists with different case already have: ["
+                          << duplicate->toStringForErrorMsg() << "] trying to create ["
+                          << dbName.toStringForErrorMsg() << "]",
+            !duplicate);
+
     // Do the catalog lookup and database creation outside of the scoped lock, because these may
     // block.
     lk.unlock();
 
-    bool isNew = CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty();
-
-    if (isNew && opCtx->isEnforcingConstraints()) {
-        // Only enforce the conflicting-casing check when creating a new database on a primary.
-        // Pre-existing databases with conflicting names (created before this check was in place)
-        // are allowed through to preserve data accessibility after an upgrade.
-        lk.lock();
-        auto duplicate = _getNameWithConflictingCasing_inlock(dbName);
-        uassert(ErrorCodes::DatabaseDifferCase,
-                str::stream() << "db name conflicts case-insensitively (Unicode case folding) with "
-                                 "existing database: ["
-                              << duplicate->toStringForErrorMsg() << "] trying to create ["
-                              << dbName.toStringForErrorMsg() << "]",
-                !duplicate);
-        lk.unlock();
-    }
-
-    if (isNew) {
+    if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty()) {
         audit::logCreateDatabase(opCtx->getClient(), dbName);
         if (justCreated)
             *justCreated = true;
@@ -311,9 +276,9 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
 DatabaseHolderImpl::DBsIndex::NormalizedDatabaseName DatabaseHolderImpl::DBsIndex::normalize(
     const DatabaseName& dbName) {
-    // Case-fold the UTF-8 string using Unicode rules so that names differing only in case
-    // (including non-ASCII characters) map to the same key.
-    return icuCaseFold(dbName.toStringForResourceId());
+    std::string str = dbName.toStringForResourceId();
+    boost::algorithm::to_lower(str);
+    return str;
 }
 
 const DatabaseHolderImpl::DBsIndex::DBs& DatabaseHolderImpl::DBsIndex::viewAll() const {
@@ -359,15 +324,14 @@ void DatabaseHolderImpl::DBsIndex::erase(const DatabaseName& dbName) {
     _dbs.erase(dbName);
 }
 
-// Check if there is any opened database with a name that differs only in case.
-// Since normalize() produces a Unicode-aware lowercased key, entries sharing a normalized key
-// are guaranteed to be case-insensitive duplicates.
+// Check if there is any opened database with a name with the same name with a case
+// insensitive search
 boost::optional<DatabaseName> DatabaseHolderImpl::DBsIndex::getAnyConflictingName(
     const DatabaseName& dbName) const {
     NormalizedDatabaseName normalizedName = normalize(dbName);
     auto [begin, end] = _normalizedDBs.equal_range(normalizedName);
     for (auto dbsIt = begin; dbsIt != end; ++dbsIt) {
-        if (dbName != dbsIt->second) {
+        if (dbName.equalCaseInsensitive(dbsIt->second) && dbName != dbsIt->second) {
             return dbsIt->second;
         }
     }

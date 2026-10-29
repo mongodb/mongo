@@ -1,7 +1,7 @@
 /**
- * This hook runs the reconfig command against the primary of a replica set:
- * The reconfig command first chooses a random node (not the primary) and will change
- * its votes and priority to 0 or 1 depending on the current value.
+ * This hook runs the reconfig command against replica sets:
+ * The reconfig command first chooses a random node (not the primary) and will toggle
+ * its electability (votes and priority to 0 or 1 depending on the current value).
  *
  * This hook will run concurrently with tests.
  */
@@ -38,40 +38,44 @@ function isShutdownError(error) {
 }
 
 /**
- * This reconfig command randomly chooses a node to change it's votes and priority to 0 or 1
- * based on what the node's current votes and priority fields are. We always check to see that
- * there exists at least two voting nodes in the set, which ensures that we can always have a
- * primary in the case of stepdowns.
- * We also want to avoid changing the votes and priority of the current primary to 0, since this
- * will result in an error.
+ * This reconfig command randomly chooses a node to change its electability.
+ * For ASC, it changes votes and priority to 0 or 1 based on their current values.
+ * We always check to see that there exists at least two voting nodes in the set,
+ * which ensures that we can always have a primary in the case of stepdowns.
+ * For DSC, we toggle priority to change electability. Note that votes do not affect elections.
+ * We also want to avoid making the current primary unelectable, since this will result in an error.
  *
- * The number of voting nodes in the replica set determines what the config majority is for both
- * reconfig config commitment and reconfig oplog commitment.
+ * For ASC, the number of voting nodes in the replica set determines what the config majority
+ * is for both reconfig config commitment and reconfig oplog commitment.
  */
-function getVotingReconfig(config, primaryIndex, numNodes) {
-    // Calculate the total number of voting nodes in this set so that we make sure we
-    // always have at least two voting nodes. This is so that the primary can always
-    // safely step down because there is at least one other electable secondary.
-    const numVotingNodes = config.members.filter((member) => member.votes === 1).length;
-
-    // Randomly change the vote of a node to 1 or 0 depending on its current value. Do not
-    // change the primary's votes.
+function getElectabilityReconfig(config, primaryIndex, numNodes, disaggEnabled) {
+    // Randomly change the electability of a node to 1 or 0 depending on its current value. Do not
+    // change the primary's electability.
     let indexToChange = primaryIndex;
     while (indexToChange === primaryIndex) {
         // randInt is exclusive of the upper bound.
         indexToChange = Random.randInt(numNodes);
     }
 
-    jsTestLog(`Running reconfig to change votes of node at index ${indexToChange}`);
+    jsTestLog(`Running reconfig to change electability of node at index ${indexToChange}`);
 
-    // Change the priority to correspond to the votes. If the member's current votes field
-    // is 1, only change it to 0 if there are more than 3 voting members in this set.
-    // We want to ensure that there are at least 3 voting nodes so that killing the primary
-    // will not affect a majority.
+    const member = config.members[indexToChange];
+    if (!disaggEnabled) {
+        // Calculate the total number of voting nodes in this set so that we make sure we
+        // always have at least two voting nodes. This is so that the primary can always
+        // safely step down because there is at least one other electable secondary.
+        const numVotingNodes = config.members.filter((m) => m.votes === 1).length;
+        // Change the priority to correspond to the votes. If the member's current votes field
+        // is 1, only change it to 0 if there are more than 3 voting members in this set.
+        // We want to ensure that there are at least 3 voting nodes so that killing the primary
+        // will not affect a majority.
+        member.votes = member.votes === 1 && numVotingNodes > 3 ? 0 : 1;
+        member.priority = member.votes;
+    } else {
+        // DSC electability depends only on priority, so leave votes unchanged.
+        member.priority = member.priority > 0 ? 0 : 1;
+    }
     config.version++;
-    config.members[indexToChange].votes =
-        config.members[indexToChange].votes === 1 && numVotingNodes > 3 ? 0 : 1;
-    config.members[indexToChange].priority = config.members[indexToChange].votes;
 
     return config;
 }
@@ -210,15 +214,38 @@ function reconfigBackground(primary, numNodes, priorityPorts) {
     jsTestLog(`primaryIndex is ${primaryIndex}`);
     jsTestLog(`primary's config: (configVersion: ${config.version}, configTerm: ${config.term})`);
 
+    const disaggEnabledRes = assert.commandWorkedOrFailedWithCode(
+        conn.adminCommand({getParameter: 1, disaggregatedStorageEnabled: 1}),
+        ErrorCodes.InvalidOptions,
+    );
+    const disaggEnabled = disaggEnabledRes.ok && disaggEnabledRes.disaggregatedStorageEnabled;
+
     let newConfig = priorityPorts
         ? getPriorityPortReconfig(config, priorityPorts)
-        : getVotingReconfig(config, primaryIndex, numNodes);
+        : getElectabilityReconfig(config, primaryIndex, numNodes, disaggEnabled);
 
-    let reconfigRes = conn.getDB("admin").runCommand({replSetReconfig: newConfig});
-    jsTestLog(`reconfigRes: ${tojson(reconfigRes)}`);
-    if (!reconfigRes.ok && !isIgnorableError(reconfigRes.codeName)) {
-        jsTestLog("Reconfig to change votes FAILED.");
-        return reconfigRes;
+    // DSC configs do not propagate via heartbeats, so reconfigure each member explicitly.
+    const hosts = disaggEnabled ? newConfig.members.map((member) => member.host) : [primary];
+    for (const host of hosts) {
+        let memberConn = conn;
+        if (host !== primary) {
+            quietly(() => {
+                memberConn = newMongoWithRetry(host);
+            });
+        }
+        let reconfigRes;
+        try {
+            reconfigRes = memberConn.adminCommand({replSetReconfig: newConfig});
+        } finally {
+            if (memberConn !== conn) {
+                memberConn.close();
+            }
+        }
+        jsTestLog(`reconfigRes: ${tojson(reconfigRes)}`);
+        if (!reconfigRes.ok && !isIgnorableError(reconfigRes.codeName)) {
+            jsTestLog("Reconfig FAILED.");
+            return reconfigRes;
+        }
     }
 
     return {ok: 1};
@@ -231,12 +258,26 @@ try {
     const conn = connect(TestData.connectionString);
     const topology = DiscoverTopology.findConnectedNodes(conn.getMongo());
 
-    if (topology.type !== Topology.kReplicaSet) {
+    let replicaSets;
+    if (topology.type === Topology.kReplicaSet) {
+        replicaSets = [topology];
+    } else if (topology.type === Topology.kShardedCluster) {
+        replicaSets = [
+            topology.configsvr,
+            ...Object.values(topology.shards).filter((shard) => !shard.configsvr),
+        ];
+    } else {
         throw new Error(`Unsupported topology configuration: ${tojson(topology)}`);
     }
 
-    const numNodes = topology.nodes.length;
-    res = reconfigBackground(topology.primary, numNodes, TestData.priorityPorts);
+    for (const replicaSet of replicaSets) {
+        assert.eq(Topology.kReplicaSet, replicaSet.type);
+        const numNodes = replicaSet.nodes.length;
+        res = reconfigBackground(replicaSet.primary, numNodes, TestData.priorityPorts);
+        if (!res.ok) {
+            break;
+        }
+    }
 } catch (e) {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
     // been killed, it may take longer than 15 seconds for a new primary to step up.

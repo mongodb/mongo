@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,26 +14,22 @@ namespace mongo::replicated_fast_count {
 
 /**
  * The `SizeCountTimestampStore` provides read and write access to a single, persisted timestamp.
+ * Owns the RecordStore that backs the underlying IntegerKeyedContainer.
  *
  * This class is useful for tracking when persisted size and count metadata were last known to be
  * accurate and thus the timestamp after which the oplog is needed for correctness.
  *
- * Two implementations exist: `CollectionSizeCountTimestampStore` (collection-backed) and
- * `ContainerSizeCountTimestampStore` (container-backed).
- *
- * Locking: the container-backed implementation reads and writes the underlying container and does
- * not acquire any locks of its own. Callers must therefore hold the global lock for the duration
- * of the call:
+ * Locking: this class reads and writes the underlying container and does not acquire any locks of
+ * its own. Callers must therefore hold the global lock for the duration of the call:
  *   MODE_IS - read()
  *   MODE_IX - write()
- *
- * The collection-backed implementation acquires the collection (and its locks) internally, but
- * callers should hold the same locks so the two implementations are interchangeable.
  */
 class SizeCountTimestampStore {
 public:
-    SizeCountTimestampStore() = default;
-    virtual ~SizeCountTimestampStore() = default;
+    explicit SizeCountTimestampStore(std::unique_ptr<RecordStore> recordStore)
+        : _recordStore(std::move(recordStore)) {
+        invariant(_recordStore, "SizeCountTimestampStore requires a non-null RecordStore");
+    }
 
     SizeCountTimestampStore(SizeCountTimestampStore&&) = default;
     SizeCountTimestampStore& operator=(SizeCountTimestampStore&&) = default;
@@ -71,7 +41,7 @@ public:
      *
      * If no timestamp exists, read() returns boost::none.
      */
-    [[nodiscard]] virtual boost::optional<Timestamp> read(OperationContext* opCtx) const = 0;
+    [[nodiscard]] boost::optional<Timestamp> read(OperationContext* opCtx) const;
 
     /**
      * Upserts `timestamp` into the store. If a timestamp already exists, it will be replaced.
@@ -79,34 +49,14 @@ public:
      * write() must be called within a WriteUnitOfWork. Otherwise, the function raises an assertion
      * error.
      */
-    virtual void write(OperationContext* opCtx, Timestamp timestamp) = 0;
-};
+    void write(OperationContext* opCtx, Timestamp timestamp);
 
-/**
- * Collection-backed implementation of `SizeCountTimestampStore`. Reads and writes target the
- * `config.fast_count_metadata_timestamp_store` collection.
- */
-class CollectionSizeCountTimestampStore final : public SizeCountTimestampStore {
-public:
-    CollectionSizeCountTimestampStore() = default;
-
-    boost::optional<Timestamp> read(OperationContext* opCtx) const override;
-    void write(OperationContext* opCtx, Timestamp timestamp) override;
-};
-
-/**
- * Container-backed implementation of `SizeCountTimestampStore`. Owns the RecordStore that
- * backs the underlying IntegerKeyedContainer.
- */
-class ContainerSizeCountTimestampStore final : public SizeCountTimestampStore {
-public:
-    explicit ContainerSizeCountTimestampStore(std::unique_ptr<RecordStore> recordStore)
-        : _recordStore(std::move(recordStore)) {
-        invariant(_recordStore, "ContainerSizeCountTimestampStore requires a non-null RecordStore");
-    }
-
-    boost::optional<Timestamp> read(OperationContext* opCtx) const override;
-    void write(OperationContext* opCtx, Timestamp timestamp) override;
+    /**
+     * Performs a single write of `timestamp` directly to the underlying physical table. Unlike
+     * write(), this does not log to the oplog: it skips invoking op observers and bypasses the
+     * `canAcceptWritesFor` primary check, so the write is not replicated.
+     */
+    void writeToTable(OperationContext* opCtx, Timestamp timestamp);
 
     RecordStore* rs_ForTest() const;
 

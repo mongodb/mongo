@@ -111,8 +111,9 @@ The \c instantiated flag and the \c page_del structure are retained for the bene
 parent internal page reconciliation.
 See @ref ft_internal_reconciliation below.
 
-When the page is itself reconciled, or if the transaction that deleted it rolls back, the
-\c instantiated flag is cleared and the \c page_del structure is discarded.
+When reconciliation replaces or removes the original page address, or when the truncate
+rolls back, the \c instantiated flag is cleared and the \c page_del structure is discarded.
+A reconciliation that skips the write retains both.
 
 Note that the \c page_del field of an instantiated page should not be used to make
 operational decisions.
@@ -245,8 +246,11 @@ For instantiated pages, under normal circumstances the instantiated child will b
 reconciled before its parent.
 Eviction skips parents that have in-memory children, and when checkpointing ordinarily all
 children are written out before their parents.
-In this case the instantiated flag and deletion information will have been cleared and no
-special steps are required to reconcile the parent.
+If child reconciliation replaces or removes the original address, the instantiated flag and
+deletion information will have been cleared and no special steps are required to reconcile
+the parent.
+If it skips the write, both are retained so the parent can evaluate the original deletion
+information.
 (It is possible for the truncation to be uncommitted so the update list to be non-null;
 however, this does not matter when checkpointing either the child or the parent, as the
 updates created by instantiation will be left in memory in the usual way.
@@ -278,11 +282,14 @@ locking) and it was judged not worthwhile.
 
 Eviction of instantiated pages where the truncation is committed is permitted, however,
 and checkpoint of instantiated pages is always allowed.
-The first reconciliation after instantiation clears the instantiated flag (\c
-page->modify->instantiated) and discards the \c page_del structure, as once a
-reconciliation result exists it can be used to reconcile the parent.
+The first reconciliation after instantiation that replaces or removes the original address
+clears the instantiated flag (\c page->modify->instantiated) and discards the \c page_del
+structure, as the parent no longer needs to rebuild the original deletion proxy.
 (This is true whether or not it includes the tombstones from instantiation, i.e., whether
 the truncation was committed.)
+In disaggregated storage a reconciliation may instead skip the write and keep the page's
+existing block; the flag and structure survive such a reconciliation, because the parent's
+cell may still be a proxy cell that can only be rebuilt from the \c page_del information.
 
 Note that "unresolved" includes "prepared".
 While we cannot write out a prepared truncation in the parent page's address cells, in
@@ -305,6 +312,11 @@ deleted the page.
 (Only committed truncations are written out.
 Prepared truncations cannot be represented on disk.
 Truncations that are globally visible do not result in a cell in the parent page at all.)
+
+The time aggregate packed in the cell describes the child page as it was before the
+truncate, so its stop information is stale.
+The effective aggregate for the deleted pages is the packed one with the truncate applied as
+its global stop point, and that is what the parent page's aggregate is built from.
 
 These fields are, however, only present if the page header includes the \c
 WT_PAGE_FT_UPDATE flag, whose value is 0x20.
@@ -368,6 +380,16 @@ end cursors, which requires the pages under them to be present in memory.
 This point is not particularly important operationally but can create complications for
 writing tests.
 
+Range-truncate activity counters are available in connection and data-source statistics;
+\c cursor_truncate_fast_delete_pages counts the leaf pages that were fast-deleted.
+The \c cursor_truncate_fast_delete_fallback_in_memory count is a subset of
+\c cursor_truncate_fast_delete_fallback_pages. Newly dirtied internal page bytes count the parent's
+memory footprint when a fast delete first dirties it, not the size of the deleted content; these
+cumulative counters are not reduced on rollback or eviction, and are approximate when other writers
+modify the same pages. History store truncation is counted.
+Use the statistics cursor for the underlying WT table to attribute the counters to a
+particular data source; connection statistics include activity from all tables.
+
 Finally note that currently the initial eviction attempt is done unconditionally even in
 cases where we could determine beforehand that the page will be ineligible.
 This causes it to be evicted and read in again, which is suboptimal, and should perhaps be
@@ -418,6 +440,21 @@ If the page is in memory and unmodified and the address cell contains page-delet
 information, it checks for the visibility of that deletion.
 Failing that, it checks the time aggregate in case all the values on the page are no
 longer visible, e.g. because the page was slow-truncated and reconciled.
+
+In a disaggregated tree these checks also apply to an internal page, but only while it is
+still on disk, and skipping one skips its whole subtree.
+An internal page resident in memory cannot be judged by its aggregate, because a descendant
+may be dirty with newer data and reconciliation is what propagates that upwards; one still
+on disk has no resident descendants, so the aggregate in its address cell describes the
+entire subtree beneath it.
+That aggregate is only a useful bound because internal page reconciliation applies the
+truncate to each deleted child's aggregate before merging it into the parent (see @ref
+ft_on_disk_format).
+
+Trees on the local block manager do not take this shortcut.
+There, reading an internal page in is what marks it dirty for the deleted children it
+references, and the reconciliation that follows is what frees their blocks, so skipping the
+read would leave the space held until the checkpoint cleanup thread came around.
 
 For an unmodified in-memory page the deletion information in the address should be the
 same as present in the ref's \c page_del structure.
@@ -613,6 +650,11 @@ deletion information to the packing code.}
 @row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_UPDATE_PAGE_DEL,
 Akin to \c WT_TIME_AGGREGATE_UPDATE but for a \c WT_PAGE_DELETED; used in internal page
 reconciliation.}
+@row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_MERGE_PAGE_DEL,
+Replace the stop information in an aggregate unpacked from a \c WT_CELL_ADDR_DEL cell with the
+global stop point supplied by its \c WT_PAGE_DELETED; the unpacked stop information describes
+the child page before the truncate and cannot be used as-is. Used by internal page
+reconciliation and verification.}
 
 @row{txn_inline.h, Function, \c __wt_txn_op_delete_apply_prepare_state,
 The code for updating \c WT_PAGE_DELETED at prepare time.}
@@ -713,8 +755,12 @@ page type.}
 @row{bt_vrfy.c, Hook, in \c __verify_tree,
 Allow namespace gaps in VLCS.}
 @row{bt_vrfy.c, Hook, in \c __verify_page_content_int,
-Handle deleted-address cells.}
+Handle deleted-address cells: validate the effective aggregate\, that is\, the unpacked
+aggregate with the page deletion applied as its stop point.}
 
+@row{bt_vrfy_dsk.c, Hook, in \c __verify_dsk_addr_validity,
+Validate the effective aggregate for deleted-address cells rather than the stale stop
+information unpacked from the cell.}
 @row{bt_vrfy_dsk.c, Function, \c __verify_dsk_addr_page_del,
 Validate and crosscheck the page deletion information discovered in on-disk address
 cells.}
@@ -758,7 +804,7 @@ Write out deleted address cells when needed.}
 Set WT_PAGE_FT_UPDATE on the page header if appropriate.}
 @row{rec_write.c, Hook, in \c __rec_write_wrapup,
 Clear the instantiated flag and discard the page deletion information for instantiated
-pages.}
+pages unless reconciliation skipped the write.}
 <!--
 Also, the mechanism for keeping track of whether a page reconciled empty is mostly in
 rec_write.c.

@@ -3,7 +3,7 @@
  * on separate views. The test verifies that the view definitions are applied correctly and the
  * results are as expected.
  *
- * @tags: [ requires_fcv_81, featureFlagMongotIndexedViews ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

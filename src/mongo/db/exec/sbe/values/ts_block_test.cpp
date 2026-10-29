@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/values/ts_block.h"
 
@@ -35,6 +9,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -565,15 +540,15 @@ TEST_F(TsSbeValueTest, TsBlockFillEmpty) {
         ASSERT(fillRes);
         auto extracted = fillRes->extract();
         ASSERT_EQ(extracted.count(), 3);
-        assertValuesEqual(extracted[0].tag,
-                          extracted[0].value,
-                          value::TypeTags::NumberDouble,
-                          value::bitcastFrom<double>(0));
-        assertValuesEqual(extracted[1].tag, extracted[1].value, value::TypeTags::Null, 0);
-        assertValuesEqual(extracted[2].tag,
-                          extracted[2].value,
-                          value::TypeTags::NumberDouble,
-                          value::bitcastFrom<double>(9));
+        ASSERT_SBE_VALUE_EQ(extracted[0].tag,
+                            extracted[0].value,
+                            value::TypeTags::NumberDouble,
+                            value::bitcastFrom<double>(0));
+        ASSERT_SBE_VALUE_EQ(extracted[1].tag, extracted[1].value, value::TypeTags::Null, 0);
+        ASSERT_SBE_VALUE_EQ(extracted[2].tag,
+                            extracted[2].value,
+                            value::TypeTags::NumberDouble,
+                            value::bitcastFrom<double>(9));
     }
 
     {
@@ -627,14 +602,14 @@ TEST_F(TsSbeValueTest, FillType) {
         // Tests on the "time" field.
         auto timeBlock = makeTsBlockFromBucket(kBucketWithMixedNumbers, "time");
 
-        auto [fillTag, fillVal] = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fillTag, fillVal};
+        value::TagValueOwned fillValue = value::TagValueOwned::fromRaw(makeDecimal("1234.5678"));
 
         {
             uint32_t nullUndefinedTypeMask = static_cast<uint32_t>(
                 getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined));
 
-            auto out = timeBlock->fillType(nullUndefinedTypeMask, fillTag, fillVal);
+            auto out =
+                timeBlock->fillType(nullUndefinedTypeMask, fillValue.tag(), fillValue.value());
 
             // The type mask won't match the control min/max tags, so no work needs to be done.
             ASSERT_EQ(out, nullptr);
@@ -643,12 +618,14 @@ TEST_F(TsSbeValueTest, FillType) {
         {
             uint32_t dateTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::date));
 
-            auto out = timeBlock->fillType(dateTypeMask, fillTag, fillVal);
+            auto out = timeBlock->fillType(dateTypeMask, fillValue.tag(), fillValue.value());
             ASSERT_NE(out, nullptr);
             auto outVal = value::bitcastFrom<value::ValueBlock*>(out.get());
             assertBlockEq(value::TypeTags::valueBlock,
                           outVal,
-                          TypedValues{{fillTag, fillVal}, {fillTag, fillVal}, {fillTag, fillVal}});
+                          TypedValues{{fillValue.tag(), fillValue.value()},
+                                      {fillValue.tag(), fillValue.value()},
+                                      {fillValue.tag(), fillValue.value()}});
         }
     }
 
@@ -658,14 +635,13 @@ TEST_F(TsSbeValueTest, FillType) {
 
         auto extracted = numBlock->extract();
 
-        auto [fillTag, fillVal] = makeDecimal("1234.5678");
-        value::ValueGuard fillGuard{fillTag, fillVal};
+        value::TagValueOwned fillValue = value::TagValueOwned::fromRaw(makeDecimal("1234.5678"));
 
         {
             uint32_t arrayStringTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::array) |
                                                                  getBSONTypeMask(BSONType::string));
 
-            auto out = numBlock->fillType(arrayStringTypeMask, fillTag, fillVal);
+            auto out = numBlock->fillType(arrayStringTypeMask, fillValue.tag(), fillValue.value());
 
             // The type mask won't match the control min/max tags, so no work needs to be done.
             ASSERT_EQ(out, nullptr);
@@ -676,12 +652,13 @@ TEST_F(TsSbeValueTest, FillType) {
             // in the block that should match this tag.
             uint32_t int32TypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::numberInt));
 
-            auto out = numBlock->fillType(int32TypeMask, fillTag, fillVal);
+            auto out = numBlock->fillType(int32TypeMask, fillValue.tag(), fillValue.value());
             ASSERT_NE(out, nullptr);
             auto outVal = value::bitcastFrom<value::ValueBlock*>(out.get());
-            assertBlockEq(value::TypeTags::valueBlock,
-                          outVal,
-                          TypedValues{extracted[0], {fillTag, fillVal}, extracted[2]});
+            assertBlockEq(
+                value::TypeTags::valueBlock,
+                outVal,
+                TypedValues{extracted[0], {fillValue.tag(), fillValue.value()}, extracted[2]});
         }
     }
 }

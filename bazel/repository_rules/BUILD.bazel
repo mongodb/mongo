@@ -1,0 +1,3 @@
+load(":libvoidstar_test.bzl", "libvoidstar_test_suite")
+
+libvoidstar_test_suite(name = "libvoidstar_test")

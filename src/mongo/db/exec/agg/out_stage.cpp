@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/out_stage.h"
 
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -49,7 +24,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceOutToStageFn(
     tassert(10561501, "expected 'DocumentSourceOut' type", ds);
 
     return make_intrusive<exec::agg::OutStage>(
-        ds->kStageName, ds->getExpCtx(), ds->getOutputNs(), ds->_timeseries, ds->getMergeShardId());
+        ds->kStageName, ds->getExpCtx(), ds->getOutputNs(), ds->_timeseries);
 }
 
 namespace exec {
@@ -63,6 +38,15 @@ MONGO_FAIL_POINT_DEFINE(outImplictlyCreateDBOnSpecificShard);
 MONGO_FAIL_POINT_DEFINE(hangDollarOutAfterInsert);
 
 REGISTER_AGG_STAGE_MAPPING(outStage, DocumentSourceOut::id, documentSourceOutToStageFn)
+
+namespace {
+auto& outInvokedWithQuota = *MetricBuilder<Counter64>{"query.out.countInvokedWithQuota"};
+auto& outFailedOverQuota = *MetricBuilder<Counter64>{"query.out.countFailedOverQuota"};
+}  // namespace
+
+void OutStage::quotaExceeded() {
+    outFailedOverQuota.increment();
+}
 
 void OutStage::doDispose() {
     if (_tmpCleanUpState == OutCleanUpProgress::kComplete) {
@@ -80,6 +64,9 @@ void OutStage::doDispose() {
     // Create a new operation context so that any interrupts on the current operation
     // will not affect the dropCollection operation below.
     auto cleanupOpCtx = cc().makeOperationContext();
+    // TODO(SERVER-130397): This cleanup opCtx does not share the query's QueryLifespan, so
+    // decorated state (e.g. resolved query settings) set during $out's main execution is not
+    // visible here.
     DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
     auto dropCollectionCmd = [&](NamespaceString dropNs) {
         try {
@@ -171,8 +158,7 @@ void OutStage::retrieveOriginalOutCollInfo() {
         }
 
         if (!originalOptions.isEmpty()) {
-            const bool isRawData = isRawDataOperation(pExpCtx->getOperationContext());
-            ON_BLOCK_EXIT([&] { isRawDataOperation(pExpCtx->getOperationContext()) = isRawData; });
+            boost::optional<ScopedRawDataOperation> rawDataGuard;
 
             auto outputNsForFetchingIndexes = _outputNs;
             if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
@@ -181,7 +167,7 @@ void OutStage::retrieveOriginalOutCollInfo() {
                 // Set isRawDataOperation to ensure getIndexSpecs always propagates rawData:true
                 // even though we are targeting the main namespace.
                 // TODO(SERVER-111600): Remove once AllBinariesSupportRawDataOperations is last LTS
-                isRawDataOperation(pExpCtx->getOperationContext()) = true;
+                rawDataGuard.emplace(pExpCtx->getOperationContext(), true);
             } else if (originalOptions.hasField("timeseries")) {
                 // When rawData operations are not supported (FCV < 8.2), getIndexSpecs cannot
                 // resolve timeseries indexes through the user-facing namespace, so we must
@@ -192,7 +178,7 @@ void OutStage::retrieveOriginalOutCollInfo() {
             auto originalIndexes =
                 pExpCtx->getMongoProcessInterface()->getIndexSpecs(pExpCtx->getOperationContext(),
                                                                    outputNsForFetchingIndexes,
-                                                                   false /* includeBuildUUIDs */);
+                                                                   /*includeBuildUUIDs=*/false);
 
             // The uuid field is considered an option, but cannot be passed to createCollection.
             originalOptions = originalOptions.removeField("uuid");
@@ -249,8 +235,9 @@ void OutStage::createTemporaryCollection() {
             return ShardId(fpTarget.getData()["shardId"].String());
         } else {
             // If the output collection exists, we should create the temp collection on the shard
-            // that owns the output collection.
-            return _mergeShardId;
+            // that owns the output collection. Otherwise, it's created on the DB primary shard.
+            return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
+                pExpCtx->getOperationContext(), _outputNs);
         }
     }();
 
@@ -353,6 +340,7 @@ void OutStage::createTemporaryCollection() {
     // Copy the indexes of the output collection to the temp collection.
     try {
         auto targetNsForCreateIndex = _tempNs;
+        boost::optional<ScopedRawDataOperation> rawDataGuard;
         if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
                 VersionContext::getDecoration(pExpCtx->getOperationContext()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -360,7 +348,7 @@ void OutStage::createTemporaryCollection() {
             // the fields of the bucket documents, we need to perform the recreation of those
             // indexes on the temp collection as a rawData operation to avoid erroneously
             // translating the indexes a second time.
-            isRawDataOperation(pExpCtx->getOperationContext()) = true;
+            rawDataGuard.emplace(pExpCtx->getOperationContext(), true);
 
             if (_outIsLegacyTimeseries) {
                 // If we can use rawData then we always use the main timeseries namespace, never the
@@ -371,9 +359,6 @@ void OutStage::createTemporaryCollection() {
 
         pExpCtx->getMongoProcessInterface()->createIndexesOnEmptyCollection(
             pExpCtx->getOperationContext(), targetNsForCreateIndex, _originalOutCollInfo->indexes);
-
-        // Reset rawData to false for the rest of the operation
-        isRawDataOperation(pExpCtx->getOperationContext()) = false;
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;
@@ -444,6 +429,10 @@ void OutStage::initialize() {
     // target collection if it exists. We will write all results into a temporary collection, then
     // rename the temporary collection to be the target collection once we are done.
 
+    if (pExpCtx->getRemainingQuota() >= 0) {
+        outInvokedWithQuota.increment();
+        setEffectiveQuota(pExpCtx->getRemainingQuota());
+    }
     retrieveOriginalOutCollInfo();
 
     _timeseries = validateTimeseries();
@@ -457,18 +446,11 @@ void OutStage::initialize() {
                         _commonStats.stageTypeStr),
             !_originalOutCollInfo || _originalOutCollInfo->options["capped"].eoo());
 
-    uassert(7406100,
-            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
-
     createTemporaryCollection();
 }
 
 void OutStage::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
-    uassert(7406101,
-            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
 
     // Rename the temporary collection to the namespace the user requested, and drop the target
     // collection if $out is writing to a collection that exists.
@@ -631,8 +613,8 @@ void OutStage::renameTemporaryCollection() {
             pExpCtx->getOperationContext(),
             _tempNs,
             outputNs,
-            true /* dropTarget */,
-            false /* stayTemp */,
+            /*dropTarget=*/true,
+            /*stayTemp=*/false,
             _originalOutCollInfo ? _originalOutCollInfo->options : BSONObj{},
             _originalOutCollInfo ? _originalOutCollInfo->indexes : std::vector<BSONObj>{});
     } catch (DBException& ex) {

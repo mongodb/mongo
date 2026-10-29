@@ -1,36 +1,13 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
 
+#include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -38,6 +15,7 @@
 #include <string_view>
 
 namespace mongo {
+using FieldAccessors = change_stream::HashedFieldAccessors;
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPreImageToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -64,7 +42,9 @@ ChangeStreamAddPreImageStage::ChangeStreamAddPreImageStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const FullDocumentBeforeChangeModeEnum& fullDocumentBeforeChangeMode)
-    : Stage(stageName, pExpCtx), _fullDocumentBeforeChangeMode(fullDocumentBeforeChangeMode) {}
+    : Stage(stageName, pExpCtx),
+      _fullDocumentBeforeChangeMode(fullDocumentBeforeChangeMode),
+      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx)) {}
 
 GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
     auto input = pSource->getNext();
@@ -73,7 +53,7 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
     }
 
     // If this is not an update, replace or delete, then just pass along the result.
-    const auto opType = input.getDocument()[DocumentSourceChangeStream::kOperationTypeField];
+    const auto opType = input.getDocument()[FieldAccessors::kOperationType];
     DocumentSourceChangeStream::checkValueType(
         opType, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
     if (auto opTypeValue = opType.getStringData();
@@ -83,8 +63,14 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
         return input;
     }
 
-    auto preImageId =
-        input.getDocument()[DocumentSourceChangeStreamAddPreImage::kPreImageIdFieldName];
+    // The resume event itself is enriched, so that an image-dependent $match placed before token
+    // verification sees the same pre-image the original stream would have produced, but its
+    // pre-image may legitimately be absent (for example when it predates pre-image enablement), so
+    // it is exempt from the "required" check.
+    const bool isResumeTokenEvent = _resumeTokenTracker.classify(input.getDocument()) ==
+        ChangeStreamResumeTokenTracker::EventPosition::kAtResumePoint;
+
+    auto preImageId = input.getDocument()[FieldAccessors::kPreImageId];
     tassert(6091900, "Pre-image id field is missing", !preImageId.missing());
     tassert(5868900,
             "Expected pre-image id field to be a document",
@@ -98,7 +84,8 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
                          "delete and replace events, but the pre-image was not found for event: "
                       << makePreImageNotFoundErrorMsg(input.getDocument()),
         preImageDoc ||
-            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
+            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired ||
+            isResumeTokenEvent);
 
     // Even if no pre-image was found, we have to populate the 'fullDocumentBeforeChange' field.
     MutableDocument outputDoc(input.releaseDocument());
@@ -112,10 +99,14 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
 }
 
 std::string ChangeStreamAddPreImageStage::makePreImageNotFoundErrorMsg(const Document& event) {
-    auto errMsgDoc = Document{{"operationType", event["operationType"]},
-                              {"ns", event["ns"]},
-                              {"clusterTime", event["clusterTime"]},
-                              {"txnNumber", event["txnNumber"]}};
+    auto errMsgDoc = Document{{DocumentSourceChangeStream::kOperationTypeField,
+                               event[DocumentSourceChangeStream::kOperationTypeField]},
+                              {DocumentSourceChangeStream::kNamespaceField,
+                               event[DocumentSourceChangeStream::kNamespaceField]},
+                              {DocumentSourceChangeStream::kClusterTimeField,
+                               event[DocumentSourceChangeStream::kClusterTimeField]},
+                              {DocumentSourceChangeStream::kTxnNumberField,
+                               event[DocumentSourceChangeStream::kTxnNumberField]}};
     return errMsgDoc.toString();
 }
 
@@ -133,7 +124,7 @@ boost::optional<Document> ChangeStreamAddPreImageStage::lookupPreImage(
     }
 
     // Return "preImage" field value from the document.
-    auto preImageField = lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName);
+    auto preImageField = lookedUpDoc->getField(FieldAccessors::kPreImage);
     tassert(
         6148000, "Pre-image document must contain the 'preImage' field", !preImageField.nullish());
     return preImageField.getDocument().getOwned();

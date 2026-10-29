@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_settings/query_settings_service.h"
 
+#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
@@ -39,8 +14,10 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
+#include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
@@ -50,6 +27,7 @@
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log_and_backoff.h"
@@ -63,32 +41,11 @@
 
 namespace mongo::query_settings {
 using namespace std::literals::string_view_literals;
-MONGO_FAIL_POINT_DEFINE(throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter);
-
 using namespace query_shape;
 
 namespace {
-// Explicitly defines the `SerializationContext` to be used in `RepresentativeQueryInfo` factory
-// methods. This was done as part of SERVER-79909 to ensure that inner query commands correctly
-// infer the `tenantId`.
-const auto kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
-
-const stdx::unordered_set<std::string_view, StringMapHasher> rejectionIncompatibleStages = {
-    "$querySettings"sv,
-    "$planCacheStats"sv,
-    "$collStats"sv,
-    "$indexStats"sv,
-    "$listSessions"sv,
-    "$listSampledQueries"sv,
-    "$queryStats"sv,
-    "$currentOp"sv,
-    "$listCatalog"sv,
-    "$listLocalSessions"sv,
-    "$listSearchIndexes"sv,
-};
+const auto kSerializationContext = SerializationContext{SerializationContext::Source::Command,
+                                                        SerializationContext::CallerType::Request};
 
 const auto getQuerySettingsService =
     ServiceContext::declareDecoration<std::unique_ptr<QuerySettingsService>>();
@@ -98,65 +55,64 @@ static constexpr auto kQuerySettingsClusterParameterName = "querySettings"sv;
 MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
 
 /**
- * If the pipeline starts with a "system"/administrative document source to which query settings
- * should not be applied, return the relevant stage name.
+ * If the pipeline contains a "system"/administrative document source that bypasses rejection by
+ * query settings, return the name of the first such stage.
  */
-boost::optional<std::string> getStageExemptedFromRejection(const std::vector<BSONObj>& pipeline) {
-    if (pipeline.empty()) {
-        return boost::none;
+boost::optional<std::string> getStageExemptedFromRejection(const LiteParsedPipeline& pipeline) {
+    for (const auto& stage : pipeline.getStages()) {
+        if (stage->shouldBypassQuerySettingsRejection()) {
+            return std::string{stage->getParseTimeName()};
+        }
     }
-
-    if (canPipelineBeRejected(pipeline)) {
-        // No pipeline stages are incompatible with rejection.
-        return boost::none;
-    }
-
-    // Currently, all "system" queries are always the first stage in a pipeline.
-    std::string firstStageName{pipeline.at(0).firstElementFieldName()};
-    return {std::move(firstStageName)};
+    return boost::none;
 }
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const QuerySettings& settings) {
-    if (expCtx->getExplain() || !expCtx->canBeRejected()) {
-        // Explaining queries which _would_ be rejected if executed is still useful;
-        // do not fail here.
+    if (!settings.getReject()) {
         return;
     }
 
-    if (settings.getReject()) {
-        auto* opCtx = expCtx->getOperationContext();
-        auto* curOp = CurOp::get(opCtx);
-
-        auto query = curOp->opDescription();
-        mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
-        if (auto cmdInvocation = CommandInvocation::get(opCtx)) {
-            cmdInvocation->definition()->snipForLogging(&cmdToLog);
-        }
-
-        LOGV2_DEBUG_OPTIONS(8687100,
+    auto* opCtx = expCtx->getOperationContext();
+    const auto& invocation = CommandInvocation::get(opCtx);
+    tassert(13453200, "Command invocation must be set before query settings rejection", invocation);
+    auto* curOp = CurOp::get(opCtx);
+    if (invocation->shouldBypassQuerySettingsRejection()) {
+        LOGV2_DEBUG_OPTIONS(13453201,
                             2,
                             {logv2::LogComponent::kQueryRejected},
-                            "Query rejected by QuerySettings",
+                            "Command is exempt from QuerySettings rejection",
                             "queryShapeHash"_attr =
                                 curOp->debug().getQueryShapeHash()->toHexString(),
                             "ns"_attr = curOp->getNS(),
-                            "command"_attr = redact(cmdToLog.getObject()));
-        uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
+                            "command"_attr = invocation->definition()->getName());
+        return;
     }
+
+    auto query = curOp->opDescription();
+    mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
+    invocation->definition()->snipForLogging(&cmdToLog);
+
+    LOGV2_DEBUG_OPTIONS(8687100,
+                        2,
+                        {logv2::LogComponent::kQueryRejected},
+                        "Query rejected by QuerySettings",
+                        "queryShapeHash"_attr = curOp->debug().getQueryShapeHash()->toHexString(),
+                        "ns"_attr = curOp->getNS(),
+                        "command"_attr = redact(cmdToLog.getObject()));
+    uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
 }
 
 /*
  * Creates the corresponding RepresentativeQueryInfo for Find query representatives.
  */
 RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
-                                                     const QueryInstance& queryInstance,
-                                                     const boost::optional<TenantId>& tenantId) {
+                                                     const QueryInstance& queryInstance) {
     auto findCommandRequest = std::make_unique<FindCommandRequest>(
         FindCommandRequest::parse(queryInstance,
                                   IDLParserContext("findCommandRequest",
                                                    auth::ValidatedTenancyScope::get(opCtx),
-                                                   tenantId,
+                                                   /* tenantId */ boost::none,
                                                    kSerializationContext)));
 
     // Add the '$recordId' meta-projection field if needed. The 'addShowRecordIdMetaProj()' helper
@@ -202,15 +158,13 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
 /*
  * Creates the corresponding RepresentativeQueryInfo for Distinct query representatives.
  */
-RepresentativeQueryInfo createRepresentativeInfoDistinct(
-    OperationContext* opCtx,
-    const QueryInstance& queryInstance,
-    const boost::optional<TenantId>& tenantId) {
+RepresentativeQueryInfo createRepresentativeInfoDistinct(OperationContext* opCtx,
+                                                         const QueryInstance& queryInstance) {
     auto distinctCommandRequest = std::make_unique<DistinctCommandRequest>(
         DistinctCommandRequest::parse(queryInstance,
                                       IDLParserContext("distinctCommandRequest",
                                                        auth::ValidatedTenancyScope::get(opCtx),
-                                                       tenantId,
+                                                       /* tenantId */ boost::none,
                                                        kSerializationContext)));
     // Extract namespace from distinct command.
     auto& nssOrUuid = distinctCommandRequest->getNamespaceOrUUID();
@@ -252,13 +206,12 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
  * Creates the corresponding RepresentativeQueryInfo for Aggregation query representatives.
  */
 RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
-                                                    const QueryInstance& queryInstance,
-                                                    const boost::optional<TenantId>& tenantId) {
+                                                    const QueryInstance& queryInstance) {
     auto aggregateCommandRequest =
         AggregateCommandRequest::parse(queryInstance,
                                        IDLParserContext("aggregateCommandRequest",
                                                         auth::ValidatedTenancyScope::get(opCtx),
-                                                        tenantId,
+                                                        /* tenantId */ boost::none,
                                                         kSerializationContext));
     // Populate foreign collection namespaces.
     auto parsedPipeline = LiteParsedPipeline(aggregateCommandRequest);
@@ -267,7 +220,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     // adds the foreign collections.
     auto resolvedNs = ResolvedNamespace{aggregateCommandRequest.getNamespace(),
                                         aggregateCommandRequest.getPipeline()};
-    involvedNamespaces.insert(resolvedNs.ns);
+    involvedNamespaces.insert(resolvedNs.getResolvedNamespace());
 
     // When parsing the pipeline, we try to resolve the namespaces, which requires the resolved
     // namespaces to be present in the expression context.
@@ -296,7 +249,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
         .involvedNamespaces = std::move(involvedNamespaces),
         .encryptionInformation = aggregateCommandRequest.getEncryptionInformation(),
         .isIdHackQuery = false,
-        .systemStage = getStageExemptedFromRejection(aggregateCommandRequest.getPipeline()),
+        .systemStage = getStageExemptedFromRejection(parsedPipeline),
         .isRawDataQuery = aggregateCommandRequest.getRawData().value_or(false),
     };
 }
@@ -436,11 +389,7 @@ public:
     // these flags; 'run()' executes the present operations in a fixed, safe order.
     enum class Op : uint8_t {
         kNone = 0,
-        kRemoveQueryKnobs = 1 << 0,
-        kCreateCollection = 1 << 1,
-        kMoveQueriesToCollection = 1 << 2,
-        kMoveQueriesToParameter = 1 << 3,
-        kDropCollection = 1 << 4,
+        kRemoveUnsupportedQueryKnobs = 1 << 0,
     };
 
     friend constexpr Op operator|(Op a, Op b) {
@@ -455,29 +404,19 @@ public:
 
     QuerySettingsMigration(const QuerySettingsService* service) : _service(service) {}
 
-    void run(OperationContext* opCtx, Op plan) {
-        // Create the collection up front, before the retry loop populates it. The create is
-        // idempotent and unrelated to the cluster parameter conflict being retried below.
-        if (contains(plan, Op::kCreateCollection)) {
-            _service->createQueryShapeRepresentativeQueriesCollection(opCtx);
-        }
-
+    void run(OperationContext* opCtx,
+             Op plan,
+             multiversion::FeatureCompatibilityVersion targetFCV) {
         conflictingOperationInProgressRetry([&] {
             _dirty = false;
-            _config = _service->getAllQueryShapeConfigurations(boost::none /* tenantId */);
+            _config = _service->getAllQueryShapeConfigurations();
             LOGV2_DEBUG(12826800,
                         2,
                         "Running query settings migration pass",
                         "numQueryShapeConfigurations"_attr =
                             _config.queryShapeConfigurations.size());
-            if (contains(plan, Op::kRemoveQueryKnobs)) {
-                removeQueryKnobs();
-            }
-            if (contains(plan, Op::kMoveQueriesToCollection)) {
-                moveQueriesToCollection(opCtx);
-            }
-            if (contains(plan, Op::kMoveQueriesToParameter)) {
-                moveQueriesToParameter(opCtx);
+            if (contains(plan, Op::kRemoveUnsupportedQueryKnobs)) {
+                removeUnsupportedQueryKnobs(targetFCV);
             }
             if (_dirty) {
                 LOGV2_DEBUG(12826801,
@@ -488,116 +427,49 @@ public:
                 _service->setQuerySettingsClusterParameter(opCtx, _config);
             }
         });
-
-        // Drop the dedicated collection only after the representative queries have been persisted
-        // back to the cluster parameter, so a failed write cannot lose them.
-        if (contains(plan, Op::kDropCollection)) {
-            _service->dropQueryShapeRepresentativeQueriesCollection(opCtx);
-        }
     }
 
 private:
-    void removeQueryKnobs() {
+    enum class ModifyResult { kModified, kNotModified };
+
+    // Applies 'modify' to each query shape configuration in place, dropping any configuration
+    // whose settings became fully default as a result.
+    void modifySettingsArray(std::function<ModifyResult(QueryShapeConfiguration&)> modify) {
         auto& configs = _config.queryShapeConfigurations;
         configs.erase(std::remove_if(configs.begin(),
                                      configs.end(),
                                      [&](auto&& entry) -> bool {
-                                         auto&& settings = entry.getSettings();
-                                         if (auto&& knobs = settings.getQueryKnobs()) {
-                                             _dirty = true;
-                                             // TODO SERVER-129571: Scope down query knob downgrades
-                                             // only to knobs below the minimum FCV
-                                             settings.setQueryKnobs(boost::none);
-                                             const bool becameDefault = isDefault(settings);
-                                             LOGV2_DEBUG(
-                                                 12826802,
-                                                 3,
-                                                 "Stripping query knobs from query settings",
-                                                 "queryShapeHash"_attr =
-                                                     entry.getQueryShapeHash().toHexString(),
-                                                 "removedEntry"_attr = becameDefault);
-                                             if (becameDefault) {
-                                                 return true;
-                                             }
-                                             entry.setSettings(settings);
+                                         switch (modify(entry)) {
+                                             case ModifyResult::kNotModified:
+                                                 return false;
+                                             case ModifyResult::kModified:
+                                                 _dirty = true;
+                                                 return isDefault(entry.getSettings());
                                          }
-                                         return false;
+                                         MONGO_UNREACHABLE;
                                      }),
                       configs.end());
     }
 
-    void moveQueriesToCollection(OperationContext* opCtx) {
-        const auto& clusterParameterTime = _config.clusterParameterTime;
-        std::vector<QueryShapeRepresentativeQuery> representativeQueries;
-        for (auto&& shapeConfig : _config.queryShapeConfigurations) {
-            auto&& representativeQuery = shapeConfig.getRepresentativeQuery();
-            if (!representativeQuery) {
-                continue;
+    void removeUnsupportedQueryKnobs(multiversion::FeatureCompatibilityVersion targetFCV) {
+        modifySettingsArray([&](QueryShapeConfiguration& configuration) {
+            auto&& settings = configuration.getSettings();
+            auto knobs = settings.getQueryKnobs();
+            if (!knobs || !knobs->removeKnobsRequiringHigherFcv(targetFCV)) {
+                return ModifyResult::kNotModified;
             }
-            representativeQueries.emplace_back(
-                shapeConfig.getQueryShapeHash(), *representativeQuery, clusterParameterTime);
-            // Clear the 'representativeQuery' information as it will be stored in a separate
-            // collection.
-            shapeConfig.setRepresentativeQuery(boost::none);
-            _dirty = true;
-        }
-        if (!representativeQueries.empty()) {
-            _service->upsertRepresentativeQueries(opCtx, representativeQueries);
-        }
-    }
-
-    void moveQueriesToParameter(OperationContext* opCtx) {
-        auto& configs = _config.queryShapeConfigurations;
-        auto setRepresentativeQuery = [&](auto representativeQuery) -> bool {
-            auto it = std::find_if(configs.begin(), configs.end(), [&](const auto& shapeConfig) {
-                return shapeConfig.getQueryShapeHash() == representativeQuery.get_id();
-            });
-            if (it != configs.end()) {
-                it->setRepresentativeQuery(representativeQuery.getRepresentativeQuery());
-                return true;
+            if (knobs->empty()) {
+                knobs = boost::none;
             }
-            return false;
-        };
-
-        // Migrate representative queries from smallest to largest, stopping once approaching
-        // BSONObjMaxUserSize limit.
-        DBDirectClient client(opCtx);
-        auto cursor = client.find([] {
-            FindCommandRequest request{NamespaceString::kQueryShapeRepresentativeQueriesNamespace};
-            BSONObjBuilder projection;
-            projection.append(QueryShapeRepresentativeQuery::k_idFieldName, 1);
-            projection.append(QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName, 1);
-            projection.append(QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName, 1);
-            std::string dollarRepresentativeQuery = str::stream()
-                << "$" << QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName;
-            projection.append("bsonSize", BSON("$bsonSize" << dollarRepresentativeQuery));
-            request.setProjection(projection.obj().getOwned());
-
-            // Prioritize by 'representativeQuery' size, so that we can migrate as many
-            // representative queries as possible.
-            // TODO SERVER-107307: Introduce additional representative query size limits test
-            // coverage.
-            request.setSort(BSON("bsonSize" << 1));
-            return request;
-        }());
-        IDLParserContext ctx{"QueryShapeRepresentativeQuery"};
-        int budget =
-            BSONObjMaxUserSize - makeQuerySettingsClusterParameter(_config).toBSON().objsize();
-        while (cursor->more()) {
-            BSONObj doc = cursor->next();
-            int cost =
-                doc.getField(QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName).size();
-            if (cost > budget) {
-                break;
-            }
-            if (setRepresentativeQuery(QueryShapeRepresentativeQuery::parse(doc, ctx))) {
-                budget -= cost;
-                _dirty = true;
-            }
-        }
-        if (!cursor->isDead()) {
-            cursor->kill();
-        }
+            settings.setQueryKnobs(knobs);
+            LOGV2_DEBUG(12826802,
+                        3,
+                        "Stripping query knobs not supported on the target FCV from query "
+                        "settings",
+                        "queryShapeHash"_attr = configuration.getQueryShapeHash().toHexString());
+            configuration.setSettings(settings);
+            return ModifyResult::kModified;
+        });
     }
 
     const QuerySettingsService* _service;
@@ -605,53 +477,117 @@ private:
     bool _dirty = false;
 };
 
+/**
+ * Checks 'settings' getQueryKnobs() for parse/validation errors accumulated while parsing an
+ * incoming per-request QuerySettings override. If 'uassertOnError' is true, throws the first
+ * error (fresh, directly client-supplied settings must be rejected outright). Otherwise, logs the
+ * errors and continues (the settings originated from a trusted, already-validated source, e.g. a
+ * router forwarding a previously-accepted value; a locally-invalid knob should be dropped rather
+ * than fail the query, exactly as fromBSON() already did when it recorded the error).
+ */
+void checkQueryKnobOverrideErrors(const QuerySettings& settings,
+                                  bool uassertOnError,
+                                  const query_shape::QueryShapeHash* queryShapeHash = nullptr) {
+    const auto& knobs = settings.getQueryKnobs();
+    if (!knobs || !knobs->hasErrors()) {
+        // No-error is the common case on the hot per-query path; return before building any log
+        // context.
+        return;
+    }
+    if (uassertOnError) {
+        knobs->uassertNoErrors();
+        return;
+    }
+    knobs->logErrors(queryShapeHash ? BSON("queryShapeHash" << queryShapeHash->toHexString())
+                                    : BSONObj());
+}
+
 }  // namespace
+
+void QuerySettingsService::initializeSettingsForQuery(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
+    const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
+    using namespace query_settings_details;
+    // A nested command running through DBDirectClient is part of the user command's execution: it
+    // must not resolve query settings on the user command's behalf, and instead observes the
+    // settings the user command resolved.
+    auto opCtx = expCtx->getOperationContext();
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+    // Only resolve while the operation is still 'Pending' (an eligible command has begun via
+    // 'QuerySettingsCommandHooks' and settings have not been resolved yet). Once resolved
+    // (e.g. a view re-dispatched onto the same opCtx), this is a no-op. 'NotStarted' is also left
+    // alone: no eligible command was dispatched, so there is nothing to resolve against.
+    auto&& state = getQuerySettingsStateForOp(opCtx);
+    if (std::holds_alternative<Pending>(state)) {
+        auto settings = lookupQuerySettingsWithRejectionCheck(
+            expCtx, queryShapeHash, querySettingsFromOriginalCommand);
+        // Collapse a default (no-op) resolution to 'Empty' so it is distinguishable from an
+        // operation that actually installed settings.
+        // TODO SERVER-XXXXXX: avoid re-inspecting the result here by having
+        // 'lookupQuerySettingsWithRejectionCheck' return the resolved state ('Empty' vs installed
+        // settings) directly.
+        if (isDefault(settings)) {
+            state = Empty{};
+            return;
+        }
+        CurOp::get(opCtx)->debug().setQuerySettings(opCtx, settings);
+        state = std::move(settings);
+    }
+}
 
 class QuerySettingsRouterService : public QuerySettingsService {
 public:
     QuerySettingsRouterService() {
         _backfillCoordinator = BackfillCoordinator::create(
             /* onCompletionHook */ [this](std::vector<QueryShapeHash> hashes,
-                                          LogicalTime clusterParameterTime,
-                                          boost::optional<TenantId> tenantId) {
-                _manager.markBackfilledRepresentativeQueries(
-                    hashes, clusterParameterTime, tenantId);
+                                          LogicalTime clusterParameterTime) {
+                _manager.markBackfilledRepresentativeQueries(hashes, clusterParameterTime);
             });
     }
 
-    QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
-        const boost::optional<TenantId>& tenantId) const final {
-        return _manager.getAllQueryShapeConfigurations(tenantId);
+    QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations() const final {
+        return _manager.getAllQueryShapeConfigurations();
     }
 
-    void setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp&& config,
-                                        const boost::optional<TenantId>& tenantId) final {
-        _manager.setAllQueryShapeConfigurations(std::move(config), tenantId);
+    void setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp&& config) final {
+        _manager.setAllQueryShapeConfigurations(std::move(config));
     }
 
-    void removeAllQueryShapeConfigurations(const boost::optional<TenantId>& tenantId) final {
-        _manager.removeAllQueryShapeConfigurations(tenantId);
+    void removeAllQueryShapeConfigurations() final {
+        _manager.removeAllQueryShapeConfigurations();
     }
 
-    LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const final {
-        return _manager.getClusterParameterTime(tenantId);
+    LogicalTime getClusterParameterTime() const final {
+        return _manager.getClusterParameterTime();
     }
 
     QuerySettings lookupQuerySettingsWithRejectionCheck(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
-        const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
-        if (expCtx->isIdHackQuery()) {
-            return QuerySettings();
+        // Always perform cluster lookup (includes rejection check for cluster PQS).
+        auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash);
+        if (querySettingsFromOriginalCommand.has_value()) {
+            // The settings were supplied directly by the user, so validate them before applying.
+            // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
+            // error.
+            auto userSettings = *querySettingsFromOriginalCommand;
+            validateQueryKnobs(userSettings);
+
+            settings = mergeQuerySettings(userSettings, settings);
+            simplifyQuerySettings(settings);
+            if (!isDefault(settings)) {
+                validateQuerySettings(settings);
+            }
         }
 
-        // Always perform cluster lookup (includes rejection check for cluster PQS).
-        auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash, nss);
-        if (querySettingsFromOriginalCommand.has_value()) {
-            // Merge: user settings as base, cluster settings override on conflict.
-            settings = mergeQuerySettings(*querySettingsFromOriginalCommand, settings);
-        }
+        // Fail the current command, if 'reject: true' flag is present.
+        failIfRejectedBySettings(expCtx, settings);
+        applyMaxTimeMSFromSettings(expCtx, settings);
+
         return settings;
     }
 
@@ -664,15 +600,6 @@ public:
 
     void createQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
         MONGO_UNIMPLEMENTED_TASSERT(10445100);
-    }
-
-    void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
-        MONGO_UNIMPLEMENTED_TASSERT(10445101);
-    }
-
-    void upgradeQuerySettings(OperationContext* opCtx,
-                              multiversion::FeatureCompatibilityVersion targetFCV) const override {
-        MONGO_UNIMPLEMENTED_TASSERT(10445102);
     }
 
     void downgradeQuerySettings(
@@ -701,41 +628,28 @@ protected:
      */
     QuerySettings lookupQuerySettingsFromInternalStorage(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const query_shape::QueryShapeHash& queryShapeHash,
-        const NamespaceString& nss) const {
-        QuerySettings settings = [&]() {
-            try {
-                if (!isEligbleForQuerySettings(expCtx, nss)) {
-                    return QuerySettings();
-                }
-
-                // Return the found query settings or an empty one.
-                auto result =
-                    _manager.getQuerySettingsForQueryShapeHash(queryShapeHash, nss.tenantId());
-                if (!result.has_value()) {
-                    return QuerySettings();
-                }
-
-                // Backfill the representative query if needed.
-                auto* opCtx = expCtx->getOperationContext();
-                if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
-                    _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
-                        opCtx, queryShapeHash, CurOp::get(opCtx)->opDescription().getOwned());
-                }
-                return std::move(result->querySettings);
-            } catch (const DBException& ex) {
-                LOGV2_WARNING_OPTIONS(10153400,
-                                      {logv2::LogComponent::kQuery},
-                                      "Failed to perform query settings lookup",
-                                      "error"_attr = ex.toString());
+        const query_shape::QueryShapeHash& queryShapeHash) const {
+        try {
+            // Return the found query settings or an empty one.
+            auto result = _manager.getQuerySettingsForQueryShapeHash(queryShapeHash);
+            if (!result.has_value()) {
                 return QuerySettings();
             }
-        }();
 
-        // Fail the current command, if 'reject: true' flag is present.
-        failIfRejectedBySettings(expCtx, settings);
-
-        return settings;
+            // Backfill the representative query if needed.
+            auto* opCtx = expCtx->getOperationContext();
+            if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
+                _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
+                    opCtx, queryShapeHash, CurOp::get(opCtx)->opDescription().getOwned());
+            }
+            return std::move(result->querySettings);
+        } catch (const DBException& ex) {
+            LOGV2_WARNING_OPTIONS(10153400,
+                                  {logv2::LogComponent::kQuery},
+                                  "Failed to perform query settings lookup",
+                                  "error"_attr = ex.toString());
+            return QuerySettings();
+        }
     }
 
 private:
@@ -751,24 +665,53 @@ public:
     QuerySettings lookupQuerySettingsWithRejectionCheck(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
-        const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
-        if (expCtx->isIdHackQuery()) {
-            return QuerySettings();
-        }
-
         auto* opCtx = expCtx->getOperationContext();
         if (isInternalOrDirectClient(opCtx->getClient())) {
-            // Mongos already looked up and merged - return forwarded settings as-is.
-            return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
+            // Mongos already looked up, validated, and merged this value, so use the forwarded
+            // settings as-is rather than repeating that work here. Two things still need to
+            // happen locally, though:
+            //   1. A knob that has since become locally invalid (e.g. removed, or its range
+            //      tightened) must be logged and dropped rather than fail the query, since the
+            //      router already vetted the request.
+            //      These forwarded settings are per-request and transient (they are never cached
+            //      in QuerySettingsManager), so the recorded errors do not need to be cleared
+            //      after logging.
+            if (querySettingsFromOriginalCommand.has_value()) {
+                checkQueryKnobOverrideErrors(*querySettingsFromOriginalCommand,
+                                             /* uassertOnError */ false,
+                                             &queryShapeHash);
+            }
+            //   2. The shard's initial command deadline was computed from the forwarded
+            //      (pre-merge) 'maxTimeMS' field before query settings were considered, so
+            //      'maxTimeMS' must be (re-)applied here: otherwise a query settings override
+            //      that loosens the deadline is silently lost, since the transport layer's
+            //      'maxTimeMS'/'maxTimeMSOpOnly' precedence always favors whichever is shorter.
+            auto settings = querySettingsFromOriginalCommand.get_value_or(QuerySettings());
+            applyMaxTimeMSFromSettings(expCtx, settings);
+            return settings;
         }
 
         // Replica set: perform cluster lookup (includes rejection check) and merge with user
-        // settings.
-        auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash, nss);
+        // settings. These settings come directly from an external client, so validate them first.
+        auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash);
         if (querySettingsFromOriginalCommand.has_value()) {
-            settings = mergeQuerySettings(*querySettingsFromOriginalCommand, settings);
+            // Unlike setQuerySettings, empty/default user settings are a no-op rather than an
+            // error.
+            auto& userSettings = *querySettingsFromOriginalCommand;
+            validateQueryKnobs(userSettings);
+
+            settings = mergeQuerySettings(userSettings, settings);
+            simplifyQuerySettings(settings);
+            if (!isDefault(settings)) {
+                validateQuerySettings(settings);
+            }
         }
+
+        // Fail the current command, if 'reject: true' flag is present.
+        failIfRejectedBySettings(expCtx, settings);
+        applyMaxTimeMSFromSettings(expCtx, settings);
+
         return settings;
     }
 
@@ -777,12 +720,6 @@ public:
         const QueryShapeConfigurationsWithTimestamp& config,
         boost::optional<LogicalTime> newClusterParameterTime = boost::none) const final {
         try {
-            if (MONGO_unlikely(throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter
-                                   .shouldFail())) {
-                uasserted(ErrorCodes::ConflictingOperationInProgress,
-                          "ConflictingOperationInProgress");
-            }
-
             auto request = makeQuerySettingsClusterParameter(config);
             auto newClusterParameterTimeAsTs = newClusterParameterTime
                 ? boost::optional<Timestamp>(newClusterParameterTime->asTimestamp())
@@ -803,61 +740,21 @@ public:
         std::ignore = client.createCollection(nss);
     }
 
-    void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
-        constexpr auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
-        DBDirectClient client(opCtx);
-        std::ignore = client.dropCollection(nss);
-    }
-
-
-    void upgradeQuerySettings(OperationContext* opCtx,
-                              multiversion::FeatureCompatibilityVersion targetFCV) const override {
-        using Op = QuerySettingsMigration::Op;
-
-        // Move representative queries into the dedicated collection once backfill is enabled.
-        auto plan = Op::kNone;
-        if (feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(targetFCV)) {
-            plan |= Op::kCreateCollection | Op::kMoveQueriesToCollection;
-        }
-
-        LOGV2_DEBUG(12826803,
-                    2,
-                    "Planning query settings FCV upgrade",
-                    "targetFCV"_attr = multiversion::toString(targetFCV),
-                    "migrateRepresentativeQueriesToCollection"_attr =
-                        QuerySettingsMigration::contains(plan, Op::kMoveQueriesToCollection));
-        if (plan != Op::kNone) {
-            QuerySettingsMigration(this).run(opCtx, plan);
-        }
-    }
-
     void downgradeQuerySettings(
         OperationContext* opCtx,
         multiversion::FeatureCompatibilityVersion targetFCV) const override {
         using Op = QuerySettingsMigration::Op;
 
-        auto plan = Op::kNone;
-        // Move representative queries back to the cluster parameter once backfill is disabled.
-        if (!feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(targetFCV)) {
-            plan |= Op::kMoveQueriesToParameter | Op::kDropCollection;
-        }
-        // Strip query knobs once the target FCV no longer supports them.
-        if (!feature_flags::gFeatureFlagPqsQueryKnobs.isEnabledOnVersion(targetFCV)) {
-            plan |= Op::kRemoveQueryKnobs;
-        }
+        // Query knob overrides not supported on the target FCV must be stripped on every
+        // downgrade.
+        auto plan = Op::kRemoveUnsupportedQueryKnobs;
 
         LOGV2_DEBUG(12826804,
                     2,
                     "Planning query settings FCV downgrade",
-                    "targetFCV"_attr = multiversion::toString(targetFCV),
-                    "removeQueryKnobs"_attr =
-                        QuerySettingsMigration::contains(plan, Op::kRemoveQueryKnobs),
-                    "migrateRepresentativeQueriesToClusterParameter"_attr =
-                        QuerySettingsMigration::contains(plan, Op::kMoveQueriesToParameter));
+                    "targetFCV"_attr = multiversion::toString(targetFCV));
 
-        if (plan != Op::kNone) {
-            QuerySettingsMigration(this).run(opCtx, plan);
-        }
+        QuerySettingsMigration(this).run(opCtx, plan, targetFCV);
     }
 
     void upsertRepresentativeQueries(
@@ -870,8 +767,8 @@ public:
                 client.update(nss,
                               BSON("_id" << query.get_id().toHexString()),
                               query.toBSON(),
-                              true /* upsert */,
-                              false /* multi */,
+                              /*upsert=*/true,
+                              /*multi=*/false,
                               defaultMajorityWriteConcern().toBSON());
             } catch (const DBException& ex) {
                 LOGV2_DEBUG(10445110,
@@ -894,7 +791,7 @@ public:
                            << QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName
                            << BSON("$lte" << latestClusterParameterTime.asTimestamp()));
             client.remove(
-                nss, predicate, false /* removeMany */, defaultMajorityWriteConcern().toBSON());
+                nss, predicate, /*removeMany=*/false, defaultMajorityWriteConcern().toBSON());
         } catch (const DBException& ex) {
             LOGV2_DEBUG(10445111,
                         1,
@@ -919,8 +816,27 @@ std::string QuerySettingsService::getQuerySettingsClusterParameterName() {
     return std::string{kQuerySettingsClusterParameterName};
 }
 
-bool QuerySettingsService::isEligbleForQuerySettings(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) {
+void QuerySettingsService::applyMaxTimeMSFromSettings(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const QuerySettings& settings) {
+    // Like 'reject', query settings reflect what would apply to a query (the setting still appears
+    // in the 'querySettings' section of explain output) but do not enforce behavioral settings
+    // during an explain itself. This also matches 'defaultMaxTimeMS', which is not applied to
+    // explain. So do not bound the explain operation by the query settings 'maxTimeMS'.
+    if (expCtx->getExplain()) {
+        return;
+    }
+
+    auto maxTimeMS = settings.getMaxTimeMS();
+    if (!maxTimeMS) {
+        return;
+    }
+
+    expCtx->getOperationContext()->setMaxTimeFromTotalBudget(
+        duration_cast<Microseconds>(Milliseconds(*maxTimeMS)), ErrorCodes::MaxTimeMSExpired);
+}
+
+bool QuerySettingsService::isEligibleForQuerySettings(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // Query settings can not be set for IDHACK queries.
     if (expCtx->isIdHackQuery()) {
         return false;
@@ -932,17 +848,13 @@ bool QuerySettingsService::isEligbleForQuerySettings(
     }
 
     // Query settings can not be set on internal dbs or system collections in user dbs.
+    const auto& nss = expCtx->getNamespaceString();
     if (nss.isOnInternalDb() || nss.isSystem()) {
         return false;
     }
 
     return true;
 }
-
-const stdx::unordered_set<std::string_view, StringMapHasher>&
-QuerySettingsService::getRejectionIncompatibleStages() {
-    return rejectionIncompatibleStages;
-};
 
 void QuerySettingsService::initializeForRouter(ServiceContext* serviceContext) {
     getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
@@ -958,26 +870,18 @@ void QuerySettingsService::initializeForTest(ServiceContext* serviceContext) {
     initializeForShard(serviceContext, nullptr);
 }
 
-RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
-                                                 const BSONObj& cmd,
-                                                 const boost::optional<TenantId>& tenantId) {
+RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx, const BSONObj& cmd) {
     const auto commandName = cmd.firstElementFieldNameStringData();
     if (commandName == FindCommandRequest::kCommandName) {
-        return createRepresentativeInfoFind(opCtx, cmd, tenantId);
+        return createRepresentativeInfoFind(opCtx, cmd);
     }
     if (commandName == AggregateCommandRequest::kCommandName) {
-        return createRepresentativeInfoAgg(opCtx, cmd, tenantId);
+        return createRepresentativeInfoAgg(opCtx, cmd);
     }
     if (commandName == DistinctCommandRequest::kCommandName) {
-        return createRepresentativeInfoDistinct(opCtx, cmd, tenantId);
+        return createRepresentativeInfoDistinct(opCtx, cmd);
     }
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
-}
-
-bool canPipelineBeRejected(const std::vector<BSONObj>& pipeline) {
-    return pipeline.empty() ||
-        !QuerySettingsService::getRejectionIncompatibleStages().contains(
-            pipeline.at(0).firstElementFieldName());
 }
 
 bool allowQuerySettingsFromClient(Client* client) {
@@ -993,19 +897,19 @@ bool allowQuerySettingsFromClient(Client* client) {
 
 bool isDefault(const QuerySettings& settings) {
     // The 'serialization_context' and 'comment' fields are not significant.
-    static_assert(QuerySettings::fieldNames.size() == 6,
+    static_assert(QuerySettings::fieldNames.size() == 7,
                   "A new field has been added to the QuerySettings structure, isDefault should be "
                   "updated appropriately.");
 
     // For the 'reject' field of type OptionalBool, consider both 'false' and missing value as
     // default.
     return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject() ||
-             settings.getQueryKnobs());
+             settings.getQueryKnobs() || settings.getMaxTimeMS());
 }
 
 QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
     static_assert(
-        QuerySettings::fieldNames.size() == 6,
+        QuerySettings::fieldNames.size() == 7,
         "A new field has been added to the QuerySettings structure, mergeQuerySettings() should be "
         "updated appropriately.");
 
@@ -1035,7 +939,41 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
         querySettings.setQueryKnobs(std::move(merged));
     }
 
+    if (rhs.getMaxTimeMS()) {
+        querySettings.setMaxTimeMS(rhs.getMaxTimeMS());
+    }
+
     return querySettings;
+}
+
+void QuerySettingsService::validateQueryKnobs(const QuerySettings& querySettings) const {
+    const auto& knobs = querySettings.getQueryKnobs();
+    if (!knobs) {
+        return;
+    }
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+    checkQueryKnobOverrideErrors(querySettings,
+                                 /* uassertOnError */ true);
+
+    // Reject knobs that are not supported on the current FCV, including transitional versions:
+    // during a downgrade the knobs being removed must not be re-settable behind the migration's
+    // stripping pass. Skip the check if the FCV is not initialized (mongos, early startup).
+    if (!fcvSnapshot.isVersionInitialized()) {
+        return;
+    }
+    const auto& reg = QueryKnobRegistry::instance();
+    for (const auto& entry : knobs->entries()) {
+        // Deletions are always allowed so that stale overrides can be removed.
+        if (std::holds_alternative<DeleteQueryKnobOverride>(entry.value)) {
+            continue;
+        }
+        const auto& knobEntry = reg.entry(entry.id);
+        uassert(12955401,
+                str::stream() << "query knob not settable via QuerySettings: "
+                              << knobEntry.wireName,
+                fcvSnapshot.isGreaterThanOrEqualTo(*knobEntry.minFcv));
+    }
 }
 
 void QuerySettingsService::validateQuerySettings(const QuerySettings& querySettings) const {
@@ -1048,6 +986,10 @@ void QuerySettingsService::validateQuerySettings(const QuerySettings& querySetti
     // duplicates are adjacent. Also tasserts that simplifyQuerySettings() was called first so that
     // no DeleteQueryKnobOverride sentinels survive into stored settings.
     if (const auto& knobs = querySettings.getQueryKnobs()) {
+        // A fresh setQuerySettings command must reject any knob that failed to parse/validate,
+        // rather than silently applying only the valid subset.
+        knobs->uassertNoErrors();
+
         auto entries = knobs->entries();
         for (size_t i = 0; i < entries.size(); ++i) {
             tassert(12366200,
@@ -1108,9 +1050,18 @@ void QuerySettingsService::simplifyQuerySettings(QuerySettings& settings) const 
     if (settings.getReject().has_value() && !settings.getReject()) {
         settings.setReject({});
     }
+    // A 'maxTimeMS' of 0 is equivalent to leaving it unset.
+    // Normalizing here keeps 0 available as a way to clear the setting without dropping the entire
+    // configuration.
+    if (settings.getMaxTimeMS() && *settings.getMaxTimeMS() == 0) {
+        settings.setMaxTimeMS(boost::none);
+    }
     if (auto knobs = settings.getQueryKnobs()) {
         knobs->simplify();
-        settings.setQueryKnobs(knobs->empty() ? boost::none : knobs);
+        // Preserve a knob override that carries recorded parse/validation errors even when it has
+        // no valid entries left, so validateQuerySettings()'s uassertNoErrors() check can still
+        // see and reject it with its original error code.
+        settings.setQueryKnobs((knobs->empty() && !knobs->hasErrors()) ? boost::none : knobs);
     }
 
     const auto& indexes = settings.getIndexHints();
@@ -1142,9 +1093,8 @@ void QuerySettingsService::sanitizeQuerySettingsHints(
         if (isDefault(settings)) {
             LOGV2_WARNING(9646003,
                           "query settings became default after index hint sanitization",
-                          "queryShapeShash"_attr = queryShapeItem.getQueryShapeHash().toHexString(),
-                          "queryInstance"_attr = queryShapeItem.getRepresentativeQuery().map(
-                              [](const BSONObj& b) { return redact(b); }));
+                          "queryShapeShash"_attr =
+                              queryShapeItem.getQueryShapeHash().toHexString());
             return true;
         }
         return false;

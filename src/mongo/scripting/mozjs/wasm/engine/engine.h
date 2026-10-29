@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,6 +8,7 @@
 #include "mongo/scripting/mozjs/common/error.h"
 #include "mongo/scripting/mozjs/common/global.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
+#include "mongo/scripting/mozjs/common/print_budget.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
@@ -297,6 +272,9 @@ public:
                               const mongo::BSONObj& singleElementDoc,
                               wasm_mozjs_error_t* err);
 
+    /// Delete a named global from the JS environment. No-op if the name does not exist.
+    err_code_t deleteGlobal(const char* name, size_t name_len, wasm_mozjs_error_t* err);
+
     /// Reset JS state without destroying the Store or JSContext.
     /// Clears user-defined globals and emit buffer; preserves compiled function handles.
     err_code_t reset(wasm_mozjs_error_t* err);
@@ -347,6 +325,7 @@ public:
     bool isJavaScriptProtectionEnabled() const override;
     void newFunction(std::string_view code, JS::MutableHandleValue out) override;
     bool requiresOwnedObjects() const override;
+    JSPrintBudget* printBudget() override;
     void trackNewPointer(void* ptr) override;
     void trackDeletePointer(void* ptr) override;
 
@@ -372,8 +351,23 @@ private:
     // Caller must hold no JSAutoRealm and _parentGlobal must be initialized.
     err_code_t _setupChildRealm(ExecutionCheck& chk, wasm_mozjs_error_t* err);
 
+    // Freeze standard built-ins and MongoDB custom types so user JS mutations do not survive
+    // reset() or leak across realms. Enumerates every own property of _global, freezes each
+    // object and walks its full .prototype chain, so all types installed by installTypes()
+    // (plus any future additions) are covered without being named. Shared with both setup
+    // paths. Must run after types.js has attached its prototype extensions and after the
+    // Array helpers are installed. Caller must hold a JSAutoRealm on _global.
+    err_code_t _freezeBuiltins(ExecutionCheck& chk, wasm_mozjs_error_t* err);
+
     bool _initialized = false;
     bool _javascriptProtection = false;
+
+    // Monotonically increasing generation counter. Incremented at the start of every
+    // invocation (invokeFunction, invokePredicate, invokeMap) and inside reset(). Any
+    // unowned BSONHolder created in a prior invocation is detected as stale when accessed
+    // in a subsequent one via uassertValid().
+    std::size_t _generation{1};
+
 
     // JS_Init() / JS_ShutDown() are once-per-runtime-lifetime calls. After the first
     // init(), subsequent shutdown()+init() cycles must skip them and only do
@@ -397,6 +391,8 @@ private:
     std::unique_ptr<InternedStringTable> _internedStrings;
 
     Status _status = Status::OK();
+
+    JSPrintBudget _printBudget;
 
     std::vector<mongo::BSONObj> _emitBuffer;
     int64_t _emitBytesUsed = 0;

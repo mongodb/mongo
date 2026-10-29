@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -60,13 +33,14 @@ struct _timelib_tzinfo;
 /**
  * TODO SERVER-114888: Remove external dependencies on this module.
  */
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Default format values for date-times, e.g. for $dateToString aggregations.
  */
-static constexpr std::string_view kIsoFormatStringZ = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
-static constexpr std::string_view kIsoFormatStringNonZ = "%Y-%m-%dT%H:%M:%S.%L"_sd;
+static constexpr std::string_view kIsoFormatStringZ = "%Y-%m-%dT%H:%M:%S.%LZ"sv;
+static constexpr std::string_view kIsoFormatStringNonZ = "%Y-%m-%dT%H:%M:%S.%L"sv;
 
 /**
  * A set of standard measures of time used to express a length of time interval.
@@ -752,4 +726,4 @@ Date_t truncateDate(Date_t date,
 Date_t truncateDateMillis(Date_t date, Date_t referencePoint, unsigned long long binSizeMillis);
 
 long long getBinSizeInMillis(unsigned long long binSize, TimeUnit unit);
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

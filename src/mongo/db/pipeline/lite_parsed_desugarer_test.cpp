@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
@@ -43,6 +17,7 @@
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -100,31 +75,31 @@ public:
     }
 };
 
+size_t liftSubpipelineStageExpander(LiteParsedPipeline* pipeline,
+                                    size_t index,
+                                    LiteParsedDocumentSource& stage) {
+    auto subpipelinesPtr = stage.getMutableSubPipelines();
+    tassert(8084900,
+            "$liftSubpipeline must have exactly one subpipeline",
+            subpipelinesPtr && subpipelinesPtr->size() == 1);
+    StageSpecs lifted;
+    for (const auto& s : (*subpipelinesPtr)[0]->getStages()) {
+        lifted.push_back(s->clone());
+    }
+    return pipeline->replaceStageWith(index, std::move(lifted));
+}
+
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(liftSubpipeline,
+                                              LiftSubpipelineStageParams::id,
+                                              liftSubpipelineStageExpander);
+
 }  // namespace
 
 class LiteParsedDesugarerTest : public AggregationContextFixture {
 public:
     LiteParsedDesugarerTest() : LiteParsedDesugarerTest(_nss) {}
     explicit LiteParsedDesugarerTest(NamespaceString nsString)
-        : AggregationContextFixture(std::move(nsString)) {
-        LiteParsedDesugarer::registerStageExpander(
-            extension::host::ExpandableStageParams::id,
-            extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpandable::
-                stageExpander);
-        LiteParsedDesugarer::registerStageExpander(
-            LiftSubpipelineStageParams::id,
-            [](LiteParsedPipeline* pipeline, size_t index, LiteParsedDocumentSource& stage) {
-                auto* subpipelinesPtr = stage.getMutableSubPipelines();
-                tassert(8084900,
-                        "$liftSubpipeline must have exactly one subpipeline",
-                        subpipelinesPtr && subpipelinesPtr->size() == 1);
-                StageSpecs lifted;
-                for (const auto& s : (*subpipelinesPtr)[0]->getStages()) {
-                    lifted.push_back(s->clone());
-                }
-                return pipeline->replaceStageWith(index, std::move(lifted));
-            });
-    }
+        : AggregationContextFixture(std::move(nsString)) {}
 
     void registerParser(extension::AggStageDescriptorHandle descriptor) {
         auto nameStringData = descriptor->getName();
@@ -180,8 +155,8 @@ public:
     void assertSubpipelineStageIsMatch(LiteParsedDocumentSource* stage,
                                        size_t subpipelineIdx,
                                        size_t stageIdx) {
-        auto* subpipelinesPtr = stage->getSubPipelines();
-        ASSERT_NE(subpipelinesPtr, nullptr);
+        auto subpipelinesPtr = stage->getSubPipelines();
+        ASSERT(subpipelinesPtr);
         ASSERT_LT(subpipelineIdx, subpipelinesPtr->size());
         auto& stages = (*subpipelinesPtr)[subpipelineIdx]->getStages();
         ASSERT_LT(stageIdx, stages.size());
@@ -543,14 +518,59 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
     unregisterParser(extStageName);
 }
 
+TEST_F(LiteParsedDesugarerTest, DesugarsLookupSubpipelineWithExpandableStageWhenHybridFlagOff) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", false};
+    registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
+    const auto extStageName =
+        std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
+
+    auto lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
+    LiteParsedPipeline lpp(_nss, {lookupStage});
+    ASSERT_EQ(lpp.getStages().size(), 1);
+
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
+
+    auto& stages = lpp.getStages();
+    ASSERT_EQ(stages.size(), 1);
+    assertSubpipelineStageIsMatch(stages[0].get(), 0, 0);
+
+    unregisterParser(extStageName);
+}
+
+TEST_F(LiteParsedDesugarerTest,
+       DesugarsGraphLookupSubpipelineWithExpandableStageWhenHybridFlagOff) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", false};
+    registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
+    const auto extStageName =
+        std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
+
+    auto graphLookupStage =
+        BSON("$graphLookup" << BSON("from" << "otherCollection"
+                                           << "startWith" << "$a"
+                                           << "connectFromField" << "b"
+                                           << "connectToField" << "c"
+                                           << "as" << "d"
+                                           << "$_internalFromPipeline"
+                                           << BSON_ARRAY(BSON(extStageName << BSONObj()))));
+    LiteParsedPipeline lpp(_nss, {graphLookupStage});
+    ASSERT_EQ(lpp.getStages().size(), 1);
+
+    ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
+
+    auto& stages = lpp.getStages();
+    ASSERT_EQ(stages.size(), 1);
+    assertSubpipelineStageIsMatch(stages[0].get(), 0, 0);
+
+    unregisterParser(extStageName);
+}
+
 TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) {
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
 
     // Create [$lookup] with subpipeline [$expandToHostParse]. With a null IFR context, subpipeline
-    // desugaring is skipped (featureFlagExtensionsInsideHybridSearch is required), so the
-    // subpipeline should remain unchanged.
+    // desugaring is skipped, so the subpipeline should remain unchanged.
     auto lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
     LiteParsedPipeline lpp(_nss, {lookupStage});
     ASSERT_EQ(lpp.getStages().size(), 1);
@@ -559,8 +579,8 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) 
     ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Subpipeline unchanged: still [$expandToHostParse] (not desugared to [$match]).
-    auto* subpipelinesPtr = lpp.getStages()[0]->getSubPipelines();
-    ASSERT_NE(subpipelinesPtr, nullptr);
+    auto subpipelinesPtr = lpp.getStages()[0]->getSubPipelines();
+    ASSERT(subpipelinesPtr);
     ASSERT_EQ(subpipelinesPtr->size(), 1);
     auto& subpipelineStages = (*subpipelinesPtr)[0]->getStages();
     ASSERT_EQ(subpipelineStages.size(), 1);
@@ -659,8 +679,8 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
     ASSERT_EQ(stages.size(), 1);
 
     // $unionWith's subpipeline: [$lookup]. The $lookup's subpipeline should be desugared.
-    auto* unionWithSubpipelinesPtr = stages[0]->getSubPipelines();
-    ASSERT_NE(unionWithSubpipelinesPtr, nullptr);
+    auto unionWithSubpipelinesPtr = stages[0]->getSubPipelines();
+    ASSERT(unionWithSubpipelinesPtr);
     ASSERT_EQ(unionWithSubpipelinesPtr->size(), 1);
     auto& unionWithPipelineStages = (*unionWithSubpipelinesPtr)[0]->getStages();
     ASSERT_EQ(unionWithPipelineStages.size(), 1);
@@ -749,6 +769,27 @@ TEST_F(LiteParsedDesugarerTest, ScoreFusionExpandsWithFlagOn) {
     for (const auto& stage : lpp.getStages()) {
         ASSERT_NE(stage->getParseTimeName(), "$scoreFusion");
     }
+}
+
+using LiteParsedDesugarerDeathTest = LiteParsedDesugarerTest;
+
+/**
+ * Test that duplicate calls to registerStageExpander() for the same stage lead to an
+ * assertion error. 'LiftSubpipelineStageParams::id' was already registered in the call
+ * to 'REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER' above.
+ */
+DEATH_TEST_REGEX_F(LiteParsedDesugarerDeathTest,
+                   DuplicateStageExpanderRegistrationFails,
+                   "12880500") {
+    LiteParsedDesugarer::registerStageExpander(
+        LiftSubpipelineStageParams::id, liftSubpipelineStageExpander, "liftSubpipeline");
+}
+
+DEATH_TEST_REGEX_F(LiteParsedDesugarerDeathTest,
+                   UnallocatedStageParamsIdRegistrationFails,
+                   "12880501") {
+    LiteParsedDesugarer::registerStageExpander(
+        StageParams::kUnallocatedId, liftSubpipelineStageExpander, "unallocated");
 }
 
 }  // namespace mongo

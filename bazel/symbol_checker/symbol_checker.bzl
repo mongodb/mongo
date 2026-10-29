@@ -1,4 +1,5 @@
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 SymbolInfo = provider(
     fields = {
@@ -23,7 +24,9 @@ def _collect_cc_objects(cc_info):
                 objs += lib.objects
             if lib.pic_objects:
                 objs += lib.pic_objects
-    return objs
+
+    # Re-owned linker inputs can contain the same library's objects more than once.
+    return depset(objs).to_list()
 
 def _has_skip_tag(ctx):
     return "skip_symbol_check" in getattr(ctx.rule.attr, "tags", [])
@@ -66,7 +69,7 @@ def symbol_checker_aspect_impl(target, ctx):
         ]
 
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     nm_bin = cc_toolchain.nm_executable
 
     objs = _collect_cc_objects(cc_info)
@@ -79,12 +82,13 @@ def symbol_checker_aspect_impl(target, ctx):
     # --- extract ---
     out = ctx.actions.declare_file(target.label.name + "_symbols.sym")
     extract_args = ctx.actions.args()
-    extract_args.add(ctx.attr._extractor.files.to_list()[0])
+    extract_args.use_param_file("@%s", use_always = True)
+    extract_args.set_param_file_format("multiline")
     extract_args.add("--out")
     extract_args.add(out)
     extract_args.add("--nm")
     extract_args.add(nm_bin)
-    extract_args.add_all([o.path for o in objs], before_each = "--obj")
+    extract_args.add_all(objs, before_each = "--obj")
 
     extract_inputs = depset(transitive = [
         ctx.attr._extractor.files,
@@ -97,20 +101,22 @@ def symbol_checker_aspect_impl(target, ctx):
         executable = python.interpreter.path,
         outputs = [out],
         inputs = extract_inputs,
-        arguments = [extract_args],
+        arguments = [ctx.file._extractor.path, extract_args],
         mnemonic = "SymbolExtractor",
     )
 
     # --- check ---
     check = ctx.actions.declare_file(target.label.name + "_checked")
     check_args = ctx.actions.args()
-    check_args.add(ctx.attr._checker.files.to_list()[0])
+    check_args.use_param_file("@%s", use_always = True)
+    check_args.set_param_file_format("multiline")
     check_args.add("--sym")
     check_args.add(out)
     check_args.add("--out")
     check_args.add(check)
-    check_args.add("--label")
-    check_args.add(str(target.label))
+
+    # Canonical labels start with @@; keep them from being read as response files.
+    check_args.add("--label=" + str(target.label))
 
     if _has_skip_tag(ctx):
         check_args.add("--skip")
@@ -130,7 +136,7 @@ def symbol_checker_aspect_impl(target, ctx):
         executable = python.interpreter.path,
         outputs = [check],
         inputs = check_inputs,
-        arguments = [check_args],
+        arguments = [ctx.file._checker.path, check_args],
         mnemonic = "SymbolChecker",
     )
 

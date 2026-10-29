@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 
-// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_checks.h"
@@ -39,6 +12,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
@@ -51,7 +25,8 @@
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
@@ -65,6 +40,7 @@
 #include <type_traits>
 
 #include <boost/none.hpp>
+// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -174,6 +150,150 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
     return toDisposeWithoutMutex.size();
 }
 
+std::size_t CursorManager::disposeIdleMongotCursorsForShutdown(OperationContext* opCtx) {
+    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDisposeWithoutMutex;
+
+    for (size_t partitionId = 0; partitionId < kNumPartitions; ++partitionId) {
+        auto lockedPartition = _cursorMap->lockOnePartitionById(partitionId);
+        for (auto it = lockedPartition->begin(); it != lockedPartition->end();) {
+            auto* cursor = it->second;
+            if (cursor->_operationUsingCursor || !cursor->mayHoldMongotTaskExecutor()) {
+                ++it;
+                continue;
+            }
+
+            toDisposeWithoutMutex.emplace_back(cursor);
+            ++it;
+            removeCursorFromMap(lockedPartition, cursor);
+        }
+    }
+
+    // Be careful not to dispose of cursors while holding the partition lock.
+    for (auto&& cursor : toDisposeWithoutMutex) {
+        cursor->dispose(opCtx, boost::none);
+    }
+
+    if (!toDisposeWithoutMutex.empty()) {
+        LOGV2(12984900,
+              "Disposed idle cursors holding mongot task executor references during shutdown",
+              "numDisposed"_attr = toDisposeWithoutMutex.size());
+    }
+
+    return toDisposeWithoutMutex.size();
+}
+
+std::size_t CursorManager::shedCursorsForMemoryPressure(OperationContext* opCtx) {
+    if (!queryMemoryShouldEvaluateIdleQueries(opCtx->getServiceContext())) {
+        return 0;
+    }
+    // Recorded as each shed reason's age; the fast clock is precise enough for the cursor timeout.
+    const Date_t now = opCtx->getServiceContext()->getFastClockSource()->now();
+
+    struct ShedCursor {
+        std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor;
+        int64_t trackedBytes;
+    };
+    std::vector<ShedCursor> toDisposeWithoutMutex;
+    std::size_t cursorsExamined = 0;
+    int64_t bytesShed = 0;
+    int64_t currentUsageBytes = 0;  // Current RSS for the logging message.
+    int64_t memLimitBytes = 0;
+
+    // The partition lock prevents concurrent changes to its cursors. A partition lock is never
+    // acquired while the reasons mutex is held, so the two locks can't deadlock.
+    for (size_t partitionId = 0; partitionId < kNumPartitions; ++partitionId) {
+        auto lockedPartition = _cursorMap->lockOnePartitionById(partitionId);
+        for (auto it = lockedPartition->begin(); it != lockedPartition->end();) {
+            auto* cursor = it->second;
+
+            // A pinned cursor evaluates shedding at its own interrupt checks, so skip it here.
+            if (cursor->_operationUsingCursor || !cursor->_memoryUsageTracker) {
+                ++it;
+                continue;
+            }
+            // Disposing a cursor opened in a multi-document transaction would abort the txn. Skip
+            // it, like the interrupt path's write-intent lock exemption.
+            if (cursor->getTxnNumber()) {
+                ++it;
+                continue;
+            }
+            // Cursors marked `noCursorTimeout` are never shed.
+            if (cursor->isNoTimeout()) {
+                ++it;
+                continue;
+            }
+            // Nothing to reclaim, thus not a shedding target.
+            const int64_t trackedBytes = cursor->_memoryUsageTracker->inUseTrackedMemoryBytes();
+            if (trackedBytes <= 0) {
+                ++it;
+                continue;
+            }
+            ++cursorsExamined;
+
+            // Evaluate under the idle query's own QueryLifespan so that its eligibility flag and dt
+            // baseline are the ones read and updated.
+            IdleQueryShedDecision decision;
+            {
+                auto queryLifespanRegion = cursor->bindQueryLifespan(opCtx);
+                decision = queryMemoryShouldShedIdleQuery(opCtx, trackedBytes);
+            }
+            currentUsageBytes = decision.currentUsageBytes;
+            memLimitBytes = decision.memLimitBytes;
+            if (!decision.shed) {
+                ++it;
+                continue;
+            }
+
+            bytesShed += trackedBytes;
+            // Advance the iterator first since erasing from the lockedPartition will invalidate any
+            // references to it.
+            ++it;
+            removeCursorFromMap(lockedPartition, cursor);
+            // Record the reason so a subsequent getMore gets QueryMemoryLimitExceeded instead of a
+            // generic CursorNotFound.
+            _recordReapedCursorReason_inlock(
+                *cursor,
+                {ErrorCodes::QueryMemoryLimitExceeded,
+                 "Cursor load-shed while idle because the server is under memory pressure. Retry "
+                 "when the server is less loaded."},
+                now);
+            toDisposeWithoutMutex.push_back(
+                {std::unique_ptr<ClientCursor, ClientCursor::Deleter>(cursor), trackedBytes});
+        }
+    }
+
+    // Logging details of the shed cursors is rate-limited to once per second at Warning level.
+    static logv2::SeveritySuppressor logSeverity{
+        Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+    for (auto&& shed : toDisposeWithoutMutex) {
+        LOGV2_DEBUG(13200200,
+                    logSeverity().toInt(),
+                    "Cursor load-shed while idle: process memory is under pressure",
+                    "cursorId"_attr = shed.cursor->cursorid(),
+                    "idleSince"_attr = shed.cursor->getLastUseDate(),
+                    "ns"_attr = toStringForLogging(shed.cursor->nss()),
+                    "command"_attr = redact(shed.cursor->getOriginatingCommandObj()),
+                    "planSummary"_attr = shed.cursor->getPlanSummary(),
+                    "lsid"_attr = shed.cursor->getSessionId(),
+                    "trackedMemBytes"_attr = shed.trackedBytes,
+                    "currentUsageBytes"_attr = currentUsageBytes,
+                    "memLimitBytes"_attr = memLimitBytes);
+        shed.cursor->dispose(opCtx, boost::none);
+    }
+
+    if (!toDisposeWithoutMutex.empty()) {
+        LOGV2(13200201,
+              "Load-shed idle cursors to relieve query-memory pressure",
+              "cursorsExamined"_attr = cursorsExamined,
+              "cursorsShed"_attr = toDisposeWithoutMutex.size(),
+              "trackedMemBytesReclaimed"_attr = bytesShed,
+              "currentUsageBytes"_attr = currentUsageBytes,
+              "memLimitBytes"_attr = memLimitBytes);
+    }
+
+    return toDisposeWithoutMutex.size();
+}
+
 std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceString& nss) {
     std::vector<CursorId> cursorIds;
 
@@ -201,6 +321,11 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
+        // The cursor is gone. If it was reaped for a specific reason (e.g., memory load shedding)
+        // and the caller owns it, return that error. Otherwise return CursorNotFound.
+        if (auto reason = _takeReapedCursorReason(opCtx, id, checkSessionAuth)) {
+            return std::move(*reason);
+        }
         return {ErrorCodes::CursorNotFound, str::stream() << "cursor id " << id << " not found"};
     }
 
@@ -236,20 +361,24 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
 
     // Pass along the original 'planCacheShapeHash', 'planCacheKey', 'queryShapeHash' for slow query
     // logging.
-    CurOp::get(opCtx)->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
-    CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
-    CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
+    CurOp* curOp = CurOp::get(opCtx);
+    {
+        // setQueryShapeHash() below acquires the Client lock, which is the reverse order of
+        // reportDebugInfo() (Client lock, then this lock), so release this lock before it.
+        auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+        curOp->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
+        curOp->debug().planCacheKey = cursor->_planCacheKey;
+    }
+    curOp->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
+    curOp->debug().setQuerySettings(opCtx, cursor->_querySettings);
 
     // Pass along queryStats context so it is retrievable after query execution for storing metrics.
-    CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;
+    curOp->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;
     // Pass along 'isChangeStreamQuery' for serverStatus metrics.
-    CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
+    curOp->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
+    // Pass along 'usesOptimizedUpdateLookup' so it detects IFR flag change at runtime.
+    curOp->debug().usesOptimizedUpdateLookup = cursor->_usesOptimizedUpdateLookup;
 
-    cursor->_operationUsingCursor = opCtx;
-    cursor->_commandUsingCursor = std::string{commandName};
-
-    // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
-    // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursor->getSessionId()) {
         auto vivifyCursorStatus =
             LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getSessionId().value());
@@ -257,6 +386,13 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
             return vivifyCursorStatus;
         }
     }
+
+    // Attribute the OperationContext to the cursor only now that every early-return check above
+    // (including the vivify above) has passed. Setting these before those checks would leave the
+    // cursor pinned to an 'opCtx' that is destroyed when the command unwinds on an early return,
+    // producing a dangling pointer that a later killCursors would dereference.
+    cursor->_operationUsingCursor = opCtx;
+    cursor->_commandUsingCursor = std::string{commandName};
 
     LOGV2_DEBUG(8928404, 2, "Pinning cursor", "cursorId"_attr = cursor->cursorid());
     auto pin = ClientCursorPin(opCtx, cursor, this);
@@ -407,8 +543,6 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
         new ClientCursor(std::move(cursorParams), cursorId, opCtx, now));
-    clientCursor->_memoryUsageTracker =
-        OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
 
     // Transfer ownership of the cursor to '_cursorMap'.
     auto partition = _cursorMap->lockOnePartition(cursorId);
@@ -474,8 +608,57 @@ void CursorManager::_destroyCursor(OperationContext* opCtx,
     cursor->_operationUsingCursor = nullptr;
 }
 
+void CursorManager::_recordReapedCursorReason_inlock(const ClientCursor& cursor,
+                                                     Status reason,
+                                                     Date_t now) {
+    std::lock_guard<std::mutex> lk(_reapedCursorReasons.mutex);
+    _reapedCursorReasons.reasons.add(
+        cursor.cursorid(),
+        ReapedCursorReasons::Entry{
+            std::move(reason), now, cursor.getSessionId(), cursor.getAuthenticatedUser()});
+}
+
+boost::optional<Status> CursorManager::_takeReapedCursorReason(OperationContext* opCtx,
+                                                               CursorId id,
+                                                               AuthCheck checkSessionAuth) {
+    std::lock_guard<std::mutex> lk(_reapedCursorReasons.mutex);
+    // `cfind` means "const find": it avoids promoting the entry to be most recently used.
+    auto it = _reapedCursorReasons.reasons.cfind(id);
+    if (it == _reapedCursorReasons.reasons.end()) {
+        return boost::none;
+    }
+    // Auth checks: pinCursor's session privilege check, and getMore's session-match (validateLSID)
+    // and same-user (validateAuthorization) checks.
+    const auto& entry = it->second;
+    if (checkSessionAuth == kCheckSession &&
+        !checkCursorSessionPrivilege(opCtx, entry.lsid).isOK()) {
+        return boost::none;
+    }
+    if (opCtx->getLogicalSessionId() != entry.lsid ||
+        !AuthorizationSession::get(opCtx->getClient())
+             ->isCoauthorizedWith(entry.authenticatedUser)) {
+        return boost::none;
+    }
+    Status reason = it->second.reason;
+    _reapedCursorReasons.reasons.erase(id);
+    return reason;
+}
+
+void CursorManager::expireReapedCursorReasons(Date_t now) {
+    const auto ttl = Milliseconds(getCursorTimeoutMillis());
+    std::lock_guard<std::mutex> lk(_reapedCursorReasons.mutex);
+    auto& reasons = _reapedCursorReasons.reasons;
+    while (!reasons.empty()) {
+        auto oldest = std::prev(reasons.end());
+        if (now - oldest->second.recordedAt < ttl) {
+            break;
+        }
+        reasons.erase(oldest);
+    }
+}
+
 Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
-    return _killCursor(opCtx, id, /*authChecker*/ {});
+    return _killCursor(opCtx, id, /*authChecker=*/{});
 }
 
 Status CursorManager::killCursorWithAuthCheck(

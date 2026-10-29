@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/db/exec/agg/high_water_mark_provider.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/shard_tag.h"
@@ -46,7 +21,7 @@ namespace mongo {
 namespace exec {
 namespace agg {
 
-class MergeCursorsStage final : public Stage {
+class MergeCursorsStage final : public Stage, public HighWaterMarkProvider {
 public:
     MergeCursorsStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       const std::shared_ptr<BlockingResultsMerger>& blockingResultsMerger);
@@ -60,10 +35,27 @@ public:
     std::size_t getNumRemotes() const;
     /**
      * Returns the high water mark sort key for the given cursor, if it exists; otherwise, returns
-     * an empty BSONObj. Calling this method causes the underlying BlockingResultsMerger to be
-     * populated and assumes ownership of the remote cursors.
+     * an empty BSONObj. As a side effect, this can advance the high water mark of the underlying
+     * results merger, which only happens when the merger has no result ready to return.
      */
     BSONObj getHighWaterMark();
+
+    /**
+     * Same as 'getHighWaterMark()', but intended for use when producing the post-batch resume token
+     * that will be returned to the client.
+     */
+    BSONObj getHighWaterMarkForClient();
+
+    /**
+     * Returns the cluster time of the high water mark tracked by the underlying results merger, or
+     * boost::none if it does not track one, or if the high water mark it tracks is not a change
+     * stream resume token.
+     *
+     * Shares the side effect of 'getHighWaterMark()' described above: asking for the high water
+     * mark can advance it.
+     */
+    boost::optional<Timestamp> getHighWaterMarkClusterTime() override;
+
     bool remotesExhausted() const;
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
@@ -113,6 +105,18 @@ public:
      * the high water mark to a timestamp earlier than the current high water mark.
      */
     void setHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Disables high-water-mark advancement based on promised sort keys in the underlying
+     * results merger.
+     */
+    void disablePromisedSortKeyHighWaterMarkAdvancement();
+
+    /**
+     * Re-enables high-water-mark advancement based on promised sort keys in the underlying
+     * results merger.
+     */
+    void enablePromisedSortKeyHighWaterMarkAdvancement();
 
     void setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer);

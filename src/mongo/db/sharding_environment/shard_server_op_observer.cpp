@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 
@@ -50,12 +24,14 @@
 #include "mongo/db/shard_role/shard_catalog/collection_critical_section_document_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
@@ -65,7 +41,9 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/testing_proctor.h"
 
+#include <compare>
 #include <memory>
 #include <utility>
 
@@ -97,8 +75,6 @@ public:
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
         auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature flag.
-        scopedCss->setNonAuthoritative();
         scopedCss->clearCollectionMetadata(opCtx, _droppingCollection);
     }
 
@@ -108,6 +84,98 @@ private:
     const NamespaceString _nss;
     const bool _droppingCollection;
 };
+
+/**
+ * Warns that the disk and in-memory shard versions relate to each other in a way that should not
+ * normally arise.
+ */
+void warnUnexpectedVersionRelationship(const std::string& reason,
+                                       const ChunkVersion& diskShardVersion,
+                                       const ChunkVersion& currentShardVersion) {
+    LOGV2_WARNING(13069800,
+                  "invalidateCollectionMetadata unexpected shard version relationship; clearing "
+                  "collection metadata",
+                  "reason"_attr = reason,
+                  "diskShardVersion"_attr = diskShardVersion.toString(),
+                  "currentShardVersion"_attr = currentShardVersion.toString());
+
+    if (TestingProctor::instance().isEnabled()) {
+        tasserted(13069801, reason);
+    }
+}
+
+/**
+ * Evaluates the precondition carried by an invalidateCollectionMetadata oplog entry against this
+ * node's currently installed collection metadata. Every node runs this independently, so that the
+ * decision to clear the CSS reflects local state rather than the state of the node that emitted the
+ * entry.
+ */
+bool shouldInvalidateCollectionMetadataLocally(const InvalidateCollectionMetadataOplogEntry& entry,
+                                               const CollectionShardingRuntime& csr) {
+    // Emergency kill-switch: bypass all of the logic below and always clear.
+    if (forceUnconditionalInvalidateCollectionMetadata.load()) {
+        return true;
+    }
+
+    // The entry asked to clear nodes that own no chunks, or this node is already UNOWNED and has no
+    // durable metadata to reconcile against a shard version either way. Either way the decision is
+    // the same: clear if and only if this node owns no chunks for the collection. The placement
+    // version is set only when this node owns chunks, so an unset version means "no chunks here"
+    // (unowned, untracked, or tracked with zero owned chunks) -- any of which may be a stale
+    // leftover that must be re-recovered from disk. A node that owns chunks keeps its metadata.
+    if (csr.isUnowned() || entry.getOnlyClearIfShardDoesntOwnChunks()) {
+        const auto currentMetadata = csr.getCurrentMetadataIfKnown();
+        return csr.isUnowned() ||
+            (currentMetadata && !currentMetadata->getShardPlacementVersion().isSet());
+    }
+
+    // No shard version was carried by the entry, so the invalidation is unconditional.
+    if (!entry.getShardVersion()) {
+        return true;
+    }
+
+    const auto& diskShardVersion = *entry.getShardVersion();
+
+    // This node's metadata is unknown, so there is nothing installed to compare the disk version
+    // against; leave it unknown and let it get recovered from disk lazily when next needed.
+    const auto currentMetadata = csr.getCurrentMetadataIfKnown();
+    if (!currentMetadata) {
+        return false;
+    }
+
+    const auto currentShardVersion = currentMetadata->getShardPlacementVersion();
+    const auto compareResult = diskShardVersion <=> currentShardVersion;
+
+    if (compareResult == std::partial_ordering::less) {
+        // The version durably written to disk is older than what's already installed in memory.
+        // This should not happen, but clear anyway so the node recovers from disk when next needed.
+        warnUnexpectedVersionRelationship(
+            "invalidateCollectionMetadata disk shard version is older than the in-memory shard "
+            "version",
+            diskShardVersion,
+            currentShardVersion);
+        return true;
+    } else if (compareResult == std::partial_ordering::greater) {
+        // The disk version is newer than what's installed, so clear the CSS to pick it up on the
+        // next access. This case comes from in-memory being filled from the legacy FCV model.
+        return true;
+    } else if (compareResult == std::partial_ordering::equivalent) {
+        // The in-memory metadata already reflects what's on disk, nothing to do.
+        return false;
+    } else if (compareResult == std::partial_ordering::unordered) {
+        // Unordered versions are not equivalent, so clear the metadata and surface the unexpected
+        // relationship.
+        warnUnexpectedVersionRelationship(
+            "invalidateCollectionMetadata disk shard version is unordered with the in-memory shard "
+            "version",
+            diskShardVersion,
+            currentShardVersion);
+
+        return true;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(13069802);
+}
 
 /**
  * Invalidates the in-memory routing table cache when a collection is dropped, so the next caller
@@ -168,7 +236,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       const std::vector<RecordId>& recordIds,
-                                      std::vector<bool> fromMigrate,
+                                      const std::vector<bool>& fromMigrate,
                                       bool defaultFromMigrate,
                                       OpStateAccumulator* opAccumulator) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
@@ -243,7 +311,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [](OperationContext* opCtx, boost::optional<Timestamp>) {
                     ShardingStatistics::get(opCtx)
-                        .authoritativeShardDatabaseStatistics.registerDurableUpdate();
+                        .databaseShardingMetadataStatistics.registerShardCatalogDatabaseWrite();
                 });
         }
     }
@@ -257,15 +325,14 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    const auto& nss = args.coll->ns();
-
     const auto& updateDoc = args.updateArgs->update;
     // Most of these handlers do not need to run when the update is a full document replacement.
     // An empty updateDoc implies a no-op update and is not a valid oplog entry.
     const bool needsSpecialHandling = !updateDoc.isEmpty() &&
         (update_oplog_entry::extractUpdateType(updateDoc) !=
          update_oplog_entry::UpdateType::kReplacement);
-    if (needsSpecialHandling && nss == NamespaceString::kShardConfigCollectionsNamespace) {
+    if (needsSpecialHandling &&
+        args.coll->ns() == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes is only needed on secondaries that are applying
         // oplog entries.
         if (opCtx->isEnforcingConstraints()) {
@@ -319,14 +386,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             // can synchronize with any work happening on the primary (e.g., migration critical
             // section).
             auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, updatedNss);
-            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
-            // flag.
-            scopedCss->setNonAuthoritative();
             scopedCss->clearCollectionMetadata(opCtx);
         }
     }
 
-    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
+    if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ShardServerOpObserver"));
         invariant(collCSDoc.getBlockReads());
@@ -345,6 +409,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             });
     }
 
+    const auto& nss = args.coll->ns();
     if (nss == NamespaceString::kServerConfigurationNamespace) {
         [&]() {
             const auto idElem = args.updateArgs->criteria["_id"];
@@ -380,21 +445,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                     fassertFailedWithStatus(10892400, ex.toStatus());
                 }
             }
-
-            // Notify ShardingState on any change of the shard UUID value.
-            // TODO SERVER-126212 Remove this block once 9.0 becomes last LTS.
-            if (shardIdentityDoc.getUuid() != oldShardIdentityDoc.getUuid()) {
-                tassert(12776400,
-                        "Overriding an already existing shard UUID is not allowed",
-                        !oldShardIdentityDoc.getUuid().has_value() ||
-                            !shardIdentityDoc.getUuid().has_value() ||
-                            oldShardIdentityDoc.getUuid().value() ==
-                                shardIdentityDoc.getUuid().value());
-                ShardHandle updatedShardHandle(
-                    ShardId(std::string{shardIdentityDoc.getShardName()}),
-                    shardIdentityDoc.getUuid());
-                ShardingState::get(opCtx)->onShardHandleUpdate(std::move(updatedShardHandle));
-            }
         }();
     }
 
@@ -402,7 +452,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [](OperationContext* opCtx, boost::optional<Timestamp>) {
                 ShardingStatistics::get(opCtx)
-                    .authoritativeShardDatabaseStatistics.registerDurableUpdate();
+                    .databaseShardingMetadataStatistics.registerShardCatalogDatabaseWrite();
             });
     }
 }
@@ -515,7 +565,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [](OperationContext* opCtx, boost::optional<Timestamp>) {
                 ShardingStatistics::get(opCtx)
-                    .authoritativeShardDatabaseStatistics.registerDurableUpdate();
+                    .databaseShardingMetadataStatistics.registerShardCatalogDatabaseWrite();
             });
     }
 }
@@ -606,24 +656,6 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
         ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
     }
 
-    // Clear the CSR authoritative state once we drop shard.catalog.collections on FCV downgrade.
-    // Otherwise, a follow up FCV upgrade can see Auth. Shards enabled & an authoritative CSR,
-    // but the corresponding persisted authoritative metadata would already be gone from disk.
-    // TODO (SERVER-127444): Remove once the authoritativeState flag is removed from the CSR.
-    if (collectionName == NamespaceString::kConfigShardCatalogCollectionsNamespace) {
-        for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            if (scopedCsr->getAuthoritativeState() ==
-                CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                LOGV2(12494600,
-                      "Clearing CSR authoritative state on shard.catalog.collections drop",
-                      logAttrs(nss));
-                scopedCsr->clearCollectionMetadata(opCtx);
-                scopedCsr->setNonAuthoritative();
-            }
-        }
-    }
-
     return {};
 }
 
@@ -701,7 +733,8 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
 
 void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
                                                   const RollbackObserverInfo& rbInfo) {
-    ShardingRecoveryService::get(opCtx)->onReplicationRollback(opCtx, rbInfo.rollbackNamespaces);
+    ShardingRecoveryService::get(opCtx)->onReplicationRollback(
+        opCtx, rbInfo.rollbackNamespaces, rbInfo.rollbackCommandCounts);
 }
 
 void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
@@ -713,22 +746,52 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
 
     auto entry = CreateDatabaseMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("OplogCreateDatabaseMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerCreateDatabaseMetadataOplogEntryApplied();
 
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
 
-    // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata.
-    // On the secondary path, this operation may be represented by only a 'c' oplog entry that
-    // commits the database metadata with the "fromClone" option. Once this occurs, the secondary
-    // path must bypass metadata access checks, because CloneAuthoritativeMetadata is allowed to
-    // modify database metadata without holding the critical section.
+    LOGV2_DEBUG(12920500,
+                1,
+                "Applying createDatabaseMetadata oplog entry",
+                logAttrs(dbName),
+                "fromClone"_attr = entry.getFromClone());
+
+    // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
+    // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL
+    // operations are in progress and 2) the clone serves as a refresh from the config server,
+    // which does not need to serialize with CRUD operations at the critical section level, but
+    // instead synchronizes using the DSS mutex.
     boost::optional<BypassDatabaseMetadataAccess> bypassDbMetadataAccess;
     if (entry.getFromClone()) {
         bypassDbMetadataAccess.emplace(opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);
     }
 
-    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->setDbMetadata(opCtx, dbMetadata);
+    {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->setDbMetadata(opCtx, dbMetadata);
+    }
+
+    // A stale router may target this shard for a collection in the dropped database before this
+    // database incarnation is recreated, causing authoritative recovery to classify an empty
+    // local shard catalog entry as kUnowned. Once this shard becomes the DB primary, any
+    // leftover collection CSS state for the database must be recovered from the new incarnation
+    // instead.
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        if (nss.dbName() != dbName) {
+            continue;
+        }
+
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        if (scopedCsr->getCurrentMetadataIfKnown() && scopedCsr->isUnowned()) {
+            LOGV2_INFO(12932800,
+                       "Clearing collection metadata after createDatabase metadata commit",
+                       logAttrs(nss));
+
+            scopedCsr->clearCollectionMetadata(opCtx);
+        }
+    }
 }
 
 void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
@@ -740,11 +803,80 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
 
     auto entry = DropDatabaseMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics.registerDropDatabaseMetadataOplogEntryApplied();
 
     auto dbName = entry.getDbName();
 
-    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-    scopedDsr->clearDbMetadata(opCtx);
+    LOGV2_DEBUG(12920501, 1, "Applying dropDatabaseMetadata oplog entry", logAttrs(dbName));
+
+    {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->clearDbMetadata(opCtx);
+    }
+
+    // Untracked/unowned collections need their metadata dropped since this shard no longer owns any
+    // collection data. Tracked collections do not need their state cleared out because the drop
+    // database coordinator already takes care of them. The only other DDL that issues a
+    // dropDatabase oplog entry is movePrimary which doesn't invalidate tracked collections but must
+    // invalidate untracked collections.
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        if (nss.dbName() != dbName) {
+            continue;
+        }
+
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        if (const auto cm = scopedCsr->getCurrentMetadataIfKnown(); cm && !cm->hasRoutingTable()) {
+            LOGV2_INFO(13247700,
+                       "Clearing collection metadata after dropDatabase metadata commit",
+                       logAttrs(nss));
+            scopedCsr->clearCollectionMetadata(opCtx, /*collIsDropped=*/true);
+        }
+    }
+}
+
+void ShardServerOpObserver::onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                                              const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
+    InvalidateAllCollectionMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("InvalidateAllCollectionMetadataOplogEntryContext"));
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics
+        .registerInvalidateAllCollectionMetadataOplogEntryApplied();
+
+    LOGV2_DEBUG(13169801, 1, "Applying invalidateAllCollectionMetadata oplog entry");
+
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->clearCollectionMetadata(opCtx);
+    }
+}
+
+void ShardServerOpObserver::onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                                            const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
+    InvalidateAllDatabaseMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("InvalidateAllDatabaseMetadataOplogEntryContext"));
+
+    ShardingStatistics::get(opCtx)
+        .databaseShardingMetadataStatistics
+        .registerInvalidateAllDatabaseMetadataOplogEntryApplied();
+
+    LOGV2_DEBUG(13169802, 1, "Applying invalidateAllDatabaseMetadata oplog entry");
+
+    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->clearDbMetadata(opCtx);
+    }
 }
 
 void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opCtx,
@@ -763,61 +895,78 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
 
     const auto entry = InvalidateCollectionMetadataOplogEntry::parse(
         op.getObject(), IDLParserContext("InvalidateCollectionMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerInvalidateCollectionMetadataOplogEntryApplied(
+            entry.getForDroppedCollection());
+
+    LOGV2_DEBUG(12920502,
+                1,
+                "Applying invalidateCollectionMetadata oplog entry",
+                logAttrs(nss),
+                "uuid"_attr = op.getUuid(),
+                "forDroppedCollection"_attr = entry.getForDroppedCollection());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
     // We have to consider concurrent recovery threads reading the durable state. As the drain and
-    // install is an atomic operation the presence of a recoverer means that we still haven't
-    // drained and applied the changes. The invalidate has to be communicated to the recovery
-    // threads such that a new durable read is performed as whatever was read before is now invalid.
+    // install is an atomic operation the presence of a metadata synchronizer means that we still
+    // haven't drained and applied the changes. The invalidate has to be communicated to the
+    // recovery threads such that a new durable read is performed as whatever was read before is now
+    // invalid. The synchronizer evaluates the entry's precondition against the metadata it recovers
+    // from disk.
     //
-    // The lack of this means we're free to proceed with a clear of the metadata.
-    if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
-        recoverer->onOplogEntry(op.getTimestamp(), entry);
-    } else {
-        // TODO (SERVER-127444): Remove this `setNonAuthoritative` and `getNonAuth`.
-        if (entry.getNonAuth())
-            scopedCsr->setNonAuthoritative();
-        else
-            scopedCsr->setAuthoritative();
-
+    // The lack of a metadata synchronizer means we're free to evaluate the precondition against the
+    // currently installed collection metadata and, if it holds, clear it.
+    if (auto synchronizer = scopedCsr->getMetadataSynchronizer()) {
+        synchronizer->onOplogEntry(op.getTimestamp(), entry);
+    } else if (shouldInvalidateCollectionMetadataLocally(entry, *scopedCsr)) {
         scopedCsr->clearCollectionMetadata(opCtx, entry.getForDroppedCollection());
     }
 }
 
-void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext* opCtx,
-                                                                const repl::OplogEntry& op) {
+void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
+                                                       const repl::OplogEntry& op) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
     tassert(12698705,
-            "CollectionShardingStateDelta oplog entry is missing the collection UUID",
+            "UpdateCollectionMetadata oplog entry is missing the collection UUID",
             op.getUuid());
 
     const auto nss =
         CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
 
-    const auto entry = CollectionShardingStateDeltaOplogEntry::parse(
-        op.getObject(), IDLParserContext("CollectionShardingStateDeltaOplogEntryContext"));
+    const auto entry = UpdateCollectionMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("UpdateCollectionMetadataOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerUpdateCollectionMetadataOplogEntryApplied(
+            entry.getChangedChunks().size());
+
+    LOGV2_DEBUG(12920503,
+                2,
+                "Applying UpdateCollectionMetadata oplog entry",
+                logAttrs(nss),
+                "uuid"_attr = op.getUuid(),
+                "numChangedChunks"_attr = entry.getChangedChunks().size());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // If cache recovery is in progress, defer applying the delta update until the recovery has
-    // installed the durable metadata snapshot read from disk. The recoverer will replay this oplog
-    // entry on top of that snapshot before the CSR publishes the recovered metadata.
-    if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
-        recoverer->onOplogEntry(op.getTimestamp(), entry);
+    // If disk recovery is in progress, defer applying the delta update until the recovery has
+    // installed the durable metadata snapshot read from disk. The metadata synchronizer will replay
+    // this oplog entry on top of that snapshot before the CSR publishes the recovered metadata.
+    if (auto synchronizer = scopedCsr->getMetadataSynchronizer()) {
+        synchronizer->onOplogEntry(op.getTimestamp(), entry);
         return;
     }
 
-    // Without known collection metadata there is no base to apply this delta to. Clear the
-    // in-memory metadata so the next user performs a full recovery from disk.
+    // We cannot apply an incremental delta without a known metadata base. The same is true when
+    // this shard is UNOWNED and owns no chunks yet. Clear the in-memory metadata so the next access
+    // performs a full recovery from disk.
     const auto collectionUuid = *op.getUuid();
     auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
-    if (!currentMetadata) {
-        scopedCsr->setAuthoritative();
+    if (!currentMetadata || scopedCsr->isUnowned()) {
         scopedCsr->clearCollectionMetadata(opCtx);
         return;
     }
@@ -828,23 +977,22 @@ void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext
             currentMetadata->hasRoutingTable());
 
     tassert(12698707,
-            str::stream()
-                << "Known metadata for " << nss.toStringForErrorMsg() << " has collection UUID "
-                << currentMetadata->getUUID()
-                << ", but applyCollectionShardingStateDelta oplog entry is for collection UUID "
-                << collectionUuid,
+            str::stream() << "Known metadata for " << nss.toStringForErrorMsg()
+                          << " has collection UUID " << currentMetadata->getUUID()
+                          << ", but UpdateCollectionMetadata oplog entry is for collection UUID "
+                          << collectionUuid,
             currentMetadata->uuidMatches(collectionUuid));
 
     const auto collPlacementVersion = currentMetadata->getCollPlacementVersion();
 
-    scopedCsr->setAuthoritative();
     scopedCsr->setCollectionMetadata(
         opCtx,
         currentMetadata->makeUpdated(
             ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
                                                 currentMetadata->getUUID(),
                                                 collPlacementVersion.epoch(),
-                                                collPlacementVersion.getTimestamp())),
+                                                collPlacementVersion.getTimestamp()),
+            /*forceAllowGaps=*/true),
         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 }
 
@@ -859,6 +1007,15 @@ void ShardServerOpObserver::onSetAllowChunkOperations(OperationContext* opCtx,
 
     const auto entry = SetAllowChunkOperationsOplogEntry::parse(
         op.getObject(), IDLParserContext("SetAllowChunkOperationsOplogEntryContext"));
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerSetAllowChunkOperationsOplogEntryApplied();
+
+    LOGV2_DEBUG(12920504,
+                2,
+                "Applying setAllowChunkOperations oplog entry",
+                logAttrs(nss),
+                "uuid"_attr = op.getUuid(),
+                "allowChunkOperations"_attr = entry.getAllowChunkOperations());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     scopedCsr->setAllowChunkOperations(entry.getAllowChunkOperations());

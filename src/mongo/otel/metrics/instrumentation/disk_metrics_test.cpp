@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/metrics/instrumentation/disk_metrics.h"
 
@@ -61,6 +35,10 @@ constexpr std::string_view kSdaIoTimeMs = "systemMetrics.disks.sda.io_time_ms"sv
 constexpr std::string_view kSdaIoQueuedMs = "systemMetrics.disks.sda.io_queued_ms"sv;
 constexpr std::string_view kSdbWrites = "systemMetrics.disks.sdb.writes"sv;
 constexpr std::string_view kSdcWrites = "systemMetrics.disks.sdc.writes"sv;
+
+// A disk whose name will not resolve to a valid otel metric name (segment starts with a digit)
+constexpr std::string_view kInvalidDisk = "0sda"sv;
+constexpr std::string_view kInvalidDiskMetricName = "systemMetrics.disks.0sda.writes"sv;
 
 BSONObj makeDiskBson(std::string_view device,
                      long long reads,
@@ -264,6 +242,24 @@ TEST_F(DiskOtelMetricsTest, MultipleRegisteredDevicesTrackedIndependently) {
     ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads, passkey)), 10);
     ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 10);
     ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdbWrites, passkey)), 5);
+}
+
+TEST_F(DiskOtelMetricsTest, SkipDisksWithInvalidNames) {
+    // The valid disk (kSda) should create a metric, and the invalid disk
+    // (kInvalidDisk) should be skipped.
+    DiskMetrics metrics{{std::string(kSda), std::string(kInvalidDisk)}};
+
+    metrics.update(makeDiskBson(kSda, 0, 0, 0, 0, 0, 0, 0, 0));
+    metrics.update(makeDiskBson(kSda, 10, 20, 50, 20, 40, 100, 200, 300));
+
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 20);
+
+    // The metric name should never have been registered.
+    ASSERT_THROWS_CODE(
+        _capturer.readInt64Counter(DynamicMetricNameMaker::make(kInvalidDiskMetricName, passkey)),
+        DBException,
+        ErrorCodes::KeyNotFound);
 }
 
 }  // namespace

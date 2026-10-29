@@ -21,7 +21,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
         logComponentVerbosity:
           replication:
@@ -46,7 +46,9 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/core/**/geo_update_btree.js
+    - jstests/core/**/query/release_memory/sort.js
     - jstests/core/**/query/max_doc_size.js
+    - jstests/core/**/query/bson_size_limit_agg.js
     - jstests/core/**/mr_bigobject.js
     - jstests/core/**/capped_large_docs.js
     - jstests/core/**/capped_resize.js
@@ -66,6 +68,7 @@ selector:
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
+    - no_kill_secondary
   roots:
     - jstests/core/**/*.js
 test_kind: js_test

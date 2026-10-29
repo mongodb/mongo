@@ -1,7 +1,7 @@
 /**
  * Test that checks the value of the query stats insert command feature flag.
  *
- * @tags: [featureFlagQueryStatsInsert]
+ * @tags: [requires_fcv_90]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 

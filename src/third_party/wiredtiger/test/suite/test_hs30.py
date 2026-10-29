@@ -108,6 +108,17 @@ class test_hs30(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
     def test_insert_updates_hs(self):
+        # A prior checkpoint ensures btree publication is processed before release eviction.
+        evicts_before_checkpoint = (
+            self.do_evict and not self.early_ckpt and not self.middle_ckpt
+        )
+        if (
+            self.runningHook("disagg")
+            and self.getDisaggParameters().schema_epochs
+            and self.key_format != 'r'
+            and evicts_before_checkpoint
+        ):
+            self.skipTest("release eviction may not write pages before deferred btree publication")
         uri = f'table:{self.test_name}'
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         logging = 'log=(enabled={})'.format('true' if self.logging else 'false')
@@ -170,9 +181,7 @@ class test_hs30(wttest.WiredTigerTestCase):
         session3.rollback_transaction()
 
         # Check via stats that the history store was used.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        hs_read = stat_cursor[stat.conn.cache_hs_read][2]
-        stat_cursor.close()
+        hs_read = self.get_stat(stat.conn.cache_hs_read)
 
         if self.do_evict:
             # Should have at least read nrows twice.

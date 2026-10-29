@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 
@@ -43,7 +17,6 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
@@ -85,28 +58,23 @@ BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minV
 
 class JournalListenerWithDurabilityTracking : public JournalListener {
 public:
-    class TrackingToken : public JournalListener::Token {};
-
-    std::unique_ptr<Token> getToken(OperationContext* opCtx, TokenMode mode) override {
-        ++getTokenCalls;
-        lastTokenMode = mode;
-        return std::make_unique<TrackingToken>();
+    std::unique_ptr<Token> getToken(OperationContext* opCtx) override {
+        return {};
     }
 
     void onDurable(const Token& token) override {
-        ++onDurableCalls;
+        onDurableCalled = true;
     }
 
-    int getTokenCalls = 0;
-    int onDurableCalls = 0;
-    TokenMode lastTokenMode = TokenMode::kDefault;
+    bool onDurableCalled = false;
 };
 
 class ReplicationConsistencyMarkersTest : public ServiceContextMongoDTest {
 protected:
-    ReplicationConsistencyMarkersTest()
-        : ServiceContextMongoDTest(Options{}.useJournalListener(
-              std::make_unique<JournalListenerWithDurabilityTracking>())) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useJournalListener(
+            std::make_unique<JournalListenerWithDurabilityTracking>());
+    }
 
     OperationContext* getOperationContext() {
         return _opCtx.get();
@@ -276,77 +244,6 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncId) {
     InitialSyncIdDocument secondInitialSyncIdDoc =
         InitialSyncIdDocument::parse(secondInitialSyncIdBson, IDLParserContext("initialSyncId"));
     ASSERT_NE(firstInitialSyncIdDoc.get_id(), secondInitialSyncIdDoc.get_id());
-}
-
-// Fixture for tests that exercise flushAllFiles/JournalListener interaction.
-// Uses a real WiredTiger journal (inMemory=false) so that flushAllFiles actually invokes the
-// JournalListener. JournalFlusher is paused in setUp so its background cycles do not race
-// with the test body's call counts.
-class FsyncJournalListenerTest : public ServiceContextMongoDTest {
-protected:
-    FsyncJournalListenerTest()
-        : ServiceContextMongoDTest(
-              Options{}
-                  .useJournalListener(std::make_unique<JournalListenerWithDurabilityTracking>())
-                  .inMemory(false)) {}
-
-    void setUp() override {
-        ServiceContextMongoDTest::setUp();
-        _opCtx = getClient()->makeOperationContext();
-        // Pause so the flusher's periodic cycles do not increment call counters during the test.
-        JournalFlusher::get(getServiceContext())->pause();
-    }
-
-    void tearDown() override {
-        JournalFlusher::get(getServiceContext())->resume();
-        _opCtx.reset();
-        ServiceContextMongoDTest::tearDown();
-    }
-
-    OperationContext* getOperationContext() {
-        return _opCtx.get();
-    }
-
-    JournalListenerWithDurabilityTracking* getJournalListener() {
-        return static_cast<JournalListenerWithDurabilityTracking*>(journalListener());
-    }
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
-};
-
-// When fsyncLockWorker calls flushAllFiles while holding Global S, the storage engine routes
-// the JournalListener through the kUpdateUnderReadLock path. The listener must be notified
-// (so onDurable advances durableOpTime) but with TokenMode::kReadLockHeld so the listener
-// avoids taking Global IX for the truncate-after-point write.
-TEST_F(FsyncJournalListenerTest, FlushAllFilesUnderReadLockNotifiesListener) {
-    auto opCtx = getOperationContext();
-    auto listener = getJournalListener();
-    int tokensBefore = listener->getTokenCalls;
-    int durableBefore = listener->onDurableCalls;
-
-    Lock::GlobalRead globalReadLock(opCtx);
-    getServiceContext()->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock=*/true);
-
-    ASSERT_EQ(listener->getTokenCalls, tokensBefore + 1);
-    ASSERT(listener->lastTokenMode == JournalListener::TokenMode::kReadLockHeld);
-    ASSERT_EQ(listener->onDurableCalls, durableBefore + 1);
-}
-
-// In the default flushAllFiles path (caller does not hold a read lock) the storage engine
-// routes the JournalListener through the kDefault path, which is free to take Global IX for
-// the truncate-after-point write when the node is a primary.
-TEST_F(FsyncJournalListenerTest, FlushAllFilesWithoutReadLockUsesDefaultMode) {
-    auto opCtx = getOperationContext();
-    auto listener = getJournalListener();
-    int tokensBefore = listener->getTokenCalls;
-    int durableBefore = listener->onDurableCalls;
-
-    getServiceContext()->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock=*/false);
-
-    ASSERT_EQ(listener->getTokenCalls, tokensBefore + 1);
-    ASSERT(listener->lastTokenMode == JournalListener::TokenMode::kDefault);
-    ASSERT_EQ(listener->onDurableCalls, durableBefore + 1);
 }
 
 }  // namespace

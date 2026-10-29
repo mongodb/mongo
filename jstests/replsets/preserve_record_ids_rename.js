@@ -16,7 +16,10 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+import {
+    hasRecordIdsReplicated,
+    validateShowRecordIdReplicatesAcrossNodes,
+} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({nodes: 2});
@@ -40,11 +43,14 @@ function makeSrcAndDstNames() {
     dstCollName = "dst" + counter;
 }
 
+// Reads the catalog entry via $listCatalog rather than listCollections, since listCollections does
+// not report 'recordIdsReplicated' under disaggregated storage.
 function assertRecordIdsReplicated(coll) {
-    const collInfo = assert.commandWorked(
-        coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}),
-    ).cursor.firstBatch[0].info;
-    assert(collInfo.recordIdsReplicated);
+    assert(
+        hasRecordIdsReplicated(coll.getDB(), coll.getName()),
+        "Expected collection to have replicated record IDs",
+        {collection: coll.getFullName()},
+    );
 }
 
 function validateRidsAcrossNodes(coll) {

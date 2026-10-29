@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -63,6 +37,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/version_context_feature_flags_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
@@ -156,7 +131,7 @@ public:
             // Upgrade to latest. If this release's lastContinuous ==
             // lastLTS then the second loop iteration just overwrites the first.
             _transitions[{from, to}] = {upgrading};
-            _fcvDocuments[upgrading] = makeFCVDoc(from /* effective */, to /* target */);
+            _fcvDocuments[upgrading] = makeFCVDoc(/*effective=*/from, /*target=*/to);
         }
 
         if (GenericFCV::kLastLTS != GenericFCV::kLastContinuous) {
@@ -165,7 +140,7 @@ public:
                 .transitionalVersion = GenericFCV::kUpgradingFromLastLTSToLastContinuous,
                 .onlyFromConfigServer = true};
             _fcvDocuments[GenericFCV::kUpgradingFromLastLTSToLastContinuous] = makeFCVDoc(
-                GenericFCV::kLastLTS /* effective */, GenericFCV::kLastContinuous /* target */);
+                /*effective=*/GenericFCV::kLastLTS, /*target=*/GenericFCV::kLastContinuous);
         }
 
         for (auto [downgrading, upgrading, to] :
@@ -179,8 +154,7 @@ public:
             // lastLTS then the second loop iteration just overwrites the first.
             _transitions[{GenericFCV::kLatest, to}] = {downgrading};
             _fcvDocuments[downgrading] =
-                makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
-                );
+                makeFCVDoc(/*effective=*/to, /*target=*/to, /*previous=*/GenericFCV::kLatest);
         }
     }
 
@@ -417,28 +391,37 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) try {
-    // FCV is initialized before catalog repair on startup (as index builds may care about FCV),
-    // which means that if we crash during initial sync there may be incomplete foreground index
-    // builds that stop us from loading the index catalog. As a result, we need to perform a
-    // collection scan instead of findById(). The collection also contains sharding configuration so
-    // there can be more than one document, but it should still be a very small number.
-    auto result = repl::StorageInterface::get(opCtx)->findDocuments(
-        opCtx,
-        NamespaceString::kServerConfigurationNamespace,
-        boost::none,
-        repl::StorageInterface::ScanDirection::kForward,
-        {},
-        BoundInclusion::kIncludeStartKeyOnly,
-        std::numeric_limits<size_t>::max());
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-    for (auto&& doc : result.getValue()) {
-        if (doc["_id"].valueStringDataSafe() == multiversion::kParameterName) {
-            return doc;
-        }
-    }
-    return {ErrorCodes::NoSuchKey, "FCV document not found"};
+    // Storage reads can throw WriteConflictException, so retry the FCV document lookup.
+    return writeConflictRetry(opCtx,
+                              "findFeatureCompatibilityVersionDocument",
+                              NamespaceString::kServerConfigurationNamespace,
+                              [&] {
+                                  // FCV is initialized before catalog repair on startup (as index
+                                  // builds may care about FCV), which means that if we crash during
+                                  // initial sync there may be incomplete foreground index builds
+                                  // that stop us from loading the index catalog. As a result, we
+                                  // need to perform a collection scan instead of findById(). The
+                                  // collection also contains sharding configuration so there can
+                                  // be more than one document, but it should still be a very small
+                                  // number.
+                                  auto result = repl::StorageInterface::get(opCtx)->findDocuments(
+                                      opCtx,
+                                      NamespaceString::kServerConfigurationNamespace,
+                                      boost::none,
+                                      repl::StorageInterface::ScanDirection::kForward,
+                                      {},
+                                      BoundInclusion::kIncludeStartKeyOnly,
+                                      std::numeric_limits<size_t>::max());
+                                  uassertStatusOK(result.getStatus());
+
+                                  for (auto&& doc : result.getValue()) {
+                                      if (doc["_id"].valueStringDataSafe() ==
+                                          multiversion::kParameterName) {
+                                          return doc;
+                                      }
+                                  }
+                                  uasserted(ErrorCodes::NoSuchKey, "FCV document not found");
+                              });
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -460,8 +443,7 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
             "could not be retrieved. Retry the setFCV request."));
     }
 
-    auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-        fcvObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+    auto fcvDoc = FeatureCompatibilityVersionDocument::parse(fcvObj.getValue());
 
     auto resolvedTransition = fcvTransitions.resolveTransition(
         opCtx->getServiceContext(), fcvDoc, newVersion, isFromConfigServer);
@@ -571,7 +553,15 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     FCV version,
     boost::optional<SetFCVPhaseEnum> phase,
     boost::optional<Timestamp> changeTimestamp,
-    boost::optional<bool> setIsCleaningServerMetadata) {
+    boost::optional<bool> setIsCleaningServerMetadata,
+    unique_function<void()> withFCVLockHeld) {
+
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    Lock::ExclusiveLock fcvChangeRegion(opCtx, fcvDocumentLock);
+
+    if (withFCVLockHeld) {
+        withFCVLockHeld();
+    }
 
     // We may have just stepped down, in which case we should not proceed.
     opCtx->checkForInterrupt();
@@ -590,7 +580,10 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     if (phase.has_value() && phase > SetFCVPhaseEnum::kComplete &&
         ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(version)) {
-        newFCVDoc.setPreviousVersion(getTransitionFCVInfo(version).from);
+        auto transitionInfo = getTransitionFCVInfo(version);
+        newFCVDoc.setVersion(transitionInfo.to);
+        newFCVDoc.setTargetVersion(transitionInfo.to);
+        newFCVDoc.setPreviousVersion(transitionInfo.from);
     }
 
     // The setIsCleaningServerMetadata parameter can either be true, false, or boost::none.
@@ -626,8 +619,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 "could not be retrieved. Retry the setFCV request."));
         }
 
-        auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(
-            currentFCVObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+        auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(currentFCVObj.getValue());
 
         auto currentIsCleaningServerMetadata = currentFCVDoc.getIsCleaningServerMetadata();
         if (currentIsCleaningServerMetadata.is_initialized() && *currentIsCleaningServerMetadata) {
@@ -834,14 +826,15 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     }
 
     auto version = swVersion.getValue();
-    serverGlobalParams.mutableFCV.setVersion(version);
+    auto onDiskFCVDoc =
+        FeatureCompatibilityVersionDocument::parse(featureCompatibilityVersion.getValue());
+    serverGlobalParams.mutableFCV.setVersionFromFCVDocument(onDiskFCVDoc);
     FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-
     fcvSnapshot.logFCVWithContext("startup"sv);
 
-    // On startup, if the version is in an upgrading or downgrading state, print a warning.
-    if (fcvSnapshot.isUpgradingOrDowngrading()) {
+    // A target version means that the last setFCV command did not complete, so we print a warning.
+    if (onDiskFCVDoc.getTargetVersion()) {
         LOGV2_WARNING_OPTIONS(
             4978301,
             {logv2::LogTag::kStartupWarnings},
@@ -899,11 +892,6 @@ void FeatureCompatibilityVersion::afterStartupActions(OperationContext* opCtx) {
     fassertInitializedAfterStartup(opCtx);
 }
 
-Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    return Lock::ExclusiveLock(opCtx, fcvDocumentLock);
-}
-
 void FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(Timestamp fcvUpdateTimestamp) {
     std::lock_guard lk(lastFCVUpdateTimestampMutex);
     if (fcvUpdateTimestamp > lastFCVUpdateTimestamp) {
@@ -926,10 +914,21 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
             str::stream() << name << " is not yet known.",
             fcvSnapshot.isVersionInitialized());
 
+    // Report version/targetVersion/previousVersion from the on-disk document, falling back to the
+    // in-memory one when only it is present (e.g. during initial sync).
+    FeatureCompatibilityVersionDocument fcvDoc;
+    auto onDiskFcvObj = FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
+    if (onDiskFcvObj.isOK()) {
+        auto onDiskFcvDoc = FeatureCompatibilityVersionDocument::parse(onDiskFcvObj.getValue());
+        fcvDoc.setVersion(onDiskFcvDoc.getVersion());
+        fcvDoc.setTargetVersion(onDiskFcvDoc.getTargetVersion());
+        fcvDoc.setPreviousVersion(onDiskFcvDoc.getPreviousVersion());
+    } else {
+        fcvDoc = fcvTransitions.getFCVDocument(fcvSnapshot.getVersion());
+    }
     BSONObjBuilder featureCompatibilityVersionBuilder(b->subobjStart(name));
-    auto version = fcvSnapshot.getVersion();
-    FeatureCompatibilityVersionDocument fcvDoc = fcvTransitions.getFCVDocument(version);
     featureCompatibilityVersionBuilder.appendElements(fcvDoc.toBSON().removeField("_id"));
+
     if (!fcvDoc.getTargetVersion()) {
         // If the FCV has been recently set to the fully upgraded FCV but is not part of the
         // majority snapshot, then if we do a binary upgrade, we may see the old FCV at startup.
@@ -962,6 +961,20 @@ Status FeatureCompatibilityVersionParameter::setFromString(std::string_view,
             str::stream() << name() << " cannot be set via setParameter. See "
                           << feature_compatibility_version_documentation::compatibilityLink()
                           << "."};
+}
+
+bool isFcvTransitionInProgress(OperationContext* opCtx) {
+    tassert(
+        13172000,
+        "Expected the FCV region to be held before checking whether an FCV transition is in "
+        "progress",
+        shard_role_details::getLocker(opCtx)->isLockHeldForMode(fcvDocumentLock.getRid(), MODE_IS));
+    bool transitionInProgress = false;
+    serverGlobalParams.featureCompatibility.withAcquiredFCVDocument([&](const auto* fcvDoc) {
+        tassert(13138000, "Expected the FCV document to be present", fcvDoc);
+        transitionInProgress = fcvDoc->getPhase().has_value();
+    });
+    return transitionInProgress;
 }
 
 FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)

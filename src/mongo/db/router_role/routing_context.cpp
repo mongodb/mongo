@@ -1,40 +1,14 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/router_role/routing_context.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
@@ -184,78 +158,14 @@ void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
 
 void RoutingContext::onStaleError(const Status& status,
                                   boost::optional<const NamespaceString&> nss) {
-
     tassert(11451300,
             str::stream() << "onStaleError called with invalid error category: " << status.code()
                           << ". Expected StaleShardVersionError or StaleDbVersion",
             status.code() == ErrorCodes::StaleDbVersion ||
                 ErrorCodes::isStaleShardVersionError(status));
 
-    if (status.code() == ErrorCodes::StaleDbVersion) {
-        auto si = status.extraInfo<StaleDbRoutingVersion>();
-        // If the database version is stale, refresh its entry in the catalog cache.
-        _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-    } else if (ErrorCodes::isStaleShardVersionError(status)) {
-        // 1. If the exception provides a shardId, add it to the set of shards requiring a refresh.
-        // 2. If the cache currently considers the collection to be unsharded, this will trigger an
-        //    epoch refresh.
-        // 3. If no shard is provided, then the epoch is stale and we must refresh.
-        if (auto si = status.extraInfo<StaleConfigInfo>()) {
-            const auto& staleNs = si->getNss();
-
-            // TODO(SERVER-118822): Remove this once 9.0 becomes last LTS
-            if (staleNs.isTimeseriesBucketsCollection()) {
-                // Legacy timeseries: buckets is tracked. Also invalidate the view namespace
-                // in case it was converted to viewless and now the main namespace is tracked.
-                _catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
-                                                        boost::none);
-            } else if (auto it = _nssRoutingInfoMap.find(staleNs); it != _nssRoutingInfoMap.end()) {
-                const auto& cri = it->second.cri;
-                if (cri.hasRoutingTable() && cri.getChunkManager().isNewTimeseriesWithoutView()) {
-                    // Viewless timeseries: view is tracked. Also invalidate the buckets
-                    // namespace in case it was converted to legacy and now the buckets namespace is
-                    // tracked.
-                    _catalogCache->onStaleCollectionVersion(
-                        staleNs.makeTimeseriesBucketsNamespace(), boost::none);
-                }
-            }
-
-            _catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
-        } else if (auto sei = status.extraInfo<StaleEpochInfo>()) {
-            const auto& versionWanted = sei->getVersionWanted();
-            if (!versionWanted.has_value() || versionWanted == ShardVersion{}) {
-                // The StaleEpochInfo does not always have a valid `wanted` version.
-                _catalogCache->onStaleCollectionVersion(sei->getNss(), boost::none);
-            } else {
-                _catalogCache->onStaleCollectionVersion(sei->getNss(), versionWanted);
-            }
-        } else {
-            // StaleEpoch errors may not contain ExtraInfo with namespace information.
-            // In such cases, we require the namespace to be passed as a parameter to properly
-            // invalidate the routing cache. This is a legacy behavior that should be removed
-            // once all StaleEpoch errors are guaranteed to contain namespace information.
-            // TODO: SERVER-109793 Remove the optional nss parameter once all StaleShardVersion
-            // errors contain ExtraInfo with namespace information.
-
-            tassert(11451301,
-                    str::stream() << "StaleShardVersion error without ExtraInfo must be "
-                                  << "StaleEpoch error. Error code: " << status.code(),
-                    status.code() == ErrorCodes::StaleEpoch);
-
-            if (nss.has_value()) {
-                _catalogCache->invalidateCollectionEntry_LINEARIZABLE(*nss);
-            } else {
-                // Let's refresh all the namespaces assigned to this RoutingContext if there is no
-                // way to know what are the namespaces with stale routing info
-                // TODO: SERVER-109793 once StaleEpochInfo becomes non-optional, it won't be
-                // possible to reach this `else`. Therefore, we should replace the for below and add
-                // a tassert.
-                for (const auto& [nss, _] : _nssRoutingInfoMap) {
-                    _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-                }
-            }
-        }
-    }
+    sharding::router::onStaleError(
+        _catalogCache, status, getNssList(), false /* filterUnrelatedNamespaces */, nss);
 }
 
 void RoutingContext::onStaleShardVersionError(const NamespaceString& nss,

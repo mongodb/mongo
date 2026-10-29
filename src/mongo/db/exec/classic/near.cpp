@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/exec/classic/near.h"
 
+#include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/sorter/file_based_spiller.h"
@@ -68,7 +43,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
                     sorter::kLatestChecksumVersion,
                     static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()))
               : nullptr,
-          /*settings=*/{}),
+          /*checkInput=*/true),
       _stageType(type),
       _nextInterval(nullptr),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
@@ -210,7 +185,12 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     }
 
     auto memberDistance = computeDistance(&nextMember);
-    if (memberDistance < _nextInterval->minDistance) {
+    // Documents outside of the search annulus can never be returned and are dropped right away:
+    // one closer than the current interval's minimum was already covered by an earlier interval,
+    // and one beyond the largest distance of the search fails the interval check of every interval,
+    // including the last one. Dropping them here also means the residual predicate below is only
+    // ever evaluated on documents that the search actually returns.
+    if (memberDistance < _nextInterval->minDistance || memberDistance > maxSearchDistance()) {
         if (nextMember.hasRecordId()) {
             _seenDocuments.freeMemory(nextMember.recordId);
             const uint64_t dedupBytesAfter = _seenDocuments.getApproximateSize();
@@ -223,6 +203,17 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
         return PlanStage::NEED_TIME;
     }
 
+    // Apply the residual document-level predicate that was pushed down from the FETCH stage which
+    // used to sit above this one. This has to happen after the distance checks above: a document
+    // that the near search discards must never be handed to the predicate, both because that is
+    // wasted work and because predicates such as $expr can throw errors on documents that the
+    // query would never have returned. Documents rejected here are still recorded in
+    // '_seenDocuments', which is what the equivalent plan with a FETCH above this stage did.
+    if (!Filter::passes(&nextMember, residualFilter())) {
+        ++_nextIntervalStats->numRejectedByFilter;
+        return PlanStage::NEED_TIME;
+    }
+
     ++_nextIntervalStats->numResultsBuffered;
 
     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
@@ -231,13 +222,14 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     _resultBuffer.add(SorterKey{memberDistance}, std::move(nextMember));
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
                        static_cast<int64_t>(bufferBytesBefore));
-    if (!_memoryTracker.withinMemoryLimit() &&
+
+    if (!_memoryTracker.withinMemoryLimit(opCtx()) &&
         feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
         spill();
     }
-    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
-    uassert(12227900, "Near stage exceeded memory limit", _memoryTracker.withinMemoryLimit());
 
+    _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
+    _memoryTracker.assertWithinMemoryLimit(opCtx(), _commonStats.stageTypeStr);
     return PlanStage::NEED_TIME;
 }
 
@@ -305,7 +297,7 @@ void NearStage::updateSpillingStats() {
         _specificStats.spillingStats.getSpilledRecords();
 
     auto spilledDataStorageIncrease =
-        _specificStats.spillingStats.updateSpillingStats(1 /*spills*/,
+        _specificStats.spillingStats.updateSpillingStats(/*additionalSpills=*/1,
                                                          additionalSpilledBytes,
                                                          additionalSpilledRecords,
                                                          _sorterFileStats.bytesSpilled());
@@ -315,11 +307,7 @@ void NearStage::updateSpillingStats() {
 }
 
 void NearStage::spill() {
-    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            str::stream() << _commonStats.stageTypeStr
-                          << " stage exceeded memory limit and can't spill to disk. Set "
-                             "allowDiskUse: true to allow spilling",
-            expCtx()->getAllowDiskUse());
+    _memoryTracker.assertCanSpill(expCtx()->getAllowDiskUse(), _commonStats.stageTypeStr);
     const uint64_t bufferBytesBefore = _resultBuffer.stats().memUsage();
     _resultBuffer.forceSpill();
     _memoryTracker.add(static_cast<int64_t>(_resultBuffer.stats().memUsage()) -
@@ -332,8 +320,16 @@ bool NearStage::isEOF() const {
 }
 
 std::unique_ptr<PlanStageStats> NearStage::getStats() {
+    // Report the residual predicate that was pushed into this stage as the stage's filter, the same
+    // way FetchStage reports its own filter. Without this the predicate would disappear from
+    // explain output entirely once the FETCH above this stage is optimized away.
+    if (const MatchExpression* filter = residualFilter();
+        nullptr != filter && _commonStats.filter.isEmpty()) {
+        _commonStats.filter = filter->serialize();
+    }
     auto ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific = std::make_unique<NearStats>(_specificStats);
+    ret->children.reserve(_childrenIntervals.size());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
     }

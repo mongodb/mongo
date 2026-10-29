@@ -97,7 +97,6 @@ __wti_blkcache_map_read(
     if (!bm->map)
         return (0);
 
-    WT_ASSERT(session, !bm->is_multi_handle);
     WT_ASSERT(session, !bm->is_remote);
 
     block = bm->block;
@@ -106,7 +105,6 @@ __wti_blkcache_map_read(
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    /* Not supported on multi-handle trees */
     WT_ASSERT(session, block->objectid == objectid);
 
     /* Map the block if it's possible. */

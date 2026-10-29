@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/express/express_plan.h"
 
@@ -33,6 +7,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -48,8 +24,13 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -164,7 +145,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -180,7 +161,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), IndexConstants::kIdIndexName);
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("_id" << 1));
 }
 
 TEST_F(ExpressPlanTest,
@@ -193,12 +174,15 @@ TEST_F(ExpressPlanTest,
         rss::ReplicatedStorageService::get(operationContext()).getPersistenceProvider();
     ASSERT(provider.supportsCursorReuseForExpressPathQueries());
 
+    unittest::ServerParameterGuard reuseGuard("internalQueryReuseCursorForExpressPathUpdates",
+                                              true);
+
     auto collection =
         createAndPopulateTestCollection("{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     boost::optional<bool> seenIsOwned;
     bool seenCursor = false;
@@ -227,7 +211,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexBsonRemainsValidAndOwnableAfterConsu
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     boost::optional<BSONObj> captured;
     auto result = iterator.consumeOne(operationContext(),
@@ -257,7 +241,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupViaIndex iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -270,7 +254,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), IndexConstants::kIdIndexName);
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("_id" << 1));
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
@@ -279,7 +263,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupOnClusteredCollection iterator(fromjson("{_id: 2}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -295,7 +279,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT(iteratorStats.indexName().empty());
-    ASSERT(iteratorStats.indexKeyPattern().empty());
+    ASSERT(iteratorStats.indexKeyPattern().isEmpty());
 }
 
 TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
@@ -304,7 +288,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
 
     IteratorStats iteratorStats;
     IdLookupOnClusteredCollection iterator(fromjson("{_id: 4}"));
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -317,7 +301,7 @@ TEST_F(ExpressPlanTest, TestIdLookupOnClusteredCollectionWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT(iteratorStats.indexName().empty());
-    ASSERT(iteratorStats.indexKeyPattern().empty());
+    ASSERT(iteratorStats.indexKeyPattern().isEmpty());
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
@@ -335,7 +319,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
         filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -351,7 +335,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
@@ -372,7 +356,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     auto filter = fromjson("{a: 'iii'}");
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
         filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -388,7 +372,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
 }
 
 TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
@@ -406,7 +390,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<FetchFromCollectionCallback> iterator(
         filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // Any number of repeated calls to 'consumeOne()' should return an 'Exhausted' result without
     // producing any documents.
@@ -419,7 +403,158 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1));
+}
+
+/**
+ * Deletes the record that '{a: 5}' indexes directly from the record store, leaving its index key in
+ * place: an index entry referencing a record that no longer exists.
+ */
+static void orphanIndexKeyForFilterValueFive(OperationContext* opCtx,
+                                             const CollectionPtr& collectionPtr) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto* recordStore = collectionPtr->getRecordStore();
+
+    boost::optional<RecordId> orphanedRid;
+    {
+        auto cursor = recordStore->getCursor(opCtx, ru);
+        while (auto record = cursor->next()) {
+            if (record->data.toBson().getIntField("a") == 5) {
+                orphanedRid = record->id;
+                break;
+            }
+        }
+    }
+    ASSERT(bool(orphanedRid));
+
+    WriteUnitOfWork wuow(opCtx);
+    recordStore->deleteRecord(opCtx, ru, *orphanedRid);
+    wuow.commit();
+}
+
+/**
+ * Asserts that a fetch miss on the user-index path terminates the iterator, rather than leaving
+ * the executor's drain loop re-seeking the same orphaned key forever.
+ *
+ * 'exhausted()' is the whole liveness guarantee, not just bookkeeping: the drain loop in
+ * 'PlanExecutorExpress::getNext()' breaks on 'ExpressPlan::exhausted()', which forwards this
+ * iterator's flag verbatim. Asserting the flag therefore proves the loop terminates.
+ */
+static void assertOrphanIndexKeyExhaustsIterator(OperationContext* opCtx,
+                                                 CollectionAcquisition collection,
+                                                 std::string_view indexName) {
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
+    auto indexEntry = collectionPtr->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    ASSERT(indexEntry);
+
+    IteratorStats iteratorStats;
+    auto filter = fromjson("{a: 5}");
+    CollatorInterface* collator = nullptr;
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
+    iterator.open(opCtx, collection, /*forWrite=*/false, &iteratorStats);
+
+    for (size_t i = 0; i < 3; ++i) {
+        auto result = iterateButExpectNoDocument(opCtx, iterator);
+        ASSERT(std::holds_alternative<Exhausted>(result));
+        ASSERT(iterator.exhausted());
+    }
+
+    // The orphaned key is examined once, on the first call; the fetch then misses. Later calls
+    // short-circuit on '_exhausted' without touching the index again.
+    ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
+    ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
+}
+
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyOnPlainRead) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
+
+    orphanIndexKeyForFilterValueFive(operationContext(), collection.getCollectionPtr());
+
+    // This is what a plain read gets: a non-transactional find at local/majority read concern is
+    // eligible to ignore prepare conflicts, unlike the 'kEnforce' default 'CatalogTestFixture'
+    // gives us here. 'logRecordNotFound()' then returns without logging or throwing.
+    //
+    // Must come after the orphaning step above, whose committed WriteUnitOfWork closes the storage
+    // transaction: 'setPrepareConflictBehavior()' invariants on '!_isActive()'.
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+
+    assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
+}
+
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyLoggingDataCorruption) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
+
+    orphanIndexKeyForFilterValueFive(operationContext(), collection.getCollectionPtr());
+
+    // 'logRecordNotFound()' logs the warning and returns instead of uasserting.
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setDataCorruptionDetectionMode(DataCorruptionDetectionMode::kLogAndContinue);
+
+    assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
+}
+
+// Documents the truncation this terminator accepts. With two keys for the same value, orphaning the
+// first makes the query report EOF even though the second still resolves to a live record. The
+// alternative was an unbounded spin, so this is the better of two bad outcomes -- but it is a
+// behavior change worth pinning.
+//
+// If this test fails because a document was produced, SERVER-87016 has added multi-key scanning and
+// the miss branch must now skip the orphaned entry rather than terminate.
+TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithOrphanIndexKeyTruncatesRemainingMatches) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 5}"sv, "{_id: 2, a: 5}"sv);
+
+    // Orphans the lowest RecordId matching 'a: 5', which is the first of the two 'a: 5' entries in
+    // index order, since duplicate keys are ordered by RecordId.
+    orphanIndexKeyForFilterValueFive(operationContext(), collection.getCollectionPtr());
+
+    // '{_id: 2, a: 5}' survives and its index key still resolves, so a scanning iterator could
+    // return it.
+    ASSERT_EQ(collection.getCollectionPtr()->numRecords(operationContext()), 2);
+
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+
+    assertOrphanIndexKeyExhaustsIterator(operationContext(), collection, indexName);
+}
+
+// Reads that enforce prepare conflicts -- multi-document transactions, snapshot/linearizable read
+// concern, or any read with 'afterClusterTime' -- never reach the miss branch's return at all:
+// 'logRecordNotFound()' uasserts first. This is the narrower case, not the common one.
+TEST_F(ExpressPlanTest,
+       TestLookupViaUserIndexWithOrphanIndexKeyThrowsWhenEnforcingPrepareConflicts) {
+    std::string_view indexName = "a_1"sv;
+    auto indexSpec = BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1));
+    auto collection = createAndPopulateTestCollectionWithIndex(
+        indexSpec, "{_id: 0, a: 2}"sv, "{_id: 1, a: 3}"sv, "{_id: 2, a: 5}"sv);
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
+
+    orphanIndexKeyForFilterValueFive(operationContext(), collectionPtr);
+
+    auto indexEntry =
+        collectionPtr->getIndexCatalog()->findIndexByName(operationContext(), indexName);
+    ASSERT(indexEntry);
+
+    IteratorStats iteratorStats;
+    auto filter = fromjson("{a: 5}");
+    CollatorInterface* collator = nullptr;
+    LookupViaUserIndex<FetchFromCollectionCallback> iterator(
+        filter.firstElement(), indexEntry->getIdent(), std::string{indexName}, collator, nullptr);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
+
+    ASSERT_THROWS_CODE(iterateButExpectNoDocument(operationContext(), iterator),
+                       DBException,
+                       ErrorCodes::DataCorruptionDetected);
 }
 
 projection_ast::Projection parseProjection(OperationContext* opCtx, BSONObj projection) {
@@ -452,7 +587,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
                                                             std::string{indexName},
                                                             collator,
                                                             &projection);
-    iterator.open(operationContext(), collection, &iteratorStats);
+    iterator.open(operationContext(), collection, /*forWrite=*/false, &iteratorStats);
 
     // The first call to 'consumeOne()' should provide a document and return 'Exhausted' to indicate
     // that it will be the last document.
@@ -468,8 +603,74 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithCoveredProjection) {
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
     ASSERT_EQ(iteratorStats.indexName(), "a_1_b_1_c_1");
-    ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ a: 1, b: 1, c: 1 }");
+    ASSERT_BSONOBJ_EQ(iteratorStats.indexKeyPattern(), BSON("a" << 1 << "b" << 1 << "c" << 1));
     ASSERT_EQ(iteratorStats.projectionCovered(), true);
+}
+
+TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonAcceptsWellFormedDocument) {
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj obj = fromjson(R"({_id: 1, a: "hello", b: [1, 2, 3]})");
+    ASSERT_DOES_NOT_THROW(
+        assertFetchedRecordIsValidBson(obj.objdata(), obj.objsize(), nss, RecordId(1)));
+}
+
+TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonRejectsTruncatedRecord) {
+    // Simulate a torn or truncated page read (as can happen when a record is materialized from
+    // disaggregated storage): the buffer is shorter than the document's own embedded objsize, so
+    // an element overruns the buffer. This is the corruption that, left undetected, triggered an
+    // opaque mutablebson invariant deep inside the update machinery.
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj obj = fromjson(R"({_id: 1, a: "hello"})");
+    ASSERT_THROWS_CODE(
+        assertFetchedRecordIsValidBson(obj.objdata(), obj.objsize() - 4, nss, RecordId(2)),
+        DBException,
+        ErrorCodes::InvalidBSON);
+}
+
+TEST_F(ExpressPlanTest, AssertFetchedRecordIsValidBsonRejectsElementOverrunningObjsize) {
+    // Construct a record whose string element claims a length that extends past the document's own
+    // objsize -- exactly the inconsistency (offset + element size > objsize) that fired the
+    // invariant in mutablebson's getElementOffset().
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj obj = BSON("a" << "hello");
+
+    auto buffer = std::make_unique<char[]>(obj.objsize());
+    memcpy(buffer.get(), obj.objdata(), obj.objsize());
+
+    // 'BSONElement::value()' points at the 4-byte little-endian length prefix of the string value.
+    const auto valueOffset = obj["a"].value() - obj.objdata();
+    const int32_t corruptLength = 1 << 20;
+    memcpy(buffer.get() + valueOffset, &corruptLength, sizeof(corruptLength));
+
+    ASSERT_THROWS_CODE(
+        assertFetchedRecordIsValidBson(buffer.get(), obj.objsize(), nss, RecordId(3)),
+        DBException,
+        ErrorCodes::InvalidBSON);
+}
+
+DEATH_TEST_REGEX(ExpressUpdateMalformedRecord,
+                 MalformedFetchedRecordTripsUpdateInPlaceInvariant,
+                 "mutable bson right sibling begins outside its backing BSONObj") {
+    // Deterministic repro of the crash: a record whose string element length overruns objsize (as
+    // from a torn disagg page read) trips a mutablebson bound check once the update machinery
+    // builds an in-place mutablebson::Document over it. The corrupt extent is detected in
+    // resolveRightSibling(), at the point where an address is first derived from the bad size.
+    BSONObj obj = BSON("a" << "hello");
+
+    auto buffer = std::make_unique<char[]>(obj.objsize());
+    memcpy(buffer.get(), obj.objdata(), obj.objsize());
+
+    const auto valueOffset = obj["a"].value() - obj.objdata();
+    const int32_t corruptLength = 1 << 20;
+    memcpy(buffer.get() + valueOffset, &corruptLength, sizeof(corruptLength));
+    BSONObj corrupt(buffer.get());
+
+    // Mirror update::transformDocument(): build the in-place Document and walk children to force
+    // lazy materialization and the offset computation.
+    mutablebson::Document doc(corrupt, mutablebson::Document::kInPlaceEnabled);
+    for (auto child = doc.root().leftChild(); child.ok(); child = child.rightSibling()) {
+        (void)child.getFieldName();
+    }
 }
 
 }  // namespace

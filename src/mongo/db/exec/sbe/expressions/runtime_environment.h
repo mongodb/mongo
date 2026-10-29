@@ -1,36 +1,8 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -46,7 +18,14 @@
 #include <string_view>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 namespace mongo::sbe {
+namespace vm {
+class ByteCode;
+}  // namespace vm
+
 /**
  * A holder for "global" slots and accessors. These are used in a PlanStage tree but:
  *  - Cannot be made constants due to restrictions on the lifetime of such values (e.g., they're
@@ -68,11 +47,11 @@ namespace mongo::sbe {
 using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, sbe::value::SlotId>;
 class RuntimeEnvironment final : public SlotsProvider {
 public:
-    RuntimeEnvironment() = default;
+    RuntimeEnvironment();
     RuntimeEnvironment(RuntimeEnvironment&&) = delete;
     RuntimeEnvironment& operator=(const RuntimeEnvironment&) = delete;
     RuntimeEnvironment& operator=(const RuntimeEnvironment&&) = delete;
-    virtual ~RuntimeEnvironment() = default;
+    virtual ~RuntimeEnvironment();
 
     class Accessor final : public value::AssignableSlotAccessor {
     public:
@@ -179,6 +158,12 @@ public:
     std::unique_ptr<RuntimeEnvironment> makeDeepCopy() const;
 
     /**
+     * Returns the plan's VM instance to be used for compiled expressions. It is not shared with
+     * copies.
+     */
+    std::shared_ptr<vm::ByteCode> getByteCode();
+
+    /**
      * Dumps all the slots currently defined in this environment into the given string builder.
      */
     void debugString(StringBuilder* builder, boost::optional<size_t> lengthCap = boost::none) const;
@@ -228,6 +213,8 @@ private:
     std::shared_ptr<State> _state{std::make_shared<State>()};
     value::SlotMap<Accessor> _accessors;
     bool _isSmp{false};
+
+    std::shared_ptr<vm::ByteCode> _byteCode;
 
     friend class Accessor;
 };

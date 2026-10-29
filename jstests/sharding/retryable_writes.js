@@ -67,12 +67,14 @@ function dropSessionsCollection(mainConn, priConn, configConn) {
         );
         configConn.getDB("config").getCollection("system.sessions").drop();
         priConn.getDB("config").getCollection("system.sessions").drop();
-        assert.commandWorked(
-            configConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
-        );
-        assert.commandWorked(
-            priConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(priConn, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                configConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
+            );
+            assert.commandWorked(
+                priConn.adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
+            );
+        }
     }
 }
 
@@ -146,6 +148,25 @@ function handleSessionsCollection(mainConn, priConn, configConn) {
         // Metadata), adding another write to config.transactions on the shard.
         if (FeatureFlagUtil.isPresentAndEnabled(priConn, "AuthoritativeShardsDDL")) {
             extraCollectionWrites += 1;
+
+            // When the collection is committed with chunk operations disallowed, the coordinator
+            // performs one (or two) additional retryable writes to re-enable them once the
+            // critical section has been released:
+            // - _shardsvrSetAllowChunkOperations.
+            // - If the shard is a config shard, _configsvrSetAllowChunkOperations as well.
+            //
+            // TODO (SERVER-133881): remove the `if` and make the body unconditional.
+            if (
+                FeatureFlagUtil.isPresentAndEnabled(
+                    priConn,
+                    "CreateRenameNewSetAllowChunkOperationsBehavior",
+                )
+            ) {
+                extraCollectionWrites += 1;
+                if (TestData.configShard) {
+                    extraCollectionWrites += 1;
+                }
+            }
         }
     }
     return extraCollectionWrites;

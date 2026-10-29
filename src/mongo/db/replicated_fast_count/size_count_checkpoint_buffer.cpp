@@ -1,93 +1,118 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
 
-namespace mongo::replicated_fast_count {
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
-SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid)
-    : _accumulatorOptions{.isCheckpoint = true, .oplogUuid = oplogUuid} {
+namespace mongo::replicated_fast_count {
+namespace {
+
+/**
+ * Returns true if the raw oplog BSON is a no-op watermark entry, i.e. a noop ('n') carrying
+ * `o.msg == kWatermarkMsg`.
+ */
+bool isWatermarkNoop(const BSONObj& raw) {
+    const BSONElement opElem = raw.getField("op");
+    if (opElem.type() != BSONType::string || opElem.valueStringData() != "n") {
+        return false;
+    }
+    const BSONElement oElem = raw.getField("o");
+    if (!oElem.isABSONObj()) {
+        return false;
+    }
+    const BSONObj o = oElem.Obj();
+    const BSONElement msgElem = o.getField("msg");
+    return msgElem.type() == BSONType::string && msgElem.valueStringData() == kWatermarkMsg;
+}
+
+}  // namespace
+
+SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid,
+                                                     boost::optional<RecordId> lastBufferedRid)
+    : _accumulatorOptions{.isCheckpoint = true, .oplogUuid = oplogUuid},
+      _lastBufferedRid(lastBufferedRid) {
     _pending.emplace(_accumulatorOptions);
 }
 
 boost::optional<OplogScanResult> SizeCountCheckpointBuffer::checkoutForFlush() {
     std::lock_guard lk(_mutex);
-
-    if (_inFlight) {
-        // A previous flush has not been acknowledged yet. Retry the same batch.
-        return _inFlight;
-    }
-
-    // Cut the _pending accumulator into a flushable batch and reset _pending.
-    OplogScanResult result = _pending->finish();
-    _pending.emplace(_accumulatorOptions);
-
-    if (!result.lastTimestamp) {
-        // finish() leaves lastTimestamp unset when no size/count entries were accumulated. We
-        // return early so we do not advance the checkpoint for untracked entries.
-        return boost::none;
-    }
-
-    _inFlight = std::move(result);
     return _inFlight;
 }
 
-boost::optional<RecordId> SizeCountCheckpointBuffer::scanToNoHolesEOF(
-    SeekableRecordCursor& cursor) {
+bool SizeCountCheckpointBuffer::readyForWatermark() const {
     std::lock_guard lk(_mutex);
+    return !_inFlight.has_value() && _pending->hasPendingWork();
+}
 
-    boost::optional<RecordId> lastSeenRid;
-    while (const auto rec = cursor.next()) {
-        _pending->consumeRecord(*rec);
-        lastSeenRid = rec->id;
+OplogScanResult SizeCountCheckpointBuffer::awaitCheckoutForFlush(OperationContext* opCtx) {
+    const Date_t start = Date_t::now();
+    std::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(_batchReady, lk, [&] { return _inFlight.has_value(); });
+    recordWatermarkAwaitTime(Date_t::now() - start);
+    return *_inFlight;
+}
+
+void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
+    std::lock_guard lk(_mutex);
+    // The boost::none state means we have not buffered any oplog entries yet.
+    if (_lastBufferedRid.has_value()) {
+        const bool lastBufferedRidFound = cursor.seekExact(_lastBufferedRid.value()).has_value();
+        if (!lastBufferedRidFound) {
+            if (!_reportedLostLastBufferedRid) {
+                // Avoid looping with the same assertion.
+                _reportedLostLastBufferedRid = true;
+                tasserted(
+                    12101812,
+                    fmt::format(
+                        "Unable to find oplog start point for next size count "
+                        "checkpoint at lastBufferedRid: {}. A repair procedure will be needed.",
+                        _lastBufferedRid.value().toStringHumanReadable()));
+            }
+
+            if (boost::optional<Record> record = cursor.seek(
+                    _lastBufferedRid.value(), SeekableRecordCursor::BoundInclusion::kExclude)) {
+                _pending->consumeRecord(*record);
+                _lastBufferedRid = record->id;
+                // Unset the flag so the next loss of the last buffered record is a new anomaly and
+                // gets its own tassert.
+                _reportedLostLastBufferedRid = false;
+                if (isWatermarkNoop(record->data.toBson())) {
+                    _handleWatermark();
+                }
+            }
+        }
     }
-    return lastSeenRid;
+
+    // We advance lastBufferedRid on each iteration so that if cursor.next() throws a
+    // WriteConflictException, the caller can resume scanning after the last consumed record.
+    while (boost::optional<Record> record = cursor.next()) {
+        _pending->consumeRecord(*record);
+        _lastBufferedRid = record->id;
+        // TODO(SERVER-135085): Update this loop to not swallow multiple watermarks. We want one
+        // checkpoint per watermark, so we need to stop accumulating in _pending past this point.
+        if (isWatermarkNoop(record->data.toBson())) {
+            _handleWatermark();
+        }
+    }
 }
 
-void SizeCountCheckpointBuffer::accumulate(const Record& rec) {
-    std::lock_guard lk(_mutex);
-    _pending->consumeRecord(rec);
-}
-
-void SizeCountCheckpointBuffer::acknowledgeFlushSuccess() {
+void SizeCountCheckpointBuffer::acknowledgeFlush() {
     std::lock_guard lk(_mutex);
     _inFlight.reset();
 }
 
-bool SizeCountCheckpointBuffer::hasInFlightWork() const {
-    std::lock_guard lk(_mutex);
-    return _inFlight.has_value();
+void SizeCountCheckpointBuffer::_handleWatermark() {
+    incrementTailerWatermarksSeenCount();
+    if (!_inFlight.has_value()) {
+        // Cut the accumulated batch, the watermark included, so its timestamp is the
+        // batch's lastTimestamp.
+        _inFlight = _pending->finish();
+        _pending.emplace(_accumulatorOptions);
+        _batchReady.notify_one();
+    }
 }
-
-bool SizeCountCheckpointBuffer::hasPendingWork() const {
-    std::lock_guard lk(_mutex);
-    return _pending->hasPendingWork();
-}
-
 }  // namespace mongo::replicated_fast_count

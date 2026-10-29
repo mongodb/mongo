@@ -18,6 +18,7 @@ mongo_cc_library(
         "change_stream_db_present_state_event_handler.cpp",
         "change_stream_reader_builder_impl.cpp",
         "change_stream_shard_targeter_base.cpp",
+        "change_stream_shard_targeter_metrics.cpp",
         "collection_change_stream_db_absent_state_event_handler.cpp",
         "collection_change_stream_db_present_state_event_handler.cpp",
         "collection_change_stream_shard_targeter_impl.cpp",
@@ -26,6 +27,7 @@ mongo_cc_library(
         "database_change_stream_db_present_state_event_handler.cpp",
         "database_change_stream_shard_targeter_impl.cpp",
         "historical_placement_fetcher_impl.cpp",
+        "historical_placement_fetcher_metrics.cpp",
         "shard_targeter_helper.cpp",
     ],
     deps = [
@@ -35,6 +37,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/pipeline:change_stream_helpers",
         "//src/mongo/db/pipeline:change_stream_interfaces",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/s:grid",
         "//src/mongo/util:pcre_util",
     ],
@@ -53,21 +56,16 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
-    name = "change_streams_test",
+    name = "change_streams_shard_targeter_test",
     srcs = [
         "all_databases_change_stream_shard_targeter_impl_test.cpp",
-        "all_databases_change_stream_state_event_handler_test.cpp",
         "change_stream_reader_builder_impl_test.cpp",
-        "collection_change_stream_db_absent_state_event_handler_test.cpp",
-        "collection_change_stream_db_present_state_event_handler_test.cpp",
         "collection_change_stream_shard_targeter_impl_test.cpp",
         "control_events_test.cpp",
         "data_to_shards_allocation_query_service_impl_test.cpp",
-        "database_change_stream_db_absent_state_event_handler_test.cpp",
-        "database_change_stream_db_present_state_event_handler_test.cpp",
         "database_change_stream_shard_targeter_impl_test.cpp",
     ],
-    tags = ["mongo_unittest_fifth_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":change_streams",
         ":change_streams_control_events",
@@ -79,5 +77,48 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:change_stream_test_helpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/repl:change_stream_oplog_notification",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_stream_shard_targeter_metrics_test",
+    srcs = [
+        "change_stream_shard_targeter_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":change_streams",
+        ":change_streams_control_events",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "historical_placement_fetcher_metrics_test",
+    srcs = [
+        "historical_placement_fetcher_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":change_streams",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_streams_state_event_handler_test",
+    srcs = [
+        "all_databases_change_stream_state_event_handler_test.cpp",
+        "collection_change_stream_db_absent_state_event_handler_test.cpp",
+        "collection_change_stream_db_present_state_event_handler_test.cpp",
+        "database_change_stream_db_absent_state_event_handler_test.cpp",
+        "database_change_stream_db_present_state_event_handler_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":change_streams",
+        ":change_streams_control_events",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/exec/document_value",
     ],
 )

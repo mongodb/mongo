@@ -52,6 +52,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
   store.
   - Not checked for sparse and partial indexes.
 - Time-series bucket collections are valid.
+- Clustered index names are valid.
 
 ## Validation Procedure
 

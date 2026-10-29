@@ -1,6 +1,6 @@
 /**
- * Overrides runCommand to retry operations that encounter FailedToSatisfyReadPreference or PrimarySteppedDown errors,
- * which can occur when the config server primary is stepped down.
+ * Overrides runCommand to retry operations that encounter FailedToSatisfyReadPreference or PrimarySteppedDown errors
+ * (or ConflictingOperationInProgress, for chunk operations), which can occur when the config server primary is stepped down.
  *
  * This override is intended to be used with the sharding_csrs_continuous_config_stepdown suite.
  *
@@ -29,28 +29,43 @@ const kNonRetryableCommands = new Set([
     "checkMetadataConsistency",
 ]);
 
-function isRetryableException(e) {
-    // Check if exception or error object has FailedToSatisfyReadPreference or PrimarySteppedDown error.
+// Retried on ConflictingOperationInProgress from a config stepup.
+const kChunkOperationCommands = new Set(["split", "mergeChunks", "mergeAllChunksOnShard"]);
+
+function isChunkOperation(cmdObj) {
     return (
-        e.code === ErrorCodes.FailedToSatisfyReadPreference ||
-        e.code === ErrorCodes.PrimarySteppedDown
+        typeof cmdObj === "object" &&
+        cmdObj !== null &&
+        kChunkOperationCommands.has(getCommandName(cmdObj))
     );
 }
 
-function isRetryableError(res) {
-    if (isRetryableException(res)) {
+function isRetryableException(e, cmdObj) {
+    // Check if exception or error object has FailedToSatisfyReadPreference or PrimarySteppedDown error.
+    if (
+        e.code === ErrorCodes.FailedToSatisfyReadPreference ||
+        e.code === ErrorCodes.PrimarySteppedDown
+    ) {
+        return true;
+    }
+
+    return e.code === ErrorCodes.ConflictingOperationInProgress && isChunkOperation(cmdObj);
+}
+
+function isRetryableError(res, cmdObj) {
+    if (isRetryableException(res, cmdObj)) {
         return true;
     }
 
     if (res.writeErrors) {
         for (const writeError of res.writeErrors) {
-            if (isRetryableException(writeError)) {
+            if (isRetryableException(writeError, cmdObj)) {
                 return true;
             }
         }
     }
 
-    if (res.writeConcernError && isRetryableException(res.writeConcernError)) {
+    if (res.writeConcernError && isRetryableException(res.writeConcernError, cmdObj)) {
         return true;
     }
 
@@ -67,7 +82,7 @@ function shouldRetry(cmdObj, res) {
         return false;
     }
 
-    return isRetryableError(res);
+    return isRetryableError(res, cmdObj);
 }
 
 function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs) {
@@ -83,7 +98,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             try {
                 res = func.apply(conn, makeFuncArgs(cmdObj));
             } catch (e) {
-                if (isRetryableException(e)) {
+                if (isRetryableException(e, cmdObj)) {
                     jsTest.log.info(
                         "Retrying on retryable exception (code " +
                             e.code +

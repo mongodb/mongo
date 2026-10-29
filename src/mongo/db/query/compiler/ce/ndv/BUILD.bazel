@@ -1,0 +1,144 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_fuzztest", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "ndv_sketch_gen",
+    src = "ndv_sketch.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "ndv_sketch_gen_lib",
+    srcs = [
+        ":ndv_sketch_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "field_stats_gen",
+    src = "field_stats.idl",
+    deps = [
+        ":ndv_sketch_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "field_stats",
+    srcs = [
+        "field_stats.cpp",
+        ":field_stats_gen",
+    ],
+    hdrs = [
+        "field_stats.h",
+    ],
+    deps = [
+        ":ndv_sketch_gen_lib",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "field_stats_test",
+    srcs = [
+        "field_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":field_stats",
+    ],
+)
+
+# The loader's implementation is compiled into //src/mongo/db:query_exec, mirroring
+# persistent_sample_loader.cpp: a standalone library could not depend on DBDirectClient
+# without creating a dependency cycle with query_exec.
+mongo_cc_library(
+    name = "field_stats_loader",
+    hdrs = [
+        "field_stats_loader.h",
+    ],
+    deps = [
+        ":field_stats",
+    ],
+)
+
+mongo_cc_library(
+    name = "hyperloglog",
+    srcs = [
+        "hyperloglog.cpp",
+    ],
+    hdrs = [
+        "hyperloglog.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "hyperloglog_test",
+    srcs = [
+        "hyperloglog_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":hyperloglog",
+    ],
+)
+
+mongo_cc_library(
+    name = "ndv_hashing",
+    srcs = [
+        "ndv_hashing.cpp",
+    ],
+    hdrs = [
+        "ndv_hashing.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage/key_string",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ndv_hashing_test",
+    srcs = [
+        "ndv_hashing_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":ndv_hashing",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "ndv_hashing_fuzz_test",
+    srcs = ["ndv_hashing_fuzz_test.cpp"],
+    deps = [
+        ":ndv_hashing",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/bson/bson_mutator",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "ndv_hashing_bm",
+    srcs = ["ndv_hashing_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [
+        ":ndv_hashing",
+    ],
+)

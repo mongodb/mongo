@@ -10,6 +10,7 @@
 //
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const collName = jsTestName();
@@ -17,6 +18,15 @@ assertDropAndRecreateCollection(db, collName);
 
 const qsutils = new QuerySettingsUtils(db, collName);
 qsutils.removeAllQuerySettings();
+
+// The '$querySettings' desugar is a binary feature (not FCV-gated), so its behavior can only be
+// asserted when every node runs a binary that has it: a non-multiversion suite at FCV 9.0+. In
+// mixed-binary suites the command may run against an older binary that lacks the desugar (e.g.
+// 'last-patch', where FCV is already 9.0), so 'isFCVgte' alone is insufficient.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+const desugarAssertable = !isMultiversion && isFCVgte(db, "9.0");
 
 const querySettingsA = {
     indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: ["a_1", {$natural: 1}]},
@@ -71,6 +81,18 @@ const nonExistentQueryShapeHash = "0".repeat(64);
             cursor: {},
         }),
         40602,
+    );
+}
+
+// Skipped unless the desugar is guaranteed present on every node (see 'desugarAssertable' above).
+if (desugarAssertable) {
+    // $querySettings desugars into a pipeline that reads its representative queries via $lookup.
+    assert.commandWorked(
+        db.getSiblingDB("admin").runCommand({
+            aggregate: 1,
+            pipeline: [{$querySettings: {}}, {$unionWith: {pipeline: [{$documents: [{x: 1}]}]}}],
+            cursor: {},
+        }),
     );
 }
 

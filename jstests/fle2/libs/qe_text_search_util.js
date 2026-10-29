@@ -130,10 +130,13 @@ export class SubstringField extends TextFieldBase {
     }
 
     createQueryTypeDescriptor(db) {
-        // Use the deprecated "substringPreview" name for mongocrypt compatibility.
-        // TODO SERVER-129158 Change to "substring" once libmongocrypt supports the new name.
+        const queryType =
+            this._forcePreview ||
+            (db && !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "QESubstringSearch"))
+                ? "substringPreview"
+                : "substring";
         return Object.assign(
-            {"queryType": "substringPreview", "strMaxLength": this._mlen},
+            {"queryType": queryType, "strMaxLength": this._mlen},
             super.createQueryTypeDescriptor(),
         );
     }

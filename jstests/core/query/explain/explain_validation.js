@@ -3,6 +3,7 @@
  * arguments will be permitted to pass validation.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  * ]
  */

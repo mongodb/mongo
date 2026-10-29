@@ -1,51 +1,28 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
-#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+
+#include <variant>
 
 namespace mongo::timeseries::write_ops::internal {
 namespace {
@@ -88,14 +65,14 @@ void TimeseriesWriteOpsInternalTest::_setUpRetryableWrites(
     auto txnParticipant = TransactionParticipant::get(_opCtx);
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 }
 
 void TimeseriesWriteOpsInternalTest::_addExecutedStatementsToTransactionParticipant(
     const std::vector<StmtId>& stmtIds) {
     auto txnParticipant = TransactionParticipant::get(_opCtx);
-    txnParticipant.addCommittedStmtIds(_opCtx, stmtIds, repl::OpTime());
+    txnParticipant.addCommittedStmtIds(_opCtx, stmtIds, repl::OpTime(), Date_t{});
 };
 
 mongo::write_ops::InsertCommandRequest TimeseriesWriteOpsInternalTest::_createInsertCommandRequest(
@@ -141,7 +118,8 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
     auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
         _opCtx, nss, request, /*expectedUUID=*/boost::none);
 
-    auto batches = write_ops::internal::stageUnorderedWritesToBucketCatalogUnoptimized(
+    bucket_catalog::TimeseriesWriteBatches batches;
+    write_ops::internal::stageUnorderedWritesToBucketCatalogUnoptimized(
         _opCtx,
         request,
         preConditions,
@@ -150,7 +128,8 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
         bucket_catalog::AllowQueryBasedReopening::kAllow,
         docsToRetry,
         optUuid,
-        &errors);
+        &errors,
+        batches);
     ASSERT_EQ(batches.size(), 1);
     auto batch = batches.front();
     EXPECT_EQ(batch->measurements.size(), expectedIndices.size());
@@ -191,7 +170,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
                                                   filteredUserBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -246,7 +225,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
                                                   filteredUserBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -302,7 +281,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
                                                   filteredUserBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -353,7 +332,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
                                                   filteredUserBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/filteredUserBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   bucket_catalog::AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -499,6 +478,104 @@ TEST_F(
     std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 1};
     _testStageUnorderedWritesUnoptimized(
         _ns1, userBatch, expectedIndices, docsToRetry, stmtIds, boost::none, executedStmtIds);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, CommitSurvivesWriteConflictOnBucketInsert) {
+    const std::vector<BSONObj> userBatch{
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(1))};
+    auto request = _createInsertCommandRequest(_ns1, userBatch);
+
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        _opCtx, _ns1, request, /*expectedUUID=*/boost::none);
+
+    boost::optional<UUID> optUuid;
+    std::vector<mongo::write_ops::WriteError> stageErrors;
+    bucket_catalog::TimeseriesWriteBatches batches;
+    stageUnorderedWritesToBucketCatalog(_opCtx,
+                                        request,
+                                        preConditions,
+                                        /*startIndex=*/0,
+                                        request.getDocuments().size(),
+                                        bucket_catalog::AllowQueryBasedReopening::kAllow,
+                                        optUuid,
+                                        &stageErrors,
+                                        batches);
+    EXPECT_TRUE(stageErrors.empty());
+    ASSERT_EQ(batches.size(), 1);
+    auto batch = batches.front();
+
+    std::vector<mongo::write_ops::WriteError> errors;
+    boost::optional<repl::OpTime> opTime;
+    boost::optional<OID> electionId;
+    absl::flat_hash_map<int, int> retryAttemptsForDup;
+
+    commit_result::Result result;
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        result = commitTimeseriesBucketForBatch(
+            _opCtx, batch, request, preConditions, errors, opTime, electionId, retryAttemptsForDup);
+        EXPECT_EQ(1, failPoint->waitForNNewEntries(0))
+            << "Expected exactly one injected write conflict during the bucket insert";
+    }
+
+    EXPECT_TRUE(std::holds_alternative<commit_result::Success>(result));
+    EXPECT_TRUE(errors.empty());
+    bucket_catalog::finish(bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext()),
+                           batch);
+
+    // The retried insert persisted exactly one bucket document holding the single measurement.
+    AutoGetCollection bucketsColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    ASSERT(bucketsColl);
+    EXPECT_EQ(1, bucketsColl->numRecords(_opCtx));
+
+    auto cursor = bucketsColl->getRecordStore()->getCursor(
+        _opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
+    auto record = cursor->next();
+    ASSERT(record);
+    const auto control = record->data.toBson().getObjectField(timeseries::kBucketControlFieldName);
+    EXPECT_EQ(1, control[timeseries::kBucketControlCountFieldName].numberInt());
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, CompressionFailureReportsUserBatchIndexForPartialBatch) {
+    const std::vector<BSONObj> userBatch{
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(1)),
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(2)),
+        BSON(_metaField << _metaValue << _timeField << Date_t::fromMillisSinceEpoch(3)),
+    };
+    auto request = _createInsertCommandRequest(_ns1, userBatch);
+
+    auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+        _opCtx, _ns1, request, /*expectedUUID=*/boost::none);
+
+    const auto initialTimesEntered =
+        write_ops_utils::timeseriesDataIntegrityCheckFailureInsert.setMode(FailPoint::Mode::nTimes,
+                                                                           1);
+
+    std::vector<mongo::write_ops::WriteError> errors;
+    boost::optional<repl::OpTime> opTime;
+    boost::optional<OID> electionId;
+    bool containsRetry = false;
+
+    // Write only the last measurement of the user batch, as the ordered path does when it falls
+    // back to writing each measurement individually.
+    performUnorderedTimeseriesWritesWithRetries(_opCtx,
+                                                request,
+                                                preConditions,
+                                                /*start=*/2,
+                                                /*numDocs=*/1,
+                                                bucket_catalog::AllowQueryBasedReopening::kAllow,
+                                                &errors,
+                                                &opTime,
+                                                &electionId,
+                                                &containsRetry);
+
+    EXPECT_EQ(
+        write_ops_utils::timeseriesDataIntegrityCheckFailureInsert.setMode(FailPoint::Mode::off),
+        initialTimesEntered + 1);
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_EQ(errors.front().getStatus(), ErrorCodes::TimeseriesBucketCompressionFailed);
+    EXPECT_EQ(errors.front().getIndex(), 2);
 }
 
 }  // namespace

@@ -1,132 +1,66 @@
 /**
- * Tests resharding correctness when shard nodes are under the ingress request rate limiter
- * (IRRL). Resharding coordinator connections (NetworkInterfaceTL-Resharding*) and inter-shard
- * commands routed through ShardRemote (NetworkInterfaceTL-Sharding-Fixed) are exempt, so
- * coordinator scatter-gather, critical-section, abort, index builds, and oplog fetch are
- * unaffected by the rate limiter. Document cloning uses NetworkInterfaceTL-TaskExecutorPool
- * (not exempt), so recipient→donor clone connections receive IngressRequestRateLimitExceeded
- * (462) when the bucket is exhausted and must retry.
+ * Tests resharding correctness under the ingress request rate limiter (IRRL).
  *
- * The IRRL is enabled with burst capacity zero and a near-zero refill rate so that every
- * non-exempt connection is immediately rejected. Resharding coordinator pause failpoints gate
- * the IRRL enable/disable at precise phase boundaries, avoiding timing races.
+ * Index builds and oplog fetch route through NetworkInterfaceTL-Sharding-Fixed (exempt).
+ * Document cloning uses NetworkInterfaceTL-TaskExecutorPool (not exempt) and retries on
+ * IngressRequestRateLimitExceeded (log 5269300) until IRRL clears.
+ *
+ * The coordinator commit/abort cleanup calls resumeMigrations → setAllowChunkOperations, which
+ * broadcasts ShardsvrSetAllowChunkOperations to all shards. This broadcast now uses
+ * Grid::getExecutorPool()->getFixedExecutor() (NetworkInterfaceTL-Sharding-Fixed, exempt), so
+ * the commit/abort path is not rate-limited even when IRRL is active on participant shards.
+ *
+ * IRRL is configured with zero burst so every non-exempt connection is immediately rejected.
+ * Phase-boundary failpoints gate enable/disable to eliminate timing races.
  *
  * Five scenarios, ordered by resharding phase:
  *
- *   1. Transient IngressRequestRateLimitExceeded during document cloning:
- *      Coordinator paused before initialization; IRRL engaged on shard nodes. The
- *      initialization scatter-gather uses NetworkInterfaceTL-ReshardingCoordinatorService-
- *      Network (exempt) and succeeds. Subsequent document cloning (TaskExecutorPool, not
- *      exempt) receives IngressRequestRateLimitExceeded and retries until IRRL clears.
- *      Verified via log 5269300 on the recipient.
+ *   1. Cloning: IRRL engaged just before clone connections open. NetworkInterfaceTL-TaskExecutorPool
+ *      connections are rejected; cloning retries (log 5269300) until IRRL clears.
  *
- *   2. IRRL active during index builds does not disrupt resharding:
- *      reshardingPauseRecipientBeforeBuildingIndex gates IRRL enable to the precise moment
- *      cloning ends and index builds begin. getCollectionOptions and index build commands route
- *      through ShardRemote::_runCommand → getFixedExecutor() → NetworkInterfaceTL-Sharding-Fixed,
- *      which is in the exemption list. IRRL therefore has no effect on this phase. The test
- *      confirms resharding commits with the correct full index set despite IRRL being active.
+ *   2. Index builds: IRRL engaged at reshardingPauseRecipientBeforeBuildingIndex, cleared at
+ *      reshardingPauseRecipientBeforeOplogApplication. Index build commands use
+ *      NetworkInterfaceTL-Sharding-Fixed (exempt) and complete unaffected.
  *
- *   3. IRRL active during oplog application does not disrupt resharding:
- *      reshardingPauseRecipientBeforeOplogApplication gates the applying phase. The oplog
- *      fetcher calls shard->runAggregation, which routes through ShardRemote::_runAggregation
- *      → getFixedExecutor() → NetworkInterfaceTL-Sharding-Fixed (exempt). IRRL therefore has
- *      no effect on oplog fetch connections. The test confirms resharding commits normally
- *      despite IRRL being active on shard nodes during the applying phase.
+ *   3. Oplog application: IRRL engaged at reshardingPauseRecipientBeforeOplogApplication, cleared
+ *      at reshardingPauseRecipientBeforeEnteringStrictConsistency. Oplog fetch uses
+ *      NetworkInterfaceTL-Sharding-Fixed (exempt) and completes unaffected.
  *
- *   4. Critical section commits despite IRRL being active:
- *      IRRL is engaged just before the critical section. All coordinator operations in the
- *      critical section use NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork (covered
- *      by the "NetworkInterfaceTL-Resharding" prefix exemption), so they succeed regardless
- *      of the rate limiter. Resharding commits correctly, demonstrating that the exemption
- *      list is correctly designed for production robustness.
+ *   4. Critical section and commit: IRRL engaged at reshardingPauseCoordinatorBeforeBlockingWrites
+ *      and kept active through returnData(). All coordinator RPCs in the critical section and
+ *      commit path use NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork (exempt via the
+ *      NetworkInterfaceTL-Reshard prefix) and setAllowChunkOperations uses Sharding-Fixed (exempt),
+ *      so the full commit completes without clearing IRRL.
  *
- *   5. Abort via abortReshardCollection while IRRL is active:
- *      IRRL is engaged while resharding is mid-cloning. abortReshardCollection is then issued
- *      via an exempt connection. The abort scatter-gather uses
- *      NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork (exempt) so it completes
- *      without needing the IRRL cleared. The original collection is intact and no orphaned
- *      system.resharding.* collections remain.
+ *   5. Abort: IRRL engaged mid-cloning, abortReshardCollection issued via exempt connection.
+ *      IRRL remains active through both returnData() calls. All coordinator abort RPCs use
+ *      NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork (exempt), so the full abort
+ *      completes without clearing IRRL.
+ *
+ * KNOWN TEST GAP — participant calculation phase:
+ *   calculateParticipantShardsAndChunks routes through NetworkInterfaceTL-TaskExecutorPool on
+ *   the config server but cannot be tested deterministically: by the time the test
+ *   runs, existing pooled connections are reused regardless of IRRL state.
  *
  * @tags: [requires_fcv_83]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
-import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
+    disableRateLimiter,
+    enableZeroBurstRateLimiter,
     kExemptions,
     kRateLimiterExemptAppName,
-    kSlowestRefreshRateSecs,
+    makeKeyfileExemptConn,
 } from "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js";
 
 const kKeyFile = "jstests/libs/key1";
 const kUser = "admin";
 const kPass = "pwd";
 const kNumDocs = 10;
-
-/**
- * This enables an overloaded IRRL on conn with near-zero burst capacity and a near-zero refill rate.
- * Every non-exempt connection is immediately rejected with IngressRequestRateLimitExceeded.
- * Coordinator/Sharding-Fixed internal clients are exempt via kExemptions, while cloning traffic
- * via NetworkInterfaceTL-TaskExecutorPool is not exempt and is expected to hit this error.
- */
-function enableZeroBurstRateLimiter(conn) {
-    authutil.asCluster(conn, kKeyFile, () => {
-        configureFailPoint(conn, "ingressRequestRateLimiterFractionalRateOverride", {
-            rate: kSlowestRefreshRateSecs,
-        });
-        assert.commandWorked(
-            conn.adminCommand({
-                setParameter: 1,
-                ingressRequestAdmissionRatePerSec: 1,
-                // Effective burstSize = rateOverride × burstCapacitySecs = 5e-6 × 5e-6 = 2.5e-11 tokens.
-                // A single request costs 1 token, so the bucket can never accumulate a usable token and every
-                // non-exempt connection is immediately rejected. The rate override keeps refill at 5e-6 tokens/s,
-                // so the bucket never accumulates a usable token.
-                ingressRequestAdmissionBurstCapacitySecs: kSlowestRefreshRateSecs,
-                ingressRequestRateLimiterApplicationExemptions: {appNames: kExemptions},
-                ingressRequestRateLimiterEnabled: 1,
-            }),
-        );
-    });
-}
-
-/**
- * Disables the IRRL on the node at host. Opens a fresh exempt connection so it succeeds
- * even while the rate limiter is active (exempt connections bypass the token bucket).
- */
-function disableRateLimiter(host) {
-    const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
-    authutil.asCluster(conn, kKeyFile, () => {
-        assert.commandWorked(
-            conn.adminCommand({
-                setParameter: 1,
-                ingressRequestAdmissionRatePerSec: Math.pow(2, 31) - 1,
-                ingressRequestAdmissionBurstCapacitySecs: Number.MAX_VALUE,
-                ingressRequestRateLimiterEnabled: 0,
-            }),
-        );
-    });
-}
-
-/**
- * Opens an exempt connection to host authenticated as __system via keyfile SCRAM-SHA-256.
- * Used for getLog polling and other privileged operations on direct shard connections.
- * The exempt appName bypasses the rate limiter; __system auth is necessary because the
- * admin/pwd user is stored on the config server and cannot authenticate on direct shard
- * connections in a keyfile-auth cluster.
- */
-function makeKeyfileExemptConn(host) {
-    const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
-    authutil.assertAuthenticate(conn, "admin", {
-        user: "__system",
-        mechanism: "SCRAM-SHA-256",
-        pwd: cat(kKeyFile).replace(/[\011-\015\040]/g, ""),
-    });
-    return conn;
-}
 
 function runResharding(mongosHost, appName, user, pass, recipientShardName) {
     const conn = new Mongo(`mongodb://${mongosHost}/?appName=${appName}`);
@@ -181,18 +115,30 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         st.stop();
     });
 
-    // Safety net: disable IRRL on all shards after every test regardless of how the test exited.
+    // Disable IRRL before and after each test so DDL in resetCollection() and resmoke's
+    // inter-test FCV/feature-flag setParameter calls are never rate-limited.
+    beforeEach(function () {
+        disableIRRLOnAllShards();
+    });
+
     afterEach(function () {
         disableIRRLOnAllShards();
     });
 
-    // Drops test.coll and recreates it sharded on {oldKey:1} with kNumDocs documents.
-    // oldKey and newKey are equal per document so integrity can be verified regardless of
-    // whether resharding committed (collection now on newKey) or aborted (still on oldKey).
+    // Drops and recreates test.coll sharded on {oldKey:1}. oldKey === newKey per document so
+    // integrity checks work whether resharding committed or aborted.
     function resetCollection() {
         exemptConn.getDB("test").coll.drop();
         assert.commandWorked(
             exemptConn.adminCommand({shardCollection: "test.coll", key: {oldKey: 1}}),
+        );
+        assert.commandWorked(exemptConn.adminCommand({split: "test.coll", middle: {oldKey: 5}}));
+        assert.commandWorked(
+            exemptConn.adminCommand({
+                moveChunk: "test.coll",
+                find: {oldKey: 9},
+                to: recipientShardName,
+            }),
         );
         const coll = exemptConn.getDB("test").coll;
         for (let i = 0; i < kNumDocs; i++) {
@@ -200,7 +146,6 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         }
     }
 
-    // Asserts all kNumDocs documents are present.
     function assertDocumentsIntact() {
         const coll = exemptConn.getDB("test").coll;
         assert.eq(coll.countDocuments({}), kNumDocs, "document count mismatch");
@@ -209,7 +154,6 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         }
     }
 
-    // Starts a reshardCollection Thread and returns it already running.
     function startReshardThread() {
         const thread = new Thread(
             runResharding,
@@ -223,86 +167,105 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         return thread;
     }
 
-    // Disables IRRL on every shard primary. Called from afterEach (safety net) and from
-    // each test's finally block (primary cleanup) and within tests that must clear the
-    // limiter before letting resharding proceed.
     function disableIRRLOnAllShards() {
         shardPrimaries.forEach((node) => disableRateLimiter(node.host));
     }
 
-    // Verifies IRRL is actively rejecting on the shard primaries by routing a find from
-    // exemptConn (mongos) through NetworkInterfaceTL-TaskExecutorPool (not in kExemptions)
-    // to the donor shard. With zero-burst config the very first attempt is rejected.
+    // Enables zero-burst IRRL on every shard primary. This cluster starts without the
+    // ingressRequestRateLimiterFractionalRateOverride failpoint, so setRefreshRateFailpoint keeps
+    // the token bucket effectively empty for the whole time IRRL is enabled.
+    function enableIRRLOnAllShards() {
+        shardPrimaries.forEach((node) =>
+            enableZeroBurstRateLimiter(node, kExemptions, {
+                setRefreshRateFailpoint: true,
+                useKeyFileAuth: true,
+            }),
+        );
+    }
+
+    // Confirms IRRL is actively rejecting by issuing a find that routes through
+    // NetworkInterfaceTL-TaskExecutorPool (not exempt) from mongos to each shard.
     function assertIRRLActiveOnShards() {
+        const db = exemptConn.getDB("test");
         assert.commandFailedWithCode(
-            exemptConn.getDB("test").runCommand({find: "coll", filter: {oldKey: 0}, limit: 1}),
+            db.runCommand({find: "coll", filter: {oldKey: 0}, limit: 1}),
             ErrorCodes.IngressRequestRateLimitExceeded,
             "IRRL must actively reject TaskExecutorPool connections after zero-burst enable",
+        );
+        assert.commandFailedWithCode(
+            db.runCommand({find: "coll", filter: {oldKey: 9}, limit: 1}),
+            ErrorCodes.IngressRequestRateLimitExceeded,
+            "IRRL must actively reject TaskExecutorPool connections on both shards after zero-burst enable",
         );
     }
 
     // ---- Phase 1: document cloning -------------------------------------------------------------
 
-    it("retries IngressRequestRateLimitExceeded on initializing scatter-gather and commits", function () {
+    it("retries IngressRequestRateLimitExceeded during document cloning and commits", function () {
         resetCollection();
 
-        // Pause the coordinator before initialization. Enable a zero-burst IRRL on shard
-        // nodes while the coordinator is paused. The initialization scatter-gather uses
-        // NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork (exempt) and succeeds.
-        // Subsequent document cloning opens TaskExecutorPool connections from recipient to
-        // donor shards; those are not exempt and receive IngressRequestRateLimitExceeded. The cloning layer retries with
-        // exponential backoff until the IRRL is cleared.
+        // Pause at reshardingPauseRecipientBeforeCloning so IRRL is engaged after all init
+        // scatter-gathers complete and just before clone connections open. Clone connections
+        // use NetworkInterfaceTL-TaskExecutorPool (not exempt) and are rejected; the cloning
+        // layer retries until IRRL clears (log 5269300).
         const pauseFp = configureFailPoint(
-            configPrimary,
-            "reshardingPauseCoordinatorBeforeInitializing",
+            st.rs1.getPrimary(),
+            "reshardingPauseRecipientBeforeCloning",
+        );
+        // Gate on reshardingPauseRecipientBeforeOplogApplication (fires after cloning and index
+        // builds complete) to confirm IRRL was active for the full cloning phase before clearing it.
+        const postCloningFp = configureFailPoint(
+            st.rs1.getPrimary(),
+            "reshardingPauseRecipientBeforeOplogApplication",
         );
         const reshardThread = startReshardThread();
         pauseFp.wait();
 
         const pollConn = makeKeyfileExemptConn(shardPrimaries[1].host);
-        // Snapshot totalLinesWritten before enabling IRRL. This anchors the log search to
-        // entries written after IRRL was engaged, preventing false positives from 5269300
-        // entries left in the ring buffer by earlier test iterations.
+        // Snapshot log position before enabling IRRL to avoid false-positive 5269300 matches
+        // from earlier test iterations still in the ring buffer.
         const baselineTotalLines = pollConn.adminCommand({getLog: "global"}).totalLinesWritten;
 
-        shardPrimaries.forEach(enableZeroBurstRateLimiter);
+        enableIRRLOnAllShards();
         assertIRRLActiveOnShards();
         pauseFp.off();
 
         try {
-            // Wait until at least one IRRL-triggered cloner retry (log 5269300) appears on
-            // the recipient. Once confirmed the spike is real; clear the limiter so the
-            // next retry can succeed.
-            assert.soon(
-                () => {
-                    const res = pollConn.adminCommand({getLog: "global"});
-                    if (!res.ok) return false;
-                    const bufferStart = res.totalLinesWritten - res.log.length;
-                    return res.log
-                        .slice(Math.max(0, baselineTotalLines - bufferStart))
-                        .some((line) => {
-                            try {
-                                const entry = JSON.parse(line);
-                                return (
-                                    entry.id === 5269300 &&
-                                    typeof entry.attr?.error === "string" &&
-                                    entry.attr.error.startsWith("IngressRequestRateLimitExceeded")
-                                );
-                            } catch (e) {
-                                return false;
-                            }
-                        });
-                },
-                "Expected at least one IRRL-triggered cloner retry (log 5269300) on recipient",
-                30000,
-            );
+            // Wait for at least one IRRL-triggered cloner retry (log 5269300).
+            assert.soon(() => {
+                const res = pollConn.adminCommand({getLog: "global"});
+                if (!res.ok) return false;
+                const bufferStart = res.totalLinesWritten - res.log.length;
+                return res.log.slice(Math.max(0, baselineTotalLines - bufferStart)).some((line) => {
+                    try {
+                        const entry = JSON.parse(line);
+                        return (
+                            entry.id === 5269300 &&
+                            typeof entry.attr?.error === "string" &&
+                            entry.attr.error.startsWith("IngressRequestRateLimitExceeded")
+                        );
+                    } catch (e) {
+                        return false;
+                    }
+                });
+            }, "Expected at least one IRRL-triggered cloner retry (log 5269300) on recipient");
+
+            // Cloning is blocked by IRRL, so IRRL must be cleared first to let cloning complete.
+            // (postCloningFp cannot be waited on before this: it fires only after cloning finishes,
+            // which cannot happen while IRRL is active.) Once IRRL is cleared, waiting on
+            // postCloningFp (reshardingPauseRecipientBeforeOplogApplication) is the deterministic
+            // boundary confirming cloning actually completed before the test proceeds to
+            // returnData(); it is then released.
             disableIRRLOnAllShards();
+            postCloningFp.wait();
+            postCloningFp.off();
 
             assert.commandWorked(
                 reshardThread.returnData(),
-                "resharding must commit after transient IngressRequestRateLimitExceeded during initialization",
+                "resharding must commit after transient IngressRequestRateLimitExceeded during document cloning",
             );
         } finally {
+            postCloningFp.off(); // idempotent safety net
             disableIRRLOnAllShards();
             try {
                 reshardThread.returnData();
@@ -316,44 +279,41 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
     it("resharding encounters IngressRequestRateLimitExceeded during index builds and commits with correct index count", function () {
         resetCollection();
 
-        // Add a secondary index whose leading field is oldKey so it is NOT a prefix cover
-        // for the new shard key {newKey:1}. The recipient must therefore build a separate
-        // newKey_1 shard key index, making the full index set independently verifiable.
+        // Add a secondary index that is not a prefix cover for the new shard key {newKey:1},
+        // forcing the recipient to build a separate newKey_1 index. Expected after resharding:
+        //   _id_, oldKey_1, oldKey_1_newKey_1, newKey_1  (4 total)
         assert.commandWorked(exemptConn.getDB("test").coll.createIndex({oldKey: 1, newKey: 1}));
-
-        // After resharding to {newKey:1} the collection must carry all indexes from the
-        // source collection plus the new shard key index:
-        //   _id_              (always present)
-        //   oldKey_1          (original shard key, preserved as a secondary index)
-        //   oldKey_1_newKey_1 (secondary index carried over from source)
-        //   newKey_1          (new shard key index built by the recipient)
         const kExpectedIndexCount = 4;
+
         const pauseFp = configureFailPoint(
             st.rs1.getPrimary(),
             "reshardingPauseRecipientBeforeBuildingIndex",
         );
+        // Gate on reshardingPauseRecipientBeforeOplogApplication to confirm IRRL was active
+        // for the full index-build phase before clearing it.
+        const postIndexFp = configureFailPoint(
+            st.rs1.getPrimary(),
+            "reshardingPauseRecipientBeforeOplogApplication",
+        );
         const reshardThread = startReshardThread();
         pauseFp.wait();
 
-        // getCollectionOptions and index build commands route through ShardRemote::_runCommand →
-        // getFixedExecutor() → NetworkInterfaceTL-Sharding-Fixed, which is in kExemptions.
-        // IRRL never rejects these connections; the test confirms resharding commits with the
-        // correct index set regardless of IRRL being active on shard nodes at this boundary.
-        shardPrimaries.forEach(enableZeroBurstRateLimiter);
+        // Index builds route through ShardRemote::_runCommand → NetworkInterfaceTL-Sharding-Fixed
+        // (exempt), so IRRL has no effect on this phase.
+        enableIRRLOnAllShards();
         assertIRRLActiveOnShards();
         pauseFp.off();
 
-        try {
-            assert.commandWorked(
-                reshardThread.returnData(),
-                "resharding must commit with IRRL active during index builds",
-            );
-        } finally {
-            disableIRRLOnAllShards();
-            try {
-                reshardThread.returnData();
-            } catch (e) {}
-        }
+        // IRRL is only exercised during the index-build phase. Disable it before resharding
+        // proceeds to the commit phase, which is covered separately by test case 4.
+        postIndexFp.wait();
+        disableIRRLOnAllShards();
+        postIndexFp.off();
+
+        assert.commandWorked(
+            reshardThread.returnData(),
+            "resharding must commit with IRRL active during index builds",
+        );
         assertDocumentsIntact();
 
         const indexes = exemptConn.getDB("test").coll.getIndexes();
@@ -382,42 +342,43 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
             st.rs1.getPrimary(),
             "reshardingPauseRecipientBeforeOplogApplication",
         );
+        // Gate on reshardingPauseRecipientBeforeEnteringStrictConsistency (fires after
+        // awaitStrictlyConsistent()) to confirm IRRL was active for the full oplog-application
+        // phase before clearing it.
+        const postOplogFp = configureFailPoint(
+            st.rs1.getPrimary(),
+            "reshardingPauseRecipientBeforeEnteringStrictConsistency",
+        );
         const reshardThread = startReshardThread();
         pauseFp.wait();
 
-        // ReshardingOplogFetcher::consume calls shard->runAggregation, which routes through
-        // ShardRemote::_runAggregation → getFixedExecutor() → NetworkInterfaceTL-Sharding-Fixed.
-        // That executor is in kExemptions, so IRRL never rejects oplog fetch connections. The
-        // test verifies resharding commits normally despite IRRL being active on shard nodes.
-        shardPrimaries.forEach(enableZeroBurstRateLimiter);
+        // Oplog fetch routes through ShardRemote::_runAggregation → NetworkInterfaceTL-Sharding-Fixed
+        // (exempt), so IRRL has no effect on this phase.
+        enableIRRLOnAllShards();
         assertIRRLActiveOnShards();
         pauseFp.off();
 
-        try {
-            assert.commandWorked(
-                reshardThread.returnData(),
-                "resharding must commit with IRRL active during oplog application",
-            );
-        } finally {
-            disableIRRLOnAllShards();
-            try {
-                reshardThread.returnData();
-            } catch (e) {}
-        }
+        postOplogFp.wait();
+        disableIRRLOnAllShards();
+        postOplogFp.off();
+
+        assert.commandWorked(
+            reshardThread.returnData(),
+            "resharding must commit after IRRL active during oplog application",
+        );
         assertDocumentsIntact();
     });
 
     // ---- Phase 4: critical section / commit ----------------------------------------------------
 
-    it("critical section commits despite IRRL because coordinator connections are exempt", function () {
+    it("commit completes with IRRL active throughout critical section and commit because all coordinator connections are exempt", function () {
         resetCollection();
 
-        // Pause the coordinator at the critical section entry point (after initialization
-        // and cloning are complete). Enable zero-burst IRRL on shard nodes, then release
-        // the pause. All coordinator operations in the critical section use
-        // NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork, covered by the
-        // "NetworkInterfaceTL-Resharding" prefix in the exemption list. Resharding
-        // therefore commits normally without any IngressRequestRateLimitExceeded errors on the coordinator path.
+        // Pause at reshardingPauseCoordinatorBeforeBlockingWrites so IRRL is active for the
+        // entire critical section entry and commit phase. All coordinator RPCs in this phase use
+        // NetworkInterfaceTL-ReshardingCoordinatorServiceNetwork (exempt via the
+        // NetworkInterfaceTL-Reshard prefix), and setAllowChunkOperations uses Sharding-Fixed
+        // (exempt). IRRL stays active through returnData() to verify the full commit path.
         const pauseFp = configureFailPoint(
             configPrimary,
             "reshardingPauseCoordinatorBeforeBlockingWrites",
@@ -425,31 +386,27 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         const reshardThread = startReshardThread();
         pauseFp.wait();
 
-        shardPrimaries.forEach(enableZeroBurstRateLimiter);
+        enableIRRLOnAllShards();
         assertIRRLActiveOnShards();
         pauseFp.off();
 
-        try {
-            assert.commandWorked(
-                reshardThread.returnData(),
-                "critical section must commit because coordinator connections are exempt",
-            );
-        } finally {
-            disableIRRLOnAllShards();
-            try {
-                reshardThread.returnData();
-            } catch (e) {}
-        }
+        assert.commandWorked(
+            reshardThread.returnData(),
+            "resharding must commit with IRRL active throughout critical section and commit",
+        );
+        disableIRRLOnAllShards();
         assertDocumentsIntact();
     });
 
     // ---- Abort path ----------------------------------------------------------------------------
 
-    it("aborts cleanly via abortReshardCollection while IRRL is active", function () {
+    it("abort completes with IRRL active throughout because all coordinator abort connections are exempt", function () {
         resetCollection();
 
-        // Pause the recipient's collection cloner before each attempt. This fires on the
-        // recipient (rs1) and gives a deterministic point at which to engage the IRRL.
+        // Pause mid-cloning to engage IRRL before abort is triggered. All coordinator RPCs in
+        // the abort path (_tellAllParticipantsToAbort, _awaitAllParticipantShardsDone, and
+        // setAllowChunkOperations) use exempt executors, so IRRL stays active through both
+        // returnData() calls to verify the full abort path is exempt.
         const clonerPauseFp = configureFailPoint(
             st.rs1.getPrimary(),
             "reshardingCollectionClonerPauseBeforeAttempt",
@@ -457,12 +414,9 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         const reshardThread = startReshardThread();
         clonerPauseFp.wait();
 
-        shardPrimaries.forEach(enableZeroBurstRateLimiter);
+        enableIRRLOnAllShards();
         assertIRRLActiveOnShards();
 
-        // Issue abortReshardCollection in a Thread so we can concurrently release the cloner.
-        // abortReshardCollection routes via NetworkInterfaceTL-ReshardingCoordinatorService-
-        // Network (exempt), so the command reaches the config server despite IRRL on shards.
         const abortReshardThread = new Thread(
             function (host, appName, user, pass) {
                 const conn = new Mongo(`mongodb://${host}/?appName=${appName}`);
@@ -479,20 +433,18 @@ describe("resharding handles IngressRequestRateLimitExceeded from shard nodes", 
         try {
             abortReshardThread.start();
             abortThreadStarted = true;
-            // Release the cloner so the abort's blocking getNoThrow can resolve. The abort
-            // fires quickly via the coordinator's exempt connections, cancelling the recipient's
-            // abort token before the cloner can make progress under IRRL.
             clonerPauseFp.off();
 
             assert.commandWorked(
                 abortReshardThread.returnData(),
-                "abortReshardCollection must succeed even while IRRL is active",
+                "abortReshardCollection must succeed with IRRL active",
             );
             assert.commandFailedWithCode(
                 reshardThread.returnData(),
                 [ErrorCodes.ReshardCollectionAborted],
                 "resharding must abort when abortReshardCollection is called under IRRL",
             );
+            disableIRRLOnAllShards();
         } finally {
             clonerPauseFp.off(); // idempotent safety net
             disableIRRLOnAllShards();

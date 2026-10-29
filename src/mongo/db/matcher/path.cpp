@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/path.h"
 
@@ -189,7 +163,8 @@ bool BSONElementIterator::subCursorHasMore() {
         // If the subcursor doesn't have more, see if the current element is an array offset
         // match (see comment in BSONElementIterator::more() for an example).  If it is indeed
         // an array offset match, create a new subcursor and examine it.
-        if (_arrayIterationState.isArrayOffsetMatch(_arrayIterationState._current.fieldName())) {
+        if (_arrayIterationState.isArrayOffsetMatch(
+                _arrayIterationState._current.fieldNameStringData())) {
             if (_arrayIterationState.nextEntireRest()) {
                 // Our path terminates at the array offset.  _next should point at the current
                 // array element. _next._arrayOffset should be EOO, since this is not an implicit
@@ -232,6 +207,7 @@ bool BSONElementIterator::more() {
         return false;
     }
 
+    bool emptyArray = false;
     if (_state == BEGIN) {
         if (_traversalStart.type() != BSONType::array) {
             _next.reset(_traversalStart, BSONElement());
@@ -240,6 +216,7 @@ bool BSONElementIterator::more() {
         }
 
         // It's an array.
+        emptyArray = true;
 
         _arrayIterationState.reset(_path->fieldRef(), _traversalStartIndex + 1);
 
@@ -295,7 +272,8 @@ bool BSONElementIterator::more() {
                 if (subCursorHasMore()) {
                     return true;
                 }
-            } else if (_arrayIterationState.isArrayOffsetMatch(eltInArray.fieldName())) {
+                emptyArray = false;
+            } else if (_arrayIterationState.isArrayOffsetMatch(eltInArray.fieldNameStringData())) {
                 // The path we're traversing has an array offset component, and the current
                 // array element corresponds to the offset we're looking for (for example: our
                 // path has a ".0" component, and we're looking at the first element of the
@@ -333,11 +311,25 @@ bool BSONElementIterator::more() {
                     if (subCursorHasMore()) {
                         return true;
                     }
+                    emptyArray = false;
                 }
+            } else if (!_path->legacyDottedPathNullSemantics() &&
+                       !_arrayIterationState.nextPieceOfPathIsNumber) {
+                // We cannot traverse the path of this element, so return an empty element
+                // to check for a match against eoo.
+                // Do not set done, we will go to the next element next time if no match.
+                _next.reset(BSONElement(), BSONElement());
+                return true;
             }
         }
 
         if (_arrayIterationState.hasMore) {
+            if (!_path->legacyDottedPathNullSemantics() && emptyArray) {
+                // An empty array, but we have more path to check.
+                // Return true so that the matcher can check whether eoo matches.
+                _state = DONE;
+                return true;
+            }
             return false;
         }
 

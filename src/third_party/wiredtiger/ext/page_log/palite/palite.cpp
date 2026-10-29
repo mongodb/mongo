@@ -139,6 +139,7 @@
 
 #include "wiredtiger.h"
 #include "wiredtiger_ext.h"
+#include "victim_cache.h"
 
 #include <sqlite3.h>
 
@@ -354,8 +355,11 @@ now_us()
 struct Config {
     WT_EXTENSION_API *extapi = nullptr; /* WiredTiger extension API */
 
-    std::filesystem::path home_dir;        /* Home directory for the extension */
-    uint32_t cache_size_mb = 1'024;        /* Size of cache in megabytes (default) */
+    std::filesystem::path home_dir; /* Home directory for the extension */
+    uint32_t cache_size_mb = 1'024; /* Size of cache in megabytes (default) */
+    /* The victim cache is off unless one of these is set; a zero bound is no limit. */
+    uint32_t victim_cache_max_entries = 0; /* Entries per handle */
+    uint32_t victim_cache_size_mb = 0;     /* Megabytes in total */
     uint32_t mmap_size_mb = 1'024;         /* Size of memory map in megabytes (default) */
     uint32_t delay_ms = 0;                 /* Average length of delay when simulated */
     uint32_t error_ms = 0;                 /* Average length of sleep when simulated */
@@ -378,6 +382,8 @@ struct Config {
 
         configure_value(parser.get(), config, "home", home_dir);
         configure_value(parser.get(), config, "cache_size_mb", cache_size_mb);
+        configure_value(parser.get(), config, "victim_cache_max_entries", victim_cache_max_entries);
+        configure_value(parser.get(), config, "victim_cache_size_mb", victim_cache_size_mb);
         configure_value(parser.get(), config, "mmap_size_mb", mmap_size_mb);
         configure_value(parser.get(), config, "delay_ms", delay_ms);
         configure_value(parser.get(), config, "error_ms", error_ms);
@@ -468,12 +474,14 @@ template <> struct std::formatter<Config> {
     format(const Config &cfg, format_context &ctx) const
     {
         return std::format_to(ctx.out(),
-          "{{cache_size_mb={:L}, mmap_size_mb={:L}, delay_ms={}, error_ms={}, force_delay={}, "
+          "{{cache_size_mb={:L}, victim_cache_max_entries={:L}, victim_cache_size_mb={:L}, "
+          "mmap_size_mb={:L}, delay_ms={}, error_ms={}, force_delay={}, "
           "force_error={}, materialization_delay_ms={}, last_materialized_lsn={}, "
           "verbose={}, verbose_msg={}, sql_trace={}, verify={}}}",
-          cfg.cache_size_mb, cfg.mmap_size_mb, cfg.delay_ms, cfg.error_ms, cfg.force_delay,
-          cfg.force_error, cfg.materialization_delay_ms, cfg.last_materialized_lsn, cfg.verbose,
-          cfg.verbose_msg, cfg.sql_trace, cfg.verify);
+          cfg.cache_size_mb, cfg.victim_cache_max_entries, cfg.victim_cache_size_mb,
+          cfg.mmap_size_mb, cfg.delay_ms, cfg.error_ms, cfg.force_delay, cfg.force_error,
+          cfg.materialization_delay_ms, cfg.last_materialized_lsn, cfg.verbose, cfg.verbose_msg,
+          cfg.sql_trace, cfg.verify);
     }
 };
 
@@ -557,14 +565,26 @@ log_and_throw(
 
 #define LOG_AND_THROW(...) log_and_throw(std::source_location::current(), config, __VA_ARGS__)
 
+template <typename R>
+static R
+safe_call_failure(int err)
+{
+    if constexpr (std::is_same_v<R, bool>)
+        return false;
+    else
+        return err;
+}
+
 /* Exception-safe template method that catches C++ exceptions */
 template <typename T, typename S, typename MemberFunc, typename... Args>
-static int
+static auto
 safe_call(WT_SESSION *sess, S *api, MemberFunc func, Args &&...args)
+  -> std::invoke_result_t<MemberFunc, T *, Args...>
 {
-    if (!api) {
-        return EINVAL;
-    }
+    using R = std::invoke_result_t<MemberFunc, T *, Args...>;
+
+    if (!api)
+        return safe_call_failure<R>(EINVAL);
 
     session(sess);
     /* std::unique_ptr is used as a simple scope guard to reset the session upon function exit */
@@ -576,28 +596,28 @@ safe_call(WT_SESSION *sess, S *api, MemberFunc func, Args &&...args)
         return std::invoke(func, obj, std::forward<Args>(args)...);
     } catch (const PaliteException &) {
         LOG_ERROR("Call failed");
-        return EINVAL;
+        return safe_call_failure<R>(EINVAL);
     } catch (const std::bad_alloc &e) {
         LOG_ERROR("Memory allocation failed: {}", e.what());
-        return ENOMEM;
+        return safe_call_failure<R>(ENOMEM);
     } catch (const std::invalid_argument &e) {
         LOG_ERROR("Invalid argument: {}", e.what());
-        return EINVAL;
+        return safe_call_failure<R>(EINVAL);
     } catch (const std::filesystem::filesystem_error &e) {
         LOG_ERROR("Filesystem error: {}", e.what());
-        return e.code().value();
+        return safe_call_failure<R>(e.code().value());
     } catch (const std::system_error &e) {
         LOG_ERROR("System error: {}", e.what());
-        return e.code().value();
+        return safe_call_failure<R>(e.code().value());
     } catch (const std::runtime_error &e) {
         LOG_ERROR("Runtime error: {}", e.what());
-        return EINVAL;
+        return safe_call_failure<R>(EINVAL);
     } catch (const std::exception &e) {
         LOG_ERROR("Exception: {}", e.what());
-        return EINVAL;
+        return safe_call_failure<R>(EINVAL);
     } catch (...) {
         LOG_ERROR("Unknown error occurred");
-        return EFAULT;
+        return safe_call_failure<R>(EFAULT);
     }
 }
 
@@ -1199,17 +1219,15 @@ struct Checkpoints : public Table<Checkpoints> {
 
         /*
          * Get the latest checkpoint (i.e., checkpoint with the highest lsn) if query lsn equals to
-         * WT_PAGE_LOG_LSN_MAX ( passed as parameter: ?2); otherwise get the checkpoint with the
-         * given lsn.
+         * 0; otherwise get the checkpoint with the given lsn. If no checkpoint exists with the
+         * given lsn, the next closest checkpoint is returned.
          */
         stmt[GET_CHECKPOINT] =
           R"(SELECT lsn, timestamp, checkpoint_metadata
              FROM checkpoints
-             WHERE (?1 = ?2 OR lsn = ?1)
-             ORDER BY
-                 lsn DESC,
-                 timestamp DESC
-             LIMIT 1;)";
+             WHERE lsn = (SELECT CASE WHEN ?1 = 0 THEN MAX(lsn) ELSE MIN(lsn) END
+                          FROM checkpoints
+                          WHERE lsn >= ?1);)";
 
         /*
          * Delete all checkpoints with lsn greater than the given lsn.
@@ -1230,7 +1248,7 @@ struct Checkpoints : public Table<Checkpoints> {
             lsn INTEGER NOT NULL,
             timestamp INTEGER NOT NULL,
             checkpoint_metadata BLOB,
-         PRIMARY KEY (lsn, timestamp));)"};
+         PRIMARY KEY (lsn));)"};
 
     ~Checkpoints() = default;
     Checkpoints(Config &cfg, std::shared_mutex &store_access, const std::filesystem::path &home)
@@ -1263,7 +1281,7 @@ struct Checkpoints : public Table<Checkpoints> {
     }
 
     int
-    get(uint64_t &lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata,
+    get(uint64_t lsn, uint64_t *checkpoint_lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata,
       AccessMode mode = AccessMode::READ)
     {
         auto acc = request(mode);
@@ -1271,11 +1289,12 @@ struct Checkpoints : public Table<Checkpoints> {
 
         Connection::StatementPtr stmt = conn.db_statement(Statement::GET_CHECKPOINT);
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 1, static_cast<sqlite3_int64>(lsn));
-        SQ_CHECK(
-          sqlite3_bind_int64, stmt.get(), 2, static_cast<sqlite3_int64>(WT_PAGE_LOG_LSN_MAX));
         int ret = SQ_CHECK(sqlite3_step, stmt.get());
         if (ret == SQLITE_DONE) {
             /* No checkpoint found */
+            if (checkpoint_lsn)
+                *checkpoint_lsn = 0;
+
             if (timestamp)
                 *timestamp = 0;
 
@@ -1287,7 +1306,9 @@ struct Checkpoints : public Table<Checkpoints> {
             return WT_NOTFOUND;
         }
 
-        lsn = sqlite3_column_int64(stmt.get(), 0);
+        if (checkpoint_lsn)
+            *checkpoint_lsn = sqlite3_column_int64(stmt.get(), 0);
+
         if (timestamp)
             *timestamp = sqlite3_column_int64(stmt.get(), 1);
 
@@ -2127,9 +2148,10 @@ public:
     }
 
     int
-    get_checkpoint(uint64_t &lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata)
+    get_checkpoint(
+      uint64_t lsn, uint64_t *checkpoint_lsn, uint64_t *timestamp, WT_ITEM *checkpoint_metadata)
     {
-        return checkpoints.get(lsn, timestamp, checkpoint_metadata);
+        return checkpoints.get(lsn, checkpoint_lsn, timestamp, checkpoint_metadata);
     }
 
     void
@@ -2169,17 +2191,14 @@ public:
     void
     abandon_checkpoint()
     {
-        uint64_t checkpoint_lsn = WT_PAGE_LOG_LSN_MAX;
+        uint64_t checkpoint_lsn = 0;
 
         /* Ensure exclusive access to storage since we update multiple tables. */
         std::unique_lock write_lock(store_access);
 
-        int ret = 0;
-        if (checkpoint_lsn == WT_PAGE_LOG_LSN_MAX) {
-            ret =
-              checkpoints.get(checkpoint_lsn, nullptr, nullptr, Checkpoints::AccessMode::BYPASS);
-        }
-
+        /* Request LSN = 0: get the most recent checkpoint. */
+        int ret =
+          checkpoints.get(0u, &checkpoint_lsn, nullptr, nullptr, Checkpoints::AccessMode::BYPASS);
         if (ret == WT_NOTFOUND) {
             LOG_DEBUG("No checkpoint found to abandon; lsn = {}", checkpoint_lsn);
             return;
@@ -2199,6 +2218,7 @@ public:
 class PaliteHandle : public WT_PAGE_LOG_HANDLE {
     uint64_t table_id; /* Table ID for this handle */
     Storage &storage;
+    victim_cache cache;
 
     void initialize_interface();
 
@@ -2206,8 +2226,12 @@ public:
     Config &config;
 
     ~PaliteHandle() = default;
-    PaliteHandle(WT_PAGE_LOG *palite, Config &cfg, Storage &store, uint64_t tid)
-        : WT_PAGE_LOG_HANDLE{}, table_id(tid), config(cfg), storage(store)
+    PaliteHandle(WT_PAGE_LOG *palite, Config &cfg, Storage &store,
+      std::atomic<uint64_t> &victim_cache_bytes, uint64_t tid)
+        : WT_PAGE_LOG_HANDLE{}, table_id(tid), storage(store),
+          cache(cfg.victim_cache_max_entries, (uint64_t)cfg.victim_cache_size_mb * 1_MB,
+            victim_cache_bytes),
+          config(cfg)
     {
         WT_PAGE_LOG_HANDLE::page_log = palite;
         initialize_interface();
@@ -2220,6 +2244,8 @@ public:
     put(uint64_t page_id, uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *args, const WT_ITEM *buf)
     {
         storage.simulate_unstable_network();
+
+        cache.erase(page_id, args->backlink_lsn);
 
         const uint64_t lsn = storage.make_next_lsn();
         storage.put_page(table_id, page_id, lsn, args, buf);
@@ -2238,6 +2264,22 @@ public:
     get(uint64_t page_id, uint64_t checkpoint_id, WT_PAGE_LOG_GET_ARGS *args,
       WT_ITEM *results_array, uint32_t *results_count)
     {
+        if (!(args->flags & WT_PAGE_LOG_CACHE_BYPASS)) {
+            /* A hit writes one slot. Callers pass the array capacity. */
+            assert(results_count != nullptr && *results_count > 0);
+            if (auto entry = cache.get_erase(page_id, args->lsn)) {
+                fill_item(&results_array[0], entry->data.data(), entry->data.size());
+                args->backlink_lsn = entry->backlink_lsn;
+                args->base_lsn = entry->base_lsn;
+                args->backlink_checkpoint_id = entry->backlink_checkpoint_id;
+                args->base_checkpoint_id = entry->base_checkpoint_id;
+                args->delta_count = entry->delta_count;
+                *results_count = 1;
+                LOG_DEBUG("Victim cache hit page_id={} lsn={}", page_id, args->lsn);
+                return 0;
+            }
+        }
+
         storage.simulate_unstable_network();
 
         uint32_t flags = 0;
@@ -2249,6 +2291,40 @@ public:
           page_id, args->lsn, *results_count, args->backlink_lsn, args->base_lsn, flags);
 
         return 0;
+    }
+
+    int
+    cache_put(uint64_t page_id, uint64_t, WT_PAGE_LOG_PUT_ARGS *args, const WT_ITEM *buf)
+    {
+        if (!cache.available() || (args->flags & WT_PAGE_LOG_DELTA))
+            return 0;
+
+        const auto *p = static_cast<const uint8_t *>(buf->data);
+        const size_t n = (p != nullptr) ? buf->size : 0;
+        victim_cache_entry entry{args->lsn, args->backlink_lsn, args->base_lsn,
+          args->backlink_checkpoint_id, args->base_checkpoint_id, args->delta_count,
+          std::vector<uint8_t>(p, p + n)};
+        cache.put(page_id, std::move(entry));
+        LOG_DEBUG("Victim cache put page_id={} lsn={} size={}", page_id, args->lsn, buf->size);
+        return 0;
+    }
+
+    int
+    cache_has(uint64_t page_id, uint64_t, WT_PAGE_LOG_PUT_ARGS *args)
+    {
+        return cache.contains(page_id, args->lsn) ? 0 : WT_NOTFOUND;
+    }
+
+    int
+    cache_del(uint64_t page_id, uint64_t, WT_PAGE_LOG_PUT_ARGS *args)
+    {
+        return cache.erase(page_id, args->lsn) ? 0 : WT_NOTFOUND;
+    }
+
+    bool
+    cache_available()
+    {
+        return cache.available();
     }
 
     int
@@ -2268,6 +2344,8 @@ public:
     discard(uint64_t page_id, uint64_t checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *args)
     {
         storage.simulate_unstable_network();
+
+        cache.erase(page_id, args->backlink_lsn);
 
         const uint64_t lsn = storage.make_next_lsn();
         storage.discard_page(table_id, page_id, lsn, args);
@@ -2326,6 +2404,36 @@ palite_handle_close(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess)
 {
     return safe_call<PaliteHandle>(sess, plh, &PaliteHandle::close);
 }
+
+static int
+palite_handle_cache_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess, uint64_t page_id,
+  uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *args, const WT_ITEM *buf)
+{
+    return safe_call<PaliteHandle>(
+      sess, plh, &PaliteHandle::cache_put, page_id, checkpoint_id, args, buf);
+}
+
+static int
+palite_handle_cache_has(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess, uint64_t page_id,
+  uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *args)
+{
+    return safe_call<PaliteHandle>(
+      sess, plh, &PaliteHandle::cache_has, page_id, checkpoint_id, args);
+}
+
+static int
+palite_handle_cache_del(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess, uint64_t page_id,
+  uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *args)
+{
+    return safe_call<PaliteHandle>(
+      sess, plh, &PaliteHandle::cache_del, page_id, checkpoint_id, args);
+}
+
+static bool
+palite_handle_cache_available(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess)
+{
+    return safe_call<PaliteHandle>(sess, plh, &PaliteHandle::cache_available);
+}
 } /* extern "C" */
 
 void
@@ -2336,6 +2444,10 @@ PaliteHandle::initialize_interface()
     plh_get_page_ids = palite_handle_get_page_ids;
     plh_discard = palite_handle_discard;
     plh_close = palite_handle_close;
+    plh_cache_put = palite_handle_cache_put;
+    plh_cache_has = palite_handle_cache_has;
+    plh_cache_del = palite_handle_cache_del;
+    plh_cache_available = palite_handle_cache_available;
 }
 
 /*
@@ -2348,7 +2460,9 @@ public:
     Config config;             /* Configuration options */
     Storage storage;           /* Storage backend for page log */
 
-public:
+    /* Victim cache bytes held across every handle, bounded by Config::victim_cache_size_mb. */
+    std::atomic<uint64_t> victim_cache_bytes{0};
+
     ~Palite() = default;
     Palite(const std::filesystem::path &home_dir, WT_EXTENSION_API *wt_api, WT_CONFIG_ARG *cfg_arg)
         : WT_PAGE_LOG(), ref_count(1), config(wt_api, cfg_arg),
@@ -2419,7 +2533,7 @@ public:
     }
 
     int
-    get_complete_checkpoint(uint64_t *checkpoint_lsn, uint64_t *checkpoint_id,
+    get_complete_checkpoint(uint64_t lsn, uint64_t *checkpoint_lsn, uint64_t *checkpoint_id,
       uint64_t *checkpoint_timestamp, WT_ITEM *checkpoint_metadata)
     {
         if (checkpoint_lsn)
@@ -2429,17 +2543,17 @@ public:
         if (checkpoint_timestamp)
             *checkpoint_timestamp = 0;
 
-        uint64_t last_ckpt_lsn = WT_PAGE_LOG_LSN_MAX; /* most recent checkpoint */
-        int ret = storage.get_checkpoint(last_ckpt_lsn, checkpoint_timestamp, checkpoint_metadata);
+        uint64_t ckpt_lsn = 0; /* found checkpoint */
+        int ret = storage.get_checkpoint(lsn, &ckpt_lsn, checkpoint_timestamp, checkpoint_metadata);
 
-        LOG_DEBUG("checkpoint_lsn={}, timestamp={}", last_ckpt_lsn,
+        LOG_DEBUG("request_lsn={}, checkpoint_lsn={}, timestamp={}", lsn, ckpt_lsn,
           checkpoint_timestamp ? *checkpoint_timestamp : 0);
         LOG_TRACE("checkpoint_metadata (size={}) =====\n{}",
           checkpoint_metadata ? checkpoint_metadata->size : 0,
           checkpoint_metadata ? verbose_item(checkpoint_metadata) : "<none>");
 
         if (checkpoint_lsn)
-            *checkpoint_lsn = last_ckpt_lsn;
+            *checkpoint_lsn = ckpt_lsn;
 
         return ret;
     }
@@ -2466,7 +2580,8 @@ public:
             return EINVAL;
         }
 
-        PaliteHandle *handle = new PaliteHandle(this, config, storage, table_id);
+        PaliteHandle *handle =
+          new PaliteHandle(this, config, storage, victim_cache_bytes, table_id);
         *plh = static_cast<WT_PAGE_LOG_HANDLE *>(handle);
         LOG_DEBUG("Opened handle for table_id={}", table_id);
 
@@ -2537,7 +2652,7 @@ static int
 palite_get_complete_checkpoint(
   WT_PAGE_LOG *page_log, WT_SESSION *sess, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args)
 {
-    return safe_call<Palite>(sess, page_log, &Palite::get_complete_checkpoint,
+    return safe_call<Palite>(sess, page_log, &Palite::get_complete_checkpoint, args->lsn,
       &args->checkpoint_lsn, &args->checkpoint_id, &args->checkpoint_timestamp,
       &args->checkpoint_metadata);
 }

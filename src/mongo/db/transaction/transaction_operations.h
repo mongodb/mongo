@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -62,7 +36,7 @@ extern FailPoint hangAfterLoggingApplyOpsForTransaction;
  * Provides methods for exporting ReplOperations in one or more applyOps oplog entries.
  * Concurrency control for this class is maintained by the TransactionParticipant.
  */
-class MONGO_MOD_PUB TransactionOperations {
+class [[MONGO_MOD_PUBLIC]] TransactionOperations {
 public:
     using TransactionOperation = repl::ReplOperation;
     using CollectionUUIDs = stdx::unordered_set<UUID, UUID::Hash>;
@@ -85,9 +59,8 @@ public:
      * contained in any of the replicated operations.
      *
      * The 'oplogGroupingFormat' indicates whether these applyOps make up a multi-document
-     * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
-     * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
-     * (kGroupForPossiblyRetryableOperations)
+     * transaction (noGroup), a batched write applied atomically (atomicGroup), or a batched
+     * write whose entries apply independently (nonAtomicGroup).
      *
      * This is based on the signature of the logApplyOps() function within the OpObserverImpl
      * implementation, which takes a few more arguments that can be derived from the caller's
@@ -151,6 +124,8 @@ public:
      * 'operations'. If any of the statements has a pre-image or post-image that needs to be
      * stored in the image collection, stores it to 'imageToWrite'.
      *
+     * When 'imageToWrite' is null, retryable findAndModify pre/post images are not extracted.
+     *
      * Throws TransactionTooLarge if the size of the resulting oplog entry exceeds the BSON limit.
      * See BSONObjMaxUserSize (currently set to 16 MB).
      *
@@ -194,9 +169,22 @@ public:
     std::size_t getNumberOfOperationsWithStatementIds() const;
 
     /**
+     * Returns true if any collected operation carries a statement id.
+     */
+    bool hasStatementIds() const;
+
+    /**
      * Clears the operations stored in this container along with corresponding statistics.
      */
     void clear();
+
+    /**
+     * Reorders the stored operations so all operations for the same record are contiguous, which
+     * getApplyOpsInfo(..., respectAtomicGroups) requires to fit a record's operations in one
+     * applyOps entry. A record is its group record id if set, else its own record id; records keep
+     * first-seen order and operations keep their staged order within a record.
+     */
+    void groupByRecordId();
 
     /**
      * Adds an operation to this container and updates relevant statistics.
@@ -207,7 +195,7 @@ public:
      * Ensures that total size of collected operations after adding operation does not
      * exceed 'transactionSizeLimitBytes' (if provided).
      */
-    Status addOperation(const TransactionOperation& operation,
+    Status addOperation(TransactionOperation operation,
                         boost::optional<std::size_t> transactionSizeLimitBytes = boost::none);
 
     /**
@@ -224,10 +212,17 @@ public:
      * operations, their assignments to "applyOps" entries, and the number of oplog slots to be used
      * for writing pre- and post- image oplog entries for the transaction consisting of
      * 'operations'. The 'prepare' indicates if the function is called when preparing a transaction.
+     *
+     * When 'respectAtomicGroups' is true, a group's operations are never split across "applyOps"
+     * entries: a group that would straddle a boundary is packed whole into the next entry, and a
+     * group too large for one entry throws TransactionTooLarge. The operations must already be
+     * grouped (see groupByRecordId). Used for nonAtomicGroup, whose entries
+     * apply independently on secondaries.
      */
     ApplyOpsInfo getApplyOpsInfo(std::size_t oplogEntryCountLimit,
                                  std::size_t oplogEntrySizeLimitBytes,
-                                 bool prepare) const;
+                                 bool prepare,
+                                 bool respectAtomicGroups = false) const;
 
     /**
      * Logs applyOps oplog entries for preparing a transaction, committing an unprepared
@@ -248,15 +243,18 @@ public:
      * assignment to "applyOps" oplog entries for a transaction.
      *
      * The 'oplogGroupingFormat' indicates whether these applyOps make up a multi-document
-     * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
-     * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
-     * (kGroupForPossiblyRetryableOperations)
+     * transaction (noGroup), a batched write applied atomically (atomicGroup), or a batched
+     * write whose entries apply independently (nonAtomicGroup).
      *
      * The number of oplog entries written is returned.
      *
      * Throws TransactionTooLarge if the size of any resulting applyOps oplog entry exceeds the
      * BSON limit.
      * See packTransactionStatementsForApplyOps() and BSONObjMaxUserSize (currently set to 16 MB).
+     *
+     * A null 'prePostImageToWriteToImageCollection' means the caller does not persist retryable
+     * findAndModify images, so pre/post image extraction is skipped. See
+     * packTransactionStatementsForApplyOps().
      */
     std::size_t logOplogEntries(const std::vector<OplogSlot>& oplogSlots,
                                 const ApplyOpsInfo& applyOpsOperationAssignment,

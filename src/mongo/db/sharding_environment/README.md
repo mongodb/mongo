@@ -43,8 +43,9 @@ relationships between its various components and the links below point to the re
 describing these components.
 
 - [Sharding catalog](../shard_role/shard_catalog/README_sharding_catalog.md#sharding-catalog)
+  - [Catalog containers](../shard_role/shard_catalog/README_sharding_catalog.md#catalog-containers)
 - [Router role](../shard_role/shard_catalog/README_sharding_catalog.md#router-role)
-- [Shard role](../shard_role/shard_catalog/README_sharding_catalog.md#router-role)
+- [Shard role](../shard_role/shard_catalog/README_sharding_catalog.md#shard-role)
 - [Routing Info Consistency Model](../router_role/routing_cache/README_routing_info_cache_consistency_model.md)
 - [Shard versioning protocol](../versioning_protocol/README_versioning_protocols.md)
 - [Balancer](../s/balancer/README.md)

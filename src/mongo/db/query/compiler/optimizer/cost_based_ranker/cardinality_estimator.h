@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -78,7 +52,8 @@ public:
     CardinalityEstimator(const CollectionInfo& collInfo,
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
-                         QueryPlanRankerModeEnum rankerMode);
+                         QueryCBRCEModeEnum rankerMode,
+                         bool considerZeroCESampledIXScanNonEstimable = true);
 
     // Delete the copy and move constructors and assignment operator
     CardinalityEstimator(const CardinalityEstimator&) = delete;
@@ -87,6 +62,13 @@ public:
     CardinalityEstimator& operator=(CardinalityEstimator&&) = delete;
 
     CEResult estimatePlan(const QuerySolution& plan);
+    /**
+     * Estimate the cardinality of a standalone filter (no QuerySolution), scaled to the
+     * collection cardinality. Resets per-estimation state, so the estimator may be reused.
+     * Applies the same zero-clamping policy as estimatePlan(): an approximate-source zero
+     * ("not observed in the sample") is floored to kMinCE.
+     */
+    CEResult estimateFilter(const MatchExpression* filter);
 
 protected:
     // QuerySolutionNodes
@@ -141,12 +123,19 @@ protected:
      *
      * Policy:
      *   - Sampling, Histogram, Heuristics, Mixed -> kMinCE ("at least one row")
-     *   - Metadata, Code -> untouched (authoritative zeros)
+     *   - Metadata, Code, HyperLogLog -> untouched (authoritative zeros)
      *
      * Authoritative zeros are deliberately preserved; the 'CostEstimator' handles them via an
      * additive per-stage minimum so structurally different plans still receive distinct costs.
      */
     void clampZeroEstimates();
+
+    /**
+     * Apply the "at least one row" floor to a single estimate: zero-valued approximate-source
+     * (Sampling / Histogram / Heuristics / Mixed) estimates become 'kMinCE'; authoritative
+     * (Metadata / Code / HyperLogLog) zeros are returned untouched.
+     */
+    CardinalityEstimate clampZeroEstimate(CardinalityEstimate ce);
 
     CEResult estimateIndexSeeks(const IndexBounds& bounds, bool multiKey);
 
@@ -236,7 +225,7 @@ protected:
     // this node is under an $elemMatch, if so it will return that path.
     std::string_view getPath(const MatchExpression* node);
 
-    const CardinalityEstimate _collCard;
+    CardinalityEstimate _collCard;
 
     // The input cardinality of the last complete conjunction. This conjunction may consist of a
     // chain of QSN nodes (an implicit conjunction) including all intervals and filter expressions
@@ -263,7 +252,12 @@ protected:
     EstimateMap& _qsnEstimates;
 
     // The cardinality estimate mode we are using for estimates.
-    const QueryPlanRankerModeEnum _rankerMode;
+    const QueryCBRCEModeEnum _ceMode;
+
+    // Whether, under sampling CE, a plan with an index scan estimated to scan zero keys is
+    // non-estimable, reported with ErrorCodes::ZeroCEEstimate. Set by the constructor; cleared
+    // while estimating the subtree of a node for which disablesZeroCEFallback() is true.
+    bool _considerZeroCESampledIXScanNonEstimable;
 
     // Set with the paths we know are multikey which is deduced from the catalog. Note that a field
     // may be multikey but not reflected in this set because there may not be an index over the

@@ -98,6 +98,7 @@ __wt_rwlock_init(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     __wt_atomic_store_uint64_v_relaxed(&l->u.v, 0);
     l->stat_read_count_off = l->stat_write_count_off = -1;
     l->stat_app_usecs_off = l->stat_int_usecs_off = -1;
+    /* FIXME-WT-18860: Initialize the rwlock session statistics offset to -1. */
 
     WT_RET(__wt_cond_alloc(session, "rwlock wait", &l->cond_readers));
     WT_RET(__wt_cond_alloc(session, "rwlock wait", &l->cond_writers));

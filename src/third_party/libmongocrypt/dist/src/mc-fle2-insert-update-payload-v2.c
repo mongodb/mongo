@@ -523,7 +523,12 @@ const _mongocrypt_buffer_t *mc_FLE2InsertUpdatePayloadV2_decrypt(_mongocrypt_cry
         return NULL;
     }
 
-    _mongocrypt_buffer_resize(&iup->plaintext, fle2v2->get_plaintext_len(ciphertext.len, status));
+    const uint32_t plaintext_len = fle2v2->get_plaintext_len(ciphertext.len, status);
+    if (!mongocrypt_status_ok(status)) {
+        return NULL;
+    }
+
+    _mongocrypt_buffer_resize(&iup->plaintext, plaintext_len);
     uint32_t bytes_written;
 
     if (!fle2v2->do_decrypt(crypto, &iup->userKeyId, user_key, &ciphertext, &iup->plaintext, &bytes_written, status)) {

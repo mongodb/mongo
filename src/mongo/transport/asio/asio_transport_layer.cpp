@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/transport/asio/asio_transport_layer.h"
@@ -312,7 +286,7 @@ private:
 
     asio::io_context _ioContext;
 
-    AtomicWord<bool> _closedForScheduling{false};
+    Atomic<bool> _closedForScheduling{false};
 };
 
 AsioTransportLayer::Options::Options(const ServerGlobalParams* params)
@@ -389,6 +363,21 @@ Reactor* AsioTransportLayer::TimerService::_getReactor() {
     return _reactor.get();
 }
 
+namespace {
+
+std::vector<Microseconds> listenerProcessingTimePartitions() {
+    // {1 μs, 5 μs, 25 μs, 125 μs, 625 μs, ...}
+    std::vector<Microseconds> bounds(10);
+    Microseconds upperBound{1};
+    for (Microseconds& bound : bounds) {
+        bound = upperBound;
+        upperBound *= 5;
+    }
+    return bounds;
+}
+
+}  // namespace
+
 AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        std::unique_ptr<SessionManager> sessionManager)
     : _ingressReactor(std::make_shared<AsioReactor>()),
@@ -411,7 +400,8 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
               : nullptr),
       _sessionManager(std::move(sessionManager)),
       _listenerOptions(opts),
-      _timerService(std::make_unique<TimerService>()) {
+      _timerService(std::make_unique<TimerService>()),
+      _listenerProcessingTimes(listenerProcessingTimePartitions()) {
     uassert(ErrorCodes::InvalidOptions,
             "Unable to start AsioTransportLayer for ingress without a SessionManager",
             _sessionManager || !_listenerOptions.isIngress());
@@ -427,7 +417,7 @@ struct AsioTransportLayer::AcceptorRecord {
     GenericAcceptor acceptor;
     // Tracks the amount of incoming connections waiting to be accepted by the server on this
     // acceptor.
-    AtomicWord<int> backlogQueueDepth{0};
+    Atomic<int> backlogQueueDepth{0};
 };
 
 class WrappedEndpoint {
@@ -1137,7 +1127,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
               peer(std::move(peer)),
               reactor(reactor) {}
 
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
         Promise<std::shared_ptr<Session>> promise;
 
         std::mutex mutex;
@@ -1467,6 +1457,8 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     // was "Milliseconds"
     bob->append("listenerProcessingTime",
                 BSON("durationMicros" << _listenerProcessingTotalMicros.load()));
+    static const auto bucketKeys = makeHistogramBucketKeys(_listenerProcessingTimes);
+    appendHistogram(*bob, _listenerProcessingTimes, "listenerProcessingTimeHistogram", bucketKeys);
     BSONArrayBuilder queueDepthsArrayBuilder(
         bob->subarrayStart("listenerSocketBacklogQueueDepths"));
     for (const auto& record : _listenerInterfaceMainPort->getAcceptorRecords()) {
@@ -1494,7 +1486,9 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     dnsStatsBuilder.done();
 }
 
-void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder&) const {}
+void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
+    bob.append("numSelfConnections", _numNonUDSSelfConnections.get());
+}
 
 Status AsioTransportLayer::start() {
     std::unique_lock lk(_mutex);
@@ -1665,7 +1659,9 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
 #endif
 
         ScopeGuard nextAcceptGuarantee([&]() {
-            _listenerProcessingTotalMicros.fetchAndAdd(timer.micros());
+            const Microseconds processingTime{timer.micros()};
+            _listenerProcessingTotalMicros.fetchAndAddRelaxed(processingTime.count());
+            _listenerProcessingTimes.increment(processingTime);
             _acceptConnection(acceptor);
         });
 
@@ -1677,6 +1673,12 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
+            // Do not count UDS connections towards the number of self connections
+            if ((session->remote().isLocalHost() ||
+                 session->local().host() == session->remote().host()) &&
+                !isUnixDomainSocket(session->remote().host())) {
+                _numNonUDSSelfConnections.increment();
+            }
             if (session->isConnectedToLoadBalancerPort() ||
                 session->isConnectedToProxyUnixSocket()) {
                 // This session is not counted towards the number of accepted connections until the
@@ -1700,8 +1702,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                         "rejected"_attr = _discardedDueToMaximumPendingOnProxyHeader.get());
                     return;
                 }
-                if (session->isConnectedToProxyUnixSocket() &&
-                    gProxyUnixSocketCheckPermissions.loadRelaxed()) {
+                if (session->isConnectedToProxyUnixSocket()) {
                     Status status = session->validateProxyUnixSocketPeerPermissions();
                     if (status.code() == ErrorCodes::Unauthorized) {
                         static logv2::SeveritySuppressor suppressor{Seconds(10),
@@ -1754,6 +1755,64 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     _trySetListenerSocketBacklogQueueDepth(acceptor);
 
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
+}
+
+SessionStatsResult AsioTransportLayer::collectReplicationSessionStats() {
+    std::scoped_lock lock(_replicationSessionLock);
+    int64_t errorCount = 0;
+    std::vector<SessionStats> stats;
+    std::erase_if(_replicationSessions,
+                  [](const std::weak_ptr<AsioSession>& wp) { return wp.expired(); });
+    stats.reserve(_replicationSessions.size());
+#ifdef __linux__
+    for (const auto& wp : _replicationSessions) {
+        if (const auto sp = wp.lock()) {
+            try {
+                SessionStats stat = {.isIngress = sp->isIngress(),
+                                     .peerId = getReplicationId(sp.get())};
+                auto& socket = sp->getSocket();
+
+                TcpInfoOption tcpi;
+                socket.get_option(tcpi);
+                stat.congestionWindowSizeBytes = tcpi->tcpi_snd_cwnd;
+
+                asio::socket_base::receive_buffer_size rcvSize;
+                socket.get_option(rcvSize);
+                stat.receiveBufferSizeBytes = rcvSize.value();
+
+                asio::socket_base::send_buffer_size sendSize;
+                socket.get_option(sendSize);
+                stat.sendBufferSizeBytes = sendSize.value();
+
+                asio::socket_base::bytes_readable rcvBytes;
+                socket.io_control(rcvBytes);
+                stat.receiveBufferBytes = static_cast<int64_t>(rcvBytes.get());
+
+                SendQueueBytes sendBytes;
+                socket.io_control(sendBytes);
+                stat.sendBufferBytes = sendBytes.get();
+
+                stats.push_back(stat);
+            } catch (const asio::system_error& e) {
+                static logv2::SeveritySuppressor suppressor{
+                    Seconds(10), logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+                LOGV2_DEBUG(13510401,
+                            suppressor().toInt(),
+                            "Error getting replication socket information",
+                            "error"_attr = e.what());
+                errorCount++;
+            }
+        }
+    }
+#endif
+    return {.stats = stats, .errorCount = errorCount};
+}
+
+void AsioTransportLayer::registerReplicationSession(std::shared_ptr<Session> session) {
+    std::scoped_lock lock(_replicationSessionLock);
+    const auto asioSession = dynamic_pointer_cast<AsioSession>(session);
+    invariant(asioSession, "All replication sessions should be AsioSessions");
+    _replicationSessions.push_back(std::move(asioSession));
 }
 
 void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) {
@@ -1879,7 +1938,7 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
         auto manager = coordinator->createTransientSSLManager(transientSSLParams);
         invariant(manager);
 
-        return _createSSLContext(manager, sslMode(), true /* asyncOCSPStaple */);
+        return _createSSLContext(manager, sslMode(), /*asyncOCSPStaple=*/true);
     } catch (...) {
         LOGV2_DEBUG(9079000,
                     1,

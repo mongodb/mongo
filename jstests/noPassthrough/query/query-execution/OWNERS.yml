@@ -1,0 +1,77 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution
+  - "sbe*":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "query_settings*":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "date_trunc_invalid_constant_args.js":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "dispatch_pipeline_to_all_shardservers.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "document_too_large_to_delete_with_batched_delete.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "ignore_notablescan.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "interruptedAtShutdown_findAndModify.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "interruptedAtShutdown_update.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "kill_pinned_cursor.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "missing_shard_key.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "multi_update_non_shard_key_retry.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "nested_sort_merge.js":
+    approvers:
+      - 10gen/query-execution-sbe
+  - "notablescan.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "notablescan_query_settings_lookup.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "oplog_document_key.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "partial_unique_indexes.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "pqs_stage_memory_knob_spill.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+  - "sharded_index_projection_verbatim_persistence.js":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "sharded_skip_zero.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "tailable_getmore_to_mongos_does_not_timeout.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "unionWith_explain_stale_router_cache.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "unionWith_sharded_unsharded_mix.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "union_with_sharded_view.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads

@@ -1,0 +1,78 @@
+diff --git a/src/third_party/opentelemetry-cpp/exporters/otlp/src/otlp_file_client.cc b/src/third_party/opentelemetry-cpp/exporters/otlp/src/otlp_file_client.cc
+index c1c00cd01d54..4b7276b71104 100644
+--- a/src/third_party/opentelemetry-cpp/exporters/otlp/src/otlp_file_client.cc
++++ b/src/third_party/opentelemetry-cpp/exporters/otlp/src/otlp_file_client.cc
+@@ -992,6 +992,10 @@ public:
+   {
+     if (file_)
+     {
++      {
++        std::lock_guard<std::mutex> waker_guard{file_->background_thread_waker_lock};
++        file_->is_shutdown.store(true, std::memory_order_release);
++      }
+       file_->background_thread_waker_cv.notify_all();
+       std::unique_ptr<std::thread> background_flush_thread;
+       {
+@@ -1476,11 +1480,6 @@ private:
+             break;
+           }
+ 
+-          if (concurrency_file->is_shutdown.load(std::memory_order_acquire))
+-          {
+-            break;
+-          }
+-
+ #ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+           if (thread_instrumentation != nullptr)
+           {
+@@ -1490,6 +1489,13 @@ private:
+ 
+           {
+             std::unique_lock<std::mutex> lk(concurrency_file->background_thread_waker_lock);
++            // Even though is_shutdown is atomic, the lock guarantees that either a change to
++            // is_shutdown will be observed, or background_thread_waker_cv will see the notification
++            // at shutdown.
++            if (concurrency_file->is_shutdown.load(std::memory_order_acquire))
++            {
++              break;
++            }
+             concurrency_file->background_thread_waker_cv.wait_for(lk, flush_interval);
+           }
+ 
+diff --git a/src/third_party/opentelemetry-cpp/sdk/src/metrics/export/periodic_exporting_metric_reader.cc b/src/third_party/opentelemetry-cpp/sdk/src/metrics/export/periodic_exporting_metric_reader.cc
+index 099b9ac122f3..7a1ac31d417e 100644
+--- a/src/third_party/opentelemetry-cpp/sdk/src/metrics/export/periodic_exporting_metric_reader.cc
++++ b/src/third_party/opentelemetry-cpp/sdk/src/metrics/export/periodic_exporting_metric_reader.cc
+@@ -293,6 +293,11 @@ bool PeriodicExportingMetricReader::OnShutDown(std::chrono::microseconds timeout
+ {
+   if (worker_thread_.joinable())
+   {
++    {
++      // Acquiring cv_m_ guarantees that the next time the worker thread checks the wait condition
++      // on cv_ (either from notify below or any other reason) it will see IsShutdown() return true.
++      std::lock_guard<std::mutex> cv_guard{cv_m_};
++    }
+     cv_.notify_all();
+     worker_thread_.join();
+   }
+diff --git a/src/third_party/opentelemetry-cpp/sdk/src/trace/batch_span_processor.cc b/src/third_party/opentelemetry-cpp/sdk/src/trace/batch_span_processor.cc
+index 7991929779be..2b468bd79c0e 100644
+--- a/src/third_party/opentelemetry-cpp/sdk/src/trace/batch_span_processor.cc
++++ b/src/third_party/opentelemetry-cpp/sdk/src/trace/batch_span_processor.cc
+@@ -378,7 +378,15 @@ bool BatchSpanProcessor::InternalShutdown(std::chrono::microseconds timeout) noe
+ 
+   if (worker_thread_.joinable())
+   {
+-    synchronization_data_->is_force_wakeup_background_worker.store(true, std::memory_order_release);
++    {
++      // Even though is_force_wakeup_background_worker is atomic, acquiring cv_m is necessary as
++      // otherwise both the change to is_force_wakeup_background_worker and the notify_all might
++      // occur after the worker has checked is_force_wakeup_background_worker but before it has
++      // blocked again on synchronization_data_->cv.
++      std::lock_guard<std::mutex> cv_guard{synchronization_data_->cv_m};
++      synchronization_data_->is_force_wakeup_background_worker.store(true,
++                                                                     std::memory_order_release);
++    }
+     synchronization_data_->cv.notify_all();
+     worker_thread_.join();
+   }

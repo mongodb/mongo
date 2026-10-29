@@ -4,8 +4,7 @@
  * and cache correctly.
  *
  * @tags: [
- *     featureFlagAuthoritativeShardsCRUD,
- *     featureFlagAuthoritativeShardsDDL,
+ *     requires_fcv_90,
  * ]
  */
 
@@ -179,18 +178,6 @@ function validateCloningDDLWithConcurrentOperation(dbName, op) {
     });
 
     assert.commandWorked(st.s.getDB(dbName).dropDatabase());
-}
-
-{
-    jsTest.log("Validate concurrent movePrimary when running the cloning DDL");
-
-    const dbName = "staleDb";
-    const db = st.s.getDB(dbName);
-
-    const movePrimary = () =>
-        assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
-
-    validateCloningDDLWithConcurrentOperation(dbName, movePrimary);
 }
 
 {

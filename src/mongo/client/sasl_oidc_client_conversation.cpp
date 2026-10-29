@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/client/sasl_oidc_client_conversation.h"
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,7 +21,7 @@
 #include "mongo/db/auth/oidc_protocol_gen.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/str.h"
@@ -123,6 +96,8 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     const auth::OIDCMechanismServerStep1& serverReply,
     std::string_view principalName) {
     auto deviceAuthorizationEndpoint = discoveryReply.getDeviceAuthorizationEndpoint().get();
+    uassertStatusOK(HttpClient::endpointIsSecure(deviceAuthorizationEndpoint)
+                        .withContext("device authorization endpoint in discovery document"));
 
     auto clientId = serverReply.getClientId();
     uassert(ErrorCodes::BadValue,
@@ -302,7 +277,7 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(std::string_view input,
         // Currently, only device authorization flow is supported for token acquisition.
         // Parse device authorization endpoint from input.
         ConstDataRange inputCdr(input.data(), input.size());
-        auto payload = inputCdr.read<Validated<BSONObj>>().val;
+        BSONObj payload{inputCdr.read<rpc::ValidatedBSONObj>()};
         auto serverReply = auth::OIDCMechanismServerStep1::parse(
             payload, IDLParserContext{"oidcServerStep1Reply"});
 
@@ -316,6 +291,8 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(std::string_view input,
         uassert(ErrorCodes::BadValue,
                 "Missing token endpoint in server reply",
                 tokenEndpoint && !tokenEndpoint->empty());
+        uassertStatusOK(HttpClient::endpointIsSecure(*tokenEndpoint)
+                            .withContext("token endpoint in discovery document"));
 
         // Cache the token endpoint for potential reuse during the refresh flow.
         oidcClientGlobalParams.oidcTokenEndpoint = std::string{*tokenEndpoint};

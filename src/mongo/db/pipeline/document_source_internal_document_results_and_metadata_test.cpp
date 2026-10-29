@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 
@@ -34,23 +8,34 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/exchange_stage.h"
+#include "mongo/db/exec/agg/internal_stream_terminator_stage.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
+#include "mongo/db/pipeline/document_source_internal_stream_terminator.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_mock_stages.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -68,6 +53,22 @@ const auto kSourceWithMeta =
                   << "returnCursor" << false);
 const auto kFullSpec = BSON("source" << BSON("$collStats" << BSONObj()) << "metadata"
                                      << BSON("as" << "SEARCH_META") << "returnCursor" << true);
+
+// Owns the pipelines referenced by a DocumentSource::DistributedPlanContext so the ctx can be
+// passed by pointer into distributedPlanLogic() without dangling.
+class OwningDistributedPlanContext : public DocumentSource::DistributedPlanContext {
+public:
+    OwningDistributedPlanContext(std::unique_ptr<Pipeline> pipelinePrefix,
+                                 std::unique_ptr<Pipeline> pipelineSuffix,
+                                 boost::optional<OrderedPathSet> shardKeys)
+        : DocumentSource::DistributedPlanContext{*pipelinePrefix, *pipelineSuffix, this->shardKeys},
+          pipelinePrefix(std::move(pipelinePrefix)),
+          pipelineSuffix(std::move(pipelineSuffix)),
+          shardKeys(std::move(shardKeys)) {}
+    std::unique_ptr<Pipeline> pipelinePrefix;
+    std::unique_ptr<Pipeline> pipelineSuffix;
+    boost::optional<OrderedPathSet> shardKeys;
+};
 
 class DocumentSourceInternalDocumentResultsAndMetadataTest : public AggregationContextFixture {
 protected:
@@ -92,7 +93,50 @@ protected:
         return docResultsAndMetadata;
     }
 
+    // Builds a DistributedPlanContext whose suffix is the given pipeline. The prefix is empty.
+    auto makePlanCtx(std::string_view pipelineJson) {
+        auto bson = fromjson(pipelineJson);
+        std::vector<BSONObj> rawPipeline;
+        for (const auto& element : bson) {
+            rawPipeline.push_back(element.Obj());
+        }
+        auto pipelinePrefix = pipeline_factory::makePipeline(
+            std::vector<BSONObj>{}, getExpCtx(), {.attachCursorSource = false});
+        auto pipelineSuffix =
+            pipeline_factory::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
+        return OwningDistributedPlanContext(
+            std::move(pipelinePrefix), std::move(pipelineSuffix), boost::none);
+    }
+
+    OperationContext* opCtx() {
+        return getExpCtx()->getOperationContext();
+    }
+
+    // $group is the one that binds to the operation tracker in its constructor.
+    boost::intrusive_ptr<DocumentSource> makeGroup() {
+        const auto& expCtx = getExpCtx();
+        return DocumentSourceGroup::create(
+            expCtx,
+            ExpressionFieldPath::parse(expCtx.get(), "$x", expCtx->variablesParseState),
+            {},
+            /*willBeMerged=*/false);
+    }
+
+    // $sort binds to the operation tracker when it is lowered to an exec stage, not when parsed.
+    boost::intrusive_ptr<DocumentSource> makeSort() {
+        return DocumentSourceSort::create(getExpCtx(), {BSON("x" << 1), getExpCtx()});
+    }
+
+    // Builds a pipeline of the parsed $_internalDRM stage followed by 'next'.
+    std::unique_ptr<Pipeline> makePipelineWith(boost::intrusive_ptr<DocumentSource> next) {
+        return Pipeline::create({_stages.front(), std::move(next)}, getExpCtx());
+    }
+
 private:
+    // The memory tracker is only created on demand, so an operation that tracks nothing has none.
+    // Not FCV-gated, but pin the flag so these tests don't ride on its default.
+    unittest::ServerParameterGuard _memoryTrackingFlag{"featureFlagQueryMemoryTracking", true};
+
     std::unique_ptr<InternalDocumentResultsAndMetadataLiteParsed> _liteParsed;
     DocumentSourceContainer _stages;
 };
@@ -220,15 +264,14 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
               StageConstraints::TransactionRequirement::kNotAllowed);
 }
 
-class DocumentSourceMockSkipMetadataStream final : public DocumentSourceMock {
+// Tracks whether elideMetadata() skipped the metadata stream on the wrapped source, for tests
+// exercising optimizeAt()'s metadata-elision decision directly.
+class DocumentSourceMockTrackingMetadataStreamSkip final : public DocumentSourceMock,
+                                                           public WrappedExtensionSourceHooks {
 public:
-    static boost::intrusive_ptr<DocumentSourceMockSkipMetadataStream> create(
+    static boost::intrusive_ptr<DocumentSourceMockTrackingMetadataStreamSkip> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        boost::intrusive_ptr<DocumentSourceMockSkipMetadataStream> mock(
-            new DocumentSourceMockSkipMetadataStream(expCtx));
-        mock->mockConstraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
-        mock->mockConstraints.requiresInputDocSource = false;
-        return mock;
+        return new DocumentSourceMockTrackingMetadataStreamSkip(expCtx);
     }
 
     void skipMetadataStream() override {
@@ -239,34 +282,19 @@ public:
         return _metadataStreamSkipped;
     }
 
+    void applyPipelineSuffixDependencies(const DepsTracker& deps,
+                                         const std::set<std::string>& builtinVarRefs) override {}
+
+    void dispatchInPlaceRules(
+        rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) const override {}
+
 private:
-    DocumentSourceMockSkipMetadataStream(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceMockTrackingMetadataStreamSkip(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMock({}, expCtx) {}
 
     bool _metadataStreamSkipped = false;
 };
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeElidesMetadataWhenNoSearchMetaRef) {
-    auto sourceStage = DocumentSourceMockSkipMetadataStream::create(getExpCtx());
-    auto* sourcePtr = sourceStage.get();
-    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
-        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
-    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
-    ASSERT(ds);
-    ASSERT(ds->getMetadata().has_value());
-
-    // Downstream $project does not reference $$SEARCH_META.
-    auto downstreamStage =
-        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(stage);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_FALSE(ds->getMetadata().has_value());
-    ASSERT_TRUE(sourcePtr->isMetadataStreamSkipped());
-}
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeRetainsMetadataWhenNeedsMergeTrue) {
@@ -291,7 +319,31 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeSerializesWithoutMetadataAfterElision) {
+       OptimizeSkipsMetadataStreamWhenMetadataAlreadyAbsent) {
+    auto sourceStage = DocumentSourceMockTrackingMetadataStreamSkip::create(getExpCtx());
+    auto* sourcePtr = sourceStage.get();
+    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        getExpCtx(), std::move(sourceStage), /*metadata=*/boost::none);
+    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
+    ASSERT(ds);
+    ASSERT_FALSE(ds->getMetadata().has_value());
+
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(stage);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    ASSERT_FALSE(ds->getMetadata().has_value());
+    ASSERT_TRUE(sourcePtr->isMetadataStreamSkipped());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       SerializedElidedStageRoundTripsWithoutMetadata) {
+    // Build the stage with metadata, then elide it via
+    // optimizeAt because no downstream stage references $$SEARCH_META. The serialized result
+    // is exactly the BSON a router ships to its shards.
     auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
@@ -305,32 +357,20 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     pipeline.push_back(stage);
     pipeline.push_back(downstreamStage);
     ds->optimizeAt(pipeline.begin(), &pipeline);
-
-    auto serialized = ds->serialize(query_shape::SerializationOptions{});
-    auto bson = serialized.getDocument().toBson();
-    auto inner = bson.getObjectField(kStageName);
-    ASSERT_FALSE(inner.hasField("metadata"));
-}
-
-TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
-       OptimizeNoOpWhenMetadataAlreadyAbsent) {
-    auto* ds = parse(BSON(kStageName << kSourceOnly));
     ASSERT_FALSE(ds->getMetadata().has_value());
 
-    auto downstreamStage =
-        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
-    DocumentSourceContainer pipeline;
-    pipeline.push_back(ds);
-    pipeline.push_back(downstreamStage);
-    ds->optimizeAt(pipeline.begin(), &pipeline);
+    auto serialized = ds->serialize().getDocument().toBson();
+    ASSERT_FALSE(serialized.getObjectField(kStageName).hasField("metadata"));
 
-    ASSERT_FALSE(ds->getMetadata().has_value());
-    ASSERT_EQ(pipeline.size(), 2u);
+    // Shard side - rebuilt stage must come back with metadata absent,
+    // proving the elision survives serialize -> parse.
+    auto* roundTripped = parse(serialized);
+    ASSERT_FALSE(roundTripped->getMetadata().has_value());
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeRetainsMetadataWhenDownstreamStageReferencesSearchMeta) {
-    auto sourceStage = DocumentSourceMockSkipMetadataStream::create(getExpCtx());
+    auto sourceStage = DocumentSourceMockTrackingMetadataStreamSkip::create(getExpCtx());
     auto* sourcePtr = sourceStage.get();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
@@ -412,11 +452,14 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_NE(additionalCursorPipeline, nullptr);
     ASSERT_EQ(additionalCursorPipeline->pipelineType, CursorTypeEnum::SearchMetaResult);
 
-    // Verify the stashed meta pipeline has exactly 2 stages: Exchange consumer + replaceRoot.
+    // Exchange consumer + $_internalStreamTerminator + $replaceRoot.
     const auto& metaStages = additionalCursorPipeline->getSources();
-    ASSERT_EQ(metaStages.size(), 2u);
+    ASSERT_EQ(metaStages.size(), 3u);
     auto stageIt = metaStages.begin();
     ASSERT_EQ((*stageIt)->getSourceName(), DocumentSourceExchange::kStageName);
+    ++stageIt;
+    ASSERT_EQ(std::string_view((*stageIt)->getSourceName()),
+              DocumentSourceInternalStreamTerminator::kStageName);
     ++stageIt;
     ASSERT_EQ(std::string_view((*stageIt)->getSourceName()), "$replaceRoot"sv);
 }
@@ -434,6 +477,17 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     const auto& stages = execPipeline->getStages();
     ASSERT_EQ(stages.size(), 2u);
     ASSERT_FALSE(dsRef->hasAdditionalCursorPipeline());
+}
+
+// Builds a shared ShardedPlanSpec with the given sort pattern and optional merge pipeline,
+// ready for passing to setShardedPlan().
+auto makeSharedPlanSpec(BSONObj sortPattern, std::vector<BSONObj> mergePipeline = {}) {
+    ShardedPlanSpec ps;
+    ps.setResultsSortPattern(std::move(sortPattern));
+    if (!mergePipeline.empty()) {
+        ps.setMetaMergePipeline(std::move(mergePipeline));
+    }
+    return std::make_shared<ShardedPlanSpec>(std::move(ps));
 }
 
 // DPL tests
@@ -482,9 +536,8 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, /*metadata=*/boost::none, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSON("score" << 1), std::vector<BSONObj>{});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    auto spec = makeSharedPlanSpec(BSON("score" << 1));
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     auto dpl = ds->distributedPlanLogic(nullptr);
     ASSERT_TRUE(dpl.has_value());
@@ -502,9 +555,10 @@ DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSONObj{}, std::vector<BSONObj>{});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    // Empty sort pattern, resultsSortPattern left unset.
+    auto spec =
+        std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>();
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     ds->distributedPlanLogic(nullptr);
 }
@@ -518,9 +572,9 @@ DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSON("score" << 1), std::vector<BSONObj>{});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    // metaMergePipeline intentionally absent — should tassert when metadata is configured.
+    auto spec = makeSharedPlanSpec(BSON("score" << 1));
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     ds->distributedPlanLogic(nullptr);
 }
@@ -533,11 +587,11 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
 
-    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
-        BSON("score" << 1),
-        std::vector<BSONObj>{BSON(
-            "$group" << BSON("_id" << BSONNULL << "meta" << BSON("$mergeObjects" << "$payload")))});
-    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
 
     auto dpl = ds->distributedPlanLogic(nullptr);
     ASSERT_TRUE(dpl.has_value());
@@ -547,6 +601,308 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
               "$setVariableFromSubPipeline"sv);
 }
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       ShardedPlanSurvivesBsonRoundTripAndDrivesDistributedPlanLogic) {
+    // Router side: stage carries a live provider supplied by the extension AST node.
+    auto* original = parse(BSON(kStageName << kSourceWithMeta));
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << -1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    original->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    // Serialize as if shipping into a subpipeline on a shard; the callback can't cross BSON.
+    query_shape::SerializationOptions opts;
+    opts.isSerializingForRemoteDispatch = true;
+    const auto roundTripped = original->serialize(opts).getDocument().toBson();
+
+    // Shard side: re-parse the serialized BSON. No provider is attached; only the cached spec the
+    // router stamped survives.
+    auto* reparsed = parse(roundTripped);
+
+    auto dpl = reparsed->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_TRUE(dpl->mergeSortPattern.has_value());
+    ASSERT_BSONOBJ_EQ(*dpl->mergeSortPattern, BSON("score" << -1));
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+}
+
+// Elision tests for the split-time metadata elision added to distributedPlanLogic(). When
+// optimization did not run, distributedPlanLogic() is the last chance to drop the metadata stream
+// (and thus the merging pipeline) if no downstream stage reads $$SEARCH_META.
+
+// The suffix does not reference $$SEARCH_META, so the metadata stream must be elided and no merge
+// stages attached.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicElidesMetadataWhenSuffixUnreferenced) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto ctx = makePlanCtx(R"([{$project: {x: 1}}])");
+    auto dpl = ds->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_TRUE(dpl->mergingStages.empty());
+    ASSERT_FALSE(ds->getMetadata().has_value());
+    ASSERT_FALSE(ds->getReturnCursor());
+}
+
+// The suffix references $$SEARCH_META, so metadata must be retained: the metadata stream is
+// returned as a secondary cursor (_returnCursor = true) and the merging pipeline is attached.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicKeepsMetadataWhenSuffixReferencesSearchMeta) {
+    auto expCtx = getExpCtx();
+    // A suffix that references $$SEARCH_META without a setter trips assertSearchMetaAccessValid
+    // during pipeline construction; routers defer that check, so model the router context.
+    expCtx->setInRouter(true);
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto ctx = makePlanCtx(R"([{$project: {meta: "$$SEARCH_META"}}])");
+    auto dpl = ds->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_TRUE(ds->getReturnCursor());
+}
+
+// Informational probes (requiredToRunOnRouter()/stageCanRunInParallel() style call sites) pass
+// ctx == nullptr and must not cause side effects: metadata must not be elided, _returnCursor must
+// not be flipped.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicProbeDoesNotMutateState) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto dpl = ds->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    // A probe must not mutate the stage.
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_FALSE(ds->getReturnCursor());
+
+    // The same result must be reproducible; calling again must not mutate either.
+    auto dpl2 = ds->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl2.has_value());
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_FALSE(ds->getReturnCursor());
+}
+
+// On a shard re-parse (needsMerge = true), the shard cannot see the router's merge half, so the
+// elision decision must be suppressed: metadata is kept even if the local suffix doesn't reference
+// $$SEARCH_META.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicKeepsMetadataWhenNeedsMergeTrue) {
+    auto expCtx = getExpCtx();
+    expCtx->setNeedsMerge(true);
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec =
+        makeSharedPlanSpec(BSON("score" << 1),
+                           {BSON("$group" << BSON("_id" << BSONNULL << "meta"
+                                                        << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlan([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    // Suffix does not reference $$SEARCH_META, but the elision must be suppressed on shards.
+    auto ctx = makePlanCtx(R"([{$project: {x: 1}}])");
+    auto dpl = ds->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+    ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_TRUE(ds->getReturnCursor());
+}
+
+// InternalStreamTerminatorStage exec-level tests.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       StreamTerminatorReturnsEOFOnEosSentinel) {
+    const auto& expCtx = getExpCtx();
+    std::deque<DocumentSource::GetNextResult> results;
+    results.emplace_back(Document{{"x", 1}});
+    results.emplace_back(Document{{"_eos", true}});
+    results.emplace_back(Document{{"x", 2}});
+
+    auto mock = exec::agg::MockStage::createForTest(std::move(results), expCtx);
+    auto terminator = make_intrusive<exec::agg::InternalStreamTerminatorStage>(
+        DocumentSourceInternalStreamTerminator::kStageName, expCtx);
+    exec::agg::MockStage::setSource_forTest(terminator, mock.get());
+
+    auto r1 = terminator->getNext();
+    ASSERT_TRUE(r1.isAdvanced());
+    ASSERT_BSONOBJ_EQ(r1.getDocument().toBson(), BSON("x" << 1));
+
+    auto r2 = terminator->getNext();
+    ASSERT_TRUE(r2.isEOF());
+    ASSERT_TRUE(mock->isDisposed);
+
+    auto r3 = terminator->getNext();
+    ASSERT_TRUE(r3.isEOF());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       StreamTerminatorPassesThroughWithoutEos) {
+    const auto& expCtx = getExpCtx();
+    std::deque<DocumentSource::GetNextResult> results;
+    results.emplace_back(Document{{"x", 1}});
+    results.emplace_back(Document{{"x", 2}});
+    results.emplace_back(Document{{"_eos", true}});
+
+    auto mock = exec::agg::MockStage::createForTest(std::move(results), expCtx);
+    auto terminator = make_intrusive<exec::agg::InternalStreamTerminatorStage>(
+        DocumentSourceInternalStreamTerminator::kStageName, expCtx);
+    exec::agg::MockStage::setSource_forTest(terminator, mock.get());
+
+    auto r1 = terminator->getNext();
+    ASSERT_TRUE(r1.isAdvanced());
+    ASSERT_BSONOBJ_EQ(r1.getDocument().toBson(), BSON("x" << 1));
+
+    auto r2 = terminator->getNext();
+    ASSERT_TRUE(r2.isAdvanced());
+    ASSERT_BSONOBJ_EQ(r2.getDocument().toBson(), BSON("x" << 2));
+
+    auto r3 = terminator->getNext();
+    ASSERT_TRUE(r3.isEOF());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       StreamTerminatorImmediateEosReturnsEOF) {
+    const auto& expCtx = getExpCtx();
+    std::deque<DocumentSource::GetNextResult> results;
+    results.emplace_back(Document{{"_eos", true}});
+    results.emplace_back(Document{{"x", 1}});
+
+    auto mock = exec::agg::MockStage::createForTest(std::move(results), expCtx);
+    auto terminator = make_intrusive<exec::agg::InternalStreamTerminatorStage>(
+        DocumentSourceInternalStreamTerminator::kStageName, expCtx);
+    exec::agg::MockStage::setSource_forTest(terminator, mock.get());
+
+    auto r1 = terminator->getNext();
+    ASSERT_TRUE(r1.isEOF());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, StreamTerminatorIgnoresFalsyEos) {
+    const auto& expCtx = getExpCtx();
+    std::deque<DocumentSource::GetNextResult> results;
+    results.emplace_back(Document{{"_eos", false}});
+    results.emplace_back(Document{{"_eos", 0}});
+    results.emplace_back(Document{{"x", 1}});
+    results.emplace_back(Document{{"_eos", true}});
+
+    auto mock = exec::agg::MockStage::createForTest(std::move(results), expCtx);
+    auto terminator = make_intrusive<exec::agg::InternalStreamTerminatorStage>(
+        DocumentSourceInternalStreamTerminator::kStageName, expCtx);
+    exec::agg::MockStage::setSource_forTest(terminator, mock.get());
+
+    auto r1 = terminator->getNext();
+    ASSERT_TRUE(r1.isAdvanced());
+    ASSERT_BSONOBJ_EQ(r1.getDocument().toBson(), BSON("_eos" << false));
+
+    auto r2 = terminator->getNext();
+    ASSERT_TRUE(r2.isAdvanced());
+    ASSERT_BSONOBJ_EQ(r2.getDocument().toBson(), BSON("_eos" << 0));
+
+    auto r3 = terminator->getNext();
+    ASSERT_TRUE(r3.isAdvanced());
+    ASSERT_BSONOBJ_EQ(r3.getDocument().toBson(), BSON("x" << 1));
+
+    auto r4 = terminator->getNext();
+    ASSERT_TRUE(r4.isEOF());
+}
+
+DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
+             StreamTerminatorTassertsOnNaturalEofWithoutSentinel,
+             "13096201") {
+    const auto& expCtx = getExpCtx();
+    std::deque<DocumentSource::GetNextResult> results;
+    results.emplace_back(Document{{"x", 1}});
+
+    auto mock = exec::agg::MockStage::createForTest(std::move(results), expCtx);
+    auto terminator = make_intrusive<exec::agg::InternalStreamTerminatorStage>(
+        DocumentSourceInternalStreamTerminator::kStageName, expCtx);
+    exec::agg::MockStage::setSource_forTest(terminator, mock.get());
+
+    terminator->getNext();
+    terminator->getNext();
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       SecondaryMetadataCursorExcludesOperationMemoryTracking) {
+    ASSERT_FALSE(getExpCtx()->getExcludeOperationMemoryTracking());
+    parse(BSON(kStageName << kFullSpec));
+    ASSERT_TRUE(getExpCtx()->getExcludeOperationMemoryTracking());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       InProcessMetadataKeepsOperationMemoryTracking) {
+    // Without 'returnCursor' the metadata is bound to $$SEARCH_META in process: one cursor, one
+    // OperationContext, nothing to race.
+    parse(BSON(kStageName << kSourceWithMeta));
+    ASSERT_FALSE(getExpCtx()->getExcludeOperationMemoryTracking());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DownstreamGroupIsNotOperationTrackedWithSecondaryMetadataCursor) {
+    parse(BSON(kStageName << kFullSpec));
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+
+    auto group = makeGroup();
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DownstreamSortIsNotOperationTrackedWithSecondaryMetadataCursor) {
+    parse(BSON(kStageName << kFullSpec));
+    auto pipeline = makePipelineWith(makeSort());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DownstreamSortIsOperationTrackedWithoutSecondaryMetadataCursor) {
+    parse(BSON(kStageName << kSourceWithMeta));
+    ASSERT_FALSE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+
+    auto pipeline = makePipelineWith(makeSort());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    ASSERT_TRUE(OperationMemoryUsageTracker::hasTrackerOnOpCtx(opCtx()));
+}
+
 
 }  // namespace
 }  // namespace mongo

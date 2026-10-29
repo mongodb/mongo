@@ -17,7 +17,7 @@ import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
     createMetricsDirectory,
     getLatestMetrics,
-} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /**
@@ -36,7 +36,7 @@ function getConnectionsMetricValue(metricsDir, afterDate) {
         1000,
     );
 
-    return metrics["serverStatus.network.numRequests"]?.value ?? 0;
+    return metrics["mongodb.serverStatus.network.numRequests"]?.value ?? 0;
 }
 
 /**

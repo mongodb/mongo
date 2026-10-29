@@ -4,6 +4,7 @@
 // This test is not prepared to handle explain output for sharded collections or when executed
 // against a mongos.
 // @tags: [
+//   uses_explain,
 //   requires_fcv_51,
 //   assumes_unsharded_collection,
 //   assumes_against_mongod_not_mongos,

@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
@@ -54,9 +27,10 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class NamespaceString : private DatabaseName {
 public:
@@ -84,13 +58,11 @@ public:
     // Name for the collection storing persistent document samples.
     static constexpr std::string_view kStatsSamplesCollectionName{"system.stats.samples"};
 
+    // Name for the collection storing persistent per-field statistics, e.g. NDV sketches.
+    static constexpr std::string_view kStatsFieldStatsCollectionName{"system.stats.field_stats"};
+
     // Name for the profile collection
     static constexpr std::string_view kSystemDotProfileCollectionName{"system.profile"};
-
-    // Name for fastcount - replicated collection size and count - collections.
-    static constexpr std::string_view kReplicatedFastCountStore{"fast_count_metadata_store"};
-    static constexpr std::string_view kReplicatedFastCountStoreTimestamps{
-        "fast_count_metadata_store_timestamps"};
 
     // Names of privilege document collections
     static constexpr std::string_view kSystemUsers{"system.users"};
@@ -122,6 +94,16 @@ public:
 
     // Prefix for the temporary collection used by the $out stage.
     static constexpr std::string_view kOutTmpCollectionPrefix{"tmp.agg_out."};
+
+    // Prefix of temporary collection names used by convertToCapped
+    // (tmp%%%%%.convertToCapped.<originalColl>).
+    static constexpr std::string_view kConvertToCappedTmpCollectionModelPrefix{
+        "tmp%%%%%.convertToCapped."};
+
+    // Temporary collection name model used by renameCollection
+    // (tmp%%%%%.renameCollection, including system.buckets.* for timeseries).
+    static constexpr std::string_view kRenameCollectionTmpCollectionModel{
+        "tmp%%%%%.renameCollection"};
 
     // Maintainers Note: The large set of `NamespaceString`-typed static data
     // members of the `NamespaceString` class representing system-reserved
@@ -183,31 +165,31 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(std::string_view ns) {
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(std::string_view ns) {
         return NamespaceString(boost::none, ns);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const DatabaseName& dbName) {
         return NamespaceString(dbName);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(std::string_view db,
-                                                                          std::string_view coll) {
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
+        std::string_view db, std::string_view coll) {
         return NamespaceString(boost::none, db, coll);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const DatabaseName& dbName, std::string_view coll) {
         return NamespaceString(dbName, coll);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const boost::optional<TenantId>& tenantId, std::string_view ns) {
         return NamespaceString(tenantId, ns);
     }
 
-    MONGO_MOD_PUBLIC static NamespaceString createNamespaceString_forTest(
+    [[MONGO_MOD_PUBLIC]] static NamespaceString createNamespaceString_forTest(
         const boost::optional<TenantId>& tenantId, std::string_view db, std::string_view coll) {
         return NamespaceString(tenantId, db, coll);
     }
@@ -317,7 +299,7 @@ public:
     /**
      * This function must only be used in unit tests.
      */
-    MONGO_MOD_PUBLIC std::string_view db_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
+    [[MONGO_MOD_PUBLIC]] std::string_view db_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
         return db_deprecated();
     }
 
@@ -339,7 +321,7 @@ public:
         return ConstDataRange(nss.data(), nss.size());
     }
 
-    MONGO_MOD_PUBLIC std::string_view ns_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
+    [[MONGO_MOD_PUBLIC]] std::string_view ns_forTest() const MONGO_COMPILER_LIFETIME_BOUND {
         return ns();
     }
 
@@ -348,7 +330,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC std::string toString_forTest() const {
+    [[MONGO_MOD_PUBLIC]] std::string toString_forTest() const {
         return toString();
     }
 
@@ -370,7 +352,7 @@ public:
      *
      * MUST only be used for tests.
      */
-    MONGO_MOD_PUBLIC std::string toStringWithTenantId_forTest() const {
+    [[MONGO_MOD_PUBLIC]] std::string toStringWithTenantId_forTest() const {
         return toStringWithTenantId();
     }
 
@@ -459,6 +441,9 @@ public:
     }
     bool isStatsSamplesCollection() const {
         return coll() == kStatsSamplesCollectionName;
+    }
+    bool isFieldStatsCollection() const {
+        return coll() == kStatsFieldStatsCollectionName;
     }
     bool isPrivilegeCollection() const {
         if (!isAdminDB()) {
@@ -560,7 +545,9 @@ public:
     static bool isFLE2StateCollection(std::string_view coll);
 
     /**
-     * Returns true if the namespace is a system.statistics collection, false otherwise.
+     * Returns true for the collections storing optimizer statistics: histograms
+     * (system.statistics.*) and per-field statistics (system.stats.field_stats).
+     * TODO SERVER-127371: collapse once the statistics namespaces are consolidated.
      */
     bool isSystemStatsCollection() const;
 
@@ -569,6 +556,18 @@ public:
      * ("tmp.agg_out") and legacy ("system.buckets.tmp.agg_out") timeseries namespaces.
      */
     bool isOutStageTmpCollection() const;
+
+    /**
+     * Returns true if the collection is a temporary convertToCapped collection
+     * (tmp%%%%%.convertToCapped.<originalColl>).
+     */
+    bool isConvertToCappedTmpCollection() const;
+
+    /**
+     * Returns true if the collection is a temporary renameCollection collection
+     * (tmp%%%%%.renameCollection, including system.buckets.tmp%%%%%.renameCollection).
+     */
+    bool isRenameCollectionTmpCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.
@@ -608,7 +607,7 @@ public:
      * Returns true if the namespace string is for a "collectionless" cursor.
      */
     bool isCollectionlessCursorNamespace() const {
-        return coll().starts_with("$cmd."_sd);
+        return coll().starts_with("$cmd."sv);
     }
 
     /**
@@ -972,7 +971,7 @@ inline bool NamespaceString::validCollectionName(std::string_view coll) {
     return true;
 }
 
-MONGO_MOD_PUBLIC inline std::string stringify_forTest(const NamespaceString& nss) {
+[[MONGO_MOD_PUBLIC]] inline std::string stringify_forTest(const NamespaceString& nss) {
     return toStringForLogging(nss);
 }
 
@@ -1000,9 +999,10 @@ constexpr auto makeNsData(const char* db, const char* coll) {
     return result;
 }
 
-#define X(id, dbname, coll)                                                                     \
-    constexpr inline auto id##_data = makeNsData<dbname.size(), std::string_view{coll}.size()>( \
-        dbname.db(OmitTenant{}).data(), std::string_view{coll}.data());
+#define X(id, dbname, coll)                                                        \
+    constexpr inline auto id##_coll = coll ""sv;                                   \
+    constexpr inline auto id##_data = makeNsData<dbname.size(), id##_coll.size()>( \
+        dbname.db(OmitTenant{}).data(), id##_coll.data());
 EXPAND_NSS_CONSTANT_TABLE(X) /* NOLINT(bugprone-suspicious-stringview-data-usage) */
 #undef X
 }  // namespace namespace_string_data

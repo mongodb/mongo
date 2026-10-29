@@ -2,6 +2,15 @@
  * Shims and polyfills for various types.
  */
 
+/**
+ * NOTE: This file is shared by every JS engine: the shell, the legacy in-process MozJS server scope
+ * and the WASM server scope. The latter two have no filesystem-backed module loader, so this file
+ * must remain a classic script -- it may not use `import` or `export`, and it may not rely on
+ * anything a module would provide. That is enforced by a lint rule (see "no-restricted-syntax" for
+ * this path in eslint.config.mjs); if you need module syntax here, the file has to be forked for
+ * server-side use first, and the fork needs a test guarding it against drift.
+ */
+
 // Date and time types
 /**
  * The return value is not a valid JSON string. See 'tojson()' function comment for details.
@@ -459,6 +468,10 @@ DBPointer.prototype.tojson = function () {
     return this.toString();
 };
 
+DBPointer.prototype.toJSON = function () {
+    return {ns: this.ns, id: this.id};
+};
+
 DBPointer.prototype.getCollection = function () {
     return this.ns;
 };
@@ -709,8 +722,12 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
         if (val == globalThis.DB?.prototype) continue;
         if (val == globalThis.DBCollection?.prototype) continue;
 
+        // JSON.stringify rather than `"${key}"`. The tojson's contract is that eval() of its output
+        // reproduces the input, and a key holding a backslash or a quote does not survive being
+        // interpolated raw.
         fieldStrings.push(
-            `${leadingPad}${indent}"${key}" : ` + tojson(val, indent, nolint, depth + 1, sortKeys),
+            `${leadingPad}${indent}${JSON.stringify(key)} : ` +
+                tojson(val, indent, nolint, depth + 1, sortKeys),
         );
     }
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -47,6 +21,8 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
@@ -67,9 +43,13 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_latency_accumulator.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
@@ -77,6 +57,7 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -87,6 +68,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -139,11 +121,7 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
  */
 void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
                                                     ClientCursorPin& cursorPin) {
-    if (!cursorPin->isChangeStreamQuery()) {
-        return;
-    }
-
-    if (!internalChangeStreamRespectsReadPreference.loadRelaxed()) {
+    if (!QueryKnobConfiguration::get(opCtx).getChangeStreamRespectsReadPreference()) {
         return;
     }
 
@@ -173,6 +151,50 @@ void ensureChangeStreamReadPreferenceCanBeSatisfied(OperationContext* opCtx,
                                 << ReadPreferenceSetting(readPref).toString()
                                 << "' can no longer be satisfied after a replica set election");
     }
+}
+
+/**
+ * For change stream cursors whose updateLookup stage was wired on the optimized (Express/SBE) path,
+ * enforces that the optimization feature flag is still enabled. If an operator has turned the flag
+ * off since the cursor was opened, kills the cursor and throws a resumable RetryChangeStream error,
+ * so the stream is reopened (built fresh with the flag's current value) on the legacy Aggregation
+ * path.
+ *
+ * This check is a no-op for cursors that never took the optimized path (non-change-stream cursors,
+ * cursors opened with the flag off, or streams that simply do not do an updateLookup).
+ */
+void ensureChangeStreamOptimizedLookupStillEnabled(OperationContext* opCtx,
+                                                   ClientCursorPin& cursorPin) {
+    if (!cursorPin->usesOptimizedUpdateLookup()) {
+        return;
+    }
+
+    // NOTE: Reading a fresh feature flag value, as opposed to snapshoted one, since we want to
+    // determine if the flag value has changed from the time the executor has been created.
+    if (feature_flags::gFeatureFlagChangeStreamOptimizedUpdateLookup.checkEnabled()) {
+        return;
+    }
+
+    // The flag got turned off after this cursor was wired on the optimized path. Kill the cursor
+    // before throwing and surface a resumable change stream error.
+    cursorPin.deleteUnderlying();
+    uasserted(ErrorCodes::RetryChangeStream,
+              "Optimized change-stream updateLookup was disabled; resuming on the legacy path");
+}
+
+/**
+ * The single method for all change-stream getMore preconditions.
+ */
+void ensureChangeStreamGetMorePreconditions(OperationContext* opCtx, ClientCursorPin& cursorPin) {
+    if (!cursorPin->isChangeStreamQuery()) {
+        return;
+    }
+
+    // Check if readPreference can still be satisfied after possible elections.
+    ensureChangeStreamReadPreferenceCanBeSatisfied(opCtx, cursorPin);
+
+    // Check if the updateLookup optimization flag was turned off on the updateLookup cursor.
+    ensureChangeStreamOptimizedLookupStillEnabled(opCtx, cursorPin);
 }
 
 /**
@@ -310,13 +332,20 @@ void setUpOperationDeadline(OperationContext* opCtx,
 }
 /**
  * Sets up the OperationContext in order to correctly inherit options like the read concern from the
- * cursor to this operation.
+ * cursor to this operation. Returns a guard that runs the rest of the getMore under the cursor's
+ * QueryLifespan (restoring the opCtx's previous lifespan on destruction); the caller must hold it
+ * for the duration of the operation.
  */
-void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
-                                                  CurOp* curOp,
-                                                  const ClientCursor& cursor,
-                                                  const GetMoreCommandRequest& cmd,
-                                                  bool disableAwaitDataFailpointActive) {
+[[nodiscard]] QueryLifespan::AlternativeQueryRegion setUpOperationContextAndCurOpStateForGetMore(
+    OperationContext* opCtx,
+    CurOp* curOp,
+    const ClientCursor& cursor,
+    const GetMoreCommandRequest& cmd,
+    bool disableAwaitDataFailpointActive) {
+    // Run the rest of the setup (and the getMore) under the cursor's lifespan.
+    auto queryLifespanRegion = cursor.bindQueryLifespan(opCtx);
+
+    // TODO(SERVER-130398): Migrate the per-getMore state setup below onto QueryLifespan.
     applyConcernsAndReadPreference(opCtx, cursor);
 
     // Restore rawData onto the opCtx.
@@ -349,6 +378,8 @@ void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
             opCtx->setComment(comment.wrap());
         }
     }
+
+    return queryLifespanRegion;
 }
 
 /**
@@ -560,14 +591,9 @@ public:
         void acquireLocksAndIterateCursor(OperationContext* opCtx,
                                           rpc::ReplyBuilderInterface* reply,
                                           ClientCursorPin& cursorPin,
-                                          CurOp* curOp) {
+                                          CurOp* curOp,
+                                          bool disableAwaitDataFailpointActive) {
             const auto& cmd = request();
-            const bool disableAwaitDataFailpointActive =
-                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
-
-            // Inherit properties like readConcern and maxTimeMS from our originating cursor.
-            setUpOperationContextAndCurOpStateForGetMore(
-                opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
 
             NamespaceString nss = ns();
             CursorLocks locks{opCtx, nss, cursorPin};
@@ -607,10 +633,6 @@ public:
                 // Initialize optime to the cursor's current position before batch generation so
                 // that $currentOp shows a non-null value while this getMore is in progress.
                 auto ts = exec->getLatestOplogTimestamp();
-                tassert(12613202,
-                        "Change stream pipeline executor must have a non-null latest oplog "
-                        "timestamp",
-                        !ts.isNull());
                 curOp->debug().changeStreamMetrics.setOptime(ts);
             }
 
@@ -671,14 +693,12 @@ public:
                 awaitDataState(opCtx).shouldWaitForInserts = true;
             }
 
-            waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &waitWithPinnedCursorDuringGetMoreBatch,
-                    opCtx,
-                    "waitWithPinnedCursorDuringGetMoreBatch",
-                    []() {}, /*empty function*/
-                    nss);
-            });
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &waitWithPinnedCursorDuringGetMoreBatch,
+                opCtx,
+                "waitWithPinnedCursorDuringGetMoreBatch",
+                /*whileWaiting=*/nullptr,
+                nss);
 
             const auto shouldSaveCursor = generateBatch(opCtx,
                                                         cursorPin.getCursor(),
@@ -686,15 +706,20 @@ public:
                                                         cursorPin->isTailable(),
                                                         &nextBatch,
                                                         &numResults);
+            // Unlike registerCursor(), the pipeline-level check cannot run here: the flag is only
+            // missing at this point when the mongot stage was established after registration (e.g.
+            // nested in a $lookup/$unionWith sub-pipeline built during this getMore). Testing the
+            // recorded mongotCursorId covers that case.
+            if (CurOp::get(opCtx)->debug().mongotCursorId.has_value()) {
+                cursorPin->setMayHoldMongotTaskExecutor();
+            }
 
-            if (cursorPin->isChangeStreamQuery()) {
+            const bool isChangeStream = cursorPin->isChangeStreamQuery();
+
+            if (isChangeStream) {
                 // Update optime after every getMore: reflects the last event's timestamp when
                 // events were returned, or the current high-watermark when the batch was empty.
                 auto ts = exec->getLatestOplogTimestamp();
-                tassert(12613201,
-                        "Change stream pipeline executor must have a non-null latest oplog "
-                        "timestamp",
-                        !ts.isNull());
                 curOp->debug().changeStreamMetrics.setOptime(ts);
             }
 
@@ -702,6 +727,16 @@ public:
             exec->getPlanExplainer().getSummaryStats(&postExecutionStats);
             postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
             postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
+
+            // Attribute this getMore's time here, while the cursor's QueryLifespan is still bound:
+            // it unbinds before completeOperation, so that chokepoint can't see getMores.
+            if (auto strategy = postExecutionStats.planSelectionStrategy;
+                strategy && shouldRecordLatencyStats(opCtx)) {
+                auto& queryLatency = QueryLatencyAccumulator::get(opCtx);
+                queryLatency.recordStrategy(*strategy);
+                queryLatency.addLatency(curOp->elapsedTimeExcludingPauses());
+            }
+
             curOp->debug().setPlanSummaryMetrics(std::move(postExecutionStats));
 
             // We do not report 'execStats' for aggregation or other cursors with the
@@ -750,6 +785,18 @@ public:
             curOp->setEndOfOpMetrics(numResults);
             collectQueryStatsMongod(opCtx, cursorPin);
 
+            if (isChangeStream) {
+                change_stream::cursorDocsReturned().add(numResults);
+                change_stream::cursorBytesReturned().add(nextBatch.bytesUsed());
+                change_stream::cursorDocsExamined().add(
+                    curOp->debug().getAdditiveMetrics().docsExamined.value_or(0));
+                const auto* storageStats = curOp->getOperationStorageStats();
+                change_stream::cursorBytesRead().add(storageStats ? storageStats->bytesRead() : 0);
+                if (numResults > 0) {
+                    change_stream::cursorBatchesReturned().add(1);
+                }
+            }
+
             const auto& includeMetricsOption = cmd.getIncludeMetrics();
             const bool includeQueryStatsMetrics =
                 cmd.getIncludeQueryStatsMetrics().value_or(false) ||
@@ -757,6 +804,15 @@ public:
             boost::optional<CursorMetrics> metrics = includeQueryStatsMetrics
                 ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                 : boost::none;
+
+            // Account the oplog batch served to a replication oplog fetcher. 'isReplOplogGetMore'
+            // is set only for getMores that carry a term, which only internal replication clients
+            // may use, so it identifies oplog fetching and excludes other oplog readers (backups,
+            // etc.).
+            if (curOp->debug().isReplOplogGetMore) {
+                repl::recordOplogBytesSent(static_cast<int64_t>(nextBatch.bytesUsed()));
+            }
+
             nextBatch.done(respondWithId,
                            nss,
                            metrics,
@@ -818,6 +874,8 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             const auto& cmd = request();
+            // A memory shedding kill will also kill the underlying cursor, so this can free
+            markOperationQueryMemorySheddingEligible(opCtx);
             // Gets the number of write ops in the current multidocument transaction.
             auto getNumTxnOps = [opCtx]() -> boost::optional<size_t> {
                 if (opCtx->inMultiDocumentTransaction()) {
@@ -871,6 +929,11 @@ public:
             // oplog read request.
             boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
             if (cmd.getTerm() && nss == NamespaceString::kRsOplogNamespace) {
+                // only mark as replication if term is not dummy value
+                if (auto* sm = transport::SessionManager::get(opCtx->getClient());
+                    *cmd.getTerm() >= 0) {
+                    sm->markReplicationSession(opCtx->getClient());
+                }
                 // Validate term before acquiring locks.
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 // Note: updateTerm returns ok if term stayed the same.
@@ -896,8 +959,12 @@ public:
 
             ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);
 
-            // Check that readPreference can still be satisfied after possible elections.
-            ensureChangeStreamReadPreferenceCanBeSatisfied(opCtx, cursorPin);
+            // Run the change stream getMore preconditions before iterating the cursor.
+            ensureChangeStreamGetMorePreconditions(opCtx, cursorPin);
+
+            if (cursorPin->isChangeStreamQuery()) {
+                change_stream::recordCursorOptionMetrics(cmd.getBatchSize(), cmd.getMaxTimeMS());
+            }
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==
@@ -907,7 +974,18 @@ public:
             // later checking of whether this invocation performed a write.
             boost::optional<size_t> numTxnOpsPre = getNumTxnOps();
 
-            acquireLocksAndIterateCursor(opCtx, reply, cursorPin, curOp);
+            const bool disableAwaitDataFailpointActive =
+                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
+
+            // Inherit properties like readConcern and maxTimeMS from our originating cursor. The
+            // returned guard runs the rest of the getMore under the cursor's lifespan (restoring
+            // the opCtx's previous lifespan on return); it is held to the end of the invocation so
+            // late steps (read-concern waits, unpin failpoints) still run under it.
+            auto queryLifespanRegion = setUpOperationContextAndCurOpStateForGetMore(
+                opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
+
+            acquireLocksAndIterateCursor(
+                opCtx, reply, cursorPin, curOp, disableAwaitDataFailpointActive);
 
             if (MONGO_unlikely(getMoreHangAfterPinCursor.shouldFail())) {
                 LOGV2(20477,

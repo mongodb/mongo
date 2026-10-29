@@ -1,0 +1,10 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "projection_test",
+    srcs = glob([
+        "*.test",
+        "*.coll",
+        "*.results",
+    ]),
+)

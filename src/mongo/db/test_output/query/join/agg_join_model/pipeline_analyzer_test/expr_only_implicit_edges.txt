@@ -62,15 +62,15 @@
     "resolvedPaths": [
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "bar"
+            "underlyingFieldPath": "bar"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "bar"
+            "underlyingFieldPath": "bar"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "bar"
+            "underlyingFieldPath": "bar"
         }
     ],
     "prefix": [

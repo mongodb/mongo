@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import platform, wttest
+import platform, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, Oplog
 from wtscenario import make_scenarios
 
@@ -58,6 +58,15 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
     @property
     def conn_follower_config(self):
         return self.base_config + 'disaggregated=(role="follower")'
+
+    # Check the step-up statistics after a step-up drained a single ingest table.
+    # Tombstone-only drains move no value bytes, so callers that only remove keys skip the byte check.
+    def check_step_up_drain_stats(self, session_follow, expect_bytes=True):
+        self.assertEqual(
+            self.get_stat(wiredtiger.stat.conn.disagg_step_up_ingest_tables_drained, session=session_follow), 1)
+        if expect_bytes:
+            self.assertGreater(
+                self.get_stat(wiredtiger.stat.conn.disagg_step_up_ingest_drain_bytes, session=session_follow), 0)
 
     def test_drain_insert_update(self):
         # Create the oplog
@@ -106,6 +115,7 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
 
         self.conn.close('debug=(skip_checkpoint=true)')
         conn_follow.reconfigure('disaggregated=(role="leader")')
+        self.check_step_up_drain_stats(session_follow)
 
         # Checkpoint after draining the ingest table
         conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())}')
@@ -168,6 +178,7 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
 
         self.conn.close('debug=(skip_checkpoint=true)')
         conn_follow.reconfigure('disaggregated=(role="leader")')
+        self.check_step_up_drain_stats(session_follow, expect_bytes=False)
 
         # Checkpoint after draining the ingest table
         conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())}')
@@ -291,6 +302,7 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
 
         self.conn.close('debug=(skip_checkpoint=true)')
         conn_follow.reconfigure('disaggregated=(role="leader")')
+        self.check_step_up_drain_stats(session_follow)
 
         # Checkpoint after draining the ingest table
         conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())}')

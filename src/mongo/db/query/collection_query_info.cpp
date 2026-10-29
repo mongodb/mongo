@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/collection_query_info.h"
 
@@ -55,7 +29,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 
 #include <map>
@@ -200,6 +174,46 @@ CollectionQueryInfo::PathArraynessCollectionState::operator=(
     return *this;
 }
 
+CollectionQueryInfo::SchemaTypeInfoCollectionState::SchemaTypeInfoCollectionState()
+    : schemaConstraints{std::make_shared<SchemaTypeInfo>()} {}
+
+CollectionQueryInfo::SchemaTypeInfoCollectionState::SchemaTypeInfoCollectionState(
+    const CollectionQueryInfo::SchemaTypeInfoCollectionState& other) {
+    schemaConstraints = other.snapshot();
+}
+
+CollectionQueryInfo::SchemaTypeInfoCollectionState&
+CollectionQueryInfo::SchemaTypeInfoCollectionState::operator=(
+    const CollectionQueryInfo::SchemaTypeInfoCollectionState& other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    replace(other.snapshot());
+    return *this;
+}
+
+std::shared_ptr<const SchemaTypeInfo> CollectionQueryInfo::SchemaTypeInfoCollectionState::snapshot()
+    const {
+    auto readLock = rwMutex.readLock();
+    return schemaConstraints;
+}
+
+void CollectionQueryInfo::SchemaTypeInfoCollectionState::publish(
+    pipeline::type_system::Type rootType) {
+    auto writeLock = rwMutex.writeLock();
+    if (schemaConstraints && schemaConstraints->getRootType() == rootType) {
+        return;
+    }
+    schemaConstraints = std::make_shared<SchemaTypeInfo>(std::move(rootType));
+}
+
+void CollectionQueryInfo::SchemaTypeInfoCollectionState::replace(
+    std::shared_ptr<const SchemaTypeInfo> schemaTypeInfo) {
+    auto writeLock = rwMutex.writeLock();
+    schemaConstraints = std::move(schemaTypeInfo);
+}
+
 void CollectionQueryInfo::updatePathArraynessForSetMultikey(
     const IndexDescriptor& descriptor, const MultikeyPaths& multikeyPaths) const {
     if (PathArrayness::isIndexEligibleToAddToPathArrayness(descriptor) && !multikeyPaths.empty()) {
@@ -214,7 +228,7 @@ void CollectionQueryInfo::updatePathArraynessForSetMultikey(
         auto newPathArrayness =
             std::make_shared<PathArrayness>(*_pathArraynessState.pathArrayness.get());
         newPathArrayness->addPathsFromIndexKeyPattern(
-            descriptor.keyPattern(), multikeyPaths, false /* isFullRebuild */);
+            descriptor.keyPattern(), multikeyPaths, /*isFullRebuild=*/false);
         newPathArrayness->incrementEpoch();
         // Re-assign PathArrayness pointer.
         _pathArraynessState.pathArrayness = std::move(newPathArrayness);
@@ -240,7 +254,7 @@ void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Co
         // since we should just assume this path is an array.
         if (!multikeyPaths.empty()) {
             newPathArrayness->addPathsFromIndexKeyPattern(
-                desc->keyPattern(), multikeyPaths, true /* isFullRebuild */);
+                desc->keyPattern(), multikeyPaths, /*isFullRebuild=*/true);
         }
     }
     // We assume that this method will be called in a thread-safe manner and thus, can safely do
@@ -251,6 +265,26 @@ void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Co
 std::shared_ptr<const PathArrayness> CollectionQueryInfo::getPathArrayness() const {
     auto readLock = _pathArraynessState.rwMutex.readLock();
     return _pathArraynessState.pathArrayness;
+}
+
+void CollectionQueryInfo::rebuildSchemaTypeInfo(OperationContext* opCtx, const Collection* coll) {
+    SchemaTypeInfo inferred;
+    auto validatorDoc = coll->getValidatorDoc();
+    if (!validatorDoc.isEmpty() && coll->getValidationLevel() == ValidationLevelEnum::constraint) {
+        auto validatorFilter = coll->getValidatorFilter();
+        if (validatorFilter.isOK()) {
+            inferred.populateFromValidator(validatorFilter.getValue().get());
+        }
+    }
+    _schemaTypeInfoState.publish(inferred.getRootType());
+}
+
+void CollectionQueryInfo::invalidateSchemaTypeInfo() {
+    _schemaTypeInfoState.publish(pipeline::type_system::Type::anyObject());
+}
+
+std::shared_ptr<const SchemaTypeInfo> CollectionQueryInfo::getSchemaTypeInfo() const {
+    return _schemaTypeInfoState.snapshot();
 }
 
 void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
@@ -274,6 +308,9 @@ void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     rebuildIndexData(opCtx, coll);
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         rebuildPathArrayness(opCtx, coll);
+    }
+    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+        rebuildSchemaTypeInfo(opCtx, coll);
     }
 }
 

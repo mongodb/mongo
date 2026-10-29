@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/util/net/ssl_manager.h"
@@ -317,8 +291,7 @@ SSLManagerCoordinator* SSLManagerCoordinator::get() {
 
 std::shared_ptr<SSLManagerInterface> SSLManagerCoordinator::createTransientSSLManager(
     const TransientSSLParams& transientSSLParams) const {
-    return SSLManagerInterface::create(
-        sslGlobalParams, transientSSLParams, false /* isSSLServer */);
+    return SSLManagerInterface::create(sslGlobalParams, transientSSLParams, /*isServer=*/false);
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerCoordinator::getSSLManager() {
@@ -1273,11 +1246,11 @@ StatusWith<std::vector<DERInteger>> parseTLSFeature(ConstDataRange cdrExtension)
 }
 
 std::string removeFQDNRoot(std::string name) {
-    if (name.back() == '.') {
+    if (name.ends_with('.')) {
         name.pop_back();
     }
     return name;
-};
+}
 
 namespace {
 
@@ -1381,6 +1354,14 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
 
 // TODO SERVER-11601 Use NFC Unicode canonicalization
 bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
+    // Defense-in-depth: reject any NUL-bearing name so the comparisons below cannot be tricked into
+    // matching only the prefix before the NUL. Callers should already extract SAN/CN values by
+    // their true length and drop such entries.
+    if (nameToMatch.find('\0') != std::string::npos ||
+        certHostName.find('\0') != std::string::npos) {
+        return false;
+    }
+
     nameToMatch = removeFQDNRoot(std::move(nameToMatch));
     certHostName = removeFQDNRoot(std::move(certHostName));
 

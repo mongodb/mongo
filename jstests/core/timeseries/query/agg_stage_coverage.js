@@ -4,6 +4,7 @@
  * for a new document source.
  *
  * @tags: [
+ *   uses_explain,
  *   # $listMqlEntities cannot be wrapped in a $facet stage.
  *   do_not_wrap_aggregations_in_facets,
  *   requires_timeseries,
@@ -44,7 +45,9 @@ for (let i = 0; i < 10; i++) {
 // Ensure the plan cache deterministically contains at least one entry for $planCacheStats
 // (the query can be satisfied either by an _id scan based on timeField, or an index scan on m.tag).
 // This avoids flakiness across SBE and classic variants, which differ in plan cache behavior.
-assert.eq(9, tsColl.find({time: {$gt: startingTime}, "m.tag": "A"}).itcount());
+const populatePlanCache = () =>
+    assert.eq(9, tsColl.find({time: {$gt: startingTime}, "m.tag": "A"}).itcount());
+populatePlanCache();
 
 // Set up a 2nd collection for stages that need subpipelines.
 const otherColl = db[jsTestName() + "_other"];
@@ -76,15 +79,6 @@ for (let i = 0; i < 10; i++) {
 
 // These are stages that will error when run on a timeseries collection.
 const errorTests = [
-    {
-        stage: "$_internalSearchIdLookup",
-        pipeline: [{$_internalSearchIdLookup: {}}],
-        expectedErrorCodes: [
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
-            10557302, // check for 'canRunOnTimeseries' failed.
-            12093200, // LiteParsed timeseries validation.
-        ],
-    },
     {
         stage: "$_analyzeShardKeyReadWriteDistribution",
         pipeline: [
@@ -148,7 +142,7 @@ const errorTests = [
         pipeline: [
             {$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}},
         ],
-        // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+        // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
         expectedErrorCodes: [40602, 10557302, 12093200, 40324, ErrorCodes.IllegalOperation],
     },
 ];
@@ -204,6 +198,9 @@ const noUnpackTests = [
         stage: "$planCacheStats",
         pipeline: [{$planCacheStats: {}}],
         skipTest: !isViewlessTimeseriesOnlySuite(db),
+        // The balancer can clear the plan cache via moveCollection at any time, so repopulate it
+        // before reading $planCacheStats.
+        repopulateBeforeRead: populatePlanCache,
     },
     {
         stage: "$_unpackBucket",
@@ -338,7 +335,23 @@ const unpackTests = [
         jsTest.log.info("Skipping " + test.stage + " test on timeseries collections.");
         return;
     }
-    const result = tsColl.aggregate(test.pipeline).toArray();
+    // 'repopulateBeforeRead' retries until docs are returned, so it can't coexist with
+    // 'zeroDocsReturned'.
+    assert(
+        !(test.repopulateBeforeRead && test.zeroDocsReturned),
+        test.stage + " cannot set both 'repopulateBeforeRead' and 'zeroDocsReturned'.",
+    );
+    let result;
+    if (test.repopulateBeforeRead && TestData.runningWithBalancer) {
+        // The balancer can clear the plan cache mid-test; retry, repopulating each attempt.
+        assert.soon(() => {
+            test.repopulateBeforeRead();
+            result = tsColl.aggregate(test.pipeline).toArray();
+            return result.length > 0;
+        }, test.stage + " expected to return documents on timeseries collections.");
+    } else {
+        result = tsColl.aggregate(test.pipeline).toArray();
+    }
     if (test.zeroDocsReturned) {
         assert.eq(
             result.length,
@@ -460,6 +473,7 @@ const skippedStages = [
     "$_internalChangeStreamUnwindTransaction",
 
     // Stages on the admin DB or run with aggregate: 1.
+    "$listQueryKnobs",
     "$listMqlEntities",
     "$documents",
     "$currentOp",
@@ -467,6 +481,10 @@ const skippedStages = [
     "$listSampledQueries",
     "$shardedDataDistribution",
     "$querySettings",
+    "$joinPlanCacheStats",
+    // Internal stage the $querySettings desugar appends for showDebugQueryShape; never user-run.
+    "$_internalListQuerySettings",
+    "$_internalQuerySettingsDebugShape",
     "$listLocalSessions",
     "$listSessions",
     "$_backupFile",
@@ -487,8 +505,11 @@ const skippedStages = [
     "$searchBeta",
     "$listSearchIndexes",
     "$setVariableFromSubPipeline",
-    // Internal container stage produced during search pipeline expansion.
+
+    // Internal stages produced during search pipeline expansion.
     "$_internalDocumentResultsAndMetadata",
+    "$_internalSearchIdLookup",
+    "$_internalStreamTerminator",
 
     // Stages tested in 'agg_stage_coverage_internal_client.js', since they require extra setup.
     "$mergeCursors",
@@ -505,6 +526,7 @@ const skippedStages = [
     "$cachedLookup",
     "$externalFunction",
     "$_streamsVectorSearch",
+    "$throttle",
 
     // Stages that cannot be made by user requests and run on oplog data.
     "$_internalFindAndModifyImageLookup",

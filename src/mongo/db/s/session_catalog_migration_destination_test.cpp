@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/session_catalog_migration_destination.h"
 
@@ -168,8 +142,8 @@ public:
         _migrationId = UUID::gen();
 
         {
-            auto donorShard = assertGet(shardRegistry()->getShard(
-                operationContext(), ShardRef(kDonorConnStr.getSetName())));
+            auto donorShard = assertGet(
+                shardRegistry()->getShard(operationContext(), kDonorConnStr.getSetName()));
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
                 ->setConnectionStringReturnValue(kDonorConnStr);
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
@@ -240,7 +214,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
     }
 
@@ -261,7 +235,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "insert");
@@ -285,7 +259,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "preparedTransaction");
@@ -329,7 +303,7 @@ public:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
@@ -341,7 +315,7 @@ public:
             FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
 
             txnParticipant.commitPreparedTransaction(
-                opCtx, *commitTimestamp, boost::none /* commitOplogEntryOpTime */);
+                opCtx, *commitTimestamp, /*commitOplogEntryOpTime=*/boost::none);
         } else {
             txnParticipant.commitUnpreparedTransaction(opCtx);
         }
@@ -419,15 +393,15 @@ public:
             initializeOperationSessionInfo(innerOpCtx.get(),
                                            opMsgRequest.getValidatedTenantId(),
                                            osi,
-                                           true /* requiresAuth */,
-                                           true /* attachToOpCtx */,
-                                           true /* isReplSetMemberOrMongos */);
+                                           /*requiresAuth=*/true,
+                                           /*attachToOpCtx=*/true,
+                                           /*isReplSetMemberOrMongos=*/true);
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(innerOpCtx.get());
             auto sessionTxnState = mongoDSessionCatalog->checkOutSession(innerOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());
             txnParticipant.beginOrContinue(innerOpCtx.get(),
                                            {*sessionInfo.getTxnNumber()},
-                                           boost::none /* autocommit */,
+                                           /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
 
             const auto reply = write_ops_exec::performInserts(innerOpCtx.get(), insertRequest);
@@ -463,13 +437,12 @@ private:
         public:
             StaticCatalogClient() = default;
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
 
                 ShardType donorShard;
-                donorShard.setHandle(ShardHandle(ShardId(kDonorConnStr.getSetName()), boost::none));
+                donorShard.setName(kDonorConnStr.getSetName());
                 donorShard.setHost(kDonorConnStr.toString());
 
                 return repl::OpTimeWith<std::vector<ShardType>>({donorShard});
@@ -2104,7 +2077,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         txnParticipant.refreshFromStorageIfNeeded(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {3},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
     }
 

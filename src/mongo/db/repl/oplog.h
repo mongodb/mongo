@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
@@ -62,7 +35,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class Collection;
 class CollectionPtr;
 class Database;
@@ -102,17 +75,18 @@ public:
 };
 
 namespace repl {
+using namespace std::literals::string_view_literals;
 namespace internal {
-MONGO_MOD_NEEDS_REPLACEMENT Status
-insertDocumentsForOplog(OperationContext* opCtx,
-                        const CollectionPtr& oplogCollection,
-                        std::vector<Record>* records,
-                        const std::vector<Timestamp>& timestamps);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status insertDocumentsForOplog(
+    OperationContext* opCtx,
+    const CollectionPtr& oplogCollection,
+    std::vector<Record>* records,
+    const std::vector<Timestamp>& timestamps);
 }  // namespace internal
 
 class ReplSettings;
 
-struct MONGO_MOD_PRIVATE OplogLink {
+struct [[MONGO_MOD_PRIVATE]] OplogLink {
     OplogLink() = default;
 
     OpTime prevOpTime;
@@ -184,8 +158,8 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx);
 /**
  * Use 'oplog' as the new cached pointer to the local oplog.
  *
- * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding onto
- * the global lock in exclusive mode.
+ * Called by catalog::openCatalogAfterRollbackToStable() to re-establish the oplog collection
+ * pointer while holding onto the global lock in exclusive mode.
  */
 void establishOplogRecordStoreForLogging(OperationContext* opCtx, RecordStore* oplog);
 
@@ -199,14 +173,14 @@ using IncrementOpsAppliedStatsFn = std::function<void(int64_t)>;
  */
 class OplogApplication {
 public:
-    static constexpr std::string_view kInitialSyncOplogApplicationMode = "InitialSync"_sd;
+    static constexpr std::string_view kInitialSyncOplogApplicationMode = "InitialSync"sv;
     // This only being used in 'applyOps' command when sent by client.
-    static constexpr std::string_view kRecoveringOplogApplicationMode = "Recovering"_sd;
-    static constexpr std::string_view kStableRecoveringOplogApplicationMode = "StableRecovering"_sd;
+    static constexpr std::string_view kRecoveringOplogApplicationMode = "Recovering"sv;
+    static constexpr std::string_view kStableRecoveringOplogApplicationMode = "StableRecovering"sv;
     static constexpr std::string_view kUnstableRecoveringOplogApplicationMode =
-        "UnstableRecovering"_sd;
-    static constexpr std::string_view kSecondaryOplogApplicationMode = "Secondary"_sd;
-    static constexpr std::string_view kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
+        "UnstableRecovering"sv;
+    static constexpr std::string_view kSecondaryOplogApplicationMode = "Secondary"sv;
+    static constexpr std::string_view kApplyOpsCmdOplogApplicationMode = "ApplyOps"sv;
 
     enum class Mode {
         // Used during the oplog application phase of the initial sync process.
@@ -299,6 +273,26 @@ Status applyCommand_inlock(OperationContext* opCtx,
                            OplogApplication::Mode mode);
 
 /**
+ * Returns true iff the per-document validation hash 'h' carried on an oplog entry should be
+ * verified against a recomputed hash on the secondary upon oplog application. All of the following
+ * must hold:
+ *   - 'mode' is steady-state secondary application (excludes initial sync, recovery, applyOps),
+ *   - the continuous internode per-document validation feature is enabled,
+ *   - 'collection' is a supported collection: one with replicated record ids, or one clustered on
+ *     _id, whose record ids follow from its documents,
+ *   - the namespace is not implicitly replicated, since those replicate only a subset of their
+ *     writes and each node derives the rest for itself, and
+ *   - 'h' is present on the entry.
+ *
+ * For a clustered collection this is only reached for updates and deletes when the by-record-id
+ * apply fast path is on.
+ */
+bool shouldVerifyValidationHash(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                OplogApplication::Mode mode,
+                                const OplogEntry& op);
+
+/**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
  */
 void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplogNS);
@@ -363,4 +357,4 @@ auto writeConflictRetryWithLimit(OperationContext* opCtx,
 }
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

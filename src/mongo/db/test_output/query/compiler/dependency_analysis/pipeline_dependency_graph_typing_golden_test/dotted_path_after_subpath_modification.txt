@@ -1,0 +1,39 @@
+VARIATION DottedPathAfterSubpathModification
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$set": {
+                "x": {
+                    "y": "$a"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x.y: any
+    x.y.z: any
+  after $match:1
+    x.y: missing
+    x.y.z: missing
+  end of pipeline
+    x.y: any
+    x.y.z: any
+

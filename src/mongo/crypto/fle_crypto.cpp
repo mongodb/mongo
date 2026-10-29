@@ -1,56 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/crypto/fle_crypto.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/cstdint.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/multiprecision/cpp_int/bitwise.hpp>
-#include <boost/multiprecision/cpp_int/comparison.hpp>
-#include <boost/multiprecision/cpp_int/divide.hpp>
-#include <boost/multiprecision/cpp_int/limits.hpp>
-#include <boost/multiprecision/cpp_int/literals.hpp>
-#include <boost/multiprecision/cpp_int/multiply.hpp>
-#include <boost/optional.hpp>
-// IWYU pragma: no_include "boost/multiprecision/detail/default_ops.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/integer_ops.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/no_et_ops.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/number_base.hpp"
-// IWYU pragma: no_include "boost/multiprecision/detail/number_compare.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/multiprecision/number.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -66,6 +18,23 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_int/bitwise.hpp>
+#include <boost/multiprecision/cpp_int/comparison.hpp>
+#include <boost/multiprecision/cpp_int/divide.hpp>
+#include <boost/multiprecision/cpp_int/limits.hpp>
+#include <boost/multiprecision/cpp_int/literals.hpp>
+#include <boost/multiprecision/cpp_int/multiply.hpp>
+#include <boost/multiprecision/number.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 extern "C" {
 #include <mc-fle2-payload-iev-private-v2.h>
@@ -122,6 +91,12 @@ extern "C" {
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+// IWYU pragma: no_include "boost/multiprecision/detail/default_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/integer_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/no_et_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/number_base.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/number_compare.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -773,8 +748,7 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     FLE2InsertUpdatePayloadV2 iupayload;
 
     iupayload.setEncryptedTokens(
-        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */, boost::none)
-            .encrypt(ecocToken));
+        StateCollectionTokensV2(escDataCounterkey, /*leaf=*/false, boost::none).encrypt(ecocToken));
 
     iupayload.setEdcDerivedToken(std::move(edcDataCounterkey));
     iupayload.setEscDerivedToken(std::move(escDataCounterkey));
@@ -1034,8 +1008,6 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
 void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
                           std::string_view fieldPath) {
-
-    // TODO: SERVER-127454 - validate field is actually indexed in the schema
 
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
@@ -2218,7 +2190,7 @@ BSONObj ESCCollectionAnchorPadding::generateNullAnchorDocument(
     const AnchorPaddingKeyToken& keyToken,
     const AnchorPaddingValueToken& valueToken,
     uint64_t apos,
-    uint64_t /* cpos */) {
+    /*cpos=*/uint64_t) {
     auto block = generateNullAnchorId(hmacCtx, keyToken);
 
     constexpr uint64_t ignored{0};
@@ -2975,8 +2947,24 @@ FLE2IndexedRangeEncryptedValueV2::getMetadataBlocks() const {
 FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue()
     : _value(mc_FLE2IndexedEncryptedValueV2_new()) {}
 
+void FLE2IndexedTextEncryptedValue::verifyTotalTagCountIsWithinLimit(ConstDataRange toParse) {
+    constexpr size_t kCountsOffset = 1 + 16 + 1;  // fle_blob_subtype + key_uuid + bson_type
+    constexpr size_t kMinHeaderSize = kCountsOffset + 3 * sizeof(uint32_t);
+    uassert(12773700,
+            "Encountered a buffer with invalid length for a FLE2IndexedTextEncryptedValue",
+            toParse.length() >= kMinHeaderSize);
+
+    ConstDataRangeCursor cursor(toParse);
+    cursor.advance(kCountsOffset);
+    auto edgeCount = cursor.readAndAdvance<LittleEndian<uint32_t>>();
+    uassert(12773701,
+            "FLE2IndexedTextEncryptedValue contains tags that exceed the tag limit",
+            edgeCount <= EncryptionInformationHelpers::kFLE2PerFieldTagLimit);
+}
+
 FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue(ConstDataRange toParse)
     : _value(mc_FLE2IndexedEncryptedValueV2_new()) {
+    verifyTotalTagCountIsWithinLimit(toParse);
     auto buf = MongoCryptBuffer::borrow(toParse);
     MongoCryptStatus status;
     mc_FLE2IndexedEncryptedValueV2_parse(_value.get(), buf.get(), status);
@@ -3626,6 +3614,14 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
                 "recreate the collection with the 'suffix' query type.",
                 !hasQueryType(efc, QueryTypeEnum::SuffixPreviewDeprecated));
     }
+    if (gFeatureFlagQESubstringSearch.isEnabledUseLastLTSFCVWhenUninitialized(
+            kVersionContextIgnored_UNSAFE,
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassert(12915801,
+                "Collection contains the 'substringPreview' query type which is deprecated. Please "
+                "recreate the collection with the 'substring' query type.",
+                !hasQueryType(efc, QueryTypeEnum::SubstringPreviewDeprecated));
+    }
     return efc;
 }
 
@@ -3705,6 +3701,25 @@ void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
                     totalTagStorage,
                     BSONObjMaxUserSize),
         shouldOverrideTotalTagOverheadLimit || totalTagStorage <= BSONObjMaxUserSize);
+}
+
+void EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(int64_t contention) {
+    uassert(ErrorCodes::BadValue,
+            fmt::format("contention factor ({}) must be >= 0", contention),
+            contention >= 0);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("contention factor ({}) exceeds the maximum allowed value ({})",
+                        contention,
+                        kFLEMaxContentionFactor),
+            contention <= kFLEMaxContentionFactor);
+}
+
+void EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(
+    const EncryptedFieldConfig& ef) {
+    visitQueryTypeConfigs(ef, [](const EncryptedField&, const QueryTypeConfig& qtc) {
+        EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(qtc.getContention());
+        return false;
+    });
 }
 
 void EncryptionInformationHelpers::checkSubstringParameterLimitsNotExceeded(
@@ -3945,14 +3960,27 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
         edc = EDCDerivedFromDataToken{prefixTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{prefixTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{prefixTokens->getServerDerivedToken().asPrfBlock()};
+        if (const auto& spec = payload.getPrefixSpec(); spec) {
+            minQueryLength = spec->getMinQueryLength();
+            maxQueryLength = spec->getMaxQueryLength();
+        }
     } else if (suffixTokens) {
         edc = EDCDerivedFromDataToken{suffixTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{suffixTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{suffixTokens->getServerDerivedToken().asPrfBlock()};
+        if (const auto& spec = payload.getSuffixSpec(); spec) {
+            minQueryLength = spec->getMinQueryLength();
+            maxQueryLength = spec->getMaxQueryLength();
+        }
     } else if (substringTokens) {
         edc = EDCDerivedFromDataToken{substringTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{substringTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{substringTokens->getServerDerivedToken().asPrfBlock()};
+        if (const auto& spec = payload.getSubstringSpec(); spec) {
+            minQueryLength = spec->getMinQueryLength();
+            maxQueryLength = spec->getMaxQueryLength();
+            maxLength = spec->getMaxLength();
+        }
     } else {
         edc = EDCDerivedFromDataToken{exactTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{exactTokens->getEscDerivedToken().asPrfBlock()};
@@ -4036,6 +4064,32 @@ bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMat
                                  [&matcher](const EncryptedField&, const QueryTypeConfig& qtc) {
                                      return matcher(qtc.getQueryType());
                                  });
+}
+
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedField& field,
+                                                      const QueryTypeMatchFn& matcher) {
+    boost::optional<QueryTypeConfig> result;
+    visitQueryTypeConfigs(field, [&](const EncryptedField&, const QueryTypeConfig& qtc) {
+        if (matcher(qtc.getQueryType())) {
+            result = qtc;
+            return true;
+        }
+        return false;
+    });
+    return result;
+}
+
+boost::optional<QueryTypeConfig> getQueryTypeMatching(const EncryptedFieldConfig& config,
+                                                      const QueryTypeMatchFn& matcher) {
+    boost::optional<QueryTypeConfig> result;
+    visitQueryTypeConfigs(config, [&](const EncryptedField&, const QueryTypeConfig& qtc) {
+        if (matcher(qtc.getQueryType())) {
+            result = qtc;
+            return true;
+        }
+        return false;
+    });
+    return result;
 }
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
@@ -4668,8 +4722,8 @@ StatusWith<std::vector<uint8_t>> FLEUtil::encryptData(ConstDataRange key,
 
     uint32_t written;
     if (!fle2alg->do_encrypt(crypto,
-                             iv.get() /* iv */,
-                             NULL /* aad */,
+                             /*iv=*/iv.get(),
+                             /*aad=*/NULL,
                              MongoCryptBuffer::borrow(key).get(),
                              MongoCryptBuffer::borrow(plainText).get(),
                              out.get(),

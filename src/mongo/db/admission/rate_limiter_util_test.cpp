@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
@@ -74,8 +48,19 @@ public:
         return _sleepAttempted;
     }
 
+    /**
+     * Runs just before an alarm fires. Since alarms here resolve without any real-time wait, this
+     * is where a test simulates the time a sleeping caller would have spent waiting.
+     */
+    void setOnAlarm(std::function<void()> onAlarm) {
+        _onAlarm = std::move(onAlarm);
+    }
+
     void setAlarm(Date_t when, unique_function<void()> action) override {
         _sleepAttempted = true;
+        if (_onAlarm) {
+            _onAlarm();
+        }
         // Fire the callback immediately so the caller unblocks without any real-time wait.
         // waitForConditionUntil detects the inline execution and returns timeout right away.
         action();
@@ -83,15 +68,23 @@ public:
 
 private:
     bool _sleepAttempted = false;
+    std::function<void()> _onAlarm;
 };
 
 // Test fixture that injects PreciseClockSourceSpy as the ServiceContext's precise clock.
 class RateLimiterWithPreciseClockSpyTest : public ServiceContextTest {
 public:
-    RateLimiterWithPreciseClockSpyTest()
-        : ServiceContextTest(_initContext(&_clockSpy, &_tickSource)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        auto spy = std::make_unique<PreciseClockSourceSpy>();
+        _clockSpy = spy.get();
+        auto tick = std::make_unique<TickSourceMock<Milliseconds>>();
+        _tickSource = tick.get();
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            std::make_unique<ClockSourceMock>(), std::move(spy), std::move(tick)));
+    }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->reset();
         _tickSource->reset(0);
     }
@@ -113,19 +106,8 @@ public:
     }
 
 private:
-    // Written by _initContext before ServiceContextTest base is constructed (safe for raw ptrs).
-    PreciseClockSourceSpy* _clockSpy;
-    TickSourceMock<Milliseconds>* _tickSource;
-
-    static std::unique_ptr<ScopedGlobalServiceContextForTest> _initContext(
-        PreciseClockSourceSpy** spyOut, TickSourceMock<Milliseconds>** tickOut) {
-        auto spy = std::make_unique<PreciseClockSourceSpy>();
-        *spyOut = spy.get();
-        auto tick = std::make_unique<TickSourceMock<Milliseconds>>();
-        *tickOut = tick.get();
-        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-            std::make_unique<ClockSourceMock>(), std::move(spy), std::move(tick)));
-    }
+    PreciseClockSourceSpy* _clockSpy = nullptr;
+    TickSourceMock<Milliseconds>* _tickSource = nullptr;
 
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
                                                           logv2::LogSeverity::Debug(4)};
@@ -134,6 +116,7 @@ private:
 class RateLimiterWithMockClockTest : public ClockSourceMockServiceContextTest {
 public:
     void setUp() override {
+        ClockSourceMockServiceContextTest::setUp();
         static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->reset();
         static_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource())->reset(0);
     }
@@ -217,10 +200,6 @@ public:
         int64_t attemptedAdmissions;
         double tokensAcquired;
     };
-
-    void setUp() override {
-        RateLimiterWithMockClockTest::setUp();
-    }
 
     std::unique_ptr<RateLimiterMetricsRecorder> recorder() {
         return _policy.recorder();
@@ -306,6 +285,25 @@ TYPED_TEST(RateLimiterRecorderTest, BasicTokenAcquisition) {
     // zero, so the average timing metric will have that as its first value.
     ASSERT(rateLimiter.stats().averageTimeQueuedMicros().has_value());
     ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros(), 0.0, 0.1);
+}
+
+// Verify that every recorder sums the queue times it is given, and that the requests admitted
+// without waiting (which report a queue time of zero) leave the total alone.
+// Verify that the recorder sums the measured waits reported by callers, and that the naps the
+// token bucket plans do not contribute to that sum.
+TYPED_TEST(RateLimiterRecorderTest, TotalTimeQueuedMicrosSumsMeasuredWaits) {
+    auto recorder = this->recorder();
+    ASSERT_EQ(recorder->totalTimeQueuedMicros(), 0);
+
+    recorder->record(AverageTimeQueuedMicros{250'000});
+    ASSERT_EQ(recorder->totalTimeQueuedMicros(), 0);
+
+    recorder->record(TimeQueuedMicros{0});
+    ASSERT_EQ(recorder->totalTimeQueuedMicros(), 0);
+
+    recorder->record(TimeQueuedMicros{250'000});
+    recorder->record(TimeQueuedMicros{1'500});
+    ASSERT_EQ(recorder->totalTimeQueuedMicros(), 251'500);
 }
 
 // Verify that RateLimiter::setBurstSize range checks its input.
@@ -587,6 +585,102 @@ TEST_F(RateLimiterWithPreciseClockSpyTest,
     ASSERT_EQ(rateLimiter.stats().removedFromQueue(), 1);
 }
 
+// Verify that the wait a caller spends held at the limiter is attributed to the admission context
+// it brought, and that the limiter reports that same measurement rather than the nap it planned.
+TEST_F(RateLimiterWithPreciseClockSpyTest, ReportsTheWaitItAttributesToTheAdmissionContext) {
+    constexpr Milliseconds kWait{250};
+    const int refreshRate = 4;
+    const double burstCapacitySecs = convertBurstSizeToBurstCapacitySecs(refreshRate, 1);
+
+    RateLimiter rateLimiter = makeRateLimiter(
+        "ReportsTheWaitItAttributesToTheAdmissionContext", refreshRate, burstCapacitySecs, INT_MAX);
+    auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 1);
+    auto* opCtx = clientsWithOps[0].second.get();
+
+    // The clocks only move while the limiter is asleep, so the wait it imposes is the only thing
+    // the measurements below can pick up.
+    bool slept = false;
+    clockSpy()->setOnAlarm([&] {
+        if (!std::exchange(slept, true)) {
+            advanceTime(kWait);
+        }
+    });
+
+    MockAdmissionContext admCtx;
+    // Consume the burst token so the next request has to wait for a refill.
+    ASSERT_OK(rateLimiter.acquireToken(opCtx, &admCtx));
+    ASSERT_EQ(admCtx.totalTimeQueuedMicros(), Microseconds{0});
+
+    ASSERT_OK(rateLimiter.acquireToken(opCtx, &admCtx));
+    ASSERT_EQ(admCtx.totalTimeQueuedMicros(), Microseconds{kWait});
+    ASSERT_EQ(rateLimiter.stats().totalTimeQueuedMicros(),
+              durationCount<Microseconds>(admCtx.totalTimeQueuedMicros()));
+
+    BSONObjBuilder bob;
+    rateLimiter.appendStats(&bob);
+    ASSERT_EQ(bob.obj()["totalTimeQueuedMicros"].safeNumberLong(),
+              durationCount<Microseconds>(kWait));
+}
+
+// Verify that an admission context bound when the slot is reserved still covers the wait that
+// happens later, when the deferred token is redeemed.
+TEST_F(RateLimiterWithPreciseClockSpyTest, AttributesTheWaitToTheContextBoundAtReservation) {
+    constexpr Milliseconds kWait{250};
+    const int refreshRate = 4;
+    const double burstCapacitySecs = convertBurstSizeToBurstCapacitySecs(refreshRate, 1);
+
+    RateLimiter rateLimiter = makeRateLimiter(
+        "AttributesTheWaitToTheContextBoundAtReservation", refreshRate, burstCapacitySecs, INT_MAX);
+    auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 1);
+    auto* opCtx = clientsWithOps[0].second.get();
+
+    bool slept = false;
+    clockSpy()->setOnAlarm([&] {
+        if (!std::exchange(slept, true)) {
+            advanceTime(kWait);
+        }
+    });
+
+    MockAdmissionContext admCtx;
+    // Consume the burst token so the slot reserved below is not immediately valid.
+    ASSERT_OK(rateLimiter.acquireToken(opCtx, &admCtx));
+
+    auto deferredToken = rateLimiter.acquireToken(&admCtx);
+    ASSERT_TRUE(deferredToken);
+    ASSERT_FALSE(deferredToken->isReady());
+    ASSERT_EQ(admCtx.totalTimeQueuedMicros(), Microseconds{0});
+
+    ASSERT_OK(std::move(*deferredToken).get(opCtx));
+    ASSERT_EQ(admCtx.totalTimeQueuedMicros(), Microseconds{kWait});
+    ASSERT_EQ(rateLimiter.stats().totalTimeQueuedMicros(),
+              durationCount<Microseconds>(admCtx.totalTimeQueuedMicros()));
+}
+
+// Verify that a gate with no admission context to attribute the wait to still has it timed.
+TEST_F(RateLimiterWithPreciseClockSpyTest, TimesItsOwnWaitWithoutAnAdmissionContext) {
+    constexpr Milliseconds kWait{250};
+    const int refreshRate = 4;
+    const double burstCapacitySecs = convertBurstSizeToBurstCapacitySecs(refreshRate, 1);
+
+    RateLimiter rateLimiter = makeRateLimiter(
+        "TimesItsOwnWaitWithoutAnAdmissionContext", refreshRate, burstCapacitySecs, INT_MAX);
+    auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 1);
+    auto* opCtx = clientsWithOps[0].second.get();
+
+    bool slept = false;
+    clockSpy()->setOnAlarm([&] {
+        if (!std::exchange(slept, true)) {
+            advanceTime(kWait);
+        }
+    });
+
+    ASSERT_OK(rateLimiter.acquireToken(opCtx));
+    ASSERT_EQ(rateLimiter.stats().totalTimeQueuedMicros(), 0);
+
+    ASSERT_OK(rateLimiter.acquireToken(opCtx));
+    ASSERT_EQ(rateLimiter.stats().totalTimeQueuedMicros(), durationCount<Microseconds>(kWait));
+}
+
 // Verify that `RateLimiter::recordExemption()` increments the exemption metric but no others.
 TYPED_TEST(RateLimiterRecorderTest, RecordExemption) {
     RateLimiter rateLimiter =
@@ -666,7 +760,7 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         // the mock clock. Use a real-time deadline instead of a bounded retry loop so the wait
         // scales correctly under slow sanitizer builds (e.g. AUBSAN ~10x slower).
         const auto enqueueDeadline = Date_t::now() + Seconds(60);
-        while (rateLimiter.queued() != numThreads - maxTokens) {
+        while (rateLimiter.stats().addedToQueue() < (numThreads - maxTokens)) {
             if (Date_t::now() >= enqueueDeadline) {
                 break;
             }
@@ -986,6 +1080,59 @@ TEST_F(RateLimiterWithMockClockTest, ReturnTokens) {
 
     // Assert that calling returnTokens returns the expected number of tokens to the bucket.
     ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - tokensToConsume + tokensToReturn);
+}
+
+TEST_F(RateLimiterWithMockClockTest, ReconcileTokens) {
+    RateLimiter rateLimiter = makeRateLimiter("RateLimiterReconcileTokens",
+                                              /*refreshRate=*/100,
+                                              /*burstCapacitySecs=*/3,
+                                              /*maxQueueDepth=*/100);
+    const auto maxTokens = 100 * 3;  // refreshRate * burstCapacitySecs
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
+
+    // Zero is a no-op. Negative credits are capped by burst capacity when the bucket is full.
+    rateLimiter.reconcileTokens(0);
+    rateLimiter.reconcileTokens(-5);
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
+
+    // Positive reconciliation drains the bucket without blocking.
+    rateLimiter.reconcileTokens(50);
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - 50);
+
+    // Negative reconciliation returns tokens (same effect as returnTokens).
+    rateLimiter.reconcileTokens(-20);
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - 30);
+
+    // Reconciling past the available balance borrows (the balance goes negative).
+    rateLimiter.reconcileTokens(maxTokens);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -30);
+
+    // Reconciliation adjusts only the balance; it records no admission.
+    ASSERT_EQ(rateLimiter.stats().successfulAdmissions(), 0);
+    ASSERT_EQ(rateLimiter.stats().attemptedAdmissions(), 0);
+}
+
+TEST_F(RateLimiterWithMockClockTest, UpdateRateParametersPreservingBalanceKeepsDebt) {
+    RateLimiter rateLimiter = makeRateLimiter("RateLimiterPreserveDebt",
+                                              /*refreshRate=*/100,
+                                              /*burstCapacitySecs=*/3,
+                                              /*maxQueueDepth=*/100);
+    const auto maxTokens = 100 * 3;  // refreshRate * burstCapacitySecs
+
+    rateLimiter.reconcileTokens(maxTokens);
+    rateLimiter.reconcileTokens(50);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -50);
+
+    rateLimiter.updateRateParametersPreservingBalance(/*refreshRatePerSec=*/10,
+                                                      /*burstCapacitySecs=*/0.5);
+    ASSERT_EQ(rateLimiter.tokenBalance(), -50);
+
+    // Positive surplus is still capped by the new burst size.
+    rateLimiter.returnTokens(100);
+    ASSERT_EQ(rateLimiter.tokenBalance(), 5);
+    rateLimiter.updateRateParametersPreservingBalance(/*refreshRatePerSec=*/10,
+                                                      /*burstCapacitySecs=*/0.5);
+    ASSERT_EQ(rateLimiter.tokenBalance(), 5);
 }
 
 }  // namespace

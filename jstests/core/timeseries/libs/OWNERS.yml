@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "viewless_timeseries_util.js":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -55,7 +55,7 @@ rules:
   - rule: "enforce-tasks-distro-with-special-tag"
     tags:
       - task_tag_name: "requires_large_host"
-        allowed_distro_regex: "(.*large|.*-medium|macos-.*|ubi.*)"
+        allowed_distro_regex: "(.*large|.*-medium|(release-)?macos-.*|ubi.*)"
 
   - rule: "enforce-tags-for-tasks"
     tag_groups:
@@ -77,10 +77,11 @@ rules:
           - assigned_to_jira_team_server_execution
           - assigned_to_jira_team_server_storage_engines
           - assigned_to_jira_team_server_programmability
-          - assigned_to_jira_team_server_workload_scheduling
+          - assigned_to_jira_team_server_workload_resilience
           - assigned_to_jira_team_server_networking_and_observability
           - assigned_to_jira_team_server_integration
           - assigned_to_jira_team_server_disagg
+          - assigned_to_jira_team_product_performance
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/devprod.yaml
           - assigned_to_jira_team_devprod_build
@@ -104,15 +105,15 @@ rules:
         max_num_of_tags: 1
       # Every task should have required selection tag
       - group_name: "required_selection_tags"
-        tag_regex: (development_critical|development_critical_single_variant|release_critical|default|non_deterministic|experimental|auxiliary|monguard|monguard_lint)
+        tag_regex: (development_critical|development_critical_single_variant|all_variants|default|non_required|experimental|auxiliary|monguard|monguard_lint)
         # Before changing anything in this list, please read
         # https://github.com/10gen/mongo/blob/master/docs/evergreen-testing/yaml_configuration/task_selection_tags.md
         tag_list:
           - development_critical
           - development_critical_single_variant
-          - release_critical
+          - all_variants
           - default
-          - non_deterministic
+          - non_required
           - experimental
           - auxiliary
           - monguard
@@ -137,9 +138,9 @@ rules:
           - incompatible_debug_mode
           - incompatible_system_allocator
           - incompatible_inmemory
+          - incompatible_with_bazel_remote_test
           - incompatible_all_feature_flags
           - incompatible_development_variant
-          - requires_replicated_fast_count_recovery
           - incompatible_disaggregated_storage
           - incompatible_disaggregated_storage_tsan
           - incompatible_disaggregated_storage_no_feature_flag
@@ -195,6 +196,7 @@ rules:
             "streams_kafka_9",
             "streams_kafka_10",
             "streams_kafka_11",
+            "streams_kafka_12",
             "streams_kafka_gwproxy",
             "streams_kafka_benchmark",
             "streams_https",
@@ -218,6 +220,7 @@ rules:
             "streams_aspio_iceberg_4",
             "streams_aspio_iceberg_large",
             "streams_aspio_iceberg_5",
+            "streams_aspio_iceberg_azure",
             "streams_aspio_utilities",
             "streams_externaljs",
             "streams_aspio_pubsub",
@@ -233,6 +236,19 @@ rules:
             "streams_sanitizer_7",
             "streams_sanitizer_8",
             "streams_sanitizer_9",
+            "streams_kafka_0_sanitizer",
+            "streams_kafka_1_sanitizer",
+            "streams_kafka_2_sanitizer",
+            "streams_kafka_3_sanitizer",
+            "streams_kafka_4_sanitizer",
+            "streams_kafka_5_sanitizer",
+            "streams_kafka_6_sanitizer",
+            "streams_kafka_7_sanitizer",
+            "streams_kafka_8_sanitizer",
+            "streams_kafka_9_sanitizer",
+            "streams_kafka_10_sanitizer",
+            "streams_kafka_11_sanitizer",
+            "streams_kafka_12_sanitizer",
             "streams_https_sanitizer",
             "streams_lambda_sanitizer",
             "streams_kinesis_sanitizer",
@@ -260,4 +276,17 @@ rules:
             "selinux_rhel9_org",
             "selinux_rhel8_enterprise",
             "ssl_linear_macos",
+            # product_limits is explicitly scheduled (weekly cron) on selected variants.
+            "product_limits",
+            # The mongot_extension_platform_matrix tasks run nightly on the enterprise Linux
+            # variants to cover the real mongot-extension on every supported Linux flavor, but the
+            # suites are still marked experimental.
+            # TODO: drop the experimental tag from these tasks and remove these exceptions.
+            "with_mongot_extension_fully_enabled_single_node",
+            "with_mongot_extension_fully_enabled_single_shard",
+            "with_mongot_extension_fully_enabled_sharded_collections",
+            "with_mongot_extension_fully_enabled_sharded_cluster",
+            "concurrency_with_mongot_extension_single_node",
+            "concurrency_with_mongot_extension_mongos",
+            "concurrency_with_mongot_extension_sharded_collections",
           ]

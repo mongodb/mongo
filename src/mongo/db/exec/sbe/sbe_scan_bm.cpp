@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -59,7 +33,7 @@ public:
         {
             WriteUnitOfWork wuow{operationContext()};
             ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+                operationContext(), *agc, inserts.begin(), inserts.end(), /*opDebug=*/nullptr));
             wuow.commit();
         }
     }
@@ -104,8 +78,8 @@ public:
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();
-        auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-        value::ValueGuard inputGuard{inputTag, inputVal};
+        value::TagValueOwned inputArr =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(BSONArray()));
 
         auto makeStageFn = [uuid, dbName](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> stage,
@@ -117,23 +91,23 @@ public:
                                                   dbName,
                                                   scanSlot,
                                                   recordIdSlot,
-                                                  boost::none /* snapshotIdSlot */,
-                                                  boost::none /* indexIdentSlot */,
-                                                  boost::none /* indexKeySlot */,
-                                                  boost::none /* indexKeyPatternSlot */,
-                                                  std::vector<std::string>{} /* scanFieldNames */,
+                                                  /*snapshotIdSlot=*/boost::none,
+                                                  /*indexIdentSlot=*/boost::none,
+                                                  /*indexKeySlot=*/boost::none,
+                                                  /*indexKeyPatternSlot=*/boost::none,
+                                                  /*scanFieldNames=*/std::vector<std::string>{},
                                                   scanFieldSlots,
-                                                  true /* forward */,
-                                                  nullptr /* yieldPolicy */,
+                                                  /*forward=*/true,
+                                                  /*yieldPolicy=*/nullptr,
                                                   kEmptyPlanNodeId,
-                                                  nullptr /* scanOpenCallback */,
-                                                  false /* participateInTrialRunTracking */);
+                                                  /*scanOpenCallback=*/nullptr,
+                                                  /*participateInTrialRunTracking=*/false);
 
             return std::make_pair(scanSlot, std::move(scanStage));
         };
 
         for (auto _ : state) {
-            dummyTest.runFast(inputTag, inputVal, makeStageFn);
+            dummyTest.runFast(inputArr.tag(), inputArr.value(), makeStageFn);
         }
     }
 
@@ -147,8 +121,8 @@ public:
 
         UUID uuid = colls.getMainCollection()->uuid();
         DatabaseName dbName = dummyTest._nss.dbName();
-        auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray());
-        value::ValueGuard inputGuard{inputTag, inputVal};
+        value::TagValueOwned inputArr =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(BSONArray()));
 
         auto makeStageFn = [uuid, dbName](value::SlotId scanSlot,
                                           std::unique_ptr<PlanStage> stage,
@@ -160,25 +134,25 @@ public:
                                            dbName,
                                            scanSlot,
                                            recordIdSlot,
-                                           boost::none /* snapshotIdSlot */,
-                                           boost::none /* indexIdentSlot */,
-                                           boost::none /* indexKeySlot */,
-                                           boost::none /* indexKeyPatternSlot */,
-                                           std::vector<std::string>{} /* scanFieldNames */,
+                                           /*snapshotIdSlot=*/boost::none,
+                                           /*indexIdentSlot=*/boost::none,
+                                           /*indexKeySlot=*/boost::none,
+                                           /*indexKeyPatternSlot=*/boost::none,
+                                           /*scanFieldNames=*/std::vector<std::string>{},
                                            scanFieldSlots,
-                                           boost::none /* minRecordIdSlot */,
-                                           boost::none /* maxRecordIdSlot */,
-                                           true /* forward */,
-                                           nullptr /* yieldPolicy */,
+                                           /*minRecordIdSlot=*/boost::none,
+                                           /*maxRecordIdSlot=*/boost::none,
+                                           /*forward=*/true,
+                                           /*yieldPolicy=*/nullptr,
                                            kEmptyPlanNodeId,
-                                           nullptr /* scanOpenCallback */,
-                                           false /* participateInTrialRunTracking */);
+                                           /*scanOpenCallback=*/nullptr,
+                                           /*participateInTrialRunTracking=*/false);
 
             return std::make_pair(scanSlot, std::move(scanStage));
         };
 
         for (auto _ : state) {
-            dummyTest.runFast(inputTag, inputVal, makeStageFn);
+            dummyTest.runFast(inputArr.tag(), inputArr.value(), makeStageFn);
         }
     }
 

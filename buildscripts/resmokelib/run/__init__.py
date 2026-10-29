@@ -3,6 +3,7 @@
 import argparse
 import collections
 import json
+import math
 import os
 import os.path
 import platform
@@ -288,6 +289,7 @@ class TestRunner(Subcommand):
 
             for suite in suites:
                 self._interrupted = self._run_suite(suite)
+                self._fail_on_test_selection_error(suite)
                 if self._interrupted or (suite.options.fail_fast and suite.return_code != 0):
                     self._log_resmoke_summary(suites)
                     self.exit(suite.return_code)
@@ -670,13 +672,16 @@ class TestRunner(Subcommand):
             local_resmoke_invocation_with_params,
         )
 
+        if task is None:
+            self._resmoke_logger.warning(
+                "Skipping local-resmoke-invocation.txt because no evergreen task definition could"
+                " be found for %s.",
+                suite_name,
+            )
+            return
+
         try:
             lines = []
-
-            if task is None:
-                raise RuntimeError(
-                    f"Error: Could not find evergreen task definition for {suite_name}"
-                )
 
             is_multiversion = "multiversion" in task.tags
             generate_func = task.find_func_command("generate resmoke tasks")
@@ -868,6 +873,20 @@ class TestRunner(Subcommand):
         )
 
     @TRACER.start_as_current_span("run.__init__._execute_suite")
+    def _fail_on_test_selection_error(self, suite: Suite):
+        """Fail the run if the suite's test selection file was unusable.
+
+        The tests have already run by this point -- a broken selection step costs coverage
+        nothing, because the suite falls back to running everything -- but it must not pass
+        quietly, or selection could stay broken indefinitely while builds look green.
+        """
+        if not suite.tss_selection_error:
+            return
+        self._resmoke_logger.error(
+            "Failing %s: %s", suite.get_display_name(), suite.tss_selection_error
+        )
+        suite.return_code = max(suite.return_code or 0, 2)
+
     def _execute_suite(self, suite: Suite) -> bool:
         """Execute a suite and return True if interrupted, False otherwise."""
         execute_suite_span = trace.get_current_span()
@@ -988,6 +1007,19 @@ class TestRunner(Subcommand):
         in buildscripts/tests/resmokelib/run/test_shuffle_tests.py
         """
 
+        # How strongly a long running test is pulled towards the front of the run. The weight of
+        # a test is this factor times sqrt(number of tests) times its standard deviations above
+        # the mean runtime. Scaling this way keeps the ordering from collapsing to a
+        # near-deterministic longest-first sort in large suites, while still placing the longest
+        # tests within the first percent or so of the run. The weight is never scaled by more
+        # than len(tests), so small suites are unchanged.
+        STIFFNESS_FACTOR = 4.0
+
+        # Runtime distributions are long tailed, so a single test can be dozens of standard
+        # deviations above the mean and swamp every other weight. Clamping keeps the handful of
+        # long tests competing with each other for the front of the run.
+        MAX_STDEVS_ABOVE_MEAN = 6.0
+
         def __init__(self, historic_task_data: HistoricTaskData):
             self.runtimes_historic = {}
             for result in historic_task_data.historic_test_results:
@@ -1003,12 +1035,15 @@ class TestRunner(Subcommand):
             if not total:
                 # Zero tests had historic runtime information
                 return TestRunner.RandomShuffle().shuffle(tests)
+            scale = min(len(tests), self.STIFFNESS_FACTOR * math.sqrt(len(tests)))
             arr = []
             for test in tests:
                 if test in self.runtimes_historic:
-                    stdevs_above_mean = (self.runtimes_historic[test] - mean) / stdev
+                    stdevs_above_mean = min(
+                        (self.runtimes_historic[test] - mean) / stdev, self.MAX_STDEVS_ABOVE_MEAN
+                    )
                     weight = max(
-                        stdevs_above_mean * len(tests), 1
+                        stdevs_above_mean * scale, 1
                     )  # max(_, 1) ensures positive, non-zero weight.
                 else:
                     weight = 1
@@ -1030,6 +1065,10 @@ class TestRunner(Subcommand):
                 return None, None, None
             mean = statistics.mean(runtimes)
             stdev = statistics.stdev(runtimes)
+            if not stdev:
+                # Every test with historic data ran for the same amount of time, so there is no
+                # long test to prioritize and no meaningful scale to weight tests against.
+                return None, None, None
             return total, mean, stdev
 
         def weighted_shuffle(self, arr):
@@ -1986,6 +2025,15 @@ class RunPlugin(PluginInterface):
             help='JSON containing historic test runtime, like [{"test_name": test.js, "avg_duration_pass": 1.4}]',
         )
         parser.add_argument(
+            "--tssTestList",
+            dest="tss_test_list",
+            help=(
+                "YAML file holding the tests Evergreen's test selection service chose for this"
+                " suite, produced at build time. When the file records a successful selection,"
+                " it is used instead of calling the selection endpoint from here."
+            ),
+        )
+        parser.add_argument(
             "--mongoVersionFile",
             dest="mongo_version_file",
             help="A YAML file containing the current `mongo_version`",
@@ -2334,6 +2382,13 @@ class RunPlugin(PluginInterface):
         )
 
         def fast_check_params_parser(params: str | None) -> dict | None:
+            if params:
+                # Tools such as burn_in_tests.py read resmoke_args straight out of the Evergreen
+                # project config, where expansions have not been substituted yet. Treat an
+                # unexpanded expansion (e.g. "${fastCheckParameters|}") the same as an empty value.
+                params = params.strip().strip("'\"")
+                if params.startswith("${") and params.endswith("}"):
+                    params = ""
             if not params:
                 return None
             try:
@@ -2350,7 +2405,8 @@ class RunPlugin(PluginInterface):
             type=fast_check_params_parser,
             help=(
                 "JSON string of parameters for fast-check property-based tests. "
-                "Supported keys: numRuns, seed, replayPath, path, endOnFailure, minCommands, maxCommands"
+                "Supported keys: numRuns, seed, replayPath, path, endOnFailure, minCommands, "
+                "maxCommands, interruptAfterTimeLimit"
             ),
         )
 
@@ -2474,6 +2530,17 @@ class RunPlugin(PluginInterface):
             dest="task_name",
             metavar="TASK_NAME",
             help="Sets the name of the Evergreen task running the tests.",
+        )
+
+        evergreen_options.add_argument(
+            "--displayTaskName",
+            dest="display_task_name",
+            metavar="DISPLAY_TASK_NAME",
+            help=(
+                "Sets the name of the Evergreen display task that the task running the tests"
+                " rolls up to, as reported to test selection. When omitted, the task name is"
+                " reported instead."
+            ),
         )
 
         evergreen_options.add_argument(

@@ -10,7 +10,6 @@ data_correctness
 encryption
 eviction
 eviction_checkpoint_interaction
-flush_tier
 functional_correctness
 history_store
 indexes
@@ -31,7 +30,6 @@ search
 search_near
 session_api
 statistics
-tiered_storage
 timestamps
 transactions
 truncate

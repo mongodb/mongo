@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -108,7 +82,7 @@ enum class TerminationCause {
  * Active transactions are protected by the locking subsystem, so we must hold at least a
  * Global intent lock before calling this function to start a transaction.
  */
-MONGO_MOD_PUB void allocateSnapshotWithConsistentCatalog(
+[[MONGO_MOD_PUBLIC]] void allocateSnapshotWithConsistentCatalog(
     OperationContext* opCtx, const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions);
 
 /**
@@ -119,7 +93,7 @@ MONGO_MOD_PUB void allocateSnapshotWithConsistentCatalog(
  * Its methods are split in two groups with distinct read/write and concurrency control rules. See
  * the comments below for more information.
  */
-class MONGO_MOD_PUB TransactionParticipant {
+class [[MONGO_MOD_PUBLIC]] TransactionParticipant {
     struct PrivateState;
     struct ObservableState;
 
@@ -225,7 +199,12 @@ public:
 
     ~TransactionParticipant();
 
-    enum class MONGO_MOD_PUB TransactionActions { kNone, kStart, kContinue, kStartOrContinue };
+    enum class [[MONGO_MOD_PUBLIC]] TransactionActions {
+        kNone,
+        kStart,
+        kContinue,
+        kStartOrContinue
+    };
 
     // Forward-declare so that TxnResources::friend resolves to the sibling nested class.
     class Participant;
@@ -234,7 +213,7 @@ public:
      * Holds state for a snapshot read or multi-statement transaction in between network
      * operations.
      */
-    class MONGO_MOD_PRIVATE TxnResources {
+    class [[MONGO_MOD_PRIVATE]] TxnResources {
     public:
         enum class StashStyle { kPrimary, kSecondary };
 
@@ -311,7 +290,7 @@ public:
      *  recovery unit back onto the `opCtx` and restoring the locker state relevant to the original
      *  WUOW.
      */
-    class MONGO_MOD_PUB SideTransactionBlock {
+    class [[MONGO_MOD_PUBLIC]] SideTransactionBlock {
     public:
         SideTransactionBlock(OperationContext* opCtx);
         ~SideTransactionBlock();
@@ -323,15 +302,16 @@ public:
         OperationContext* _opCtx;
     };  // class SideTransactionBlock
 
-    using CommittedStatementTimestampMap MONGO_MOD_PRIVATE =
-        absl::flat_hash_map<StmtId, repl::OpTime>;
+    // Map from statement ID -> opTime and wall clock time when that statement was executed.
+    using CommittedStatementTimestampMap [[MONGO_MOD_PRIVATE]] =
+        absl::flat_hash_map<StmtId, std::pair<repl::OpTime, Date_t>>;
 
     static const BSONObj kDeadEndSentinel;
 
     /**
      * Class used by observers to examine the state of a TransactionParticipant.
      */
-    class MONGO_MOD_PUB Observer {
+    class [[MONGO_MOD_PUBLIC]] Observer {
     public:
         explicit Observer(const ObservableSession& session);
 
@@ -409,6 +389,13 @@ public:
 
         bool transactionIsInRetryableWriteMode() const {
             return o().txnState.isInRetryableWriteMode();
+        }
+
+        bool isServerInitiatedTransaction() const {
+            // The metrics observer's stats are the single source of truth for this classification.
+            return o()
+                .transactionMetricsObserver.getSingleTransactionStats()
+                .isServerInitiatedTransaction();
         }
 
         std::string transactionStateDescriptor() const {
@@ -521,7 +508,7 @@ public:
      * Class used by a thread that has checked out the TransactionParticipant's session to observe
      * and modify the transaction participant.
      */
-    class MONGO_MOD_PUB Participant : public Observer {
+    class [[MONGO_MOD_PUBLIC]] Participant : public Observer {
     public:
         // Indicates whether the future lock requests should have timeouts.
         enum class MaxLockTimeout { kNotAllowed, kAllowed };
@@ -628,7 +615,8 @@ public:
                              boost::optional<bool> autocommit,
                              TransactionActions action,
                              const boost::optional<TransactionRuntimeContext>&
-                                 transactionRuntimeContext = boost::none);
+                                 transactionRuntimeContext = boost::none,
+                             boost::optional<bool> isServerInitiatedTransaction = boost::none);
 
         /**
          * Used only by the secondary oplog application logic. Similar to 'beginOrContinue' without
@@ -770,7 +758,7 @@ public:
          * Returns an object containing the transaction-related metadata known by this participant
          * to append on responses.
          */
-        BSONObj getResponseMetadata();
+        BSONObj getResponseMetadata(OperationContext* opCtx);
 
         /**
          * Clears the stored operations for an multi-document (non-autocommit) transaction, marking
@@ -846,6 +834,24 @@ public:
          * the oplog entry which was generated by that write.
          */
         bool checkStatementExecuted(OperationContext* opCtx, StmtId stmtId) const;
+
+        /**
+         * Same as checkStatementExecuted(), but returns the opTime of the oplog entry generated by
+         * the already-executed statement instead of a boolean. Unlike
+         * checkStatementExecutedAndFetchOplogEntry(), it does not scan the oplog: the opTime comes
+         * from the in-memory committed-statements map.
+         * Returns boost::none if the statement has not executed.
+         */
+        boost::optional<repl::OpTime> checkStatementExecutedAndGetOpTime(OperationContext* opCtx,
+                                                                         StmtId stmtId) const;
+
+        /**
+         * Same as checkStatementExecuted(), but returns the wall-clock time at which the statement
+         * was applied (stored in the statement cache at write time) instead of just the opTime.
+         * Returns boost::none if the statement has not executed.
+         */
+        boost::optional<Date_t> checkStatementExecutedAndGetWallClockTime(OperationContext* opCtx,
+                                                                          StmtId stmtId) const;
 
         /**
          * Marks the session as requiring refresh. Used when the session state has been modified
@@ -967,7 +973,8 @@ public:
                 /* isAutoCommit */ false,
                 ticksource,
                 curWallClockTime,
-                expireDate);
+                expireDate,
+                !opCtx->getClient()->session());
         }
 
         /**
@@ -976,7 +983,8 @@ public:
          */
         void addCommittedStmtIds(OperationContext* opCtx,
                                  const std::vector<StmtId>& stmtIdsCommitted,
-                                 const repl::OpTime& writeOpTime);
+                                 const repl::OpTime& writeOpTime,
+                                 Date_t writeWallClockTime);
 
         /**
          * Handles a WouldChangeOwningShard error based on whether the operation that triggered it
@@ -1008,6 +1016,7 @@ public:
     private:
         struct StatementInfo {
             repl::OpTime oplogEntryOpTime;
+            Date_t wallClockTime;
             boost::optional<Timestamp> commitTimestamp;
         };
 
@@ -1032,7 +1041,8 @@ public:
 
         void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                           std::vector<StmtId> stmtIdsWritten,
-                                          const repl::OpTime& lastStmtIdWriteTs);
+                                          const repl::OpTime& lastStmtIdWriteTs,
+                                          Date_t wallClockTime);
 
         // Chooses a snapshot from which a new transaction will read by beginning a storage
         // transaction. This is chosen based on the read concern arguments. If an atClusterTime is
@@ -1170,7 +1180,8 @@ public:
             OperationContext* opCtx,
             const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
             const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext =
-                boost::none);
+                boost::none,
+            boost::optional<bool> isServerInitiatedTransaction = boost::none);
 
         // Attempt to continue an in-progress multi document transaction at the given transaction
         // number and transaction retry counter.
@@ -1465,7 +1476,7 @@ private:
  * The catalog can only exist as a decoration on the Session object and can only be accessed and
  * modified by the thread which has the session checked-out.
  */
-class MONGO_MOD_PRIVATE RetryableWriteTransactionParticipantCatalog {
+class [[MONGO_MOD_PRIVATE]] RetryableWriteTransactionParticipantCatalog {
 public:
     RetryableWriteTransactionParticipantCatalog() = default;
     ~RetryableWriteTransactionParticipantCatalog() = default;
@@ -1557,7 +1568,7 @@ private:
  * it, as a single max-length operation should be able to be packed into an "applyOps"
  * entry.
  */
-MONGO_MOD_PUB std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry();
+[[MONGO_MOD_PUBLIC]] std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry();
 
 /**
  * Returns maximum size (bytes) of operations to pack into a single oplog entry,
@@ -1566,6 +1577,6 @@ MONGO_MOD_PUB std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry(
  * Refer to getMaxNumberOfTransactionOperationsInSingleOplogEntry() comments for a
  * description on packing transaction operations into "applyOps" entries.
  */
-MONGO_MOD_PUB std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes();
+[[MONGO_MOD_PUBLIC]] std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes();
 
 }  // namespace mongo

@@ -2,6 +2,7 @@
  * Tests that the SBE slots and SBE stages fields of explain respect
  * internalQueryExplainSizeThresholdBytes.
  * @tags: [
+ *  uses_explain,
  *  # For simplicity of explain analysis, this test does not run against sharded collections.
  *  assumes_against_mongod_not_mongos,
  *  assumes_standalone_mongod,
@@ -62,7 +63,7 @@ const original = assert.commandWorked(
 
 try {
     // Increase explain threshold step-by-step.
-    for (let size = 410; ; size++) {
+    for (let size = 501; ; size++) {
         if (!checkSbeRestrictedOrFullyEnabled(db)) {
             // Test is SBE-only.
             break;

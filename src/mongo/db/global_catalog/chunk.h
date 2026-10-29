@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,9 +7,8 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -51,14 +24,14 @@ class BSONObj;
 /**
  * Represents a cache entry for a single Chunk. Owned by a RoutingTableHistory.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkInfo {
 public:
     explicit ChunkInfo(const ChunkType& from);
 
     ChunkInfo(ChunkRange range,
               std::string maxKeyString,
               std::string minKeyString,
-              ShardRef shardRef,
+              ShardId shardId,
               ChunkVersion version,
               std::vector<ChunkHistory> history,
               bool jumbo);
@@ -90,19 +63,10 @@ public:
         return _minKeyString;
     }
 
-    const ShardRef& getShardRef() const {
-        return _shardRef;
+    const ShardId& getShardId() const {
+        return _shardId;
     }
 
-    // TODO SERVER-127411: remove this method once all call sites have been migrated to
-    // getShardRef().
-    ShardId getShardId() const {
-        return static_cast<ShardId>(_shardRef);
-    }
-
-    const ShardRef& getShardRefAt(const boost::optional<Timestamp>& ts) const;
-    // TODO SERVER-127411: remove this method once all call sites have been migrated to
-    // getShardRefAt().
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
 
     /**
@@ -151,7 +115,7 @@ private:
 
     const ChunkRange _range;
 
-    const ShardRef _shardRef;
+    const ShardId _shardId;
 
     const ChunkVersion _lastmod;
 
@@ -159,10 +123,10 @@ private:
 
     // Indicates whether this chunk should be treated as jumbo and not attempted to be moved or
     // split
-    AtomicWord<bool> _jumbo;
+    Atomic<bool> _jumbo;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT Chunk {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] Chunk {
 public:
     Chunk(ChunkInfo& chunkInfo, const boost::optional<Timestamp>& atClusterTime)
         : _chunkInfo(chunkInfo), _atClusterTime(atClusterTime) {}
@@ -177,11 +141,6 @@ public:
         return _chunkInfo.getMax();
     }
 
-    const ShardRef& getShardRef() const {
-        return _chunkInfo.getShardRefAt(_atClusterTime);
-    }
-
-    // TODO SERVER-127411: remove this method if we don't need it
     const ShardId& getShardId() const {
         return _chunkInfo.getShardIdAt(_atClusterTime);
     }

@@ -433,6 +433,7 @@ const skips = new Set([
     "$_internalAssertDataAssumptions",
     "$_internalSplitPipeline",
     "$_internalStreamingGroup",
+    "$_internalStreamTerminator",
     "$_internalUnpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.
     "$_streamsVectorSearch", // Internal ASP stub; not a user-facing stage.
     "$_unpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.
@@ -453,12 +454,16 @@ const skips = new Set([
     "$listExtensions",
     "$listLocalSessions",
     "$listMqlEntities",
+    "$listQueryKnobs",
     "$listSampledQueries", // Tested in list_sampled_queries.js.
     "$listSearchIndexes",
     "$listSessions",
     "$mergeCursors",
     "$planCacheStats",
+    "$joinPlanCacheStats",
     "$querySettings",
+    "$_internalListQuerySettings",
+    "$_internalQuerySettingsDebugShape",
     "$queryStats",
     "$queue",
     "$rankFusion",
@@ -475,6 +480,7 @@ const skips = new Set([
     "$setVariableFromSubPipeline",
     "$shardedDataDistribution",
     "$skip",
+    "$throttle",
     "$tumblingWindow",
     "$validate",
     "$vectorSearch",

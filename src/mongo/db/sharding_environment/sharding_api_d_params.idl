@@ -1,29 +1,5 @@
-# Copyright (C) 2022-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     mod_visibility: private
@@ -35,7 +11,7 @@ server_parameters:
             Maximum time in milliseconds to wait on a blocking operation when refreshing the filtering 
             metadata within a transaction.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: metadataRefreshInTransactionMaxWaitMS
         deprecated_name: metadataRefreshInTransactionMaxWaitBehindCritSecMS
         validator:
@@ -49,7 +25,7 @@ server_parameters:
             only a single shard in the cluster. Will have no effect on the behavior in clusters with
             two or more shards.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: directConnectionChecksWithSingleShard
         default: true
         redact: false
@@ -60,7 +36,7 @@ server_parameters:
             direct shard DDL checks. This should only be used in extreme cases, e.g., restore a
             sharded cluster backup to a replica set.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableDirectShardDDLOperations
         default: false
         redact: false
@@ -70,7 +46,7 @@ server_parameters:
             Prohibits upgrading from last LTS FCV to last continuous FCV if the replica set contains
             user data during addShard. **Not a supported feature**. For emergency use only.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: disableTransitionFromLastLTSToLastContinuousWithUserData
         default: true
         redact: false
@@ -80,24 +56,35 @@ server_parameters:
             Maximum number of times a shard will retry a ShardRole operation after detecting stale
             or missing sharding metadata.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: maxShardStaleMetadataRetryAttempts
         validator:
             gte: 1
         default: 10
         redact: false
 
+    # TODO (SERVER-132182): Remove this server parameter. No usages; do not use.
     maxShardMetadataDiskRecoveryAttempts:
         description: >-
-            Maximum number of consecutive no-progress attempts the shard will make while recovering
-            a collection's authoritative collection metadata from the on-disk catalog. Attempts that
-            wait for concurrent placement-version work reset this cap.
+            Unused. Do not use. Kept only for IDL compatibility with 9.0.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: maxShardMetadataDiskRecoveryAttempts
         validator:
             gte: 1
         default: 10
+        redact: false
+
+    enableIncomparableShardVersionRouterBounce:
+        description: >-
+            When enabled, a shard that detects an incomparable shard version and cannot advance
+            configTime via a noop write (e.g. no reachable primary, as on a readable-standby
+            cluster) surfaces a StaleConfig on the router's first attempt so the router refreshes and
+            retries, instead of blocking on the configTime wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableIncomparableShardVersionRouterBounce
+        default: false
         redact: false
 
     # TODO (SERVER-112793) Remove once v9.0 branches out
@@ -106,7 +93,7 @@ server_parameters:
             Enable logging whether a compound wildcard index prefixed by the shard key exists
             when a shard key index is fetched for a sharded collection.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableCompoundWildcardIndexLog
         default: true
         redact: false

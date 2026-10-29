@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -63,10 +37,10 @@ namespace mongo {
 
 struct SplitPolicyParams {
     UUID collectionUUID;
-    ShardRef primaryShardRef;
+    ShardId primaryShardId;
 };
 
-class MONGO_MOD_PUBLIC InitialSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] InitialSplitPolicy {
 public:
     virtual ~InitialSplitPolicy() {}
 
@@ -118,13 +92,13 @@ public:
         const ShardKeyPattern& shardKeyPattern,
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
-        const std::vector<ShardRef>& allShardRefs);
+        const std::vector<ShardId>& allShardIds);
 };
 
 /**
  * Default optimization strategy where we create a single chunk on the primary shard.
  */
-class MONGO_MOD_PUBLIC SingleChunkOnPrimarySplitPolicy : public InitialSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] SingleChunkOnPrimarySplitPolicy : public InitialSplitPolicy {
 public:
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -134,29 +108,29 @@ public:
 /**
  * Create a single chunk on a specified shard.
  */
-class MONGO_MOD_PUBLIC SingleChunkOnShardSplitPolicy : public InitialSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] SingleChunkOnShardSplitPolicy : public InitialSplitPolicy {
 public:
-    SingleChunkOnShardSplitPolicy(OperationContext* opCtx, ShardRef dataShard);
+    SingleChunkOnShardSplitPolicy(OperationContext* opCtx, ShardId dataShard);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
                                             const SplitPolicyParams& params) override;
 
 private:
-    ShardRef _dataShard;
+    ShardId _dataShard;
 };
 
 /**
  * Split point building strategy to be used when the appropriate splitpoints can be trivially
  * deduced from the shard key.
  */
-class MONGO_MOD_PUBLIC SplitPointsBasedSplitPolicy : public InitialSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] SplitPointsBasedSplitPolicy : public InitialSplitPolicy {
 public:
     /**
      * Constructor used when generating split points for a hashed-prefix shard key.
      */
     SplitPointsBasedSplitPolicy(
-        boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none);
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -169,7 +143,7 @@ public:
 
 private:
     std::vector<BSONObj> _splitPoints;
-    boost::optional<std::vector<ShardRef>> _availableShardRefs;
+    boost::optional<std::vector<ShardId>> _availableShardIds;
 };
 
 /**
@@ -183,12 +157,12 @@ public:
      */
     struct SplitInfo {
         std::vector<BSONObj> splitPoints;
-        std::vector<std::pair<ShardRef, size_t>> chunkDistribution;
+        std::vector<std::pair<ShardId, size_t>> chunkDistribution;
     };
 
     AbstractTagsBasedSplitPolicy(OperationContext* opCtx,
                                  std::vector<TagsType> tags,
-                                 boost::optional<std::vector<ShardRef>> availableShardRefs);
+                                 boost::optional<std::vector<ShardId>> availableShardIds);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -204,26 +178,26 @@ public:
         return _tags;
     }
 
-    const StringMap<std::vector<ShardRef>>& getTagsToShardRefs() const {
-        return _tagToShardRefs;
+    const StringMap<std::vector<ShardId>>& getTagsToShardIds() const {
+        return _tagToShardIds;
     }
 
 private:
     const std::vector<TagsType> _tags;
-    StringMap<std::vector<ShardRef>> _tagToShardRefs;
-    boost::optional<std::vector<ShardRef>> _availableShardRefs;
+    StringMap<std::vector<ShardId>> _tagToShardIds;
+    boost::optional<std::vector<ShardId>> _availableShardIds;
 };
 
 /**
  * In this strategy we directly generate a single chunk for each tag range.
  */
-class MONGO_MOD_PUBLIC SingleChunkPerTagSplitPolicy : public AbstractTagsBasedSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] SingleChunkPerTagSplitPolicy : public AbstractTagsBasedSplitPolicy {
 public:
     SingleChunkPerTagSplitPolicy(
         OperationContext* opCtx,
         std::vector<TagsType> tags,
-        boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none)
-        : AbstractTagsBasedSplitPolicy(opCtx, tags, availableShardRefs) {}
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none)
+        : AbstractTagsBasedSplitPolicy(opCtx, tags, availableShardIds) {}
 
     SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
@@ -237,14 +211,14 @@ private:
  * case, we generate one chunk per tag range and then further split each of these using the hashed
  * field of the shard key.
  */
-class MONGO_MOD_PUBLIC PresplitHashedZonesSplitPolicy : public AbstractTagsBasedSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] PresplitHashedZonesSplitPolicy : public AbstractTagsBasedSplitPolicy {
 public:
     PresplitHashedZonesSplitPolicy(
         OperationContext* opCtx,
         const ShardKeyPattern& shardKeyPattern,
         std::vector<TagsType> tags,
         bool isCollectionEmpty,
-        boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none);
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
 
     SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
@@ -259,7 +233,7 @@ private:
 /**
  * Split point building strategy for resharding.
  */
-class MONGO_MOD_PUBLIC SamplingBasedSplitPolicy : public InitialSplitPolicy {
+class [[MONGO_MOD_PUBLIC]] SamplingBasedSplitPolicy : public InitialSplitPolicy {
 public:
     using SampleDocumentPipeline = std::unique_ptr<Pipeline>;
 
@@ -292,13 +266,13 @@ public:
                                          const ShardKeyPattern& shardKey,
                                          int numInitialChunks,
                                          boost::optional<std::vector<TagsType>> zones,
-                                         boost::optional<std::vector<ShardRef>> availableShardRefs,
+                                         boost::optional<std::vector<ShardId>> availableShardIds,
                                          int samplesPerChunk = kDefaultSamplesPerChunk);
 
     SamplingBasedSplitPolicy(int numInitialChunks,
                              boost::optional<std::vector<TagsType>> zones,
                              std::unique_ptr<SampleDocumentSource> samples,
-                             boost::optional<std::vector<ShardRef>> availableShardRefs);
+                             boost::optional<std::vector<ShardId>> availableShardIds);
 
     /**
      * Generates the initial split points and returns them in ascending shard key order. Does not
@@ -321,7 +295,7 @@ public:
     static constexpr int kDefaultSamplesPerChunk = 10;
 
     // TODO This should ideally be file_private.
-    MONGO_MOD_NEEDS_REPLACEMENT static std::unique_ptr<SampleDocumentSource>
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] static std::unique_ptr<SampleDocumentSource>
     makePipelineDocumentSource_forTest(OperationContext* opCtx,
                                        boost::intrusive_ptr<DocumentSource> initialSource,
                                        const NamespaceString& ns,
@@ -356,7 +330,7 @@ private:
     boost::optional<std::vector<TagsType>> _zones;
     std::unique_ptr<SampleDocumentSource> _samples;
     // If provided, only pick shard that is in this vector.
-    boost::optional<std::vector<ShardRef>> _availableShardRefs;
+    boost::optional<std::vector<ShardId>> _availableShardIds;
 };
 
 class ShardDistributionSplitPolicy : public InitialSplitPolicy {

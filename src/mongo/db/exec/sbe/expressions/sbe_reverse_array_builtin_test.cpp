@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -63,10 +37,10 @@ protected:
         auto compiledExpr = compileExpression(*reverseArrayExpr);
 
         auto actual = runCompiledExpression(compiledExpr.get());
-        value::ValueGuard actualGuard{actual};
+        value::TagValueOwned actualOwned = value::TagValueOwned::fromRaw(actual);
 
-        auto [compareTag, compareValue] =
-            value::compareValue(actual.first, actual.second, expected.first, expected.second);
+        auto [compareTag, compareValue] = value::compareValue(
+            actualOwned.tag(), actualOwned.value(), expected.first, expected.second);
         ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
         ASSERT_EQ(compareValue, 0);
     }
@@ -75,10 +49,10 @@ protected:
 TEST_F(SBEBuiltinReverseArrayTest, Array) {
     for (auto makeArrayFn : {makeBsonArray, makeArray}) {
         auto testArray = makeArrayFn(BSON_ARRAY(1 << 2 << 3));
-        value::ValueGuard testArrayGuard{testArray};
+        value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(testArray);
 
         auto expectedResult = makeArray(BSON_ARRAY(3 << 2 << 1));
-        value::ValueGuard expectedResultGuard{expectedResult};
+        value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(expectedResult);
 
         runAndAssertExpression(testArray, expectedResult);
     }
@@ -89,13 +63,13 @@ TEST_F(SBEBuiltinReverseArrayTest, ArraySet) {
     // internal order is determined by it's hash function and not the order that elements are added
     // to it.
     auto testArray = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard testArrayGuard{testArray};
-    value::ArrayEnumerator testEnumerator{testArray.first, testArray.second};
+    value::TagValueOwned testArrayOwned = value::TagValueOwned::fromRaw(testArray);
+    value::ArrayEnumerator testEnumerator{testArrayOwned.tag(), testArrayOwned.value()};
 
     std::vector<value::TagValueView> testArrayContents;
     auto expectedResult = value::makeNewArray();
-    value::ValueGuard expectedResultGuard{expectedResult};
-    auto expectedResultView = value::getArrayView(expectedResult.second);
+    value::TagValueOwned expectedResultOwned = value::TagValueOwned::fromRaw(expectedResult);
+    auto expectedResultView = value::getArrayView(expectedResultOwned.value());
 
     while (!testEnumerator.atEnd()) {
         testArrayContents.push_back(testEnumerator.getViewOfValue());

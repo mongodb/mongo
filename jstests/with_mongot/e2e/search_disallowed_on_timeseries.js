@@ -80,37 +80,11 @@ assert.commandWorked(bulk.execute());
     searchPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             tsColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
             [10557302, 12093200, 10623000],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
     });
-
-    // $_internalDocumentResultsAndMetadata is an internal container stage produced during search
-    // pipeline expansion. Although users aren't expected to write it directly, it can be specified
-    // in a pipeline, so confirm it is also rejected on a timeseries collection when wrapping a
-    // search source stage. It inherits its source's constraints, so it is disallowed for the same
-    // reason $search is.
-    assert.commandFailedWithCode(
-        tsColl.runCommand("aggregate", {
-            pipeline: [
-                {
-                    $_internalDocumentResultsAndMetadata: {
-                        source: {
-                            $search: {
-                                index: "default",
-                                text: {query: "example", path: metaFieldName},
-                            },
-                        },
-                    },
-                },
-            ],
-            cursor: {},
-        }),
-        // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
-        [10557302, 12093200, 10623000],
-        "Expected failure for $_internalDocumentResultsAndMetadata wrapping $search on timeseries",
-    );
 
     // Search stages should fail when querying a view on a timeseries collection.
     const viewName = "view_" + timeseriesCollName;
@@ -118,7 +92,7 @@ assert.commandWorked(bulk.execute());
     searchPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             db[viewName].runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
             [10557302, 12093200, 10623000, 40602],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
@@ -134,7 +108,7 @@ assert.commandWorked(bulk.execute());
     );
     assert.commandFailedWithCode(
         db[searchView].runCommand("aggregate", {pipeline: [{$match: {}}], cursor: {}}),
-        // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
+        // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
         [10557302, 12093200, 10623000, 40602],
         `Expected failure for pipeline: ${tojson([{$match: {}}])}`,
     );
@@ -166,12 +140,24 @@ assert.commandWorked(bulk.execute());
                 },
             },
         ],
+        [
+            {
+                $unionWith: {
+                    coll: searchView,
+                    pipeline: [{$match: {}}],
+                },
+            },
+        ],
     ];
     subPipelines.forEach((pipeline) => {
         assert.commandFailedWithCode(
             nonTSColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-            // TODO SERVER-117803 Delete code 10557302 once we only validate in LPP.
-            [10557302, 12093200, 10623000, 40602],
+            // TODO SERVER-121094 Delete code 10557302 once we only validate in LPP.
+            // 65180 is the extension $search's "view definition is incompatible with Atlas
+            // Search" error, surfaced when the view resolution runs through the extension path.
+            // 13130801 is the $lookup/$graphLookup/$unionWith rejection when their foreign
+            // namespace is a search view over a timeseries collection.
+            [10557302, 12093200, 10623000, 40602, 65180, 13130801],
             `Expected failure for pipeline: ${tojson(pipeline)}`,
         );
     });

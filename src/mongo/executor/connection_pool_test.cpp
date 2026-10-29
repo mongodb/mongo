@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/executor/connection_pool.h"
 
@@ -33,6 +7,8 @@
 #include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_test_fixture.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
@@ -62,6 +38,26 @@ namespace mongo {
 namespace executor {
 namespace connection_pool_test_details {
 using namespace std::literals::string_view_literals;
+
+struct ReadEgressConnectionsCounterOptions {
+    std::string_view purpose = kNormalConnectionPurpose;
+    std::string_view poolAttribute = kOtherConnectionPoolAttribute;
+};
+
+int64_t readEgressConnectionsCreatedCounterOrZero(
+    otel::metrics::OtelMetricsCapturer& capturer,
+    const ReadEgressConnectionsCounterOptions& options = {}) {
+    try {
+        return capturer.readInt64Counter(
+            otel::metrics::MetricNames::kNetworkEgressConnectionsCreated,
+            std::tuple{options.purpose, options.poolAttribute});
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::KeyNotFound) {
+            return 0;
+        }
+        throw;
+    }
+}
 
 class ConnectionPoolTest : public unittest::Test {
 public:
@@ -118,6 +114,13 @@ protected:
         dynamic_cast<ConnectionImpl*>(conn.get())->indicateFailure(error);
 
         ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto) {});
+    }
+
+    /** Cleans up a connection future by ensuring it is properly destroyed (returned). */
+    void cleanupConnectionFuture(SemiFuture<ConnectionPool::ConnectionHandle> connFuture) {
+        ASSERT_TRUE(connFuture.isReady());
+        auto conn = std::move(connFuture).get();
+        doneWith(conn);
     }
 
     /**
@@ -504,6 +507,271 @@ TEST_F(ConnectionPoolCheckoutTest, ReturnedConnectionIsReusedOnNextCheckout) {
     ASSERT(conn1Id);
     ASSERT(conn2Id);
     ASSERT_EQ(conn1Id, conn2Id);
+}
+
+TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricOnlyCountsNewConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+    auto pool = makePool();
+    auto getConnection = [&](ConnectionAcquisitionPurpose purpose) {
+        return getFromPool(HostAndPort(),
+                           transport::kGlobalSSLMode,
+                           Seconds(1),
+                           CancellationToken::uncancelable(),
+                           purpose);
+    };
+
+    ConnectionImpl::pushSetup(Status::OK());
+    auto ordinaryConnection = std::move(getConnection(ConnectionAcquisitionPurpose::kNormal)).get();
+    doneWith(ordinaryConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+
+    auto killOperationReuse =
+        std::move(getConnection(ConnectionAcquisitionPurpose::kKillOperation)).get();
+    doneWith(killOperationReuse);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+
+    pool->dropConnections(HostAndPort());
+    ConnectionImpl::pushSetup(Status::OK());
+    auto newConnection =
+        std::move(getConnection(ConnectionAcquisitionPurpose::kKillOperation)).get();
+    doneWith(newConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    auto reusedConnection =
+        std::move(getConnection(ConnectionAcquisitionPurpose::kKillOperation)).get();
+    doneWith(reusedConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+}
+
+TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricCountsQueuedNewConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+    auto pool = makePool();
+
+    auto ordinaryFuture = getFromPool(HostAndPort(),
+                                      transport::kGlobalSSLMode,
+                                      Seconds(1),
+                                      CancellationToken::uncancelable(),
+                                      ConnectionAcquisitionPurpose::kNormal);
+    ASSERT_FALSE(ordinaryFuture.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+    ConnectionImpl::pushSetup(Status::OK());
+    ASSERT_TRUE(ordinaryFuture.isReady());
+    auto ordinaryConnection = std::move(ordinaryFuture).get();
+
+    auto killOperationFuture = getFromPool(HostAndPort(),
+                                           transport::kGlobalSSLMode,
+                                           Seconds(1),
+                                           CancellationToken::uncancelable(),
+                                           ConnectionAcquisitionPurpose::kKillOperation);
+    ASSERT_FALSE(killOperationFuture.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+    ConnectionImpl::pushSetup(Status::OK());
+    cleanupConnectionFuture(std::move(killOperationFuture));
+
+    auto reusedConnection = std::move(getFromPool(HostAndPort(),
+                                                  transport::kGlobalSSLMode,
+                                                  Seconds(1),
+                                                  CancellationToken::uncancelable(),
+                                                  ConnectionAcquisitionPurpose::kKillOperation))
+                                .get();
+    doneWith(reusedConnection);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    doneWith(ordinaryConnection);
+}
+
+TEST_F(ConnectionPoolSpawningTest, EgressConnectionsCreatedMetricAttributesProactiveConnections) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+
+    ConnectionPool::Options options;
+    options.minConnections = 2;
+    auto pool = makePool(options);
+
+    auto killOperationFuture = getFromPool(HostAndPort(),
+                                           transport::kGlobalSSLMode,
+                                           Seconds(1),
+                                           CancellationToken::uncancelable(),
+                                           ConnectionAcquisitionPurpose::kKillOperation);
+    ASSERT_FALSE(killOperationFuture.isReady());
+    // Since min connections is 2, when we get the first connection for a kill operation, we also
+    // create a normal connection.
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    cleanupConnectionFuture(std::move(killOperationFuture));
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+}
+
+// This test shows that connection creation purposes are preserved when requests are queued and
+// are fulfilled in a different order than they were requested.
+TEST_F(ConnectionPoolSpawningTest, EgressConnectionsCreatedMetricAttributesQueuedRequests) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto readCounter = [&](std::string_view purpose) {
+        return readEgressConnectionsCreatedCounterOrZero(capturer, {.purpose = purpose});
+    };
+
+    ConnectionPool::Options options;
+    options.minConnections = 0;
+    options.maxConnecting = 1;
+    auto pool = makePool(options);
+    // The futures will and purposes will be the order of timeouts (normal(1s), kill(2s), kill(3s),
+    // normal(4s)). Running on _executor guarantees all four requests are sent to the pool before
+    // connections are spawned.
+    auto [future2sKill, future1sNormal, future4sNormal, future3sKill] =
+        ExecutorFuture(_executor)
+            .then([pool] {
+                return std::make_tuple(pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(2),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kKillOperation),
+                                       pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(1),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kNormal),
+                                       pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(4),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kNormal),
+                                       pool->get(HostAndPort(),
+                                                 transport::kGlobalSSLMode,
+                                                 Seconds(3),
+                                                 CancellationToken::uncancelable(),
+                                                 ConnectionAcquisitionPurpose::kKillOperation));
+            })
+            .get();
+
+    ASSERT_EQ(ConnectionImpl::setupQueueDepth(), 1);
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 0);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future1sNormal.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 1);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future2sKill.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 1);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 2);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future3sKill.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 2);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 2);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    EXPECT_TRUE(future4sNormal.isReady());
+    EXPECT_EQ(readCounter(kNormalConnectionPurpose), 2);
+    EXPECT_EQ(readCounter(kKillOperationConnectionPurpose), 2);
+
+    cleanupConnectionFuture(std::move(future1sNormal));
+    cleanupConnectionFuture(std::move(future2sKill));
+    cleanupConnectionFuture(std::move(future3sKill));
+    cleanupConnectionFuture(std::move(future4sNormal));
+}
+
+TEST_F(ConnectionPoolCheckoutTest, EgressConnectionsCreatedMetricConnectionPoolAttribute) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+
+    // Helper that acquires one connection from the pool, returns it to the pool, and shuts the pool
+    // down. Returns the counter values keyed by pool attribute.
+    auto acquireAndReturnConnection = [this](ConnectionPool& pool,
+                                             otel::metrics::OtelMetricsCapturer& capturer) {
+        ConnectionImpl::pushSetup(Status::OK());
+        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+            pool.get_forTest(HostAndPort(),
+                             Seconds(1),
+                             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                                 monitor.exec([&]() {
+                                     ASSERT_OK(swConn.getStatus());
+                                     doneWith(swConn.getValue());
+                                 });
+                             });
+        });
+
+        auto read = [&](std::string_view poolAttribute) {
+            return readEgressConnectionsCreatedCounterOrZero(
+                capturer, {.purpose = kNormalConnectionPurpose, .poolAttribute = poolAttribute});
+        };
+        pool.shutdown();
+        return std::make_tuple(read(kTaskExecutorPoolConnectionPoolAttribute),
+                               read(kShardingFixedConnectionPoolAttribute),
+                               read(kOtherConnectionPoolAttribute));
+    };
+
+    // A pool whose name contains "TaskExecutorPool" is attributed to "TaskExecutorPool".
+    {
+        otel::metrics::OtelMetricsCapturer capturer;
+        auto pool = std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(_executor),
+                                                     "NetworkInterfaceTL-TaskExecutorPool-0");
+        auto [taskExecutorPool, shardingFixed, other] = acquireAndReturnConnection(*pool, capturer);
+        EXPECT_EQ(taskExecutorPool, 1);
+        EXPECT_EQ(shardingFixed, 0);
+        EXPECT_EQ(other, 0);
+    }
+
+    // A pool whose name contains "Sharding-Fixed" is attributed to "Sharding-Fixed".
+    {
+        auto pool = std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(_executor),
+                                                     "NetworkInterfaceTL-Sharding-Fixed");
+        otel::metrics::OtelMetricsCapturer capturer;
+        auto [taskExecutorPool, shardingFixed, other] = acquireAndReturnConnection(*pool, capturer);
+        EXPECT_EQ(taskExecutorPool, 0);
+        EXPECT_EQ(shardingFixed, 1);
+        EXPECT_EQ(other, 0);
+    }
+
+    // Any other pool name is attributed to "other".
+    {
+        auto pool =
+            std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(_executor), "test pool");
+        otel::metrics::OtelMetricsCapturer capturer;
+        auto [taskExecutorPool, shardingFixed, other] = acquireAndReturnConnection(*pool, capturer);
+        EXPECT_EQ(taskExecutorPool, 0);
+        EXPECT_EQ(shardingFixed, 0);
+        EXPECT_EQ(other, 1);
+    }
 }
 
 /**
@@ -1067,13 +1335,14 @@ TEST_F(ConnectionPoolQueuingTest,
 
 /**
  * Verify that when the pool's pending connection timeout fires first, the error returned is
- * HostUnreachable.
+ * ConnectionEstablishmentTimeout (the connection-establishment timeout now has a
+ * dedicated error code rather than the generic HostUnreachable).
  */
 TEST_F(ConnectionPoolQueuingTest,
-       PendingTimeoutBeforeAcquisitionTimeoutReturnsHostUnreachableError) {
+       PendingTimeoutBeforeAcquisitionTimeoutReturnsConnectionEstablishmentTimeoutError) {
     assertTimeoutHelper(
         /* timeout duration */ Milliseconds{500},
-        /* expected timeout codes */ ErrorCodes::HostUnreachable);
+        /* expected timeout codes */ ErrorCodes::ConnectionEstablishmentTimeout);
 }
 
 /**
@@ -2258,11 +2527,11 @@ TEST_F(ConnectionPoolSetupTest, SetupTimeoutsFailOtherPendingRequestsWhenPoolIsE
 
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
-    ASSERT_EQ(conn1->getStatus(), ErrorCodes::HostUnreachable);
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::ConnectionEstablishmentTimeout);
     ASSERT(conn2);
     ASSERT(!conn2->isOK());
     // Pending connection fails with the same timeout status.
-    ASSERT_EQ(conn2->getStatus(), ErrorCodes::HostUnreachable);
+    ASSERT_EQ(conn2->getStatus(), ErrorCodes::ConnectionEstablishmentTimeout);
 }
 
 /**
@@ -2325,6 +2594,7 @@ TEST_F(ConnectionPoolSetupTest, SetupTimeoutsDontFailOtherPendingRequestsWhenPoo
     ASSERT(conn1);
     ASSERT_EQ(conn1->getStatus(), ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit);
 }
+
 
 /**
  * Verify that a refresh timeout fails all pending requests for the same host.
@@ -3518,19 +3788,13 @@ TEST_F(ConnectionPoolMetricsTest, ConnectionStatsCoverAllHosts) {
     EXPECT_EQ(1u, stats.statsByHost.at(host2).available);
 }
 
-/**
- * Verify that a setup failure with established connections does not cause pool failure.
- */
-TEST_F(ConnectionPoolSetupTest, SetupFailureWithEstablishedConnectionsDoesNotCausePoolFailure) {
-    // None of these errors should drop available connections. The pool spawns replacement
-    // connections for each failure.
-    std::vector<ErrorCodes::Error> setupFailures = {
-        ErrorCodes::HostUnreachable, ErrorCodes::SocketException, ErrorCodes::NetworkTimeout};
-
+// SERVER-68329: a ConnectionError setup failure (e.g. asio::error::in_progress
+// race in the transport layer) drops only the failing connection without flushing the pool.
+TEST_F(ConnectionPoolTest, SetupFailureWithConnectionErrorDoesNotDropOpenConnections) {
     auto [pool, inUseConnections] = setupConnectionPool(
         1,
         1,
-        setupFailures.size(),
+        1,
         [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
         [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
 
@@ -3540,21 +3804,18 @@ TEST_F(ConnectionPoolSetupTest, SetupFailureWithEstablishedConnectionsDoesNotCau
         }
     });
 
+    ConnectionImpl::pushSetup(Status(ErrorCodes::ConnectionError, "rate-limited"));
 
-    for (auto ec : setupFailures) {
-        ConnectionImpl::pushSetup(Status(ec, ""));
-    }
-
-    // Verify that there is still one available connection and the pool maintains the target
-    // number of refreshing connections.
+    // The failing pending connection is dropped, but the in-use and available connections survive
+    // and the pool spawns a replacement pending connection.
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
         ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(setupFailures.size(), connStats.totalRefreshing);
+        ASSERT_EQ(1, connStats.totalRefreshing);
     }
 
-    // Return the in-use connection, which should not be refreshed.
+    // Return the in-use connection; it should not be refreshed away.
     {
         auto conn = std::move(inUseConnections.back());
         inUseConnections.pop_back();
@@ -3562,18 +3823,163 @@ TEST_F(ConnectionPoolSetupTest, SetupFailureWithEstablishedConnectionsDoesNotCau
 
         const auto connStats = getStats(pool);
         ASSERT_EQ(0, connStats.totalInUse);
-        ASSERT_EQ(setupFailures.size(), connStats.totalRefreshing);
         ASSERT_EQ(2, connStats.totalAvailable);
+        ASSERT_EQ(1, connStats.totalRefreshing);
     }
 
-    // Contrarily, when a setup connection fails with another error, the available connection gets
-    // dropped.
+    // Contrarily, when a setup connection fails with a non-ConnectionError, the available
+    // connections get dropped via processFailure.
     ConnectionImpl::pushSetup(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, ""));
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(0, connStats.totalInUse);
         ASSERT_EQ(0, connStats.totalRefreshing);
         ASSERT_EQ(0, connStats.totalAvailable);
+    }
+}
+
+// Any setup failure that is not ConnectionError and is not one of the transient
+// rate-limiter signals (ConnectionClosedByPeer / ConnectionEstablishmentTimeout) must drop open
+// connections via processFailure, even when the pool already has established connections. This
+// covers plain HostUnreachable (e.g. a failed or refused connect, or an otherwise-unhealthy host)
+// and unrelated network errors. Note on timeouts: a timeout during
+// connect or the initial hello is reported as ConnectionEstablishmentTimeout and single-drops (so
+// it is not in this flush list); a timeout during the later authentication step is reported as
+// HostUnreachable, which flushes -- so HostUnreachable is exercised here.
+TEST_F(ConnectionPoolTest, SetupFailureWithNonConnectionErrorDropsOpenConnections) {
+    const std::vector<ErrorCodes::Error> nonConnectionErrorFailures = {
+        ErrorCodes::HostUnreachable,
+        ErrorCodes::SocketException,
+        ErrorCodes::NetworkTimeout,
+        ErrorCodes::AuthenticationFailed,
+        ErrorCodes::HostNotFound,
+        ErrorCodes::SSLHandshakeFailed,
+    };
+
+    for (auto ec : nonConnectionErrorFailures) {
+        auto [pool, inUseConnections] = setupConnectionPool(
+            1,
+            3,
+            1,
+            [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
+            [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
+
+        ON_BLOCK_EXIT([&]() {
+            for (auto& conn : inUseConnections) {
+                doneWith(conn);
+            }
+        });
+
+        // Sanity check: pool starts with one in-use, three available, one refreshing.
+        {
+            const auto connStats = getStats(pool);
+            ASSERT_EQ(1, connStats.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(3, connStats.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(1, connStats.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        }
+
+        // Inject the non-ConnectionError setup failure. The pool must process it as a real failure:
+        // the available pool and any in-flight refreshes are cleared and the pool transitions to
+        // kFailed. Currently checked-out (in-use) connections survive processFailure -- they are
+        // owned by the caller and only become stale via the generation bump.
+        ConnectionImpl::pushSetup(Status(ec, "non-ConnectionError setup failure"));
+
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+        ASSERT_EQ(0, connStats.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+        ASSERT_EQ(0, connStats.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+
+        const auto hostStats = connStats.statsByHost.at(HostAndPort());
+        ASSERT_EQ(static_cast<int>(hostStats.poolState),
+                  static_cast<int>(ConnectionPoolState::kFailed))
+            << "ec=" << ErrorCodes::errorString(ec);
+    }
+}
+
+// A transient rate-limiter signal during setup -- ConnectionClosedByPeer (the peer closed the
+// socket: asio::error::eof for non-TLS, asio::ssl::error::stream_truncated for TLS) or
+// ConnectionEstablishmentTimeout (setup timed out) -- must single-drop the failing attempt, not
+// flush the pool, when the pool already has established connections. finishRefresh keys on the code
+// (not the reason string), so we inject the code directly.
+TEST_F(ConnectionPoolTest, RateLimiterRejectionsDoNotClearPool) {
+    for (auto ec :
+         {ErrorCodes::ConnectionClosedByPeer, ErrorCodes::ConnectionEstablishmentTimeout}) {
+        auto [pool, inUseConnections] = setupConnectionPool(
+            1,
+            3,
+            1,
+            [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
+            [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
+
+        ON_BLOCK_EXIT([&]() {
+            for (auto& conn : inUseConnections) {
+                doneWith(conn);
+            }
+        });
+
+        // Sanity: pool starts with one in-use, three available, one refreshing.
+        {
+            const auto s = getStats(pool);
+            ASSERT_EQ(1, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(3, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        }
+
+        // The failing pending connection is single-dropped; the in-use and the three available
+        // connections must survive and a replacement is spawned.
+        ConnectionImpl::pushSetup(Status(ec, "transient single-drop signal"));
+        {
+            const auto s = getStats(pool);
+            ASSERT_EQ(1, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(3, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        }
+
+        // Returning the in-use connection keeps the pool healthy.
+        {
+            auto conn = std::move(inUseConnections.back());
+            inUseConnections.pop_back();
+            doneWithAsync(conn).get();
+
+            const auto s = getStats(pool);
+            ASSERT_EQ(0, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(4, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        }
+
+        // Drain the replacement pending connection before the next iteration / teardown.
+        ConnectionImpl::pushSetup(Status::OK());
+    }
+}
+
+// Negative case: the same signals with no established connections have nothing to protect, so they
+// fall through to processFailure and clear the pool.
+TEST_F(ConnectionPoolTest, RateLimiterRejectionsClearPoolWhenNoEstablishedConnections) {
+    for (auto ec :
+         {ErrorCodes::ConnectionClosedByPeer, ErrorCodes::ConnectionEstablishmentTimeout}) {
+        auto [pool, inUseConnections] = setupConnectionPool(
+            0,
+            0,
+            1,
+            [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
+            [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
+
+        // No established connections -- pool is entirely in the "refreshing" (setup) state.
+        {
+            const auto s = getStats(pool);
+            ASSERT_EQ(0, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(0, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(1, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        }
+
+        // The failure triggers processFailure and clears the pool.
+        ConnectionImpl::pushSetup(Status(ec, "transient single-drop signal"));
+        {
+            const auto s = getStats(pool);
+            ASSERT_EQ(0, s.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(0, s.totalAvailable) << "ec=" << ErrorCodes::errorString(ec);
+            ASSERT_EQ(0, s.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
+        }
     }
 }
 
@@ -3890,27 +4296,16 @@ TEST_F(ConnectionPoolSetupTest, MultipleConsecutiveSetupFailuresDoNotBlockNewCon
         ASSERT_EQ(3, connStats.totalRefreshing);
     }
 
-    // Push multiple HostUnreachable failures in sequence. The pool immediately spawns a
-    // replacement for each failed connection.
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    {
+    // Push a single-drop failure of each code in sequence (establishedConnections > 0, so all three
+    // take the single-drop path). The pool immediately spawns a replacement for each, so
+    // consecutive failures never block it.
+    for (auto ec : {ErrorCodes::ConnectionError,
+                    ErrorCodes::ConnectionClosedByPeer,
+                    ErrorCodes::ConnectionEstablishmentTimeout}) {
+        ConnectionImpl::pushSetup(Status(ec, ""));
         const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(3, connStats.totalRefreshing);
-    }
-
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(3, connStats.totalRefreshing);
-    }
-
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(3, connStats.totalRefreshing);
+        ASSERT_EQ(1, connStats.totalInUse) << "ec=" << ErrorCodes::errorString(ec);
+        ASSERT_EQ(3, connStats.totalRefreshing) << "ec=" << ErrorCodes::errorString(ec);
     }
 
     // Verify the pool is still healthy (not in failed state) because there's an established
@@ -3920,6 +4315,7 @@ TEST_F(ConnectionPoolSetupTest, MultipleConsecutiveSetupFailuresDoNotBlockNewCon
     ASSERT_EQ(static_cast<int>(hostStats.poolState),
               static_cast<int>(ConnectionPoolState::kHealthy));
 }
+
 
 /**
  * Verify that a connection that completes setup after a failure event is discarded rather than

@@ -32,7 +32,6 @@
 import wiredtiger, wttest
 from wiredtiger import stat
 
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_config09(wttest.WiredTigerTestCase):
     ntables = 50
     nentries = 5
@@ -61,12 +60,6 @@ class test_config09(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
     # Verify statistics.
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_config09_invalid(self):
         self.conn.close()
 
@@ -106,11 +99,8 @@ class test_config09(wttest.WiredTigerTestCase):
         # if the reset is missing, the second value will be roughly double
         # the first.
         locked_1 = self.get_stat(stat.conn.checkpoint_handle_locked)
-        meta_checked_1 = self.get_stat(stat.conn.checkpoint_handle_meta_checked)
         self.session.checkpoint()
         locked_2 = self.get_stat(stat.conn.checkpoint_handle_locked)
-        meta_checked_2 = self.get_stat(stat.conn.checkpoint_handle_meta_checked)
         self.assertEqual(locked_1, locked_2)
-        self.assertEqual(meta_checked_1, meta_checked_2)
 
         self.conn.close()

@@ -1,4 +1,5 @@
 // Tests that certain aggregation operators have configurable memory limits.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -180,6 +181,406 @@ assert.commandWorked(bulk.execute());
         () => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]),
         ErrorCodes.ExceededMemoryLimit,
     );
+})();
+
+(function testConcatArraysExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        return;
+    }
+
+    // TODO SERVER-129929: remove once SBE tracks $concatArrays.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $concatArrays memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: {
+                    $concatArrays: [
+                        {$range: [0, {$add: ["$_id", 50]}]},
+                        {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                    ],
+                },
+            },
+        },
+    ];
+
+    // Unbounded by default (knob at its max). The operation succeeds.
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $concatArrays result exceeds it.
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$concatArrays needs too much memory"),
+        "Expected error message to mention $concatArrays, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testSetUnionExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+    // TODO SERVER-129889: remove once SBE tracks $setUnion.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $setUnion memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: {
+                    $setUnion: [
+                        {$range: [0, {$add: ["$_id", 50]}]},
+                        {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                    ],
+                },
+            },
+        },
+    ];
+
+    // The operation succeeds with the default limit.
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $setUnion result exceeds it.
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$setUnion needs too much memory"),
+        "Expected error message to mention $setUnion, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testConvertExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        return;
+    }
+
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    // BinData -> array has by far the largest blow-up of any $convert conversion (one array element
+    // per vector entry, so the output can be many times the input size), so it is the only tracked
+    // case.
+    // Build a vector-subtype BinData from an array field, then convert it back to an array.
+    const memColl = db.agg_convert_memory_limit;
+    memColl.drop();
+    const bigArray = Array.from({length: 2000}, (_, i) => i % 100);
+    assert.commandWorked(memColl.insert({_id: 0, arr: bigArray}));
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: {
+                    $convert: {
+                        input: {
+                            $convert: {
+                                input: "$arr",
+                                to: {type: "binData", subtype: 9},
+                                format: "base64",
+                            },
+                        },
+                        to: "array",
+                        format: "base64",
+                    },
+                },
+            },
+        },
+    ];
+
+    assert.doesNotThrow(() => memColl.aggregate(pipeline).toArray());
+
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => memColl.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$convert needs too much memory"),
+        "Expected error message to mention $convert, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testConcatExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+
+    // TODO SERVER-129995: remove once SBE tracks $concat.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $concat memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    const big = "x".repeat(2000);
+    const pipeline = [{$limit: 1}, {$project: {a: {$concat: ["$y", big]}}}];
+
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$concat needs too much memory"),
+        "Expected error message to mention $concat, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testArrayExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+
+    // TODO SERVER-130093: remove once SBE tracks $array (ExpressionArray).
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $array memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: [
+                    {$range: [0, {$add: ["$_id", 50]}]},
+                    {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                ],
+            },
+        },
+    ];
+
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $array result exceeds it.
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$array needs too much memory"),
+        "Expected error message to mention $array, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testReplaceAllExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        return;
+    }
+
+    // TODO SERVER-130003: remove once SBE tracks $replaceAll.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $replaceAll memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    const big = "x".repeat(2000);
+    const pipeline = [
+        {$limit: 1},
+        {$project: {a: {$replaceAll: {input: "$y", find: "", replacement: big}}}},
+    ];
+
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$replaceAll needs too much memory"),
+        "Expected error message to mention $replaceAll, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testZipExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+    // TODO SERVER-129975: remove once SBE tracks $zip.
+    if (sbeFullyEnabled) {
+        jsTest.log.info("Skipping test because $zip memory tracking is not yet implemented in SBE");
+        return;
+    }
+    const knob = "internalQueryMaxMemoryUsageBytesPerOperation";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $project: {
+                a: {
+                    $zip: {
+                        inputs: [
+                            {$range: [0, {$add: ["$_id", 50]}]},
+                            {$range: [{$add: ["$_id", 50]}, {$add: ["$_id", 100]}]},
+                        ],
+                    },
+                },
+            },
+        },
+    ];
+
+    // The operation succeeds with the default limit.
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the operation-wide limit so the $zip result exceeds it.
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$zip needs too much memory"),
+        "Expected error message to mention $zip, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testObjectExpressionMemoryLimit() {
+    // featureFlagExpressionMemoryTracking turns on the expression evaluation tracking.
+    if (!FeatureFlagUtil.isEnabled(db, "ExpressionMemoryTracking")) {
+        jsTest.log.info("Skipping test because ExpressionMemoryTracking is not enabled");
+        return;
+    }
+
+    // TODO SERVER-130519: remove once SBE tracks ExpressionObject.
+    if (sbeFullyEnabled) {
+        jsTest.log.info(
+            "Skipping test because $object memory tracking is not yet implemented in SBE",
+        );
+        return;
+    }
+    // $object memory is tracked locally against a per-expression cap; it does not count against the
+    // operation-wide limit. Lower that cap to make the $object result exceed it.
+    const knob = "internalQueryMaxSingleExpressionMemoryUsageBytes";
+
+    const pipeline = [
+        {$limit: 1},
+        {
+            $replaceWith: {
+                x: {$range: [0, {$add: ["$_id", 50]}]},
+                y: {$range: [0, {$add: ["$_id", 50]}]},
+            },
+        },
+    ];
+
+    assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
+
+    // Lower the per-expression cap so the $object result exceeds it.
+    const originalVal = setParam(knob, 1024);
+
+    const err = assert.throwsWithCode(
+        () => coll.aggregate(pipeline).toArray(),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    assert(
+        err.message.includes("$object needs too much memory"),
+        "Expected error message to mention $object, but got: " + err.message,
+        {err},
+    );
+
+    setParam(knob, originalVal);
+})();
+
+(function testInternalQueryMaxMemoryIntensiveExpressions() {
+    // Pipeline covering all 9 tracked memory-intensive expressions:
+    //   $addFields stage: $range (1)
+    //   $project stage:   $range (2), $map (3), $reduce (4), $concatArrays (5),
+    //                     $setUnion (6), $zip (7), $array literal (8), $object literal (9)
+    // The $addFields stage creates an array field so downstream expressions can reference it
+    // via "$arr" instead of introducing extra tracked sub-expressions.
+    // $array is triggered by the [1, 2, 3] literal inside $arrayElemAt's argument list.
+    // $object is triggered by the {a: "$y"} literal passed as the $mergeObjects argument.
+    const pipeline = [
+        {$addFields: {arr: {$range: [0, 3]}}},
+        {
+            $project: {
+                ranged: {$range: [0, 5]},
+                mapped: {$map: {input: "$arr", as: "x", in: "$$x"}},
+                reduced: {
+                    $reduce: {input: "$arr", initialValue: 0, in: {$add: ["$$value", "$$this"]}},
+                },
+                concat: {$concatArrays: ["$arr", "$arr"]},
+                union: {$setUnion: ["$arr", "$arr"]},
+                zipped: {$zip: {inputs: ["$arr", "$arr"]}},
+                firstOfArr: {$arrayElemAt: [[1, 2, 3], 0]},
+                merged: {$mergeObjects: {a: "$y"}},
+            },
+        },
+    ];
+
+    // Verify the pipeline works at the default limit.
+    assert.doesNotThrow(() => coll.aggregate(pipeline));
+
+    // Set limit below expression count (9) to trigger the error at parse time.
+    const originalVal = setParam("internalQueryMaxMemoryIntensiveExpressions", 8);
+    assert.throwsWithCode(() => coll.aggregate(pipeline), 12876600);
+    setParam("internalQueryMaxMemoryIntensiveExpressions", originalVal);
 })();
 
 MongoRunner.stopMongod(conn);

@@ -1,41 +1,17 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_builds/primary_driven/util.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -47,7 +23,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -396,6 +372,78 @@ TEST_F(UtilTest, Abort) {
     EXPECT_FALSE(args.isTimeseries);
 }
 
+TEST_F(UtilTest, AbortSkipsAlreadyAbortedBuild) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a", "b"});
+    Status cause{ErrorCodes::IndexBuildAborted, "abort"};
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_OK(
+        start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(Timestamp(1, 0));
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+
+    // The build is gone, so the second abort has nothing of its own to drop.
+    {
+        auto coll =
+            acquireCollectionMaybeLockFree(operationContext(),
+                                           CollectionAcquisitionRequest::fromOpCtx(
+                                               operationContext(),
+                                               {ns.dbName(), collUUID},
+                                               AcquisitionPrerequisites::OperationType::kRead));
+        for (auto&& index : indexes) {
+            EXPECT_FALSE(coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+                operationContext(), index.getIndexName(), IndexCatalog::InclusionPolicy::kAll));
+        }
+    }
+
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+}
+
+TEST_F(UtilTest, AbortDropsRemainingIndexesWhenOneWasAlreadyDropped) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a", "b"});
+    Status cause{ErrorCodes::IndexBuildAborted, "abort"};
+    const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_OK(
+        start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(Timestamp(1, 0));
+
+    // Drop the first index's catalog entry only.
+    {
+        auto opCtx = operationContext();
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, {ns.dbName(), collUUID}, AcquisitionPrerequisites::OperationType::kWrite),
+            LockMode::MODE_X);
+        CollectionWriter writer{opCtx, &coll};
+        WriteUnitOfWork wuow{opCtx};
+        auto* writableColl = writer.getWritableCollection(opCtx);
+        auto* entry = writableColl->getIndexCatalog()->getWritableEntryByName(
+            opCtx, indexes[0].getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT_TRUE(entry);
+        ASSERT_OK(writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry));
+        wuow.commit();
+    }
+
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+
+    auto coll = acquireCollectionMaybeLockFree(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(operationContext(),
+                                                {ns.dbName(), collUUID},
+                                                AcquisitionPrerequisites::OperationType::kRead));
+    for (auto&& index : indexes) {
+        EXPECT_FALSE(coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+            operationContext(), index.getIndexName(), IndexCatalog::InclusionPolicy::kAll));
+    }
+}
+
 TEST_F(UtilTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
     auto buildUUID = UUID::gen();
     auto indexes = makeIndexes({"a"});
@@ -523,6 +571,17 @@ TEST_F(UtilTest, ResumeInfoRequiresValidIdent) {
     }
 }
 
+TEST_F(UtilTest, ResumeInfoFailsOnMissingIdent) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
+    auto validResumableIndexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_THROWS_CODE(
+        resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent),
+        DBException,
+        ErrorCodes::FailedToParse);
+}
+
 TEST_F(UtilTest, ResumeInfoFailsOnParseError) {
     auto buildUUID = UUID::gen();
     auto indexes = makeIndexes({"a"});
@@ -608,6 +667,7 @@ void insertSorterEntries(OperationContext* opCtx,
                                           container,
                                           key,
                                           std::span<const char>(dummyValue, sizeof(dummyValue)),
+                                          boost::none,
                                           container_write::NonexistentKeyGuarantee{}));
     }
     wuow.commit();
@@ -821,12 +881,11 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysLess
 
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     // Exactly one WCE must have fired when removing keys < 6.
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
 
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
@@ -871,12 +930,11 @@ TEST_F(UtilTest,
 
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
 
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     // Exactly one WCE must have fired when removing keys >= 11.
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
 
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
@@ -885,6 +943,98 @@ TEST_F(UtilTest,
                     remainingKeys.end());
     }
 }
+
+StringKeyedContainer& indexContainer(OperationContext* opCtx,
+                                     const CollectionPtr& coll,
+                                     const std::string& indexIdent) {
+    auto* entry = coll->getIndexCatalog()->findIndexByIdent(
+        opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished);
+    ASSERT_TRUE(entry);
+    return entry->accessMethod()->asSortedData()->getSortedDataInterface()->getContainer();
+}
+
+std::vector<std::string> getIndexKeys(OperationContext* opCtx,
+                                      DatabaseName dbName,
+                                      const UUID& collUUID,
+                                      const std::string& indexIdent) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, {std::move(dbName), collUUID}, AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    auto cursor = indexContainer(opCtx, coll.getCollectionPtr(), indexIdent)
+                      .getCursor(*shard_role_details::getRecoveryUnit(opCtx));
+    std::vector<std::string> keys;
+    while (auto entry = cursor->next()) {
+        keys.emplace_back(entry->first.data(), entry->first.size());
+    }
+    return keys;
+}
+
+void insertIndexEntries(OperationContext* opCtx,
+                        DatabaseName dbName,
+                        const UUID& collUUID,
+                        const std::string& indexIdent,
+                        int count) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, {std::move(dbName), collUUID}, AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto& container = indexContainer(opCtx, coll.getCollectionPtr(), indexIdent);
+
+    WriteUnitOfWork wuow{opCtx};
+    std::string value(8, 'v');
+    for (int i = 0; i < count; ++i) {
+        auto key = fmt::format("key-{:08d}", i);
+        ASSERT_OK(container_write::insert(opCtx,
+                                          ru,
+                                          container,
+                                          std::span<const char>(key.data(), key.size()),
+                                          std::span<const char>(value.data(), value.size())));
+    }
+    wuow.commit();
+}
+
+class DeleteAllIndexEntriesTest : public UtilTest, public testing::WithParamInterface<long long> {};
+
+TEST_P(DeleteAllIndexEntriesTest, DeletesEverything) {
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard batchBytes{"primaryDrivenIndexBuildIndexTableCleanupBatchBytes",
+                                              GetParam()};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a", "b", "c"});
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_OK(start(opCtx, ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+
+    insertIndexEntries(opCtx, ns.dbName(), collUUID, indexes[0].indexIdent, 25);
+    insertIndexEntries(
+        opCtx, ns.dbName(), collUUID, indexes[2].indexIdent, 10);  // indexes[1] empty.
+    EXPECT_EQ(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[0].indexIdent).size(), 25);
+    EXPECT_EQ(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[1].indexIdent).size(), 0);
+    EXPECT_EQ(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[2].indexIdent).size(), 10);
+
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    deleteAllIndexEntries(opCtx, ns.dbName(), collUUID, indexes);
+
+    EXPECT_TRUE(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[0].indexIdent).empty());
+    EXPECT_TRUE(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[1].indexIdent).empty());
+    EXPECT_TRUE(getIndexKeys(opCtx, ns.dbName(), collUUID, indexes[2].indexIdent).empty());
+}
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         DeleteAllIndexEntriesTest,
+                         testing::Values(1, 64, 4 * 1024 * 1024),
+                         testing::PrintToStringParamName{});
 
 }  // namespace
 }  // namespace mongo::index_builds::primary_driven

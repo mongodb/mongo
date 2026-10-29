@@ -7,7 +7,17 @@ TOOLCHAIN_MAP_V5 = {
         "sha": "9a108875e80d5ad9f3ff2c09c99da5951dedb66e9e3955397fad93783030db02",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-amazon2023-arm64-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
     },
+    "amazon_linux_2023_3_aarch64": {
+        "platform_name": "amazon2023-arm64",
+        "sha": "9a108875e80d5ad9f3ff2c09c99da5951dedb66e9e3955397fad93783030db02",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-amazon2023-arm64-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
     "amazon_linux_2023_x86_64": {
+        "platform_name": "amazon2023",
+        "sha": "0b695d60913053f4d7194a02078e995be237051bd66ec622901e514b7ec6c10d",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-amazon2023-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
+    "amazon_linux_2023_3_x86_64": {
         "platform_name": "amazon2023",
         "sha": "0b695d60913053f4d7194a02078e995be237051bd66ec622901e514b7ec6c10d",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-amazon2023-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
@@ -44,8 +54,8 @@ TOOLCHAIN_MAP_V5 = {
     },
     "rhel8_ppc64le": {
         "platform_name": "rhel81-ppc64le",
-        "sha": "4d7f05fbc368794b5598e391e56e7e209cae71cc034e93d307b7f84d0c60e8b2",
-        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel81-ppc64le-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+        "sha": "a22aec8955cec3a9597d9267ece0319d51b2837520e6078638d16d7c4c974cb6",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel81-ppc64le-2a5f4757b341f678def9fda281807dd2243d9bc2.tar.gz",
     },
     "rhel8_s390x": {
         "platform_name": "rhel80-zseries",
@@ -86,6 +96,16 @@ TOOLCHAIN_MAP_V5 = {
         "platform_name": "rhel10-arm64",
         "sha": "664a86f9c6286b756009d901c46a5e3504a6d1c36ebb2ae813dfc0a0fdebaa49",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel10-arm64-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
+    "rhel10_ppc64le": {
+        "platform_name": "rhel10-ppc64le",
+        "sha": "d219d629deaf384e6437b834abff1e0cef8baa8360503ed8f46160cc8bb98c7e",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel10-ppc64le-0c3eeaa558572479d43c6526bcb5cf9b16bdafe8.tar.gz",
+    },
+    "rhel10_s390x": {
+        "platform_name": "rhel10-zseries",
+        "sha": "ff8d7bca7ce9d43ca89ff13370b994fc70d00fad68b30fe7ff1f67ea003ee02c",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel10-zseries-0c3eeaa558572479d43c6526bcb5cf9b16bdafe8.tar.gz",
     },
     "suse15_x86_64": {
         "platform_name": "suse15",
@@ -131,5 +151,15 @@ TOOLCHAIN_MAP_V5 = {
         "platform_name": "ubuntu2404",
         "sha": "44581b6a7e0df623cecc6a9f56c958f4a981293a9df338c5a95a5aa08310fd0a",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-ubuntu2404-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
+    "ubuntu26_aarch64": {
+        "platform_name": "ubuntu2604-arm64",
+        "sha": "4a3eb9555e679bcb2416948e65db54b6363d114343aa51cf0e42058fdcf2f008",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-ubuntu2604-arm64-edf71c48476695b4bb7bb3ee0e098920dc226a99.tar.gz",
+    },
+    "ubuntu26_x86_64": {
+        "platform_name": "ubuntu2604",
+        "sha": "a2b2126664f36f0fdbc8e377d889b4a536550c9f6ed389d7bbaf6777599c9943",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-ubuntu2604-edf71c48476695b4bb7bb3ee0e098920dc226a99.tar.gz",
     },
 }

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::HashAggStage.
@@ -33,10 +7,12 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
@@ -94,7 +70,7 @@ public:
         stage->saveState();
 
         // Force spill.
-        stage->forceSpill(nullptr /*yieldPolicy*/);
+        stage->forceSpill(/*yieldPolicy=*/nullptr);
 
         // Check stats to make sure it spilled
         auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
@@ -120,6 +96,63 @@ public:
         ASSERT_GT(stats->peakTrackedMemBytes, 0);
     }
 
+    // Returns the (inUse, peak) memory-tracking stats currently recorded in this operation's CurOp.
+    // The SBE HashAggStage's memory tracker reports these values to CurOp via the operation-wide
+    // memory tracker.
+    std::pair<int64_t, int64_t> getCurOpMemoryStats() {
+        CurOp* curOp = CurOp::get(operationContext());
+        return {curOp->getInUseTrackedMemoryBytes(), curOp->getPeakTrackedMemoryBytes()};
+    }
+
+    // Bundle that keeps a prepared-and-run HashAggStage (plus everything it depends on) alive so a
+    // caller can inspect memory-tracking state before the stage is destroyed.
+    struct RunResult {
+        std::unique_ptr<CompileCtx> ctx;
+        std::unique_ptr<PlanStage> stage;
+        value::TagValueOwned results;
+    };
+
+    // Builds a simple $group-style HashAggStage that groups a small integer input by value and sums
+    // a constant per document, runs it to completion, and returns the still-open stage so the
+    // caller can inspect its memory tracker and the CurOp stats.
+    RunResult runGroupingSumHashAgg() {
+        BSONArrayBuilder bab;
+        for (int i = 0; i < 100; ++i) {
+            bab.append(i % 10);
+        }
+        value::TagValueOwned inputOwned =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(bab.arr()));
+
+        auto makeStageFn = [this](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
+            auto countsSlot = generateSlotId();
+            auto spillSlot = generateSlotId();
+            auto hashAggStage = makeS<HashAggStage>(
+                std::move(scanStage),
+                makeSV(scanSlot),
+                makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
+                    countsSlot,
+                    spillSlot,
+                    makeFunction(EFn::kSum,
+                                 makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                  value::bitcastFrom<int64_t>(1))),
+                    makeFunction(EFn::kSum, makeVariable(spillSlot)))),
+                true,
+                boost::none,
+                /*allowDiskUse=*/false,
+                /*yieldPolicy=*/nullptr,
+                kEmptyPlanNodeId);
+            return std::make_pair(countsSlot, std::move(hashAggStage));
+        };
+
+        auto ctx = makeCompileCtx();
+        auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
+        auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
+        auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
+        value::TagValueOwned results =
+            value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
+        return {std::move(ctx), std::move(stage), std::move(results)};
+    }
+
 private:
     std::unique_ptr<Lock::GlobalLock> _globalLock;
 };
@@ -132,10 +165,10 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     using namespace std::literals;
 
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArr);
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedOutputArray);
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedOutputArray));
 
     auto collatorSlot = generateSlotId();
     auto shouldUseCollator = optionalCollator != nullptr;
@@ -158,7 +191,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
             true,
             boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
             shouldSpill,
-            nullptr /* yieldPolicy */,
+            /*yieldPolicy=*/nullptr,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -174,19 +207,18 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     }
 
     // Generate a mock scan from 'input' with a single output slot.
-    inputGuard.reset();
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
 
     auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
 
     // Get all the results produced.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
 
     // Sort results for stable compare, since the counts could come out in any order.
     std::vector<value::TagValueView> resultsContents;
-    auto resultsView = value::getArrayView(resultsVal);
+    auto resultsView = value::getArrayView(resultsOwned.value());
     for (size_t i = 0; i < resultsView->size(); i++) {
         resultsContents.push_back(resultsView->getAt(i));
     }
@@ -203,15 +235,17 @@ void HashAggStageTest::performHashAggWithSpillChecking(
                   return value::bitcastTo<int32_t>(compareVal) > 0;
               });
 
-    auto [sortedResultsTag, sortedResultsVal] = value::makeNewArray();
-    value::ValueGuard sortedResultsGuard{sortedResultsTag, sortedResultsVal};
-    auto sortedResultsView = value::getArrayView(sortedResultsVal);
+    value::TagValueOwned sortedResultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto sortedResultsView = value::getArrayView(sortedResultsOwned.value());
     for (auto [tag, val] : resultsContents) {
         auto [tagCopy, valCopy] = copyValue(tag, val);
         sortedResultsView->push_back_raw(tagCopy, valCopy);
     }
 
-    assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(sortedResultsOwned.tag(),
+                        sortedResultsOwned.value(),
+                        expectedOwned.tag(),
+                        expectedOwned.value());
     ASSERT_GT(stage->getMemoryTracker()->peakTrackedMemoryBytes(), 0);
     if (shouldSpill) {
         ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
@@ -220,18 +254,57 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     }
 };
 
+// The SBE HashAggStage's operation memory tracker only pushes memory-usage updates to CurOp when
+// usage crosses a chunk boundary. With a chunk size larger than anything this small aggregation
+// consumes, the tracker never crosses a boundary, so nothing is reported to CurOp while the stage
+// still holds its memory, even though the stage-local tracker reflects the exact usage.
+TEST_F(HashAggStageTest, MemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                             100 * 1024 * 1024);
+
+    auto run = runGroupingSumHashAgg();
+
+    // The stage-local tracker reflects exact, non-zero usage that is still being held.
+    ASSERT_GT(run.stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(run.stage->getMemoryTracker()->peakTrackedMemoryBytes(), 0);
+
+    // But because usage never crossed the (large) chunk boundary, CurOp was never updated.
+    auto [curOpInUse, curOpPeak] = getCurOpMemoryStats();
+    ASSERT_EQ(curOpInUse, 0);
+    ASSERT_EQ(curOpPeak, 0);
+}
+
+// With a chunk size of 1 byte the tracker reports on essentially every add(), so CurOp ends up
+// mirroring the stage-local tracker's usage. This confirms that the SBE HashAggStage's tracker
+// actually consults the chunk-size knob.
+TEST_F(HashAggStageTest, MemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
+
+    auto run = runGroupingSumHashAgg();
+
+    auto stageInUse = run.stage->getMemoryTracker()->inUseTrackedMemoryBytes();
+    auto stagePeak = run.stage->getMemoryTracker()->peakTrackedMemoryBytes();
+    ASSERT_GT(stageInUse, 0);
+
+    auto [curOpInUse, curOpPeak] = getCurOpMemoryStats();
+    ASSERT_EQ(curOpInUse, stageInUse);
+    ASSERT_EQ(curOpPeak, stagePeak);
+}
+
 TEST_F(HashAggStageTest, HashAggMinMaxTest) {
     using namespace std::literals;
 
     BSONArrayBuilder bab1;
     bab1.append("D").append("a").append("F").append("e").append("B").append("c");
     auto [inputTag, inputVal] = stage_builder::makeValue(bab1.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
 
     BSONArrayBuilder bab2;
     bab2.append("B").append("e").append("a").append("F");
     auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(bab2.arr()));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
@@ -280,8 +353,8 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
                                  makeStringConstant("Unexpected merge with allowDiskUse=false")))),
             true,
             boost::none,
-            false /* allowDiskUse */,
-            nullptr /* yieldPolicy */,
+            /*allowDiskUse=*/false,
+            /*yieldPolicy=*/nullptr,
             kEmptyPlanNodeId);
 
         auto outSlot = generateSlotId();
@@ -297,8 +370,8 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
         return std::make_pair(outSlot, std::move(projectStage));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    inputOwned.reset();
+    expectedOwned.reset();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -309,13 +382,12 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     bab.append("cc").append("BB").append("Aa").append("Bb").append("dD").append("aA");
     bab.append("CC").append("AA").append("Dd").append("cC").append("bb").append("DD");
     auto [inputTag, inputVal] = stage_builder::makeValue(bab.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(inputTag, inputVal);
 
-    auto [expectedTag, expectedVal] = value::makeNewArray();
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
     for (auto&& sv : std::array<std::string_view, 4>{"Aa", "BB", "cc", "dD"}) {
         auto [tag, val] = value::makeNewString(sv);
-        value::getArrayView(expectedVal)->push_back_raw(tag, val);
+        value::getArrayView(expectedOwned.value())->push_back_raw(tag, val);
     }
 
     auto collator =
@@ -340,16 +412,15 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
                              makeStringConstant("Unexpected merge with allowDiskUse=false")))),
             true,
             boost::none,
-            false /* allowDiskUse */,
-            nullptr /* yieldPolicy */,
+            /*allowDiskUse=*/false,
+            /*yieldPolicy=*/nullptr,
             kEmptyPlanNodeId);
 
         return std::make_pair(hashAggSlot, std::move(hashAggStage));
     };
 
     // Generate a mock scan from 'input' with a single output slot.
-    inputGuard.reset();
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
 
     // Call the 'makeStage' callback to create the PlanStage that we want to test, passing in
     // the mock scan subtree and its output slot.
@@ -360,23 +431,23 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
 
     // Get all the results produced by the PlanStage we want to test.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessor));
 
     // Retrieve the first element from the results array.
-    value::ArrayEnumerator resultsEnumerator{resultsTag, resultsVal};
+    value::ArrayEnumerator resultsEnumerator{resultsOwned.tag(), resultsOwned.value()};
     ASSERT_TRUE(!resultsEnumerator.atEnd());
     auto [elemTag, elemVal] = resultsEnumerator.getViewOfValue();
 
     // Convert the element into an ArraySet 'as' (with no collation).
-    auto [asTag, asVal] = value::arrayToSet(elemTag, elemVal);
-    value::ValueGuard asGuard{asTag, asVal};
-    ASSERT_TRUE(asTag == value::TypeTags::ArraySet);
+    value::TagValueOwned asOwned =
+        value::TagValueOwned::fromRaw(value::arrayToSet(elemTag, elemVal));
+    ASSERT_TRUE(asOwned.tag() == value::TypeTags::ArraySet);
 
     // Assert that 'as' and 'expected' are the same size and contain the same values.
-    auto as = value::getArraySetView(asVal);
+    auto as = value::getArraySetView(asOwned.value());
     size_t expectedSize = 0;
-    value::ArrayEnumerator expectedEnumerator{expectedTag, expectedVal};
+    value::ArrayEnumerator expectedEnumerator{expectedOwned.tag(), expectedOwned.value()};
 
     for (; !expectedEnumerator.atEnd(); expectedEnumerator.advance()) {
         ASSERT_TRUE(as->values().count(expectedEnumerator.getViewOfValue()));
@@ -422,7 +493,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -439,8 +511,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -466,7 +538,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), false /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
 
@@ -476,7 +548,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -493,8 +566,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -542,7 +615,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
     ASSERT_EQ(1, stats->spillingStats.getSpills());
     ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -557,7 +630,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -574,8 +648,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -607,7 +681,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -628,7 +702,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -645,8 +720,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -672,7 +747,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), false /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
 
@@ -687,7 +762,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] = stage_builder::makeValue(
         BSON_ARRAY(5.0 << 6.0 << 7.0 << 5.0 << 6.0 << 7.0 << 6.0 << 7.0 << 7.0));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -704,8 +780,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -737,7 +813,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -749,7 +825,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
 
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(1.0 << 2.0 << 3.0 << 4.0 << 5.0));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, with an empty group by slot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -766,8 +843,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -809,7 +886,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -834,8 +912,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
                                     makeFunction(EFn::kSum, makeVariable(spillSlot2)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -870,7 +948,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -884,7 +962,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -910,7 +989,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
-                            nullptr /* yieldPolicy */,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -944,7 +1023,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     ASSERT_EQ(stats->spillingStats.getSpills(), 9);
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 9);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -954,7 +1033,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -979,8 +1059,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
                                     makeFunction(EFn::kSum, makeVariable(spillSlot2)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1037,7 +1117,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
     ASSERT_EQ(1, stats->spillingStats.getSpills());
     ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1052,7 +1132,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
     auto [inputTag, inputVal] =
         stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -1077,8 +1158,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
                                     makeFunction(EFn::kSum, makeVariable(spillSlot2)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1120,7 +1201,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1147,7 +1228,8 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
     }
 
     auto [inputTag, inputVal] = stage_builder::makeValue(BSONArray(builder.done()));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a sum for each group.
     auto sumsSlot = generateSlotId();
@@ -1163,7 +1245,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
-                            nullptr /* yieldPolicy */,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1174,12 +1256,12 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
         auto [resSumTag, resSumVal] = resultAccessors[1]->getViewOfValue();
         auto it = sums.find(value::bitcastTo<int>(resGroupByVal));
         ASSERT_TRUE(it != sums.end());
-        assertValuesEqual(resSumTag,
-                          resSumVal,
-                          value::TypeTags::NumberInt32,
-                          value::bitcastFrom<int>(it->second));
+        ASSERT_SBE_VALUE_EQ(resSumTag,
+                            resSumVal,
+                            value::TypeTags::NumberInt32,
+                            value::bitcastFrom<int>(it->second));
     }
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1194,7 +1276,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
         auto [ridTag, ridVal] = sbe::value::makeNewRecordId(id);
         testData->push_back_raw(ridTag, ridVal);
     }
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Build a HashAggStage, group by the scanSlot and compute a simple count.
     auto countsSlot = generateSlotId();
@@ -1212,7 +1295,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
-                            nullptr /* yieldPolicy */,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1240,7 +1323,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     ASSERT_EQ(3, results[10]);
     ASSERT_EQ(4, results[999]);
 
-    checkMemoryStats(stage.get(), false /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
 }  // namespace mongo::sbe

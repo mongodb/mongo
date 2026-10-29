@@ -5,10 +5,15 @@ selector:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # The auto-compaction tests in this file require background compaction to become active, which
+    # is not guaranteed while initial sync is deliberately lagged.
+    - jstests/core/administrative/block_replica_set_writes.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - incompatible_with_initial_sync
+    - query_intensive_pbt
     # Tests that query the system.profile collection cannot run in this suite since an initial sync
     # may insert unexpected operations into the profile collection.
     - queries_system_profile_collection

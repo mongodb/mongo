@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 
@@ -182,6 +156,30 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, UpdateMultipleDocuments) {
 
     ASSERT_TRUE(stage->getNext().isEOF());
     ASSERT_TRUE(stage->getNext().isEOF());
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceInternalApplyOplogUpdateTest, StageOwnsOplogUpdateAfterSourceBsonIsFreed) {
+    // Regression test for a heap-use-after-free: the stage must not read the oplog update BSON from
+    // the original command request, which is freed once the initial aggregate returns a cursor and
+    // its 'Invocation' is destroyed (before any getMore).
+    auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
+
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    {
+        // Build the stage from a spec whose backing BSON buffer is freed at the end of this scope.
+        auto spec = fromjson(
+            R"({$_internalApplyOplogUpdate: {oplogUpdate: {"$v": NumberInt(2), diff: {i: {b: 3}}}}})");
+        auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
+                                                                             getExpCtx());
+        stage = exec::agg::buildStageAndStitch(source, mock);
+    }
+
+    // The BSON backing the oplog update has now been freed; executing the stage must not read it.
+    auto next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", 0}, {"b", 3}}));
+
     ASSERT_TRUE(stage->getNext().isEOF());
 }
 

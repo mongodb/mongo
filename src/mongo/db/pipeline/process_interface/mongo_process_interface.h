@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -61,7 +35,6 @@
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/db/storage/key_format.h"
@@ -111,7 +84,7 @@ class TransactionHistoryIteratorBase;
  * interface. This allows all DocumentSources to be parsed on either mongos or mongod, but only
  * executable where it makes sense.
  */
-class MONGO_MOD_OPEN MongoProcessInterface {
+class [[MONGO_MOD_OPEN]] MongoProcessInterface {
 public:
     /**
      * Storage for a batch of BSON Objects to be updated in the write namespace. For each element
@@ -144,7 +117,7 @@ public:
     /**
      * Interface which estimates the size of a given write operation.
      */
-    class MONGO_MOD_OPEN WriteSizeEstimator {
+    class [[MONGO_MOD_OPEN]] WriteSizeEstimator {
     public:
         virtual ~WriteSizeEstimator() = default;
 
@@ -228,9 +201,6 @@ public:
      * unsplittable or untracked, we should route to the shard which owns 'nss'. Note that this
      * decision is inherently racy and subject to become stale. This is okay because either choice
      * will work correctly, we are simply applying a heuristic optimization.
-     *
-     * TODO (SERVER-128349): Update this function to return a ShardRef once the chunk manager's APIs
-     * use ShardRef.
      */
     virtual boost::optional<ShardId> determineSpecificMergeShard(
         OperationContext* opCtx, const NamespaceString& ns) const = 0;
@@ -415,9 +385,6 @@ public:
      *
      * This function accepts an optional 'dataShard' parameter that indicates the shard where the
      * temporary collection should be created.
-     *
-     * TODO (SERVER-128349): Update this function to accept a ShardRef instead of a ShardId once
-     * the merge shard calculation uses ShardRef.
      */
     virtual void createTempCollection(OperationContext* opCtx,
                                       const NamespaceString& nss,
@@ -581,16 +548,14 @@ public:
         CurrentOpCursorMode) const = 0;
 
     /**
-     * Returns the name of the local shard if sharding is enabled, or an empty string. Should only
-     * be used for logging, error message, and information returned to the user.
+     * Returns the name of the local shard if sharding is enabled, or an empty string.
      */
     virtual std::string getShardName(OperationContext* opCtx) const = 0;
 
     /**
-     * Returns the local shard if this process is a shardsvr, else boost::none. Should be used for
-     * any routing or other internal operations requiring a shard identifier.
+     * Returns the the local shard if this process is a shardsvr, else boost::none.
      */
-    virtual boost::optional<ShardRef> getShardRef(OperationContext* opCtx) const = 0;
+    virtual boost::optional<ShardId> getShardId(OperationContext* opCtx) const = 0;
 
     /**
      * Returns whether or not this process is running as part of a sharded cluster.
@@ -729,7 +694,7 @@ public:
     /**
      * Used to enforce the constraint that the foreign collection must be untracked.
      */
-    class MONGO_MOD_UNFORTUNATELY_OPEN ScopedExpectUntrackedCollection {
+    class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ScopedExpectUntrackedCollection {
     public:
         virtual ~ScopedExpectUntrackedCollection() = default;
     };

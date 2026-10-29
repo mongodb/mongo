@@ -1,0 +1,56 @@
+Resolve target-environment generation from the selected execution group.
+
+--- a/pycross/private/target_environment.bzl
++++ b/pycross/private/target_environment.bzl
+@@ -30,11 +30,20 @@
+     if ctx.attr.config_setting:
+         args.add("--config-setting-target", str(ctx.attr.config_setting.label))
+
+-    ctx.actions.run(
+-        outputs = [f],
+-        executable = ctx.executable._tool,
+-        arguments = [args],
+-    )
++    exec_group = "cross" if (
++        ctx.target_platform_has_constraint(
++            ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++        ) or ctx.var.get("MONGO_IBM_CROSS") == "1"
++    ) else None
++    action_kwargs = {
++        "outputs": [f],
++        "executable": ctx.executable._cross_tool if exec_group else ctx.executable._tool,
++        "arguments": [args],
++        "mnemonic": "PycrossTargetEnvironment",
++    }
++    if exec_group:
++        action_kwargs["exec_group"] = exec_group
++    ctx.actions.run(**action_kwargs)
+
+     return [
+         DefaultInfo(
+@@ -87,5 +87,25 @@
+             cfg = "exec",
+             executable = True,
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++        "_cross_tool": attr.label(
++            default = Label("//pycross/private/tools:target_environment_generator"),
++            cfg = config.exec(exec_group = "cross"),
++            executable = True,
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [config_common.toolchain_type(
++                Label("@rules_python//python:toolchain_type"),
++                mandatory = True,
++            )],
++            exec_compatible_with = [
++                "@@//bazel/platforms:use_mongo_linux_cross_execution",
++            ],
++        ),
+     },
+ )

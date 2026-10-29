@@ -12,6 +12,7 @@
  * @tags: [
  *   featureFlagExtensionsAPI,
  *   featureFlagExtensionsOptimizations,
+ *   requires_fcv_90,
  * ]
  */
 import {

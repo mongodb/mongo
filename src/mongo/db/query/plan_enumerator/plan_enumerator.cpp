@@ -1,40 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/plan_enumerator/plan_enumerator.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/none.hpp>
-
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
@@ -54,6 +23,11 @@
 #include <algorithm>
 #include <set>
 #include <string_view>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/none.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -277,9 +251,13 @@ void tagForSort(MatchExpression* tree) {
     }
 }
 
-bool isNodeEligibleForContainedOrPushdown(MatchExpression* node) {
+// 'currentElemMatchExpr' is the $elemMatch context of the $and being enumerated. A negation may
+// still be pushed into a sibling $or under that same $elemMatch, as both see the same array
+// element.
+bool isNodeEligibleForContainedOrPushdown(MatchExpression* node,
+                                          const MatchExpression* currentElemMatchExpr) {
     auto* rt = indexTagCast<RelevantTag>(node->getTag());
-    if (rt->elemMatchExpr && rt->notExpr) {
+    if (rt->elemMatchExpr && rt->notExpr && rt->elemMatchExpr != currentElemMatchExpr) {
         // Do not extract an index predicate which is a negation inside the $elemMatch. For example,
         // do not extract {a.b: {$ne: 2}} from {a: {$elemMatch: {b: {$ne: 2}}}. Due to the potential
         // presence of arrays at "a", the negation predicate itself is an "under-approximation" of
@@ -309,7 +287,8 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
       _projection(params.projection),
       _shardKey(params.shardKey),
       _distinct(params.distinct),
-      _shouldPruneDistinct(params.shouldPruneDistinct) {
+      _shouldPruneDistinct(params.shouldPruneDistinct),
+      _enableIndexPruning(params.enableIndexPruning) {
     if (params.sort && *params.sort) {
         _sortPatFields = stdx::unordered_set<std::string>();
         for (size_t i = 0; i < (*params.sort)->size(); i++) {
@@ -325,7 +304,7 @@ Status PlanEnumerator::init() {
     // Fill out our memo structure from the tagged _root.
     _done = !prepMemo(_root, PrepMemoContext());
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
-    if (internalQueryPlannerEnableIndexPruning.load() && (!_distinct || _shouldPruneDistinct)) {
+    if (_enableIndexPruning && (!_distinct || _shouldPruneDistinct)) {
         bool prunedAnyIndexes = pruneMemoOfDupIndexes(
             _memo, QueryPruningInfo{_projection, _sortPatFields, _shardKey, _indices});
         _explainInfo.prunedAnyIndexes = prunedAnyIndexes;
@@ -518,7 +497,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
         if (MONGO_likely(!_disableOrPushdown)) {
             auto& hashIdx = getOutsidePredHashedIdx(childContextCopy.outsidePreds);
             for (auto pred : indexedPreds) {
-                if (!isNodeEligibleForContainedOrPushdown(pred)) {
+                if (!isNodeEligibleForContainedOrPushdown(pred, context.elemMatchExpr)) {
                     continue;
                 }
                 auto [it, inserted] = hashIdx.insert({pred, OutsidePredRoute{}});
@@ -1139,7 +1118,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
         IndexToPredMap::const_iterator secondIt = firstIt;
         secondIt++;
         for (; secondIt != idxToFirst.end(); secondIt++) {
-            const IndexEntry& firstIndex = (*_indices)[secondIt->first];
+            const IndexEntry& firstIndex = (*_indices)[firstIt->first];
             const IndexEntry& secondIndex = (*_indices)[secondIt->first];
 
             // Limit n^2.

@@ -1,44 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 
-#include <cstddef>
-#include <cstdint>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -49,7 +14,6 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
@@ -65,12 +29,15 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <iterator>
 #include <memory>
@@ -80,7 +47,14 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class GeoNearExpression;
 
@@ -163,7 +137,7 @@ inline const static ProvidedSortSet kEmptySet;
  * This is an abstract representation of a query plan.  It can be transcribed into a tree of
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode {
     QuerySolutionNode() = default;
 
     /**
@@ -300,6 +274,14 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
     }
 
     /**
+     * True if this node type may appear in a plan run by the parallelism planner. Defaults to
+     * false, so a node type has to opt in explicitly.
+     */
+    virtual bool isParallelEligible() const {
+        return false;
+    }
+
+    /**
      * Returns the id associated with this node. Each node in a 'QuerySolution' tree is assigned a
      * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
      * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
@@ -340,6 +322,17 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
      *  - Total number of nodes with the specified type in tree.
      */
     std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(StageType type) const;
+
+    static void assertSupportsLeftMostBranchTraversal(const QuerySolutionNode* node) {
+        // At the moment, we only extend a solution plan with a tree for $group stage(s), which have
+        // exactly one child. The only node with more than one child that we accept is $lookup,
+        // where we descend down the first child, representing the main collection. We'll replace
+        // the left-most branch descent with a full tree traversal, if/when it becomes necessary.
+        tassert(5842800,
+                "Only chain extension trees are supported",
+                node->children.size() == 1 || node->getType() == StageType::STAGE_EQ_LOOKUP ||
+                    node->getType() == StageType::STAGE_EQ_LOOKUP_UNWIND);
+    }
 
 protected:
     /**
@@ -437,10 +430,10 @@ public:
 
     std::string summaryString() const;
 
-    MONGO_MOD_NEEDS_REPLACEMENT const QuerySolutionNode* root() const {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] const QuerySolutionNode* root() const {
         return _root.get();
     }
-    MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode* root() {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode* root() {
         return _root.get();
     }
 
@@ -535,6 +528,9 @@ public:
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 
     // Score calculated by PlanRanker. Only present if there are multiple candidate plans.
+    // TODO SERVER-131545 Refactor QuerySolution::score into BaseCandidatePlan: a score is a
+    // property of a candidacy, not of the plan, and belongs next to
+    // BaseCandidatePlan::adjustedScore as one per-candidate scores record.
     boost::optional<double> score;
 
     // Used for populating the 'isCached' field in explain when the query is not parameterized.
@@ -560,6 +556,10 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         return STAGE_COLLSCAN;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     void computeProperties() override;
     void appendToString(str::stream* ss, int indent) const override;
 
@@ -580,12 +580,12 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // Tells whether this scan will be performed as a clustered collection scan in SBE.
     bool doClusteredCollectionScanSbe() const {
-        return (isClustered && !isOplog && (minRecord || maxRecord || resumeScanPoint));
+        return (isClustered && !isOplog && (!rangeList.isUnbounded() || resumeScanPoint));
     }
 
     // Tells whether this scan will be performed as a clustered collection scan in classic.
     bool doClusteredCollectionScanClassic() const {
-        return (isClustered && !isOplog && (minRecord || maxRecord));
+        return (isClustered && !isOplog && !rangeList.isUnbounded());
     }
 
     void markNotEligibleForPlanCache() {
@@ -597,13 +597,9 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Name of the namespace.
     NamespaceString nss;
 
-    // If present, this parameter sets the start point of a forward scan or the end point of a
-    // reverse scan.
-    boost::optional<RecordIdBound> minRecord;
-
-    // If present, this parameter sets the start point of a reverse scan or the end point of a
-    // forward scan.
-    boost::optional<RecordIdBound> maxRecord;
+    // The set of RecordId ranges to scan. Default-constructed as unbounded (all records).
+    // For clustered non-oplog scans this encodes the planner-derived bounds.
+    RecordIdRangeList rangeList;
 
     // If present, this parameter denotes the clustering info on the collection
     boost::optional<ClusteredIndexSpec> clusteredIndex;
@@ -621,7 +617,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // - If 'tolerateKeyNotFound' is true, and if the RecordId does not exist, it will seek to the
     // next valid one.
     // This field must only be set on forward collection scans and cannot be used in conjunction
-    // with 'minRecord' or 'maxRecord'.
+    // with 'rangeList' bounds.
     boost::optional<ResumeScanPoint> resumeScanPoint;
 
     // Should we make a tailable cursor?
@@ -643,10 +639,6 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // Tells whether the collection is an oplog.
     bool isOplog = false;
-
-    // By default, includes the minRecord and maxRecord when present.
-    CollectionScanParams::ScanBoundInclusion boundInclusion =
-        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
 
     // Whether or not to wait for oplog visibility on oplog collection scans.
     bool shouldWaitForOplogVisibility = false;
@@ -834,12 +826,35 @@ struct FetchNode : public QuerySolutionNode {
         return children[0]->providedSorts();
     }
 
-    std::unique_ptr<QuerySolutionNode> clone() const final;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
 
     NamespaceString nss;
 };
 
-struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithSortSet {
+/**
+ * A fetch that may return records in a different order from its child, allowing batched execution.
+ * This is not currently generated for any query plans.
+ * TODO SERVER-136309: Build batched index scan + fetch SBE plans for this node.
+ * TODO SERVER-136310: Build batched index scan + fetch Classic plans for this node.
+ */
+struct BatchedFetchNode : public FetchNode {
+    using FetchNode::FetchNode;
+
+    StageType getType() const override {
+        return STAGE_BATCHED_FETCH;
+    }
+
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+    const ProvidedSortSet& providedSorts() const override {
+        return kEmptySet;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+};
+
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexScanNode : public QuerySolutionNodeWithSortSet {
     IndexScanNode(NamespaceString nss, IndexEntry index);
     ~IndexScanNode() override {}
 
@@ -883,6 +898,13 @@ struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithS
     IndexEntry index;
 
     int direction;
+
+    // Planning metadata only; execution stages do not consume this yet. Future execution stages
+    // will read multiple index keys and eventually the underlying WiredTiger index scan will
+    // support returning many entries at once.
+    // TODO SERVER-136309: Consume this flag to create batched index scan + fetch SBE plans.
+    // TODO SERVER-136310: Consume this flag to create batched index scan + fetch Classic plans.
+    bool allowBatching = false;
 
     // If there's a 'returnKey' projection we add key metadata.
     bool addKeyMetadata;
@@ -945,6 +967,10 @@ struct MatchNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_MATCH;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
 
     /**
@@ -1130,10 +1156,14 @@ struct ProjectionNodeDefault final : ProjectionNode {
         return STAGE_PROJECTION_DEFAULT;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
-        return "DEFAULT"_sd;
+        return "DEFAULT"sv;
     }
 };
 
@@ -1152,10 +1182,14 @@ struct ProjectionNodeCovered final : ProjectionNode {
         return STAGE_PROJECTION_COVERED;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
-        return "COVERED_ONE_INDEX"_sd;
+        return "COVERED_ONE_INDEX"sv;
     }
 
     // This is the key pattern of the index supplying our covered data. We can pre-compute which
@@ -1173,10 +1207,14 @@ struct ProjectionNodeSimple final : ProjectionNode {
         return STAGE_PROJECTION_SIMPLE;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
-        return "SIMPLE_DOC"_sd;
+        return "SIMPLE_DOC"sv;
     }
 };
 
@@ -1221,11 +1259,13 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
     SortNode(std::unique_ptr<QuerySolutionNode> child,
              BSONObj pattern,
              size_t limit,
-             LimitSkipParameterization canBeParameterized)
+             LimitSkipParameterization canBeParameterized,
+             uint64_t maxMemoryUsageBytes)
         : QuerySolutionNodeWithSortSet(std::move(child)),
           pattern(std::move(pattern)),
           limit(limit),
-          canBeParameterized(canBeParameterized) {}
+          canBeParameterized(canBeParameterized),
+          maxMemoryUsageBytes(maxMemoryUsageBytes) {}
     SortNode(const SortNode& other);
 
     ~SortNode() override {}
@@ -1261,16 +1301,15 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
 
     // The maximum number of bytes of memory we're willing to use during execution of the sort. If
     // this limit is exceeded and we're not allowed to spill to disk, the query will fail at
-    // execution time. Otherwise, the data will be spilled to disk.
-    const uint64_t maxMemoryUsageBytes = _loadMaxMemoryUsageBytes();
+    // execution time. Otherwise, the data will be spilled to disk. Sourced from the per-operation
+    // QueryKnobConfiguration at construction time.
+    const uint64_t maxMemoryUsageBytes;
 
 protected:
     void cloneSortData(SortNode* copy) const;
 
 private:
     virtual std::string_view sortImplementationTypeToString() const = 0;
-
-    static uint64_t _loadMaxMemoryUsageBytes();
 };
 
 /**
@@ -1286,7 +1325,7 @@ struct SortNodeDefault final : public SortNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view sortImplementationTypeToString() const override {
-        return "DEFAULT"_sd;
+        return "DEFAULT"sv;
     }
 };
 
@@ -1306,7 +1345,7 @@ struct SortNodeSimple final : public SortNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view sortImplementationTypeToString() const override {
-        return "SIMPLE"_sd;
+        return "SIMPLE"sv;
     }
 };
 
@@ -1323,6 +1362,10 @@ struct LimitNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_LIMIT;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
 
     void appendToString(str::stream* ss, int indent) const override;
@@ -1359,6 +1402,10 @@ struct SkipNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_SKIP;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
     void appendToString(str::stream* ss, int indent) const override;
 
@@ -1419,6 +1466,12 @@ struct GeoNear2DNode : public QuerySolutionNodeWithSortSet {
     IndexEntry index;
     bool addPointMeta;
     bool addDistMeta;
+
+    // Residual predicate to evaluate on the fetched document inside the stage, after the distance
+    // check and before BSON ownership and the distance sorter. Unlike 'filter' -- which
+    // GeoNear2DStage applies to the index KEY -- this may reference fields that are not in the
+    // index key pattern.
+    std::unique_ptr<MatchExpression> residualFilter;
 };
 
 struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
@@ -1457,6 +1510,12 @@ struct GeoNear2DSphereNode : public QuerySolutionNodeWithSortSet {
     IndexEntry index;
     bool addPointMeta;
     bool addDistMeta;
+
+    // Residual predicate to evaluate on the fetched document inside the stage, after the distance
+    // check and before BSON ownership and the distance sorter. This predicate is evaluated against
+    // the fetched document, so it may reference fields that are not part of the geo index key
+    // pattern.
+    std::unique_ptr<MatchExpression> residualFilter;
 };
 
 //
@@ -1475,6 +1534,10 @@ struct ShardingFilterNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_SHARDING_FILTER;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
     void appendToString(str::stream* ss, int indent) const override;
 
@@ -1572,6 +1635,10 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
 
     bool isShardFiltering = false;
     bool isFetching = false;
+
+    // Indicates that the distinct field may be multikey and the scan should proceed as if iterating
+    // over the sorted list of values that would result from unwinding the distinct field.
+    bool unwindsArrays = false;
 };
 
 /**
@@ -1747,11 +1814,11 @@ struct GroupNode : public QuerySolutionNode {
         return false;
     }
 
-    const ProvidedSortSet& providedSorts() const final {
+    const ProvidedSortSet& providedSorts() const override {
         return kEmptySet;
     }
 
-    std::unique_ptr<QuerySolutionNode> clone() const final;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
 
     bool metadataExhausted() const final {
         return true;
@@ -1772,6 +1839,43 @@ struct GroupNode : public QuerySolutionNode {
     // If set to true, generated SBE plan will produce result as BSON object. If false,
     // 'sbe::Object' is produced instead.
     bool shouldProduceBson;
+
+protected:
+    virtual void appendSpecificToString(str::stream* ss, int indent) const {}
+};
+
+// Group node that processes input clustered by the group key.
+struct StreamingGroupNode : public GroupNode {
+    StreamingGroupNode(std::unique_ptr<QuerySolutionNode> child,
+                       boost::intrusive_ptr<Expression> groupByExpression,
+                       std::vector<AccumulationStatement> accs,
+                       bool shouldProduceBson,
+                       std::vector<FieldPath> streamingKey)
+        : GroupNode(std::move(child),
+                    std::move(groupByExpression),
+                    std::move(accs),
+                    /*merging=*/false,
+                    /*willBeMerged=*/false,
+                    shouldProduceBson),
+          streamingKey(std::move(streamingKey)) {}
+
+    StageType getType() const override {
+        return STAGE_STREAMING_GROUP;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    void appendSpecificToString(str::stream* ss, int indent) const override;
+
+    void hash(absl::HashState h) const override {
+        for (const auto& path : streamingKey) {
+            h = absl::HashState::combine(std::move(h), path.fullPath());
+        }
+        GroupNode::hash(std::move(h));
+    }
+
+    // Field paths by which the child is clustered.
+    std::vector<FieldPath> streamingKey;
 };
 
 /**
@@ -1829,12 +1933,14 @@ struct EqLookupNode : public QuerySolutionNode {
                  const FieldPath& joinFieldForeign,
                  const FieldPath& joinField,
                  EqLookupNode::LookupStrategy lookupStrategy,
-                 bool shouldProduceBson)
+                 bool shouldProduceBson,
+                 bool collationCompatibleForDilj = true)
         : foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
           joinFieldForeign(joinFieldForeign),
           joinField(joinField),
           lookupStrategy(lookupStrategy),
+          collationCompatibleForDilj(collationCompatibleForDilj),
           shouldProduceBson(shouldProduceBson) {
         tassert(11801400, "EqLookupNode needs at least two input streams", children.size() > 1);
         tassert(11801401,
@@ -1862,14 +1968,16 @@ struct EqLookupNode : public QuerySolutionNode {
                  EqLookupNode::LookupStrategy lookupStrategy,
                  bool shouldProduceBson,
                  bool preserveNullAndEmptyArrays,
-                 const boost::optional<FieldPath>& indexPath)
+                 const boost::optional<FieldPath>& indexPath,
+                 bool collationCompatibleForDilj = true)
         : EqLookupNode(std::move(children),
                        foreignCollection,
                        joinFieldLocal,
                        joinFieldForeign,
                        joinField,
                        lookupStrategy,
-                       shouldProduceBson) {
+                       shouldProduceBson,
+                       collationCompatibleForDilj) {
         unwindSpec.emplace(
             UnwindNode::UnwindSpec{joinField, preserveNullAndEmptyArrays, indexPath});
     }
@@ -1932,6 +2040,14 @@ struct EqLookupNode : public QuerySolutionNode {
      * as it's applicable independent of collection sizes or the availability of indexes.
      */
     LookupStrategy lookupStrategy = LookupStrategy::kNestedLoopJoin;
+
+    /**
+     * Only meaningful when 'lookupStrategy' is kDynamicIndexedLoopJoin. True if the chosen index
+     * has a collation compatible with the query (no run-time type check needed for collation).
+     * False if the collation is incompatible and the type check is required. (The other reason for
+     * DILJ - a sparse index - is derived at lowering directly from the index's 'sparse' flag.)
+     */
+    bool collationCompatibleForDilj = true;
 
     /**
      * If set to true, generated SBE plan will produce result as BSON object. If false,
@@ -2026,9 +2142,8 @@ struct SearchNode : public QuerySolutionNode {
     const BSONObj searchQuery;
 
     /**
-     * This will populate the docsRequested field of the cursorOptions document sent as part of the
-     * command to mongot in the case where the query has an extractable limit that can guide the
-     * number of documents that mongot returns to mongod.
+     * The extractable limit from the user pipeline, if any. Used to feed the 'searchLimit' slot
+     * for SBE limit pushdown/parameterization.
      */
     boost::optional<long long> limit;
 
@@ -2109,66 +2224,6 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
     std::unique_ptr<MatchExpression> eventFilter = nullptr;
     std::unique_ptr<MatchExpression> wholeBucketFilter = nullptr;
     bool includeMeta = false;
-};
-
-struct WindowNode : public QuerySolutionNode {
-    WindowNode(std::unique_ptr<QuerySolutionNode> child,
-               boost::optional<boost::intrusive_ptr<Expression>> partitionByArg,
-               boost::optional<SortPattern> sortByArg,
-               std::vector<WindowFunctionStatement> outputFieldsArg)
-        : QuerySolutionNode(std::move(child)),
-          partitionBy(std::move(partitionByArg)),
-          sortBy(std::move(sortByArg)),
-          outputFields(std::move(outputFieldsArg)) {
-        DepsTracker partitionByDeps;
-        if (partitionBy) {
-            expression::addDependencies(partitionBy->get(), &partitionByDeps);
-        }
-        partitionByRequiredFields = std::move(partitionByDeps.fields);
-
-        DepsTracker sortByDeps;
-        if (sortBy) {
-            sortBy->addDependencies(&sortByDeps);
-        }
-        sortByRequiredFields = std::move(sortByDeps.fields);
-
-        DepsTracker outputDeps;
-        for (auto& outputField : outputFields) {
-            outputField.addDependencies(&outputDeps);
-        }
-        outputRequiredFields = std::move(outputDeps.fields);
-    }
-
-    StageType getType() const override {
-        return STAGE_WINDOW;
-    }
-
-    void appendToString(str::stream* ss, int indent) const override;
-
-    bool fetched() const override {
-        return true;
-    }
-
-    FieldAvailability getFieldAvailability(const std::string& field) const override {
-        return FieldAvailability::kFullyProvided;
-    }
-    bool sortedByDiskLoc() const override {
-        return false;
-    }
-
-    const ProvidedSortSet& providedSorts() const final {
-        return children.back()->providedSorts();
-    }
-
-    std::unique_ptr<QuerySolutionNode> clone() const final;
-
-    boost::optional<boost::intrusive_ptr<Expression>> partitionBy;
-    boost::optional<SortPattern> sortBy;
-    std::vector<WindowFunctionStatement> outputFields;
-
-    OrderedPathSet partitionByRequiredFields;
-    OrderedPathSet sortByRequiredFields;
-    OrderedPathSet outputRequiredFields;
 };
 
 /**
@@ -2305,8 +2360,12 @@ struct NestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
  * an index over the fields in the join predicates.
  */
 struct IndexedNestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
-    // Inherit the constructor from BinaryJoinEmbeddingNode
-    using BinaryJoinEmbeddingNode::BinaryJoinEmbeddingNode;
+    IndexedNestedLoopJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
+                                       std::unique_ptr<QuerySolutionNode> rightChildArg,
+                                       std::vector<QSNJoinPredicate> joinPredicatesArg,
+                                       std::vector<QSNJoinPredicate> probePredicatesArg,
+                                       boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                       boost::optional<FieldPath> rightEmbeddingFieldArg);
 
     StageType getType() const override {
         return STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE;
@@ -2314,6 +2373,15 @@ struct IndexedNestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
 
     void appendToString(str::stream* ss, int indent) const override;
     std::unique_ptr<QuerySolutionNode> clone() const override;
+
+    void hash(absl::HashState h) const override {
+        h = absl::HashState::combine(std::move(h), probePredicates);
+        BinaryJoinEmbeddingNode::hash(std::move(h));
+    }
+
+    // Identifies predicates used for probing the index. The fields referenced on the RHS are not
+    // aliased, i.e. they should match fields provided by the index.
+    std::vector<QSNJoinPredicate> probePredicates;
 };
 
 /**
@@ -2356,5 +2424,11 @@ struct IndexProbeNode : public QuerySolutionNode {
     NamespaceString nss;
     IndexEntry index;
 };
+
+/**
+ * Returns the address of the 'residualFilter' member if 'node' is a $geoNear node, otherwise
+ * nullptr.
+ */
+std::unique_ptr<MatchExpression>* getGeoNearDocFilter(QuerySolutionNode& node);
 
 }  // namespace mongo

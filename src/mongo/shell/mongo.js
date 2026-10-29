@@ -181,18 +181,30 @@ Mongo.prototype._setSecurityToken = function (token) {
     this._securityToken = token;
 };
 
-Mongo.prototype.runCommand = function (dbname, cmd, options) {
-    let cmdToSend = {...cmd};
+Mongo.prototype.withoutTelemetryContext = function (fn) {
+    const previous = this._skipTelemetryContext;
+    this._skipTelemetryContext = true;
+    try {
+        return fn();
+    } finally {
+        this._skipTelemetryContext = previous;
+    }
+};
 
-    if (jsTestOptions().enableOTELTracing && !cmdToSend.hasOwnProperty("$traceCtx")) {
+Mongo.prototype.runCommand = function (dbname, cmd, options) {
+    const queryOptions = options && typeof options === "object" ? options.queryOptions : options;
+    let traceparent = "";
+    const skipTelemetryContext =
+        this._skipTelemetryContext || (options && options.skipTelemetryContext);
+    if (!skipTelemetryContext && jsTestOptions().enableOTELTracing) {
         if (jsTestOptions().traceCtx != null) {
-            cmdToSend["$traceCtx"] = jsTestOptions().traceCtx;
+            traceparent = jsTestOptions().traceCtx.traceparent;
         } else {
             chatty("WARNING: OTEL tracing enabled but no trace context available.");
         }
     }
 
-    return this._runCommandImpl(dbname, cmdToSend, options, this._securityToken);
+    return this._runCommandImpl(dbname, cmd, queryOptions, this._securityToken, traceparent);
 };
 
 /**
@@ -675,6 +687,12 @@ Mongo.prototype._extractChangeStreamOptions = function (opts) {
     if (options.hasOwnProperty("showCommitTimestamp")) {
         changeStreamOptions.showCommitTimestamp = options.showCommitTimestamp;
         delete options.showCommitTimestamp;
+    }
+
+    if (options.hasOwnProperty("matchCollectionUUIDForUpdateLookup")) {
+        changeStreamOptions.matchCollectionUUIDForUpdateLookup =
+            options.matchCollectionUUIDForUpdateLookup;
+        delete options.matchCollectionUUIDForUpdateLookup;
     }
 
     // If no maxAwaitTimeMS is set in the options, we set a high wait timeout, so that there won't

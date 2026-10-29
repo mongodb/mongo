@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,6 +15,7 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
@@ -63,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -83,7 +59,7 @@ namespace mongo {
  * accessible via the ServiceContext. It owns an IndexBuildsManager that manages all MultiIndexBlock
  * index builder instances.
  */
-class MONGO_MOD_PUBLIC IndexBuildsCoordinator {
+class [[MONGO_MOD_PUBLIC]] IndexBuildsCoordinator {
 public:
     /**
      * Represents the set of different application modes used around building indexes that differ
@@ -278,7 +254,11 @@ public:
                                   const DatabaseName& dbName,
                                   const std::string& reason);
 
-    void abortUserIndexBuildsForUserWriteBlocking(OperationContext* opCtx);
+    /**
+     * Aborts non-internal DBs index builds and waits for any that are already finishing
+     * (and thus cannot be aborted) to complete.
+     */
+    void abortIndexBuildsForWriteBlocking(OperationContext* opCtx);
 
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
@@ -335,6 +315,12 @@ public:
      * Does not stop new index builds from starting.
      */
     void abortAllIndexBuildsWithReason(OperationContext* opCtx, const std::string& reason);
+
+    /**
+     * Returns whether this node is running the given index build, meaning it has a builder thread
+     * that has to be signalled and joined to stop it.
+     */
+    bool isIndexBuildRunning(const UUID& buildUUID) const;
 
     /**
      * Returns true if there is an index builder building the given index names on a collection.
@@ -440,7 +426,9 @@ public:
     /**
      * Waits for all index builds on a specified database to finish.
      */
-    void awaitNoBgOpInProgForDb(OperationContext* opCtx, const DatabaseName& dbName);
+    void awaitNoBgOpInProgForDb(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                std::initializer_list<IndexBuildProtocol> protocols);
 
     /**
      * Waits until an index build completes or the deadline expires. If there are no index builds in
@@ -454,14 +442,6 @@ public:
      * Does nothing if build UUID does not refer to an active index build.
      */
     void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
-
-    /**
-     * Writes an abort sentinel for every active primary-driven index build on the given collection.
-     *
-     * TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-     */
-    void writeTearableSideWriteAbortRecordForCollection(OperationContext* opCtx,
-                                                        const UUID& collectionUUID);
 
     /**
      * Registers kill index build action with the input DiskSpaceMonitor.
@@ -549,6 +529,13 @@ public:
     static int getNumIndexesTotal(OperationContext* opCtx, const CollectionPtr& collection);
 
 private:
+    /**
+     * Creates a pending interceptor for each primary-driven index build awaiting resume, so writes
+     * accepted before those builds set themselves up are recorded. Must run before the node accepts
+     * writes.
+     */
+    void _attachInterceptorsForResumableBuildsOnStepUp(OperationContext* opCtx);
+
     /**
      * Resumes primary-driven index builds on step-up to primary. Resumed index builds will be
      * continued in a background thread. Index builds that cannot be resumed will be aborted.
@@ -926,9 +913,11 @@ protected:
 
     /**
      * Function to be run in the asynchronous task launched onStepUp to check if there are any index
-     * builds that can be aborted because it has skipped records.
+     * builds that can be aborted because it has skipped records. 'stepUpTerm' is the term this node
+     * is stepping up in; the task gives up if it observes a different term, since that means the
+     * step-up it was launched for has been abandoned.
      */
-    void _onStepUpAsyncTaskFn(OperationContext* opCtx);
+    void _onStepUpAsyncTaskFn(OperationContext* opCtx, long long stepUpTerm);
 
     /**
      * Runs the index build.
@@ -944,6 +933,30 @@ protected:
      * Looks up active index build by UUID. Returns NoSuchKey if the build does not exist.
      */
     StatusWith<std::shared_ptr<ReplIndexBuildState>> _getIndexBuild(const UUID& buildUUID) const;
+
+    /**
+     * Aborts a primary-driven index build that is registered but not yet running. There is no
+     * builder thread to signal, so this aborts the build's durable state directly, under the
+     * collection X lock.
+     *
+     * Returns whether the build was aborted; it may have been resumed or aborted concurrently.
+     */
+    bool _abortUnresumedPrimaryDrivenIndexBuild(
+        OperationContext* opCtx,
+        const UUID& buildUUID,
+        const index_builds::primary_driven::Registry::Entry& build,
+        const std::string& reason);
+
+    /**
+     * Aborts the registered primary-driven index builds that 'match' and are not running here.
+     * Returns the UUIDs of the builds that were aborted. Callers must deal with running builds
+     * first: a build the coordinator is running is registered too, and aborting its durable state
+     * from underneath its builder thread would corrupt it.
+     */
+    std::vector<UUID> _abortUnresumedPrimaryDrivenIndexBuilds(
+        OperationContext* opCtx,
+        const std::function<bool(const index_builds::primary_driven::Registry::Entry&)>& match,
+        const std::string& reason);
 
     /** Called by implementations to bump the waitForCommitQuorum counter when they do so.*/
     void _incWaitForCommitQuorum();

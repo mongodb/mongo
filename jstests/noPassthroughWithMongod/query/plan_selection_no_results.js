@@ -49,17 +49,9 @@ try {
     // AND_HASH and AND_SORTED plans are disabled in SBE. If deferred engine choice is used, then
     // these plans will be planned and rejected. But if SBE is chosen before planning, these
     // plans are not even enumerated.
-    if (
-        engineUsed === "sbe" &&
-        !FeatureFlagUtil.isPresentAndEnabled(db, "featureFlagGetExecutorDeferredEngineChoice")
-    ) {
-        // Check that there's one rejected plan (which scans the '{x: 1}' index).
-        assert.eq(explain.queryPlanner.rejectedPlans.length, 1, explain);
-    } else {
-        // Check that there's two rejected plans (one IX intersect plan, and one plan which scans
-        // the '{x: 1}' index).
-        assert.eq(explain.queryPlanner.rejectedPlans.length, 2, explain);
-    }
+    // Check that there's two rejected plans (one IX intersect plan, and one plan which scans
+    // the '{x: 1}' index).
+    assert.eq(explain.queryPlanner.rejectedPlans.length, 2, explain);
 } finally {
     assert.commandWorked(
         db.adminCommand({

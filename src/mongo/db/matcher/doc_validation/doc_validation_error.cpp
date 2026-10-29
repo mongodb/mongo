@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/doc_validation/doc_validation_error.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -1001,7 +976,7 @@ public:
                           kInvertedReason,
                           &kExpectedTypes,
                           LeafArrayBehavior::kNoTraversal,
-                          true /* isJsonSchemaKeyword */);
+                          /*isJsonSchemaKeyword=*/true);
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
         _context->pushNewFrame(*expr);
@@ -1094,7 +1069,7 @@ public:
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
     void visit(const InternalSchemaTypeExpression* expr) final {
-        generateTypeError(*expr, LeafArrayBehavior::kNoTraversal, true /* isJsonSchemaKeyword */);
+        generateTypeError(*expr, LeafArrayBehavior::kNoTraversal, /*isJsonSchemaKeyword=*/true);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
         static constexpr auto normalReason = "found a duplicate item";
@@ -1186,7 +1161,7 @@ public:
             static constexpr auto kNormalReason = "value was not found in enum";
             static constexpr auto kInvertedReason = "value was found in enum";
             generateLogicalLeafError(
-                *expr, kNormalReason, kInvertedReason, true /* isJsonSchemaKeyword */);
+                *expr, kNormalReason, kInvertedReason, /*isJsonSchemaKeyword=*/true);
         } else {
             preVisitTreeOperator(expr);
             // An OR needs its children to call 'matches' in an inverted context to discern which
@@ -1507,7 +1482,7 @@ private:
                               kInvertedReason,
                               &kExpectedTypes,
                               LeafArrayBehavior::kNoTraversal,
-                              true /* isJsonSchemaKeyword */);
+                              /*isJsonSchemaKeyword=*/true);
         } else {
             generatePathError(*expr, kNormalReason, kInvertedReason);
         }
@@ -1683,7 +1658,7 @@ private:
                           kInvertedReason,
                           &expectedTypes,
                           LeafArrayBehavior::kNoTraversal,
-                          true /* isJsonSchemaKeyword */);
+                          /*isJsonSchemaKeyword=*/true);
     }
 
     /**
@@ -1856,8 +1831,11 @@ private:
                 "Must have at least one mismatched array element when generating an error for an "
                 "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
                 failingElement);
-            _context->getCurrentObjBuilder().appendNumber(
-                "itemIndex"sv, std::stoll(std::string{failingElement.fieldNameStringData()}));
+
+            int itemIndex;
+            uassertStatusOK(
+                NumberParser().base(10)(failingElement.fieldNameStringData(), &itemIndex));
+            _context->getCurrentObjBuilder().appendNumber("itemIndex"sv, itemIndex);
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
                                     _context->getCurrentInversion());
         } else {

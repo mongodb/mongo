@@ -7,6 +7,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -88,14 +89,13 @@ function setupCollections(st) {
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
     // refresh after the transaction has started.
-    [st.shard0, st.shard1, st.shard2].forEach((shard) => {
-        assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
-    });
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+        [st.shard0, st.shard1, st.shard2].forEach((shard) => {
+            assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
+            assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+        });
+    }
     st.refreshCatalogCacheForNs(st.s, localNs);
-
-    [st.shard0, st.shard1, st.shard2].forEach((shard) => {
-        assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
-    });
     st.refreshCatalogCacheForNs(st.s, foreignNs);
 
     assert.commandWorked(st.s.getDB(dbName).foo.insert([{_id: -5}])); // will live on shard0
@@ -340,14 +340,13 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
     // refresh after the transaction has started.
-    [st.shard0, st.shard1, st.shard2].forEach((shard) => {
-        assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
-    });
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+        [st.shard0, st.shard1, st.shard2].forEach((shard) => {
+            assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
+            assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+        });
+    }
     st.refreshCatalogCacheForNs(st.s, localNs);
-
-    [st.shard0, st.shard1, st.shard2].forEach((shard) => {
-        assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
-    });
     st.refreshCatalogCacheForNs(st.s, foreignNs);
 
     // Insert documents for shard0:

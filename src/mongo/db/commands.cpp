@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/commands.h"
 
@@ -54,6 +28,7 @@
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -203,8 +178,15 @@ bool prepareForFLERewrite(OperationContext* opCtx,
         std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
+    const auto processed = encryptionInformation->getCrudProcessed().value_or(false);
+    uassert(12783100,
+            "External users cannot have encryptionInformation.crudProcessed enabled",
+            !processed ||
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(boost::none), ActionType::internal));
     // Prevent duplicate rewriting.
-    return !encryptionInformation->getCrudProcessed().value_or(false);
+    return !processed;
 }
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
@@ -369,7 +351,7 @@ void CommandHelpers::ensureValidCollectionName(const NamespaceString& nss) {
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    if (first.type() != BSONType::string)
+    if (first.type() != BSONType::string && first.type() != BSONType::symbol)
         return NamespaceString(dbName);
     return NamespaceStringUtil::deserialize(dbName, cmdObj.firstElement().valueStringData());
 }
@@ -1095,6 +1077,12 @@ void Command::snipForLogging(mutablebson::Document* cmdObj) const {
     }
 }
 
+BSONObj snipCommandForLogging(const Command* command, const BSONObj& cmdObj) {
+    mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
+    command->snipForLogging(&cmdToLog);
+    return cmdToLog.getObject();
+}
+
 
 std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
     OperationContext* opCtx, const OpMsgRequest& request) {
@@ -1106,6 +1094,13 @@ Command::Command(std::string_view name, std::vector<std::string_view> aliases)
     : _name(std::string{name}), _aliases(std::move(aliases)) {}
 
 void Command::initializeClusterRole(ClusterRole role) {
+    // Commands served by mongos are entry points for sharded operations, so they are "upgraded" to
+    // be sampled by default. Commands served by mongod inherit the sampling decision from the
+    // mongos that dispatched them, if applicable.
+    if (role.hasExclusively(ClusterRole::RouterServer)) {
+        otel::traces::TracingSampler::get().sampleByDefault(_traceSpanName);
+    }
+
     if (includeInCommandStats()) {
         for (auto&& [ptr, stat] : {
                  std::pair{&_commandsExecuted, "total"},

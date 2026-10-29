@@ -1,5 +1,6 @@
 // Test that $text query can spill when textScore is needed.
 // @tags: [
+//   uses_explain,
 //   not_allowed_with_signed_security_token,
 //   requires_fcv_83,
 //   requires_persistence,

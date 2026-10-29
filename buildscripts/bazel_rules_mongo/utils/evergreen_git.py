@@ -168,6 +168,8 @@ def get_files_to_lint() -> list[str]:
     tracked_files.update(
         repo.git.execute(["git", "ls-files", "--others", "--exclude-standard"]).split("\n")
     )
+    # Unstaged deletions are still listed in the index.
+    tracked_files.difference_update(repo.git.execute(["git", "ls-files", "--deleted"]).split("\n"))
     # remove any empty entries
     tracked_files = list(filter(bool, tracked_files))
     return tracked_files

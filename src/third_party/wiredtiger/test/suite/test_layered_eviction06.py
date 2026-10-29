@@ -48,12 +48,6 @@ class test_layered_eviction06(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     # Force a read-and-evict of the page holding the given key. The session-level
     # release_evict_page debug flag is required to let eviction run the obsolete-time-window
     # review (application threads otherwise skip it).

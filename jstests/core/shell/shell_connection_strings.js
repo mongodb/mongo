@@ -5,6 +5,8 @@
 //   not_allowed_with_signed_security_token,
 //   uses_multiple_connections,
 //   docker_incompatible,
+//   # TODO SERVER-129949: Enable the test on gRPC
+//   grpc_incompatible,
 // ]
 
 assert(db.getMongo().uri, "Mongo object should have 'uri' property");

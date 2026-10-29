@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/auto_split_vector.h"
@@ -82,8 +56,8 @@ std::pair<std::vector<BSONObj>, bool> autoSplit(OperationContext* opCtx,
     return autoSplitVector(opCtx,
                            acq,
                            BSON(kPattern_id << 1) /* shard key pattern */,
-                           BSON(kPattern_id << 0) /* min */,
-                           BSON(kPattern_id << 1000) /* max */,
+                           /*min=*/BSON(kPattern_id << 0),
+                           /*max=*/BSON(kPattern_id << 1000),
                            maxChunkSizeMB * 1024 * 1024 /* max chunk size in bytes*/,
                            limit,
                            forward);
@@ -146,7 +120,7 @@ class AutoSplitVectorTest10MB : public AutoSplitVectorTest {
 
         auto opCtx = operationContext();
 
-        insertNDocsOf1MB(opCtx, 10 /* nDocs */);
+        insertNDocsOf1MB(opCtx, /*nDocs=*/10);
 
         DBDirectClient client(opCtx);
         ASSERT_EQUALS(10, client.count(kNss));
@@ -160,8 +134,8 @@ TEST_F(AutoSplitVectorTest, NoCollection) {
     ASSERT_THROWS_CODE(autoSplitVector(operationContext(),
                                        acq,
                                        BSON(kPattern_id << 1) /* shard key pattern */,
-                                       BSON(kPattern_id << kMinBSONKey) /* min */,
-                                       BSON(kPattern_id << kMaxBSONKey) /* max */,
+                                       /*min=*/BSON(kPattern_id << kMinBSONKey),
+                                       /*max=*/BSON(kPattern_id << kMaxBSONKey),
                                        1 * 1024 * 1024 /* max chunk size in bytes*/),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
@@ -173,8 +147,8 @@ TEST_F(AutoSplitVectorTest, EmptyCollection) {
         autoSplitVector(operationContext(),
                         acq,
                         BSON(kPattern_id << 1) /* shard key pattern */,
-                        BSON(kPattern_id << kMinBSONKey) /* min */,
-                        BSON(kPattern_id << kMaxBSONKey) /* max */,
+                        /*min=*/BSON(kPattern_id << kMinBSONKey),
+                        /*max=*/BSON(kPattern_id << kMaxBSONKey),
                         1 * 1024 * 1024 /* max chunk size in bytes*/);
     ASSERT_EQ(0, splitKey.size());
     ASSERT_FALSE(continuation);
@@ -186,8 +160,8 @@ TEST_F(AutoSplitVectorTest, EmptyCollectionBackwards) {
         autoSplitVector(operationContext(),
                         acq,
                         BSON(kPattern_id << 1) /* shard key pattern */,
-                        BSON(kPattern_id << kMinBSONKey) /* min */,
-                        BSON(kPattern_id << kMaxBSONKey) /* max */,
+                        /*min=*/BSON(kPattern_id << kMinBSONKey),
+                        /*max=*/BSON(kPattern_id << kMaxBSONKey),
                         1 * 1024 * 1024 /* max chunk size in bytes*/,
                         boost::none,
                         false);
@@ -201,8 +175,8 @@ TEST_F(AutoSplitVectorTest10MB, EmptyRange) {
         autoSplitVector(operationContext(),
                         acq,
                         BSON(kPattern_id << 1) /* shard key pattern */,
-                        BSON(kPattern_id << kMinBSONKey) /* min */,
-                        BSON(kPattern_id << -10) /* max */,
+                        /*min=*/BSON(kPattern_id << kMinBSONKey),
+                        /*max=*/BSON(kPattern_id << -10),
                         1 * 1024 * 1024 /* max chunk size in bytes*/);
     ASSERT_EQ(0, splitKey.size());
     ASSERT_FALSE(continuation);
@@ -211,14 +185,14 @@ TEST_F(AutoSplitVectorTest10MB, EmptyRange) {
 
 // No split points if estimated `data size < max chunk size`
 TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanMaxChunkSize) {
-    auto [splitKeys, continuation] = autoSplit(operationContext(), 11 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/11);
     ASSERT_EQ(splitKeys.size(), 0);
     ASSERT_FALSE(continuation);
 }
 
 // Do not split in case of `chunk size == maxChunkSize`
 TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataEqualMaxChunkSize) {
-    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/10);
     ASSERT_EQ(splitKeys.size(), 0);
     ASSERT_FALSE(continuation);
 }
@@ -229,9 +203,9 @@ TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanThreshold) {
     {
         // Increase collection size so that the auto splitter can actually be triggered. Use a
         // different range to don't interfere with the chunk getting splitted.
-        insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+        insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
     }
-    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/10);
     ASSERT_EQ(splitKeys.size(), 0);
     ASSERT_FALSE(continuation);
 }
@@ -239,8 +213,8 @@ TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanThreshold) {
 // One split point if `chunk size > max chunk size` and threshold reached
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThreshold) {
     const auto surplus = 4;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
-    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/10);
     ASSERT_EQ(splitKeys.size(), 1);
     ASSERT_EQ(6, splitKeys.front().getIntField(kPattern_id));
     ASSERT_FALSE(continuation);
@@ -248,9 +222,9 @@ TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThreshold) {
 
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThresholdBackwards) {
     const auto surplus = 4;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
     auto [splitKeys, continuation] =
-        autoSplit(operationContext(), 10 /* maxChunkSizeMB */, boost::none, false);
+        autoSplit(operationContext(), /*maxChunkSizeMB=*/10, boost::none, false);
     ASSERT_EQ(splitKeys.size(), 1);
     ASSERT_EQ(7, splitKeys.front().getIntField(kPattern_id));
     ASSERT_FALSE(continuation);
@@ -259,8 +233,8 @@ TEST_F(AutoSplitVectorTest10MB, SplitIfDataSlightlyMoreThanThresholdBackwards) {
 // Split points if `data size > max chunk size * 2` and threshold reached
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThreshold) {
     const auto surplus = 14;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
-    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/10);
     ASSERT_EQ(splitKeys.size(), 2);
     ASSERT_EQ(7, splitKeys.front().getIntField(kPattern_id));
     ASSERT_EQ(15, splitKeys.back().getIntField(kPattern_id));
@@ -269,9 +243,9 @@ TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThreshold) {
 
 TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThresholdBackwards) {
     const auto surplus = 14;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
     auto [splitKeys, continuation] =
-        autoSplit(operationContext(), 10 /* maxChunkSizeMB */, boost::none, false);
+        autoSplit(operationContext(), /*maxChunkSizeMB=*/10, boost::none, false);
     ASSERT_EQ(splitKeys.size(), 2);
     ASSERT_EQ(16, splitKeys.front().getIntField(kPattern_id));
     ASSERT_EQ(8, splitKeys.back().getIntField(kPattern_id));
@@ -281,8 +255,8 @@ TEST_F(AutoSplitVectorTest10MB, SplitIfDataMoreThanThresholdBackwards) {
 // Split points are not recalculated if the right-most chunk is at least `80% maxChunkSize`
 TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
     const auto surplus = 8;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
-    auto [splitKeys, continuation] = autoSplit(operationContext(), 10 /* maxChunkSizeMB */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
+    auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/10);
     ASSERT_EQ(splitKeys.size(), 1);
     ASSERT_EQ(9, splitKeys.front().getIntField(kPattern_id));
     ASSERT_FALSE(continuation);
@@ -290,9 +264,9 @@ TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunk) {
 
 TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunkBackwards) {
     const auto surplus = 8;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
     auto [splitKeys, continuation] =
-        autoSplit(operationContext(), 10 /* maxChunkSizeMB */, boost::none, false);
+        autoSplit(operationContext(), /*maxChunkSizeMB=*/10, boost::none, false);
     ASSERT_EQ(splitKeys.size(), 1);
     ASSERT_EQ(8, splitKeys.front().getIntField(kPattern_id));
     ASSERT_FALSE(continuation);
@@ -301,37 +275,37 @@ TEST_F(AutoSplitVectorTest10MB, NoRecalculateIfBigLastChunkBackwards) {
 // Test that the limit argument is honored and that split points are correctly repositioned
 TEST_F(AutoSplitVectorTest10MB, LimitArgIsRespected) {
     const auto surplus = 4;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
 
     // Maximum split keys returned (no limit)
     const auto numPossibleSplitKeys = [&]() {
-        auto [splitKeys, continuation] = autoSplit(operationContext(), 2 /* maxChunkSizeMB */);
+        auto [splitKeys, continuation] = autoSplit(operationContext(), /*maxChunkSizeMB=*/2);
         return splitKeys.size();
     }();
 
     ASSERT_GT(numPossibleSplitKeys, 3);
     for (auto limit : {1, 2, 3}) {
         const auto [splitKeys, continuation] =
-            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, limit);
+            autoSplit(operationContext(), /*maxChunkSizeMB=*/2, limit);
         ASSERT_EQ(splitKeys.size(), limit);
     }
 }
 
 TEST_F(AutoSplitVectorTest10MB, LimitArgIsRespectedBackwards) {
     const auto surplus = 4;
-    insertNDocsOf1MB(operationContext(), surplus /* nDocs */);
+    insertNDocsOf1MB(operationContext(), /*nDocs=*/surplus);
 
     // Maximum split keys returned (no limit)
     const auto numPossibleSplitKeys = [&]() {
         auto [splitKeys, continuation] =
-            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, boost::none, false);
+            autoSplit(operationContext(), /*maxChunkSizeMB=*/2, boost::none, false);
         return splitKeys.size();
     }();
 
     ASSERT_GT(numPossibleSplitKeys, 3);
     for (auto limit : {1, 2, 3}) {
         const auto [splitKeys, continuation] =
-            autoSplit(operationContext(), 2 /* maxChunkSizeMB */, limit, false);
+            autoSplit(operationContext(), /*maxChunkSizeMB=*/2, limit, false);
         ASSERT_EQ(splitKeys.size(), limit);
     }
 }
@@ -387,8 +361,8 @@ TEST_F(AutoSplitVectorTestInvalidKey, NoSplitIfAllDataIsInvalid) {
         autoSplitVector(operationContext(),
                         acq,
                         BSON(kPattern_x << 1) /* shard key pattern */,
-                        BSON(kPattern_x << MINKEY) /* min */,
-                        BSON(kPattern_x << MAXKEY) /* max */,
+                        /*min=*/BSON(kPattern_x << MINKEY),
+                        /*max=*/BSON(kPattern_x << MAXKEY),
                         1 * 1024 * 1024 /* max chunk size in bytes*/);
 
     ASSERT_EQ(0, splitKey.size());
@@ -403,8 +377,8 @@ TEST_F(AutoSplitVectorTestInvalidKey, OnlySplitAtValidKey) {
         autoSplitVector(operationContext(),
                         acq,
                         BSON(kPattern_x << 1) /* shard key pattern */,
-                        BSON(kPattern_x << MINKEY) /* min */,
-                        BSON(kPattern_x << MAXKEY) /* max */,
+                        /*min=*/BSON(kPattern_x << MINKEY),
+                        /*max=*/BSON(kPattern_x << MAXKEY),
                         10 * 1024 * 1024 /* max chunk size in bytes*/);
 
     ASSERT_EQ(1, splitKey.size());
@@ -432,7 +406,7 @@ public:
         int expectedChunkSize =
             mustReposition ? getInsertedSize() / (nSplitPoints + 1) : maxDocsPerChunk;
         auto [splitKeys, continuation] =
-            autoSplit(operationContext(), maxDocsPerChunk /* maxChunkSizeMB */);
+            autoSplit(operationContext(), /*maxChunkSizeMB=*/maxDocsPerChunk);
 
         int approximateNextMin = expectedChunkSize;
         for (const auto& splitKey : splitKeys) {

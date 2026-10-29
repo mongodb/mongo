@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,7 +14,7 @@
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -67,12 +41,13 @@ enum TimedPhase {
     kApplying,
     kCriticalSection,
     kBuildingIndex,
+    kDonorCloneCountFetchDuration,
     kVerificationPreApplying,
     kVerificationPreCommit,
     kChangeStreamMonitor,
     kStrictConsistency,
 };
-constexpr auto kNumTimedPhase = 8;
+constexpr auto kNumTimedPhase = 9;
 using PhaseDurationTracker = PhaseDurationTracker<TimedPhase, kNumTimedPhase>;
 
 }  // namespace resharding_metrics
@@ -158,7 +133,7 @@ public:
 
     ~ReshardingMetrics();
 
-    MONGO_MOD_PRIVATE static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(
+    [[MONGO_MOD_PRIVATE]] static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(
         UUID instanceId,
         BSONObj shardKey,
         NamespaceString nss,
@@ -252,6 +227,7 @@ public:
     void onPreCommitVerificationTimedOut();
     void onPreCommitDonorVerificationRetry();
     void onPreCommitRecipientVerificationRetry();
+    void onCoordinatorRetry(std::string_view label);
 
     ReshardingCumulativeMetrics::AnyState getState() const {
         return _state.load();
@@ -406,8 +382,8 @@ private:
     void appendChangeStreamMonitorLagMetrics(BSONObjBuilder& bob) const;
 
     template <typename T>
-    T getElapsed(const AtomicWord<Date_t>& startTime,
-                 const AtomicWord<Date_t>& endTime,
+    T getElapsed(const Atomic<Date_t>& startTime,
+                 const Atomic<Date_t>& endTime,
                  ClockSource* clock) const {
         auto start = startTime.load();
         if (start == kNoDate) {
@@ -534,26 +510,26 @@ private:
     ObserverPtr _observer;
     ReshardingCumulativeMetrics* _cumulativeMetrics;
 
-    AtomicWord<int64_t> _approxDocumentsToProcess;
-    AtomicWord<int64_t> _documentsProcessed;
-    AtomicWord<int64_t> _approxBytesToScan;
-    AtomicWord<int64_t> _bytesWritten;
+    Atomic<int64_t> _approxDocumentsToProcess;
+    Atomic<int64_t> _documentsProcessed;
+    Atomic<int64_t> _approxBytesToScan;
+    Atomic<int64_t> _bytesWritten;
 
-    AtomicWord<int64_t> _writesToStashCollections;
+    Atomic<int64_t> _writesToStashCollections;
 
-    AtomicWord<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;
-    AtomicWord<Milliseconds> _coordinatorLowEstimateRemainingTimeMillis;
+    Atomic<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;
+    Atomic<Milliseconds> _coordinatorLowEstimateRemainingTimeMillis;
 
-    AtomicWord<int64_t> _readsDuringCriticalSection;
-    AtomicWord<int64_t> _writesDuringCriticalSection;
+    Atomic<int64_t> _readsDuringCriticalSection;
+    Atomic<int64_t> _writesDuringCriticalSection;
 
-    AtomicWord<ReshardingCumulativeMetrics::AnyState> _state;
+    Atomic<ReshardingCumulativeMetrics::AnyState> _state;
 
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesFetched{0};
+    Atomic<int64_t> _insertsApplied{0};
+    Atomic<int64_t> _updatesApplied{0};
+    Atomic<int64_t> _deletesApplied{0};
+    Atomic<int64_t> _oplogEntriesApplied{0};
+    Atomic<int64_t> _oplogEntriesFetched{0};
 
     // To be used by recipients only. This map stores the OplogLatencyMetrics for each donor that a
     // recipient is copying data from. The map is populated by 'registerDonors' before the oplog
@@ -567,16 +543,16 @@ private:
 
     resharding_metrics::PhaseDurationTracker _phaseDurations;
 
-    AtomicWord<bool> _ableToEstimateRemainingRecipientTime;
+    Atomic<bool> _ableToEstimateRemainingRecipientTime;
 
-    AtomicWord<bool> _isSameKeyResharding;
-    AtomicWord<int64_t> _indexesToBuild;
-    AtomicWord<int64_t> _indexesBuilt;
+    Atomic<bool> _isSameKeyResharding;
+    Atomic<int64_t> _indexesToBuild;
+    Atomic<int64_t> _indexesBuilt;
 
     // Change stream monitor metrics (donors and recipients only).
     // Pre-computed lag between the majority-committed oplog timestamp and the change stream
     // monitor's resume token timestamp, in milliseconds. -1 means "not yet set".
-    AtomicWord<int64_t> _changeStreamMonitorLagMillis{-1};
+    Atomic<int64_t> _changeStreamMonitorLagMillis{-1};
 
     UniqueScopedObserver _scopedObserver;
     const ReshardingProvenanceEnum _provenance;

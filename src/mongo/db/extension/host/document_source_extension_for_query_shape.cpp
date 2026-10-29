@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 
@@ -72,13 +46,35 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
 
 Value DocumentSourceExtensionForQueryShape::serialize(
     const query_shape::SerializationOptions& opts) const {
-    tassert(10978000,
-            "query_shape::SerializationOptions should change literals while represented as a "
-            "DocumentSourceExtensionForQueryShape",
-            !opts.isKeepingLiteralsUnchanged());
-
+    if (opts.isKeepingLiteralsUnchanged() && !opts.transformIdentifiers) {
+        // Round-trippable serialization: emit the original user-provided stage so that callers
+        // re-serializing this pipeline (e.g. a hybrid search desugarer embedding an input pipeline
+        // in the $unionWith it constructs) produce BSON that re-parses to the same stage. Every
+        // construction path populates _rawStage; an empty one means this wrapper was built in a
+        // state that cannot round-trip, which should never reach literal-preserving serialization.
+        tassert(11766200,
+                "pre-desugar extension wrapper has no original BSON to round-trip",
+                !_rawStage.isEmpty());
+        return Value(Document{_rawStage});
+    }
+    // TODO SERVER-129346 Ideally we should tassert here that literals are being changed, but we
+    // cannot because hybrid search desugars when running against query stats. Restore the tassert
+    // when hybrid search can compute query shape without desugaring.
     host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
-    return Value(_parseNode->getQueryShape(adapter));
+    BSONObj queryShape = _parseNode->getQueryShape(adapter);
+    // An extension stage's query shape must be a single-field {$stageName: ...} object so it can be
+    // reparsed on query stats store read.
+    uassert(13462501,
+            str::stream() << "Extension stage " << _stageName << " produced a query shape with "
+                          << queryShape.nFields()
+                          << " field(s); expected exactly one (a {$stageName: ...} object)",
+            queryShape.nFields() == 1);
+    uassert(13462502,
+            str::stream() << "Extension stage " << _stageName << " produced a query shape with "
+                          << queryShape.firstElementFieldName()
+                          << " as the sole field name; expected \"" << _stageName << "\"",
+            queryShape.firstElementFieldNameStringData() == _stageName);
+    return Value(queryShape);
 }
 
 DocumentSource::Id DocumentSourceExtensionForQueryShape::getId() const {

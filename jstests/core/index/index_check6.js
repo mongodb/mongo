@@ -1,6 +1,7 @@
 // This test makes assertions about how many keys are examined during query execution, which can
 // change depending on whether/how many documents are filtered out by the SHARDING_FILTER stage.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 // ]
 

@@ -1,0 +1,39 @@
+VARIATION MatchOnPrefixOfDeclaredSubpath
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "x": {
+                    "y": "$a"
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  after $set:0
+    x: any
+    x.y: any
+  after $match:1
+    x: number|array(S)
+    x.y: any
+  end of pipeline
+    x: number
+    x.y: missing
+

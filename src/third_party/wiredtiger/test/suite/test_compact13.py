@@ -44,9 +44,6 @@ class test_compact13(compact_util):
 
     # Test background compaction stats are reset when after being disabled.
     def test_compact13(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create and populate tables.
         uris = []
         for i in range(self.n_tables):
@@ -59,7 +56,7 @@ class test_compact13(compact_util):
         self.session.checkpoint()
 
         # Enable background compaction.
-        bg_compact_config = 'background=true,free_space_target=1MB'
+        bg_compact_config = 'free_space_target=1MB'
         self.turn_on_bg_compact(bg_compact_config)
 
         # Nothing should be compacted.

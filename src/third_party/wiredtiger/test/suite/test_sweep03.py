@@ -83,13 +83,10 @@ class test_sweep03(sweep_util, suite_subprocess):
         #
         self.wait_for_sweep(baseline=0, increment=2, timeout=5)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
-        stat_cursor.close()
+        close1 = self.get_stat(stat.conn.dh_sweep_dead_close)
         # We expect nothing to have been closed.
         self.assertEqual(close1, 0)
 
-    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_disable_idle_timeout_drop_force(self):
         # Create a table to drop. A drop should close its associated handle
         drop_uri = '%s.%s' % (self.uri, "force_drop_test")
@@ -131,7 +128,6 @@ class test_sweep03(sweep_util, suite_subprocess):
 
     # FIXME-WT-16757: Enable on disagg once issue has been investigated.
     @wttest.skip_for_hook("disagg", "Fails with disagg")
-    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_disable_idle_timeout_drop(self):
         # Create a table to drop. A drop should close its associated handles
         drop_uri = '%s.%s' % (self.uri, "drop_test")
@@ -159,8 +155,9 @@ class test_sweep03(sweep_util, suite_subprocess):
         close2 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
 
-        # The sweep server should not be involved in regular drop cleanup
-        self.assertEqual(close2, close1)
+        # A drop of a clean tree marks its handle dead and defers the close to sweep, the same as
+        # a forced drop of a clean tree already does.
+        self.assertEqual(close2, close1 + 1)
         # Ensure that any space was reclaimed from cache.
         self.assertLess(cache2, cache1)
 

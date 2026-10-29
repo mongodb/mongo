@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 
@@ -33,6 +7,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -40,6 +15,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/assert_util.h"
@@ -161,6 +137,13 @@ void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
         LOGV2_DEBUG(
             10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
     }
+}
+
+// Returns true if this operation runs under a server-spawned internal transaction (a child
+// session).
+bool isInternalTransaction(OperationContext* opCtx) {
+    const auto& lsid = opCtx->getLogicalSessionId();
+    return lsid && isChildSession(*lsid);
 }
 
 void aggregateQueryStatsMetrics(OperationContext* opCtx, const WriteBatchResponse& response) {
@@ -524,11 +507,10 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
             LOGV2_DEBUG(10346900, 4, "Noting stale config response", "status"_attr = status);
             if (const auto info = status.extraInfo<StaleConfigInfo>()) {
                 _lastRoundStaleVersions.try_emplace(
-                    info->getNss(),
-                    std::make_pair(info->getShardRef(), info->getVersionReceived()));
+                    info->getNss(), std::make_pair(info->getShardId(), info->getVersionReceived()));
             }
         }
-        routingCtx.onStaleError(status);
+        routingCtx.onStaleError(status, boost::none /* nss */);
     } else if (status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
         LOGV2_DEBUG(10413104,
                     4,
@@ -1454,10 +1436,12 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
         resp.setWriteConcernError(new WriteConcernErrorDetail{totalWcError->toStatus()});
     }
 
-    // Append query stats metrics if the command is forwarded from router (the current node is a
-    // primary shard) such that router can receive and aggregate the metrics there.
-    // Otherwise, ignore if the current node is a router.
-    if (opCtx->isCommandForwardedFromRouter()) {
+    // Echo metrics when the request asks for them and comes from a trusted source -- a command
+    // forwarded from another router, or a write inside a server-spawned internal transaction. Today
+    // the only internal transaction that carries the flag is a retryable time-series update
+    // re-dispatch, so echoing when the flag is set is safe.
+    if ((opCtx->isCommandForwardedFromRouter() || isInternalTransaction(opCtx)) &&
+        query_stats::WriteCmdQueryStatsRegistrar::requestIncludesQueryStatsMetrics(_cmdRef)) {
         auto& opDebug = CurOp::get(opCtx)->debug();
         resp.setQueryStatsMetrics(opDebug.gatherQueryStatsMetricsForBatchWrites());
     }

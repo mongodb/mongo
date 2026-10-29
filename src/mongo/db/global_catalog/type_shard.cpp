@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/type_shard.h"
 
@@ -38,14 +12,19 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
+#include <type_traits>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+// The UUID is the word "config" in hex (636f6e66-6967) plus the v4
+// required bits.
+const UUID ShardType::kConfigServerUuid =
+    UUID::parse("636f6e66-6967-4000-8000-000000000000").getValue();
 
 const BSONField<std::string> ShardType::name("_id");
 const BSONField<UUID> ShardType::uuid("uuid");
@@ -64,7 +43,8 @@ ShardType::ShardType(std::string name,
                      boost::optional<UUID> uuid,
                      std::string host,
                      std::vector<std::string> tags)
-    : _handle(ShardHandle(std::move(name), std::move(uuid))),
+    : _name(std::move(name)),
+      _uuid(std::move(uuid)),
       _host(std::move(host)),
       _tags(std::move(tags)) {}
 
@@ -96,7 +76,8 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
             return swUuid.getStatus();
         }
 
-        shard._handle.emplace(std::move(shardName), swUuid.getValue());
+        shard._name = std::move(shardName);
+        shard._uuid = swUuid.getValue();
     }
 
     {
@@ -170,7 +151,7 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
 }
 
 Status ShardType::validate() const {
-    if (!_handle.has_value() || !_handle->name().isValid()) {
+    if (!_name.has_value() || _name->empty()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << name.name() << " field");
     }
@@ -192,12 +173,10 @@ Status ShardType::validate() const {
 BSONObj ShardType::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_handle) {
+    if (_name)
         builder.append(name(), getName());
-        if (_handle->uuid()) {
-            _handle->uuid()->appendToBuilder(&builder, uuid.name());
-        }
-    }
+    if (_uuid)
+        getUuid().get().appendToBuilder(&builder, uuid());
     if (_host)
         builder.append(host(), getHost());
     if (_draining)
@@ -216,23 +195,12 @@ std::string ShardType::toString() const {
     return toBSON().toString();
 }
 
-const std::string& ShardType::getName() const {
-    invariant(_handle);
-    return _handle->name().toString();
+void ShardType::setName(const std::string& name) {
+    _name = name;
 }
 
-const boost::optional<UUID>& ShardType::getUuid() const {
-    invariant(_handle);
-    return _handle->uuid();
-}
-
-const ShardHandle& ShardType::getHandle() const {
-    invariant(_handle);
-    return *_handle;
-}
-
-void ShardType::setHandle(ShardHandle handle) {
-    _handle = std::move(handle);
+void ShardType::setUuid(boost::optional<UUID> uuid) {
+    _uuid = uuid;
 }
 
 void ShardType::setHost(const std::string& host) {

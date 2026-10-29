@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/views/pipeline_resolver.h"
 
@@ -40,6 +14,7 @@
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 const NamespaceString kUserNss =
     NamespaceString::createNamespaceString_forTest("testdb", "usercoll");
@@ -90,8 +65,8 @@ TEST(PipelineResolverTest, BindsTopLevelView) {
     ASSERT_TRUE(result);
     ASSERT_EQ(userLpp.getStages().size(), 2U);
     // Both stages should be $match.
-    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$match"_sd);
-    ASSERT_EQ(userLpp.getStages()[1]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(userLpp.getStages()[1]->getParseTimeName(), "$match"sv);
 }
 
 TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
@@ -133,23 +108,24 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
 
     // Top-level stage count should remain 1 (still just $unionWith).
     ASSERT_EQ(userLpp.getStages().size(), 1U);
-    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$unionWith"sv);
 
     // Drill into the subpipeline via getMutableSubPipelines.
-    auto* subs = userLpp.getStages()[0]->getMutableSubPipelines();
+    auto subs = userLpp.getStages()[0]->getMutableSubPipelines();
+    ASSERT(subs);
     ASSERT_EQ(subs->size(), 1U);
 
     // The inner subpipeline should now have 2 stages: view's $match prepended + user's $match.
     const auto& innerStages = subs->front()->getStages();
     ASSERT_EQ(innerStages.size(), 2U);
-    ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"_sd);
-    ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"sv);
 
     // The recursive resolver should have upgraded the resolved backing namespace on the parent
     // $unionWith stage to the view, so downstream DocumentSource construction can skip a per-stage
     // view application.
     auto resolvedBackingNss = userLpp.getStages()[0]->getResolvedBackingNss();
-    ASSERT_TRUE(resolvedBackingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(resolvedBackingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(resolvedBackingNss.getNamespace(), kUnionViewNss);
 }
 
@@ -174,7 +150,7 @@ TEST(PipelineResolverTest, ResolverDoesNotBindResolvedSubpipelineViewOnNonViewTa
     // No view in the map → parent stage's resolved backing namespace stays at its identity default:
     // not a view, and pointing at the user-provided foreign namespace.
     auto resolvedBackingNss = userLpp.getStages()[0]->getResolvedBackingNss();
-    ASSERT_FALSE(resolvedBackingNss.involvedNamespaceIsAView);
+    ASSERT_FALSE(resolvedBackingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(resolvedBackingNss.getNamespace(), kForeignNss);
 }
 
@@ -215,7 +191,7 @@ TEST(PipelineResolverTest, WalkerRespectsViewPolicyKDoNothing) {
 
     // Assert: stages must NOT have been prepended — still exactly 1 stage.
     ASSERT_EQ(userLpp.getStages().size(), 1U);
-    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$_internalSearchIdLookup"_sd);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$_internalSearchIdLookup"sv);
 }
 
 TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
@@ -264,20 +240,20 @@ TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
     ASSERT_EQ(userLpp.getStages().size(), 1U);
 
     // Outer $unionWith sub-LPP: [{$match:{v:1}} (from viewMain), {$unionWith: viewMain}].
-    auto* outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
+    auto outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
     ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
     const auto& outerSubStages = (*outerSubs)[0]->getStages();
     ASSERT_EQ(outerSubStages.size(), 2U);
-    ASSERT_EQ(outerSubStages[0]->getParseTimeName(), "$match"_sd);
-    ASSERT_EQ(outerSubStages[1]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(outerSubStages[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(outerSubStages[1]->getParseTimeName(), "$unionWith"sv);
 
     // Inner $unionWith sub-LPP: [{$match:{v:1}} (from viewMain)] — not empty, proving the
     // second reference to viewMain was resolved and not suppressed as a cycle.
-    auto* innerSubs = outerSubStages[1]->getMutableSubPipelines();
+    auto innerSubs = outerSubStages[1]->getMutableSubPipelines();
     ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
     const auto& innerSubStages = (*innerSubs)[0]->getStages();
     ASSERT_EQ(innerSubStages.size(), 1U);
-    ASSERT_EQ(innerSubStages[0]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(innerSubStages[0]->getParseTimeName(), "$match"sv);
 }
 
 TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionReferences) {
@@ -316,24 +292,130 @@ TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionRef
 
     // Walk outer -> middle: neither targets a view, so nothing is prepended at those levels.
     ASSERT_EQ(userLpp.getStages().size(), 1U);
-    auto* outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
+    auto outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
     ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
     const auto& middleStages = (*outerSubs)[0]->getStages();
     ASSERT_EQ(middleStages.size(), 1U);
-    ASSERT_EQ(middleStages[0]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(middleStages[0]->getParseTimeName(), "$unionWith"sv);
 
-    auto* middleSubs = middleStages[0]->getMutableSubPipelines();
+    auto middleSubs = middleStages[0]->getMutableSubPipelines();
     ASSERT_TRUE(middleSubs && middleSubs->size() == 1U);
     const auto& innermostStages = (*middleSubs)[0]->getStages();
     ASSERT_EQ(innermostStages.size(), 1U);
-    ASSERT_EQ(innermostStages[0]->getParseTimeName(), "$unionWith"_sd);
+    ASSERT_EQ(innermostStages[0]->getParseTimeName(), "$unionWith"sv);
 
     // The innermost $unionWith targeted innerView should be fully resolved.
-    auto* innerSubs = innermostStages[0]->getMutableSubPipelines();
+    auto innerSubs = innermostStages[0]->getMutableSubPipelines();
     ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
     const auto& viewStages = (*innerSubs)[0]->getStages();
     ASSERT_EQ(viewStages.size(), 1U);
-    ASSERT_EQ(viewStages[0]->getParseTimeName(), "$match"_sd);
+    ASSERT_EQ(viewStages[0]->getParseTimeName(), "$match"sv);
+}
+
+TEST(PipelineResolverTest, DoesNotInfiniteLoopOnMutualGraphLookupViewCycle) {
+    // viewB has pipeline [{$graphLookup: {from: "viewE", ...}}]
+    // viewE has pipeline [{$graphLookup: {from: "viewB", ...}}]
+    // Both back the same base collection. Before the fix, resolveInvolvedNamespacesImpl would
+    // recurse infinitely because the materialized sub-pipeline uses the backing-collection NSS
+    // (not the view NSS), bypassing the inProgress cycle-detection guard.
+    const NamespaceString kViewBNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewB");
+    const NamespaceString kViewENss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewE");
+    const NamespaceString kBaseColl =
+        NamespaceString::createNamespaceString_forTest("testdb", "fsmcoll0");
+
+    auto makeGraphLookupStage = [](std::string_view fromColl) {
+        return BSON("$graphLookup" << BSON("from" << fromColl << "startWith"
+                                                  << "$a"
+                                                  << "connectFromField"
+                                                  << "a"
+                                                  << "connectToField"
+                                                  << "b"
+                                                  << "as"
+                                                  << "result"));
+    };
+
+    // viewB: {viewOn: "fsmcoll0", pipeline: [{$graphLookup: {from: "viewE", ...}}]}
+    std::vector<BSONObj> viewBPipeline{makeGraphLookupStage("viewE")};
+    // viewE: {viewOn: "fsmcoll0", pipeline: [{$graphLookup: {from: "viewB", ...}}]}
+    std::vector<BSONObj> viewEPipeline{makeGraphLookupStage("viewB")};
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(kViewBNss,
+                  ResolvedNamespace(kViewBNss, kBaseColl, viewBPipeline, BSONObj{}, opts));
+    nsMap.emplace(kViewENss,
+                  ResolvedNamespace(kViewENss, kBaseColl, viewEPipeline, BSONObj{}, opts));
+
+    // User queries viewB (empty pipeline, like a find command).
+    LiteParsedPipeline userLpp(kViewBNss, std::vector<BSONObj>{}, true, LiteParserOptions{});
+
+    // This must complete without hanging or crashing (stack overflow).
+    bool result =
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(&userLpp, kViewBNss, nsMap);
+
+    // A view was bound (viewB's pipeline was prepended).
+    ASSERT_TRUE(result);
+
+    // viewB's $graphLookup stage was prepended — exactly one stage.
+    ASSERT_EQ(userLpp.getStages().size(), 1U);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$graphLookup"sv);
+}
+
+TEST(PipelineResolverTest, MongotLedPipelineOnViewBindsUnionWithSubpipelineView) {
+    const NamespaceString kViewNss =
+        NamespaceString::createNamespaceString_forTest("test", "searchView");
+    const NamespaceString kViewBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "searchBacking");
+
+    // Insert the top-level view entry the way maybeApplyViewPipeline does for view aggregations.
+    BSONObj viewMatchStage = BSON("$match" << BSON("v" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespace rnView(kViewNss, kViewBackingNss, {viewMatchStage}, BSONObj{}, opts);
+    ResolvedNamespaceMap nsMap;
+    PipelineResolver::insertTopLevelViewEntry(nsMap, kViewNss, std::move(rnView));
+
+    // Model the shape hybrid search desugars to on a view: a mongot stage first, followed by a
+    // $unionWith wrapping another input pipeline that targets the same view.
+    BSONObj searchStage = BSON(
+        "$search" << BSON("index" << "idx" << "text" << BSON("query" << "q" << "path" << "m")));
+    BSONObj unionStage = BSON(
+        "$unionWith" << BSON("coll" << "searchView"
+                                    << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("i" << 1)))));
+    LiteParsedPipeline userLpp(
+        kViewNss, std::vector<BSONObj>{searchStage, unionStage}, true, LiteParserOptions{});
+
+    bool result =
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(&userLpp, kViewNss, nsMap);
+    ASSERT_TRUE(result);
+
+    // Mongot-led pipelines are bind-only at the top level: the view pipeline must NOT be
+    // prepended (mongot applies the view itself).
+    ASSERT_EQ(userLpp.getStages().size(), 2U);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$search"sv);
+    ASSERT_EQ(userLpp.getStages()[1]->getParseTimeName(), "$unionWith"sv);
+
+    // The $unionWith must be marked view-resolved so DocumentSource construction keeps the
+    // parsed stage params instead of reparsing the sub-pipeline from BSON (which drops AST-only
+    // extension stage specs).
+    auto resolvedBackingNss = userLpp.getStages()[1]->getResolvedBackingNss();
+    ASSERT_TRUE(resolvedBackingNss.isInvolvedNamespaceAView());
+    ASSERT_EQ(resolvedBackingNss.getNamespace(), kViewNss);
+
+    // The recursion must also have handled the view inside the sub-pipeline: the sub-pipeline is
+    // not mongot-led, so the view's $match gets stitched in front of the user's $match.
+    auto subs = userLpp.getStages()[1]->getMutableSubPipelines();
+    ASSERT(subs);
+    ASSERT_EQ(subs->size(), 1U);
+    const auto& innerStages = subs->front()->getStages();
+    ASSERT_EQ(innerStages.size(), 2U);
+    ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"sv);
+    ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"sv);
 }
 
 TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
@@ -361,10 +443,65 @@ TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     ASSERT_EQ(entry.getBsonPipeline().size(), 1U);
 
     // Assert: involvedNamespaceIsAView is true.
-    ASSERT_TRUE(entry.involvedNamespaceIsAView);
+    ASSERT_TRUE(entry.isInvolvedNamespaceAView());
 
     // Assert: backing namespace (entry.ns) matches the ResolvedNamespace's resolved namespace.
-    ASSERT_EQ(entry.ns, resolvedView.getResolvedNamespace());
+    ASSERT_EQ(entry.getResolvedNamespace(), resolvedView.getResolvedNamespace());
+}
+
+TEST(PipelineResolverTest, BindOnlyDoesNotInfiniteLoopOnMutualLookupViewCycle) {
+    // Same mutual-view cycle shape as DoesNotInfiniteLoopOnMutualGraphLookupViewCycle, but driven
+    // through the bindOnly=true path used by the $lookup execution-time binder. bindOnly toggles
+    // bind-vs-prepend at each level, but the inProgress/taggedViewNss cycle guard in
+    // resolveSubpipelinesInRange runs identically — this test proves the cycle is still detected.
+    //
+    // viewB has pipeline [{$lookup: {from: "viewE", ...}}]
+    // viewE has pipeline [{$lookup: {from: "viewB", ...}}]
+    // Both back the same base collection. Each bare-foreign $lookup materializes the target view's
+    // pipeline (tagged with the view NSS), so the recursion would loop forever without the guard.
+    const NamespaceString kViewBNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewB");
+    const NamespaceString kViewENss =
+        NamespaceString::createNamespaceString_forTest("testdb", "viewE");
+    const NamespaceString kBaseColl =
+        NamespaceString::createNamespaceString_forTest("testdb", "fsmcoll0");
+
+    auto makeLookupStage = [](std::string_view fromColl) {
+        return BSON("$lookup" << BSON("from" << fromColl << "localField"
+                                             << "a"
+                                             << "foreignField"
+                                             << "b"
+                                             << "as"
+                                             << "result"));
+    };
+
+    // viewB: {viewOn: "fsmcoll0", pipeline: [{$lookup: {from: "viewE", ...}}]}
+    std::vector<BSONObj> viewBPipeline{makeLookupStage("viewE")};
+    // viewE: {viewOn: "fsmcoll0", pipeline: [{$lookup: {from: "viewB", ...}}]}
+    std::vector<BSONObj> viewEPipeline{makeLookupStage("viewB")};
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(kViewBNss,
+                  ResolvedNamespace(kViewBNss, kBaseColl, viewBPipeline, BSONObj{}, opts));
+    nsMap.emplace(kViewENss,
+                  ResolvedNamespace(kViewENss, kBaseColl, viewEPipeline, BSONObj{}, opts));
+
+    // User queries the base collection with a bare $lookup against viewB (no user subpipeline).
+    LiteParsedPipeline userLpp(
+        kBaseColl, std::vector<BSONObj>{makeLookupStage("viewB")}, true, LiteParserOptions{});
+
+    // This must complete without hanging or crashing (stack overflow) even though viewB <-> viewE
+    // form a mutual cycle.
+    PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+        &userLpp, kBaseColl, nsMap, /*bindOnly=*/true);
+
+    // bindOnly never prepends the view pipeline: the top-level user $lookup is the only stage.
+    ASSERT_EQ(userLpp.getStages().size(), 1U);
+    ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$lookup"sv);
 }
 
 }  // namespace

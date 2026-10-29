@@ -2,7 +2,6 @@
  * Tests the vector similarity family of expressions in aggregation pipelines.
  *
  * @tags: [
- *   featureFlagVectorSimilarityExpressions,
  *   requires_fcv_83,
  * ]
  */

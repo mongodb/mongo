@@ -7,8 +7,6 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO SERVER-129087: Remove this tag once the test is fixed.
- *   disagg_multiversion_incompatible,
  * ]
  */
 

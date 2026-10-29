@@ -1,6 +1,5 @@
 // Term counter should be present in oplog entries under protocol version 1.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {getLatestOp} from "jstests/replsets/rslib.js";
 
 let name = "oplog_term";
 let replSet = new ReplSetTest({name: name, nodes: 1});
@@ -13,18 +12,13 @@ let primary = replSet.getPrimary();
 let collection = primary.getDB("test").getCollection(name);
 assert.commandWorked(collection.save({_id: 1}));
 
-let oplogEntry = getLatestOp(primary);
-assert(oplogEntry, "unexpected empty oplog");
-assert.eq(
-    collection.getFullName(),
-    oplogEntry.ns,
-    "unexpected namespace in oplog entry: " + tojson(oplogEntry),
-);
-assert.eq(
-    1,
-    oplogEntry.o._id,
-    "oplog entry does not refer to most recently inserted document: " + tojson(oplogEntry),
-);
+// Look up this test's own insert rather than the oplog tip: unrelated background writes (HMAC key
+// generation, query analysis setup) can land after the insert and would otherwise make the tip
+// refer to an entry this test never made.
+let oplogEntry = replSet
+    .findOplog(primary, {op: "i", ns: collection.getFullName(), "o._id": 1}, 1)
+    .toArray()[0];
+assert(oplogEntry, "could not find the oplog entry for the inserted document");
 assert(oplogEntry.hasOwnProperty("t"), "oplog entry must contain term: " + tojson(oplogEntry));
 
 let status = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
@@ -37,6 +11,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/client.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -45,7 +20,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_mock.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
@@ -187,7 +161,7 @@ protected:
                         {kShardKeyPattern.getKeyPattern().globalMin(),
                          kShardKeyPattern.getKeyPattern().globalMax()},
                         version,
-                        ShardRef{"0"});
+                        {"0"});
         chunk.setName(OID::gen());
         return {chunk};
     }
@@ -376,7 +350,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksReturnsImmediately) {
     auto coll = loadCollection(cachedCollVersion);
 
     const auto swCri = _catalogCache->getCollectionRoutingInfo(
-        operationContext(), coll.getNss(), true /* allowLocks */);
+        operationContext(), coll.getNss(), /*allowLocks=*/true);
     ASSERT_OK(swCri.getStatus());
 
     ASSERT(swCri.getValue().getCollectionVersion() == cachedCollVersion);
@@ -396,7 +370,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewCollIn
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
 
         const auto status =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, /*allowLocks=*/true)
                 .getStatus();
 
         ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
@@ -421,7 +395,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo
         FailPointEnableBlock failPoint("blockDatabaseCacheLookup");
 
         const auto status =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, /*allowLocks=*/true)
                 .getStatus();
 
         ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
@@ -478,7 +452,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});
 
-        _catalogCache->onStaleCollectionVersion(coll.getNss(), boost::none /* wantedVersion */);
+        _catalogCache->onStaleCollectionVersion(coll.getNss(), /*wantedVersion=*/boost::none);
         const auto swCri =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());
@@ -568,5 +542,123 @@ TEST_F(CatalogCacheTest, AdvanceCollectionTimeInStore) {
                   .getCollectionVersion());
 }
 
+TEST_F(CatalogCacheTest,
+       LookupDatabaseCalledOnceOnSeveralGetDatabaseWithStaleDatabaseVersionException) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
+
+    // Receiving StaleDbVersion on catalog cache
+    _catalogCache->onStaleDatabaseVersion(kNss.dbName(), boost::none);
+
+    _catalogCacheLoader->setDatabaseRefreshReturnValue(
+        DatabaseType(kNss.dbName(), kShards[0], dbVersion));
+
+    // Capture baseline for stats (loadDatabases should have increased them already)
+    BSONObjBuilder baselineBuilder;
+    _catalogCache->report(&baselineBuilder);
+    const auto countBefore = baselineBuilder.obj()["catalogCache"]
+                                 .Obj()["countDatabaseFullRefreshesStarted"]
+                                 .numberLong();
+
+    // Spawn 10 threads each of which is trying to get database (leading to refresh)
+    constexpr size_t kNumThreads = 10;
+    std::vector<StatusWith<CachedDatabaseInfo>> results(
+        kNumThreads, Status(ErrorCodes::InternalError, "Unknown"));
+    std::vector<stdx::thread> threads;
+    threads.reserve(kNumThreads);
+
+    {
+        FailPointEnableBlock failPoint("blockDatabaseCacheLookup");
+
+        for (size_t i = 0; i < kNumThreads; ++i) {
+            threads.emplace_back([this, &results, i] {
+                ThreadClient tc("getDatabase-" + std::to_string(i),
+                                getGlobalServiceContext()->getService());
+                auto opCtx = tc->makeOperationContext();
+                results[i] = _catalogCache->getDatabase(opCtx.get(), kNss.dbName());
+            });
+        }
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // All 10 getDatabase calls must have succeeded with the correct database info
+    for (size_t i = 0; i < kNumThreads; ++i) {
+        ASSERT_OK(results[i].getStatus());
+        ASSERT_EQ(results[i].getValue()->getPrimary(), kShards[0]);
+        ASSERT_EQ(results[i].getValue()->getVersion().getUuid(), dbVersion.getUuid());
+        ASSERT_EQ(results[i].getValue()->getVersion().getLastMod(), dbVersion.getLastMod());
+    }
+
+    // Despite 10 concurrent callers all seeing a stale cache, only one full refresh
+    // was made to the config server
+    BSONObjBuilder builder;
+    _catalogCache->report(&builder);
+    const auto report = builder.obj();
+    const auto stats = report["catalogCache"].Obj();
+    ASSERT_EQ(1, stats["countDatabaseFullRefreshesStarted"].numberLong() - countBefore);
+}
+
+TEST_F(CatalogCacheTest,
+       LookupCollectionCalledOnceOnSeveralGetCollectionWithStaleDatabaseVersionException) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const auto gen = CollectionGeneration(OID::gen(), Timestamp(1, 1));
+    const auto collVersion = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}));
+    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
+    loadCollection(collVersion);
+
+    // Receiving StaleCollectionVersion on catalog cache
+    _catalogCache->onStaleCollectionVersion(kNss, boost::none);
+
+    _catalogCacheLoader->setCollectionRefreshReturnValue(makeCollectionType(collVersion));
+    _catalogCacheLoader->setChunkRefreshReturnValue(makeChunks(collVersion.placementVersion()));
+
+    // Capture baseline for stats (loadCollection should have increased them already)
+    BSONObjBuilder baselineBuilder;
+    _catalogCache->report(&baselineBuilder);
+    const auto countBefore = baselineBuilder.obj()["catalogCache"]
+                                 .Obj()["countIncrementalRefreshesStarted"]
+                                 .numberLong();
+
+    // Spawn 10 threads each of which is trying to get collection routing info (leading to refresh)
+    constexpr size_t kNumThreads = 10;
+    std::vector<StatusWith<CollectionRoutingInfo>> results(
+        kNumThreads, Status(ErrorCodes::InternalError, "Unknown"));
+    std::vector<stdx::thread> threads;
+    threads.reserve(kNumThreads);
+
+    {
+        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
+
+        for (size_t i = 0; i < kNumThreads; ++i) {
+            threads.emplace_back([this, &results, i] {
+                ThreadClient tc("getCollection-" + std::to_string(i),
+                                getGlobalServiceContext()->getService());
+                auto opCtx = tc->makeOperationContext();
+                results[i] = _catalogCache->getCollectionRoutingInfo(opCtx.get(), kNss);
+            });
+        }
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // All 10 getCollectionRoutingInfo calls must have succeeded with the correct collection info
+    for (size_t i = 0; i < kNumThreads; ++i) {
+        ASSERT_OK(results[i].getStatus());
+        ASSERT_EQ(results[i].getValue().getCollectionVersion(), collVersion);
+    }
+
+    // Despite 10 concurrent callers all seeing a stale cache, only one full refresh
+    // was made to the config server
+    BSONObjBuilder builder;
+    _catalogCache->report(&builder);
+    const auto report = builder.obj();
+    const auto stats = report["catalogCache"].Obj();
+    ASSERT_EQ(1, stats["countIncrementalRefreshesStarted"].numberLong() - countBefore);
+}
 }  // namespace
 }  // namespace mongo

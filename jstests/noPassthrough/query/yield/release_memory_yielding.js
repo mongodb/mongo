@@ -1,5 +1,9 @@
 /**
  * Tests that release memory doesn't prevent DDL operation and can be interrupted.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

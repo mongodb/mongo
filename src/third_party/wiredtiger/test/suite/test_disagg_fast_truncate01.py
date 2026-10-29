@@ -173,7 +173,7 @@ class test_disagg_fast_truncate01(wttest.WiredTigerTestCase):
         """A checkpoint must never both contain a discard and reference its page."""
         self.populate()
 
-        fast_delete_before = self.read_stat(stat.dsrc.rec_page_delete_fast, self.uri)
+        fast_delete_before = self.read_stat(stat.dsrc.cursor_truncate_fast_delete_pages, self.uri)
         inmem_split_before = self.read_stat(stat.dsrc.cache_inmem_split, self.uri)
 
         # With oldest pinned at 1 the truncate is committed but not globally visible, so
@@ -191,7 +191,7 @@ class test_disagg_fast_truncate01(wttest.WiredTigerTestCase):
             self.split_parent()
 
         self.assertGreater(
-            self.read_stat(stat.dsrc.rec_page_delete_fast, self.uri),
+            self.read_stat(stat.dsrc.cursor_truncate_fast_delete_pages, self.uri),
             fast_delete_before,
             "fast truncate did not trigger",
         )

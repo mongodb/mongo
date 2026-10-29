@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/field_path.h"
 
@@ -56,7 +30,7 @@ TEST(FieldPathTest, Simple) {
 
 /** Accessing hashed field names from a FieldPath without precomputed hashes */
 DEATH_TEST_REGEX(FieldPathTestDeathTest, AccessInvalidHashes, "Tripwire assertion.*11212700") {
-    FieldPath path("foo.bar.baz", false /* precomputeHashes */);
+    FieldPath path("foo.bar.baz", /*precomputeHashes=*/false);
     ASSERT_EQUALS(3U, path.getPathLength());
     ASSERT_EQUALS("foo", path.getFieldName(0));
     ASSERT_EQUALS("bar", path.getFieldName(1));
@@ -71,7 +45,7 @@ DEATH_TEST_REGEX(FieldPathTestDeathTest, AccessInvalidHashes, "Tripwire assertio
 
 /** Accessing hashed field names from a FieldPath with computed hashes */
 TEST(FieldPathTest, AccessValidHashes) {
-    FieldPath path("foo.bar.baz", true /* precomputeHashes */);
+    FieldPath path("foo.bar.baz", /*precomputeHashes=*/true);
     ASSERT_EQUALS(3U, path.getPathLength());
     ASSERT_EQUALS("foo", path.getFieldName(0));
     ASSERT_EQUALS("bar", path.getFieldName(1));
@@ -285,8 +259,8 @@ TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
 DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfConcatenatedPathsThatAreNotComputed,
                  "Tripwire assertion.*11212700") {
-    FieldPath head("some.long.path", false /* precomputeHashes */);
-    FieldPath tail("another.path", false /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/false);
+    FieldPath tail("another.path", /*precomputeHashes=*/false);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_THROWS_CODE(path.getFieldNameHashed(0), AssertionException, 11212700);
@@ -297,8 +271,8 @@ DEATH_TEST_REGEX(FieldPathTestDeathTest,
 }
 
 TEST(FieldPathTest, AccessHashesOfConcatenatedPathsThatAreFullyComputed) {
-    FieldPath head("some.long.path", true /* precomputeHashes */);
-    FieldPath tail("another.path", true /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/true);
+    FieldPath tail("another.path", /*precomputeHashes=*/true);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_EQ("some", path.getFieldNameHashed(0).key());
@@ -316,8 +290,8 @@ TEST(FieldPathTest, AccessHashesOfConcatenatedPathsThatAreFullyComputed) {
 DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfConcatenatedPathsOnlyHeadHasComputedHashes,
                  "Tripwire assertion.*11212700") {
-    FieldPath head("some.long.path", true /* precomputeHashes */);
-    FieldPath tail("another.path", false /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/true);
+    FieldPath tail("another.path", /*precomputeHashes=*/false);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_EQ("some", path.getFieldNameHashed(0).key());
@@ -331,8 +305,8 @@ DEATH_TEST_REGEX(FieldPathTestDeathTest,
 }
 
 TEST(FieldPathTest, AccessHashesOfConcatenatedPathsOnlyTailHasComputedHashes) {
-    FieldPath head("some.long.path", false /* precomputeHashes */);
-    FieldPath tail("another.path", true /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/false);
+    FieldPath tail("another.path", /*precomputeHashes=*/true);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_EQ("some", path.getFieldNameHashed(0).key());
@@ -350,12 +324,12 @@ TEST(FieldPathTest, AccessHashesOfConcatenatedPathsOnlyTailHasComputedHashes) {
 DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfMultiConcatenatedFieldPaths,
                  "Tripwire assertion.*11212700") {
-    FieldPath one("some.long.path", true /* precomputeHashes */);
-    FieldPath two("another.path", false /* precomputeHashes */);
-    FieldPath three("here", true /* precomputeHashes */);
-    FieldPath four("is.another.path", false /* precomputeHashes */);
-    FieldPath five("finally.the.end.is.near", true /* precomputeHashes */);
-    FieldPath six("really", false /* precomputeHashes */);
+    FieldPath one("some.long.path", /*precomputeHashes=*/true);
+    FieldPath two("another.path", /*precomputeHashes=*/false);
+    FieldPath three("here", /*precomputeHashes=*/true);
+    FieldPath four("is.another.path", /*precomputeHashes=*/false);
+    FieldPath five("finally.the.end.is.near", /*precomputeHashes=*/true);
+    FieldPath six("really", /*precomputeHashes=*/false);
     FieldPath path = one.concat(two).concat(three).concat(four).concat(five).concat(six);
 
     ASSERT_EQ("some.long.path.another.path.here.is.another.path.finally.the.end.is.near.really",

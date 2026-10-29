@@ -1,41 +1,17 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
@@ -62,10 +38,68 @@ public:
     static ResumeStatus compareAgainstClientResumeToken(const Document& eventFromResumedStream,
                                                         const ResumeTokenData& tokenDataFromClient);
 
+    /**
+     * Returns the resume token the client used to open or resume the change stream, read from the
+     * change stream spec on 'expCtx'. Returns boost::none when 'expCtx' has no change stream spec
+     * or the spec carries no resume point (e.g. in unit tests that build stages in isolation).
+     */
+    static boost::optional<ResumeTokenData> getClientResumeToken(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 protected:
     GetNextResult doGetNext() override;
 
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
     const ResumeTokenData _tokenFromClient;
+};
+
+/**
+ * Tracks where a change stream event sits, relative to the client's resume point, as events flow
+ * through the pipeline. Stages that run before DSCSEnsureResumeTokenPresent (in particular the
+ * pre-/post-image stages) use it to avoid work on events which the resume point causes to be
+ * skipped, and to stop comparing once the resume point has been passed.
+ *
+ * The result describes the resume point only: kAfterResumePoint means "the resume point does not
+ * cause this event to be skipped", not "this event will be delivered to the client". Other filters
+ * (namespace, operation type, a user $match, ...) may still drop an event that is past the resume
+ * point. Callers must not treat this component as a delivery oracle.
+ *
+ * If the stream has no resume point at all, every event is reported as kAfterResumePoint without
+ * any comparison. A high water mark resume point is classified by the same comparison as an event
+ * resume point (see classify()).
+ */
+class ChangeStreamResumeTokenTracker {
+public:
+    enum class EventPosition {
+        kBeforeResumePoint,  // Precedes the resume point; the resume point causes it to be skipped.
+        kAtResumePoint,      // Is the resume point; the resume point causes it to be skipped.
+        kAfterResumePoint,   // Is at or past the resume point; the resume point does not skip it.
+    };
+
+    explicit ChangeStreamResumeTokenTracker(boost::optional<ResumeTokenData> tokenFromClient);
+
+    /**
+     * Classifies 'event' relative to the client's resume point. Events must be classified in the
+     * order in which they appear in the stream. Once an event at or past the resume point has been
+     * seen, all subsequent events are reported as kAfterResumePoint without further comparison, so
+     * at most the events up to and including the resume point are ever compared.
+     *
+     * A high water mark resume point is classified by this same comparison. A high water mark token
+     * identifies a point in time rather than an event, so its token type never matches an event's;
+     * every event therefore compares as kSurpassedToken and is reported as kAfterResumePoint. That
+     * is correct for a consumer asking "does the resume point skip this event?": no event is
+     * skipped on account of a high water mark resume point, because DSCSEnsureResumeTokenPresent is
+     * not added to the pipeline for one. The one comparison needed to reach that conclusion is
+     * amortized by the latch described above.
+     *
+     * Like compareAgainstClientResumeToken(), this requires every event to be at or after the
+     * resume point's clusterTime. That holds for change streams, whose oplog scan starts at the
+     * resume point's clusterTime.
+     */
+    EventPosition classify(const Document& event);
+
+private:
+    boost::optional<ResumeTokenData> _tokenFromClient;
+    bool _atOrPastResumePoint = false;
 };
 }  // namespace mongo::exec::agg

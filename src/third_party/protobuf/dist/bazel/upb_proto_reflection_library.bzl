@@ -6,6 +6,7 @@ load("//bazel/common:proto_info.bzl", "ProtoInfo")
 load("//bazel/private:upb_proto_library_internal/aspect.bzl", "upb_proto_aspect_impl")
 load("//bazel/private:upb_proto_library_internal/cc_library_func.bzl", "upb_use_cpp_toolchain")
 load("//bazel/private:upb_proto_library_internal/rule.bzl", "upb_proto_rule_impl")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 _UpbDefsWrappedCcInfo = provider("Provider for cc_info for protos", fields = ["cc_info"])
 

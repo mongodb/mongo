@@ -1,57 +1,52 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace mongo::join_ordering {
+namespace {
+
+// Quantizes a page count to the nearest power of 2^(1/4). This absorbs small run-to-run and
+// platform-dependent variations in the underlying value: 'onDiskSizeBytes' differs by a few percent
+// across platforms and restores of the same data, and the storage engine's leaf page counter
+// reflects timing-dependent page split/eviction/compaction history. The ~9.5% max quantization
+// error is acceptable given the Mackert-Lohman formula is already approximate.
+double quantizePageCount(double pages) {
+    constexpr double kQuantizationGranularity = 4.0;
+    return std::pow(
+        2.0, std::round(kQuantizationGranularity * std::log2(pages)) / kQuantizationGranularity);
+}
+
+}  // namespace
+
+bool CollectionStats::hasApproxNumLeafPages() const {
+    return _approxNumLeafPages.has_value() && _approxNumLeafPages.value() > 0;
+}
 
 double CollectionStats::numPages() const {
+    // Prefer the storage engine's leaf page count if available: it tracks the actual page structure
+    // of the tree, whereas the size-based fallback assumes leaf pages are filled to
+    // '_pageSizeBytes'.
+    if (hasApproxNumLeafPages()) {
+        return quantizePageCount(*_approxNumLeafPages);
+    }
+
     if (_onDiskSizeBytes <= 0) {
         return 0.0;
     }
+
     tassert(12259201, "pageSizeBytes must be > 0", _pageSizeBytes > 0);
-    double pagesInCollRaw = _onDiskSizeBytes / _pageSizeBytes;
-    // Quantize to the nearest power of 2^(1/4) to absorb small platform-dependent
-    // differences in onDiskSizeBytes (~3% observed between Ubuntu and Amazon Linux 2023 for
-    // TPC-H SF 0.1 orders table). This gives ~9.5% max quantization error, which is acceptable
-    // given the Mackert-Lohman formula is already approximate.
-    constexpr double kQuantizationGranularity = 4.0;
-    return std::pow(2.0,
-                    std::round(kQuantizationGranularity * std::log2(pagesInCollRaw)) /
-                        kQuantizationGranularity);
+    return quantizePageCount(_onDiskSizeBytes / _pageSizeBytes);
 }
 
 double CatalogStats::numPagesInStorageEngineCache(const NamespaceString& nss) const {
     const auto& coll = collStats.at(nss);
     // Estimate the average in memory page size by first estimating the number of leaf pages in
     // the collection. Take care to avoid division by 0 in cases of empty collection.
-    double avgInMemoryPageSize = 32 * 1024;
+    double avgInMemoryPageSize = kDefaultPageSizeBytes;
     double pagesInColl = coll.numPages();
     if (pagesInColl > 0 && coll.logicalDataSizeBytes > 0) {
         avgInMemoryPageSize = coll.logicalDataSizeBytes / pagesInColl;

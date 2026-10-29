@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/sharding_environment/client/shard.h"
 
@@ -37,8 +11,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -149,7 +124,8 @@ StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* in
                 return RetryStrategy::Result<Shard::CommandResponse>{
                     status,
                     Shard::CommandResponse::getErrorLabels(swResponse),
-                    swResponse.isOK() ? swResponse.getValue().hostAndPort : boost::none};
+                    swResponse.isOK() ? swResponse.getValue().hostAndPort : boost::none,
+                    Shard::CommandResponse::getBaseBackoffMS(swResponse)};
             }
 
             const auto& response = swResponse.getValue();
@@ -199,26 +175,18 @@ Shard::RetryStrategy::RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCr
 bool Shard::RetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
-    std::span<const std::string> errorLabels) {
-    const bool willRetry =
-        _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
+    const bool willRetry = _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+        s, target, errorLabels, baseBackoffMS);
 
     _recordOperationAttempted();
 
     if (containsSystemOverloadedErrorLabel(errorLabels)) {
         _stats->numOverloadErrorsReceived.addAndFetch(1);
-
-        if (willRetry) {
-            _stats->numRetriesDueToOverloadAttempted.addAndFetch(1);
-        }
-
-        if (!_previousAttemptOverloaded) {
-            _stats->numOperationsRetriedAtLeastOnceDueToOverload.addAndFetch(1);
-        }
-
-        _previousAttemptOverloaded = true;
+        _precedingErrorWasOverload = true;
     } else {
-        _recordOperationNotOverloaded();
+        _precedingErrorWasOverload = false;
     }
 
     return willRetry;
@@ -228,7 +196,10 @@ void Shard::RetryStrategy::recordSuccess(const boost::optional<HostAndPort>& tar
     _underlyingStrategy.recordSuccess(target);
 
     _recordOperationAttempted();
-    _recordOperationNotOverloaded();
+
+    if (_retriedAtLeastOnceDueToOverload) {
+        _stats->numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.addAndFetch(1);
+    }
 }
 
 void Shard::RetryStrategy::recordBackoff(Milliseconds backoff) {
@@ -240,6 +211,14 @@ void Shard::RetryStrategy::_recordOperationAttempted() {
     if (!_recordedAttempted) {
         _recordedAttempted = true;
         _stats->numOperationsAttempted.addAndFetch(1);
+    } else if (_precedingErrorWasOverload) {
+        _stats->numRetriesDueToOverloadAttempted.addAndFetch(1);
+
+        // Prevent double counting of "at least once" metric.
+        if (!_retriedAtLeastOnceDueToOverload) {
+            _stats->numOperationsRetriedAtLeastOnceDueToOverload.addAndFetch(1);
+            _retriedAtLeastOnceDueToOverload = true;
+        }
     }
 
     if (getTargetingMetadata().stats) {
@@ -249,13 +228,6 @@ void Shard::RetryStrategy::_recordOperationAttempted() {
             _stats->numRetriesRetargetedDueToOverload.addAndFetch(_numRetargets -
                                                                   previousRetargetCounter);
         }
-    }
-}
-
-void Shard::RetryStrategy::_recordOperationNotOverloaded() {
-    if (_previousAttemptOverloaded) {
-        _stats->numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.addAndFetch(1);
-        _previousAttemptOverloaded = false;
     }
 }
 
@@ -311,6 +283,22 @@ std::vector<std::string> Shard::CommandResponse::getErrorLabels(
     return {};
 }
 
+boost::optional<Milliseconds> Shard::CommandResponse::getBaseBackoffMS(
+    const StatusWith<Shard::CommandResponse>& swResponse) {
+    // Check if the request even reached the shard.
+    if (!swResponse.isOK()) {
+        return boost::none;
+    }
+
+    auto& response = swResponse.getValue();
+
+    if (response.commandStatus.isOK()) {
+        return boost::none;
+    }
+
+    return executor::extractBaseBackoffMS(response.response);
+}
+
 Status Shard::CommandResponse::processBatchWriteResponse(
     StatusWith<Shard::CommandResponse> swResponse, BatchedCommandResponse* batchResponse) {
     auto status = getEffectiveStatus(swResponse);
@@ -336,8 +324,8 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return !isMongosRetriableError(code) && (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
-Shard::Shard(const ShardHandle& handle, std::shared_ptr<ShardSharedStateCache::State> sharedState)
-    : _handle(handle), _sharedState{std::move(sharedState)} {}
+Shard::Shard(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState)
+    : _id(id), _sharedState{std::move(sharedState)} {}
 
 std::shared_ptr<ShardSharedStateCache::State> Shard::getSharedState() const {
     return _sharedState;
@@ -348,7 +336,7 @@ AdaptiveRetryStrategy::RetryBudget& Shard::getRetryBudget_forTest() const {
 }
 
 bool Shard::isConfig() const {
-    return _handle.name() == ShardId::kConfigServerId;
+    return _id == ShardId::kConfigServerId;
 }
 
 bool Shard::localIsRetriableError(const Status& status,
@@ -513,7 +501,7 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const repl::ReadConcernLevel& readConcernLevel,
+    const repl::ReadConcernArgs& readConcern,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -530,7 +518,7 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
             return _exhaustiveFindOnConfig(opCtx,
                                            readPref,
                                            targetingMetadata,
-                                           readConcernLevel,
+                                           readConcern,
                                            nss,
                                            query,
                                            sort,

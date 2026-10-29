@@ -1,8 +1,7 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
 // @tags: [
 //   not_allowed_with_signed_security_token,
-//   # In 8.0, we changed behavior for equality to null.
-//   requires_fcv_80,
+//   requires_fcv_91,
 //   requires_getmore,
 // ]
 //

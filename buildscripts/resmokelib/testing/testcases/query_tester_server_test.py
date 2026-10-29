@@ -48,7 +48,11 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
         self.override = override
 
     def _make_process(self):
-        if self.wait_for_files:
+        # Under Bazel the test corpus is a declared input of the test target, so it
+        # is fully materialized in runfiles before resmoke starts. There is no
+        # sparse checkout racing us and no sentinel will ever be written, so
+        # waiting here would hang forever.
+        if self.wait_for_files and not os.environ.get("TEST_SRCDIR"):
             # Ensure the test files are all available. See
             # query_tester_test_sparse_checkout.sh for how this process
             # works. This must be done outside of the constructor to allow
@@ -73,6 +77,13 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
         ]
         if self.override:
             command = command + ["--override", self.override]
+
+        # Under Bazel the corpus is a build output, so its directory is read-only and
+        # mongotest cannot write a test's .actual/.fail files next to it. Send them to
+        # the test's undeclared outputs instead, which also gets them archived.
+        undeclared_outputs = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+        if undeclared_outputs:
+            command = command + ["--outputDir", os.path.join(undeclared_outputs, "query_tester")]
 
         program_options = {}
         interface.append_process_tracking_options(program_options, self._id)

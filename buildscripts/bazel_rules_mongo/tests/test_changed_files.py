@@ -4,6 +4,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from git import Repo
 from mock import MagicMock
@@ -18,6 +19,59 @@ def write_file(repo: Repo, file_name: str) -> None:
     # just adding more text to the file so git thinks it has changed or is created
     with open(os.path.join(repo.working_tree_dir, file_name), "a+") as file:
         file.write("change\n")
+
+
+class TestFilesToLint(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp_dir.cleanup)
+        original_dir = os.getcwd()
+        os.chdir(self.tmp_dir.name)
+        self.addCleanup(os.chdir, original_dir)
+        self.repo = Repo.init(self.tmp_dir.name)
+        self.addCleanup(self.repo.close)
+
+    @unittest.skipIf(sys.platform == "win32", reason="This test requires symlink support")
+    def test_includes_tracked_and_untracked_files(self) -> None:
+        Path("tracked.txt").write_text("tracked\n")
+        self.repo.index.add(["tracked.txt"])
+        Path("tracked.txt").write_text("modified\n")
+        Path("untracked.txt").write_text("untracked\n")
+        Path(".gitignore").write_text("ignored.txt\n")
+        Path("ignored.txt").write_text("ignored\n")
+        Path("tracked-link").symlink_to("missing-target")
+        self.repo.index.add(["tracked-link"])
+        Path("untracked-link").symlink_to("missing-target")
+
+        self.assertEqual(
+            set(evergreen_git.get_files_to_lint()),
+            {"tracked.txt", "untracked.txt", ".gitignore", "tracked-link", "untracked-link"},
+        )
+
+    def test_excludes_staged_and_unstaged_deletions(self) -> None:
+        Path("remaining.txt").write_text("remaining\n")
+        self.repo.index.add(["remaining.txt"])
+        Path("untracked/OWNERS.yaml").parent.mkdir()
+        Path("untracked/OWNERS.yaml").write_text("version: 2.0.0\n")
+
+        for staged in (False, True):
+            with self.subTest(staged=staged):
+                deleted_files = ["nested/OWNERS.yaml", "nested/OWNERS.yml", "nested/file.py"]
+                Path("nested").mkdir(exist_ok=True)
+                for file in deleted_files:
+                    Path(file).write_text("test\n")
+                self.repo.index.add(deleted_files)
+                self.assertTrue(set(deleted_files) <= set(evergreen_git.get_files_to_lint()))
+
+                for file in deleted_files:
+                    Path(file).unlink()
+                if staged:
+                    self.repo.git.add("-u", "--", "nested")
+
+                self.assertEqual(
+                    set(evergreen_git.get_files_to_lint()),
+                    {"remaining.txt", "untracked/OWNERS.yaml"},
+                )
 
 
 @unittest.skipIf(

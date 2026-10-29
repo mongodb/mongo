@@ -404,20 +404,6 @@ thread_ts_run(void *arg)
 }
 
 /*
- * set_flush_tier_delay --
- *     Set up a random delay for the next flush_tier.
- */
-static void
-set_flush_tier_delay(WT_RAND_STATE *rnd)
-{
-    /*
-     * We are checkpointing with a random interval up to MAX_CKPT_INVL seconds, and we'll do a flush
-     * tier randomly every 0-10 seconds.
-     */
-    opts->tiered_flush_interval_us = __wt_random(rnd) % (10 * WT_MILLION + 1);
-}
-
-/*
  * backup_create_full --
  *     Perform a full backup.
  */
@@ -476,20 +462,14 @@ thread_ckpt_run(void *arg)
     wt_timestamp_t stable;
     uint32_t sleep_time;
     int i;
-    char ckpt_config[128], ckpt_flush_config[128];
-    bool first_ckpt, flush_tier;
+    char ckpt_config[128];
+    bool first_ckpt;
     char ts_string[WT_TS_HEX_STRING_SIZE];
 
     td = (THREAD_DATA *)arg;
-    flush_tier = false;
-    memset(ckpt_flush_config, 0, sizeof(ckpt_flush_config));
     memset(ckpt_config, 0, sizeof(ckpt_config));
 
     testutil_snprintf(ckpt_config, sizeof(ckpt_config), "use_timestamp=true");
-    testutil_snprintf(
-      ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force),%s", ckpt_config);
-
-    set_flush_tier_delay(&td->extra_rnd);
 
     /*
      * Keep a separate file with the records we wrote for checking.
@@ -511,29 +491,15 @@ thread_ckpt_run(void *arg)
     first_ckpt = true;
     for (i = 1;; ++i) {
         sleep_time = __wt_random(&td->extra_rnd) % MAX_CKPT_INVL;
-        testutil_tiered_sleep(opts, session, sleep_time, &flush_tier);
+        __wt_sleep(sleep_time, 0);
         /*
          * Since this is the default, send in this string even if running without timestamps.
          */
-        printf("Checkpoint %d start: Flush: %s.\n", i, flush_tier ? "YES" : "NO");
-        testutil_check(session->checkpoint(session, flush_tier ? ckpt_flush_config : ckpt_config));
+        printf("Checkpoint %d start.\n", i);
+        testutil_check(session->checkpoint(session, ckpt_config));
         testutil_check(td->conn->query_timestamp(td->conn, ts_string, "get=last_checkpoint"));
         testutil_assert(sscanf(ts_string, "%" SCNx64, &stable) == 1);
-        printf("Checkpoint %d complete: Flush: %s, at stable %" PRIu64 ".\n", i,
-          flush_tier ? "YES" : "NO", stable);
-
-        if (flush_tier) {
-            /*
-             * FIXME: when we change the API to notify that a flush_tier has completed, we'll need
-             * to set up a general event handler and catch that notification, so we can pass the
-             * flush_tier "cookie" to the test utility function.
-             */
-            testutil_tiered_flush_complete(opts, session, NULL);
-            flush_tier = false;
-            printf("Finished a flush_tier\n");
-
-            set_flush_tier_delay(&td->extra_rnd);
-        }
+        printf("Checkpoint %d complete: at stable %" PRIu64 ".\n", i, stable);
 
         /*
          * Create the checkpoint file so that the parent process knows at least one checkpoint has
@@ -974,7 +940,7 @@ run_workload(uint32_t workload_iteration)
     if (opts->disagg.is_enabled)
         strcat(envconf, ",disaggregated=(lose_all_my_data=true)");
 
-    testutil_wiredtiger_open(opts, WT_HOME_DIR, envconf, &other_event, &conn, false, false);
+    testutil_wiredtiger_open(opts, WT_HOME_DIR, envconf, &other_event, &conn, false);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*
@@ -1018,11 +984,6 @@ run_workload(uint32_t workload_iteration)
     testutil_check(session->close(session, NULL));
 
     opts->conn = conn;
-
-    if (opts->tiered_storage) {
-        set_flush_tier_delay(&opts->extra_rnd);
-        testutil_tiered_begin(opts);
-    }
 
     opts->running = true;
     /* Initialize cond variables. */
@@ -1202,7 +1163,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
          */
         testutil_wiredtiger_open(opts, verify_dir,
           opts->disagg.is_enabled ? "create=true,disaggregated=(lose_all_my_data=true)" : NULL,
-          &reopen_event, &conn, true, false);
+          &reopen_event, &conn, true);
         printf("Connection open and recovery complete. Verify content\n");
         /*
          * Only call this when index is 0 because it calls back into here to verify a specific
@@ -1230,7 +1191,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
          * statistics thread at a time.
          */
         printf("Recover_and_verify: Open %s with config %s\n", verify_dir, open_cfg);
-        testutil_wiredtiger_open(opts, verify_dir, open_cfg, &other_event, &conn, true, false);
+        testutil_wiredtiger_open(opts, verify_dir, open_cfg, &other_event, &conn, true);
     }
 
     /* Sleep to guarantee the statistics thread has enough time to run. */
@@ -1511,7 +1472,7 @@ main(int argc, char *argv[])
     pid_t pid;
     uint32_t iteration, num_iterations, rand_value, timeout, tmp;
     int ch, ret, status, wait_time;
-    char buf[PATH_MAX], bucket[512];
+    char buf[PATH_MAX];
     char cwd_start[PATH_MAX]; /* The working directory when we started */
     bool rand_th, rand_time, verify_only;
 
@@ -1666,11 +1627,6 @@ main(int argc, char *argv[])
         if (use_lazyfs)
             testutil_lazyfs_setup(&lazyfs, home);
 
-        if (opts->tiered_storage) {
-            testutil_snprintf(bucket, sizeof(bucket), "%s/%s/bucket", home, WT_HOME_DIR);
-            testutil_mkdir(bucket);
-        }
-
         if (rand_time) {
             timeout = __wt_random(&opts->extra_rnd) % MAX_TIME;
             if (timeout < MIN_TIME)
@@ -1703,13 +1659,12 @@ main(int argc, char *argv[])
                ", force stop interval: %" PRIu32 "\n",
           use_backups ? "true" : "false", backup_full_interval, backup_force_stop_interval);
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s%s%s%s%s%s -F %" PRIu32 " -h %s -I %" PRIu32 " -T %" PRIu32
+        printf("CONFIG: %s%s%s%s%s%s%s%s%s%s -F %" PRIu32 " -h %s -I %" PRIu32 " -T %" PRIu32
                " -t %" PRIu32 " " TESTUTIL_SEED_FORMAT "\n",
           progname, use_backups ? " -B" : "", opts->compat ? " -C" : "", columns ? " -c" : "",
           opts->disagg.is_enabled ? " -G" : "", use_lazyfs ? " -l" : "", verify_model ? " -M" : "",
-          opts->inmem ? " -m" : "", opts->tiered_storage ? " -PT" : "", stress ? " -s" : "",
-          !use_ts ? " -z" : "", backup_full_interval, opts->home, num_iterations, nth, timeout,
-          opts->data_seed, opts->extra_seed);
+          opts->inmem ? " -m" : "", stress ? " -s" : "", !use_ts ? " -z" : "", backup_full_interval,
+          opts->home, num_iterations, nth, timeout, opts->data_seed, opts->extra_seed);
 
         /*
          * Go inside the home directory (typically WT_TEST), but not all the way into the database's

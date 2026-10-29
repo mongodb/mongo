@@ -1,0 +1,34 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/otel/traces/traceparent.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    OtelContextSection:
+        description: >-
+            Context related to OpenTelemetry.
+        strict: false
+        fields:
+            traceparent:
+                type: string
+                description: >-
+                    W3C `traceparent` header value, formatted as
+                    "<version>-<trace-id>-<parent-id>-<trace-flags>".
+                validator:
+                    callback: otel::traces::validateW3CTraceparent
+
+    TelemetryContextSection:
+        description: >-
+            Context for telemetry, for sending it between processes.
+        strict: false
+        fields:
+            otel:
+                type: OtelContextSection
+                description: "The otel propagation sub-document."

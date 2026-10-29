@@ -59,6 +59,15 @@ if [ -n "$___expansions_error" ]; then
     echo $___expansions_error
     exit 1
 fi
+
+# Builds that link against libraries outside the default search path (for example a
+# build against a system OpenSSL installed in a non-standard prefix) can set the
+# custom_ld_library_path expansion to have every Evergreen script run with those
+# directories prepended to LD_LIBRARY_PATH.
+if [ -n "${custom_ld_library_path:-}" ]; then
+    export LD_LIBRARY_PATH="${custom_ld_library_path}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
+
 unset expansions_yaml
 unset expansions_default_yaml
 unset script

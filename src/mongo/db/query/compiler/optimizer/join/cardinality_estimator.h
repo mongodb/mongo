@@ -1,36 +1,10 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/db/op_debug.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
-#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
@@ -49,19 +23,25 @@ public:
     JoinCardinalityEstimator(const JoinReorderingContext& ctx, EdgeSelectivities edgeSelectivities);
     virtual ~JoinCardinalityEstimator() {};
 
-    static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
-                                         const SamplingEstimatorMap& samplingEstimators);
-
-    /**
-     * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling.
-     */
-    static cost_based_ranker::SelectivityEstimate joinPredicateSel(
+    static JoinCardinalityEstimator make(
         const JoinReorderingContext& ctx,
         const SamplingEstimatorMap& samplingEstimators,
-        const JoinEdge& edge);
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
+
+    /**
+     * Returns an estimate of the selectivity of the given 'JoinEdge' using sampling, along with
+     * metadata about how this estimate was obtained.
+     */
+    static JoinEdgeSelectivityEstimate joinPredicateSel(
+        const JoinReorderingContext& ctx,
+        const SamplingEstimatorMap& samplingEstimators,
+        const JoinEdge& edge,
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
     static EdgeSelectivities estimateEdgeSelectivities(
-        const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators);
+        const JoinReorderingContext& ctx,
+        const SamplingEstimatorMap& samplingEstimators,
+        OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics);
 
     /**
      * Estimates the cardinality of a join plan over the given subset of nodes. This method
@@ -76,9 +56,29 @@ public:
      */
     SelectivityEstimate getEdgeSelectivity(EdgeId edge) const;
 
+    /**
+     * Returns information about the estimated NDV recorded for 'edge' if we have any, or nullptr if
+     * none is available.
+     */
+    const JoinEdgeSelectivityEstimate* getEdgeSelectivityEstimate(EdgeId edge) const {
+        return edge < _edgeSelectivities.size() ? &_edgeSelectivities[edge] : nullptr;
+    }
+
+    /**
+     * Returns the total time spent estimating cardinalities on this estimator: the up-front edge
+     * selectivity estimation done by 'make()' plus every subsequent subset cardinality estimate
+     * that was not served from the memo. Reported by query stats as 'ceTimeMicros'.
+     */
+    int64_t getEstimationTimeMicros() const {
+        return _estimationTimeMicros;
+    }
+
 protected:
     const JoinReorderingContext& _ctx;
     const EdgeSelectivities _edgeSelectivities;
+
+    // Accumulated over the course of subset enumeration. See 'getEstimationTimeMicros()'.
+    int64_t _estimationTimeMicros = 0;
 
     GraphCycleBreaker _cycleBreaker;
 

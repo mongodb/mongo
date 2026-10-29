@@ -46,7 +46,6 @@ class test_truncate11(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(format_values)
 
-    @wttest.skip_for_hook("tiered", "test depends on regular checkpoints running")
     def test_truncate11(self):
         # Create a large table with lots of pages.
         uri = f"table:{self.test_name}"
@@ -85,9 +84,7 @@ class test_truncate11(wttest.WiredTigerTestCase):
             ckpt_started = 0
             while not ckpt_started:
                 time.sleep(1)
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
 
             # Start a transaction.
             self.session.begin_transaction()
@@ -108,7 +105,5 @@ class test_truncate11(wttest.WiredTigerTestCase):
             done.set()
             ckpt.join()
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
+        read_deleted = self.get_stat(stat.conn.cache_read_deleted)
         self.assertLess(read_deleted, 10)
-        stat_cursor.close()

@@ -1,49 +1,21 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/ddl/create_database_coordinator.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
-#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_test_grid.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/version_context.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -55,11 +27,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/version/releases.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -91,6 +62,14 @@ public:
         _testExecutor = makeTestExecutor();
 
         DDLLockManager::get(getServiceContext())->setRecoverable(ddlService());
+
+        // Coordinators check for in-progress index builds via Grid on first execution.
+        auto gridOpCtx = makeOperationContext();
+        _grid.emplace(gridOpCtx.get());
+    }
+
+    void stepUp(OperationContext* opCtx) {
+        PrimaryOnlyServiceMongoDTest::stepUp(opCtx);
     }
 
     void tearDown() override {
@@ -119,8 +98,7 @@ public:
                         Client::initThread(threadName, getGlobalServiceContext()->getService());
                     },
             }),
-            executor::makeNetworkInterface(
-                "ShardingCoordinatorServiceTestNetwork", nullptr, nullptr));
+            executor::makeNetworkInterface("ShardingCoordinatorServiceTestNetwork"));
         executor->startup();
         return executor;
     }
@@ -202,7 +180,7 @@ protected:
                                                       LockMode mode,
                                                       int32_t timeoutMillisecs) {
         return acquireDbAndCollDDLLocks(
-            opCtx, ns, reason, mode, timeoutMillisecs, false /*waitForRecovery*/);
+            opCtx, ns, reason, mode, timeoutMillisecs, /*waitForRecovery=*/false);
     }
 
     MigrationBlockingOperationCoordinatorDocument createMBOCDoc(
@@ -216,8 +194,17 @@ protected:
         }
         metadata.setForwardableOpMetadata(fom);
         metadata.setDatabaseVersion(DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
+        metadata.setAuthoritativeMetadataAccessLevel(
+            AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
         MigrationBlockingOperationCoordinatorDocument doc;
         doc.setShardingCoordinatorMetadata(metadata);
+        return doc;
+    }
+
+    CreateDatabaseCoordinatorDocument createDatabaseDoc(const NamespaceString& nss) {
+        CreateDatabaseCoordinatorDocument doc;
+        doc.setShardingCoordinatorMetadata({{nss, CoordinatorTypeEnum::kCreateDatabase}});
+        doc.setUserSelectedPrimary(false);
         return doc;
     }
 
@@ -241,6 +228,7 @@ protected:
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
     std::unique_ptr<ShardingCoordinatorExternalStateFactoryForTest> _externalStateFactory;
     std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
+    std::optional<ShardingCoordinatorTestGrid> _grid;
 };
 
 TEST_F(ShardingCoordinatorServiceTest, StateTransitions) {
@@ -296,12 +284,12 @@ TEST_F(ShardingCoordinatorServiceTest,
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0),
         DBException,
         ErrorCodes::LockTimeout);
 
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0));
 
     // 2- Stepping up and pausing on Recovery state
     // Only DDL coordinators can acquire DDL locks during recovery, otherwise trying to acquire a
@@ -313,11 +301,11 @@ TEST_F(ShardingCoordinatorServiceTest,
     pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10),
         DBException,
         ErrorCodes::LockTimeout);
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0));
 
     // 3- Ending Recovery and enter on Recovered state
     // Once ShardingCoordinatorService is recovered, anyone can aquire a DDL lock
@@ -325,9 +313,9 @@ TEST_F(ShardingCoordinatorServiceTest,
     ddlService()->waitForRecovery(opCtx.get());
 
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10));
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0));
 }
 
 TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
@@ -343,7 +331,7 @@ TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStep
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10),
         DBException,
         ErrorCodes::NotWritablePrimary);
 
@@ -369,7 +357,7 @@ TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStep
 
     syncPoint.countDownAndWait();
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10000 /*timeoutMillisec*/));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10000));
 
     // Lock should be acquired after step up conclusion
     ASSERT(stepUpFuture.isReady());
@@ -390,6 +378,119 @@ TEST_F(ShardingCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondaries)
 
     ASSERT_THROWS_CODE(
         ddlService()->waitForRecovery(opCtx.get()), DBException, ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(ShardingCoordinatorServiceTest,
+       CreateDatabaseBypassMetadataDoesNotAffectJoinWhenUserShardedDDLIsAllowed) {
+    auto opCtx = makeOperationContext();
+    ddlService()->waitForRecovery(opCtx.get());
+
+    auto hangBeforeRunningInstance =
+        globalFailPointRegistry().find("PrimaryOnlyServiceHangBeforeRunningInstance");
+    const auto timesEntered = hangBeforeRunningInstance->setMode(FailPoint::alwaysOn);
+    const auto coordinatorDoc =
+        createDatabaseDoc(NamespaceString::createNamespaceString_forTest("testDB"));
+    auto coordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    hangBeforeRunningInstance->waitForTimesEntered(timesEntered + 1);
+
+    auto matchingCoordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, matchingCoordinator);
+
+    WriteBlockBypass::get(opCtx.get()).set(true);
+    auto coordinatorWithDifferentBypass =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, coordinatorWithDifferentBypass);
+
+    stepDown();
+    hangBeforeRunningInstance->setMode(FailPoint::off);
+    ASSERT_NOT_OK(coordinator->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ShardingCoordinatorServiceTest,
+       CreateDatabaseBypassMetadataMustMatchWhenUserShardedDDLIsBlocked) {
+    auto opCtx = makeOperationContext();
+    ddlService()->waitForRecovery(opCtx.get());
+
+    auto hangBeforeRunningInstance =
+        globalFailPointRegistry().find("PrimaryOnlyServiceHangBeforeRunningInstance");
+    const auto timesEntered = hangBeforeRunningInstance->setMode(FailPoint::alwaysOn);
+    const auto coordinatorDoc =
+        createDatabaseDoc(NamespaceString::createNamespaceString_forTest("testDB"));
+    auto coordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    hangBeforeRunningInstance->waitForTimesEntered(timesEntered + 1);
+
+    GlobalUserWriteBlockState::get(opCtx.get())->enableUserShardedDDLBlocking(opCtx.get());
+
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()));
+    auto matchingCoordinatorWhileBlocked =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, matchingCoordinatorWhileBlocked);
+
+    WriteBlockBypass::get(opCtx.get()).set(true);
+    ASSERT_THROWS_WITH_CHECK(ddlService()->getOrCreateInstance(
+                                 opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}),
+                             DBException,
+                             [](const DBException& ex) {
+                                 ASSERT_EQ(ex.code(), ErrorCodes::ConflictingOperationInProgress);
+                                 ASSERT_STRING_CONTAINS(ex.reason(),
+                                                        "different write-block bypass metadata");
+                             });
+
+    GlobalUserWriteBlockState::get(opCtx.get())->disableUserShardedDDLBlocking(opCtx.get());
+
+    stepDown();
+    hangBeforeRunningInstance->setMode(FailPoint::off);
+    ASSERT_NOT_OK(coordinator->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ShardingCoordinatorServiceTest,
+       CreateDatabaseNonBypassMetadataConflictsWithBypassWhenUserShardedDDLIsBlocked) {
+    auto opCtx = makeOperationContext();
+    ddlService()->waitForRecovery(opCtx.get());
+
+    auto hangBeforeRunningInstance =
+        globalFailPointRegistry().find("PrimaryOnlyServiceHangBeforeRunningInstance");
+    const auto timesEntered = hangBeforeRunningInstance->setMode(FailPoint::alwaysOn);
+    WriteBlockBypass::get(opCtx.get()).set(true);
+    const auto coordinatorDoc =
+        createDatabaseDoc(NamespaceString::createNamespaceString_forTest("testDB"));
+    auto coordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    hangBeforeRunningInstance->waitForTimesEntered(timesEntered + 1);
+
+    GlobalUserWriteBlockState::get(opCtx.get())->enableUserShardedDDLBlocking(opCtx.get());
+
+    auto matchingBypassCoordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, matchingBypassCoordinator);
+
+    ASSERT_THROWS_WITH_CHECK(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()),
+                             DBException,
+                             [](const DBException& ex) {
+                                 ASSERT_EQ(ex.code(), ErrorCodes::ConflictingOperationInProgress);
+                             });
+
+    WriteBlockBypass::get(opCtx.get()).set(false);
+    ASSERT_THROWS_CODE(ddlService()->getOrCreateInstance(
+                           opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    GlobalUserWriteBlockState::get(opCtx.get())->disableUserShardedDDLBlocking(opCtx.get());
+
+    stepDown();
+    hangBeforeRunningInstance->setMode(FailPoint::off);
+    ASSERT_NOT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(ShardingCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
@@ -526,117 +627,6 @@ TEST_F(ShardingCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType) {
     assertNoActiveCoordinators();
 
     endLastLTSTaskThread.join();
-}
-
-TEST_F(ShardingCoordinatorServiceTest, ShardIdentificationTypePreservedAcrossFCVTransition) {
-    feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.setForServerParameter(true);
-    feature_flags::gFeatureFlagUniqueShardIdentifiers.setForServerParameter(true);
-    const auto savedFCV = serverGlobalParams.mutableFCV.acquireFCVSnapshot().getVersion();
-    ScopeGuard restoreState([&] {
-        serverGlobalParams.mutableFCV.setVersion(savedFCV);
-        feature_flags::gFeatureFlagUniqueShardIdentifiers.setForServerParameter(false);
-        feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.setForServerParameter(false);
-    });
-
-    auto opCtx = makeOperationContext();
-    ddlService()->waitForRecovery(opCtx.get());
-
-    // Create a coordinator at kLastLTS. Both flags are gated on kLatest, so
-    // getGrantedShardIdentificationType returns kShardId.
-    // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
-    const auto nss1 = NamespaceString::createNamespaceString_forTest("testDB.coll1");
-    std::shared_ptr<MigrationBlockingOperationCoordinator> coord1;
-    {
-        ScopedSetShardRole scopedShardRole(
-            opCtx.get(), nss1, boost::none, DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
-        coord1 = MigrationBlockingOperationCoordinator::getOrCreate(opCtx.get(), nss1);
-    }
-
-    // beginOperation writes _doc to config.system.sharding_ddl_coordinators.
-    const UUID opId1 = UUID::gen();
-    coord1->beginOperation(opCtx.get(), opId1);
-
-    {
-        // shardIdentificationType is omitted from the stored BSON when kShardId; IDL returns the
-        // default value kShardId when the field is absent.
-        DBDirectClient client(opCtx.get());
-        const auto doc =
-            client.findOne(NamespaceString::kShardingDDLCoordinatorsNamespace, BSONObj{});
-        ASSERT(!doc.isEmpty());
-        const auto coorDoc =
-            MigrationBlockingOperationCoordinatorDocument::parse(doc, IDLParserContext{"test"});
-        ASSERT_EQ(coorDoc.getShardingCoordinatorMetadata().getShardIdentificationType(),
-                  ShardIdentificationTypeEnum::kShardId);
-    }
-
-    // Transition to kUpgrading. The existing coordinator's stored shardIdentificationType must
-    // remain kShardId; only coordinators created after this transition are affected.
-    // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFCV.setVersion(
-        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-
-    {
-        // coord1 is still the only document in the collection at this point.
-        DBDirectClient client(opCtx.get());
-        const auto doc =
-            client.findOne(NamespaceString::kShardingDDLCoordinatorsNamespace, BSONObj{});
-        ASSERT(!doc.isEmpty());
-        const auto coorDoc =
-            MigrationBlockingOperationCoordinatorDocument::parse(doc, IDLParserContext{"test"});
-        ASSERT_EQ(coorDoc.getShardingCoordinatorMetadata().getShardIdentificationType(),
-                  ShardIdentificationTypeEnum::kShardId);
-    }
-
-    // A coordinator created during kUpgrading sees gFeatureFlagUniqueShardIdentifiersDDL enabled
-    // (enable_on_transitional_fcv_UNSAFE=true), so it gets kUuidOrShardId.
-    // (Generic FCV reference): feature flag test
-    ASSERT_EQ(serverGlobalParams.mutableFCV.acquireFCVSnapshot().getVersion(),
-              multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-    ASSERT_TRUE(feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.isEnabledAndIgnoreFCVUnsafe());
-    ASSERT_EQ(sharding_ddl_util::getGrantedShardIdentificationType(
-                  VersionContext{}, serverGlobalParams.mutableFCV.acquireFCVSnapshot()),
-              ShardIdentificationTypeEnum::kUuidOrShardId);
-    const auto nss2 = NamespaceString::createNamespaceString_forTest("testDB.coll2");
-    std::shared_ptr<MigrationBlockingOperationCoordinator> coord2;
-    {
-        ScopedSetShardRole scopedShardRole(
-            opCtx.get(), nss2, boost::none, DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
-        coord2 = MigrationBlockingOperationCoordinator::getOrCreate(opCtx.get(), nss2);
-    }
-
-    const UUID opId2 = UUID::gen();
-    coord2->beginOperation(opCtx.get(), opId2);
-
-    {
-        // Iterate all coordinator documents and verify that coord2 has kUuidOrShardId.
-        // kUuidOrShardId is not the default, so it is present in the stored BSON as
-        // shardIdentificationType="uuidOrShardId". kShardId is absent (default omitted).
-        DBDirectClient client(opCtx.get());
-        auto cursor =
-            client.find(FindCommandRequest{NamespaceString::kShardingDDLCoordinatorsNamespace});
-        bool foundUuidOrShardId = false;
-        int count = 0;
-        while (cursor->more()) {
-            const auto doc = cursor->next();
-            const auto coorDoc =
-                MigrationBlockingOperationCoordinatorDocument::parse(doc, IDLParserContext{"test"});
-            const auto sitEnum =
-                coorDoc.getShardingCoordinatorMetadata().getShardIdentificationType();
-            if (sitEnum == ShardIdentificationTypeEnum::kUuidOrShardId) {
-                foundUuidOrShardId = true;
-            }
-            ++count;
-        }
-        ASSERT_EQ(count, 2);
-        ASSERT_TRUE(foundUuidOrShardId);
-    }
-
-    coord1->endOperation(opCtx.get(), opId1);
-    coord2->endOperation(opCtx.get(), opId2);
-
-    coord1->getCompletionFuture().get();
-    coord2->getCompletionFuture().get();
 }
 
 }  // namespace mongo

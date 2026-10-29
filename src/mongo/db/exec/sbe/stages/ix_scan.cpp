@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 
@@ -89,6 +63,7 @@ IndexScanStageBase::IndexScanStageBase(std::string_view stageType,
 }
 
 void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _accessors.resize(_vars.size());
     for (size_t idx = 0; idx < _accessors.size(); ++idx) {
         auto [it, inserted] = _accessorMap.emplace(_vars[idx], &_accessors[idx]);
@@ -625,8 +600,8 @@ void SimpleIndexScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     if (debugPrintInfo.printBytecode) {
         DebugPrinter::addNewLine(ret);
-        PlanStage::debugPrintBytecode(ret, _seekKeyLowCode, "SEEK_KEY_LOW" /*title*/);
-        PlanStage::debugPrintBytecode(ret, _seekKeyHighCode, "SEEK_KEY_HIGH" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _seekKeyLowCode, /*title=*/"SEEK_KEY_LOW");
+        PlanStage::debugPrintBytecode(ret, _seekKeyHighCode, /*title=*/"SEEK_KEY_HIGH");
     }
 }
 
@@ -704,7 +679,7 @@ void GenericIndexScanStage::open(bool reOpen) {
 
     IndexScanStageBase::openImpl(reOpen);
 
-    value::TagValueMaybeOwned bound = _bytecode.run(_indexBoundsCode.get());
+    value::TagValueMaybeOwned bound = _bytecode->run(_indexBoundsCode.get());
     if (bound.tag() == value::TypeTags::Nothing) {
         _scanState = ScanState::kFinished;
         return;
@@ -728,7 +703,7 @@ void GenericIndexScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     if (debugPrintInfo.printBytecode) {
         DebugPrinter::addNewLine(ret);
-        PlanStage::debugPrintBytecode(ret, _indexBoundsCode, "INDEX_BOUNDS" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _indexBoundsCode, /*title=*/"INDEX_BOUNDS");
     }
 }
 
@@ -775,15 +750,15 @@ bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
 
         switch (_checker->checkKeyWithEndPosition(
             bsonKey, &_seekPoint, _endKey, _params.ord, _forward)) {
-            case IndexBoundsChecker::VALID:
+            case KeyState::VALID:
                 _scanState = ScanState::kScanning;
                 return true;
 
-            case IndexBoundsChecker::DONE:
+            case KeyState::DONE:
                 _scanState = ScanState::kFinished;
                 return false;
 
-            case IndexBoundsChecker::MUST_ADVANCE:
+            case KeyState::MUST_ADVANCE:
                 _scanState = ScanState::kNeedSeek;
                 return false;
         }

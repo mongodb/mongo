@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 #include "mongo/base/error_codes.h"
@@ -39,7 +13,6 @@
 #include <cstddef>
 #include <functional>
 #include <list>
-#include <memory>
 #include <utility>
 
 #include <fmt/format.h>
@@ -77,7 +50,9 @@ public:
 template <class K, class V, typename Estimator, typename InsertionEvictionListener>
 class LRUBudgetTracker {
 public:
-    LRUBudgetTracker(size_t maxBudget) : _max(maxBudget), _current(0) {}
+    LRUBudgetTracker(size_t maxBudget,
+                     InsertionEvictionListener listener = InsertionEvictionListener())
+        : _max(maxBudget), _current(0), _listener(std::move(listener)) {}
 
     void onAdd(const K& k, const V& v) {
         size_t budget = _estimator(k, v);
@@ -190,7 +165,8 @@ public:
     using mapped_type = typename KVMap::mapped_type;
     using value_type = typename KVMap::value_type;
 
-    LRUKeyValue(size_t maxSize) : _budgetTracker{maxSize} {}
+    LRUKeyValue(size_t maxSize, InsertionEvictionListener listener = InsertionEvictionListener())
+        : _budgetTracker{maxSize, std::move(listener)} {}
 
     ~LRUKeyValue() {
         clear();
@@ -221,18 +197,30 @@ public:
     }
 
     /**
-     * Retrieve the iterator to the value associated with 'key' from the kv-store. Note that this
-     * iterator returned is only guaranteed to be valid until the next call to any method in this
-     * class. As a side effect, the retrieved entry is promoted to the most recently used.
+     * Retrieve the iterator to the value associated with 'key' from the kv-store, without
+     * promoting the entry to the most recently used. The returned iterator is only guaranteed to be
+     * valid until the next call to any method in this class.
      */
-    StatusWith<KVListIt> get(const K& key) const {
+    StatusWith<KVListIt> peek(const K& key) const {
         KVMapConstIt i = _kvMap.find(&key);
         if (i == _kvMap.end()) {
             return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
         }
-        KVListIt found = i->second;
+        return i->second;
+    }
+
+    /**
+     * Same as peek(), but as a side effect, the retrieved entry is promoted to the most recently
+     * used. The returned iterator is only guaranteed to be valid until the next call to any method
+     * in this class.
+     */
+    StatusWith<KVListIt> get(const K& key) const {
+        auto found = peek(key);
+        if (!found.isOK()) {
+            return found.getStatus();
+        }
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
-        _kvList.splice(_kvList.begin(), _kvList, found);
+        _kvList.splice(_kvList.begin(), _kvList, found.getValue());
         return _kvList.begin();
     }
 

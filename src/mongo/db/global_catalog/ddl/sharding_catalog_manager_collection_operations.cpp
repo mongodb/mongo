@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -112,14 +86,14 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeUpdatingChunks);
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(commitRefineCollectionShardKeyFailsAfterDurableChange);
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
                                         Shard* configShard,
                                         ShardingCatalogClient* catalogClient,
                                         const CollectionType& coll) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto allShards =
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern).value;
+    const auto allShards = catalogClient->getAllShards(opCtx, repl::ReadConcernArgs::kLocal).value;
     for (const auto& shardEntry : allShards) {
         const auto query = BSON(ChunkType::collectionUUID
                                 << coll.getUuid() << ChunkType::shard(shardEntry.getName()));
@@ -127,7 +101,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
         const auto chunk = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                                opCtx,
                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               repl::ReadConcernLevel::kLocalReadConcern,
+                                               repl::ReadConcernArgs::kLocal,
                                                NamespaceString::kConfigsvrChunksNamespace,
                                                query,
                                                BSONObj(),
@@ -138,7 +112,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
 
         if (chunk.size() == 1) {
             const auto shard =
-                uassertStatusOK(shardRegistry->getShard(opCtx, ShardRef(shardEntry.getName())));
+                uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
 
             // This is a best-effort attempt to refresh the shard 'shardEntry'. Fire and forget an
             // asynchronous '_flushRoutingTableCacheUpdates' request.
@@ -290,7 +264,7 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
         const auto oldFields = oldShardKeyPattern.toBSON();
         const auto newFields =
-            newShardKeyPattern.toBSON().filterFieldsUndotted(oldFields, false /* inFilter */);
+            newShardKeyPattern.toBSON().filterFieldsUndotted(oldFields, /*inFilter=*/false);
 
         collType.setEpoch(newEpoch);
         collType.setTimestamp(newTimestamp);
@@ -302,8 +276,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
             BSON(CollectionType::kNssFieldName
                  << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             collType.toBSON(),
-            false /* upsert */,
-            false /* multi */);
+            /*upsert=*/false,
+            /*multi=*/false);
         auto updateCollResponse = txnClient.runCRUDOpSync(catalogUpdateRequest, {});
         uassertStatusOK(updateCollResponse.toStatus());
 
@@ -325,8 +299,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
             BatchedCommandRequest::buildPipelineUpdateOp(NamespaceString::kConfigsvrChunksNamespace,
                                                          chunksQuery,
                                                          chunkUpdates,
-                                                         false /* upsert */,
-                                                         true /* useMultiUpdate */);
+                                                         /*upsert=*/false,
+                                                         /*useMultiUpdate=*/true);
 
         auto updateChunksResponse = txnClient.runCRUDOpSync(chunksUpdateRequest, {});
         uassertStatusOK(updateChunksResponse.toStatus());
@@ -349,8 +323,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
             TagsType::ConfigNS,
             BSON("ns" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             tagUpdates,
-            false /* upsert */,
-            true /* useMultiUpdate */);
+            /*upsert=*/false,
+            /*useMultiUpdate=*/true);
         auto updateTagResponse = txnClient.runCRUDOpSync(tagUpdateRequest, {});
         uassertStatusOK(updateTagResponse.toStatus());
 
@@ -391,8 +365,7 @@ void ShardingCatalogManager::commitRefineCollectionShardKey(
 
     // Idempotency check: if the shard key is already the one requested, there is nothing to do
     // except waiting for majority, in case the write haven't been majority written.
-    auto collType =
-        _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+    auto collType = _localCatalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::kLocal);
     if (newTimestamp == collType.getTimestamp()) {
         uassert(7648607,
                 str::stream() << "Expected refined key " << newShardKeyPattern.toBSON() << " but "
@@ -421,6 +394,11 @@ void ShardingCatalogManager::commitRefineCollectionShardKey(
 
     refineCollectionShardKeyInTxn(
         opCtx, nss, newShardKeyPattern, newTimestamp, newEpoch, oldTimestamp);
+
+    if (MONGO_unlikely(commitRefineCollectionShardKeyFailsAfterDurableChange.shouldFail())) {
+        uasserted(ErrorCodes::LockBusy,
+                  "Failing because of commitRefineCollectionShardKeyFailsAfterDurableChange");
+    }
 }
 
 void ShardingCatalogManager::configureCollectionBalancing(
@@ -525,7 +503,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
             NamespaceString::kConfigsvrCollectionsNamespace,
             query,
             update,
-            false /* upsert */,
+            /*upsert=*/false,
             defaultMajorityWriteConcernDoNotUse()));
         uassert(ErrorCodes::NamespaceNotSharded,
                 str::stream() << "Expected to match one doc for query " << query,
@@ -650,11 +628,12 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
                 NamespaceString::kConfigsvrCollectionsNamespace,
                 BatchedCommandRequest::buildUpdateOp(
                     NamespaceString::kConfigsvrCollectionsNamespace,
+                    /*query=*/
                     BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                             nss, SerializationContext::stateDefault())) /* query */,
+                             nss, SerializationContext::stateDefault())),
                     update,
-                    false /* upsert */,
-                    false /* multi */),
+                    /*upsert=*/false,
+                    /*multi=*/false),
                 txnNumber);
 
             // Bump the chunk version for shards.

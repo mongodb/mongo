@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 
@@ -489,13 +463,14 @@ TEST(ReplSetHeartbeatResponse, ServerError) {
 // CmdReplSetHeartbeat exhaust streaming tests
 // ============================================================
 
-// Lets the test choose whether getNextAppliedOpTimeFuture() resolves immediately (simulating an
-// optime advance) or stays pending (simulating no progress), so we can drive both exhaust paths.
+// Lets the test choose whether getNextHeartbeatNotificationFuture() resolves immediately
+// (simulating a lastApplied or checkpoint advance) or stays pending (simulating no progress), so we
+// can drive both exhaust paths.
 class ExhaustReplCoordMock : public ReplicationCoordinatorMock {
 public:
     using ReplicationCoordinatorMock::ReplicationCoordinatorMock;
 
-    SharedSemiFuture<void> getNextAppliedOpTimeFuture() override {
+    SharedSemiFuture<void> getNextHeartbeatNotificationFuture() override {
         return _future;
     }
 
@@ -509,7 +484,9 @@ private:
 
 class ExhaustHeartbeatTest : public ServiceContextMongoDTest {
 public:
-    ExhaustHeartbeatTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -551,8 +528,8 @@ protected:
     ExhaustReplCoordMock* _replCoord = nullptr;
 };
 
-// When getNextAppliedOpTimeFuture() resolves before the interval deadline, the node keeps the
-// exhaust stream open so the primary gets a prompt response for each optime advance.
+// When getNextHeartbeatNotificationFuture() resolves before the interval deadline, the node keeps
+// the exhaust stream open so the primary gets a prompt response for each reported-value advance.
 TEST_F(ExhaustHeartbeatTest, FutureResolved_StreamStaysOpen) {
     _replCoord->setFuture(SemiFuture<void>::makeReady().share());
 
@@ -567,9 +544,9 @@ TEST_F(ExhaustHeartbeatTest, FutureResolved_StreamStaysOpen) {
         << "expected exhaust stream to remain open when optime advanced before interval expired";
 }
 
-// When the heartbeat interval deadline expires before getNextAppliedOpTimeFuture() resolves, the
-// node closes the exhaust stream so the primary is forced to issue a fresh request carrying updated
-// $replData gossip.
+// When the heartbeat interval deadline expires before getNextHeartbeatNotificationFuture()
+// resolves, the node closes the exhaust stream so the primary is forced to issue a fresh request
+// carrying updated $replData gossip.
 TEST_F(ExhaustHeartbeatTest, IntervalExpired_StreamCloses) {
     // First call with a ready future: initialises the per-Client streamDeadline to now() + 2s and
     // verifies the normal path works.

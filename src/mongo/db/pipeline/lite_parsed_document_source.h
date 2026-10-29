@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -53,6 +27,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -60,10 +35,22 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo {
+namespace [[MONGO_MOD_UNFORTUNATELY_OPEN]] mongo {
 
 class LiteParsedPipeline;
 class OwnedLiteParsedPipeline;
+
+/**
+ * Views over a stage's subpipelines, defined in owned_lite_parsed_pipeline.h (the element
+ * accessors require OwnedLiteParsedPipeline to be complete). They allow iterating and editing
+ * each subpipeline in place but not reordering, adding, or removing subpipelines, so that stages
+ * that attach meaning to subpipeline order can rely on that order being stable.
+ */
+template <typename Vector>
+class OwnedLiteParsedPipelinesView;
+using MutableSubPipelinesView = OwnedLiteParsedPipelinesView<std::vector<OwnedLiteParsedPipeline>>;
+using ConstSubPipelinesView =
+    OwnedLiteParsedPipelinesView<const std::vector<OwnedLiteParsedPipeline>>;
 
 struct LiteParserOptions {
     // Allows the foreign collection of a lookup to be in a different database than the local
@@ -86,16 +73,6 @@ struct LiteParserOptions {
     // Optional tracker to note when extensions are used in a given aggregate, and track whether
     // that command succeeds. Should be owned by the command invocation, not here.
     ExtensionMetrics* extensionMetrics = nullptr;
-
-    // True when the query is executing on or was forwarded from a router (mongos).
-    // TODO SERVER-129127 This should be removed in favor of storing this attribute on a
-    // ParseContext struct.
-    bool usingMongos = false;
-
-    // True when the pipeline is being parsed as part of a view definition.
-    // TODO SERVER-129127 This should be removed in favor of storing this attribute on a
-    // ParseContext struct.
-    bool isParsingViewDefinition = false;
 };
 
 namespace exec::agg {
@@ -147,7 +124,7 @@ enum class FirstStageViewApplicationPolicy {
  * - Owned: The instance owns BSON data via '_ownedBson'. Call makeOwned() to transition from
  * unowned to owned when the source BSON lifetime cannot be guaranteed.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN LiteParsedDocumentSource {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] LiteParsedDocumentSource {
 public:
     /*
      * This is the type of parser you should register using REGISTER_DOCUMENT_SOURCE. It need not
@@ -451,6 +428,16 @@ public:
     }
 
     /**
+     * Returns true to bypass rejection by query settings with 'reject: true'.
+     *
+     * Reserved for admin operations whose rejection would render the cluster unusable
+     * (e.g. $querySettings). Do NOT override for ordinary stages.
+     */
+    virtual bool shouldBypassQuerySettingsRejection() const {
+        return false;
+    }
+
+    /**
      * Returns true if this is a $currentOp stage.
      */
     virtual bool isCurrentOpStage() const {
@@ -476,9 +463,9 @@ public:
     }
 
     /**
-     * Stage-specific validation. Called by LiteParsedPipeline::validate().
+     * Stage-specific validation. Called by LiteParsedPipeline::validate() after parsing.
      */
-    virtual void validate() const {};
+    virtual void validate(const OperationContext* opCtx) const {};
 
     /**
      * Returns true if this stage is allowed inside a $lookup sub-pipeline.
@@ -602,19 +589,18 @@ public:
     virtual void assertSupportsMultiDocumentTransaction() const {}
 
     /**
-     * Returns this document source's subpipelines (const view), or nullptr if none exist.
+     * Returns this document source's subpipelines (const view), or boost::none if none exist.
      */
-    const std::vector<OwnedLiteParsedPipeline>* getSubPipelines() const {
-        return const_cast<LiteParsedDocumentSource*>(this)->getMutableSubPipelines();
-    }
+    boost::optional<ConstSubPipelinesView> getSubPipelines() const;
 
     /**
-     * Returns mutable subpipelines, or nullptr if this stage has none.
+     * Returns a mutable view of this stage's subpipelines, or boost::none if this stage has none.
      * Overridden by stages that have subpipelines (e.g. $lookup, $facet).
+     *
+     * The view permits modifying each subpipeline in place but not reordering, adding, or
+     * removing subpipelines; stages whose semantics depend on subpipeline order rely on this.
      */
-    virtual std::vector<OwnedLiteParsedPipeline>* getMutableSubPipelines() {
-        return nullptr;
-    }
+    virtual boost::optional<MutableSubPipelinesView> getMutableSubPipelines();
 
     /**
      * Returns the name of the stage that this LiteParsedDocumentSource represents.
@@ -788,7 +774,7 @@ private:
  *   class MyLiteParsed final : public LiteParsedDocumentSourceDefault<MyLiteParsed> { ... };
  */
 template <typename Derived>
-class MONGO_MOD_OPEN LiteParsedDocumentSourceDefault : public LiteParsedDocumentSource {
+class [[MONGO_MOD_OPEN]] LiteParsedDocumentSourceDefault : public LiteParsedDocumentSource {
 public:
     LiteParsedDocumentSourceDefault(const BSONElement& originalBson)
         : LiteParsedDocumentSource(originalBson) {}
@@ -833,7 +819,7 @@ private:
  *   class MyLiteParsed final : public LiteParsedDocumentSourceInternal<MyLiteParsed> { ... };
  */
 template <typename Derived>
-class MONGO_MOD_OPEN LiteParsedDocumentSourceInternal
+class [[MONGO_MOD_OPEN]] LiteParsedDocumentSourceInternal
     : public LiteParsedDocumentSourceDefault<Derived> {
 public:
     LiteParsedDocumentSourceInternal(const BSONElement& originalBson)
@@ -994,4 +980,4 @@ public:
         mongo::LiteParsedDocumentSource::Constraints constraints() \
             const override { return {.canRunOnTimeseries = false}; })
 
-}  // namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo
+}  // namespace mongo

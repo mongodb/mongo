@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -44,6 +18,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -67,6 +42,8 @@ namespace mongo {
 using OperationContextFn = std::function<void(OperationContext*)>;
 
 namespace txn {
+
+extern FailPoint hangAfterShutdownCheckWhileHoldingSchedulerMutex;
 
 /**
  * This class groups all the asynchronous work scheduled by a given TransactionCoordinatorDriver.
@@ -105,51 +82,39 @@ public:
         auto pf = makePromiseFuture<ReturnType>();
         auto taskCompletionPromise = std::make_shared<Promise<ReturnType>>(std::move(pf.promise));
         try {
-            std::unique_lock<std::mutex> ul(_mutex);
-            uassertStatusOK(_shutdownStatus);
-
-            auto scheduledWorkHandle = uassertStatusOK(_executor->scheduleWorkAt(
-                when,
-                [this, task = std::forward<Callable>(task), taskCompletionPromise](
-                    const executor::TaskExecutor::CallbackArgs& args) mutable {
-                    taskCompletionPromise->setWith([&] {
-                        {
-                            std::lock_guard lk(_mutex);
-                            uassertStatusOK(_shutdownStatus);
+            return _trackScheduledWork(std::move(pf.future), [&] {
+                return _executor->scheduleWorkAt(
+                    when,
+                    [this, task = std::forward<Callable>(task), taskCompletionPromise](
+                        const executor::TaskExecutor::CallbackArgs& args) mutable {
+                        taskCompletionPromise->setWith([&] {
+                            {
+                                std::lock_guard lk(_mutex);
+                                uassertStatusOK(_shutdownStatus);
+                            }
                             uassertStatusOK(args.status);
-                        }
 
-                        ThreadClient tc("TransactionCoordinator", _serviceContext->getService());
+                            ThreadClient tc("TransactionCoordinator",
+                                            _serviceContext->getService());
 
-                        auto uniqueOpCtxIter = [&] {
-                            std::lock_guard lk(_mutex);
-                            return _activeOpContexts.emplace(_activeOpContexts.begin(),
-                                                             tc->makeOperationContext());
-                        }();
+                            auto uniqueOpCtxIter = [&] {
+                                std::lock_guard lk(_mutex);
+                                return _activeOpContexts.emplace(_activeOpContexts.begin(),
+                                                                 tc->makeOperationContext());
+                            }();
 
-                        ON_BLOCK_EXIT([&] {
-                            std::lock_guard lk(_mutex);
-                            _activeOpContexts.erase(uniqueOpCtxIter);
-                            // There is no need to call _notifyAllTasksComplete here, because we
-                            // will still have an outstanding _activeHandles entry, so the scheduler
-                            // is never completed at this point
+                            ON_BLOCK_EXIT([&] {
+                                std::lock_guard lk(_mutex);
+                                _activeOpContexts.erase(uniqueOpCtxIter);
+                                // There is no need to call _notifyAllTasksComplete here, because we
+                                // will still have an outstanding _activeHandles entry, so the
+                                // scheduler is never completed at this point
+                            });
+
+                            return task(uniqueOpCtxIter->get());
                         });
-
-                        return task(uniqueOpCtxIter->get());
                     });
-                }));
-
-            auto it =
-                _activeHandles.emplace(_activeHandles.begin(), std::move(scheduledWorkHandle));
-
-            ul.unlock();
-
-            return std::move(pf.future).tapAll(
-                [this, it = std::move(it)](StatusOrStatusWith<ReturnType> s) {
-                    std::lock_guard<std::mutex> lg(_mutex);
-                    _activeHandles.erase(it);
-                    _notifyAllTasksComplete(lg);
-                });
+            });
         } catch (const DBException& ex) {
             taskCompletionPromise->setError(ex.toStatus());
             return std::move(pf.future);
@@ -202,21 +167,20 @@ private:
                        AsyncWorkScheduler* parent,
                        WithLock withParentLock);
 
-    // A targeted host and the shard object used to target it. The shard object is passed through
-    // resolved so the caller can avoid a potentially blocking "ShardRegistry::getShard" call.
-    struct HostAndShard {
-        HostAndPort hostTargeted;
-        std::shared_ptr<Shard> shard;
-    };
-
     /**
-     * Finds the host and port for a shard id, returning it and the shard object used for targeting.
+     * Schedules 'commandObj' on an already-resolved host, storing the resulting
+     * TaskExecutor::CallbackHandle in '_activeHandles' so shutdown() can cancel it, and returns a
+     * future for the response. Must be called from within scheduleRemoteCommand's scheduleWork
+     * task, whose CallbackHandle is still in '_activeHandles'; that keeps join() from destroying
+     * the scheduler while the response callbacks scheduled here (which capture a raw 'this') are
+     * still pending.
      */
-    Future<HostAndShard> _targetHostAsync(
-        const ShardId& shardId,
+    Future<executor::TaskExecutor::ResponseStatus> _sendCommandToResolvedHost(
+        HostAndPort host,
+        std::shared_ptr<Shard> shard,
+        BSONObj commandObj,
         const ReadPreferenceSetting& readPref,
-        OperationContextFn operationContextFn = [](OperationContext*) {},
-        BSONObj commandObj = BSONObj());
+        const std::shared_ptr<executor::TaskExecutor>& executor);
 
     /**
      * Returns true when all the registered child schedulers, op contexts and handles have joined.
@@ -229,6 +193,32 @@ private:
      * activity on a scheduler which has been shut down.
      */
     void _notifyAllTasksComplete(WithLock);
+
+    /**
+     * Single place that registers executor work with the scheduler. Under '_mutex', checks the
+     * shutdown status, invokes 'scheduleWork' (which schedules the executor callback and returns
+     * its CallbackHandle), and tracks that handle in '_activeHandles' so shutdown() can cancel it;
+     * returns 'future' wrapped to remove the handle once it resolves. 'scheduleWork' runs while
+     * '_mutex' is held, so the executor must not invoke the scheduled callback inline (which would
+     * self-deadlock on '_mutex'). Throws (without consuming 'future') if the scheduler is shut
+     * down.
+     */
+    template <typename T, typename ScheduleWorkFn>
+    Future<T> _trackScheduledWork(Future<T>&& future, ScheduleWorkFn&& scheduleWork) {
+        auto it = [&] {
+            std::lock_guard lg(_mutex);
+            uassertStatusOK(_shutdownStatus);
+            // Lets a test block here with '_mutex' held to race an executor shutdown.
+            hangAfterShutdownCheckWhileHoldingSchedulerMutex.pauseWhileSet();
+            auto handle = uassertStatusOK(scheduleWork());
+            return _activeHandles.emplace(_activeHandles.begin(), std::move(handle));
+        }();
+        return std::move(future).tapAll([this, it = std::move(it)](auto&&) {
+            std::lock_guard lg(_mutex);
+            _activeHandles.erase(it);
+            _notifyAllTasksComplete(lg);
+        });
+    }
 
     // Service context under which this executor runs
     ServiceContext* const _serviceContext;

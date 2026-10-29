@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/values/row.h"
 
@@ -119,7 +93,7 @@ public:
         RowType row(N);
         for (size_t i = 0; i < row.size(); i++) {
             auto expected = value::makeNewString(longStrings[i % longStringsSize]);
-            value::ValueGuard expectedGuard(expected);
+            value::TagValueOwned expectedOwner = value::TagValueOwned::fromRaw(expected);
 
             setValue(row, i, true, value::makeNewString(longStrings[i % longStringsSize]));
 
@@ -132,6 +106,27 @@ public:
             ASSERT_THAT(p2.raw(), ValueEq(expected));
             verifyValue(row, i, copyValue(expected));
         }
+    }
+
+    void testResetView() {
+        RowType row(N);
+        for (size_t i = 0; i < row.size(); i++) {
+            // Own the string here; hand the row only a non-owning *view* of it.
+            auto owned = value::makeNewString(longStrings[i % longStringsSize]);
+            value::TagValueOwned guard = value::TagValueOwned::fromRaw(owned);
+            // Ensure pointer comparisons are meaningful (i.e. we're not in the small-string inline
+            // representation).
+            ASSERT_GT(value::getStringLength(owned.first, owned.second),
+                      value::kSmallStringMaxLength);
+            row.reset(i, value::TagValueView{owned.first, owned.second});
+            auto copied = row.copyOrMoveValue(i);
+            ASSERT_NE(value::getRawStringView(owned.first, owned.second),
+                      value::getRawStringView(copied.tag(), copied.value()));
+            verifyValue(row, i, copyValue(owned));
+        }
+        // 'row' holds only views, so its destructor must NOT free the strings;
+        // the ValueGuards free each string exactly once (a wrongful own would also
+        // trip ASAN here as a double-free).
     }
 
     void testResize() {
@@ -165,6 +160,7 @@ public:
         testMove();
         testAssign();
         testCopyOrMoveValue();
+        testResetView();
 
         if (allowResize) {
             testResize();
@@ -181,11 +177,11 @@ private:
     }
 
     void setValue(RowType& row, int idx, bool owned, TypedValue p) {
-        row.reset(idx, owned, p.first, p.second);
+        row.reset(idx, value::TagValueMaybeOwned::fromRaw(owned, p.first, p.second));
     }
 
     void verifyValue(RowType& row, int idx, TypedValue p) {
-        value::ValueGuard guard(p);
+        value::TagValueOwned pOwner = value::TagValueOwned::fromRaw(p);
         ASSERT_THAT(row.getViewOfValue(idx), ValueEq(p));
     }
 

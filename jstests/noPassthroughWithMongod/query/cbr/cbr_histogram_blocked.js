@@ -1,4 +1,5 @@
 // @tags: [
+//   requires_fcv_90,
 //   disables_test_commands,
 // ]
 
@@ -13,25 +14,18 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue,
 );
 
-assert.commandFailedWithCode(
-    mongo.getDB("admin").adminCommand({
-        setParameter: 1,
-        automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
-    }),
-    ErrorCodes.BadValue,
-);
-
 assert.commandWorked(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
     }),
 );
 
 assert.commandWorked(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
-        automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+        internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
     }),
 );
 

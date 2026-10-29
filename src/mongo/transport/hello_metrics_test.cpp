@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/hello_metrics.h"
 
@@ -152,6 +126,36 @@ TEST_F(HelloMetricsTest, SessionManagerDecrementsExhaustInMasterMetrics) {
     }
 
     ASSERT_EQ(transportLayer->getSessionManager()->helloMetrics.getNumExhaustIsMaster(), 1);
+}
+
+/**
+ * Verifies that operator+= sums all three fields (exhaustIsMaster, exhaustHello,
+ * awaitingTopologyChanges) from another HelloMetrics instance into the receiver.
+ */
+TEST_F(HelloMetricsTest, AdditionOperatorSumsAllFields) {
+    auto& metrics = transportLayer->getSessionManager()->helloMetrics;
+
+    // Drive exhaustHello and exhaustIsMaster via InExhaustHello on separate sessions.
+    auto sessionForHello = transportLayer->createSession();
+    InExhaustHello::get(sessionForHello.get())->setInExhaust(InExhaustHello::Command::kHello);
+
+    auto sessionForIsMaster = transportLayer->createSession();
+    InExhaustHello::get(sessionForIsMaster.get())->setInExhaust(InExhaustHello::Command::kIsMaster);
+
+    metrics.incrementNumAwaitingTopologyChanges();
+    metrics.incrementNumAwaitingTopologyChanges();
+
+    HelloMetrics accumulated;
+    accumulated += metrics;
+
+    ASSERT_EQ(accumulated.getNumExhaustHello(), 1);
+    ASSERT_EQ(accumulated.getNumExhaustIsMaster(), 1);
+    ASSERT_EQ(accumulated.getNumAwaitingTopologyChanges(), 2);
+
+    // Fail if a new field is added to HelloMetrics without being covered above.
+    BSONObjBuilder bob;
+    accumulated.serialize(&bob);
+    ASSERT_EQ(bob.obj().nFields(), 3) << "new HelloMetrics field needs a sum assertion above";
 }
 
 }  // namespace

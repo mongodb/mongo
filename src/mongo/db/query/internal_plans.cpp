@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
+#include "mongo/db/query/internal_plans.h"
+
 #include "mongo/base/status_with.h"
 #include "mongo/db/exec/classic/batched_delete_stage.h"
 #include "mongo/db/exec/classic/collection_scan.h"
@@ -42,7 +15,6 @@
 #include "mongo/db/exec/classic/upsert_stage.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id_helpers.h"
@@ -55,9 +27,12 @@
 #include <memory>
 #include <utility>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 
 namespace mongo {
 
@@ -138,7 +113,8 @@ CollectionScanParams createCollectionScanParams(
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion,
-    bool shouldReturnEofOnFilterMismatch) {
+    bool shouldReturnEofOnFilterMismatch,
+    bool tolerateDeletedScanPosition) {
     const auto& collection = *coll;
     tassert(11321309, "collection must not be null", collection);
 
@@ -147,8 +123,7 @@ CollectionScanParams createCollectionScanParams(
         shouldWaitForOplogVisibility(expCtx->getOperationContext(), collection, false);
 
     if (resumeAfterRecordId) {
-        params.resumeScanPoint =
-            ResumeScanPoint{*resumeAfterRecordId, false /* tolerateKeyNotFound */};
+        params.resumeScanPoint = ResumeScanPoint{*resumeAfterRecordId, tolerateDeletedScanPosition};
     }
 
     params.minRecord = std::move(minRecord);
@@ -160,6 +135,7 @@ CollectionScanParams createCollectionScanParams(
     }
     params.boundInclusion = boundInclusion;
     params.shouldReturnEofOnFilterMismatch = shouldReturnEofOnFilterMismatch;
+    params.tolerateCappedRepositioning = tolerateDeletedScanPosition;
     return params;
 }
 }  // namespace
@@ -230,7 +206,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                                      std::move(params.minRecord),
                                                      std::move(params.maxRecord),
                                                      params.boundInclusion,
-                                                     params.shouldReturnEofOnFilterMismatch);
+                                                     params.shouldReturnEofOnFilterMismatch,
+                                                     params.tolerateDeletedScanPosition);
 
     auto cs = _collectionScan(expCtx, ws.get(), params.collection, collScanParams);
 
@@ -296,11 +273,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      ws.get(),
                                                      &collectionPtr,
                                                      direction,
-                                                     boost::none /* resumeAfterId */,
+                                                     /*resumeAfterRecordId=*/boost::none,
                                                      std::move(minRecord),
                                                      std::move(maxRecord),
                                                      boundInclusion,
-                                                     shouldReturnEofOnFilterMismatch);
+                                                     shouldReturnEofOnFilterMismatch,
+                                                     /*tolerateDeletedScanPosition=*/false);
 
     auto root = _collectionScan(expCtx, ws.get(), coll, collScanParams, filter);
 

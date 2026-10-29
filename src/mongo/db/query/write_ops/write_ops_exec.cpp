@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 
@@ -34,6 +8,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/admission/write_throttler.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -46,7 +21,6 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -70,17 +44,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_shape/delete_cmd_shape.h"
-#include "mongo/db/query/query_shape/insert_cmd_shape.h"
-#include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_shape/query_shape_hash.h"
-#include "mongo/db/query/query_shape/shape_helpers.h"
-#include "mongo/db/query/query_shape/update_cmd_shape.h"
-#include "mongo/db/query/query_stats/delete_key.h"
-#include "mongo/db/query/query_stats/insert_key.h"
-#include "mongo/db/query/query_stats/query_stats.h"
-#include "mongo/db/query/query_stats/update_key.h"
+#include "mongo/db/query/query_stats/write_cmd_shape_registration.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
@@ -94,7 +58,6 @@
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -111,7 +74,6 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -133,7 +95,7 @@
 #include "mongo/db/version_context.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
@@ -150,6 +112,7 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #include <algorithm>
@@ -192,6 +155,22 @@ MONGO_FAIL_POINT_DEFINE(hangAndFailAfterDocumentInsertsReserveOpTimes);
 MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchInsert);
 MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchRemove);
+
+bool isTimeseriesWriteSource(OperationSource source) {
+    return source == OperationSource::kTimeseriesInsert ||
+        source == OperationSource::kTimeseriesUpdate ||
+        source == OperationSource::kTimeseriesDelete;
+}
+
+void admitKnownWrites(OperationContext* opCtx, OperationSource source, int64_t knownWrites) {
+    if (isTimeseriesWriteSource(source)) {
+        return;
+    }
+
+    if (auto* throttler = WriteThrottler::get(opCtx)) {
+        throttler->admitKnownWrites(opCtx, knownWrites);
+    }
+}
 
 /**
  * Metrics group for the `updateMany` and `deleteMany` operations. For each
@@ -388,12 +367,12 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool inTransaction = opCtx->inMultiDocumentTransaction();
     const bool oplogDisabled = replCoord->isOplogDisabledFor(opCtx, collection.nss());
-    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
+    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::noGroup;
 
     // For multiple inserts not part of a multi-document transaction, the inserts will be
     // batched into a single applyOps oplog entry.
     if (!inTransaction && batchSize > 1 && !oplogDisabled) {
-        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+        oplogEntryGroupType = WriteUnitOfWork::nonAtomicGroup;
     }
 
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
@@ -464,96 +443,8 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
                                                   const write_ops::WriteCommandRequestBase& req,
                                                   const boost::optional<TenantId>& tenantId) {
-    auto& encryptionInfo = req.getEncryptionInformation();
-    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo, tenantId);
-    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
-}
-
-inline boost::optional<query_shape::DeferredQueryShape> computeQueryShape(
-    OperationContext* opCtx,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const write_ops::UpdateCommandRequest& wholeOp,
-    const ParsedUpdate& parsedUpdate) {
-    // Skip computing the shape when the feature flag is disabled.
-    if (!feature_flags::gFeatureFlagQueryStatsUpdateCommand.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return boost::none;
-    }
-
-    // Skip computing the shape with encrypted fields as indicated by the inclusion of
-    // encryptionInformation. It is important to do this before canonicalizing and optimizing the
-    // query, each of which would alter the query shape.
-    if (wholeOp.getEncryptionInformation()) {
-        return boost::none;
-    }
-
-    // Skip unsupported update types, such as delta and transform.
-    auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
-    switch (modType) {
-        case write_ops::UpdateModification::Type::kReplacement:
-        case write_ops::UpdateModification::Type::kModifier:
-        case write_ops::UpdateModification::Type::kPipeline:
-            break;
-        default:
-            return boost::none;
-    }
-
-    // Compute QueryShapeHash and record it in CurOp.
-    query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::UpdateCmdShape>(
-            wholeOp, parsedUpdate, expCtx);
-    }};
-
-    return deferredShape;
-}
-
-inline void storeQueryShapeHash(OperationContext* opCtx,
-                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                const write_ops::UpdateCommandRequest& wholeOp,
-                                const ParsedUpdate& parsedUpdate,
-                                const query_shape::DeferredQueryShape& deferredShape) {
-    // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else
-    // downstream yet until we support updates in PQS. Using std::ignore to indicate that discarding
-    // the returned QSH is intended.
-    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
-            // TODO(SERVER-102484): Provide fast path QueryShape and QueryShapeHash computation for
-            // Express queries.
-            if (!parsedUpdate.hasParsedFindCommand()) {
-                return boost::none;
-            }
-            // We want to compute queryShapeHash for updates even for internal queries so slow
-            // query logs will contain the hash value.
-            return shape_helpers::computeQueryShapeHash(
-                expCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
-        });
-}
-
-void computeShapeAndRegisterQueryStats(OperationContext* opCtx,
-                                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const CollectionAcquisition& collection,
-                                       const write_ops::UpdateCommandRequest& wholeOp,
-                                       const ParsedUpdate& parsedUpdate) {
-    const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
-        computeQueryShape(opCtx, expCtx, wholeOp, parsedUpdate);
-
-    if (!maybeDeferredShape) {
-        return;
-    }
-
-    const auto& deferredShape = maybeDeferredShape.get();
-    storeQueryShapeHash(opCtx, expCtx, wholeOp, parsedUpdate, deferredShape);
-
-    // Register query stats collection.
-    query_stats::registerWriteRequest(opCtx, wholeOp.getNamespace(), [&]() {
-        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
-        return std::make_unique<query_stats::UpdateKey>(expCtx,
-                                                        wholeOp,
-                                                        parsedUpdate.getRequest()->getHint(),
-                                                        std::move(deferredShape->getValue()),
-                                                        collection.getCollectionType());
-    });
+    return std::make_tuple(req.getBypassDocumentValidation(),
+                           getFleCrudProcessed(req.getEncryptionInformation()));
 }
 
 void saveStatsOnConflict(PlanExecutor* exec, CurOp* curOp) {
@@ -563,139 +454,9 @@ void saveStatsOnConflict(PlanExecutor* exec, CurOp* curOp) {
 }
 
 [[noreturn]] void throwUnsupportedUpdateOnColdCollection(const NamespaceString& nss) {
-    uasserted(ErrorCodes::IllegalOperation,
+    uasserted(ErrorCodes::CommandNotSupported,
               str::stream() << "Updates are not supported on cold collection '"
                             << nss.toStringForErrorMsg() << "'");
-}
-
-/**
- * Returns a DeferredQueryShape for the insert command, or boost::none if query stats should
- * not be collected (feature flag disabled, or encrypted fields present).
- */
-inline boost::optional<query_shape::DeferredQueryShape> computeInsertQueryShape(
-    OperationContext* opCtx, const write_ops::InsertCommandRequest& wholeOp) {
-    if (!feature_flags::gFeatureFlagQueryStatsInsert.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return boost::none;
-    }
-    if (wholeOp.getEncryptionInformation()) {
-        return boost::none;
-    }
-    query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(wholeOp);
-    }};
-    return deferredShape;
-}
-
-/**
- * Stores the query shape hash for the insert command in CurOp so that it is reported in slow
- * query logs. Mirrors storeQueryShapeHash() for updates, but uses the OperationContext overload
- * of shape_helpers::computeQueryShapeHash (insert has no ExpressionContext; IDHACK and Express does
- * not apply, and FLE is already screened earlier via wholeOp.getEncryptionInformation()). Internal
- * clients are included (skipInternalClientCheck = true) so that sharded cluster writes still
- * record the hash on the shard side.
- * TODO SERVER-127269 Remove duplicated code in computing query shapes for inserts, deletes, and
- * updates.
- */
-inline void storeInsertQueryShapeHash(OperationContext* opCtx,
-                                      const write_ops::InsertCommandRequest& wholeOp,
-                                      const query_shape::DeferredQueryShape& deferredShape) {
-    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
-            return shape_helpers::computeQueryShapeHash(
-                opCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
-        });
-}
-
-/**
- * Computes the insert query shape, records its hash in CurOp (for slow query logs), and
- * registers it with the query stats store.
- */
-void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
-                                             const write_ops::InsertCommandRequest& wholeOp,
-                                             query_shape::CollectionType collType) {
-    const auto maybeDeferredShape = computeInsertQueryShape(opCtx, wholeOp);
-    if (!maybeDeferredShape) {
-        return;
-    }
-    const auto& deferredShape = maybeDeferredShape.get();
-
-    storeInsertQueryShapeHash(opCtx, wholeOp, deferredShape);
-
-    query_stats::registerWriteRequest(opCtx, wholeOp.getNamespace(), [&]() {
-        uassertStatusOKWithContext(deferredShape->getStatus(),
-                                   "Failed to compute insert query shape");
-        return std::make_unique<query_stats::InsertKey>(
-            opCtx, wholeOp, std::move(deferredShape->getValue()), collType);
-    });
-}
-
-inline boost::optional<query_shape::DeferredQueryShape> computeDeleteQueryShape(
-    OperationContext* opCtx,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const write_ops::DeleteCommandRequest& wholeOp,
-    const ParsedDelete& parsedDelete) {
-    if (!feature_flags::gFeatureFlagQueryStatsDelete.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return boost::none;
-    }
-
-    if (wholeOp.getEncryptionInformation()) {
-        return boost::none;
-    }
-
-    query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::DeleteCmdShape>(
-            wholeOp, parsedDelete, expCtx);
-    }};
-
-    return deferredShape;
-}
-
-inline void storeDeleteQueryShapeHash(OperationContext* opCtx,
-                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      const write_ops::DeleteCommandRequest& wholeOp,
-                                      const ParsedDelete& parsedDelete,
-                                      const query_shape::DeferredQueryShape& deferredShape) {
-    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
-            // TODO (SERVER-102484): Provide fast path QueryShape and QueryShapeHash computation for
-            // Express queries.
-            if (!parsedDelete.hasParsedFindCommand()) {
-                return boost::none;
-            }
-            return shape_helpers::computeQueryShapeHash(
-                expCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
-        });
-}
-
-void computeShapeAndMaybeRegisterDeleteQueryStats(
-    OperationContext* opCtx,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const CollectionAcquisition& collection,
-    const write_ops::DeleteCommandRequest& wholeOp,
-    const ParsedDelete& parsedDelete) {
-    const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
-        computeDeleteQueryShape(opCtx, expCtx, wholeOp, parsedDelete);
-
-    if (!maybeDeferredShape) {
-        return;
-    }
-
-    const auto& deferredShape = maybeDeferredShape.get();
-    storeDeleteQueryShapeHash(opCtx, expCtx, wholeOp, parsedDelete, deferredShape);
-
-    query_stats::registerWriteRequest(opCtx, wholeOp.getNamespace(), [&]() {
-        uassertStatusOKWithContext(deferredShape->getStatus(),
-                                   "Failed to compute delete query shape");
-        return std::make_unique<query_stats::DeleteKey>(expCtx,
-                                                        wholeOp,
-                                                        parsedDelete.getRequest()->getHint(),
-                                                        std::move(deferredShape->getValue()),
-                                                        collection.getCollectionType());
-    });
 }
 
 }  // namespace
@@ -713,14 +474,6 @@ bool handleError(OperationContext* opCtx,
 
     if (ErrorCodes::isInterruption(ex.code())) {
         throw;  // These have always failed the whole batch.
-    }
-
-    if (ex.code() == ErrorCodes::WriteConflictRetryLimitExceeded) {
-        // Surface as command-level ok:0 so drivers' RetryableWriteError /
-        // TransientTransactionError label attachment fires. Per-doc framing in writeErrors does
-        // not trigger driver retry. For ordered:false batches this aborts the whole batch;
-        // drivers re-send with stmtId idempotency.
-        throw;
     }
 
     if (ErrorCodes::WouldChangeOwningShard == ex.code()) {
@@ -748,7 +501,7 @@ bool handleError(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && opCtx->inMultiDocumentTransaction()) {
         if (isTransientTransactionError(
-                ex.code(), false /* hasWriteConcernError */, false /* isCommitOrAbort */)) {
+                ex.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false)) {
             // Tell the client to try the whole txn again, by returning ok: 0 with errorLabels.
             throw;
         }
@@ -789,19 +542,8 @@ bool handleError(OperationContext* opCtx,
     return !ordered;
 }
 
-bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo,
-                         const boost::optional<TenantId>& tenantId) {
-    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
-        uassert(6666201,
-                "External users cannot have crudProcessed enabled",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(tenantId), ActionType::internal));
-
-        return true;
-    }
-    return false;
+bool getFleCrudProcessed(const boost::optional<EncryptionInformation>& encryptionInfo) {
+    return encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false);
 }
 
 /**
@@ -862,7 +604,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                       .getDatabaseProfileLevel(nss.dbName()));
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
+            &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert", nullptr, nss);
     };
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -877,7 +619,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             // It is not safe to ignore errors from collection creation while inside a
             // multi-document transaction.
             auto canContinue = handleError(
-                opCtx, ex, nss, ordered, false /* multiUpdate */, boost::none /* sampleId */, out);
+                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, /*sampleId=*/boost::none, out);
             invariant(!canContinue);
             return false;
         }
@@ -988,7 +730,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             });
         } catch (const DBException& ex) {
             bool canContinue = handleError(
-                opCtx, ex, nss, ordered, false /* multiUpdate */, boost::none /* sampleId */, out);
+                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, /*sampleId=*/boost::none, out);
 
             if (!canContinue) {
                 // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
@@ -1133,9 +875,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
-    const auto exec = uassertStatusOK(
-        getExecutorUpdate(&curOp->debug(), collection, *canonicalUpdate, boost::none /* verbosity
-        */));
+    const auto exec = uassertStatusOK(getExecutorUpdate(
+        &curOp->debug(), collection, *canonicalUpdate, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -1272,8 +1013,7 @@ long long performDelete(OperationContext* opCtx,
     }
 
     const auto exec = uassertStatusOK(
-        getExecutorDelete(&curOp->debug(), collection, canonicalDelete, boost::none /* verbosity
-        */));
+        getExecutorDelete(&curOp->debug(), collection, canonicalDelete, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -1532,6 +1272,11 @@ WriteResult performInserts(
     out.results.reserve(wholeOp.getDocuments().size());
 
     bool containsRetry = false;
+    // Update total retryable commands counter if applicable. The retried commands counter is
+    // updated by the below hook.
+    if (opCtx->isRetryableWrite()) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
 
     size_t nextOpIndex = 0;
@@ -1560,7 +1305,7 @@ WriteResult performInserts(
         const query_shape::CollectionType collType = preConditions.isTimeseriesCollection()
             ? query_shape::CollectionType::kTimeseries
             : query_shape::CollectionType::kCollection;
-        computeInsertShapeAndRegisterQueryStats(opCtx, wholeOp, collType);
+        query_stats::computeInsertShapeAndRegisterQueryStats(opCtx, wholeOp, collType);
     }
 
     for (auto&& doc : wholeOp.getDocuments()) {
@@ -1572,8 +1317,10 @@ WriteResult performInserts(
             opCtx, doc, bypassEmptyTsReplacement, &containsDotsAndDollarsField);
 
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
-        const bool wasAlreadyExecuted =
-            opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId);
+        const auto timestampIfAlreadyExecuted = opCtx->isRetryableWrite()
+            ? txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)
+            : boost::none;
+        const bool wasAlreadyExecuted = bool(timestampIfAlreadyExecuted);
 
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -1601,6 +1348,7 @@ WriteResult performInserts(
                 continue;  // Add more to batch before inserting.
         }
 
+        admitKnownWrites(opCtx, source, batch.size());
         out.canContinue = insertBatchAndHandleErrors(opCtx,
                                                      actualNs,
                                                      preConditions,
@@ -1632,8 +1380,8 @@ WriteResult performInserts(
                                               ex,
                                               actualNs,
                                               wholeOp.getOrdered(),
-                                              false /* multiUpdate */,
-                                              boost::none /* sampleId */,
+                                              /*isMultiUpdate=*/false,
+                                              /*sampleId=*/boost::none,
                                               &out);
             }
 
@@ -1643,6 +1391,8 @@ WriteResult performInserts(
         } else if (wasAlreadyExecuted) {
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - *timestampIfAlreadyExecuted);
             out.retriedStmtIds.push_back(stmtId);
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
         }
@@ -1665,8 +1415,8 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
                                                       CollectionAcquisition collection,
                                                       CanonicalUpdate& canonicalUpdate,
                                                       bool* containsDotsAndDollarsField) {
-    auto exec = uassertStatusOK(getExecutorUpdate(
-        &curOp.debug(), collection, canonicalUpdate, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&curOp.debug(), collection, canonicalUpdate, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -1842,7 +1592,8 @@ static SingleWriteResult performSingleUpdateOp(
     // available for computing query shape.
     // TODO SERVER-119643 Enable query stats for timeseries updates.
     if (!isRequestToTimeseries) {
-        computeShapeAndRegisterQueryStats(opCtx, expCtx, collection, wholeOp, parsedUpdate);
+        query_stats::computeShapeAndRegisterQueryStats<query_stats::UpdateTypes>(
+            opCtx, expCtx, wholeOp, parsedUpdate, collection.getCollectionType());
     }
 
     std::unique_ptr<CanonicalUpdate> canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(
@@ -2099,7 +1850,19 @@ WriteResult performUpdates(
 
     LastOpFixer lastOpFixer(opCtx);
 
+    // Count retryable commands for all types of operations except for user-facing
+    // time-series updates on a non-sharded cluster. For non-sharded user time-series
+    // updates, handles the metrics of the command at the caller since each statement
+    // will run as a command through the internal transaction API.
+    bool couldCountAsRetryableCommand = source != OperationSource::kTimeseriesUpdate ||
+        !preConditions.getIsTimeseriesLogicalRequest() || wholeOp.getShardVersion();
+
     bool containsRetry = false;
+    // Update total retryable commands counter if applicable. The retried commands counter is
+    // updated by the below hook.
+    if (opCtx->isRetryableWrite() && couldCountAsRetryableCommand) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
 
     size_t nextOpIndex = 0;
@@ -2134,13 +1897,10 @@ WriteResult performUpdates(
         if (opCtx->isRetryableWrite()) {
             if (auto entry =
                     txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
-                // Set containsRetry to true for all types of operations except for user-facing
-                // time-series updates on a non-sharded cluster. For non-sharded user time-series
-                // updates, handles the metrics of the command at the caller since each statement
-                // will run as a command through the internal transaction API.
-                containsRetry = source != OperationSource::kTimeseriesUpdate ||
-                    !preConditions.getIsTimeseriesLogicalRequest() || wholeOp.getShardVersion();
+                containsRetry = couldCountAsRetryableCommand;
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                    opCtx->fastClockSource().now() - entry->getWallClockTime());
                 // Returns the '_id' of the user measurement for time-series upserts.
                 boost::optional<BSONElement> upsertedId;
                 if (entry->getOpType() == repl::OpTypeEnum::kInsert &&
@@ -2202,6 +1962,7 @@ WriteResult performUpdates(
                 timer.emplace();
             }
 
+            admitKnownWrites(opCtx, source, 1);
             const SingleWriteResult&& reply =
                 performSingleUpdateOpWithDupKeyRetry(opCtx,
                                                      ns,
@@ -2360,8 +2121,8 @@ static SingleWriteResult performSingleDeleteOp(
     // Register query shape here once we have a parsed delete, before executing the delete command.
     // TODO SERVER-120999 Enable query stats for timeseries deletes.
     if (!isRequestToTimeseries) {
-        computeShapeAndMaybeRegisterDeleteQueryStats(
-            opCtx, expCtx, collection, wholeOp, parsedDelete);
+        query_stats::computeShapeAndRegisterQueryStats<query_stats::DeleteTypes>(
+            opCtx, expCtx, wholeOp, parsedDelete, collection.getCollectionType());
     }
 
     auto canonicalDelete = uassertStatusOK(CanonicalDelete::make(
@@ -2388,8 +2149,8 @@ static SingleWriteResult performSingleDeleteOp(
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
-    auto exec = uassertStatusOK(getExecutorDelete(
-        &curOp.debug(), collection, canonicalDelete, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(
+        getExecutorDelete(&curOp.debug(), collection, canonicalDelete, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -2457,6 +2218,9 @@ WriteResult performDeletes(
     LastOpFixer lastOpFixer(opCtx);
 
     bool containsRetry = false;
+    if (opCtx->isRetryableWrite()) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
 
     size_t nextOpIndex = 0;
@@ -2479,9 +2243,14 @@ WriteResult performDeletes(
 
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
-        if (opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+        const auto alreadyExecutedTime = opCtx->isRetryableWrite()
+            ? txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)
+            : boost::none;
+        if (alreadyExecutedTime) {
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - *alreadyExecutedTime);
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
             out.retriedStmtIds.push_back(stmtId);
             continue;
@@ -2494,7 +2263,7 @@ WriteResult performDeletes(
         CurOp curOp(cmd);
         curOp.push(opCtx);
         boost::optional<int32_t> originalOpIndex = singleOp.getIncludeQueryStatsMetricsForOpIndex();
-        if (originalOpIndex.has_value() && source != OperationSource::kTimeseriesDelete) {
+        if (originalOpIndex.has_value()) {
             curOp.debug().getQueryStatsInfo().metricsRequested = true;
         }
         bool writeResultAppended = false;
@@ -2530,6 +2299,7 @@ WriteResult performDeletes(
                 timer.emplace();
             }
 
+            admitKnownWrites(opCtx, source, 1);
             const SingleWriteResult&& reply = performSingleDeleteOp(opCtx,
                                                                     ns,
                                                                     stmtId,
@@ -2552,7 +2322,7 @@ WriteResult performDeletes(
                                           ex,
                                           ns,
                                           wholeOp.getOrdered(),
-                                          false /* multiUpdate */,
+                                          /*isMultiUpdate=*/false,
                                           singleOp.getSampleId(),
                                           &out);
             if (!out.canContinue)
@@ -2598,6 +2368,28 @@ bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
 
     return false;
 }
+
+bool queryCollatorMatchesIndexCollation(OperationContext* opCtx,
+                                        const CollatorInterface* queryCollator,
+                                        const BSONObj& indexCollation) {
+    const bool queryHasSimpleCollator = CollatorInterface::isSimpleCollator(queryCollator);
+    const bool indexHasSimpleCollator = indexCollation.isEmpty();
+    if (queryHasSimpleCollator != indexHasSimpleCollator) {
+        return false;
+    }
+
+    if (indexHasSimpleCollator) {
+        return true;
+    }
+
+    const auto serviceCtx = opCtx->getServiceContext();
+    const auto collatorFactory = CollatorFactoryInterface::get(serviceCtx);
+    const auto indexCollator = collatorFactory->makeFromBSON(indexCollation);
+    tassert(indexCollator.getStatus().withContext(
+        "Duplicate key error contained an invalid index collation"));
+    return CollatorInterface::collatorsMatch(queryCollator, indexCollator.getValue().get());
+}
+
 }  // namespace
 
 bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
@@ -2620,7 +2412,7 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
 
     // There was a bug where an upsert sending a document into a partial/sparse unique index would
     // retry indefinitely. To avoid this, cap the number of retries.
-    int upsertMaxRetryAttemptsOnDuplicateKeyError =
+    const int upsertMaxRetryAttemptsOnDuplicateKeyError =
         write_ops::gUpsertMaxRetryAttemptsOnDuplicateKeyError.load();
     if (retryAttempts > upsertMaxRetryAttemptsOnDuplicateKeyError) {
         LOGV2(9552300,
@@ -2654,37 +2446,25 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
         return false;
     }
 
-    // Check that collation of the query matches the unique index. To avoid calling
-    // CollatorFactoryInterface when possible, first check the simple collator case.
-    bool queryHasSimpleCollator = CollatorInterface::isSimpleCollator(cq.getCollator());
-    bool indexHasSimpleCollator = errorInfo.getCollation().isEmpty();
-    if (queryHasSimpleCollator != indexHasSimpleCollator) {
+    if (!queryCollatorMatchesIndexCollation(opCtx, cq.getCollator(), errorInfo.getCollation())) {
         return false;
     }
 
-    if (!indexHasSimpleCollator) {
-        auto indexCollator =
-            uassertStatusOK(CollatorFactoryInterface::get(cq.getOpCtx()->getServiceContext())
-                                ->makeFromBSON(errorInfo.getCollation()));
-        if (!CollatorInterface::collatorsMatch(cq.getCollator(), indexCollator.get())) {
-            return false;
-        }
-    }
-
-    const auto& keyValue = errorInfo.getDuplicatedKeyValue();
-
+    // A retry is safe only if the query equality predicates match the duplicate-key error's index
+    // fields and values.
+    const BSONObj& duplicatedKeyValue = errorInfo.getDuplicatedKeyValue();
+    const bool indexHasSimpleCollator = errorInfo.getCollation().isEmpty();
+    const BSONElementComparator comparator{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
     BSONObjIterator keyPatternIter(keyPattern);
-    BSONObjIterator keyValueIter(keyValue);
+    BSONObjIterator keyValueIter(duplicatedKeyValue);
     while (keyPatternIter.more() && keyValueIter.more()) {
-        auto keyPatternElem = keyPatternIter.next();
-        auto keyValueElem = keyValueIter.next();
-
-        auto keyName = keyPatternElem.fieldNameStringData();
-        auto equalityIt = equalities.find(keyName);
-        if (equalityIt == equalities.end()) {
+        const auto keyPatternElem = keyPatternIter.next();
+        const auto it = equalities.find(keyPatternElem.fieldNameStringData());
+        if (it == equalities.end()) {
             return false;
         }
-        const BSONElement& equalityElem = equalityIt->second->getData();
+        const auto equalityElem = it->second->getData();
+        const auto keyValueElem = keyValueIter.next();
 
         // If the index have collation and we are comparing strings, we need to compare
         // ComparisonStrings instead of the raw value to respect collation.
@@ -2692,26 +2472,23 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
             if (keyValueElem.type() != BSONType::string) {
                 return false;
             }
-            auto equalityComparisonString =
-                cq.getCollator()->getComparisonString(equalityElem.valueStringData());
-            if (equalityComparisonString != keyValueElem.valueStringData()) {
+            const auto* collator = cq.getCollator();
+            tassert(13424100, "Expected a query collator for a collated index", collator);
+            if (collator->getComparisonString(equalityElem.valueStringData()) !=
+                keyValueElem.valueStringData()) {
                 return false;
             }
-        } else {
-            // Comparison which obeys field ordering but ignores field name.
-            BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
-            if (cmp.evaluate(equalityElem != keyValueElem)) {
-                return false;
-            }
+        } else if (comparator.evaluate(equalityElem != keyValueElem)) {
+            return false;
         }
     }
+
     tassert(11052017,
             fmt::format("Expected number of elements in keyPattern {} to match number of elements "
                         "in keyValue {}",
                         keyPattern.toString(),
-                        keyValue.toString()),
+                        duplicatedKeyValue.toString()),
             !keyPatternIter.more() && !keyValueIter.more());
-
     return true;
 }
 
@@ -2767,11 +2544,8 @@ void explainUpdate(OperationContext* opCtx,
 
     // TODO SERVER-119643: Compute the queryShapeHash for timeseries updates after it is supported.
     if (updateOp && !isTimeseriesViewRequest) {
-        const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
-            computeQueryShape(opCtx, expCtx, *updateOp, parsedUpdate);
-        if (maybeDeferredShape) {
-            storeQueryShapeHash(opCtx, expCtx, *updateOp, parsedUpdate, maybeDeferredShape.get());
-        }
+        query_stats::computeAndStoreQueryShapeHash<query_stats::UpdateTypes>(
+            opCtx, expCtx, *updateOp, parsedUpdate);
     }
 
     auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(
@@ -2839,12 +2613,8 @@ void explainDelete(OperationContext* opCtx,
 
     // TODO SERVER-120999: Compute the queryShapeHash for timeseries deletes after it is supported.
     if (deleteOp && !isTimeseriesViewRequest) {
-        const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
-            computeDeleteQueryShape(opCtx, expCtx, *deleteOp, parsedDelete);
-        if (maybeDeferredShape) {
-            storeDeleteQueryShapeHash(
-                opCtx, expCtx, *deleteOp, parsedDelete, maybeDeferredShape.get());
-        }
+        query_stats::computeAndStoreQueryShapeHash<query_stats::DeleteTypes>(
+            opCtx, expCtx, *deleteOp, parsedDelete);
     }
 
     auto canonicalDelete = uassertStatusOK(CanonicalDelete::make(

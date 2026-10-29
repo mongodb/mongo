@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,6 +22,10 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -904,6 +882,180 @@ TEST_F(QueryPlannerTest, PreserveRecordIdOptionPrecludesSimpleSort) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sort: {pattern: {a: 1}, limit: 0, type: 'default', node: {cscan: {dir: 1}}}}");
+}
+
+// ---------------------------------------------------------------------------
+// maxEstimatedScanBytes: COLLECTION_EXCEEDS_SCAN_BYTES flag unit tests
+// ---------------------------------------------------------------------------
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscan) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 1000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 500;
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+    runInvalidQuery(fromjson("{a: 1}"));
+    assertNoSolutions();
+
+    // The main planning path (query_planner.cpp's QueryPlanner::plan()) should log the rejection
+    // at default verbosity so operators can see it without raising log verbosity.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466402)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.collection" << "estimatedSize" << 1000
+                                                  << "threshold" << 500))),
+              1);
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscanOnTailableCursor) {
+    // The tailable-cursor path (attemptCollectionScan()) is a distinct code path from the main
+    // plan() collScanRequired branch, and uses its own LOGV2 id.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 2000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 1000;
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+    runInvalidQueryAsCommand(fromjson("{find: 'collection', filter: {}, tailable: true}"));
+    assertNoSolutions();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466401)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.collection" << "estimatedSize" << 2000
+                                                  << "threshold" << 1000))),
+              1);
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscanOnCacheReplay) {
+    // planFromCache() re-checks COLLECTION_EXCEEDS_SCAN_BYTES on cache replay so that setting the
+    // parameter at runtime takes effect even for queries whose COLLSCAN was already cached; this
+    // is a third distinct code path from the two above, with its own LOGV2 id.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    ASSERT_TRUE(solns.front()->cacheData);
+    ASSERT_EQ(solns.front()->cacheData->solnType, SolutionCacheData::COLLSCAN_SOLN);
+    auto cachedSolnData = solns.front()->cacheData->clone();
+
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 3000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 1500;
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+    auto status = QueryPlanner::planFromCache(*cq, params, *cachedSolnData);
+    ASSERT_NOT_OK(status.getStatus());
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::NoQueryExecutionPlans);
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466400)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.collection" << "estimatedSize" << 3000
+                                                  << "threshold" << 1500))),
+              1);
+}
+
+TEST_F(QueryPlannerTest, RateLimitsRejectionLoggingByNamespace) {
+    // Unique namespaces avoid the file-scope suppressor state left by the "test.collection" tests.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 1000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 500;
+
+    // Capture at Debug(2) so downgraded lines are observed alongside Info.
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+
+    auto rejectionSeverities = [&](int32_t id) {
+        std::vector<std::string> severities;
+        for (const auto& obj : logs.getBSON()) {
+            if (obj.getIntField("id") == id) {
+                severities.push_back(std::string(obj.getStringField("s")));
+            }
+        }
+        return severities;
+    };
+
+    nss = NamespaceString::createNamespaceString_forTest("test.rateLimitedCollection");
+    // Info, then downgraded to Debug(2) on repeat, then Info for a different namespace.
+    runInvalidQuery(fromjson("{a: 1}"));
+    runInvalidQuery(fromjson("{a: 1}"));
+
+    nss = NamespaceString::createNamespaceString_forTest("test.rateLimitedOtherCollection");
+    runInvalidQuery(fromjson("{a: 1}"));
+
+    ASSERT_EQ(rejectionSeverities(13466402), std::vector<std::string>({"I", "D2", "I"}));
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanAllowsCollscanWithLimit) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    // limit > 0 exempts the COLLSCAN.
+    runQuerySortProjSkipLimit(fromjson("{a: 1}"), BSONObj(), BSONObj(), 0, 5);
+    assertNumSolutions(1U);
+    assertSolutionExists("{limit: {n: 5, node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanAllowsCollscanWithLimitOne) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    runQuerySortProjSkipLimit(fromjson("{a: 1}"), BSONObj(), BSONObj(), 0, 1);
+    assertNumSolutions(1U);
+    assertSolutionExists("{limit: {n: 1, node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanDoesNotRejectIndexedPlan) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, MaxEstimatedScanBytesDryRunAllowsUnboundedCollscan) {
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES |
+        QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+    // Dry-run mode allows the COLLSCAN through instead of rejecting it.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, MaxEstimatedScanBytesDryRunBitAloneHasNoEffect) {
+    // Without COLLECTION_EXCEEDS_SCAN_BYTES also set, the dry-run bit alone does nothing: there
+    // was never a rejection to suppress.
+    params.mainCollectionInfo.options |= QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanFallsBackToIndexWhenCollscanBlocked) {
+    params.mainCollectionInfo.options |=
+        QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES | QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+    // INCLUDE_COLLSCAN would normally add a COLLSCAN alongside the index plan,
+    // but COLLECTION_EXCEEDS_SCAN_BYTES + no limit suppresses it.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanAllowsBoundedClusteredScan) {
+    // A predicate on the cluster key (_id) produces a bounded scan, which is exempt.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.clusteredInfo = clustered_util::makeDefaultClusteredIdIndex();
+    runQuery(fromjson("{_id: {$gte: 5}}"));
+    // Both the _id ixscan and the bounded clustered scan are valid solutions.
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedClusteredScan) {
+    // A predicate on a non-cluster-key field leaves the scan unbounded — still rejected.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.clusteredInfo = clustered_util::makeDefaultClusteredIdIndex();
+    runInvalidQuery(fromjson("{a: 1}"));
+    assertNoSolutions();
 }
 
 }  // namespace

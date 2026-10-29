@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 
@@ -45,6 +19,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/query/util/string_util.h"
 #include "mongo/util/string_map.h"
 
@@ -421,6 +396,8 @@ void validateIsHybridSearchNotSetByUser(boost::intrusive_ptr<ExpressionContext> 
     }
 }
 
+// TODO SERVER-121094 Remove function once 9.0 becomes last LTS and the validation is done inside
+// '$_internalHybridSearch' lite parsed document source.
 void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto opCtx = expCtx->getOperationContext();
@@ -439,11 +416,38 @@ void assertForeignCollectionIsNotTimeseries(const NamespaceString& nss,
         // However, in a sharded collections environment, a mongod shard might not know the
         // information about the timeseries collection (if it is owned by another shard). In
         // that case, it is non-trivial to ban the timeseries query.
-        // TODO SERVER-108218 Ban hybrid search inside of subpipelines on time series collections.
         LOGV2(10787902,
               "$rankFusion and $scoreFusion are unsupported on timeseries collections, but not "
               "enough information is available to determine if a subpipeline is running on a "
               "timeseries collection.");
+    }
+}
+
+void assertForeignSearchViewIsNotTimeseries(const NamespaceString& nss,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto opCtx = expCtx->getOperationContext();
+    const auto catalog = CollectionCatalog::get(opCtx);
+    const auto viewPtr = catalog->lookupView(opCtx, nss);
+
+    // Only reject a search view (a view whose definition begins with a mongot stage). A plain view
+    // over a timeseries collection remains a valid foreign namespace. A shard that does not own the
+    // namespace may not see the view here; that is fine, because the search stages are validated on
+    // the shard that resolves the view.
+    if (!viewPtr ||
+        !search_helper_bson_obj::startsWithMongotStage(expCtx->getIfrContext(),
+                                                       viewPtr->pipeline())) {
+        return;
+    }
+
+    // The view is a search view. Reject it if it is backed by a timeseries collection. This covers
+    // both the legacy buckets-view model (ViewDefinition::timeseries()) and the viewless-timeseries
+    // model, where the view is defined directly on the timeseries collection, so we inspect the
+    // backing collection.
+    const auto backing = catalog->lookupCollectionByNamespace(opCtx, viewPtr->viewOn());
+    if (viewPtr->timeseries() || (backing && backing->isTimeseriesCollection())) {
+        uasserted(13130801,
+                  "$search, $searchMeta, and $vectorSearch are unsupported on views over "
+                  "timeseries collections");
     }
 }
 

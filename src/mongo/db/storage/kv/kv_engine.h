@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,10 +13,14 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/shared_buffer.h"
 
 #include <memory>
+#include <mutex>
+#include <span>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace mongo {
@@ -51,23 +29,23 @@ class JournalListener;
 class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
+class StorageOplogManager;
+class KVEngineDirectCrudCursor;
 
 /**
  * Whether a write may skip the read-before-write existence check the storage engine would
  * otherwise perform. A "blind" write is safe only when the caller has already validated the
  * operation (e.g. secondary oplog application of an op the primary accepted).
  */
-enum class BlindWritePolicy {
+enum class [[MONGO_MOD_PUBLIC]] BlindWritePolicy {
     // Storage engine performs its usual existence check before writing.
     nonBlind,
     // Skip the existence check; overwrite if a value is already present.
     blind,
 };
 
-class MONGO_MOD_OPEN KVEngine {
+class [[MONGO_MOD_OPEN]] KVEngine {
 public:
-    using IdentKey = std::variant<std::span<const char>, int64_t>;
-
     /**
      * During the startup process, the storage engine is one of the first components to be started
      * up and fully initialized. But that fully initialized storage engine may not be recognized as
@@ -201,6 +179,21 @@ public:
                                                          RecordStore* oplogRecordStore) const = 0;
 
     /**
+     * Gets the StorageOplogManager which updates oplog visibility.
+     */
+    virtual StorageOplogManager* getOplogManager() const {
+        return nullptr;
+    }
+
+    /**
+     * Returns whether this node was started as a replica set member. This governs oplog visibility
+     * behavior and is fixed for the lifetime of the engine.
+     */
+    virtual bool isReplSet() const {
+        return false;
+    }
+
+    /**
      * Waits until all commits that happened before this call are durable in the journal. Returns
      * true, unless the storage engine cannot guarantee durability, which should never happen when
      * the engine is non-ephemeral. This cannot be called from inside a unit of work, and should
@@ -257,17 +250,16 @@ public:
 
     /**
      * Removes any knowledge of the ident from the storage engines metadata which includes removing
-     * the underlying files belonging to the ident. If the storage engine is unable to process the
-     * removal immediately, we enqueue it to be removed at a later time. If a callback is specified,
-     * it will be run upon the drop if this function returns an OK status. If a 'schemaEpoch' is
-     * specified, it indicates the schema epoch at which the ident drop should become visible in
-     * checkpoints.
+     * the underlying files belonging to the ident. If a 'schemaEpoch' is specified, it indicates
+     * the schema epoch at which the ident drop should become visible in checkpoints. If
+     * waitForLocks is false dropIdent() will return LockBusy if acquiring any locks would require
+     * waiting.
      */
     virtual Status dropIdent(RecoveryUnit& ru,
                              std::string_view ident,
                              bool identHasSizeInfo,
-                             const StorageEngine::DropIdentCallback& onDrop = nullptr,
-                             boost::optional<uint64_t> schemaEpoch = boost::none) = 0;
+                             boost::optional<uint64_t> schemaEpoch = boost::none,
+                             bool waitForLocks = true) = 0;
 
     /**
      * Removes any knowledge of the ident from the storage engines metadata without removing the
@@ -428,18 +420,49 @@ public:
     /**
      * Configures the specified checkpoint as the starting point for recovery.
      */
-    virtual void setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {}
+    virtual Status setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
+        return Status::OK();
+    }
 
     /**
      * Configures the storage engine as the leader, allowing it to flush checkpoints to remote
      * storage.
+     * Invariants on failure.
+     * This is NOT idempotent - it will invariant if the storage engine is already in leader mode.
      */
     virtual void promoteToLeader() {}
+
+    /**
+     * Configures the storage engine as a follower. Inverse of promoteToLeader().
+     * Invariants on failure.
+     * This is NOT idempotent - it will invariant if the storage engine is already in
+     * follower mode.
+     */
+    virtual void demoteToFollower() {}
 
     /**
      * See `StorageEngine::setStableTimestamp`
      */
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force) {}
+
+    /**
+     * See `StorageEngine::setStepDownTimestamp`
+     */
+    virtual void setStepDownTimestamp(WithLock, Timestamp stepDownTimestamp) {}
+
+    /**
+     * See `StorageEngine::getStepDownTimestamp`
+     */
+    virtual Timestamp getStepDownTimestamp() const {
+        return Timestamp();
+    }
+
+    /**
+     * See `StorageEngine::lockStepDown`
+     */
+    virtual std::unique_lock<std::mutex> lockStepDown() {
+        return {};
+    }
 
     /**
      * See `StorageEngine::setInitialDataTimestamp`
@@ -551,6 +574,33 @@ public:
     virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) = 0;
 
     /**
+     * The initial stable schema epoch which must be set on startup prior to creating any tables
+     * when schema epochs are in use.
+     */
+    static constexpr uint64_t kInitialSchemaEpoch = 1;
+
+    /**
+     * Untimestamped writes which create tables must still have a schema epoch when those are in
+     * use. This constant is a value which will be accepted as a schema epoch when untimestamped
+     * writes are allowed, and rejected when they are unsafe.
+     */
+    static constexpr uint64_t kUntimestampedSchemaEpoch = 2;
+
+    /**
+     * Reads the current stable schema epoch from the storage engine, returning none if it has not
+     * been set or if schema epochs are not enabled.
+     */
+    virtual boost::optional<uint64_t> getStableSchemaEpoch() = 0;
+
+    /**
+     * Explicitly sets the stable schema epoch to the specified value. Normally the stable epoch is
+     * derived from the stable timestamp, but during initial setup there is a dependency cycle where
+     * we must create several tables before timestamps are available. Has no effect if schema epochs
+     * are not enabled by the persistence provider.
+     */
+    virtual void setStableSchemaEpoch(uint64_t schemaEpoch) = 0;
+
+    /**
      * Returns the blind-write policy to use for a write on this engine in the given context. The
      * default returns `nonBlind`; engines that support blind writes override to sample based on
      * engine state.
@@ -560,57 +610,14 @@ public:
     }
 
     /**
-     * Inserts a key-value pair into the specified 'ident'. Must be called from within a storage
-     * transaction. With `BlindWritePolicy::nonBlind` duplicate keys are rejected. With
-     * `BlindWritePolicy::blind` the duplicate key check is skipped: any existing value at `key` is
-     * silently overwritten.
-     *
-     * Returns OK on success, `DuplicateKey` if the key already exists (nonBlind only), or the
-     * error returned by the underlying storage engine on other failures.
+     * Returns a cursor for performing direct key-value CRUD operations on the specified 'ident'.
+     * All operations performed through the cursor use the given blind-write 'policy'. Must be used
+     * from within a storage transaction on 'ru'.
      */
-    virtual Status insertIntoIdent(RecoveryUnit& ru,
-                                   std::string_view ident,
-                                   IdentKey key,
-                                   std::span<const char> value,
-                                   BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
-
-    /**
-     * Updates the value associated with `key` in the specified 'ident'. Must be called from within
-     * a storage transaction. With `BlindWritePolicy::nonBlind` the key must already exist; missing
-     * keys are rejected with `NoSuchKey`. With `BlindWritePolicy::blind` the key-existence check
-     * is skipped and the operation becomes an upsert: a missing key is inserted, and an existing
-     * value is overwritten.
-     *
-     * Returns OK on success, `NoSuchKey` if the key does not exist (nonBlind only), or the error
-     * returned by the underlying storage engine on other failures.
-     */
-    virtual Status updateInIdent(RecoveryUnit& ru,
-                                 std::string_view ident,
-                                 IdentKey key,
-                                 std::span<const char> value,
-                                 BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
-
-    /**
-     * Retrieves the value associated with 'key' from the specified 'ident'.
-     *
-     * Returns a 'UniqueBuffer' containing the value on success, 'KeyNotFound' if the key does not
-     * exist, or the error returned by the underlying storage engine on other failures.
-     */
-    virtual StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
-                                                  std::string_view ident,
-                                                  IdentKey key) = 0;
-
-    /**
-     * Deletes the key from the specified 'ident'.
-     *
-     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by the
-     * underlying storage engine on other failures. Must be called from within a storage
-     * transaction.
-     */
-    virtual Status deleteFromIdent(RecoveryUnit& ru,
-                                   std::string_view ident,
-                                   IdentKey key,
-                                   BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
+    virtual std::unique_ptr<KVEngineDirectCrudCursor> getDirectCursor(
+        RecoveryUnit& ru,
+        std::string_view ident,
+        BlindWritePolicy policy = BlindWritePolicy::nonBlind) = 0;
 
     /**
      * See `StorageEngine::dump`
@@ -684,6 +691,14 @@ public:
         const BSONObj& storageEngineOptions) const = 0;
 
     /**
+     * Returns a collection of statistics about the storage engine, or boost::none
+     * if the engine is unable to collect or by default.
+     */
+    virtual boost::optional<BSONObj> collectStorageStats() {
+        return boost::none;
+    }
+
+    /**
      * Returns the input storage engine options, sanitized to remove options that may not apply to
      * this node, such as encryption. Might be called for both collection and index options. See
      * SERVER-68122.
@@ -696,11 +711,51 @@ public:
     }
 
     /**
-     * See StorageEngine::autoCompact for details
+     * See StorageEngine::autoCompact for details.
      */
     virtual Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support auto compact");
+    }
+
+    /**
+     * See StorageEngine::wiredTigerRepair for details.
+     */
+    virtual StatusWith<std::string> wiredTigerRepair(const std::string& config) {
+        return {ErrorCodes::CommandNotSupported,
+                "The current storage engine does not support wiredTigerRepair"};
+    }
+
+    /**
+     * See StorageEngine::fixDatabaseSize for details.
+     */
+    virtual Status fixDatabaseSize() {
+        return {ErrorCodes::CommandNotSupported,
+                "The current storage engine does not support fixDatabaseSize"};
+    }
+
+    /**
+     * See StorageEngine::getIndexStorageSize for details.
+     */
+    virtual StatusWith<int64_t> getIndexStorageSize(
+        OperationContext*, const std::vector<std::string>& indexIdents) const {
+        return 0;
+    }
+
+    /**
+     * See StorageEngine::getSharedHistoryStoreStorageSize for details.
+     */
+    virtual StatusWith<int64_t> getSharedHistoryStoreStorageSize(OperationContext*) const {
+        return 0;
+    }
+
+    /**
+     * Pauses background auto-compaction for a replica set write block transition. Auto-compaction
+     * must be explicitly re-enabled after the write block is released; rollback does not re-enable
+     * it.
+     */
+    virtual Status pauseAutoCompactForReplicaSetWritesBlock(RecoveryUnit&) {
+        return Status::OK();
     }
 
     /**
@@ -718,6 +773,13 @@ public:
     }
 
     /**
+     * Returns whether the kv-engine is currently in leader mode.
+     */
+    virtual bool isInLeaderMode() {
+        return false;
+    }
+
+    /**
      * Returns an iterator that yields the prepared_id of unclaimed prepared transactions that exist
      * in the checkpoint on startup recovery. Callers can use these prepared_ids to reclaim the
      * prepared transactions through the storage engine.
@@ -726,5 +788,57 @@ public:
     getUnclaimedPreparedTransactionsForStartupRecovery(OperationContext* opCtx) const {
         MONGO_UNREACHABLE;
     }
+};
+
+/**
+ * A cursor which exposes low-level CRUD operations to a specific ident in a KV store without going
+ * through the normal collection interface. A direct cursor's lifetime is tied to the storage
+ * transaction which was used to obtain it.
+ */
+class [[MONGO_MOD_OPEN]] KVEngineDirectCrudCursor {
+public:
+    using Key = std::variant<std::span<const char>, int64_t>;
+
+    virtual ~KVEngineDirectCrudCursor() = default;
+
+    /**
+     * Inserts a key-value pair into the cursor's ident. Must be called from within a storage
+     * transaction. With `BlindWritePolicy::nonBlind` duplicate keys are rejected. With
+     * `BlindWritePolicy::blind` the duplicate key check is skipped: any existing value at `key` is
+     * silently overwritten.
+     *
+     * Returns OK on success, `DuplicateKey` if the key already exists (nonBlind only), or the
+     * error returned by the underlying storage engine on other failures.
+     */
+    virtual Status insert(RecoveryUnit& ru, Key key, std::span<const char> value) = 0;
+
+    /**
+     * Updates the value associated with `key` in the cursor's ident. Must be called from within
+     * a storage transaction. With `BlindWritePolicy::nonBlind` the key must already exist; missing
+     * keys are rejected with `NoSuchKey`. With `BlindWritePolicy::blind` the key-existence check
+     * is skipped and the operation becomes an upsert: a missing key is inserted, and an existing
+     * value is overwritten.
+     *
+     * Returns OK on success, `NoSuchKey` if the key does not exist (nonBlind only), or the error
+     * returned by the underlying storage engine on other failures.
+     */
+    virtual Status update(RecoveryUnit& ru, Key key, std::span<const char> value) = 0;
+
+    /**
+     * Retrieves the value associated with 'key' from the cursor's ident.
+     *
+     * Returns a 'UniqueBuffer' containing the value on success, 'NoSuchKey' if the key does not
+     * exist, or the error returned by the underlying storage engine on other failures.
+     */
+    virtual StatusWith<UniqueBuffer> get(Key key) = 0;
+
+    /**
+     * Deletes the key from the cursor's ident.
+     *
+     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by the
+     * underlying storage engine on other failures. Must be called from within a storage
+     * transaction.
+     */
+    virtual Status remove(RecoveryUnit& ru, Key key) = 0;
 };
 }  // namespace mongo

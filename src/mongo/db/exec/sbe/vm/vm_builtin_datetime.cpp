@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -202,19 +176,18 @@ value::TagValueMaybeOwned ByteCode::builtinDateFromStringNoThrow(ArityType arity
     }
 }
 
-value::TagValueMaybeOwned ByteCode::dateTrunc(value::TypeTags dateTag,
-                                              value::Value dateValue,
+value::TagValueMaybeOwned ByteCode::dateTrunc(value::TagValueView date,
                                               TimeUnit unit,
                                               int64_t binSize,
                                               TimeZone timezone,
                                               DayOfWeek startOfWeek) {
     // Get date.
-    if (!coercibleToDate(dateTag)) {
+    if (!coercibleToDate(date.tag)) {
         return value::TagValueMaybeOwned::nothing();
     }
-    auto date = getDate({dateTag, dateValue});
+    auto dateValue = getDate(date);
 
-    auto truncatedDate = truncateDate(date, unit, binSize, timezone, startOfWeek);
+    auto truncatedDate = truncateDate(dateValue, unit, binSize, timezone, startOfWeek);
     return value::TagValueMaybeOwned::date(truncatedDate.toMillisSinceEpoch());
 }
 
@@ -268,7 +241,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
 
     // Get date parts.
     auto dateParts = timezone.dateParts(date);
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto dateObj = value::getObjectView(result.value());
     dateObj->reserve(7);
     dateObj->push_back_raw("year", value::TypeTags::NumberInt32, dateParts.year);
@@ -308,7 +281,7 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
 
     // Get date parts.
     auto dateParts = timezone.dateIso8601Parts(date);
-    value::TagValueOwned result{value::makeNewObject()};
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewObject());
     auto dateObj = value::getObjectView(result.value());
     dateObj->reserve(7);
     dateObj->push_back_raw("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);
@@ -659,7 +632,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateTrunc(ArityType arity) {
     // Get date.
     auto dateView = viewFromStack(1);
 
-    return dateTrunc(dateView.tag, dateView.value, unit, binSize, timezone, startOfWeek);
+    return dateTrunc(dateView, unit, binSize, timezone, startOfWeek);
 }
 
 
@@ -798,7 +771,7 @@ bool ByteCode::validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZo
     if (!value::isString(unitView.tag)) {
         return false;
     }
-    std::string unitStr{value::getStringView(unitView.tag, unitView.value)};
+    std::string_view unitStr = value::getStringView(unitView.tag, unitView.value);
     if (!isValidTimeUnit(unitStr)) {
         return false;
     }

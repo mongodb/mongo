@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 //   requires_fcv_80,

@@ -6,6 +6,7 @@
  * This test was originally designed to reproduce SERVER-75304.
  *
  * @tags: [
+ *   uses_explain,
  *   # explain does not support majority read concern
  *   assumes_read_concern_local,
  *   # Time series collections do not support indexing array values in measurement fields.

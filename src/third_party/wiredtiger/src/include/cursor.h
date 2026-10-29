@@ -275,7 +275,8 @@ struct __wt_cursor_btree {
 #define WT_CBT_ITERATE_RETRY_PREV 0x040u /* Prepare conflict by prev. */
 #define WT_CBT_READ_ONCE 0x080u          /* Page in with WT_READ_WONT_NEED */
 #define WT_CBT_SEARCH_SMALLEST 0x100u    /* Row-store: small-key insert list */
-#define WT_CBT_VAR_ONPAGE_MATCH 0x200u   /* Var-store: on-page recno match */
+#define WT_CBT_SIZE_STAT 0x200u          /* Accumulate size summary during traversal */
+#define WT_CBT_VAR_ONPAGE_MATCH 0x400u   /* Var-store: on-page recno match */
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \
@@ -413,6 +414,10 @@ struct __wt_cursor_stat {
     /* Statistics descriptions */
     int (*next_set)(WT_SESSION_IMPL *, WT_CURSOR_STAT *, bool, bool); /* Advance to next set */
 
+    const int *otel_keys; /* Sorted keys of the requested OTel type */
+    u_int otel_count;     /* Count of OTel keys */
+    u_int otel_idx;       /* Current position in the OTel keys */
+
     union { /* Copies of the statistics */
         WT_DSRC_STATS dsrc_stats;
         WT_CONNECTION_STATS conn_stats;
@@ -514,37 +519,6 @@ struct __wt_cursor_version {
 #define WT_CURVERSION_VISIBLE_ONLY 0x40u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
-};
-
-/*
- * WT_CURSOR_LAYERED --
- *	A layered table cursor.
- */
-struct __wt_cursor_layered {
-    WT_CURSOR iface;
-
-    WT_DATA_HANDLE *dhandle;
-
-    WT_CURSOR *current_cursor; /* The current cursor for iteration */
-    WT_CURSOR *ingest_cursor;  /* The ingest table */
-    WT_CURSOR *stable_cursor;  /* The stable table */
-
-    uint64_t next_random_seed;
-    u_int next_random_sample_size;
-
-    uint64_t snapshot_gen;               /* Snapshot generation on last access */
-    uint64_t read_timestamp;             /* Read timestamp on last access */
-    uint64_t stable_checkpoint_meta_lsn; /* Checkpoint LSN stable cursor is on */
-    bool leader;                         /* Leader/follower state on last update */
-
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CLAYERED_ACTIVE 0x01u       /* Incremented the session count */
-#define WT_CLAYERED_ITERATE_NEXT 0x02u /* Forward iteration */
-#define WT_CLAYERED_ITERATE_PREV 0x04u /* Backward iteration */
-#define WT_CLAYERED_RANDOM 0x08u       /* Random cursor operations only */
-#define WT_CLAYERED_READ_STABLE 0x10u  /* Open for reads */
-                                       /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
 };
 
 #define WT_CURSOR_PRIMARY(cursor) (((WT_CURSOR_TABLE *)(cursor))->cg_cursors[0])

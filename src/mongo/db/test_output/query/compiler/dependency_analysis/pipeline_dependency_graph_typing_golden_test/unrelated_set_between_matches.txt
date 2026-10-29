@@ -1,0 +1,36 @@
+VARIATION UnrelatedSetBetweenMatches
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        },
+        {
+            "$set": {
+                "y": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: number|array(S)
+  after $set:1
+    x: number|array(S)
+  end of pipeline
+    x: number
+

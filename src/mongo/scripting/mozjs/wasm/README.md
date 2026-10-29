@@ -103,5 +103,5 @@ bazel build //src/mongo/scripting/mozjs/wasm:wasm_aot_compile_tool
 # Bridge Tests
 bazel run +wasm_mozjs_test
 # Scope Tests
-bazel run //src/mongo/scripting:scripting_mozjs_test --//bazel/config:js_engine=wasm
+bazel run //src/mongo/scripting:scripting_legacy_mozjs_test --//bazel/config:js_engine=wasm
 ```

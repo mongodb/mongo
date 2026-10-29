@@ -3,3 +3,4 @@ overrides:
   - "multiversion.sharding_temporarily_disable_due_to_fcv_upgrade"
   - "multiversion.sharded_fixture_last_lts_new_old_old_new"
   - "multiversion.sharding_multiversion_mongos_testdata_last_lts"
+  - "multiversion.disable_replicated_fast_count_on_new_binary"

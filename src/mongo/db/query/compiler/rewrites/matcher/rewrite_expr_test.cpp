@@ -1,38 +1,16 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {
@@ -67,6 +45,37 @@ void testExprRewrite(BSONObj expr, BSONObj expectedMatch, bool reversedInRewrite
         ASSERT_BSONOBJ_EQ(expectedMatch, bob.obj());
     } else {
         ASSERT_FALSE(result.matchExpression());
+    }
+}
+
+/**
+ * Rewrites 'expr' in the presence of a case-insensitive collation and confirms that the resulting
+ * MatchExpression matches every document in 'matchingDocs' and none of the documents in
+ * 'nonMatchingDocs'.
+ */
+void testExprRewriteWithCollator(BSONObj expr,
+                                 std::vector<BSONObj> matchingDocs,
+                                 std::vector<BSONObj> nonMatchingDocs,
+                                 bool reversedInRewrite = false) {
+    auto expCtx = ExpressionContextForTest{};
+    expCtx.setCollator(
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString));
+    internalQueryExtraPredicateForReversedIn.store(reversedInRewrite);
+
+    auto expression =
+        Expression::parseOperand(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    expression = expression->optimize();
+
+    auto result = RewriteExpr::rewrite(expression, expCtx.getCollator());
+    ASSERT(result.matchExpression());
+
+    for (const auto& doc : matchingDocs) {
+        ASSERT_TRUE(exec::matcher::matchesBSON(result.matchExpression(), doc))
+            << "expected " << doc << " to match " << result.matchExpression()->debugString();
+    }
+    for (const auto& doc : nonMatchingDocs) {
+        ASSERT_FALSE(exec::matcher::matchesBSON(result.matchExpression(), doc))
+            << "expected " << doc << " not to match " << result.matchExpression()->debugString();
     }
 }
 
@@ -458,6 +467,50 @@ TEST(RewriteExpr, InWithRootAsLHSFieldPathDoesNotGetRewrittenToMatch) {
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
     testExprRewrite(expr, expectedMatch, true);
+}
+
+TEST(RewriteExpr, EqRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson("{$expr: {$eq: ['$x', 'ABC']}}");
+    testExprRewriteWithCollator(expr, {fromjson("{x: 'abc'}")}, {fromjson("{x: 'abd'}")});
+}
+
+TEST(RewriteExpr, InRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['$x', ['ABC', 'DEF']]}}");
+    const std::vector<BSONObj> matchingDocs = {fromjson("{x: 'abc'}"), fromjson("{x: 'dEf'}")};
+    const std::vector<BSONObj> nonMatchingDocs = {fromjson("{x: 'ghi'}")};
+    testExprRewriteWithCollator(expr, matchingDocs, nonMatchingDocs);
+}
+
+TEST(RewriteExpr, SingleElementInRewritesToMatchThatRespectsCollation) {
+    // A single-element $in is optimized into an equality, which must also keep the collation.
+    const BSONObj expr = fromjson("{$expr: {$in: ['$x', ['ABC']]}}");
+    testExprRewriteWithCollator(expr, {fromjson("{x: 'abc'}")}, {fromjson("{x: 'abd'}")});
+}
+
+TEST(RewriteExpr, InWithFieldPathOnRHSRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['ABC', '$x']}}");
+    testExprRewriteWithCollator(expr,
+                                {fromjson("{x: ['abc', 'ghi']}"), fromjson("{x: 'abc'}")},
+                                {fromjson("{x: ['ghi']}"), fromjson("{x: 'abd'}")},
+                                true /* reversedInRewrite */);
+}
+
+TEST(RewriteExpr, InWithFieldPathOnRHSInOrRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson(
+        "{$expr: {$or: [{$in: ['ABC', '$x']}, {$in: ['DEF', '$x']}, {$in: ['GHI', '$x']}]}}");
+    testExprRewriteWithCollator(expr,
+                                {fromjson("{x: 'abc'}"), fromjson("{x: 'dEf'}")},
+                                {fromjson("{x: 'abd'}"), fromjson("{x2: 'abc'}")},
+                                true /* reversedInRewrite */);
+}
+
+TEST(RewriteExpr, InWithMultipleRHSFieldPathsInOrRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson(
+        "{$expr: {$or: [{$in: ['ABC', '$x']}, {$in: ['DEF', '$x']}, {$in: ['GHI', '$x2']}]}}");
+    testExprRewriteWithCollator(expr,
+                                {fromjson("{x: 'abc'}"), fromjson("{x2: 'ghi'}")},
+                                {fromjson("{x: 'abd'}"), fromjson("{x2: 'abd'}")},
+                                true /* reversedInRewrite */);
 }
 
 TEST(RewriteExpr, InWithRegexAsLHSConstDoesNotGetRewrittenToMatch) {

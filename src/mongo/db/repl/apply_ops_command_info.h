@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -38,18 +11,19 @@
 #include <string_view>
 #include <vector>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class BSONObjBuilder;
 class OperationContext;
 
 namespace repl {
+using namespace std::literals::string_view_literals;
 namespace apply_ops_command_info_details {
 bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd);
 }  // namespace apply_ops_command_info_details
 
 class ApplyOps {
 public:
-    static constexpr std::string_view kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
+    static constexpr std::string_view kOplogApplicationModeFieldName = "oplogApplicationMode"sv;
 
     /**
      * Extracts CRUD operations from an applyOps oplog entry. Throws UserException on error.
@@ -89,5 +63,37 @@ private:
     const bool _areOpsCrudOnly;
 };
 
+/**
+ * Returns the number of operations in an applyOps, given its array or the oplog entry carrying it.
+ */
+inline std::size_t numOperationsInApplyOps(const Value& applyOpsArray) {
+    return applyOpsArray.missing() ? 0U : applyOpsArray.getArrayLength();
+}
+
+inline std::size_t numOperationsInApplyOps(const OplogEntry& applyOpsEntry) {
+    return static_cast<std::size_t>(
+        applyOpsEntry.getObject()[ApplyOpsCommandInfoBase::kOperationsFieldName].Obj().nFields());
+}
+
+/**
+ * Returns the total number of operations in the applyOps chain terminated by 'entry': its 'count'
+ * field when present (a multi-entry batch), otherwise this entry's own operation count (a
+ * single-entry batch).
+ */
+inline std::size_t applyOpsChainOperationTotal(const OplogEntry& entry) {
+    const auto count = entry.getObject()[ApplyOpsCommandInfoBase::kCountFieldName];
+    return count.eoo() ? numOperationsInApplyOps(entry)
+                       : static_cast<std::size_t>(count.numberLong());
+}
+
+/**
+ * Saturating 'totalOps - opsAlreadyCollected', for bounding an applyOps chain walk by the
+ * terminal's 'count'. See walkApplyOpsChain().
+ */
+inline std::size_t remainingApplyOpsChainOps(std::size_t totalOps,
+                                             std::size_t opsAlreadyCollected) {
+    return totalOps > opsAlreadyCollected ? totalOps - opsAlreadyCollected : 0;
+}
+
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

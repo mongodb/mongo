@@ -1,13 +1,18 @@
 /**
  * Verify CBR can estimate value $elemMatch MatchExpression using histograms.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {planEstimatedWithHistogram} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -26,7 +31,7 @@ assert.commandWorked(coll.insert(docs));
 function testElemMatchWithDifferentSelectivities() {
     coll.dropIndexes();
 
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
     // No index on 'a' forces a collection scan plan.
 
     const moreDocsPlan = getWinningPlanFromExplain(
@@ -43,7 +48,7 @@ function testElemMatchWithDifferentSelectivities() {
 
 function testIndexDoesNotAffectEstimate() {
     coll.dropIndexes();
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
 
     const query = {a: {$elemMatch: {$gt: 5, $lt: 20}}};
     const noIndexPlan = getWinningPlanFromExplain(coll.find(query).explain());
@@ -64,6 +69,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );

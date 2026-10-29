@@ -290,8 +290,7 @@ let case9 = function () {
     assert.eq(1, res.splitKeys.length, "9b");
     assert.eq(2, res.splitKeys[0].x, "9c");
 
-    // TODO SERVER-87574 remove !TestData.testingReplicaSetEndpoint
-    if (db.runCommand("hello").msg != "isdbgrid" && !TestData.testingReplicaSetEndpoint) {
+    if (db.runCommand("hello").msg != "isdbgrid") {
         res = db.adminCommand({
             splitVector: "test.jstests_splitvector",
             keyPattern: {x: 1},

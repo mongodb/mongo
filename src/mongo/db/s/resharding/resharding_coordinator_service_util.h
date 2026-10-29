@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,7 +8,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/flush_routing_table_cache_updates_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -67,7 +40,7 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 const std::vector<ShardRef>& reshardedCollectionPlacement);
+                                 const std::vector<ShardId>& reshardedCollectionPlacement);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
                               const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -110,10 +83,9 @@ template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-    const std::vector<ShardId>& shardIds) {
-    // TODO SERVER-129196: remove conversion once resharding is migrated to ShardRef.
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, std::vector<ShardRef>(shardIds.begin(), shardIds.end()));
+    const std::vector<ShardId>& shardIds,
+    bool throwOnError = true) {
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds, throwOnError);
 }
 
 template <typename CommandType>
@@ -121,9 +93,10 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::map<ShardId, ShardVersion>& shardVersions,
-    const ReadPreferenceSetting& readPref) {
+    const ReadPreferenceSetting& readPref,
+    bool throwOnError = true) {
     return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, shardVersions, readPref, true /* throwOnError */);
+        opCtx, opts, shardVersions, readPref, throwOnError);
 }
 
 void sendFlushReshardingStateChangeToShards(OperationContext* opCtx,
@@ -224,6 +197,13 @@ BSONObj createReshardedCollectionEntryUpdate(OperationContext* opCtx,
 boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
 
 UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
+
+/**
+ * Translates a user-facing timeseries namespace to its bucket namespace, since resharding metadata
+ * is keyed by the bucket namespace. Returns the namespace unchanged if it is not a tracked
+ * timeseries collection.
+ */
+NamespaceString resolveReshardingSourceNss(OperationContext* opCtx, const NamespaceString& ns);
 
 /**
  * Returns the deadline the coordinator uses to bound how long it waits for the donor and recipient

@@ -1,0 +1,31 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/metrics_category.idl"
+    - "mongo/idl/generic_argument.idl"
+
+structs:
+    UpdateMetricsFilteringAllowlistReply:
+        description: "Reply for updateMetricsFilteringAllowlist command"
+        is_command_reply: true
+        fields: {}
+
+commands:
+    updateMetricsFilteringAllowlist:
+        description: "Command to update the metrics filtering allowlist for a specific category"
+        command_name: updateMetricsFilteringAllowlist
+        namespace: ignored
+        api_version: ""
+        fields:
+            category:
+                description: "Metrics category"
+                type: MetricsCategory
+            add:
+                description: "Array of metric paths to add to the allowlist"
+                type: array<string>
+        reply_type: UpdateMetricsFilteringAllowlistReply

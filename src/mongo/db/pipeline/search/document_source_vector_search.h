@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,6 +7,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -46,6 +21,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(VectorSearch);
 class VectorSearchLiteParsed final : public LiteParsedSearchStage<VectorSearchLiteParsed> {
@@ -61,6 +37,22 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<VectorSearchStageParams>(_originalBson);
+    }
+
+    // Override the base LiteParsedSearchStage::validate to check only the 'view' field.
+    // $vectorSearch's user spec has fields (e.g. 'limit') that share names with internal
+    // InternalSearchMongotRemoteSpec fields used by $search/$searchMeta but are user-facing on
+    // this stage. Applying the full internal-field list here would reject legitimate queries.
+    void validate(const OperationContext* opCtx) const final {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << this->getParseTimeName() << " value must be an object. Found: "
+                              << typeName(this->_originalBson.type()),
+                this->_originalBson.type() == BSONType::object);
+        const auto spec = this->_originalBson.embeddedObject();
+        if (spec.hasField(search_helpers::kViewFieldName)) {
+            assertAllowedInternalIfRequired(
+                opCtx, search_helpers::kViewFieldName, AllowedWithClientType::kInternal);
+        }
     }
 
     // $vectorSearch produces $sortKey metadata.
@@ -119,13 +111,13 @@ private:
 class DocumentSourceVectorSearch : public DocumentSource {
 public:
     const BSONObj kSortSpec = BSON("$vectorSearchScore" << -1);
-    static constexpr std::string_view kStageName = "$vectorSearch"_sd;
-    static constexpr std::string_view kLimitFieldName = "limit"_sd;
-    static constexpr std::string_view kFilterFieldName = "filter"_sd;
-    static constexpr std::string_view kIndexFieldName = "index"_sd;
-    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"_sd;
-    static constexpr std::string_view kViewFieldName = "view"_sd;
-    static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"_sd;
+    static constexpr std::string_view kStageName = "$vectorSearch"sv;
+    static constexpr std::string_view kLimitFieldName = "limit"sv;
+    static constexpr std::string_view kFilterFieldName = "filter"sv;
+    static constexpr std::string_view kIndexFieldName = "index"sv;
+    static constexpr std::string_view kNumCandidatesFieldName = "numCandidates"sv;
+    static constexpr std::string_view kViewFieldName = "view"sv;
+    static constexpr std::string_view kReturnStoredSourceFieldName = "returnStoredSource"sv;
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,

@@ -53,7 +53,22 @@ const testCases = {
 
 // Set up a set and grab things for later.
 let name = "read_committed";
-let replTest = new ReplSetTest({name: name, nodes: 3});
+
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
+const replTestOptions = {name: name, nodes: 3};
+if (!isMultiversion) {
+    // Force off replicated fast count so the test exercises the legacy size/count tracking path.
+    replTestOptions.nodeOptions = {
+        setParameter: {
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    };
+}
+let replTest = new ReplSetTest(replTestOptions);
 
 replTest.startSet();
 let nodes = replTest.nodeList();
@@ -142,29 +157,33 @@ for (let testName in testCases) {
     // them from becoming committed.
     setUpInitialState();
     stopServerReplication(secondary);
-    const initialOplogTs = readLatestOplogEntry("local").ts;
+
+    const initialLocalOplogTs = readLatestOplogEntry("local").ts;
+    const initialMajorityOplogTs = readLatestOplogEntry("majority").ts;
 
     // Writes done without majority write concern must be immediately visible to dirty read
     // and hidden from committed reads until they have been replicated. The rules for seeing
     // an oplog entry for a write are the same as for the write itself.
     test.write(coll, {});
     assert.eq(doDirtyRead(coll), test.expectedAfter);
-    assert.neq(readLatestOplogEntry("local").ts, initialOplogTs);
+    assert.neq(readLatestOplogEntry("local").ts, initialLocalOplogTs);
+    assert.neq(readLatestOplogEntry("local").ts, initialMajorityOplogTs);
     assert.eq(doCommittedRead(coll), test.expectedBefore);
-    assert.eq(readLatestOplogEntry("majority").ts, initialOplogTs);
+    assert.eq(readLatestOplogEntry("majority").ts, initialMajorityOplogTs);
 
     // Try the committed read again after sleeping to ensure it doesn't only work for
     // queries immediately after the write.
     sleep(1000);
     assert.eq(doCommittedRead(coll), test.expectedBefore);
-    assert.eq(readLatestOplogEntry("majority").ts, initialOplogTs);
+    assert.eq(readLatestOplogEntry("majority").ts, initialMajorityOplogTs);
 
     // Restart oplog application on the secondary and ensure the committed view is updated.
     restartServerReplication(secondary);
     replTest.awaitLastOpCommitted();
 
     assert.eq(doCommittedRead(coll), test.expectedAfter);
-    assert.neq(readLatestOplogEntry("majority").ts, initialOplogTs);
+    assert.neq(readLatestOplogEntry("majority").ts, initialMajorityOplogTs);
+    assert.neq(readLatestOplogEntry("majority").ts, initialLocalOplogTs);
 
     // The secondary will be able to make the write committed soon after the primary, but there
     // is no way to block until it does.

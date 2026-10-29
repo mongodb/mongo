@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 
@@ -43,19 +17,24 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/sbe_single_document_lookup_executor.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_stats.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
 #include <deque>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -67,6 +46,32 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
+
+/**
+ * A stub MongoProcessInterface whose local single-document lookup (used to fetch pre-images from
+ * the pre-images collection) returns a configurable result and counts the number of lookups.
+ */
+class MockPreImageLookupInterface final : public StubMongoProcessInterface {
+public:
+    explicit MockPreImageLookupInterface(boost::optional<Document> preImageDoc)
+        : _preImageDoc(std::move(preImageDoc)) {}
+
+    boost::optional<Document> lookupSingleDocumentLocally(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const Document& documentKey) override {
+        ++_lookupCount;
+        return _preImageDoc;
+    }
+
+    int lookupCount() const {
+        return _lookupCount;
+    }
+
+private:
+    boost::optional<Document> _preImageDoc;
+    int _lookupCount = 0;
+};
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceChangeStreamAddPostImageTest : public AggregationContextFixture {
@@ -80,16 +85,24 @@ public:
         return *uuid_gen;
     }
 
-    Document createDocumentWithIdAndResumeToken(int idValue, Document&& doc) {
+    static ResumeTokenData makeResumeTokenData(int idValue,
+                                               Timestamp clusterTime = Timestamp(100, 1),
+                                               size_t txnOpIndex = 0) {
+        return ResumeTokenData(clusterTime,
+                               ResumeTokenData::kDefaultTokenVersion,
+                               txnOpIndex,
+                               testUuid(),
+                               /* eventIdentifier */ Value(Document{{"_id", idValue}}));
+    }
+
+    Document createDocumentWithIdAndResumeToken(int idValue,
+                                                Document&& doc,
+                                                Timestamp clusterTime = Timestamp(100, 1),
+                                                size_t txnOpIndex = 0) {
         MutableDocument combined;
 
         // Sort key comes first, then _id, then all other fields.
-        const Timestamp clusterTime(100, 1);
-        ResumeTokenData tokenData(clusterTime,
-                                  ResumeTokenData::kDefaultTokenVersion,
-                                  /* txnOpIndex */ 0,
-                                  testUuid(),
-                                  /* eventIdentifier */ Value(Document{{"_id", idValue}}));
+        ResumeTokenData tokenData = makeResumeTokenData(idValue, clusterTime, txnOpIndex);
 
         auto resumeTokenDoc = Value(ResumeToken(tokenData).toDocument());
         combined.metadata().setSortKey(resumeTokenDoc, true);
@@ -114,6 +127,57 @@ public:
         spec.setFullDocument(documentMode);
         return spec;
     }
+
+    /**
+     * Builds a ChangeStreamUpdateLookupStage directly, with an
+     * AggregationSingleDocumentLookupExecutor injected. These tests are about the stage's document-
+     * transformation logic, which is executor-agnostic, so they inject the Aggregation executor
+     * directly and run entirely against the mocked MongoProcessInterface.
+     */
+    boost::intrusive_ptr<exec::agg::Stage> buildUpdateLookupStage(
+        const boost::intrusive_ptr<exec::agg::Stage>& source) {
+        auto stage = make_intrusive<exec::agg::ChangeStreamUpdateLookupStage>(
+            DocumentSourceChangeStreamAddPostImage::kStageName,
+            getExpCtx(),
+            std::make_unique<exec::agg::AggregationSingleDocumentLookupExecutor>(
+                exec::SingleDocumentLookupStatsRecorder::makeUpdateLookupAggregationRecorder()),
+            exec::agg::BatchedEnrichmentStage::Limits{
+                .maxInputEvents = 1,
+                .maxInputBytes = std::numeric_limits<size_t>::max(),
+                .maxOutputBytes = std::numeric_limits<size_t>::max()},
+            exec::agg::BatchedEnrichmentStatsRecorder::makeNoopRecorder_forTest());
+        exec::agg::stitchStage(*stage, source.get());
+        return stage;
+    }
+
+    /**
+     * Builds a ChangeStreamAddPostImageStage (the 'required'/'whenAvailable' path) directly, with a
+     * mock source producing 'events' and a mock local lookup for the pre-image.
+     */
+    boost::intrusive_ptr<exec::agg::Stage> buildAddPostImageStage(
+        const std::vector<Document>& events,
+        FullDocumentModeEnum mode,
+        boost::optional<Document> preImageDoc) {
+        auto processInterface =
+            std::make_unique<MockPreImageLookupInterface>(std::move(preImageDoc));
+        _processInterface = processInterface.get();
+        getExpCtx()->setMongoProcessInterface(std::move(processInterface));
+        // Keep the mock source alive for the lifetime of the fixture; the stage holds only a raw
+        // pointer to it.
+        _mockSource = exec::agg::MockStage::createForTest(events, getExpCtx());
+        auto stage = make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(
+            DocumentSourceChangeStreamAddPostImage::kStageName, getExpCtx(), mode);
+        exec::agg::stitchStage(*stage, _mockSource.get());
+        return stage;
+    }
+
+    int lookupCount() const {
+        return _processInterface->lookupCount();
+    }
+
+private:
+    boost::intrusive_ptr<exec::agg::Stage> _mockSource;
+    MockPreImageLookupInterface* _processInterface = nullptr;
 };
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest,
@@ -154,9 +218,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForD
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentKeyOnUpdate) {
     auto expCtx = getExpCtx();
 
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
-
     // Mock its input with a document without a "documentKey" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         {createDocumentWithIdAndResumeToken(
@@ -168,7 +229,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
                                {"coll", expCtx->getNamespaceString().coll()}}}})},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -179,9 +240,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperationType) {
     auto expCtx = getExpCtx();
-
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
@@ -194,7 +252,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
                                {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -212,9 +270,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
     expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
-
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         createDocumentWithIdAndResumeToken(0,
@@ -224,7 +279,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
                                            }),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -242,9 +297,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
     expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
-
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         createDocumentWithIdAndResumeToken(0,
@@ -253,7 +305,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
                                                     {"ns", 4}}),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -271,9 +323,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
     expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
-
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         createDocumentWithIdAndResumeToken(
@@ -285,7 +334,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
                  Document{{"db", "DIFFERENT"sv}, {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -301,9 +350,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
     expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
-
     // Mock its input with a document without a "ns" field.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         createDocumentWithIdAndResumeToken(
@@ -313,7 +359,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
                      {"ns", Document{{"db", "DIFFERENT"sv}, {"coll", "irrelevant"sv}}}}),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
@@ -327,9 +373,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
 
     expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "test")));
-
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock out the foreign collection.
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
@@ -345,7 +388,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
                                {"coll", "irrelevant"sv}}}}),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -363,9 +406,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNotUnique) {
     auto expCtx = getExpCtx();
 
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
-
     // Mock its input with an update document.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         createDocumentWithIdAndResumeToken(
@@ -377,7 +417,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
                                {"coll", expCtx->getNamespaceString().coll()}}}}),
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection to have two documents with the same document key.
     std::deque<DocumentSource::GetNextResult> foreignCollection = {Document{{"_id", 0}},
@@ -391,9 +431,6 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
-
-    // Set up the lookup change post image document source.
-    auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
 
     // Mock its input, pausing every other result.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
@@ -416,7 +453,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
          DocumentSource::GetNextResult::makePauseExecution()},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
 
     // Mock out the foreign collection.
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
@@ -456,6 +493,251 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
 }
 
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       MatchCollectionUUIDReadsAndStripsCollectionUUIDField) {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec();
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+    expCtx->setChangeStreamSpec(spec);
+
+    // The event carries the collection UUID emitted by the event transform.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {std::string{DocumentSourceChangeStream::kCollectionUuidField}, testUuid()},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto outputDoc = next.releaseDocument();
+
+    // The lookup succeeded and the internal-only 'collectionUUID' field was removed.
+    ASSERT_VALUE_EQ(outputDoc[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+                    Value(Document{{"_id", 0}}));
+    ASSERT_TRUE(outputDoc[DocumentSourceChangeStream::kCollectionUuidField].missing());
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       ShowExpandedEventsKeepsCollectionUUIDFieldOnOutput) {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec();
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+    spec.setShowExpandedEvents(true);
+    expCtx->setChangeStreamSpec(spec);
+
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {std::string{DocumentSourceChangeStream::kCollectionUuidField}, testUuid()},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto outputDoc = next.releaseDocument();
+
+    // With 'showExpandedEvents' the 'collectionUUID' field is user-visible and must remain.
+    ASSERT_VALUE_EQ(outputDoc[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
+}
+
+using DocumentSourceChangeStreamAddPostImageDeathTest = DocumentSourceChangeStreamAddPostImageTest;
+
+DEATH_TEST_REGEX_F(DocumentSourceChangeStreamAddPostImageDeathTest,
+                   MatchCollectionUUIDWithoutCollectionUUIDFieldTasserts,
+                   "Tripwire assertion.*12888200") {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec();
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+    expCtx->setChangeStreamSpec(spec);
+
+    // The event lacks the 'collectionUUID' field the transform must have emitted.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12888200);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest, UpdateLookupDependsOnCollectionUUIDField) {
+    auto ds = DocumentSourceChangeStreamAddPostImage::create(getExpCtx(), getSpec());
+    DepsTracker deps;
+    ds->getDependencies(&deps);
+    ASSERT_EQ(deps.fields.count(std::string{DocumentSourceChangeStream::kCollectionUuidField}), 1u);
+}
+
+// The resume-token event is consumed by DSCSEnsureResumeTokenPresent and never returned to the
+// client, but it is still enriched, so that an image-dependent $match placed before token
+// verification sees the same post-image the original stream would have produced. Its post-image is
+// not required, though.
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       ResumeTokenEventIsEnrichedButExemptFromRequired) {
+    auto expCtx = getExpCtx();
+    const auto token = makeResumeTokenData(0);
+    auto spec = getSpec(FullDocumentModeEnum::kRequired);
+    spec.setResumeAfter(ResumeToken(token));
+    expCtx->setChangeStreamSpec(spec);
+
+    auto event = createDocumentWithIdAndResumeToken(
+        0,
+        Document{{"operationType", "update"sv},
+                 {"preImageId", Document{{"x", 1}}},
+                 {"ns",
+                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                           {"coll", expCtx->getNamespaceString().coll()}}}});
+
+    auto stage = buildAddPostImageStage(
+        {event}, FullDocumentModeEnum::kRequired, /* preImageDoc */ boost::none);
+
+    auto next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(
+        next.releaseDocument()[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+        Value(BSONNULL));
+    ASSERT_EQ(lookupCount(), 1);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       RequiredPostImageMissingForEventAfterResumePointThrows) {
+    auto expCtx = getExpCtx();
+    const auto resumeToken = makeResumeTokenData(0, Timestamp(100, 1));
+    auto spec = getSpec(FullDocumentModeEnum::kRequired);
+    spec.setResumeAfter(ResumeToken(resumeToken));
+    expCtx->setChangeStreamSpec(spec);
+
+    // The event's clusterTime is past the resume token's.
+    auto event = createDocumentWithIdAndResumeToken(
+        0,
+        Document{{"operationType", "update"sv},
+                 {"preImageId", Document{{"x", 1}}},
+                 {"ns",
+                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                           {"coll", expCtx->getNamespaceString().coll()}}}},
+        Timestamp(100, 2));
+
+    auto stage = buildAddPostImageStage(
+        {event}, FullDocumentModeEnum::kRequired, /* preImageDoc */ boost::none);
+
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::NoMatchingDocument);
+    ASSERT_EQ(lookupCount(), 1);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       RequiredPostImageMissingWithHighWaterMarkResumePointThrows) {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec(FullDocumentModeEnum::kRequired);
+    // A high water mark token never matches an actual event, so the "required" check still applies.
+    spec.setStartAtOperationTime(Timestamp(100, 1));
+    expCtx->setChangeStreamSpec(spec);
+
+    auto event = createDocumentWithIdAndResumeToken(
+        0,
+        Document{{"operationType", "update"sv},
+                 {"preImageId", Document{{"x", 1}}},
+                 {"ns",
+                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                           {"coll", expCtx->getNamespaceString().coll()}}}});
+
+    auto stage = buildAddPostImageStage(
+        {event}, FullDocumentModeEnum::kRequired, /* preImageDoc */ boost::none);
+
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::NoMatchingDocument);
+    ASSERT_EQ(lookupCount(), 1);
+}
+
+// The resume-token event is discarded by DSCSEnsureResumeTokenPresent, but updateLookup still
+// performs its lookup for it, so that an image-dependent $match placed before token verification
+// sees the same 'fullDocument' the original stream would have produced.
+TEST_F(DocumentSourceChangeStreamAddPostImageTest, UpdateLookupPerformsLookupForResumeTokenEvent) {
+    auto expCtx = getExpCtx();
+    const auto token = makeResumeTokenData(0);
+    auto spec = getSpec(FullDocumentModeEnum::kUpdateLookup);
+    spec.setResumeAfter(ResumeToken(token));
+    expCtx->setChangeStreamSpec(spec);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(
+        next.releaseDocument()[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+        Value(Document{{"_id", 0}}));
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       UpdateLookupPerformsLookupForEventAfterResumePoint) {
+    auto expCtx = getExpCtx();
+    const auto resumeToken = makeResumeTokenData(0, Timestamp(100, 1));
+    auto spec = getSpec(FullDocumentModeEnum::kUpdateLookup);
+    spec.setResumeAfter(ResumeToken(resumeToken));
+    expCtx->setChangeStreamSpec(spec);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}, {"x", 1}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    // The event's clusterTime is past the resume token's.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}},
+            Timestamp(100, 2)),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(
+        next.releaseDocument()[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+        Value(Document{{"_id", 0}, {"x", 1}}));
+}
+
 // Wire-up tests: assert documentSourceChangeStreamAddPostImageToStageFn builds the right
 // single-responsibility execution stage for each 'fullDocument' mode. This guards the split this
 // refactor introduced:
@@ -487,10 +769,31 @@ TEST_F(ChangeStreamAddPostImageStageFnWiringTest, UpdateLookupFlagOffWiresAggreg
         updateLookupStage->getLookupExecutor_forTest()));
 }
 
-// Flag on: the updateLookup stage routes through PrimaryWithFallback(Express, Aggregation).
+// Flag on, collection-level stream (the fixture's default namespace): the updateLookup stage
+// routes through PrimaryWithFallback(Sbe, Aggregation).
 TEST_F(ChangeStreamAddPostImageStageFnWiringTest,
-       UpdateLookupFlagOnWiresExpressWithAggregationFallback) {
+       UpdateLookupFlagOnWiresSbeWithAggregationFallbackForCollectionStream) {
     unittest::ServerParameterGuard flag{"featureFlagChangeStreamOptimizedUpdateLookup", true};
+    auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
+    auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
+    ASSERT(updateLookupStage);
+
+    auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(
+        updateLookupStage->getLookupExecutor_forTest());
+    ASSERT(chain);
+    ASSERT(
+        dynamic_cast<const exec::agg::SbeSingleDocumentLookupExecutor*>(chain->primary_forTest()));
+    ASSERT(dynamic_cast<const exec::agg::AggregationSingleDocumentLookupExecutor*>(
+        chain->fallback_forTest()));
+}
+
+// Flag on, database-level stream: the updateLookup stage routes through
+// PrimaryWithFallback(Express, Aggregation).
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest,
+       UpdateLookupFlagOnWiresExpressWithAggregationFallbackForDatabaseStream) {
+    unittest::ServerParameterGuard flag{"featureFlagChangeStreamOptimizedUpdateLookup", true};
+    getExpCtx()->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        getExpCtx()->getNamespaceString().dbName()));
     auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
     auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
     ASSERT(updateLookupStage);

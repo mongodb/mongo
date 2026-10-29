@@ -78,6 +78,8 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     __wt_evict_stats_init(session);
     __wt_txn_stats_update(session);
 
+    /* Update the load control statistics after the cache stats are updated. */
+    __wti_conn_load_control_stats_update(session);
     WT_STATP_CONN_SET(
       session, stats, file_open, __wt_atomic_load_uint32_relaxed(&conn->open_file_count));
     WT_STATP_CONN_SET(
@@ -92,10 +94,6 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_LAYERED]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_table_count,
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TABLE]));
-    WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_count,
-      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED]));
-    WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_tree_count,
-      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TIERED_TREE]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_checkpoint_count,
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_checkpoint_count));
     WT_STATP_CONN_SET(session, stats, rec_split_stashed_objects,

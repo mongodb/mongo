@@ -16,8 +16,6 @@
 //   transitioning_replicaset_incompatible,
 // ]
 
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-
 const sourceColl = db.irap_cmd;
 const adminDB = db.getSiblingDB("admin");
 const destDB = db.getSiblingDB("irap_out_db");
@@ -43,10 +41,8 @@ let commandObj = {
 // Destination has an extra index.
 assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandFailed);
 
-let destIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(
-    destColl.getIndexes(),
-);
-commandObj.indexes = destIndexes;
+let destIndexes = assert.commandWorked(destDB.runCommand({"listIndexes": destColl.getName()}));
+commandObj.indexes = new DBCommandCursor(db, destIndexes).toArray();
 jsTestLog("Testing against destination collection with indexes: " + tojson(commandObj.indexes));
 assert.commandWorked(adminDB.runCommand(commandObj));
 
@@ -61,10 +57,8 @@ destColl.drop();
 assert.commandWorked(
     destDB.runCommand({"create": destColl.getName(), capped: true, size: 256, max: 2}),
 );
-destIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(
-    destDB.getCollection(destColl.getName()).getIndexes(),
-);
-commandObj.indexes = destIndexes;
+destIndexes = assert.commandWorked(destDB.runCommand({"listIndexes": destColl.getName()}));
+commandObj.indexes = new DBCommandCursor(db, destIndexes).toArray();
 
 // Source is missing collection options.
 assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandFailed);

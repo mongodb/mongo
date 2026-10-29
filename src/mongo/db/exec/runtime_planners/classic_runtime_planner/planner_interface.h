@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,6 +15,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
@@ -56,9 +31,11 @@ namespace mongo::classic_runtime_planner {
  */
 class ClassicPlannerInterface : public PlannerInterface {
 public:
-    ClassicPlannerInterface(PlannerData plannerData);
+    ClassicPlannerInterface(PlannerData plannerData, PlanSelectionStrategy planSelectionStrategy);
 
-    ClassicPlannerInterface(PlannerData plannerData, PlanExplainerData explainData);
+    ClassicPlannerInterface(PlannerData plannerData,
+                            PlanExplainerData explainData,
+                            PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
@@ -106,6 +83,20 @@ public:
     PlanStage* getRoot() const;
 
 protected:
+    PlanSelectionStrategy planSelectionStrategy() const {
+        return _planSelectionStrategy;
+    }
+
+    /**
+     * For planners that only learn the strategy while planning (the sub-planner). Must be called
+     * before 'makeExecutor()'. The ordering is enforced by the existing planner state machine:
+     * callers must invoke it from 'doPlan()', which runs before 'plan()' advances '_state' to
+     * kInitialized, and 'makeExecutor()' asserts on that state.
+     */
+    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
+        _planSelectionStrategy = planSelectionStrategy;
+    }
+
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
 
     void setRoot(std::unique_ptr<PlanStage> root);
@@ -152,6 +143,8 @@ private:
     NamespaceString _nss;
     PlannerData _plannerData;
     PlanExplainerData _planExplainerData;
+
+    PlanSelectionStrategy _planSelectionStrategy;
 };
 
 /**
@@ -173,17 +166,21 @@ private:
 /**
  * Trivial planner that just creates a classic plan executor when there is only one QuerySolution
  * present.
+ * The planSelectionStrategy param is needed since a single-solution planner can be used for the
+ * winning plan of the cost-based ranker.
  */
 class SingleSolutionPassthroughPlanner final : public ClassicPlannerInterface {
 public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
-                                     PlanExplainerData explainData);
+                                     PlanExplainerData explainData,
+                                     PlanSelectionStrategy planSelectionStrategy);
 
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
                                      PlanExplainerData explainData,
-                                     ClassicExecState&& state);
+                                     ClassicExecState&& state,
+                                     PlanSelectionStrategy planSelectionStrategy);
 
     const QuerySolution* querySolution() const override;
 
@@ -222,10 +219,15 @@ private:
  */
 class MultiPlanner final : public ClassicPlannerInterface {
 public:
+    // 'planSelectionStrategy' comes from the ranking result and is not always kMultiPlanner: when
+    // this MultiPlanner is only measuring works for the plan cache,
+    // keep whatever strategy chose it - costBased when CBR ranked competing candidates, kSinglePlan
+    // when there was only one candidate to begin with.
     MultiPlanner(PlannerData plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
                  PlanExplainerData explainData,
-                 bool addingCBRChosenPlanToPlanCache = false);
+                 bool addingCBRChosenPlanToPlanCache,
+                 PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/data_type_endian.h"
@@ -73,10 +47,17 @@ Value evaluate(const ExpressionArray& expr,
     auto& children = expr.getChildren();
     std::vector<Value> values;
     values.reserve(children.size());
+
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
+
     for (auto&& child : children) {
         Value elemVal = child->evaluate(root, variables, ctx);
-        values.push_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
+        Value& stored =
+            values.emplace_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
+
+        memCharger.add(static_cast<int64_t>(stored.getApproximateSize()));
     }
+    memCharger.flush();
     return Value(std::move(values));
 }
 
@@ -289,6 +270,8 @@ Value evaluate(const ExpressionConcatArrays& expr,
     const size_t n = children.size();
     std::vector<Value> values;
 
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
+
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables, ctx);
         if (val.nullish()) {
@@ -296,13 +279,19 @@ Value evaluate(const ExpressionConcatArrays& expr,
         }
 
         uassert(28664,
-                str::stream() << "$concatArrays only supports arrays, not "
+                str::stream() << expr.getOpName() << " only supports arrays, not "
                               << typeName(val.getType()),
                 val.isArray());
 
         const auto& subValues = val.getArray();
+        size_t valuesSize = 0;
+        for (const auto& v : subValues) {
+            valuesSize += v.getApproximateSize();
+        }
         values.insert(values.end(), subValues.begin(), subValues.end());
+        memCharger.add(static_cast<int64_t>(valuesSize));
     }
+    memCharger.flush();
     return Value(std::move(values));
 }
 
@@ -475,12 +464,7 @@ Value evaluate(const ExpressionSortArray& expr,
     // Pre-extract sort keys once per element rather than re-extracting inside the comparator on
     // every comparison. Each extraction requires a Value->BSONObj conversion and dotted-path
     // traversal, which dominates sort cost for pattern-based sorts on arrays of objects.
-    int64_t keyBytes = 0;
-    ScopeGuard deductKeyMemory([&] {
-        if (ctx.tracker && keyBytes > 0) {
-            ctx.tracker->add(-keyBytes);
-        }
-    });
+    BatchedExpressionMemoryCharger memCharger(expr, ctx, ExpressionSortArray::kName);
     // Note that we use an ordinary int for the array indexes rather than a size_t here.
     // We get a solid 5% bump in performance with a 32-bit int, which seems worth it
     // given that arrays larger than INT_MAX are too large to fit in a BSON document.
@@ -489,14 +473,11 @@ Value evaluate(const ExpressionSortArray& expr,
     keysAndIdx.reserve(array.size());
     for (int i = 0; i < std::ssize(array); ++i) {
         auto key = cmp.extractSortKey(array[i]);
-        if (ctx.tracker) {
-            const size_t sz = key.objsize() + sizeof(int);
-            keyBytes += sz;
-            ctx.tracker->add(sz);
-            ctx.tracker->assertWithinMemoryLimit(ExpressionSortArray::kName, ctx.stageName);
-        }
+        int64_t keySize = static_cast<int64_t>(key.objsize() + sizeof(int));
         keysAndIdx.emplace_back(std::move(key), i);
+        memCharger.add(keySize);
     }
+    memCharger.flush();
 
     std::sort(keysAndIdx.begin(), keysAndIdx.end(), [&](const auto& a, const auto& b) {
         return a.first.woCompare(b.first, cmp.sortPattern, false, cmp.collator) < 0;
@@ -839,18 +820,33 @@ Value evaluate(const ExpressionSetUnion& expr,
     ValueSet unionedSet = expr.getExpressionContext()->getValueComparator().makeOrderedValueSet();
     auto& children = expr.getChildren();
     const size_t n = children.size();
+
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
+
     for (size_t i = 0; i < n; i++) {
         const Value newEntries = children[i]->evaluate(root, variables, ctx);
         if (newEntries.nullish()) {
             return Value(BSONNULL);
         }
+
         uassert(17043,
-                str::stream() << "All operands of $setUnion must be arrays. One argument"
-                              << " is of type: " << typeName(newEntries.getType()),
+                str::stream() << "All operands of " << expr.getOpName()
+                              << " must be arrays. One argument is of type: "
+                              << typeName(newEntries.getType()),
                 newEntries.isArray());
 
+        // Count all elements including duplicates already in the set, to keep the bulk insert
+        // below on the hot path. This overestimates memory for inputs with many duplicates but
+        // avoids the ~15% overhead of per-element tracking and insertion.
+        size_t newEntriesSize = 0;
+        for (const auto& v : newEntries.getArray()) {
+            newEntriesSize += v.getApproximateSize();
+        }
+
+        memCharger.add(static_cast<int64_t>(newEntriesSize));
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
     }
+    memCharger.flush();
     return Value(std::vector<Value>(unionedSet.begin(), unionedSet.end()));
 }
 
@@ -1451,6 +1447,8 @@ Value evaluate(const ExpressionZip& expr,
     auto& inputs = expr.getInputs();
     inputValues.reserve(inputs.size());
 
+    BatchedExpressionMemoryCharger memCharger(expr, ctx);
+
     size_t minArraySize = 0;
     size_t maxArraySize = 0;
     for (size_t i = 0; i < inputs.size(); i++) {
@@ -1460,9 +1458,11 @@ Value evaluate(const ExpressionZip& expr,
         }
 
         uassert(34468,
-                str::stream() << "$zip found a non-array expression in input: "
-                              << evalExpr.toString(),
+                str::stream() << expr.getOpName()
+                              << " found a non-array expression in input: " << evalExpr.toString(),
                 evalExpr.isArray());
+
+        memCharger.add(static_cast<int64_t>(evalExpr.getApproximateSize()));
 
         inputValues.push_back(evalExpr.getArray());
 
@@ -1477,16 +1477,26 @@ Value evaluate(const ExpressionZip& expr,
             maxArraySize = arraySizes.second;
         }
     }
+    Value evaluatedDefaults(std::vector<Value>(inputs.size(), Value(BSONNULL)));
 
-    std::vector<Value> evaluatedDefaults(inputs.size(), Value(BSONNULL));
-
-    // If we need default values, evaluate each expression.
-    if (minArraySize != maxArraySize) {
-        auto& defaults = expr.getDefaults();
-        for (size_t i = 0; i < defaults.size(); i++) {
-            evaluatedDefaults[i] = defaults[i].get()->evaluate(root, variables, ctx);
+    // If we need default values, evaluate the defaults expression. A nullish result is treated
+    // the same as absent defaults, so each missing input element falls back to null.
+    if (minArraySize != maxArraySize && expr.getDefaults()) {
+        Value evaluated = expr.getDefaults()->get()->evaluate(root, variables, ctx);
+        if (!evaluated.nullish()) {
+            uassert(10961500,
+                    str::stream() << expr.getOpName()
+                                  << " defaults must resolve to an array, but the expression "
+                                     "evaluated to "
+                                  << evaluated.toString(),
+                    evaluated.isArray());
+            uassert(10961501,
+                    "defaults and inputs must have the same length",
+                    evaluated.getArrayLength() == inputs.size());
+            evaluatedDefaults = evaluated;
         }
     }
+    memCharger.add(static_cast<int64_t>(evaluatedDefaults.getApproximateSize()));
 
     size_t outputLength = expr.getUseLongestLength() ? maxArraySize : minArraySize;
 
@@ -1496,6 +1506,23 @@ Value evaluate(const ExpressionZip& expr,
     // Used to construct each array in the output, e.g. [1, 2, 3].
     std::vector<Value> outputChild;
 
+    // Track the memory for the output and outputChild vectors. Per-element tracking is
+    // unnecessary: large heap-allocated values (strings, arrays, documents) were already
+    // accounted for when evaluating inputs and defaults above, and a copy merely bumps
+    // their ref-count. Inline scalars are bounded by sizeof(Value) per slot.
+
+    // outputChild memory usage
+    memCharger.add(static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value)));
+    // Per-row output memory: one Value slot in the outer vector, one RCVector<Value> heap
+    // allocation, and inputs.size() Value slots inside it.
+    // Total: outputLength * (sizeof(Value) + sizeof(RCVector<Value>) + inputs.size() *
+    // sizeof(Value))
+    memCharger.add(static_cast<int64_t>(outputLength) *
+                   (static_cast<int64_t>(sizeof(Value) + sizeof(RCVector<Value>)) +
+                    static_cast<int64_t>(inputs.size()) * static_cast<int64_t>(sizeof(Value))));
+    // Flush here to make sure all memory has been accounted for before reserving the output
+    // vectors.
+    memCharger.flush();
     output.reserve(outputLength);
     outputChild.reserve(inputs.size());
 

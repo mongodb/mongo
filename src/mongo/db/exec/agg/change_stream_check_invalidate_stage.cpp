@@ -1,36 +1,12 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/change_stream_check_invalidate_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -39,6 +15,7 @@
 #include <string_view>
 
 namespace mongo {
+using FieldAccessors = change_stream::HashedFieldAccessors;
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckInvalidateToStageFn(
     const boost::intrusive_ptr<DocumentSource>& documentSource) {
@@ -75,8 +52,6 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckInvalidate
 
 namespace exec::agg {
 
-using DSCS = DocumentSourceChangeStream;
-
 REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamCheckInvalidate,
                            DocumentSourceChangeStreamCheckInvalidate::id,
                            documentSourceChangeStreamCheckInvalidateToStageFn)
@@ -88,11 +63,11 @@ namespace {
 bool isInvalidationCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            std::string_view operationType) {
     if (expCtx->isSingleNamespaceAggregation()) {
-        return operationType == DSCS::kDropCollectionOpType ||
-            operationType == DSCS::kRenameCollectionOpType ||
-            operationType == DSCS::kDropDatabaseOpType;
+        return operationType == DocumentSourceChangeStream::kDropCollectionOpType ||
+            operationType == DocumentSourceChangeStream::kRenameCollectionOpType ||
+            operationType == DocumentSourceChangeStream::kDropDatabaseOpType;
     } else if (!expCtx->isClusterAggregation()) {
-        return operationType == DSCS::kDropDatabaseOpType;
+        return operationType == DocumentSourceChangeStream::kDropDatabaseOpType;
     }
     return false;
 }
@@ -108,13 +83,13 @@ ChangeStreamCheckInvalidateStage::ChangeStreamCheckInvalidateStage(
 GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
     // To declare a change stream as invalidated, this stage first emits an invalidate event and
     // then throws a 'ChangeStreamInvalidated' exception on the next call to this method.
-    if (_queuedInvalidate) {
+    if (MONGO_unlikely(_queuedInvalidate)) {
         auto res = DocumentSource::GetNextResult(std::move(_queuedInvalidate.value()));
         _queuedInvalidate.reset();
         return res;
     }
 
-    if (_queuedException) {
+    if (MONGO_unlikely(_queuedException)) {
         uasserted(std::move(*_queuedException), "Change stream invalidated");
     }
 
@@ -128,8 +103,9 @@ GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
     ON_BLOCK_EXIT([this] { _startAfterInvalidate.reset(); });
 
     // If it's not an invalidation event, just forward the event.
-    const auto& operationType = doc[DSCS::kOperationTypeField];
-    DSCS::checkValueType(operationType, DSCS::kOperationTypeField, BSONType::string);
+    const auto& operationType = doc[FieldAccessors::kOperationType];
+    DocumentSourceChangeStream::checkValueType(
+        operationType, DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
 
     if (!isInvalidationCommand(pExpCtx, operationType.getString())) {
         return nextInput;
@@ -189,10 +165,13 @@ Document ChangeStreamCheckInvalidateStage::_buildInvalidateEvent(
 
     // Note: if 'showExpandedEvents' is false, 'wallTime' will be missing in the input
     // document.
-    MutableDocument result(Document{{DSCS::kIdField, resumeTokenDoc},
-                                    {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
-                                    {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]},
-                                    {DSCS::kWallTimeField, doc[DSCS::kWallTimeField]}});
+    MutableDocument result(Document{{DocumentSourceChangeStream::kIdField, resumeTokenDoc},
+                                    {DocumentSourceChangeStream::kOperationTypeField,
+                                     DocumentSourceChangeStream::kInvalidateOpType},
+                                    {DocumentSourceChangeStream::kClusterTimeField,
+                                     doc[DocumentSourceChangeStream::kClusterTimeField]},
+                                    {DocumentSourceChangeStream::kWallTimeField,
+                                     doc[DocumentSourceChangeStream::kWallTimeField]}});
     result.copyMetaDataFrom(doc);
 
     // We set the resume token as the document's sort key in both the sharded and

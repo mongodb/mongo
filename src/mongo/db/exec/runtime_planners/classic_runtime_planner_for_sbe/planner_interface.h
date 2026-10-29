@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,6 +12,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -88,7 +63,7 @@ struct PlannerDataForSBE final : public PlannerData {
 
 class PlannerBase : public PlannerInterface {
 public:
-    PlannerBase(PlannerDataForSBE plannerData);
+    PlannerBase(PlannerDataForSBE plannerData, PlanSelectionStrategy planSelectionStrategy);
 
 protected:
     /**
@@ -171,9 +146,22 @@ protected:
         return std::move(_plannerData);
     }
 
+    PlanSelectionStrategy planSelectionStrategy() const {
+        return _planSelectionStrategy;
+    }
+
+    /**
+     * For planners that only learn the strategy while planning (the sub-planner). Must be called
+     * before 'makeExecutor()'.
+     */
+    void setPlanSelectionStrategy(PlanSelectionStrategy planSelectionStrategy) {
+        _planSelectionStrategy = planSelectionStrategy;
+    }
+
 
 private:
     PlannerDataForSBE _plannerData;
+    PlanSelectionStrategy _planSelectionStrategy;
 };
 
 /**
@@ -183,6 +171,7 @@ class SingleSolutionPassthroughPlanner final : public PlannerBase {
 public:
     SingleSolutionPassthroughPlanner(PlannerDataForSBE plannerData,
                                      std::unique_ptr<QuerySolution> solution,
+                                     PlanSelectionStrategy planSelectionStrategy,
                                      boost::optional<std::string> replanReason = boost::none);
 
     SingleSolutionPassthroughPlanner(
@@ -206,12 +195,12 @@ private:
 
 class MultiPlanner final : public PlannerBase {
 public:
-    MultiPlanner(
-        PlannerDataForSBE plannerData,
-        std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
-        bool shouldWriteToPlanCache,
-        const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb = []() {},
-        boost::optional<std::string> replanReason = boost::none);
+    MultiPlanner(PlannerDataForSBE plannerData,
+                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
+                 bool shouldWriteToPlanCache,
+                 const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb,
+                 boost::optional<std::string> replanReason,
+                 PlanSelectionStrategy planSelectionStrategy);
 
     /**
      * Picks the best plan given by the classic engine multiplanner and returns a plan executor. If
@@ -252,7 +241,9 @@ private:
 
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
     const bool _shouldWriteToPlanCache;
-    const std::function<void()>& _incrementReplannedPlanIsCachedPlanCounterCb;
+    // Held by value: this is invoked long after the constructor returns, so a reference to a
+    // caller's temporary would dangle.
+    const std::function<void()> _incrementReplannedPlanIsCachedPlanCounterCb;
     boost::optional<std::string> _replanReason;
 
     // The SBE plan is constructed from the callback we pass to the 'MultiPlanStage' so that it can
@@ -371,8 +362,8 @@ public:
      * Test-only helper for swapping in a mock SBE plan for the one that was built from the cache
      * entry.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void setSbePlan_forTest(std::unique_ptr<sbe::PlanStage> sbePlan,
-                                                        stage_builder::PlanStageData data) {
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setSbePlan_forTest(std::unique_ptr<sbe::PlanStage> sbePlan,
+                                                            stage_builder::PlanStageData data) {
         _sbePlan = std::move(sbePlan);
         _planStageData = std::move(data);
     }

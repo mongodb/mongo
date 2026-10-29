@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,15 +8,41 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/container/flat_map.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+inline constexpr int64_t kEmptyCollectionValidationHash = 0;
+
+/**
+ * The `o.msg` value identifying a no-op oplog entry as a replicated collection metadata
+ * watermark.
+ */
+inline constexpr std::string_view kWatermarkMsg = "replicated collection metadata watermark";
+
+/**
+ * Combines two validation hashes with XOR, which is its own inverse: folding a contribution in and
+ * back out again restores the original value, and the order of the contributions does not matter.
+ *
+ * An absent operand makes the result absent, since a value that is missing one of its contributions
+ * is indistinguishable from a wrong one.
+ */
+[[MONGO_MOD_PUBLIC]] inline boost::optional<int64_t> combineValidationHashes(
+    const boost::optional<int64_t>& lhs, const boost::optional<int64_t>& rhs) {
+    if (!lhs || !rhs) {
+        return boost::none;
+    }
+    return *lhs ^ *rhs;
+}
 
 /**
  * Stores the last committed size and count values for a collection.
  */
-struct MONGO_MOD_PUBLIC CollectionSizeCount {
+struct [[MONGO_MOD_PUBLIC]] CollectionSizeCount {
     int64_t size{0};
     int64_t count{0};
 
@@ -66,9 +66,45 @@ inline std::ostream& operator<<(std::ostream& s, const CollectionSizeCount& coll
 }
 
 /**
+ * Stores a collection's size and count along with the validation hash accumulated over the same
+ * operations.
+ */
+struct [[MONGO_MOD_PUBLIC]] CollectionReplicatedMetadata {
+    CollectionSizeCount sizeCount;
+
+    boost::optional<int64_t> hash;
+
+    bool operator==(const CollectionReplicatedMetadata&) const = default;
+
+    CollectionReplicatedMetadata operator+(const CollectionReplicatedMetadata& other) const {
+        return CollectionReplicatedMetadata{sizeCount + other.sizeCount,
+                                            combineValidationHashes(hash, other.hash)};
+    }
+    CollectionReplicatedMetadata operator-(const CollectionReplicatedMetadata& other) const {
+        // XOR is its own inverse, so removing a hash contribution is the same operation as adding
+        // it.
+        return CollectionReplicatedMetadata{sizeCount - other.sizeCount,
+                                            combineValidationHashes(hash, other.hash)};
+    }
+
+    std::string toString() const {
+        str::stream s;
+        s << sizeCount.toString();
+        if (hash) {
+            s << ", hash: " << *hash;
+        }
+        return s;
+    }
+};
+
+inline std::ostream& operator<<(std::ostream& s, const CollectionReplicatedMetadata& metadata) {
+    return (s << metadata.toString());
+}
+
+/**
  * Indicates whether a collection had been created or dropped since the last checkpoint.
  */
-enum class DDLState {
+enum class [[MONGO_MOD_PUBLIC]] DDLState {
     /**
      * Indicates the collection has been created for the first time.
      */
@@ -93,12 +129,31 @@ enum class DDLState {
 };
 
 /**
- * Stores the size and count values for a collection along with state indicating whether the
- * collection had been created or dropped.
+ * Indicates how a delta's hash applies to the collection's persisted hash.
  */
-struct SizeCountDelta {
-    CollectionSizeCount sizeCount{0, 0};
+enum class [[MONGO_MOD_PUBLIC]] HashUpdateMode {
+    /**
+     * The hash is a contribution that combines with the persisted hash.
+     */
+    kFold,
+
+    /**
+     * The hash replaces the persisted hash, including an absent one.
+     */
+    kSet,
+};
+
+/**
+ * Stores the size, count, and validation hash values for a collection along with state indicating
+ * whether the collection had been created or dropped.
+ */
+struct [[MONGO_MOD_PUBLIC]] ReplicatedMetadataDelta {
+    CollectionReplicatedMetadata metadata{.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
+                                          .hash = boost::none};
     DDLState state{DDLState::kNone};
+    HashUpdateMode hashUpdateMode{HashUpdateMode::kFold};
+
+    bool operator==(const ReplicatedMetadataDelta&) const = default;
 
     std::string toString() const {
         auto stateStr = [&] {
@@ -114,19 +169,26 @@ struct SizeCountDelta {
             }
             MONGO_UNREACHABLE;
         }();
-        return fmt::format("sizeCount: {}, state: {}", sizeCount.toString(), stateStr);
+        return fmt::format("metadata: {}, state: {}, hashUpdateMode: {}",
+                           metadata.toString(),
+                           stateStr,
+                           hashUpdateMode == HashUpdateMode::kSet ? "set" : "fold");
     }
 };
+
+inline std::ostream& operator<<(std::ostream& s, const ReplicatedMetadataDelta& delta) {
+    return (s << delta.toString());
+}
 
 namespace replicated_fast_count {
 
 /**
- * Data structure mapping collection UUIDs to their size and count deltas.
+ * Data structure mapping collection UUIDs to their replicated-metadata deltas.
  *
- * Useful for tracking changes to collections' size and count while scanning the oplog during
- * both checkpoints and size/count lookups.
+ * Useful for tracking changes to collections' size, count, and hash while scanning the oplog during
+ * checkpoints.
  */
-using SizeCountDeltas = absl::flat_hash_map<UUID, SizeCountDelta>;
+using ReplicatedMetadataDeltas = absl::flat_hash_map<UUID, ReplicatedMetadataDelta>;
 
 }  // namespace replicated_fast_count
 

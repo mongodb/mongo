@@ -1,35 +1,9 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -39,7 +13,7 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace waitable_atomic_details {
 
@@ -62,7 +36,7 @@ bool waitUntil(const void* uaddr,
 }  // namespace waitable_atomic_details
 
 /**
- * Extends the AtomicWord interface to include wait functionality with deadline and timeout.
+ * Extends the Atomic interface to include wait functionality with deadline and timeout.
  *
  * This class is very similar to the wait() and notify() functions on std::atomic, with these
  * exceptions:
@@ -81,10 +55,10 @@ bool waitUntil(const void* uaddr,
  */
 template <typename T>
 requires(std::has_unique_object_representations_v<T> && sizeof(T) == 4 &&
-         sizeof(AtomicWord<T>) == 4)  //
-class BasicWaitableAtomic : public AtomicWord<T> {
+         sizeof(Atomic<T>) == 4)  //
+class BasicWaitableAtomic : public Atomic<T> {
 public:
-    using AtomicWord<T>::AtomicWord;
+    using Atomic<T>::Atomic;
 
     /**
      * Returns this->load() once it doesn't equal old.
@@ -113,7 +87,7 @@ public:
      */
     boost::optional<T> waitUntil(
         T old, boost::optional<std::chrono::system_clock::time_point> deadline) const {
-        // We know that T and AtomicWord<T> are 4 bytes but we should also ensure we are too.
+        // We know that T and Atomic<T> are 4 bytes but we should also ensure we are too.
         static_assert(sizeof(*this) == 4);
 
         while (true) {
@@ -188,10 +162,10 @@ public:
 };
 
 /**
- * Extends the AtomicWord interface to provide wait functionality with deadline and timeout.
+ * Extends the Atomic interface to provide wait functionality with deadline and timeout.
  *
  * This is a more flexible and easier to use version of BasicAtomicWaitable. It supports any size T
- * that is supported by our AtomicWord type, and takes care of tracking whether there are any
+ * that is supported by our Atomic type, and takes care of tracking whether there are any
  * waiters so that notifyAll() is cheap when there aren't.
  *
  * notifyOne() is not supported because we only track whether there are any waiters, not how many
@@ -201,9 +175,9 @@ public:
 template <typename T,
           // try to put counter (member) and value (base) on same cache line.
           size_t alignment = 2 * std::max(sizeof(T), sizeof(uint32_t))>
-class alignas(alignment) WaitableAtomic : public AtomicWord<T> {
+class alignas(alignment) WaitableAtomic : public Atomic<T> {
 public:
-    using AtomicWord<T>::AtomicWord;
+    using Atomic<T>::Atomic;
 
     /**
      * Returns this->load() once it doesn't equal old.
@@ -319,7 +293,7 @@ public:
     }
 
 private:
-    MONGO_MOD_PRIVATE friend bool hasWaiters_forTest(const WaitableAtomic& wa) {
+    [[MONGO_MOD_PRIVATE]] friend bool hasWaiters_forTest(const WaitableAtomic& wa) {
         return wa._waitFlag.load() & 1;
     }
 
@@ -344,4 +318,4 @@ private:
     mutable BasicWaitableAtomic<uint32_t> _waitFlag = 0;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

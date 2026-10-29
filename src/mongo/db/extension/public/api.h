@@ -1,40 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #ifdef __has_include
 #if __has_include("mongo/util/modules.h")
 #include "mongo/util/modules.h"
 #else
-#define MONGO_MOD_PUB
+#define[[MONGO_MOD_PUBLIC]]
 #endif
 #endif  // __has_include
+
+#include "mongo/db/extension/public/api_contract.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -50,19 +26,6 @@ extern "C" {
 //
 //
 ////////////////////////////////////////////////////////////////
-
-/**
- * Represents the API version of the MongoDB extension, to ensure compatibility between the MongoDB
- * server and the extension.
- *
- * The version is composed of two parts: major and minor. The major version is incremented
- * for incompatible changes and the minor version for backward-compatible changes.
- */
-typedef struct {
-    uint32_t major;
-    uint32_t minor;
-} MongoExtensionAPIVersion;
-
 #define MONGODB_EXTENSION_API_MAJOR_VERSION 1
 #define MONGODB_EXTENSION_API_MINOR_VERSION 0
 
@@ -71,18 +34,6 @@ typedef struct {
     MongoExtensionAPIVersion {                                                   \
         MONGODB_EXTENSION_API_MAJOR_VERSION, MONGODB_EXTENSION_API_MINOR_VERSION \
     }
-
-/**
- * A generic struct for a vector of Extensions API versions.
- *
- * Used for version compatibility checking. The data pointed to by 'versions' is read-only from
- * the receiver's perspective; the producer (host or extension, depending on direction) is
- * responsible for keeping the array alive for the lifetime of the struct's use.
- */
-typedef struct {
-    uint64_t len;
-    const MongoExtensionAPIVersion* versions;
-} MongoExtensionAPIVersionVector;
 
 /**
  * MongoExtensionStatus error code reserved for errors which are not DBException errors generated
@@ -394,14 +345,18 @@ typedef struct MongoExtensionResolvedNamespace {
 
 /**
  * MongoExtensionCatalogContext contains a collection's catalog context information (i.e
- * MongoExtensionNamespaceString, uuidString, shardId), which is generally available when an AstNode
- * binds into a LogicalStage. Note that the members of this struct are provided as views, meaning
- * the values' underlying data is not owned by this struct. When a callee receives a
- * MongoExtensionCatalogContext as a parameter, the callee is responsible for immediately copying
- * the values into an owned copy if they must persist beyond the scope of the callee function.
+ * MongoExtensionNamespaceString, uuidString, shardId, willBeMerged), which is generally
+ * available when an AstNode binds into a LogicalStage. Note that the members of this struct are
+ * provided as views, meaning the values' underlying data is not owned by this struct. When a
+ * callee receives a MongoExtensionCatalogContext as a parameter, the callee is responsible for
+ * immediately copying the values into an owned copy if they must persist beyond the scope of the
+ * callee function.
  *
  * shardId is populated with the shard identifier when running on a shard server. When running on
  * a router or a standalone deployment, shardId is empty.
+ *
+ * willBeMerged is true when the pipeline is running on a shard and results will be merged on
+ * the router.
  */
 typedef struct MongoExtensionCatalogContext {
     const ::MongoExtensionNamespaceString namespaceString;
@@ -409,6 +364,7 @@ typedef struct MongoExtensionCatalogContext {
     const uint8_t inRouter;
     const MongoExtensionExplainVerbosity verbosity;
     const MongoExtensionByteView shardId;
+    const uint8_t willBeMerged;
 } MongoExtensionCatalogContext;
 
 ////////////////////////////////////////////////////////////////
@@ -981,6 +937,17 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
                                               const MongoExtensionByteView* metricNames,
                                               uint64_t numMetricNames,
                                               MongoExtensionByteBuf** result);
+
+    /**
+     * Limits the number of documents pulled from this source for the current batch.
+     *
+     * By default, the host retrieves documents individually. This method enables
+     * batching, allowing the host to retrieve 'batchSize' documents at once. Call
+     * this with a 'batchSize' greater than 0 before returning the first document
+     * of each new batch.
+     */
+    MongoExtensionStatus* (*set_batch_size)(const MongoExtensionQueryExecutionContext* ctx,
+                                            uint64_t batchSize);
 } MongoExtensionQueryExecutionContextVTable;
 
 ////////////////////////////////////////////////////////////////
@@ -1448,42 +1415,13 @@ typedef struct MongoExtensionVTable {
 } MongoExtensionVTable;
 
 /**
- * Extension loading is a two-step process driven by the host across two symbols that the
- * extension shared library must export:
- *
- *   1. get_mongodb_extension_versions: the host asks the extension to specify all the versions
- *      of the Extensions API the extension implements.
- *
- *   2. get_mongodb_extension: the host deliberates on whether any of those published versions
- *      are compatible with its own supported set. If a compatible version is found, the host
- *      explicitly requests that version by invoking this function with the chosen version. During
- * this step, the host provides the HostServices corresponding to the requested API version.
- *
- * NOTE: You must define both symbols in your extension shared library and avoid name mangling
- * (for example, with 'extern "C"') so that the MongoDB server can find them at loadtime.
- */
-
-/**
- * Phase 1 : the host asks the extension for the versions of the API it implements. The host
- * provides a MongoExtensionAPIVersionVector struct which the extension is responsible for filling
- * with its supported API versions. Any errors during the execution of this function should result
- * in the extensionVersions array being left empty.
- *
- * This call MUST NOT allow exceptions to escape across the C API boundary. No HostServices have
- * been delivered to the extension at this point, so host-routed assertion mechanisms are not
- * available and must not be used. Extension implementations must be noexcept in practice: if a
- * thrown exception escapes this function, behavior is undefined and the host has no way to recover.
- */
-#define GET_MONGODB_EXTENSION_VERSIONS_SYMBOL "get_mongodb_extension_versions"
-typedef void (*get_mongodb_extension_versions_t)(MongoExtensionAPIVersionVector* extensionVersions);
-
-/**
- * Phase 2: The host requests the specific version. The version must be one of the versions which
- * the extension advertised as supported in a previous call to get_mongodb_extension_versions.
- * Calling this function with a version which was not previously advertised by the extension is
- * considered undefined behaviour. The provided MongoExtensionHostServices is guaranteed to be
- * compatible with the requested version. The HostServices pointer remains valid for the lifetime of
- * the extension and may be saved by the extension for later use.
+ * Extension loading - Phase 2: The host requests the specific version. The version must be one of
+ * the versions which the extension advertised as supported in a previous call to
+ * get_mongodb_extension_versions. Calling this function with a version which was not previously
+ * advertised by the extension is considered undefined behaviour. The provided
+ * MongoExtensionHostServices is guaranteed to be compatible with the requested version. The
+ * HostServices pointer remains valid for the lifetime of the extension and may be saved by the
+ * extension for later use.
  *
  * Returns a MongoExtensionStatus indicating whether the parameter MongoExtension was successfully
  * initialized.

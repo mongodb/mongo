@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -50,7 +24,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  *
@@ -232,7 +206,7 @@ public:
      *       {"skip" : val}    // skip calls, activate on and after call number (val+1).
      *       {"activationProbability" : val}  // val is in interval [0.0, 1.0]
      */
-    MONGO_MOD_FILE_PRIVATE static StatusWith<ModeOptions> parseBSON(const BSONObj& obj);
+    [[MONGO_MOD_FILE_PRIVATE]] static StatusWith<ModeOptions> parseBSON(const BSONObj& obj);
 
     /**
      * FailPoint state can be kept alive during shutdown by setting `immortal` true.
@@ -325,7 +299,7 @@ public:
     /**
      * @returns a BSON object showing the current mode and data stored.
      */
-    MONGO_MOD_FILE_PRIVATE BSONObj toBSON() const {
+    [[MONGO_MOD_FILE_PRIVATE]] BSONObj toBSON() const {
         return _impl()->toBSON();
     }
 
@@ -543,14 +517,14 @@ private:
         // Bit layout:
         // 31: tells whether this fail point is active.
         // 0~30: ref counter: # of outstanding LockHandles.
-        AtomicWord<std::uint32_t> _fpInfo{0};
+        Atomic<std::uint32_t> _fpInfo{0};
 
         /* Number of times this has been locked with a `hit` result. */
-        AtomicWord<EntryCountT> _hitCount{0};
+        Atomic<EntryCountT> _hitCount{0};
 
         // Invariant: These should be read only if _kActiveBit of _fpInfo is set.
         Mode _mode{off};
-        AtomicWord<int> _modeValue{0};
+        Atomic<int> _modeValue{0};
         BSONObj _data;
 
         const std::string _name;
@@ -582,12 +556,12 @@ private:
      * True only when `_impl()` should succeed.
      * We exploit zero-initialization of statics to detect use-before-init.
      */
-    AtomicWord<bool> _ready;
+    Atomic<bool> _ready;
 
     std::aligned_storage_t<sizeof(Impl), alignof(Impl)> _implStorage;
 };
 
-class MONGO_MOD_FILE_PRIVATE FailPointRegistry {
+class [[MONGO_MOD_FILE_PRIVATE]] FailPointRegistry {
 public:
     FailPointRegistry();
 
@@ -604,7 +578,7 @@ public:
     /**
      * @return a registered FailPoint, or nullptr if it was not registered.
      */
-    MONGO_MOD_PUBLIC FailPoint* find(std::string_view name) const;
+    [[MONGO_MOD_PUBLIC]] FailPoint* find(std::string_view name) const;
 
     /**
      * Freezes this registry from being modified.
@@ -616,14 +590,14 @@ public:
      * failpoint to be set on the command line via --setParameter, but is only allowed when
      * running with '--setParameter enableTestCommands=1'.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT void registerAllFailPointsAsServerParameters();
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void registerAllFailPointsAsServerParameters();
 
     /**
      * Sets all registered FailPoints to Mode::off. Used primarily during unit test cleanup to
      * reset the state of all FailPoints set by the unit test. Does not prevent FailPoints from
      * being enabled again after.
      */
-    MONGO_MOD_PUBLIC void disableAllFailpoints();
+    [[MONGO_MOD_PUBLIC]] void disableAllFailpoints();
 
 private:
     bool _frozen;
@@ -656,6 +630,42 @@ public:
         return _initialTimesEntered;
     }
 
+    /**
+     * Waits until the fail point has been entered once since this block enabled it. Prefer this
+     * over `FailPoint::waitForTimesEntered`, which uses an absolute count accumulated over the
+     * fail point's lifetime and so can be pre-satisfied by earlier tests in the same binary.
+     *
+     * Returns the number of times the fail point has been entered since this block enabled it,
+     * which can be used to assert an exact count without racing against further entries, e.g.
+     * `ASSERT_EQ(fpb.waitForOneNewEntry(), 1);`
+     */
+    FailPoint::EntryCountT waitForOneNewEntry() const {
+        return waitForNNewEntries(1);
+    }
+
+    FailPoint::EntryCountT waitForOneNewEntry(Interruptible* interruptible) const {
+        return waitForNNewEntries(interruptible, 1);
+    }
+
+    /**
+     * Like `waitForOneNewEntry`, but waits for `n` entries since enable. `n` must be
+     * non-negative.
+     */
+    FailPoint::EntryCountT waitForNNewEntries(FailPoint::EntryCountT n) const {
+        return waitForNNewEntries(Interruptible::notInterruptible(), n);
+    }
+
+    FailPoint::EntryCountT waitForNNewEntries(Interruptible* interruptible,
+                                              FailPoint::EntryCountT n) const {
+        tassert(
+            13570300, "Number of new fail point entries to wait for must be non-negative", n >= 0);
+        tassert(13570301,
+                "Number of new fail point entries to wait for must be representable",
+                n <= std::numeric_limits<FailPoint::EntryCountT>::max() - _initialTimesEntered);
+        return _failPoint->waitForTimesEntered(interruptible, _initialTimesEntered + n) -
+            _initialTimesEntered;
+    }
+
 private:
     FailPoint* const _failPoint;
     FailPoint::EntryCountT _initialTimesEntered;
@@ -667,7 +677,7 @@ private:
  * @throw DBException corresponding to ErrorCodes::FailPointSetFailed if no failpoint
  * called failPointName exists.
  */
-MONGO_MOD_USE_REPLACEMENT(FailPointEnableBlock or globalFailPointRegistry().find())
+[[MONGO_MOD_USE_REPLACEMENT(FailPointEnableBlock or globalFailPointRegistry().find())]]
 FailPoint::EntryCountT setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
 
 /**
@@ -691,4 +701,4 @@ FailPointRegistry& globalFailPointRegistry();
     ::mongo::FailPointRegisterer fp##failPointRegisterer(&fp);
 
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

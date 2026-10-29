@@ -1,4 +1,6 @@
 // This tests that we can successfully profile queries on secondaries.
+// @tags: [ queries_system_profile_collection ]
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let rst = new ReplSetTest({nodes: 2});

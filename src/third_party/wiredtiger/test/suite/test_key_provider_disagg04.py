@@ -37,6 +37,11 @@ from wtscenario import make_scenarios
 class test_key_provider_disagg04(KeyProviderBase):
     test_name = __qualname__
 
+    def setUp(self):
+        super().setUp()
+        # INFO verbosity also surfaces the tombstone encoding adoption line at every open.
+        self.ignoreStdoutPattern(r'stable tombstone encoding (on|off) \(')
+
     def conn_config(self):
         # Raise disaggregated-storage verbosity to INFO so the crypt-key load message is emitted;
         # restarts assert on it to confirm the persisted timestamp round-trips.
@@ -96,8 +101,14 @@ class test_key_provider_disagg04(KeyProviderBase):
         self.key_provider_version = self.start_version
         self.reopen_conn()
 
+        # The first checkpoint persists a key even though nothing has been written yet, so this
+        # reopen loads one back at timestamp zero. The restarts below assert on the message.
+        self.ignoreStdoutPatternIfExists(r'Loading persisted crypt key: lsn=\d+, timestamp=0')
+
         ds1 = SimpleDataSet(self, self.uri, self.nentries)
+        self.session.begin_transaction()
         ds1.populate()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.write_and_checkpoint()
         ds1.check()
 
@@ -106,7 +117,9 @@ class test_key_provider_disagg04(KeyProviderBase):
         ds1.check()
 
         ds2 = SimpleDataSet(self, self.uri, self.nentries * 2)
+        self.session.begin_transaction()
         ds2.populate(first_row=self.nentries + 1)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.write_and_checkpoint()
         ds2.check()
 
@@ -115,7 +128,9 @@ class test_key_provider_disagg04(KeyProviderBase):
         ds2.check()
 
         ds3 = SimpleDataSet(self, self.uri, self.nentries * 3)
+        self.session.begin_transaction()
         ds3.populate(first_row=self.nentries * 2 + 1)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.write_and_checkpoint()
         ds3.check()
 

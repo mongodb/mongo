@@ -62,12 +62,6 @@ const internalCommandsMap = {
             },
         },
     },
-    _internalClearCollectionShardingMetadata: {
-        testname: "_internalClearCollectionShardingMetadata",
-        command: {
-            _internalClearCollectionShardingMetadata: "test.x",
-        },
-    },
     _clusterWriteWithoutShardKey: {
         testname: "_clusterWriteWithoutShardKey",
         command: {_clusterWriteWithoutShardKey: 1, writeCmd: {}, shardId: "", targetDocId: {}},
@@ -144,9 +138,36 @@ const internalCommandsMap = {
             chunkRange: {min: {a: 1}, max: {a: 10}},
         },
     },
+    _configsvrCommitMergeChunks: {
+        testname: "_configsvrCommitMergeChunks",
+        command: {
+            _configsvrCommitMergeChunks: "x.y",
+            shard: shard0name,
+            chunkRange: {min: {a: 1}, max: {a: 10}},
+            shardVersionPreMerge: {
+                e: new ObjectId("62b052ac7f5653479a67a54f"),
+                t: new Timestamp(1655722668, 22),
+                v: new Timestamp(1, 0),
+            },
+        },
+    },
     _configsvrCommitChunkSplit: {
         testname: "_configsvrCommitChunkSplit",
         command: {_configsvrCommitChunkSplit: "x.y"},
+    },
+    _configsvrCommitSplitChunk: {
+        testname: "_configsvrCommitSplitChunk",
+        command: {
+            _configsvrCommitSplitChunk: "x.y",
+            shard: shard0name,
+            range: {min: {a: 1}, max: {a: 10}},
+            splitPoints: [{a: 5}],
+            shardVersionPreSplit: {
+                e: new ObjectId("62b052ac7f5653479a67a54f"),
+                t: new Timestamp(1655722668, 22),
+                v: new Timestamp(1, 0),
+            },
+        },
     },
     _configsvrCommitRefineCollectionShardKey: {
         testname: "_configsvrCommitRefineCollectionShardKey",
@@ -178,10 +199,6 @@ const internalCommandsMap = {
         testname: "_configsvrConfigureCollectionBalancing",
         command: {_configsvrConfigureCollectionBalancing: "test.x"},
     },
-    _configsvrConvertShardRefsInNamespaceMetadata: {
-        testname: "_configsvrConvertShardRefsInNamespaceMetadata",
-        command: {_configsvrConvertShardRefsInNamespaceMetadata: "test.x"},
-    },
     _configsvrCreateDatabase: {
         testname: "_configsvrCreateDatabase",
         command: {_configsvrCreateDatabase: "test.x", primaryShardId: ""},
@@ -206,6 +223,28 @@ const internalCommandsMap = {
         command: {
             _configsvrCollMod: "x.y",
             collModRequest: {},
+        },
+    },
+    _configsvrCommitMoveRange: {
+        testname: "_configsvrCommitMoveRange",
+        command: {
+            _configsvrCommitMoveRange: "db.fooHashed",
+            fromShard: "move_chunk_basic-rs0",
+            toShard: "move_chunk_basic-rs1",
+            migratedChunk: {
+                lastmod: {
+                    e: new ObjectId("62b052ac7f5653479a67a54f"),
+                    t: new Timestamp(1655722668, 22),
+                    v: new Timestamp(1, 0),
+                },
+                min: {_id: MinKey},
+                max: {_id: 611686018427387902},
+            },
+            donorShardVersionPreMigration: {
+                e: new ObjectId("62b052ac7f5653479a67a54f"),
+                t: new Timestamp(1655722668, 22),
+                v: new Timestamp(1, 3),
+            },
         },
     },
     _configsvrCommitMovePrimary: {
@@ -351,12 +390,18 @@ const internalCommandsMap = {
         },
     },
     _flushRoutingTableCacheUpdates: {
+        skip: true, // This command isn't valid when the shards are authoritative for collection metadata.
+        // Also, it can not be used during the FCV upgrade. The command will be removed
+        // in the future.
         testname: "_flushRoutingTableCacheUpdates",
         command: {
             _flushRoutingTableCacheUpdates: ns,
         },
     },
     _flushRoutingTableCacheUpdatesWithWriteConcern: {
+        skip: true, // This command isn't valid when the shards are authoritative for collection metadata.
+        // Also, it can not be used during the FCV upgrade. The command will be removed
+        // in the future.
         testname: "_flushRoutingTableCacheUpdatesWithWriteConcern",
         command: {_flushRoutingTableCacheUpdatesWithWriteConcern: ns, writeConcern: {w: 2}},
     },
@@ -863,6 +908,13 @@ const internalCommandsMap = {
         command: {
             _shardsvrCommitCollModCollectionMetadata: "test.x",
             primaryShardId: "",
+        },
+    },
+    _shardsvrCommitChunkOperationsMetadata: {
+        testname: "_shardsvrCommitChunkOperationsMetadata",
+        command: {
+            _shardsvrCommitChunkOperationsMetadata: "test.x",
+            newChunks: [],
         },
     },
     _shardsvrCommitDropCollectionMetadata: {

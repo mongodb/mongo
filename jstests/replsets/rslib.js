@@ -561,7 +561,7 @@ waitUntilAllNodesCaughtUp = function (rs, timeout) {
  * Waits for the given node to reach the given state, ignoring network errors.  Ensures that the
  * connection is re-connected and usable when the function returns.
  */
-waitForState = function (node, state) {
+waitForState = function (node, state, msg) {
     assert.soonNoExcept(function () {
         assert.commandWorked(
             node.adminCommand({
@@ -571,7 +571,7 @@ waitForState = function (node, state) {
             }),
         );
         return true;
-    });
+    }, msg);
     // Some state transitions cause connections to be closed, but whether the connection close
     // happens before or after the replSetTest command above returns is racy, so to ensure that
     // the connection to 'node' is usable after this function returns, reconnect it first.

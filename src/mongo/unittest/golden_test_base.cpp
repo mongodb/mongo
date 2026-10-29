@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/unittest/golden_test_base.h"
 
@@ -68,6 +42,25 @@ using namespace std::literals::string_view_literals;
 namespace fs = ::boost::filesystem;
 namespace po = ::boost::program_options;
 
+fs::path resolveGoldenDataRoot(const boost::optional<std::string>& configuredDataRoot) {
+    // An explicitly configured root from GOLDEN_TEST_DATA_ROOT always wins.
+    if (configuredDataRoot && !configuredDataRoot->empty()) {
+        return fs::path(*configuredDataRoot);
+    }
+
+    // Bazel may run the test binary with a working directory that is not the repository root
+    // (for example, Windows tests are executed from inside the runfiles tree). Bazel always
+    // provides the runfiles root and the main repository name through the test environment, so
+    // resolve the repository root from them when available.
+    const char* testSrcdir = std::getenv("TEST_SRCDIR");
+    const char* testWorkspace = std::getenv("TEST_WORKSPACE");
+    if (testSrcdir && *testSrcdir && testWorkspace && *testWorkspace) {
+        return fs::path(testSrcdir) / testWorkspace;
+    }
+
+    return ".";
+}
+
 std::string readFile(const fs::path& path) {
     uassert(6741506,
             str::stream() << "path '" << path.string() << "' must not be a directory",
@@ -108,9 +101,11 @@ GoldenTestEnvironment* GoldenTestEnvironment::getInstance() {
     return &instance;
 }
 
-GoldenTestEnvironment::GoldenTestEnvironment() : _goldenDataRoot(".") {
+GoldenTestEnvironment::GoldenTestEnvironment() {
     // Parse environment variables
     auto opts = GoldenTestOptions::parseEnvironment();
+
+    _goldenDataRoot = resolveGoldenDataRoot(opts.goldenDataRoot);
 
     fs::path outputRoot;
     if (opts.outputRootPattern) {
@@ -242,12 +237,14 @@ GoldenTestOptions GoldenTestOptions::parseEnvironment() {
     po::options_description desc_env;
     boost::optional<std::string> configPath;
     boost::optional<std::string> outputRootPatternOverride;
+    boost::optional<std::string> dataRoot;
     desc_env.add_options()  //
         ("config_path",
          po::value<std::string>()->notifier([&configPath](auto v) { configPath = v; }))  //
         ("output_root_pattern",
          po::value<std::string>()->notifier(
-             [&outputRootPatternOverride](auto v) { outputRootPatternOverride = v; }));
+             [&outputRootPatternOverride](auto v) { outputRootPatternOverride = v; }))  //
+        ("data_root", po::value<std::string>()->notifier([&dataRoot](auto v) { dataRoot = v; }));
 
     po::variables_map vm_env;
     po::store(po::parse_environment(desc_env, "GOLDEN_TEST_"), vm_env);
@@ -275,6 +272,8 @@ GoldenTestOptions GoldenTestOptions::parseEnvironment() {
     if (outputRootPatternOverride) {
         opts.outputRootPattern = *outputRootPatternOverride;
     }
+
+    opts.goldenDataRoot = dataRoot;
 
     return opts;
 }

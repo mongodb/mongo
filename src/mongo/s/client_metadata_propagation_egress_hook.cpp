@@ -1,49 +1,43 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/client_metadata_propagation_egress_hook.h"
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 namespace mongo {
 namespace rpc {
+namespace {
+
+void maybeAppendIFRContext(const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrCtx,
+                           BSONObjBuilder* metadataBob) {
+    // A router stamps its own binary's full version so the receiving shard can distinguish "flag
+    // omitted because sender predates it" from "flag omitted because sender removed it." A shard
+    // whose current ifrCtx was created from an inbound wire payload forwards the *original*
+    // sender's version verbatim: this is what preserves multi-hop semantics across e.g. mongos ->
+    // shardA -> shardB $lookup fan-out.
+    // A shard originating a fresh (non-wire) request — e.g. a background thread — emits nothing.
+    const bool isRouter = serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer);
+    if (ifrCtx->isInstalledFromWire() || isRouter) {
+        ifrCtx->appendToEgressMetadata(metadataBob);
+    }
+}
+}  // namespace
 
 Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContext* opCtx,
                                                                  BSONObjBuilder* metadataBob) {
@@ -63,6 +57,10 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
                     "Expected VersionContext with propagation across shards",
                     vCtx.canPropagateAcrossShards());
             metadataBob->append(GenericArguments::kVersionContextFieldName, vCtx.toBSON());
+        }
+
+        if (auto ifrCtx = IncrementalFeatureRolloutContext::tryGet(opCtx); ifrCtx) {
+            maybeAppendIFRContext(ifrCtx, metadataBob);
         }
 
         WriteBlockBypass::get(opCtx).writeAsMetadata(metadataBob);
@@ -90,6 +88,12 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
                 .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx),
                                                          fcvSnap)) {
             metadataBob->appendBool(kIsExternalClientOnRouterFieldName, true);
+        }
+
+        if (const auto& retryAttempt = staleConfigRetryAttempt(opCtx); retryAttempt.has_value() &&
+            feature_flags::gAuthoritativeShardsDDL.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx), fcvSnap)) {
+            metadataBob->append(GenericArguments::kStaleConfigRetryAttemptFieldName, *retryAttempt);
         }
 
         // If the request is using the 'defaultMaxTimeMS' value, attaches the field so shards can

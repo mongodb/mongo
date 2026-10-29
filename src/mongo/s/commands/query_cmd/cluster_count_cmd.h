@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -73,10 +47,8 @@
 namespace mongo {
 
 inline BSONObj prepareCountForPassthrough(const OperationContext* opCtx,
-                                          const BSONObj& cmdObj,
+                                          CountCommandRequest& countRequest,
                                           bool requestQueryStats) {
-    BSONObjBuilder bob(cmdObj);
-
     // Pass the queryShapeHash to the shards. We must validate that all participating shards can
     // understand 'originalQueryShapeHash' and therefore check the feature flag. We use the last
     // LTS when the FCV is uninitialized, since count commands can run during initial sync. This is
@@ -87,15 +59,16 @@ inline BSONObj prepareCountForPassthrough(const OperationContext* opCtx,
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (auto&& queryShapeHash = CurOp::get(opCtx)->debug().getQueryShapeHash()) {
-            bob.append(CountCommandRequest::kOriginalQueryShapeHashFieldName,
-                       queryShapeHash->toHexString());
+            countRequest.setOriginalQueryShapeHash(queryShapeHash);
         }
     }
+    // Set rather than append so a client-supplied includeQueryStatsMetrics is overwritten instead
+    // of duplicated in the shard OP_MSG.
     if (requestQueryStats) {
-        bob.append(CountCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
+        countRequest.setIncludeQueryStatsMetrics(true);
     }
 
-    return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
+    return CommandHelpers::filterCommandRequestForPassthrough(countRequest.toBSON());
 }
 
 inline bool convertAndRunAggregateIfViewlessTimeseries(
@@ -138,24 +111,23 @@ inline void createShapeAndRegisterQueryStats(const boost::intrusive_ptr<Expressi
 
     // Compute QueryShapeHash and record it in CurOp.
     OperationContext* opCtx = expCtx->getOperationContext();
+    const bool rawDataForShape = countRequest.getRawData().value_or(false);
     const query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
-            *parsedFind, countRequest.getLimit().has_value(), countRequest.getSkip().has_value());
+            *parsedFind,
+            countRequest.getLimit().has_value(),
+            countRequest.getSkip().has_value(),
+            rawDataForShape);
     }};
     boost::optional<query_shape::QueryShapeHash> queryShapeHash =
-        CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
-        });
+        CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+            opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
-    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        query_stats::registerRequest(opCtx, nss, [&]() {
-            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
-            return std::make_unique<query_stats::CountKey>(
-                expCtx, countRequest, std::move(deferredShape->getValue()));
-        });
-    }
+    query_stats::registerRequest(opCtx, nss, [&]() {
+        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+        return std::make_unique<query_stats::CountKey>(
+            expCtx, countRequest, std::move(deferredShape->getValue()));
+    });
 }
 
 /**
@@ -215,6 +187,7 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             Impl::checkCanRunHere(opCtx);
             constexpr auto cmdName = Request::kCommandName;
+            setReadWriteConcern(opCtx, request(), /*setRC=*/true, /*setWC=*/false);
             const auto originalCountRequest = request();
 
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -277,9 +250,9 @@ public:
                             nss,
                             cri,
                             collation,
-                            boost::none /*explainVerbosity*/,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*verbosity=*/boost::none,
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
 
                         // Create an RAII object that prints useful information about the
                         // ExpressionContext in the case of a tassert or crash.
@@ -300,7 +273,7 @@ public:
                                     opCtx, routingCtx, aggResult, countRequestForShard, nss)) {
                                 return count_cmd_helper::buildCountReply(
                                     ViewResponseFormatter{aggResult.obj()}.getCountValue(
-                                        boost::none /*tenantId*/));
+                                        /*tenantId=*/boost::none));
                             }
                         }
 
@@ -325,8 +298,9 @@ public:
                         countRequestForShard.setSkip(boost::none);
 
                         // The includeQueryStatsMetrics field is not supported on mongos for the
-                        // count command, so we do not need to check the value on the original
-                        // request when updating requestQueryStats here.
+                        // count command (it is not returned in the client reply). When this op is
+                        // sampled, prepareCountForPassthrough overwrites the field to true so
+                        // shards return metrics for the query stats store.
                         bool requestQueryStats =
                             query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
@@ -336,16 +310,13 @@ public:
                                 expCtx,
                                 routingCtx,
                                 nss,
-                                applyReadWriteConcern(
-                                    opCtx,
-                                    this,
-                                    prepareCountForPassthrough(
-                                        opCtx, countRequestForShard.toBSON(), requestQueryStats)),
+                                prepareCountForPassthrough(
+                                    opCtx, countRequestForShard, requestQueryStats),
                                 ReadPreferenceSetting::get(opCtx),
                                 Shard::RetryPolicy::kIdempotent,
                                 countRequestForShard.getQuery(),
                                 collation,
-                                true /*eligibleForSampling*/);
+                                /*eligibleForSampling=*/true);
 
                         } catch (const ExceptionFor<
                                  ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
@@ -367,7 +338,7 @@ public:
 
                             return count_cmd_helper::buildCountReply(
                                 ViewResponseFormatter{aggResult}.getCountValue(
-                                    boost::none /*tenantId*/));
+                                    /*tenantId=*/boost::none));
                         }
 
                         long long total = 0;
@@ -529,11 +500,12 @@ public:
                         return shape_helpers::tryMakeShape<query_shape::CountCmdShape>(
                             *parsedFind,
                             countRequestForShard.getLimit().has_value(),
-                            countRequestForShard.getSkip().has_value());
+                            countRequestForShard.getSkip().has_value(),
+                            countRequestForShard.getRawData().value_or(false));
                     }};
 
                     CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-                        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
+                        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
                     });
 
                     auto numShards =
@@ -569,13 +541,13 @@ public:
                             Shard::RetryPolicy::kIdempotent,
                             targetingQuery,
                             targetingCollation,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
                     } catch (
                         const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&
                             ex) {
                         auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
-                            originalCountRequest, true /* hasExplain */);
+                            originalCountRequest, /*hasExplain=*/true);
                         // An empty PrivilegeVector is acceptable because these privileges are only
                         // checked on getMore and explain will not open a cursor.
                         return ClusterAggregate::retryOnViewOrIFRKickbackError(

@@ -1,19 +1,23 @@
 load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel:signing.bzl", "signed_mongo_cc_extension_shared_library")
 
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
-    glob([
-        "*.h",
-    ]),
+    glob(
+        [
+            "*.h",
+        ],
+        allow_empty = True,
+    ),
 )
 
 filegroup(
     name = "resmoke_data",
     srcs = [
+        "aggregation_stage_fallback_parsers.json",
         "configurations.yml",
         "//src/mongo/db/extension/test_examples/test_extensions_signing_keys:test_extensions_signing_public_key.asc",
     ],
@@ -56,14 +60,15 @@ extensions_with_config(
         ":idle_threads_mongo_extension_signed_lib",
         ":interrupt_mongo_extension_signed_lib",
         ":match_topN_mongo_extension_signed_lib",
+        ":match_top_n_with_metrics_mongo_extension_signed_lib",
         ":native_vector_search_mongo_extension_signed_lib",
+        ":selection_optimization_mongo_extension_signed_lib",
         ":metrics_mongo_extension_signed_lib",
         ":other_metrics_mongo_extension_signed_lib",
         ":sleep_mongo_extension_signed_lib",
         ":vector_search_optimization_mongo_extension_signed_lib",
         ":view_pipeline_validator_mongo_extension_signed_lib",
         ":disallow_view_mongo_extension_signed_lib",
-        ":disallow_view_source_mongo_extension_signed_lib",
         ":desugar_add_view_name_mongo_extension_signed_lib",
         ":add_fields_match_mongo_extension_signed_lib",
         ":modify_for_log_mongo_extension_signed_lib",
@@ -141,7 +146,6 @@ pkg_name = "//" + package_name() + "/"
         "bar",
         "read_n_documents",
         "disallow_view",
-        "disallow_view_source",
         "desugar_add_view_name",
         "view_pipeline_validator",
         "shard_id",
@@ -160,7 +164,9 @@ pkg_name = "//" + package_name() + "/"
     for extension_name in [
         "limit",
         "match_topN",
+        "match_top_n_with_metrics",
         "native_vector_search",
+        "selection_optimization",
         "vector_search_optimization",
         "add_fields_match",
     ]

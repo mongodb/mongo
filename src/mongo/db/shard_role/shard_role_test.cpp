@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_role.h"
 
@@ -43,6 +17,7 @@
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -173,38 +148,13 @@ protected:
 
         Lock::GlobalLock globalLk(newOpCtx.get(), MODE_X);
         auto catalogState = catalog::closeCatalog(newOpCtx.get());
-        catalog::openCatalog(newOpCtx.get(), catalogState, stableTimestamp);
+        catalog::openCatalogAfterRollbackToStable(newOpCtx.get(), catalogState, stableTimestamp);
     }
 
     void testRestoreFailsWhenMetadataInvalidated(bool terminateSecondaryReadsUponRangeDeletion,
                                                  bool terminateSecondaryReadsOnOrphan,
                                                  bool mustFail);
 };
-
-class ShardRoleUniqueShardIdentifiersTest : public ShardRoleTest,
-                                            public testing::WithParamInterface<bool> {
-protected:
-    void setUp() override {
-        _featureFlagScope.emplace("featureFlagUniqueShardIdentifiers", GetParam());
-        ShardRoleTest::setUp();
-    }
-
-    void tearDown() override {
-        ShardRoleTest::tearDown();
-        _featureFlagScope.reset();
-    }
-
-private:
-    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
-};
-
-INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,
-                         ShardRoleUniqueShardIdentifiersTest,
-                         testing::Bool(),
-                         [](const testing::TestParamInfo<bool>& info) {
-                             return info.param ? "WithUniqueShardIdentifiers"
-                                               : "WithoutUniqueShardIdentifiers";
-                         });
 
 void ShardRoleTest::setUp() {
     ShardServerTestFixture::setUp();
@@ -264,9 +214,9 @@ void ShardRoleTest::installShardedCollectionMetadata(
                                            false,
                                            epoch,
                                            timestamp,
-                                           boost::none /* timeseriesFields */,
+                                           /*timeseriesFields=*/boost::none,
                                            reshardingFields,
-                                           true /* allowMigrations */,
+                                           /*allowMigrations=*/true,
                                            chunks);
 
     const auto version = rt.getVersion();
@@ -930,7 +880,7 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
     }
 }
 
-TEST_P(ShardRoleUniqueShardIdentifiersTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
+TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
     PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
 
     auto validateException = [&](const DBException& ex) {
@@ -938,7 +888,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest, AcquireShardedCollWithIncorrectPlace
         ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
         ASSERT_EQ(ShardVersion::UNTRACKED(), exInfo->getVersionReceived());
         ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionWanted());
-        ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
+        ASSERT_EQ(kMyShardName, exInfo->getShardId());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
     };
 
@@ -965,8 +915,36 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest, AcquireShardedCollWithIncorrectPlace
         validateException);
 }
 
-TEST_P(ShardRoleUniqueShardIdentifiersTest,
-       AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionThrows) {
+TEST_F(ShardRoleTest, IntentAcquisitionErrorsHavePrecedenceOverShardVersionChecks) {
+    ASSERT_TRUE(gFeatureFlagIntentRegistration.isEnabled());
+
+    // The intentionally incorrect placement concern would throw StaleConfig if acquisition were
+    // allowed to reach the sharding metadata check.
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+
+    auto shutdownClient = getServiceContext()->getService()->makeClient("ShutdownClient");
+    auto shutdownOpCtx = shutdownClient->makeOperationContext();
+    auto shutdownTransition =
+        rss::consensus::IntentRegistry::get(getServiceContext())
+            .killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::Shutdown,
+                                       shutdownOpCtx.get(),
+                                       nullptr,
+                                       /*timeout_sec=*/10);
+    auto shutdownGuard = shutdownTransition.get();
+
+    ASSERT_THROWS_CODE(acquireCollection(operationContext(),
+                                         {
+                                             nssShardedCollection1,
+                                             placementConcern,
+                                             repl::ReadConcernArgs(),
+                                             AcquisitionPrerequisites::kWrite,
+                                         },
+                                         MODE_IX),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
+}
+
+TEST_F(ShardRoleTest, AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionThrows) {
     {
         // Clear the collection filtering metadata on the shard.
         CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1)
@@ -980,7 +958,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
         ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
         ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
         ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-        ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
+        ASSERT_EQ(kMyShardName, exInfo->getShardId());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
     };
 
@@ -1002,7 +980,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
         validateException);
 }
 
-TEST_P(ShardRoleUniqueShardIdentifiersTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
+TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter the critical section.
@@ -1025,7 +1003,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest, AcquireShardedCollWhenCriticalSectio
         ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
         ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
         ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-        ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
+        ASSERT_EQ(kMyShardName, exInfo->getShardId());
         ASSERT_TRUE(exInfo->getCriticalSectionSignal().is_initialized());
     };
     ASSERT_THROWS_WITH_CHECK(acquireCollection(operationContext(),
@@ -1296,8 +1274,7 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
                     ->isCollectionLockedForMode(nssShardedCollection1, MODE_IX));
 }
 
-TEST_P(ShardRoleUniqueShardIdentifiersTest,
-       AcquireMultipleCollectionsWithIncorrectPlacementConcernThrows) {
+TEST_F(ShardRoleTest, AcquireMultipleCollectionsWithIncorrectPlacementConcernThrows) {
     ASSERT_THROWS_WITH_CHECK(
         acquireCollections(operationContext(),
                            {{nssUnshardedCollection1,
@@ -1315,7 +1292,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
             ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
             ASSERT_EQ(ShardVersion::UNTRACKED(), exInfo->getVersionReceived());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
+            ASSERT_EQ(kMyShardName, exInfo->getShardId());
             ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
         });
 }
@@ -1712,6 +1689,116 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
         shard_role_details::getLocker(operationContext())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
+namespace {
+using Intent = rss::consensus::IntentRegistry::Intent;
+
+size_t declaredIntents(ServiceContext* svcCtx, Intent intent) {
+    return rss::consensus::IntentRegistry::get(svcCtx)
+        .getTotalIntentsDeclared()[static_cast<size_t>(intent)];
+}
+}  // namespace
+
+TEST_F(ShardRoleTest, YieldReleasesWriteIntentAndRestoreReacquiresIt) {
+    unittest::ServerParameterGuard intentRegistration("featureFlagIntentRegistration", true);
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                               },
+                                               MODE_IX);
+
+    const auto intentsAfterAcquire = declaredIntents(getServiceContext(), Intent::Write);
+
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+
+    // No locks are held while yielded, so no intent should be declared either.
+    const bool lockedWhileYielded =
+        shard_role_details::getLocker(operationContext())->isDbLockedForMode(nss.dbName(), MODE_IX);
+    const auto intentsWhileYielded = declaredIntents(getServiceContext(), Intent::Write);
+
+    restoreTransactionResourcesToOperationContext(operationContext(),
+                                                  std::move(yieldedTransactionResources));
+
+    ASSERT_EQ(1, intentsAfterAcquire);
+    ASSERT_FALSE(lockedWhileYielded);
+    ASSERT_EQ(0, intentsWhileYielded);
+
+    ASSERT_TRUE(shard_role_details::getLocker(operationContext())
+                    ->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_EQ(1, declaredIntents(getServiceContext(), Intent::Write));
+}
+
+TEST_F(ShardRoleTest, YieldReleasesReadIntentAndRestoreReacquiresIt) {
+    unittest::ServerParameterGuard intentRegistration("featureFlagIntentRegistration", true);
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kRead,
+                                               },
+                                               MODE_IS);
+
+    const auto intentsAfterAcquire = declaredIntents(getServiceContext(), Intent::Read);
+
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+
+    const auto intentsWhileYielded = declaredIntents(getServiceContext(), Intent::Read);
+
+    restoreTransactionResourcesToOperationContext(operationContext(),
+                                                  std::move(yieldedTransactionResources));
+
+    ASSERT_EQ(1, intentsAfterAcquire);
+    ASSERT_EQ(0, intentsWhileYielded);
+    ASSERT_EQ(1, declaredIntents(getServiceContext(), Intent::Read));
+}
+
+TEST_F(ShardRoleTest, StepdownWhileYieldedDrainsAndRestoreFailsForWrite) {
+    unittest::ServerParameterGuard intentRegistration("featureFlagIntentRegistration", true);
+    const auto nss = nssUnshardedCollection1;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNTRACKED()};
+    const auto acquisition = acquireCollection(operationContext(),
+                                               {
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kWrite,
+                                               },
+                                               MODE_IX);
+
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+
+    // The drain completes without needing to kill the yielded operation since no intent is held.
+    auto stepdownClient = getServiceContext()->getService()->makeClient("StepdownClient");
+    auto stepdownOpCtx = stepdownClient->makeOperationContext();
+    auto stepdownGuard =
+        rss::consensus::IntentRegistry::get(getServiceContext())
+            .killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown,
+                                       stepdownOpCtx.get(),
+                                       nullptr,
+                                       /*timeout_sec=*/10)
+            .get();
+
+    // If the yield is resumed during the state transition it should fail due to not being able to
+    // declare the intent.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+}
+
 TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
     const auto nss = nssUnshardedCollection1;
 
@@ -1855,7 +1942,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithoutLocks) {
                        ErrorCodes::QueryPlanKilled);
 }
 
-TEST_P(ShardRoleUniqueShardIdentifiersTest,
+TEST_F(ShardRoleTest,
        RestoreForWriteInvalidatesAcquisitionIfPlacementConcernShardVersionNoLongerMet) {
     const auto nss = nssShardedCollection1;
 
@@ -1887,18 +1974,18 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
                    kMyShardName)});
 
     // Try to restore the resources should fail because placement concern is no longer met.
-    ASSERT_THROWS_WITH_CHECK(
-        restoreTransactionResourcesToOperationContext(operationContext(),
-                                                      std::move(yieldedTransactionResources)),
-        ExceptionFor<ErrorCodes::StaleConfig>,
-        [&](const DBException& ex) {
-            const auto exInfo = ex.extraInfo<StaleConfigInfo>();
-            ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
-            ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
-            ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
-            ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
-        });
+    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
+                                 operationContext(), std::move(yieldedTransactionResources)),
+                             ExceptionFor<ErrorCodes::StaleConfig>,
+                             [&](const DBException& ex) {
+                                 const auto exInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
+                                 ASSERT_EQ(shardVersionShardedCollection1,
+                                           exInfo->getVersionReceived());
+                                 ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
+                                 ASSERT_EQ(kMyShardName, exInfo->getShardId());
+                                 ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
+                             });
 
     ASSERT_FALSE(shard_role_details::getLocker(operationContext())
                      ->isDbLockedForMode(nss.dbName(), MODE_IX));
@@ -1906,8 +1993,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
         shard_role_details::getLocker(operationContext())->isCollectionLockedForMode(nss, MODE_IX));
 }
 
-TEST_P(ShardRoleUniqueShardIdentifiersTest,
-       RestoreForWriteInvalidatesAcquisitionIfPlacementConcernTimestampChanged) {
+TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernTimestampChanged) {
     const auto nss = nssShardedCollection1;
 
     PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
@@ -1942,18 +2028,18 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
                    kMyShardName)});
 
     // Try to restore the resources should fail because placement concern is no longer met.
-    ASSERT_THROWS_WITH_CHECK(
-        restoreTransactionResourcesToOperationContext(operationContext(),
-                                                      std::move(yieldedTransactionResources)),
-        ExceptionFor<ErrorCodes::StaleConfig>,
-        [&](const DBException& ex) {
-            const auto exInfo = ex.extraInfo<StaleConfigInfo>();
-            ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
-            ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
-            ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
-            ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
-        });
+    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
+                                 operationContext(), std::move(yieldedTransactionResources)),
+                             ExceptionFor<ErrorCodes::StaleConfig>,
+                             [&](const DBException& ex) {
+                                 const auto exInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
+                                 ASSERT_EQ(shardVersionShardedCollection1,
+                                           exInfo->getVersionReceived());
+                                 ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
+                                 ASSERT_EQ(kMyShardName, exInfo->getShardId());
+                                 ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
+                             });
 
     ASSERT_FALSE(shard_role_details::getLocker(operationContext())
                      ->isDbLockedForMode(nss.dbName(), MODE_IX));
@@ -2056,7 +2142,7 @@ TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) 
     const BSONObj criticalSectionReason = BSON("reason" << 1);
 
     unittest::Barrier barrier(2);
-    AtomicWord<bool> restoreCompleted{false};
+    Atomic<bool> restoreCompleted{false};
 
     stdx::thread parallelThread([&] {
         ThreadClient client(operationContext()->getService());
@@ -2770,6 +2856,88 @@ TEST_F(ShardRoleTest, ReadAcquisitionsChangeReadSourceToLastApplied) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tests for iterateDurableCatalog
+// ---------------------------------------------------------------------------
+
+TEST_F(ShardRoleTest, IterateDurableCatalogOnPrimaryDoesNotChangeReadSource) {
+    // Default fixture state is primary.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    Lock::GlobalLock globalLk(operationContext(), MODE_IS);
+
+    std::vector<NamespaceString> visited;
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(),
+        [&](const NamespaceString& ns, const BSONObj& catalogEntry) { visited.push_back(ns); });
+
+    // The fixture creates nssUnshardedCollection1 and nssShardedCollection1, so the visitor
+    // must have observed at least these two collections.
+    ASSERT(std::find(visited.begin(), visited.end(), nssUnshardedCollection1) != visited.end());
+    ASSERT(std::find(visited.begin(), visited.end(), nssShardedCollection1) != visited.end());
+
+    // On a primary, the read source must remain kNoTimestamp.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+TEST_F(ShardRoleTest, IterateDurableCatalogOnSecondarySetsLastApplied) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Starting state is kNoTimestamp until iterateDurableCatalog adjusts it.
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+
+    Lock::GlobalLock globalLk(operationContext(), MODE_IS);
+
+    int visitorCount = 0;
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(),
+        [&](const NamespaceString& ns, const BSONObj& catalogEntry) { ++visitorCount; });
+
+    ASSERT_GT(visitorCount, 0);
+    ASSERT_EQUALS(
+        RecoveryUnit::ReadSource::kLastApplied,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+// When a snapshot is already open (recovery unit active), iterateDurableCatalog must not touch
+// the read source. This guards callers that wrap iterateDurableCatalog after an existing
+// acquisition (e.g. CommonMongodProcessInterface::listCatalog when system.views is present).
+TEST_F(ShardRoleTest, IterateDurableCatalogPreservesReadSourceWhenSnapshotAlreadyOpen) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Open a snapshot before any read-source switch can take place. This pins the recovery unit
+    // to its current read source (kNoTimestamp) and marks it active.
+    shard_role_details::getRecoveryUnit(operationContext())->preallocateSnapshot();
+    ASSERT_TRUE(shard_role_details::getRecoveryUnit(operationContext())->isActive());
+    const auto readSourceBefore =
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource();
+
+    Lock::GlobalLock globalLk(operationContext(), MODE_IS);
+
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(), [&](const NamespaceString& ns, const BSONObj& catalogEntry) {});
+
+    // Read source must be unchanged because the recovery unit was already active.
+    ASSERT_EQUALS(
+        readSourceBefore,
+        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
+}
+
+DEATH_TEST_REGEX_F(ShardRoleTestDeathTest,
+                   IterateDurableCatalogTassertsWithoutGlobalISLock,
+                   "Tripwire assertion.*9724500") {
+    shard_role_nocheck::iterateDurableCatalog(
+        operationContext(), [&](const NamespaceString& ns, const BSONObj& catalogEntry) {});
+}
+
 TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
     const auto nss = nssShardedCollection1;
 
@@ -3219,18 +3387,18 @@ DEATH_TEST_F(ShardRoleTestDeathTest,
                    kMyShardName)});
 
     // Try to restore the resources should fail because placement concern is no longer met.
-    ASSERT_THROWS_WITH_CHECK(
-        restoreTransactionResourcesToOperationContext(operationContext(),
-                                                      std::move(yieldedTransactionResources)),
-        ExceptionFor<ErrorCodes::StaleConfig>,
-        [&](const DBException& ex) {
-            const auto exInfo = ex.extraInfo<StaleConfigInfo>();
-            ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
-            ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
-            ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
-            ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
-        });
+    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
+                                 operationContext(), std::move(yieldedTransactionResources)),
+                             ExceptionFor<ErrorCodes::StaleConfig>,
+                             [&](const DBException& ex) {
+                                 const auto exInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
+                                 ASSERT_EQ(shardVersionShardedCollection1,
+                                           exInfo->getVersionReceived());
+                                 ASSERT_EQ(newShardVersion, exInfo->getVersionWanted());
+                                 ASSERT_EQ(kMyShardName, exInfo->getShardId());
+                                 ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
+                             });
 
     const NamespaceString otherNss =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "inexistent");
@@ -3451,7 +3619,6 @@ void ShardRoleTest::testRestoreFailsWhenMetadataInvalidated(
     {
         const auto& csr = CollectionShardingRuntime::acquireExclusive(operationContext(), nss);
         csr->invalidateRangePreserversOlderThanShardVersion(
-            operationContext(),
             shardVersionShardedCollection1.placementVersion(),
             getCollectionUUID(operationContext(), nss));
     }

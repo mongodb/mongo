@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/ce/histogram/histogram_test_utils.h"
 #include "mongo/db/query/compiler/stats/max_diff.h"
@@ -228,20 +202,20 @@ TEST_F(HistogramTest, MaxDiffTestString) {
 
     sortValueVector(randData);
     const DataDistribution& dataDistrib = getDataDistribution(randData);
-    const auto [tag, val] = value::makeNewString("91YgOvBB"sv);
-    value::ValueGuard vg(tag, val);
+    value::TagValueOwned val = value::TagValueOwned::fromRaw(value::makeNewString("91YgOvBB"sv));
 
     const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
     LOGV2(8674804, "Generated histogram", "histogram"_attr = hist.toString());
     ASSERT_LTE(hist.getBuckets().size(), nBuckets);
-    const double estimatedCard = estimateCardinality(hist, tag, val, EstimationType::kLess).card;
+    const double estimatedCard =
+        estimateCardinality(hist, val.tag(), val.value(), EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(15.9443, estimatedCard, kTolerance);
 
     const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
     LOGV2(8674805, "Generated histogram", "histogram"_attr = histAreaDiff.toString());
     ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
     const double estimatedCardAreaDiff =
-        estimateCardinality(histAreaDiff, tag, val, EstimationType::kLess).card;
+        estimateCardinality(histAreaDiff, val.tag(), val.value(), EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(9.59627, estimatedCardAreaDiff, kTolerance);
 }
 
@@ -325,12 +299,11 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const size_t actualCard =
             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$eq: 2}}}]");
 
-        const auto [tag, val] = makeInt64Value(2);
-        value::ValueGuard vg(tag, val);
+        value::TagValueOwned val = value::TagValueOwned::fromRaw(makeInt64Value(2));
         const EstimationResult estimatedCard =
-            estimateCardinalityEq(*estimator, tag, val, true /*includeScalar*/);
+            estimateCardinalityEq(*estimator, val.tag(), val.value(), /*includeScalar=*/true);
         const EstimationResult estimatedCardAreaDiff =
-            estimateCardinalityEq(*estimatorAreaDiff, tag, val, true);
+            estimateCardinalityEq(*estimatorAreaDiff, val.tag(), val.value(), true);
 
         ASSERT_EQ(4, actualCard);
         ASSERT_APPROX_EQUAL(4.0, estimatedCard.card, kTolerance);
@@ -341,27 +314,26 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const size_t actualCard =
             getActualCard(opCtx.get(), arrayData, "[{$match: {a: {$lt: 3}}}]");
 
-        const auto [tag, val] = makeInt64Value(3);
-        value::ValueGuard vg(tag, val);
+        value::TagValueOwned val = value::TagValueOwned::fromRaw(makeInt64Value(3));
         const EstimationResult estimatedCard =
             estimateCardinalityRange(*estimator,
-                                     false /*lowInclusive*/,
+                                     /*lowInclusive=*/false,
                                      value::TypeTags::MinKey,
                                      0,
-                                     false /*highInclusive*/,
-                                     tag,
-                                     val,
-                                     true /* includeScalar */,
+                                     /*highInclusive=*/false,
+                                     val.tag(),
+                                     val.value(),
+                                     /*includeScalar=*/true,
                                      ArrayRangeEstimationAlgo::kConjunctArrayCE);
         const EstimationResult estimatedCardAreaDiff =
             estimateCardinalityRange(*estimatorAreaDiff,
-                                     false /*lowInclusive*/,
+                                     /*lowInclusive=*/false,
                                      value::TypeTags::MinKey,
                                      0,
-                                     false /*highInclusive*/,
-                                     tag,
-                                     val,
-                                     true /* includeScalar */,
+                                     /*highInclusive=*/false,
+                                     val.tag(),
+                                     val.value(),
+                                     /*includeScalar=*/true,
                                      ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
         ASSERT_EQ(6, actualCard);
@@ -373,30 +345,28 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const size_t actualCard = getActualCard(
             opCtx.get(), arrayData, "[{$match: {a: {$elemMatch: {$gt: 2, $lt: 5}}}}]");
 
-        const auto [lowTag, lowVal] = makeInt64Value(2);
-        value::ValueGuard vgLow(lowTag, lowVal);
-        const auto [highTag, highVal] = makeInt64Value(5);
-        value::ValueGuard vgHigh(highTag, highVal);
+        value::TagValueOwned low = value::TagValueOwned::fromRaw(makeInt64Value(2));
+        value::TagValueOwned high = value::TagValueOwned::fromRaw(makeInt64Value(5));
 
         const EstimationResult estimatedCard =
             estimateCardinalityRange(*estimator,
-                                     false /*lowInclusive*/,
-                                     lowTag,
-                                     lowVal,
-                                     false /*highInclusive*/,
-                                     highTag,
-                                     highVal,
-                                     false /* includeScalar */,
+                                     /*lowInclusive=*/false,
+                                     low.tag(),
+                                     low.value(),
+                                     /*highInclusive=*/false,
+                                     high.tag(),
+                                     high.value(),
+                                     /*includeScalar=*/false,
                                      ArrayRangeEstimationAlgo::kExactArrayCE);
         const EstimationResult estimatedCardAreaDiff =
             estimateCardinalityRange(*estimatorAreaDiff,
-                                     false /*lowInclusive*/,
-                                     lowTag,
-                                     lowVal,
-                                     false /*highInclusive*/,
-                                     highTag,
-                                     highVal,
-                                     false /* includeScalar */,
+                                     /*lowInclusive=*/false,
+                                     low.tag(),
+                                     low.value(),
+                                     /*highInclusive=*/false,
+                                     high.tag(),
+                                     high.value(),
+                                     /*includeScalar=*/false,
                                      ArrayRangeEstimationAlgo::kExactArrayCE);
 
         ASSERT_EQ(2, actualCard);

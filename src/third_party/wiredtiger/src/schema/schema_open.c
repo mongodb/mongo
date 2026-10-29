@@ -28,18 +28,6 @@ __schema_colgroup_name(
 }
 
 /*
- * __wt_schema_tiered_shared_colgroup_name --
- *     Get the URI for a tiered storage shared column group. This is used for metadata lookups.
- */
-int
-__wt_schema_tiered_shared_colgroup_name(
-  WT_SESSION_IMPL *session, const char *tablename, bool active, WT_ITEM *buf)
-{
-    WT_PREFIX_SKIP(tablename, "table:");
-    return (__wt_buf_fmt(session, buf, "colgroup:%s.%s", tablename, active ? "active" : "shared"));
-}
-
-/*
  * __wti_schema_open_colgroups --
  *     Open the column groups for a table.
  */
@@ -80,11 +68,7 @@ __wti_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
         __wti_schema_destroy_colgroup(session, &table->cgroups[i]);
 
         WT_ERR(__wt_buf_init(session, buf, 0));
-        if (table->is_tiered_shared)
-            WT_ERR(__wt_schema_tiered_shared_colgroup_name(
-              session, table->iface.name, i == 0 ? true : false, buf));
-        else
-            WT_ERR(__schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
+        WT_ERR(__schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
         if ((ret = __wt_metadata_search(session, buf->data, &cgconfig)) != 0) {
             /* It is okay if the table is incomplete. */
             if (ret == WT_NOTFOUND)
@@ -390,8 +374,7 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 /*
  * __wt_schema_open_page_log --
- *     Return a page log if configured. This doesn't really belong here, but it's shared between
- *     btree and tiered handle configuration, so I could not think of somewhere better.
+ *     Return a page log if configured.
  */
 int
 __wt_schema_open_page_log(
@@ -415,29 +398,31 @@ __wt_schema_open_page_log(
 }
 
 /*
- * __wt_schema_open_storage_source --
- *     Return a storage source if configured. This doesn't really belong here, but it's shared
- *     between btree and tiered handle configuration, so I could not think of somewhere better.
+ * __wt_schema_page_log_from_config --
+ *     Return the page log named by a table's configuration, or the connection's page log if the
+ *     table does not name one.
  */
 int
-__wt_schema_open_storage_source(
-  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, WT_NAMED_STORAGE_SOURCE **nstoragep)
+__wt_schema_page_log_from_config(
+  WT_SESSION_IMPL *session, const char *cfg[], WT_PAGE_LOG **page_logp)
 {
-    WT_CONNECTION_IMPL *conn;
-    WT_NAMED_STORAGE_SOURCE *nstorage;
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+    WT_NAMED_PAGE_LOG *npage_log;
 
-    *nstoragep = NULL;
+    *page_logp = NULL;
 
-    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
-        return (0);
+    ret = __wt_config_gets(session, cfg, "disaggregated.page_log", &cval);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret == WT_NOTFOUND || cval.len == 0)
+        npage_log = S2C(session)->disaggregated_storage.npage_log;
+    else
+        WT_RET(__wt_schema_open_page_log(session, &cval, &npage_log));
 
-    conn = S2C(session);
-    TAILQ_FOREACH (nstorage, &conn->ext.storagesrcqh, q)
-        if (WT_CONFIG_MATCH(nstorage->name, *name)) {
-            *nstoragep = nstorage;
-            return (0);
-        }
-    WT_RET_MSG(session, EINVAL, "unknown storage source '%.*s'", (int)name->len, name->str);
+    if (npage_log != NULL)
+        *page_logp = npage_log->page_log;
+
+    return (0);
 }
 
 /*
@@ -487,10 +472,6 @@ __schema_open_table(WT_SESSION_IMPL *session)
 
     if (table->ncolgroups > 0 && table->is_simple)
         WT_ERR_MSG(session, EINVAL, "%s requires a table with named columns", tablename);
-
-    if ((ret = __wt_config_gets(session, table_cfg, "shared", &cval)) == 0)
-        table->is_tiered_shared = true;
-    WT_ERR_NOTFOUND_OK(ret, false);
 
     WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
     WT_ERR(__wti_schema_open_colgroups(session, table));
@@ -685,8 +666,12 @@ __schema_open_layered(WT_SESSION_IMPL *session)
 int
 __wt_schema_open_layered(WT_SESSION_IMPL *session)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_LAYERED_TABLE *layered;
+    char *stable_value;
+
+    stable_value = NULL;
 
     if (!__wt_conn_is_disagg(session)) {
         __wt_err(session, EINVAL, "layered table is only supported for disaggregated storage");
@@ -710,6 +695,20 @@ __wt_schema_open_layered(WT_SESSION_IMPL *session)
     WT_RET(ret);
 
     WT_RET(__wt_layered_table_manager_add_table(session, layered->ingest_btree_id));
+
+    /*
+     * A create after the step-down timestamp skips the stable constituent, so mark the handle and
+     * cursors route to ingest rather than attempting an open that cannot succeed. The schema lock
+     * held here serializes the timestamp, making the relaxed load safe.
+     */
+    conn = S2C(session);
+    if (__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) &&
+      __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE) {
+        WT_RET_NOTFOUND_OK(ret = __wt_metadata_search(session, layered->stable_uri, &stable_value));
+        if (ret == WT_NOTFOUND)
+            __wt_atomic_store_bool_relaxed(&layered->step_down_created, true);
+        __wt_free(session, stable_value);
+    }
 
     F_SET(layered, WT_LAYERED_TABLE_OPEN);
 

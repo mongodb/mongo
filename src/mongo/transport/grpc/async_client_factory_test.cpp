@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/executor/async_client_factory.h"
 
@@ -146,12 +120,9 @@ public:
     }
 
     std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle> getClient(
-        const HostAndPort& target) {
-        return getFactory()
-            .get(target,
-                 ConnectSSLMode::kGlobalSSLMode,
-                 CommandServiceTestFixtures::kDefaultConnectTimeout)
-            .get();
+        const HostAndPort& target,
+        Milliseconds timeout = CommandServiceTestFixtures::kDefaultConnectTimeout) {
+        return getFactory().get(target, ConnectSSLMode::kGlobalSSLMode, timeout).get();
     }
 
     std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle> getLeasedClient() {
@@ -250,7 +221,7 @@ TEST_F(GRPCAsyncClientFactoryTest, Ping) {
         auto handle = getClient();
         ON_BLOCK_EXIT([&] { handle->indicateSuccess(); });
         auto msg = makeUniqueMessage();
-        auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
+        auto resp = handle->getClient().runCommand_forTest(OpMsgRequest::parse(msg)).get();
         ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
         handle->indicateSuccess();
     }
@@ -265,10 +236,12 @@ TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
 
         for (int i = 0; i < concurrentThreads; i++) {
             auto th = monitor.spawn([&] {
-                auto handle = getClient();
+                auto handle =
+                    getClient(getTarget(), CommandServiceTestFixtures::kConcurrentConnectTimeout);
                 for (int req = 0; req < 5; req++) {
                     auto msg = makeUniqueMessage();
-                    auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
+                    auto resp =
+                        handle->getClient().runCommand_forTest(OpMsgRequest::parse(msg)).get();
                     ON_BLOCK_EXIT([&] { handle->indicateSuccess(); });
                     ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
                 }
@@ -297,8 +270,10 @@ TEST_F(GRPCAsyncClientFactoryTest, DropAllConnections) {
 
         getFactory().dropConnections();
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
-        ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle1->getClient().runCommand_forTest(msg).getNoThrow(),
+                  ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle2->getClient().runCommand_forTest(msg).getNoThrow(),
+                  ErrorCodes::CallbackCanceled);
 
         // New sessions succeed and use a different underlying channel.
         auto handle3 = getClient();
@@ -306,7 +281,7 @@ TEST_F(GRPCAsyncClientFactoryTest, DropAllConnections) {
 
         ASSERT_NE(handle1ChannelId, getChannelIdForClient(handle3));
 
-        ASSERT_OK(handle3->getClient().runCommand(msg).getNoThrow());
+        ASSERT_OK(handle3->getClient().runCommand_forTest(msg).getNoThrow());
     }
 
     shutdownAndAssertOnTransportStats(1 /*successful streams*/, 2 /*failed streams*/);
@@ -328,10 +303,11 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionToTarget) {
         getFactory().dropConnections(target1);
 
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle1->getClient().runCommand_forTest(msg).getNoThrow(),
+                  ErrorCodes::CallbackCanceled);
 
         // The other target is unaffected by dropConnections.
-        ASSERT_OK(handle2->getClient().runCommand(msg).getNoThrow());
+        ASSERT_OK(handle2->getClient().runCommand_forTest(msg).getNoThrow());
     }
 
     shutdownAndAssertOnTransportStats(1 /*successful streams*/, 1 /*failed streams*/);
@@ -342,7 +318,7 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnecting) {
         // Start a stream establishment attempt that will hang until cancelled.
         auto connAttempt = getFactory().get(
             HostAndPort("localhost", 12345), ConnectSSLMode::kGlobalSSLMode, Milliseconds::max());
-        assertStatsSoon(0 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+        assertStatsSoon(/*created=*/0, /*inUse=*/0, /*leased=*/0, /*open=*/1);
         getFactory().dropConnections();
         auto status = connAttempt.getNoThrow().getStatus();
         ASSERT_NOT_OK(status);
@@ -363,7 +339,7 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnectingWithKeepOpen) {
         // Start a stream establishment attempt that will hang until cancelled.
         auto connAttempt = getFactory().get(
             remote, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max(), cancelSource.token());
-        assertStatsSoon(0 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+        assertStatsSoon(/*created=*/0, /*inUse=*/0, /*leased=*/0, /*open=*/1);
         getFactory().dropConnections();
 
         // The first dropConnections does not affect the connect Future.
@@ -391,12 +367,12 @@ TEST_F(GRPCAsyncClientFactoryTest, KeepOpen) {
 
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
         // We can still run a command on the old session.
-        ASSERT_OK(handle1->getClient().runCommand(msg).getNoThrow());
+        ASSERT_OK(handle1->getClient().runCommand_forTest(msg).getNoThrow());
 
         // New sessions are also unaffected.
         auto handle2 = getClient();
         ON_BLOCK_EXIT([&] { handle2->indicateSuccess(); });
-        ASSERT_OK(handle2->getClient().runCommand(msg).getNoThrow());
+        ASSERT_OK(handle2->getClient().runCommand_forTest(msg).getNoThrow());
 
         // The same channel is used for the remote on new sessions because it was kept open.
         ASSERT_EQ(getChannelIdForClient(handle1), getChannelIdForClient(handle2));
@@ -423,8 +399,10 @@ TEST_F(GRPCAsyncClientFactoryTest, Shutdown) {
         waitForDisconnected(handle1);
         waitForDisconnected(handle2);
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
-        ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle1->getClient().runCommand_forTest(msg).getNoThrow(),
+                  ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle2->getClient().runCommand_forTest(msg).getNoThrow(),
+                  ErrorCodes::CallbackCanceled);
 
         ASSERT_FALSE(pf.future.isReady());
     }
@@ -447,7 +425,8 @@ TEST_F(GRPCAsyncClientFactoryTest, RefuseShutdownWithActiveClient) {
         });
         waitForDisconnected(handle1);
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle1->getClient().runCommand_forTest(msg).getNoThrow(),
+                  ErrorCodes::CallbackCanceled);
 
         ASSERT_FALSE(pf.future.isReady());
 
@@ -466,7 +445,7 @@ TEST_F(GRPCAsyncClientFactoryTest, PerClientStatsTest) {
     auto handle = getClient();
     auto anotherHandle = getClient();
     auto leasedHandle = getLeasedClient();
-    assertStatsSoon(3 /*created*/, 2 /*inUse*/, 1 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/2, /*leased=*/1, /*open=*/1);
 
     // Destroy two handles.
     handle->indicateSuccess();
@@ -475,18 +454,18 @@ TEST_F(GRPCAsyncClientFactoryTest, PerClientStatsTest) {
     leasedHandle.reset();
 
     // Handle outcome should not affect stats.
-    assertStatsSoon(3 /*created*/, 1 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/1, /*leased=*/0, /*open=*/1);
 
     auto msg = makeUniqueMessage();
-    auto resp = anotherHandle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
+    auto resp = anotherHandle->getClient().runCommand_forTest(OpMsgRequest::parse(msg)).get();
     ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
 
     // A handle is still in use after a command is run and before it is destroyed.
-    assertStatsSoon(3 /*created*/, 1 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/1, /*leased=*/0, /*open=*/1);
 
     anotherHandle->indicateSuccess();
     anotherHandle.reset();
-    assertStatsSoon(3 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/0, /*leased=*/0, /*open=*/1);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, CumulativeStatsTest) {
@@ -550,9 +529,7 @@ public:
 
         _net = executor::makeNetworkInterfaceWithClientFactory(
             "MockGRPCAsyncClientFactoryTest",
-            std::make_shared<GRPCAsyncClientFactory>("MockGRPCAsyncClientFactoryTest"),
-            nullptr,
-            false);
+            std::make_shared<GRPCAsyncClientFactory>("MockGRPCAsyncClientFactoryTest"));
         _net->startup();
     }
 
@@ -613,7 +590,7 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelChannelEstablishment) {
     });
     ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    fpb->waitForOneNewEntry();
     cancellationSource.cancel();
     fpb.reset();
 
@@ -651,7 +628,7 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
         });
         ON_BLOCK_EXIT([&] { cmdThread.join(); });
 
-        fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+        fpb->waitForOneNewEntry();
         cancellationSource.cancel();
         fpb.reset();
 

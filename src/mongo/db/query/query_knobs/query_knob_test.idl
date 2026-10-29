@@ -1,36 +1,12 @@
-# Copyright (C) 2026-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/query_knobs/query_knob_test_callbacks.h"
         - "mongo/db/query/query_knobs/with_on_update_util.h"
-        - "mongo/platform/atomic_word.h"
+        - "mongo/platform/atomic.h"
         - "mongo/util/synchronized_value.h"
 
 enums:
@@ -45,7 +21,7 @@ server_parameters:
     testIntKnob:
         set_at: [startup, runtime]
         description: "Synthetic int knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gTestIntKnob
         default: 42
         validator:
@@ -63,7 +39,7 @@ server_parameters:
     testDoubleKnob:
         set_at: [startup, runtime]
         description: "Synthetic double knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gTestDoubleKnob
         default: 3.14
         validator:
@@ -80,7 +56,7 @@ server_parameters:
     testBoolKnob:
         set_at: [startup, runtime]
         description: "Synthetic bool knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gTestBoolKnob
         default: true
         redact: false
@@ -91,10 +67,24 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    testLowFcvKnob:
+        set_at: [startup, runtime]
+        description: "Synthetic int knob with a low minimum FCV for FCV-gating tests."
+        cpp_vartype: Atomic<int>
+        cpp_varname: gTestLowFcvKnob
+        default: 5
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: testLowFcvKnobWire
+                pqs_settable: true
+                fcv:
+                    min: "8.0"
+
     testLLKnob:
         set_at: [startup, runtime]
         description: "Synthetic long long knob for QueryKnob descriptor tests."
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: gTestLLKnob
         default: 100
         redact: false
@@ -118,7 +108,7 @@ server_parameters:
     testPlainParam:
         set_at: [startup, runtime]
         description: "Plain ServerParameter (no query_knob annotation) for QueryKnobRegistry tests."
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: gTestPlainParam
         default: 0.0
         redact: false

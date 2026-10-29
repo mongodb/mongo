@@ -580,7 +580,8 @@ main(int argc, char *argv[])
 
     /* Optionally scan created tables to warm the WT cache. */
     if (opt.warm_cache_pct > 0)
-        cache_warming(opt.collection_count * opt.key_count * opt.warm_cache_pct / 100);
+        cache_warming(
+          static_cast<int64_t>(opt.collection_count) * opt.key_count * opt.warm_cache_pct / 100);
 
     crud_operations();
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 
@@ -37,16 +11,56 @@ namespace mongo::query_stats {
 // Estimated overhead for BSON document header, EOO, and potential subobject field names.
 const size_t kBSONOverhead = 100;
 
+// Estimated overhead of a single 'errors' array entry: {code, codeName, count,
+// latestSeenTimestamp}.
+const size_t kBSONOverheadPerErrorEntry = 100;
+
+void QueryStatsEntry::recordErrorCode(ErrorCodes::Error code) {
+    execCountErrored++;
+    const auto now = Date_t::now();
+
+    // 'find()' promotes the entry to most-recently-seen if it already exists.
+    if (auto it = recentErrors.find(code); it != recentErrors.end()) {
+        it->second.count++;
+        it->second.latestSeenTimestamp = now;
+    } else {
+        recentErrors.add(code, QueryStatsErrorEntry{1, now});
+    }
+}
+
+// Estimated BSON padding for a serialized QueryStatsEntry, on top of 'sizeof(QueryStatsEntry)'.
+// This is an estimate of future growth, made up of:
+// - overhead for the BSON structure itself, plus one allowance per top-level sub-structure
+//   (cursorStats, queryExecStats, queryPlannerStats and writesStats), and
+// - an additional 500 bytes to account for any potential supplemental metrics.
+const size_t kQueryStatsEntryPadding = (kBSONOverhead * 5) + 500;
+
 BSONObj QueryStatsEntry::toBSON(bool buildSubsections,
                                 bool includeWriteMetrics,
-                                bool includeCBRMetrics) const {
-    // Pad not only for the overhead of the BSON structure itself, but also for the
-    // sub-structures it contains. We have 4 sub-structures at the top level:
-    // cursorStats, queryExecStats, queryPlannerStats, and writesStats.
-    // Pad an additional 500 bytes to account for any potential supplemental metrics.
-    BSONObjBuilder builder{sizeof(QueryStatsEntry) + (kBSONOverhead * 5) + 500};
+                                bool includeCBRMetrics,
+                                bool includeErrorMetrics) const {
+    // Pad overhead for the 'errors' array based on the number of entries currently tracked.
+    const size_t errorEntriesSizeEstimate =
+        includeErrorMetrics ? recentErrors.size() * kBSONOverheadPerErrorEntry : 0;
+    BSONObjBuilder builder{static_cast<int>(sizeof(QueryStatsEntry) + kQueryStatsEntryPadding +
+                                            errorEntriesSizeEstimate)};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
     builder.append("execCount", (long long)execCount);
+    if (includeErrorMetrics) {
+        builder.append("execCountErrored", (long long)execCountErrored);
+        // Serialize the bounded 'recentErrors' cache as the 'errors' array, resolving each stored
+        // code to its name.
+        if (!recentErrors.empty()) {
+            BSONArrayBuilder errorsBuilder{builder.subarrayStart("errors")};
+            for (const auto& [code, error] : recentErrors) {
+                BSONObjBuilder errorBuilder{errorsBuilder.subobjStart()};
+                errorBuilder.append("code", static_cast<int32_t>(code));
+                errorBuilder.append("codeName", ErrorCodes::errorString(code));
+                errorBuilder.append("count", (long long)error.count);
+                errorBuilder.append("latestSeenTimestamp", error.latestSeenTimestamp);
+            }
+        }
+    }
     totalExecMicros.appendTo(builder, "totalExecMicros");
     cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
     workingTimeMillis.appendTo(builder, "workingTimeMillis");
@@ -132,6 +146,9 @@ void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder,
     usedDisk.appendTo(*builder, "usedDisk");
     fromMultiPlanner.appendTo(*builder, "fromMultiPlanner");
     fromPlanCache.appendTo(*builder, "fromPlanCache");
+    if (!planShapeCounters.empty()) {
+        builder->append("planShapeCounters", planShapeCounters.toBSON());
+    }
 
     if (includeCBRMetrics) {
         planningTimeMicros.appendTo(*builder, "planningTimeMicros");

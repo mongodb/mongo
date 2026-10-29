@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 
@@ -35,9 +9,7 @@
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
-#include "mongo/db/query/query_stats/delete_key.h"
-#include "mongo/db/query/query_stats/insert_key.h"
-#include "mongo/db/query/query_stats/update_key.h"
+#include "mongo/db/query/query_stats/write_key.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
@@ -46,6 +18,22 @@
 
 namespace mongo::query_stats {
 using namespace std::literals::string_view_literals;
+
+bool WriteCmdQueryStatsRegistrar::requestIncludesQueryStatsMetrics(const WriteCommandRef& cmdRef) {
+    if (!cmdRef.isBatchWriteCommand()) {
+        return false;
+    }
+    const auto& batchRequest = cmdRef.getBatchedCommandRequest();
+    if (batchRequest.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
+        return bool(batchRequest.getInsertRequest().getIncludeQueryStatsMetrics());
+    }
+    for (int opIndex = 0; opIndex < static_cast<int>(cmdRef.getNumOps()); ++opIndex) {
+        if (cmdRef.getOp(opIndex).getIncludeQueryStatsMetricsForOpIndex()) {
+            return true;
+        }
+    }
+    return false;
+}
 
 namespace {
 
@@ -72,7 +60,7 @@ void computeHashAndMaybeRegister(OperationContext* opCtx,
             // batch rather than a single op.
             if (nOps > 1)
                 return boost::none;
-            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
         });
 
     if (skipRegistration)
@@ -273,7 +261,7 @@ void parseAndRegisterInsertOp(OperationContext* opCtx,
             return shape_helpers::computeQueryShapeHash(opCtx,
                                                         deferredShape,
                                                         insertRequest.getNamespace(),
-                                                        true /*skipInternalClientCheck*/);
+                                                        /*skipInternalClientCheck=*/true);
         });
 
     if (skipRegistration) {

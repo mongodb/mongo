@@ -73,9 +73,6 @@
  * form). Don't use when strict-suffix semantics are required. */
 #define WT_URI_IS_STABLE(uri) (strstr(uri, ".wt_stable") != NULL)
 
-/* Check whether a URI refers to the checkpoint-view form of a stable constituent. */
-#define WT_URI_IS_STABLE_CHECKPOINT(uri) (strstr(uri, ".wt_stable/") != NULL)
-
 /* Check whether a URI refers to the ingest constituent of a layered table. */
 #define WT_URI_IS_INGEST(uri) WT_SUFFIX_MATCH(uri, ".wt_ingest")
 
@@ -84,12 +81,18 @@
  */
 #define WT_IS_METADATA(dh) F_ISSET((dh), WT_DHANDLE_IS_METADATA)
 #define WT_IS_DISAGG_META(dh) F_ISSET(dh, WT_DHANDLE_DISAGG_META)
+/* Either metadata tree: prefer this unless one of them alone is meant. */
+#define WT_IS_ANY_METADATA(dh) F_ISSET((dh), WT_DHANDLE_DISAGG_META | WT_DHANDLE_IS_METADATA)
 
 /*
  * Optimize comparisons against the history store URI, flag handles that reference the history store
  * file.
  */
 #define WT_IS_HS(dh) F_ISSET(dh, WT_DHANDLE_HS)
+
+/* The shared history store is the history store instance used by disaggregated storage. */
+#define WT_IS_SHARED_HS(btree) \
+    (WT_IS_HS((btree)->dhandle) && F_ISSET((btree), WT_BTREE_DISAGGREGATED))
 
 #define WT_METAFILE_ID 0 /* Metadata file ID */
 
@@ -165,6 +168,7 @@ typedef struct __wt_disagg_metadata {
     wt_timestamp_t oldest_timestamp;     /* Oldest timestamp */
     wt_timestamp_t schema_epoch;         /* Disaggregated schema epoch at the time of checkpoint */
     uint32_t largest_file_id;            /* High water mark of allocated file IDs */
+    uint64_t max_write_gen; /* Largest write generation used when the checkpoint was written */
 
     const char *key_provider; /* Key provider metadata string */
     size_t key_provider_len;  /* Length of key provider metadata string */
@@ -172,3 +176,13 @@ typedef struct __wt_disagg_metadata {
     int version;            /* Metadata version */
     int compatible_version; /* Minimum compatible reader version */
 } WT_DISAGG_METADATA;
+
+/*
+ * WT_DROP_PENDING --
+ *	A renamed file a committed drop removes once its locks are released.
+ */
+struct __wt_drop_pending {
+    char *name;
+
+    TAILQ_ENTRY(__wt_drop_pending) q;
+};

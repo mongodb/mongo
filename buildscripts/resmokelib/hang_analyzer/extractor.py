@@ -24,13 +24,14 @@ from retry import retry
 
 from buildscripts.create_rbe_sysroot import create_rbe_sysroot
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
+from buildscripts.resmokelib.setup_multiversion import download
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
     _DownloadOptions,
 )
 from buildscripts.resmokelib.symbolizer import Symbolizer
-from buildscripts.resmokelib.utils import evergreen_conn
+from buildscripts.resmokelib.utils import evergreen_conn, filesystem
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 from buildscripts.resmokelib.utils.otel_thread_pool_executor import OtelThreadPoolExecutor
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
@@ -348,6 +349,53 @@ def download_multiversion_artifact(
         return False
 
 
+def download_release_multiversion_artifact(
+    root_logger: Logger,
+    release_urls: dict,
+    download_options: _DownloadOptions,
+    download_dir: str,
+    name: str,
+    bin_version: str,
+) -> bool:
+    """Download a version pinned to the public release feed (e.g. last-patch), which has a plain
+    download URL instead of an Evergreen version/variant to resolve.
+    """
+    current_span = get_default_current_span(
+        {"downloaded_artifact_type": name, "version": bin_version}
+    )
+    try:
+        root_logger.info("Downloading %s", name)
+        url = (
+            release_urls.get("binary")
+            if download_options.download_binaries
+            else release_urls.get("debug_symbols")
+        )
+        if not url:
+            raise DownloadError(f"Release download URL not found for {name}")
+
+        # This is a plain public download.mongodb.com URL, not an S3 object -- go straight through
+        # the generic HTTP path rather than download.download_from_s3, which assumes any
+        # non-presigned URL is an S3 bucket and would 403 trying to sign a request for it.
+        install_dir = os.path.abspath(os.path.join(download_dir, bin_version, "install"))
+        os.makedirs(install_dir, exist_ok=True)
+        filename = os.path.join(filesystem.mkdtemp_in_build_dir(), url.split("/")[-1].split("?")[0])
+        download_from_s3_with_requests(url, filename, raise_on_error=True)
+        download.extract_archive(filename, install_dir)
+        os.remove(filename)
+
+        if download_options.download_binaries:
+            download.symlink_version(bin_version, install_dir, os.path.abspath(download_dir))
+
+        root_logger.info("Downloaded %s", name)
+        return True
+    except Exception as ex:
+        root_logger.error("An error occured while trying to download %s", name)
+        root_logger.error(ex)
+        current_span.set_status(StatusCode.ERROR, f"Failed to download {name}")
+        current_span.set_attribute("download_multiversion_artifact_error", str(ex))
+        return False
+
+
 def get_dwarf_version(dwarf_dump):
     """
     Find the dwarf version of a compile unit that was produced by a MongoDB compiler or
@@ -590,6 +638,11 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
     if os.path.exists(os.path.join(install_dir, "dist-test")):
         install_dir = os.path.join(install_dir, "dist-test")
     bin_dir = os.path.join(install_dir, "bin")
+    if not os.path.isdir(bin_dir):
+        # Pre-hygienic tarballs (e.g. the public release feed used for last-patch) have no
+        # nested bin/ dir -- extract_archive() flattens them so the executables land directly
+        # in install_dir, matching the layout symlink_version() already falls back to.
+        bin_dir = install_dir
     bin_files = [os.path.join(bin_dir, file_path) for file_path in os.listdir(bin_dir)]
     lib_dir = os.path.join(install_dir, "lib")
     lib_files = []
@@ -699,9 +752,10 @@ def download_task_artifacts(
         skip_download = next(
             filter(lambda v: v.get("bin_suffix") == "", multiversion_downloads), None
         )
-        if skip_download:
-            version_id = skip_download["evg_urls_info"]["evg_version_id"]
-            variant = skip_download["evg_urls_info"]["evg_build_variant"]
+        skip_download_urls_info = skip_download.get("evg_urls_info") if skip_download else None
+        if skip_download_urls_info:
+            version_id = skip_download_urls_info["evg_version_id"]
+            variant = skip_download_urls_info["evg_build_variant"]
 
     if variant == "enterprise-rhel-8-64-bit-future-git-tag-multiversion":
         # Tasks on this variant depend on multiple archive_dist_test tasks from the same version, so
@@ -711,6 +765,7 @@ def download_task_artifacts(
 
     all_downloaded = True
     multiversion_versions = set()
+    skipped_versions = set()
     with OtelThreadPoolExecutor() as executor:
         futures = []
         futures.append(
@@ -787,40 +842,86 @@ def download_task_artifacts(
                     filter(
                         lambda actual, desired=version: actual.get("bin_suffix") == desired,
                         multiversion_downloads,
-                    )
+                    ),
+                    None,
                 )
-                version_id = version_downloads["evg_urls_info"]["evg_version_id"]
-                variant = version_downloads["evg_urls_info"]["evg_build_variant"]
-                futures.append(
-                    executor.submit(
-                        run_with_retries,
-                        func=download_multiversion_artifact,
-                        timeout_secs=download_timeout_secs,
-                        retry_secs=retry_secs,
-                        root_logger=root_logger,
-                        version_id=version_id,
-                        variant=variant,
-                        download_options=binary_download_options,
-                        download_dir=multiversion_dir,
-                        name=f"binaries-{version}",
-                        bin_version=version,
-                    )
+                evg_urls_info = (
+                    version_downloads.get("evg_urls_info") if version_downloads else None
                 )
-                futures.append(
-                    executor.submit(
-                        run_with_retries,
-                        func=download_multiversion_artifact,
-                        timeout_secs=download_timeout_secs,
-                        retry_secs=retry_secs,
-                        root_logger=root_logger,
-                        version_id=version_id,
-                        variant=variant,
-                        download_options=debugsymbols_download_options,
-                        download_dir=multiversion_dir,
-                        name=f"debugsymbols-{version}",
-                        bin_version=version,
-                    )
+                release_urls_info = (
+                    version_downloads.get("release_urls_info") if version_downloads else None
                 )
+                if evg_urls_info:
+                    futures.append(
+                        executor.submit(
+                            run_with_retries,
+                            func=download_multiversion_artifact,
+                            timeout_secs=download_timeout_secs,
+                            retry_secs=retry_secs,
+                            root_logger=root_logger,
+                            version_id=evg_urls_info["evg_version_id"],
+                            variant=evg_urls_info["evg_build_variant"],
+                            download_options=binary_download_options,
+                            download_dir=multiversion_dir,
+                            name=f"binaries-{version}",
+                            bin_version=version,
+                        )
+                    )
+                    futures.append(
+                        executor.submit(
+                            run_with_retries,
+                            func=download_multiversion_artifact,
+                            timeout_secs=download_timeout_secs,
+                            retry_secs=retry_secs,
+                            root_logger=root_logger,
+                            version_id=evg_urls_info["evg_version_id"],
+                            variant=evg_urls_info["evg_build_variant"],
+                            download_options=debugsymbols_download_options,
+                            download_dir=multiversion_dir,
+                            name=f"debugsymbols-{version}",
+                            bin_version=version,
+                        )
+                    )
+                elif release_urls_info and release_urls_info.get("urls"):
+                    # No Evergreen version to resolve (e.g. last-patch, pinned to the public
+                    # release feed instead), but there is a plain download URL to use directly.
+                    release_urls = release_urls_info["urls"]
+                    futures.append(
+                        executor.submit(
+                            run_with_retries,
+                            func=download_release_multiversion_artifact,
+                            timeout_secs=download_timeout_secs,
+                            retry_secs=retry_secs,
+                            root_logger=root_logger,
+                            release_urls=release_urls,
+                            download_options=binary_download_options,
+                            download_dir=multiversion_dir,
+                            name=f"binaries-{version}",
+                            bin_version=version,
+                        )
+                    )
+                    futures.append(
+                        executor.submit(
+                            run_with_retries,
+                            func=download_release_multiversion_artifact,
+                            timeout_secs=download_timeout_secs,
+                            retry_secs=retry_secs,
+                            root_logger=root_logger,
+                            release_urls=release_urls,
+                            download_options=debugsymbols_download_options,
+                            download_dir=multiversion_dir,
+                            name=f"debugsymbols-{version}",
+                            bin_version=version,
+                        )
+                    )
+                else:
+                    # No download info at all for this version -- it was built locally rather
+                    # than downloaded (e.g. the binary under test), so there is nothing to fetch.
+                    root_logger.info(
+                        f"No download info for version '{version}' found in a core dump; "
+                        "skipping (likely built locally rather than downloaded)."
+                    )
+                    skipped_versions.add(version)
 
             for future in concurrent.futures.as_completed(futures):
                 if not future.result():
@@ -838,7 +939,7 @@ def download_task_artifacts(
     if all_downloaded and sys.platform.startswith("linux"):
         post_install_gdb_optimization(download_dir, root_logger)
 
-        for version in multiversion_versions:
+        for version in multiversion_versions - skipped_versions:
             post_install_gdb_optimization(os.path.join(multiversion_dir, version), root_logger)
 
     return all_downloaded
@@ -1033,18 +1134,44 @@ def find_test_task_with_binaries(evg_api, results_task_id: str):
         return None
 
 
+def _find_binary_artifacts(root_logger: Logger, evg_api, task_id: str) -> list:
+    """
+    Find the archive of symbolized binaries to analyze cores against.
+
+    The runner (resmoke_tests) task relinks and uploads binaries for the targets that failed in its
+    own execution. A result task restarted on its own by stepback or the autoreverter re-runs the
+    test itself, and uploads its own binaries, so prefer the result task's archive.
+
+    :return: List of matching artifacts, empty if none were found on either task.
+    """
+    candidates = []
+
+    try:
+        candidates.append(evg_api.task_by_id(task_id))
+    except Exception as ex:
+        root_logger.error(f"Failed to query Evergreen for result task {task_id}: {ex}")
+
+    runner_task = find_test_task_with_binaries(evg_api, task_id)
+    if runner_task is not None:
+        candidates.append(runner_task)
+
+    for task in candidates:
+        artifacts = [a for a in task.artifacts if "Test binaries and libraries" in a.name]
+        if artifacts:
+            root_logger.info(f"Downloading binaries from task {task.display_name} ({task.task_id})")
+            return artifacts
+        root_logger.info(f"No binary archive found on task {task.display_name} ({task.task_id})")
+
+    return []
+
+
 @TRACER.start_as_current_span("core_analyzer.download_bazel_test_task_binaries")
 def download_bazel_test_task_binaries(root_logger: Logger, task_id: str, download_dir: str) -> bool:
     evg_api = evergreen_conn.get_evergreen_api()
-    resmoke_task = find_test_task_with_binaries(evg_api, task_id)
 
-    root_logger.info(f"Downloading binaries from task {resmoke_task.task_id}")
-
-    dist_tests_artifacts = [
-        a for a in resmoke_task.artifacts if "Test binaries and libraries" in a.name
-    ]
+    dist_tests_artifacts = _find_binary_artifacts(root_logger, evg_api, task_id)
     if not dist_tests_artifacts:
-        root_logger.error("No binary archive found in the resmoke_test task")
+        root_logger.error("No binary archive found in the result task or the resmoke_tests task")
         return False
 
     install_dir = os.path.join(download_dir, "install")

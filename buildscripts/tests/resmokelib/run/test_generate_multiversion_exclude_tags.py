@@ -2,6 +2,7 @@
 
 import os
 import unittest
+from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 
 from mock import MagicMock, patch
@@ -410,6 +411,84 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
         self.patch_and_run(latest_yaml, old_yaml, MultiversionOptions.LAST_PATCH)
         self.assert_contents(expected)
+
+
+class TestGetGitFileContent(unittest.TestCase):
+    COMMIT = "7aba7e33c0a0dcbff28618f506b689dd8f931ba8"
+
+    @staticmethod
+    def _show_failure():
+        return CalledProcessError(128, ["git", "show"], stderr="fatal: bad object\n")
+
+    @staticmethod
+    def _show_promisor_failure():
+        # `git show` in a partial clone surfaces the promisor remote's network error.
+        return CalledProcessError(
+            128,
+            ["git", "show"],
+            stderr="fatal: unable to access 'https://github.com/10gen/mongo.git/': "
+            "The requested URL returned error: 503\n",
+        )
+
+    @staticmethod
+    def _fetch_failure():
+        return CalledProcessError(
+            128, ["git", "fetch"], stderr="fatal: unable to access: error: 503\n"
+        )
+
+    def test_no_fetch_needed(self):
+        with patch.object(
+            under_test.subprocess, "run", return_value=MagicMock(stdout="contents")
+        ) as mock_run:
+            self.assertEqual(under_test.get_git_file_content(self.COMMIT, MagicMock()), "contents")
+            self.assertEqual(mock_run.call_count, 1)
+
+    def test_transient_fetch_failure_is_retried(self):
+        # `git show` fails, the first fetch hits a 503, and the retried fetch succeeds.
+        side_effects = [
+            self._show_failure(),
+            self._fetch_failure(),
+            MagicMock(),  # successful fetch
+            MagicMock(stdout="contents"),  # successful show
+        ]
+        with patch.object(under_test.subprocess, "run", side_effect=side_effects) as mock_run:
+            with patch("tenacity.nap.time.sleep") as mock_sleep:
+                self.assertEqual(
+                    under_test.get_git_file_content(self.COMMIT, MagicMock()), "contents"
+                )
+        self.assertEqual(mock_run.call_count, len(side_effects))
+        mock_sleep.assert_called_once()
+
+    def test_persistent_fetch_failure_raises_after_max_attempts(self):
+        side_effects = [self._show_failure()] + [
+            self._fetch_failure() for _ in range(under_test.FETCH_MAX_ATTEMPTS)
+        ]
+        with patch.object(under_test.subprocess, "run", side_effect=side_effects) as mock_run:
+            with patch("tenacity.nap.time.sleep") as mock_sleep:
+                with self.assertRaisesRegex(RuntimeError, "503"):
+                    under_test.get_git_file_content(self.COMMIT, MagicMock())
+        self.assertEqual(mock_run.call_count, len(side_effects))
+        # We back off between attempts, but not after the final one.
+        self.assertEqual(mock_sleep.call_count, under_test.FETCH_MAX_ATTEMPTS - 1)
+
+    def test_transient_show_failure_is_retried(self):
+        # The BF-45380 scenario: the fetch succeeds, but `git show` still hits a 503 because
+        # Evergreen's partial clone makes it lazily fetch the blob from the promisor remote.
+        # The retry has to cover `git show`, not just the fetch.
+        side_effects = [
+            self._show_failure(),
+            MagicMock(),  # successful fetch
+            self._show_promisor_failure(),
+            MagicMock(),  # successful fetch
+            MagicMock(stdout="contents"),  # successful show
+        ]
+        with patch.object(under_test.subprocess, "run", side_effect=side_effects) as mock_run:
+            with patch("tenacity.nap.time.sleep") as mock_sleep:
+                self.assertEqual(
+                    under_test.get_git_file_content(self.COMMIT, MagicMock()), "contents"
+                )
+        self.assertEqual(mock_run.call_count, len(side_effects))
+        mock_sleep.assert_called_once()
 
 
 if __name__ == "__main__":

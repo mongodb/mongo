@@ -82,9 +82,11 @@ class test_layered_stepup11(sweep_util):
         return miss, hit
 
     def update_one_and_checkpoint(self, session, value):
+        session.begin_transaction()
         cursor = session.open_cursor(self.uri)
         cursor[self.key(0)] = value
         cursor.close()
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         session.checkpoint()
 
     def test_layered_stepup11(self):
@@ -99,8 +101,10 @@ class test_layered_stepup11(sweep_util):
 
         # Leader bulk loads and checkpoints so conn_follow can read the data.
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(self.nrows):
             cursor[self.key(i)] = 'value_' + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
         self.session.checkpoint()
 

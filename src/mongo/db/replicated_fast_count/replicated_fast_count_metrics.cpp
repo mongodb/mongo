@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 
@@ -47,14 +21,20 @@ using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 using otel::metrics::ServerStatusOptions;
 
-// Boolean flag indicating whether or not the fast count background thread is currently running.
-// Since OTel gauges do not natively support booleans, we use an int64_t gauge instead.
-auto& isRunningGauge = MetricsService::instance().createInt64Gauge(
-    MetricNames::kReplicatedFastCountIsRunning,
-    "1 if the replicated fast count background thread is running, 0 otherwise",
-    MetricUnit::kEvents,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.isRunning",
-                                                .role = ClusterRole::None}});
+// Per-thread isRunning gauges. Useful for identifying if a thread has independently died.
+auto& tailerIsRunningGauge = MetricsService::instance().createInt64Gauge(
+    MetricNames::kReplicatedFastCountTailerIsRunning,
+    "1 if the oplog tailer thread is running, 0 otherwise",
+    MetricUnit::kBoolean,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.isRunning", .role = ClusterRole::None}});
+
+auto& flusherIsRunningGauge = MetricsService::instance().createInt64Gauge(
+    MetricNames::kReplicatedFastCountFlusherIsRunning,
+    "1 if the flusher thread is running, 0 otherwise",
+    MetricUnit::kBoolean,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.flusher.isRunning", .role = ClusterRole::None}});
 
 // Flushes persist fast count information to the oplog and occur during checkpointing,
 // shutdown, etc. The total number of flush attempts = flushSuccessCounter + flushFailureCounter.
@@ -72,12 +52,32 @@ auto& flushFailureCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.flush.failureCount", .role = ClusterRole::None}});
 
+auto& flushRetriedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountFlushRetriedCount,
+    "Total write-conflict retries during flushes",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.flush.retriedCount", .role = ClusterRole::None}});
+
 auto& flushTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
     MetricNames::kReplicatedFastCountFlushTimeMsTotal,
     "Total flush duration in milliseconds across all replicated fast count flushes",
     MetricUnit::kMilliseconds,
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.flushTime.total",
                                                 .role = ClusterRole::None}});
+auto& tailerFailureCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountTailerFailureCount,
+    "Total unexpected exceptions handled in the oplog tailer thread",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.failureCount", .role = ClusterRole::None}});
+
+auto& tailerRetriedScanCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountTailerRetriedScanCount,
+    "Total write-conflict retries during oplog tailer scans",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.retriedScanCount", .role = ClusterRole::None}});
 
 // The total number of documents written during flushes.
 auto& flushedDocsTotalCounter = MetricsService::instance().createInt64Counter(
@@ -103,6 +103,41 @@ auto& updateCounter = MetricsService::instance().createInt64Counter(
     MetricUnit::kOperations,
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.updateCount",
                                                 .role = ClusterRole::None}});
+
+// The number of watermark entries written to the oplog.
+auto& watermarksWrittenCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountWatermarksWritten,
+    "Total number of replicated fast count watermark entries written to the oplog",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.watermarksWritten", .role = ClusterRole::None}});
+
+// The number of watermark entries observed by the oplog tailer during checkpoint scans.
+auto& tailerWatermarksSeenCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountTailerWatermarksSeen,
+    "Total number of replicated fast count watermark entries observed by the oplog tailer",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.watermarksSeen", .role = ClusterRole::None}});
+
+// The number of replicated metadata checkpoints validated during oplog application.
+auto& checkpointsValidatedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountCheckpointsValidated,
+    "Total number of replicated fast count checkpoints validated",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.checkpointsValidated", .role = ClusterRole::None}});
+
+// Total time the flusher spent blocked waiting for the oplog tailer to cut a batch at a
+// watermark.
+auto& watermarkAwaitTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal,
+    "Total time in milliseconds the flusher spent waiting for the oplog tailer to cut a batch at "
+    "a replicated fast count watermark",
+    MetricUnit::kMilliseconds,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "replicatedFastCount.flush.watermarkAwaitTime.total",
+                             .role = ClusterRole::None}});
 
 // Gauge for the number of seconds between the most recently applied oplog entry and the most
 // recently persisted fastcount checkpoint. A large value indicates the fastcount checkpoint is
@@ -130,12 +165,28 @@ void refreshOplogLagGauge() {
 
 }  // namespace
 
-void setIsRunning(bool running) {
-    isRunningGauge.set(running ? 1 : 0);
+void setTailerIsRunning(bool running) {
+    tailerIsRunningGauge.set(running ? 1 : 0);
+}
+
+void setFlusherIsRunning(bool running) {
+    flusherIsRunningGauge.set(running ? 1 : 0);
 }
 
 void incrementFlushFailureCount() {
     flushFailureCounter.add(1);
+}
+
+void incrementTailerFailureCount() {
+    tailerFailureCounter.add(1);
+}
+
+void incrementRetriedFlushCount() {
+    flushRetriedCounter.add(1);
+}
+
+void incrementRetriedTailerScanCount() {
+    tailerRetriedScanCounter.add(1);
 }
 
 void incrementInsertCount() {
@@ -146,12 +197,30 @@ void incrementUpdateCount() {
     updateCounter.add(1);
 }
 
-void recordFlush(Date_t startTime, size_t batchSize) {
+void incrementWatermarksWrittenCount() {
+    watermarksWrittenCounter.add(1);
+}
+
+void incrementTailerWatermarksSeenCount() {
+    tailerWatermarksSeenCounter.add(1);
+}
+
+void incrementCheckpointsValidatedCount() {
+    checkpointsValidatedCounter.add(1);
+}
+
+void recordWatermarkAwaitTime(Milliseconds waitTime) {
+    watermarkAwaitTimeMsTotalCounter.add(waitTime.count());
+}
+
+void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts writeCounts) {
     const int64_t elapsedMs = (Date_t::now() - startTime).count();
 
     flushSuccessCounter.add(1);
     flushTimeMsTotalCounter.add(elapsedMs);
-    flushedDocsTotalCounter.add(static_cast<int64_t>(batchSize));
+    flushedDocsTotalCounter.add(static_cast<int64_t>(writeCounts.entryWriteCount));
+    insertCounter.add(static_cast<int64_t>(writeCounts.insertCount));
+    updateCounter.add(static_cast<int64_t>(writeCounts.updateCount));
 }
 
 void recordAppliedOpTime(const Timestamp& ts) {

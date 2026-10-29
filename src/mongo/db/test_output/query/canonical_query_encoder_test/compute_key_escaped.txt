@@ -1,8 +1,8 @@
 ==== VARIATION: query={ a,[]~|-<>: 1 }, sort={}, proj={}
-eqa\,\[\]~\|\-<>||||ftr
+eqa\,\[\]~\|\-<>||||fr
 ==== VARIATION: query={}, sort={ a,[]~|-<>: 1 }, proj={}
-an|aa\,\[\]~\|\-<>|||ftr
+an|aa\,\[\]~\|\-<>|||fr
 ==== VARIATION: query={}, sort={}, proj={ a,[]~|-<>: 1 }
-an||_id-a\,\[\]~\|\-<>||ftr
+an||_id-a\,\[\]~\|\-<>||fr
 ==== VARIATION: query={}, sort={}, proj={ a: "foo,[]~|-<>" }
-an||_id||ftr
+an||_id||fr

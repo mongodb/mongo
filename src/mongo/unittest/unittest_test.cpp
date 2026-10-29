@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * Unit tests of the unittest framework itself.
@@ -44,9 +18,11 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/stringify.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest_main_core.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/demangle.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <array>
 #include <cstddef>
@@ -70,6 +46,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
+namespace mongo {
 namespace {
 using namespace std::literals::string_view_literals;
 namespace mus = mongo::unittest::stringify;
@@ -100,6 +77,117 @@ public:
 
 TEST(UnitTestSelfTest, TestAssertThrowsWhatSuccess) {
     ASSERT_THROWS_WHAT(throw MyException(), MyException, "whatever");
+    ASSERT_THROWS_WHAT(throw MyException(), MyException, mongo::unittest::match::Eq("whatever"));
+}
+
+class ExcusedTripwireTest : public mongo::unittest::Test {
+public:
+    void setUp() override {
+        assertAllTripwiresExcused();
+    }
+    void tearDown() override {
+        assertAllTripwiresExcused();
+    }
+    void assertAllTripwiresExcused() {
+        ASSERT_EQ(TestingProctor::instance().excusedTripwireCount(),
+                  assertionCount.tripwire.load());
+    }
+};
+
+TEST_F(ExcusedTripwireTest, Tassert) {
+    ASSERT_TASSERT_CODE(([&] {
+                            tassert(ErrorCodes::BadValue, "test", false);
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+TEST_F(ExcusedTripwireTest, Tasserted) {
+    ASSERT_TASSERT_CODE(([&] {
+                            tasserted(ErrorCodes::BadValue, "test");
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+TEST_F(ExcusedTripwireTest, MultipleTasserts) {
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tasserted(ErrorCodes::BadValue, "first");
+                            } catch (...) {
+                            }
+                            tasserted(ErrorCodes::BadValue, "second");
+                        }()),
+                        ErrorCodes::BadValue,
+                        2);
+}
+
+TEST_F(ExcusedTripwireTest, GuardExcusesCaughtTassert) {
+    const auto tw0 = assertionCount.tripwire.load();
+    unittest::TassertGuard guard;
+    try {
+        tassert(ErrorCodes::BadValue, "test", false);
+    } catch (...) {
+    }
+    ASSERT_EQ(assertionCount.tripwire.load(), tw0 + 1);
+}
+
+using ExcusedTripwireDeathTest = ExcusedTripwireTest;
+DEATH_TEST_F(ExcusedTripwireDeathTest, NoThrow, "Actual: does not throw") {
+    ASSERT_TASSERT_CODE(([&] {
+                            tassert(ErrorCodes::BadValue, "test", true);
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+TEST_F(ExcusedTripwireTest, CaughtPreviousTassert) {
+    const auto tw0 = assertionCount.tripwire.load();
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tassert(ErrorCodes::BadValue, "test in try/catch", false);
+                            } catch (...) {
+                            }
+                            ASSERT_EQ(assertionCount.tripwire.load(), tw0 + 1);
+
+                            // Something else can throw with the same code to trigger the internal
+                            // ASSERT_THROWS.
+                            uasserted(ErrorCodes::BadValue, "test out of try/catch");
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+DEATH_TEST_F(ExcusedTripwireDeathTest, CaughtPreviousTassertNoThrow, "Actual: does not throw") {
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tassert(ErrorCodes::BadValue, "test", false);
+                            } catch (...) {
+                            }
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+DEATH_TEST_F(ExcusedTripwireDeathTest, TassertTwice, "Unexpected tasserts triggered") {
+    ASSERT_TASSERT_CODE(([&] {
+                            try {
+                                tasserted(ErrorCodes::BadValue, "test in try/catch");
+                            } catch (...) {
+                            }
+                            tasserted(ErrorCodes::BadValue, "test outside of try/catch");
+                        }()),
+                        ErrorCodes::BadValue);
+}
+
+DEATH_TEST_REGEX_F(ExcusedTripwireDeathTest, WrongCode, "Expected:.*is equal to InternalError") {
+    ASSERT_TASSERT_CODE(([&] {
+                            tasserted(ErrorCodes::BadValue, "test");
+                        }()),
+                        ErrorCodes::InternalError);
+}
+
+DEATH_TEST_F(ExcusedTripwireDeathTest, GuardWrongCount, "Unexpected tasserts triggered") {
+    unittest::TassertGuard guard(0);
+    try {
+        tasserted(ErrorCodes::BadValue, "test");
+    } catch (...) {
+    }
 }
 
 TEST(UnitTestSelfTest, TestSuccessfulNumericComparisons) {
@@ -168,6 +256,64 @@ TEST(UnitTestSelfTest, BSONElementComparisons) {
     ASSERT_BSONELT_GT(b, a);
     ASSERT_BSONELT_GTE(b, a);
     ASSERT_BSONELT_GTE(a, a);
+}
+
+TEST(UnitTestMatcherTest, AsStringViewMatcher) {
+    namespace match = mongo::unittest::match;
+    const char* str1 = "str";
+    const char* str2 = "str";
+    ASSERT_THAT(str1, match::AsStringView(str2));
+    ASSERT_THAT("different", match::AsStringView(match::Not(str2)));
+}
+
+TEST(UnitTestMatcherTest, AsStringViewMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    const char* str = "str";
+    ASSERT_EQ(match::DescribeMatcher<std::string_view>(match::AsStringView(match::StartsWith(str))),
+              "as string view starts with \"str\"");
+    ASSERT_EQ(match::DescribeMatcher<std::string_view>(
+                  match::Not(match::AsStringView(match::StartsWith(str)))),
+              "as string view doesn't start with \"str\"");
+    ASSERT_EQ(
+        match::DescribeMatcher<mongo::AssertionException>(match::Property(
+            "what", &mongo::AssertionException::what, match::AsStringView(match::StartsWith(str)))),
+        "is an object whose property `what` as string view starts with \"str\"");
+}
+
+TEST(UnitTestMatcherTest, WhatIsMatcher) {
+    namespace match = mongo::unittest::match;
+    auto ex = mongo::ExceptionFor<mongo::ErrorCodes::APIMismatchError>{
+        mongo::Status{mongo::ErrorCodes::APIMismatchError, "what"}};
+    ASSERT_THAT(ex, match::WhatIs(match::StrEq("what")));
+    ASSERT_THAT(ex, match::Not(match::WhatIs(match::StrEq("unrelated"))));
+}
+
+TEST(UnitTestMatcherTest, WhatIsMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_THAT(
+        match::DescribeMatcher<mongo::AssertionException>(match::WhatIs(match::StrEq("what"))),
+        "is an object whose what() result is equal to \"what\"");
+    ASSERT_THAT(match::DescribeMatcher<mongo::AssertionException>(
+                    match::Not(match::WhatIs(match::StrEq("unrelated")))),
+                "isn't an object whose what() result is equal to \"unrelated\"");
+}
+
+TEST(UnitTestMatcherTest, CodeIsMatcher) {
+    namespace match = mongo::unittest::match;
+    auto ex = mongo::ExceptionFor<mongo::ErrorCodes::APIMismatchError>{
+        mongo::Status{mongo::ErrorCodes::APIMismatchError, "what"}};
+    ASSERT_THAT(ex, match::CodeIs(mongo::ErrorCodes::APIMismatchError));
+    ASSERT_THAT(ex, match::Not(match::CodeIs(mongo::ErrorCodes::InternalError)));
+}
+
+TEST(UnitTestMatcherTest, CodeIsMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_THAT(match::DescribeMatcher<mongo::AssertionException>(
+                    match::CodeIs(mongo::ErrorCodes::APIMismatchError)),
+                "is an object whose code() result is equal to APIMismatchError");
+    ASSERT_THAT(match::DescribeMatcher<mongo::AssertionException>(
+                    match::Not(match::CodeIs(mongo::ErrorCodes::InternalError))),
+                "isn't an object whose code() result is equal to InternalError");
 }
 
 TEST(UnitTestMatcherTest, StatusIsOKMatcherStatusWithOK) {
@@ -483,8 +629,13 @@ TEST_F(ExceptionMatcherTest, TestAssertThrowsNotCalledTwice) {
 }
 
 TEST_F(ExceptionMatcherTest, TestAssertThrowsCodeAndWhatSuccess) {
+    namespace match = mongo::unittest::match;
     ASSERT_THROWS_CODE_AND_WHAT(
         doThrow(), mongo::DBException, mongo::ErrorCodes::CommandFailed, "failure message");
+    ASSERT_THROWS_CODE_AND_WHAT(doThrow(),
+                                mongo::DBException,
+                                match::Eq(mongo::ErrorCodes::CommandFailed),
+                                match::StartsWith("failure"));
 }
 
 TEST_F(ExceptionMatcherTest, DBExceptionMatcherDescription) {
@@ -603,3 +754,4 @@ TEST_F(MockNicenessTest, TryFlagsVsMockWrappers) {
 }
 
 }  // namespace
+}  // namespace mongo

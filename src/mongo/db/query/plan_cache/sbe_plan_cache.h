@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -65,7 +39,7 @@ namespace sbe {
  * sharding epoch is not updated on operations like chunk splits and moves but rather on sharding
  * and refine shard key operations.
  */
-struct MONGO_MOD_PUB PlanCacheKeyShardingEpoch {
+struct [[MONGO_MOD_PUBLIC]] PlanCacheKeyShardingEpoch {
     bool operator==(const PlanCacheKeyShardingEpoch& other) const {
         return epoch == other.epoch && ts == other.ts;
     }
@@ -74,7 +48,7 @@ struct MONGO_MOD_PUB PlanCacheKeyShardingEpoch {
     Timestamp ts;
 };
 
-struct MONGO_MOD_PUB PlanCacheKeyCollectionState {
+struct [[MONGO_MOD_PUBLIC]] PlanCacheKeyCollectionState {
     bool operator==(const PlanCacheKeyCollectionState& other) const {
         return other.uuid == uuid && other.version == version &&
             other.collectionGeneration == collectionGeneration;
@@ -112,7 +86,7 @@ struct MONGO_MOD_PUB PlanCacheKeyCollectionState {
 /**
  * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
  */
-class MONGO_MOD_PUB PlanCacheKey {
+class [[MONGO_MOD_PUBLIC]] PlanCacheKey {
 public:
     PlanCacheKey(PlanCacheKeyInfo&& info,
                  PlanCacheKeyCollectionState mainCollectionState,
@@ -231,7 +205,7 @@ struct CachedSbePlan {
     size_t solutionHash;
 };
 
-using PlanCacheEntry MONGO_MOD_PUB =
+using PlanCacheEntry [[MONGO_MOD_PUBLIC]] =
     PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 using CachedPlanHolder =
     mongo::CachedPlanHolder<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
@@ -257,12 +231,12 @@ using PlanCache = PlanCacheBase<PlanCacheKey,
 /**
  * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.
  */
-MONGO_MOD_PUB PlanCache& getPlanCache(ServiceContext* serviceCtx);
+[[MONGO_MOD_PUBLIC]] PlanCache& getPlanCache(ServiceContext* serviceCtx);
 
 /**
  * A wrapper for the helper above. 'opCtx' cannot be null.
  */
-MONGO_MOD_PUB PlanCache& getPlanCache(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] PlanCache& getPlanCache(OperationContext* opCtx);
 
 /**
  * Removes cached plan entries with the given collection UUID and collection version number.

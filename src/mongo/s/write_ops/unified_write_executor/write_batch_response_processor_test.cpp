@@ -1,43 +1,21 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/session_catalog_router.h"
@@ -56,13 +34,14 @@ public:
     using RemoteCommandResponse = executor::RemoteCommandResponse;
     using Response = ShardResponse;
 
-    WriteBatchResponseProcessorTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         opCtxHolder = makeOperationContext();
         opCtx = opCtxHolder.get();
     }
 
     ServiceContext::UniqueOperationContext opCtxHolder;
-    OperationContext* opCtx;
+    OperationContext* opCtx = nullptr;
 
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
@@ -1147,7 +1126,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(setTopLevelOK(reply.toBSON())),
-                                        /*wce*/ boost::none,
+                                        /*wce=*/boost::none,
                                         WriteOp(request, 0),
                                         inTransaction));
     ASSERT_TRUE(result.opsToRetry.empty());
@@ -1184,7 +1163,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseError) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(setTopLevelOK(reply.toBSON())),
-                                        /*wce*/ boost::none,
+                                        /*wce=*/boost::none,
                                         WriteOp(request, 0),
                                         inTransaction));
     ASSERT_TRUE(result.opsToRetry.empty());
@@ -1225,7 +1204,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
 
     WriteCommandRef cmdRef(request);
     Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
+    WriteBatchResponseProcessor processor(cmdRef, stats, /*isNonVerbose=*/true);
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
@@ -1261,7 +1240,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
 
     WriteCommandRef cmdRef(request);
     Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
+    WriteBatchResponseProcessor processor(cmdRef, stats, /*isNonVerbose=*/true);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1315,7 +1294,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
 
     WriteCommandRef cmdRef(request);
     Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
+    WriteBatchResponseProcessor processor(cmdRef, stats, /*isNonVerbose=*/true);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -1853,10 +1832,10 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyErrorResponse) {
     request.setUpdate(write_ops::UpdateModification(BSON("b" << 1)));
     WriteOp op(request);
 
-    ErrorReply reply(0 /* ok */,
+    ErrorReply reply(/*ok=*/0,
                      ErrorCodes::BadValue,
-                     "Bad Value" /* codeName */,
-                     "Wrong argument" /* errmsg */);
+                     /*codeName=*/"Bad Value",
+                     /*errmsg=*/"Wrong argument");
 
     ShardId shard1 = ShardId("shard1");
     RemoteCommandResponse rcr1(host1, reply.toBSON(), Microseconds{0}, false);
@@ -1887,11 +1866,11 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyRetryResponse) {
     WriteOp op(request);
 
     ShardId shard1 = ShardId("shard1");
-    ErrorReply errorReply(0 /* ok */,
+    ErrorReply errorReply(/*ok=*/0,
                           ErrorCodes::StaleConfig,
-                          "StaleConfig" /* codeName */,
-                          "Shard stale error, please retry" /* errmsg */);
-    StaleConfigInfo staleInfo(nss1, *shard1Endpoint.shardVersion, boost::none /* wanted */, shard1);
+                          /*codeName=*/"StaleConfig",
+                          /*errmsg=*/"Shard stale error, please retry");
+    StaleConfigInfo staleInfo(nss1, *shard1Endpoint.shardVersion, /*wanted=*/boost::none, shard1);
     BSONObjBuilder builder;
     errorReply.serialize(&builder);
     staleInfo.serialize(&builder);
@@ -2578,7 +2557,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeNoError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        NoRetryWriteBatchResponse::make(BSONObj(), /*wce*/ boost::none, op1, inTransaction));
+        NoRetryWriteBatchResponse::make(BSONObj(), /*wce=*/boost::none, op1, inTransaction));
 
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -2614,7 +2593,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(
-            Status(ErrorCodes::BadValue, ""), /*wce*/ boost::none, op1, inTransaction));
+            Status(ErrorCodes::BadValue, ""), /*wce=*/boost::none, op1, inTransaction));
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -2650,7 +2629,7 @@ TEST_F(WriteBatchResponseProcessorTest, UpdateQueryStatsMetricsAggregatedFromSha
         SimpleWriteBatchResponse{
             {{shard1Name,
               ShardResponse::make(
-                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, false /*inTransaction*/)}}});
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, /*inTransaction=*/false)}}});
 
     auto& opDebug = CurOp::get(opCtx)->debug();
     assertQueryStatsAggregated(opDebug, 0, 10, 5);
@@ -2685,8 +2664,8 @@ TEST_F(WriteBatchResponseProcessorTest, UpdateQueryStatsMetricsAggregatedFromMul
 TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromShardResponse) {
     auto deleteRequest = write_ops::DeleteCommandRequest(
         nss1,
-        {write_ops::DeleteOpEntry(BSON("_id" << 0), false /*multi*/),
-         write_ops::DeleteOpEntry(BSON("_id" << 1), false /*multi*/)});
+        {write_ops::DeleteOpEntry(BSON("_id" << 0), /*multi=*/false),
+         write_ops::DeleteOpEntry(BSON("_id" << 1), /*multi=*/false)});
     auto request = BatchedCommandRequest(deleteRequest);
 
     auto resp = makeBatchResponseWithQueryStatsMetrics(
@@ -2701,7 +2680,7 @@ TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromSha
         SimpleWriteBatchResponse{
             {{shard1Name,
               ShardResponse::make(
-                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, false /*inTransaction*/)}}});
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, /*inTransaction=*/false)}}});
 
     auto& opDebug = CurOp::get(opCtx)->debug();
     assertQueryStatsAggregated(opDebug, 0, 10, 5);
@@ -2710,7 +2689,7 @@ TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromSha
 
 TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromMultipleShards) {
     auto deleteRequest = write_ops::DeleteCommandRequest(
-        nss1, {write_ops::DeleteOpEntry(BSON("_id" << 0), true /*multi*/)});
+        nss1, {write_ops::DeleteOpEntry(BSON("_id" << 0), /*multi=*/true)});
     auto request = BatchedCommandRequest(deleteRequest);
 
     auto resp1 = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
@@ -2729,6 +2708,123 @@ TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromMul
 
     auto& opDebug = CurOp::get(opCtx)->debug();
     assertQueryStatsAggregated(opDebug, 0, 25, 13);  // 10+15, 5+8
+}
+
+// A write running inside a server-spawned internal transaction echoes requested query stats metrics
+// back to the originating router.
+TEST_F(WriteBatchResponseProcessorTest,
+       QueryStatsMetricsEchoedBackForInternalTransactionWhenRequested) {
+    opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+
+    write_ops::UpdateOpEntry updateOp(BSON("_id" << 0),
+                                      write_ops::UpdateModification(BSON("a" << 0)));
+    updateOp.setIncludeQueryStatsMetricsForOpIndex(0);
+    auto request = BatchedCommandRequest(write_ops::UpdateCommandRequest(nss1, {updateOp}));
+
+    auto resp = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
+    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
+
+    CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {{shard1Name,
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
+
+    auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
+    ASSERT_TRUE(reply.areQueryStatsMetricsSet());
+    ASSERT_EQ(reply.getQueryStatsMetrics().size(), 1u);
+}
+
+// When no parent requested metrics (the request does not carry 'includeQueryStatsMetrics'), query
+// stats sampled locally must NOT be echoed back in the response.
+TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsNotEchoedBackWhenNotRequested) {
+    auto request = BatchedCommandRequest(write_ops::UpdateCommandRequest(
+        nss1,
+        {write_ops::UpdateOpEntry(BSON("_id" << 0),
+                                  write_ops::UpdateModification(BSON("a" << 0)))}));
+
+    auto resp = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
+    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
+
+    CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {{shard1Name,
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
+
+    auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
+    ASSERT_FALSE(reply.areQueryStatsMetricsSet());
+}
+
+// Running under an internal session must NOT by itself echo metrics -- only a parent's
+// 'includeQueryStatsMetrics' request should.
+TEST_F(WriteBatchResponseProcessorTest,
+       QueryStatsMetricsNotEchoedBackForInternalSessionWithoutRequest) {
+    opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+
+    auto request = BatchedCommandRequest(write_ops::UpdateCommandRequest(
+        nss1,
+        {write_ops::UpdateOpEntry(BSON("_id" << 0),
+                                  write_ops::UpdateModification(BSON("a" << 0)))}));
+
+    auto resp = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
+    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
+
+    CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {{shard1Name,
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
+
+    auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
+    ASSERT_FALSE(reply.areQueryStatsMetricsSet());
+}
+
+// A router ignores 'includeQueryStatsMetrics' on requests from external clients: even when the flag
+// is set, metrics must NOT be echoed unless the request comes from a trusted internal source (a
+// forwarding router or a server-spawned internal transaction). Here the flag is set but there is no
+// internal session, so nothing is echoed.
+TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsNotEchoedBackForExternalClientRequest) {
+    write_ops::UpdateOpEntry updateOp(BSON("_id" << 0),
+                                      write_ops::UpdateModification(BSON("a" << 0)));
+    updateOp.setIncludeQueryStatsMetricsForOpIndex(0);
+    auto request = BatchedCommandRequest(write_ops::UpdateCommandRequest(nss1, {updateOp}));
+
+    auto resp = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
+    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
+
+    CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {{shard1Name,
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
+
+    auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
+    ASSERT_FALSE(reply.areQueryStatsMetricsSet());
 }
 
 }  // namespace

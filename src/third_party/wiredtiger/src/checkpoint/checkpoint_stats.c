@@ -18,9 +18,9 @@ __wt_checkpoint_handle_stats_clear(WT_SESSION_IMPL *session)
     WT_CKPT_CONNECTION *ckpt = &S2C(session)->ckpt;
 
     ckpt->handle_stats.apply = ckpt->handle_stats.drop = ckpt->handle_stats.lock =
-      ckpt->handle_stats.meta_check = ckpt->handle_stats.skip = 0;
+      ckpt->handle_stats.skip = 0;
     ckpt->handle_stats.apply_time = ckpt->handle_stats.drop_time = ckpt->handle_stats.lock_time =
-      ckpt->handle_stats.meta_check_time = ckpt->handle_stats.skip_time = 0;
+      ckpt->handle_stats.skip_time = 0;
 }
 
 /*
@@ -35,6 +35,7 @@ __wt_checkpoint_timer_stats_clear(WT_SESSION_IMPL *session)
     ckpt->prepare.min = UINT64_MAX;
     ckpt->ckpt_api.min = UINT64_MAX;
     ckpt->scrub.min = UINT64_MAX;
+    ckpt->stepdown.min = UINT64_MAX;
 }
 
 /*
@@ -53,9 +54,6 @@ __wt_checkpoint_handle_stats(WT_SESSION_IMPL *session, uint64_t gathering_handle
     WT_STAT_CONN_SET(session, checkpoint_handle_duration, gathering_handles_time_us);
     WT_STAT_CONN_SET(session, checkpoint_handle_lock_duration, ckpt->handle_stats.lock_time);
     WT_STAT_CONN_SET(session, checkpoint_handle_locked, ckpt->handle_stats.lock);
-    WT_STAT_CONN_SET(session, checkpoint_handle_meta_checked, ckpt->handle_stats.meta_check);
-    WT_STAT_CONN_SET(
-      session, checkpoint_handle_meta_check_duration, ckpt->handle_stats.meta_check_time);
     WT_STAT_CONN_SET(session, checkpoint_handle_skipped, ckpt->handle_stats.skip);
     WT_STAT_CONN_SET(session, checkpoint_handle_skip_duration, ckpt->handle_stats.skip_time);
 }
@@ -114,6 +112,16 @@ __wt_checkpoint_timer_stats(WT_SESSION_IMPL *session)
     WT_STAT_CONN_SET(
       session, checkpoint_time_total, __wt_atomic_load_uint64_relaxed(&ckpt->ckpt_api.total));
 
+    WT_STAT_CONN_SET(
+      session, checkpoint_stepdown_time_max, __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.max));
+    min = __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.min);
+    if (min != UINT64_MAX)
+        WT_STAT_CONN_SET(session, checkpoint_stepdown_time_min, min);
+    WT_STAT_CONN_SET(session, checkpoint_stepdown_time_recent,
+      __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.recent));
+    WT_STAT_CONN_SET(session, checkpoint_stepdown_time_total,
+      __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.total));
+
     rec_ticks = __wt_atomic_load_uint64_relaxed(&ckpt->reconcile_time_ticks);
     total_ticks = __wt_atomic_load_uint64_relaxed(&ckpt->sync_time_ticks);
     WT_STAT_CONN_SET(
@@ -129,7 +137,7 @@ __wt_checkpoint_apply_or_skip_handle_stats(WT_SESSION_IMPL *session, uint64_t ti
 {
     WT_CKPT_CONNECTION *ckpt = &S2C(session)->ckpt;
 
-    if (F_ISSET(S2BT(session), WT_BTREE_SKIP_CKPT)) {
+    if (F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_SKIP_CKPT)) {
         ++ckpt->handle_stats.skip;
         ckpt->handle_stats.skip_time += time_us;
     } else {

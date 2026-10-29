@@ -9,10 +9,8 @@ exports_files(
     ]),
 )
 
-# s2n-tls, on which we depend, supports Linux and Darwin, but we are targeting Linux only.
 HANDOFF_TARGET_COMPATIBLE_WITH = select({
-    "//bazel/config:linux_aarch64": [],
-    "//bazel/config:linux_x86_64": [],
+    "//bazel/config:build_connection_handoff_enabled": [],
     "//conditions:default": ["@platforms//:incompatible"],
 })
 
@@ -47,6 +45,7 @@ mongo_cc_library(
         ":handoff_posix_interface",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/transport:message_filter_hooks",
         "//src/mongo/transport:service_executor",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer",
@@ -65,8 +64,12 @@ mongo_cc_unit_test(
     deps = [
         ":handoff_s2n_init",
         ":handoff_session",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/rpc:message",
+        "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/third_party/s2n:s2n-tls",
     ],
 )
@@ -78,6 +81,18 @@ mongo_cc_library(
     target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
     deps = [
         "//src/mongo/transport:session_manager",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "handoff_session_manager_test",
+    srcs = ["handoff_session_manager_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = HANDOFF_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":handoff_session_manager",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 

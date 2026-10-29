@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/single_doc_lookup/collection_acquirer.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -165,14 +140,39 @@ TEST_F(CollectionAcquirerTest, PreAcquiredAcceptsMatchingUuid) {
     ASSERT_EQ(handle.uuid(), expectedUuid);
 }
 
-DEATH_TEST_REGEX_F(CollectionAcquirerDeathTest,
-                   PreAcquiredTassertsOnUuidMismatch,
-                   "Tripwire assertion.*12841103") {
+TEST_F(CollectionAcquirerTest, PreAcquiredThrowsOnUuidMismatch) {
     auto [stasher, acquisition] = stashTestCollection();
     PreAcquiredCollectionAcquirer acquirer(std::move(stasher), std::move(acquisition));
     // A different UUID for the same nss (e.g. the namespace was dropped and recreated) must not be
-    // silently served from the held acquisition.
-    acquirer.acquireCollection(operationContext(), kTestNss, UUID::gen());
+    // silently served from the held acquisition, but must also not crash the server: this is a
+    // real, expected runtime occurrence (a stale event racing a rename+recreate), not a
+    // programming-contract violation, so it's a catchable CollectionUUIDMismatch, not a tassert.
+    ASSERT_THROWS_CODE(acquirer.acquireCollection(operationContext(), kTestNss, UUID::gen()),
+                       DBException,
+                       ErrorCodes::CollectionUUIDMismatch);
+}
+
+// While the cursor is parked, TransactionResources are stashed and CollectionPtr is not valid
+// to use. acquireCollection() must restore those resources before checkCollectionUUIDMismatch.
+// After a drop/recreate, restore throws QueryPlanKilled because the original collection is gone.
+TEST_F(CollectionAcquirerTest, PreAcquiredRestoresBeforeUuidCheckAcrossDropRecreate) {
+    auto [stasher, acquisition] = stashTestCollection();
+    const auto originalUuid = acquisition.uuid();
+    PreAcquiredCollectionAcquirer acquirer(std::move(stasher), std::move(acquisition));
+
+    // storageInterface()->dropCollection() leaves 'dropOpTime' null and expects the registered
+    // OpObserver to allocate one by writing an oplog entry, which the test OpObserver does not do.
+    // UnreplicatedWritesBlock takes the "oplog disabled for this write" path instead.
+    {
+        repl::UnreplicatedWritesBlock noRepl(operationContext());
+        ASSERT_OK(storageInterface()->dropCollection(operationContext(), kTestNss));
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), kTestNss, CollectionOptions()));
+    }
+
+    ASSERT_THROWS_CODE(acquirer.acquireCollection(operationContext(), kTestNss, originalUuid),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
 }
 
 }  // namespace

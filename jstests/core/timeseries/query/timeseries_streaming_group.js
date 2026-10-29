@@ -3,11 +3,14 @@
  * monotonic on time and documents are sorted on time.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   does_not_support_stepdowns,
  *   requires_fcv_63,
  *   requires_timeseries,
+ *   # The test assumes that the collection will remain on a single shard.
+ *   assumes_balancer_off,
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";

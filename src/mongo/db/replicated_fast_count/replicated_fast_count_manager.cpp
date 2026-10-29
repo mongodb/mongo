@@ -1,64 +1,35 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
+#include "mongo/db/replicated_fast_count/skip_replicated_metadata_startup_oplog_scan_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/version_context.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+
+#include <limits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
-
 namespace mongo::replicated_fast_count {
 using namespace std::literals::string_view_literals;
-
-namespace {
-
-MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
-MONGO_FAIL_POINT_DEFINE(failDuringFlush);
-MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
-
-}  // namespace
 
 static const ServiceContext::Decoration<ReplicatedFastCountManager> getReplicatedFastCountManager =
     ServiceContext::declareDecoration<ReplicatedFastCountManager>();
@@ -67,9 +38,50 @@ ReplicatedFastCountManager& ReplicatedFastCountManager::get(ServiceContext* svcC
     return getReplicatedFastCountManager(svcCtx);
 }
 
+boost::optional<Timestamp> ReplicatedFastCountManager::_computeSkipTimestamp(
+    OperationContext* opCtx) {
+    if (!gSkipReplicatedMetadataStartupOplogScan.load()) {
+        return boost::none;
+    }
+
+    // Start from the last visible oplog entry.
+    auto* oplogManager =
+        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getOplogManager();
+    if (!oplogManager) {
+        return boost::none;
+    }
+
+    const Timestamp visibilityTs{oplogManager->getOplogReadTimestamp()};
+    if (visibilityTs == Timestamp::min()) {
+        return boost::none;
+    }
+
+    // The visibility boundary may not identify an actual oplog entry. Use it to find the last oplog
+    // entry's timestamp.
+    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+    const auto& oplogColl = oplogRead.getCollection();
+    if (!oplogColl) {
+        return boost::none;
+    }
+
+    auto cursor = oplogColl->getRecordStore()->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false);
+    const bool visibilityIsUnbounded = visibilityTs.asULL() ==
+        static_cast<unsigned long long>(std::numeric_limits<int64_t>::max());
+    const boost::optional<Record> record = visibilityIsUnbounded
+        ? cursor->next()
+        : cursor->seek(
+              uassertStatusOK(record_id_helpers::keyForOptime(visibilityTs, KeyFormat::Long)),
+              SeekableRecordCursor::BoundInclusion::kInclude);
+    if (!record) {
+        return boost::none;
+    }
+
+    return Timestamp(static_cast<unsigned long long>(record->id.getLong()));
+}
+
 void ReplicatedFastCountManager::initializeFastCountCommitFn() {
-    setFastCountCommitFn([](OperationContext* opCtx,
-                            const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
+    setFastCountCommitFn([](OperationContext* opCtx, UncommittedFastCountChangeMap& changes) {
         getReplicatedFastCountManager(opCtx->getServiceContext()).commit(opCtx, changes);
     });
 }
@@ -79,29 +91,44 @@ void ReplicatedFastCountManager::initializeContainerStores(
     LOGV2(12231710, "Initializing container stores");
     invariant(metadataRS, "metadata RecordStore must not be null");
     invariant(timestampsRS, "timestamps RecordStore must not be null");
+
+    if (_sizeCountStore || _timestampStore) {
+        invariant(_sizeCountStore && _timestampStore,
+                  "Replicated fast count stores must be initialized together");
+        LOGV2(13337200, "Replicated fast count container stores are already initialized; skipping");
+        return;
+    }
+
     _sizeCountStore =
-        std::make_unique<replicated_fast_count::ContainerSizeCountStore>(std::move(metadataRS));
-    _timestampStore = std::make_unique<replicated_fast_count::ContainerSizeCountTimestampStore>(
-        std::move(timestampsRS));
+        std::make_unique<replicated_fast_count::SizeCountStore>(std::move(metadataRS));
+    _timestampStore =
+        std::make_unique<replicated_fast_count::SizeCountTimestampStore>(std::move(timestampsRS));
 }
 
 void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
-    if (!_sizeCountStore->usesContainers()) {
-        massert(11718600,
-                "Expected fastcount collection to exist on startup",
-                acquireFastCountCollectionForRead(opCtx).has_value());
-    }
+    const UUID oplogUuid = [&] {
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+        const auto& oplogColl = oplogRead.getCollection();
+        massert(12912600, "oplog collection not found", oplogColl);
+        return oplogColl->uuid();
+    }();
 
     const Timestamp lastPersistedCheckpointTS = [&] {
         Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
         return _timestampStore->read(opCtx).value_or(Timestamp{});
     }();
 
-    const UUID oplogUuid = [&] {
-        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-        const auto& oplogColl = oplogRead.getCollection();
-        massert(12912600, "oplog collection not found", oplogColl);
-        return oplogColl->uuid();
+    // Scan from the persisted valid-as-of timestamp. If 'skipReplicatedMetadataStartupOplogScan' is
+    // set, scan from latest oplog entry's timestamp.
+    const Timestamp startCheckpointingAfterTS = [&] {
+        if (const auto skipTimestamp = _computeSkipTimestamp(opCtx); skipTimestamp) {
+            LOGV2(13060000,
+                  "Skipping replicated metadata startup oplog scan and starting the checkpoint "
+                  "tailer from the latest visible oplog entry",
+                  "startCheckpointingAfterTs"_attr = *skipTimestamp);
+            return *skipTimestamp;
+        }
+        return lastPersistedCheckpointTS;
     }();
 
     std::lock_guard lock(_checkpointerMutex);
@@ -113,12 +140,11 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager checkpoint coordinator");
     _checkpointer = std::make_unique<SizeCountCheckpointCoordinator>(
-        *_sizeCountStore, *_timestampStore, oplogUuid);
+        *_sizeCountStore, *_timestampStore, oplogUuid, startCheckpointingAfterTS);
     if (!_isUnderTest) {
-        _checkpointer->startup(opCtx->getServiceContext(), lastPersistedCheckpointTS);
+        _checkpointer->startup(opCtx->getServiceContext());
     }
-
-    setIsRunning(true);
+    gSkipReplicatedMetadataStartupOplogScan.store(false);
 }
 
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
@@ -134,27 +160,11 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     }
 
     if (!_isUnderTest) {
-        checkpointer->shutdown();
-        // Final synchronous flush after checkpoint coordinator threads have stopped.
-        try {
-            advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
-        } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                ex.code() == ErrorCodes::NotWritablePrimary) {
-                LOGV2_DEBUG(12101806,
-                            2,
-                            "ReplicatedFastCountManager final checkpoint flush interrupted",
-                            "error"_attr = ex.toStatus());
-            } else {
-                LOGV2_WARNING(12101807,
-                              "ReplicatedFastCountManager failed to flush on shutdown",
-                              "error"_attr = ex.toStatus());
-            }
-        }
+        // Join the checkpointer threads.
+        checkpointer.reset();
     }
 
     LOGV2(12101800, "ReplicatedFastCountManager stopped");
-    setIsRunning(false);
 }
 
 int ReplicatedFastCountManager::_hydrateMetadataFromContainer(
@@ -210,27 +220,17 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
     SizeCountAccumulator accumulator;
 
     Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
-    bool useContainers = shouldUseReplicatedFastCountContainers(opCtx);
     {
-        // Initialize the in-memory map by loading all persisted collection size/count information.
-        // The block scope is required to avoid a lock cycle fassert in the collection path when
-        // reading the oplog below.
+        // Initialize the in-memory map by loading all persisted container size/count information.
         const auto startTime = Date_t::now();
         int numRecordsScanned = 0;
 
-        if (useContainers) {
-            // TODO SERVER-126250: We should only need the nullptr check since we won't have a
-            // non-null CollectionSizeCountStore pointer.
-            massert(12231701,
-                    "_sizeCountStore should be uninitialized when initializeMetadata is called",
-                    !_sizeCountStore || !_sizeCountStore->usesContainers());
-            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-            if (!storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore)) {
-                // This should only be the case on cold boot.
-                LOGV2(12231703, "Internal fastcount container not present during initialization.");
-                return;
-            }
+        massert(12231701,
+                "_sizeCountStore should be uninitialized when initializeMetadata is called",
+                !_sizeCountStore);
+        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        if (storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStore)) {
             // This RecordStore will be destroyed after hydrating the metadata since only one
             // RecordStore object can exist per ident.
             auto recordStore = storageEngine->getEngine()->getRecordStore(
@@ -242,80 +242,94 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
             massert(12231700, "Storage engine returned a null RecordStore", recordStore);
             numRecordsScanned =
                 _hydrateMetadataFromContainer(opCtx, accumulator, recordStore->getContainer());
-        } else {
-            auto acquisition = replicated_fast_count::acquireFastCountCollectionForRead(opCtx);
-            if (!acquisition.has_value()) {
-                // This should only be the case on cold boot.
-                LOGV2(11999600, "Internal fastcount collection not present during initialization.");
-                return;
-            }
-            numRecordsScanned = _hydrateMetadataFromCollection(opCtx, accumulator, *acquisition);
         }
 
         LOGV2(11648801,
               "ReplicatedFastCountManager persisted size/count information read complete",
-              "storeType"_attr = useContainers ? "container"sv : "collection"sv,
+              "storeType"_attr = "container"sv,
               "numRecordsScanned"_attr = numRecordsScanned,
               "duration"_attr = Date_t::now() - startTime);
     }
 
-    // In container mode, _timestampStore is still the collection-backed implementation because
+    // _timestampStore is still the collection-backed implementation because
     // initializeContainerStores() is called after initializeMetadata(). Read directly from the
     // storage engine like the metadata hydration above does.
     const boost::optional<Timestamp> persistedTimestamp = [&]() -> boost::optional<Timestamp> {
-        if (useContainers) {
-            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-            if (!storageEngine->getEngine()->hasIdent(ru,
-                                                      ident::kFastCountMetadataStoreTimestamps)) {
-                LOGV2_WARNING(12743500,
-                              "Internal fastcount Timestamps container did not exist during "
-                              "initialization even though the Metadata container did");
-                return boost::none;
-            }
-            auto timestampRS = storageEngine->getEngine()->getRecordStore(
-                opCtx,
-                NamespaceString::kAdminCommandNamespace,
-                ident::kFastCountMetadataStoreTimestamps,
-                RecordStore::Options{.keyFormat = KeyFormat::Long},
-                /*uuid=*/boost::none);
-            massert(
-                12580002, "Storage engine returned a null RecordStore for timestamps", timestampRS);
-            ContainerSizeCountTimestampStore tempStore(std::move(timestampRS));
-            return tempStore.read(opCtx);
+        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        if (!storageEngine->getEngine()->hasIdent(ru, ident::kFastCountMetadataStoreTimestamps)) {
+            LOGV2_WARNING(12743500,
+                          "Internal fastcount Timestamps container did not exist during "
+                          "initialization");
+            return boost::none;
         }
-        return _timestampStore->read(opCtx);
+        auto timestampRS = storageEngine->getEngine()->getRecordStore(
+            opCtx,
+            NamespaceString::kAdminCommandNamespace,
+            ident::kFastCountMetadataStoreTimestamps,
+            RecordStore::Options{.keyFormat = KeyFormat::Long},
+            /*uuid=*/boost::none);
+        massert(12580002, "Storage engine returned a null RecordStore for timestamps", timestampRS);
+        SizeCountTimestampStore tempStore(std::move(timestampRS));
+        return tempStore.read(opCtx);
     }();
 
     const Date_t oplogScanStartTime = Date_t::now();
 
-    const Timestamp seekAfterTimestamp = persistedTimestamp.value_or(Timestamp::min());
-
-    // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every
-    // UUID that has been updated since the last checkpoint.
-    const auto scanResult = [&]() -> OplogScanResult {
+    // The oplog collection itself may not exist yet at cold boot.
+    const bool oplogExists = [&] {
         AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-        const auto& oplogColl = oplogRead.getCollection();
-        massert(12554000, "oplog collection not found", oplogColl);
-
-        auto oplogCursor = oplogColl->getRecordStore()->getCursor(
-            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-        // We pass the oplog UUID here to include the oplog's own size and count in the
-        // aggregation.
-        return aggregateSizeCountDeltasInOplog(
-            *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
+        return static_cast<bool>(oplogRead.getCollection());
     }();
 
-    for (const auto& [uuid, delta] : scanResult.deltas) {
-        accumulator[uuid].count += delta.sizeCount.count;
-        accumulator[uuid].size += delta.sizeCount.size;
-    }
+    // Ignore the persisted valid-as-of timestamp if 'skipReplicatedMetadataStartupOplogScan' is
+    // set.
+    const boost::optional<Timestamp> seekAfterTimestamp = [&]() -> boost::optional<Timestamp> {
+        if (!oplogExists) {
+            return boost::none;
+        }
+        if (MONGO_unlikely(gSkipReplicatedMetadataStartupOplogScan.load())) {
+            LOGV2(13060001,
+                  "Skipping replicated metadata startup oplog scan while initializing in-memory "
+                  "metadata; fast size and count may be inaccurate");
+            return boost::none;
+        }
+        if (persistedTimestamp) {
+            return *persistedTimestamp;
+        }
+        return Timestamp::min();
+    }();
 
-    LOGV2(12554001,
-          "ReplicatedFastCountManager oplog scan during initialization complete",
-          "seekAfterTimestamp"_attr = seekAfterTimestamp,
-          "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
-          "duration"_attr = Date_t::now() - oplogScanStartTime);
+    // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every UUID
+    // that has been updated since the last checkpoint. If we do not have a timestamp to seek from,
+    // skip this phase entirely.
+    if (seekAfterTimestamp) {
+        const auto scanResult = [&]() -> OplogScanResult {
+            AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+            const auto& oplogColl = oplogRead.getCollection();
+            massert(12554000, "oplog collection not found", oplogColl);
+
+            auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+            // We pass the oplog UUID here to include the oplog's own size and count in the
+            // aggregation.
+            return aggregateReplicatedMetadataDeltasInOplog(*oplogCursor,
+                                                            *seekAfterTimestamp,
+                                                            oplogColl->uuid(),
+                                                            /*isCheckpoint=*/false);
+        }();
+
+        for (const auto& [uuid, delta] : scanResult.deltas) {
+            accumulator[uuid].count += delta.metadata.sizeCount.count;
+            accumulator[uuid].size += delta.metadata.sizeCount.size;
+        }
+
+        LOGV2(12554001,
+              "ReplicatedFastCountManager oplog scan during initialization complete",
+              "seekAfterTimestamp"_attr = *seekAfterTimestamp,
+              "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
+              "duration"_attr = Date_t::now() - oplogScanStartTime);
+    }
 
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
     int numInitialized = 0;
@@ -360,45 +374,151 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
     }
 }
 
-void ReplicatedFastCountManager::commit(
-    OperationContext* opCtx, const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
+void ReplicatedFastCountManager::finalizeMetadataFromInitialSync(OperationContext* opCtx) {
+    Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
+
+    // The bound _timestampStore reflects the donor's checkpoint timestamp seeded during initial
+    // sync. All seeded per-collection entries are consistent as of this timestamp, so it is the
+    // correct point to begin accumulating oplog deltas from.
+    const boost::optional<Timestamp> persistedTimestamp = _timestampStore->read(opCtx);
+    const Timestamp seekAfterTimestamp = persistedTimestamp.value_or(Timestamp::min());
+
+    // Scan the oplog once, accumulating size/count deltas per UUID since the checkpoint. Done in a
+    // dedicated scope before any collection handles are acquired below, to avoid the lock-cycle
+    // fassert in the collection-backed metadata read path.
+    SizeCountAccumulator deltasByUuid;
+    {
+        const Date_t oplogScanStartTime = Date_t::now();
+        const auto scanResult = [&]() -> OplogScanResult {
+            AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+            const auto& oplogColl = oplogRead.getCollection();
+            massert(12554004, "oplog collection not found", oplogColl);
+
+            auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+            // Pass the oplog UUID so the oplog's own size and count are included in the
+            // aggregation.
+            return aggregateReplicatedMetadataDeltasInOplog(*oplogCursor,
+                                                            seekAfterTimestamp,
+                                                            oplogColl->uuid(),
+                                                            /*isCheckpoint=*/false);
+        }();
+        for (const auto& [uuid, delta] : scanResult.deltas) {
+            deltasByUuid[uuid].count += delta.metadata.sizeCount.count;
+            deltasByUuid[uuid].size += delta.metadata.sizeCount.size;
+        }
+        LOGV2(12554005,
+              "ReplicatedFastCountManager oplog scan during initial sync finalization complete",
+              "seekAfterTimestamp"_attr = seekAfterTimestamp,
+              "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
+              "duration"_attr = Date_t::now() - oplogScanStartTime);
+    }
+
+    // Gather the eligible collections up front so the per-collection persisted reads below do not
+    // acquire a collection (collection-backed read path) while iterating the catalog. The catalog
+    // snapshot keeps each RecordStore alive for the duration of this function.
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
-    for (const auto& [uuid, delta] : changes) {
-        if (delta.count == 0 && delta.size == 0) {
+    int numFromCheckpoint = 0;
+    for (const auto& dbName : catalog->getAllDbNames()) {
+        for (const auto& coll : catalog->range(dbName)) {
+            if (!isReplicatedFastCountEligible(coll->ns())) {
+                continue;
+            }
+            const auto& uuid = coll->uuid();
+            auto recordStore = coll->getRecordStore();
+            const auto persisted = _sizeCountStore->read(opCtx, uuid);
+            // The persisted entry is authoritative as of the checkpoint timestamp; add every oplog
+            // delta since then to obtain the final count, avoiding a full collection scan. If there
+            // is no persisted entry, that collection's size and count haven't been flushed yet so
+            // treat that as 0 size/0 count.
+            int64_t size = 0;
+            int64_t count = 0;
+            if (persisted) {
+                size = persisted->size;
+                count = persisted->count;
+            }
+
+            if (auto it = deltasByUuid.find(uuid); it != deltasByUuid.end()) {
+                size += it->second.size;
+                count += it->second.count;
+            }
+            recordStore->setAccurateSizeCount(size, count);
+            ++numFromCheckpoint;
+        }
+    }
+
+    LOGV2(12554006,
+          "Reconciled in-memory replicated fast count after initial sync",
+          "numCollectionsFromCheckpoint"_attr = numFromCheckpoint,
+          "numOplogDeltas"_attr = deltasByUuid.size());
+}
+
+void ReplicatedFastCountManager::commit(OperationContext* opCtx,
+                                        UncommittedFastCountChangeMap& changes) {
+    for (auto& [uuid, change] : changes) {
+        if (change.delta.count == 0 && change.delta.size == 0) {
             continue;
         }
-        const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
-        // In a single WUOW, if the collection size/count is changed and then the collection is
-        // dropped, the collection will be removed from the catalog before we attempt to write these
-        // uncommitted size/count changes. So, we necessarily skip updating the collection's record
-        // store.
-        if (!collection) {
-            continue;
-        }
-        collection->getRecordStore()->adjustAccurateSizeCount(delta.size, delta.count);
+        invariant(change.recordStore,
+                  fmt::format("Missing RecordStore for fast count change on collection {}",
+                              uuid.toString()));
+        change.recordStore->adjustAccurateSizeCount(change.delta.size, change.delta.count);
         // TODO SERVER-120203: Re-enable this invariant once outstanding bugs are fixed.
-        // invariant(stored.sizeCount.size >= 0 && stored.sizeCount.count >= 0,
+        // invariant(stored.metadata.sizeCount.size >= 0 && stored.metadata.sizeCount.count >= 0,
         //           fmt::format("Expected fast count size and count to be non-negative, but saw
         //           size "
         //                       "{} and count {}",
-        //                       stored.sizeCount.size,
-        //                       stored.sizeCount.count));
+        //                       stored.metadata.sizeCount.size,
+        //                       stored.metadata.sizeCount.count));
     }
 }
 
-boost::optional<std::pair<CollectionSizeCount, Timestamp>>
+boost::optional<std::pair<CollectionReplicatedMetadata, Timestamp>>
 ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) const {
+    if (!_sizeCountStore) {
+        return boost::none;
+    }
     const auto entry = _sizeCountStore->read(opCtx, uuid);
     if (!entry) {
         return boost::none;
     }
-    return std::pair{CollectionSizeCount{.size = entry->size, .count = entry->count},
-                     entry->timestamp};
+    return std::pair{
+        CollectionReplicatedMetadata{
+            .sizeCount = CollectionSizeCount{.size = entry->size, .count = entry->count},
+            .hash = entry->hash},
+        entry->timestamp};
 }
 
 boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(
     OperationContext* opCtx) const {
+    if (!_timestampStore) {
+        return boost::none;
+    }
     return _timestampStore->read(opCtx);
+}
+
+void ReplicatedFastCountManager::populateFromInitialSync(
+    OperationContext* opCtx,
+    const std::vector<std::pair<UUID, FastCountEntry>>& entries,
+    boost::optional<Timestamp> timestampStoreTs) {
+    LOGV2(12549701,
+          "Populating replicated fast count stores from initial sync",
+          "numEntries"_attr = entries.size(),
+          "timestampStoreTs"_attr = timestampStoreTs);
+    {
+        // Use writeToTable() rather than write() here: this node is still in INITIAL_SYNC, so it
+        // cannot accept replicated writes and these entries are seeded locally without going
+        // through the oplog.
+        WriteUnitOfWork wuow(opCtx);
+        for (const auto& [uuid, entry] : entries) {
+            _sizeCountStore->writeToTable(
+                opCtx, uuid, SizeCountStore::Entry{entry.timestamp, entry.size, entry.count});
+        }
+        if (timestampStoreTs) {
+            _timestampStore->writeToTable(opCtx, *timestampStoreTs);
+        }
+        wuow.commit();
+    }
 }
 
 void ReplicatedFastCountManager::flushAsync() {
@@ -408,24 +528,13 @@ void ReplicatedFastCountManager::flushAsync() {
     }
 }
 
-void ReplicatedFastCountManager::flushSync_ForTest(OperationContext* opCtx) {
-    std::lock_guard lock(_checkpointerMutex);
-    invariant(_checkpointer, "flushSync_ForTest() requires startup() to have been called");
-    _checkpointer->flushSync_ForTest(opCtx);
-}
-
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
-    invariant(!_checkpointer, "flushSync_ForTest() requires startup() to have been called");
     _isUnderTest = true;
 }
 
 bool ReplicatedFastCountManager::isRunning_ForTest() {
     std::lock_guard lock(_checkpointerMutex);
     return _checkpointer && _checkpointer->isRunning_ForTest();
-}
-
-bool ReplicatedFastCountManager::usesContainers_ForTest() const {
-    return _sizeCountStore->usesContainers();
 }
 
 std::pair<SizeCountStore*, SizeCountTimestampStore*>

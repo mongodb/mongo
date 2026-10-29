@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
@@ -110,6 +85,60 @@ void createReshardingStateMachine(OperationContext* opCtx,
                                   bool throwOnNotPrimaryError = false);
 
 /**
+ * Returns the in-memory StateMachine for 'reshardingUUID'. If there is no in-memory instance but a
+ * state document is still persisted at 'stateDocumentNss', reconstructs the in-memory instance from
+ * the persisted document and returns it.
+ *
+ * This recovers the state machine in the edge case where the state document was inserted but the
+ * in-memory instance was never constructed - e.g. because createReshardingStateMachine() was
+ * interrupted between the insert and getOrCreate() (see SERVER-130696). Callers such as
+ * _shardsvrAbortReshardCollection use this so that the recovered instance can be driven to
+ * completion.
+ *
+ * Returns boost::none only if neither an in-memory instance nor a persisted document exists. May
+ * uassert InterruptedDueToReplStateChange if the node is stepping or shutting down.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+boost::optional<std::shared_ptr<StateMachine>> getOrRecoverReshardingStateMachine(
+    OperationContext* opCtx, const NamespaceString& stateDocumentNss, const UUID& reshardingUUID) {
+    if (auto instance = tryGetReshardingStateMachineAndThrowIfShuttingDown<Service,
+                                                                           StateMachine,
+                                                                           ReshardingDocument>(
+            opCtx, reshardingUUID)) {
+        return instance;
+    }
+
+    boost::optional<ReshardingDocument> persistedDoc;
+    PersistentTaskStore<ReshardingDocument> store(stateDocumentNss);
+    store.forEach(opCtx,
+                  BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID),
+                  [&](const ReshardingDocument& doc) {
+                      persistedDoc.emplace(doc);
+                      return false;  // Stop iterating after the first (and only) match.
+                  });
+
+    if (!persistedDoc) {
+        return boost::none;
+    }
+
+    // Reconstruct the in-memory instance from the persisted document.
+    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+    auto service = registry->lookupServiceByName(Service::kServiceName);
+    return StateMachine::getOrCreate(opCtx, service, persistedDoc->toBSON());
+}
+
+/**
+ * Waits for this node's most recent write (the system's last op time) to be majority committed.
+ *
+ * Resharding participant initialization commands use this to guarantee the participant's state
+ * document is durable before returning success, even on paths that performed no write on the
+ * current operation context (e.g. the state machine already existed in memory, or an insert was
+ * deduplicated). This ensures the coordinator can rely on the participant not forgetting its role
+ * after a rollback.
+ */
+void waitForStateDocumentMajorityCommitted(OperationContext* opCtx);
+
+/**
  * The following functions construct a ReshardingDocument from the given 'reshardingFields'.
  */
 ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
@@ -131,15 +160,16 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
  *     1. The reshardingFields state indicates that the resharding operation is new, and
  *     2. A state machine does not exist on this node for the given namespace.
  */
-MONGO_MOD_PUBLIC void processReshardingFieldsForCollection(
+[[MONGO_MOD_PUBLIC]] void processReshardingFieldsForCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
 
-MONGO_MOD_PUBLIC void clearCollectionMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
+[[MONGO_MOD_PUBLIC]] void clearCollectionMetadata(OperationContext* opCtx,
+                                                  bool scheduleAsyncRefresh);
 
-MONGO_MOD_PUBLIC void clearCollectionMetadata(
+[[MONGO_MOD_PUBLIC]] void clearCollectionMetadata(
     OperationContext* opCtx,
     stdx::unordered_set<NamespaceString> namespacesToRefresh,
     bool scheduleAsyncRefresh);

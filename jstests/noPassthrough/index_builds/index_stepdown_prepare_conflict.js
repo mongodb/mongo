@@ -69,21 +69,8 @@ jsTestLog("Start txn");
 const session = primary.startSession();
 const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
-
-// TODO (SERVER-128101): a suite-level override may make this retry loop unnecessary.
-assert.soon(() => {
-    session.startTransaction();
-    try {
-        assert.commandWorked(sessionColl.insert({x: 1}, {$set: {y: 1}}));
-        return true;
-    } catch (e) {
-        session.abortTransaction_forTesting();
-        if (e.errorLabels && e.errorLabels.includes("TransientTransactionError")) {
-            return false;
-        }
-        throw e;
-    }
-}, "timed out retrying transaction setup on TransientTransactionError");
+session.startTransaction();
+assert.commandWorked(sessionColl.insert({x: 1}));
 
 jsTestLog("Prepare txn");
 PrepareHelpers.prepareTransaction(session);

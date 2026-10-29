@@ -36,7 +36,7 @@ executor:
           overrideRetryAttempts: 3
           runningWithStepdowns: true
           sessionOptions:
-            maybeUseCausalConsistency: true
+            causalConsistency: true
             readConcern:
               level: majority
             readPreference:
@@ -57,7 +57,7 @@ executor:
         enableElectionHandoff: 0
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
       syncdelay: 5
     mongos_options:
@@ -65,7 +65,7 @@ executor:
         defaultFindReplicaSetHostTimeoutMS: 120000
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 1
     num_rs_nodes_per_shard: 3
@@ -81,6 +81,10 @@ executor:
       randomize_kill: true
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            runningWithStepdowns: true
     - class: ValidateCollections
       shell_options:
         global_vars:

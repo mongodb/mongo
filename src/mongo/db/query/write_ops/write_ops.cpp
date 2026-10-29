@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/write_ops/write_ops.h"
 
@@ -48,6 +22,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
@@ -67,6 +42,7 @@
 #include <utility>
 #include <variant>
 
+#include <absl/container/flat_hash_set.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -123,6 +99,7 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
                                                << "stmtIds" << *stmtIds)
                               << ". Write command: " << op.toBSON(),
                 !op.getWriteCommandRequestBase().getStmtId());
+        write_ops::validateStmtIds(*stmtIds);
     }
 }
 
@@ -252,6 +229,26 @@ int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, siz
     const auto& stmtId = writeCommandBase.getStmtId();
     const int32_t kFirstStmtId = stmtId ? *stmtId : 0;
     return kFirstStmtId + writePos;
+}
+
+void validateStmtIds(const std::vector<std::int32_t>& stmtIds) {
+    // Statement ids are not allowed to repeat.
+    absl::flat_hash_set<std::int32_t> seen;
+    seen.reserve(stmtIds.size());
+    for (auto stmtId : stmtIds) {
+        if (stmtId == kUninitializedStmtId) {
+            // This sentinel marks a write that is not retryable, so it may repeat.
+            continue;
+        }
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Statement id must be non-negative. Got " << stmtId,
+                stmtId >= 0);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Statement ids must be unique within a write command. Found "
+                                 "duplicate statement id "
+                              << stmtId,
+                seen.insert(stmtId).second);
+    }
 }
 
 int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants) {
@@ -693,8 +690,9 @@ bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
 }
 
 bool isClassicalUpdateReplacement(const BSONObj& update) {
-    // An empty update object will be treated as replacement as firstElementFieldName() returns "".
-    return update.firstElementFieldName()[0] != '$';
+    // An empty update object will be treated as replacement as firstElementFieldNameStringData()
+    // returns an empty string, which does not start with '$'.
+    return !update.firstElementFieldNameStringData().starts_with('$');
 }
 
 void checkWriteErrors(const WriteCommandReplyBase& reply) {

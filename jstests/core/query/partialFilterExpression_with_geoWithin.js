@@ -1,4 +1,5 @@
 // @tags: [
+//  uses_explain,
 //  requires_non_retryable_writes,
 //  requires_fcv_51,
 //  requires_getmore,

@@ -18,6 +18,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
     ] + select({
         "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metric_name_validation",
             "//src/mongo/otel/metrics:otel_metrics_service",
             "//src/mongo/util:periodic_runner",
             "//src/mongo/util:procparser",
@@ -49,6 +50,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
     ] + select({
         "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metric_name_validation",
             "//src/mongo/otel/metrics:otel_metrics_service",
             "//src/mongo/util:periodic_runner",
             "//src/mongo/util:procparser",
@@ -158,6 +160,125 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "replication_session_metrics",
+    hdrs = ["replication_session_metrics.h"],
+    srcs_select = [{
+        "@platforms//os:linux": ["replication_session_metrics_linux.cpp"],
+        "//conditions:default": ["replication_session_metrics_noop.cpp"],
+    }],
+    deps = [
+        "//src/mongo/db:service_context",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metrics_service",
+            "//src/mongo/util:fail_point",
+            "//src/mongo/util:periodic_runner",
+            "//src/mongo/util/net:connection_purpose",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "replication_session_metrics_test",
+    srcs = ["replication_session_metrics_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":replication_session_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/util:fail_point",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "process_health_metrics",
+    hdrs = ["process_health_metrics.h"],
+    srcs_select = [{
+        "@platforms//os:linux": ["process_health_metrics_linux.cpp"],
+        "//conditions:default": ["process_health_metrics_noop.cpp"],
+    }],
+    deps = [
+        "//src/mongo/db:service_context",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metrics_service",
+            "//src/mongo/util:fail_point",
+            "//src/mongo/util:periodic_runner",
+            "//src/mongo/util:processinfo",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "process_health_metrics_test",
+    srcs = ["process_health_metrics_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":process_health_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/util:fail_point",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "wiredtiger_metrics",
+    srcs = ["wiredtiger_metrics.cpp"],
+    hdrs = ["wiredtiger_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/execution_control:ticketing_system",
+        "//src/mongo/db/storage:storage_engine_common",
+        "//src/mongo/db/storage/kv:kv_engine",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wiredtiger_metrics_test",
+    srcs = ["wiredtiger_metrics_test.cpp"],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":wiredtiger_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "wiredtiger_metric_registry",
+    srcs = ["wiredtiger_metric_registry.cpp"],
+    hdrs = ["wiredtiger_metric_registry.h"],
+    deps = [
+        "//src/mongo/otel/metrics:metric_unit",
+        "//src/mongo/otel/metrics:otel_metric_name_validation",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wiredtiger_metric_registry_test",
+    srcs = ["wiredtiger_metric_registry_test.cpp"],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":wiredtiger_metric_registry",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metric_name_validation",
+    ],
+)
+
+mongo_cc_library(
     name = "connections_metrics",
     srcs = ["connections_metrics.cpp"],
     hdrs = ["connections_metrics.h"],
@@ -182,6 +303,33 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "query_memory_metrics",
+    srcs = ["query_memory_metrics.cpp"],
+    hdrs = ["query_memory_metrics.h"],
+    deps = [
+        "//src/mongo/db:cluster_role",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_memory_metrics_test",
+    srcs = ["query_memory_metrics_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":query_memory_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
     name = "mongodb_build_info_metrics",
     srcs = ["mongodb_build_info_metrics.cpp"],
     hdrs = ["mongodb_build_info_metrics.h"],
@@ -190,6 +338,29 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "observable_mutex_metrics",
+    srcs = ["observable_mutex_metrics.cpp"],
+    hdrs = ["observable_mutex_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/otel/metrics:metric_unit",
+        "//src/mongo/otel/metrics:otel_metric_name_validation",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_metrics_test",
+    srcs = ["observable_mutex_metrics_test.cpp"],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":observable_mutex_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
@@ -203,8 +374,15 @@ mongo_cc_library(
         ":global_lock_metrics",
         ":index_build_metrics",
         ":mongodb_build_info_metrics",
+        ":observable_mutex_metrics",
+        ":process_health_metrics",
+        ":query_memory_metrics",
+        ":replication_session_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
+        ":wiredtiger_metrics",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/admission:egress_response_rate_limiter",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
     ],
 )

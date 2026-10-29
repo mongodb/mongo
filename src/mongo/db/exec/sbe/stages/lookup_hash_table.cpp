@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/lookup_hash_table.h"
 
@@ -53,22 +27,31 @@ void LookupHashTableIter::initSearchArray() {
 
         auto hashTableMatchIter = _hashTable._memoryHt->find(elemView);
         if (hashTableMatchIter != _hashTable._memoryHt->end()) {
-            _hashTableMatchSet.insert(hashTableMatchIter->second.begin(),
-                                      hashTableMatchIter->second.end());
+            _hashTableMatchVector.insert(_hashTableMatchVector.end(),
+                                         hashTableMatchIter->second.begin(),
+                                         hashTableMatchIter->second.end());
         } else if (_hashTable._recordStoreHt) {
             // The key wasn't in memory. Check the '_hashTable._recordStoreHt' disk spill.
             auto elemColl = _hashTable.normalizeStringIfCollator(elemView);
 
-            boost::optional<std::vector<size_t>> indicesFromRS =
-                _hashTable.readIndicesFromRecordStore(_hashTable._recordStoreHt.get(),
-                                                      elemColl.view());
+            auto indicesFromRS = _hashTable.readIndicesFromRecordStore(
+                _hashTable._recordStoreHt.get(), elemColl.view());
             if (indicesFromRS) {
-                _hashTableMatchSet.insert(indicesFromRS->begin(), indicesFromRS->end());
+                _hashTableMatchVector.insert(
+                    _hashTableMatchVector.end(), indicesFromRS->begin(), indicesFromRS->end());
             }
         }
         enumerator.advance();
     }  // while
-    _hashTableMatchSetIter = _hashTableMatchSet.begin();
+
+    // Different array elements (or the memory and disk portions of the hash table) may map to the
+    // same inner buffer index, so duplicates must be removed.
+    std::sort(_hashTableMatchVector.begin(), _hashTableMatchVector.end());
+    _hashTableMatchVector.erase(
+        std::unique(_hashTableMatchVector.begin(), _hashTableMatchVector.end()),
+        _hashTableMatchVector.end());
+
+    _hashTableMatchVectorIdx = 0;
     _hashTableSearched = true;
 }  // LookupHashTableIter::initSearchArray
 
@@ -83,7 +66,7 @@ void LookupHashTableIter::initSearchScalar() {
         // The key wasn't in memory. Check the '_hashTable._recordStoreHt' disk spill.
         auto keyColl = _hashTable.normalizeStringIfCollator(_outerKey);
 
-        boost::optional<std::vector<size_t>> indicesFromRS =
+        auto indicesFromRS =
             _hashTable.readIndicesFromRecordStore(_hashTable._recordStoreHt.get(), keyColl.view());
         if (indicesFromRS) {
             _hashTableMatchVector = std::move(indicesFromRS.get());
@@ -95,35 +78,22 @@ void LookupHashTableIter::initSearchScalar() {
 
 size_t LookupHashTableIter::getNextMatchingIndex() {
     // Iterator over matches of an individual outer key value in '_hashTable->_memoryHt'.
-    if (_outerKeyIsArray) {
-        // Outer key is an array. '_outerKey' contains the key value.
-        if (MONGO_unlikely(!_hashTableSearched)) {
-            // This is the first time we are looking for this outer key. Build a sorted set of all
-            // inner matches, if any, for all entries in this outer key array.
+    if (MONGO_unlikely(!_hashTableSearched)) {
+        // This is the first time we are looking for this outer key. Build a sorted, de-duplicated
+        // vector of all inner matches, if any, for the outer key (scalar or array).
+        if (_outerKeyIsArray) {
             initSearchArray();
-        }
-
-        // Return the next match, if any.
-        if (_hashTableMatchSetIter != _hashTableMatchSet.end()) {
-            return *(_hashTableMatchSetIter++);
         } else {
-            return kNoMatchingIndex;
-        }
-    } else {
-        // Outer key is a scalar. '_outerKey' contains the key value.
-        if (MONGO_unlikely(!_hashTableSearched)) {
-            // This is the first time we are looking for this outer scalar key. Find its vector of
-            // inner matches, if any.
             initSearchScalar();
         }
+    }
 
-        // Return the next match, if any.
-        if (_hashTableMatchVectorIdx < _hashTableMatchVector.size()) {
-            return _hashTableMatchVector[_hashTableMatchVectorIdx++];
-        } else {
-            return kNoMatchingIndex;
-        }
-    }  // else outer key is a scalar
+    // Return the next match, if any.
+    if (_hashTableMatchVectorIdx < _hashTableMatchVector.size()) {
+        return _hashTableMatchVector[_hashTableMatchVectorIdx++];
+    } else {
+        return kNoMatchingIndex;
+    }
 }  // LookupHashTableIter::getNextMatchingValue
 
 void LookupHashTableIter::reset(value::TagValueView outerKey) {
@@ -159,7 +129,7 @@ bool LookupHashTable::shouldCheckDiskSpace() {
     return _spilledBytesSinceLastCheck == 0;
 }
 
-boost::optional<std::vector<size_t>> LookupHashTable::readIndicesFromRecordStore(
+boost::optional<RecordIndexCollection> LookupHashTable::readIndicesFromRecordStore(
     SpillingStore* rs, value::TagValueView key) {
 
     auto [rid, _] = serializeKeyForRecordStore(key);
@@ -168,7 +138,7 @@ boost::optional<std::vector<size_t>> LookupHashTable::readIndicesFromRecordStore
         // 'BufBuilder' writes numbers in little endian format, so must read them using the same.
         auto valueReader = BufReader(record.data(), record.size());
         auto nRecords = valueReader.read<LittleEndian<size_t>>();
-        std::vector<size_t> result(nRecords);
+        RecordIndexCollection result(nRecords);
         for (size_t i = 0; i < nRecords; ++i) {
             auto idx = valueReader.read<LittleEndian<size_t>>();
             result[i] = idx;
@@ -193,10 +163,10 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
         const long long newMemUsage = _computedTotalMemUsage +
             size_estimator::estimate(keyView.tag, keyView.value) + sizeof(size_t);
 
-        value::FixedSizeRow<1 /*N*/> key{1};
         if (!hasSpilledHtToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
             // We have to insert an owned key, attempt a move, but force copy if necessary when we
             // haven't spilled to the '_recordStore' yet.
+            value::FixedSizeRow<1 /*N*/> key{1};
             key.reset(0, keyAccessor->getCopyOfValue());
 
             auto [it, inserted] = _memoryHt->try_emplace(std::move(key));
@@ -212,7 +182,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
                 makeInternalRecordStore();
             }
 
-            auto val = std::vector<size_t>{valueIndex};
+            auto val = RecordIndexCollection{valueIndex};
             spillIndicesToRecordStore(_recordStoreHt.get(), keyView, val);
         }
     } else {
@@ -265,7 +235,7 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
     auto spilledDataStorageIncrease = _hashLookupStats.spillingBuffStats.updateSpillingStats(
         1, spillToDiskBytes, 1, _recordStoreBuf->storageSize(_opCtx));
     lookupPushdownCounters.incrementPerSpilling(
-        1 /* spills */, spillToDiskBytes, 1, spilledDataStorageIncrease);
+        /*spills=*/1, spillToDiskBytes, 1, spilledDataStorageIncrease);
     _recordStoreBuf->updateSpillStorageStatsForOperation(_opCtx);
 }
 
@@ -287,7 +257,7 @@ size_t LookupHashTable::bufferValueOrSpill(value::FixedSizeRow<1 /*N*/>& value) 
 
 int64_t LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
                                                    value::TagValueView key,
-                                                   const std::vector<size_t>& value,
+                                                   const RecordIndexCollection& value,
                                                    bool update) {
     BufBuilder buf;
     buf.appendNum(value.size());  // number of indices
@@ -311,7 +281,7 @@ int64_t LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
 
 void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
                                                 value::TagValueView key,
-                                                const std::vector<size_t>& value) {
+                                                const RecordIndexCollection& value) {
     // Ensure there is sufficient disk space for spilling
     if (shouldCheckDiskSpace()) {
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
@@ -346,9 +316,12 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
 
     auto spilledDataStorageIncrease = _hashLookupStats.spillingHtStats.updateSpillingStats(
-        1 /*spills*/, spillToDiskBytes, update ? 0 : 1, _recordStoreHt->storageSize(_opCtx));
+        /*additionalSpills=*/1,
+        spillToDiskBytes,
+        update ? 0 : 1,
+        _recordStoreHt->storageSize(_opCtx));
     lookupPushdownCounters.incrementPerSpilling(
-        1 /* spills */, spillToDiskBytes, update ? 0 : 1, spilledDataStorageIncrease);
+        /*spills=*/1, spillToDiskBytes, update ? 0 : 1, spilledDataStorageIncrease);
     _recordStoreHt->updateSpillStorageStatsForOperation(_opCtx);
 }
 
@@ -371,7 +344,7 @@ std::pair<RecordId, key_string::TypeBits> LookupHashTable::serializeKeyForRecord
     value::TagValueView key) const {
     key_string::Builder kb{key_string::Version::kLatestVersion};
     value::FixedSizeRow<1 /*N*/> row{};
-    row.reset(0, false, key.tag, key.value);
+    row.reset(0, key);
     return encodeKeyString(kb, row);
 }
 
@@ -399,8 +372,6 @@ boost::optional<value::TagValueView> LookupHashTable::getValueAtIndex(size_t ind
 }  // HashLookupUnwindStage::getValueAtIndex
 
 void LookupHashTable::reset(bool fromClose) {
-    _memoryUseInBytesBeforeSpill =
-        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill);
     _memoryHt = boost::none;
     _computedTotalMemUsage = 0;
 

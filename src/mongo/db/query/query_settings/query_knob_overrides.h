@@ -1,38 +1,14 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/util/version/releases.h"
 
 #include <span>
 #include <string_view>
@@ -45,6 +21,12 @@ namespace mongo::query_settings {
  *
  * Each entry is a (registry-index, value) pair produced by a single fromBSON() call.
  * An empty entries vector means no overrides are active.
+ *
+ * fromBSON() never throws: a knob that fails to parse or validate is simply omitted from
+ * entries() and its failure is recorded in errors() instead, so a caller can decide whether to
+ * reject (uassertNoErrors()) or degrade gracefully (log errors() and keep using entries()) based
+ * on its own trust context. errors() is a parse-time diagnostic only; it is excluded from
+ * equality comparisons and is never round-tripped through toBSON().
  *
  * DeleteQueryKnobOverride is a write-path-only removal sentinel used to signal that a knob should
  * be removed during merge. It must not survive into stored settings; validateQuerySettings()
@@ -69,7 +51,8 @@ public:
      * Applies 'rhs' as a per-knob patch onto 'lhs' (a sorted union where 'rhs' wins on equal ids).
      * 'lhs' is expected to be sentinel-free (it is always already-stored or already-simplified
      * settings); sentinels legitimately originate only in the 'rhs' wire patch. Callers must run
-     * simplify() on the result before passing it to validateQuerySettings().
+     * simplify() on the result before passing it to validateQuerySettings(). The result's errors()
+     * is the concatenation of 'lhs' and 'rhs' errors().
      */
     static QuerySettingsKnobOverrides merge(const QuerySettingsKnobOverrides& lhs,
                                             const QuerySettingsKnobOverrides& rhs);
@@ -79,6 +62,12 @@ public:
      * before calling validateQuerySettings() to ensure no sentinel survives into stored settings.
      */
     void simplify();
+
+    /**
+     * Removes all overrides for knobs whose 'minFcv' is greater than 'fcv', i.e. knobs not
+     * supported on that FCV. Returns true if any entry was removed.
+     */
+    bool removeKnobsRequiringHigherFcv(multiversion::FeatureCompatibilityVersion fcv);
 
     BSONObj toBSON() const;
     void toBSON(std::string_view fieldName, BSONObjBuilder* builder) const {
@@ -93,10 +82,45 @@ public:
         return _entries;
     }
 
-    auto operator<=>(const QuerySettingsKnobOverrides&) const = default;
+    bool hasErrors() const {
+        return !_errors.empty();
+    }
+
+    std::span<const Status> errors() const {
+        return _errors;
+    }
+
+    /**
+     * Throws the first recorded parse/validation error, if any. No-op if errors() is empty.
+     */
+    void uassertNoErrors() const;
+
+    /**
+     * Logs all recorded parse/validation errors() in a single log line, with extra context (e.g.
+     * a query shape hash) merged in. No-op if errors() is empty.
+     */
+    void logErrors(const BSONObj& context) const;
+
+    /**
+     * Discards all recorded parse/validation errors(). Call once they've been reported (e.g. via
+     * logErrors()) and no longer need to persist with a stored value.
+     */
+    void clearErrors() {
+        _errors.clear();
+    }
+
+    friend auto operator<=>(const QuerySettingsKnobOverrides& lhs,
+                            const QuerySettingsKnobOverrides& rhs) {
+        return lhs._entries <=> rhs._entries;
+    }
+    friend bool operator==(const QuerySettingsKnobOverrides& lhs,
+                           const QuerySettingsKnobOverrides& rhs) {
+        return lhs._entries == rhs._entries;
+    }
 
 private:
     std::vector<Entry> _entries;
+    std::vector<Status> _errors;
 };
 
 }  // namespace mongo::query_settings

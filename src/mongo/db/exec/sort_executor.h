@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,6 +9,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
@@ -60,7 +36,7 @@ namespace mongo {
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this class.
  */
 template <typename T>
-class MONGO_MOD_NEEDS_REPLACEMENT SortExecutor {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SortExecutor {
 public:
     using DocumentSorter = Sorter<Value, T>;
     class Comparator {
@@ -77,24 +53,43 @@ public:
     /**
      * If the passed in limit is 0, this is treated as no limit.
      */
-    SortExecutor(SortPattern sortPattern,
+    SortExecutor(OperationContext* opCtx,
+                 SortPattern sortPattern,
                  uint64_t limit,
-                 uint64_t maxMemoryUsageBytes,
+                 MemoryUsageLimit maxMemoryUsageBytes,
                  boost::filesystem::path tempDir,
                  bool allowDiskUse,
                  bool moveSortedDataIntoIterator = false)
         : _sortPattern(std::move(sortPattern)),
           _tempDir(std::move(tempDir)),
           _diskUseAllowed(allowDiskUse),
-          _moveSortedDataIntoIterator(moveSortedDataIntoIterator) {
+          _moveSortedDataIntoIterator(moveSortedDataIntoIterator),
+          _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes) {
         _stats.sortPattern =
             _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
         _stats.limit = limit;
-        _stats.maxMemoryUsageBytes = maxMemoryUsageBytes;
+        _stats.maxMemoryUsageBytes = static_cast<uint64_t>(maxMemoryUsageBytes.get(opCtx));
         if (allowDiskUse) {
             _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
         }
     }
+
+    SortExecutor(SortPattern sortPattern,
+                 uint64_t limit,
+                 uint64_t maxMemoryUsageBytes,
+                 boost::filesystem::path tempDir,
+                 bool allowDiskUse,
+                 bool moveSortedDataIntoIterator = false)
+        // A fixed-value limit never consults the OperationContext.
+        // TODO SERVER-131141: thread an OperationContext through this constructor too; deferred
+        // for now to avoid call-site churn outside query-owned code.
+        : SortExecutor(nullptr,
+                       std::move(sortPattern),
+                       limit,
+                       MemoryUsageLimit{static_cast<int64_t>(maxMemoryUsageBytes)},
+                       std::move(tempDir),
+                       allowDiskUse,
+                       moveSortedDataIntoIterator) {}
 
     const SortPattern& sortPattern() const {
         return _sortPattern;
@@ -208,8 +203,8 @@ public:
         return _output->next();
     }
 
-    uint64_t getMaxMemoryBytes() const {
-        return _stats.maxMemoryUsageBytes;
+    MemoryUsageLimit getMaxMemoryBytes() const {
+        return _maxAllowedMemoryUsageBytes;
     }
 
     /**
@@ -294,6 +289,8 @@ private:
     const boost::filesystem::path _tempDir;
     const bool _diskUseAllowed;
     const bool _moveSortedDataIntoIterator;
+
+    MemoryUsageLimit _maxAllowedMemoryUsageBytes;
 
     std::unique_ptr<SorterFileStats> _sorterFileStats;
     std::unique_ptr<DocumentSorter> _sorter;

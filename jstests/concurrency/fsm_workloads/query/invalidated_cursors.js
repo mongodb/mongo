@@ -42,20 +42,25 @@ export const $config = (function () {
         isCreateIndexRequested: false,
         isCreatedSucceedAtLeastOnce: false,
         createIndexAndAssert: function (db, collName, indexSpecs) {
+            // createIndexes fails with ConflictingOperationInProgress after exhausting its
+            // retries when the collection keeps being dropped and recreated concurrently (see
+            // the dropDatabase/dropCollection states).
             const errorCodesTxn = [
+                ErrorCodes.ConflictingOperationInProgress,
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.IndexBuildAlreadyInProgress,
                 ErrorCodes.NoMatchingDocument,
             ];
             const errorCodesNonTxn = [
+                ErrorCodes.ConflictingOperationInProgress,
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ];
             // TODO(SERVER-18047): Unify error codes once an explain against a non-existent
             // database fails in an unsharded environment.
-            if (isMongos(db) || TestData.testingReplicaSetEndpoint) {
+            if (isMongos(db)) {
                 errorCodesNonTxn.push(ErrorCodes.NamespaceNotFound);
                 errorCodesNonTxn.push(ErrorCodes.CannotImplicitlyCreateCollection);
                 errorCodesNonTxn.push(ErrorCodes.StaleConfig);

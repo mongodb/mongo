@@ -45,7 +45,7 @@ random_kv(void *arg)
     uint32_t i;
     u_int period;
     const char *config;
-    bool simple;
+    bool rollback, simple;
 
     (void)(arg); /* Unused parameter */
 
@@ -71,19 +71,27 @@ random_kv(void *arg)
         config = simple ? "next_random=true" : "next_random=true,next_random_sample_size=37";
         simple = !simple;
 
-        /* Select a table and open a cursor. */
+        /* Select a table. */
         table = table_select_type(ROW, false);
+
+        /* Read inside a snapshot transaction so the reads observe a single consistent state. */
+        wt_wrap_begin_transaction(session, "isolation=snapshot");
         wt_wrap_open_cursor(session, table->uri, config, &cursor);
 
         /* This is just a smoke-test, get some key/value pairs. */
-        for (i = mmrand(&g.extra_rnd, 0, WT_THOUSAND); i > 0 && !g.workers_finished; --i) {
+        rollback = false;
+        for (i = mmrand(&g.extra_rnd, 0, WT_THOUSAND); i > 0 && !rollback && !g.workers_finished;
+          --i) {
             switch (ret = cursor->next(cursor)) {
             case 0:
                 break;
             case WT_NOTFOUND:
-            case WT_ROLLBACK:
             case WT_CACHE_FULL:
             case WT_PREPARE_CONFLICT:
+                continue;
+            case WT_ROLLBACK:
+                /* The snapshot can no longer be used; abandon this round and start a new one. */
+                rollback = true;
                 continue;
             default:
                 testutil_check(ret);
@@ -93,6 +101,12 @@ random_kv(void *arg)
         }
 
         testutil_check(cursor->close(cursor));
+
+        /*
+         * End the transaction; required even after WT_ROLLBACK, which only marks the error and
+         * leaves it running.
+         */
+        testutil_check(session->rollback_transaction(session, NULL));
 
         /* Sleep for some number of seconds. */
         period = mmrand(&g.extra_rnd, 1, 10);

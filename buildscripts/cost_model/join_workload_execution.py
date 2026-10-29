@@ -1,30 +1,5 @@
-# Copyright (C) 2026-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 """Join workload execution helpers for calibration."""
 
 from __future__ import annotations
@@ -78,14 +53,16 @@ def load_execution_times(csv_paths: list[str]) -> CachedTimes:
     return cached
 
 
+JOIN_STAGE_ABBREVIATIONS = {
+    "HASH_JOIN_EMBEDDING": "HJ",
+    "NESTED_LOOP_JOIN_EMBEDDING": "NLJ",
+    "INDEXED_NESTED_LOOP_JOIN_EMBEDDING": "INLJ",
+}
+
+
 def abbreviate_stage(stage_name: str) -> str:
     """Abbreviate join algorithm stage names."""
-    abbreviations = {
-        "HASH_JOIN_EMBEDDING": "HJ",
-        "NESTED_LOOP_JOIN_EMBEDDING": "NLJ",
-        "INDEXED_NESTED_LOOP_JOIN_EMBEDDING": "INLJ",
-    }
-    return abbreviations.get(stage_name, stage_name)
+    return JOIN_STAGE_ABBREVIATIONS.get(stage_name, stage_name)
 
 
 async def run_join_explain(
@@ -95,25 +72,31 @@ async def run_join_explain(
     verbosity: str = "executionStats",
 ) -> JoinExplainResult:
     explain = await database.explain_aggregate(collection_name, pipeline, verbosity)
-    cursor = explain["stages"][0]["$cursor"]
+    container = explain["stages"][0]["$cursor"] if "stages" in explain else explain
+    join_node = container["queryPlanner"]["winningPlan"]["queryPlan"]
+    while join_node["stage"] not in JOIN_STAGE_ABBREVIATIONS:
+        join_node = join_node["inputStage"]
 
     exec_time_ms, used_disk = None, None
     if verbosity == "executionStats":
-        stats = cursor["executionStats"]["executionStages"]
+        # Walk down to the topmost SBE stage of the join subtree, so that the measurements
+        # exclude the pushed-down suffix stages (and their spill stats) above the join.
+        stats = container["executionStats"]["executionStages"]
+        while stats["planNodeId"] != join_node["planNodeId"]:
+            stats = stats["inputStage"]
         exec_time_ms = stats["executionTimeNanos"] / 1e6
         used_disk = stats["inputStage"].get("usedDisk")
-    query_plan = cursor["queryPlanner"]["winningPlan"]["queryPlan"]
-    join_cost_components = query_plan.get("joinCostComponents", {})
+    join_cost_components = join_node.get("joinCostComponents", {})
 
-    assert query_plan["leftEmbeddingField"] == "none", f"Expected {collection_name} as outer table"
+    assert join_node["leftEmbeddingField"] == "none", f"Expected {collection_name} as outer table"
 
     return JoinExplainResult(
         exec_time_ms=exec_time_ms,
         used_disk=used_disk,
-        algorithm=abbreviate_stage(query_plan["stage"]),
-        cost_estimate=query_plan["costEstimate"],
-        left_input_cost=query_plan["inputStages"][0]["costEstimate"],
-        right_input_cost=query_plan["inputStages"][1].get("costEstimate"),
+        algorithm=abbreviate_stage(join_node["stage"]),
+        cost_estimate=join_node["costEstimate"],
+        left_input_cost=join_node["inputStages"][0]["costEstimate"],
+        right_input_cost=join_node["inputStages"][1].get("costEstimate"),
         mackert_lohman_case=MACKERT_LOHMAN_CASES.get(join_cost_components.get("mackertLohmanCase")),
         sequential_io_pages=join_cost_components.get("sequentialIOPages"),
         random_io_pages=join_cost_components.get("randomIOPages"),

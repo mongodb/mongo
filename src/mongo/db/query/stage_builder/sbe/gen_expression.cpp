@@ -1,37 +1,8 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -70,6 +41,10 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 
 namespace mongo::stage_builder {
@@ -1865,10 +1840,12 @@ public:
         // "timezone" parameter validation.
         if (timezoneExpression.isConstantExpr()) {
             auto [timezoneTag, timezoneVal] = timezoneExpression.getConstantValue();
-            tassert(7157928,
+            // These are user errors rather than invariants: with pipeline optimization disabled
+            // constant folding does not run, so an invalid constant reaches stage building.
+            uassert(7157928,
                     "$dateTrunc parameter 'timezone' must be a string",
                     sbe::value::isString(timezoneTag));
-            tassert(7157929,
+            uassert(7157929,
                     "$dateTrunc parameter 'timezone' must be a valid timezone",
                     sbe::vm::isValidTimezone({timezoneTag, timezoneVal}, timezoneDB));
         } else {
@@ -1889,11 +1866,11 @@ public:
         // "unit" parameter validation.
         if (unitExpression.isConstantExpr()) {
             auto [unitTag, unitVal] = unitExpression.getConstantValue();
-            tassert(7157933,
+            uassert(7157933,
                     "$dateTrunc parameter 'unit' must be a string",
                     sbe::value::isString(unitTag));
             auto unitString = sbe::value::getStringView(unitTag, unitVal);
-            tassert(7157934,
+            uassert(7157934,
                     "$dateTrunc parameter 'unit' must be a valid time unit",
                     isValidTimeUnit(unitString));
         } else {
@@ -1911,18 +1888,18 @@ public:
         if (expr->isBinSizeSpecified()) {
             if (binSizeExpression.isConstantExpr()) {
                 auto [binSizeTag, binSizeValue] = binSizeExpression.getConstantValue();
-                tassert(7157937,
+                uassert(7157937,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         sbe::value::isNumber(binSizeTag));
                 auto binSizeLong = sbe::value::genericNumConvert(
                     binSizeTag, binSizeValue, sbe::value::TypeTags::NumberInt64);
-                tassert(7157938,
+                uassert(7157938,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         binSizeLong.tag() != sbe::value::TypeTags::Nothing);
                 auto binSize = sbe::value::bitcastTo<int64_t>(binSizeLong.value());
-                tassert(7157939,
+                uassert(7157939,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
                         binSize > 0);
@@ -1951,11 +1928,11 @@ public:
         if (expr->isStartOfWeekSpecified()) {
             if (startOfWeekExpression.isConstantExpr()) {
                 auto [startOfWeekTag, startOfWeekVal] = startOfWeekExpression.getConstantValue();
-                tassert(7157941,
+                uassert(7157941,
                         "$dateTrunc parameter 'startOfWeek' must be a string",
                         sbe::value::isString(startOfWeekTag));
                 auto startOfWeekString = sbe::value::getStringView(startOfWeekTag, startOfWeekVal);
-                tassert(7157942,
+                uassert(7157942,
                         "$dateTrunc parameter 'startOfWeek' must be a valid day of the week",
                         isValidDayOfWeek(startOfWeekString));
             } else {
@@ -2228,38 +2205,7 @@ public:
         unsupportedExpression("$map");
     }
     void visit(const ExpressionMeta* expr) final {
-        auto pushMetadataExpr = [&](boost::optional<sbe::value::SlotId> slot, uint32_t typeMask) {
-            if (slot) {
-                pushExpr(_b.makeIf(
-                    _b.makeFillEmptyTrue(_b.makeFunction(
-                        sbe::EFn::kTypeMatch, SbVar{*slot}, _b.makeInt32Constant(typeMask))),
-                    SbVar{*slot},
-                    _b.makeFail(ErrorCodes::Error{8107800}, "Unexpected metadata type")));
-            } else {
-                pushExpr(_b.makeNothingConstant());
-            }
-        };
-        switch (expr->getMetaType()) {
-            case DocumentMetadataFields::MetaType::kSearchScore:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchScoreSlot,
-                                 getBSONTypeMask(BSONType::numberDouble) |
-                                     getBSONTypeMask(BSONType::numberLong));
-                break;
-            case DocumentMetadataFields::MetaType::kSearchHighlights:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchHighlightsSlot,
-                                 getBSONTypeMask(BSONType::array));
-                break;
-            case DocumentMetadataFields::MetaType::kSearchScoreDetails:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchDetailsSlot,
-                                 getBSONTypeMask(BSONType::object));
-                break;
-            case DocumentMetadataFields::MetaType::kSearchSequenceToken:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchSequenceToken,
-                                 getBSONTypeMask(BSONType::string));
-                break;
-            default:
-                unsupportedExpression("$meta");
-        }
+        unsupportedExpression("$meta");
     }
     void visit(const ExpressionMod* expr) final {
         auto rhs = popExpr();
@@ -2657,7 +2603,33 @@ public:
     }
 
     void visit(const ExpressionSize* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arg = popExpr();
+        auto frameId = _context->state.frameId();
+        SbVar var{frameId, 0};
+
+        auto argumentIsNotArray = _b.makeNot(_b.makeFunction(sbe::EFn::kIsArray, var));
+        auto makeNotArrayFail = [&] {
+            return _b.makeFail(ErrorCodes::Error{8069800},
+                               "The argument to $size must be an array");
+        };
+
+        // getArraySize() always returns an int64, but classic $size returns an int32 when the
+        // count fits (Value::createIntOrLong), so narrow the result to match.
+        auto sizeFrameId = _context->state.frameId();
+        SbVar sizeVar{sizeFrameId, 0};
+        auto narrowedSize = _b.makeLet(
+            sizeFrameId,
+            SbExpr::makeSeq(_b.makeFunction(sbe::EFn::kGetArraySize, var)),
+            _b.makeFillEmpty(_b.makeNumericConvert(sizeVar, sbe::value::TypeTags::NumberInt32),
+                             sizeVar));
+
+        auto sizeExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(var), makeNotArrayFail()},
+                SbExprPair{std::move(argumentIsNotArray), makeNotArrayFail()}),
+            std::move(narrowedSize));
+
+        pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(sizeExpr)));
     }
     void visit(const ExpressionReverseArray* expr) final {
         auto arg = popExpr();
@@ -2739,7 +2711,8 @@ public:
                 expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
-        sbe::value::TagValueOwned arrayWithEmptyString{sbe::value::makeNewArray()};
+        sbe::value::TagValueOwned arrayWithEmptyString =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
         auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
         sbe::value::getArrayView(arrayWithEmptyString.value())
             ->push_back_raw(emptyStrTag, emptyStrVal);
@@ -2829,6 +2802,30 @@ public:
         SbVar byteCountVar{frameId, 0};
         SbVar startIndexVar{frameId, 1};
         SbVar stringExprVar{frameId, 2};
+        SbVar convertedStart{frameId, 3};
+
+        // Match Value::coerceToLong(): doubles truncate, but decimals round with ties to even.
+        // Keep integers unchanged so int64 values never pass through floating-point arithmetic.
+        auto coerceToLong = [&](SbVar input, ErrorCodes::Error conversionError) {
+            auto rounded = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.makeFunction(
+                                   sbe::EFn::kTypeMatch,
+                                   input,
+                                   _b.makeInt32Constant(getBSONTypeMask(BSONType::numberDouble))),
+                               _b.makeFunction(sbe::EFn::kTrunc, input)},
+                    SbExprPair{_b.makeFunction(
+                                   sbe::EFn::kTypeMatch,
+                                   input,
+                                   _b.makeInt32Constant(getBSONTypeMask(BSONType::numberDecimal))),
+                               _b.makeFunction(sbe::EFn::kRound, input)}),
+                input);
+            SbExpr convertedExpr = _b.makeFillEmpty(
+                _b.makeNumericConvert(std::move(rounded), sbe::value::TypeTags::NumberInt64),
+                _b.makeFail(conversionError,
+                            "$substrBytes: cannot coerce out of range value to long"));
+            return convertedExpr;
+        };
 
         SbExpr::Vector functionArgs;
 
@@ -2844,37 +2841,31 @@ public:
             _b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar));
         functionArgs.push_back(std::move(validStringExpr));
 
-        SbExpr validStartIndexExpr = _b.makeIf(
-            _b.makeBinaryOp(
-                abt::Operations::Or,
-                _b.generateNullMissingOrUndefined(startIndexVar),
-                _b.makeBinaryOp(
-                    abt::Operations::Or,
-                    _b.generateNonNumericCheck(startIndexVar),
-                    _b.makeBinaryOp(abt::Operations::Lt, startIndexVar, _b.makeInt32Constant(0)))),
-            _b.makeFail(ErrorCodes::Error{5155603},
-                        "Starting index must be non-negative numeric type"),
-            _b.makeFunction(
-                sbe::EFn::kConvert,
-                startIndexVar,
-                _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
-        functionArgs.push_back(std::move(validStartIndexExpr));
+        functionArgs.push_back(convertedStart);
 
+        // SBE evaluates function arguments right to left, so check the start before the length.
         SbExpr validLengthExpr = _b.makeIf(
-            _b.makeBinaryOp(abt::Operations::Or,
-                            _b.generateNullMissingOrUndefined(byteCountVar),
-                            _b.generateNonNumericCheck(byteCountVar)),
-            _b.makeFail(ErrorCodes::Error{5155602}, "Length must be a numeric type"),
-            _b.makeFunction(
-                sbe::EFn::kConvert,
-                byteCountVar,
-                _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+            _b.makeBinaryOp(abt::Operations::Lt, convertedStart, _b.makeInt64Constant(0)),
+            _b.makeFail(ErrorCodes::Error{5155603}, "Starting index must be non-negative"),
+            coerceToLong(byteCountVar, ErrorCodes::Error{13626501}));
         functionArgs.push_back(std::move(validLengthExpr));
 
-        pushExpr(_b.makeLet(
-            frameId,
-            SbExpr::makeSeq(std::move(byteCount), std::move(startIndex), std::move(stringExpr)),
-            _b.makeFunction(sbe::EFn::kSubstrBytes, std::move(functionArgs))));
+        SbExpr convertedStartExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.makeFillEmptyTrue(_b.generateNonNumericCheck(startIndexVar)),
+                           _b.makeFail(ErrorCodes::Error{13626502},
+                                       "$substrBytes: starting index must be a numeric type")},
+                SbExprPair{_b.makeFillEmptyTrue(_b.generateNonNumericCheck(byteCountVar)),
+                           _b.makeFail(ErrorCodes::Error{5155602},
+                                       "$substrBytes: length must be a numeric type")}),
+            coerceToLong(startIndexVar, ErrorCodes::Error{13626500}));
+
+        pushExpr(_b.makeLet(frameId,
+                            SbExpr::makeSeq(std::move(byteCount),
+                                            std::move(startIndex),
+                                            std::move(stringExpr),
+                                            std::move(convertedStartExpr)),
+                            _b.makeFunction(sbe::EFn::kSubstrBytes, std::move(functionArgs))));
     }
     void visit(const ExpressionSubstrCP* expr) final {
         tassert(11051813,
@@ -3125,7 +3116,8 @@ public:
 
         binds[0] = _b.makeInt32Constant(expr->getInputs().size());
         binds[1] = _b.makeBoolConstant(expr->getUseLongestLength());
-        // Pop expressions from the stack in reverse, so that inputs come before defaults.
+        // Pop expressions from the stack in reverse, so that the inputs come before the optional
+        // trailing child that evaluates to the whole defaults array.
         for (size_t i = binds.size(); i > localVariables;) {
             --i;
             binds[i] = popExpr();
@@ -3267,8 +3259,32 @@ public:
     void visit(const ExpressionYear* expr) final {
         generateDateExpressionAcceptingTimeZone(sbe::EFn::kYear, expr);
     }
+    void generateAccumulatorExpression(const Expression* expr,
+                                       sbe::EFn fn,
+                                       bool passCollator = false) {
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        SbExpr::Vector args;
+        args.reserve(arity + (passCollator ? 1 : 0));
+        for (size_t idx = 0; idx < arity; ++idx) {
+            args.emplace_back(popExpr());
+        }
+        std::reverse(args.begin(), args.end());
+
+        // If the accumulator is collation-aware and the query has a collation, pass the collator as
+        // the first argument.
+        if (passCollator) {
+            if (auto collatorSlot = _context->state.getCollatorSlot()) {
+                args.insert(args.begin(), SbExpr{SbVar{*collatorSlot}});
+            }
+        }
+
+        pushExpr(_b.makeFunction(fn, std::move(args)));
+    }
+
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kAvgFromAcc);
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3277,13 +3293,11 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kMaxFromAcc, /*passCollator=*/true);
     }
-
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kMinFromAcc, /*passCollator=*/true);
     }
-
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
@@ -3297,16 +3311,16 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kStdDevPopFromAcc);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kStdDevSampFromAcc);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kDoubleDoubleSumFromAcc);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateAccumulatorExpression(expr, sbe::EFn::kMergeObjectsForExpr);
     }
     void visit(const ExpressionTests::Testable* expr) final {
         unsupportedExpression("$test");
@@ -4116,7 +4130,7 @@ private:
                 }
 
                 // Create the compiled Regex from constant pattern and options.
-                auto [regexTag, regexVal] = sbe::makeNewPcreRegex(*pattern, options);
+                auto [regexTag, regexVal] = sbe::makeNewPcreRegex(*pattern, options).releaseToRaw();
                 auto compiledRegex = _b.makeConstant(regexTag, regexVal);
                 return makeRegexFunctionCall(std::move(compiledRegex));
             }
@@ -4538,19 +4552,17 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
     // If either operand evaluates to "Nothing", then the entire operation expressed by
     // 'cmp' will also evaluate to "Nothing". MQL comparisons, however, treat "Nothing" as
     // if it is a value that is less than everything other than MinKey. (Notably, two
-    // expressions that evaluate to "Nothing" are considered equal to each other.) We also
-    // need to explicitly check for 'bsonUndefined' type because it is considered equal to
-    // "Nothing" according to MQL semantics.
-    auto generateExists = [&](SbLocalVar var) {
-        auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::undefined));
-        return b.makeBinaryOp(
-            abt::Operations::And,
-            b.makeFunction(sbe::EFn::kExists, var),
-            b.makeFunction(sbe::EFn::kTypeMatch, var, b.makeInt32Constant(~undefinedTypeMask)));
-    };
-
-    auto nothingFallbackCmp =
-        b.makeBinaryOp(comparisonOperator, generateExists(lhsVar), generateExists(rhsVar));
+    // expressions that evaluate to "Nothing" are considered equal to each other, and
+    // 'bsonUndefined' is considered equal to "Nothing".)
+    //
+    // To reproduce that ordering when at least one operand is "Nothing", we compare each operand's
+    // "mqlComparisonRank": MinKey (0) < Nothing/missing/undefined (1) < any other value (2), and
+    // then apply the original comparison operator to those ranks. A plain existence check would be
+    // insufficient here: it maps MinKey to the same "exists" bucket as ordinary values, which would
+    // incorrectly report that "Nothing" is less than MinKey.
+    auto nothingFallbackCmp = b.makeBinaryOp(comparisonOperator,
+                                             b.makeFunction(sbe::EFn::kMqlComparisonRank, lhsVar),
+                                             b.makeFunction(sbe::EFn::kMqlComparisonRank, rhsVar));
 
     auto cmpWithFallback = b.makeFillEmpty(std::move(cmp), std::move(nothingFallbackCmp));
 

@@ -48,16 +48,20 @@ class test_key_provider_disagg06(KeyProviderBase):
     def populate_table(self):
         # A populated table gives every checkpoint real work to flush.
         self.dataset = SimpleDataSet(self, self.uri, 10)
+        self.session.begin_transaction()
         self.dataset.populate()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.row = 10
 
     def write_and_checkpoint(self):
         # A checkpoint only runs the key provider when there is dirty data; reopen the cursor per
         # call to survive restarts.
         self.row += 1
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri)
         cursor[self.dataset.key(self.row)] = self.dataset.value(self.row)
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.session.checkpoint()
 
     def test_select_highest_at_or_below_checkpoint(self):

@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
- *   requires_fcv_82
+ *   requires_fcv_82,
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";

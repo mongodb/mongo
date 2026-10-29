@@ -24,26 +24,28 @@
     --(s)->api_call_counter
 
 /* Standard entry points to the API: declares/initializes local variables. */
-#define API_SESSION_INIT(s, struct_name, func_name, dh)                                  \
-    WT_TRACK_OP_DECL;                                                                    \
-    API_SESSION_PUSH(s, struct_name, func_name, dh);                                     \
-    /*                                                                                   \
-     * No code before this line, otherwise error handling won't be                       \
-     * correct.                                                                          \
-     */                                                                                  \
-    WT_ERR(WT_SESSION_CHECK_PANIC(s));                                                   \
-    __wt_single_thread_check_start(s);                                                   \
-    WT_TRACK_OP_INIT(s);                                                                 \
-    if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL))                  \
-        __wt_op_timer_start(s);                                                          \
-    /* Reset wait time if this isn't an API reentry. */                                  \
-    if ((s)->api_call_counter == 1)                                                      \
-        (s)->cache_wait_us = 0;                                                          \
-    /*                                                                                   \
-     * Reset the err_info struct back to default only if the prior API call had an error \
-     */                                                                                  \
-    if ((s)->api_call_counter == 1 && (s)->err_info.err != 0)                            \
-        __wt_session_reset_last_error((s));                                              \
+#define API_SESSION_INIT(s, struct_name, func_name, dh)                             \
+    WT_TRACK_OP_DECL;                                                               \
+    API_SESSION_PUSH(s, struct_name, func_name, dh);                                \
+    /*                                                                              \
+     * No code before this line, otherwise error handling won't be                  \
+     * correct.                                                                     \
+     */                                                                             \
+    WT_ERR(WT_SESSION_CHECK_PANIC(s));                                              \
+    __wt_single_thread_check_start(s);                                              \
+    WT_TRACK_OP_INIT(s);                                                            \
+    /*                                                                              \
+     * Internal sessions save errors only on behalf of the application session that \
+     * spawned them; leave error information to that session.                       \
+     */                                                                             \
+    if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) {           \
+        __wt_op_timer_start(s);                                                     \
+        if ((s)->err_info.err != 0)                                                 \
+            __wt_session_reset_last_error((s));                                     \
+    }                                                                               \
+    /* Reset wait time if this isn't an API reentry. */                             \
+    if ((s)->api_call_counter == 1)                                                 \
+        (s)->cache_wait_us = 0;                                                     \
     __wt_verbose((s), WT_VERB_API, "%s", "CALL: " #struct_name ":" #func_name)
 
 #define API_CALL_NOCONF_NOERRCLEAR(s, struct_name, func_name, dh, set_err) \
@@ -56,6 +58,20 @@
     if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) \
         __wt_error_log_clear_helper();
 
+/*
+ * Optimize configuration checking. If the configuration string passed into the API is empty, use
+ * NULL instead, it saves a little on every configuration lookup. The API caller's configuration
+ * string is stored in array position 1.
+ */
+#define API_CONFIG_CHECK(s, struct_name, func_name, config, cfg)                                 \
+    if (config != NULL) {                                                                        \
+        if (((const char *)config)[0] == '\0')                                                   \
+            cfg[1] = NULL;                                                                       \
+        else                                                                                     \
+            WT_ERR(                                                                              \
+              __wt_config_check((s), WT_CONFIG_REF(s, struct_name##_##func_name), (config), 0)); \
+    }
+
 #define API_CALL(s, struct_name, func_name, dh, config, cfg, set_err)                       \
     do {                                                                                    \
         bool __set_err = (set_err);                                                         \
@@ -63,19 +79,7 @@
         API_SESSION_INIT(s, struct_name, func_name, dh);                                    \
         if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL))                 \
             __wt_error_log_clear_helper();                                                  \
-        /*                                                                                  \
-         * Optimize configuration checking. If the configuration string                     \
-         * passed into the API is empty, use NULL instead, it saves a                       \
-         * little on every configuration lookup. The API caller's configuration             \
-         * string is stored in array position 1.                                            \
-         */                                                                                 \
-        if (config != NULL) {                                                               \
-            if (((const char *)config)[0] == '\0')                                          \
-                cfg[1] = NULL;                                                              \
-            else                                                                            \
-                WT_ERR(__wt_config_check(                                                   \
-                  (s), WT_CONFIG_REF(s, struct_name##_##func_name), (config), 0));          \
-        }
+    API_CONFIG_CHECK(s, struct_name, func_name, config, cfg)
 
 #define API_END(s, ret)                                                                            \
     if ((s) != NULL) {                                                                             \
@@ -83,7 +87,7 @@
         __wt_single_thread_check_stop(s);                                                          \
         if ((ret) != 0 && __set_err)                                                               \
             __wt_txn_err_set(s, (ret));                                                            \
-        if ((s)->api_call_counter == 1) {                                                          \
+        if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) {                      \
             /*                                                                                     \
              * Check that the API return value matches what is stored in the err_info struct.      \
              *                                                                                     \
@@ -103,8 +107,7 @@
                 else                                                                               \
                     (s)->err_info.err = (ret);                                                     \
             };                                                                                     \
-            if (!F_ISSET(s, WT_SESSION_INTERNAL))                                                  \
-                __wt_op_timer_stop(s);                                                             \
+            __wt_op_timer_stop(s);                                                                 \
         }                                                                                          \
         /*                                                                                         \
          * FIXME-WT-7247 Ideally we would not leave any history store cursors open when we         \
@@ -217,17 +220,41 @@
 
 #define API_USER_ENTRY(s) (s)->api_call_counter == 1
 
-#define CONNECTION_API_CALL(conn, s, func_name, config, cfg) \
-    s = (conn)->default_session;                             \
-    API_CALL(s, WT_CONNECTION, func_name, NULL, config, cfg, false)
+/*
+ * Connection methods can run concurrently on the shared default session, so they skip the
+ * per-session API state, which assumes a single owning thread. The method's name is kept per thread
+ * instead.
+ */
+#define CONNECTION_API_CALL_NOCONF(conn, s, func_name)    \
+    s = (conn)->default_session;                          \
+    do {                                                  \
+        const char *__prev_api_name = __wt_conn_api_name; \
+        __wt_conn_api_name = "WT_CONNECTION." #func_name; \
+        WT_ERR(WT_SESSION_CHECK_PANIC(s));                \
+    __wt_verbose((s), WT_VERB_API, "%s", "CALL: WT_CONNECTION:" #func_name)
 
-#define CONNECTION_API_CALL_NOCONF(conn, s, func_name) \
-    s = (conn)->default_session;                       \
-    API_CALL_NOCONF(s, WT_CONNECTION, func_name, NULL, false)
+#define CONNECTION_API_CALL(conn, s, func_name, config, cfg)                                \
+    s = (conn)->default_session;                                                            \
+    do {                                                                                    \
+        const char *__prev_api_name = __wt_conn_api_name;                                   \
+        const char *(cfg)[] = {WT_CONFIG_BASE(s, WT_CONNECTION_##func_name), config, NULL}; \
+        __wt_conn_api_name = "WT_CONNECTION." #func_name;                                   \
+        WT_ERR(WT_SESSION_CHECK_PANIC(s));                                                  \
+        __wt_verbose((s), WT_VERB_API, "%s", "CALL: WT_CONNECTION:" #func_name);            \
+    API_CONFIG_CHECK(s, WT_CONNECTION, func_name, config, cfg)
 
-#define CONNECTION_API_CALL_NOCONF_NOERRCLEAR(conn, s, func_name) \
-    s = (conn)->default_session;                                  \
-    API_CALL_NOCONF_NOERRCLEAR(s, WT_CONNECTION, func_name, NULL, false)
+/* Restore the name of the connection method if this call is nested. */
+#define CONNECTION_API_END(s)             \
+    __wt_conn_api_name = __prev_api_name; \
+    }                                     \
+    while (0)
+
+#define CONNECTION_API_END_RET(s, ret) \
+    CONNECTION_API_END(s);             \
+    return (ret)
+
+#define CONNECTION_API_END_RET_NOTFOUND_MAP(s, ret) \
+    CONNECTION_API_END_RET(s, (ret) == WT_NOTFOUND ? ENOENT : (ret))
 
 #define SESSION_API_CALL_PREPARE_ALLOWED(s, func_name, config, cfg, set_err) \
     API_CALL(s, WT_SESSION, func_name, NULL, config, cfg, set_err)

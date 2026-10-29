@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -56,16 +29,58 @@
  *   also define an associated toStringData(MyColors) function which returns
  *   the unqualified value names "red", "green", "blue" as constexpr
  *   std::string_view. The array of unqualified std::string_view names is accessible via
- *   the arr_ field; in the example above, this would be MyColors_EnumString::arr_.
+ *   the arr_ field; in the example above, this would be MyColorsEnumString::arr_.
+ *
+ *   A table entry may instead supply an explicit name as a second argument, for values whose
+ *   reported name differs from the C++ enumerator - e.g. an enumerator following the 'k' prefix
+ *   convention, or one whose name must match an externally fixed spelling:
+ *
+ *       #define MYCOLORS_TABLE(X) \
+ *            X(kRed, "red")       \
+ *            X(kGreen, "green")   \
+ *            X(kBlue, "blue")
+ *
+ *   Both entry forms may be mixed within one table; an entry with no explicit name continues to
+ *   report the enumerator itself.
  */
 
-#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                         \
-    namespace ENUM_##EnumString {                                                          \
-        constexpr std::string_view arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
-    }                                                                                      \
-    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                         \
-    constexpr std::string_view toStringData(ENUM_ v_) {                                    \
-        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                           \
+#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                                 \
+    namespace ENUM_##EnumString {                                                                  \
+        inline constexpr std::string_view arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_)}; \
+    }                                                                                              \
+    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                                 \
+    constexpr std::string_view toStringData(ENUM_ v_) {                                            \
+        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                                   \
     }
-#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_(x) x,
-#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_(x) #x ""_sd,
+
+/**
+ * Table entries accept either form, 'X(enumerator)' or 'X(enumerator, "name")', so both the
+ * enumerator expansion and the name expansion dispatch on the entry's argument count. SELECT_
+ * receives the entry's arguments followed by the two candidate expansions and returns whichever
+ * one lands in its third parameter: with one entry argument that is the 1-argument expansion, and
+ * with two it is the 2-argument one (which pushes the other candidate into the trailing '...').
+ */
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_SELECT_(_1, _2, CHOSEN_, ...) CHOSEN_
+
+/**
+ * MSVC's traditional preprocessor passes '__VA_ARGS__' to a nested macro as a single argument
+ * rather than as a comma-separated list, which would defeat the dispatch above. Routing each
+ * dispatch through this identity macro forces the extra rescan that splits it back apart.
+ */
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_EXPAND_(...) __VA_ARGS__
+
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_(...)                                     \
+    QUERY_UTIL_NAMED_ENUM_INTERNAL_EXPAND_(QUERY_UTIL_NAMED_ENUM_INTERNAL_SELECT_( \
+        __VA_ARGS__,                                                               \
+        QUERY_UTIL_NAMED_ENUM_INTERNAL_X_NAMED_,                                   \
+        QUERY_UTIL_NAMED_ENUM_INTERNAL_X_PLAIN_)(__VA_ARGS__))
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_PLAIN_(x) x,
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_NAMED_(x, name) x,
+
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_(...)                                 \
+    QUERY_UTIL_NAMED_ENUM_INTERNAL_EXPAND_(QUERY_UTIL_NAMED_ENUM_INTERNAL_SELECT_( \
+        __VA_ARGS__,                                                               \
+        QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_NAMED_,                               \
+        QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_PLAIN_)(__VA_ARGS__))
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_PLAIN_(x) #x,
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_STR_NAMED_(x, name) name,

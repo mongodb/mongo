@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/document_value/document.h"
 
@@ -150,6 +124,17 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
         if (_storage->bsonHasMetadata() && Document::isMetadataFieldName(fieldName)) {
             return true;
         }
+
+        // '_first == _end' means the cache holds no fields at all (both are null when nothing has
+        // been allocated yet). There is then no point in hashing the field name just to look it up
+        // and miss. Note that this has to be re-checked for every field rather than hoisted out of
+        // the iteration, because 'get()' can populate the cache part-way through.
+        if (_first == _end) {
+            // See the comment in the 'else' branch below for why this is set to nullptr.
+            _it = nullptr;
+            return false;
+        }
+
         // Check if the field is in the cache and if so then check if it has been deleted (i.e. the
         // val.missing() is true).
         if (auto pos = _storage->findFieldInCache(fieldName); pos.found()) {
@@ -403,6 +388,31 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     out->_snapshottedSize = _snapshottedSize;
 
     return out;
+}
+
+size_t DocumentStorage::computeSize() const {
+    size_t count = 0;
+
+    // When the storage is unmodified, every cache entry is a 'kCached' mirror of a field that is
+    // still present in '_bson': nothing has been inserted and nothing has been logically removed.
+    // (Fields are only ever inserted through 'appendField()', which marks the storage modified via
+    // the non-const 'getField(Position)' overload it returns through. 'constructInCache()' is the
+    // sole caller that deliberately saves and restores the flag around that.) The field count is
+    // therefore just the number of non-metadata fields in the backing BSON, which we can count
+    // without consulting the cache at all.
+    if (!_modified) {
+        for (auto&& elem : _bson) {
+            if (_bsonHasMetadata && Document::isMetadataFieldName(elem.fieldNameStringData())) {
+                continue;
+            }
+            ++count;
+        }
+    } else {
+        // can't use _numFields because it includes removed fields.
+        for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance())
+            count++;
+    }
+    return count;
 }
 
 size_t DocumentStorage::getMetadataApproximateSize() const {

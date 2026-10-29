@@ -1,0 +1,77 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/admission/write_throttler.h"
+
+server_parameters:
+    writeThrottlerEnabled:
+        description: >-
+            Master on/off switch for the write throttler. When enabled, writes pass
+            through the write-path rate limiter at service entry. The target rate is
+            configured via the writeThrottlerTargetRatePerSec server parameter. With the default
+            false the per-op gate is skipped entirely (zero overhead). Toggling at runtime syncs the
+            rate via the on_update handler.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gWriteThrottlerEnabled"
+        on_update: WriteThrottler::onUpdateEnabled
+        default: false
+        redact: false
+
+    writeThrottlerTargetRatePerSec:
+        description: >-
+            The target write rate, in documents per second (the throttler is always batch-aware).
+            When the throttler is enabled, setting this parameter drives the rate; the on_update
+            handler pushes the new rate into the token bucket. The default is kMaxRate (no
+            throttling). Must be >= 1.
+        set_at: [startup, runtime]
+        cpp_vartype: "Atomic<int32_t>"
+        cpp_varname: "gWriteThrottlerTargetRatePerSec"
+        on_update: WriteThrottler::onUpdateTargetRatePerSec
+        default:
+            expr: WriteThrottler::kMaxRate
+        validator: {gte: 1}
+        redact: false
+
+    writeThrottlerBurstCapacitySecs:
+        description: >-
+            Seconds of unused write-path rate that can accumulate as burst capacity in the token
+            bucket before throttling kicks in. Applied immediately on runtime change via the
+            on_update handler (mirrors the ingress request rate limiter).
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: "gWriteThrottlerBurstCapacitySecs"
+        on_update: WriteThrottler::onUpdateBurstCapacitySecs
+        default: 0.5
+        validator: {gt: 0.0}
+        redact: false
+
+    writeThrottlerMaxQueueDepth:
+        description: >-
+            Maximum number of threads that can block waiting for a write-path rate limiter token.
+            Requests exceeding this depth are rejected immediately with RateLimitExceeded. Applied
+            immediately on runtime change via the on_update handler (mirrors the ingress request
+            rate limiter).
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: "gWriteThrottlerMaxQueueDepth"
+        on_update: WriteThrottler::onUpdateMaxQueueDepth
+        default: 1000000
+        validator: {gt: 0}
+        redact: false
+
+    writeThrottlerMaxCostPerOp:
+        description: >-
+            Upper bound on the token cost charged for a single write operation (pre-charge and
+            command-end true-up). Caps the borrowed (negative) balance a single very large batch
+            can create, bounding how long it stalls subsequent writes. 0 means no limit (charge the
+            full reconciled cost).
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: "gWriteThrottlerMaxCostPerOp"
+        default: 0
+        validator: {gte: 0}
+        redact: false

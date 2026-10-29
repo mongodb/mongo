@@ -1,0 +1,61 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "BUILD.tmpl",
+    "mongo_windows_cross_toolchain.bzl",
+    "windows_cross_lib_aliases.py",
+    "write_case_insensitive_vfs.py",
+    "windows_cross_action_wrapper.py",
+])
+
+sh_binary(
+    name = "windows_cross_action_wrapper_sh",
+    srcs = ["windows_cross_action_wrapper.py"],
+)
+
+py_binary(
+    name = "windows_cross_action_wrapper",
+    srcs = ["windows_cross_action_wrapper.py"],
+    main = "windows_cross_action_wrapper.py",
+)
+
+py_test(
+    name = "write_case_insensitive_vfs_test",
+    srcs = [
+        "write_case_insensitive_vfs.py",
+        "write_case_insensitive_vfs_test.py",
+    ],
+    main = "write_case_insensitive_vfs_test.py",
+)
+
+py_test(
+    name = "package_minimal_llvm_test",
+    srcs = [
+        "package_minimal_llvm.py",
+        "package_minimal_llvm_test.py",
+    ],
+    main = "package_minimal_llvm_test.py",
+)
+
+py_test(
+    name = "windows_cross_lib_aliases_test",
+    srcs = [
+        "windows_cross_lib_aliases.py",
+        "windows_cross_lib_aliases_test.py",
+    ],
+    main = "windows_cross_lib_aliases_test.py",
+)
+
+py_test(
+    name = "windows_cross_toolchain_test",
+    srcs = ["windows_cross_toolchain_test.py"],
+    data = [
+        "BUILD.tmpl",
+        "mongo_windows_cross_toolchain.bzl",
+        "//bazel/platforms:platform_util.bzl",
+    ],
+    main = "windows_cross_toolchain_test.py",
+)

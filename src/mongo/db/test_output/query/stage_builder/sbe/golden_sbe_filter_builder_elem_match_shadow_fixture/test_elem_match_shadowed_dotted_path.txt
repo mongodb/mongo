@@ -1,0 +1,8 @@
+# Golden test output of GoldenSbeFilterBuilderElemMatchShadowFixture/TestElemMatchShadowedDottedPath
+DottedElemMatch_ShadowedCD
+
+    let [
+        l5.0 = getField(s1, "arr") 
+    ] 
+    in ((isArray(l5.0) && traverseF(l5.0, lambda(l6.0) { (typeMatch(l6.0, 24) && traverseF(getField(l6.0, "c"), lambda(l7.0) { traverseF(getField(move(l7.0), "d"), lambda(l8.0) { ((move(l8.0) == 2) ?: false) }, false) }, false)) }, false)) ?: false) 
+

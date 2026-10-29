@@ -1,55 +1,43 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
+#include <mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -108,11 +96,23 @@ IndexBuildMetricsSnapshot readIndexBuildMetrics(otel::metrics::OtelMetricsCaptur
 }
 
 class IndexBuildsCoordinatorMongodTest : public CatalogTestFixture {
-private:
+public:
     void setUp() override;
     void tearDown() override;
 
-public:
+    /**
+     * By default, 'recoverFromOplogAsStandalone' stays false for the whole test: most subclasses
+     * don't exercise standalone recovery, and the flag must stay false at least until the
+     * ServiceContext and oplog are set up, since that init runs replication machinery which
+     * asserts the node isn't already recovering from the oplog as a standalone and would fail.
+     *
+     * Override to true to have the flag set right after that setup completes (before the
+     * baseline collections below are created) and left set for the rest of the test.
+     */
+    virtual bool recoverFromOplogAsStandalone() const {
+        return false;
+    }
+
     /**
      * Creates a collection with a default CollectionsOptions and the given UUID.
      */
@@ -157,10 +157,18 @@ public:
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)};
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _recoverAsStandalone;
 };
 
 void IndexBuildsCoordinatorMongodTest::setUp() {
     CatalogTestFixture::setUp();
+
+    if (recoverFromOplogAsStandalone()) {
+        _recoverAsStandalone.emplace("recoverFromOplogAsStandalone", true);
+    }
+
     // Create config.system.indexBuilds collection to store commit quorum value during index
     // building.
     createCollection(NamespaceString::kIndexBuildEntryNamespace, UUID::gen());
@@ -225,6 +233,125 @@ std::vector<IndexBuildInfo> IndexBuildsCoordinatorMongodTest::makeSpecs(
     }
     return indexes;
 }
+
+/**
+ * Tests the IndexBuildsCoordinator methods that wait and block until index builds finish
+ * (assertNoIndexBuildInProgForCollection() and assertNoBgOpInProgForDb()). They must honour
+ * interruption of the waiter's OperationContext.
+ */
+class IndexBuildsCoordinatorMongodInterruptibleWaitTest : public IndexBuildsCoordinatorMongodTest {
+public:
+    static constexpr auto kInterruptCode = ErrorCodes::InterruptedDueToReplStateChange;
+    // The protocol used by builds started with _indexBuildOptions, which leaves
+    // IndexBuildOptions::indexBuildProtocol at its kTwoPhase default.
+    static constexpr auto kProtocol = IndexBuildProtocol::kTwoPhase;
+
+    struct WaiterResult {
+        // Whether the waiter was observed inside an interruptible wait. False means the wait never
+        // consulted its OperationContext.
+        bool reachedInterruptibleWait = false;
+        // Whether the test had to abort the index build to get the waiter moving again. True means
+        // the interrupt was ignored.
+        bool neededEscapeHatch = false;
+        // What the wait threw, or Status::OK() if it returned normally.
+        Status status = Status::OK();
+    };
+
+    /**
+     * Starts a paused index build on _testFooNss, runs 'waitFn' on a separate thread with its own
+     * OperationContext, and once that thread is observed to be waiting on the opCtx, interrupts it
+     * and checks waitFn() correctly threw an exception.
+     *
+     * Always joins the waiter thread and leaves no index build in progress, so callers can assert
+     * on the result without leaking a wedged thread.
+     */
+    WaiterResult runInterruptedWaiter(std::function<void(OperationContext*)> waitFn) {
+        static constexpr auto kTimeout = Seconds(10);
+
+        // Hold an index build in progress for the duration of the wait.
+        _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+        const auto buildUUID = UUID::gen();
+        auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                        _testFooNss.dbName(),
+                                                                        _testFooUUID,
+                                                                        makeSpecs({"a"}, {1}),
+                                                                        buildUUID,
+                                                                        _indexBuildOptions));
+
+        // Releases the index build, so if we ignore the interrupt, we abort the index build and
+        // fail the test instead of hanging forever.
+        auto escapeHatch = [&] {
+            _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+            _indexBuildsCoord->abortIndexBuildByBuildUUID(
+                operationContext(),
+                buildUUID,
+                IndexBuildAction::kPrimaryAbort,
+                Status{ErrorCodes::IndexBuildAborted, "interruptibility test cleanup"});
+            buildFuture.getNoThrow().getStatus().ignore();
+        };
+
+        WaiterResult result;
+        auto [finishedPromise, finishedFuture] = makePromiseFuture<void>();
+
+        auto waiterClient = getServiceContext()->getService()->makeClient("indexBuildWaiter");
+        auto waiterOpCtx = waiterClient->makeOperationContext();
+
+        stdx::thread waiter([&]() {
+            try {
+                waitFn(waiterOpCtx.get());
+            } catch (const DBException& ex) {
+                result.status = ex.toStatus();
+            }
+            finishedPromise.emplaceValue();
+        });
+
+        result.reachedInterruptibleWait = waitForPredicate(
+            [&] { return waiterOpCtx->isWaitingForConditionOrInterrupt(); }, kTimeout);
+        markKilled(waiterOpCtx.get());
+
+        // Give the waiter a bounded chance to unwind. Timing out means the interrupt was ignored.
+        if (!waitForPredicate([&] { return finishedFuture.isReady(); }, kTimeout)) {
+            result.neededEscapeHatch = true;
+            escapeHatch();
+        }
+        waiter.join();
+
+        if (!result.neededEscapeHatch) {
+            // Clean up the index build.
+            escapeHatch();
+        }
+        return result;
+    }
+
+    void assertWasInterrupted(const WaiterResult& result) {
+        EXPECT_TRUE(result.reachedInterruptibleWait)
+            << "the waiter never entered an interruptible wait; the wait is ignoring its "
+               "OperationContext";
+        EXPECT_FALSE(result.neededEscapeHatch)
+            << "the wait ignored the interrupt and only unwound once the index build completed";
+        EXPECT_EQ(result.status.code(), kInterruptCode);
+    }
+
+private:
+    static void markKilled(OperationContext* opCtx) {
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        opCtx->markKilled(kInterruptCode);
+    }
+
+    // Polls 'pred' until it returns true or 'timeout' elapses, and returns its final value.
+    static bool waitForPredicate(const std::function<bool()>& pred, Milliseconds timeout) {
+        static constexpr auto kSleepInterval = Milliseconds(10);
+
+        const auto deadline = Date_t::now() + timeout;
+        while (Date_t::now() < deadline) {
+            if (pred()) {
+                return true;
+            }
+            sleepFor(kSleepInterval);
+        }
+        return pred();
+    }
+};
 
 TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
@@ -395,6 +522,34 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
 
     EXPECT_NE(_testFooNss, _testBarNss);
     EXPECT_NE(_testFooNss, _othertestFooNss);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest,
+       AwaitNoIndexBuildInProgressForCollectionIsInterruptible) {
+    // Test awaitNoIndexBuildInProgressForCollection() 2-arguments overload.
+    auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
+        _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, _testFooUUID);
+    });
+
+    assertWasInterrupted(result);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest,
+       AwaitNoIndexBuildInProgressForCollectionWithProtocolIsInterruptible) {
+    // Test awaitNoIndexBuildInProgressForCollection() 3-arguments overload.
+    auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
+        _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, _testFooUUID, kProtocol);
+    });
+
+    assertWasInterrupted(result);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodInterruptibleWaitTest, AwaitNoBgOpInProgForDbIsInterruptible) {
+    auto result = runInterruptedWaiter([&](OperationContext* opCtx) {
+        _indexBuildsCoord->awaitNoBgOpInProgForDb(opCtx, _testFooNss.dbName(), {kProtocol});
+    });
+
+    assertWasInterrupted(result);
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
@@ -677,6 +832,100 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterAbort
     EXPECT_EQ(metricsAfter.started, metricsBeforeBuild.started + 1);
     EXPECT_EQ(metricsAfter.failed, metricsBeforeBuild.failed + 1);
     EXPECT_EQ(metricsAfter.toBeResumed, metricsBeforeBuild.toBeResumed);
+}
+
+
+class IndexBuildsCoordinatorMongodStandaloneRecoveryTest : public IndexBuildsCoordinatorMongodTest {
+public:
+    bool recoverFromOplogAsStandalone() const override {
+        return true;
+    }
+
+    /**
+     * Writes the given indexes to the durable catalog as one unfinished two-phase build, then
+     * reloads the catalog the way startup does for a replica set member in standalone mode, so
+     * they come back frozen and no index builds are restarted.
+     */
+    void createFrozenIndexes(const UUID& buildUUID, const std::vector<IndexBuildInfo>& indexes) {
+        auto opCtx = operationContext();
+        {
+            auto coll = getCollectionExclusive(opCtx, _testFooNss);
+            WriteUnitOfWork wuow(opCtx);
+            CollectionWriter writer{opCtx, &coll};
+            auto writableColl = writer.getWritableCollection(opCtx);
+            for (const auto& index : indexes) {
+                IndexDescriptor desc{IndexNames::BTREE, index.spec};
+                ASSERT_OK(
+                    writableColl->prepareForIndexBuild(opCtx, &desc, index.indexIdent, buildUUID));
+            }
+            wuow.commit();
+        }
+
+        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
+        Lock::GlobalLock globalLk(opCtx, MODE_X);
+        catalog::closeCatalog(opCtx);
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        storageEngine->loadMDBCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
+        catalog::initializeCollectionCatalog(opCtx, storageEngine, catalog::InitMode::kStartup);
+        for (auto&& dbName : catalog::listDatabases()) {
+            DatabaseHolder::get(opCtx)->openDb(opCtx, dbName);
+        }
+    }
+
+    IndexBuildOplogEntry makeAbortOplogEntry(const UUID& buildUUID,
+                                             std::vector<IndexBuildInfo> indexes) {
+        return {.collUUID = _testFooUUID,
+                .commandType = repl::OplogEntry::CommandType::kAbortIndexBuild,
+                .commandName = "abortIndexBuild",
+                .buildUUID = buildUUID,
+                .indexes = std::move(indexes),
+                .cause = Status{ErrorCodes::IndexBuildAborted, "test abort"}};
+    }
+
+    void applyAbort(const IndexBuildOplogEntry& oplogEntry) {
+        TimestampBlock tsBlock(operationContext(), Timestamp(10, 1));
+        _indexBuildsCoord->applyAbortIndexBuild(operationContext(), oplogEntry);
+    }
+
+    std::vector<std::string> nonIdIndexNames() {
+        auto coll = getCollectionExclusive(operationContext(), _testFooNss);
+        std::vector<std::string> names;
+        auto it = coll.getCollectionPtr()->getIndexCatalog()->getIndexIterator(
+            IndexCatalog::InclusionPolicy::kAll);
+        while (it->more()) {
+            auto name = it->next()->descriptor()->indexName();
+            if (name != "_id_") {
+                names.push_back(name);
+            }
+        }
+        return names;
+    }
+};
+
+TEST_F(IndexBuildsCoordinatorMongodStandaloneRecoveryTest,
+       ApplyAbortDropsFrozenIndexesWhenSomeIndexesAreMissing) {
+    const auto buildUUID = UUID::gen();
+    auto indexes = makeSpecs({"a", "b", "c"}, {1, 2, 3});
+    createFrozenIndexes(buildUUID, {indexes[0], indexes[2]});
+    ASSERT_EQ(2U, nonIdIndexNames().size());
+
+    applyAbort(makeAbortOplogEntry(buildUUID, indexes));
+
+    ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
+}
+
+TEST_F(IndexBuildsCoordinatorMongodStandaloneRecoveryTest,
+       ApplyAbortIsNoOpWhenAllIndexesAreAlreadyDropped) {
+    const auto buildUUID = UUID::gen();
+    auto indexes = makeSpecs({"a", "b"}, {1, 2});
+    createFrozenIndexes(buildUUID, indexes);
+    ASSERT_EQ(2U, nonIdIndexNames().size());
+
+    applyAbort(makeAbortOplogEntry(buildUUID, indexes));
+    ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
+
+    applyAbort(makeAbortOplogEntry(buildUUID, indexes));
+    ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
 }
 
 }  // namespace

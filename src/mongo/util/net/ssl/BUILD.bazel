@@ -1,16 +1,22 @@
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
-    glob([
-        "*.hpp",
-        "*.ipp",
-    ]),
+    glob(
+        [
+            "*.hpp",
+            "*.ipp",
+        ],
+        allow_empty = True,
+    ),
 )
 
 filegroup(
     name = "ssl",
-    srcs = glob([
-        "*.hpp",
-        "*.ipp",
-    ]),
+    srcs = glob(
+        [
+            "*.hpp",
+            "*.ipp",
+        ],
+        allow_empty = True,
+    ),
 )

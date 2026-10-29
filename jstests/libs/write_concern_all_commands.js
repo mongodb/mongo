@@ -16,6 +16,7 @@ import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
@@ -84,7 +85,6 @@ let getShardKey = (coll, fullNs) => {
 // All commands in the server.
 const wcCommandsTests = {
     _addShard: {skip: "internal command"},
-    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
@@ -104,12 +104,14 @@ const wcCommandsTests = {
     _configsvrCommitChunkSplit: {skip: "internal command"},
     _configsvrCommitMergeAllChunksOnShard: {skip: "internal command"},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "internal command"},
+    _configsvrCommitMergeChunks: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},
+    _configsvrCommitMoveRange: {skip: "internal command"},
     _configsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrCommitShardRemoval: {skip: "internal command"},
+    _configsvrCommitSplitChunk: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
     _configsvrGetHistoricalPlacement: {skip: "internal command"},
@@ -195,6 +197,7 @@ const wcCommandsTests = {
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitCollModCollectionMetadata: {skip: "internal command"},
+    _shardsvrCommitChunkOperationsMetadata: {skip: "internal command"},
     _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitCreateCollectionChunklessMetadata: {skip: "internal command"},
@@ -247,6 +250,9 @@ const wcCommandsTests = {
     streams_writeCheckpoint: {skip: "internal command"},
     streams_sendEvent: {skip: "internal command"},
     streams_updateConnection: {skip: "internal command"},
+    streams_previewStream: {skip: "internal command"},
+    streams_getMorePreview: {skip: "internal command"},
+    streams_stopPreview: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept write concern"},
     abortReshardCollection: {skip: "does not accept write concern"},
@@ -547,6 +553,7 @@ const wcCommandsTests = {
     checkShardingIndex: {skip: "does not accept write concern"},
     cleanupOrphaned: {skip: "only exist on direct shard connection"},
     cleanupStructuredEncryptionData: {skip: "does not accept write concern"},
+    clearJoinPlanCache: {skip: "does not accept write concern"},
     clearJumboFlag: {skip: "does not accept write concern"},
     clearLog: {skip: "does not accept write concern"},
     cloneCollectionAsCapped: {
@@ -1635,6 +1642,7 @@ const wcCommandsTests = {
     getESECMKIdentifierListStatus: {skip: "does not accept write concern"},
     getESERotateActiveKEKStatus: {skip: "does not accept write concern"},
     getLog: {skip: "does not accept write concern"},
+    getMetricsFilteringAllowlist: {skip: "does not accept write concern"},
     getMore: {skip: "does not accept write concern"},
     getParameter: {skip: "does not accept write concern"},
     getQueryableEncryptionCountInfo: {skip: "does not accept write concern"},
@@ -2413,6 +2421,17 @@ const wcCommandsTests = {
                 assert.eq(coll.find().itcount(), 1);
                 assert.eq(coll.getDB().coll2.find().itcount(), 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
+            },
+            admin: true,
+        },
+    },
+    repairReplicatedMetadata: {
+        success: {
+            // repairReplicatedMetadata records a no-op oplog entry
+            req: {repairReplicatedMetadata: 1, uuid: UUID(), metadata: {sz: 100}},
+            setupFunc: (coll) => {},
+            confirmFunc: (res, coll) => {
+                assert.commandWorkedIgnoringWriteConcernErrors(res);
             },
             admin: true,
         },
@@ -3245,7 +3264,7 @@ const wcCommandsTests = {
     stopTrafficRecording: {skip: "does not accept write concern"},
     stopTransitionToDedicatedConfigServer: {skip: "unrelated"},
     sysprofile: {skip: "internal command"},
-    testCommandFeatureFlaggedOnLatestFCV83: {skip: "internal command"},
+    testCommandFeatureFlaggedOnLatestFCV91: {skip: "internal command"},
     testDeprecation: {skip: "test command"},
     testDeprecationInVersion2: {skip: "test command"},
     testInternalTransactions: {skip: "internal command"},
@@ -3306,6 +3325,7 @@ const wcCommandsTests = {
         },
     },
     updateESECMKIdentifierList: {skip: "does not accept write concern"},
+    updateMetricsFilteringAllowlist: {skip: "does not accept write concern"},
     updateRole: {
         targetConfigServer: true,
         noop: {
@@ -3562,13 +3582,13 @@ const wcCommandsTests = {
     getShardingReady: {skip: "internal command"},
     whatsmysni: {skip: "does not accept write concern"},
     whatsmyuri: {skip: "internal command"},
+    wiredTigerRepair: {skip: "does not accept write concern"},
 };
 
 // All commands applicable on timeseries collections in the server.
 
 const wcTimeseriesCommandsTests = {
     _addShard: {skip: "internal command"},
-    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
@@ -3588,12 +3608,14 @@ const wcTimeseriesCommandsTests = {
     _configsvrCommitChunkSplit: {skip: "internal command"},
     _configsvrCommitMergeAllChunksOnShard: {skip: "internal command"},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "internal command"},
+    _configsvrCommitMergeChunks: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},
+    _configsvrCommitMoveRange: {skip: "internal command"},
     _configsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrCommitShardRemoval: {skip: "internal command"},
+    _configsvrCommitSplitChunk: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
     _configsvrGetHistoricalPlacement: {skip: "internal command"},
@@ -3682,6 +3704,7 @@ const wcTimeseriesCommandsTests = {
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrCommitCollModCollectionMetadata: {skip: "internal command"},
+    _shardsvrCommitChunkOperationsMetadata: {skip: "internal command"},
     _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitCreateCollectionChunklessMetadata: {skip: "internal command"},
@@ -3733,6 +3756,9 @@ const wcTimeseriesCommandsTests = {
     streams_writeCheckpoint: {skip: "internal command"},
     streams_sendEvent: {skip: "internal command"},
     streams_updateConnection: {skip: "internal command"},
+    streams_previewStream: {skip: "internal command"},
+    streams_getMorePreview: {skip: "internal command"},
+    streams_stopPreview: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept write concern"},
     abortReshardCollection: {skip: "does not accept write concern"},
@@ -3960,6 +3986,7 @@ const wcTimeseriesCommandsTests = {
     checkShardingIndex: {skip: "does not accept write concern"},
     cleanupOrphaned: {skip: "only exist on direct shard connection"},
     cleanupStructuredEncryptionData: {skip: "does not accept write concern"},
+    clearJoinPlanCache: {skip: "does not accept write concern"},
     clearJumboFlag: {skip: "does not accept write concern"},
     clearLog: {skip: "does not accept write concern"},
     // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
@@ -4436,6 +4463,7 @@ const wcTimeseriesCommandsTests = {
     getESECMKIdentifierListStatus: {skip: "does not accept write concern"},
     getESERotateActiveKEKStatus: {skip: "does not accept write concern"},
     getLog: {skip: "does not accept write concern"},
+    getMetricsFilteringAllowlist: {skip: "does not accept write concern"},
     getMore: {skip: "does not accept write concern"},
     getParameter: {skip: "does not accept write concern"},
     getQueryableEncryptionCountInfo: {skip: "does not accept write concern"},
@@ -4637,6 +4665,17 @@ const wcTimeseriesCommandsTests = {
     removeShardFromZone: {skip: "does not accept write concern"},
     // TODO SERVER-125423: add test coverage now that viewless timeseries are enabled.
     renameCollection: {skip: "not supported on timeseries views"},
+    repairReplicatedMetadata: {
+        success: {
+            // repairReplicatedMetadata records a no-op oplog entry
+            req: {repairReplicatedMetadata: 1, uuid: UUID(), metadata: {sz: 100}},
+            setupFunc: (coll) => {},
+            confirmFunc: (res, coll) => {
+                assert.commandWorkedIgnoringWriteConcernErrors(res);
+            },
+            admin: true,
+        },
+    },
     replicateSearchIndexCommand: {skip: "internal command for testing only"},
     replSetAbortPrimaryCatchUp: {skip: "does not accept write concern"},
     replSetFreeze: {skip: "does not accept write concern"},
@@ -4699,7 +4738,7 @@ const wcTimeseriesCommandsTests = {
     stopTrafficRecording: {skip: "does not accept write concern"},
     stopTransitionToDedicatedConfigServer: {skip: "unrelated"},
     sysprofile: {skip: "internal command"},
-    testCommandFeatureFlaggedOnLatestFCV83: {skip: "internal command"},
+    testCommandFeatureFlaggedOnLatestFCV91: {skip: "internal command"},
     testDeprecation: {skip: "test command"},
     testDeprecationInVersion2: {skip: "test command"},
     testInternalTransactions: {skip: "internal command"},
@@ -4767,6 +4806,7 @@ const wcTimeseriesCommandsTests = {
         },
     },
     updateESECMKIdentifierList: {skip: "does not accept write concern"},
+    updateMetricsFilteringAllowlist: {skip: "does not accept write concern"},
     updateRole: wcCommandsTests["updateRole"],
     updateSearchIndex: {skip: "does not accept write concern"},
     updateUser: wcCommandsTests["updateRole"],
@@ -4781,6 +4821,7 @@ const wcTimeseriesCommandsTests = {
     getShardingReady: {skip: "internal command"},
     whatsmysni: {skip: "does not accept write concern"},
     whatsmyuri: {skip: "internal command"},
+    wiredTigerRepair: {skip: "does not accept write concern"},
 };
 
 // A list of additional CRUD ops which exercise different write paths, and do error handling
@@ -6575,7 +6616,7 @@ function shouldSkipTestCase(
         // TODO SERVER-125423: confirm whether this skip is still needed on viewless timeseries
         // and either remove the branch or update this comment.
         if (
-            FeatureFlagUtil.isEnabled(coll.getDB(), "UnifiedWriteExecutor") &&
+            isUweEnabled(coll.getDB()) &&
             clusterType == "sharded" &&
             ["findAndModify", "findOneAndUpdate"].includes(command) &&
             shardedCollection &&

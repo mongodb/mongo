@@ -3,7 +3,7 @@
  * purpose is to verify that the nested unions and searches return the correct results across all
  * views.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {
     actionMoviesViewPipeline,

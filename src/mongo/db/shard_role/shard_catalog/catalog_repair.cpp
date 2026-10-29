@@ -1,41 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/catalog_repair.h"
 
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -102,6 +77,7 @@ bool identHandler(StorageEngine* engine,
 }  // namespace
 
 namespace catalog_repair {
+using namespace std::literals::string_view_literals;
 
 /**
  * This method reconciles differences between idents the KVEngine is aware of and the
@@ -244,8 +220,8 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                             "metadata"_attr = md->toBSON(),
                             "lastShutdownState"_attr =
                                 (lastShutdownState == StorageEngine::LastShutdownState::kClean
-                                     ? "clean"_sd
-                                     : "unclean"_sd));
+                                     ? "clean"sv
+                                     : "unclean"sv));
                 return {ErrorCodes::DataCorruptionDetected,
                         str::stream()
                             << "Expected index ident is missing from the catalog entry, "
@@ -341,18 +317,19 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                                     << md->nss.toStringForErrorMsg() << " Index: " << indexName);
         }
         if (indexesToDrop.size() > 0) {
-            WriteUnitOfWork wuow(opCtx);
-            CollectionWriter writer{opCtx, entry.nss};
-            auto collection = writer.getWritableCollection(opCtx);
-            invariant(collection->getCatalogId() == entry.catalogId);
-            collection->replaceMetadata(opCtx, std::move(md));
-            wuow.commit();
+            writeConflictRetry(opCtx, "dropUnfinishedIndexes", entry.nss, [&] {
+                WriteUnitOfWork wuow(opCtx);
+                CollectionWriter writer{opCtx, entry.nss};
+                auto collection = writer.getWritableCollection(opCtx);
+                invariant(collection->getCatalogId() == entry.catalogId);
+                collection->replaceMetadata(opCtx, md);
+                wuow.commit();
+            });
         }
     }
 
-    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return reconcileResult;
     }
 

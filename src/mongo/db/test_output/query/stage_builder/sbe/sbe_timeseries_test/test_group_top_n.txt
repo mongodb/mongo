@@ -2,7 +2,7 @@
 [4] project [s24 = makeBsonObj(MakeObjSpec([topN = Add(0)], Closed, NewObj, 0), s23, s22)] 
 [3] project [s22 = aggTopNFinalize(s21, s11)] 
 [3] block_to_row blocks[s16, s19] row[s20, s21] s9 
-[3] block_group bitset = s9 [s16] [s19 = valueBlockAggTopN(s14, s11, null, s13, s12)] [s19 = aggTopN(s11, null, s13, s12) init{[[], 0ll, 2ll, 0, 104857600, true]}] [s17, s18] [s12, s13] spillSlots[s15] mergingExprs[aggTopNMerge(s15, s11)] 
+[3] block_group bitset = s9 [s16] [s19 = valueBlockAggTopN(s14, s11, null, s13, s12)] [s19 = aggTopN(s11, null, s13, s12) init{[[], 0ll, 2ll, 0, 104857600]}] [s17, s18] [s12, s13] spillSlots[s15] mergingExprs[aggTopNMerge(s15, s11)] 
 [3] project [s16 = null, s17 = (newObj("tag", s3) ?: null), s18 = valueBlockGetSortKeyAsc(cellFoldValues_P(cellBlockGetFlatValuesBlock(s6), s6))] 
 [2] filter {!(valueBlockNone(s9, true))} 
 [2] project [s9 = valueBlockLogicalAnd(s4, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s8), Date(1737650858692)), false), s8))] 

@@ -7,10 +7,7 @@ const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
 assert(
-    topology.type == Topology.kShardedCluster ||
-        (topology.type == Topology.kReplicaSet &&
-            topology.configsvr &&
-            TestData.testingReplicaSetEndpoint),
+    topology.type == Topology.kShardedCluster,
     "Routing table consistency check must be run against a sharded cluster, but got: " +
         tojson(topology),
 );

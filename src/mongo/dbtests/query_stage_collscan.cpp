@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file tests db/exec/collection_scan.cpp.
@@ -79,6 +53,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -100,6 +75,8 @@ using namespace std::literals::string_view_literals;
 
 static const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("unittests.QueryStageCollectionScan");
+static const NamespaceString kCappedNss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageCollectionScanCapped");
 
 //
 // Stage-specific tests.
@@ -380,7 +357,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicBackwardWithMatch) {
 TEST_F(QueryStageCollectionScanTest,
        QueryTestCollscanStopsScanningOnFilterFailureInClusteredCollectionIfSpecified) {
     auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-    auto collDeleter = createClusteredCollection(ns, false /* prePopulate */);
+    auto collDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
     for (int i = 1; i <= numObj(); ++i) {
         insertDocument(ns, BSON("_id" << i << "foo" << i));
     }
@@ -587,6 +564,47 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     ASSERT_EQUALS(numObj(), count);
 }
 
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanCappedRollOffTolerated) {
+    // A scan that tolerates capped repositioning continues from the oldest surviving document when
+    // the one it was positioned on rolls off.
+    constexpr int kCappedMax = 5;
+    DBDirectClient client(&_opCtx);
+    ON_BLOCK_EXIT([&] { client.dropCollection(kCappedNss); });
+    ASSERT_TRUE(client.createCollection(kCappedNss, 1024 * 1024, /*capped=*/true, kCappedMax));
+    for (int i = 0; i < kCappedMax; ++i) {
+        client.insert(kCappedNss, BSON("foo" << i));
+    }
+
+    dbtests::WriteContextForTests ctx(&_opCtx, kCappedNss.ns_forTest());
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tolerateCappedRepositioning = true;
+    WorkingSet ws;
+    auto scan =
+        std::make_unique<CollectionScan>(_expCtx.get(), ctx.getCollection(), params, &ws, nullptr);
+
+    std::vector<int> seen;
+    auto workUntil = [&](size_t count) {
+        while (seen.size() < count && !scan->isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            if (PlanStage::ADVANCED == scan->work(&id)) {
+                seen.push_back(ws.get(id)->doc.value()["foo"].getInt());
+            }
+        }
+    };
+    workUntil(3);
+
+    // Roll off every document, including the one the scan is positioned on.
+    scan->saveState();
+    for (int i = kCappedMax; i < 2 * kCappedMax; ++i) {
+        client.insert(kCappedNss, BSON("foo" << i));
+    }
+    scan->restoreState(RestoreContext(nullptr));
+    workUntil(3 * kCappedMax);
+
+    ASSERT_EQ((std::vector<int>{0, 1, 2, 5, 6, 7, 8, 9}), seen);
+}
+
 // Verify that successfully seeking to the resumeAfterRecordId returns PlanStage::NEED_TIME and
 // that we can complete the collection scan afterwards.
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuccess) {
@@ -661,8 +679,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
 
     // Create plan stage.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
-        _expCtx.get(), coll, params, ws.get(), nullptr /* filter */);
+    std::unique_ptr<PlanStage> ps =
+        std::make_unique<CollectionScan>(_expCtx.get(), coll, params, ws.get(), /*filter=*/nullptr);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
@@ -858,7 +876,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredIgnoreNumericReco
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
 
         int numOIDDocs = 20;
         // Insert documents with default '_id' values of type 'objectId' used to generate their
@@ -895,7 +913,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
 
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
 
         Date_t maxDate = Date_t::now();
         Date_t middleDate = maxDate - Milliseconds(1);
@@ -1254,7 +1272,7 @@ TEST_F(QueryStageCollectionScanTest,
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
                                   BSON("_id" << 1),
@@ -1297,7 +1315,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundInc
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
                                   BSON("_id" << 1),
@@ -1341,7 +1359,7 @@ TEST_F(QueryStageCollectionScanTest,
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
                                   BSON("_id" << 1),
@@ -1384,7 +1402,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundYie
               "scanDirection"_attr =
                   (direction == CollectionScanParams::FORWARD ? "FORWARD" : "BACKWARD"));
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
 
         std::vector<BSONObj> docs{BSON("_id" << 0),
                                   BSON("_id" << 1),
@@ -1420,7 +1438,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsOv
 
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
         std::vector<BSONObj> docs{BSON("_id" << 0),
                                   BSON("_id" << 1),
                                   BSON("_id" << 2),
@@ -1473,7 +1491,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsHa
 
         auto ns = NamespaceString::createNamespaceString_forTest("a.b");
 
-        auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
+        auto scopedCollectionDeleter = createClusteredCollection(ns, /*prePopulate=*/false);
         std::vector<BSONObj> docs{BSON("_id" << 0),
                                   BSON("_id" << 1),
                                   BSON("_id" << 2),

@@ -6,6 +6,7 @@
  *   uses_transactions,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -129,7 +130,9 @@ assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
 );
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
-assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 
 kCmdTestCases.forEach((cmdTestCase) => {
     runTest(st, session, sessionDB, cmdTestCase.name, cmdTestCase.command, true /*isSharded*/);

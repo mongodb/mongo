@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -63,24 +37,24 @@ namespace durable_catalog {
  * Scans the persisted catalog until an entry is found matching 'nss'. If present, returns a parsed
  * version of the catalog entry.
  */
-MONGO_MOD_PRIVATE boost::optional<CatalogEntry> scanForCatalogEntryByNss(
+[[MONGO_MOD_PRIVATE]] boost::optional<CatalogEntry> scanForCatalogEntryByNss(
     OperationContext* opCtx, const NamespaceString& nss, const MDBCatalog* mdbCatalog);
 
 /**
  * Scans the persisted catalog until an entry is found matching 'uuid'. If present, returns a parsed
  * version of the catalog entry.
  */
-MONGO_MOD_PRIVATE boost::optional<CatalogEntry> scanForCatalogEntryByUUID(
+[[MONGO_MOD_PRIVATE]] boost::optional<CatalogEntry> scanForCatalogEntryByUUID(
     OperationContext* opCtx, const UUID& uuid, const MDBCatalog* mdbCatalog);
 
 /**
  * Parses the _mdb_catalog entry object at `catalogId` to common types. Returns boost::none if it
  * doesn't exist or if the entry is the feature document.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CatalogEntry> getParsedCatalogEntry(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<CatalogEntry> getParsedCatalogEntry(
     OperationContext* opCtx, const RecordId& catalogId, const MDBCatalog* mdbCatalog);
 
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CatalogEntry> parseCatalogEntry(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<CatalogEntry> parseCatalogEntry(
     const RecordId& catalogId, const BSONObj& obj);
 
 /**
@@ -92,17 +66,18 @@ MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CatalogEntry> parseCatalogEntry(
  * given object. If not, `idxIdents` must already contain idents for all indexes in the metadata.
  * Any idents for indexes not present in the metadata will be discarded.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void putMetaData(OperationContext* opCtx,
-                                             const RecordId& catalogId,
-                                             const durable_catalog::CatalogEntryMetaData& md,
-                                             MDBCatalog* mdbCatalog,
-                                             boost::optional<BSONObj> indexIdents = boost::none);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void putMetaData(
+    OperationContext* opCtx,
+    const RecordId& catalogId,
+    const durable_catalog::CatalogEntryMetaData& md,
+    MDBCatalog* mdbCatalog,
+    boost::optional<BSONObj> indexIdents = boost::none);
 
 /**
  * Persists a new collection in the catalog. The caller takes ownership of the newly created
  * RecordStore for the collection.
  */
-MONGO_MOD_PRIVATE StatusWith<std::unique_ptr<RecordStore>> createCollection(
+[[MONGO_MOD_PRIVATE]] StatusWith<std::unique_ptr<RecordStore>> createCollection(
     OperationContext* opCtx,
     const RecordId& catalogId,
     const NamespaceString& nss,
@@ -111,12 +86,12 @@ MONGO_MOD_PRIVATE StatusWith<std::unique_ptr<RecordStore>> createCollection(
     MDBCatalog* mdbCatalog,
     bool recordIdsReplicated = false);
 
-MONGO_MOD_PRIVATE Status createIndex(OperationContext* opCtx,
-                                     const RecordId& catalogId,
-                                     const NamespaceString& nss,
-                                     const CollectionOptions& collectionOptions,
-                                     const IndexConfig& indexConfig,
-                                     std::string_view ident);
+[[MONGO_MOD_PRIVATE]] Status createIndex(OperationContext* opCtx,
+                                         const RecordId& catalogId,
+                                         const NamespaceString& nss,
+                                         const CollectionOptions& collectionOptions,
+                                         const IndexConfig& indexConfig,
+                                         std::string_view ident);
 
 /**
  * Import a collection by inserting the given metadata into the durable catalog and instructing
@@ -133,14 +108,14 @@ MONGO_MOD_PRIVATE Status createIndex(OperationContext* opCtx,
  *
  * The collection must be locked in MODE_X when calling this function.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT ImportResult {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ImportResult {
     ImportResult(RecordId catalogId, std::unique_ptr<RecordStore> rs, UUID uuid)
         : catalogId(std::move(catalogId)), rs(std::move(rs)), uuid(uuid) {}
     RecordId catalogId;
     std::unique_ptr<RecordStore> rs;
     UUID uuid;
 };
-MONGO_MOD_NEEDS_REPLACEMENT StatusWith<ImportResult> importCollection(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] StatusWith<ImportResult> importCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& metadata,
@@ -150,11 +125,11 @@ MONGO_MOD_NEEDS_REPLACEMENT StatusWith<ImportResult> importCollection(
     bool panicOnCorruptWtMetadata = true,
     bool repair = false);
 
-MONGO_MOD_PRIVATE Status renameCollection(OperationContext* opCtx,
-                                          const RecordId& catalogId,
-                                          const NamespaceString& toNss,
-                                          durable_catalog::CatalogEntryMetaData& md,
-                                          MDBCatalog* mdbCatalog);
+[[MONGO_MOD_PRIVATE]] Status renameCollection(OperationContext* opCtx,
+                                              const RecordId& catalogId,
+                                              const NamespaceString& toNss,
+                                              durable_catalog::CatalogEntryMetaData& md,
+                                              MDBCatalog* mdbCatalog);
 
 /**
  * Deletes the persisted collection catalog entry identified by 'catalogId'.
@@ -162,31 +137,31 @@ MONGO_MOD_PRIVATE Status renameCollection(OperationContext* opCtx,
  * Expects (invariants) that all of the index catalog entries have been removed already via
  * removeIndex.
  */
-MONGO_MOD_PRIVATE Status dropCollection(OperationContext* opCtx,
-                                        const RecordId& catalogId,
-                                        MDBCatalog* mdbCatalog);
+[[MONGO_MOD_PRIVATE]] Status dropCollection(OperationContext* opCtx,
+                                            const RecordId& catalogId,
+                                            MDBCatalog* mdbCatalog);
 
 /**
  * Drops the provided ident and recreates it as empty for use in resuming an index build.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status
-dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const CollectionOptions& options,
-                                   const IndexConfig& indexConfig,
-                                   std::string_view ident);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status dropAndRecreateIndexIdentForResume(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& options,
+    const IndexConfig& indexConfig,
+    std::string_view ident);
 
-MONGO_MOD_PRIVATE void getReadyIndexes(OperationContext* opCtx,
-                                       RecordId catalogId,
-                                       StringSet* names,
-                                       const MDBCatalog* mdbCatalog);
+[[MONGO_MOD_PRIVATE]] void getReadyIndexes(OperationContext* opCtx,
+                                           RecordId catalogId,
+                                           StringSet* names,
+                                           const MDBCatalog* mdbCatalog);
 
-MONGO_MOD_PRIVATE bool isIndexPresent(OperationContext* opCtx,
-                                      const RecordId& catalogId,
-                                      std::string_view indexName,
-                                      const MDBCatalog* mdbCatalog);
+[[MONGO_MOD_PRIVATE]] bool isIndexPresent(OperationContext* opCtx,
+                                          const RecordId& catalogId,
+                                          std::string_view indexName,
+                                          const MDBCatalog* mdbCatalog);
 
-MONGO_MOD_NEEDS_REPLACEMENT void sanitizeTimeseriesOptions(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void sanitizeTimeseriesOptions(
     OperationContext* opCtx, durable_catalog::CatalogEntryMetaData& metadata);
 
 /**
@@ -198,16 +173,16 @@ namespace internal {
  * Generates 'durable_catalog::CatalogEntryMetaData' from 'collectionOptions' and
  * 'recordIdsReplicated'. Assumes it is for a new collection without no indexes present.
  */
-MONGO_MOD_NEEDS_REPLACEMENT durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
-    const NamespaceString& nss,
-    const CollectionOptions& collectionOptions,
-    bool recordIdsReplicated = false);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] durable_catalog::CatalogEntryMetaData
+createMetaDataForNewCollection(const NamespaceString& nss,
+                               const CollectionOptions& collectionOptions,
+                               bool recordIdsReplicated = false);
 
-MONGO_MOD_NEEDS_REPLACEMENT BSONObj
-buildRawMDBCatalogEntry(const std::string& ident,
-                        const BSONObj& idxIdent,
-                        const durable_catalog::CatalogEntryMetaData& md,
-                        const NamespaceString& nss);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] BSONObj buildRawMDBCatalogEntry(
+    const std::string& ident,
+    const BSONObj& idxIdent,
+    const durable_catalog::CatalogEntryMetaData& md,
+    const NamespaceString& nss);
 
 }  // namespace internal
 

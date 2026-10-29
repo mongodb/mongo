@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/modules.h"
 
@@ -40,7 +14,6 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 
@@ -91,45 +64,12 @@ protected:
      */
     static void associateClientMetadata(Client* client, std::string appName);
 
-    /**
-     * Converts a list of ShardHandles into a list of ShardRefs using the test's OperationContext,
-     * so it can be passed to the transaction coordinator APIs.
-     */
-    std::vector<ShardRef> transformToShardRefs(const std::vector<ShardHandle>& handles) const {
-        std::vector<ShardRef> shardRefs;
-        shardRefs.reserve(handles.size());
-        for (const auto& handle : handles) {
-            shardRefs.push_back(handle.toShardRef(operationContext()));
-        }
-        return shardRefs;
-    }
-
-    /**
-     * Converts a set of ShardHandles into a set of ShardRefs using the test's OperationContext, so
-     * it can be passed to the transaction coordinator APIs.
-     */
-    std::set<ShardRef> transformToShardRefs(const std::set<ShardHandle>& handles) const {
-        std::set<ShardRef> shardRefs;
-        for (const auto& handle : handles) {
-            shardRefs.insert(handle.toShardRef(operationContext()));
-        }
-        return shardRefs;
-    }
-
-    // TODO SERVER-128815: use non empty optionals for UUIDs once feature is ready
-
-    const std::vector<ShardHandle> kOneShardHandleList{ShardHandle{ShardId{"s1"}, boost::none}};
-    const std::set<ShardHandle> kOneShardHandleSet{ShardHandle{ShardId{"s1"}, boost::none}};
-    const std::vector<ShardHandle> kTwoShardHandleList{ShardHandle{ShardId{"s1"}, boost::none},
-                                                       ShardHandle{ShardId{"s2"}, boost::none}};
-    const std::set<ShardHandle> kTwoShardHandleSet{ShardHandle{ShardId{"s1"}, boost::none},
-                                                   ShardHandle{ShardId{"s2"}, boost::none}};
-    const std::vector<ShardHandle> kThreeShardHandleList{ShardHandle{ShardId{"s1"}, boost::none},
-                                                         ShardHandle{ShardId{"s2"}, boost::none},
-                                                         ShardHandle{ShardId{"s3"}, boost::none}};
-    const std::set<ShardHandle> kThreeShardHandleSet{ShardHandle{ShardId{"s1"}, boost::none},
-                                                     ShardHandle{ShardId{"s2"}, boost::none},
-                                                     ShardHandle{ShardId{"s3"}, boost::none}};
+    const std::vector<ShardId> kOneShardIdList{{"s1"}};
+    const std::set<ShardId> kOneShardIdSet{{"s1"}};
+    const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
+    const std::set<ShardId> kTwoShardIdSet{{"s1"}, {"s2"}};
+    const std::vector<ShardId> kThreeShardIdList{{"s1"}, {"s2"}, {"s3"}};
+    const std::set<ShardId> kThreeShardIdSet{{"s1"}, {"s2"}, {"s3"}};
 
     const Status kRetryableError{ErrorCodes::HostUnreachable,
                                  "Retryable error for coordinator test"};

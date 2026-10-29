@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/initialize_operation_session_info.h"
 
@@ -70,7 +44,7 @@ bool isAuthorizedForInternalClusterAction(OperationContext* opCtx,
 
 /**
  * A client is internal if the connection is a self connection, a connection from a mongos or
- * different mongod or a direct client connection.
+ * different mongod or a DBDirectClient connection.
  */
 bool isInternalClient(OperationContext* opCtx) {
     return !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient() ||
@@ -88,7 +62,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
         uassert(50891,
                 "Invalid to set operation session info in a direct client",
                 !osi.getSessionId() && !osi.getTxnNumber() && !osi.getAutocommit() &&
-                    !osi.getStartTransaction());
+                    !osi.getStartTransaction() && !osi.getStartOrContinueTransaction());
     }
 
     if (!requiresAuth) {
@@ -195,13 +169,39 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
         uassert(ErrorCodes::InvalidOptions,
                 "'startTransaction' field requires 'autocommit' field to also be specified",
                 !osi.getStartTransaction());
+        uassert(
+            ErrorCodes::InvalidOptions,
+            "'startOrContinueTransaction' field requires 'autocommit' field to also be specified",
+            !osi.getStartOrContinueTransaction());
     }
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot specify both 'startTransaction' and 'startOrContinueTransaction'",
+            !(osi.getStartTransaction() && osi.getStartOrContinueTransaction()));
 
     if (osi.getStartTransaction()) {
         invariant(osi.getAutocommit());
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying startTransaction=false is not allowed.",
                 osi.getStartTransaction().value());
+    }
+
+    if (osi.getIsServerInitiatedTransaction().has_value()) {
+        uassert(ErrorCodes::Unauthorized,
+                "'isServerInitiatedTransaction' is only allowed for internal clients",
+                isAuthorizedForInternalClusterAction(
+                    opCtx, validatedTenantId, cachedIsAuthorizedForInternalClusterAction));
+    }
+
+    if (osi.getStartOrContinueTransaction()) {
+        invariant(osi.getAutocommit());
+        uassert(ErrorCodes::InvalidOptions,
+                "Specifying startOrContinueTransaction=false is not allowed.",
+                osi.getStartOrContinueTransaction().value());
+        uassert(ErrorCodes::Unauthorized,
+                "'startOrContinueTransaction' is only allowed for internal clients",
+                isAuthorizedForInternalClusterAction(
+                    opCtx, validatedTenantId, cachedIsAuthorizedForInternalClusterAction));
     }
 
     if (osi.getTxnNumber()) {

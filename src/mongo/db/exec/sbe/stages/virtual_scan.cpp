@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
 
@@ -36,21 +10,21 @@ namespace mongo::sbe {
 using namespace std::literals::string_view_literals;
 VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    value::SlotId out,
-                                   value::TypeTags arrTag,
-                                   value::Value arrVal,
+                                   value::TagValueMaybeOwned arr,
                                    PlanYieldPolicySBE* yieldPolicy,
-                                   bool participateInTrialRunTracking,
-                                   bool owned /*=true*/)
+                                   bool participateInTrialRunTracking)
     : PlanStage("virtualscan"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outField(out),
-      _arr(owned, arrTag, arrVal) {
-    tassert(11094700, "expect arr parameter to be an array", value::isArray(arrTag));
+      _arr(std::move(arr)) {
+    tassert(11094700, "expect arr parameter to be an array", value::isArray(_arr.tag()));
 }
 
 std::unique_ptr<PlanStage> VirtualScanStage::clone() const {
-    auto [tag, val] = value::copyValue(_arr.tag(), _arr.value());
-    return std::make_unique<VirtualScanStage>(
-        _commonStats.nodeId, _outField, tag, val, _yieldPolicy, participateInTrialRunTracking());
+    return std::make_unique<VirtualScanStage>(_commonStats.nodeId,
+                                              _outField,
+                                              _arr.getOwnedCopy(),
+                                              _yieldPolicy,
+                                              participateInTrialRunTracking());
 }
 
 void VirtualScanStage::prepare(CompileCtx& ctx) {

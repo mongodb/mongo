@@ -1,40 +1,15 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/validate/validate_state.h"
 
 #include "mongo/db/repl/local_oplog_info.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -58,11 +33,23 @@ class ValidateStateTest : public CatalogTestFixture {};
 
 class ValidateStateWithoutSizeStorerTest : public CatalogTestFixture {
 public:
-    ValidateStateWithoutSizeStorerTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count::test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
+
+// Creates the replicated fast count backing stores as container idents.
+void createReplicatedFastCountContainers(OperationContext* opCtx) {
+    ASSERT_OK(createInternalFastCountContainers(opCtx,
+                                                NamespaceString::kAdminCommandNamespace,
+                                                ident::kFastCountMetadataStore,
+                                                KeyFormat::String,
+                                                ident::kFastCountMetadataStoreTimestamps,
+                                                KeyFormat::Long,
+                                                /*writeToOplog=*/false));
+}
 
 }  // namespace
 
@@ -73,15 +60,13 @@ TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsLegacySizeStorer) {
 };
 
 TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsBoth) {
-    ASSERT_OK(replicated_fast_count::createReplicatedFastCountCollection(storageInterface(),
-                                                                         operationContext()));
+    createReplicatedFastCountContainers(operationContext());
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()), FastCountType::both);
 };
 
 TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsReplicated) {
-    ASSERT_OK(replicated_fast_count::createReplicatedFastCountCollection(storageInterface(),
-                                                                         operationContext()));
+    createReplicatedFastCountContainers(operationContext());
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()),
               FastCountType::replicated);
@@ -90,6 +75,38 @@ TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsReplic
 TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsNeither) {
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()), FastCountType::neither);
+}
+
+TEST(ValidationOptionsToBSONTest, ReportsModeAndRepairMode) {
+    const ValidationOptions options(ValidateMode::kCollectionHash, RepairMode::kNone, false);
+    const BSONObj obj = options.toBSON();
+    EXPECT_EQ(obj["mode"].String(), "collectionHash");
+    EXPECT_EQ(obj["repairMode"].String(), "none");
+    EXPECT_FALSE(obj["repair"].Bool());
+    EXPECT_FALSE(obj["fixMultikey"].Bool());
+    EXPECT_FALSE(obj["logDiagnostics"].Bool());
+}
+
+TEST(ValidationOptionsToBSONTest, ReportsSliceTargetAndSizeStats) {
+    const ValidationOptions options(ValidateMode::kForegroundFull,
+                                    RepairMode::kFixErrors,
+                                    true,
+                                    currentValidationVersion,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    /*targetRecordsPerRecordStoreSlice=*/5000,
+                                    /*sizeStats=*/true);
+    const BSONObj obj = options.toBSON();
+    EXPECT_EQ(obj["mode"].String(), "foregroundFull");
+    EXPECT_EQ(obj["repairMode"].String(), "fixErrors");
+    EXPECT_TRUE(obj["repair"].Bool());
+    // kFixErrors implies kAdjustMultikey.
+    EXPECT_TRUE(obj["fixMultikey"].Bool());
+    EXPECT_TRUE(obj["logDiagnostics"].Bool());
+    EXPECT_TRUE(obj["sizeStats"].Bool());
+    EXPECT_EQ(obj["targetRecordsPerRecordStoreSlice"].numberLong(), 5000);
 }
 
 TEST(FastCountTypeToStringTest, Works) {
@@ -167,13 +184,15 @@ class ShouldEnforceFastCountAndSizeTest
     : public CatalogTestFixture,
       public ::testing::WithParamInterface<ShouldEnforceFastCountAndSizeParams> {
 public:
-    ShouldEnforceFastCountAndSizeTest()
-        : CatalogTestFixture(
-              GetParam().hasSizeStorer
-                  ? Options()
-                  : Options().setPersistenceProvider(
-                        std::make_unique<replicated_fast_count::test_helpers::
-                                             ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        auto options = CatalogTestFixture::makeServiceContextOptions();
+        if (GetParam().hasSizeStorer) {
+            return options;
+        }
+        return std::move(options).setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
 
 TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {
@@ -186,8 +205,7 @@ TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {
     }
 
     if (p.createRfcCollection) {
-        ASSERT_OK(replicated_fast_count::createReplicatedFastCountCollection(storageInterface(),
-                                                                             operationContext()));
+        createReplicatedFastCountContainers(operationContext());
     }
 
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
@@ -369,6 +387,34 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<ShouldEnforceFastCountAndSizeParams>& info) {
         return info.param.name;
     });
+
+TEST_F(ValidateStateTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
+    const ValidationOptions options(ValidateMode::kForegroundFullEnforceFastCountAndSize,
+                                    RepairMode::kNone,
+                                    /*logDiagnostics=*/false,
+                                    currentValidationVersion,
+                                    /*verifyConfigurationOverride=*/boost::none,
+                                    /*readTimestamp=*/Timestamp(1, 1));
+    ValidateState validateState(operationContext(), kNss, options);
+    const FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
+    EXPECT_FALSE(validateState.shouldEnforceFastCount(operationContext(), fastCountType));
+    EXPECT_FALSE(validateState.shouldEnforceFastSize(operationContext(), fastCountType));
+}
+
+TEST_F(ValidateStateWithoutSizeStorerTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
+    createReplicatedFastCountContainers(operationContext());
+    const ValidationOptions options(ValidateMode::kForegroundFullEnforceFastCountAndSize,
+                                    RepairMode::kNone,
+                                    /*logDiagnostics=*/false,
+                                    currentValidationVersion,
+                                    /*verifyConfigurationOverride=*/boost::none,
+                                    /*readTimestamp=*/Timestamp(1, 1));
+    ValidateState validateState(operationContext(), kNss, options);
+    const FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
+    EXPECT_EQ(fastCountType, FastCountType::replicated);
+    EXPECT_FALSE(validateState.shouldEnforceFastCount(operationContext(), fastCountType));
+    EXPECT_FALSE(validateState.shouldEnforceFastSize(operationContext(), fastCountType));
+}
 
 DEATH_TEST(FastCountToStringDeathTest, DiesOnBadFastCountType, "11853100") {
     toString(static_cast<FastCountType>(-1));

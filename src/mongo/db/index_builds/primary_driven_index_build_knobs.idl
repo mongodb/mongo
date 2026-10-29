@@ -1,32 +1,8 @@
-# Copyright (C) 2026-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::index_builds::primary_driven"
     mod_visibility: private
 
 server_parameters:
@@ -35,7 +11,52 @@ server_parameters:
         set_at:
             - runtime
             - startup
-        cpp_varname: primaryDrivenIndexBuildPrefetching
-        cpp_vartype: AtomicWord<bool>
+        cpp_varname: prefetching
+        cpp_vartype: Atomic<bool>
         default: true
+        redact: false
+
+    primaryDrivenIndexBuildScanPhaseContainerWriteMBperSec:
+        description:
+            "Max MB per second that the collection scan phase of a primary-driven index build will
+            spill into the sorter's container. Those spills are replicated container writes, so on
+            disaggregated storage they compete with the foreground workload. Setting it to 0 turns
+            off throttling. The limit applies to the build as a whole, not to each index being
+            built. Spills are paced one container write at a time, so the longest run of
+            unthrottled writes is bounded by
+            'primaryDrivenIndexBuildSorterInsertionBatchBytes'."
+        set_at: [startup, runtime]
+        cpp_varname: scanPhaseContainerWriteMBperSec
+        cpp_vartype: Atomic<int>
+        default: 0
+        validator:
+            gte: 0
+        redact: false
+
+    primaryDrivenIndexBuildIndexTableCleanupBatchBytes:
+        description:
+            "The maximum number of bytes per batch when cleaning up index entries before
+            resuming a primary-driven index build."
+        set_at: [startup, runtime]
+        cpp_varname: indexTableCleanupBatchBytes
+        cpp_vartype: Atomic<long long>
+        default:
+            expr: 4 * 1024 * 1024
+        validator:
+            gte: 1
+        redact: false
+
+    primaryDrivenIndexBuildBulkLoadPhaseContainerWriteMBperSec:
+        description:
+            "Max MB per second that the bulk load phase of a primary-driven index build will write
+            from the sorter into the index table. Setting it to 0 turns off throttling. The
+            limit applies to the index build as a whole, not to each index being built. The limit is
+            charged when the build yields, so the longest run of unthrottled writes is bounded by
+            'internalIndexBuildBulkLoadYieldIterations' keys."
+        set_at: [startup, runtime]
+        cpp_varname: bulkLoadPhaseContainerWriteMBperSec
+        cpp_vartype: Atomic<int>
+        default: 0
+        validator:
+            gte: 0
         redact: false

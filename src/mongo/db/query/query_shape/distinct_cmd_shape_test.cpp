@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -247,6 +222,91 @@ TEST_F(ExtractQueryShapeDistinctTest, StableQueryShapeHashValue) {
             $db: "testdb",
             key: "name",
             query: { area : 5 }})");
+}
+
+// -------------------------------------------------------------------------
+// rawData tests
+// -------------------------------------------------------------------------
+
+class DistinctRawDataTest : public ServiceContextTest {
+protected:
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    void setUp() override {
+        ServiceContextTest::setUp();
+        expCtx = make_intrusive<ExpressionContextForTest>();
+    }
+
+    std::unique_ptr<DistinctCmdShape> makeShape(const char* keyStr,
+                                                boost::optional<bool> rawDataVal) {
+        auto json =
+            std::string(R"({ distinct: "testcoll", $db: "testdb", key: ")") + keyStr + "\"}";
+        auto distinct = fromjson(json);
+        auto distinctCommand =
+            std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+                distinct,
+                IDLParserContext("distinctCommandRequest",
+                                 auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
+                                 boost::none,
+                                 SerializationContext::stateDefault())));
+        if (rawDataVal.has_value()) {
+            distinctCommand->setRawData(*rawDataVal);
+        }
+        auto pd = parsed_distinct_command::parse(
+            expCtx, std::move(distinctCommand), ExtensionsCallbackNoop(), {});
+        return std::make_unique<DistinctCmdShape>(*pd, expCtx);
+    }
+};
+
+TEST_F(DistinctRawDataTest, RawDataTrueAppearsInShape) {
+    auto shape = makeShape("field", true);
+    auto shapeBson = shape->toBson(expCtx->getOperationContext(),
+                                   SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                                   {});
+    ASSERT_TRUE(shapeBson.hasField(DistinctCommandRequest::kRawDataFieldName));
+    ASSERT_TRUE(shapeBson[DistinctCommandRequest::kRawDataFieldName].boolean());
+}
+
+TEST_F(DistinctRawDataTest, RawDataAbsentOrFalseNotInShape) {
+    for (auto rawDataVal : {boost::optional<bool>{}, boost::optional<bool>{false}}) {
+        auto shape = makeShape("field", rawDataVal);
+        ASSERT_FALSE(shape->rawData);
+        auto shapeBson =
+            shape->toBson(expCtx->getOperationContext(),
+                          SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                          {});
+        ASSERT_FALSE(shapeBson.hasField(DistinctCommandRequest::kRawDataFieldName));
+    }
+}
+
+TEST_F(DistinctRawDataTest, RawDataDifferentiatesQueryShape) {
+    auto hashNone = makeShape("field", boost::none)->sha256Hash(expCtx->getOperationContext(), {});
+    auto hashTrue = makeShape("field", true)->sha256Hash(expCtx->getOperationContext(), {});
+    auto hashFalse = makeShape("field", false)->sha256Hash(expCtx->getOperationContext(), {});
+
+    ASSERT_NE(hashNone.toHexString(), hashTrue.toHexString());
+    // rawData=false is normalized to absent — same hash as no rawData.
+    ASSERT_EQ(hashNone.toHexString(), hashFalse.toHexString());
+    ASSERT_NE(hashTrue.toHexString(), hashFalse.toHexString());
+}
+
+// The shape must read rawData from the command request, not from isRawDataOperation(opCtx), so
+// that query shapes built inside the setQuerySettings command still set rawData when the
+// represented query has it. This pins that: with the opCtx flag left false, a request with
+// rawData:true must still produce a rawData shape (and a different hash from a rawData-absent one).
+TEST_F(DistinctRawDataTest, RawDataSourcedFromRequestNotOpCtx) {
+    OperationContext* opCtx = expCtx->getOperationContext();
+    isRawDataOperation(opCtx) = false;
+
+    auto shapeFromRequest = makeShape("field", true);
+    ASSERT_TRUE(shapeFromRequest->rawData)
+        << "shape rawData must come from the request even when isRawDataOperation(opCtx) is false";
+
+    // rawData from the request must still enter the hash despite the opCtx flag being false: the
+    // rawData:true shape must differ from a rawData-absent shape. If the shape sourced rawData from
+    // the (false) opCtx instead, these would collide.
+    auto hashRequestTrue = shapeFromRequest->sha256Hash(opCtx, {});
+    auto hashAbsent = makeShape("field", boost::none)->sha256Hash(opCtx, {});
+    ASSERT_NE(hashRequestTrue.toHexString(), hashAbsent.toHexString());
 }
 
 TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/topology/topology_change_helpers.h"
 
@@ -90,7 +64,6 @@
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_gen.h"
@@ -98,7 +71,6 @@
 #include "mongo/db/topology/cluster_parameters/set_cluster_parameter_invocation.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
-#include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
 #include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
@@ -601,7 +573,7 @@ void deleteAllDocumentsInCollection(
         opCtx,
         targeter,
         nss,
-        BSONObj() /* filter */,
+        /*filter=*/BSONObj(),
         repl::ReadConcernLevel::kMajorityReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
@@ -758,8 +730,7 @@ boost::optional<ShardType> getExistingShard(
     // Check whether any host in the connection is already part of the cluster.
     const auto existingShards = [&] {
         try {
-            return localCatalogClient.getAllShards(opCtx,
-                                                   repl::ReadConcernLevel::kLocalReadConcern);
+            return localCatalogClient.getAllShards(opCtx, repl::ReadConcernArgs::kLocal);
         } catch (DBException& ex) {
             ex.addContext("Failed to load existing shards during addShard");
             throw;
@@ -1005,7 +976,7 @@ void setUserWriteBlockingState(
         [opCtx, block, &osiGenerator](ShardsvrSetUserWriteBlockModePhaseEnum phase) -> BSONObj {
         ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
         shardsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
-        SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(block /* global */);
+        SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(/*global=*/block);
         shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
             std::move(setUserWriteBlockModeRequest));
         shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
@@ -1265,7 +1236,7 @@ void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
         opCtx,
         targeter,
         NamespaceString::kKeysCollectionNamespace,
-        BSONObj() /* filter */,
+        /*filter=*/BSONObj(),
         repl::ReadConcernLevel::kLocalReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
@@ -1463,7 +1434,7 @@ void setClusterParametersLocally(OperationContext* opCtx,
                 invocation.invoke(opCtx,
                                   setClusterParameterRequest,
                                   parameter["clusterParameterTime"].timestamp(),
-                                  boost::none /* previousTime */,
+                                  /*previousTime=*/boost::none,
                                   kMajorityWriteConcern);
             }
         });
@@ -1491,7 +1462,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
             opCtx,
             targeter,
             NamespaceString::makeClusterParametersNSS(tenantId),
-            BSONObj() /* filter */,
+            /*filter=*/BSONObj(),
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&allParameters, tenantId](const std::vector<BSONObj>& docs) -> bool {
                 std::vector<BSONObj> parameters;
@@ -1533,7 +1504,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* 
         auto findResponse = uassertStatusOK(localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::makeClusterParametersNSS(tenantId),
             BSONObj(),
             BSONObj(),
@@ -1694,7 +1665,7 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
     LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = shardName);
 
     for (auto&& db : trackedDBs) {
-        const auto dropStatus = dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
+        const auto dropStatus = dropDatabase(opCtx, db.getDbName(), /*markFromMigrate=*/true);
         if (dropStatus != ErrorCodes::NamespaceNotFound) {
             uassertStatusOK(dropStatus);
         }
@@ -1721,7 +1692,7 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
     auto controlShardQueryStatus =
         localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrShardsNamespace,
                                                  BSON(ShardType::name.ne(shardName)),
                                                  {},
@@ -1772,7 +1743,7 @@ void addShardInTransaction(OperationContext* opCtx,
                            [&](const DatabaseName& dbName) {
                                return DatabaseType(
                                           dbName,
-                                          newShard.getHandle().toShardRef(opCtx),
+                                          newShard.getName(),
                                           DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
                                    .toBSON();
                            });
@@ -1787,10 +1758,9 @@ void addShardInTransaction(OperationContext* opCtx,
                            databasesInNewShard.end(),
                            std::back_inserter(placementEntries),
                            [&](const DatabaseName& dbName) {
-                               return NamespacePlacementType(
-                                          NamespaceString(dbName),
-                                          newShard.getTopologyTime(),
-                                          {newShard.getHandle().toShardRef(opCtx)})
+                               return NamespacePlacementType(NamespaceString(dbName),
+                                                             newShard.getTopologyTime(),
+                                                             {newShard.getName()})
                                    .toBSON();
                            });
             write_ops::InsertCommandRequest insertPlacementEntries(
@@ -1802,7 +1772,7 @@ void addShardInTransaction(OperationContext* opCtx,
         if (insertPlacementHistoryInitMetadata) {
             auto insertRequest =
                 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-                    newShard.getTopologyTime(), {newShard.getHandle().toShardRef(opCtx)});
+                    newShard.getTopologyTime(), {newShard.getName()});
             auto insertResponse = txnClient.runCRUDOpSync(insertRequest, {});
             uassertStatusOK(insertResponse.toStatus());
         }
@@ -1864,7 +1834,7 @@ boost::optional<ShardType> getShardIfExists(OperationContext* opCtx,
     auto findShardResponse = uassertStatusOK(
         localConfigShard->exhaustiveFindOnConfig(opCtx,
                                                  kConfigReadSelector,
-                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 repl::ReadConcernArgs::kLocal,
                                                  NamespaceString::kConfigsvrShardsNamespace,
                                                  BSON(ShardType::name() << shardId.toString()),
                                                  BSONObj(),

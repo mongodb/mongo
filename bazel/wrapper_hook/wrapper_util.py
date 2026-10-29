@@ -20,9 +20,9 @@ def get_terminal_stream(fd_env_var: str):
         return None
 
     global _EXISTING_TERMINAL_STDOUT, _EXISTING_TERMINAL_STDERR
-    if _EXISTING_TERMINAL_STDOUT:
+    if "STDOUT" in fd_env_var and _EXISTING_TERMINAL_STDOUT:
         return _EXISTING_TERMINAL_STDOUT
-    if _EXISTING_TERMINAL_STDERR:
+    if "STDERR" in fd_env_var and _EXISTING_TERMINAL_STDERR:
         return _EXISTING_TERMINAL_STDERR
 
     # Handle Windows CON device
@@ -50,14 +50,14 @@ def get_terminal_stream(fd_env_var: str):
         fd = int(fd_str)
         if "STDOUT" in fd_env_var:
             try:
-                _EXISTING_TERMINAL_STDOUT = os.fdopen(fd, "w", buffering=1)
+                _EXISTING_TERMINAL_STDOUT = os.fdopen(os.dup(fd), "w", buffering=1)
                 return _EXISTING_TERMINAL_STDOUT
             except (OSError, ValueError) as e:
                 print(e)
                 return None
         elif "STDERR" in fd_env_var:
             try:
-                _EXISTING_TERMINAL_STDERR = os.fdopen(fd, "w", buffering=1)
+                _EXISTING_TERMINAL_STDERR = os.fdopen(os.dup(fd), "w", buffering=1)
                 return _EXISTING_TERMINAL_STDERR
             except (OSError, ValueError) as e:
                 print(e)

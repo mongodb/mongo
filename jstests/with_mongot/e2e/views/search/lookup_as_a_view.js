@@ -3,7 +3,7 @@
  * resolution. In this test, we create a lookup view where the foreign collection is another view
  * and the subpipeline contains $search.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

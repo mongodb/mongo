@@ -1,60 +1,21 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <chrono>
-#include <compare>
-#include <cstddef>
-#include <memory>
-#include <new>
-#include <thread>
-#include <utility>
+#include "mongo/transport/service_executor.h"
 
-#include <asio.hpp>  // IWYU pragma: keep
-
-#include <boost/smart_ptr.hpp>
-
-// IWYU pragma: no_include "asio/impl/dispatch.hpp"
-// IWYU pragma: no_include "asio/impl/io_context.hpp"
-// IWYU pragma: no_include "asio/impl/post.hpp"
-// IWYU pragma: no_include "asio/impl/system_executor.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -71,9 +32,28 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
+#include <chrono>
+#include <compare>
+#include <cstddef>
+#include <memory>
+#include <new>
+#include <thread>
+#include <utility>
+
+#include <asio.hpp>  // IWYU pragma: keep
+
 #include <asio/io_context.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "asio/impl/dispatch.hpp"
+// IWYU pragma: no_include "asio/impl/io_context.hpp"
+// IWYU pragma: no_include "asio/impl/post.hpp"
+// IWYU pragma: no_include "asio/impl/system_executor.hpp"
+
+#ifdef __linux__
+#include <sys/resource.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -297,6 +277,79 @@ TEST_F(ServiceExecutorSynchronousTest, TaskPostQueueing) {
 TEST_F(ServiceExecutorInlineTest, TaskPostQueueing) {
     doTestTaskPostQueueing(&executor);
 }
+
+class ClientThreadNiceValueTest : public unittest::Test {
+public:
+    void tearDown() override {
+        // Restore the "nothing registered" default state so other test suites in this binary
+        // are unaffected.
+        registerClientThreadNiceEligibilityPredicate({});
+        registerClientThreadNiceValueProvider({});
+    }
+};
+
+TEST_F(ClientThreadNiceValueTest, DefaultIsNoOp) {
+    registerClientThreadNiceValueProvider([] { return 0; });
+    registerClientThreadNiceEligibilityPredicate([] { return true; });
+    const auto before = getClientThreadsRenicedCount();
+    const auto failedBefore = getClientThreadReniceFailedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+    ASSERT_EQ(getClientThreadReniceFailedCount(), failedBefore);
+}
+
+TEST_F(ClientThreadNiceValueTest, NoProviderRegisteredIsNoOp) {
+    registerClientThreadNiceEligibilityPredicate([] { return true; });
+    const auto before = getClientThreadsRenicedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+}
+
+TEST_F(ClientThreadNiceValueTest, NoPredicateRegisteredIsNoOp) {
+    registerClientThreadNiceValueProvider([] { return 5; });
+    registerClientThreadNiceEligibilityPredicate({});
+    const auto before = getClientThreadsRenicedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+}
+
+TEST_F(ClientThreadNiceValueTest, PredicateDecliningIsNoOp) {
+    registerClientThreadNiceValueProvider([] { return 5; });
+    registerClientThreadNiceEligibilityPredicate([] { return false; });
+    const auto before = getClientThreadsRenicedCount();
+    applyClientThreadNiceValue();
+    ASSERT_EQ(getClientThreadsRenicedCount(), before);
+}
+
+#ifdef __linux__
+TEST_F(ClientThreadNiceValueTest, AppliesToCallingThreadOnlyWhenPredicateAccepts) {
+    constexpr int kNice = 5;
+    registerClientThreadNiceValueProvider([] { return kNice; });
+    registerClientThreadNiceEligibilityPredicate([] { return true; });
+
+    const auto before = getClientThreadsRenicedCount();
+    int nicedThreadValue = 0;
+    int otherThreadValue = 0;
+
+    unittest::JoinThread niced{[&] {
+        applyClientThreadNiceValue();
+        errno = 0;
+        nicedThreadValue = getpriority(PRIO_PROCESS, 0);
+    }};
+    niced.join();
+
+    unittest::JoinThread other{[&] {
+        errno = 0;
+        otherThreadValue = getpriority(PRIO_PROCESS, 0);
+    }};
+    other.join();
+
+    ASSERT_EQ(nicedThreadValue, kNice);
+    // A thread that never calls the helper (and is not spawned by a niced thread) is unaffected.
+    ASSERT_EQ(otherThreadValue, 0);
+    ASSERT_EQ(getClientThreadsRenicedCount(), before + 1);
+}
+#endif
 
 }  // namespace
 }  // namespace mongo::transport

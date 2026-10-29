@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/fail_point.h"
 
@@ -36,18 +10,21 @@
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -213,7 +190,7 @@ TEST(FailPoint, Stress) {
     mongo::unittest::ThreadAssertionMonitor monitor;
     monitor
         .spawnController([&] {
-            mongo::AtomicWord<bool> done{false};
+            mongo::Atomic<bool> done{false};
             FailPoint fp("testFP");
             fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
             auto fpGuard =
@@ -537,6 +514,208 @@ TEST(FailPoint, WaitForFailPointTimeout) {
     });
 
     failPoint.setMode(FailPoint::off);
+}
+
+namespace {
+// Turns an attempt to block into an exception, so tests can check wait thresholds without threads.
+// Interrupt checks succeed; only the low-level wait returns an error for the wrapper to throw.
+class ThrowOnBlock final : public Interruptible {
+private:
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(stdx::condition_variable&,
+                                                                         BasicLockableAdapter,
+                                                                         Date_t) noexcept override {
+        return Status(ErrorCodes::Interrupted, "Test wait would block");
+    }
+
+    Date_t getDeadline() const override {
+        return Date_t::max();
+    }
+
+    Status checkForInterruptNoAssert() noexcept override {
+        return Status::OK();
+    }
+
+    Status checkForDeadlineExpiredNoAssert(Date_t) noexcept override {
+        return Status::OK();
+    }
+
+    DeadlineState pushArtificialDeadline(Date_t, ErrorCodes::Error) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void popArtificialDeadline(DeadlineState) override {
+        MONGO_UNREACHABLE;
+    }
+
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
+        return Date_t::now() + waitFor;
+    }
+};
+
+void repeatedlyTestFailPoint(FailPoint& failPoint, int n) {
+    failPoint.setMode(FailPoint::alwaysOn);
+    for (int i = 0; i < n; ++i) {
+        ASSERT_TRUE(failPoint.shouldFail());
+    }
+    failPoint.setMode(FailPoint::off);
+}
+}  // namespace
+
+// Test that we immediately return from 'waitForNNewEntries()' if the fail point has already been
+// entered 'n' times.
+TEST(FailPointBlock, WaitForNNewEntriesSuccessCase) {
+    FailPoint failPoint("testFP");
+    FailPointEnableBlock fpb(&failPoint);
+    ThrowOnBlock interruptible;
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_TRUE(failPoint.shouldFail());
+    }
+    ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 3), 3);
+}
+
+// Test that we immediately return from 'waitForOneNewEntry()' if the fail point has already been
+// entered once.
+TEST(FailPointBlock, WaitForOneNewEntrySuccessCase) {
+    FailPoint failPoint("testFP");
+    FailPointEnableBlock fpb(&failPoint);
+    ThrowOnBlock interruptible;
+    ASSERT_TRUE(failPoint.shouldFail());
+    ASSERT_EQ(fpb.waitForOneNewEntry(&interruptible), 1);
+}
+
+// Test that entries from before the block was created don't count towards the wait, so
+// 'waitForOneNewEntry()' would block until a new entry occurs.
+TEST(FailPointBlock, WaitForOneNewEntryIgnoresEntriesBeforeBlock) {
+    FailPoint failPoint("testFP");
+    repeatedlyTestFailPoint(failPoint, 3);
+
+    FailPointEnableBlock fpb(&failPoint);
+    ThrowOnBlock interruptible;
+    ASSERT_THROWS_CODE(
+        fpb.waitForOneNewEntry(&interruptible), DBException, ErrorCodes::Interrupted);
+
+    ASSERT_TRUE(failPoint.shouldFail());
+    ASSERT_EQ(fpb.waitForOneNewEntry(&interruptible), 1);
+}
+
+// Test that 'waitForNNewEntries()' ignores entries from before the block was created and blocks
+// until the fail point has been entered 'n' more times.
+TEST(FailPointBlock, WaitForNNewEntriesIgnoresEntriesBeforeBlock) {
+    FailPoint failPoint("testFP");
+    repeatedlyTestFailPoint(failPoint, 3);
+
+    FailPointEnableBlock fpb(&failPoint);
+    ThrowOnBlock interruptible;
+    ASSERT_THROWS_CODE(
+        fpb.waitForNNewEntries(&interruptible, 2), DBException, ErrorCodes::Interrupted);
+
+    ASSERT_TRUE(failPoint.shouldFail());
+    ASSERT_THROWS_CODE(
+        fpb.waitForNNewEntries(&interruptible, 2), DBException, ErrorCodes::Interrupted);
+
+    ASSERT_TRUE(failPoint.shouldFail());
+    ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 2), 2);
+}
+
+TEST(FailPointBlock, WaitForOneNewEntryResumesAfterAnotherThreadEnters) {
+    FailPoint failPoint("testFP");
+    repeatedlyTestFailPoint(failPoint, 3);
+    FailPointEnableBlock fpb(&failPoint);
+
+    const auto service = ServiceContext::make();
+    const auto client = service->getService()->makeClient("FailPointWaiter");
+    auto opCtx = client->makeOperationContext();
+    // Bound the wait so a regression fails rather than leaving the test stuck in join().
+    opCtx->setDeadlineAfterNowBy(Seconds{10}, ErrorCodes::ExceededTimeLimit);
+
+    Atomic<bool> finished{false};
+    FailPoint::EntryCountT entries = 0;
+    std::exception_ptr waiterException;
+    stdx::thread waiter([&] {
+        try {
+            entries = fpb.waitForOneNewEntry(opCtx.get());
+        } catch (...) {
+            waiterException = std::current_exception();
+        }
+        finished.store(true);
+    });
+
+    // Enter only after the waiter reaches an interruptible wait. Also stop polling if an
+    // incorrect implementation returns early, so that failure doesn't cost the full deadline.
+    const auto deadline = Date_t::now() + Seconds{10};
+    while (!opCtx->isWaitingForConditionOrInterrupt() && !finished.load() &&
+           Date_t::now() < deadline) {
+        sleepmillis(1);
+        LOGV2_DEBUG(13570302, 0, "Waiting for fail point to be entered");
+    }
+    const bool wasWaiting = opCtx->isWaitingForConditionOrInterrupt();
+    const bool entered = failPoint.shouldFail();  // Unblocks the waiting thread.
+    waiter.join();
+
+    if (waiterException) {
+        std::rethrow_exception(waiterException);
+    }
+    ASSERT_TRUE(wasWaiting);
+    ASSERT_TRUE(entered);
+    ASSERT_EQ(entries, 1);
+}
+
+// Test that entries made after the block was created but before the wait is called count towards
+// the wait.
+TEST(FailPointBlock, WaitCountsEntriesBeforeWaitIsCalled) {
+    FailPoint failPoint("testFP");
+    repeatedlyTestFailPoint(failPoint, 3);
+
+    FailPointEnableBlock fpb(&failPoint);
+    ThrowOnBlock interruptible;
+    ASSERT_TRUE(failPoint.shouldFail());
+    ASSERT_EQ(fpb.waitForOneNewEntry(&interruptible), 1);
+}
+
+// Test that the waits return the number of entries since the block was created, not the absolute
+// count, and not just the number that was waited for.
+TEST(FailPointBlock, WaitReturnsEntriesSinceBlockCreated) {
+    FailPoint failPoint("testFP");
+    repeatedlyTestFailPoint(failPoint, 3);
+
+    FailPointEnableBlock fpb(&failPoint);
+    ThrowOnBlock interruptible;
+    ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 0), 0);
+    for (int i = 1; i <= 3; ++i) {
+        ASSERT_TRUE(failPoint.shouldFail());
+        ASSERT_EQ(fpb.waitForNNewEntries(&interruptible, 0), i);
+    }
+}
+
+// Test that waiting for a negative number of entries trips a tassert rather than returning
+// instantly.
+TEST(FailPointBlock, WaitForNegativeEntriesTasserts) {
+    FailPoint failPoint("testFP");
+    FailPointEnableBlock fpb(&failPoint);
+    ASSERT_TASSERT_CODE(fpb.waitForNNewEntries(-1), 13570300);
+}
+
+TEST(FailPointBlock, WaitForIntMaxEntriesTasserts) {
+    FailPoint failPoint("testFP");
+    repeatedlyTestFailPoint(failPoint, 3);
+    FailPointEnableBlock fpb(&failPoint);
+    ASSERT_TASSERT_CODE(fpb.waitForNNewEntries(std::numeric_limits<FailPoint::EntryCountT>::max()),
+                        13570301);
+    ASSERT_TASSERT_CODE(
+        fpb.waitForNNewEntries(std::numeric_limits<FailPoint::EntryCountT>::max() - 1), 13570301);
+    ASSERT_TASSERT_CODE(
+        fpb.waitForNNewEntries(std::numeric_limits<FailPoint::EntryCountT>::max() - 2), 13570301);
+}
+
+// Test that the waits can be interrupted while the fail point has not yet been entered.
+TEST(FailPointBlock, WaitForNewEntriesIsInterruptible) {
+    FailPoint failPoint("testFP");
+    FailPointEnableBlock fpb(&failPoint);
+
+    assertFunctionInterruptible(
+        [&fpb](Interruptible* interruptible) { fpb.waitForOneNewEntry(interruptible); });
+    assertFunctionInterruptible(
+        [&fpb](Interruptible* interruptible) { fpb.waitForNNewEntries(interruptible, 2); });
 }
 
 }  // namespace mongo

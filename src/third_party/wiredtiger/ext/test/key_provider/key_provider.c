@@ -519,8 +519,7 @@ key_provider_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
     return (0);
 
 err:
-    if (kp != NULL)
-        kp_terminate((WT_KEY_PROVIDER *)kp, NULL);
+    kp_terminate((WT_KEY_PROVIDER *)kp, NULL);
 
     return (ret);
 }

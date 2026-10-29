@@ -1,47 +1,13 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <vector>
-
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/client/backoff_with_jitter.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/db/auth/action_type.h"
@@ -53,6 +19,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/index_key_validate.h"
@@ -95,6 +62,7 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -102,9 +70,18 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -125,12 +102,17 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildAbortOnInterrupt);
 // through the IndexBuildsCoordinator.
 MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
 
-
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
+
+// This failpoint makes createIndexes fail with NamespaceNotFound.
+MONGO_FAIL_POINT_DEFINE(createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild);
 
 constexpr auto kCommandName = "createIndexes"sv;
 constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"sv;
 constexpr auto kIndexAlreadyExists = "index already exists"sv;
+
+// How many times createIndexes retries after a NamespaceNotFound.
+constexpr size_t kMaxNamespaceNotFoundRetryAttempts = 10;
 
 /**
  * Appends 'message' to the 'note' component of the response.
@@ -277,11 +259,10 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
 
     // TODO(SERVER-109664): Do not use the feature-flag to disable commit quorum for
     // primary-driven index builds.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    auto isPrimaryDrivenIndexBuild = replCoord->getSettings().isReplSet() &&
-        fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
+    auto isPrimaryDrivenIndexBuild =
+        replCoord->getSettings().isReplSet() &&
+        index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     // Commit quorum is disabled for primary-driven index builds.
     auto commitQuorum = cmd.getCommitQuorum();
@@ -497,7 +478,8 @@ bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
 IndexBuildProtocol determineProtocol(OperationContext* opCtx, const NamespaceString& ns) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
         return IndexBuildProtocol::kSinglePhase;
-    } else if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+    } else if (index_builds::primary_driven::enabled(
+                   opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return IndexBuildProtocol::kPrimaryDriven;
     }
     return IndexBuildProtocol::kTwoPhase;
@@ -687,14 +669,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
     auto buildUUID = UUID::gen();
     ReplIndexBuildState::IndexCatalogStats stats;
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
         // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
-        .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
-                              feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                                  VersionContext::getDecoration(opCtx), fcvSnapshot))
-                                 ? IndexBuildMethodEnum::kPrimaryDriven
-                                 : IndexBuildMethodEnum::kHybrid),
+        .indexBuildMethod = index_builds::primary_driven::enabled(
+                                opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+            ? IndexBuildMethodEnum::kPrimaryDriven
+            : IndexBuildMethodEnum::kHybrid,
         .indexBuildProtocol = protocol,
         .commitQuorum = commitQuorum};
 
@@ -717,6 +697,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
     bool shouldContinueInBackground = false;
     try {
+        if (MONGO_unlikely(
+                createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild.shouldFail())) {
+            uasserted(ErrorCodes::NamespaceNotFound,
+                      "createIndexesFailWithNamespaceNotFoundBeforeStartingIndexBuild failpoint");
+        }
+
         auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
             opCtx, cmd.getDbName(), *collectionUUID, indexes, buildUUID, indexBuildOptions));
 
@@ -823,17 +809,15 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
         LOGV2(20447, "Index build: completed", "buildUUID"_attr = buildUUID);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        // If the collection is dropped after the initial checks in this function (before the
-        // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
-        // the task running the index build) may return NamespaceNotFound. This is not
-        // considered an error and the command should return success.
-        LOGV2(20448,
-              "Index build: failed because collection dropped",
+        // A concurrent drop or move can invalidate the collection after its UUID is resolved.
+        // Propagate NamespaceNotFound so the outer loop can retry the command.
+        LOGV2(13282200,
+              "Index build: lost UUID resolution; retrying createIndexes",
               "buildUUID"_attr = buildUUID,
               logAttrs(ns),
               "collectionUUID"_attr = *collectionUUID,
               "exception"_attr = ex);
-        return reply;
+        throw;
     } catch (DBException& ex) {
         if (shouldContinueInBackground) {
             LOGV2(4760400,
@@ -911,6 +895,21 @@ public:
         }
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
+            // Capture a stable FCV for the lifetime of this command. The captured FCV is forwarded
+            // automatically to outgoing oplog entries (via OpObserver) and to async index build
+            // threads (via ForwardableOperationMetadata), so that secondary oplog application and
+            // async build spec validation evaluate feature flags against the same FCV the primary
+            // used. Without this, a concurrent setFCV transition between primary spec validation
+            // and secondary oplog application can cause the secondary to fatal-assert on any index
+            // spec whose feature flag has enableOnTransitionalFCV=false (e.g. 2dsphere v4,
+            // SERVER-125400).
+
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+            {
+                ClientLock lk(opCtx->getClient());
+                VersionContext::markDecorationAsLongRunning(lk, opCtx);
+            }
+
             boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL> scopedReplicaSetDDL{
                 boost::in_place_init, opCtx, std::vector<NamespaceString>{ns()}};
 
@@ -934,6 +933,8 @@ public:
             // specs, then we will wait for the build(s) to finish before trying again unless we are
             // in a multi-document transaction.
             bool shouldLogMessageOnAlreadyBuildingError = true;
+            auto remainingNamespaceNotFoundRetryAttempts = kMaxNamespaceNotFoundRetryAttempts;
+            BackoffWithJitter namespaceNotFoundBackoff{Milliseconds{1}, Milliseconds{10}};
             while (true) {
                 boost::optional<ResolvedIndexBuildRequest> resolvedRequest;
                 try {
@@ -992,6 +993,53 @@ public:
                     // in-progress build and starting to listen for completion. It is good enough,
                     // however: we can only wait longer than needed, not less.
                     IndexBuildsCoordinator::get(opCtx)->waitUntilAnIndexBuildFinishes(opCtx);
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // NamespaceNotFound can mean the collection is truly gone, or just not yet
+                    // published by its still-committing creator. The latter is retried for free
+                    // below, since it's guaranteed to resolve; only the former spends the budget.
+                    bool isCommitPending = false;
+                    if (resolvedRequest && resolvedRequest->collectionUUID) {
+                        try {
+                            CollectionCatalog::latest(opCtx)
+                                ->resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
+                                    opCtx, ns().dbName(), *resolvedRequest->collectionUUID);
+                        } catch (const ExceptionFor<ErrorCodes::CommitPendingNamespaceOrUUID>&) {
+                            isCommitPending = true;
+                        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        }
+                    }
+
+                    if (!isCommitPending) {
+                        if (remainingNamespaceNotFoundRetryAttempts == 0) {
+                            LOGV2(13282201,
+                                  "Index build: exhausted retry attempts after repeated "
+                                  "NamespaceNotFound",
+                                  logAttrs(ns()),
+                                  "attempts"_attr = kMaxNamespaceNotFoundRetryAttempts);
+                            uasserted(ErrorCodes::ConflictingOperationInProgress,
+                                      str::stream()
+                                          << "createIndexes on " << ns().toStringForErrorMsg()
+                                          << " conflicted with another operation after "
+                                          << kMaxNamespaceNotFoundRetryAttempts << " retries");
+                        }
+                        --remainingNamespaceNotFoundRetryAttempts;
+                    }
+
+                    // Retry from the beginning to recheck collection and sharding state. A direct
+                    // request may recreate a dropped collection; a routed request may surface a
+                    // sharding error.
+
+                    // This command releases the DDL scope once the coordinator has accepted the
+                    // build, so it may be gone by now. Re-establish it for the retry.
+                    if (!scopedReplicaSetDDL) {
+                        scopedReplicaSetDDL.emplace(opCtx, std::vector<NamespaceString>{ns()});
+                    }
+                    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+                    // The collection may not have become visible yet to the code path that raised
+                    // NamespaceNotFound.
+                    namespaceNotFoundBackoff.incrementAttemptCount();
+                    opCtx->sleepFor(namespaceNotFoundBackoff.getBackoffDelay());
                 } catch (const DBException&) {
                     // Set last op on error to provide the client with a specific optime to read the
                     // state of the server when the createIndexes command failed.

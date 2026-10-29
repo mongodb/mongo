@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/lru_key_value.h"
 
@@ -144,6 +118,7 @@ void assertInKVStore(LRUKeyValue<Key, Value, Estimator, Listener>& cache, Key ke
 template <typename Key, typename Value, typename Estimator, typename Listener>
 void assertNotInKVStore(LRUKeyValue<Key, Value, Estimator, Listener>& cache, Key key) {
     ASSERT_FALSE(cache.hasKey(key));
+    ASSERT(!cache.peek(key).isOK());
     auto s = cache.get(key);
     ASSERT(!s.isOK());
 }
@@ -304,6 +279,30 @@ TEST(LRUKeyValueTest, PromotionTest) {
         } else {
             assertNotInKVStore(cache, i);
         }
+    }
+}
+
+/**
+ * Ensures that a peeked key is evicted on the same schedule as one that was never read.
+ */
+TEST(LRUKeyValueTest, PeekDoesNotPromoteTest) {
+    int maxSize = 10;
+    TestSharedPtrValue cache{static_cast<size_t>(maxSize)};
+    for (int i = 0; i < maxSize; ++i) {
+        ASSERT_EQ(0, cache.add(i, std::make_shared<int>(i)));
+    }
+
+    // peek() the least recently used entry.
+    const int peekKey = 0;
+    auto peeked = cache.peek(peekKey);
+    ASSERT_OK(peeked.getStatus());
+    ASSERT_EQUALS(*(peeked.getValue()->second), peekKey);
+
+    // A single insertion over budget evicts the entry that was just peeked.
+    ASSERT_GT(cache.add(maxSize, std::make_shared<int>(maxSize)), 0u);
+    assertNotInKVStore(cache, peekKey);
+    for (int i = 1; i < maxSize; ++i) {
+        ASSERT_TRUE(cache.hasKey(i));
     }
 }
 

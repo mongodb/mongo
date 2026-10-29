@@ -28,22 +28,31 @@ function updateMaxPoolSizeAndVerify(conn, size) {
     assert.eq(res.mirrorReadsMaxConnPoolSize, size);
 }
 
-function runTest(conn, secondaryHosts, numFindQueries, expectedConns, checkStatsFunc = undefined) {
+function connCount(stats) {
+    return stats.available + stats.inUse;
+}
+
+function checkConnsInRange(minConns, maxConns) {
+    return function (stats) {
+        const n = connCount(stats);
+        return n >= minConns && n <= maxConns;
+    };
+}
+
+function runTest(conn, secondaryHosts, numFindQueries, minConns, maxConns) {
     let threads = [];
     launchFinds(conn, threads, {times: numFindQueries, readPref: "primary"});
     threads.forEach(function (thread) {
         thread.join();
     });
 
-    let args = {ready: expectedConns};
-    if (checkStatsFunc !== undefined) {
-        args.checkStatsFunc = checkStatsFunc;
-    }
-
+    // Count available and in-use together so the check is stable while mirrored ops check
+    // connections out and return them. Depending on the scheduler, traffic profile, etc, the pool
+    // may vary the number of connections, so assert a range rather than an exact size.
     currentCheckNum = assertHasConnPoolStats(
         conn,
         secondaryHosts,
-        args,
+        {checkStatsFunc: checkConnsInRange(minConns, maxConns)},
         currentCheckNum,
         "_mirrorMaestroConnPoolStats",
     );
@@ -63,33 +72,42 @@ function testMinAndMax(primary, secondaries) {
         hostsToAssertStatsOn.push(secondary.name);
     }
 
-    // Launch an initial find query to trigger to min. Since some internal replset operations may
-    // also be mirrored during this test, we have to assert on a range of available connections
-    // rather than a specific number.
+    // Launch an initial find query to trigger the min.
     runTest(
         primary,
         hostsToAssertStatsOn,
         kDefaultPoolMinSize,
         kDefaultPoolMinSize,
-        function (stats) {
-            return stats.available >= kDefaultPoolMinSize && stats.available <= kDefaultPoolMaxSize;
-        },
+        kDefaultPoolMaxSize,
     );
 
-    // Launch find quieries to fill the pool to max.
+    // Launch find queries to create connection demand for the pool.
     const numFindQueries = kDefaultPoolMaxSize + 20;
-    runTest(primary, hostsToAssertStatsOn, numFindQueries, kDefaultPoolMaxSize);
+    runTest(
+        primary,
+        hostsToAssertStatsOn,
+        numFindQueries,
+        kDefaultPoolMinSize,
+        kDefaultPoolMaxSize,
+    );
 
-    // Increase pool size by 1.
-    updateMaxPoolSizeAndVerify(primary, kDefaultPoolMaxSize + 1);
-    runTest(primary, hostsToAssertStatsOn, numFindQueries, kDefaultPoolMaxSize + 1);
+    // Verify the pool size stays within a larger maximum value.
+    const updatedMaxSize = kDefaultPoolMaxSize + 1;
+    updateMaxPoolSizeAndVerify(primary, updatedMaxSize);
+    runTest(primary, hostsToAssertStatsOn, numFindQueries, kDefaultPoolMinSize, updatedMaxSize);
 
     // Decrease max pool size to min.
     updateMaxPoolSizeAndVerify(primary, kDefaultPoolMinSize);
     assert.commandWorked(
         primary.adminCommand({_dropMirrorMaestroConnections: 1, hostAndPort: hostsToAssertStatsOn}),
     );
-    runTest(primary, hostsToAssertStatsOn, numFindQueries, kDefaultPoolMinSize);
+    runTest(
+        primary,
+        hostsToAssertStatsOn,
+        numFindQueries,
+        kDefaultPoolMinSize,
+        kDefaultPoolMinSize,
+    );
 
     // Invalid max pool size.
     assert.commandFailedWithCode(setMaxPoolSize(primary, 0), ErrorCodes.BadValue);

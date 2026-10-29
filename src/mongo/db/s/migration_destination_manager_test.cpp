@@ -1,46 +1,25 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/migration_destination_manager.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
-#include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -48,12 +27,19 @@
 
 #include <system_error>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
 using namespace std::literals::string_view_literals;
 
+const ShardId kRecipientShard("recipientShard");
+const ShardId kOtherShard("otherShard");
 
 class MigrationDestinationManagerTest : public ShardServerTestFixture {
 protected:
@@ -62,6 +48,59 @@ protected:
      */
     static BSONObj createDocument(int value) {
         return BSON("_id" << value << "X" << value);
+    }
+
+    /**
+     * Inserts a document into config.shard.catalog.chunks (ChunkType::toConfigBSON layout) for
+     * 'collUuid' over the range [min, max), currently owned by 'currentShard', with the given
+     * 'history' entries expressed as {validAfter, owningShard} pairs listed newest-first.
+     *
+     * Shard identity is written as a bare string, exactly as the shard catalog stores a shard name.
+     */
+    void insertShardCatalogChunk(const UUID& collUuid,
+                                 const BSONObj& min,
+                                 const BSONObj& max,
+                                 const ShardId& currentShard,
+                                 const std::vector<std::pair<Timestamp, ShardId>>& history) {
+        BSONArrayBuilder historyBuilder;
+        for (const auto& [validAfter, shard] : history) {
+            BSONObjBuilder entry;
+            entry.append(ChunkHistoryBase::kValidAfterFieldName, validAfter);
+            entry.append(ChunkHistoryBase::kShardFieldName, shard.toString());
+            historyBuilder.append(entry.obj());
+        }
+
+        const auto onCurrentShardSince = history.empty() ? Timestamp(1, 1) : history.front().first;
+        BSONObjBuilder builder;
+        builder.append(ChunkType::name.name(), OID::gen());
+        collUuid.appendToBuilder(&builder, ChunkType::collectionUUID.name());
+        builder.append(ChunkType::min.name(), min);
+        builder.append(ChunkType::max.name(), max);
+        builder.append(ChunkType::shard.name(), currentShard.toString());
+        builder.append("lastmod", Timestamp(1, 1));
+        builder.append(ChunkType::onCurrentShardSince.name(), onCurrentShardSince);
+        builder.append(ChunkType::history.name(), historyBuilder.arr());
+
+        DBDirectClient client(operationContext());
+        client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, builder.obj());
+    }
+
+    /**
+     * Forces the storage engine's oldest timestamp, which is the lower bound of point-in-time
+     * (PIT) reachability that the check under test compares chunk history against. Self-validates
+     * that the value took effect in this fixture.
+     */
+    void setOldestTimestamp(Timestamp ts) {
+        auto* storageEngine = getServiceContext()->getStorageEngine();
+        storageEngine->setOldestTimestamp(ts, /*force=*/true);
+        ASSERT_EQ(storageEngine->getOldestTimestamp(), ts);
+    }
+
+    bool hasConflict(const UUID& collUuid,
+                     const ChunkRange& span,
+                     const ShardId& recipient = kRecipientShard) {
+        return MigrationDestinationManager::migrationWouldDropPITHistory(
+            operationContext(), collUuid, recipient, span);
     }
 
     /**
@@ -285,6 +324,292 @@ TEST_F(MigrationDestinationManagerTest, ErrorMessageIncludesMissingIndexNames) {
         ErrorCodes::CannotCreateCollection,
         "aborting, shard is missing 2 indexes and collection is not empty. Non-trivial index "
         "creation should be scheduled manually. Missing indexes: y_1, z_1");
+}
+
+// Shard key bounds reused across the PIT-reachable unowned chunk tests.
+const BSONObj k0 = BSON("a" << 0);
+const BSONObj k50 = BSON("a" << 50);
+const BSONObj k100 = BSON("a" << 100);
+const BSONObj k200 = BSON("a" << 200);
+const BSONObj k300 = BSON("a" << 300);
+
+// An empty shard catalog cannot conflict with any span.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkEmptyCatalog) {
+    ASSERT_FALSE(hasConflict(UUID::gen(), ChunkRange(k0, k100)));
+}
+
+// A reachable unowned entry that extends beyond the span (here past its max) loses the uncovered
+// portion's PIT history when the span is refreshed, so it is a conflict. This is the pre-split
+// move-back case: the source chunk is only [0, 50), but the stale entry [0, 100) reaches to 100.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkExtendsPastSpanMax) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_TRUE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
+
+TEST_F(MigrationDestinationManagerTest,
+       PITReachableUnownedChunkExtendsPastSpanMax_TestEnvironment) {
+    unittest::ServerParameterGuard overriddenPitWindowToPreserve(
+        "migrationRecipientPITHistoryToPreserveInSecs", 2);
+    const auto collUuid = UUID::gen();
+    const auto currentOwnershipTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{currentOwnershipTimestamp, kOtherShard},
+                             {currentOwnershipTimestamp - 1, kRecipientShard}});
+    setOldestTimestamp(currentOwnershipTimestamp);
+
+    ASSERT_TRUE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
+// The override ages out ownership at its one-second cutoff, even if the storage engine retains it;
+// without it, this is a conflict.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkAgedOutByOverride_TestEnvironment) {
+    unittest::ServerParameterGuard overriddenPitWindowToPreserve(
+        "migrationRecipientPITHistoryToPreserveInSecs", 1);
+    const auto collUuid = UUID::gen();
+    const auto currentTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    const auto ownershipTimestamp = Timestamp(currentTimestamp.getSecs() - 1, 0);
+    insertShardCatalogChunk(
+        collUuid,
+        k0,
+        k100,
+        kOtherShard,
+        {{ownershipTimestamp, kOtherShard}, {ownershipTimestamp - 1, kRecipientShard}});
+    setOldestTimestamp(Timestamp(1, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
+TEST_F(
+    MigrationDestinationManagerTest,
+    PITReachableUnownedChunkShouldNotConflictIfMigrationRecipientPITHistoryToPreserveInSecsIsZero) {
+    unittest::ServerParameterGuard overriddenPitWindowToPreserve(
+        "migrationRecipientPITHistoryToPreserveInSecs", 0);
+    const auto currentTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(currentTimestamp.getSecs(), 1), kOtherShard},
+                             {Timestamp(currentTimestamp.getSecs(), 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(1, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
+// A reachable unowned entry extending below the span's min is likewise a conflict.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkExtendsBelowSpanMin) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_TRUE(hasConflict(collUuid, ChunkRange(k50, k100)));
+}
+
+TEST_F(MigrationDestinationManagerTest,
+       PITReachableUnownedChunkExtendsBelowSpanMin_TestEnvironment) {
+    unittest::ServerParameterGuard overriddenPitWindowToPreserve(
+        "migrationRecipientPITHistoryToPreserveInSecs", 2);
+
+    const auto collUuid = UUID::gen();
+    const auto currentOwnershipTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{currentOwnershipTimestamp, kOtherShard},
+                             {currentOwnershipTimestamp - 1, kRecipientShard}});
+
+    setOldestTimestamp(currentOwnershipTimestamp);
+
+    ASSERT_TRUE(hasConflict(collUuid, ChunkRange(k50, k100)));
+}
+
+// A reachable unowned entry exactly equal to the span is fully re-inserted, so its PIT history is
+// preserved and it is not a conflict. This is the move-back case where the source chunk covers the
+// whole stale entry.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkEqualToSpan) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k100)));
+}
+
+// The merged-back case: the source chunk [0, 100) covers two narrower stale sub-range entries that
+// each fall within it, so both are fully refreshed and neither is a conflict.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkMergedSpanCoversSubRanges) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k50,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    insertShardCatalogChunk(collUuid,
+                            k50,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k100)));
+}
+
+// Several entries start within the span and only the last one extends past its max. The lookup only
+// reads the entry with the greatest min within the span, which is exactly that one, so the conflict
+// is still detected.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkLastSubRangeExtendsPastSpanMax) {
+    const auto collUuid = UUID::gen();
+    const std::vector<std::pair<Timestamp, ShardId>> history{{Timestamp(20, 0), kOtherShard},
+                                                             {Timestamp(10, 0), kRecipientShard}};
+    insertShardCatalogChunk(collUuid, k0, k50, kOtherShard, history);
+    insertShardCatalogChunk(collUuid, k50, k100, kOtherShard, history);
+    insertShardCatalogChunk(collUuid, k100, k300, kOtherShard, history);
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_TRUE(hasConflict(collUuid, ChunkRange(k0, k200)));
+}
+
+// A reachable unowned entry strictly contained within the span is fully refreshed, so it is not a
+// conflict.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkContainedInSpan) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k50,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k200)));
+}
+
+// An entry extending beyond the span, but whose stale ownership has aged past the oldest timestamp,
+// is no longer reachable by PIT reads and so is not a conflict.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkAgedOut) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(25, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
+// An entry currently owned by the recipient is not a conflict; the recipient re-owning a range it
+// already owns does not create an inconsistent timeline, even when it extends beyond the span.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkCurrentlyOwnedByRecipient) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(
+        collUuid, k0, k100, kRecipientShard, {{Timestamp(20, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k50)));
+}
+
+// A reachable unowned entry that does not overlap the span is not a conflict.
+TEST_F(MigrationDestinationManagerTest, PITReachableUnownedChunkNonOverlapping) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k200,
+                            k300,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    ASSERT_FALSE(hasConflict(collUuid, ChunkRange(k0, k100)));
+}
+
+// By default, ensurePITHistoryPreserved() aborts a migration that would drop PIT-reachable
+// ownership history, and its error message points operators at the escape-hatch parameter.
+TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedAbortsByDefault) {
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        MigrationDestinationManager::ensurePITHistoryPreserved(
+            operationContext(), collUuid, kRecipientShard, ChunkRange(k0, k50), nss, UUID::gen()),
+        DBException,
+        ErrorCodes::ConflictingOperationInProgress,
+        "Migration aborted: committing it would drop point-in-time reachable ownership history "
+        "for a chunk only partially covered by source chunk [{ a: 0 }, { a: 50 }). Set the "
+        "allowMigrationsToDropRecipientPITHistory server parameter to bypass this check.");
+}
+
+TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedAbortsByDefault_TestEnvironment) {
+    unittest::ServerParameterGuard overriddenPitWindowToPreserve(
+        "migrationRecipientPITHistoryToPreserveInSecs", 2);
+
+    const auto collUuid = UUID::gen();
+    const auto currentOwnershipTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{currentOwnershipTimestamp, kOtherShard},
+                             {currentOwnershipTimestamp - 1, kRecipientShard}});
+    setOldestTimestamp(currentOwnershipTimestamp);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        MigrationDestinationManager::ensurePITHistoryPreserved(
+            operationContext(), collUuid, kRecipientShard, ChunkRange(k0, k50), nss, UUID::gen()),
+        DBException,
+        ErrorCodes::ConflictingOperationInProgress,
+        "Migration aborted: committing it would drop point-in-time reachable ownership history "
+        "for a chunk only partially covered by source chunk [{ a: 0 }, { a: 50 }). Set the "
+        "allowMigrationsToDropRecipientPITHistory server parameter to bypass this check.");
+}
+
+
+// With the escape-hatch parameter enabled, ensurePITHistoryPreserved() lets the same migration
+// proceed instead of aborting.
+TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedProceedsWithEscapeHatchEnabled) {
+    unittest::ServerParameterGuard allowDrop{"allowMigrationsToDropRecipientPITHistory", true};
+
+    const auto collUuid = UUID::gen();
+    insertShardCatalogChunk(collUuid,
+                            k0,
+                            k100,
+                            kOtherShard,
+                            {{Timestamp(20, 0), kOtherShard}, {Timestamp(10, 0), kRecipientShard}});
+    setOldestTimestamp(Timestamp(5, 0));
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    MigrationDestinationManager::ensurePITHistoryPreserved(
+        operationContext(), collUuid, kRecipientShard, ChunkRange(k0, k50), nss, UUID::gen());
 }
 
 }  // namespace

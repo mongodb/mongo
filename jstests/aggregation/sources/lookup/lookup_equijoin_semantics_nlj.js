@@ -1,5 +1,8 @@
 /**
  * Tests for $lookup with localField/foreignField syntax using nested loop join algorithm.
+ * @tags: [
+ *   requires_fcv_91,
+ * ]
  */
 import {
     JoinAlgorithm,

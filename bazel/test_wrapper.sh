@@ -31,6 +31,23 @@ if [[ -n "${RUNFILES_DIR:-}" && ! -x "$test_bin" ]]; then
     test_bin="${RUNFILES_DIR}/_main/${test_bin}"
 fi
 
+# Linux AF_UNIX socket names are limited to 108 bytes. Evergreen's task and Bazel test
+# directories can be long enough that transport tests fail before they exercise any socket
+# behavior. Keep only the test process's temporary files in a short, unique directory on IBM
+# hosts; the Bazel output and undeclared-output directories remain under TEST_TMPDIR. This must
+# happen before forking the test so the child inherits the shortened environment.
+short_tmpdir=""
+if is_s390x_or_ppc64le && [[ "$(uname -s)" == "Linux" ]]; then
+    if short_tmpdir="$(mktemp -d /tmp/mongo-test.XXXXXX)"; then
+        export TMPDIR="$short_tmpdir"
+        export TMP="$short_tmpdir"
+        export TEMP="$short_tmpdir"
+        trap 'rm -rf -- "$short_tmpdir"' EXIT
+    else
+        echo "WARNING: unable to create a short IBM test temporary directory" >&2
+    fi
+fi
+
 # Run the test in its own process group so that, on timeout, we can signal both the
 # test process and any child processes it has spawned (e.g. per-test forked workers
 # used for isolation). Without setsid the test binary is in the shell's process group

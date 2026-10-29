@@ -16,7 +16,7 @@
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {queryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
+import {buildQueryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -33,6 +33,73 @@ const numQueriesPerRun = 50;
 
 const controlColl = db.query_knob_correctness_pbt_control;
 const experimentColl = db.query_knob_correctness_pbt_experiment;
+
+const excludeKnobs = [
+    // Small values reject otherwise-valid multi-stage pipelines with error 7749501, which is a
+    // server-side guardrail rather than a correctness divergence.
+    "internalPipelineLengthLimit",
+    // Small values reject otherwise-valid sub-pipelines with error 232
+    // (MaxSubPipelineDepthExceeded), which is a server-side guardrail rather than a correctness
+    // divergence.
+    "internalMaxSubPipelineViewDepth",
+    /*
+     * TODO SERVER-99091 re-enable CE methods for PBT.
+     * Using the knobs below runs into "Currently index union is a top-level node."
+     * {
+     * 	"internalQueryPlannerEnableHashIntersection" : true,
+     * 	"featureFlagCostBasedRanker": true,
+     * 	"internalQueryPlanRanker" : "mixed",
+     * 	"internalQueryCBRCEMode" : "samplingCE"
+     * }
+     */
+    "internalQueryCBRCEMode",
+    // Forcing a non-default plan ranker (e.g. costBased) engages CBR, hitting the same
+    // SERVER-99091 "index union is a top-level node" limitation as the CE knobs above.
+    "internalQueryPlanRanker",
+    "internalQueryMixedPlanRankingStrategy",
+    "internalQueryPlannerEnableHashIntersection",
+    "internalQuerySamplingCEMethod",
+    // Disallows collection scans; if the generated query has no covering index this is a
+    // legitimate NoQueryExecutionPlans server-side guardrail, not a correctness divergence, so it
+    // can't be compared against a forced-COLLSCAN control.
+    "notablescan",
+    // Rejects unbounded COLLSCANs on collections exceeding the configured size threshold; like
+    // notablescan, this is a legitimate server-side guardrail and can't be compared against a
+    // forced-COLLSCAN control.
+    "maxEstimatedScanBytes",
+    // Non-spilling stage memory limits: small values uassert instead of returning results, a
+    // server-side guardrail rather than a correctness divergence.
+    "internalDocumentSourceDensifyMaxMemoryBytes",
+    "internalQueryFacetBufferSizeBytes",
+    "internalOrStageMaxMemoryBytes",
+    "internalMergeSortStageMaxMemoryBytes",
+    "internalIndexScanStageMaxMemoryBytes",
+    "internalSlotBasedExecutionUniqueStageMaxMemoryBytes",
+    "internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes",
+    "internalSlotBasedExecutionAndHashStageMaxMemoryBytes",
+    "internalUpdateStageMaxMemoryBytes",
+    "internalCountScanStageMaxMemoryBytes",
+    // Accumulator and expression memory caps: small values uassert (ExceededMemoryLimit) instead
+    // of returning results, a server-side guardrail rather than a correctness divergence.
+    "internalQueryMaxPushBytes",
+    "internalQueryMaxAddToSetBytes",
+    "internalQueryMaxConcatArraysBytes",
+    "internalQueryMaxSetUnionBytes",
+    "internalQueryTopNAccumulatorBytes",
+    "internalQueryMaxPercentileAccumulatorBytes",
+    "internalQueryMaxSingleExpressionMemoryUsageBytes",
+    // Operation-wide memory cap: a small value fails every query outright.
+    "internalQueryMaxMemoryUsageBytesPerOperation",
+    // TODO SERVER-131322: remove this exclusion once the resharding invariant (BF-44347) is fixed.
+    "internalQueryPlannerUseMultiplannerForSingleSolutions",
+];
+
+const knobSchema = db
+    .getSiblingDB("admin")
+    .aggregate([{$listQueryKnobs: {}}, {$match: {name: {$nin: excludeKnobs}}}, {$sort: {name: 1}}])
+    .toArray();
+
+const queryKnobsModel = buildQueryKnobsModel(knobSchema);
 
 function getWorkloadModel() {
     return fc

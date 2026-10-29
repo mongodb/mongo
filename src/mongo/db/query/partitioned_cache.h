@@ -1,39 +1,19 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/db/commands/server_status/server_status_metric.h"
-#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/util/modules.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -98,10 +78,12 @@ public:
      * enough number of partitions so the entries can be more equally dispersed to avoid unnecessary
      * evictions.
      */
-    explicit PartitionedCache(size_t cacheSize, size_t numPartitions)
+    explicit PartitionedCache(size_t cacheSize,
+                              size_t numPartitions,
+                              InsertionEvictionListener listener = InsertionEvictionListener())
         : _numPartitions(numPartitions) {
         invariant(numPartitions > 0);
-        Lru lru{cacheSize / numPartitions};
+        Lru lru{cacheSize / numPartitions, std::move(listener)};
         _partitionedCache =
             std::make_unique<Partitioned<Lru, Partitioner>>(numPartitions, std::move(lru));
     }
@@ -148,6 +130,74 @@ public:
     }
 
     /**
+     * Scans all partitions, locking one partition at a time, and returns copies of up to
+     * 'maxCandidates' entries whose extracted sort keys are the best candidates according to
+     * 'isBetter', in no particular order.
+     * - 'extract' maps an entry to a cheap, copyable sort key and is called while the partition
+     * lock is held, so it must be inexpensive.
+     * - 'isBetter(a, b)' must be a strict weak ordering returning true iff the sort key 'a' is a
+     * better candidate than 'b' (e.g. 'a > b' for a descending top-K).
+     * - 'interruptCheck' is called between each partition lock once.
+     *
+     * Only one partition is locked at a time. This means entries selected from different partitions
+     * are not guaranteed to have coexisted at a single point in time, and thus we do not return
+     * top-K entries from a single point-in-time. This would require locking the entire store, which
+     * would affect performance of concurrent queries.
+     */
+    template <typename Extract, typename Better, typename InterruptCheck>
+    std::vector<std::pair<KeyType, ValueType>> topKCandidateEntries(
+        size_t maxCandidates,
+        Extract&& extract,
+        Better&& isBetter,
+        InterruptCheck&& interruptCheck) const {
+        if (maxCandidates == 0) {
+            return {};
+        }
+
+        using SortKey = std::decay_t<std::invoke_result_t<Extract, const ValueType&>>;
+        struct HeapEntry {
+            SortKey sortKey;
+            KeyType key;
+            std::unique_ptr<ValueType> value;
+        };
+        // Binary heap where the front is always the worst surviving candidate, so it can be
+        // replaced as soon as a better one arrives.
+        auto heapComp = [&isBetter](const HeapEntry& a, const HeapEntry& b) {
+            return isBetter(a.sortKey, b.sortKey);
+        };
+        std::vector<HeapEntry> heap;
+
+        // Adds a candidate to the heap, keeping it bounded to the best 'maxCandidates' seen so far.
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            interruptCheck();
+            auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
+            for (auto&& [key, entry] : *lockedPartition) {
+                auto sortKey = extract(entry);
+                // Only copy entries that provisionally make the cut.
+                if (heap.size() < maxCandidates) {
+                    heap.push_back(
+                        HeapEntry{std::move(sortKey), key, std::make_unique<ValueType>(entry)});
+                    std::push_heap(heap.begin(), heap.end(), heapComp);
+                } else if (isBetter(sortKey, heap.front().sortKey)) {
+                    // Replace the worst candidate: move it to the back, overwrite it, sift up.
+                    std::pop_heap(heap.begin(), heap.end(), heapComp);
+                    heap.back() =
+                        HeapEntry{std::move(sortKey), key, std::make_unique<ValueType>(entry)};
+                    std::push_heap(heap.begin(), heap.end(), heapComp);
+                }
+            }
+        }
+
+        // Moves the heap entries into the returned result vector.
+        std::vector<std::pair<KeyType, ValueType>> candidates;
+        candidates.reserve(heap.size());
+        for (auto& node : heap) {
+            candidates.emplace_back(std::move(node.key), std::move(*node.value));
+        }
+        return candidates;
+    }
+
+    /**
      * Remove the entry with the 'key' from the cache. If there is no entry for the given key in
      * the cache, this call is a no-op.
      */
@@ -160,7 +210,7 @@ public:
      * removed entries.
      */
     template <typename UnaryPredicate>
-    MONGO_MOD_PUBLIC size_t removeIf(UnaryPredicate predicate) {
+    [[MONGO_MOD_PUBLIC]] size_t removeIf(UnaryPredicate predicate) {
         size_t nRemoved = 0;
         for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
             auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
@@ -204,6 +254,13 @@ public:
      */
     size_t numPartitions() const {
         return _numPartitions;
+    }
+
+    /**
+     * Returns the id of the partition that 'key' belongs to.
+     */
+    PartitionId partitionOf(const KeyType& key) const {
+        return Partitioner()(key, _numPartitions);
     }
 
     /**

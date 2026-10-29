@@ -114,8 +114,8 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 let validateRes = assert.commandWorked(coll.validate());
 assert.eq(true, validateRes.valid, tojson(validateRes));
 
-// TODO SERVER-118625 SERVER-115491: Consider enabling this portion of the test to not depend on
-// reusing the same dbpath across test fixtures.
+// TODO SERVER-118625: Consider enabling this portion of the test to not depend on reusing the same
+// dbpath across test fixtures.
 if (!shouldDelayDataAccessDuringStartup) {
     // Reintroduce the dangling index entry, and this time fix it using the "repair" flag.
     createDanglingIndexEntry({a: 1, b: 1});

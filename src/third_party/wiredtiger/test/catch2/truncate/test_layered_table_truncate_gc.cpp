@@ -363,3 +363,68 @@ SCENARIO(
         }
     }
 }
+
+SCENARIO("pruning reaps eligible entries", "[truncate_list][gc]")
+{
+    GIVEN("a truncate list holding an eligible and an ineligible entry")
+    {
+        truncate_list_fixture fixture;
+
+        const wt_timestamp_t prune_ts = 10u;
+        insert_durable_entry(fixture, prune_ts - 1u);
+        insert_durable_entry(fixture, prune_ts + 1u);
+
+        WHEN("pruning runs with that timestamp")
+        {
+            __wt_layered_table_truncate_prune(
+              &fixture.session(), &fixture.layered_table(), prune_ts);
+
+            THEN("only the entry the timestamp covers is removed")
+            {
+                REQUIRE(truncate_list_size(fixture.layered_table()) == 1u);
+            }
+        }
+    }
+}
+
+SCENARIO("pruning releases the truncate lock", "[truncate_list][gc]")
+{
+    GIVEN("a truncate list holding an eligible entry")
+    {
+        truncate_list_fixture fixture;
+
+        const wt_timestamp_t prune_ts = 10u;
+        insert_durable_entry(fixture, prune_ts - 1u);
+
+        WHEN("pruning runs with that timestamp")
+        {
+            __wt_layered_table_truncate_prune(
+              &fixture.session(), &fixture.layered_table(), prune_ts);
+
+            THEN("the truncate lock is not held")
+            {
+                REQUIRE(lock_is_released(fixture.session(), fixture.layered_table()));
+            }
+        }
+    }
+}
+
+SCENARIO("pruning an empty list is a no-op", "[truncate_list][gc]")
+{
+    GIVEN("an empty truncate list")
+    {
+        truncate_list_fixture fixture;
+        const auto initial_reference_count = fixture.reference_count();
+
+        WHEN("pruning runs")
+        {
+            __wt_layered_table_truncate_prune(&fixture.session(), &fixture.layered_table(), 10u);
+
+            THEN("the list stays empty and the dhandle reference count is unchanged")
+            {
+                REQUIRE(truncate_list_size(fixture.layered_table()) == 0u);
+                REQUIRE(fixture.reference_count() == initial_reference_count);
+            }
+        }
+    }
+}

@@ -43,13 +43,10 @@ assert.commandWorked(db.foo.insert({"x": 150, "a": 20}));
 
 if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
     assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
-}
-if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) {
     assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 }
-
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 
 let session = mongos.startSession({retryWrites: false});
 let sessionDB = session.getDatabase(kDbName);

@@ -2,6 +2,8 @@
 # License: BSD-like (bzip2 license)
 # https://sourceware.org/bzip2/
 
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/mirror_maestro.h"
 
@@ -49,9 +23,12 @@ namespace mongo {
 
 namespace {
 
-class MirrorMaestroTest : service_context_test::WithSetupTransportLayer,
-                          public ServiceContextMongoDTest {
+class MirrorMaestroTest : public ServiceContextMongoDTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     constexpr static auto kInitialConfigVersion = 1;
     constexpr static auto kInitialTermVersion = 1;
     const BSONObj kEastTag = BSON("dc" << "east");
@@ -608,7 +585,7 @@ TEST_F(TargetedMirrorMaestroTest, UninitializedConfigDefersHostCompute) {
     ASSERT_EQ(0, getCachedHosts().size());
 
     // Update the config to be initialized.
-    setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
+    setAndVerifyConfig(/*version=*/2, /*term=*/1, kTwoHostsEW, 2);
 
     // Host list should be computed upon getting.
     auto hosts = getCachedHosts();
@@ -626,7 +603,7 @@ public:
 // Test that setting the mirrorReads parameter before initialization will update the cached hosts
 // after initialization.
 TEST_F(NoInitMirrorTest, SetParamBeforeInit) {
-    setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
+    setAndVerifyConfig(/*version=*/2, /*term=*/1, kTwoHostsEW, 2);
 
     auto param = BSON("samplingRate"
                       << 0.0 << "targetedMirroring"

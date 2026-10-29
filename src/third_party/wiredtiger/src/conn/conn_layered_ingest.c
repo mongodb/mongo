@@ -125,6 +125,8 @@ err:
     return (ret);
 }
 
+#define WT_CLEAR_INGEST_TABLE_MAX_RETRIES 10
+
 /*
  * __layered_clear_ingest_table --
  *     After ingest content has been drained to the stable table, clear out the ingest table.
@@ -133,16 +135,36 @@ static int
 __layered_clear_ingest_table(WT_SESSION_IMPL *session, const char *uri)
 {
     WT_DECL_RET;
+    uint32_t orig_flags;
+    u_int retries;
 
     WT_ASSERT(session, WT_URI_IS_INGEST(uri));
 
     /*
      * Clearing the ingest table is final and owned by no transaction. The session flag makes the
      * truncate write globally visible tombstones that are immediately visible to every reader.
+     * Ignoring the cache size ensures the scan completes during step-up rather than being rolled
+     * back by application eviction.
+     *
+     * FIXME-WT-18058: Replace the whole-table clear with incremental per-page draining.
+     * FIXME-WT-18381: Remove the ignore cache size flag once the draining cache stuck is fixed.
      */
+    orig_flags = F_MASK(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
     F_SET(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE);
-    ret = session->iface.truncate(&session->iface, uri, NULL, NULL, NULL);
+    /*
+     * The truncate conflicts with its own globally visible tombstones: a restarted scan
+     * re-searching a just-removed key surfaces a spurious WT_ROLLBACK, so retry.
+     */
+    for (retries = 0;; ++retries) {
+        ret = session->iface.truncate(&session->iface, uri, NULL, NULL, NULL);
+        if (ret != WT_ROLLBACK || retries >= WT_CLEAR_INGEST_TABLE_MAX_RETRIES)
+            break;
+        WT_STAT_CONN_INCR(session, disagg_step_up_clear_ingest_retry);
+    }
     F_CLR(session, WT_SESSION_NON_TRANSACTIONAL_TRUNCATE);
+    F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    F_SET(session, orig_flags);
 
     return (ret);
 }
@@ -315,6 +337,8 @@ __layered_fix_prepared_transaction_callback(
         op->u.op_upd->txnid = WT_TXN_ABORTED;
         /* Point the operation to the stable btree. */
         op->btree = cookie->stable_btree;
+        WT_ASSERT(
+          session, __wt_dhandle_shared_btree_kind(op->btree->dhandle) == WT_SHARED_BTREE_LIVE);
 
         /*
          * Transfer the session_inuse reference from the ingest btree to the stable btree. The
@@ -528,6 +552,13 @@ __layered_copy_ingest_table(
                                 (durable_start_ts > from_ts && durable_start_ts <= to_ts);
         if (in_ts_range) {
             /*
+             * Drained updates bypass the commit path that tracks the unpublished minimum, so do it
+             * here.
+             */
+            if (F_ISSET_ATOMIC_32(stable_btree, WT_BTREE_AWAITS_PUBLISH))
+                __wt_btree_update_unpublished_min(stable_btree, durable_start_ts);
+
+            /*
              * If the "preserve prepared" option is enabled and the ingest btree contains a resolved
              * prepared update for this key whose prepared timestamp is less than or equal to the
              * last checkpoint timestamp, the stable btree must still contain an unresolved prepared
@@ -592,6 +623,12 @@ __layered_copy_ingest_table(
                     prepare_resolved = true;
                 }
             } else {
+                /* Only full updates carry the escape; the write path keeps modifies out. */
+                WT_ASSERT_ALWAYS(session,
+                  type != WT_UPDATE_MODIFY ||
+                    !__wt_clayered_value_in_tombstone_namespace(value, true /* encode */),
+                  "an ingest modify version reconstructed into the tombstone namespace");
+
                 /*
                  * If the update is not a prepared update or a resolved prepared update that has
                  * never been written to the checkpoint as a prepared update, move it to the stable
@@ -603,8 +640,14 @@ __layered_copy_ingest_table(
                  */
                 if (__wt_clayered_deleted(value))
                     WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
-                else
+                else {
+                    /*
+                     * The ingest value is tombstone-escaped; store it in the stable table's form so
+                     * an unescaped stable table does not inherit the encoding on disk.
+                     */
+                    __wt_clayered_ingest_to_stable_value(session, value);
                     WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, NULL));
+                }
                 /*
                  * If the prepared update is aborted, move the aborted update to the stable table
                  * because we may write a prepared update to the disk in a future reconciliation.
@@ -657,6 +700,8 @@ __layered_copy_ingest_table(
                 upds = upd;
 
             prev_upd = upd;
+            __wt_atomic_add_uint64_relaxed(
+              &S2C(session)->layered_drain_data.drain_bytes, upd->size);
         }
     }
 
@@ -709,15 +754,23 @@ __layered_build_sorted_truncates(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *lay
 {
     WT_DECL_RET;
     WT_TRUNCATE *t = NULL, **sorted = NULL;
+    WT_TRUNCATE_LIST *truncate_list = &layered_table->truncate_list;
+    bool committed;
     size_t i = 0, ntruncates = 0;
 
     *sortedp = NULL;
     *ntruncatesp = 0;
 
-    __wt_readlock(session, &layered_table->truncate_lock);
-    TAILQ_FOREACH (t, &layered_table->truncateqh, q)
-        if (t->txn_id != WT_TXN_NONE)
-            ++ntruncates;
+    __wt_readlock(session, &truncate_list->lock);
+    TAILQ_FOREACH (t, &truncate_list->qh, q) {
+        if (t->txn_id == WT_TXN_NONE)
+            continue;
+        committed = __wt_atomic_load_bool_acquire(&t->committed);
+        /* No conflicting transaction should reach the step-up drain. */
+        WT_ASSERT_ALWAYS(session, committed,
+          "an uncommitted follower truncate was found during the step-up drain");
+        ++ntruncates;
+    }
 
     /* Early exit if there are no committed truncates. */
     if (ntruncates == 0)
@@ -725,7 +778,7 @@ __layered_build_sorted_truncates(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *lay
 
     WT_ERR(__wt_calloc(session, ntruncates, sizeof(WT_TRUNCATE *), &sorted));
     /* Populate the array with committed truncates. */
-    TAILQ_FOREACH (t, &layered_table->truncateqh, q)
+    TAILQ_FOREACH (t, &truncate_list->qh, q)
         if (t->txn_id != WT_TXN_NONE)
             sorted[i++] = t;
 
@@ -735,7 +788,7 @@ __layered_build_sorted_truncates(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *lay
     *ntruncatesp = ntruncates;
 
 err:
-    __wt_readunlock(session, &layered_table->truncate_lock);
+    __wt_readunlock(session, &truncate_list->lock);
     if (ret != 0)
         __wt_free(session, sorted);
     return (ret);
@@ -837,6 +890,8 @@ __layered_drain_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     WT_ERR_MSG_CHK(session, __layered_reset_ingest_table_prune_timestamp(session, ingest_uri),
       "Failed to reset ingest table prune timestamp \"%s\"", ingest_uri);
 
+    __wt_atomic_add_uint64_relaxed(&conn->layered_drain_data.tables_drained, 1);
+
 err:
     /*
      * Balance the pin acquired when queueing. The work item has already been removed from the
@@ -907,6 +962,15 @@ __layered_queue_ingest_dhandles(WT_SESSION_IMPL *session)
 
         if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
             continue;
+
+        /*
+         * A dead handle stays marked open until sweep's own close call clears it: its table (and
+         * the stable pair a drain would need) may already be gone, so skip it rather than queue a
+         * drain that can only fail to reopen it.
+         */
+        if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
+            continue;
+
         if (!WT_URI_IS_INGEST(dhandle->name))
             continue;
 
@@ -937,17 +1001,20 @@ __wti_layered_drain_ingest_tables(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-
+    uint64_t time_start, time_stop;
     bool empty, group_created;
 
     conn = S2C(session);
     group_created = false;
+    time_start = __wt_clock(session);
 
     /* Initialize the work queue. */
     TAILQ_INIT(&conn->layered_drain_data.work_queue);
     WT_RET(__wt_spin_init(
       session, &conn->layered_drain_data.queue_lock, "layered drain work queue lock"));
 
+    conn->layered_drain_data.tables_drained = 0;
+    conn->layered_drain_data.drain_bytes = 0;
     __wt_atomic_store_bool(&conn->layered_drain_data.running, true);
 
     bool multithreaded = conn->layered_drain_data.thread_count > 1;
@@ -997,6 +1064,19 @@ err:
     }
     /* Cleanup and release resources. */
     __layered_drain_clear_work_queue(session);
+    time_stop = __wt_clock(session);
+
+    WT_STAT_CONN_SET(
+      session, disagg_step_up_ingest_drain_time, WT_CLOCKDIFF_MS(time_stop, time_start));
+    WT_STAT_CONN_SET(
+      session, disagg_step_up_ingest_tables_drained, conn->layered_drain_data.tables_drained);
+    WT_STAT_CONN_SET(
+      session, disagg_step_up_ingest_drain_bytes, conn->layered_drain_data.drain_bytes);
+    __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Step up drained %" PRIu64 " ingest tables (%" PRIu64
+      " bytes moved to stable tables) in %" PRIu64 " milliseconds",
+      conn->layered_drain_data.tables_drained, conn->layered_drain_data.drain_bytes,
+      WT_CLOCKDIFF_MS(time_stop, time_start));
     return (ret);
 }
 
@@ -1062,6 +1142,15 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
     ckpt_inuse = layered_table->last_ckpt_inuse;
     if (ckpt_inuse == 0)
         ckpt_inuse = (last_ckpt > 1) ? last_ckpt - 1 : last_ckpt;
+
+    /*
+     * The pickup sets outdated on superseded checkpoint dhandles, then reads session_inuse below to
+     * set the prune timestamp. A reader first increases session_inuse to acquire the dhandle, then
+     * checks outdated before binding the checkpoint. Both sides store first and then load; the full
+     * barrier prevents a store-load reordering that would let both miss each other and prune
+     * content a reader has already bound.
+     */
+    WT_FULL_BARRIER();
 
     /* Find the last checkpoint which is still in use. */
     while (ckpt_inuse < last_ckpt) {
@@ -1137,6 +1226,15 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
       " and checkpoint in use from %" PRId64 " to %" PRId64,
       layered_table->iface.name, btree_prune_timestamp, prune_timestamp,
       layered_table->last_ckpt_inuse, ckpt_inuse);
+
+    /*
+     * Prune the truncate list before the new prune timestamp is published, so garbage collection
+     * never runs ahead of the entries still masking ingest content.
+     *
+     * FIXME-WT-18951: Enforce this ordering where ingest content is discarded, so correctness does
+     * not depend on which path advances the prune timestamp.
+     */
+    __wt_layered_table_truncate_prune(session, layered_table, prune_timestamp);
 
     /*
      * The prune timestamp should be monotonically increasing. It is fine for the user to read the

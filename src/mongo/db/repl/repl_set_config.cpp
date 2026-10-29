@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/repl_set_config.h"
@@ -100,7 +74,7 @@ bool isValidCIDRRange(std::string_view host) {
 ReplSetConfig ReplSetConfig::parse(const BSONObj& cfg,
                                    boost::optional<long long> forceTerm,
                                    OID defaultReplicaSetId) {
-    return ReplSetConfig(cfg, false /* forInitiate */, forceTerm, defaultReplicaSetId);
+    return ReplSetConfig(cfg, /*forInitiate=*/false, forceTerm, defaultReplicaSetId);
 }
 
 /* static */
@@ -108,7 +82,7 @@ ReplSetConfig ReplSetConfig::parseForInitiate(const BSONObj& cfg, OID newReplica
     uassert(
         4709000, "A replica set ID must be provided to parseForInitiate", newReplicaSetId.isSet());
     auto result = ReplSetConfig(
-        cfg, true /* forInitiate */, OpTime::kInitialTerm /* forceTerm*/, newReplicaSetId);
+        cfg, /*forInitiate=*/true, /*forceTerm=*/OpTime::kInitialTerm, newReplicaSetId);
     uassert(ErrorCodes::InvalidReplicaSetConfig,
             str::stream() << "replica set configuration cannot contain '"
                           << ReplSetConfigSettings::kReplicaSetIdFieldName
@@ -409,6 +383,16 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                       str::stream() << "Replica set configuration contains " << voterCount
                                     << " voting members, but must be at least 1 and no more than "
                                     << kMaxVotingMembers);
+    }
+
+    if (getSettings()->getElectionTimeoutMillis() <= getSettings()->getHeartbeatIntervalMillis()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "electionTimeoutMillis (" << getSettings()->getElectionTimeoutMillis()
+                          << ") must be greater than heartbeatIntervalMillis ("
+                          << getSettings()->getHeartbeatIntervalMillis()
+                          << ") to allow at least one heartbeat before the election "
+                             "timeout expires");
     }
 
     if (electableCount == 0) {
@@ -746,7 +730,7 @@ BSONObj ReplSetConfig::toBSONWithoutNewlyAdded() const {
         if (e.fieldName() == kMembersFieldName) {
             BSONArrayBuilder memberBuilder(bob.subarrayStart(kMembersFieldName));
             for (auto&& member : getMembers())
-                memberBuilder.append(member.toBSON(true /* omitNewlyAddedField */));
+                memberBuilder.append(member.toBSON(/*omitNewlyAddedField=*/true));
             memberBuilder.done();
             continue;
         }

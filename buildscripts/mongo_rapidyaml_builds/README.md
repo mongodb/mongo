@@ -111,3 +111,43 @@ For example:
 ```toml
 rapidyaml = { url = "https://your-bucket/rapidyaml/0.9.0.post0/rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_x86_64.whl", markers = "platform_system == 'Linux' and platform_machine == 'x86_64'" }
 ```
+
+## Simple-Index Regeneration (`regenerate_simple_index.py`)
+
+The repo consumes `rapidyaml` from the S3-hosted PEP 503 simple index at
+`https://mdb-build-public.s3.amazonaws.com/rapidyaml_wheels/simple/` — declared under
+`[[tool.poetry.source]]` in `pyproject.toml`:
+
+```toml
+[[tool.poetry.source]]
+name = "mdb-build-public"
+url = "https://mdb-build-public.s3.amazonaws.com/rapidyaml_wheels/simple/"
+priority = "explicit"
+```
+
+After uploading a new wheel or sdist to `s3://mdb-build-public/rapidyaml_wheels/`, regenerate the
+index so every anchor carries a `#sha256=<hex>` fragment:
+
+```bash
+# Optional preview (writes both index pages to stdout, no upload):
+python3 buildscripts/mongo_rapidyaml_builds/regenerate_simple_index.py --dry-run
+
+# Real thing — rewrites the index in place:
+python3 buildscripts/mongo_rapidyaml_builds/regenerate_simple_index.py
+```
+
+Requires AWS credentials with `s3:List/Get/Put` on `mdb-build-public`. The script downloads each
+artifact once to compute a whole-object sha256 locally (S3's ETag is not a full sha256 for multipart
+uploads, so we can't trust it).
+
+**Why the fragments matter:** PEP 503 lets each anchor carry a `#sha256=<hex>` URL fragment. Poetry
+(and any other PEP 503-aware installer) uses that fragment to verify downloads and to populate
+hashes in the lockfile without re-hashing locally. Without fragments, every `poetry lock` that
+touches `rapidyaml` re-downloads each wheel to hash it. Future installers that require indexes to
+carry hashes (e.g. `rules_pycross`'s `uv_translator`) will work against this bucket without extra
+plumbing once the fragments are in place.
+
+The script writes four S3 keys per run (two byte-identical pairs) so that plain
+`s3.amazonaws.com/...` endpoints — which serve keys literally, without the `/` → `/index.html`
+rewrite that static-website endpoints do — serve the right content whether the client requests
+`.../simple/rapidyaml/` or `.../simple/rapidyaml/index.html`.

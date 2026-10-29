@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/executor/async_rpc.h"
 
@@ -380,6 +354,55 @@ TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
 }
 
 /*
+ * Tests that 'sendCommand' extracts the server-hinted 'baseBackoffMS' field from a remote error
+ * response and threads it through to the retry strategy's 'recordFailureAndEvaluateShouldRetry'.
+ */
+TEST_F(AsyncRPCTestFixture, BaseBackoffMSExtractedFromRemoteError) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    std::shared_ptr<TestRetryStrategy> testStrategy = std::make_shared<TestRetryStrategy>();
+    const auto baseBackoffMS = Milliseconds(250);
+    testStrategy->setMaxNumRetries(1);
+    testStrategy->pushRetryDelay(baseBackoffMS);
+
+    auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        getExecutorPtr(), _cancellationToken, helloCmd, testStrategy);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    // The initial attempt fails with a remote error whose response body carries a 'baseBackoffMS'
+    // server hint. async_rpc should extract this and pass it to the retry strategy.
+    const auto onCommandErrorFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        BSONObjBuilder result(helloReply.toBSON());
+        CommandHelpers::appendCommandStatusNoThrow(
+            result, Status(ErrorCodes::Overflow, "test error code for retry"));
+        result.append("baseBackoffMS", baseBackoffMS.count());
+        return result.obj();
+    };
+    const auto onCommandOKFunc = [&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+        return helloReply.toBSON();
+    };
+
+    scheduleRequestAndAdvanceClockForRetry(testStrategy, onCommandErrorFunc, baseBackoffMS);
+    onCommand(onCommandOKFunc);
+    AsyncRPCResponse res = resultFuture.get();
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(1, testStrategy->getNumRetriesPerformed());
+    // The server-hinted retry delay must have been extracted from the remote response and handed
+    // to the retry strategy.
+    ASSERT_EQ(testStrategy->getLastBaseBackoffMS(), baseBackoffMS);
+}
+
+/*
  * Tests that 'sendCommand' will not retry when the retry policy indicates accordingly.
  */
 TEST_F(AsyncRPCTestFixture, DoNotRetryOnErrorAccordingToStrategy) {
@@ -727,8 +750,10 @@ TEST_F(AsyncRPCTestFixture, HostAndPortTargeter) {
 TEST_F(AsyncRPCTestFixture, NoRetry) {
     NoRetryStrategy p;
 
-    ASSERT_FALSE(p.recordFailureAndEvaluateShouldRetry(
-        Status(ErrorCodes::BadValue, "mock"), boost::none, std::span<const std::string>{}));
+    ASSERT_FALSE(p.recordFailureAndEvaluateShouldRetry(Status(ErrorCodes::BadValue, "mock"),
+                                                       boost::none,
+                                                       std::span<const std::string>{},
+                                                       boost::none));
     ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 
@@ -1329,7 +1354,7 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
 TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     auto pauseAfterNetworkResponseFailPoint =
         globalFailPointRegistry().find("pauseAsyncRPCAfterNetworkResponse");
-    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::alwaysOn);
+    FailPointEnableBlock pauseAfterNetworkResponse(pauseAfterNetworkResponseFailPoint);
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto opCtxHolder = makeOperationContext();
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
@@ -1351,7 +1376,7 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     });
 
     // Cancel after network response received in the TaskExecutor.
-    pauseAfterNetworkResponseFailPoint->waitForTimesEntered(1);
+    pauseAfterNetworkResponse.waitForOneNewEntry();
     source.cancel();
     pauseAfterNetworkResponseFailPoint->setMode(FailPoint::off);
 

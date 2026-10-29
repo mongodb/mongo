@@ -1,39 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -54,7 +23,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -72,6 +40,12 @@
 #include <system_error>
 #include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+
 namespace mongo {
 
 void CoreCatalogCacheTestFixture::setUp() {
@@ -87,7 +61,7 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceStr
         auto client = getServiceContext()->getService()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
-        catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+        catalogCache->onStaleCollectionVersion(nss, /*wantedVersion=*/boost::none);
         auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
         return boost::make_optional(cri);
     });
@@ -131,7 +105,7 @@ std::vector<ShardType> CoreCatalogCacheTestFixture::setupNShards(int numShards) 
         HostAndPort host(str::stream() << "Host" << i << ":12345");
 
         ShardType shard;
-        shard.setHandle(ShardHandle{ShardId(name.toString()), boost::none});
+        shard.setName(name.toString());
         shard.setHost(host.toString());
         shards.emplace_back(std::move(shard));
 
@@ -158,8 +132,7 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     size_t chunksPerShard) {
     ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
-    DatabaseType db(
-        nss.dbName(), ShardRef{std::string{"0"}}, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto uuid = UUID::gen();
     const BSONObj collectionBSON = [&]() {
@@ -203,7 +176,7 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
                                                               false),
              shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
             version,
-            ShardRef{std::string(str::stream() << shardIndex)});
+            ShardId{str::stream() << shardIndex});
         chunk.setName(OID::gen());
 
         initialChunks.push_back(chunk.toConfigBSON());
@@ -231,19 +204,18 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUnshardedCollectionRoutin
     const NamespaceString& nss) {
     return makeCollectionRoutingInfo(nss,
                                      ShardKeyPattern(BSON("_id" << 1)),
-                                     nullptr /* defaultCollator */,
-                                     false /* unique */,
-                                     {} /* splitPoints */,
-                                     boost::none /* reshardingFields */,
-                                     boost::none /* timeseriesFields */,
-                                     true /* unsplittable */);
+                                     /*defaultCollator=*/nullptr,
+                                     /*unique=*/false,
+                                     /*splitPoints=*/{},
+                                     /*reshardingFields=*/boost::none,
+                                     /*timeseriesFields=*/boost::none,
+                                     /*unsplittable=*/true);
 }
 
 CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(
     const NamespaceString& nss) {
     setupNShards(1);
-    DatabaseType db(
-        nss.dbName(), ShardRef{std::string{"0"}}, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto future = scheduleRoutingInfoUnforcedRefresh(nss);
     expectFindSendBSONObjVector(kConfigHostAndPort, {db.toBSON()});
@@ -253,9 +225,7 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUntrackedCollectionRoutin
 
 void CoreCatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(nss.dbName(),
-                        ShardRef{std::string{shardId}},
-                        DatabaseVersion(UUID::gen(), Timestamp()));
+        DatabaseType db(nss.dbName(), {shardId}, DatabaseVersion(UUID::gen(), Timestamp()));
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }
@@ -327,17 +297,13 @@ ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoSha
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version({epoch, timestamp}, {1, 0});
 
-        ChunkType chunk1(uuid,
-                         {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                         version,
-                         ShardRef{"0"});
+        ChunkType chunk1(
+            uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
         chunk1.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk2(uuid,
-                         {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
-                         version,
-                         ShardRef{"1"});
+        ChunkType chunk2(
+            uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 

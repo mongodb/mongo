@@ -353,6 +353,7 @@ mongo_cc_library(
         ":otel_metrics_service",
         "//src/mongo:base",
         "//src/mongo/db:server_base",
+        "//src/mongo/unittest",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [

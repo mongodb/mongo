@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -89,7 +63,7 @@ namespace mongo {
 /**
  * Holds information update an update operation.
  */
-struct MONGO_MOD_PUBLIC CollectionUpdateArgs {
+struct [[MONGO_MOD_PUBLIC]] CollectionUpdateArgs {
     enum class StoreDocOption { None, PreImage, PostImage };
 
     CollectionUpdateArgs() = delete;
@@ -135,7 +109,7 @@ struct MONGO_MOD_PUBLIC CollectionUpdateArgs {
  * Local catalog ('_mdb_catalog') information identifying where collection contents are/should be
  * stored at the time of collection creation.
  */
-struct MONGO_MOD_PUBLIC CreateCollCatalogIdentifier {
+struct [[MONGO_MOD_PUBLIC]] CreateCollCatalogIdentifier {
     /**
      * Where collection information is stored in the local catalog.
      */
@@ -160,15 +134,16 @@ struct MONGO_MOD_PUBLIC CreateCollCatalogIdentifier {
  * associated with all of the Collection instances for a collection, sharing whatever data may
  * decorate it across all point in time views of the collection.
  */
-class MONGO_MOD_USE_REPLACEMENT("Do not use without Catalog Team's knowledge")
-    SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {
+class [[MONGO_MOD_USE_REPLACEMENT(
+    "Do not use without Catalog Team's knowledge")]] SharedCollectionDecorations
+    : public Decorable<SharedCollectionDecorations> {
 public:
     SharedCollectionDecorations() = default;
     SharedCollectionDecorations(const SharedCollectionDecorations&) = delete;
     SharedCollectionDecorations& operator=(const SharedCollectionDecorations&) = delete;
 };
 
-class MONGO_MOD_PUBLIC Collection : public Decorable<Collection> {
+class [[MONGO_MOD_PUBLIC]] Collection : public Decorable<Collection> {
 public:
     /**
      * A Collection::Factory is a factory class that constructs Collection objects.
@@ -308,6 +283,8 @@ public:
 
     virtual BSONObj getValidatorDoc() const = 0;
 
+    virtual StatusWith<std::shared_ptr<MatchExpression>> getValidatorFilter() const = 0;
+
     /**
      * Returns 'kPass' with an ok Status if the document passes this collection's schema validator.
      *
@@ -343,11 +320,53 @@ public:
             // Document failed schema validation; action is reflected in the result field.
             kSchemaViolation,
             // Timeseries bucket failed strict consistency check; action is in the result field.
+            // bucketViolation carries the specific failure mode.
             kTimeseriesSchemaViolation,
+        };
+
+        // Specific failure mode when reason == kTimeseriesSchemaViolation.
+        enum class BucketConsistencyViolation {
+            kNone,
+            // control.version is not 1, 2, or 3.
+            kBadVersion,
+            // Embedded timestamp in _id doesn't match control.min timestamp.
+            kIdTimestampMismatch,
+            // Bucket time span exceeds collection's bucketMaxSpanSeconds.
+            kTimeSpanTooLarge,
+            // control.min.time is not aligned to the fixed-bucket boundary.
+            kMinTimeNotRounded,
+            // Duplicate field detected in bucket data.
+            kDuplicateField,
+            // Number of data fields doesn't match number of control.min/max fields.
+            kFieldCountMismatch,
+            // Expected field is absent from control.min or control.max.
+            kMissingField,
+            // The collection's time field is absent from the bucket's data object.
+            kMissingTimeField,
+            // control.count has an unexpected or invalid integer representation.
+            kBadControlCount,
+            // Uncompressed data indexes are not consecutively increasing from 0.
+            kIndexNotIncreasing,
+            // An uncompressed data index exceeds the measurement count.
+            kIndexOutOfRange,
+            // An uncompressed data index is negative or non-numerical.
+            kIndexBadValue,
+            // Observed data min or max doesn't match control.min or control.max.
+            kMinMaxMismatch,
+            // Compressed column data field has wrong BSON type (expected binData).
+            kBadDataType,
+            // Compressed column data field has wrong binData subtype (expected Column).
+            kBadBinDataSubtype,
+            // Decompressed column element count doesn't match control.count.
+            kCountMismatch,
+            // Exception thrown accessing BSON fields (missing required field, wrong type,
+            // or malformed compressed column data).
+            kInvalidBsonData,
         };
 
         SchemaValidationResult result;
         NonComplianceReason reason;
+        BucketConsistencyViolation bucketViolation = BucketConsistencyViolation::kNone;
     };
     virtual std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const = 0;
@@ -803,14 +822,14 @@ public:
      */
     virtual void onDeregisterFromCatalog(ServiceContext* svcCtx) = 0;
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     friend auto logAttrs(const Collection& col) {
         return logv2::multipleAttrs(col.ns(), col.uuid());
     }
 };
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
-class MONGO_MOD_PUBLIC DisableCollectionConsistencyChecks {
+class [[MONGO_MOD_PUBLIC]] DisableCollectionConsistencyChecks {
 public:
     DisableCollectionConsistencyChecks(OperationContext* opCtx, int numTimes = 1);
     ~DisableCollectionConsistencyChecks();
@@ -843,7 +862,7 @@ private:
  * TODO SERVER-95260: Investigate if this can be detected once generational lock information is
  * available.
  */
-class MONGO_MOD_PUBLIC ConsistentCollection {
+class [[MONGO_MOD_PUBLIC]] ConsistentCollection {
 public:
     ConsistentCollection() = default;
 
@@ -918,7 +937,7 @@ private:
  * resuming. CollectionPtr will re-load the Collection from the Catalog when restoring from a yield
  * that dropped locks.
  */
-class MONGO_MOD_PUBLIC CollectionPtr : public Yieldable {
+class [[MONGO_MOD_PUBLIC]] CollectionPtr : public Yieldable {
 public:
     static CollectionPtr null;
 
@@ -1022,30 +1041,30 @@ private:
     boost::optional<ShardKeyPattern> _shardKeyPattern = boost::none;
 };
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {
     os << coll.get();
     return os;
 }
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline ValidationActionEnum validationActionOrDefault(
     boost::optional<ValidationActionEnum> action) {
     return action.value_or(ValidationActionEnum::error);
 }
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline ValidationActionEnum validationActionOrCurrent(
     const CollectionOptions& opts, boost::optional<ValidationActionEnum> action) {
     return action.value_or(validationActionOrDefault(opts.validationAction));
 }
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLevelEnum> level) {
     return level.value_or(ValidationLevelEnum::strict);
 }
 
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline ValidationLevelEnum validationLevelOrCurrent(const CollectionOptions& opts,
                                                     boost::optional<ValidationLevelEnum> level) {
     return level.value_or(validationLevelOrDefault(opts.validationLevel));
@@ -1055,7 +1074,7 @@ inline ValidationLevelEnum validationLevelOrCurrent(const CollectionOptions& opt
  * Mandatory level means that the schema validator is strictly enforced on all inserts and updates.
  * 'constraint' and 'strict' both forbid inserting/updating non-conforming documents.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline bool validationLevelIsMandatory(ValidationLevelEnum level) {
     return level == ValidationLevelEnum::strict || level == ValidationLevelEnum::constraint;
 }
@@ -1066,7 +1085,7 @@ inline bool validationLevelIsMandatory(ValidationLevelEnum level) {
  * Note: The caller should check if 'userCollation' is not empty since the empty 'userCollation'
  * has the special meaning that the query follows the collection default collation that exists.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCtx,
                                                           const BSONObj& userCollation) {
     tassert(7542402, "Empty user collation", !userCollation.isEmpty());
@@ -1079,7 +1098,7 @@ inline std::unique_ptr<CollatorInterface> getUserCollator(OperationContext* opCt
  * the collection-default collation and also returns a flag indicating whether the user-provided
  * collation matches the collection default collation.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
 resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection);
 

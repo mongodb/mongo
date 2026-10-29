@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,6 +11,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -85,7 +60,7 @@ struct ShardingStatistics;
  * case the desctructor will take care of clean up based on how far we have advanced. One exception
  * is the commitDonateChunk and its comments explain the reasoning.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT MigrationSourceManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] MigrationSourceManager {
     MigrationSourceManager(const MigrationSourceManager&) = delete;
     MigrationSourceManager& operator=(const MigrationSourceManager&) = delete;
 
@@ -174,11 +149,61 @@ public:
      */
     void commitChunkMetadataOnConfig();
 
+    // The methods below split commitChunkMetadataOnConfig() into steps so the MoveRangeCoordinator
+    // can run an authoritative shard-catalog commit between the config commit and finalization,
+    // while both critical sections stay held. Used only by the MoveRangeCoordinator; the standalone
+    // path keeps using commitChunkMetadataOnConfig().
+
+    /**
+     * Promotes the donor recoverable critical section to also block reads, just before committing
+     * on the config server.
+     *
+     * Expected state: kCloneCompleted
+     */
+    void promoteCriticalSectionToBlockReads();
+
+    /**
+     * Marks that the global-catalog commit is about to be issued. From here on the migration may
+     * already be committed, so a teardown must treat it as uncertain rather than as a clean abort;
+     * the coordinator's recovery resolves the outcome.
+     *
+     * Expected state: kCloneCompleted
+     * Resulting state: kCommittingOnConfig
+     */
+    void markCommitInProgress();
+
+    /**
+     * Records that the global-catalog commit has succeeded: clears the time-series bucket catalog
+     * if needed, records the committed decision in memory, and writes the moveChunk.commit
+     * changelog entry. Idempotent across same-term retries. Does not issue the commit or complete
+     * the migration; the coordinator drives those steps.
+     *
+     * Expected state: kCommittingOnConfig
+     */
+    void recordCommitSuccess(OperationContext* opCtx);
+
+    /**
+     * Completes a committed migration: releases the recipient critical section, completes the
+     * migration coordinator (range deletion + forgets the doc), and honours waitForDelete. Called
+     * from the kFinalizeMigration phase while the migration attempt is still in memory; otherwise
+     * the coordinator completes from the persisted coordinator document.
+     */
+    void finishCommit();
+
+    /**
+     * The donor shard's placement version captured at the start of the migration (in startClone).
+     * The coordinator persists it so the global-catalog commit can be re-sent from durable state
+     * after a failover. Only valid after startClone.
+     */
+    ChunkVersion getDonorShardVersionPreMigration() const {
+        return *_donorShardVersionPreMigration;
+    }
+
     /**
      * Aborts the migration after observing a concurrent index operation by marking its operation
      * context as killed.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT SharedSemiFuture<void> abort();
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] SharedSemiFuture<void> abort();
 
     /**
      * Returns a report on the active migration.
@@ -202,6 +227,13 @@ public:
 
     long long getOpTimeMillis() {
         return _entireOpTimer.millis();
+    }
+
+    boost::optional<MigrationChunkClonerSource::CloneStats> getLastCloneStats() {
+        if (_cloneDriver) {
+            return _cloneDriver->getCloneStats();
+        }
+        return _lastCloneStats;
     }
 
 private:
@@ -228,6 +260,12 @@ private:
 
     CollectionMetadata _getCurrentMetadataAndCheckForConflictingErrors();
 
+    // Serializes the CommitChunkMigration command body (migrated chunk + collection version + write
+    // concern) into `builder`.
+    void _buildCommitChunkMigrationRequest(BSONObjBuilder* builder,
+                                           const ChunkVersion& collVersion,
+                                           bool isAuthoritative);
+
     /**
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
@@ -236,13 +274,19 @@ private:
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
-     * restores the committed metadata (if in critical section) and logs error in the change log to
-     * indicate that the migration has failed.
+     * restores the committed metadata (if in critical section) and logs the failure in the change
+     * log.
      *
      * Expected state: Any
      * Resulting state: kDone
      */
     void _cleanupOnError();
+
+    /**
+     * Writes a "moveChunk.error" entry to the sharding change log, attaching the recorded _errMsg
+     * (if any).
+     */
+    void _logMoveChunkErrorToChangelog();
 
     /**
      * Sets _errMsg to the provided string before running the given callable. If the callable
@@ -273,7 +317,9 @@ private:
     // Stores a reference to the process sharding statistics object which needs to be updated
     ShardingStatistics& _stats;
 
+    // TODO (SERVER-127253): Remove this field once v9.0 branches out
     const ManagementModeEnum _managementMode;
+
     const UUID _migrationId;
 
     // Information about the moveChunk to be used in the critical section.
@@ -293,8 +339,17 @@ private:
     // move chunk sequence
     Timer _cloneAndCommitTimer;
 
+    // Times the commit phase on the MoveRangeCoordinator path (when the critical section is
+    // promoted to block reads) through finishCommit(), used for
+    // totalCriticalSectionCommitTimeMillis
+    Timer _commitPhaseTimer;
+
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
+
+    // Set once the live coordinator path has observed and recorded a successful config-server
+    // commit. This distinguishes a known commit from an uncertain commit attempt during cleanup.
+    bool _commitRecorded{false};
 
     // Responsible for registering and unregistering the MigrationSourceManager from the collection
     // sharding runtime for the collection
@@ -317,10 +372,17 @@ private:
     // The version of the chunk at the time the migration started.
     boost::optional<ChunkVersion> _chunkVersion;
 
+    // The donor shard's placement version at the time the migration started. Captured in
+    // startClone() and exposed so the MoveRangeCoordinator can persist it for the global-catalog
+    // commit.
+    boost::optional<ChunkVersion> _donorShardVersionPreMigration;
+
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, the CSRLock needs to be acquired in exclusive mode. To access it, the CSRlock has
     // to be acquired at least in shared mode. Available after cloning stage has completed.
     std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
+
+    boost::optional<MigrationChunkClonerSource::CloneStats> _lastCloneStats;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
     // correctly updated based on whether the migration committed or aborted.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/client/dbclient_connection.h"
 
@@ -63,6 +37,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -92,12 +67,13 @@ namespace mongo {
 
 using std::string;
 
-DBClientConnection::DBClientConnection(bool autoReconnect,
-                                       double soTimeout,
-                                       MongoURI uri,
-                                       const HandshakeValidationHook& hook,
-                                       const ClientAPIVersionParameters* apiParameters)
-    : DBClientSession(autoReconnect, soTimeout, std::move(uri), hook, apiParameters),
+DBClientConnection::DBClientConnection(DBClientConnectionOptions options)
+    : DBClientSession(options.autoReconnect,
+                      options.soTimeout,
+                      std::move(options.uri),
+                      options.hook,
+                      options.apiParameters,
+                      options.connectionPurpose),
       _autoReconnectBackoff(Seconds(1), Seconds(2)) {
     _numConnections.fetchAndAdd(1);
 }
@@ -113,6 +89,17 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
             transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
             _socketTimeout.value_or(Milliseconds(5000)),
             transientSSLParams);
+    if (swSession.isOK()) {
+        const auto& session = swSession.getValue();
+        const ConnectionPurpose purpose = getConnectionPurpose();
+        mongo::getConnectionPurpose(session.get()) = purpose;
+        if (purpose == ConnectionPurpose::kReplication) {
+            getGlobalServiceContext()
+                ->getTransportLayerManager()
+                ->getDefaultEgressLayer()
+                ->registerReplicationSession(session);
+        }
+    }
     return swSession;
 }
 
@@ -126,7 +113,7 @@ void DBClientConnection::_auth(const BSONObj& params) {
         authCache[dbName] = params.getOwned();
     }
 
-    DBClientBase::_auth(params);
+    DBClientSession::_auth(params);
 }
 
 void DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
@@ -135,7 +122,7 @@ void DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDow
         _internalAuthStepDownBehavior = stepDownBehavior;
     }
 
-    return DBClientBase::authenticateInternalUser(stepDownBehavior);
+    return DBClientSession::authenticateInternalUser(stepDownBehavior);
 }
 
 void DBClientConnection::logout(const DatabaseName& dbName, BSONObj& info) {
@@ -146,7 +133,7 @@ void DBClientConnection::logout(const DatabaseName& dbName, BSONObj& info) {
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTarget(
     OpMsgRequest request) {
-    auto out = DBClientBase::runCommandWithTarget(std::move(request));
+    auto out = DBClientSession::runCommandWithTarget(std::move(request));
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
@@ -159,7 +146,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTar
 
 std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::runCommandWithTarget(
     OpMsgRequest request, std::shared_ptr<DBClientBase> me) {
-    auto out = DBClientBase::runCommandWithTarget(std::move(request), std::move(me));
+    auto out = DBClientSession::runCommandWithTarget(std::move(request), std::move(me));
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
@@ -173,7 +160,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::r
 rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string& host,
                                                               const Message& replyMsg) {
     try {
-        return DBClientBase::parseCommandReplyMessage(host, replyMsg);
+        return DBClientSession::parseCommandReplyMessage(host, replyMsg);
     } catch (const DBException& ex) {
         if (ErrorCodes::isConnectionFatalMessageParseError(ex.code())) {
             _markFailed(kKillSession);
@@ -266,6 +253,6 @@ bool DBClientConnection::isUsingTransientSSLParams() const {
 
 #endif
 
-AtomicWord<int> DBClientConnection::_numConnections;
+Atomic<int> DBClientConnection::_numConnections;
 
 }  // namespace mongo

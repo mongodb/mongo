@@ -1,36 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -67,22 +39,33 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class OperationContext;
 /**
  * Callback function to get a SyncTransactionWithRetries with the appropiate Executor
  */
 using GetTxnCallback = std::function<std::shared_ptr<txn_api::SyncTransactionWithRetries>(
     OperationContext*, const boost::optional<CancellationToken>&)>;
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo
 
 namespace mongo {
+
+// Asserts that encryptionInformation.crudProcessed is not set to true.
+// This is a common precondition to all the processFLE*() functions.
+// If crudProcessed is true, then it signals that the command has already gone through FLE2
+// preprocessing, and so it should just be processed as an ordinary CRUD operation.
+// Some processFLE*() functions internally invoke commands with crudProcessed set to true so
+// as to avoid an infinite recursion.
+void assertFLECrudNotYetProcessed(const EncryptionInformation& ei);
+void assertFLECrudNotYetProcessed(const boost::optional<EncryptionInformation>& ei);
 
 /**
  * FLE Result enum
  */
-enum class MONGO_MOD_PUB FLEBatchResult {
+enum class [[MONGO_MOD_PUBLIC]] FLEBatchResult {
     /**
      * FLE CRUD code decided input document requires FLE processing. Caller should not do any CRUD.
      */
@@ -98,53 +81,54 @@ enum class MONGO_MOD_PUB FLEBatchResult {
 /**
  * Process a batch from mongos.
  */
-MONGO_MOD_PUB FLEBatchResult processFLEBatch(OperationContext* opCtx,
-                                             const BatchedCommandRequest& request,
-                                             BatchedCommandResponse* response);
+[[MONGO_MOD_PUBLIC]] FLEBatchResult processFLEBatch(OperationContext* opCtx,
+                                                    const BatchedCommandRequest& request,
+                                                    BatchedCommandResponse* response);
 
 /**
  * Rewrite a BatchedCommandRequest for explain commands.
  */
-MONGO_MOD_PUB std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
     OperationContext* opCtx, const BatchedCommandRequest& request);
 
 
 /**
  * Initialize the FLE CRUD subsystem on Mongod.
  */
-MONGO_MOD_PUB void startFLECrud(ServiceContext* serviceContext);
+[[MONGO_MOD_PUBLIC]] void startFLECrud(ServiceContext* serviceContext);
 
 /**
  * Stop the FLE CRUD subsystem on Mongod.
  */
-MONGO_MOD_PUB void stopFLECrud();
+[[MONGO_MOD_PUBLIC]] void stopFLECrud();
 
 
 /**
  * Process a replica set insert.
  */
-MONGO_MOD_PUB FLEBatchResult processFLEInsert(OperationContext* opCtx,
-                                              const write_ops::InsertCommandRequest& insertRequest,
-                                              write_ops::InsertCommandReply* insertReply);
+[[MONGO_MOD_PUBLIC]] FLEBatchResult processFLEInsert(
+    OperationContext* opCtx,
+    const write_ops::InsertCommandRequest& insertRequest,
+    write_ops::InsertCommandReply* insertReply);
 
 /**
  * Process a replica set delete.
  */
-MONGO_MOD_PUB write_ops::DeleteCommandReply processFLEDelete(
+[[MONGO_MOD_PUBLIC]] write_ops::DeleteCommandReply processFLEDelete(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest);
 
 /**
  * Rewrite the query within a replica set explain command for delete and update.
  * This concrete function is passed all the parameters directly.
  */
-MONGO_MOD_PUB BSONObj
-processFLEWriteExplainD(OperationContext* opCtx,
-                        const BSONObj& collation,
-                        const NamespaceString& nss,
-                        const EncryptionInformation& info,
-                        const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-                        const boost::optional<BSONObj>& letParameters,
-                        const BSONObj& query);
+[[MONGO_MOD_PUBLIC]] BSONObj processFLEWriteExplainD(
+    OperationContext* opCtx,
+    const BSONObj& collation,
+    const NamespaceString& nss,
+    const EncryptionInformation& info,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
+    const boost::optional<BSONObj>& letParameters,
+    const BSONObj& query);
 
 /**
  * Rewrite the query within a replica set explain command for delete and update.
@@ -152,10 +136,10 @@ processFLEWriteExplainD(OperationContext* opCtx,
  * to the function above.
  */
 template <typename T>
-MONGO_MOD_PUB BSONObj processFLEWriteExplainD(OperationContext* opCtx,
-                                              const BSONObj& collation,
-                                              const T& request,
-                                              const BSONObj& query) {
+[[MONGO_MOD_PUBLIC]] BSONObj processFLEWriteExplainD(OperationContext* opCtx,
+                                                     const BSONObj& collation,
+                                                     const T& request,
+                                                     const BSONObj& query) {
 
     return processFLEWriteExplainD(opCtx,
                                    collation,
@@ -169,24 +153,24 @@ MONGO_MOD_PUB BSONObj processFLEWriteExplainD(OperationContext* opCtx,
 /**
  * Process a replica set update.
  */
-MONGO_MOD_PUB write_ops::UpdateCommandReply processFLEUpdate(
+[[MONGO_MOD_PUBLIC]] write_ops::UpdateCommandReply processFLEUpdate(
     OperationContext* opCtx, const write_ops::UpdateCommandRequest& updateRequest);
 
 /**
  * Process a findAndModify request from mongos
  */
-MONGO_MOD_PUB FLEBatchResult
-processFLEFindAndModify(OperationContext* opCtx,
-                        const write_ops::FindAndModifyCommandRequest& request,
-                        StatusWith<write_ops::FindAndModifyCommandReply>& swReply,
-                        boost::optional<WriteConcernErrorDetail>& wceReply);
+[[MONGO_MOD_PUBLIC]] FLEBatchResult processFLEFindAndModify(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& request,
+    StatusWith<write_ops::FindAndModifyCommandReply>& swReply,
+    boost::optional<WriteConcernErrorDetail>& wceReply);
 
-MONGO_MOD_PUB FLEBatchResult
-processFLEFindAndModify(OperationContext* opCtx,
-                        const write_ops::FindAndModifyCommandRequest& request,
-                        BSONObjBuilder& result);
+[[MONGO_MOD_PUBLIC]] FLEBatchResult processFLEFindAndModify(
+    OperationContext* opCtx,
+    const write_ops::FindAndModifyCommandRequest& request,
+    BSONObjBuilder& result);
 
-MONGO_MOD_PUB std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
+[[MONGO_MOD_PUBLIC]] std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongos(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
@@ -200,46 +184,46 @@ processFLEFindAndModifyHelper(OperationContext* opCtx,
 /**
  * Process a findAndModify request from a replica set.
  */
-MONGO_MOD_PUB write_ops::FindAndModifyCommandReply processFLEFindAndModify(
+[[MONGO_MOD_PUBLIC]] write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
-MONGO_MOD_PUB std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
+[[MONGO_MOD_PUBLIC]] std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongod(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 
 /**
  * Process a find command from mongos.
  */
-MONGO_MOD_PUB void processFLEFindS(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   FindCommandRequest* findCommand);
+[[MONGO_MOD_PUBLIC]] void processFLEFindS(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          FindCommandRequest* findCommand);
 
 /**
  * Process a find command from a replica set.
  */
-MONGO_MOD_PUB void processFLEFindD(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   FindCommandRequest* findCommand);
+[[MONGO_MOD_PUBLIC]] void processFLEFindD(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          FindCommandRequest* findCommand);
 
 
 /**
  * Process a find command from mongos.
  */
-MONGO_MOD_PUB void processFLECountS(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    CountCommandRequest& countCommand);
+[[MONGO_MOD_PUBLIC]] void processFLECountS(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           CountCommandRequest& countCommand);
 
 /**
  * Process a find command from a replica set.
  */
-MONGO_MOD_PUB void processFLECountD(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    CountCommandRequest& countCommand);
+[[MONGO_MOD_PUBLIC]] void processFLECountD(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           CountCommandRequest& countCommand);
 
 /**
  * Process a pipeline from mongos.
  */
-MONGO_MOD_PUB std::unique_ptr<Pipeline> processFLEPipelineS(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<Pipeline> processFLEPipelineS(
     OperationContext* opCtx,
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
@@ -248,7 +232,7 @@ MONGO_MOD_PUB std::unique_ptr<Pipeline> processFLEPipelineS(
 /**
  * Process a pipeline from a replica set.
  */
-MONGO_MOD_PUB std::unique_ptr<Pipeline> processFLEPipelineD(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<Pipeline> processFLEPipelineD(
     OperationContext* opCtx,
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
@@ -257,7 +241,7 @@ MONGO_MOD_PUB std::unique_ptr<Pipeline> processFLEPipelineD(
 /**
  * Abstraction layer for FLE
  */
-class MONGO_MOD_PUB FLEQueryInterface : public FLETagQueryInterface {
+class [[MONGO_MOD_PUBLIC]] FLEQueryInterface : public FLETagQueryInterface {
 public:
     /**
      * Insert a document into the given collection.
@@ -330,7 +314,7 @@ public:
  * Implementation of the FLE Query interface that exposes the DB operations needed for FLE 2
  * server-side work.
  */
-class MONGO_MOD_PUB FLEQueryInterfaceImpl : public FLEQueryInterface {
+class [[MONGO_MOD_PUBLIC]] FLEQueryInterfaceImpl : public FLEQueryInterface {
 public:
     FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient, Service* service)
         : _txnClient(txnClient), _service(service) {}
@@ -384,7 +368,7 @@ private:
 /**
  * FLETagQueryInterface that does not use transaction_api.h to retrieve tags.
  */
-class MONGO_MOD_PUB FLETagNoTXNQuery : public FLETagQueryInterface {
+class [[MONGO_MOD_PUBLIC]] FLETagNoTXNQuery : public FLETagQueryInterface {
 public:
     FLETagNoTXNQuery(OperationContext* opCtx);
 

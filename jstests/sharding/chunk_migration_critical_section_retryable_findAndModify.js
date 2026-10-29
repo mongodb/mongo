@@ -17,6 +17,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -36,6 +37,10 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(testColl.insert({_id: 1, x: 1, counter: 0}));
 
 const donorPrimary = st.rs0.getPrimary();
+const isAuthoritativeShardsDDLEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AuthoritativeShardsDDL",
+);
 
 const pauseSessionFetcherFp = configureFailPoint(
     donorPrimary,
@@ -95,15 +100,29 @@ const criticalSectionCounterBefore = collDocBefore
     ? collDocBefore.enterCriticalSectionCounter || 0
     : 0;
 
-jsTest.log("Unpause migration and wait for the critical section to start");
-hangBeforeCriticalSectionFp.off();
-assert.soon(() => {
+function hasRecoverableCriticalSectionDoc() {
+    return (
+        donorPrimary.getCollection("config.collection_critical_sections").find({_id: ns}).toArray()
+            .length > 0
+    );
+}
+
+function legacyCriticalSectionCounterIncremented() {
     const collDocAfter = cacheColl.findOne({_id: ns});
     const criticalSectionCounterAfter = collDocAfter
         ? collDocAfter.enterCriticalSectionCounter || 0
         : 0;
     return criticalSectionCounterAfter > criticalSectionCounterBefore;
-}, "Critical section did not start (enterCriticalSectionCounter did not increment)");
+}
+
+jsTest.log("Unpause migration and wait for the critical section to start");
+hangBeforeCriticalSectionFp.off();
+assert.soon(() => {
+    if (isAuthoritativeShardsDDLEnabled) {
+        return hasRecoverableCriticalSectionDoc();
+    }
+    return legacyCriticalSectionCounterIncremented() || hasRecoverableCriticalSectionDoc();
+}, "Critical section did not start");
 
 jsTest.log("Unpause the session oplog fetching");
 pauseSessionFetcherFp.off();

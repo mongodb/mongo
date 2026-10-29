@@ -1,41 +1,12 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 
-#include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/ddl/convert_shard_refs_in_namespace_metadata_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
-#include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
-#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
@@ -46,19 +17,22 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL);
+MONGO_FAIL_POINT_DEFINE(hangBeforeCloningCollectionCloneAuthoritativeMetadataDDL);
 
 namespace {
 
 std::vector<NamespaceString> getTrackedNamespaces(OperationContext* opCtx,
                                                   const DatabaseName& dbName) {
     auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
-        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+        opCtx, dbName, repl::ReadConcernArgs::kMajority);
     std::vector<NamespaceString> nssList;
     nssList.reserve(collections.size());
     for (const auto& coll : collections) {
@@ -144,9 +118,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneConfigSystemSessions(
     const auto& nss = NamespaceString::kLogicalSessionsNamespace;
     try {
         DDLLockManager::ScopedCollectionDDLLock collLock(
-            opCtx, nss, "cloneAuthoritativeMetadata"_sd, MODE_X);
-
-        _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, nss);
+            opCtx, nss, "cloneAuthoritativeMetadata"sv, MODE_X);
 
         // The config server is the primary shard of the config database, so it is the shard that
         // must always carry an entry for the collection even if it owns no chunks.
@@ -164,28 +136,6 @@ void CloneAuthoritativeMetadataCoordinator::_cloneConfigSystemSessions(
     }
 }
 
-void CloneAuthoritativeMetadataCoordinator::_convertShardRefsInNamespaceMetadataInGlobalCatalog(
-    OperationContext* opCtx, const NamespaceString& ns) {
-    if (_doc.getShardIdentificationType() == ShardIdentificationTypeEnum::kShardId) {
-        // The command is currently running under an FCV version that does not support the new
-        // ShardRef format. Skip the conversion.
-        return;
-    }
-
-    ConfigsvrConvertShardRefsInNamespaceMetadata cmd(
-        NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()));
-    cmd.setDbName(DatabaseName::kAdmin);
-    generic_argument_util::setMajorityWriteConcern(cmd);
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            cmd.toBSON(),
-            Shard::RetryPolicy::kIdempotent)));
-}
-
 void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -194,8 +144,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     DatabaseType dbMetadata;
     try {
-        dbMetadata =
-            catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+        dbMetadata = catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernArgs::kMajority);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // If the database has been dropped, we remove it from the cloning list. If any
         // concurrent operations are attempting to recreate it, they will handle the cloning.
@@ -211,7 +160,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     }
 
     ScopedSetShardRole scopedShardRole(
-        opCtx, NamespaceString{dbName}, boost::none /* shardVersion */, dbMetadata.getVersion());
+        opCtx, NamespaceString{dbName}, /*shardVersion=*/boost::none, dbMetadata.getVersion());
 
     if (MONGO_unlikely(hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL.shouldFail())) {
         hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL.executeIf(
@@ -231,7 +180,6 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
         opCtx, dbName, "cloneAuthoritativeMetadata"sv, MODE_IX);
 
     {
-        _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, NamespaceString(dbName));
         // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
         // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL
         // operations are in progress and 2) the clone serves as a refresh from the config server,
@@ -240,17 +188,26 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
         BypassDatabaseMetadataAccess bypassDbMetadataAccess(
             opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
 
-        commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
+        shard_catalog_commit::commitCreateDatabaseMetadataLocally(
+            opCtx, dbMetadata, /*fromClone=*/true);
     }
 
-    // Now that the database metadata is cloned, clone the metadata of its tracked collections by
-    // instructing the shards owning data to persist it into their local shard catalog.
-    for (const auto& nss : getTrackedNamespaces(opCtx, dbName)) {
+    // Clone the tracked collections in namespace order, persisting the last cloned one after each
+    // step so a step-down resumes from there instead of re-cloning the whole database.
+    auto nssList = getTrackedNamespaces(opCtx, dbName);
+    std::sort(nssList.begin(), nssList.end());
+
+    for (const auto& nss : nssList) {
+        if (_doc.getLastClonedCollectionForCurrentDb() &&
+            nss <= *_doc.getLastClonedCollectionForCurrentDb()) {
+            continue;
+        }
+
+        hangBeforeCloningCollectionCloneAuthoritativeMetadataDDL.pauseWhileSet();
+
         try {
             DDLLockManager::ScopedCollectionDDLLock collLock(
                 opCtx, nss, "cloneAuthoritativeMetadata"sv, MODE_X);
-
-            _convertShardRefsInNamespaceMetadataInGlobalCatalog(opCtx, nss);
 
             sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
                 opCtx,
@@ -265,6 +222,8 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
             // before taking the DDL lock), so there is nothing to clone. If any concurrent
             // operations are attempting to recreate it, they will handle the cloning.
         }
+
+        _updateLastClonedCollection(opCtx, nss);
     }
 }
 
@@ -273,6 +232,13 @@ void CloneAuthoritativeMetadataCoordinator::_removeDbFromCloningList(OperationCo
     auto dbs = *_doc.getDbsToClone();
     dbs.erase(std::remove(dbs.begin(), dbs.end(), dbName), dbs.end());
     _doc.setDbsToClone(std::move(dbs));
+    _doc.setLastClonedCollectionForCurrentDb(boost::none);
+    _updateStateDocument(opCtx, StateDoc(_doc));
+}
+
+void CloneAuthoritativeMetadataCoordinator::_updateLastClonedCollection(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    _doc.setLastClonedCollectionForCurrentDb(nss);
     _updateStateDocument(opCtx, StateDoc(_doc));
 }
 

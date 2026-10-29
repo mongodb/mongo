@@ -4,8 +4,7 @@
  * - $where and geo operators are not allowed
  *
  * @tags: [
- *   # SERVER-101260 changed the behavior for SBE engine
- *   requires_fcv_83,
+ *   requires_fcv_91,
  * ]
  */
 

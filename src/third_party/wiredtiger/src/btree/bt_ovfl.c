@@ -29,7 +29,7 @@ __ovfl_read(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, WT_
      */
     WT_RET(__wt_blkcache_read(session, store, NULL, addr, addr_size));
     dsk = store->data;
-    store->data = WT_PAGE_HEADER_BYTE(btree, dsk);
+    store->data = WT_PAGE_HEADER_READ_BYTE(session, btree, dsk);
     store->size = dsk->u.datalen;
 
     WT_STAT_CONN_DSRC_INCR(session, cache_read_overflow);

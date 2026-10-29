@@ -1,39 +1,16 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+#include <boost/optional/optional.hpp>
+
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Group multiple writes into a single applyOps entry.
@@ -74,7 +51,7 @@ public:
      * The stored operations must generate an applyOps entry that's within the max BSON size.
      * Anything larger will throw a TransactionTooLarge exception at commit.
      */
-    void addBatchedOperation(OperationContext* opCtx, const BatchedOperation& operation);
+    void addBatchedOperation(OperationContext* opCtx, BatchedOperation operation);
 
     /**
      * Returns a pointer to the stored operations for the current WUOW.
@@ -82,11 +59,57 @@ public:
     TransactionOperations* getBatchedOperations(OperationContext* opCtx);
     void clearBatchedOperations(OperationContext* opCtx);
 
+    /**
+     * RAII scope that stamps every operation staged during its lifetime with a shared group record
+     * id (from 'recordId'), so the applyOps packer keeps operations for the same record within a
+     * single applyOps entry. Nesting is not supported.
+     */
+    class AtomicOperationGroup {
+    public:
+        AtomicOperationGroup(OperationContext* opCtx, const RecordId& recordId);
+        ~AtomicOperationGroup();
+        AtomicOperationGroup(const AtomicOperationGroup&) = delete;
+        AtomicOperationGroup& operator=(const AtomicOperationGroup&) = delete;
+
+    private:
+        BatchedWriteContext& _context;
+    };
+
+    /**
+     * Returns true if any operation staged in this batch was assigned an atomic group, i.e. an
+     * AtomicOperationGroup was active while staging.
+     */
+    bool hasAtomicOperationGroups() const {
+        return _hasAtomicOperationGroups;
+    }
+
+    /**
+     * Returns true if a container operation was staged in this batch.
+     */
+    bool hasContainerWrites() const {
+        return _containerOpStaged;
+    }
+
 private:
+    // Sets the group record id stamped on operations staged while an AtomicOperationGroup is
+    // active.
+    void _enterAtomicOperationGroup(const RecordId& recordId);
+    // Clears the current group record id.
+    void _leaveAtomicOperationGroup();
+
     // Whether batching writes is enabled.
     bool _batchWrites = false;
     // Whether a DDL operation has occurred in the current batched write group.
     bool _ddlOperationOccurred = false;
+
+    // The group record id stamped onto operations staged while an AtomicOperationGroup is active;
+    // boost::none when none is active.
+    boost::optional<RecordId> _currentGroupRecordId;
+    // Whether any staged operation was stamped with a group record id. Gates group-aware packing at
+    // commit.
+    bool _hasAtomicOperationGroups = false;
+    // Whether a container operation was staged in this batch.
+    bool _containerOpStaged = false;
 
     /**
      * Holds oplog data for operations which have been applied in the current batched
@@ -95,4 +118,4 @@ private:
     BatchedOperations _batchedOperations;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

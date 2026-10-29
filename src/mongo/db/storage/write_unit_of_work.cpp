@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -35,8 +9,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 
 #include <ostream>
@@ -47,28 +19,47 @@
 namespace mongo {
 namespace {
 
+const auto getOplogGroupingPolicy =
+    ServiceContext::declareDecoration<std::unique_ptr<OplogGroupingPolicy>>();
+
 /**
- * Returns the grouping type to be used, converting kDontGroup to
- * kGroupForPossiblyRetryableOperations for a top-level WriteUnitOfWork if the operation is not a
- * multi-document transaction and primary-driven index builds are enabled.
+ * Returns the grouping type to be used, converting noGroup to atomicGroup for a top-level
+ * WriteUnitOfWork if the operation is not a multi-document transaction and oplog entry grouping is
+ * enabled. Whether such a batch is a retryable write is decided later, at commit, not here.
+ *
+ * A caller that requests an explicit (non-noGroup) grouping mode bypasses this conversion:
+ * 'groupType' is already set, so it is returned unchanged (e.g. a write that intentionally batches
+ * multiple independent statements passes nonAtomicGroup).
  */
 WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
                                                   WriteUnitOfWork::OplogEntryGroupType groupType,
                                                   bool topLevel) {
     if (opCtx->inMultiDocumentTransaction() ||
-        groupType != WriteUnitOfWork::OplogEntryGroupType::kDontGroup || !topLevel) {
+        groupType != WriteUnitOfWork::OplogEntryGroupType::noGroup || !topLevel) {
         return groupType;
     }
 
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot)
-        ? WriteUnitOfWork::OplogEntryGroupType::kGroupForPossiblyRetryableOperations
-        : groupType;
+    if (!OplogGroupingPolicy::get(opCtx->getServiceContext()).shouldGroupOplogEntries(opCtx)) {
+        return groupType;
+    }
+
+    return WriteUnitOfWork::OplogEntryGroupType::atomicGroup;
 }
 
 }  // namespace
+
+OplogGroupingPolicy& OplogGroupingPolicy::get(ServiceContext* svc) {
+    auto& policy = getOplogGroupingPolicy(svc);
+    if (policy) {
+        return *policy;
+    }
+    static OplogGroupingPolicy defaultPolicy;
+    return defaultPolicy;
+}
+
+void OplogGroupingPolicy::set(ServiceContext* svc, std::unique_ptr<OplogGroupingPolicy> policy) {
+    getOplogGroupingPolicy(svc) = std::move(policy);
+}
 
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupOplogEntries)
     : _opCtx(opCtx),

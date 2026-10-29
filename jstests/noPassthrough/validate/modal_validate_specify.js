@@ -20,15 +20,43 @@ function setupCollections(db) {
     assert.commandWorked(db["cheese"].createIndex({b: 1}));
 }
 
-function generateResults(dbpath, opts, validateCommand = {validate: ""}) {
+// The "validating collection" log line reports the options validation actually resolved to, which
+// may differ from those the caller specified.
+function parseValidationOptionsFromLogs() {
+    return rawMongoProgramOutput('"id":20303')
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
+}
+
+function generateResults(dbpath, opts) {
     MongoRunner.runMongod({
         dbpath: dbpath,
-        ...validateCommand,
+        validate: "",
         setParameter: opts,
         noCleanData: true,
     });
     return parseValidateOutputsFromLogs();
 }
+
+// TODO SERVER-76346 reconfigure modes when feature flag is not used to switch.
+const kValidateModes = [
+    {
+        name: "serial validation",
+        params: {featureFlagParallelCollectionValidation: false},
+    },
+    {
+        name: "parallel validation using all cores",
+        params: {featureFlagParallelCollectionValidation: true},
+    },
+    {
+        name: "parallel validation limited to 8 namespaces",
+        params: {
+            featureFlagParallelCollectionValidation: true,
+            validateParallelMaxConcurrentNamespaces: 8,
+        },
+    },
+];
 
 const dbpath = MongoRunner.dataPath + "modal_validate_specify";
 let port;
@@ -53,9 +81,9 @@ describe("Modal Validate can specify target Databases and Collections", () => {
 
     beforeEach(() => clearRawMongoProgramOutput());
 
-    for (const validateCommand of [{validate: ""}, {validateParallel: ""}, {validateParallel: 8}]) {
-        it(`Command validates every namespace with ${tojson(validateCommand)}`, () => {
-            const validateLogs = generateResults(dbpath, {}, validateCommand);
+    for (const validateMode of kValidateModes) {
+        it(`Command validates every namespace with ${validateMode.name}`, () => {
+            const validateLogs = generateResults(dbpath, validateMode.params);
             jsTest.log.info("Validate logs", {validateLogs});
             const validatedNss = new Set(validateLogs.map((log) => log.attr.results.ns));
             for (const ns of [
@@ -70,8 +98,11 @@ describe("Modal Validate can specify target Databases and Collections", () => {
             }
         });
 
-        it(`Command validates everything in the specified DB with ${tojson(validateCommand)}`, () => {
-            const validateLogs = generateResults(dbpath, {validateDbName: "test"}, validateCommand);
+        it(`Command validates everything in the specified DB with ${validateMode.name}`, () => {
+            const validateLogs = generateResults(dbpath, {
+                ...validateMode.params,
+                validateDbName: "test",
+            });
             jsTest.log.info(validateLogs);
             assert.eq(2, validateLogs.length);
             const firstResult = validateLogs[0].attr.results;
@@ -80,6 +111,26 @@ describe("Modal Validate can specify target Databases and Collections", () => {
             assert(secondResult.ns == "test.ham" || secondResult.ns == "test.cheese");
             assert.eq(2, firstResult.nIndexes);
             assert.eq(2, secondResult.nIndexes);
+        });
+
+        it(`Reports successful log for ${validateMode.name}`, () => {
+            generateResults(dbpath, validateMode.params);
+            const successLogs = rawMongoProgramOutput("9437303")
+                .split("\n")
+                .filter((line) => line.trim() !== "");
+            assert.eq(1, successLogs.length, "Expected exactly one success log", {successLogs});
+        });
+
+        it(`Reports unsuccessful log for ${validateMode.name}`, () => {
+            generateResults(dbpath, {
+                ...validateMode.params,
+                "failpoint.failRecordStoreTraversal": tojson({mode: "alwaysOn"}),
+            });
+            const failureLogs = rawMongoProgramOutput("9437304")
+                .split("\n")
+                .filter((line) => line.trim() !== "");
+            assert.eq(1, failureLogs.length, "Expected exactly one failure log", {failureLogs});
+            assert.eq(0, rawMongoProgramOutput("9437303").trim().length, "Unexpected success log");
         });
     }
 
@@ -131,6 +182,11 @@ describe("Modal Validate can specify target Databases and Collections", () => {
                 `collectionValidateOptions={options: {repair: false}}`,
             ),
         );
+        const optionLogs = parseValidationOptionsFromLogs();
+        assert.eq(1, optionLogs.length, {optionLogs});
+        assert.eq("test.ham", optionLogs[0].attr.namespace);
+        assert.eq("foreground", optionLogs[0].attr.options.mode);
+        assert.eq(false, optionLogs[0].attr.options.repair);
     });
 
     it("Cannot be run with repair:true when running modal validation.", () => {
@@ -171,6 +227,11 @@ describe("Modal Validate can specify target Databases and Collections", () => {
                 `collectionValidateOptions={options: {fixMultikey: false}}`,
             ),
         );
+        const optionLogs = parseValidationOptionsFromLogs();
+        assert.eq(1, optionLogs.length, {optionLogs});
+        assert.eq("test.ham", optionLogs[0].attr.namespace);
+        assert.eq("foreground", optionLogs[0].attr.options.mode);
+        assert.eq(false, optionLogs[0].attr.options.fixMultikey);
     });
 
     it("Cannot be run with fixMultikey:true when running modal validation.", () => {

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/stage_builder/sbe/gen_coll_scan.h"
@@ -38,16 +12,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
-#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
-
-#include <cstddef>
-#include <tuple>
 
 #include <boost/optional/optional.hpp>
 
@@ -89,129 +59,54 @@ sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
     }
 }
 
-/**
- * Creates a collection scan sub-tree optimized for clustered collection scans. Should only be
- * called on clustered collections. We can build an optimized scan when any of the following
- * scenarios apply:
- *
- * 1. 'csn->minRecord' and/or 'csn->maxRecord' exist.
- *    1.1 CollectionScanParams::FORWARD scan:
- *        a. If 'csn->minRecord' is present, the collection scan will seek directly to the RecordId
- *           of a record as close to this lower bound as possible without going higher.
- *        b. If 'csn->maxRecord' is present, the collection scan will stop and return EOF the first
- *           time it fetches a document greater than this upper bound.
- *    1.2 CollectionScanParams::BACKWARD scan:
- *        a. If 'csn->maxRecord' is present, the collection scan will seek directly to the RecordId
- *           of a record as close to this upper bound as possible without going lower.
- *        b. If 'csn->minRecord' is present, the collection scan will stop and return EOF the first
- *           time it fetches a document less than this lower bound.
- * 2. The user request specified a $_resumeAfter RecordId from which to begin the scan AND the scan
- *    is forward AND neither 'csn->minRecord' nor 'csn->maxRecord' exist.
- *    2a. The scan will continue with the next RecordId after $_resumeAfter.
- */
-std::pair<SbStage, PlanStageSlots> generateClusteredCollScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const CollectionScanNode* csn,
-    std::vector<std::string> scanFieldNames) {
-    SbBuilder b(state, csn->nodeId());
-
-    const bool forward = csn->direction == CollectionScanParams::FORWARD;
-
-    tassert(11051828,
-            "Expecting CollectionScanNode to allow clustered collection scan",
-            csn->doClusteredCollectionScanSbe());
-
-    tassert(9884961, "resumeScanPoint not supported in SBE", !csn->resumeScanPoint);
-
-    tassert(9884962,
-            "SBE does not support queries on the oplog",
-            !collection->ns().isOplog() && !csn->shouldTrackLatestOplogTimestamp);
-
-    // The minRecord and maxRecord optimizations are not compatible with resume tokens.
-    tassert(9884902,
-            "'resumeScanPoint' cannot be used with 'minRecord' or 'maxRecord'",
-            !(csn->resumeScanPoint && (csn->minRecord || csn->maxRecord)));
-    // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
-    tassert(9884903,
-            "Cannot use 'stopApplyingFilterAfterFirstMatch' when generating clustered scan",
-            !csn->stopApplyingFilterAfterFirstMatch);
-
-    SbStage resumeRecordIdTree;
-
-    // Create minRecordId and/or maxRecordId slots as needed.
-    boost::optional<SbSlot> minRecordSlot;
-    boost::optional<SbSlot> maxRecordSlot;
-    if (csn->minRecord) {
-        auto [tag, val] = sbe::value::makeCopyRecordId(csn->minRecord->recordId());
-        minRecordSlot = SbSlot{state.env->registerSlot(tag, val, true, state.slotIdGenerator)};
-    }
-    if (csn->maxRecord) {
-        auto [tag, val] = sbe::value::makeCopyRecordId(csn->maxRecord->recordId());
-        maxRecordSlot = SbSlot{state.env->registerSlot(tag, val, true, state.slotIdGenerator)};
-    }
-    state.data->clusteredCollBoundsInfos.emplace_back(
-        ParameterizedClusteredScanSlots{b.lower(minRecordSlot), b.lower(maxRecordSlot)});
-
-    // Create the ScanStage.
-    bool includeScanStartRecordId =
-        (csn->boundInclusion ==
-             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
-         csn->boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
-    bool includeScanEndRecordId =
-        (csn->boundInclusion ==
-             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
-         csn->boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly);
-
+// Unlike generateGenericCollScan() below, this takes 'scanFieldNames' by value: it does not add the
+// filter's dependencies to the list, so the caller's copy still describes exactly the fields the
+// scan produces. The consequence is that a field referenced only by the filter gets no slot here,
+// and the filter reads it from the result object instead. That is a missed optimization rather than
+// a correctness issue.
+// TODO(SERVER-133309): Consider extracting the filter's top-level fields into slots here too.
+SbBuilder::MakeScanResult generateClusteredCollScan(SbBuilder& b,
+                                                    StageBuilderState& state,
+                                                    const CollectionPtr& collection,
+                                                    bool forward,
+                                                    RecordIdRange range,
+                                                    std::vector<std::string> scanFieldNames) {
     SbScanBounds scanBounds;
-    scanBounds.minRecordIdSlot = minRecordSlot;
-    scanBounds.maxRecordIdSlot = maxRecordSlot;
-    scanBounds.includeScanStartRecordId = includeScanStartRecordId;
-    scanBounds.includeScanEndRecordId = includeScanEndRecordId;
-
-    auto [stage, resultSlot, recordIdSlot, scanFieldSlots] =
-        b.makeScan(collection->uuid(),
-                   collection->ns().dbName(),
-                   forward,
-                   scanFieldNames,  // do not std::move - used later
-                   std::move(scanBounds));
-
-    PlanStageSlots outputs;
-    outputs.setResultObj(resultSlot);
-    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
-    for (size_t i = 0; i < scanFieldNames.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, scanFieldNames[i]), scanFieldSlots[i]);
+    if (range.getMin()) {
+        auto [tag, val] = sbe::value::makeCopyRecordId(range.getMin()->recordId());
+        scanBounds.minRecordIdSlot =
+            SbSlot{state.env->registerSlot(tag, val, true, state.slotIdGenerator)};
     }
-
-    // When the start and/or end scan bounds are from an expression, ScanStage::getNext() treats
-    // them both as inclusive, and 'csn->filter' will enforce any exclusions. If the bound(s) came
-    // from the "min" (always inclusive) and/or "max" (always exclusive) keywords, there may be no
-    // filter, so ScanStage->getNext() must directly enforce the bounds. min's inclusivity matches
-    // getNext()'s default behavior, but max's exclusivity does not and thus is enforced by the
-    // includeScanEndRecordId argument to the ScanStage constructor above.
-    SbExpr filterExpr = generateFilter(
-        state,
-        csn->filter.get(),
-        resultSlot,
-        outputs,
-        /*isFilterOverIxscan*/ false,
-        /*canUsePathArrayness*/ state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
-    if (!filterExpr.isNull()) {
-        stage = b.makeFilter(std::move(stage), std::move(filterExpr));
+    if (range.getMax()) {
+        auto [tag, val] = sbe::value::makeCopyRecordId(range.getMax()->recordId());
+        scanBounds.maxRecordIdSlot =
+            SbSlot{state.env->registerSlot(tag, val, true, state.slotIdGenerator)};
     }
+    scanBounds.includeScanStartRecordId = forward ? range.isMinInclusive() : range.isMaxInclusive();
+    scanBounds.includeScanEndRecordId = forward ? range.isMaxInclusive() : range.isMinInclusive();
 
-    return {std::move(stage), std::move(outputs)};
+    state.data->clusteredCollBoundsInfos.emplace_back(ParameterizedClusteredScanSlots{
+        b.lower(scanBounds.minRecordIdSlot), b.lower(scanBounds.maxRecordIdSlot)});
+
+    return b.makeScan(collection->uuid(),
+                      collection->ns().dbName(),
+                      forward,
+                      std::move(scanFieldNames),
+                      std::move(scanBounds));
 }  // generateClusteredCollScan
 
 /**
  * Generates a generic collection scan sub-tree.
+ * Note that 'fields' is an in/out parameter: it is augmented with the top-level fields referenced
+ * by 'csn->filter' below, and the caller relies on seeing those additions so that it can map the
+ * scan's field slots into 'PlanStageSlots'. Otherwise the filter would have no kField slot to use
+ * and would redundantly re-extract the field from the result object.
  */
-std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& state,
-                                                           const CollectionPtr& collection,
-                                                           const CollectionScanNode* csn,
-                                                           std::vector<std::string> fields) {
-    SbBuilder b(state, csn->nodeId());
-
+SbBuilder::MakeScanResult generateGenericCollScan(SbBuilder& b,
+                                                  StageBuilderState& state,
+                                                  const CollectionPtr& collection,
+                                                  const CollectionScanNode* csn,
+                                                  std::vector<std::string>& fields) {
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
     tassert(9884951, "resumeScanPoint not supported in SBE", !csn->resumeScanPoint);
@@ -233,45 +128,16 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
 
     sbe::ScanOpenCallback callback = makeOpenCallbackIfNeeded(collection, csn);
 
-    SbStage resumeRecordIdTree;
     boost::optional<SbSlot> oplogTsSlot;
 
-    auto [stage, resultSlot, recordIdSlot, fieldSlots] = b.makeScan(collection->uuid(),
-                                                                    collection->ns().dbName(),
-                                                                    forward,
-                                                                    fields,
-                                                                    SbScanBounds{},
-                                                                    SbIndexInfoSlots{},
-                                                                    std::move(callback),
-                                                                    oplogTsSlot);
-
-    PlanStageSlots outputs;
-    outputs.setResultObj(resultSlot);
-    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
-    for (size_t i = 0; i < fields.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, fields[i]), fieldSlots[i]);
-    }
-
-    if (csn->filter) {
-        // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
-        tassert(11051827,
-                "Unexpected stopApplyingFilterAfterFirstMatch flag in non-oplog scan",
-                !csn->stopApplyingFilterAfterFirstMatch);
-
-        auto filterExpr =
-            generateFilter(state,
-                           csn->filter.get(),
-                           resultSlot,
-                           outputs,
-                           /*isFilterOverIxscan*/ false,
-                           /*canUsePathArrayness*/
-                           state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
-        if (!filterExpr.isNull()) {
-            stage = b.makeFilter(std::move(stage), std::move(filterExpr));
-        }
-    }
-
-    return {std::move(stage), std::move(outputs)};
+    return b.makeScan(collection->uuid(),
+                      collection->ns().dbName(),
+                      forward,
+                      fields,
+                      SbScanBounds{},
+                      SbIndexInfoSlots{},
+                      std::move(callback),
+                      oplogTsSlot);
 }  // generateGenericCollScan
 
 }  // namespace
@@ -280,10 +146,81 @@ std::pair<SbStage, PlanStageSlots> generateCollScan(StageBuilderState& state,
                                                     const CollectionPtr& collection,
                                                     const CollectionScanNode* csn,
                                                     std::vector<std::string> fields) {
-    if (csn->doClusteredCollectionScanSbe()) {
-        return generateClusteredCollScan(state, collection, csn, std::move(fields));
-    } else {
-        return generateGenericCollScan(state, collection, csn, std::move(fields));
+    // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
+    tassert(11051827,
+            "Unexpected stopApplyingFilterAfterFirstMatch flag in non-oplog scan",
+            !csn->stopApplyingFilterAfterFirstMatch);
+
+    tassert(9884961, "resumeScanPoint not supported in SBE", !csn->resumeScanPoint);
+
+    tassert(13625900,
+            "expected CollectionScanNode namespace to match CollectionPtr",
+            collection->ns() == csn->nss);
+
+    SbBuilder b(state, csn->nodeId());
+
+    // Empty range list (∅) — nothing can match, return an empty limit stage.
+    // TODO(SERVER-133100): Handle trivially empty scans at the QO level instead.
+    // Then the branch below can be replaced with a tassert.
+    if (csn->rangeList.isEmpty()) {
+        PlanStageReqs eofReqs;
+        eofReqs.setResultObj().set(PlanStageSlots::kRecordId);
+        PlanStageSlots outputs;
+        outputs.setMissingRequiredNamedSlotsToNothing(state, eofReqs);
+        return {b.makeLimit(b.makeCoScan(), b.makeInt64Constant(0)), std::move(outputs)};
     }
+
+    SbStage stage;
+    SbSlot resultSlot;
+    SbSlot recordIdSlot;
+    SbSlotVector scanFieldSlots;
+
+    if (csn->doClusteredCollectionScanSbe()) {
+        // The minRecord and maxRecord optimizations are not compatible with resume tokens.
+        tassert(9884902,
+                "'resumeScanPoint' cannot be used with 'rangeList' bounds",
+                !(csn->resumeScanPoint && !csn->rangeList.isUnbounded()));
+
+        const bool forward = csn->direction == CollectionScanParams::FORWARD;
+
+        if (csn->rangeList.getRanges().size() == 1) {
+            auto range = csn->rangeList.outerBounds();
+            std::tie(stage, resultSlot, recordIdSlot, scanFieldSlots) =
+                generateClusteredCollScan(b, state, collection, forward, std::move(range), fields);
+        } else {
+            std::tie(stage, resultSlot, recordIdSlot, scanFieldSlots) = b.makeScan(
+                collection->uuid(), collection->ns().dbName(), forward, fields, csn->rangeList);
+        }
+    } else {
+        std::tie(stage, resultSlot, recordIdSlot, scanFieldSlots) =
+            generateGenericCollScan(b, state, collection, csn, fields);
+    }
+
+    PlanStageSlots outputs;
+    outputs.setResultObj(resultSlot);
+    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+    for (size_t i = 0; i < fields.size(); ++i) {
+        outputs.set(std::make_pair(PlanStageSlots::kField, fields[i]), scanFieldSlots[i]);
+    }
+
+    if (csn->filter) {
+        // The filter runs over raw documents from 'collection', which may differ from the main
+        // namespace (e.g. a foreign collection scan under join optimization).
+        SbExpr filterExpr =
+            generateFilter(state,
+                           csn->filter.get(),
+                           resultSlot,
+                           outputs,
+                           /*isFilterOverIxscan=*/false,
+                           /*pathArraynessNss=*/
+                           state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness()
+                               ? boost::make_optional(csn->nss)
+                               : boost::none);
+        if (!filterExpr.isNull()) {
+            stage = b.makeFilter(std::move(stage), std::move(filterExpr));
+        }
+    }
+
+    return {std::move(stage), std::move(outputs)};
 }
 }  // namespace mongo::stage_builder

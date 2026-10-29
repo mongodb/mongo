@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/rollback_impl.h"
 
@@ -1850,9 +1824,9 @@ TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTi
                                                     lsid2,
                                                     txnNumTwo,
                                                     OpTime(),
-                                                    1 /* stmtId */,
-                                                    2 /* wallClockMillis */,
-                                                    true /* isRetryableWrite */);
+                                                    /*stmtId=*/1,
+                                                    /*wallClockMillis=*/2,
+                                                    /*isRetryableWrite=*/true);
 
     // Create transactions entry after 'stableTimestamp'. Transactions entries are of 'command' op
     // type.
@@ -1875,9 +1849,9 @@ TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTi
                                                    lsid2,
                                                    txnNumTwo,
                                                    noopPrevOpTime,
-                                                   2 /* stmtId */,
-                                                   5 /* wallClockMillis */,
-                                                   true /* isRetryableWrite */);
+                                                   /*stmtId=*/2,
+                                                   /*wallClockMillis=*/5,
+                                                   /*isRetryableWrite=*/true);
 
     // Create transactions entry after 'stableTimestamp'. Transactions entries are of 'command' op
     // type.
@@ -1964,11 +1938,11 @@ TEST_F(
     auto noopEntryAfterStableTs = makeMigratedNoop(OpTime(Timestamp(5, 5), 5),
                                                    firstOplogEntryAfterStableTs,
                                                    lsid2,
-                                                   3 /* txnNum */,
+                                                   /*txnNum=*/3,
                                                    OpTime(Timestamp(2, 1), 1),
-                                                   2 /* stmtId */,
-                                                   5 /* wallClockMillis */,
-                                                   true /*isRetryableWrite */);
+                                                   /*stmtId=*/2,
+                                                   /*wallClockMillis=*/5,
+                                                   /*isRetryableWrite=*/true);
 
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
     ASSERT_OK(_insertOplogEntry(firstOplogEntryAfterStableTs));
@@ -2040,9 +2014,9 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
                                                     lsid2,
                                                     txnNumTwo,
                                                     OpTime(),
-                                                    1 /* stmtId*/,
-                                                    2 /* wallClockMillis */,
-                                                    true /* isRetryableWrite */);
+                                                    /*stmtId=*/1,
+                                                    /*wallClockMillis=*/2,
+                                                    /*isRetryableWrite=*/true);
 
     // Create migrated no-op transactions entry before 'stableTimestamp'.
     auto txnOpTime = OpTime(Timestamp(3, 3), 3);
@@ -2051,9 +2025,9 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
                                                    lsid,
                                                    txnNumTwo,
                                                    OpTime(),
-                                                   boost::none /* stmtId */,
-                                                   4 /* wallClockMillis */,
-                                                   false /* isRetryableWrite */);
+                                                   /*stmtId=*/boost::none,
+                                                   /*wallClockMillis=*/4,
+                                                   /*isRetryableWrite=*/false);
 
     // Create regular non-retryable write oplog entry after 'stableTimestamp'.
     auto insertEntry = makeInsertOplogEntry(7, BSON("_id" << 3), redactTenant(nss), collUuid);
@@ -2064,9 +2038,9 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
                                                   lsid,
                                                   txnNumTwo,
                                                   txnOpTime,
-                                                  boost::none /* stmtId */,
-                                                  10 /* wallClockMillis */,
-                                                  false /* isRetryableWrite */);
+                                                  /*stmtId=*/boost::none,
+                                                  /*wallClockMillis=*/10,
+                                                  /*isRetryableWrite=*/false);
 
     ASSERT_OK(_insertOplogEntry(oplogEntryBeforeStableTs));
     ASSERT_OK(_insertOplogEntry(noopEntryBeforeStableTs));

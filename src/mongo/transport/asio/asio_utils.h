@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -52,6 +26,50 @@
 
 namespace mongo::transport {
 
+// POLLRDHUP (peer half-closed) is Linux-specific. On platforms that don't define it (e.g. Windows,
+// older BSDs), define it to 0 so callers can request it in a poll mask without #ifdef noise; the
+// kernel simply never reports it there and POLLHUP carries the signal instead.
+#ifndef POLLRDHUP
+#define POLLRDHUP 0
+#endif
+
+#ifdef __linux__
+#include <linux/sockios.h>
+
+/**
+ * Wrapper class to allow SIOCOUTQ IO control command to be accessed through
+ * socket.io_control.
+ * @par Example
+ * @code
+ * asio::ip::tcp::socket socket(my_context);
+ * ...
+ * SendQueueBytes command;
+ * socket.io_control(command);
+ * int64_t sendBytes = command.get();
+ * @endcode
+ */
+class SendQueueBytes {
+public:
+    int name() const {
+        return SIOCOUTQ;
+    }
+
+    asio::detail::ioctl_arg_type* data() {
+        return &_value;
+    }
+
+    const asio::detail::ioctl_arg_type* data() const {
+        return &_value;
+    }
+
+    int64_t get() const {
+        return static_cast<int64_t>(_value);
+    }
+
+private:
+    asio::detail::ioctl_arg_type _value = 0;
+};
+#endif
 /**
  * Generic wrapper for making an ASIO socket get_option or set_option call
  * having a payload of type `T`, which is usually just `int` so it's the default.

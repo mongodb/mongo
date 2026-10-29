@@ -1,5 +1,6 @@
 // Check key match with sub matchers - part of SERVER-3192
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   # Uses $where operator
 //   requires_scripting,

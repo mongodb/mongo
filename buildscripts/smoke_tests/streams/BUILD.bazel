@@ -39,8 +39,6 @@ resmoke_suite_test(
         "//src/mongo/db/modules/enterprise/jstests/streams:merge_pipeline.js",
         # failed 3:12577 times, success p90 => 0.262s, score => 11.438
         "//src/mongo/db/modules/enterprise/jstests/streams:checkpoint_helper.js",
-        # failed 29:14016 times, success p90 => 2.594s, score => 11.178
-        "//src/mongo/db/modules/enterprise/jstests/streams:checkpoint_backwards_compat.js",
         # failed 31:12566 times, success p90 => 2.779s, score => 11.156
         "//src/mongo/db/modules/enterprise/jstests/streams:sample_data_source.js",
         # failed 33:14008 times, success p90 => 3.034s, score => 10.876

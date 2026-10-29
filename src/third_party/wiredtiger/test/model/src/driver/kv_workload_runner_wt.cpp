@@ -169,7 +169,8 @@ kv_workload_runner_wt::run(const kv_workload &workload)
                 for (; p < workload.size(); p++) {
                     const kv_workload_operation &op = workload[p];
                     if (std::holds_alternative<operation::crash>(op.operation) ||
-                      std::holds_alternative<operation::checkpoint_crash>(op.operation)) {
+                      std::holds_alternative<operation::checkpoint_crash>(op.operation) ||
+                      std::holds_alternative<operation::checkpoint_crash_trigger>(op.operation)) {
                         _state->expect_crash = true;
                         _state->crash_index = p;
                     }
@@ -334,6 +335,28 @@ kv_workload_runner_wt::do_operation(const operation::checkpoint_crash &op)
 
     std::ostringstream config;
     config << "debug=(checkpoint_crash_point=" << op.crash_step << ")";
+    std::string config_str = config.str();
+
+    return session->checkpoint(session, config_str.c_str());
+}
+
+/*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
+kv_workload_runner_wt::do_operation(const operation::checkpoint_crash_trigger &op)
+{
+    std::shared_lock lock(_connection_lock);
+
+    WT_SESSION *session;
+    int ret = _connection->open_session(_connection, nullptr, nullptr, &session);
+    if (ret != 0)
+        return ret;
+    wiredtiger_session_guard session_guard(session);
+
+    std::ostringstream config;
+    config << "debug=(checkpoint_crash_trigger_point=" << operation::to_string(op.phase) << ")";
     std::string config_str = config.str();
 
     return session->checkpoint(session, config_str.c_str());
@@ -683,6 +706,8 @@ kv_workload_runner_wt::wiredtiger_open_nolock()
     config << k_config_base;
     if (database_config.disaggregated)
         config << "," << wt_disagg_config_string();
+    if (database_config.logging)
+        config << ",log=(enabled=true)";
     if (_state->connection_config[0] != '\0')
         config << "," << _state->connection_config;
     if (!_connection_config_override.empty())
@@ -692,6 +717,15 @@ kv_workload_runner_wt::wiredtiger_open_nolock()
     int ret = ::wiredtiger_open(_home.c_str(), nullptr, config_str.c_str(), &_connection);
     if (ret != 0)
         throw wiredtiger_exception("Cannot open WiredTiger", ret);
+
+    /*
+     * The database configuration is the only place the model records logging state. The connection
+     * configuration and any override can turn it on or off behind the model's back, so reconcile
+     * the resolved state with the model's belief at every open.
+     */
+    bool logging = FLD_ISSET(((WT_CONNECTION_IMPL *)_connection)->log_mgr.flags, WT_LOG_ENABLED);
+    if (logging != database_config.logging)
+        throw model_exception("Connection logging does not match the database configuration");
 
     /*
      * If we're using disaggregated storage, pick up the latest checkpoint, and step up, and set the

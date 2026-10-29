@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 
@@ -34,21 +8,17 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -60,51 +30,6 @@
 namespace mongo {
 
 namespace {
-
-void _handleStatus(const Status& status,
-                   std::string_view collDescription,
-                   const NamespaceString& nss) {
-    if (status.isOK()) {
-        LOGV2(11718601,
-              "Created internal {collDescription} collection.",
-              "collDescription"_attr = collDescription,
-              "ns"_attr = nss.toStringForErrorMsg());
-    } else if (status.code() == ErrorCodes::NamespaceExists) {
-        LOGV2(11886900,
-              "{collDescription} collection already exists.",
-              "collDescription"_attr = collDescription,
-              "ns"_attr = nss.toStringForErrorMsg());
-    } else {
-        massertStatusOK(
-            status.withContext(fmt::format("Failed to create the {} collection", collDescription)));
-    }
-}
-
-Status _createInternalFastCountCollection(repl::StorageInterface* storageInterface,
-                                          OperationContext* opCtx,
-                                          const NamespaceString& nss) {
-    return storageInterface->createCollection(
-        opCtx,
-        nss,
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
-}
-
-void _createInternalFastCountCollections(repl::StorageInterface* storageInterface,
-                                         OperationContext* opCtx) {
-    const auto storeNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    _handleStatus(
-        replicated_fast_count::createReplicatedFastCountCollection(storageInterface, opCtx),
-        "replicated fast count metadata store",
-        storeNss);
-
-    const auto timestampsNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-    _handleStatus(replicated_fast_count::createReplicatedFastCountTimestampCollection(
-                      storageInterface, opCtx),
-                  "replicated fast count metadata store timestamps",
-                  timestampsNss);
-}
 
 void _writeInitReplicatedFastCountOplogEntry(OperationContext* opCtx) {
     InitReplicatedFastCountO2 o2;
@@ -123,48 +48,44 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
     auto& manager =
         replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext());
 
-    // Containers and collections should be mutually exclusive.
-    if (shouldUseReplicatedFastCountContainers(opCtx)) {
-        auto status = createInternalFastCountContainers(opCtx,
-                                                        NamespaceString::kAdminCommandNamespace,
-                                                        ident::kFastCountMetadataStore,
-                                                        KeyFormat::String,
-                                                        ident::kFastCountMetadataStoreTimestamps,
-                                                        KeyFormat::Long,
-                                                        /*writeToOplog=*/true);
-        if (status == ErrorCodes::ObjectAlreadyExists) {
-            LOGV2(12309403,
-                  "Replicated fast count idents already exist",
-                  "metadataIdent"_attr = ident::kFastCountMetadataStore,
-                  "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
-        } else {
-            massertStatusOK(status);
-        }
-
-        auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
-        auto metadataRS =
-            engine->getRecordStore(opCtx,
-                                   NamespaceString::kAdminCommandNamespace,
-                                   ident::kFastCountMetadataStore,
-                                   RecordStore::Options{.keyFormat = KeyFormat::String},
-                                   /*uuid=*/boost::none);
-        auto timestampsRS =
-            engine->getRecordStore(opCtx,
-                                   NamespaceString::kAdminCommandNamespace,
-                                   ident::kFastCountMetadataStoreTimestamps,
-                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
-                                   /*uuid=*/boost::none);
-        manager.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
+    auto status = createInternalFastCountContainers(opCtx,
+                                                    NamespaceString::kAdminCommandNamespace,
+                                                    ident::kFastCountMetadataStore,
+                                                    KeyFormat::String,
+                                                    ident::kFastCountMetadataStoreTimestamps,
+                                                    KeyFormat::Long,
+                                                    /*writeToOplog=*/true);
+    if (status == ErrorCodes::ObjectAlreadyExists) {
+        LOGV2(12309403,
+              "Replicated fast count idents already exist",
+              "metadataIdent"_attr = ident::kFastCountMetadataStore,
+              "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
     } else {
-        _createInternalFastCountCollections(repl::StorageInterface::get(opCtx->getServiceContext()),
-                                            opCtx);
+        massertStatusOK(status);
     }
+
+    auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto metadataRS = engine->getRecordStore(opCtx,
+                                             NamespaceString::kAdminCommandNamespace,
+                                             ident::kFastCountMetadataStore,
+                                             RecordStore::Options{.keyFormat = KeyFormat::String},
+                                             /*uuid=*/boost::none);
+    auto timestampsRS = engine->getRecordStore(opCtx,
+                                               NamespaceString::kAdminCommandNamespace,
+                                               ident::kFastCountMetadataStoreTimestamps,
+                                               RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                               /*uuid=*/boost::none);
+    manager.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
 
     manager.startup(opCtx);
 
     // Register the manager as the storage engine's FlushAllFilesObserver so the engine notifies it
     // to flush size and count metadata when flushing all files.
     opCtx->getServiceContext()->getStorageEngine()->setFlushAllFilesObserver(&manager);
+
+    // Standalones reach an invariant that there are no active storage transactions during setFCV so
+    // we abandon the snapshot.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 
 namespace {
@@ -253,82 +174,88 @@ Status createInternalFastCountContainers(OperationContext* opCtx,
                                : rss::consensus::IntentRegistry::Intent::LocalWrite;
     Lock::GlobalLock globalLock(opCtx, MODE_IX, Lock::GlobalLockOptions{.explicitIntent = intent});
 
-    // Try creating both containers. ObjectAlreadyExists tells us which idents exist.
+    return writeConflictRetry(opCtx, "createInternalFastCountContainers", nss, [&]() -> Status {
+        // Try creating both containers. ObjectAlreadyExists tells us which idents exist.
 
-    WriteUnitOfWork wuow(opCtx);
-    auto metadataStatus =
-        _createInternalFastCountContainer(opCtx, nss, metadataIdent, metadataKeyFormat);
-    auto timestampsStatus =
-        _createInternalFastCountContainer(opCtx, nss, timestampsIdent, timestampsKeyFormat);
+        WriteUnitOfWork wuow(opCtx);
+        auto metadataStatus =
+            _createInternalFastCountContainer(opCtx, nss, metadataIdent, metadataKeyFormat);
+        auto timestampsStatus =
+            _createInternalFastCountContainer(opCtx, nss, timestampsIdent, timestampsKeyFormat);
 
-    if (metadataStatus.isOK() && timestampsStatus.isOK()) {
-        if (writeToOplog) {
-            _writeInitReplicatedFastCountOplogEntry(opCtx);
+        if (metadataStatus.isOK() && timestampsStatus.isOK()) {
+            if (writeToOplog) {
+                _writeInitReplicatedFastCountOplogEntry(opCtx);
+            }
+            wuow.commit();
+            LOGV2(12231704,
+                  "Created replicated fast count idents",
+                  "metadataIdent"_attr = ident::kFastCountMetadataStore,
+                  "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
+            return Status::OK();
         }
-        wuow.commit();
-        LOGV2(12231704,
-              "Created replicated fast count idents",
-              "metadataIdent"_attr = ident::kFastCountMetadataStore,
-              "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
-        return Status::OK();
-    }
 
-    if (metadataStatus == ErrorCodes::ObjectAlreadyExists &&
-        timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
-        // Handling for both idents existing differs between stepup initialization and oplog
-        // application.
-        return metadataStatus;
-    }
-
-    if ((!metadataStatus.isOK() && metadataStatus != ErrorCodes::ObjectAlreadyExists) ||
-        (!timestampsStatus.isOK() && timestampsStatus != ErrorCodes::ObjectAlreadyExists)) {
-        // Return any unexpected error. WUOW rollback will remove any ident that was newly created.
-        return !metadataStatus.isOK() ? metadataStatus : timestampsStatus;
-    }
-
-    // TODO SERVER-114575 Layered table drops can sometimes report OK but collide with subsequent
-    // table creations. We can re-use the colliding ident as long as it is empty.
-    Status existingIdentStatus = Status::OK();
-    std::string msg;
-    if (metadataStatus == ErrorCodes::ObjectAlreadyExists) {
-        std::tie(existingIdentStatus, msg) =
-            handleExistingFastCountIdent(opCtx, nss, metadataIdent, metadataKeyFormat);
-    } else if (timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
-        std::tie(existingIdentStatus, msg) =
-            handleExistingFastCountIdent(opCtx, nss, timestampsIdent, timestampsKeyFormat);
-    } else {
-        // Success cases or unexpected errors should have already been handled.
-        MONGO_UNREACHABLE_TASSERT(12309405);
-    }
-
-    if (existingIdentStatus.isOK()) {
-        // The colliding ident was empty so we can treat it as newly created.
-        LOGV2(12309400, "Reusing empty ident", "details"_attr = msg);
-        if (writeToOplog) {
-            _writeInitReplicatedFastCountOplogEntry(opCtx);
+        if (metadataStatus == ErrorCodes::ObjectAlreadyExists &&
+            timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
+            // Handling for both idents existing differs between stepup initialization and oplog
+            // application.
+            return metadataStatus;
         }
-        wuow.commit();
+
+        if ((!metadataStatus.isOK() && metadataStatus != ErrorCodes::ObjectAlreadyExists) ||
+            (!timestampsStatus.isOK() && timestampsStatus != ErrorCodes::ObjectAlreadyExists)) {
+            // Return any unexpected error. WUOW rollback will remove any ident that was newly
+            // created.
+            return !metadataStatus.isOK() ? metadataStatus : timestampsStatus;
+        }
+
+        // TODO SERVER-114575 Layered table drops can sometimes report OK but collide with
+        // subsequent table creations. We can re-use the colliding ident as long as it is empty.
+        Status existingIdentStatus = Status::OK();
+        std::string msg;
+        if (metadataStatus == ErrorCodes::ObjectAlreadyExists) {
+            std::tie(existingIdentStatus, msg) =
+                handleExistingFastCountIdent(opCtx, nss, metadataIdent, metadataKeyFormat);
+        } else if (timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
+            std::tie(existingIdentStatus, msg) =
+                handleExistingFastCountIdent(opCtx, nss, timestampsIdent, timestampsKeyFormat);
+        } else {
+            // Success cases or unexpected errors should have already been handled.
+            MONGO_UNREACHABLE_TASSERT(12309405);
+        }
+
+        if (existingIdentStatus.isOK()) {
+            // The colliding ident was empty so we can treat it as newly created.
+            LOGV2(12309400, "Reusing empty ident", "details"_attr = msg);
+            if (writeToOplog) {
+                _writeInitReplicatedFastCountOplogEntry(opCtx);
+            }
+            wuow.commit();
+        }
+        return existingIdentStatus;
+    });
+}
+
+void dropInternalFastCountContainers(OperationContext* opCtx) {
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
+    if (!engine) {
+        // No underlying KVEngine (e.g. mock storage engines used in unit tests). There are no
+        // internal fast count container idents to drop.
+        return;
     }
-    return existingIdentStatus;
-}
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
-namespace replicated_fast_count {
-
-Status createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
-                                           OperationContext* opCtx) {
-    return _createInternalFastCountCollection(
-        storageInterface,
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore));
+    for (std::string_view containerIdent :
+         {ident::kFastCountMetadataStore, ident::kFastCountMetadataStoreTimestamps}) {
+        if (!engine->hasIdent(ru, containerIdent)) {
+            continue;
+        }
+        storageEngine->addDropPendingIdent(StorageEngine::Immediate{},
+                                           std::make_shared<Ident>(std::string(containerIdent)));
+        LOGV2(12549700,
+              "Marked internal replicated fast count container ident for immediate drop",
+              "ident"_attr = containerIdent);
+    }
 }
-
-Status createReplicatedFastCountTimestampCollection(repl::StorageInterface* storageInterface,
-                                                    OperationContext* opCtx) {
-    return _createInternalFastCountCollection(
-        storageInterface,
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(
-            NamespaceString::kReplicatedFastCountStoreTimestamps));
-}
-}  // namespace replicated_fast_count
 }  // namespace mongo

@@ -141,13 +141,14 @@ DEFAULTS = {
     "shard_index": None,
     "shell_conn_string": None,
     "historic_test_runtimes": None,
+    "tss_test_list": None,
     "shell_port": None,
     "shuffle": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
     "modules": "default",
     "resmoke_modules_path": os.path.join("buildscripts", "resmokeconfig", "resmoke_modules.yml"),
-    "enable_evergreen_api_test_selection": None,
+    "enable_evergreen_api_test_selection": False,
     "test_selection_strategies_array": None,
     "mongo_version_file": None,
     "releases_file": None,
@@ -193,6 +194,7 @@ DEFAULTS = {
     "revision_order_id": None,
     "task_id": None,
     "task_name": None,
+    "display_task_name": None,
     "task_doc": None,
     "variant_name": None,
     "version_id": None,
@@ -433,7 +435,7 @@ EXTERNAL_MODULE_SUITE_DIRS = []
 EXTERNAL_MODULE_MATRIX_SUITE_DIRS = []
 
 # if set, enables test selection using the Evergreen API
-ENABLE_EVERGREEN_API_TEST_SELECTION = None
+ENABLE_EVERGREEN_API_TEST_SELECTION = False
 
 # If set, requests Evergreen to use the specified test selection strategies.
 EVERGREEN_TEST_SELECTION_STRATEGY = None
@@ -477,6 +479,10 @@ EVERGREEN_TASK_ID = None
 
 # The name of the Evergreen task that resmoke.py is being run for.
 EVERGREEN_TASK_NAME = None
+
+# The name of the Evergreen display task that the task resmoke.py is being run for rolls up to.
+# Unset when the task is not part of a display task.
+EVERGREEN_DISPLAY_TASK_NAME = None
 
 # The documentation that describes what Evergreen task does.
 EVERGREEN_TASK_DOC = None
@@ -788,6 +794,14 @@ SHARD_INDEX = None
 # JSON containing historic test runtimes
 HISTORIC_TEST_RUNTIMES = None
 
+# YAML file of tests chosen for this suite by Evergreen's test selection service, generated at
+# build time. Used in place of calling the selection endpoint from inside the suite.
+TSS_TEST_LIST = None
+
+# Strategies used when test selection is enabled but none were named. Shared with the bazel path,
+# which asks the same service with the same strategies (bazel/resmoke/generate_tss_test_list.py).
+DEFAULT_EVERGREEN_TEST_SELECTION_STRATEGY = ["ExcludeManuallyQuarantined"]
+
 # Shell debug options
 JSDBG = None
 
@@ -908,12 +922,6 @@ REQUIRES_WORKLOAD_CONTAINER_SETUP = False
 
 # Config fuzzer encryption options, this is only set when the fuzzer is run
 CONFIG_FUZZER_ENCRYPTION_OPTS = None
-
-# Indicates which JavaScript engine the tested binary was built with. Corresponds to the
-# "javascriptEngine" field returned by the buildInfo command (or --version). When set to
-# "mozjs-wasm", tests tagged with "mozjs_wasm_unsupported" will be excluded. When NOT set to
-# "mozjs-wasm", tests tagged with "requires_mozjs_wasm" will be excluded.
-JS_ENGINE = None
 
 # If resmoke is running on a build variant that specifies a mongo_mozjs_opts,
 # we need a way to provide the JS_GC_ZEAL setting provided as part of the mongo_mozjs_opts

@@ -15,6 +15,7 @@ executor:
         TestData:
           clusterType: replset
           enableOTELTracing: false
+          oldBin: last-continuous
       nodb: ""
 matrix_suite: true
 selector:

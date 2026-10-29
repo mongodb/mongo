@@ -45,12 +45,6 @@ class test_layered_checkpoint14(wttest.WiredTigerTestCase):
     uri = "layered:" + table_name
     stable_uri = "file:" + table_name + ".wt_stable"
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     # Test records into a layered tree and restarting
     def test_layered_checkpoint14(self):
         session_config = 'key_format=S,value_format=S'
@@ -67,26 +61,35 @@ class test_layered_checkpoint14(wttest.WiredTigerTestCase):
         self.assertEqual(self.get_stat(stat.conn.disagg_block_page_discard), 0)
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor["Key " + str(i)] = str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(self.nitems):
             if i % 2 == 0:
                 cursor["Key " + str(i)] = str(i) + "_even"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(2))
         self.session.checkpoint()
 
         cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
         for i in range(self.nitems):
             if i % 100 == 0:
                 cursor["Key " + str(i)] = str(i) + "_hundred"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(3))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(3))
         self.session.checkpoint()
 
         # Get the stdout.txt file from the current working directory.
@@ -102,7 +105,7 @@ class test_layered_checkpoint14(wttest.WiredTigerTestCase):
                 freed_pages.add(page_number)
         self.assertGreater(len(freed_pages), 0)
 
-        self.assertGreater(self.get_stat(stat.conn.disagg_block_page_discard), 0)
+        self.assertStatGreaterSoon(stat.conn.disagg_block_page_discard, 0)
 
         #
         # Part 2: Open a follower, read the data, and check that we do not read any freed pages.

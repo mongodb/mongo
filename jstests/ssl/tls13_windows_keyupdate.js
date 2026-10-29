@@ -21,7 +21,7 @@
  */
 import {before, after, describe, it} from "jstests/libs/mochalite.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
-import {windowsSupportsTLS13} from "jstests/libs/os_helpers.js";
+import {windowsSupportsTLS13} from "jstests/libs/server_security/os_helpers.js";
 import {getPython3Binary} from "jstests/libs/python.js";
 
 if (determineSSLProvider() !== "windows" || !windowsSupportsTLS13()) {

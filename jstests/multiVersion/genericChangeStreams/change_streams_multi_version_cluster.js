@@ -5,10 +5,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// Checking UUID consistency uses cached connections, which are not valid across restarts or
-// stepdowns.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 await import("jstests/multiVersion/libs/multi_rs.js");
 await import("jstests/multiVersion/libs/multi_cluster.js");
 

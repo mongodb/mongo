@@ -260,13 +260,20 @@ and `last-lts` is `6.0`, tests tagged with `requires_fcv_61` will NOT run in mul
 run `latest` with `last-lts`, but will run in multiversion tasks that run `lastest` with
 `last-continuous`.
 
+**Do not add a `requires_fcv_XX` tag to a test in an explicit multiversion suite** (e.g. a test in
+`jstests/multiVersion`). Those tests run in no other suite, so the tag does not narrow which
+multiversion tasks run the test - it stops the test from running anywhere. A linter
+([test_jstest_tags.py](../../buildscripts/tests/resmoke_validation/test_jstest_tags.py)) fails on
+this. If such a test needs binaries newer than some version, check the binary version inside the
+test instead, e.g. with `MongoRunner.compareBinVersions`.
+
 In addition to disabling multiversion tests based on FCV, there is no need to run in-development
 `featureFlagXYZ` tests (featureFlags that have `default: false`) because these tests will most
 likely fail on older versions that have not implemented this feature. For multiversion tasks, we
 pass the `--runNoFeatureFlagTests` flag to avoid these failures on `all feature flag` variants.
 
-For more info on FCV, take a look at
-[FCV_AND_FEATURE_FLAG_README.md](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/FCV_AND_FEATURE_FLAG_README.md).
+For more info on FCV, take a look at the
+[FCV and Feature Flag documentation](https://github.com/mongodb/mongo/blob/master/src/mongo/db/README.md#fcv-and-feature-flags).
 
 Another common case could be that the changes on master branch are breaking multiversion tests, but
 with those changes backported to the older branches the multiversion tests should work. In order to

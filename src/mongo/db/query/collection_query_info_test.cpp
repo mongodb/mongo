@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/collection_query_info.h"
 
@@ -35,6 +9,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -43,6 +18,15 @@
 #include "mongo/unittest/unittest.h"
 namespace mongo {
 namespace {
+
+CollectionOrViewAcquisition acquireCollectionForRead(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
+    return acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_IX);
+}
+
 class CollectionQueryInfoTest : public CatalogTestFixture {
 public:
     void setUp() override {
@@ -67,6 +51,11 @@ public:
         wuow.commit();
     }
 
+    void createCollectionWithSchemaTypeInfo(const CollectionOptions& options) {
+        unittest::ServerParameterGuard featureFlag{"featureFlagQueryTypeInference", true};
+        ASSERT_OK(storageInterface()->createCollection(operationContext(), _kTestNss, options));
+    }
+
     void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj> docs) {
         std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
         const auto batchSize = 50000;
@@ -88,7 +77,7 @@ public:
                     ASSERT_OK(collection_internal::insertDocument(operationContext(),
                                                                   coll.getCollectionPtr(),
                                                                   inserts[currentInsertion],
-                                                                  nullptr /* opDebug */));
+                                                                  /*opDebug=*/nullptr));
                     insertionsBeforeCommit++;
                     currentInsertion++;
 
@@ -119,16 +108,86 @@ public:
         wuow.commit();
     }
 
+    CollectionAcquisition acquireForMetadataWrite() {
+        return acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(_kTestNss,
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
+    }
+
+    std::shared_ptr<const SchemaTypeInfo> readSchemaTypeInfo() {
+        const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+        return CollectionQueryInfo::get(coll.getCollection().getCollectionPtr())
+            .getSchemaTypeInfo();
+    }
 
     NamespaceString _kTestNss;
 };
 
-CollectionOrViewAcquisition acquireCollectionForRead(OperationContext* opCtx,
-                                                     const NamespaceString& nss) {
-    return acquireCollectionOrView(
-        opCtx,
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_IX);
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoIsBuiltDuringCollectionInitialization) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagQueryTypeInference", true};
+    CollectionOptions options;
+    options.validator = BSON("a" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), _kTestNss, options));
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_TRUE(schemaTypeInfo->getRootType().getField("a").hasType(BSONType::string));
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoChangesOnValidationLevelTransition) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagQueryTypeInference", true};
+    CollectionOptions options;
+    options.validator = BSON("a" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), _kTestNss, options));
+    const auto oldSchemaTypeInfo = readSchemaTypeInfo();
+    ASSERT_TRUE(oldSchemaTypeInfo->getRootType().getField("a").hasType(BSONType::string));
+    {
+        WriteUnitOfWork wuow(operationContext());
+        auto coll = acquireForMetadataWrite();
+        CollectionWriter collectionWriter(operationContext(), &coll);
+        auto writableColl = collectionWriter.getWritableCollection(operationContext());
+        ASSERT_OK(writableColl->setValidationOptions(
+            operationContext(), ValidationLevelEnum::strict, boost::none, boost::none));
+        CollectionQueryInfo::get(writableColl)
+            .rebuildSchemaTypeInfo(operationContext(), writableColl);
+        wuow.commit();
+    }
+    const auto newSchemaTypeInfo = readSchemaTypeInfo();
+    ASSERT_EQ(newSchemaTypeInfo->getRootType(), pipeline::type_system::Type::anyObject());
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoChangesWhenUpgradingToConstraint) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagQueryTypeInference", true};
+    CollectionOptions options;
+    options.validator = BSON("a" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::strict;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), _kTestNss, options));
+    const auto oldSchemaTypeInfo = readSchemaTypeInfo();
+    ASSERT_TRUE(oldSchemaTypeInfo->getRootType() == pipeline::type_system::Type::anyObject());
+    {
+        WriteUnitOfWork wuow(operationContext());
+        auto coll = acquireForMetadataWrite();
+        CollectionWriter collectionWriter(operationContext(), &coll);
+        auto writableColl = collectionWriter.getWritableCollection(operationContext());
+        ASSERT_OK(writableColl->setValidationOptions(operationContext(),
+                                                     boost::none,
+                                                     boost::none,
+                                                     boost::none,
+                                                     true /* prepareConstraintValidationLevel */));
+        ASSERT_OK(writableColl->setValidationOptions(
+            operationContext(), ValidationLevelEnum::constraint, boost::none, boost::none));
+        CollectionQueryInfo::get(writableColl)
+            .rebuildSchemaTypeInfo(operationContext(), writableColl);
+        wuow.commit();
+    }
+    const auto newSchemaTypeInfo = readSchemaTypeInfo();
+    ASSERT_TRUE(newSchemaTypeInfo->getRootType().getField("a").hasType(BSONType::string));
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndexOnEmptyCollection) {
@@ -310,6 +369,159 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdateForSetMultikeyIncrementsEpoch
                       ->epoch(),
                   epochBefore + 1);
     }
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoUsesConstraintValidator) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_TRUE(schemaTypeInfo->getPathType(FieldRef("x")).hasType(BSONType::string));
+    ASSERT_FALSE(schemaTypeInfo->getPathType(FieldRef("x")).hasType(BSONType::object));
+}
+
+TEST_F(CollectionQueryInfoTest, RebuildSchemaTypeInfoDirectly) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    CollectionQueryInfo collectionQueryInfo;
+
+    collectionQueryInfo.rebuildSchemaTypeInfo(operationContext(),
+                                              coll.getCollection().getCollectionPtr().get());
+
+    const auto schemaTypeInfo = collectionQueryInfo.getSchemaTypeInfo();
+    ASSERT_TRUE(schemaTypeInfo->getPathType(FieldRef("x")).hasType(BSONType::string));
+    ASSERT_FALSE(schemaTypeInfo->getPathType(FieldRef("x")).hasType(BSONType::object));
+
+    // Rebuilding with identical schema constraints, assert they are identical.
+    collectionQueryInfo.rebuildSchemaTypeInfo(operationContext(),
+                                              coll.getCollection().getCollectionPtr().get());
+    ASSERT_EQ(schemaTypeInfo, collectionQueryInfo.getSchemaTypeInfo());
+
+    // Invalidation changes the inferred type from string to anyObject.
+    collectionQueryInfo.invalidateSchemaTypeInfo();
+    ASSERT_TRUE(collectionQueryInfo.getSchemaTypeInfo()->getRootType() ==
+                pipeline::type_system::Type::anyObject());
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoWithoutValidatorRemainsAnyObject) {
+    createCollectionWithSchemaTypeInfo(CollectionOptions());
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_TRUE(schemaTypeInfo->getPathType(FieldRef("x")) == pipeline::type_system::Type::any());
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoIgnoresNonConstraintValidator) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::moderate;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_TRUE(schemaTypeInfo->getPathType(FieldRef("x")) == pipeline::type_system::Type::any());
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoIgnoresInvalidConstraintValidator) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$unsupportedOperator" << 1));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_TRUE(schemaTypeInfo->getPathType(FieldRef("x")) == pipeline::type_system::Type::any());
+}
+
+class MultipleCollectionSchemaCheckerTest : public CollectionQueryInfoTest {
+public:
+    using Type = pipeline::type_system::Type;
+
+    void tearDown() override {
+        // The acquisition holds locks and must be released before the fixture destroys the opCtx.
+        _acquisition.reset();
+        CollectionQueryInfoTest::tearDown();
+    }
+
+    static std::shared_ptr<const SchemaTypeInfo> infoWithX(BSONType xType) {
+        return std::make_shared<const SchemaTypeInfo>(
+            Type::object({{"x", Type(xType, pipeline::type_system::Extent::kAll)}},
+                         pipeline::type_system::Open::kYes));
+    }
+
+    PlanYieldPolicySBE::MultipleCollectionSchemaChecker makeChecker(
+        CollectionSchemaChecker perNssChecker,
+        std::shared_ptr<const SchemaTypeInfo>* currentInfo,
+        bool registerNss = true) {
+        createCollectionWithSchemaTypeInfo(CollectionOptions());
+        _acquisition.emplace(acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(_kTestNss,
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS));
+        stdx::unordered_map<NamespaceString, CollectionSchemaChecker> perNss;
+        if (registerNss) {
+            perNss.emplace(_kTestNss, std::move(perNssChecker));
+        }
+        return {MultipleCollectionAccessor{*_acquisition},
+                std::move(perNss),
+                [currentInfo](const CollectionPtr&) {
+                    return *currentInfo;
+                }};
+    }
+
+    boost::optional<CollectionAcquisition> _acquisition;
+};
+
+TEST_F(MultipleCollectionSchemaCheckerTest, DoesNotKillWhenTheSchemaRemainsSame) {
+    auto info = infoWithX(BSONType::string);
+    auto checker = makeChecker(CollectionSchemaChecker{}, &info);
+    checker.uassertIfInvalidatedAndSyncSchema();
+    checker.uassertIfInvalidatedAndSyncSchema();
+    const auto previousInfo = info;
+    info = infoWithX(BSONType::string);
+    ASSERT_NE(previousInfo, info);
+    checker.uassertIfInvalidatedAndSyncSchema();
+}
+
+TEST_F(MultipleCollectionSchemaCheckerTest, KillsWhenTheSchemaChanges) {
+    auto info = infoWithX(BSONType::string);
+    auto checker = makeChecker(CollectionSchemaChecker{}, &info);
+    checker.uassertIfInvalidatedAndSyncSchema();
+    info = infoWithX(BSONType::numberInt);
+    ASSERT_THROWS_WHAT(checker.uassertIfInvalidatedAndSyncSchema(),
+                       DBException,
+                       "query plan killed :: collection schema metadata changed during yield");
+}
+
+TEST_F(MultipleCollectionSchemaCheckerTest, KillsWhenTheSchemaBecomesUnconstrained) {
+    auto info = infoWithX(BSONType::string);
+    auto checker = makeChecker(CollectionSchemaChecker{}, &info);
+    checker.uassertIfInvalidatedAndSyncSchema();
+    info = std::make_shared<const SchemaTypeInfo>();
+    ASSERT_THROWS_CODE(
+        checker.uassertIfInvalidatedAndSyncSchema(), DBException, ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(MultipleCollectionSchemaCheckerTest, IgnoresACollectionWithoutARegisteredChecker) {
+    auto info = infoWithX(BSONType::string);
+    auto checker = makeChecker(CollectionSchemaChecker{}, &info, /*registerNss=*/false);
+    checker.uassertIfInvalidatedAndSyncSchema();
+    info = infoWithX(BSONType::numberInt);
+    checker.uassertIfInvalidatedAndSyncSchema();
 }
 }  // namespace
 }  // namespace mongo

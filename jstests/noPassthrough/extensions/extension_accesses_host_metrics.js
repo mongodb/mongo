@@ -26,6 +26,14 @@ withExtensions(
         // Use profiling level 2 so every operation is profiled.
         assert.commandWorked(db.runCommand({profile: 2}));
 
+        // Pin idLookup to batch-of-one so $produceIds' EOF getHostMetrics() read observes the fully
+        // accumulated counters. With featureFlagSearchOptimizedIdLookup on, $_internalSearchIdLookup
+        // batches (default 100) and fillBatch() drains the upstream EOF before the counters are
+        // incremented, which would make $produceIds see 0/0/0.
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalSearchIdLookupMaxBatchSize: 1}),
+        );
+
         // Insert documents with _ids 0 and 1. $readNDocuments with numDocs:4 will produce IDs
         // 0-3, so idLookup will find 2 of 4: success rate 0.5.
         const docs = [

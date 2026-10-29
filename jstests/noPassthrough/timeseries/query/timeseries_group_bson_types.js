@@ -11,7 +11,7 @@ import {leafs} from "jstests/query_golden/libs/example_data.js";
 
 const scalarConn = MongoRunner.runMongod();
 const bpConn = MongoRunner.runMongod({
-    setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true},
+    setParameter: {featureFlagSbeFull: true},
 });
 
 assert.neq(null, scalarConn, "mongod was unable to start up");

@@ -34,12 +34,6 @@ from wtdataset import SimpleDataSet
 class test_update_obsolete_short_chain(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 
-    def get_stat(self, stat_id):
-        stat_cursor = self.session.open_cursor('statistics:')
-        value = stat_cursor[stat_id][2]
-        stat_cursor.close()
-        return value
-
     def update_with_ts(self, uri, key, value, ts):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -69,12 +63,13 @@ class test_update_obsolete_short_chain(wttest.WiredTigerTestCase):
         # After this update, the chain is [new] -> [prior] -> NULL.
         # There is nothing to prune.
         self.update_with_ts(uri, key, 'value-b', 20)
-        self.pin_timestamps(20)
         removed_after_second = self.get_stat(stat.conn.cache_obsolete_updates_removed)
         self.assertEqual(removed_after_second, removed_start)
 
         # Grow the chain to length >= 3. Obsolete updates are then eligible
-        # for cleanup during reconciliation.
+        # for cleanup during reconciliation. Keep oldest/stable below value-b
+        # timestamp until after the chain is fully built so the in-line serial
+        # obsolete check cannot prune value-a before the checkpoint does.
         self.update_with_ts(uri, key, 'value-c', 30)
         self.pin_timestamps(30)
 

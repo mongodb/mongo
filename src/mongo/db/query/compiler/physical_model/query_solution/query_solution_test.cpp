@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 
@@ -44,10 +18,12 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/wildcard_test_utils.h"
@@ -136,6 +112,154 @@ void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& se
     }
 
     ASSERT_EQ(secondaryNssMultiset, expectedNssMultiset);
+}
+
+TEST(QuerySolutionTest, IndexScanBatchingDefaultsToDisabled) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode scan{nss, buildSimpleIndexEntry(BSON("a" << 1))};
+    ASSERT_FALSE(scan.allowBatching);
+}
+
+TEST(QuerySolutionTest, IndexScanClonePreservesAllFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    IndexScanNode scan{nss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    scan.index.multikey = true;
+    scan.index.multikeyPaths = MultikeyPaths{{0U}, {}};
+    scan.direction = -1;
+    scan.allowBatching = true;
+    scan.addKeyMetadata = true;
+    scan.shouldDedup = true;
+    scan.bounds.isSimpleRange = true;
+    scan.bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scan.bounds.endKey = BSON("a" << 2 << "b" << 2);
+    scan.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+    scan.queryCollator = &queryCollator;
+    scan.multikeyFields.insert("a");
+    scan.sortSet = ProvidedSortSet(BSON("b" << 1), {"a"});
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 1)));
+    scan.iets.push_back(
+        interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(oilA));
+    scan.filter = std::make_unique<EqualityMatchExpression>("a"sv, Value(1));
+
+    auto clone = scan.clone();
+    const auto& cloned = static_cast<const IndexScanNode&>(*clone);
+
+    ASSERT_TRUE(cloned.nss == scan.nss);
+    ASSERT_TRUE(cloned.index.identifier == scan.index.identifier);
+    ASSERT_TRUE(cloned.index.keyPattern.woCompare(scan.index.keyPattern) == 0);
+    ASSERT_EQ(cloned.index.multikey, scan.index.multikey);
+    ASSERT_EQ(cloned.index.multikeyPaths, scan.index.multikeyPaths);
+    ASSERT_EQ(cloned.direction, scan.direction);
+    ASSERT_EQ(cloned.allowBatching, scan.allowBatching);
+    ASSERT_EQ(cloned.addKeyMetadata, scan.addKeyMetadata);
+    ASSERT_EQ(cloned.shouldDedup, scan.shouldDedup);
+    ASSERT_TRUE(cloned.bounds == scan.bounds);
+    ASSERT_EQ(cloned.queryCollator, scan.queryCollator);
+    ASSERT_EQ(cloned.multikeyFields, scan.multikeyFields);
+    ASSERT_TRUE(cloned.iets == scan.iets);
+    ASSERT_EQ(cloned.sortSet, scan.sortSet);
+    ASSERT_TRUE(cloned.filter->equivalent(scan.filter.get()));
+}
+
+TEST(QuerySolutionTest, FetchClonePreservesAllFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    FetchNode fetch{std::move(child), nss};
+    fetch.filter = std::make_unique<EqualityMatchExpression>("a"sv, Value(1));
+
+    auto clone = fetch.clone();
+    const auto& cloned = static_cast<const FetchNode&>(*clone);
+
+    ASSERT_TRUE(cloned.nss == fetch.nss);
+    ASSERT_EQ(cloned.getType(), STAGE_FETCH);
+    ASSERT_EQ(cloned.children.size(), 1u);
+    ASSERT_EQ(cloned.children.size(), fetch.children.size());
+    ASSERT_EQ(cloned.children[0]->getType(), fetch.children[0]->getType());
+    ASSERT_TRUE(cloned.filter->equivalent(fetch.filter.get()));
+}
+
+TEST(QuerySolutionTest, BatchedFetchClonePreservesAllFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    BatchedFetchNode fetch{std::move(child), nss};
+    fetch.filter = std::make_unique<EqualityMatchExpression>("a"sv, Value(1));
+
+    auto clone = fetch.clone();
+    ASSERT_EQ(clone->getType(), STAGE_BATCHED_FETCH);
+    const auto& cloned = static_cast<const BatchedFetchNode&>(*clone);
+
+    ASSERT_TRUE(cloned.nss == fetch.nss);
+    ASSERT_EQ(cloned.children.size(), 1u);
+    ASSERT_EQ(cloned.children[0]->getType(), fetch.children[0]->getType());
+    ASSERT_NE(cloned.children[0].get(), fetch.children[0].get());
+    ASSERT_TRUE(cloned.filter->equivalent(fetch.filter.get()));
+    ASSERT_NE(cloned.filter.get(), fetch.filter.get());
+    verifyClone(fetch);
+}
+
+TEST(QuerySolutionTest, BatchedFetchProvidesFetchedFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    BatchedFetchNode fetch{std::move(child), nss};
+    fetch.computeProperties();
+
+    ASSERT_TRUE(fetch.fetched());
+    ASSERT_EQ(fetch.getFieldAvailability("a"), FieldAvailability::kFullyProvided);
+    ASSERT_EQ(fetch.getFieldAvailability("b"), FieldAvailability::kFullyProvided);
+}
+
+TEST(QuerySolutionTest, BatchedFetchHasDistinctStageName) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    FetchNode orderedFetch{child->clone(), nss};
+    BatchedFetchNode batchedFetch{std::move(child), nss};
+
+    ASSERT_EQ(nodeStageTypeToString(&orderedFetch), "FETCH"sv);
+    ASSERT_EQ(nodeStageTypeToString(&batchedFetch), "BATCHED_FETCH"sv);
+    ASSERT_EQ(nodeStageTypeToString(&batchedFetch, true), "BATCHED_FETCH"sv);
+    ASSERT_EQ(orderedFetch.toString().find("FETCH\n"), 0u);
+    ASSERT_EQ(batchedFetch.toString().find("BATCHED_FETCH\n"), 0u);
+    ASSERT_NE(absl::Hash<QuerySolutionNode>{}(orderedFetch),
+              absl::Hash<QuerySolutionNode>{}(batchedFetch));
+}
+
+TEST(QuerySolutionTest, OnlyOrderedFetchPreservesProvidedSorts) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scan =
+        std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scan->bounds.isSimpleRange = true;
+    scan->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scan->bounds.endKey = BSON("a" << 1 << "b" << 2);
+    BatchedFetchNode batchedFetch{scan->clone(), nss};
+    FetchNode fetch{std::move(scan), nss};
+    fetch.computeProperties();
+    batchedFetch.computeProperties();
+
+    ASSERT_EQ(fetch.providedSorts(), ProvidedSortSet(BSON("b" << 1), {"a"}));
+    ASSERT_EQ(batchedFetch.children[0]->providedSorts(), fetch.providedSorts());
+    ASSERT_EQ(batchedFetch.providedSorts(), kEmptySet);
+    ASSERT_EQ(batchedFetch.clone()->providedSorts(), kEmptySet);
+}
+
+TEST(QuerySolutionTest, OnlyOrderedFetchPreservesDiskLocOrder) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    scan->bounds.isSimpleRange = true;
+    scan->bounds.startKey = BSON("a" << 1);
+    scan->bounds.endKey = BSON("a" << 1);
+    BatchedFetchNode batchedFetch{scan->clone(), nss};
+    FetchNode fetch{std::move(scan), nss};
+    fetch.computeProperties();
+    batchedFetch.computeProperties();
+
+    ASSERT_TRUE(fetch.sortedByDiskLoc());
+    ASSERT_TRUE(batchedFetch.children[0]->sortedByDiskLoc());
+    ASSERT_FALSE(batchedFetch.sortedByDiskLoc());
+    ASSERT_FALSE(batchedFetch.clone()->sortedByDiskLoc());
 }
 
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
@@ -918,7 +1042,8 @@ TEST(QuerySolutionTest, WildcardIndexSupportsSortWhenIndexOnlyNeedsToLookAtOnePa
         BSON("" << 2 << "" << 3), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
 
     node.computeProperties();
     auto sorts = node.providedSorts();
@@ -974,7 +1099,8 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenIndexNeedsToLookAtMul
         BSON("" << 2 << "" << 3), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
 
     node.computeProperties();
     auto sorts = node.providedSorts();
@@ -1027,7 +1153,8 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch)
     node.bounds.fields.push_back(c);
 
 
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
 
     node.computeProperties();
 
@@ -1086,7 +1213,8 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchW
         BSON("" << 2 << "" << 3), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
-    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node);
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    mongo::wildcard_planning::finalizeWildcardIndexScanConfiguration(&node, &ietBuilders);
 
     node.computeProperties();
     auto sorts = node.providedSorts();
@@ -1675,7 +1803,252 @@ TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
 
     ASSERT_EQ(node.getFieldAvailability("any_field"), FieldAvailability::kNotProvided);
 
+    ASSERT_STRING_CONTAINS(node.toString(), "GROUP");
+
     verifyClone(node);
+}
+
+std::unique_ptr<GroupNode> makeGroupNodeForToStringTest(
+    ExpressionContext* expCtx, boost::intrusive_ptr<Expression> groupByExpression) {
+    auto scanNode = std::make_unique<IndexScanNode>(
+        expCtx->getNamespaceString(), buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
+    auto sumAcc = AccumulationStatement::parseAccumulationStatement(
+        expCtx, BSON("sum" << BSON("$sum" << "$a")).firstElement(), expCtx->variablesParseState);
+    auto cntAcc = AccumulationStatement::parseAccumulationStatement(
+        expCtx, BSON("cnt" << BSON("$sum" << 1)).firstElement(), expCtx->variablesParseState);
+    std::vector<AccumulationStatement> accs;
+    accs.push_back(std::move(sumAcc));
+    accs.push_back(std::move(cntAcc));
+    auto node = std::make_unique<GroupNode>(
+        std::move(scanNode), groupByExpression, std::move(accs), false, false, false);
+    node->computeProperties();
+    return node;
+}
+
+TEST(QuerySolutionTest, GroupNodeToString) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression = Expression::parseObject(
+        expCtx.get(), BSON("a" << "$a" << "b" << "$b"), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {a: "$a", b: "$b"}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, GroupNodeToStringWithSingleFieldKey) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression =
+        Expression::parseObject(expCtx.get(), BSON("a" << "$a"), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {a: "$a"}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, GroupNodeToStringWithNestedDocumentKey) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression = Expression::parseObject(
+        expCtx.get(), BSON("x" << BSON("y" << "$a")), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {x: {y: "$a"}}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, GroupNodeToStringWithArrayKey) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression =
+        Expression::parseOperand(expCtx.get(),
+                                 BSON("" << BSON_ARRAY("$a" << "$b")).firstElement(),
+                                 expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {_id: ["$a", "$b"]}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto scanNode = std::make_unique<IndexScanNode>(
+        expCtx->getNamespaceString(), buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
+    auto groupByExpression =
+        ExpressionFieldPath::parse(expCtx.get(), "$b", expCtx->variablesParseState);
+    StreamingGroupNode node(std::move(scanNode), groupByExpression, {}, false, {FieldPath("b")});
+    node.computeProperties();
+
+    ASSERT_EQ(node.getType(), StageType::STAGE_STREAMING_GROUP);
+    ASSERT_EQ(nodeStageTypeToString(&node), "STREAMING_GROUP"sv);
+    ASSERT_EQ(node.fetched(), true);
+    ASSERT_EQ(node.sortedByDiskLoc(), false);
+    ASSERT_EQ(node.providedSorts(), kEmptySet);
+    ASSERT_EQ(node.getFieldAvailability("any_field"), FieldAvailability::kNotProvided);
+    ASSERT_EQ(node.doingMerge, false);
+    ASSERT_EQ(node.willBeMerged, false);
+
+    auto asString = node.toString();
+    ASSERT_STRING_CONTAINS(asString, "STREAMING_GROUP");
+    ASSERT_STRING_CONTAINS(asString, "streamingKey = [b]");
+
+    auto clone = node.clone();
+    ASSERT_EQ(clone->getType(), StageType::STAGE_STREAMING_GROUP);
+    auto* clonedStreamingGroup = static_cast<StreamingGroupNode*>(clone.get());
+    ASSERT_EQ(clonedStreamingGroup->streamingKey.size(), 1u);
+    ASSERT_EQ(clonedStreamingGroup->streamingKey[0].fullPath(), "b");
+
+    verifyClone(node);
+}
+
+TEST(QuerySolutionTest, StreamingGroupNodeToString) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto scanNode = std::make_unique<IndexScanNode>(
+        expCtx->getNamespaceString(), buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
+    auto groupByExpression = Expression::parseObject(
+        expCtx.get(), BSON("a" << "$a" << "b" << "$b"), expCtx->variablesParseState);
+    auto sumAcc = AccumulationStatement::parseAccumulationStatement(
+        expCtx.get(),
+        BSON("sum" << BSON("$sum" << "$a")).firstElement(),
+        expCtx->variablesParseState);
+    auto cntAcc = AccumulationStatement::parseAccumulationStatement(
+        expCtx.get(), BSON("cnt" << BSON("$sum" << 1)).firstElement(), expCtx->variablesParseState);
+    StreamingGroupNode node(std::move(scanNode),
+                            groupByExpression,
+                            {std::move(sumAcc), std::move(cntAcc)},
+                            false,
+                            {FieldPath("a"), FieldPath("b")});
+    node.computeProperties();
+
+    ASSERT_EQ(node.toString(),
+              R"gold(STREAMING_GROUP
+---key = {a: "$a", b: "$b"}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---streamingKey = [a, b]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
 }
 
 TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
@@ -1701,7 +2074,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
                       "foreign",
                       "as",
                       EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                      false /* shouldProduceBson */);
+                      /*shouldProduceBson=*/false);
 
     node.computeProperties();
 
@@ -1747,7 +2120,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
                       "foreign",
                       "b",
                       EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                      false /* shouldProduceBson */);
+                      /*shouldProduceBson=*/false);
 
     node.computeProperties();
 
@@ -1827,7 +2200,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
                                                "remote",
                                                "b",
                                                EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                               false /* shouldProduceBson */);
+                                               /*shouldProduceBson=*/false);
 
 
     QuerySolution qs;
@@ -1853,7 +2226,7 @@ TEST(QuerySolutionTest, AssertSameHashes) {
                                                    "remote",
                                                    "b",
                                                    EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                                   false /* shouldProduceBson */);
+                                                   /*shouldProduceBson=*/false);
 
 
         auto qs = std::make_unique<QuerySolution>();
@@ -1956,6 +2329,7 @@ TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
                                         foreignNss),
             std::vector<QSNJoinPredicate>{
                 {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            std::vector<QSNJoinPredicate>{},
             boost::none,
             FieldPath("customer"));
         auto qs = std::make_unique<QuerySolution>();
@@ -1965,6 +2339,34 @@ TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
 
     ASSERT_NE(makeInlj(BSON("a" << 1), "index_a")->hash(),
               makeInlj(BSON("b" << 1), "index_b")->hash());
+}
+
+TEST(QuerySolutionTest, AssertDifferentHashesForDifferentProbePredicates) {
+    const NamespaceString foreignNss = NamespaceString::createNamespaceString_forTest("db.foreign");
+
+    auto makeInlj = [&](std::vector<QSNJoinPredicate> probePreds) {
+        auto root = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(),
+            std::make_unique<FetchNode>(
+                std::make_unique<IndexProbeNode>(foreignNss,
+                                                 buildSimpleIndexEntry(BSON("a" << 1), "a_1")),
+                foreignNss),
+            std::vector<QSNJoinPredicate>{
+                {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            std::move(probePreds),
+            boost::none,
+            FieldPath("customer"));
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+
+    ASSERT_EQ(
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}})->hash(),
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}})->hash());
+    ASSERT_NE(
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}})->hash(),
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("c"), FieldPath("d")}})->hash());
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
@@ -1979,7 +2381,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
                                                "remote",
                                                "b",
                                                EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                               false /* shouldProduceBson */);
+                                               /*shouldProduceBson=*/false);
 
 
     QuerySolution qs;
@@ -2008,7 +2410,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     std::vector<std::unique_ptr<QuerySolutionNode>> children2;
     children2.emplace_back(std::move(childEqLookupNode));
@@ -2020,7 +2422,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     QuerySolution qs;
     qs.setRoot(std::move(parentEqLookupNode));
@@ -2047,7 +2449,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     std::vector<std::unique_ptr<QuerySolutionNode>> children2;
     children2.emplace_back(std::move(childEqLookupNode));
@@ -2059,7 +2461,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     QuerySolution qs;
     qs.setRoot(std::move(parentEqLookupNode));
@@ -2148,4 +2550,201 @@ TEST(QuerySolutionTest, ShouldCacheEofPlanTree) {
 
     ASSERT_TRUE(solution2->isEligibleForPlanCache());
 }
+
+namespace {
+const NamespaceString kNssA = NamespaceString::createNamespaceString_forTest("db.a");
+const NamespaceString kNssB = NamespaceString::createNamespaceString_forTest("db.b");
+const NamespaceString kNssC = NamespaceString::createNamespaceString_forTest("db.c");
+
+std::vector<QSNJoinPredicate> makeJoinPredicates(std::string leftField, std::string rightField) {
+    return {QSNJoinPredicate{QSNJoinPredicate::ComparisonOp::Eq,
+                             FieldPath{std::move(leftField)},
+                             FieldPath{std::move(rightField)}}};
+}
+}  // namespace
+
+TEST(QuerySolutionTest, SummaryStringForNonJoinPlan) {
+    auto ixscan =
+        std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    auto fetch = std::make_unique<FetchNode>(kNssA);
+    fetch->children.push_back(std::move(ixscan));
+
+    QuerySolution solution;
+    solution.setRoot(std::move(fetch));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "IXSCAN { a: 1, b: 1 }",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForHashJoinPlan) {
+    auto ixscan = std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1)));
+    auto collscan = std::make_unique<CollectionScanNode>(kNssB);
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),
+                                                            std::move(collscan),
+                                                            makeJoinPredicates("a", "b"),
+                                                            /*leftEmbeddingField=*/boost::none,
+                                                            FieldPath{"out"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "HJ( _ = ( IXSCAN [db.a] { a: 1 } ), out = ( COLLSCAN [db.b] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForNestedJoinPlan) {
+    auto ixscan = std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1)));
+    auto collscan = std::make_unique<CollectionScanNode>(kNssB);
+    auto probe =
+        std::make_unique<IndexProbeNode>(kNssC, buildSimpleIndexEntry(BSON("c" << 1 << "d" << -1)));
+    auto inlj =
+        std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(collscan),
+                                                             std::move(probe),
+                                                             makeJoinPredicates("b", "c"),
+                                                             std::vector<QSNJoinPredicate>{},
+                                                             /*leftEmbeddingField=*/boost::none,
+                                                             FieldPath{"cOut"});
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),
+                                                            std::move(inlj),
+                                                            makeJoinPredicates("a", "b"),
+                                                            /*leftEmbeddingField=*/boost::none,
+                                                            FieldPath{"bOut"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(
+        "HJ( _ = ( IXSCAN [db.a] { a: 1 } ), bOut = ( INLJ( _ = ( COLLSCAN [db.b] ), cOut = ( "
+        "IXPROBE [db.c] { c: 1, d: -1 } ) ) ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringSkipsNonJoinNodesAboveJoin) {
+    auto collscanA = std::make_unique<CollectionScanNode>(kNssA);
+    auto collscanB = std::make_unique<CollectionScanNode>(kNssB);
+    auto nlj = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(collscanA),
+                                                             std::move(collscanB),
+                                                             makeJoinPredicates("a", "b"),
+                                                             /*leftEmbeddingField=*/boost::none,
+                                                             FieldPath{"out"});
+    auto skip = std::make_unique<SkipNode>(
+        std::move(nlj), /*skip=*/10, LimitSkipParameterization::Disabled);
+
+    QuerySolution solution;
+    solution.setRoot(std::move(skip));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForNonJoinSubtreeAboveLeaves) {
+    // The subtree on the left of the join contains no join stage, so it is summarized using the
+    // short form, which lists each of its leaves. The whole operand is then wrapped in parentheses
+    // so that it remains a single element of the join's argument list.
+    std::vector<std::unique_ptr<QuerySolutionNode>> orChildren;
+    orChildren.push_back(
+        std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("a" << 1))));
+    orChildren.push_back(
+        std::make_unique<IndexScanNode>(kNssA, buildSimpleIndexEntry(BSON("b" << 1))));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(orChildren));
+
+    auto collscan = std::make_unique<CollectionScanNode>(kNssB);
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(orNode),
+                                                            std::move(collscan),
+                                                            makeJoinPredicates("a", "b"),
+                                                            /*leftEmbeddingField=*/boost::none,
+                                                            FieldPath{"out"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "HJ( _ = ( IXSCAN [db.a] { a: 1 }, IXSCAN [db.a] { b: 1 } ), out = ( COLLSCAN [db.b] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringForMultipleJoinSubtreesUnderNonJoinNode) {
+    // A non-join node with more than one child which each contain a join contributes nothing to the
+    // summary itself; the summary of each of its children is listed instead.
+    auto makeJoin = [](const NamespaceString& leftNss, const NamespaceString& rightNss) {
+        return std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(leftNss),
+            std::make_unique<CollectionScanNode>(rightNss),
+            makeJoinPredicates("a", "b"),
+            /*leftEmbeddingField=*/boost::none,
+            FieldPath{"out"});
+    };
+
+    std::vector<std::unique_ptr<QuerySolutionNode>> orChildren;
+    orChildren.push_back(makeJoin(kNssA, kNssB));
+    orChildren.push_back(makeJoin(kNssA, kNssC));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(orChildren));
+
+    QuerySolution solution;
+    solution.setRoot(std::move(orNode));
+    ASSERT_STR_EQ_AUTO(
+        "NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) ), NLJ( _ = ( COLLSCAN [db.a] ), "
+        "out = ( COLLSCAN [db.c] ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput) {
+    // Same as above, but with the multi-child non-join node as the input of another join, so that
+    // its two elements are wrapped in parentheses to remain a single element of that join's
+    // argument list.
+    auto makeJoin = [](const NamespaceString& leftNss, const NamespaceString& rightNss) {
+        return std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(leftNss),
+            std::make_unique<CollectionScanNode>(rightNss),
+            makeJoinPredicates("a", "b"),
+            /*leftEmbeddingField=*/boost::none,
+            FieldPath{"out"});
+    };
+
+    std::vector<std::unique_ptr<QuerySolutionNode>> orChildren;
+    orChildren.push_back(makeJoin(kNssA, kNssB));
+    orChildren.push_back(makeJoin(kNssA, kNssC));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(orChildren));
+
+    auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(orNode),
+        std::make_unique<IndexScanNode>(kNssC, buildSimpleIndexEntry(BSON("c" << 1))),
+        makeJoinPredicates("a", "c"),
+        /*leftEmbeddingField=*/boost::none,
+        FieldPath{"cOut"});
+
+    QuerySolution solution;
+    solution.setRoot(std::move(hashJoin));
+    ASSERT_STR_EQ_AUTO(
+        "HJ( _ = ( NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) ), NLJ( _ = ( "
+        "COLLSCAN [db.a] ), out = ( COLLSCAN [db.c] ) ) ), cOut = ( IXSCAN [db.c] { c: 1 } ) )",
+        solution.summaryString());
+}
+
+TEST(QuerySolutionTest, ParallelEligibleNodes) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scan = [] {
+        return std::make_unique<CollectionScanNode>();
+    };
+
+    ASSERT_TRUE(scan()->isParallelEligible());
+    ASSERT_TRUE(LimitNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
+    ASSERT_TRUE(SkipNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
+    ASSERT_TRUE(ShardingFilterNode().isParallelEligible());
+
+    auto [filter, projection] = createMatchExprAndProjection(BSONObj(), BSON("a" << 1));
+    ASSERT_TRUE(ProjectionNodeDefault(scan(), filter.get(), projection).isParallelEligible());
+    ASSERT_TRUE(ProjectionNodeSimple(scan(), filter.get(), projection).isParallelEligible());
+    ASSERT_TRUE(ProjectionNodeCovered(scan(), filter.get(), projection, BSON("a" << 1))
+                    .isParallelEligible());
+    ASSERT_TRUE(MatchNode(scan(), std::move(filter)).isParallelEligible());
+
+    // Everything else is opted out by default.
+    auto indexScan =
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
+    ASSERT_FALSE(indexScan->isParallelEligible());
+    ASSERT_FALSE(FetchNode(std::move(indexScan), mainNss).isParallelEligible());
+}
+
 }  // namespace

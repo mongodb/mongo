@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -65,8 +39,8 @@
 
 namespace mongo {
 
-MONGO_MOD_FILE_PRIVATE
-extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
+[[MONGO_MOD_FILE_PRIVATE]]
+extern const SharedCollectionDecorations::Decoration<Atomic<bool>>
     historicalIDTrackerAllowsMixedModeWrites;
 
 namespace catalog {
@@ -76,21 +50,25 @@ namespace catalog {
 // catalog_control.cpp
 class CatalogControlUtils;
 
+enum class [[MONGO_MOD_PUBLIC]] InitMode { kStartup = 0, kRollback, kStorageChange };
+[[MONGO_MOD_PUBLIC]] std::string toStringForLogging(InitMode mode);
+
 /**
  * Must be called after MDBCatalog is loaded.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
+                                 InitMode mode,
                                  boost::optional<Timestamp> stableTs);
 
-MONGO_MOD_PUBLIC
-void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine);
+[[MONGO_MOD_PUBLIC]]
+void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine, InitMode mode);
 
 /**
  * Creates a Collection object and registers it in the CollectionCatalog.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 void initCollectionObject(OperationContext* opCtx,
                           StorageEngine* engine,
                           RecordId catalogId,
@@ -103,12 +81,12 @@ void initCollectionObject(OperationContext* opCtx,
  * This function doesn't return databases whose creation has committed durably but hasn't been
  * published yet in the CollectionCatalog.
  */
-MONGO_MOD_PUBLIC
+[[MONGO_MOD_PUBLIC]]
 std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId = boost::none);
 
 }  // namespace catalog
 
-class MONGO_MOD_USE_REPLACEMENT(acquireCollection) CollectionCatalog {
+class [[MONGO_MOD_USE_REPLACEMENT(acquireCollection)]] CollectionCatalog {
     friend class iterator;
     using OrderedCollectionMap =
         immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
@@ -368,6 +346,16 @@ public:
         OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
+     * Returns an owning reference to the oplog collection, which stays valid without retaining this
+     * catalog instance. Returns nullptr if no oplog is known.
+
+     * TODO SERVER-133360: Remove this function and its caller if possible. Do not add new callers
+     * of this function.
+     */
+    std::shared_ptr<const Collection> lookupOplogCollectionForFastPath_UNSAFE(
+        OperationContext* opCtx) const;
+
+    /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to UUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.
@@ -450,10 +438,11 @@ public:
 
     /**
      * Resolves and validates the namespace from the given DatabaseName and UUID.
+     *
+     * Throws CommitPendingNamespaceOrUUID if the UUID is pending commit.
      */
-    NamespaceString resolveNamespaceStringFromDBNameAndUUID(OperationContext* opCtx,
-                                                            const DatabaseName& dbName,
-                                                            const UUID& uuid) const;
+    NamespaceString resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
+        OperationContext* opCtx, const DatabaseName& dbName, const UUID& uuid) const;
 
     /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
@@ -653,9 +642,21 @@ public:
     const HistoricalCatalogIdTracker& catalogIdTracker() const;
     HistoricalCatalogIdTracker& catalogIdTracker();
 
+    /**
+     * Resets the HistoricalCatalogIdTracker to an empty state and seeds the oldest timestamp
+     * maintained. Resetting the state is necessary for FCBIS, as leaking tracker state across
+     * storage changes can lead to incorrect behavior. Setting the oldest timestamp maintained is
+     * necessary for both FCBIS and startup, as the tracker needs to know at which timestamp the
+     * storage engine is initialized.
+     */
+    void resetCatalogIdTracker(Timestamp oldest);
+
+    bool isNamespaceOrUUIDCommitPending_forTest(const NamespaceStringOrUUID& nssOrUUID) const;
+
     class BatchedCollectionWrite;
 
 private:
+    enum class CommitPendingMode { kIgnore, kInclude, kThrow };
     friend class CollectionCatalog::iterator;
 
     // We only allow the CollectionWriter class to interface with the catalog. This is to prevent
@@ -780,23 +781,36 @@ private:
     /**
      * Resolves and validates the namespace from the given DatabaseName and UUID.
      *
-     * This will also lookup in the commit pending entries if passed true for withCommitPending.
+     * When CommitPendingMode::kInclude is passed, this will return the commit pending entry if
+     * there is one.
+     *
+     * When CommitPendingMode::kThrow is passed, this will throw CommitPendingNamespaceOrUUID if the
+     * UUID is pending commit.
+     *
+     * When CommitPendingMode::kIgnore is passed, this will ignore any commit pending entries.
      */
-    NamespaceString _resolveNamespaceStringFromDBNameAndUUID(OperationContext* opCtx,
-                                                             const DatabaseName& dbName,
-                                                             const UUID& uuid,
-                                                             bool withCommitPending) const;
+    NamespaceString _resolveNamespaceStringFromDBNameAndUUID(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        const UUID& uuid,
+        CommitPendingMode commitPendingMode) const;
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
-     * corresponds to UUID uuid. If no collection exists with the uuid, return
-     * boost::none. See onCloseCatalog/onOpenCatalog for more info.
+     * corresponds to UUID uuid. If no collection exists with the uuid, return boost::none. See
+     * onCloseCatalog/onOpenCatalog for more info.
      *
-     * This will also lookup in the commit pending entries if passed true for withCommitPending.
+     * When CommitPendingMode::kInclude is passed, this will return the commit pending entry if
+     * there is one.
+     *
+     * When CommitPendingMode::kThrow is passed, this will throw CommitPendingNamespaceOrUUID if the
+     * UUID is pending commit.
+     *
+     * When CommitPendingMode::kIgnore is passed, this will ignore any commit pending entries.
      */
     boost::optional<NamespaceString> _lookupNSSByUUID(OperationContext* opCtx,
                                                       const UUID& uuid,
-                                                      bool withCommitPending) const;
+                                                      CommitPendingMode commitPendingMode) const;
 
     /**
      * Checks if an instance of the given namespace or UUID has already been instantiated for the
@@ -1023,7 +1037,7 @@ private:
  * there and why we had to temporarily disable this. The owning team's task should be to therefore
  * fix the code in order to remove the exception.
  */
-class MONGO_MOD_PUBLIC ExcludeTestOnlyCollectionInstantiation {
+class [[MONGO_MOD_PUBLIC]] ExcludeTestOnlyCollectionInstantiation {
 public:
     ExcludeTestOnlyCollectionInstantiation(OperationContext* opCtx);
     ~ExcludeTestOnlyCollectionInstantiation();

@@ -1,6 +1,7 @@
 /**
  * Test that $searchMeta works correctly on an sharded collection but when there is only one chunk
  * for the collection - on a single shard.
+ * TODO (SERVER-131069): Remove this mocked test file now that its coverage is provided by e2e/search/search_meta.js running in the single-shard e2e passthrough suite.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

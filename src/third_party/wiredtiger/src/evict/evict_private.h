@@ -16,6 +16,29 @@
 #define WTI_EVICT_WALK_BASE 300         /* Pages tracked across file visits */
 #define WTI_EVICT_WALK_INCR 100         /* Pages added each walk */
 
+/*
+ * The walk end is incremented each time the walk reaches the boundary of the tree. Two ends
+ * guarantee at least one full traversal from wherever the scan arrived.
+ */
+#define WTI_EVICT_WALK_MAX_ENDS 2 /* Tree walk ends before the scan moves on */
+
+/*
+ * The walk period doubles on every unproductive walk of a tree, so saturation means the tree has
+ * been unproductive for many consecutive walks.
+ */
+#define WTI_EVICT_WALK_PERIOD_MAX 100 /* Ceiling on walks skipped for one tree */
+
+/*
+ * Cap the wait for callers that pin no transaction state: the stuck-cache escape cannot roll them
+ * back, so an unbounded wait ends only when eviction succeeds, and blocking them can stop the
+ * application from advancing the timestamps that would make the cache reclaimable.
+ *
+ * Used only when the caller set no operation timeout of its own. Keep it generous: a shorter cap
+ * cuts these callers out of the assist while the cache is still draining, and they are the only
+ * application threads that help with nothing pinned, so the work is not made up elsewhere.
+ */
+#define WTI_EVICT_BOUNDED_WAIT_US (60 * WT_MILLION)
+
 /* True if there are eviction worker threads beyond the server thread itself. */
 #define WT_EVICT_HAS_WORKERS(s) \
     (__wt_atomic_load_uint32_relaxed(&S2C(s)->evict_config.threads.current_threads) > 1)
@@ -51,12 +74,41 @@ struct __wti_evict_queue {
         WT_WITH_LOCK_WAIT(session, &evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, op); \
     } while (0)
 
+/*
+ * WTI_EVICT_VICTIM_REASON --
+ *	Why a page was, or was not, admitted to the disaggregated victim cache.
+ *
+ * Each gate in the eligibility check has its own value rather than folding into a single "not
+ * eligible". Two main benefits with this approach: a page that was expected to be cached and was
+ * not can be explained from a verbose log instead of by bisecting the gate by hand. And every
+ * switch over this enum is written without a default label, adding a gate here fails the build
+ * until both the caller and the unit tests account for it, rather than leaving the new gate
+ * silently untested.
+ */
+typedef enum {
+    WTI_EVICT_VICTIM_CACHE_UNAVAILABLE, /* The page log's cache is not currently accepting puts. */
+    WTI_EVICT_VICTIM_CHECKPOINT_CURSOR, /* The btree is open under a checkpoint cursor. */
+    WTI_EVICT_VICTIM_COLD_TIER,         /* Cold collections must not displace hot pages. */
+    WTI_EVICT_VICTIM_ENCRYPTED,         /* The cached image would not be encrypted. */
+    WTI_EVICT_VICTIM_INVALID_PAGE_ID,   /* The block metadata holds no valid page id. */
+    WTI_EVICT_VICTIM_NO_BLOCK_MANAGER,  /* The btree has no disaggregated block manager. */
+    WTI_EVICT_VICTIM_NO_DISAGG_INFO,    /* The page carries no disaggregated block metadata. */
+    WTI_EVICT_VICTIM_NO_IMAGE,          /* No image matches the page's current block metadata. */
+    WTI_EVICT_VICTIM_NO_PAGE_LOG,       /* No page log handle, or it cannot cache at all. */
+    WTI_EVICT_VICTIM_NOT_DISAGG,        /* The btree is not disaggregated. */
+    WTI_EVICT_VICTIM_NOT_LEAF,          /* Internal pages are never cached. */
+    WTI_EVICT_VICTIM_OK,                /* Eligible: the resolved image is returned. */
+    WTI_EVICT_VICTIM_ROOT,              /* Root pages are never cached. */
+
+    WTI_EVICT_VICTIM_COUNT /* Number of reasons; must stay last. */
+} WTI_EVICT_VICTIM_REASON;
+
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 extern bool __wti_evict_push_candidate(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue,
   WTI_EVICT_ENTRY *evict_entry, WT_REF *ref) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_evict_app_assist_worker(WT_SESSION_IMPL *session, bool busy, bool readonly,
-  bool interruptible) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  bool interruptible, bool bounded) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_evict_clear_all_walks_and_saved_tree(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_evict_clear_walk_and_saved_tree_if_current_locked(WT_SESSION_IMPL *session)
@@ -75,13 +127,22 @@ extern void __wti_evict_queue_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wti_evict_queue_clear_page_locked(
   WT_SESSION_IMPL *session, WT_REF *ref, bool exclude_urgent);
 extern void __wti_evict_set_saved_walk_tree(WT_SESSION_IMPL *session, WT_DATA_HANDLE *new_dhandle);
+static WT_INLINE bool __wti_evict_ckpt_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wti_evict_prune_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_readgen_is_soon_or_wont_need(uint64_t *readgen)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wti_evict_restored_page_unchanged(WT_SESSION_IMPL *session, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE double __wti_evict_dirty_target(WT_EVICT *evict)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE double __wti_evict_threshold_pct(double pct_clean, double pct_dirty,
+  double pct_updates, double clean_trigger, double dirty_trigger, double updates_trigger)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE void __wti_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page);
 static WT_INLINE void __wti_evict_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page);

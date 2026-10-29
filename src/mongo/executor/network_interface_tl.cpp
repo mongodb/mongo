@@ -1,43 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/executor/network_interface_tl.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -76,6 +42,15 @@
 #include <mutex>
 #include <tuple>
 #include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -176,7 +151,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
       _state(kDefault),
       _trackShardRequestCounts{trackShardRequestCounts} {
     ObservableMutexRegistry::get().add(
-        "NetworkInterfaceTL::_mutex", _mutex, std::string_view(_instanceName));
+        "networkInterfaceTlMutex", _mutex, std::string_view(_instanceName));
 }
 
 NetworkInterfaceTL::~NetworkInterfaceTL() {
@@ -431,7 +406,6 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
                         2,
                         "Skipping redundant cancellation",
                         "requestId"_attr = request.id,
-                        "request"_attr = redact(request.toString()),
                         "originalReason"_attr = cancelStatus,
                         "redundantReason"_attr = status);
             return;
@@ -442,7 +416,6 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
                     2,
                     "Cancelling command with reason",
                     "requestId"_attr = request.id,
-                    "request"_attr = redact(request.toString()),
                     "reason"_attr = status);
     }
     cancelSource.cancel();
@@ -490,16 +463,14 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
                 return;
             }
 
-            const std::string message = str::stream()
-                << "Request " << request.id << " timed out" << ", deadline was "
-                << deadline.toString() << ", op was " << redact(request.toString());
+            const std::string message = str::stream() << "Request " << request.id << " timed out"
+                                                      << ", deadline was " << deadline.toString();
 
             LOGV2_DEBUG(22595,
                         2,
                         "Request timed out",
                         "requestId"_attr = request.id,
-                        "deadline"_attr = deadline,
-                        "request"_attr = request);
+                        "deadline"_attr = deadline);
             cancel({timeoutCode, message});
         });
 }
@@ -672,7 +643,6 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
                 "Sending remote _killOperations request to cancel command",
                 "target"_attr = cmdStateToKill->request.target,
                 "cancelledRequestId"_attr = cmdStateToKill->request.id,
-                "canelledRequest"_attr = redact(cmdStateToKill->request.toString()),
                 "operationKey"_attr = operationKey);
 
     executor::RemoteCommandRequest killOpRequest(
@@ -680,8 +650,9 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
         DatabaseName::kAdmin,
         BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(*operationKey)),
         nullptr,
-        increaseTimeoutOnKillOp.shouldFail() ? kCancelCommandTimeout_forTest
-                                             : kCancelCommandTimeout);
+        {.timeout = increaseTimeoutOnKillOp.shouldFail() ? kCancelCommandTimeout_forTest
+                                                         : kCancelCommandTimeout,
+         .isKillOp = true});
     auto cbHandle = executor::TaskExecutor::CallbackHandle();
     auto killOpCmdState = std::make_shared<CommandState>(
         this, killOpRequest, cbHandle, nullptr, CancellationToken::uncancelable());
@@ -873,7 +844,12 @@ NetworkInterfaceTL::CommandStateBase::getClient(AsyncClientFactory& factory) {
         }
     }
 
-    return factory.get(request.target, request.sslMode, poolTimeout, cancelSource.token());
+    return factory.get(request.target,
+                       request.sslMode,
+                       poolTimeout,
+                       cancelSource.token(),
+                       request.isKillOp ? ConnectionAcquisitionPurpose::kKillOperation
+                                        : ConnectionAcquisitionPurpose::kNormal);
 }
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::sendRequest(
@@ -1080,12 +1056,6 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
 
                 return false;
             });
-
-            // The TransportLayer has, for historical reasons returned SocketException for network
-            // errors, but sharding assumes HostUnreachable on network errors.
-            if (response.status == ErrorCodes::SocketException) {
-                response.status = Status(ErrorCodes::HostUnreachable, response.status.reason());
-            }
 
             LOGV2_DEBUG(22597,
                         2,

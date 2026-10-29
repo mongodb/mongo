@@ -86,37 +86,30 @@ let chunkToSplit = findChunksUtil.findOneChunkByNs(configDB, ns, {
 //         -2500000000000000000 -> -2000000000000000000
 //         0                    -> 4611686018427387902
 //         4611686018427387902  -> MAX
-let splitPoints = [
-    {x: NumberLong(-4500000000000000000)},
-    {x: NumberLong(-4000000000000000000)},
-    {x: NumberLong(-3500000000000000000)},
-    {x: NumberLong(-3000000000000000000)},
-    {x: NumberLong(-2500000000000000000)},
-    {x: NumberLong(-2000000000000000000)},
-];
-assert.gt(0, bsonWoCompare(chunkToSplit.min, splitPoints[0]));
-assert.lt(0, bsonWoCompare(chunkToSplit.max, splitPoints[splitPoints.length - 1]));
+assert.gt(0, bsonWoCompare(chunkToSplit.min, {x: NumberLong(-4500000000000000000)}));
+assert.lt(0, bsonWoCompare(chunkToSplit.max, {x: NumberLong(-2000000000000000000)}));
 
 jsTest.log("Creating additional chunks and holes...");
-for (let splitPoint of splitPoints) {
-    assert.commandWorked(admin.runCommand({split: ns, middle: splitPoint}));
-}
 assert.commandWorked(
     admin.runCommand({
-        moveChunk: ns,
-        bounds: [{x: NumberLong(-4500000000000000000)}, {x: NumberLong(-4000000000000000000)}],
-        to: st.shard1.shardName,
-        _waitForDelete: true,
+        moveRange: ns,
+        min: {x: NumberLong(-4500000000000000000)},
+        max: {x: NumberLong(-4000000000000000000)},
+        toShard: st.shard1.shardName,
+        waitForDelete: true,
     }),
 );
 assert.commandWorked(
     admin.runCommand({
-        moveChunk: ns,
-        bounds: [{x: NumberLong(-2500000000000000000)}, {x: NumberLong(-2000000000000000000)}],
-        to: st.shard1.shardName,
-        _waitForDelete: true,
+        moveRange: ns,
+        min: {x: NumberLong(-2500000000000000000)},
+        max: {x: NumberLong(-2000000000000000000)},
+        toShard: st.shard1.shardName,
+        waitForDelete: true,
     }),
 );
+assert.commandWorked(admin.runCommand({split: ns, middle: {x: NumberLong(-3500000000000000000)}}));
+assert.commandWorked(admin.runCommand({split: ns, middle: {x: NumberLong(-3000000000000000000)}}));
 
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);

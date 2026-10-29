@@ -8,6 +8,7 @@
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 
 const dbName = "testDB";
 const collName = jsTestName();
@@ -21,9 +22,17 @@ const conn = rst.getPrimary();
 const testDB = conn.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
+// profiling is unsupported in disagg
+const profilingSupported = !isDisagg(conn);
+
 // Set up some data and up the profiling (and 'Slow query') threshold to log everything.
 assert.commandWorked(testColl.insert({_id: "doc"}));
-assert.commandWorked(testDB.runCommand({profile: 1, slowms: 0}));
+if (profilingSupported) {
+    assert.commandWorked(testDB.runCommand({profile: 1, slowms: 0}));
+} else {
+    jsTest.log.info("Skipping profiling because it is unsupported in this architecture");
+    assert.commandWorked(testDB.runCommand({profile: 0, slowms: 0}));
+}
 
 jsTest.log("Run an identifiable (when logged) write operation.");
 assert.commandWorked(
@@ -56,14 +65,16 @@ assert(
     "Expected to find a 'totalOplogSlotDurationMicros' entry in a 'Slow query' log msg.",
 );
 
-profilerHasAtLeastOneMatchingEntryOrThrow({
-    profileDB: testDB,
-    filter: {
-        "ns": testColl.getFullName(),
-        "op": "update",
-        "command.comment": writeComment,
-        "totalOplogSlotDurationMicros": {"$exists": true},
-    },
-});
+if (profilingSupported) {
+    profilerHasAtLeastOneMatchingEntryOrThrow({
+        profileDB: testDB,
+        filter: {
+            "ns": testColl.getFullName(),
+            "op": "update",
+            "command.comment": writeComment,
+            "totalOplogSlotDurationMicros": {"$exists": true},
+        },
+    });
+}
 
 rst.stopSet();

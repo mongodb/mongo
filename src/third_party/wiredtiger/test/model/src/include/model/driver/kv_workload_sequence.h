@@ -30,6 +30,7 @@
 
 #include <deque>
 #include <memory>
+#include <vector>
 #include "model/driver/kv_workload.h"
 #include "model/core.h"
 #include "model/data_value.h"
@@ -175,9 +176,9 @@ public:
      *     Check whether this sequence overlaps in any key ranges with the other sequence.
      */
     inline bool
-    overlaps_with(std::shared_ptr<kv_workload_sequence> other) const
+    overlaps_with(const std::shared_ptr<kv_workload_sequence> &other) const
     {
-        return overlaps_with(*other.get());
+        return overlaps_with(*other);
     }
 
     /*
@@ -208,6 +209,41 @@ public:
      */
     void must_finish_before(kv_workload_sequence *other);
 
+    /*
+     * kv_workload_sequence::must_finish_before --
+     *     Declare that the other sequence cannot start until this sequence finishes.
+     */
+    inline void
+    must_finish_before(const std::shared_ptr<kv_workload_sequence> &other)
+    {
+        must_finish_before(other.get());
+    }
+
+    /*
+     * kv_workload_sequence::ordered_before --
+     *     Check whether the other sequence already cannot start until this sequence finishes,
+     *     directly or transitively. A false result is not definitive: the transitive part only
+     *     includes edges that the other sequences had at the time they were merged into this one.
+     */
+    inline bool
+    ordered_before(const kv_workload_sequence &other) const noexcept
+    {
+        size_t word = other._seq_no / 64;
+        return word < _must_finish_before_bitset.size() &&
+          (_must_finish_before_bitset[word] & ((uint64_t)1 << (other._seq_no % 64))) != 0;
+    }
+
+    /*
+     * kv_workload_sequence::ordered_before --
+     *     Check whether the other sequence already cannot start until this sequence finishes,
+     *     directly or transitively. A false result is not definitive.
+     */
+    inline bool
+    ordered_before(const std::shared_ptr<kv_workload_sequence> &other) const noexcept
+    {
+        return ordered_before(*other);
+    }
+
 protected:
     /*
      * kv_workload_sequence::contains_key --
@@ -223,6 +259,13 @@ protected:
 
     /* Sequences that must finish before this sequence can start. */
     std::deque<kv_workload_sequence *> _dependencies;
+
+    /*
+     * Bitset of sequences that cannot start until this sequence finishes, directly or transitively,
+     * with bit N of the words set for the sequence number N. Edges added to a sequence after it was
+     * merged into this one are not reflected, so the set may be incomplete.
+     */
+    std::vector<uint64_t> _must_finish_before_bitset;
 
     /* Sequences that may be unblocked after this sequence finishes. */
     std::deque<kv_workload_sequence *> _unblocks;

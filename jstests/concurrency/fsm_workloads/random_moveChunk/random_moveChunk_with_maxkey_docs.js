@@ -21,7 +21,7 @@
  */
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 import {isMoveChunkErrorAcceptableWithConcurrent} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -87,7 +87,11 @@ export const $config = (function () {
         }
         const idx = Random.randInt(this.trackedDocs.length);
         const tracked = this.trackedDocs[idx];
-        const res = db[collName].update({_id: tracked._id}, {$inc: {counter: 1}});
+
+        const res = db[collName].update(
+            {_id: tracked._id, skey: tracked.skey, otherKey: tracked.otherKey},
+            {$inc: {counter: 1}},
+        );
         if (res.nModified === 1) {
             tracked.counter++;
         }
@@ -194,6 +198,16 @@ export const $config = (function () {
     function setup(db, collName, cluster) {
         const ns = db[collName].getFullName();
 
+        // This test verifies the SERVER-121533 migration fix: MaxKey-prefixed documents are cloned during
+        // migration and their orphans are cleaned up by the range deleter. Disable the delete-guard
+        // which when enabled would instead preserve those orphans.
+        cluster.executeOnMongodNodes((adminDb) => {
+            assert.commandWorkedOrFailedWithCode(
+                adminDb.adminCommand({setParameter: 1, skipRangeDeletionForMaxKeyChunks: false}),
+                ErrorCodes.InvalidOptions,
+            );
+        });
+
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < kNumInitialRegularDocs; i++) {
             bulk.insert({_id: i, skey: i, otherKey: i, tid: i % 5, counter: 0});
@@ -260,6 +274,14 @@ export const $config = (function () {
     }
 
     function teardown(db, collName, cluster) {
+        // Restore the guard's default before finishing (see setup).
+        cluster.executeOnMongodNodes((adminDb) => {
+            assert.commandWorkedOrFailedWithCode(
+                adminDb.adminCommand({setParameter: 1, skipRangeDeletionForMaxKeyChunks: true}),
+                ErrorCodes.InvalidOptions,
+            );
+        });
+
         const counterDoc = db[collName + kCounterCollSuffix].findOne({_id: "maxKeyCount"});
         assert.neq(counterDoc, null, "MaxKey counter document not found");
         const expectedCount = counterDoc.count;

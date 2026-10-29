@@ -1,4 +1,10 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load(
+    "//bazel:mongo_src_rules.bzl",
+    "mongo_cc_benchmark",
+    "mongo_cc_fuzztest",
+    "mongo_cc_library",
+    "mongo_cc_unit_test",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -69,6 +75,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/vm:vm_builtin_string.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_datetime.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_instruction.cpp",
+        "//src/mongo/db/exec/sbe/vm:vm_mql.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_printer.cpp",
     ],
     deps = [
@@ -83,7 +90,9 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe:query_sbe_makeobj_spec",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query:random_utils",
+        "//src/mongo/db/query:record_id_range",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/metadata:query_metadata",
         "//src/mongo/db/query/compiler/physical_model/index_bounds",
@@ -111,6 +120,23 @@ mongo_cc_library(
     ],
 )
 
+# The out-of-line query-memory load-shedding shim called from the CanInterrupt inline in stages.h.
+# It lives in its own leaf so both query_sbe_storage (lower layer) and query_sbe_stages (which
+# depends on query_sbe_storage) can link the symbol without a dependency cycle, and so the widely
+# included stages.h header does not pull the load-shedding library into every SBE compile.
+mongo_cc_library(
+    name = "query_sbe_load_shedding_shim",
+    srcs = [
+        "//src/mongo/db/exec/sbe/stages:stages.cpp",
+    ],
+    deps = [
+        ":query_sbe",
+        "//src/mongo:base",
+        "//src/mongo/db/memory_tracking:query_memory_load_shedding",
+        "//src/mongo/db/query:plan_yield_policy_sbe",
+    ],
+)
+
 mongo_cc_library(
     name = "query_sbe_stages",
     srcs = [
@@ -121,6 +147,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:branch.cpp",
         "//src/mongo/db/exec/sbe/stages:bson_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:co_scan.cpp",
+        "//src/mongo/db/exec/sbe/stages:compact_hash_agg.cpp",
         "//src/mongo/db/exec/sbe/stages:extract_field_paths.cpp",
         "//src/mongo/db/exec/sbe/stages:fetch.cpp",
         "//src/mongo/db/exec/sbe/stages:hash_agg.cpp",
@@ -139,15 +166,16 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:sort.cpp",
         "//src/mongo/db/exec/sbe/stages:sort_stage_sort_impl.cpp",
         "//src/mongo/db/exec/sbe/stages:sorted_merge.cpp",
+        "//src/mongo/db/exec/sbe/stages:streaming_agg.cpp",
         "//src/mongo/db/exec/sbe/stages:ts_bucket_to_cell_block.cpp",
         "//src/mongo/db/exec/sbe/stages:union.cpp",
         "//src/mongo/db/exec/sbe/stages:unique.cpp",
         "//src/mongo/db/exec/sbe/stages:unwind.cpp",
         "//src/mongo/db/exec/sbe/stages:virtual_scan.cpp",
-        "//src/mongo/db/exec/sbe/stages:window.cpp",
     ],
     deps = [
         ":query_sbe",
+        ":query_sbe_load_shedding_shim",
         ":query_sbe_plan_stats",
         ":query_sbe_storage",
         "//src/mongo/bson/dotted_path:dotted_path_support",
@@ -157,6 +185,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/memory_tracking:query_memory_load_shedding",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/db/query:plan_yield_policy_sbe",
@@ -182,15 +211,18 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/exec/sbe/stages:generic_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:ix_scan.cpp",
+        "//src/mongo/db/exec/sbe/stages:multi_range_clustered_scan_stage.cpp",
         "//src/mongo/db/exec/sbe/stages:random_scan.cpp",
         "//src/mongo/db/exec/sbe/stages:scan.cpp",
     ],
     deps = [
         ":query_sbe",
+        ":query_sbe_load_shedding_shim",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/query:plan_yield_policy_sbe",
+        "//src/mongo/db/query:record_id_range",
         "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/storage:index_entry_comparison",
@@ -205,6 +237,7 @@ mongo_cc_library(
     deps = [
         ":query_sbe",
         ":query_sbe_stages",
+        ":sbe_unittest_base",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
@@ -220,13 +253,32 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "clustered_scan_stage_test_fixtures",
+    srcs = [
+        "//src/mongo/db/exec/sbe/stages:clustered_scan_stage_test_fixtures.cpp",
+    ],
+    deps = [
+        ":sbe_plan_stage_test",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/query:record_id_range",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+    ],
+)
+
+mongo_cc_library(
     name = "sbe_unittest_base",
     srcs = [
         "sbe_unittest.cpp",
+        "sbe_unittest_assert.cpp",
+    ],
+    private_hdrs = [
+        "sbe_unittest_assert.h",
     ],
     deps = [
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/unittest",
     ],
 )
 
@@ -250,6 +302,7 @@ mongo_cc_unit_test(
         "sbe_block_hashagg_test.cpp",
         "sbe_block_stages_test.cpp",
         "sbe_code_fragment_test.cpp",
+        "sbe_compact_hash_agg_test.cpp",
         "sbe_extract_field_paths_test.cpp",
         "sbe_filter_test.cpp",
         "sbe_hash_agg_accumulator_test.cpp",
@@ -259,6 +312,7 @@ mongo_cc_unit_test(
         "sbe_hash_lookup_test.cpp",
         "sbe_hash_lookup_unwind_test.cpp",
         "sbe_hybrid_hash_join_test.cpp",
+        "sbe_ix_scan_test.cpp",
         "sbe_key_string_test.cpp",
         "sbe_limit_skip_test.cpp",
         "sbe_loop_join_test.cpp",
@@ -267,14 +321,15 @@ mongo_cc_unit_test(
         "sbe_numeric_convert_test.cpp",
         "sbe_pattern_value_cmp_test.cpp",
         "sbe_plan_size_test.cpp",
+        "sbe_project_test.cpp",
         "sbe_scan_test.cpp",
         "sbe_search_cursor_test.cpp",
         "sbe_sort_test.cpp",
         "sbe_sorted_merge_test.cpp",
+        "sbe_streaming_agg_test.cpp",
         "sbe_test.cpp",
         "sbe_trial_run_tracker_test.cpp",
         "sbe_unique_test.cpp",
-        "sbe_window_test.cpp",
         "write_value_to_stream_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_array_set_conversion_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_block_expr_test.cpp",
@@ -282,9 +337,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_bson_size_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_coerce_to_string_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_collIsMember_builtin_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_concat_arrays_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_concat_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_constant_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_covariance_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_current_date_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_add_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_diff_test.cpp",
@@ -293,38 +348,30 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_date_to_parts_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_to_string_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_trunc_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_derivative_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_exp_moving_avg_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_double_double_sum_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_extract_sub_array_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_fail_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_fill_type_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_firstn_lastn_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_fn_names_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_get_element_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_if_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_index_of_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_integral_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_is_array_empty_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_is_member_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_iso_date_to_parts_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_ks_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_lambda_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_linearfill_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_local_bind_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_merge_objects_for_expr_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_mod_expression_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_new_array_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_new_array_from_range_builtin_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_new_obj_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_object_array_conversion_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_prim_binary_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_prim_nary_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_prim_unary_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_rank_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_regex_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_removable_avg_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_removable_min_max_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_removable_minn_maxn_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_removable_push_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_removable_stddev_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_removable_sum_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_replace_one_expression_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_reverse_array_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_round_builtin_test.cpp",
@@ -333,12 +380,13 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_shard_filter_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_to_upper_to_lower_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_topn_bottomn_expr_builtin_test.cpp",
-        "//src/mongo/db/exec/sbe/expressions:sbe_topn_bottomn_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_trigonometric_expressions_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_trunc_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_ts_second_ts_increment_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_unwind_array_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_variable_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_zip_arrays_test.cpp",
+        "//src/mongo/db/exec/sbe/stages:multi_range_clustered_scan_stage_test.cpp",
         "//src/mongo/db/exec/sbe/util:bloom_filter_test.cpp",
         "//src/mongo/db/exec/sbe/util:stage_results_printer_test.cpp",
         "//src/mongo/db/exec/sbe/values:block_test.cpp",
@@ -362,13 +410,16 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
+        ":clustered_scan_stage_test_fixtures",
         ":sbe_plan_stage_test",
         ":sbe_unittest_base",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/db/timeseries:bucket_compression",
         "//src/mongo/unittest",
         "//src/mongo/util:pcre_wrapper",
@@ -407,6 +458,20 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "sbe_concat_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/vm:concat_bm.cpp",
+    ],
+    tags = [
+        "first_half_bm",
+    ],
+    deps = [
+        ":query_sbe",
+        "//src/mongo/db/memory_tracking",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "sbe_extract_field_paths_bm",
     srcs = [
         "//src/mongo/db/exec/sbe/values:extract_field_paths_bm.cpp",
@@ -420,6 +485,16 @@ mongo_cc_benchmark(
         "//src/mongo/unittest",
         "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "sbe_bson_field_extraction_bm",
+    srcs = [
+        "//src/mongo/db/exec/sbe/stages:sbe_bson_field_extraction_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe_stages",
     ],
 )
 
@@ -502,6 +577,19 @@ mongo_cc_benchmark(
     deps = [
         ":sbe_plan_stage_test",
         ":sbe_unittest_base",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration_test_util",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "sbe_group_stage_fuzz_test",
+    srcs = [
+        "sbe_group_stage_fuzz_test.cpp",
+    ],
+    deps = [
+        ":sbe_plan_stage_test",
+        "//src/mongo/db/exec/sbe/values:document_tree_generator",
+        "@fuzztest//fuzztest:googletest_fixture_adapter",
     ],
 )

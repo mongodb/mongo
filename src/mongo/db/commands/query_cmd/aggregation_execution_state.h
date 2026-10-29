@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/namespace_string.h"
@@ -183,6 +157,19 @@ public:
      */
     std::vector<NamespaceStringOrUUID> getForeignExecutionNamespaces() const {
         return _aggReqDerivatives->liteParsedPipeline.getForeignExecutionNamespaces();
+    }
+
+    /**
+     * Foreign views resolved against the database primary shard before any storage snapshot was
+     * acquired. A shard that does not hold the view catalog (i.e. not the database primary) makes
+     * remote resolveView requests to the primary shard to resolve any views, rather than leaving
+     * the entry empty in the resolvedNamespaces closure kickback-ed to mongos.
+     */
+    void setPreResolvedForeignViews(ResolvedNamespaceMap views) {
+        _preResolvedForeignViews = std::move(views);
+    }
+    const ResolvedNamespaceMap& getPreResolvedForeignViews() const {
+        return _preResolvedForeignViews;
     }
 
     /**
@@ -353,6 +340,10 @@ private:
     // an external reference. Also, its cheap to copy this object because it is small.
     NamespaceString _executionNss;
 
+    // Foreign views resolved against the database primary shard before snapshot acquisition. Empty
+    // unless this shard had to consult the primary to resolve a foreign view it lacks locally.
+    ResolvedNamespaceMap _preResolvedForeignViews;
+
     // 'privileges' contains the privileges that were required to run this aggregation, to be used
     // later for re-checking privileges for getMore commands.
     const PrivilegeVector& _privileges;
@@ -470,6 +461,10 @@ public:
      * for a collectionless pipeline.
      */
     virtual const CollectionOrViewAcquisition& getMainCollectionOrView() const = 0;
+
+    virtual bool isCollectionlessAggregation() const {
+        return false;
+    }
 
     /**
      * Collectionless pipelines may need an 'AutoStatsTracker' to track stats. This method will

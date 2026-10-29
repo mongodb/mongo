@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/type_chunk.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/logv2/log_debug.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -229,7 +202,7 @@ TEST(ChunkType, ToFromConfigBSON) {
     ASSERT_BSONOBJ_EQ(chunk.getMax(), BSON("a" << 20));
     ASSERT_EQUALS(chunk.getVersion().toLong(), chunkVersion.toLong());
     ASSERT_EQUALS(chunk.getVersion().epoch(), chunkVersion.epoch());
-    ASSERT_EQUALS(chunk.getShard(), ShardRef{"shard0001"});
+    ASSERT_EQUALS(chunk.getShard(), "shard0001");
     ASSERT_EQUALS(*chunk.getOnCurrentShardSince(), onCurrentShardSince);
     ASSERT_OK(chunk.validate());
 }
@@ -337,81 +310,8 @@ TEST(ChunkType, ParseFromNetworkRequest) {
                                 << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
                                 << "shard0001")))));
 
-    ASSERT_EQ(ShardRef{"shard0001"}, chunk.getShard());
+    ASSERT_EQ("shard0001", chunk.getShard().toString());
     ASSERT_EQ(chunkVersion, chunk.getVersion());
-}
-
-TEST(ChunkType, ShardRefStringRoundTrip) {
-    const auto collUuid = UUID::gen();
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp(1);
-    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
-    const auto onCurrentShardSince = Timestamp(2);
-    const ShardRef strShard{std::string{"shard0001"}};
-
-    // Build and parse a chunk with a string ShardRef.
-    ChunkType original(
-        collUuid, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, chunkVersion, strShard);
-    original.setName(OID::gen());
-    original.setOnCurrentShardSince(onCurrentShardSince);
-    original.setHistory({ChunkHistory{onCurrentShardSince, strShard}});
-
-    ASSERT_OK(original.validate());
-
-    // Config BSON round-trip.
-    auto bson = original.toConfigBSON();
-    auto parsed = assertGet(ChunkType::parseFromConfigBSON(bson, collEpoch, collTimestamp));
-    ASSERT_TRUE(parsed.getShard().isString());
-    ASSERT_EQ(parsed.getShard(), strShard);
-    ASSERT_EQ(parsed.getHistory().front().getShard(), strShard);
-    ASSERT_BSONOBJ_EQ(parsed.toConfigBSON(), bson);
-}
-
-TEST(ChunkType, ShardRefUUIDRoundTrip) {
-    const auto collUuid = UUID::gen();
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp(1);
-    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
-    const auto onCurrentShardSince = Timestamp(2);
-    const ShardRef uuidShard{UUID::gen()};
-
-    // Build and parse a chunk with a UUID ShardRef.
-    ChunkType original(
-        collUuid, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, chunkVersion, uuidShard);
-    original.setName(OID::gen());
-    original.setOnCurrentShardSince(onCurrentShardSince);
-    original.setHistory({ChunkHistory{onCurrentShardSince, uuidShard}});
-
-    ASSERT_OK(original.validate());
-
-    // Config BSON round-trip.
-    auto bson = original.toConfigBSON();
-    auto parsed = assertGet(ChunkType::parseFromConfigBSON(bson, collEpoch, collTimestamp));
-    ASSERT_TRUE(parsed.getShard().isUUID());
-    ASSERT_EQ(parsed.getShard(), uuidShard);
-    ASSERT_EQ(parsed.getHistory().front().getShard(), uuidShard);
-    ASSERT_BSONOBJ_EQ(parsed.toConfigBSON(), bson);
-}
-
-TEST(ChunkType, ShardRefInvalidTypeFails) {
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp(1);
-    const auto chunkVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 2});
-    const auto onCurrentShardSince = Timestamp(2);
-
-    // Build a BSON where the shard field has an invalid type (integer).
-    BSONObj obj =
-        BSON(ChunkType::name(OID::gen())
-             << ChunkType::collectionUUID() << UUID::gen() << ChunkType::min(BSON("a" << 10))
-             << ChunkType::max(BSON("a" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << "lastmodTimestamp"
-             << chunkVersion.getTimestamp() << "shard" << 42 << ChunkType::onCurrentShardSince()
-             << onCurrentShardSince << ChunkType::history()
-             << BSON_ARRAY(BSON(ChunkHistoryBase::kValidAfterFieldName
-                                << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
-                                << "shard0001")));
-    auto chunkRes = ChunkType::parseFromConfigBSON(obj, collEpoch, collTimestamp);
-    ASSERT_NOT_OK(chunkRes.getStatus());
 }
 
 }  // namespace

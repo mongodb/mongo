@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 
@@ -142,13 +116,13 @@ protected:
                                          collUuid,
                                          chunkSplitInfo.shardKeyPattern.getKeyPattern(),
                                          false, /* unsplittable */
-                                         std::move(defaultCollator) /* collator */,
-                                         false /* unique */,
+                                         /*defaultCollator=*/std::move(defaultCollator),
+                                         /*unique=*/false,
                                          epoch,
                                          timestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
-                                         true /* allowMigrations */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
+                                         /*allowMigrations=*/true,
                                          chunks);
 
         CurrentChunkManager cm(RoutingTableHistoryValueHandle(
@@ -575,13 +549,13 @@ TEST_F(ReadWriteDistributionTest, WriteDistributionSampleSize) {
 
     // Add three delete queries, one of them via bulkWrite.
     auto filter4 = BSON("a.x" << 4);
-    auto deleteOp4 = write_ops::DeleteOpEntry(filter4, false /* multi */);
+    auto deleteOp4 = write_ops::DeleteOpEntry(filter4, /*multi=*/false);
     auto filter5 = BSON("a.x" << 5);
-    auto deleteOp5 = write_ops::DeleteOpEntry(filter5, true /* multi */);
+    auto deleteOp5 = write_ops::DeleteOpEntry(filter5, /*multi=*/true);
     writeDistributionCalculator.addQuery(operationContext(),
                                          makeSampledDeleteQueryDocument({deleteOp4, deleteOp5}));
     auto filter6 = BSON("a.x" << 6);
-    auto deleteOp6 = write_ops::DeleteOpEntry(filter6, true /* multi */);
+    auto deleteOp6 = write_ops::DeleteOpEntry(filter6, /*multi=*/true);
     writeDistributionCalculator.addQuery(operationContext(),
                                          makeSampledBulkWriteDeleteQueryDocument({deleteOp6}));
 
@@ -591,7 +565,7 @@ TEST_F(ReadWriteDistributionTest, WriteDistributionSampleSize) {
     writeDistributionCalculator.addQuery(
         operationContext(),
         makeSampledFindAndModifyQueryDocument(
-            filter7, updateMod, false /* upsert */, false /* remove */));
+            filter7, updateMod, /*upsert=*/false, /*remove=*/false));
 
     auto metrics = writeDistributionCalculator.getMetrics();
     auto sampleSize = metrics.getSampleSize();
@@ -622,7 +596,7 @@ DEATH_TEST_F(ReadWriteDistributionTestDeathTest,
     ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
 
     auto filter = BSON("a.x" << 0);
-    auto deleteOp = write_ops::DeleteOpEntry(filter, false /* multi */);
+    auto deleteOp = write_ops::DeleteOpEntry(filter, /*multi=*/false);
     readDistributionCalculator.addQuery(operationContext(),
                                         makeSampledDeleteQueryDocument({deleteOp}));
 }
@@ -635,10 +609,9 @@ DEATH_TEST_F(ReadWriteDistributionTestDeathTest,
 
     auto filter = BSON("a.x" << 0);
     auto updateMod = write_ops::UpdateModification(BSON("$set" << BSON("c" << 0)));
-    readDistributionCalculator.addQuery(
-        operationContext(),
-        makeSampledFindAndModifyQueryDocument(
-            filter, updateMod, false /* upsert */, false /* remove */));
+    readDistributionCalculator.addQuery(operationContext(),
+                                        makeSampledFindAndModifyQueryDocument(
+                                            filter, updateMod, /*upsert=*/false, /*remove=*/false));
 }
 
 DEATH_TEST_F(ReadWriteDistributionTestDeathTest,
@@ -1225,8 +1198,8 @@ protected:
         return ReadWriteDistributionTest::makeSampledFindAndModifyQueryDocument(
             filter,
             updateMod,
-            getRandomBool() /* upsert */,
-            getRandomBool() /* remove */,
+            /*upsert=*/getRandomBool(),
+            /*remove=*/getRandomBool(),
             collation,
             letParameters);
     }
@@ -1788,7 +1761,7 @@ protected:
     SampledQueryDocument makeSampledFindAndModifyQueryDocument(const BSONObj& filter,
                                                                const BSONObj& updateMod) const {
         return ReadWriteDistributionTest::makeSampledFindAndModifyQueryDocument(
-            filter, updateMod, getRandomBool() /* upsert */, getRandomBool() /* remove */);
+            filter, updateMod, /*upsert=*/getRandomBool(), /*remove=*/getRandomBool());
     }
 };
 
@@ -1811,7 +1784,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyPrefixEqualityDotted)
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1834,7 +1807,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyPrefixEqualityNotDott
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1857,7 +1830,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyPrefixRangeMinKey) {
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1880,7 +1853,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyPrefixRangeMaxKey) {
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1903,7 +1876,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyPrefixRangeNoMinOrMax
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1929,7 +1902,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, FullShardKeyRange) {
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1952,7 +1925,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyNonEquality) {
     }
     assertTargetMetrics(targeter,
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
-                        false /* multi */,
+                        /*multi=*/false,
                         numByRange);
 }
 
@@ -1972,7 +1945,7 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyRangeHashed) {
             targeter, makeSampledBulkWriteDeleteQueryDocument(filter, multi), multi);
     }
     assertTargetMetrics(
-        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
+        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), /*multi=*/false);
 }
 
 class WriteDistributionFilterByShardKeyRangeReplacementUpdateTest
@@ -2013,10 +1986,10 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {
     metrics.numByRange = std::vector<int64_t>({1, 1, 0});
     metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
-        targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
+        targeter, makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/false), metrics);
     assertMetricsForWriteQuery(
         targeter,
-        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */),
+        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/false),
         metrics);
 }
 
@@ -2030,10 +2003,10 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertEve
     metrics.numByRange = std::vector<int64_t>({1, 1, 0});
     metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
-        targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
+        targeter, makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/false), metrics);
     assertMetricsForWriteQuery(
         targeter,
-        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */),
+        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/false),
         metrics);
 }
 
@@ -2047,10 +2020,10 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertPre
     metrics.numByRange = std::vector<int64_t>({1, 1, 0});
     metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
-        targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
+        targeter, makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/false), metrics);
     assertMetricsForWriteQuery(
         targeter,
-        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */),
+        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/false),
         metrics);
 }
 
@@ -2064,10 +2037,10 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertSuf
     metrics.numByRange = std::vector<int64_t>({1, 1, 0});
     metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
-        targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
+        targeter, makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/false), metrics);
     assertMetricsForWriteQuery(
         targeter,
-        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */),
+        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/false),
         metrics);
 }
 
@@ -2082,12 +2055,12 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NonUpsertNot
         metrics.numSingleWritesWithoutShardKey = 1;
         assertMetricsForWriteQuery(
             targeter,
-            makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */, collation),
+            makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/false, collation),
             metrics);
-        assertMetricsForWriteQuery(targeter,
-                                   makeSampledBulkWriteUpdateQueryDocument(
-                                       filter, updateMod, false /* upsert */, collation),
-                                   metrics);
+        assertMetricsForWriteQuery(
+            targeter,
+            makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/false, collation),
+            metrics);
     };
 
     runTest(BSON("a.x" << BSON("$lt" << 0)));
@@ -2107,10 +2080,10 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, Upsert) {
     metrics.numByRange = std::vector<int64_t>({1, 1, 0});
     metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
-        targeter, makeSampledUpdateQueryDocument(filter, updateMod, true /* upsert */), metrics);
+        targeter, makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/true), metrics);
     assertMetricsForWriteQuery(
         targeter,
-        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, true /* upsert */),
+        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/true),
         metrics);
 }
 
@@ -2164,7 +2137,7 @@ protected:
     SampledQueryDocument makeSampledFindAndModifyQueryDocument(const BSONObj& filter,
                                                                const BSONObj& updateMod) const {
         return ReadWriteDistributionTest::makeSampledFindAndModifyQueryDocument(
-            filter, updateMod, getRandomBool() /* upsert */, getRandomBool() /* remove */);
+            filter, updateMod, /*upsert=*/getRandomBool(), /*remove=*/getRandomBool());
     }
 };
 
@@ -2182,7 +2155,7 @@ TEST_F(WriteDistributionNotFilterByShardKeyTest, ShardKeySuffixEquality) {
             targeter, makeSampledBulkWriteDeleteQueryDocument(filter, multi), multi);
     }
     assertTargetMetrics(
-        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
+        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), /*multi=*/false);
 }
 
 TEST_F(WriteDistributionNotFilterByShardKeyTest, NoShardKey) {
@@ -2199,7 +2172,7 @@ TEST_F(WriteDistributionNotFilterByShardKeyTest, NoShardKey) {
             targeter, makeSampledBulkWriteDeleteQueryDocument(filter, multi), multi);
     }
     assertTargetMetrics(
-        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
+        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), /*multi=*/false);
 }
 
 TEST_F(WriteDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityNotDotted) {
@@ -2221,7 +2194,7 @@ TEST_F(WriteDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityNotDotted
             targeter, makeSampledBulkWriteDeleteQueryDocument(filter, multi), multi);
     }
     assertTargetMetrics(
-        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
+        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), /*multi=*/false);
 }
 
 TEST_F(WriteDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityDotted) {
@@ -2241,7 +2214,7 @@ TEST_F(WriteDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityDotted) {
             targeter, makeSampledBulkWriteDeleteQueryDocument(filter, multi), multi);
     }
     assertTargetMetrics(
-        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
+        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), /*multi=*/false);
 }
 
 class WriteDistributionNotFilterByShardKeyReplacementUpdateTest : public ReadWriteDistributionTest {
@@ -2281,10 +2254,10 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, NotUpsert) {
         BSON("_id" << 0 << "a" << BSON("x" << 0) << "b" << BSON("y" << "A") << "c" << 0);
 
     assertTargetMetrics(targeter,
-                        makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */));
+                        makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/false));
 
     assertTargetMetrics(
-        targeter, makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */));
+        targeter, makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/false));
 }
 
 TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {
@@ -2302,9 +2275,9 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {
     auto updateMod =
         BSON("_id" << 0 << "a" << BSON("x" << 0) << "b" << BSON("y" << "A") << "c" << 0);
     assertTargetMetrics(targeter,
-                        makeSampledUpdateQueryDocument(filter, updateMod, true /* upsert */));
+                        makeSampledUpdateQueryDocument(filter, updateMod, /*upsert=*/true));
     assertTargetMetrics(
-        targeter, makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, true /* upsert */));
+        targeter, makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, /*upsert=*/true));
 }
 
 TEST_F(ReadWriteDistributionTest, WriteDistributionShardKeyUpdates) {

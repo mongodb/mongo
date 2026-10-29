@@ -71,17 +71,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "rank_fusion_util",
-    srcs = [
-        "rank_fusion_util.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/query:query_knobs",
-    ],
-)
-
-mongo_cc_library(
     name = "field_set",
     srcs = [
         "field_set.cpp",
@@ -100,6 +89,16 @@ mongo_cc_library(
     ],
     hdrs = [
         "bitset_util.h",
+    ],
+)
+
+mongo_cc_library(
+    name = "represent_as_util",
+    hdrs = [
+        "represent_as_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
     ],
 )
 
@@ -123,6 +122,7 @@ mongo_cc_unit_test(
         "hash_roaring_set_test.cpp",
         "jparse_util_test.cpp",
         "memory_util_test.cpp",
+        "named_enum_test.cpp",
         "retry_test.cpp",
         "scoped_timer_metric_test.cpp",
         "stop_token_test.cpp",

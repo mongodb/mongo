@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/op_observer/op_observer_impl.h"
 
@@ -46,7 +20,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
-#include "mongo/db/index_builds/primary_driven/tearable_side_write_redo_state.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
@@ -62,6 +35,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -108,6 +82,8 @@
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -122,6 +98,7 @@
 #include <functional>
 #include <limits>
 #include <ostream>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -137,6 +114,14 @@ using namespace std::literals::string_view_literals;
 
 using repl::OplogEntry;
 using unittest::assertGet;
+
+boost::optional<SingleOpSizeMetadata> getSizeMetadataFromOplogEntry(const OplogEntry& entry) {
+    const auto& sizeMetadata = entry.getSizeMetadata();
+    if (!sizeMetadata || !std::holds_alternative<SingleOpSizeMetadata>(*sizeMetadata)) {
+        return boost::none;
+    }
+    return std::get<SingleOpSizeMetadata>(*sizeMetadata);
+}
 
 OplogEntry getInnerEntryFromApplyOpsOplogEntry(const OplogEntry& oplogEntry) {
     std::vector<repl::OplogEntry> innerEntries;
@@ -158,7 +143,7 @@ void beginRetryableWriteWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 }
 
@@ -175,7 +160,7 @@ void beginNonRetryableTransactionWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
 }
 
@@ -192,7 +177,7 @@ void beginRetryableInternalTransactionWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
 }
 
@@ -241,11 +226,17 @@ repl::OpTime reserveOpTimeInSideTransaction(OperationContext* opCtx) {
 
 class OpObserverTest : public ServiceContextMongoDTest {
 protected:
-    explicit OpObserverTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
+    OpObserverImpl& opObserver() {
+        return *_opObserver;
+    }
+
+    boost::optional<OpObserverImpl> _opObserver;
 
     void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
+
+        _opObserver.emplace(std::make_unique<OperationLoggerImpl>());
 
         auto service = getServiceContext();
         auto opCtx = cc().makeOperationContext();
@@ -275,6 +266,7 @@ protected:
         reset(opCtx.get(), nss1, uuid1);
         reset(opCtx.get(), nss2, uuid2);
         reset(opCtx.get(), nss3, uuid3);
+        reset(opCtx.get(), rridNss, rridUuid);
         reset(opCtx.get(), kNssUnderTenantId, kNssUnderTenantIdUUID);
         reset(opCtx.get(), NamespaceString::kRsOplogNamespace);
     }
@@ -305,7 +297,20 @@ protected:
                 if (nss == clusteredNss) {
                     opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
                 }
-                invariant(db->createCollection(opCtx, nss, opts));
+                if (nss == timeseriesNss) {
+                    opts.timeseries = TimeseriesOptions("t");
+                    opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+                }
+                if (nss == implicitlyReplicatedClusteredNss || nss == tempReshardingNss) {
+                    opts.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+                }
+                invariant(db->createCollection(opCtx,
+                                               nss,
+                                               opts,
+                                               /*createDefaultIndexes=*/true,
+                                               /*idIndex=*/BSONObj(),
+                                               /*fromMigrate=*/false,
+                                               /*recordIdsReplicated=*/nss == rridNss));
             }
             wunit.commit();
         });
@@ -464,6 +469,106 @@ protected:
         return indexes;
     }
 
+    // The following helpers return the full SingleOpSizeMetadata. Insert derives the size delta
+    // from the document size, while update and delete take it as an explicit argument, mirroring
+    // how the write path populates it.
+    boost::optional<SingleOpSizeMetadata> insertAndGetSizeMetadata(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const BSONObj& doc,
+        std::vector<RecordId> recordIds) {
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        std::vector<InsertStatement> insert;
+        insert.emplace_back(doc);
+        opObserver().onInserts(opCtx,
+                               *autoColl,
+                               insert.begin(),
+                               insert.end(),
+                               recordIds,
+                               /*fromMigrate=*/std::vector<bool>(insert.size(), false),
+                               /*defaultFromMigrate=*/false);
+        wuow.commit();
+        auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        return getSizeMetadataFromOplogEntry(entry);
+    }
+
+    // Inserts all of 'docs' in a single batch and returns the size metadata of the oplog entry
+    // generated for each one, in insertion order.
+    std::vector<boost::optional<SingleOpSizeMetadata>> insertManyAndGetSizeMetadata(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const std::vector<BSONObj>& docs,
+        std::vector<RecordId> recordIds) {
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        std::vector<InsertStatement> inserts;
+        for (const auto& doc : docs) {
+            inserts.emplace_back(doc);
+        }
+        opObserver().onInserts(opCtx,
+                               *autoColl,
+                               inserts.begin(),
+                               inserts.end(),
+                               recordIds,
+                               /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                               /*defaultFromMigrate=*/false);
+        wuow.commit();
+
+        std::vector<boost::optional<SingleOpSizeMetadata>> sizeMetadata;
+        for (const auto& entryBSON : getNOplogEntries(opCtx, docs.size())) {
+            sizeMetadata.push_back(
+                getSizeMetadataFromOplogEntry(assertGet(OplogEntry::parse(entryBSON))));
+        }
+        return sizeMetadata;
+    }
+
+    boost::optional<SingleOpSizeMetadata> updateAndGetSizeMetadata(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const BSONObj& preImageDoc,
+        const BSONObj& update,
+        const BSONObj& updatedDoc,
+        RecordId recordId,
+        boost::optional<int32_t> replicatedSizeDelta) {
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = preImageDoc;
+        updateArgs.updatedDoc = updatedDoc;
+        updateArgs.update = update;
+        updateArgs.replicatedRecordId = recordId;
+
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *autoColl);
+        updateEntryArgs.replicatedSizeDelta = replicatedSizeDelta;
+        opObserver.onUpdate(opCtx, updateEntryArgs);
+        wuow.commit();
+        auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        return getSizeMetadataFromOplogEntry(entry);
+    }
+
+    boost::optional<SingleOpSizeMetadata> deleteAndGetSizeMetadata(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const BSONObj& deletedDoc,
+        RecordId replicatedRecordId,
+        boost::optional<int32_t> replicatedSizeDelta) {
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        OplogDeleteEntryArgs deleteEntryArgs;
+        deleteEntryArgs.replicatedRecordId = replicatedRecordId;
+        deleteEntryArgs.replicatedSizeDelta = replicatedSizeDelta;
+        const auto& documentKey = getDocumentKey(*autoColl, deletedDoc);
+        opObserver.onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, deletedDoc, documentKey, deleteEntryArgs);
+        wuow.commit();
+        auto entry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        return getSizeMetadataFromOplogEntry(entry);
+    }
+
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "testDB", "testColl");
     const UUID uuid{UUID::gen()};
@@ -476,13 +581,36 @@ protected:
     const NamespaceString nss3 =
         NamespaceString::createNamespaceString_forTest(boost::none, "testDB3", "testColl3");
     const UUID uuid3{UUID::gen()};
+    // A collection that replicates its record ids, so its writes are eligible to carry a hash.
+    const NamespaceString rridNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB", "rridColl");
+    const UUID rridUuid{UUID::gen()};
     const NamespaceString clusteredNss = NamespaceString::createNamespaceString_forTest(
         TenantId(OID::gen()), "testDB", "clusteredColl");
+    // Viewless time-series has no separate buckets namespace: the collection itself holds the
+    // bucket documents, clustered on their OID '_id'.
+    const NamespaceString timeseriesNss =
+        NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "testDB", "ts");
+    // Resharding's temporary collection. It is renamed onto the source namespace keeping its UUID,
+    // so its writes must still be hashed or the resharded collection loses hash coverage.
+    const NamespaceString tempReshardingNss = NamespaceString::createNamespaceString_forTest(
+        TenantId(OID::gen()), "testDB", "system.resharding.deadbeef-dead-beef-dead-beefdeadbeef");
+    // An implicitly replicated collection that is also clustered on _id. config.transactions takes
+    // the same shape under featureFlagClusteredConfigTransactions.
+    const NamespaceString implicitlyReplicatedClusteredNss =
+        NamespaceString::createNamespaceString_forTest(
+            TenantId(OID::gen()), "config", "system.preimages");
 
     const TenantId kTenantId = TenantId(OID::gen());
     const NamespaceString kNssUnderTenantId = NamespaceString::createNamespaceString_forTest(
         boost::none, kTenantId.toString() + "_db", "testColl");
     const UUID kNssUnderTenantIdUUID{UUID::gen()};
+
+    const BSONObj kPreImageDoc = BSON("_id" << 0 << "data"
+                                            << "x");
+    const BSONObj kUpdatedDoc = BSON("_id" << 0 << "data"
+                                           << "y");
+    const BSONObj kUpdate = BSON("$set" << BSON("data" << "y"));
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 
@@ -559,7 +687,7 @@ protected:
         // Simulate catalog information for a normal collection with a standard '_id_' index.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(opCtx, nss.dbName(), true /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), /*includeIdIndexIdent=*/true);
         CollectionOptions options{.uuid = uuid};
 
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -571,11 +699,12 @@ protected:
             opObserver.onCreateCollection(opCtx,
                                           nss,
                                           options,
+                                          /*idIndex=*/
                                           BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                                   << "_id_") /* idIndex */,
+                                                   << "_id_"),
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/,
+                                          /*fromMigrate=*/false,
                                           viewless);
             wuow.commit();
         }
@@ -600,7 +729,7 @@ protected:
         // Simulate catalog information for a normal collection with a standard '_id_' index.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(opCtx, nss.dbName(), true /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), /*includeIdIndexIdent=*/true);
         CollectionOptions options{.uuid = uuid};
 
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -612,11 +741,12 @@ protected:
             opObserver.onCreateCollection(opCtx,
                                           nss,
                                           options,
+                                          /*idIndex=*/
                                           BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                                   << "_id_") /* idIndex */,
+                                                   << "_id_"),
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/,
+                                          /*fromMigrate=*/false,
                                           false,
                                           recordIdsReplicated);
             wuow.commit();
@@ -644,7 +774,7 @@ protected:
         // an explicit '_id_' index table.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(opCtx, nss.dbName(), false /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), /*includeIdIndexIdent=*/false);
         ASSERT_FALSE(catalogIdentifier.idIndexIdent.has_value());
 
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -656,10 +786,10 @@ protected:
             opObserver.onCreateCollection(opCtx,
                                           nss,
                                           clusteredCollectionOptions,
-                                          BSONObj() /* idIndex */,
+                                          /*idIndex=*/BSONObj(),
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/);
+                                          /*fromMigrate=*/false);
             wuow.commit();
         }
 
@@ -695,8 +825,8 @@ protected:
 
         boost::optional<CreateCollCatalogIdentifier> catalogIdentifier;
         if (isPersistedInLocalCatalog) {
-            catalogIdentifier = newCatalogIdentifier(
-                opCtx.get(), localNSS.dbName(), false /* includeIdIndexIdent */);
+            catalogIdentifier =
+                newCatalogIdentifier(opCtx.get(), localNSS.dbName(), /*includeIdIndexIdent=*/false);
         }
 
         {
@@ -706,10 +836,10 @@ protected:
             opObserver.onCreateCollection(opCtx.get(),
                                           localNSS,
                                           CollectionOptions{},
-                                          BSONObj() /* idIndex */,
-                                          repl::OpTime() /* createOpTime */,
-                                          catalogIdentifier /* createCollCatalogIdentifier */,
-                                          false /* fromMigrate*/);
+                                          /*idIndex=*/BSONObj(),
+                                          /*createOpTime=*/repl::OpTime(),
+                                          /*createCollCatalogIdentifier=*/catalogIdentifier,
+                                          /*fromMigrate=*/false);
             wuow.commit();
         }
 
@@ -719,30 +849,30 @@ protected:
 };
 
 TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnabled) {
-    testOnCreateCollBasic(true /* catalogReplicationEnabled */);
+    testOnCreateCollBasic(/*catalogReplicationEnabled=*/true);
 }
 TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabled) {
-    testOnCreateCollBasic(false /* catalogReplicationEnabled */);
+    testOnCreateCollBasic(/*catalogReplicationEnabled=*/false);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersEnabledWithTimeseriesParamOff) {
     testOnCreateCollBasic(
-        true /* catalogReplicationEnabled */, true /* viewless */, false /* viewlessParam */);
+        /*catalogReplicationEnabled=*/true, /*viewless=*/true, /*viewlessParam=*/false);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersDisabledWithTimeseriesParamOff) {
     testOnCreateCollBasic(
-        false /* catalogReplicationEnabled */, true /* viewless */, false /* viewlessParam */);
+        /*catalogReplicationEnabled=*/false, /*viewless=*/true, /*viewlessParam=*/false);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersEnabledWithTimeseriesParamOn) {
     testOnCreateCollBasic(
-        true /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
+        /*catalogReplicationEnabled=*/true, /*viewless=*/true, /*viewlessParam=*/true);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersDisabledWithTimeseriesParamOn) {
     testOnCreateCollBasic(
-        false /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
+        /*catalogReplicationEnabled=*/false, /*viewless=*/true, /*viewlessParam=*/true);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, createCollectionRecordIdsReplicatedFalse) {
@@ -813,7 +943,7 @@ TEST_F(OpObserverOnCreateCollectionTest,
                                                << "_id_"),
                                       repl::getNextOpTime(opCtx),
                                       catalogIdentifier,
-                                      false /* fromMigrate */,
+                                      /*fromMigrate=*/false,
                                       false,
                                       /*recordIdsReplicated=*/true);
         wuow.commit();
@@ -851,7 +981,7 @@ TEST_F(OpObserverOnCreateCollectionTest,
                                                << "_id_"),
                                       repl::getNextOpTime(opCtx),
                                       catalogIdentifier,
-                                      false /* fromMigrate */,
+                                      /*fromMigrate=*/false,
                                       false,
                                       /*recordIdsReplicated=*/true);
         wuow.commit();
@@ -862,24 +992,24 @@ TEST_F(OpObserverOnCreateCollectionTest,
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
-    testOnCreateCollClustered(true /* catalogReplicationEnabled */);
+    testOnCreateCollClustered(/*catalogReplicationEnabled=*/true);
 }
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersDisabled) {
-    testOnCreateCollClustered(false /* catalogReplicationEnabled */);
+    testOnCreateCollClustered(/*catalogReplicationEnabled=*/false);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, CatalogIdentifierForUnreplicatedCollection) {
-    testOnCreateUnreplicatedCollection(true /* catalogReplicationEnabled */,
-                                       true /* isPersistedInLocalCatalog */);
-    testOnCreateUnreplicatedCollection(false /* catalogReplicationEnabled */,
-                                       true /* isPersistedInLocalCatalog */);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/true,
+                                       /*isPersistedInLocalCatalog=*/true);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/false,
+                                       /*isPersistedInLocalCatalog=*/true);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, UnreplicatedCollectionNotInLocalCatalog) {
-    testOnCreateUnreplicatedCollection(true /* catalogReplicationEnabled */,
-                                       false /* isPersistedInLocalCatalog */);
-    testOnCreateUnreplicatedCollection(false /* catalogReplicationEnabled */,
-                                       false /* isPersistedInLocalCatalog */);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/true,
+                                       /*isPersistedInLocalCatalog=*/false);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/false,
+                                       /*isPersistedInLocalCatalog=*/false);
 }
 
 using OpObserverOnCreateCollectionTestDeathTest = OpObserverOnCreateCollectionTest;
@@ -900,11 +1030,12 @@ DEATH_TEST_F(OpObserverOnCreateCollectionTestDeathTest,
     opObserver.onCreateCollection(opCtx.get(),
                                   nss,
                                   CollectionOptions{.uuid = UUID::gen()},
+                                  /*idIndex=*/
                                   BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                           << "_id_") /* idIndex */,
+                                           << "_id_"),
                                   repl::getNextOpTime(opCtx.get()),
-                                  boost::none /* createCollCatalogIdentifier */,
-                                  false /* fromMigrate*/);
+                                  /*createCollCatalogIdentifier=*/boost::none,
+                                  /*fromMigrate=*/false);
     wuow.commit();
 }
 
@@ -922,7 +1053,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, indexes, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, /*fromMigrate=*/false);
         wunit.commit();
     }
 
@@ -956,21 +1087,21 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onCommitIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, indexes, {}, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, {}, /*fromMigrate=*/false);
         opObserver.onCommitIndexBuild(opCtx.get(),
                                       nss,
                                       uuid,
                                       indexBuildUUID,
                                       indexes,
                                       {boost::none, BSON("a" << "value")},
-                                      false /*fromMigrate*/);
+                                      /*fromMigrate=*/false);
         ASSERT_THROWS_CODE(opObserver.onCommitIndexBuild(opCtx.get(),
                                                          nss,
                                                          uuid,
                                                          indexBuildUUID,
                                                          indexes,
                                                          {boost::none},
-                                                         false /*fromMigrate*/),
+                                                         /*fromMigrate=*/false),
                            DBException,
                            11084600);
         ASSERT_THROWS_CODE(opObserver.onCommitIndexBuild(opCtx.get(),
@@ -979,7 +1110,7 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
                                                          indexBuildUUID,
                                                          indexes,
                                                          {boost::none, boost::none, boost::none},
-                                                         false /*fromMigrate*/),
+                                                         /*fromMigrate=*/false),
                            DBException,
                            11084600);
         wunit.commit();
@@ -1380,7 +1511,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -1424,7 +1555,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1468,7 +1599,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1509,7 +1640,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1564,7 +1695,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
                                       catalogEntry,
                                       storageMetadata,
                                       isDryRun,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1607,7 +1738,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
                                       catalogEntry,
                                       storageMetadata,
                                       isDryRun,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1808,6 +1939,399 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
     ASSERT_BSONOBJ_EQ(o, objectEntry.toBSON());
 }
 
+TEST_F(OpObserverTest, CheckHashExistsOnInsertWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, rridNss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+    EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+// The override only skips verification on the applier, so the hash is still emitted.
+TEST_F(OpObserverTest, CheckHashExistsOnInsertWithValidationOverride) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    unittest::ServerParameterGuard disableValidation{"disableContinuousInternodeValidation", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, rridNss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
+TEST_F(OpObserverTest, CheckHashMatchesItsOwnDocumentOnMultiDocumentInsert) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const std::vector<BSONObj> docs = {BSON("_id" << 0 << "data" << "x"),
+                                       BSON("_id" << 1 << "data" << "yy"),
+                                       BSON("_id" << 2 << "data" << "zzz")};
+    const auto sizeMetadata =
+        insertManyAndGetSizeMetadata(opCtx, rridNss, docs, {RecordId(1), RecordId(2), RecordId(3)});
+    ASSERT_EQ(sizeMetadata.size(), docs.size());
+    for (size_t i = 0; i < docs.size(); i++) {
+        ASSERT(sizeMetadata[i]) << "no size metadata for document " << i;
+        ASSERT(sizeMetadata[i]->getH()) << "no hash for document " << i;
+        EXPECT_EQ(*sizeMetadata[i]->getH(), repl::computeDocValidationHash(docs[i]));
+    }
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(insertAndGetSizeMetadata(opCtx, nss, doc, {}).has_value());
+}
+
+// Hash emission follows the collection, not whether the write happened to pass a record id.
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithRecordIdWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, nss, doc, {RecordId(1)});
+    EXPECT_FALSE(sizeMetadata && sizeMetadata->getH());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnInsertWithoutFlag) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(insertAndGetSizeMetadata(opCtx, rridNss, doc, {RecordId(1)}).has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashExistsOnUpdateWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const auto sizeMetadata = updateAndGetSizeMetadata(opCtx,
+                                                       rridNss,
+                                                       kPreImageDoc,
+                                                       kUpdate,
+                                                       kUpdatedDoc,
+                                                       RecordId(1),
+                                                       /*replicatedSizeDelta=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc));
+    EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnUpdateWithoutFlag) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    EXPECT_FALSE(updateAndGetSizeMetadata(
+                     opCtx, rridNss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId(1), {})
+                     .has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnUpdateWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    EXPECT_FALSE(
+        updateAndGetSizeMetadata(opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId{}, {})
+            .has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashExistsOnDeleteWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata =
+        deleteAndGetSizeMetadata(opCtx, rridNss, doc, RecordId(1), /*replicatedSizeDelta=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+    EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnDeleteWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(deleteAndGetSizeMetadata(opCtx, nss, doc, RecordId(), {}).has_value());
+}
+
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnDeleteWithoutFlag) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(deleteAndGetSizeMetadata(opCtx, rridNss, doc, RecordId(1), {}).has_value());
+}
+
+// A clustered collection has no replicated record ids, but the applier can derive its record ids
+// from the documents themselves, so its writes carry a hash all the same.
+TEST_F(OpObserverTest, CheckHashExistsOnInsertToClusteredCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, clusteredNss);
+
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, clusteredNss, doc, /*recordIds=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
+TEST_F(OpObserverTest, CheckHashExistsOnMultiDocumentInsertToClusteredCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, clusteredNss);
+
+    const std::vector<BSONObj> docs = {BSON("_id" << 0 << "data" << "x"),
+                                       BSON("_id" << 1 << "data" << "yy")};
+    const auto sizeMetadata =
+        insertManyAndGetSizeMetadata(opCtx, clusteredNss, docs, /*recordIds=*/{});
+    ASSERT_EQ(sizeMetadata.size(), docs.size());
+    for (size_t i = 0; i < docs.size(); i++) {
+        ASSERT(sizeMetadata[i]) << "no size metadata for document " << i;
+        ASSERT(sizeMetadata[i]->getH()) << "no hash for document " << i;
+        EXPECT_EQ(*sizeMetadata[i]->getH(), repl::computeDocValidationHash(docs[i]));
+    }
+}
+
+TEST_F(OpObserverTest, CheckHashExistsOnUpdateToClusteredCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, clusteredNss);
+
+    const auto sizeMetadata = updateAndGetSizeMetadata(opCtx,
+                                                       clusteredNss,
+                                                       kPreImageDoc,
+                                                       kUpdate,
+                                                       kUpdatedDoc,
+                                                       RecordId{},
+                                                       /*replicatedSizeDelta=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc));
+}
+
+TEST_F(OpObserverTest, CheckHashExistsOnDeleteFromClusteredCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, clusteredNss);
+
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata =
+        deleteAndGetSizeMetadata(opCtx, clusteredNss, doc, RecordId{}, /*replicatedSizeDelta=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
+// A time-series collection is clustered on its bucket documents' OID '_id', so the writes the
+// bucket catalog makes on its behalf carry a hash like any other clustered collection's.
+TEST_F(OpObserverTest, CheckHashExistsOnInsertToTimeseriesBucketCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, timeseriesNss);
+
+    const BSONObj bucket = BSON("_id" << OID::gen() << "control" << BSON("version" << 1) << "data"
+                                      << BSON("t" << BSON("0" << Date_t())));
+    const auto sizeMetadata =
+        insertAndGetSizeMetadata(opCtx, timeseriesNss, bucket, /*recordIds=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(bucket));
+}
+
+// Appending a measurement to an open bucket is an update, and its hash covers both images.
+TEST_F(OpObserverTest, CheckHashExistsOnUpdateToTimeseriesBucketCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, timeseriesNss);
+
+    const OID bucketId = OID::gen();
+    const BSONObj preImage = BSON("_id" << bucketId << "data" << BSON("x" << BSON("0" << 10)));
+    const BSONObj postImage =
+        BSON("_id" << bucketId << "data" << BSON("x" << BSON("0" << 10 << "1" << 20)));
+    const auto sizeMetadata = updateAndGetSizeMetadata(opCtx,
+                                                       timeseriesNss,
+                                                       preImage,
+                                                       kUpdate,
+                                                       postImage,
+                                                       RecordId{},
+                                                       /*replicatedSizeDelta=*/{});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeUpdateValidationHash(preImage, postImage));
+}
+
+// An implicitly replicated collection replicates only a subset of its writes and each node derives
+// the rest for itself, so its documents are allowed to differ between nodes.
+TEST_F(OpObserverTest, CheckHashDoesNotExistForImplicitlyReplicatedClusteredCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, implicitlyReplicatedClusteredNss);
+
+    // Otherwise the exclusion under test would be doing nothing.
+    ASSERT_TRUE(implicitlyReplicatedClusteredNss.isImplicitlyReplicated());
+    {
+        AutoGetCollection autoColl(opCtx, implicitlyReplicatedClusteredNss, MODE_IS);
+        ASSERT_TRUE(clustered_util::isClusteredOnId(autoColl->getClusteredInfo()));
+    }
+
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(
+        insertAndGetSizeMetadata(opCtx, implicitlyReplicatedClusteredNss, doc, /*recordIds=*/{})
+            .has_value());
+}
+
+// A replicated delete on such a collection is the case that would actually fassert a secondary:
+// config.transactions writes its records unreplicated but replicates its reaping deletes.
+TEST_F(OpObserverTest, CheckHashDoesNotExistOnDeleteFromImplicitlyReplicatedClusteredCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, implicitlyReplicatedClusteredNss);
+
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(deleteAndGetSizeMetadata(opCtx,
+                                          implicitlyReplicatedClusteredNss,
+                                          doc,
+                                          RecordId{},
+                                          /*replicatedSizeDelta=*/{})
+                     .has_value());
+}
+
+// Resharding's temporary collection keeps its UUID through the rename onto the source namespace,
+// and the fast count store is keyed by UUID, so suppressing its hashes would leave every resharded
+// collection permanently without one. The applier skips verifying it; emission must not skip it.
+TEST_F(OpObserverTest, CheckHashExistsForTemporaryReshardingCollection) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    reset(opCtx, tempReshardingNss);
+
+    ASSERT_TRUE(tempReshardingNss.isTemporaryReshardingCollection());
+
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata =
+        insertAndGetSizeMetadata(opCtx, tempReshardingNss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
+TEST_F(OpObserverTest, CheckSizeExistsWithoutHashOnInsert) {
+    unittest::ServerParameterGuard fastCountScope{"featureFlagReplicatedFastCount", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, nss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getSz());
+    EXPECT_EQ(*sizeMetadata->getSz(), doc.objsize());
+    EXPECT_FALSE(sizeMetadata->getH().has_value());
+}
+
+TEST_F(OpObserverTest, CheckSizeExistsWithoutHashOnUpdate) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const auto sizeMetadata = updateAndGetSizeMetadata(
+        opCtx, nss, kPreImageDoc, kUpdate, kUpdatedDoc, RecordId(1), /*replicatedSizeDelta=*/10);
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getSz());
+    EXPECT_EQ(*sizeMetadata->getSz(), 10);
+    EXPECT_FALSE(sizeMetadata->getH().has_value());
+}
+
+TEST_F(OpObserverTest, CheckSizeExistsWithoutHashOnDelete) {
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata =
+        deleteAndGetSizeMetadata(opCtx, nss, doc, RecordId(1), /*replicatedSizeDelta=*/10);
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getSz());
+    EXPECT_EQ(*sizeMetadata->getSz(), 10);
+    EXPECT_FALSE(sizeMetadata->getH().has_value());
+}
+
+TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnInsert) {
+    unittest::ServerParameterGuard fastCountScope{"featureFlagReplicatedFastCount", true};
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, rridNss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getSz());
+    EXPECT_EQ(*sizeMetadata->getSz(), doc.objsize());
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
+TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnUpdate) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const auto sizeMetadata = updateAndGetSizeMetadata(opCtx,
+                                                       rridNss,
+                                                       kPreImageDoc,
+                                                       kUpdate,
+                                                       kUpdatedDoc,
+                                                       RecordId(1),
+                                                       /*replicatedSizeDelta=*/10);
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getSz());
+    EXPECT_EQ(*sizeMetadata->getSz(), 10);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc));
+}
+
+TEST_F(OpObserverTest, CheckSizeAndHashExistTogetherOnDelete) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata =
+        deleteAndGetSizeMetadata(opCtx, rridNss, doc, RecordId(1), /*replicatedSizeDelta=*/10);
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getSz());
+    EXPECT_EQ(*sizeMetadata->getSz(), 10);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
@@ -1830,7 +2354,7 @@ public:
                               StmtId stmtId) {
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNum},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
 
         {
@@ -1929,7 +2453,6 @@ public:
 
     void setUpObserverContext() {
         _opCtx = cc().makeOperationContext();
-        _opObserver.emplace(std::make_unique<OperationLoggerImpl>());
         _times.emplace(opCtx());
     }
 
@@ -1951,10 +2474,6 @@ public:
 protected:
     Session* session() {
         return OperationContextSession::get(opCtx());
-    }
-
-    OpObserverImpl& opObserver() {
-        return *_opObserver;
     }
 
     OperationContext* opCtx() {
@@ -2015,7 +2534,6 @@ private:
 
     ServiceContext::UniqueOperationContext _opCtx;
 
-    boost::optional<OpObserverImpl> _opObserver;
     boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
     boost::optional<TransactionParticipant::Participant> _txnParticipant;
 
@@ -2116,6 +2634,65 @@ protected:
             ASSERT_EQ(*startOpTime, *txnRecord.getStartOpTime());
         }
     }
+
+    // Performs a transactional insert and returns the SingleOpSizeMetadata from the inner oplog
+    // entry.
+    boost::optional<SingleOpSizeMetadata> txnInsertAndGetSizeMetadata(
+        const NamespaceString& ns, const BSONObj& doc, std::vector<RecordId> recordIds) {
+        txnParticipant().unstashTransactionResources(opCtx(), "insert");
+        AutoGetCollection autoColl(opCtx(), ns, MODE_IX);
+        std::vector<InsertStatement> insert;
+        insert.emplace_back(doc);
+        opObserver().onInserts(opCtx(),
+                               *autoColl,
+                               insert.begin(),
+                               insert.end(),
+                               recordIds,
+                               /*fromMigrate=*/std::vector<bool>(insert.size(), false),
+                               /*defaultFromMigrate=*/false);
+        commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
+        return getSizeMetadataFromOplogEntry(getInnerEntryFromApplyOpsOplogEntry(oplogEntry));
+    }
+
+    // Performs a transactional update and returns the SingleOpSizeMetadata from the inner oplog
+    // entry.
+    boost::optional<SingleOpSizeMetadata> txnUpdateAndGetSizeMetadata(const NamespaceString& ns,
+                                                                      const BSONObj& preImageDoc,
+                                                                      const BSONObj& updatedDoc,
+                                                                      RecordId recordId) {
+        txnParticipant().unstashTransactionResources(opCtx(), "update");
+        AutoGetCollection autoColl(opCtx(), ns, MODE_IX);
+
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = preImageDoc;
+        updateArgs.updatedDoc = updatedDoc;
+        updateArgs.update = BSON("$set" << updatedDoc);
+        updateArgs.replicatedRecordId = recordId;
+        OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *autoColl);
+
+        opObserver().onUpdate(opCtx(), updateEntryArgs);
+        commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
+        return getSizeMetadataFromOplogEntry(getInnerEntryFromApplyOpsOplogEntry(oplogEntry));
+    }
+
+    // Performs a transactional delete and returns the SingleOpSizeMetadata from the inner oplog
+    // entry.
+    boost::optional<SingleOpSizeMetadata> txnDeleteAndGetSizeMetadata(const NamespaceString& ns,
+                                                                      const BSONObj& doc,
+                                                                      RecordId replicatedRecordId) {
+        txnParticipant().unstashTransactionResources(opCtx(), "delete");
+        AutoGetCollection autoColl(opCtx(), ns, MODE_IX);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
+        OplogDeleteEntryArgs deleteEntryArgs;
+        deleteEntryArgs.replicatedRecordId = replicatedRecordId;
+        opObserver().onDelete(
+            opCtx(), *autoColl, kUninitializedStmtId, doc, documentKey, deleteEntryArgs);
+        commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx())));
+        return getSizeMetadataFromOplogEntry(getInnerEntryFromApplyOpsOplogEntry(oplogEntry));
+    }
 };
 
 TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
@@ -2135,6 +2712,81 @@ TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
                        AssertionException,
                        ErrorCodes::OperationNotSupportedInTransaction);
     wuow.commit();
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionInsertWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const int64_t expectedHash = repl::computeDocValidationHash(doc);
+    const auto sizeMetadata = txnInsertAndGetSizeMetadata(rridNss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), expectedHash);
+    EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionInsertWithoutFlag) {
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(txnInsertAndGetSizeMetadata(rridNss, doc, {RecordId(1)}).has_value());
+}
+
+TEST_F(OpObserverTransactionTest,
+       CheckHashDoesNotExistOnTransactionInsertWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(txnInsertAndGetSizeMetadata(nss1, doc, {}).has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionUpdateWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const int64_t expectedHash = repl::computeUpdateValidationHash(kPreImageDoc, kUpdatedDoc);
+    const auto sizeMetadata =
+        txnUpdateAndGetSizeMetadata(rridNss, kPreImageDoc, kUpdatedDoc, RecordId(1));
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), expectedHash);
+    EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionUpdateWithoutFlag) {
+    EXPECT_FALSE(
+        txnUpdateAndGetSizeMetadata(rridNss, kPreImageDoc, kUpdatedDoc, RecordId(1)).has_value());
+}
+
+TEST_F(OpObserverTransactionTest,
+       CheckHashDoesNotExistOnTransactionUpdateWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    EXPECT_FALSE(
+        txnUpdateAndGetSizeMetadata(nss1, kPreImageDoc, kUpdatedDoc, RecordId{}).has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashExistsOnTransactionDeleteWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const int64_t expectedHash = repl::computeDocValidationHash(doc);
+    const auto sizeMetadata = txnDeleteAndGetSizeMetadata(rridNss, doc, RecordId(1));
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), expectedHash);
+    EXPECT_FALSE(sizeMetadata->getSz().has_value());
+}
+
+TEST_F(OpObserverTransactionTest, CheckHashDoesNotExistOnTransactionDeleteWithoutFlag) {
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(txnDeleteAndGetSizeMetadata(rridNss, doc, RecordId(1)).has_value());
+}
+
+TEST_F(OpObserverTransactionTest,
+       CheckHashDoesNotExistOnTransactionDeleteWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    EXPECT_FALSE(txnDeleteAndGetSizeMetadata(nss1, doc, RecordId()).has_value());
 }
 
 TEST_F(OpObserverTransactionTest, TransactionOpsIncludeVersionContext) {
@@ -2971,7 +3623,7 @@ public:
 protected:
     void testRetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage() {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-            boost::none /* tenantId */, "test", "coll");
+            /*tenantId=*/boost::none, "test", "coll");
         const auto criteria = BSON("_id" << 0);
         const auto preImageDoc = criteria;
         CollectionUpdateArgs updateArgs{preImageDoc};
@@ -3207,8 +3859,8 @@ const auto kRecordInSideCollection = RetryableFindAndModifyLocation::kSideCollec
 
 const std::vector<bool> kInMultiDocumentTransactionCases{false, true};
 
-const auto kDontGroup = WriteUnitOfWork::OplogEntryGroupType::kDontGroup;
-const auto kGroup = WriteUnitOfWork::OplogEntryGroupType::kGroupForPossiblyRetryableOperations;
+const auto noGroup = WriteUnitOfWork::OplogEntryGroupType::noGroup;
+const auto kGroup = WriteUnitOfWork::OplogEntryGroupType::nonAtomicGroup;
 
 }  // namespace
 
@@ -3360,26 +4012,26 @@ protected:
 
     std::vector<UpdateTestCase> _cases = {
         // Regular updates.
-        {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, noGroup, 1},
         {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
-        {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, noGroup, 1},
         {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
-        {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, noGroup, 1},
         {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, kGroup, 1},
         // FindAndModify asking for a preImage.
-        {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, noGroup, 1},
         {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
-        {kFaMPre, kChangeStreamImagesDisabled, kRecordInSideCollection, kDontGroup, 1},
-        {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPre, kChangeStreamImagesDisabled, kRecordInSideCollection, noGroup, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, noGroup, 1},
         {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
-        {kFaMPre, kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kRecordInSideCollection, noGroup, 1},
         // FindAndModify asking for a postImage.
-        {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, noGroup, 1},
         {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
-        {kFaMPost, kChangeStreamImagesDisabled, kRecordInSideCollection, kDontGroup, 1},
-        {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPost, kChangeStreamImagesDisabled, kRecordInSideCollection, noGroup, 1},
+        {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, noGroup, 1},
         {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
-        {kFaMPost, kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1}};
+        {kFaMPost, kChangeStreamImagesEnabled, kRecordInSideCollection, noGroup, 1}};
 
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
@@ -3657,9 +4309,128 @@ protected:
     repl::OplogEntry commitBatchedInserts(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           const std::vector<bool>& fromMigrateFlags);
+
+    // Performs a batched insert of two documents and returns a pair of SingleOpSizeMetadata (first
+    // and second document) from the inner applyOps entry.
+    std::pair<boost::optional<SingleOpSizeMetadata>, boost::optional<SingleOpSizeMetadata>>
+    batchedInsertAndGetSizeMetadata(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const BSONObj& doc1,
+                                    const BSONObj& doc2,
+                                    const std::vector<RecordId>& recordIds) {
+        reset(opCtx, ns);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        std::vector<InsertStatement> inserts;
+        inserts.emplace_back(doc1);
+        inserts.emplace_back(doc2);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            recordIds,
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        std::vector<repl::OplogEntry> innerEntries;
+        repl::ApplyOps::extractOperationsTo(
+            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+        ASSERT_GTE(innerEntries.size(), 1u);
+        return {getSizeMetadataFromOplogEntry(innerEntries[0]),
+                innerEntries.size() > 1 ? getSizeMetadataFromOplogEntry(innerEntries[1])
+                                        : boost::none};
+    }
+
+    // Performs a batched update of two documents and returns a pair of SingleOpSizeMetadata (first
+    // and second document) from the inner applyOps entry.
+    std::pair<boost::optional<SingleOpSizeMetadata>, boost::optional<SingleOpSizeMetadata>>
+    batchedUpdateAndGetSizeMetadata(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const BSONObj& preImageDoc1,
+                                    const BSONObj& updatedDoc1,
+                                    const BSONObj& preImageDoc2,
+                                    const BSONObj& updatedDoc2,
+                                    const RecordId recordId1,
+                                    const RecordId recordId2) {
+        reset(opCtx, ns);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+
+        CollectionUpdateArgs updateArgs1{preImageDoc1};
+        updateArgs1.criteria = preImageDoc1;
+        updateArgs1.updatedDoc = updatedDoc1;
+        updateArgs1.update = BSON("$set" << updatedDoc1);
+        updateArgs1.replicatedRecordId = recordId1;
+        OplogUpdateEntryArgs updateEntryArgs1(&updateArgs1, *autoColl);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, updateEntryArgs1);
+
+        CollectionUpdateArgs updateArgs2{preImageDoc2};
+        updateArgs2.criteria = preImageDoc2;
+        updateArgs2.updatedDoc = updatedDoc2;
+        updateArgs2.update = BSON("$set" << updatedDoc2);
+        updateArgs2.replicatedRecordId = recordId2;
+        OplogUpdateEntryArgs updateEntryArgs2(&updateArgs2, *autoColl);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, updateEntryArgs2);
+
+        wuow.commit();
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        std::vector<repl::OplogEntry> innerEntries;
+        repl::ApplyOps::extractOperationsTo(
+            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+        ASSERT_GTE(innerEntries.size(), 1u);
+        return {getSizeMetadataFromOplogEntry(innerEntries[0]),
+                innerEntries.size() > 1 ? getSizeMetadataFromOplogEntry(innerEntries[1])
+                                        : boost::none};
+    }
+
+    // Performs a batched delete of two documents and returns a pair of SingleOpSizeMetadata (first
+    // and second document) from the inner applyOps entry.
+    std::pair<boost::optional<SingleOpSizeMetadata>, boost::optional<SingleOpSizeMetadata>>
+    batchedDeleteAndGetSizeMetadata(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const BSONObj& doc1,
+                                    const BSONObj& doc2,
+                                    const RecordId& recordId1,
+                                    const RecordId& recordId2) {
+        reset(opCtx, ns);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+
+        const auto& documentKey1 = getDocumentKey(*autoColl, doc1);
+        const auto& documentKey2 = getDocumentKey(*autoColl, doc2);
+        OplogDeleteEntryArgs deleteEntryArgs1;
+        deleteEntryArgs1.replicatedRecordId = recordId1;
+        OplogDeleteEntryArgs deleteEntryArgs2;
+        deleteEntryArgs2.replicatedRecordId = recordId2;
+
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, doc1, documentKey1, deleteEntryArgs1);
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, doc2, documentKey2, deleteEntryArgs2);
+        wuow.commit();
+        auto oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx)));
+        ASSERT(oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        std::vector<repl::OplogEntry> innerEntries;
+        repl::ApplyOps::extractOperationsTo(
+            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+        ASSERT_GTE(innerEntries.size(), 1u);
+        return {getSizeMetadataFromOplogEntry(innerEntries[0]),
+                innerEntries.size() > 1 ? getSizeMetadataFromOplogEntry(innerEntries[1])
+                                        : boost::none};
+    }
 };
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction replicates its writes
+// Verifies that a WriteUnitOfWork with groupOplogEntries=atomicGroup replicates its writes
 // as a single applyOps. Tests WUOWs batching a range of 2 to 5 deletes (inclusive).
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     const auto nDocsToDelete = 5;
@@ -3680,11 +4451,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     // Run the test with WUOW's grouping 2 to 5 deletions.
     for (size_t docsToBeBatched = 2; docsToBeBatched <= nDocsToDelete; docsToBeBatched++) {
 
-        // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
+        // Start a WUOW with groupOplogEntries=atomicGroup. Verify that initialises the
         // BatchedWriteContext.
         auto& bwc = BatchedWriteContext::get(opCtx);
         ASSERT(!bwc.writesAreBatched());
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         ASSERT(bwc.writesAreBatched());
 
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
@@ -3724,67 +4495,124 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
-// The "tearable side write" redo state decorates the OperationContext: onBatchedWriteCommit arms it
-// (with the affected collection) when it throws a write conflict to redo a write. The armed UUID
-// must survive the WUOW rollback so the redo can read it, but must be consumed once a batched write
-// commits so it cannot leak onto a later write that shares the OperationContext (which would
-// suppress that write's own redo). The per-attempt "flag persisted" marker must reset on both
-// terminal paths. These two tests pin that lifecycle.
-//
-// TODO (SERVER-126257): Remove these tests once index build side writes cannot be torn.
-TEST_F(BatchedWriteOutputsTest, TearableSideWriteRedoStateConsumedOnBatchedWriteCommit) {
+// getGroupType() converts a top-level noGroup WUOW to atomicGroup when oplog entry grouping is
+// enabled. The following tests verify the conversion through the resulting oplog output.
+
+// A retryable write is grouped atomically: the batch replicates as an applyOps tagged
+// kApplyOpsAppliedAtomically and stamped with the session id and txnNumber, exactly as an explicit
+// retryable atomicGroup batch would (see RetryableAtomicWriteEmitsAppliedAtomicallyTag).
+TEST_F(BatchedWriteOutputsTest, RetryableWriteWithPdibGroupsAtomically) {
+    // (Generic FCV reference): test requires an initialized FCV to enable the feature flag.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+    unittest::ServerParameterGuard pdib("featureFlagPrimaryDrivenIndexBuilds", true);
+
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
+    // Create the collection before resetting the oplog so its 'create' entry isn't counted below.
     reset(opCtx, _nss);
-    reset(opCtx, NamespaceString::kRsOplogNamespace);
+    resetOplogAndTransactions(opCtx);
 
-    // Simulate a prior attempt that armed the redo and marked the flag persisted.
-    auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-    redoState.arm(UUID::gen());
-    redoState.setFlagPersisted();
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
+
+    // Two ops so the batch produces an applyOps rather than the single-op fast path.
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(StmtId(0), BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
 
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForTransaction};
-        AutoGetCollection autoColl{opCtx, _nss, MODE_IX};
-        auto doc = BSON("_id" << 0);
-        OplogDeleteEntryArgs args;
-        opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, getDocumentKey(*autoColl, doc), args);
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        // Default grouping (noGroup); getGroupType performs the conversion.
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
         wuow.commit();
     }
 
-    // Committing consumes both signals so they cannot leak onto later writes on this opCtx.
-    EXPECT_FALSE(redoState.armedCollectionUUID().has_value());
-    EXPECT_FALSE(redoState.flagPersisted());
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx, 1).back()));
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_EQ(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+    EXPECT_EQ(opCtx->getLogicalSessionId(), entry.getSessionId());
+    EXPECT_EQ(opCtx->getTxnNumber(), entry.getTxnNumber());
 }
-TEST_F(BatchedWriteOutputsTest, TearableSideWriteRedoStateSurvivesBatchedWriteAbort) {
+
+// A non-retryable write is grouped as a one-shot transaction: it batches into an applyOps that is
+// not tagged applied-atomically and carries no txnNumber.
+TEST_F(BatchedWriteOutputsTest, NonRetryableWriteWithPdibGroupsAsTransaction) {
+    // (Generic FCV reference): test requires an initialized FCV to enable the feature flag.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+    unittest::ServerParameterGuard pdib("featureFlagPrimaryDrivenIndexBuilds", true);
+
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-    auto collectionUUID = UUID::gen();
-    redoState.arm(collectionUUID);
-    redoState.setFlagPersisted();
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
 
     {
-        WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForTransaction};
-        AutoGetCollection autoColl{opCtx, _nss, MODE_IX};
-        auto doc = BSON("_id" << 0);
-        OplogDeleteEntryArgs args;
-        opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, getDocumentKey(*autoColl, doc), args);
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
     }
 
-    // The armed UUID must survive the rollback (the redo reads it on the retry), but the
-    // per-attempt flag must be cleared so the retry re-persists the sentinel.
-    ASSERT_TRUE(redoState.armedCollectionUUID().has_value());
-    EXPECT_EQ(*redoState.armedCollectionUUID(), collectionUUID);
-    EXPECT_FALSE(redoState.flagPersisted());
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx, 1).back()));
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_NE(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+    EXPECT_FALSE(entry.getTxnNumber());
 }
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction consisting of an
+// Without primary-driven index builds, noGroup is left as-is: writes are not batched, so each
+// insert replicates as its own (non-applyOps) oplog entry.
+TEST_F(BatchedWriteOutputsTest, WriteWithoutPdibIsNotGrouped) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    // Two individual insert entries, neither wrapped in an applyOps.
+    for (const auto& obj : getNOplogEntries(opCtx, 2)) {
+        auto entry = assertGet(OplogEntry::parse(obj));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kInsert);
+        EXPECT_NE(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    }
+}
+
+// Verifies that a WriteUnitOfWork with groupOplogEntries=atomicGroup consisting of an
 // insert, an update and a delete replicates as a single applyOps.
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     // Setup.
@@ -3793,11 +4621,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
+    // Start a WUOW with groupOplogEntries=atomicGroup. Verify that initialises the
     // BatchedWriteContext.
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     ASSERT(bwc.writesAreBatched());
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
@@ -3899,7 +4727,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseri
     AutoGetCollection autoColl(opCtx, curNss, MODE_IX);
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     ASSERT(bwc.writesAreBatched());
 
     auto doc = BSON("_id" << 0 << "data"
@@ -3977,11 +4805,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     reset(opCtx, _nssWithTid);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
+    // Start a WUOW with groupOplogEntries=atomicGroup. Verify that initialises the
     // BatchedWriteContext.
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     ASSERT(bwc.writesAreBatched());
 
     AutoGetCollection autoColl(opCtx, _nssWithTid, MODE_IX);
@@ -4082,7 +4910,7 @@ TEST_F(BatchedWriteOutputsTest, testEmptyWUOW) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     // Start and commit an empty WUOW.
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     wuow.commit();
 
     // The getNOplogEntries call below asserts that the oplog is empty.
@@ -4098,7 +4926,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
 
     // Delete BatchedWriteOutputsTest::maxDeleteOpsInBatch documents in a single batch, which is the
     // maximum number of docs that can be batched while staying within 16MB of applyOps.
@@ -4134,9 +4962,9 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     }
 }
 
-// Verifies a retryable kGroupForAtomicWrite batch emits an applyOps tagged
+// Verifies a retryable atomicGroup batch emits an applyOps tagged
 // kApplyOpsAppliedAtomically with the session metadata, and updates config.transactions.
-TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteEmitsAppliedAtomicallyTag) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     // Create the collection before resetting the oplog so its 'create' entry isn't counted below.
@@ -4144,7 +4972,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // Two ops so the batch produces an applyOps rather than the single-op fast path; one carries a
     // statement id, one doesn't (a kUninitializedStmtId insert yields an op with no statement ids).
@@ -4154,7 +4982,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
 
     {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx,
             *autoColl,
@@ -4196,11 +5024,11 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
     EXPECT_EQ(opCtx->getTxnNumber(), txnRecord.getTxnNum());
 }
 
-// Verifies an oversized kGroupForAtomicWrite batch replicates as a chain of applyOps entries: every
-// entry is tagged kApplyOpsAppliedAtomically and linked via prevOpTime, and config.transactions is
-// updated only once, pointing at the terminal entry. The per-applyOps op-count limit is lowered so
-// a small batch splits into multiple entries.
-TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
+// Verifies an oversized retryable atomicGroup batch replicates as a chain of applyOps
+// entries: every entry is tagged kApplyOpsAppliedAtomically and linked via prevOpTime, and
+// config.transactions is updated only once, pointing at the terminal entry. The per-applyOps
+// op-count limit is lowered so a small batch splits into multiple entries.
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteChainTagsAndLinksEveryEntry) {
     unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
     unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
 
@@ -4211,7 +5039,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // One retryable insert plus stmtId-less inserts; with the count limit at 1, each op lands in
     // its own applyOps entry, forming a chain.
@@ -4224,7 +5052,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
 
     {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx,
             *autoColl,
@@ -4255,6 +5083,76 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
               txnRecord.getLastWriteOpTime().getTimestamp());
 }
 
+// Each statement of one retryable write stamps a link to the previous statement's terminal entry,
+// chaining them into a single session history. The second statement is oversized, so the link is
+// written on the first entry of a chain rather than on a lone entry.
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteChainLinksAcrossStatements) {
+    unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
+    unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 2);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
+
+    // One statement's inserts in a WUOW; only the first carries a statement id, as a real
+    // retryable statement's internal ops would.
+    auto runStatement = [&](StmtId stmtId, int firstDocId, int numOps) {
+        std::vector<InsertStatement> toInsert;
+        toInsert.emplace_back(stmtId, BSON("_id" << firstDocId));
+        for (int i = 1; i < numOps; i++) {
+            toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << (firstDocId + i)));
+        }
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    };
+
+    // Statement 0 fits in one applyOps entry; statement 1 needs two.
+    runStatement(StmtId(0), /*firstDocId=*/0, /*numOps=*/2);
+    runStatement(StmtId(1), /*firstDocId=*/10, /*numOps=*/4);
+
+    auto oplogs = getNOplogEntries(opCtx, 3);
+    auto stmt0 = assertGet(OplogEntry::parse(oplogs[0]));
+    auto stmt1First = assertGet(OplogEntry::parse(oplogs[1]));
+    auto stmt1Terminal = assertGet(OplogEntry::parse(oplogs[2]));
+
+    for (const auto& entry : {stmt0, stmt1First, stmt1Terminal}) {
+        EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+        EXPECT_EQ(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+        EXPECT_EQ(opCtx->getLogicalSessionId(), entry.getSessionId());
+        EXPECT_EQ(opCtx->getTxnNumber(), entry.getTxnNumber());
+    }
+
+    // The session's first write links to nothing, but the field must be present-and-null, not
+    // omitted: TransactionHistoryIterator rejects an entry with no prevOpTime field.
+    EXPECT_TRUE(oplogs[0].hasField(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName));
+    ASSERT_TRUE(stmt0.getPrevWriteOpTimeInTransaction());
+    EXPECT_TRUE(stmt0.getPrevWriteOpTimeInTransaction()->isNull());
+
+    // Statement 1's first entry links back to statement 0's terminal rather than being severed;
+    // this is the cross-statement link the op observer must stamp.
+    EXPECT_EQ(stmt1First.getPrevWriteOpTimeInTransaction(), stmt0.getOpTime());
+
+    // Within statement 1 the link is the ordinary intra-batch one.
+    EXPECT_EQ(stmt1Terminal.getPrevWriteOpTimeInTransaction(), stmt1First.getOpTime());
+
+    // Only statement 1's terminal entry is recorded as the session's last write.
+    auto txnRecord = getTxnRecord(opCtx, *opCtx->getLogicalSessionId());
+    EXPECT_EQ(stmt1Terminal.getOpTime(), txnRecord.getLastWriteOpTime());
+}
+
 // Verifies a WUOW that would result in a an oplog entry >16MB fails with TransactionTooLarge.
 TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     unittest::ServerParameterGuard featureFlagController("featureFlagLargeBatchedOperations",
@@ -4267,7 +5165,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
 
     // Attempt to delete more documents than allowed in a single applyOps batch because the
     // generated entry exceeds the limit of 16MB for an applyOps entry.
@@ -4307,7 +5205,7 @@ TEST_F(BatchedWriteOutputsTest, RuntimeOpCountLimitThrowsWithFeatureFlagOff) {
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
     {
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
         for (int docId = 0; docId < kDocsInBatch; docId++) {
             OplogDeleteEntryArgs args;
@@ -4326,7 +5224,7 @@ TEST_F(BatchedWriteOutputsTest, RuntimeOpCountLimitThrowsWithFeatureFlagOff) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
     unittest::ServerParameterGuard opCountLimit("maxNumberOfBatchedOperationsInSingleOplogEntry",
                                                 kOpLimitForTransactionTooLarge);
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     for (int docId = 0; docId < kDocsInBatch; docId++) {
         OplogDeleteEntryArgs args;
@@ -4361,7 +5259,7 @@ TEST_F(BatchedWriteOutputsTest, RuntimeLimitsAffectApplyOpsBatchingWithFeatureFl
         unittest::ServerParameterGuard maxBytesController(
             "maxSizeOfBatchedOperationsInSingleOplogEntryBytes", maxBytes);
 
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
         for (int docId = 0; docId < kDocsInBatch; ++docId) {
             OplogDeleteEntryArgs args;
@@ -4395,7 +5293,7 @@ TEST_F(BatchedWriteOutputsTest, RuntimeLimitsAffectApplyOpsBatchingWithFeatureFl
                           /*expectedEntries=*/2);
 }
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForPossiblyRetryableOperations
+// Verifies that a WriteUnitOfWork with groupOplogEntries=nonAtomicGroup
 // replicates its writes as a single applyOps. Tests WUOWs batching a range of 2 to 5 inserts
 // (inclusive).
 TEST_F(BatchedWriteOutputsTest, TestVectoredInsertApplyOpsGrouping) {
@@ -4416,11 +5314,11 @@ TEST_F(BatchedWriteOutputsTest, TestVectoredInsertApplyOpsGrouping) {
 
     // Run the test with WUOW's grouping 2 to 5 inserts.
     for (size_t docsToBeBatched = 2; docsToBeBatched <= nDocsToInsert; docsToBeBatched++) {
-        // Start a WUOW with groupOplogEntries=kGroupForPossiblyRetryableOperation.
+        // Start a WUOW with groupOplogEntries=nonAtomicGroup.
         // Verify that initialises the BatchedWriteContext.
         auto& bwc = BatchedWriteContext::get(opCtx);
         ASSERT(!bwc.writesAreBatched());
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
         ASSERT(bwc.writesAreBatched());
 
         std::vector<InsertStatement> inserts;
@@ -4499,7 +5397,7 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertApplyOpsGrouping) {
         std::unique_ptr<MongoDSessionCatalog::Session> session;
         beginRetryableWriteWithTxnNumber(opCtx, TxnNumber(1), session);
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::nonAtomicGroup);
         std::vector<InsertStatement> inserts0;
 
         for (size_t i = 0; i < nDocsToInsert0; i++) {
@@ -4515,7 +5413,7 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertApplyOpsGrouping) {
             /*defaultFromMigrate=*/false);
         wuow0.commit();
 
-        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::nonAtomicGroup);
         std::vector<InsertStatement> inserts1;
 
         for (size_t i = 0; i < nDocsToInsert1; i++) {
@@ -4590,7 +5488,7 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertApplyOpsGrouping) {
     }
 }
 
-TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips) {
+TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteWithMultipleStatementBearingOpsTrips) {
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
     reset(opCtx, _nss);
@@ -4601,7 +5499,7 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips)
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
 
     // Two separate inserts in one WUOW, each its own statement-bearing operation.
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     std::vector<InsertStatement> inserts;
     inserts.emplace_back(StmtId(0), BSON("_id" << 0));
     inserts.emplace_back(StmtId(1), BSON("_id" << 1));
@@ -4614,12 +5512,167 @@ TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips)
         /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
         /*defaultFromMigrate=*/false);
 
-    // Committing trips the kGroupForAtomicWrite assertion. tassert both throws and arms the
-    // tripwire; clear the tripwire so the test process doesn't abort at shutdown.
+    // Committing trips the assertion that an atomic batch carries at most one statement-bearing
+    // operation. tassert both throws and arms the tripwire; clear it so the test doesn't abort at
+    // shutdown.
     ASSERT_THROWS_WITH_CHECK(wuow.commit(), DBException, [](const DBException& ex) {
         EXPECT_EQ(ex.code(), 12782600);
         assertionCount.tripwire.subtractAndFetch(1);
     });
+}
+
+// An atomically-grouped batch that runs within a retryable write but carries no retryable
+// statements is not itself retryable: it commits successfully and replicates as a plain atomic
+// applyOps with no session metadata.
+TEST_F(BatchedWriteOutputsTest, RetryableSessionAtomicBatchWithoutStatementIdsIsNotRetryable) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
+
+    // Two ops with no statement ids, so the batch is a multi-op applyOps (not the single-op fast
+    // path) and carries no retryable statements despite running within a retryable write.
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // Replicates as a plain atomic applyOps: no retryable multiOpType tag and no session metadata,
+    // despite running within a retryable write.
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_FALSE(entry.getMultiOpType().has_value());
+    EXPECT_FALSE(entry.getSessionId().has_value());
+    EXPECT_FALSE(entry.getTxnNumber().has_value());
+
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(2u, innerEntries.size());
+    EXPECT_EQ(0, innerEntries[0].getStatementIds().size());
+    EXPECT_EQ(0, innerEntries[1].getStatementIds().size());
+}
+
+TEST_F(BatchedWriteOutputsTest, NonRetryableSingleOpAtomicBatchDoesNotWriteTxnRecord) {
+    // The fast path is selected purely by operation count, so every grouping mode reaches it.
+    // Which mode a plain WUOW is promoted to depends on whether the enclosing operation carries a
+    // txnNumber, so cover all of them.
+    for (auto groupType : {WriteUnitOfWork::atomicGroup, WriteUnitOfWork::nonAtomicGroup}) {
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, _nss);
+        resetOplogAndTransactions(opCtx);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+        beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
+        const auto sessionId = *opCtx->getLogicalSessionId();
+
+        const auto doc = BSON("_id" << 0);
+        {
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx, groupType);
+            const auto& documentKey = getDocumentKey(*autoColl, doc);
+            OplogDeleteEntryArgs args;
+            opCtx->getServiceContext()->getOpObserver()->onDelete(
+                opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
+            wuow.commit();
+        }
+
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+        auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+        ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kDelete);
+
+        // setInitializedStatementIds() dropped kUninitializedStmtId, so the entry reaches
+        // onBatchedWriteCommit with an empty statement id list.
+        EXPECT_EQ(0, entry.getStatementIds().size());
+
+        // Carrying no transaction chain info is correct for a non-retryable write.
+        EXPECT_FALSE(entry.getPrevWriteOpTimeInTransaction().has_value());
+        EXPECT_FALSE(entry.getSessionId().has_value());
+        EXPECT_FALSE(entry.getTxnNumber().has_value());
+
+        auto configTransactions = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto txnRecord = Helpers::findOneForTesting(opCtx,
+                                                    configTransactions,
+                                                    BSON("_id" << sessionId.toBSON()),
+                                                    /*invariantOnError=*/false);
+        EXPECT_TRUE(txnRecord.isEmpty())
+            << "a non-retryable grouped write recorded a session lastWriteOpTime referencing an "
+               "oplog entry with no prevOpTime (groupType "
+            << static_cast<int>(groupType) << "): " << txnRecord;
+    }
+}
+
+TEST_F(BatchedWriteOutputsTest, NonRetryableMultiOpBatchDoesNotWriteTxnRecord) {
+    for (auto groupType : {WriteUnitOfWork::atomicGroup, WriteUnitOfWork::nonAtomicGroup}) {
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, _nss);
+        resetOplogAndTransactions(opCtx);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+        beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
+        const auto sessionId = *opCtx->getLogicalSessionId();
+
+        std::vector<InsertStatement> toInsert;
+        toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 0));
+        toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+        {
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx, groupType);
+            opCtx->getServiceContext()->getOpObserver()->onInserts(
+                opCtx,
+                *autoColl,
+                toInsert.begin(),
+                toInsert.end(),
+                /*recordIds=*/{},
+                /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+                /*defaultFromMigrate=*/false);
+            wuow.commit();
+        }
+
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+        auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+        ASSERT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+        EXPECT_FALSE(entry.getPrevWriteOpTimeInTransaction().has_value());
+
+        auto configTransactions = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto txnRecord = Helpers::findOneForTesting(opCtx,
+                                                    configTransactions,
+                                                    BSON("_id" << sessionId.toBSON()),
+                                                    /*invariantOnError=*/false);
+        EXPECT_TRUE(txnRecord.isEmpty())
+            << "multi-op groupType " << static_cast<int>(groupType) << ": " << txnRecord;
+    }
 }
 
 // Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This
@@ -4655,7 +5708,7 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertMultiApplyOpsGrouping
         std::unique_ptr<MongoDSessionCatalog::Session> session;
         beginRetryableWriteWithTxnNumber(opCtx, TxnNumber(1), session);
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::nonAtomicGroup);
         std::vector<InsertStatement> inserts0;
 
         for (size_t i = 0; i < nDocsToInsert0; i++) {
@@ -4671,7 +5724,7 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertMultiApplyOpsGrouping
             /*defaultFromMigrate=*/false);
         wuow0.commit();
 
-        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::nonAtomicGroup);
         std::vector<InsertStatement> inserts1;
 
         for (size_t i = 0; i < nDocsToInsert1; i++) {
@@ -4769,6 +5822,236 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertMultiApplyOpsGrouping
     }
 }
 
+int64_t readApplyOpsChainsTotal(otel::metrics::OtelMetricsCapturer& capturer) {
+    return capturer.readInt64Counter(otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsTotal);
+}
+
+int64_t readApplyOpsChainsWithContainerOps(otel::metrics::OtelMetricsCapturer& capturer) {
+    return capturer.readInt64Counter(
+        otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsWithContainerOps);
+}
+
+// A batched write too large for a single applyOps entry increments the
+// batchedWrites.applyOpsChains.total metric once, on both the plain and retryable write paths.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnMultiApplyOps) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    auto runScenario = [&](bool retryable) {
+        const auto before = readApplyOpsChainsTotal(capturer);
+        const auto withContainerOpsBefore = readApplyOpsChainsWithContainerOps(capturer);
+
+        // max=2 ops/entry with 3 inserts forces the batch across multiple applyOps entries.
+        unittest::ServerParameterGuard batchReducer(
+            "maxNumberOfBatchedOperationsInSingleOplogEntry", 2);
+
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, _nss);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+        std::unique_ptr<MongoDSessionCatalog::Session> session;
+        if (retryable) {
+            beginRetryableWriteWithTxnNumber(opCtx, TxnNumber(1), session);
+        }
+
+        {
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
+            std::vector<InsertStatement> inserts;
+            for (int i = 0; i < 3; i++) {
+                // stmtIds only belong on the retryable path.
+                inserts.push_back(retryable ? InsertStatement(i, BSON("_id" << i))
+                                            : InsertStatement(BSON("_id" << i)));
+            }
+            opCtx->getServiceContext()->getOpObserver()->onInserts(
+                opCtx,
+                *autoColl,
+                inserts.begin(),
+                inserts.end(),
+                /*recordIds=*/{},
+                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                /*defaultFromMigrate=*/false);
+            wuow.commit();
+        }
+
+        EXPECT_EQ(readApplyOpsChainsTotal(capturer), before + 1) << "retryable=" << retryable;
+        // No container op was staged, so the withContainerOps subset counter is untouched.
+        EXPECT_EQ(readApplyOpsChainsWithContainerOps(capturer), withContainerOpsBefore)
+            << "retryable=" << retryable;
+    };
+
+    runScenario(/*retryable=*/false);
+    runScenario(/*retryable=*/true);
+}
+
+// The metric increments once when an oversized retryable batched write is split into an
+// applyOps chain.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnRetryableAtomicWriteChain) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto before = readApplyOpsChainsTotal(capturer);
+
+    unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
+    // max=1 op/entry splits the batch into a chain of one-op entries.
+    unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> session;
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, session);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        // Exactly one op carries a stmtId, as a retryable batch requires.
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < 3; i++) {
+            inserts.emplace_back(i == 0 ? StmtId(0) : kUninitializedStmtId, BSON("_id" << i));
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), before + 1);
+}
+
+// The metric increments once when an oversized non-retryable one-shot batched write is split
+// into an applyOps chain.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnTransactionBatch) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto before = readApplyOpsChainsTotal(capturer);
+
+    unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
+    // max=1 op/entry splits the batch into a chain of one-op entries.
+    unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
+        // A non-retryable batch carries no session, so the inserts carry no stmtId.
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < 3; i++) {
+            inserts.emplace_back(BSON("_id" << i));
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), before + 1);
+}
+
+// A batched write that fits in a single applyOps entry does not increment the metric.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricDoesNotIncrementForSingleEntryBatch) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto before = readApplyOpsChainsTotal(capturer);
+
+    // Roomy limit: the inserts fit in one applyOps entry, so no chain forms.
+    unittest::ServerParameterGuard batchReducer("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                10);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
+        std::vector<InsertStatement> inserts;
+        for (int i = 0; i < 3; i++) {
+            inserts.emplace_back(BSON("_id" << i));
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), before);
+}
+
+// A split batch carrying an index build side-table (container) write increments the
+// withContainerOps counter, in addition to the total.
+TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricCountsContainerWrites) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+    const auto withContainerOpsBefore = readApplyOpsChainsWithContainerOps(capturer);
+    const auto totalBefore = readApplyOpsChainsTotal(capturer);
+
+    // max=2 ops/entry: two collection inserts plus a container write span multiple applyOps
+    // entries.
+    unittest::ServerParameterGuard batchReducer("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                2);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    const char kContainerValue[] = {'v'};
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
+        auto* opObserver = opCtx->getServiceContext()->getOpObserver();
+        std::vector<InsertStatement> inserts{InsertStatement(BSON("_id" << 0)),
+                                             InsertStatement(BSON("_id" << 1))};
+        opObserver->onInserts(opCtx,
+                              *autoColl,
+                              inserts.begin(),
+                              inserts.end(),
+                              /*recordIds=*/{},
+                              /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                              /*defaultFromMigrate=*/false);
+        // A container (index build side-table) write staged in the same batch.
+        opObserver->onContainerInsert(
+            opCtx, "sideWritesIdent", int64_t{0}, std::span<const char>(kContainerValue));
+        wuow.commit();
+    }
+
+    EXPECT_EQ(readApplyOpsChainsWithContainerOps(capturer), withContainerOpsBefore + 1);
+    EXPECT_EQ(readApplyOpsChainsTotal(capturer), totalBefore + 1);
+}
+
 // Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This
 // should never happen except in tests which specifically set the batching parameters, but it makes
 // the code simpler to assume it does happen, and testing that it works is simpler and more reliable
@@ -4801,7 +6084,7 @@ TEST_F(BatchedWriteOutputsTest, TestNonRetryableVectoredInsertMultiApplyOpsGroup
 
     {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::nonAtomicGroup);
         std::vector<InsertStatement> inserts0;
 
         for (size_t i = 0; i < nDocsToInsert0; i++) {
@@ -4817,7 +6100,7 @@ TEST_F(BatchedWriteOutputsTest, TestNonRetryableVectoredInsertMultiApplyOpsGroup
             /*defaultFromMigrate=*/false);
         wuow0.commit();
 
-        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::nonAtomicGroup);
         std::vector<InsertStatement> inserts1;
 
         for (size_t i = 0; i < nDocsToInsert1; i++) {
@@ -4941,7 +6224,7 @@ void BatchedWriteOutputsTest::testBatchedWriteSingleOplogEntryIsNotWrappedInAppl
 
         // Execute same operation but grouped.
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        WriteUnitOfWork wuowGrouped(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        WriteUnitOfWork wuowGrouped(opCtx, WriteUnitOfWork::nonAtomicGroup);
         opLoggingFn(opCtx, autoColl, stmtId);
         wuowGrouped.commit();
     }
@@ -4982,7 +6265,7 @@ TEST_P(BatchedWriteOutputsTest, TestSingleInsertIsNotInApplyOps) {
                 /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                 /*defaultFromMigrate=*/false);
         },
-        GetParam() /*isRetryable*/);
+        /*isRetryable=*/GetParam());
 }
 
 TEST_P(BatchedWriteOutputsTest, TestSingleDeleteIsNotInApplyOps) {
@@ -4992,7 +6275,7 @@ TEST_P(BatchedWriteOutputsTest, TestSingleDeleteIsNotInApplyOps) {
             opCtx->getServiceContext()->getOpObserver()->onDelete(
                 opCtx, *autoColl, stmtId, doc, getDocumentKey(*autoColl, doc), {});
         },
-        GetParam() /*isRetryable*/);
+        /*isRetryable=*/GetParam());
 }
 
 TEST_P(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
@@ -5013,7 +6296,7 @@ TEST_P(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
 
             opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, update);
         },
-        GetParam() /*isRetryable*/);
+        /*isRetryable=*/GetParam());
 }
 
 TEST_F(BatchedWriteOutputsTest, TestSingleContainerInsertIsNotInApplyOps) {
@@ -5025,7 +6308,7 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerInsertIsNotInApplyOps) {
             opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
                 opCtx, ident, key, value);
         },
-        false /*isRetryable*/);
+        /*isRetryable=*/false);
 }
 
 TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
@@ -5036,12 +6319,12 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
 
             opCtx->getServiceContext()->getOpObserver()->onContainerDelete(opCtx, ident, key);
         },
-        false /*isRetryable*/);
+        /*isRetryable=*/false);
 }
 
 repl::OplogEntry BatchedWriteOutputsTest::commitBatchedInserts(
     OperationContext* opCtx, const CollectionPtr& coll, const std::vector<bool>& fromMigrateFlags) {
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
     ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
 
     std::vector<InsertStatement> inserts;
@@ -5134,7 +6417,7 @@ TEST_F(BatchedWriteOutputsTest, TestMultipleOpObserverCallsWithMixedFromMigrate)
     reset(opCtx, NamespaceString::kRsOplogNamespace);
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
 
     auto batchInsert = [&](std::vector<BSONObj> docs, bool fromMigrate) {
@@ -5173,7 +6456,7 @@ TEST_F(BatchedWriteOutputsTest, TestMixedOperationTypesWithMixedFromMigrate) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
 
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
     ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
 
     // Insert with fromMigrate=true.
@@ -5276,7 +6559,7 @@ TEST_F(BatchedWriteOutputsTest, TestBatchedWritePreImagesWithMixedFromMigrate) {
     // Batched updates: doc0 is NOT fromMigrate, doc1 IS fromMigrate.
     {
         AutoGetCollection autoColl(opCtx, preImageNss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
         ASSERT(BatchedWriteContext::get(opCtx).writesAreBatched());
 
         batchUpdate(opCtx, *autoColl, 0, OperationSource::kStandard);
@@ -5313,6 +6596,155 @@ TEST_F(BatchedWriteOutputsTest, TestBatchedWritePreImagesWithMixedFromMigrate) {
                                               /*invariantOnError=*/false);
         ASSERT_TRUE(doc.isEmpty()) << "Pre-image should NOT be recorded for fromMigrate operation";
     }
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedInsertWithFlagAndRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const int64_t expectedHash1 = repl::computeDocValidationHash(doc1);
+    const int64_t expectedHash2 = repl::computeDocValidationHash(doc2);
+
+    const auto sizeMetadata =
+        batchedInsertAndGetSizeMetadata(opCtx, rridNss, doc1, doc2, {RecordId(1), RecordId(2)});
+    ASSERT(sizeMetadata.first);
+    ASSERT(sizeMetadata.first->getH());
+    EXPECT_EQ(*sizeMetadata.first->getH(), expectedHash1);
+    EXPECT_FALSE(sizeMetadata.first->getSz().has_value());
+    ASSERT(sizeMetadata.second);
+    ASSERT(sizeMetadata.second->getH());
+    EXPECT_EQ(*sizeMetadata.second->getH(), expectedHash2);
+    EXPECT_FALSE(sizeMetadata.second->getSz().has_value());
+    EXPECT_NE(*sizeMetadata.first->getH(), *sizeMetadata.second->getH());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedInsertWithoutFlag) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const auto sizeMetadata =
+        batchedInsertAndGetSizeMetadata(opCtx, rridNss, doc1, doc2, {RecordId(1), RecordId(2)});
+    EXPECT_FALSE(sizeMetadata.first.has_value());
+    EXPECT_FALSE(sizeMetadata.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedInsertWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const auto sizeMetadata = batchedInsertAndGetSizeMetadata(opCtx, _nss, doc1, doc2, {});
+    EXPECT_FALSE(sizeMetadata.first.has_value());
+    EXPECT_FALSE(sizeMetadata.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedUpdateWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj preImageDoc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj updatedDoc1 = BSON("_id" << 0 << "data" << "y");
+    const BSONObj preImageDoc2 = BSON("_id" << 1 << "data" << 1);
+    const BSONObj updatedDoc2 = BSON("_id" << 1 << "data" << 2);
+    const int64_t expectedHash1 = repl::computeUpdateValidationHash(preImageDoc1, updatedDoc1);
+    const int64_t expectedHash2 = repl::computeUpdateValidationHash(preImageDoc2, updatedDoc2);
+    const auto sizeMetadata = batchedUpdateAndGetSizeMetadata(opCtx,
+                                                              rridNss,
+                                                              preImageDoc1,
+                                                              updatedDoc1,
+                                                              preImageDoc2,
+                                                              updatedDoc2,
+                                                              RecordId(1),
+                                                              RecordId(2));
+    ASSERT(sizeMetadata.first);
+    ASSERT(sizeMetadata.first->getH());
+    EXPECT_EQ(*sizeMetadata.first->getH(), expectedHash1);
+    EXPECT_FALSE(sizeMetadata.first->getSz().has_value());
+    ASSERT(sizeMetadata.second);
+    ASSERT(sizeMetadata.second->getH());
+    EXPECT_EQ(*sizeMetadata.second->getH(), expectedHash2);
+    EXPECT_FALSE(sizeMetadata.second->getSz().has_value());
+    EXPECT_NE(*sizeMetadata.first->getH(), *sizeMetadata.second->getH());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedUpdateWithoutFlag) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << 1);
+    const auto sizeMetadata = batchedUpdateAndGetSizeMetadata(
+        opCtx, rridNss, doc1, doc1, doc2, doc2, RecordId(1), RecordId(2));
+    EXPECT_FALSE(sizeMetadata.first.has_value());
+    EXPECT_FALSE(sizeMetadata.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedUpdateWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << 1);
+    const auto sizeMetadata = batchedUpdateAndGetSizeMetadata(
+        opCtx, _nss, doc1, doc1, doc2, doc2, RecordId(), RecordId());
+    EXPECT_FALSE(sizeMetadata.first.has_value());
+    EXPECT_FALSE(sizeMetadata.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashExistsOnBatchedDeleteWithFlagAndRecordId) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const int64_t expectedHash1 = repl::computeDocValidationHash(doc1);
+    const int64_t expectedHash2 = repl::computeDocValidationHash(doc2);
+
+    const auto sizeMetadata =
+        batchedDeleteAndGetSizeMetadata(opCtx, rridNss, doc1, doc2, RecordId(1), RecordId(2));
+    ASSERT(sizeMetadata.first);
+    ASSERT(sizeMetadata.first->getH());
+    EXPECT_EQ(*sizeMetadata.first->getH(), expectedHash1);
+    EXPECT_FALSE(sizeMetadata.first->getSz().has_value());
+    ASSERT(sizeMetadata.second);
+    ASSERT(sizeMetadata.second->getH());
+    EXPECT_EQ(*sizeMetadata.second->getH(), expectedHash2);
+    EXPECT_FALSE(sizeMetadata.second->getSz().has_value());
+    EXPECT_NE(*sizeMetadata.first->getH(), *sizeMetadata.second->getH());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedDeleteWithoutFlag) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const auto sizeMetadata =
+        batchedDeleteAndGetSizeMetadata(opCtx, rridNss, doc1, doc2, RecordId(1), RecordId(2));
+    EXPECT_FALSE(sizeMetadata.first.has_value());
+    EXPECT_FALSE(sizeMetadata.second.has_value());
+}
+
+TEST_F(BatchedWriteOutputsTest, CheckHashDoesNotExistOnBatchedDeleteWithoutReplicatedRecordIds) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    const BSONObj doc1 = BSON("_id" << 0 << "data" << "x");
+    const BSONObj doc2 = BSON("_id" << 1 << "data" << "y");
+    const auto sizeMetadata =
+        batchedDeleteAndGetSizeMetadata(opCtx, _nss, doc1, doc2, RecordId(), RecordId());
+    EXPECT_FALSE(sizeMetadata.first.has_value());
+    EXPECT_FALSE(sizeMetadata.second.has_value());
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {
@@ -5400,12 +6832,12 @@ protected:
     }
 
     std::vector<DeleteTestCase> _cases{
-        {kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kChangeStreamImagesDisabled, kNotRetryable, noGroup, 1},
         {kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
-        {kChangeStreamImagesDisabled, kRecordInSideCollection, kDontGroup, 1},
-        {kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kChangeStreamImagesDisabled, kRecordInSideCollection, noGroup, 1},
+        {kChangeStreamImagesEnabled, kNotRetryable, noGroup, 1},
         {kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
-        {kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1},
+        {kChangeStreamImagesEnabled, kRecordInSideCollection, noGroup, 1},
     };
 
     const NamespaceString _nss =
@@ -6451,7 +7883,7 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, indexes, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, /*fromMigrate=*/false);
         wunit.commit();
     }
 
@@ -7080,6 +8512,300 @@ TEST_F(OpObserverTest, OnContainerInsert) {
     ASSERT_EQ(std::string(entry2ValueBinData, entry2ValueBinDataLength), value2);
 }
 
+TEST_F(OpObserverTest, OnContainerInsertRange) {
+    // TODO SERVER-134951 Remove check for enable
+    unittest::ServerParameterGuard batchedContainerWritesEnabled{
+        "featureFlagBatchedContainerWrites", true};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    static constexpr int64_t startKey = 100;
+    // Backing storage for the non-owning value views; must outlive the onContainerInsert() call.
+    const std::string value0 = "a";
+    const std::string value1 = "bb";
+    const std::string value2 = "ccc";
+    const std::vector<std::span<const char>> vals{
+        std::span<const char>{value0.data(), value0.size()},
+        std::span<const char>{value1.data(), value1.size()},
+        std::span<const char>{value2.data(), value2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(opCtx.get(), ident, startKey, vals);
+
+    // A range insert produces a single oplog entry covering the contiguous key range.
+    const auto entries = getNOplogEntries(opCtx.get(), 1);
+    const auto entry = assertGet(OplogEntry::parse(entries[0]));
+
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+    // "o": { "k": <NumberLong startKey>, "v": [BinData(value0), BinData(value1), BinData(value2)] }
+    const auto o = entry.getObject();
+    ASSERT_EQ(o.nFields(), 2);
+
+    const auto k = o["k"];
+    ASSERT_EQ(k.type(), BSONType::numberLong);
+    ASSERT_EQ(k.numberLong(), startKey);
+
+    const auto v = o["v"];
+    ASSERT_EQ(v.type(), BSONType::array);
+    const std::vector<std::string> expected{value0, value1, value2};
+    const auto arr = v.Array();
+    ASSERT_EQ(arr.size(), expected.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        EXPECT_EQ(arr[i].type(), BSONType::binData);
+        EXPECT_EQ(arr[i].binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = arr[i].binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
+// TODO SERVER-134951 Remove feature disabled test
+TEST_F(OpObserverTest, OnContainerInsertRangeFeatureFlagDisabled) {
+    unittest::ServerParameterGuard batchedContainerWritesDisabled{
+        "featureFlagBatchedContainerWrites", false};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident";
+    static constexpr int64_t startKey = 100;
+    const std::string value0 = "a";
+    const std::string value1 = "bb";
+    const std::string value2 = "ccc";
+    const std::vector<std::span<const char>> vals{
+        std::span<const char>{value0.data(), value0.size()},
+        std::span<const char>{value1.data(), value1.size()},
+        std::span<const char>{value2.data(), value2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(opCtx.get(), ident, startKey, vals);
+
+    // With the feature disabled we must not emit the array format; instead each value produces its
+    // own scalar oplog entry across the contiguous key range.
+    const auto entries = getNOplogEntries(opCtx.get(), 3);
+    const std::vector<std::string> expected{value0, value1, value2};
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto entry = assertGet(OplogEntry::parse(entries[i]));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+        EXPECT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+        const auto o = entry.getObject();
+        EXPECT_EQ(o.nFields(), 2);
+
+        const auto k = o["k"];
+        EXPECT_EQ(k.type(), BSONType::numberLong);
+        EXPECT_EQ(k.numberLong(), startKey + static_cast<int64_t>(i));
+
+        const auto v = o["v"];
+        EXPECT_EQ(v.type(), BSONType::binData);
+        EXPECT_EQ(v.binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = v.binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
+TEST_F(OpObserverTest, OnContainerInsertKeyArray) {
+    // TODO SERVER-134951 Remove check for enable
+    unittest::ServerParameterGuard batchedContainerWritesEnabled{
+        "featureFlagBatchedContainerWrites", true};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    // Backing storage for the non-owning key views; must outlive the onContainerInsert() call.
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+    const std::string value;
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(
+        opCtx.get(), ident, keys, std::span<const char>{value.data(), value.size()});
+
+    // An array-keyed insert produces a single oplog entry carrying the key array.
+    const auto entries = getNOplogEntries(opCtx.get(), 1);
+    const auto entry = assertGet(OplogEntry::parse(entries[0]));
+
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+    ASSERT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+    // "o": { "k": [BinData(key0), BinData(key1), BinData(key2)] }
+    const auto o = entry.getObject();
+    ASSERT_EQ(o.nFields(), 1) << o;
+
+    const auto k = o["k"];
+    ASSERT_EQ(k.type(), BSONType::array) << k;
+    const std::vector<std::string> expected{key0, key1, key2};
+    const auto arr = k.Array();
+    ASSERT_EQ(arr.size(), expected.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        EXPECT_EQ(arr[i].type(), BSONType::binData) << k;
+        EXPECT_EQ(arr[i].binDataType(), BinDataType::BinDataGeneral) << k;
+        int len;
+        const auto data = arr[i].binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]) << k;
+    }
+
+    ASSERT_TRUE(o["v"].eoo()) << o;
+}
+
+// TODO SERVER-134951 Remove feature disabled test
+TEST_F(OpObserverTest, OnContainerInsertKeyArrayFeatureFlagDisabled) {
+    unittest::ServerParameterGuard batchedContainerWritesDisabled{
+        "featureFlagBatchedContainerWrites", false};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+    const std::string value;
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerInsert(
+        opCtx.get(), ident, keys, std::span<const char>{value.data(), value.size()});
+
+    // With the feature disabled we must not emit the array format; instead each key produces its
+    // own scalar oplog entry, all sharing the same value.
+    const auto entries = getNOplogEntries(opCtx.get(), 3);
+    const std::vector<std::string> expected{key0, key1, key2};
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto entry = assertGet(OplogEntry::parse(entries[i]));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerInsert);
+        EXPECT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+        const auto o = entry.getObject();
+        EXPECT_EQ(o.nFields(), 2) << o;
+
+        {
+            const auto k = o["k"];
+            EXPECT_EQ(k.type(), BSONType::binData) << k;
+            EXPECT_EQ(k.binDataType(), BinDataType::BinDataGeneral) << k;
+            int klen;
+            const auto kdata = k.binData(klen);
+            EXPECT_EQ(std::string_view(kdata, klen), expected[i]) << k;
+        }
+
+        {
+            const auto v = o["v"];
+            EXPECT_EQ(v.type(), BSONType::binData) << v;
+            EXPECT_EQ(v.binDataType(), BinDataType::BinDataGeneral) << v;
+            int vlen;
+            const auto vdata = v.binData(vlen);
+            EXPECT_EQ(std::string_view(vdata, vlen), value) << v;
+        }
+    }
+}
+
+TEST_F(OpObserverTest, OnContainerDeleteKeyArray) {
+    // TODO SERVER-134951 Remove check for enable
+    unittest::ServerParameterGuard batchedContainerWritesEnabled{
+        "featureFlagBatchedContainerWrites", true};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    // Backing storage for the non-owning key views; must outlive the onContainerDelete() call.
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerDelete(opCtx.get(), ident, keys);
+
+    // An array-keyed delete produces a single oplog entry carrying the key array.
+    const auto entries = getNOplogEntries(opCtx.get(), 1);
+    const auto entry = assertGet(OplogEntry::parse(entries[0]));
+
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerDelete);
+    ASSERT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+    // "o": { "k": [BinData(key0), BinData(key1), BinData(key2)] }
+    const auto o = entry.getObject();
+    ASSERT_EQ(o.nFields(), 1);
+
+    const auto k = o["k"];
+    ASSERT_EQ(k.type(), BSONType::array);
+    const std::vector<std::string> expected{key0, key1, key2};
+    const auto arr = k.Array();
+    ASSERT_EQ(arr.size(), expected.size());
+    for (size_t i = 0; i < arr.size(); ++i) {
+        EXPECT_EQ(arr[i].type(), BSONType::binData);
+        EXPECT_EQ(arr[i].binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = arr[i].binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
+// TODO SERVER-134951 Remove feature disabled test
+TEST_F(OpObserverTest, OnContainerDeleteKeyArrayFeatureFlagDisabled) {
+    unittest::ServerParameterGuard batchedContainerWritesDisabled{
+        "featureFlagBatchedContainerWrites", false};
+
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
+
+    static constexpr auto ident = "ident"sv;
+    const std::string key0 = "K0";
+    const std::string key1 = "K1";
+    const std::string key2 = "K2";
+    const std::vector<std::span<const char>> keys{
+        std::span<const char>{key0.data(), key0.size()},
+        std::span<const char>{key1.data(), key1.size()},
+        std::span<const char>{key2.data(), key2.size()},
+    };
+
+    OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
+    opObserver.onContainerDelete(opCtx.get(), ident, keys);
+
+    // With the feature disabled we must not emit the array format; instead each key produces its
+    // own scalar oplog entry.
+    const auto entries = getNOplogEntries(opCtx.get(), 3);
+    const std::vector<std::string> expected{key0, key1, key2};
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto entry = assertGet(OplogEntry::parse(entries[i]));
+        EXPECT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerDelete);
+        EXPECT_EQ(entry.getEntry().getContainer(), std::string_view{ident});
+
+        const auto o = entry.getObject();
+        EXPECT_EQ(o.nFields(), 1);
+
+        const auto k = o["k"];
+        EXPECT_EQ(k.type(), BSONType::binData);
+        EXPECT_EQ(k.binDataType(), BinDataType::BinDataGeneral);
+        int len;
+        const auto data = k.binData(len);
+        EXPECT_EQ(std::string(data, len), expected[i]);
+    }
+}
+
 TEST_F(OpObserverTest, OnContainerDelete) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
@@ -7197,7 +8923,7 @@ TEST_F(OpObserverTest, onDropIdent) {
 TEST_F(BatchedWriteOutputsTest, OnContainerInsertBatched) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
-    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::atomicGroup};
 
     auto ident = "ident";
     int64_t key1 = 100;
@@ -7255,7 +8981,7 @@ TEST_F(BatchedWriteOutputsTest, OnContainerInsertBatched) {
 TEST_F(BatchedWriteOutputsTest, OnContainerDeleteBatched) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
-    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::atomicGroup};
 
     auto ident = "ident";
     int64_t key1 = 100;
@@ -7297,7 +9023,7 @@ TEST_F(BatchedWriteOutputsTest, OnContainerDeleteBatched) {
 TEST_F(BatchedWriteOutputsTest, OnContainerUpdateBatched) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
-    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::atomicGroup};
 
     auto ident = "ident";
     int64_t key1 = 100;
@@ -7359,7 +9085,7 @@ TEST_F(BatchedWriteOutputsTest, OnContainerInsertDeleteBatchedWithInsertDeleteUp
     reset(opCtx.get(), _nss);
     reset(opCtx.get(), NamespaceString::kRsOplogNamespace);
     AutoGetCollection coll{opCtx.get(), _nss, LockMode::MODE_IX};
-    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::kGroupForTransaction};
+    WriteUnitOfWork wuow{opCtx.get(), WriteUnitOfWork::OplogEntryGroupType::atomicGroup};
 
     auto ident = "ident";
     int64_t key1 = 100;

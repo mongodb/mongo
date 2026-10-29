@@ -1,0 +1,403 @@
+import argparse
+import copy
+import json
+import os
+import sys
+
+import jsonschema
+import yaml
+from license_expression import get_spdx_licensing
+from referencing import Registry, Resource
+
+# Resolved relative to this script's own directory (not the process cwd) since these are
+# fixed resource files shipped alongside sbom_linter.py, unlike user-supplied --input-file /
+# --check-metadata paths which are intentionally resolved relative to the invocation cwd.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BOM_SCHEMA_LOCATION = os.path.join(_SCRIPT_DIR, "bom-1.6.schema.json")
+SPDX_SCHEMA_LOCATION = os.path.join(_SCRIPT_DIR, "spdx.schema.json")
+SPDX_SCHEMA_REF = "spdx.schema.json"
+
+# directory to scan for third party libraries
+THIRD_PARTY_DIR = os.path.join("src", "third_party")
+# platform independent prefix of third party libraries
+THIRD_PARTY_LOCATION_PREFIX = "src/third_party/"
+# This should only be set to true for testing to ensure the tests to not rely on the current state
+# of the third party library dir.
+SKIP_FILE_CHECKING = False
+
+# Error messages used for matching in testing
+UNDEFINED_THIRD_PARTY_ERROR = (
+    "The following files in src/third_party do not have components defined in the sbom:"
+)
+FORMATTING_ERROR = "File has incorrect formatting, re-run `buildscripts/tests/sbom_linter/sbom_linter.py` with the `--format` option to fix this."
+MISSING_PURL_CPE_ERROR = "Component must include a 'purl' or 'cpe' field."
+MISSING_EVIDENCE_ERROR = (
+    "Component must include an 'evidence.occurrences' field when the scope is required."
+)
+MISSING_TEAM_ERROR = "Component must include a 'internal:team_responsible' property."
+SCHEMA_MATCH_FAILURE = "File did not match the CycloneDX schema"
+MISSING_VERSION_IN_SBOM_COMPONENT_ERROR = "Component must include a version."
+MISSING_VERSION_IN_IMPORT_FILE_ERROR = "Missing version in the import file: "
+MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR = "Component must include a license."
+COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = "Could not find or read the import script file"
+
+
+# A class for managing error messages for components
+class ErrorManager:
+    def __init__(self, input_file: str):
+        self.input_file: str = input_file
+        self.component_name: str = ""
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+
+    def update_component_attribute(self, component_name: str) -> None:
+        self.component_name = component_name
+
+    def append(self, message: str) -> None:
+        self.errors.append(message)
+
+    def append_warning(self, message: str) -> None:
+        self.warnings.append(message)
+
+    def append_full_error_message(self, message: str) -> None:
+        if self.component_name == "":
+            self.errors.append(f"Input-file:{self.input_file} Error: {message}")
+        else:
+            self.errors.append(
+                f"Input-file:{self.input_file} Component:{self.component_name} Error: {message}"
+            )
+
+    def append_full_warning_message(self, message: str) -> None:
+        if self.component_name == "":
+            self.warnings.append(f"Input-file:{self.input_file} Warning: {message}")
+        else:
+            self.warnings.append(
+                f"Input-file:{self.input_file} Component:{self.component_name} Warning: {message}"
+            )
+
+    def print_errors(self) -> None:
+        if self.warnings:
+            print("\n".join(self.warnings), file=sys.stderr)
+        if self.errors:
+            print("\n".join(self.errors), file=sys.stderr)
+
+    def zero_error(self) -> bool:
+        return bool(not self.errors)
+
+    def find_message_in_errors(self, message: str) -> bool:
+        message_found = False
+        for error in self.errors:
+            if message in error:
+                message_found = True
+                break
+        return message_found
+
+    def find_message_in_warnings(self, message: str) -> bool:
+        message_found = False
+        for warning in self.warnings:
+            if message in warning:
+                message_found = True
+                break
+        return message_found
+
+
+def get_schema() -> dict:
+    with open(BOM_SCHEMA_LOCATION, "r") as schema_data:
+        return json.load(schema_data)
+
+
+def local_schema_registry():
+    "Create a local registry which is used to resolve references to external schema"
+
+    with open(SPDX_SCHEMA_LOCATION, "r") as spdx:
+        spdx_schema = Resource.from_contents(json.load(spdx))
+    return Registry().with_resources([(SPDX_SCHEMA_REF, spdx_schema)])
+
+
+# The script_path is a file which may contain a line where two tokens script_version_key and
+# the version string are separated by a separtor value of "=" and some optional spaces.
+# There is an "end of line" delimiter at the end of the line which needs to be stripped.
+def get_script_version(
+    script_path: str, script_version_key: str, error_manager: ErrorManager
+) -> str | None:
+    result = ""
+    try:
+        file = open(script_path, "r")
+    except OSError:
+        # buildscripts/sbom/generate_sbom.py warns when an import script path listed in component properties does not exist.
+        error_manager.append_full_warning_message(COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR)
+        return None
+
+    with file:
+        for line in file:
+            # Remove possible spaces, string delimiters and an "end of line" delimiter.
+            tokens = line.rstrip().replace('"', "").replace(" ", "").split("=")
+            if (len(tokens) > 1) and (tokens[0] == script_version_key):
+                result = tokens[1]
+                break
+    return result
+
+
+def validate_license(component: dict, error_manager: ErrorManager) -> None:
+    if "licenses" not in component:
+        error_manager.append_full_error_message(MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR)
+        return
+
+    valid_license = False
+    expression = None
+    for component_license in component["licenses"]:
+        if "expression" in component_license:
+            expression = component_license.get("expression")
+        elif "license" in component_license:
+            if "id" in component_license["license"]:
+                # Should be a valid SPDX license ID
+                expression = component_license["license"].get("id")
+            elif "name" in component_license["license"]:
+                # If SPDX does not define the license used, the name field may be used to provide the license name
+                valid_license = True
+
+        if not valid_license:
+            licensing_validate = get_spdx_licensing().validate(expression, validate=True)
+            # LicenseRef- prefixed identifiers are valid per the SPDX/CycloneDX spec for custom
+            # or proprietary licenses not in the SPDX catalog; exclude them before checking.
+            non_licenseref_invalid = [
+                s
+                for s in licensing_validate.invalid_symbols
+                if not str(s).lower().startswith("licenseref-")
+            ]
+            valid_license = not licensing_validate.errors or not non_licenseref_invalid
+            if not valid_license:
+                error_manager.append_full_error_message(licensing_validate)
+                return
+
+
+def validate_evidence(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
+    if component["scope"] == "required":
+        if "evidence" not in component or "occurrences" not in component["evidence"]:
+            error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
+            return
+
+    validate_location(component, third_party_libs, error_manager)
+
+
+def validate_properties(component: dict, error_manager: ErrorManager) -> None:
+    has_team_responsible_property = False or component["scope"] == "excluded"
+    script_path = ""
+    if "properties" in component:
+        for prop in component["properties"]:
+            if prop["name"] == "internal:team_responsible":
+                has_team_responsible_property = True
+            elif prop["name"] == "import_script_path":
+                script_path = prop["value"]
+    if not has_team_responsible_property:
+        error_manager.append_full_error_message(MISSING_TEAM_ERROR)
+
+    if not component.get("version"):
+        error_manager.append_full_error_message(MISSING_VERSION_IN_SBOM_COMPONENT_ERROR)
+        return
+
+    comp_version = component["version"]
+    # If the version is unknown or the script path property is absent, the version
+    # check is not possible (these are valid options and no error is generated).
+    if comp_version == "Unknown" or script_path == "":
+        return
+
+    # At this point a version is attempted to be read from the import script file
+    script_version_key = "VERSION"
+    if "properties" in component:
+        for prop in component["properties"]:
+            if prop["name"] == "internal:generate_sbom:import_script_variable_name":
+                script_version_key = prop["value"]
+
+    script_version = get_script_version(script_path, script_version_key, error_manager)
+    if script_version == "":
+        error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
+
+
+def validate_component(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
+    error_manager.update_component_attribute(component["name"])
+    if "scope" not in component:
+        error_manager.append_full_error_message("component must include a scope.")
+    else:
+        validate_evidence(component, third_party_libs, error_manager)
+    validate_properties(component, error_manager)
+    validate_license(component, error_manager)
+
+    if "purl" not in component and "cpe" not in component:
+        error_manager.append_full_error_message(MISSING_PURL_CPE_ERROR)
+    error_manager.update_component_attribute("")
+
+
+def validate_location(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
+    if "evidence" in component:
+        if "occurrences" not in component["evidence"]:
+            # validate_evidence already errors and returns before calling this function
+            # when scope is "required", so reaching here means occurrences is legitimately
+            # absent (e.g. a component whose evidence only carries silkbomb-added licenses).
+            return
+
+        occurrences = component["evidence"]["occurrences"]
+        for occurrence in occurrences:
+            if "location" in occurrence:
+                location = occurrence["location"]
+
+                if not os.path.exists(location) and not SKIP_FILE_CHECKING:
+                    # buildscripts/sbom/generate_sbom.py also warns when a component's evidence location folder does not exist.
+                    error_manager.append_full_warning_message("location does not exist in repo.")
+
+                if location.startswith(THIRD_PARTY_LOCATION_PREFIX):
+                    lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)
+                    if lib in third_party_libs:
+                        third_party_libs.remove(lib)
+
+
+def lint_sbom(
+    input_file: str, output_file: str, third_party_libs: set, should_format: bool
+) -> ErrorManager:
+    with open(input_file, "r", encoding="utf-8") as sbom_file:
+        sbom_text = sbom_file.read()
+
+    error_manager = ErrorManager(input_file)
+
+    try:
+        sbom = json.loads(sbom_text)
+    except Exception as ex:
+        error_manager.append(f"Failed to parse {input_file}: {str(ex)}")
+        return error_manager
+
+    try:
+        schema = get_schema()
+        jsonschema.validators.validator_for(schema)(
+            schema, registry=local_schema_registry()
+        ).validate(sbom)
+    except jsonschema.ValidationError as error:
+        error_manager.append(f"{SCHEMA_MATCH_FAILURE} {input_file}")
+        error_manager.append(error.message)
+        return error_manager
+
+    components = sbom["components"]
+    for component in components:
+        validate_component(component, third_party_libs, error_manager)
+
+    if third_party_libs:
+        # buildscripts/sbom/generate_sbom.py warns when src/third_party folders are not matched to any SBOM component.
+        error_manager.append_warning(UNDEFINED_THIRD_PARTY_ERROR)
+        for lib in third_party_libs:
+            error_manager.append_warning(f"    {lib}")
+
+    formatted_sbom = json.dumps(sbom, indent=2) + "\n"
+    if sbom_text not in (formatted_sbom, formatted_sbom.rstrip("\n")):
+        error_manager.append(f"{input_file} {FORMATTING_ERROR}")
+
+    if should_format:
+        with open(output_file, "w", encoding="utf-8") as sbom_file:
+            sbom_file.write(formatted_sbom)
+    return error_manager
+
+
+def load_metadata(path: str) -> dict:
+    """Load a metadata.cdx.yaml file and return a CycloneDX BOM dict.
+
+    The file is a structured CycloneDX document with ``metadata.component`` and
+    ``components`` sections at the top level. Each component (including the primary one)
+    may carry an inline ``dependsOn`` list of bom-ref strings which is hoisted into
+    the top-level ``dependencies`` section and then removed from the component entry.
+
+    Raises SystemExit on schema validation failure.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        bom = yaml.safe_load(f)
+
+    # Hoist inline dependsOn from metadata.component and each component entry
+    # into the top-level dependencies section.
+    dependencies: list[dict] = list(bom.get("dependencies", []))
+    for entry in [bom.get("metadata", {}).get("component", {})] + bom.get("components", []):
+        if "dependsOn" in entry:
+            bom_ref = entry.get("bom-ref", "")
+            dependencies.append({"ref": bom_ref, "dependsOn": entry.pop("dependsOn")})
+    if dependencies:
+        bom["dependencies"] = dependencies
+
+    # Strip non-CycloneDX extension fields before schema validation, then validate
+    # a copy so the originals remain accessible to callers (e.g. generate_sbom.py
+    # reads branchOverrides from each component during version detection).
+    validation_bom = copy.deepcopy(bom)
+    for entry in [validation_bom.get("metadata", {}).get("component", {})] + validation_bom.get(
+        "components", []
+    ):
+        entry.pop("branchOverrides", None)
+
+    try:
+        schema = get_schema()
+        jsonschema.validators.validator_for(schema)(
+            schema, registry=local_schema_registry()
+        ).validate(validation_bom)
+    except jsonschema.ValidationError as error:
+        print(f"load_metadata: {path} failed CycloneDX schema validation", file=sys.stderr)
+        print(error.message, file=sys.stderr)
+        sys.exit(1)
+
+    return bom
+
+
+def main() -> int:
+    os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--format",
+        action="store_true",
+        default=False,
+        help="Whether to apply formatting to the output file.",
+    )
+    parser.add_argument(
+        "--input-file",
+        default="sbom.private.json",
+        help="The input CycloneDX file to format and lint.",
+    )
+    parser.add_argument(
+        "--output-file",
+        default="sbom.private.json",
+        help="The file to output to when formatting is specified.",
+    )
+    parser.add_argument(
+        "--check-metadata",
+        metavar="FILE",
+        default=None,
+        help="Validate a metadata.cdx.yaml file against the CycloneDX schema and exit.",
+    )
+    args = parser.parse_args()
+
+    if args.check_metadata:
+        load_metadata(args.check_metadata)
+        print(f"{args.check_metadata}: OK")
+        return 0
+
+    should_format = args.format
+    input_file = args.input_file
+    output_file = args.output_file
+    third_party_libs = set(
+        [
+            path
+            for path in os.listdir(THIRD_PARTY_DIR)
+            if not os.path.isfile(os.path.join(THIRD_PARTY_DIR, path))
+        ]
+    )
+    # the only files in this dir that are not third party libs
+    third_party_libs.discard("scripts")
+    # the only files in the sasl dir are BUILD files to setup the sasl library in Windows
+    third_party_libs.discard("sasl")
+    # This is not a real third party, its just the local ssl pretending to be boringssl
+    third_party_libs.discard("boringssl_replacement")
+    # This is just a build file that gets inserted into a third party
+    third_party_libs.discard("wasmtime")
+    # Nothing in this directory is included in Community/EA
+    third_party_libs.discard("private")
+    error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)
+    error_manager.print_errors()
+
+    return 0 if error_manager.zero_error() else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

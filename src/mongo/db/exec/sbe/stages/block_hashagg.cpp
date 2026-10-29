@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 
@@ -180,6 +154,7 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
 }
 
 void BlockHashAggStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     value::SlotSet dupCheck;
@@ -334,14 +309,14 @@ void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::Materializ
         // Run accumulator initializers if needed.
         for (size_t i = 0; i < _initCodes.size(); ++i) {
             if (_initCodes[i]) {
-                _rowAggHtAccessors[i]->reset(_bytecode.run(_initCodes[i].get()));
+                _rowAggHtAccessors[i]->reset(_bytecode->run(_initCodes[i].get()));
             }
         }
     }
 
     // Run the block level accumulators.
     for (size_t i = 0; i < _blockAggCodes.size(); ++i) {
-        _rowAggHtAccessors[i]->reset(_bytecode.run(_blockAggCodes[i].get()));
+        _rowAggHtAccessors[i]->reset(_bytecode->run(_blockAggCodes[i].get()));
     }
 }
 
@@ -368,7 +343,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 
         for (size_t i = 0; i < extractedGbs.size(); ++i) {
             auto [idTag, idVal] = extractedGbs[i][blockIndex];
-            key->reset(i, false, idTag, idVal);
+            key->reset(i, value::TagValueView{idTag, idVal});
         }
 
         // Set '_htIt' to point to the entry for 'key' in '_ht'.
@@ -387,7 +362,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
             // Run accumulator initializers if needed.
             for (size_t i = 0; i < _initCodes.size(); ++i) {
                 if (_initCodes[i]) {
-                    _rowAggHtAccessors[i]->reset(_bytecode.run(_initCodes[i].get()));
+                    _rowAggHtAccessors[i]->reset(_bytecode->run(_initCodes[i].get()));
                 }
             }
         }
@@ -400,7 +375,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 
         // Run each row level accumulator.
         for (size_t i = 0; i < _aggCodes.size(); ++i) {
-            _rowAggHtAccessors[i]->reset(_bytecode.run(_aggCodes[i].get()));
+            _rowAggHtAccessors[i]->reset(_bytecode->run(_aggCodes[i].get()));
         }
     }
 }
@@ -569,7 +544,7 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
         // Go over each mono block and produce the output manually.
         size_t idx = 0;
         for (auto* mb : monoGbBlocks) {
-            key.reset(idx++, false, mb->getTag(), mb->getValue());
+            key.reset(idx++, value::TagValueView{mb->getTag(), mb->getValue()});
         }
 
         out.keys.push_back(std::move(key));
@@ -626,13 +601,14 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
                 for (size_t keyIdx = 0; keyIdx < _gbBlocks.size(); ++keyIdx) {
                     if (isMonoBlock[keyIdx]) {
                         auto* monoBlock = monoGbBlocks[monoBlockIdx];
-                        key.reset(keyIdx, false, monoBlock->getTag(), monoBlock->getValue());
+                        key.reset(keyIdx,
+                                  value::TagValueView{monoBlock->getTag(), monoBlock->getValue()});
                         ++monoBlockIdx;
                     } else {
                         const size_t originalTokenId = _tokenInfos[nonMonoBlockIdx].idxs[i];
                         dassert(originalTokenId < _deblockedTokens[nonMonoBlockIdx].count());
                         auto [t, v] = _deblockedTokens[nonMonoBlockIdx][originalTokenId];
-                        key.reset(keyIdx, false, t, v);
+                        key.reset(keyIdx, value::TagValueView{t, v});
                         ++nonMonoBlockIdx;
                     }
                 }
@@ -762,6 +738,19 @@ void BlockHashAggStage::open(bool reOpen) {
     _htIt = _ht->end();
 }
 
+std::pair<int64_t, int64_t> BlockHashAggStage::spillImpl(SpillingStore* recordStore) {
+    int64_t spilledBytes = 0;
+    int64_t spilledRecords = 0;
+
+    // Spill only the records that have not been already consumed.
+    for (; _htIt != _ht->end(); ++_htIt) {
+        spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
+        spilledRecords++;
+    }
+
+    return {spilledBytes, spilledRecords};
+}
+
 bool BlockHashAggStage::getNextSpilledHelper() {
     auto recoverSpilledRecord = [&](const Record& record, BufBuilder& keyBuffer) {
         return deserializeSpilledRecord(record, _groupSlots.size(), keyBuffer);
@@ -801,7 +790,7 @@ bool BlockHashAggStage::getNextSpilledHelper() {
         // Merge in the new partial aggregate values.
         _spilledAggRow = std::move(recoveredRow.second);
         for (size_t idx = 0; idx < _mergingExprCodes.size(); ++idx) {
-            _rowAggRSAccessors[idx]->reset(_bytecode.run(_mergingExprCodes[idx].get()));
+            _rowAggRSAccessors[idx]->reset(_bytecode->run(_mergingExprCodes[idx].get()));
         }
     }
 
@@ -1128,12 +1117,12 @@ size_t BlockHashAggStage::estimateCompileTimeSize() const {
 }
 
 void BlockHashAggStage::populateBitmapSlot(size_t n) {
-    _blockBitsetOutAccessor.reset(
-        value::TagValueOwned{value::TypeTags::valueBlock,
-                             value::bitcastFrom<value::ValueBlock*>(
-                                 std::make_unique<value::MonoBlock>(
-                                     n, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
-                                     .release())});
+    _blockBitsetOutAccessor.reset(value::TagValueOwned::fromRaw(
+        value::TypeTags::valueBlock,
+        value::bitcastFrom<value::ValueBlock*>(
+            std::make_unique<value::MonoBlock>(
+                n, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
+                .release())));
 }
 
 value::ValueBlock* BlockHashAggStage::makeMonoBlock(value::TypeTags tag, value::Value val) {

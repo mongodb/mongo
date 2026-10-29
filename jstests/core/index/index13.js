@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   requires_fastcount,
 //   requires_non_retryable_writes,
 //   requires_getmore,

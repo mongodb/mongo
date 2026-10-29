@@ -4,12 +4,6 @@
 [jsTest] See README.plan_stability.md for more information.
 [jsTest] ----
 
-
-
-[jsTest] ----
-[jsTest] Found python 3.13 by default. Likely this is because we are using a virtual environment.
-[jsTest] ----
-
 {">>>pipelines":[
 {">>>pipeline": [{"$match":{"$nor":[{"field18_bool_idx":{"$eq":true},"field7_str_idx":{"$eq":"w"}},{"field47_Timestamp":{"$gte":{"$timestamp":{"t":1713770379,"i":0}}},"field42_mixed":{"$gte":true},"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"2.6"}}}],"$and":[{"$or":[{"$or":[{"field26_int_idx":{"$eq":1369},"field10_datetime_idx":{"$eq":"2025-03-20T00:00:00.000Z"},"field43_str":{"$gte":"n"}},{"field23_dict_idx":{"$eq":{"d":2,"b":1}},"field19_datetime_idx":{"$gte":"2024-02-20T00:00:00.000Z"}}]},{"field5_dict_idx":{"$eq":{"b":15}},"field0_bool_idx":{"$lt":true}},{"field46_datetime":{"$type":"date"},"field5_dict_idx":{"$gte":{"b":2}}}]},{"field27_bool_idx":{"$lte":false},"field44_int":{"$gt":33}}],"$or":[{"$and":[{"$or":[{"field30_Decimal128_idx":{"$lte":{"$numberDecimal":"100.3"}},"field22_list_idx":{"$nin":[5]},"field4_list_idx":{"$ne":"f"}},{"field21_Decimal128_idx":{"$lte":{"$numberDecimal":"7.2"}},"field40_list":[],"field14_dict_idx":{"$eq":{"i":1,"b":4}},"field19_datetime_idx":{"$exists":true}},{"field12_Decimal128_idx":{"$lte":{"$numberDecimal":"5.4"}},"field4_list_idx":{"$elemMatch":{"$lt":26,"$size":15,"$ne":"e"}},"field31_list_idx":{"$elemMatch":{"$lte":74,"$size":11}}}]},{"field26_int_idx":{"$lte":3581},"field44_int":{"$gte":84},"field27_bool_idx":{"$eq":false}},{"$or":[{"field32_dict_idx":{"$lte":{"b":2,"h":1}},"field6_mixed_idx":{"$ne":39688}},{"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"1.1"}},"field40_list":{"$lte":"q"},"field15_mixed_idx":{"$lte":"2024-02-03T00:00:00.000Z"},"field43_str":{"$gte":"r"},"field14_dict_idx":{"$eq":{"t":1}}},{"field36_bool":{"$type":"bool"},"field6_mixed_idx":{"$eq":10161},"field44_int":{"$ne":56}},{"field19_datetime_idx":{"$eq":"2024-01-26T00:00:00.000Z"},"field0_bool_idx":{"$lt":true}},{"field7_str_idx":{"$regex":{"$regex":"^XKQ","$options":""}},"field6_mixed_idx":{"$regex":{"$regex":"^e","$options":""}}}]}]},{"field24_mixed_idx":{"$in":[]}}]}},{"$project":{"field24_mixed_idx":1}}],
     "error": "encountered interval which is unestimatable: [MaxKey, CollationKey(0x66))"},

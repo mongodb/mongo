@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -46,7 +20,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 class CollatorInterface;
 
 struct OpCounters;
@@ -57,7 +31,7 @@ namespace repl {
  * Caches per-collection properties which are relevant for oplog application, so that they don't
  * have to be retrieved repeatedly for each op.
  */
-class MONGO_MOD_PRIVATE CachedCollectionProperties {
+class [[MONGO_MOD_PRIVATE]] CachedCollectionProperties {
 public:
     struct CollectionProperties {
         bool isCapped = false;
@@ -75,7 +49,7 @@ private:
 /**
  * This class contains some static methods common to ordinary oplog application.
  */
-class MONGO_MOD_PARENT_PRIVATE OplogApplierUtils {
+class [[MONGO_MOD_PARENT_PRIVATE]] OplogApplierUtils {
 public:
     /*
      * Returns the hash of the oplog entry based on the namespace string (and document
@@ -108,6 +82,31 @@ public:
      * ]                                         ]
      */
     static void stableSortByNamespace(std::vector<ApplierOperation>& ops);
+
+    /**
+     * Rewrites, in place and preserving relative order, every container op in 'ops' that packs
+     * multiple keys into the equivalent sequence of single-key container ops. Ops that are not
+     * multi-key container ops are left untouched.
+     *
+     * Writer thread assignment for a container op hashes the container ident together with the key,
+     * so that all ops touching a key are applied by the same thread in oplog order. A packed entry
+     * hashes as a single unit, which does not agree with the hash of any other entry touching the
+     * same keys, so packed entries must be expanded before they are distributed.
+     */
+    static void expandBatchedContainerOps(std::vector<OplogEntry>& ops);
+
+    /**
+     * Returns the single-key container ops equivalent to 'op', or boost::none if 'op' is not a
+     * container op that packs multiple keys.
+     *
+     * Note that boost::none and an empty vector mean different things, and callers must treat them
+     * differently: boost::none means 'op' was not packed and should be applied as it is, while an
+     * empty vector means 'op' was packed but has no keys to write (its key is an empty array) and
+     * should be dropped. Applying such an entry as it is would trip the assertion in writer thread
+     * assignment, since it is a packed entry.
+     */
+    [[nodiscard]] static boost::optional<std::vector<OplogEntry>> expandBatchedContainerOp(
+        const OplogEntry& op);
 
     /**
      * Adds a single oplog entry to the appropriate writer vector. Returns the index of the
@@ -257,4 +256,4 @@ public:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

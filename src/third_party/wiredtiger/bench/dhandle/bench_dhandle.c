@@ -221,7 +221,7 @@ bench_dhandle(SHARED *shared)
     char *home = shared->opts.home;
 
     testutil_recreate_dir(home);
-    testutil_wiredtiger_open(&shared->opts, home, conn_config, NULL, &shared->conn, false, true);
+    testutil_wiredtiger_open(&shared->opts, home, conn_config, NULL, &shared->conn, false);
 
     bench_dhandle_run(shared);
 

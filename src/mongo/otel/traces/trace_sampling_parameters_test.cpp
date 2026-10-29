@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -34,11 +8,14 @@
 #include "mongo/otel/traces/trace_sampling_parameters_gen.h"
 #include "mongo/unittest/unittest.h"
 
+#include <string_view>
+
 #include <boost/optional.hpp>
 #include <gmock/gmock.h>
 
 namespace mongo::otel::traces {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using mongo::unittest::match::StatusIsOK;
 using ::testing::AllOf;
@@ -97,7 +74,7 @@ TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentSamplerState) {
     ASSERT_OK(setDefaultFactor(0.75));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.75);
 }
@@ -107,7 +84,7 @@ TEST_F(TraceSamplingParametersTest, AppendAfterMultipleSetsReflectsLastValue) {
     ASSERT_OK(setDefaultFactor(0.9));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(bob.obj()), 0.9);
     EXPECT_DOUBLE_EQ(TracingSampler::get().getConfig().defaultSpans.factor, 0.9);
@@ -154,7 +131,7 @@ TEST_F(TraceSamplingParametersTest, AppendReflectsCurrentRateLimit) {
     ASSERT_OK(setRateLimit(3.0, 7));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
     auto result = bob.obj();
 
     EXPECT_DOUBLE_EQ(readRefillRate(result), 3.0);
@@ -227,7 +204,7 @@ TEST_F(TraceSamplingParametersTest, AppendRoundTripsSamples) {
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
     auto result = bob.obj();
 
     EXPECT_DOUBLE_EQ(readDefaultFactor(result), 0.3);
@@ -319,7 +296,7 @@ TEST_F(TraceSamplingParametersTest, AppendRoundTripsPerSpanRateLimits) {
     ASSERT_OK(param.set(storage.firstElement(), /*tenantId=*/boost::none));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryTracingSampling"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryTracingSampling"sv, /*tenantId=*/boost::none);
     auto result = bob.obj();
 
     auto samples = result["openTelemetryTracingSampling"]["samples"].Array();
@@ -375,7 +352,7 @@ TEST_F(TraceExternalTracingParametersTest, AppendReflectsCurrentState) {
     ASSERT_OK(setRateLimit(3.0, 7));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryExternalTracing"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
 
     EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(3.0, 7));
 }
@@ -385,7 +362,7 @@ TEST_F(TraceExternalTracingParametersTest, AppendAfterMultipleSetsReflectsLastVa
     ASSERT_OK(setRateLimit(4.0, 15));
 
     BSONObjBuilder bob;
-    param.append(nullptr, &bob, "openTelemetryExternalTracing"_sd, /*tenantId=*/boost::none);
+    param.append(nullptr, &bob, "openTelemetryExternalTracing"sv, /*tenantId=*/boost::none);
 
     EXPECT_THAT(readExternalRateLimit(bob.obj()), FieldsAre(4.0, 15));
 }

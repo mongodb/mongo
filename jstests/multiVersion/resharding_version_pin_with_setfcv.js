@@ -27,6 +27,45 @@ let otherReshardingPauseFPNames = [
     "reshardingPauseBeforeTellingParticipantsToCommit",
 ];
 
+function assertReshardingFCVConsistency(st, configPrimary, expectedFCVStr) {
+    const coordOps = configPrimary
+        .getDB("admin")
+        .aggregate([
+            {$currentOp: {allUsers: true, localOps: true}},
+            {$match: {desc: {$regex: "ReshardingMetricsCoordinatorService"}}},
+        ])
+        .toArray();
+    coordOps.forEach((op) => {
+        assert.eq(op.versionContext.OFCV, expectedFCVStr, {
+            msg: "coordinator versionContext mismatch",
+            op,
+        });
+    });
+
+    [st.shard0, st.shard1].forEach((shard) => {
+        const participantOps = shard.rs
+            .getPrimary()
+            .getDB("admin")
+            .aggregate([
+                {$currentOp: {allUsers: true, localOps: true}},
+                {
+                    $match: {
+                        desc: {
+                            $regex: "ReshardingMetricsRecipientService|ReshardingMetricsDonorService",
+                        },
+                    },
+                },
+            ])
+            .toArray();
+        participantOps.forEach((op) => {
+            assert.eq(op.versionContext.OFCV, expectedFCVStr, {
+                msg: "participant versionContext mismatch",
+                op,
+            });
+        });
+    });
+}
+
 function testReshardingWithFCV(st, sourceNs, startingFCVStr, targetFCVStr, reshardingPauseFPName) {
     jsTest.log(`Testing resharding with FCV change from ${startingFCVStr} to ${targetFCVStr} while\
          paused at ${reshardingPauseFPName}`);
@@ -85,45 +124,57 @@ function testReshardingWithFCV(st, sourceNs, startingFCVStr, targetFCVStr, resha
         ],
     );
 
-    // Note: It is not possible to start a new resharding while fcv is upgrading/downgrading.
-    // We also create the FixedVersionContext inside the FixedFCVRegion. This means that it is
-    // not possible for FixedVersionContext to have upgrading/downgrading fcv versions.
-    reshardingThread.start();
+    let fcvHangFp;
+    let awaitSetFCV;
+    try {
+        // Note: It is not possible to start a new resharding while fcv is upgrading/downgrading.
+        // We also create the FixedVersionContext inside the FixedFCVRegion. This means that it is
+        // not possible for FixedVersionContext to have upgrading/downgrading fcv versions.
+        reshardingThread.start();
 
-    pauseReshardingFp.wait();
+        pauseReshardingFp.wait();
 
-    // Hang the FCV change right after the FCV document is written to the kDowngrading
-    // transitional state, before abortAllReshardCollection is called.
-    const fcvHangFp = configureFailPoint(configPrimary, "hangAfterConfigServerChangedFCV");
+        assertReshardingFCVConsistency(st, configPrimary, startingFCVStr);
 
-    const awaitSetFCV = startParallelShell(
-        funWithArgs(function (version) {
-            assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}),
-            );
-        }, targetFCVStr),
-        mongos.port,
-    );
+        // Hang the FCV change right after the FCV document is written to the kDowngrading
+        // transitional state, before abortAllReshardCollection is called.
+        fcvHangFp = configureFailPoint(configPrimary, "hangAfterConfigServerChangedFCV");
 
-    jsTest.log("Waiting for FCV failpoint to get hit");
+        awaitSetFCV = startParallelShell(
+            funWithArgs(function (version) {
+                assert.commandWorked(
+                    db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}),
+                );
+            }, targetFCVStr),
+            mongos.port,
+        );
 
-    // Wait until the FCV change has entered the hang in order to ensure that setFCV is about
-    // ready to abort resharding. However, it is still possible for resharding to complete before
-    // the abort is executed, but this is alright since the main point of this test is to ensure that
-    // resharding does not get stuck.
-    fcvHangFp.wait();
+        jsTest.log("Waiting for FCV failpoint to get hit");
 
-    jsTest.log(
-        "Finished waiting for FCV failpoint to get hit, " +
-            "now unblocking it to allow FCV to abort resharding",
-    );
+        // Wait until the FCV change has entered the hang in order to ensure that setFCV is about
+        // ready to abort resharding. However, it is still possible for resharding to complete before
+        // the abort is executed, but this is alright since the main point of this test is to ensure
+        // that resharding does not get stuck.
+        fcvHangFp.wait();
 
-    fcvHangFp.off();
-
-    pauseReshardingFp.off();
-    reshardingThread.join();
-
-    awaitSetFCV();
+        jsTest.log(
+            "Finished waiting for FCV failpoint to get hit, " +
+                "now unblocking it to allow FCV to abort resharding",
+        );
+    } finally {
+        // Always release the failpoints and join the background operations, even if an assertion
+        // above threw. Otherwise a failed assertion would leave the resharding operation paused at
+        // reshardingPauseFPName and the reshardingThread/setFCV shell blocked, which would cause
+        // the test to hang, and not report any failures.
+        if (fcvHangFp) {
+            fcvHangFp.off();
+        }
+        pauseReshardingFp.off();
+        reshardingThread.join();
+        if (awaitSetFCV) {
+            awaitSetFCV();
+        }
+    }
 
     assert(sourceCollection.drop());
 }
@@ -179,4 +230,18 @@ describe("resharding is pinned to version while FCV is in transitional state", f
             testReshardingWithFCV(st, nextTestNS(), lastLTSFCV, latestFCV, fpName);
         });
     });
+
+    if (lastContinuousFCV !== lastLTSFCV) {
+        reshardingFpNamesToTest.forEach((fpName) => {
+            it(`participants agree with coordinator on FCV upgrading from lastContinuous, ${fpName}`, function () {
+                testReshardingWithFCV(st, nextTestNS(), lastContinuousFCV, latestFCV, fpName);
+            });
+        });
+
+        reshardingFpNamesToTest.forEach((fpName) => {
+            it(`participants agree with coordinator on FCV downgrading to lastContinuous, ${fpName}`, function () {
+                testReshardingWithFCV(st, nextTestNS(), latestFCV, lastContinuousFCV, fpName);
+            });
+        });
+    }
 });

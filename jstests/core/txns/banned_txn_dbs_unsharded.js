@@ -45,11 +45,9 @@ function runTest(sessionDB) {
     );
 }
 
-if (!TestData.testingReplicaSetEndpoint) {
-    // This test drops a collection the config database, which is not allowed via a router on a
-    // sharded cluster.
-    runTest(session.getDatabase("config"));
-}
+// This test drops a collection in the config database, which is not allowed via a router on a
+// sharded cluster.
+runTest(session.getDatabase("config"));
 
 if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalCollections", true)) {
     runTest(session.getDatabase("local"));

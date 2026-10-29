@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/update/storage_validation.h"
 
@@ -147,7 +121,7 @@ void scanDocument(const mutablebson::Document& doc,
                 // We need to recursively validate the _id field while ensuring we disallow
                 // top-level $-prefix fields in the _id object.
                 scanDocument(currElem,
-                             true /* deep */,
+                             /*deep=*/true,
                              0 /* recursionLevel - forces _id fields to be treated as top-level. */,
                              false /* Top-level _id fields cannot be $-prefixed. */,
                              shouldValidate,
@@ -223,7 +197,7 @@ void scanDocument(mutablebson::ConstElement elem,
         BSONElement bsonElem = elem.getValue();
         if (bsonElem.binDataType() == BinDataType::Column) {
             int len = 0;
-            const char* buf = bsonElem.binData(len /*out*/);
+            const char* buf = bsonElem.binData(len);
             auto status = validateBSONColumn(buf, len);
             if (!status.isOK()) {
                 uasserted(ErrorCodes::InvalidBSONColumn,

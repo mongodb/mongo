@@ -3,6 +3,7 @@
  * disabled to check that we prune correctly and do not remove potentially useful plans.
  *
  * @tags: [
+ * uses_explain,
  * # Expected plan structure changes in these cases.
  * assumes_against_mongod_not_mongos,
  * does_not_support_stepdowns,

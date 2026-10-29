@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/commands/strategy.h"
 
@@ -88,6 +62,7 @@
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
@@ -185,6 +160,9 @@ void invokeInTransactionRouter(TransactionRouter::Router& txnRouter,
 
     try {
         runCommandInvocation(rec, invocation);
+        // Surface any abort latched by this command's own cursor-cleanup drains (killCursors, or a
+        // getMore's cursor check-in);
+        txnRouter.raiseDeferredAbortIfNeeded();
     } catch (const DBException& ex) {
         auto status = ex.toStatus();
 
@@ -470,9 +448,9 @@ void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
                                       command->getName(),
                                       status.code(),
                                       boost::none,
-                                      false /* isInternalClient */,
-                                      true /* isMongos */,
-                                      false /* isComingFromRouter */,
+                                      /*isInternalClient=*/false,
+                                      /*isMongos=*/true,
+                                      /*isComingFromRouter=*/false,
                                       repl::OpTime{},
                                       repl::OpTime{});
     _errorBuilder->appendElements(errorLabels);
@@ -495,6 +473,18 @@ void ParseAndRunCommand::_parseCommand() {
     }
 
     _rec->setCommand(command);
+    auto& telemetryCtx = _rec->getTelemetryContext();
+    _rec->setOtelSpan(otel::traces::Span::startIngressSpan(
+        telemetryCtx,
+        command->getTraceSpanName(),
+        /*options=*/
+        {.kind = _rec->hasMoreToComeFlag() ? otel::traces::SpanKind::kConsumer
+                                           : otel::traces::SpanKind::kServer}));
+    // Keep the OpCtx decoration in sync so later Span::start(opCtx, ...) calls see the same
+    // context. Skip when null so the common no-tracing path never touches the decoration.
+    if (telemetryCtx) {
+        otel::TelemetryContextHolder::getDecoration(opCtx).setTelemetryContext(telemetryCtx);
+    }
 
     _isHello.emplace(command->getName() == "hello"sv || command->getName() == "isMaster"sv);
 
@@ -521,14 +511,6 @@ void ParseAndRunCommand::_parseCommand() {
     if (auto& commentField = _invocation->getGenericArguments().getComment()) {
         std::lock_guard<Client> lk(*client);
         opCtx->setComment(commentField->getElement().wrap());
-    }
-
-    if (auto& traceCtx = _invocation->getGenericArguments().getTraceCtx()) {
-        auto telemetryCtx = otel::traces::TelemetryContextSerializer::fromBSON(*traceCtx);
-        if (telemetryCtx) {
-            auto& telemetryCtxHolder = otel::TelemetryContextHolder::getDecoration(opCtx);
-            telemetryCtxHolder.setTelemetryContext(telemetryCtx);
-        }
     }
 
     auto apiParams = parseAndValidateAPIParameters(*_invocation);
@@ -621,14 +603,7 @@ void ParseAndRunCommand::RunInvocation::_maybeWaitForAdmission() {
 
     // Deferred admission must run after maxTimeMS is applied to the opCtx so that queued requests
     // respect the deadline.
-    // NOTE: All cluster commands are subject to admission control at this time.
-    const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
-    // TODO(SERVER-125863): Integrate whether the cluster command is subject to admission control
-    // here once we audit the list.
-    const bool exemptFromIngressRateLimit =
-        isProcessInternalCommand || !admission::gIngressRequestRateLimiterEnabled.load();
-    uassertStatusOK(
-        admission::IngressRequestRateLimiter::waitForAdmission(opCtx, exemptFromIngressRateLimit));
+    uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(opCtx));
 }
 
 bool isInternalClient(OperationContext* opCtx) {
@@ -1127,11 +1102,6 @@ void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status
 }
 
 void ParseAndRunCommand::RunAndRetry::run() {
-    // We do not want to create a span for every incoming command, we only want a span when
-    // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
-    // Span::start.
-    auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
-        _parc->_rec->getOpCtx(), _parc->_rec->getCommand()->getTraceSpanName());
     do {
         try {
             // Try gMaxNumStaleVersionRetries times. On the last try, exceptions are
@@ -1239,6 +1209,13 @@ void ClientCommand::_parseMessage() try {
         checkAllowedOpQueryCommand(*(_rec->getOpCtx()->getClient()), opMsgReq.getCommandName());
     }
     _rec->setRequest(opMsgReq);
+
+    // Check for the presence of a telemetry context in the request first as that is much cheaper
+    // than checking if tracing is enabled.
+    if (_rec->getRequest().telemetryContext && otel::traces::isTracingEnabled(_rec->getOpCtx())) {
+        _rec->setTelemetryContext(otel::traces::TelemetryContextSerializer::fromSection(
+            _rec->getRequest().telemetryContext));
+    }
 } catch (const DBException& ex) {
     // If this error needs to fail the connection, propagate it out.
     if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
@@ -1348,7 +1325,7 @@ DbResponse ClientCommand::_produceResponse() {
     const auto& m = _rec->getMessage();
     auto reply = _rec->getReplyBuilder();
 
-    if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
+    if (_rec->hasMoreToComeFlag()) {
         return {};  // Don't reply.
     }
 

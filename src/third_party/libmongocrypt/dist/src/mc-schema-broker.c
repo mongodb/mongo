@@ -323,7 +323,11 @@ bool mc_schema_broker_satisfy_from_collinfo(mc_schema_broker_t *sb,
             CLIENT_ERR("failed to find 'name' in collinfo in database: %s", sb->db);
             return false;
         }
-        coll = bson_iter_utf8(&name_iter, NULL);
+        uint32_t coll_len;
+        coll = bson_iter_utf8(&name_iter, &coll_len);
+        if (!_mongocrypt_check_no_embedded_nul(coll, coll_len, "collection name in collinfo", status)) {
+            return false;
+        }
     }
 
     // Cache the received collinfo.
@@ -508,7 +512,11 @@ bool mc_schema_broker_satisfy_from_create_or_collMod(mc_schema_broker_t *sb,
         CLIENT_ERR("Failed to get collection name from command");
         return false;
     }
-    const char *coll = bson_iter_utf8(&iter, NULL);
+    uint32_t coll_len;
+    const char *coll = bson_iter_utf8(&iter, &coll_len);
+    if (!_mongocrypt_check_no_embedded_nul(coll, coll_len, "collection name", status)) {
+        return false;
+    }
 
     // Check if schema was requested.
     mc_schema_entry_t *found = NULL;

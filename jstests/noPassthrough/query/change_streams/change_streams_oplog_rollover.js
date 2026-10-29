@@ -19,7 +19,8 @@ const rst = new ReplSetTest({nodes: 1, oplogSize: oplogSize});
 rst.startSet({oplogSize: 1, oplogMinRetentionHours: 0.000001});
 rst.initiate();
 
-// This test relies on size-based oplog truncation, which may be disabled in disagg.
+// This test relies on marker-based oplog truncation, which may be disabled in disagg.
+// TODO(SERVER-125068) remove this once this feature flag is deleted
 skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 const testDB = rst.getPrimary().getDB(jsTestName());
@@ -33,7 +34,6 @@ assert.commandWorked(testColl.insert({_id: 1}, {writeConcern: {w: "majority"}}))
 let changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {}}],
     collection: testColl.getName(),
-    includeToken: true,
 });
 
 // We awaited the replication of the insert, so the change stream shouldn't return them.

@@ -1,5 +1,6 @@
 // Tests the behavior of $mod for match expressions.
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   # Uses $where operator
 //   requires_scripting,

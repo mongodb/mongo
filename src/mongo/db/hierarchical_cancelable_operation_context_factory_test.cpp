@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 
@@ -81,11 +55,12 @@ TEST_F(HierarchicalCancelableOperationContextTest, KilledWhenCancellationSourceI
         serviceCtx->getService()->makeClient("HierarchicalCancelableOperationContextTest");
 
     CancellationSource cancelSource;
-    HierarchicalCancelableOperationContextFactory factory(cancelSource.token(), executor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
 
-    ASSERT_EQ(factory.getHierarchyDepth(), 0);
+    ASSERT_EQ(factory->getHierarchyDepth(), 0);
 
-    auto opCtx = factory.makeOperationContext(client.get());
+    auto opCtx = factory->makeOperationContext(client.get());
     ASSERT_OK(opCtx->checkForInterruptNoAssert());
 
     cancelSource.cancel();
@@ -100,10 +75,11 @@ TEST_F(HierarchicalCancelableOperationContextTest,
         serviceCtx->getService()->makeClient("HierarchicalCancelableOperationContextTest");
 
     CancellationSource cancelSource;
-    HierarchicalCancelableOperationContextFactory factory(cancelSource.token(), executor());
-    ASSERT_EQ(factory.getHierarchyDepth(), 0);
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+    ASSERT_EQ(factory->getHierarchyDepth(), 0);
 
-    auto childFactory = factory.createChild();
+    auto childFactory = factory->createChild();
 
     ASSERT_EQ(childFactory->getHierarchyDepth(), 1);
 
@@ -125,8 +101,9 @@ TEST_F(HierarchicalCancelableOperationContextTest,
     CancellationSource cancelSource;
     cancelSource.cancel();
 
-    HierarchicalCancelableOperationContextFactory factory(cancelSource.token(), executor());
-    auto opCtx = factory.makeOperationContext(client.get());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+    auto opCtx = factory->makeOperationContext(client.get());
 
     ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
 }
@@ -141,10 +118,11 @@ TEST_F(HierarchicalCancelableOperationContextTest,
     CancellationSource cancelSource;
     cancelSource.cancel();
 
-    HierarchicalCancelableOperationContextFactory factory(cancelSource.token(), executor());
-    ASSERT_EQ(factory.getHierarchyDepth(), 0);
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+    ASSERT_EQ(factory->getHierarchyDepth(), 0);
 
-    auto childFactory = factory.createChild();
+    auto childFactory = factory->createChild();
     ASSERT_EQ(childFactory->getHierarchyDepth(), 1);
 
     auto opCtx = childFactory->makeOperationContext(client.get());
@@ -155,10 +133,11 @@ TEST_F(HierarchicalCancelableOperationContextTest,
 TEST_F(HierarchicalCancelableOperationContextTest, HierarchyDepthTracking) {
     CancellationSource cancelSource;
 
-    HierarchicalCancelableOperationContextFactory root(cancelSource.token(), executor());
-    ASSERT_EQ(root.getHierarchyDepth(), 0);
+    auto root = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+    ASSERT_EQ(root->getHierarchyDepth(), 0);
 
-    auto child = root.createChild();
+    auto child = root->createChild();
     ASSERT_EQ(child->getHierarchyDepth(), 1);
 
     auto grandchild = child->createChild();
@@ -167,7 +146,7 @@ TEST_F(HierarchicalCancelableOperationContextTest, HierarchyDepthTracking) {
     auto greatGrandchild = grandchild->createChild();
     ASSERT_EQ(greatGrandchild->getHierarchyDepth(), 3);
 
-    ASSERT_EQ(root.getHierarchyDepth(), 0);
+    ASSERT_EQ(root->getHierarchyDepth(), 0);
 }
 
 TEST_F(HierarchicalCancelableOperationContextTest, DeepHierarchyCancellationPropagation) {
@@ -176,9 +155,10 @@ TEST_F(HierarchicalCancelableOperationContextTest, DeepHierarchyCancellationProp
         serviceCtx->getService()->makeClient("HierarchicalCancelableOperationContextTest");
 
     CancellationSource cancelSource;
-    HierarchicalCancelableOperationContextFactory root(cancelSource.token(), executor());
+    auto root = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
 
-    auto level1 = root.createChild();
+    auto level1 = root->createChild();
     ASSERT_EQ(level1->getHierarchyDepth(), 1);
 
     auto level2 = level1->createChild();
@@ -206,15 +186,16 @@ TEST_F(HierarchicalCancelableOperationContextTest, ThreeLevelHierarchyCancellati
     auto client3 = serviceCtx->getService()->makeClient("client3");
 
     CancellationSource cancelSource;
-    HierarchicalCancelableOperationContextFactory root(cancelSource.token(), executor());
+    auto root = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
 
-    auto child = root.createChild();
+    auto child = root->createChild();
     ASSERT_EQ(child->getHierarchyDepth(), 1);
 
     auto grandchild = child->createChild();
     ASSERT_EQ(grandchild->getHierarchyDepth(), 2);
 
-    auto rootOpCtx = root.makeOperationContext(client1.get());
+    auto rootOpCtx = root->makeOperationContext(client1.get());
     auto childOpCtx = child->makeOperationContext(client2.get());
     auto grandchildOpCtx = grandchild->makeOperationContext(client3.get());
 
@@ -237,11 +218,12 @@ TEST_F(HierarchicalCancelableOperationContextTest, MultipleOperationContextsFrom
     auto client3 = serviceCtx->getService()->makeClient("client3");
 
     CancellationSource cancelSource;
-    HierarchicalCancelableOperationContextFactory factory(cancelSource.token(), executor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
 
-    auto opCtx1 = factory.makeOperationContext(client1.get());
-    auto opCtx2 = factory.makeOperationContext(client2.get());
-    auto opCtx3 = factory.makeOperationContext(client3.get());
+    auto opCtx1 = factory->makeOperationContext(client1.get());
+    auto opCtx2 = factory->makeOperationContext(client2.get());
+    auto opCtx3 = factory->makeOperationContext(client3.get());
 
     ASSERT_OK(opCtx1->checkForInterruptNoAssert());
     ASSERT_OK(opCtx2->checkForInterruptNoAssert());
@@ -263,11 +245,13 @@ TEST_F(HierarchicalCancelableOperationContextTest, ChildFactoriesFromDifferentPa
     CancellationSource cancelSource1;
     CancellationSource cancelSource2;
 
-    HierarchicalCancelableOperationContextFactory factory1(cancelSource1.token(), executor());
-    HierarchicalCancelableOperationContextFactory factory2(cancelSource2.token(), executor());
+    auto factory1 = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource1.token(), executor());
+    auto factory2 = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource2.token(), executor());
 
-    auto child1 = factory1.createChild();
-    auto child2 = factory2.createChild();
+    auto child1 = factory1->createChild();
+    auto child2 = factory2->createChild();
 
     auto opCtx1 = child1->makeOperationContext(client1.get());
     auto opCtx2 = child2->makeOperationContext(client2.get());
@@ -285,6 +269,81 @@ TEST_F(HierarchicalCancelableOperationContextTest, ChildFactoriesFromDifferentPa
     waitForAllEarlierTasksToComplete();
 
     ASSERT_EQ(opCtx2->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
+}
+
+TEST_F(HierarchicalCancelableOperationContextTest, ChildOutlivingReleasedCreatorIsStillCancelable) {
+    auto serviceCtx = ServiceContext::make();
+    auto client =
+        serviceCtx->getService()->makeClient("HierarchicalCancelableOperationContextTest");
+
+    CancellationSource cancelSource;
+    auto root = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+
+    auto child = root->createChild();
+    root.reset();
+
+    ASSERT_TRUE(child->token().isCancelable());
+
+    auto opCtx = child->makeOperationContext(client.get());
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    cancelSource.cancel();
+    waitForAllEarlierTasksToComplete();
+    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
+}
+
+TEST_F(HierarchicalCancelableOperationContextTest,
+       GrandchildOutlivingReleasedAncestorsIsStillCancelable) {
+    auto serviceCtx = ServiceContext::make();
+    auto client =
+        serviceCtx->getService()->makeClient("HierarchicalCancelableOperationContextTest");
+
+    CancellationSource cancelSource;
+    auto root = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+
+    auto child = root->createChild();
+    auto grandchild = child->createChild();
+
+    root.reset();
+    child.reset();
+
+    ASSERT_TRUE(grandchild->token().isCancelable());
+
+    auto opCtx = grandchild->makeOperationContext(client.get());
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    cancelSource.cancel();
+    waitForAllEarlierTasksToComplete();
+    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
+}
+
+TEST_F(HierarchicalCancelableOperationContextTest, ReleasingChildReleasesCreator) {
+    CancellationSource cancelSource;
+    auto root = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelSource.token(), executor());
+    std::weak_ptr<HierarchicalCancelableOperationContextFactory> weakRoot = root;
+
+    auto child = root->createChild();
+    root.reset();
+
+    ASSERT_FALSE(weakRoot.expired());
+
+    child.reset();
+
+    ASSERT_TRUE(weakRoot.expired());
+}
+
+
+TEST_F(HierarchicalCancelableOperationContextTest,
+       CreateChildOnStackAllocatedFactoryThrowsBadWeakPtr) {
+    CancellationSource cancelSource;
+    HierarchicalCancelableOperationContextFactory factory(cancelSource.token(), executor());
+
+    // Parent must be created with a shared_ptr to allow the child to hold a reference to the parent
+    // as a way to keep the parent alive if the child is still in use.
+    ASSERT_THROWS(factory.createChild(), std::bad_weak_ptr);
 }
 
 }  // namespace

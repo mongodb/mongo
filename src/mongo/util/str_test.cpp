@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/str.h"
 
@@ -472,6 +446,106 @@ TEST(StringEscapeTest, ValidUTF8) {
         ASSERT(!str::validUTF8(pair.first));
     }
 }
+
+namespace detail {
+template <typename T>
+struct assert_helper {
+    template <typename U>
+    static boost::optional<T> to_optional(U value) {
+        return boost::optional<T>(T(value));
+    }
+
+    template <typename U>
+    static boost::optional<T> to_optional(boost::optional<U> value) {
+        return value.map([](auto s) { return T(s); });
+    }
+
+    static boost::optional<T> to_optional(boost::none_t) {
+        return boost::none;
+    }
+};
+}  // namespace detail
+
+#define EXPECT_OPTEQ(lhs, rhs)                                        \
+    EXPECT_EQ(detail::assert_helper<std::string>::to_optional((lhs)), \
+              detail::assert_helper<std::string>::to_optional((rhs)))
+
+TEST(SplitTest, Example) {
+    auto it = split_iter("one.two.three.four", '.');
+    EXPECT_OPTEQ("one", it.next());
+    EXPECT_OPTEQ("two", it.next());
+    EXPECT_OPTEQ("three", it.next());
+    EXPECT_OPTEQ("four", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, Empty) {
+    auto it = split_iter("", '.');
+    EXPECT_OPTEQ(boost::none, it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, DelimiterNotFound) {
+    auto it = split_iter("one.two.three.four", '$');
+    EXPECT_OPTEQ("one.two.three.four", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, DelimOnly) {
+    auto it = split_iter(".", '.');
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+
+    it = split_iter("...", '.');
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ("", it.next());
+    EXPECT_OPTEQ(boost::none, it.next());
+}
+
+TEST(SplitTest, SplitStringDelimEquivalence) {
+    auto splitStringDelimCollect = [](std::string_view input, char delim) {
+        std::vector<std::string> splitVec;
+        splitStringDelim(std::string(input), &splitVec, delim);
+        return splitVec;
+    };
+
+    auto splitIterCollect = [](std::string_view input, char delim) {
+        const auto views = split_iter(input, delim).collect();
+        std::vector<std::string> owned;
+        for (const auto& view : views) {
+            owned.push_back(std::string(view));
+        }
+        return owned;
+    };
+
+#define INSTANCE(input, delim) \
+    ASSERT_EQ((splitStringDelimCollect((input), (delim))), (splitIterCollect((input), (delim))))
+
+    INSTANCE("", '$');
+    INSTANCE("", '/');
+    INSTANCE("one.two.three.four", '.');
+    INSTANCE("one.two.three.four", '$');
+    INSTANCE("one/two/three$four", '$');
+    INSTANCE("one/two/three$four", '/');
+    INSTANCE("one/two/three$four", '-');
+    INSTANCE("one/two/three$four", 'o');
+    INSTANCE("one/two/three$four", 'r');
+    INSTANCE("one/two/three$four", '-');
+}
+
+TEST(SplitTest, Collect) {
+    EXPECT_EQ(std::vector<std::string_view>{}, split_iter("", '.').collect());
+    EXPECT_EQ(std::vector<std::string_view>{"foo"}, split_iter("foo", '.').collect());
+    EXPECT_EQ((std::vector<std::string_view>{"", ""}), split_iter(".", '.').collect());
+    EXPECT_EQ((std::vector<std::string_view>{"one", "two", "three", "four"}),
+              split_iter("one.two.three.four", '.').collect());
+}
+
 
 }  // namespace
 }  // namespace mongo::str

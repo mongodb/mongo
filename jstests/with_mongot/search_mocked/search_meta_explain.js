@@ -1,6 +1,9 @@
 /**
  * Test the use of "explain" with the "$searchMeta" aggregation stage. This tests all verbosities
  * and tests when mongot returns explain only as well as explain with cursor response.
+ * TODO SERVER-131069: Mocked-only coverage not in e2e: omitSearchDocumentResults
+ * command, explain-only vs explain-plus-cursor variants, injected explain
+ * payloads, controlled metadata-cursor getMore.
  * @tags: [requires_fcv_81]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

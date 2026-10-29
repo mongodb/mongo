@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 
@@ -93,6 +67,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_op_observer.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_metadata_hook.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -136,12 +112,21 @@
 namespace mongo {
 namespace {
 
-class ReshardingOplogBatchApplierTest : service_context_test::WithSetupTransportLayer,
-                                        public ServiceContextMongoDTest {
+class ReshardingOplogBatchApplierTest : public ServiceContextMongoDTest {
 public:
-    ReshardingOplogBatchApplierTest()
-        : ServiceContextMongoDTest(
-              Options{}.useMockClock(true).useMockTickSource<Milliseconds>(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useMockClock(true)
+            .useMockTickSource<Milliseconds>(true);
+    }
+
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -265,8 +250,8 @@ public:
                         AuthorizationSession::get(*client)->grantInternalAuthorization();
                     },
             }),
-            executor::makeNetworkInterface(
-                "TestReshardOplogBatchApplierNetwork", nullptr, std::move(hookList)));
+            executor::makeNetworkInterface("TestReshardOplogBatchApplierNetwork",
+                                           {.metadataHook = std::move(hookList)}));
 
         executor->startup();
         return executor;
@@ -298,7 +283,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -335,7 +320,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -513,13 +498,13 @@ private:
                                                _sourceUUID,
                                                BSON(_currentShardKey << 1),
                                                false, /* unsplittable */
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
 
         return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
@@ -549,8 +534,6 @@ private:
         resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
     const NamespaceString _myOplogBufferNss =
         resharding::getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
@@ -647,11 +630,42 @@ TEST_F(ReshardingOplogBatchApplierTest,
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 
     auto oplogEntry =
-        makeProgressMarkNoopOplogEntry(now(), true /* createdAfterOplogApplicationStarted */);
+        makeProgressMarkNoopOplogEntry(now(), /*createdAfterOplogApplicationStarted=*/true);
 
     auto future = applier()->applyBatch<false>(
         {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
     future.get();
+}
+
+TEST_F(ReshardingOplogBatchApplierTest, RetriesWhileReplicaSetWritesAreBlocked) {
+    // Register the op observer that enforces the replica set write block so that the applier's
+    // writes to the (non-internal) temporary resharding collection are rejected with
+    // ReplicaSetWritesBlocked while the block is enabled.
+    auto opObserverRegistry =
+        dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+    invariant(opObserverRegistry);
+    opObserverRegistry->addObserver(std::make_unique<ReplicaSetWriteBlockOpObserver>());
+
+    auto* writeBlockState = ReplicaSetWriteBlockState::get(getServiceContext());
+    writeBlockState->enableReplicaSetWriteBlocking(
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto oplogEntry = makeInsertOplogEntry();
+
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+    auto future = applier()->applyBatch<false>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+
+    // While the block is active the batch is repeatedly rejected, so the applier holds and retries
+    // in place rather than completing or failing the operation.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    // Once the block is lifted, the batch is applied successfully.
+    writeBlockState->disableReplicaSetWriteBlocking();
+    ASSERT_OK(future.getNoThrow());
 }
 
 using ReshardingOplogBatchApplierTestDeathTest = ReshardingOplogBatchApplierTest;
@@ -662,7 +676,7 @@ DEATH_TEST_F(ReshardingOplogBatchApplierTestDeathTest,
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 
     auto oplogEntry =
-        makeProgressMarkNoopOplogEntry(now(), false /* createdAfterOplogApplicationStarted */);
+        makeProgressMarkNoopOplogEntry(now(), /*createdAfterOplogApplicationStarted=*/false);
 
     auto future = applier()->applyBatch<false>(
         {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);

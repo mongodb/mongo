@@ -4,15 +4,13 @@
  * @tags: [requires_fcv_70]
  */
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     testExistingCollection,
     testNonExistingCollection,
 } from "jstests/sharding/analyze_shard_key/libs/configure_query_analyzer_common.js";
-
-// This test requires running commands directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
 
 // Set this to opt into the 'samplesPerSecond' check.
 TestData.testingDiagnosticsEnabled = false;
@@ -156,11 +154,14 @@ if (!TestData.auth) {
 {
     const mongod = MongoRunner.runMongod();
 
-    // The configureQueryAnalyzer command is not supported on standalone mongod.
-    const testCases = [
-        {conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation},
-    ];
-    testNonExistingCollection(testCases, dbNameBase);
+    // Some suites implicitly converts standalone to a replica set, so we need to make sure.
+    if (FixtureHelpers.isStandalone(mongod.getDB("admin"))) {
+        // The configureQueryAnalyzer command is not supported on standalone mongod.
+        const testCases = [
+            {conn: mongod, isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation},
+        ];
+        testNonExistingCollection(testCases, dbNameBase);
+    }
 
     MongoRunner.stopMongod(mongod);
 }

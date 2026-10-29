@@ -1,41 +1,22 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
+#include <deque>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -49,7 +30,9 @@ public:
                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     TransformAlgorithmEnum algorithm,
                     std::string hmacKey,
-                    BSONObj serializedForDebug);
+                    BSONObj serializedForDebug,
+                    boost::optional<std::vector<std::string>> keyHashLookupSet,
+                    boost::optional<query_stats::TopKSortSpec> topKSortSpec = boost::none);
 
 private:
     /*
@@ -74,9 +57,9 @@ private:
 
         const Date_t& getReadTimestamp() const;
 
-        bool empty() const;
-
-        void load(QueryStatsStore& queryStatsStore);
+        // Copies every entry in the partition whose key is not in 'skipKeys'.
+        void load(QueryStatsStore& queryStatsStore,
+                  const stdx::unordered_set<std::size_t>& skipKeys);
 
         std::deque<QueryStatsEntry> statsEntries;
 
@@ -88,12 +71,62 @@ private:
 
     GetNextResult doGetNext() final;
 
-    boost::optional<Document> toDocument(const Date_t& partitionReadTime,
+    /**
+     * Optimized execution path used when a $match on keyHash was pushed down to avoid full-store
+     * scan. Returns EOF once all requested user-visible hashes have been consumed.
+     */
+    GetNextResult doGetNextViaKeyHashLookup();
+
+    /**
+     * Reads and materializes the next live entry among 'locations', popping the locations it
+     * consumes. Locations whose store key no longer has a live entry, and entries that fail to
+     * serialize, are skipped. Returns boost::none once every location has been read.
+     */
+    boost::optional<Document> _nextKeyHashDocument(std::deque<KeyHashLocation>& locations);
+
+    /**
+     * Returns the document for the front entry of 'statsEntries', popping the entries it consumes.
+     * Skips over entries that fail to serialize, and returns boost::none once 'statsEntries' is
+     * empty.
+     */
+    boost::optional<Document> nextDocument(std::deque<QueryStatsEntry>& statsEntries,
+                                           const Date_t& readTimestamp) const;
+
+    /**
+     * Materializes 'queryStatsEntry' and logs it as output, or returns boost::none if it fails to
+     * serialize. Callers must go through this so that every emitted document is logged.
+     */
+    boost::optional<Document> _materialize(const Date_t& readTimestamp,
+                                           const QueryStatsEntry& queryStatsEntry) const;
+
+    boost::optional<Document> toDocument(const Date_t& readTimestamp,
                                          const QueryStatsEntry& queryStatsEntry) const;
 
+    void conditionallyLogOutput(const Document& doc) const;
+
+    void conditionallyLogFinished() const;
+
+    // Logs that the stage has finished and returns EOF.
+    GetNextResult _eof() const;
 
     BSONObj computeQueryStatsKey(std::shared_ptr<const Key> key,
                                  const SerializationContext& serializationContext) const;
+
+    /**
+     * Scans all partitions (locking one partition at a time) to select and copy the top-K
+     * candidate entries, requesting exactly 'K' candidates equal to the sort limit.
+     */
+    void computeTopKCandidates(const QueryStatsStore& queryStatsStore, const TopKSortSpec& spec);
+
+    /**
+     * Returns the document for the next top-K candidate, recording its key in '_topKConsumedKeys'
+     * whether or not it materializes. Returns boost::none once the candidates are exhausted.
+     */
+    boost::optional<Document> nextTopKDocument(QueryStatsStore& queryStatsStore,
+                                               const TopKSortSpec& spec);
+
+    // Returns the next document of the full scan over every partition.
+    GetNextResult nextFullScanDocument(QueryStatsStore& queryStatsStore);
 
     // The current partition copied from query stats store to avoid holding lock during reads.
     CopiedPartition _currentCopiedPartition;
@@ -110,6 +143,34 @@ private:
 
     // For-debug serialization of the corresponding 'DocumentSourceQueryStats' instance.
     BSONObj _serializedForDebug;
+
+    // User-visible hashes captured from a pushed-down $match on keyHash. boost::none when the
+    // optimization did not fire, leaving the stage on its default path. There is no fallback: a
+    // hash that resolves to nothing simply contributes no documents.
+    boost::optional<std::vector<std::string>> _keyHashLookupSet;
+
+    // The store locations '_keyHashLookupSet' resolves to. Populated on the first getNext() call
+    // and popped from the front as they are read. boost::none until then; empty once every
+    // location has been read.
+    boost::optional<std::deque<KeyHashLocation>> _resolvedKeyHashLocations;
+
+    // Top-K optimization set during optimization if the pattern is recognized.
+    boost::optional<query_stats::TopKSortSpec> _topKSortSpec;
+
+    // Candidate entries copied out of the store by the top-K scan, populated lazily on the first
+    // doGetNext() call and popped from the back as they are materialized. Owning copies means
+    // materialization never touches the store and cannot lose entries to eviction.
+    boost::optional<std::vector<std::pair<std::size_t, QueryStatsEntry>>> _topKCandidateEntries;
+
+    // When the optimized scan (top-K or keyHash lookup) began, captured once and reported as the
+    // 'asOf' time of every entry it materializes.
+    Date_t _optimizationTimestamp;
+
+    // Store keys the top-K path has already processed, whether they were emitted or failed in
+    // 'toDocument'. If it falls back to the full scan, these keys are skipped so they are not
+    // re-emitted.
+    stdx::unordered_set<std::size_t> _topKConsumedKeys;
+    bool _topKCandidateFailed{false};
 };
 
 }  // namespace exec::agg

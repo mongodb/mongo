@@ -11,7 +11,7 @@
 // ]
 
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 let testDB = db.getSiblingDB("profile_find");
@@ -91,6 +91,8 @@ assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
     assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
     if (!ClusteredCollectionUtil.areAllCollectionsClustered(testDB)) {
         // Clustered collections are not always eligible for express path.
+        assert.eq(profileObj.execStats.stage, "EXPRESS_IXSCAN", profileObj);
+        assert.eq(profileObj.execStats.keyPattern, {a: 1}, profileObj);
         assert.eq(profileObj.planSummary, "EXPRESS_IXSCAN { a: 1 }", profileObj);
         assert(profileObj.execStats.hasOwnProperty("indexName"), profileObj);
     }

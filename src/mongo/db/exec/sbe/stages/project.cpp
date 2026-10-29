@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/project.h"
 
@@ -44,10 +18,23 @@ using namespace std::literals::string_view_literals;
 ProjectStage::ProjectStage(std::unique_ptr<PlanStage> input,
                            SlotExprPairVector projects,
                            PlanNodeId nodeId,
+                           Binding binding,
                            bool participateInTrialRunTracking)
-    : PlanStage("project"sv, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
-      _projects(std::move(projects)) {
+    : PlanStage(binding == Binding::kSequential ? "project*"sv : "project"sv,
+                /*yieldPolicy=*/nullptr,
+                nodeId,
+                participateInTrialRunTracking),
+      _projects(std::move(projects)),
+      _binding(binding) {
     _children.emplace_back(std::move(input));
+
+    for (size_t idx = 0; idx < _projects.size(); ++idx) {
+        auto [_, inserted] = _slotToIdx.emplace(_projects[idx].first, idx);
+        tassert(13572200,
+                str::stream() << "project stage defines slot " << _projects[idx].first
+                              << " more than once",
+                inserted);
+    }
 }
 
 std::unique_ptr<PlanStage> ProjectStage::clone() const {
@@ -58,27 +45,37 @@ std::unique_ptr<PlanStage> ProjectStage::clone() const {
     return std::make_unique<ProjectStage>(_children[0]->clone(),
                                           std::move(projects),
                                           _commonStats.nodeId,
+                                          _binding,
                                           participateInTrialRunTracking());
 }
 
 void ProjectStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
-    // Compile project expressions here.
-    for (auto& [slot, expr] : _projects) {
+    // Compile the expressions in order. With sequential binding, each output slot becomes visible
+    // through getAccessor() as soon as its expression is compiled, so later expressions can refer
+    // to it. Reserve the full capacity up front so that the accessors of earlier entries never
+    // move.
+    _compiled.reserve(_projects.size());
+    for (auto& [_, expr] : _projects) {
         ctx.root = this;
         auto code = expr->compile(ctx);
-        _fields[slot] = {std::move(code), value::OwnedValueAccessor{}};
+        _compiled.push_back({std::move(code), value::OwnedValueAccessor{}});
     }
-    _compiled = true;
+    _prepared = true;
 }
 
 value::SlotAccessor* ProjectStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (auto it = _fields.find(slot); _compiled && it != _fields.end()) {
-        return &it->second.second;
-    } else {
-        return _children[0]->getAccessor(ctx, slot);
+    if (auto it = _slotToIdx.find(slot); it != _slotToIdx.end()) {
+        // While the expressions are being compiled, only sequential binding lets an expression see
+        // the output slots of the expressions before it.
+        if (auto idx = it->second;
+            idx < _compiled.size() && (_prepared || _binding == Binding::kSequential)) {
+            return &_compiled[idx].accessor;
+        }
     }
+    return _children[0]->getAccessor(ctx, slot);
 }
 void ProjectStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
@@ -96,10 +93,10 @@ PlanState ProjectStage::getNext() {
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
-        // Run the project expressions here.
-        for (auto& p : _fields) {
-            // Set the accessors.
-            p.second.second.reset(_bytecode.run(p.second.first.get()));
+        // Run the expressions in order so that each one sees the values produced for this row by
+        // the expressions before it.
+        for (auto& project : _compiled) {
+            project.accessor.reset(_bytecode->run(project.code.get()));
         }
     }
 
@@ -153,10 +150,10 @@ void ProjectStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     if (debugPrintInfo.printBytecode) {
         int i = 0;
-        for (auto& p : _fields) {
+        for (auto& project : _compiled) {
             std::stringstream title;
             title << "FIELD_" << i;
-            PlanStage::debugPrintBytecode(ret, p.second.first, title.str().c_str());
+            PlanStage::debugPrintBytecode(ret, project.code, title.str().c_str());
             i++;
         }
     }
@@ -168,13 +165,13 @@ size_t ProjectStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_projects);
+    size += size_estimator::estimate(_slotToIdx);
     return size;
 }
 
 void ProjectStage::doSaveState() {
-    for (auto& [slotId, codeAndAccessor] : _fields) {
-        auto& [code, accessor] = codeAndAccessor;
-        prepareForYielding(accessor, slotsAccessible());
+    for (auto& project : _compiled) {
+        prepareForYielding(project.accessor, slotsAccessible());
     }
 }
 

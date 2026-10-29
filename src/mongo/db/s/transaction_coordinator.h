@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,6 +8,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/clang_checked/checked_mutex.h"
+#include "mongo/db/repl/clang_checked/thread_safety_annotations.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
@@ -125,7 +101,7 @@ public:
      *
      * Subsequent calls will not re-run the commit process.
      */
-    void runCommit(OperationContext* opCtx, std::vector<ShardRef> participantShards);
+    void runCommit(OperationContext* opCtx, std::vector<ShardId> participantShards);
 
     /**
      * To be used to continue coordinating a transaction on step up.
@@ -197,7 +173,8 @@ private:
     /**
      * Logs the diagnostic string for a commit coordination.
      */
-    void _logSlowTwoPhaseCommit(const txn::CoordinatorCommitDecision& decision);
+    void _logSlowTwoPhaseCommit(const txn::CoordinatorCommitDecision& decision,
+                                size_t numParticipants);
 
     // Shortcut to the service context under which this coordinator runs
     ServiceContext* const _serviceContext;
@@ -215,14 +192,14 @@ private:
     std::unique_ptr<txn::AsyncWorkScheduler> _sendPrepareScheduler;
 
     // Protects the state below
-    mutable std::mutex _mutex;
+    mutable clang_checked::CheckedMutex<std::mutex> _mutex;
 
     // Tracks which step of the 2PC coordination is currently (or was most recently) executing
-    Step _step{Step::kInactive};
+    Step _step MONGO_LOCKING_GUARDED_BY(_mutex) = Step::kInactive;
 
     // Promise/future pair which will be signaled when the coordinator has completed
-    bool _kickOffCommitPromiseSet{false};
-    Promise<void> _kickOffCommitPromise;
+    bool _kickOffCommitPromiseSet MONGO_LOCKING_GUARDED_BY(_mutex) = false;
+    Promise<void> _kickOffCommitPromise MONGO_LOCKING_GUARDED_BY(_mutex);
 
     // The state below gets populated sequentially as the coordinator advances through the 2 phase
     // commit stages. Each of these fields is set only once for the lifetime of a coordinator and
@@ -231,20 +208,20 @@ private:
     // If the coordinator is canceled before commit is requested, none of these fiends will be set
 
     // Set when the coordinator has been asked to coordinate commit
-    boost::optional<txn::ParticipantsList> _participants;
-    bool _participantsDurable{false};
+    boost::optional<txn::ParticipantsList> _participants MONGO_LOCKING_GUARDED_BY(_mutex);
+    bool _participantsDurable MONGO_LOCKING_GUARDED_BY(_mutex) = false;
 
     // Set when the coordinator has heard back from all the participants and reached a decision, but
     // hasn't yet persisted it
-    boost::optional<txn::CoordinatorCommitDecision> _decision;
+    boost::optional<txn::CoordinatorCommitDecision> _decision MONGO_LOCKING_GUARDED_BY(_mutex);
 
     // Set when the coordinator has heard back from all the participants and reached a commit
     // decision.
-    std::vector<NamespaceString> _affectedNamespaces;
+    std::vector<NamespaceString> _affectedNamespaces MONGO_LOCKING_GUARDED_BY(_mutex);
 
     // Set when the coordinator has durably persisted `_decision` to the `config.coordinators`
     // collection
-    bool _decisionDurable{false};
+    bool _decisionDurable MONGO_LOCKING_GUARDED_BY(_mutex) = false;
     SharedPromise<txn::CommitDecision> _decisionPromise;
 
     // Set when the coordinator has received acks from all participants that they have successfully

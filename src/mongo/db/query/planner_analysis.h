@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,6 +10,7 @@
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_hint.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
@@ -61,6 +36,11 @@ public:
      * validated when they were indexed.
      */
     static void analyzeGeo(const QueryPlannerParams& params, QuerySolutionNode* solnRoot);
+
+    /**
+     * Rewrites the query solution tree for geo-related optimizations.
+     */
+    static void rewriteGeo(std::unique_ptr<QuerySolutionNode>& solnRoot);
 
     /**
      * Takes an index key pattern and returns an object describing the "maximal sort" that this
@@ -159,6 +139,10 @@ public:
         EqLookupNode::LookupStrategy strategy;
         boost::optional<IndexEntry> indexEntry;
         NaturalOrderHint::Direction scanDirection = NaturalOrderHint::Direction::kForward;
+        // Only meaningful for kDynamicIndexedLoopJoin: true if the chosen index has a collation
+        // compatible with the query (no run-time type check needed for collation). (Sparseness, the
+        // other reason for DILJ, is derived at lowering from the index itself.)
+        bool collationCompatibleForDilj = true;
     };
     /**
      * For the provided 'foreignCollName' and 'foreignFieldName' corresponding to an EqLookupNode,
@@ -172,23 +156,25 @@ public:
      * - A nested loop join is chosen in all other cases.
      */
     static Strategy determineLookupStrategy(
+        const CanonicalQuery& query,
         const NamespaceString& foreignCollName,
         const std::string& foreignField,
-        const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
-        bool allowDiskUse,
-        const CollatorInterface* collator);
+        const std::map<NamespaceString, CollectionInfo>& collectionsInfo);
 
     /**
      * Returns true if the available indexes can only be used in classic engine.
      */
     static bool canUseIndexForRightSideOfLookupOnlyInClassic(
-        const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const std::string& foreignField,
+        const std::vector<IndexEntry>& fullIndexList);
 
     /**
      * Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
      * choose the hash join algorithm for cases when the hash table is unlikely to spill to disk.
      */
-    static bool isEligibleForHashJoin(const CollectionInfo& foreignCollInfo);
+    static bool isEligibleForHashJoin(const QueryKnobConfiguration& knobs,
+                                      const CollectionInfo& foreignCollInfo);
 
     /**
      * Returns 'true' if the provided solution uses a fast counting stage.

@@ -1,17 +1,39 @@
-"""Module extension that computes whether last-continuous is redundant.
+"""Module extension that computes multiversion peer availability.
+
+Two things are computed:
+
+    LAST_CONTINUOUS_IS_LAST_LTS  (bool), from .bazelrc.target_mongo_version
+                                 plus releases.yml
+    LAST_PATCH_HAS_GA_RELEASE    (bool), from the repository's git tags
 
 last-continuous is redundant when it resolves to the same FCV as last-lts,
 or when it resolves to an EOL version. In either case, dedicated last-continuous
 test suites would duplicate last-lts suites exactly and should be skipped.
 
-The extension reads .bazelrc.target_mongo_version and releases.yml from the
-workspace at analysis time and generates a repository that exports:
+last-patch has no peer at all on a series that has never had a GA release
+(master, whose only in-series tag is an alpha) or on a freshly cut branch whose
+HEAD is still the release tag itself. db-contrib-tool then finds nothing to
+download and the multiversion_setup target fails, so dedicated last-patch
+suites must be skipped rather than built.
 
-    LAST_CONTINUOUS_IS_LAST_LTS  (bool)
+Note what is *not* recomputed here: which tag last-patch resolves to. That
+selection is fork-distance based and lives in
+buildscripts/resmokelib/multiversion/previous_release_tag.py; duplicating it in
+Starlark would be a second implementation of the same policy. Availability is a
+much weaker question -- `find_previous_release_tag` returns None only when no
+candidate tag survives filtering -- so it needs only "does some GA tag of this
+series exist that HEAD is not an ancestor of", which is a couple of git
+plumbing calls. This mirrors MultiversionService.has_released_patch_version(),
+the same strict (GA-only) predicate mongo-task-generator gates suite generation
+on.
 
-This constant is loaded into bazel/resmoke/multiversion/BUILD.bazel to set
-the default value of the //bazel/resmoke/multiversion:last_continuous_is_last_lts
-bool_flag.
+The extension reads the version files from the workspace and shells out to git
+at fetch time; both constants are loaded into
+bazel/resmoke/multiversion/BUILD.bazel to set the default values of the
+corresponding bool_flags. Because they are only defaults, either can be
+overridden on the command line -- which is the escape hatch for the cases the
+strict predicate gets wrong for a particular suite (see the note on the disagg
+suites in BUILD.bazel).
 """
 
 def _parse_mongo_version(content):
@@ -107,12 +129,87 @@ def _compute_redundant(mongo_version_content, releases_content):
 
     return last_continuous == last_lts or eol_set.get(last_continuous, False)
 
+def _is_ga_release_tag(tag, mongo_version):
+    """Return True if `tag` is a final release tag of the `mongo_version` series.
+
+    Starlark has no regex, so this open-codes
+    previous_release_tag.FINAL_RELEASE_TAG_RE: 'r8.3.1' matches, while
+    'r8.3.1-rc0', 'r9.1.0-alpha0' and 'r8.0.13-s8-0' do not.
+    """
+    if not tag.startswith("r"):
+        return False
+    parts = tag[1:].split(".")
+    if len(parts) != 3:
+        return False
+    for part in parts:
+        if not part.isdigit():
+            return False
+    return "{}.{}".format(parts[0], parts[1]) == mongo_version
+
+def _compute_last_patch_has_ga_release(repo_ctx, mongo_version_content):
+    """Return True if a GA release of the current series precedes HEAD.
+
+    Fails open (True, i.e. nothing is skipped) whenever the question cannot be
+    answered -- no git, no repository, unparsable version file -- matching how
+    _compute_redundant treats input it cannot read.
+    """
+    mongo_version = _parse_mongo_version(mongo_version_content)
+    git = repo_ctx.which("git")
+    if mongo_version == None or git == None:
+        return True
+
+    root = str(repo_ctx.workspace_root)
+
+    # The tag list and HEAD are not files Bazel tracks, so an ordinary
+    # `repo_ctx.execute` would leave this repo unfetched after a commit or a
+    # fetch that moves either. Watching these two makes the common cases
+    # (committing, checking out, `git fetch` writing packed-refs) invalidate it.
+    # A tag delivered as a loose ref under .git/refs/tags is not covered; that
+    # is what the command-line override on the bool_flag is for.
+    for ref_file in [".git/HEAD", ".git/packed-refs"]:
+        path = repo_ctx.path(root + "/" + ref_file)
+        if path.exists:
+            repo_ctx.watch(path)
+
+    tags = repo_ctx.execute([
+        git,
+        "-C",
+        root,
+        "tag",
+        "-l",
+        "r{}.*".format(mongo_version),
+    ])
+    if tags.return_code != 0:
+        return True
+
+    for tag in tags.stdout.splitlines():
+        tag = tag.strip()
+        if not _is_ga_release_tag(tag, mongo_version):
+            continue
+
+        # `find_previous_release_tag` never returns a tag at or descending from
+        # HEAD, so a tag HEAD is an ancestor of is not a usable peer. Anything
+        # else is: it is an earlier GA release of this series.
+        is_ancestor = repo_ctx.execute([
+            git,
+            "-C",
+            root,
+            "merge-base",
+            "--is-ancestor",
+            "HEAD",
+            tag,
+        ])
+        if is_ancestor.return_code != 0:
+            return True
+
+    return False
+
 # ---------------------------------------------------------------------------
 # Repository rule
 # ---------------------------------------------------------------------------
 
 def _multiversion_compat_settings_impl(repo_ctx):
-    """Generate settings.bzl with LAST_CONTINUOUS_IS_LAST_LTS constant."""
+    """Generate settings.bzl with the multiversion peer availability constants."""
     mongo_version_content = repo_ctx.read(
         Label("//:.bazelrc.target_mongo_version"),
     )
@@ -121,16 +218,23 @@ def _multiversion_compat_settings_impl(repo_ctx):
     )
 
     redundant = _compute_redundant(mongo_version_content, releases_content)
+    last_patch_has_ga_release = _compute_last_patch_has_ga_release(
+        repo_ctx,
+        mongo_version_content,
+    )
 
     repo_ctx.file(
         "settings.bzl",
-        "LAST_CONTINUOUS_IS_LAST_LTS = {}\n".format("True" if redundant else "False"),
+        "LAST_CONTINUOUS_IS_LAST_LTS = {}\nLAST_PATCH_HAS_GA_RELEASE = {}\n".format(
+            "True" if redundant else "False",
+            "True" if last_patch_has_ga_release else "False",
+        ),
     )
     repo_ctx.file("BUILD.bazel", "")
 
 _multiversion_compat_settings = repository_rule(
     implementation = _multiversion_compat_settings_impl,
-    doc = "Generates LAST_CONTINUOUS_IS_LAST_LTS based on the current MONGO_VERSION.",
+    doc = "Generates multiversion peer availability flags based on the current MONGO_VERSION.",
 )
 
 # ---------------------------------------------------------------------------

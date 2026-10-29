@@ -1,33 +1,6 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/log_test.h"
@@ -36,9 +9,12 @@
 
 namespace mongo {
 
-class ShardRegistryTest : service_context_test::WithSetupTransportLayer,
-                          public ShardingTestFixture {
+class ShardRegistryTest : public ShardingTestFixture {
 protected:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         // Setting the role is important for topologyTime gossiping.
         serverGlobalParams.clusterRole = {ClusterRole::RouterServer};
@@ -51,13 +27,9 @@ protected:
         return time.topologyTime();
     }
 
-    ShardType buildShardTypeFrom(ShardId id) {
-        return buildShardTypeFrom(id, boost::none);
-    }
-
-    ShardType buildShardTypeFrom(ShardId id, boost::optional<UUID> uuid) {
+    ShardType shardIdToShardType(ShardId id) {
         ShardType shardType;
-        shardType.setHandle(ShardHandle{id, std::move(uuid)});
+        shardType.setName(id.toString());
         const auto connString = ConnectionString::forReplicaSet(
             id.toString() + "-replset", {HostAndPort(id.toString(), kDummyPort)});
         shardType.setHost(connString.toString());
@@ -69,7 +41,7 @@ protected:
     void addShard(ShardId id, bool advanceTopologyTime) {
         configsvrTopologyTime = Timestamp(addRemoveShardCounterForTopologyTime++, 0);
 
-        auto shardType = buildShardTypeFrom(id);
+        auto shardType = shardIdToShardType(id);
         shardType.setTopologyTime(configsvrTopologyTime);
         shards.push_back(shardType);
 
@@ -101,7 +73,7 @@ protected:
     // entries. Old versions did not have the topologyTime, when upgrading the shard registry must
     // still populate the cache.
     void addShardWithoutTopologyTime(ShardId id) {
-        auto shardType = buildShardTypeFrom(id);
+        auto shardType = shardIdToShardType(id);
         shards.push_back(shardType);
     }
 
@@ -119,7 +91,7 @@ protected:
 
         // Recreate ShardType, resetting topologyTime is not allowed.
         auto& topologyTimeUpdateShard = shards[0];
-        auto shardWithUpdatedTopologyTime = buildShardTypeFrom(topologyTimeUpdateShard.getName());
+        auto shardWithUpdatedTopologyTime = shardIdToShardType(topologyTimeUpdateShard.getName());
         shardWithUpdatedTopologyTime.setTopologyTime(configsvrTopologyTime);
 
         topologyTimeUpdateShard = shardWithUpdatedTopologyTime;
@@ -178,13 +150,6 @@ protected:
         return shardRegistry()->_getData(operationContext());
     }
 
-    void loadRegistryFromFixture() {
-        auto future =
-            launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
-        expectCSRSLookup();
-        future.default_timed_get();
-    }
-
     auto makeTimeForForceReload() {
         return ShardRegistry::Time::makeForForcedReload();
     }
@@ -195,7 +160,7 @@ protected:
 
     auto makeTimeWithLookup(std::function<Timestamp(void)>&& lookupFn) {
         auto [_, time] = ShardRegistry::Time::makeWithLookup([fn = std::move(lookupFn)]() {
-            return std::pair{ShardRegistryData::ShardHandleToConnectionStringMap{}, fn()};
+            return std::pair{ShardRegistryData::ShardIdToConnectionStringMap{}, fn()};
         });
         return time;
     }
@@ -613,7 +578,7 @@ TEST_F(ShardRegistryTest, UserShardInputResolutionSeparatesIdAndAlternateLookups
         future.default_timed_get();
     }
 
-    const auto shardType = buildShardTypeFrom(shardId);
+    const auto shardType = shardIdToShardType(shardId);
     const auto connString = uassertStatusOK(ConnectionString::parse(shardType.getHost()));
     const auto hostAndPort = connString.getServers().front();
     const ShardId connStringId(connString.toString());
@@ -646,10 +611,10 @@ TEST_F(ShardRegistryTest, GetShardIdAcceptsShardId) {
     auto* opCtx = operationContext();
     ASSERT_EQ(shardId,
               unittest::assertGet(shardRegistry()->resolveShardId(
-                  opCtx, shardId, false /* allowNonShardIdIdentifiers */)));
+                  opCtx, shardId, /*allowNonShardIdIdentifiers=*/false)));
     ASSERT_EQ(shardId,
               unittest::assertGet(shardRegistry()->resolveShardId(
-                  opCtx, shardId, true /* allowNonShardIdIdentifiers */)));
+                  opCtx, shardId, /*allowNonShardIdIdentifiers=*/true)));
 }
 
 TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
@@ -663,7 +628,7 @@ TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
     auto future = launchAsync([this, opCtx, unknownShard] {
         ASSERT_EQ(ErrorCodes::ShardNotFound,
                   shardRegistry()
-                      ->resolveShardId(opCtx, unknownShard, false /* allowNonShardIdIdentifiers */)
+                      ->resolveShardId(opCtx, unknownShard, /*allowNonShardIdIdentifiers=*/false)
                       .getStatus());
     });
     expectCSRSLookup();
@@ -672,7 +637,7 @@ TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
     future = launchAsync([this, opCtx, unknownShard] {
         ASSERT_EQ(ErrorCodes::ShardNotFound,
                   shardRegistry()
-                      ->resolveShardId(opCtx, unknownShard, true /* allowNonShardIdIdentifiers */)
+                      ->resolveShardId(opCtx, unknownShard, /*allowNonShardIdIdentifiers=*/true)
                       .getStatus());
     });
     expectCSRSLookup();
@@ -684,7 +649,7 @@ TEST_F(ShardRegistryTest, GetShardIdAllowsAlternateIdentifiers) {
     addShard(shardId, kAdvanceTopologyTime);
     reloadAndWait();
 
-    const auto shardType = buildShardTypeFrom(shardId);
+    const auto shardType = shardIdToShardType(shardId);
     const auto connString = uassertStatusOK(ConnectionString::parse(shardType.getHost()));
     const auto hostAndPort = connString.getServers().front();
     const ShardId hostAndPortId(hostAndPort.toString());
@@ -692,12 +657,12 @@ TEST_F(ShardRegistryTest, GetShardIdAllowsAlternateIdentifiers) {
     auto* opCtx = operationContext();
     ASSERT_EQ(shardId,
               unittest::assertGet(shardRegistry()->resolveShardId(
-                  opCtx, hostAndPortId, true /* allowNonShardIdIdentifiers */)));
+                  opCtx, hostAndPortId, /*allowNonShardIdIdentifiers=*/true)));
 
     auto future = launchAsync([this, opCtx, hostAndPortId] {
         ASSERT_EQ(ErrorCodes::ShardNotFound,
                   shardRegistry()
-                      ->resolveShardId(opCtx, hostAndPortId, false /* allowNonShardIdIdentifiers */)
+                      ->resolveShardId(opCtx, hostAndPortId, /*allowNonShardIdIdentifiers=*/false)
                       .getStatus());
     });
     expectCSRSLookup();
@@ -852,109 +817,6 @@ TEST_F(ShardRegistryTest, ShardIdChangeWithSameRSNameButDifferentHostsPicksUpNew
         << "Shard should have new hosts from config.shards, not stale hosts from "
            "_latestConnStrings. Actual conn string: "
         << shard->getConnString().toString();
-}
-
-TEST_F(ShardRegistryTest, FindShardByUuid) {
-    const UUID shardUuid = UUID::gen();
-    addShard(buildShardTypeFrom({"shardWithUuid"}, shardUuid), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    auto data = getData();
-    auto shardByUuid = data->findShard(ShardRef(shardUuid));
-    ASSERT(shardByUuid) << "Shard should be found by UUID ShardRef";
-    ASSERT_EQ(shardByUuid->getId(), ShardId("shardWithUuid"));
-    ASSERT(shardByUuid->getHandle().uuid());
-    ASSERT_EQ(*shardByUuid->getHandle().uuid(), shardUuid);
-}
-
-TEST_F(ShardRegistryTest, FindShardByUnknownUuidReturnsNull) {
-    addShard(buildShardTypeFrom({"shard0"}, UUID::gen()), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    auto data = getData();
-    ASSERT(!data->findShard(ShardRef(UUID::gen())));
-}
-
-TEST_F(ShardRegistryTest, FindShardWithoutUuidNotFoundByUuidRef) {
-    addShard({"shard0"}, kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    auto data = getData();
-    auto shard = data->findShard(ShardId("shard0"));
-    ASSERT(shard);
-    ASSERT(!shard->getHandle().uuid());
-
-    ASSERT(!data->findShard(ShardRef(UUID::gen())))
-        << "Shards without a UUID must not be found via UUID ShardRef";
-}
-
-TEST_F(ShardRegistryTest, FindShardByShardIdStringRef) {
-    const UUID shardUuid = UUID::gen();
-    addShard(buildShardTypeFrom({"shard0"}, shardUuid), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    auto data = getData();
-    auto shard = data->findShard(ShardRef(std::string{"shard0"}));
-    ASSERT(shard);
-    ASSERT_EQ(shard->getId(), ShardId("shard0"));
-    ASSERT(shard->getHandle().uuid());
-    ASSERT_EQ(*shard->getHandle().uuid(), shardUuid);
-}
-
-TEST_F(ShardRegistryTest, FindShardByConnectionStringRef) {
-    const UUID shardUuid = UUID::gen();
-    addShard(buildShardTypeFrom({"shard0"}, shardUuid), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    const auto connString =
-        ConnectionString::forReplicaSet("shard0-replset", {HostAndPort("shard0", kDummyPort)});
-
-    auto data = getData();
-    auto shard =
-        data->findShard(ShardRef(connString.toString()), true /* allowNonShardIdIdentifiers */);
-    ASSERT(shard);
-    ASSERT_EQ(shard->getId(), ShardId("shard0"));
-    ASSERT(shard->getHandle().uuid());
-    ASSERT_EQ(*shard->getHandle().uuid(), shardUuid);
-}
-
-TEST_F(ShardRegistryTest, FindShardByHostAndPortRef) {
-    const UUID shardUuid = UUID::gen();
-    addShard(buildShardTypeFrom({"shard0"}, shardUuid), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    auto data = getData();
-    auto shard = data->findShard(ShardRef(HostAndPort("shard0", kDummyPort).toString()),
-                                 true /* allowNonShardIdIdentifiers */);
-    ASSERT(shard);
-    ASSERT_EQ(shard->getId(), ShardId("shard0"));
-    ASSERT(shard->getHandle().uuid());
-    ASSERT_EQ(*shard->getHandle().uuid(), shardUuid);
-}
-
-TEST_F(ShardRegistryTest, GetShardByUuid) {
-    const UUID shardUuid = UUID::gen();
-    addShard(buildShardTypeFrom({"shardWithUuid"}, shardUuid), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    auto swShard = shardRegistry()->getShard(operationContext(), ShardRef(shardUuid));
-    ASSERT_OK(swShard.getStatus());
-    ASSERT_EQ(swShard.getValue()->getId(), ShardId("shardWithUuid"));
-}
-
-TEST_F(ShardRegistryTest, GetShardByUuidShardNotFound) {
-    const UUID shardUuid = UUID::gen();
-    addShard(buildShardTypeFrom({"shardWithUuid"}, shardUuid), kAdvanceTopologyTime);
-    loadRegistryFromFixture();
-
-    reloadAndWait();
-
-    auto future = launchAsync([this] {
-        auto swShard = shardRegistry()->getShard(operationContext(), ShardRef(UUID::gen()));
-        ASSERT_EQ(swShard.getStatus(), ErrorCodes::ShardNotFound);
-    });
-    expectCSRSLookup();
-    future.default_timed_get();
 }
 
 }  // namespace

@@ -1,43 +1,19 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/util/modules.h"
 
 #include <string_view>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 // Forward declarations needed for DynamicMetricNameMaker to declare Passkey friends
 class DiskMetrics;
+class ObservableMutexMetrics;
 class SystemMountMetrics;
+class WiredTigerMetricRegistry;
 
 // Forward declarations needed for MetricName to declare Passkey friends.
 namespace disagg {
@@ -50,14 +26,14 @@ class DynamicMetricNameTestPasskeyMaker;
 
 /** Helper to implement the passkey idiom. */
 template <typename T>
-class MONGO_MOD_PUBLIC Passkey {
+class [[MONGO_MOD_PUBLIC]] Passkey {
 private:
     friend T;
     constexpr Passkey() = default;
 };
 
 /** Wrapper class around a string to ensure `MetricName`s are only constructed in certain places. */
-class MONGO_MOD_PUBLIC MetricName {
+class [[MONGO_MOD_PUBLIC]] MetricName {
 public:
     /**
      * Note that this can only be constructed by code allowed to access the passkey. N&O must have
@@ -80,9 +56,11 @@ private:
 };
 
 /** Helper to create MetricName instances. */
-class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricName make(
-    std::string_view name){return MetricName(name, Passkey<MetricNameMaker>{});
-}  // namespace otel::metrics
+class [[MONGO_MOD_FILE_PRIVATE]] MetricNameMaker {
+public:
+    static constexpr MetricName make(std::string_view name) {
+        return MetricName(name, Passkey<MetricNameMaker>{});
+    }  // namespace otel::metrics
 };  // namespace mongo
 
 /**
@@ -90,7 +68,7 @@ class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricNam
  * device names or mount paths discovered at startup). Requires N&O review since dynamic names
  * cannot be audited at compile time.
  */
-class MONGO_MOD_PUBLIC DynamicMetricNameMaker {
+class [[MONGO_MOD_PUBLIC]] DynamicMetricNameMaker {
 public:
     /**
      * Classes that need to create dynamic metric names should be added as a
@@ -98,7 +76,11 @@ public:
      */
     class Passkey {
         friend ::mongo::DiskMetrics;
+        friend ::mongo::ObservableMutexMetrics;
         friend ::mongo::SystemMountMetrics;
+        // TODO (SERVER-136509): rename WiredTigerMetricRegistry to WiredTigerMetrics and remove the
+        // current WiredTigerMetrics
+        friend ::mongo::WiredTigerMetricRegistry;
         // This allows us to create dynamic metric names in tests
         friend ::mongo::otel::metrics::DynamicMetricNameTestPasskeyMaker;
         constexpr Passkey() = default;
@@ -111,7 +93,7 @@ public:
 
 /**
  * Central registry of OpenTelemetry metric names used in the server. When adding a new metric to
- * the server, please add an entry to MetricNames grouped under your team name.
+ * the server, please add an entry to MetricNames grouped with related metrics.
  *
  * This ensures that the N&O team has full ownership over new OTel metrics in the server for
  * centralized collaboration with downstream OTel consumers. OTel metrics are stored in time-series
@@ -121,294 +103,743 @@ public:
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
+    static constexpr MetricName kReplicationPrimaryTcpCongestionWindowSize =
+        MetricNameMaker::make("mongodb.network.repl.source.tcp_congestion_window_size");
+    static constexpr MetricName kReplicationPrimarySendQueueSize =
+        MetricNameMaker::make("mongodb.network.repl.source.send_queue_size");
+    static constexpr MetricName kReplicationPrimarySendQueueBytes =
+        MetricNameMaker::make("mongodb.network.repl.source.send_queue");
+    static constexpr MetricName kReplicationPrimaryPeerEstablishedTime =
+        MetricNameMaker::make("mongodb.network.repl.source.connection_established_time");
+    static constexpr MetricName kReplicationPrimaryLogicalBytesOut =
+        MetricNameMaker::make("mongodb.network.repl.source.bytes_out");
+    static constexpr MetricName kReplicationPrimaryPhysicalBytesOut =
+        MetricNameMaker::make("mongodb.network.repl.source.physical_bytes_out");
+    static constexpr MetricName kReplicationSecondaryReceiveQueueBytes =
+        MetricNameMaker::make("mongodb.network.repl.secondary.receive_queue");
+    static constexpr MetricName kReplicationSecondaryReceiveQueueSize =
+        MetricNameMaker::make("mongodb.network.repl.secondary.receive_queue_size");
+    static constexpr MetricName kReplicationCollectErrors =
+        MetricNameMaker::make("mongodb.network.repl.collect_errors");
+    static constexpr MetricName kReplicationSecondaryTcpCongestionWindowSize =
+        MetricNameMaker::make("mongodb.network.repl.secondary.tcp_congestion_window_size");
+    static constexpr MetricName kReplicationSecondaryLogicalBytesIn =
+        MetricNameMaker::make("mongodb.network.repl.secondary.bytes_in");
+    static constexpr MetricName kReplicationSecondaryPhysicalBytesIn =
+        MetricNameMaker::make("mongodb.network.repl.secondary.physical_bytes_in");
     static constexpr MetricName kNetworkIngressBytesIn =
-        MetricNameMaker::make("serverStatus.network.bytesIn");
+        MetricNameMaker::make("mongodb.serverStatus.network.bytesIn");
     static constexpr MetricName kNetworkIngressBytesOut =
-        MetricNameMaker::make("serverStatus.network.bytesOut");
+        MetricNameMaker::make("mongodb.serverStatus.network.bytesOut");
     static constexpr MetricName kNetworkIngressNumRequests =
-        MetricNameMaker::make("serverStatus.network.numRequests");
+        MetricNameMaker::make("mongodb.serverStatus.network.numRequests");
     static constexpr MetricName kNetworkEgressBytesIn =
-        MetricNameMaker::make("serverStatus.network.egress.bytesIn");
+        MetricNameMaker::make("mongodb.serverStatus.network.egress.bytesIn");
     static constexpr MetricName kNetworkEgressBytesOut =
-        MetricNameMaker::make("serverStatus.network.egress.bytesOut");
+        MetricNameMaker::make("mongodb.serverStatus.network.egress.bytesOut");
     static constexpr MetricName kNetworkEgressNumRequests =
-        MetricNameMaker::make("serverStatus.network.egress.numRequests");
+        MetricNameMaker::make("mongodb.serverStatus.network.egress.numRequests");
+    static constexpr MetricName kNetworkEgressConnectionsCreated =
+        MetricNameMaker::make("mongodb.network.egress.connections_created");
     static constexpr MetricName kNetworkNumSlowDNSOperations =
-        MetricNameMaker::make("serverStatus.network.numSlowDNSOperations");
+        MetricNameMaker::make("mongodb.serverStatus.network.numSlowDNSOperations");
     static constexpr MetricName kNetworkNumSlowSSLOperations =
-        MetricNameMaker::make("serverStatus.network.numSlowSSLOperations");
+        MetricNameMaker::make("mongodb.serverStatus.network.numSlowSSLOperations");
+    static constexpr MetricName kNetworkRpcLocalLatency =
+        MetricNameMaker::make("mongodb.network.rpc.local_latency");
     static constexpr MetricName kPrometheusFileExporterWrites =
-        MetricNameMaker::make("metrics.prometheus_file_exporter.writes");
+        MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.writes");
     static constexpr MetricName kPrometheusFileExporterWritesFailed =
-        MetricNameMaker::make("metrics.prometheus_file_exporter.failed_writes");
+        MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.failed_writes");
     static constexpr MetricName kPrometheusFileExporterWritesSkipped =
-        MetricNameMaker::make("metrics.prometheus_file_exporter.skipped_writes");
+        MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.skipped_writes");
     static constexpr MetricName kPrometheusFileExporterWriteDuration =
-        MetricNameMaker::make("metrics.prometheus_file_exporter.write_duration");
+        MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.write_duration");
     static constexpr MetricName kPrometheusFileExporterWriteSize =
-        MetricNameMaker::make("metrics.prometheus_file_exporter.write_size");
+        MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.write_size");
     static constexpr MetricName kIngressTLSHandshakeLatency =
-        MetricNameMaker::make("network.ingress_tls_handshake_latency");
+        MetricNameMaker::make("mongodb.network.ingress_tls_handshake_latency");
     static constexpr MetricName kConnectionsCurrent =
-        MetricNameMaker::make("serverStatus.connections.current");
+        MetricNameMaker::make("mongodb.serverStatus.connections.current");
     static constexpr MetricName kConnectionsAvailable =
-        MetricNameMaker::make("serverStatus.connections.available");
+        MetricNameMaker::make("mongodb.serverStatus.connections.available");
     static constexpr MetricName kConnectionsTotalCreated =
-        MetricNameMaker::make("serverStatus.connections.totalCreated");
+        MetricNameMaker::make("mongodb.serverStatus.connections.totalCreated");
     static constexpr MetricName kConnectionsRejected =
-        MetricNameMaker::make("serverStatus.connections.rejected");
+        MetricNameMaker::make("mongodb.serverStatus.connections.rejected");
     static constexpr MetricName kConnectionsActive =
-        MetricNameMaker::make("serverStatus.connections.active");
+        MetricNameMaker::make("mongodb.serverStatus.connections.active");
+    static constexpr MetricName kConnectionsBackpressureVersionsCurrent =
+        MetricNameMaker::make("mongodb.serverStatus.connections.backpressureVersions.current");
+    static constexpr MetricName kConnectionsBackpressureVersionsTotal =
+        MetricNameMaker::make("mongodb.serverStatus.connections.backpressureVersions.total");
     static constexpr MetricName kMongoDBBuildInfo = MetricNameMaker::make("mongodb.build.info");
+
+    // WiredTiger metrics
+    static constexpr MetricName kEvictionCallsToGetAPageFoundQueueEmpty = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.eviction_calls_to_get_a_page_found_queue_empty");
+    static constexpr MetricName kEvictionEmptyScore =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.eviction_empty_score");
+    static constexpr MetricName kEvictPageAttemptsByEvictionWorkerThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.evict_page_attempts_by_eviction_worker_threads");
+    static constexpr MetricName kEvictPageFailuresByEvictionWorkerThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.evict_page_failures_by_eviction_worker_threads");
+    static constexpr MetricName kEvictionWorkerThreadActive = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.eviction_worker_thread_active");
+    static constexpr MetricName kEvictionWorkerThreadStableNumber = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.eviction_worker_thread_stable_number");
+    static constexpr MetricName kPageEvictAttemptsByApplicationThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.page_evict_attempts_by_application_threads");
+    static constexpr MetricName kPageEvictFailuresByApplicationThreads = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.page_evict_failures_by_application_threads");
+    static constexpr MetricName kConnectionDataHandlesCurrentlyActive = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.data-handle.connection_data_handles_currently_active");
+    static constexpr MetricName kTransactionCheckpointMostRecentTime = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.transaction.transaction_checkpoint_most_recent_time_"
+        "msecs");
+    static constexpr MetricName kConcurrentTransactionsReadAvailable = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.concurrentTransactions.read.available");
+    static constexpr MetricName kConcurrentTransactionsWriteAvailable = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.concurrentTransactions.write.available");
+    static constexpr MetricName kBytesReadIntoCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.bytes_read_into_cache");
+    static constexpr MetricName kBytesWrittenFromCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.bytes_written_from_cache");
+    static constexpr MetricName kBytesCurrentlyInTheCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.bytes_currently_in_the_cache");
+    static constexpr MetricName kTrackedDirtyBytesInTheCache = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.tracked_dirty_bytes_in_the_cache");
+    static constexpr MetricName kMaximumBytesConfigured =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.maximum_bytes_configured");
+    static constexpr MetricName kPagesReadIntoCache =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.cache.pages_read_into_cache");
+    static constexpr MetricName kPagesRequestedFromTheCache = MetricNameMaker::make(
+        "mongodb.serverStatus.wiredTiger.cache.pages_requested_from_the_cache");
+    // Keeping these scoped to serverStatus for consistency with every other metric avoids
+    // confusion.
+    static constexpr MetricName kWiredTigerCollectErrors =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.collectErrors");
+    static constexpr MetricName kWiredTigerEngineNotReadyErrors =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.engineNotReadyErrors");
+    static constexpr MetricName kTicketingSystemCollectErrors =
+        MetricNameMaker::make("mongodb.serverStatus.wiredTiger.ticketingSystem.collectErrors");
 
     // Ingress Request Rate Limiter (Admission Control) Metrics. These mirror the fields that
     // RateLimiter::appendStats() historically reported under
     static constexpr MetricName kIngressRequestRateLimiterAttemptedAdmissions =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.attemptedAdmissions");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.attemptedAdmissions");
     static constexpr MetricName kIngressRequestRateLimiterSuccessfulAdmissions =
         MetricNameMaker::make(
-            "serverStatus.network.ingressRequestRateLimiter.successfulAdmissions");
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.successfulAdmissions");
     static constexpr MetricName kIngressRequestRateLimiterRejectedAdmissions =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.rejectedAdmissions");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.rejectedAdmissions");
     static constexpr MetricName kIngressRequestRateLimiterExemptedAdmissions =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.exemptedAdmissions");
-    static constexpr MetricName kIngressRequestRateLimiterAddedToQueue =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.addedToQueue");
-    static constexpr MetricName kIngressRequestRateLimiterRemovedFromQueue =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.removedFromQueue");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.exemptedAdmissions");
+    static constexpr MetricName kIngressRequestRateLimiterAddedToQueue = MetricNameMaker::make(
+        "mongodb.serverStatus.network.ingressRequestRateLimiter.addedToQueue");
+    static constexpr MetricName kIngressRequestRateLimiterRemovedFromQueue = MetricNameMaker::make(
+        "mongodb.serverStatus.network.ingressRequestRateLimiter.removedFromQueue");
     static constexpr MetricName kIngressRequestRateLimiterInterruptedInQueue =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.interruptedInQueue");
-    static constexpr MetricName kIngressRequestRateLimiterTokensAcquired =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.tokensAcquired");
-    static constexpr MetricName kIngressRequestRateLimiterCurrentQueueDepth =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.currentQueueDepth");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.interruptedInQueue");
+    static constexpr MetricName kIngressRequestRateLimiterTokensAcquired = MetricNameMaker::make(
+        "mongodb.serverStatus.network.ingressRequestRateLimiter.tokensAcquired");
+    static constexpr MetricName kIngressRequestRateLimiterCurrentQueueDepth = MetricNameMaker::make(
+        "mongodb.serverStatus.network.ingressRequestRateLimiter.currentQueueDepth");
     static constexpr MetricName kIngressRequestRateLimiterTotalAvailableTokens =
         MetricNameMaker::make(
-            "serverStatus.network.ingressRequestRateLimiter.totalAvailableTokens");
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.totalAvailableTokens");
     static constexpr MetricName kIngressRequestRateLimiterAverageTimeQueuedMicros =
         MetricNameMaker::make(
-            "serverStatus.network.ingressRequestRateLimiter.averageTimeQueuedMicros");
-    static constexpr MetricName kIngressRequestRateLimiterTimeQueuedMicros =
-        MetricNameMaker::make("serverStatus.network.ingressRequestRateLimiter.timeQueuedMicros");
+            "mongodb.serverStatus.network.ingressRequestRateLimiter.averageTimeQueuedMicros");
+    static constexpr MetricName kIngressRequestRateLimiterTimeQueuedMicros = MetricNameMaker::make(
+        "mongodb.serverStatus.network.ingressRequestRateLimiter.timeQueuedMicros");
+
+    // OpenTelemetry Tracing Sampler Metrics
+    static constexpr MetricName kOtelTracingSamplerInternalSpanRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.internalSpans.rateLimiter.successfulAdmissions");
+    static constexpr MetricName kOtelTracingSamplerInternalSpanRateLimiterRejectedAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.internalSpans.rateLimiter.rejectedAdmissions");
+    static constexpr MetricName kOtelTracingSamplerExternalSpanRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.externalSpan.rateLimiter.successfulAdmissions");
+    static constexpr MetricName kOtelTracingSamplerExternalSpanRateLimiterRejectedAdmissions =
+        MetricNameMaker::make(
+            "serverStatus.otelTracingSampler.externalSpan.rateLimiter.rejectedAdmissions");
+
+    // Egress Response Rate Limiter (Admission Control) Metrics. These mirror the fields that
+    // RateLimiter::appendStats() reports under serverStatus.network.egressResponseRateLimiter.
+    static constexpr MetricName kEgressResponseRateLimiterAttemptedAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.attemptedAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterSuccessfulAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.successfulAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterRejectedAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.rejectedAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterExemptedAdmissions =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.exemptedAdmissions");
+    static constexpr MetricName kEgressResponseRateLimiterAddedToQueue = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.addedToQueue");
+    static constexpr MetricName kEgressResponseRateLimiterRemovedFromQueue = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.removedFromQueue");
+    static constexpr MetricName kEgressResponseRateLimiterInterruptedInQueue =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.interruptedInQueue");
+    static constexpr MetricName kEgressResponseRateLimiterTokensAcquired = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.tokensAcquired");
+    static constexpr MetricName kEgressResponseRateLimiterCurrentQueueDepth = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.currentQueueDepth");
+    static constexpr MetricName kEgressResponseRateLimiterTotalAvailableTokens =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.totalAvailableTokens");
+    static constexpr MetricName kEgressResponseRateLimiterAverageTimeQueuedMicros =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.network.egressResponseRateLimiter.averageTimeQueuedMicros");
+    static constexpr MetricName kEgressResponseRateLimiterTimeQueuedMicros = MetricNameMaker::make(
+        "mongodb.serverStatus.network.egressResponseRateLimiter.timeQueuedMicros");
 
     // Query Execution Team Metrics
+    static constexpr MetricName kQueryMemoryLoadSheddingOperationsShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.operationsShed");
+    static constexpr MetricName kQueryMemoryLoadSheddingIdleCursorsShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.idleCursorsShed");
+    static constexpr MetricName kQueryMemoryLoadSheddingIdleCursorBytesShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.idleCursorBytesShed");
     static constexpr MetricName kChangeStreamCursorsTotalOpened =
-        MetricNameMaker::make("change_streams.cursor.total_opened");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.totalOpened");
     static constexpr MetricName kChangeStreamCursorsLifespan =
-        MetricNameMaker::make("change_streams.cursor.lifespan");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.lifespan");
     static constexpr MetricName kChangeStreamCursorsOpenTotal =
-        MetricNameMaker::make("change_streams.cursor.open.total");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.open.total");
     static constexpr MetricName kChangeStreamCursorsOpenPinned =
-        MetricNameMaker::make("change_streams.cursor.open.pinned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.open.pinned");
+    static constexpr MetricName kChangeStreamCursorsOpenOptimeMin =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.open.optime.min");
+    static constexpr MetricName kChangeStreamCursorsOpenOptimeMax =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.open.optime.max");
+    static constexpr MetricName kChangeStreamBatchExecMicrosSum =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.batch.execMicros.sum");
+    static constexpr MetricName kChangeStreamBatchShardLatencyMicrosSum = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.batch.shardLatencyMicros.sum");
+    static constexpr MetricName kChangeStreamBatchConfigLatencyMicrosSum = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.batch.configLatencyMicros.sum");
+
+    // BatchedEnrichmentStage's batch count. Counted before beginBatch(), so it can include
+    // failed batch openings.
+    static constexpr MetricName kChangeStreamUpdateLookupEnrichBatchesStarted =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.updateLookup.enrichBatchesStarted");
+    static constexpr MetricName kSearchIdLookupEnrichBatchesStarted =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.enrichBatchesStarted");
+
+    // Per-(consumer x engine) single-document lookup metrics for change stream updateLookup.
+    static constexpr MetricName kChangeStreamUpdateLookupExpressFound = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.express.found");
+    static constexpr MetricName kChangeStreamUpdateLookupExpressNotFound = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.express.notFound");
+    static constexpr MetricName kChangeStreamUpdateLookupExpressNotHandled = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.express.notHandled");
+    static constexpr MetricName kChangeStreamUpdateLookupExpressLatency = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.express.latencyMicros");
+    static constexpr MetricName kChangeStreamUpdateLookupAggregationFound = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.aggregation.found");
+    static constexpr MetricName kChangeStreamUpdateLookupAggregationNotFound =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.updateLookup.aggregation.notFound");
+    static constexpr MetricName kChangeStreamUpdateLookupAggregationNotHandled =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.updateLookup.aggregation.notHandled");
+    static constexpr MetricName kChangeStreamUpdateLookupAggregationLatency = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.aggregation.latencyMicros");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.updateLookup.sbe.found");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeNotFound = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.sbe.notFound");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeNotHandled = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.sbe.notHandled");
+    static constexpr MetricName kChangeStreamUpdateLookupSbeLatency = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.updateLookup.sbe.latencyMicros");
+    // Per-(consumer x engine) single-document lookup metrics for search idLookup.
+    static constexpr MetricName kSearchIdLookupSbeFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.found");
+    static constexpr MetricName kSearchIdLookupSbeNotFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.notFound");
+    static constexpr MetricName kSearchIdLookupSbeNotHandled =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.notHandled");
+    static constexpr MetricName kSearchIdLookupSbeLatency =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.sbe.latencyMicros");
+    static constexpr MetricName kSearchIdLookupAggregationFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.aggregation.found");
+    static constexpr MetricName kSearchIdLookupAggregationNotFound =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.search.idLookup.aggregation.notFound");
+    static constexpr MetricName kSearchIdLookupAggregationNotHandled = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.search.idLookup.aggregation.notHandled");
+    static constexpr MetricName kSearchIdLookupAggregationLatency = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.search.idLookup.aggregation.latencyMicros");
+
     static constexpr MetricName kChangeStreamErrorNonRetriableHistoryLost = MetricNameMaker::make(
-        "serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamHistoryLost");
+        "mongodb.serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamHistoryLost");
     static constexpr MetricName kChangeStreamErrorNonRetriableFatalError = MetricNameMaker::make(
-        "serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamFatalError");
+        "mongodb.serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamFatalError");
     static constexpr MetricName kChangeStreamErrorNonRetriableBsonObjectTooLarge =
         MetricNameMaker::make(
-            "serverStatus.metrics.changeStreams.error.nonRetriable.bsonObjectTooLarge");
-    static constexpr MetricName kChangeStreamErrorNonRetriableOther =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.error.nonRetriable.other");
+            "mongodb.serverStatus.metrics.changeStreams.error.nonRetriable.bsonObjectTooLarge");
+    static constexpr MetricName kChangeStreamErrorNonRetriableOther = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.error.nonRetriable.other");
     static constexpr MetricName kChangeStreamErrorRetriableInterruptedDueToReplStateChange =
         MetricNameMaker::make(
-            "serverStatus.metrics.changeStreams.error.retriable.interruptedDueToReplStateChange");
+            "mongodb.serverStatus.metrics.changeStreams.error.retriable."
+            "interruptedDueToReplStateChange");
     static constexpr MetricName kChangeStreamErrorRetriableOther =
-        MetricNameMaker::make("serverStatus.metrics.changeStreams.error.retriable.other");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.error.retriable.other");
+    static constexpr MetricName kChangeStreamOptionShowExpandedEvents = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.showExpandedEvents");
+    static constexpr MetricName kChangeStreamOptionShowMigrationEvents = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.showMigrationEvents");
+    static constexpr MetricName kChangeStreamOptionShowSystemEvents =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.showSystemEvents");
+    static constexpr MetricName kChangeStreamOptionShowRawUpdateDescription = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.showRawUpdateDescription");
+    static constexpr MetricName kChangeStreamOptionIgnoreRemovedShards = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.ignoreRemovedShards");
+    static constexpr MetricName kChangeStreamOptionMatchCollectionUUIDForUpdateLookup =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.option.matchCollectionUUIDForUpdateLookup");
+    static constexpr MetricName kChangeStreamOptionStartAfter =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.startAfter");
+    static constexpr MetricName kChangeStreamOptionResumeAfter =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.resumeAfter");
+    static constexpr MetricName kChangeStreamOptionStartAtOperationTime = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.startAtOperationTime");
+    static constexpr MetricName kChangeStreamOptionFullDocumentRequired = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.fullDocument.required");
+    static constexpr MetricName kChangeStreamOptionFullDocumentUpdateLookup = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.changeStreams.option.fullDocument.updateLookup");
+    static constexpr MetricName kChangeStreamOptionFullDocumentWhenAvailable =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.option.fullDocument.whenAvailable");
+    static constexpr MetricName kChangeStreamOptionFullDocumentBeforeChangeRequired =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.option.fullDocumentBeforeChange.required");
+    static constexpr MetricName kChangeStreamOptionFullDocumentBeforeChangeWhenAvailable =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.option.fullDocumentBeforeChange."
+            "whenAvailable");
+    static constexpr MetricName kChangeStreamScopeCluster =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.scope.cluster");
+    static constexpr MetricName kChangeStreamScopeDb =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.scope.db");
+    static constexpr MetricName kChangeStreamScopeCollection =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.scope.collection");
+    static constexpr MetricName kChangeStreamOptionCursorBatchSize =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.cursor.batchSize");
+    static constexpr MetricName kChangeStreamOptionCursorMaxTimeMS =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.option.cursor.maxTimeMS");
+    static constexpr MetricName kChangeStreamCursorDocsReturned =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.docsReturned");
+    static constexpr MetricName kChangeStreamCursorBytesReturned =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.bytesReturned");
+    static constexpr MetricName kChangeStreamCursorBatchesReturned =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.batchesReturned");
+    static constexpr MetricName kChangeStreamCursorDocsExamined =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.docsExamined");
+    static constexpr MetricName kChangeStreamCursorBytesRead =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.bytesRead");
+
+    // Per-state entry counters for the v2 change stream topology-handler stage's state machine.
+    // 'kUninitialized' has no counter: it is the initial state and transitions back to it are
+    // forbidden, so an entry counter would read zero forever.
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateWaiting =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState.waiting");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateFetchingInitialization =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+            "fetchingInitialization");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateFetchingGettingChangeEvent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+            "fetchingGettingChangeEvent");
+    static constexpr MetricName
+        kChangeStreamShardTargetingTopologyStateFetchingStartingChangeStreamSegment =
+            MetricNameMaker::make(
+                "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+                "fetchingStartingChangeStreamSegment");
+    static constexpr MetricName
+        kChangeStreamShardTargetingTopologyStateFetchingNormalGettingChangeEvent =
+            MetricNameMaker::make(
+                "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+                "fetchingNormalGettingChangeEvent");
+    static constexpr MetricName
+        kChangeStreamShardTargetingTopologyStateFetchingDegradedGettingChangeEvent =
+            MetricNameMaker::make(
+                "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+                "fetchingDegradedGettingChangeEvent");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateDowngrading =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState.downgrading");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateFinal =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState.final");
+
+    // Gauge for the number of v2 change streams currently in degraded mode.
+    static constexpr MetricName kChangeStreamShardTargetingDegraded =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.shardTargeting.degraded");
+
+    // Per-(scope, db-presence) counters for the v2 change stream shard targeters' event-handler
+    // installations. The collection- and database-scoped targeters install a db-present or
+    // db-absent handler whenever they (re-)initialize; the all-databases targeter does not use
+    // the db-present/db-absent split and gets a single install counter.
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeCollectionDbPresent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.collection."
+            "dbPresent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeCollectionDbAbsent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.collection."
+            "dbAbsent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeDatabaseDbPresent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.database."
+            "dbPresent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeDatabaseDbAbsent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.database."
+            "dbAbsent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeAllDatabases =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.allDatabases");
+
+    // Counters for the control events observed by the v2 change stream shard targeter.
+    static constexpr MetricName kChangeStreamShardTargetingControlEventMoveChunk =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents.moveChunk");
+    static constexpr MetricName kChangeStreamShardTargetingControlEventMovePrimary =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents.movePrimary");
+    static constexpr MetricName kChangeStreamShardTargetingControlEventNamespacePlacementChanged =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents."
+            "namespacePlacementChanged");
+    static constexpr MetricName kChangeStreamShardTargetingControlEventDatabaseCreated =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents."
+            "databaseCreated");
+
+    // Outcome counters and latency histogram for the placement-history lookups issued by the v2
+    // change stream shard targeter (all callers of HistoricalPlacementFetcherImpl::fetch()).
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupOk =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup.ok");
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupFutureClusterTime =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
+            "futureClusterTime");
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupNotAvailable =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
+            "notAvailable");
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupLatencyMillis =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
+            "latencyMillis");
 
     // Storage Execution Team Metrics
-    static constexpr MetricName kIndexBuildsActive = MetricNameMaker::make("index_builds.active");
-    static constexpr MetricName kIndexBuildsStarted = MetricNameMaker::make("index_builds.started");
+    static constexpr MetricName kIndexBuildsActive =
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.active");
+    static constexpr MetricName kIndexBuildsStarted =
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.started");
     static constexpr MetricName kIndexBuildsSucceeded =
-        MetricNameMaker::make("index_builds.succeeded");
-    static constexpr MetricName kIndexBuildsFailed = MetricNameMaker::make("index_builds.failed");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.succeeded");
+    static constexpr MetricName kIndexBuildsFailed =
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.failed");
     static constexpr MetricName kIndexBuildsToBeResumed =
-        MetricNameMaker::make("index_builds.to_be_resumed");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.to_be_resumed");
     static constexpr MetricName kIndexBuildSideWritesInserted =
-        MetricNameMaker::make("index_builds.side_writes.inserted");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.inserted");
     static constexpr MetricName kIndexBuildSideWritesDeleted =
-        MetricNameMaker::make("index_builds.side_writes.deleted");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.deleted");
     static constexpr MetricName kIndexBuildSideWritesDrained =
-        MetricNameMaker::make("index_builds.side_writes.drained");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drained");
     static constexpr MetricName kIndexBuildSideWritesDrainDuration =
-        MetricNameMaker::make("index_builds.side_writes.drain_duration");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drainDuration");
     static constexpr MetricName kIndexBuildSideWritesDrainBytes =
-        MetricNameMaker::make("index_builds.side_writes.drain_bytes");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drainBytes");
     static constexpr MetricName kIndexBuildSideWritesDrainYields =
-        MetricNameMaker::make("index_builds.side_writes.drain_yields");
-    static constexpr MetricName kReplicatedFastCountIsRunning =
-        MetricNameMaker::make("replicated_fast_count.is_running");
-    static constexpr MetricName kReplicatedFastCountFlushSuccessCount =
-        MetricNameMaker::make("replicated_fast_count.flush.success_count");
-    static constexpr MetricName kReplicatedFastCountFlushFailureCount =
-        MetricNameMaker::make("replicated_fast_count.flush.failure_count");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.sideWrites.drainYields");
+    static constexpr MetricName kReplicatedFastCountFlushSuccessCount = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.flush.successCount");
+    static constexpr MetricName kReplicatedFastCountFlushFailureCount = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.flush.failureCount");
     static constexpr MetricName kReplicatedFastCountFlushTimeMsMin =
-        MetricNameMaker::make("replicated_fast_count.flush_time.min");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.flushTime.min");
     static constexpr MetricName kReplicatedFastCountFlushTimeMsMax =
-        MetricNameMaker::make("replicated_fast_count.flush_time.max");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.flushTime.max");
     static constexpr MetricName kReplicatedFastCountFlushTimeMsTotal =
-        MetricNameMaker::make("replicated_fast_count.flush_time.total");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.flushTime.total");
     static constexpr MetricName kReplicatedFastCountFlushedDocsMin =
-        MetricNameMaker::make("replicated_fast_count.flushed_docs.min");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.flushed_docs.min");
     static constexpr MetricName kReplicatedFastCountFlushedDocsMax =
-        MetricNameMaker::make("replicated_fast_count.flushed_docs.max");
-    static constexpr MetricName kReplicatedFastCountFlushedDocsTotal =
-        MetricNameMaker::make("replicated_fast_count.flushed_docs.total");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.flushed_docs.max");
+    static constexpr MetricName kReplicatedFastCountFlushedDocsTotal = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.flushed_docs.total");
     static constexpr MetricName kReplicatedFastCountInsertCount =
-        MetricNameMaker::make("replicated_fast_count.insert_count");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.insertCount");
     static constexpr MetricName kReplicatedFastCountUpdateCount =
-        MetricNameMaker::make("replicated_fast_count.update_count");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.updateCount");
     static constexpr MetricName kReplicatedFastCountCheckpointOplogEntriesProcessed =
-        MetricNameMaker::make("replicated_fast_count.checkpoint.oplog_entries_processed");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.checkpoint.oplogEntriesProcessed");
     static constexpr MetricName kReplicatedFastCountCheckpointOplogEntriesSkipped =
-        MetricNameMaker::make("replicated_fast_count.checkpoint.oplog_entries_skipped");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.checkpoint.oplogEntriesSkipped");
     static constexpr MetricName kReplicatedFastCountCheckpointSizeCountEntriesProcessed =
-        MetricNameMaker::make("replicated_fast_count.checkpoint.size_count_entries_processed");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.checkpoint."
+            "sizeCountEntriesProcessed");
+    static constexpr MetricName kReplicatedFastCountCheckpointsValidated = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.checkpointsValidated");
     static constexpr MetricName kReplicatedFastCountOplogLagSecs =
-        MetricNameMaker::make("replicated_fast_count.oplog_lag_secs");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.oplogLagSecs");
+    static constexpr MetricName kReplicatedFastCountTailerIsRunning =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.tailer.isRunning");
+    static constexpr MetricName kReplicatedFastCountFlusherIsRunning =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.flusher.isRunning");
+    static constexpr MetricName kReplicatedFastCountTailerFailureCount = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.tailer.failureCount");
+    static constexpr MetricName kReplicatedFastCountFlushRetriedCount = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.flush.retriedCount");
+    static constexpr MetricName kReplicatedFastCountTailerRetriedScanCount = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.tailer.retriedScanCount");
+    static constexpr MetricName kReplicatedFastCountWatermarksWritten =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.watermarksWritten");
+    static constexpr MetricName kReplicatedFastCountTailerWatermarksSeen = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.tailer.watermarksSeen");
+    static constexpr MetricName kReplicatedFastCountWatermarkAwaitTimeMsTotal =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.flush.watermarkAwaitTime.total");
 
-    static constexpr MetricName kIndexBuildKeysInsertedFromScan =
-        MetricNameMaker::make("index_builds.keys_inserted_from_scan");
+    static constexpr MetricName kInternodeConsistencyHashMismatchInsert = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.insert");
+    static constexpr MetricName kInternodeConsistencyHashMismatchUpdate = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.update");
+    static constexpr MetricName kInternodeConsistencyHashMismatchDelete = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.delete");
+
+    static constexpr MetricName kIndexBuildCompletedDurationMillis =
+        MetricNameMaker::make("mongodb.index_builds.completed.duration_millis");
+    static constexpr MetricName kIndexBuildCompletedKeysWritten =
+        MetricNameMaker::make("mongodb.index_builds.completed.keys_written");
+    static constexpr MetricName kIndexBuildCompletedBytesWritten =
+        MetricNameMaker::make("mongodb.index_builds.completed.data_written");
+    static constexpr MetricName kIndexBuildKeysProcessed =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.keysProcessed");
+    static constexpr MetricName kIndexBuildBytesProcessed =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.bytesProcessed");
+    static constexpr MetricName kIndexBuildPhasesDuration =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.phaseDurationMicros");
     static constexpr MetricName kIndexBuildDocsScanned =
-        MetricNameMaker::make("index_builds.docs_scanned");
-    static constexpr MetricName kIndexBuildKeysGeneratedFromScan =
-        MetricNameMaker::make("index_builds.keys_generated_from_scan");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.docsScanned");
+    static constexpr MetricName kIndexBuildBytesScanned =
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.bytesScanned");
     static constexpr MetricName kIndexBuildResumeSucceeded =
-        MetricNameMaker::make("index_builds.resume.succeeded");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.resume.succeeded");
     static constexpr MetricName kIndexBuildResumeFailed =
-        MetricNameMaker::make("index_builds.resume.failed");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.resume.failed");
 
     static constexpr MetricName kTtlPasses =
-        MetricNameMaker::make("serverStatus.metrics.ttl.passes");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.passes");
     static constexpr MetricName kTtlSubPasses =
-        MetricNameMaker::make("serverStatus.metrics.ttl.subPasses");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.subPasses");
     static constexpr MetricName kTtlDuration =
-        MetricNameMaker::make("serverStatus.metrics.ttl.durationMicros");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.durationMicros");
     static constexpr MetricName kTtlDeletedDocuments =
-        MetricNameMaker::make("serverStatus.metrics.ttl.deletedDocuments");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.deletedDocuments");
     static constexpr MetricName kTtlDeletedKeys =
-        MetricNameMaker::make("serverStatus.metrics.ttl.deletedKeys");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.deletedKeys");
     static constexpr MetricName kTtlExaminedDocuments =
-        MetricNameMaker::make("serverStatus.metrics.ttl.examinedDocuments");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.examinedDocuments");
     static constexpr MetricName kTtlExaminedKeys =
-        MetricNameMaker::make("serverStatus.metrics.ttl.examinedKeys");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.examinedKeys");
     static constexpr MetricName kTtlInvalidTtlIndexSkips =
-        MetricNameMaker::make("serverStatus.metrics.ttl.invalidTTLIndexSkips");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.invalidTTLIndexSkips");
+    static constexpr MetricName kTtlTimeQueuedForTickets =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.timeQueuedForTicketsMicros");
+    static constexpr MetricName kTtlTimeProcessingWithTickets =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.timeProcessingWithTicketsMicros");
+    static constexpr MetricName kTtlTicketAdmissions =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.ticketAdmissions");
+    static constexpr MetricName kTtlLowPriorityTicketAdmissions =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.lowPriorityTicketAdmissions");
+    static constexpr MetricName kTtlQueuedForTickets =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.ttl.queuedForTickets");
     static constexpr MetricName kIndexCount =
-        MetricNameMaker::make("serverStatus.indexStats.count");
+        MetricNameMaker::make("mongodb.serverStatus.indexStats.count");
     static constexpr MetricName kIndexStatsMultikeyNewPathsOrdinaryInTransaction =
-        MetricNameMaker::make("serverStatus.indexStats.multikey.newPaths.ordinary.inTransaction");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.indexStats.multikey.newPaths.ordinary.inTransaction");
     static constexpr MetricName kIndexStatsMultikeyNewPathsOrdinaryOutsideTransaction =
         MetricNameMaker::make(
-            "serverStatus.indexStats.multikey.newPaths.ordinary.outsideTransaction");
+            "mongodb.serverStatus.indexStats.multikey.newPaths.ordinary.outsideTransaction");
     static constexpr MetricName kIndexStatsMultikeyNewPathsWildcardInTransaction =
-        MetricNameMaker::make("serverStatus.indexStats.multikey.newPaths.wildcard.inTransaction");
+        MetricNameMaker::make(
+            "mongodb.serverStatus.indexStats.multikey.newPaths.wildcard.inTransaction");
     static constexpr MetricName kIndexStatsMultikeyNewPathsWildcardOutsideTransaction =
         MetricNameMaker::make(
-            "serverStatus.indexStats.multikey.newPaths.wildcard.outsideTransaction");
+            "mongodb.serverStatus.indexStats.multikey.newPaths.wildcard.outsideTransaction");
     static constexpr MetricName kIndexStatsMultikeySideTransactions =
-        MetricNameMaker::make("serverStatus.indexStats.multikey.sideTransactions");
+        MetricNameMaker::make("mongodb.serverStatus.indexStats.multikey.sideTransactions");
 
     static constexpr MetricName kIndexBuildsTotal =
-        MetricNameMaker::make("serverStatus.indexBuilds.total");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.total");
     static constexpr MetricName kIndexBuildPhasesCommit =
-        MetricNameMaker::make("serverStatus.indexBuilds.phases.commit");
+        MetricNameMaker::make("mongodb.serverStatus.indexBuilds.phases.commit");
+    static constexpr MetricName kIndexBuildsLastCommittedMillis = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.indexBuilds.phases.lastCommittedMillis");
 
     static constexpr MetricName kIndexBulkBuilderNumSorted =
-        MetricNameMaker::make("serverStatus.indexBulkBuilder.numSorted");
+        MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.numSorted");
     static constexpr MetricName kIndexBulkBuilderBytesSorted =
-        MetricNameMaker::make("serverStatus.indexBulkBuilder.bytesSorted");
+        MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.bytesSorted");
     static constexpr MetricName kIndexBulkBuilderBytesSpilled =
-        MetricNameMaker::make("serverStatus.indexBulkBuilder.bytesSpilled");
+        MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.bytesSpilled");
     static constexpr MetricName kIndexBulkBuilderBytesSpilledUncompressed =
-        MetricNameMaker::make("serverStatus.indexBulkBuilder.bytesSpilledUncompressed");
+        MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.bytesSpilledUncompressed");
     static constexpr MetricName kIndexBulkBuilderMemUsage =
-        MetricNameMaker::make("serverStatus.indexBulkBuilder.memUsage");
+        MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.memUsage");
     static constexpr MetricName kIndexBulkBuilderSpilledRanges =
-        MetricNameMaker::make("serverStatus.indexBulkBuilder.spilledRanges");
+        MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.spilledRanges");
+    static constexpr MetricName kBatchedWriteApplyOpsChainsTotal =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.batchedWrites.applyOpsChains.total");
+    static constexpr MetricName kBatchedWriteApplyOpsChainsWithContainerOps = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.batchedWrites.applyOpsChains.withContainerOps");
 
     // Replication Team Metrics
-    static constexpr MetricName kOplogApplyBytes = MetricNameMaker::make("oplog.apply.bytes");
+    static constexpr MetricName kOplogApplyBytes =
+        MetricNameMaker::make("mongodb.oplog.apply.bytes");
     static constexpr MetricName kOplogApplyBufferCount =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.count");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.apply.count");
     static constexpr MetricName kOplogApplyBufferSize =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.sizeBytes");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.apply.sizeBytes");
     static constexpr MetricName kOplogApplyBufferMaxSize =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.maxSizeBytes");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.apply.maxSizeBytes");
     static constexpr MetricName kOplogApplyBufferMaxCount =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.maxCount");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.apply.maxCount");
     static constexpr MetricName kOplogWriteBufferCount =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.count");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.write.count");
     static constexpr MetricName kOplogWriteBufferSize =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.sizeBytes");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.write.sizeBytes");
     static constexpr MetricName kOplogWriteBufferMaxSize =
-        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.maxSizeBytes");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.buffer.write.maxSizeBytes");
     static constexpr MetricName kApplyBatchesNum =
-        MetricNameMaker::make("serverStatus.metrics.repl.apply.batches.num");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.apply.batches.num");
     static constexpr MetricName kApplyBatchesTotalMillis =
-        MetricNameMaker::make("serverStatus.metrics.repl.apply.batches.totalMillis");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.apply.batches.totalMillis");
     static constexpr MetricName kInitialSyncFailedAttempts =
-        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failedAttempts");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.initialSync.failedAttempts");
     static constexpr MetricName kInitialSyncFailures =
-        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failures");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.initialSync.failures");
     static constexpr MetricName kInitialSyncCompleted =
-        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.completed");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.initialSync.completed");
+    static constexpr MetricName kReplNetworkBytes =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.network.bytes");
+    static constexpr MetricName kReplNetworkBytesSent =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.network.bytesSent");
     static constexpr MetricName kGetLastErrorWtimeNum =
-        MetricNameMaker::make("serverStatus.metrics.getLastError.wtime.num");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.wtime.num");
     static constexpr MetricName kGetLastErrorWtimeTotalMillis =
-        MetricNameMaker::make("serverStatus.metrics.getLastError.wtime.totalMillis");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.wtime.totalMillis");
     static constexpr MetricName kGetLastErrorWtimeouts =
-        MetricNameMaker::make("serverStatus.metrics.getLastError.wtimeouts");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.wtimeouts");
     static constexpr MetricName kGetLastErrorDefaultWtimeouts =
-        MetricNameMaker::make("serverStatus.metrics.getLastError.default.wtimeouts");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.default.wtimeouts");
     static constexpr MetricName kGetLastErrorDefaultUnsatisfiable =
-        MetricNameMaker::make("serverStatus.metrics.getLastError.default.unsatisfiable");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.default.unsatisfiable");
+    static constexpr MetricName kPipelinedApplyOpsDispatched =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.opsDispatched");
+    static constexpr MetricName kPipelinedApplyOpsAppliedByWorkers = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.pipelinedApply.opsAppliedByWorkers");
+    static constexpr MetricName kPipelinedApplyOpsDrained =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.opsDrained");
+    static constexpr MetricName kPipelinedApplyOpsQueued =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.opsQueued");
+    static constexpr MetricName kPipelinedApplyQueueDepthMin =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.queueDepthMin");
+    static constexpr MetricName kPipelinedApplyQueueDepthMax =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.queueDepthMax");
+    static constexpr MetricName kPipelinedApplyLastAppliedAdvancements = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.pipelinedApply.lastAppliedAdvancements");
 
-    // Query Integration Team Metrics
+
+    // DB Integration & Observability Team Metrics
 
     // System Health
-    static constexpr MetricName kCpuTime = MetricNameMaker::make("mongodb.cpu.time");
-    static constexpr MetricName kCpuUtilization = MetricNameMaker::make("mongodb.cpu.utilization");
-    static constexpr MetricName kThreadActive = MetricNameMaker::make("mongodb.thread.active");
-    static constexpr MetricName kThreadQueued = MetricNameMaker::make("mongodb.thread.queued");
-    static constexpr MetricName kFdOpen = MetricNameMaker::make("mongodb.fd.open");
+    static constexpr MetricName kCpuTime = MetricNameMaker::make("mongodb.system.cpu.time");
+    static constexpr MetricName kCpuUtilization =
+        MetricNameMaker::make("mongodb.system.cpu.utilization");
+    static constexpr MetricName kThreadActive =
+        MetricNameMaker::make("mongodb.system.thread.active");
+    static constexpr MetricName kThreadQueued =
+        MetricNameMaker::make("mongodb.system.thread.queued");
+    static constexpr MetricName kFdOpen = MetricNameMaker::make("mongodb.system.fd.open");
     static constexpr MetricName kSystemHealthCollectErrors =
         MetricNameMaker::make("mongodb.systemHealth.collectErrors");
 
+    static constexpr MetricName kProcessCpuTime = MetricNameMaker::make("mongodb.process.cpu.time");
+    static constexpr MetricName kProcessCpuUtilization =
+        MetricNameMaker::make("mongodb.process.cpu.utilization");
+    static constexpr MetricName kProcessContextSwitches =
+        MetricNameMaker::make("mongodb.process.context.switch");
+    static constexpr MetricName kProcessThreadCount =
+        MetricNameMaker::make("mongodb.process.threads.count");
+    static constexpr MetricName kProcessPagingFaults =
+        MetricNameMaker::make("mongodb.process.paging.faults");
+    static constexpr MetricName kProcessHealthCollectErrors =
+        MetricNameMaker::make("mongodb.process.collectErrors");
+
     // Global Lock
     static constexpr MetricName kGlobalLockTotalTime =
-        MetricNameMaker::make("serverStatus.globalLock.totalTime");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.totalTime");
     static constexpr MetricName kGlobalLockCurrentQueueTotal =
-        MetricNameMaker::make("serverStatus.globalLock.currentQueue.total");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.currentQueue.total");
     static constexpr MetricName kGlobalLockCurrentQueueReaders =
-        MetricNameMaker::make("serverStatus.globalLock.currentQueue.readers");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.currentQueue.readers");
     static constexpr MetricName kGlobalLockCurrentQueueWriters =
-        MetricNameMaker::make("serverStatus.globalLock.currentQueue.writers");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.currentQueue.writers");
     static constexpr MetricName kGlobalLockActiveClientsTotal =
-        MetricNameMaker::make("serverStatus.globalLock.activeClients.total");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.activeClients.total");
     static constexpr MetricName kGlobalLockActiveClientsReaders =
-        MetricNameMaker::make("serverStatus.globalLock.activeClients.readers");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.activeClients.readers");
     static constexpr MetricName kGlobalLockActiveClientsWriters =
-        MetricNameMaker::make("serverStatus.globalLock.activeClients.writers");
+        MetricNameMaker::make("mongodb.serverStatus.globalLock.activeClients.writers");
 
     static constexpr MetricName kOperationLatency =
-        MetricNameMaker::make("serverStatus.opLatencies.latency");
+        MetricNameMaker::make("mongodb.serverStatus.opLatencies.latency");
 
     // Op Counters
     static constexpr MetricName kInsertOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.inserts");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.insert");
     static constexpr MetricName kQueryOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.queries");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.query");
     static constexpr MetricName kUpdateOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.updates");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.update");
     static constexpr MetricName kDeleteOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.deletes");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.delete");
     static constexpr MetricName kGetMoreOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.getMores");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.getmore");
     static constexpr MetricName kCommandOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.commands");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.command");
     // New in SERVER-123987 - Counts every top-level 'aggregate' command.
     static constexpr MetricName kAggregateOpCount =
-        MetricNameMaker::make("serverStatus.opcounters.aggregates");
+        MetricNameMaker::make("mongodb.serverStatus.opcounters.aggregate");
 
     // Asserts - Counts every assertion failure broken down by `kind` attribute (one
     // of: "regular", "msg", "user", "tripwire"). Mirrors the per-type counters under
@@ -416,68 +847,88 @@ public:
     // `rollovers` is omitted because the OTel counter is int64 and never wraps.
     // TODO (follow-up SERVER ticket): add a `command` attribute so failures can be sliced by
     // command name (the "(c)" approach from the design discussion).
-    static constexpr MetricName kAsserts = MetricNameMaker::make("serverStatus.asserts");
+    static constexpr MetricName kAsserts = MetricNameMaker::make("mongodb.serverStatus.asserts");
 
     // Query Performance Counters
     static constexpr MetricName kQueryExecutorScanned =
-        MetricNameMaker::make("serverStatus.metrics.queryExecutor.scanned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.queryExecutor.scanned");
     static constexpr MetricName kQueryExecutorScannedObjects =
-        MetricNameMaker::make("serverStatus.metrics.queryExecutor.scannedObjects");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.queryExecutor.scannedObjects");
     static constexpr MetricName kDocumentReturned =
-        MetricNameMaker::make("serverStatus.metrics.document.returned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.document.returned");
+
+    // Memory tracking — system-wide high-water mark of the largest amount of memory (in bytes) ever
+    // tracked for a single operation since process startup. Mirrors the serverStatus value at
+    // metrics.query.peakMemoryUsageOperation.
+    static constexpr MetricName kQueryPeakMemoryUsageOperation =
+        MetricNameMaker::make("serverStatus.metrics.query.peakMemoryUsageOperation");
+
+    // Memory tracking — current configured value of the
+    // internalQueryMaxMemoryUsageBytesPerOperation server parameter, i.e. the operation-wide cap
+    // (in bytes) on memory-tracked query stages. Mirrors the serverStatus value at
+    // metrics.query.configuredMaxMemoryUsageBytesPerOperation.
+    static constexpr MetricName kQueryConfiguredMaxMemoryUsageBytesPerOperation =
+        MetricNameMaker::make(
+            "serverStatus.metrics.query.configuredMaxMemoryUsageBytesPerOperation");
+
+    // Memory tracking — number of times a query operation was failed (via an ExceededMemoryLimit
+    // error) because it exceeded a memory-tracking limit. Mirrors the serverStatus value at
+    // metrics.query.operationsFailedDueToMemoryLimit.
+    static constexpr MetricName kQueryOperationsFailedDueToMemoryLimit =
+        MetricNameMaker::make("serverStatus.metrics.query.operationsFailedDueToMemoryLimit");
 
     // Plan cache counters — classic engine
     static constexpr MetricName kPlanCacheClassicHits =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.hits");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.classic.hits");
     static constexpr MetricName kPlanCacheClassicMisses =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.misses");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.classic.misses");
     static constexpr MetricName kPlanCacheClassicSkipped =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.skipped");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.classic.skipped");
     static constexpr MetricName kPlanCacheClassicReplanned =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.replanned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.classic.replanned");
     static constexpr MetricName kPlanCacheClassicReplannedPlanIsCachedPlan = MetricNameMaker::make(
-        "serverStatus.metrics.query.planCache.classic.replanned_plan_is_cached_plan");
-    static constexpr MetricName kPlanCacheClassicCachedPlansEvicted =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.cached_plans_evicted");
+        "mongodb.serverStatus.metrics.query.planCache.classic.replanned_plan_is_cached_plan");
+    static constexpr MetricName kPlanCacheClassicCachedPlansEvicted = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.query.planCache.classic.cached_plans_evicted");
     static constexpr MetricName kPlanCacheClassicInactiveCachedPlansReplaced =
         MetricNameMaker::make(
-            "serverStatus.metrics.query.planCache.classic.inactive_cached_plans_replaced");
+            "mongodb.serverStatus.metrics.query.planCache.classic.inactive_cached_plans_replaced");
 
     // Plan cache counters — SBE engine
     static constexpr MetricName kPlanCacheSbeHits =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.hits");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.sbe.hits");
     static constexpr MetricName kPlanCacheSbeMisses =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.misses");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.sbe.misses");
     static constexpr MetricName kPlanCacheSbeSkipped =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.skipped");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.sbe.skipped");
     static constexpr MetricName kPlanCacheSbeReplanned =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.replanned");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planCache.sbe.replanned");
     static constexpr MetricName kPlanCacheSbeReplannedPlanIsCachedPlan = MetricNameMaker::make(
-        "serverStatus.metrics.query.planCache.sbe.replanned_plan_is_cached_plan");
-    static constexpr MetricName kPlanCacheSbeCachedPlansEvicted =
-        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.cached_plans_evicted");
+        "mongodb.serverStatus.metrics.query.planCache.sbe.replanned_plan_is_cached_plan");
+    static constexpr MetricName kPlanCacheSbeCachedPlansEvicted = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.query.planCache.sbe.cached_plans_evicted");
     static constexpr MetricName kPlanCacheSbeInactiveCachedPlansReplaced = MetricNameMaker::make(
-        "serverStatus.metrics.query.planCache.sbe.inactive_cached_plans_replaced");
+        "mongodb.serverStatus.metrics.query.planCache.sbe.inactive_cached_plans_replaced");
 
     // Query framework engine-mix counters
     static constexpr MetricName kQueryFrameworkFindSbe =
-        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.find.sbe");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.queryFramework.find.sbe");
     static constexpr MetricName kQueryFrameworkFindClassic =
-        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.find.classic");
-    static constexpr MetricName kQueryFrameworkAggregateSbeOnly =
-        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.sbeOnly");
-    static constexpr MetricName kQueryFrameworkAggregateClassicOnly =
-        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.classicOnly");
-    static constexpr MetricName kQueryFrameworkAggregateSbeHybrid =
-        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.sbeHybrid");
-    static constexpr MetricName kQueryFrameworkAggregateClassicHybrid =
-        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.classicHybrid");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.queryFramework.find.classic");
+    static constexpr MetricName kQueryFrameworkAggregateSbeOnly = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.query.queryFramework.aggregate.sbeOnly");
+    static constexpr MetricName kQueryFrameworkAggregateClassicOnly = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.query.queryFramework.aggregate.classicOnly");
+    static constexpr MetricName kQueryFrameworkAggregateSbeHybrid = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.query.queryFramework.aggregate.sbeHybrid");
+    static constexpr MetricName kQueryFrameworkAggregateClassicHybrid = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.query.queryFramework.aggregate.classicHybrid");
 
     // Fast-path planning counters
     static constexpr MetricName kFastPathIdHack =
-        MetricNameMaker::make("serverStatus.metrics.query.planning.fastPath.idHack");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planning.fastPath.idHack");
     static constexpr MetricName kFastPathExpress =
-        MetricNameMaker::make("serverStatus.metrics.query.planning.fastPath.express");
+        MetricNameMaker::make("mongodb.serverStatus.metrics.query.planning.fastPath.express");
 
     // Test-only
     static constexpr MetricName kTest1 = MetricNameMaker::make("test_only.metric1");

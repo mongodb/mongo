@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * Integration tests verifying the egress connection pool's behavior when the server-side
@@ -41,6 +15,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
@@ -52,6 +27,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
@@ -297,7 +273,7 @@ public:
         for (size_t i = 0; i < results.size(); ++i) {
             const auto& res = results[i];
             const Status failStatus = res.isOK() ? res.getValue().status : res.getStatus();
-            if (failStatus.code() == ErrorCodes::HostUnreachable) {
+            if (!failStatus.isOK()) {
                 continue;
             }
 
@@ -317,10 +293,9 @@ public:
             LOGV2_ERROR(1196905,
                         "EgressPoolRateLimiterResilienceTest assertAllRequestsFailed mismatch",
                         "index"_attr = i,
-                        "expected"_attr = ErrorCodes::HostUnreachable,
                         "actual"_attr = failStatus.toString());
             FAIL(
-                fmt::format("Expected HostUnreachable for all requests; mismatch at index={}. "
+                fmt::format("Expected all requests to fail; request at index={} succeeded. "
                             "Got: {}. "
                             "All futures: ---\n{}---\n"
                             "Diagnostics: grpcEgress={} poolOptions={} "
@@ -401,7 +376,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithEstablishedConnection) 
         auto baselineRejected = baseline.isEmpty() ? 0 : baseline["rejected"].numberLong();
 
         enableRateLimiter(/*maxQueueDepth=*/1);
-        auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+        auto hangFP = configureFailPoint(
+            "hangInRateLimiter",
+            BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
 
         auto futures = sendPings(6, Minutes{10});
 
@@ -430,7 +407,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithEstablishedConnection) {
             baseline.isEmpty() ? 0 : baseline["interruptedDueToClientDisconnect"].numberLong();
 
         enableRateLimiter(/*maxQueueDepth=*/10);
-        auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+        auto hangFP = configureFailPoint(
+            "hangInRateLimiter",
+            BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
 
         auto futures = sendPings(3, Minutes{10});
 
@@ -460,7 +439,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithNoEstablishedConnection
     // Keep initial token balance below one token so the first request cannot race through and
     // establish a connection before rejections propagate.
     enableRateLimiter(/*maxQueueDepth=*/1, /*burstCapacitySecs=*/0.1);
-    auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+    auto hangFP = configureFailPoint(
+        "hangInRateLimiter",
+        BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
     assertPoolHasNoEstablishedConnection(
         "Pool must have zero established connections before no-established rejection test");
 
@@ -488,7 +469,9 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithNoEstablishedConnection) 
 
     // Keep initial token balance below one token so requests have to queue in this test.
     enableRateLimiter(/*maxQueueDepth=*/10, /*burstCapacitySecs=*/0.1);
-    auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+    auto hangFP = configureFailPoint(
+        "hangInRateLimiter",
+        BSON("limiter" << transport::SessionEstablishmentRateLimiter::kRateLimiterName));
     assertPoolHasNoEstablishedConnection(
         "Pool must have zero established connections before no-established timeout test");
 

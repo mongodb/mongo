@@ -20,6 +20,7 @@
  * 8) Release the fsync lock. This will resume replication.
  * 9) Soon, the secondary should be applying the oplog again, which we should
  *    witness as an increase in the count of documents stored on the secondary.
+ * @tags: [requires_fsync]
  */
 // Load utility methods for replica set tests
 import {ReplSetTest} from "jstests/libs/replsettest.js";

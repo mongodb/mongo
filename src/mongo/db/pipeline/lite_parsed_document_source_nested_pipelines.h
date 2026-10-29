@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -42,6 +16,9 @@ namespace mongo {
 template <typename Derived>
 class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSourceDefault<Derived> {
 public:
+    // TODO SERVER-132721: Remove constructors that don't accept LiteParserOptions. Derived classes
+    // may require the ifr context, and failure to pass the options means we incorrectly assume a
+    // null IFR context.
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             std::vector<OwnedLiteParsedPipeline> pipelines)
@@ -61,11 +38,26 @@ public:
           _resolvedBackingNss(_foreignNss ? ResolvedNamespace{*_foreignNss, {}}
                                           : ResolvedNamespace{}) {}
 
+    // TODO SERVER-132721: Remove constructors that don't accept LiteParserOptions. Derived classes
+    // may require the ifr context, and failure to pass the options means we incorrectly assume a
+    // null IFR context.
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             boost::optional<OwnedLiteParsedPipeline> pipeline)
         : LiteParsedDocumentSourceNestedPipelines(
               originalBson, std::move(foreignNss), std::vector<OwnedLiteParsedPipeline>{}) {
+        if (pipeline)
+            _pipelines.emplace_back(std::move(pipeline.value()));
+    }
+
+    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
+                                            const LiteParserOptions& options,
+                                            boost::optional<NamespaceString> foreignNss,
+                                            boost::optional<OwnedLiteParsedPipeline> pipeline)
+        : LiteParsedDocumentSourceNestedPipelines(originalBson,
+                                                  options,
+                                                  std::move(foreignNss),
+                                                  std::vector<OwnedLiteParsedPipeline>{}) {
         if (pipeline)
             _pipelines.emplace_back(std::move(pipeline.value()));
     }
@@ -113,8 +105,8 @@ public:
         return Status::OK();
     }
 
-    std::vector<OwnedLiteParsedPipeline>* getMutableSubPipelines() override {
-        return &_pipelines;
+    boost::optional<MutableSubPipelinesView> getMutableSubPipelines() override {
+        return MutableSubPipelinesView{_pipelines};
     }
 
     /**
@@ -145,7 +137,7 @@ public:
         // Handle explicit user pipelines running against a view.
         for (const auto& subpipeline : _pipelines) {
             auto it = resolvedNamespaces.find(subpipeline->getOriginalParseNss());
-            if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+            if (it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
                 _resolvedBackingNss = it->second;
             }
         }
@@ -153,7 +145,7 @@ public:
         // pipeline.
         if (_foreignNss && needsViewSubpipelineMaterialized()) {
             auto it = resolvedNamespaces.find(*_foreignNss);
-            if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+            if (it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
                 _resolvedBackingNss = it->second;
                 materializeViewSubpipeline(it->second);
             }
@@ -174,6 +166,12 @@ protected:
     // Materializes a view's resolved pipeline into `_pipelines`, parsing and desugaring using the
     // ResolvedNamespace entry.
     void materializeViewSubpipeline(const ResolvedNamespace& viewEntry) {
+        // A re-bind of an already-materialized stage (e.g. a cloned copy from a resolved-namespace
+        // map copy) is a no-op: the first materialization is already correct within one aggregate
+        // execution's consistent catalog snapshot.
+        if (_viewSubpipelineMaterialized) {
+            return;
+        }
         // A stage only materializes a view subpipeline when it has no user-written subpipeline, so
         // `_pipelines` should always be empty here.
         tassert(12792401,
@@ -184,6 +182,12 @@ protected:
         copy.liteParseViewPipeline();
         copy.desugarViewPipeline();
         _pipelines.push_back(std::move(*copy.getMutableParsedPipeline()));
+        // Tag the materialized pipeline with the VIEW's NSS so that resolveInvolvedNamespacesImpl
+        // can use it for cycle detection. The pipeline itself is stored with the backing-collection
+        // NSS (ResolvedNamespace::ns), which is not a view and would bypass the inProgress guard
+        // without this tag.
+        _pipelines.back().setViewNss(viewEntry.getNamespace());
+        _viewSubpipelineMaterialized = true;
     }
 
     /**
@@ -205,6 +209,13 @@ protected:
     // The most-resolved namespace this stage knows about: the resolved backing namespace its
     // subpipeline targets. Before view resolution, this just points to the user NSS.
     ResolvedNamespace _resolvedBackingNss;
-};
 
+    // True once a view's pipeline has been materialized into `_pipelines` by
+    // materializeViewSubpipeline(). Once set, a later bindResolvedNamespace() call is a no-op
+    // rather than re-materializing, even if it's passed a different ResolvedNamespaceMap entry for
+    // the same foreign namespace. This is safe only because, within one aggregate execution, every
+    // ResolvedNamespaceMap the stage is bound against is derived from the same consistent catalog
+    // snapshot, so re-resolving the same view namespace always yields the same pipeline.
+    bool _viewSubpipelineMaterialized = false;
+};
 }  // namespace mongo

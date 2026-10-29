@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonelement.h"
@@ -73,7 +47,7 @@ namespace {
 class VectorClockMongoDTest : public ShardingMongoDTestFixture {
 protected:
     VectorClockMongoDTest()
-        : ShardingMongoDTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ShardingMongoDTestFixture(Options{}.useMockClock(true), /*allowMajorityReads=*/false) {}
 
     void setUp() override {
         // Ensure that this node is neither "config server" nor "shard server".
@@ -82,7 +56,7 @@ protected:
         ShardingMongoDTestFixture::setUp();
 
         auto keysCollectionClient =
-            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
+            std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false);
 
         VectorClockMutable::get(getServiceContext())
             ->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));
@@ -181,7 +155,7 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
-    vc->gossipOut(operationContext(), &bob, true /* forceInternal */);
+    vc->gossipOut(operationContext(), &bob, /*forceInternal=*/true);
     auto obj = bob.obj();
 
     // On plain replset servers, gossip out to internal clients should have $clusterTime, but not
@@ -309,7 +283,7 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
 class VectorClockMongoDDurableTest : public ShardServerTestFixture {
 protected:
     VectorClockMongoDDurableTest()
-        : ShardServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ShardServerTestFixture(Options{}.useMockClock(true), /*setUpMajorityReads=*/false) {}
 };
 
 TEST_F(VectorClockMongoDDurableTest, DurableTimeDoesNotHangAfterShutdown) {

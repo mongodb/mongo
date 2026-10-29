@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,6 +7,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -142,6 +117,10 @@ public:
             Status{errorCode, "Failing call to searchIndexExistsForCollection"});
     }
 
+    void pushResumeMigrationsError(ErrorCodes::Error errorCode) {
+        _resumeMigrationsErrors.push_back(errorCode);
+    }
+
     void tellAllDonorsToRefresh(OperationContext* opCtx,
                                 const NamespaceString& sourceNss,
                                 const UUID& reshardingUUID,
@@ -217,6 +196,8 @@ public:
 
         if (_options.blockInGetDocumentsToCopy) {
             std::unique_lock lk(_mutex);
+            _hasBlockedInGetDocumentsToCopy = true;
+            _blockedInGetDocumentsToCopyCV.notify_all();
             opCtx->waitForConditionOrInterrupt(_blockInGetDocumentsToCopyCV, lk, [this] {
                 return !_doKeepBlockingInGetDocumentsToCopy;
             });
@@ -245,6 +226,8 @@ public:
 
         if (_options.blockInGetDocumentsDelta) {
             std::unique_lock lk(_mutex);
+            _hasBlockedInGetDocumentsDelta = true;
+            _blockedInGetDocumentsDeltaCV.notify_all();
             opCtx->waitForConditionOrInterrupt(_blockInGetDocumentsDeltaCV, lk, [this] {
                 return !_doKeepBlockingInGetDocumentsDelta;
             });
@@ -304,24 +287,28 @@ public:
                         ReshardingAuthoritativeMetadataAccessLevelEnum,
                         std::function<OperationSessionInfo()>) override {
         DBDirectClient client(opCtx);
-        client.update(NamespaceString::kConfigsvrCollectionsNamespace,
-                      BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                               nss, SerializationContext::stateDefault())),
-                      BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)));
-        _bumpOneChunk(opCtx, nss);
+        client.update(
+            NamespaceString::kConfigsvrCollectionsNamespace,
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+            BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)));
     }
 
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const UUID&,
                           ReshardingAuthoritativeMetadataAccessLevelEnum,
                           std::function<OperationSessionInfo()>) override {
+        if (!_resumeMigrationsErrors.empty()) {
+            auto errorCode = _resumeMigrationsErrors.front();
+            _resumeMigrationsErrors.erase(_resumeMigrationsErrors.begin());
+            uasserted(errorCode, "Simulating resumeMigrations failure");
+        }
+
         DBDirectClient client(opCtx);
         client.update(NamespaceString::kConfigsvrCollectionsNamespace,
                       BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                nss, SerializationContext::stateDefault())),
-                      BSON("$unset" << BSON(CollectionType::kAllowMigrationsFieldName << "")));
-        _bumpOneChunk(opCtx, nss);
+                      BSON("$unset" << BSON(CollectionType::kAllowChunkOperationsFieldName << "")));
     }
 
     std::unique_ptr<CausalityBarrier> buildCausalityBarrier(std::vector<ShardId>,
@@ -345,10 +332,22 @@ public:
         _errorFunction = std::make_tuple(phase, func);
     }
 
+    void waitUntilBlockedInGetDocumentsToCopy(OperationContext* opCtx) {
+        std::unique_lock lk(_mutex);
+        opCtx->waitForConditionOrInterrupt(
+            _blockedInGetDocumentsToCopyCV, lk, [this] { return _hasBlockedInGetDocumentsToCopy; });
+    }
+
     void unblockGetDocumentsToCopy() {
         std::lock_guard lk(_mutex);
         _doKeepBlockingInGetDocumentsToCopy = false;
         _blockInGetDocumentsToCopyCV.notify_all();
+    }
+
+    void waitUntilBlockedInGetDocumentsDelta(OperationContext* opCtx) {
+        std::unique_lock lk(_mutex);
+        opCtx->waitForConditionOrInterrupt(
+            _blockedInGetDocumentsDeltaCV, lk, [this] { return _hasBlockedInGetDocumentsDelta; });
     }
 
     void unblockGetDocumentsDelta() {
@@ -370,37 +369,17 @@ private:
     std::mutex _mutex;
     stdx::condition_variable _blockInGetDocumentsToCopyCV;
     bool _doKeepBlockingInGetDocumentsToCopy = true;
+    stdx::condition_variable _blockedInGetDocumentsToCopyCV;
+    bool _hasBlockedInGetDocumentsToCopy = false;
     stdx::condition_variable _blockInGetDocumentsDeltaCV;
     bool _doKeepBlockingInGetDocumentsDelta = true;
+    stdx::condition_variable _blockedInGetDocumentsDeltaCV;
+    bool _hasBlockedInGetDocumentsDelta = false;
 
     std::vector<StatusWith<bool>> _searchIndexResults;
     bool _searchIndexDefaultResult{false};
 
-    // Bumps the minor version of one chunk belonging to the collection at 'nss' in config.chunks.
-    // This keeps the catalog cache invariant satisfied after allowMigrations is toggled: the
-    // invariant requires that any change to allowMigrations is accompanied by a placement version
-    // bump so that cached routing tables are invalidated on the next refresh.
-    void _bumpOneChunk(OperationContext* opCtx, const NamespaceString& nss) {
-        DBDirectClient client(opCtx);
-        auto collDoc =
-            client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
-                           BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                                    nss, SerializationContext::stateDefault())));
-        if (collDoc.isEmpty())
-            return;
-        auto collUUID = uassertStatusOK(UUID::parse(collDoc[CollectionType::kUuidFieldName]));
-        FindCommandRequest findChunk(NamespaceString::kConfigsvrChunksNamespace);
-        findChunk.setFilter(BSON(ChunkType::collectionUUID() << collUUID));
-        findChunk.setSort(BSON(ChunkType::lastmod.name() << -1));
-        auto chunkDoc = client.findOne(std::move(findChunk));
-        if (chunkDoc.isEmpty())
-            return;
-        auto current = chunkDoc[ChunkType::lastmod.name()].timestamp();
-        Timestamp bumped(current.getSecs(), current.getInc() + 1);
-        client.update(NamespaceString::kConfigsvrChunksNamespace,
-                      BSON("_id" << chunkDoc["_id"]),
-                      BSON("$set" << BSON(ChunkType::lastmod.name() << bumped)));
-    }
+    std::vector<ErrorCodes::Error> _resumeMigrationsErrors;
 
     CoordinatorStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
@@ -500,9 +479,12 @@ private:
 /**
  * Provenance-agnostic base fixture for reshardingCoordinator tests.
  */
-class ReshardingCoordinatorServiceTestCommon : public service_context_test::WithSetupTransportLayer,
-                                               public ConfigServerTestFixture {
+class ReshardingCoordinatorServiceTestCommon : public ConfigServerTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     using CoordinatorStateTransitionController =
         resharding_service_test_helpers::StateTransitionController<CoordinatorStateEnum>;
     using OpObserverForTest = resharding_service_test_helpers::
@@ -523,10 +505,18 @@ public:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
+        // Creating a resharding coordinator checks whether an FCV transition is in progress, which
+        // requires a global FCV document to be set.
+        // TODO(SERVER-131381): Review/rework this logic to avoid relying on FCV internals
+        FeatureCompatibilityVersionDocument fcvDoc;
+        // (Generic FCV reference): Required test only setup.
+        fcvDoc.setVersion(multiversion::GenericFCV::kLatest);
+        serverGlobalParams.mutableFCV.setVersionFromFCVDocument(fcvDoc);
+
         std::vector<ShardType> shards;
         for (const auto& id : getShardIds()) {
             ShardType s;
-            s.setHandle(ShardHandle{ShardId(id.toString()), boost::none});
+            s.setName(id.toString());
             s.setHost(id.toString() + ":1234");
             shards.push_back(std::move(s));
         }
@@ -541,7 +531,7 @@ public:
         client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
-        TransactionCoordinatorService::get(opCtx)->initializeIfNeeded(opCtx, /*term*/ 1);
+        TransactionCoordinatorService::get(opCtx)->initializeIfNeeded(opCtx, /*term=*/1);
 
         _controller = std::make_shared<CoordinatorStateTransitionController>();
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
@@ -573,10 +563,14 @@ public:
         globalFailPointRegistry().disableAllFailpoints();
         externalState()->unblockGetDocumentsToCopy();
         externalState()->unblockGetDocumentsDelta();
+        // Coordinators must be stepped down before their executors are shut down, and joined
+        // before ConfigServerTestFixture::tearDown() clears the sharding state they use.
+        _registry->onStepDown();
         TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
-        ConfigServerTestFixture::tearDown();
+        shutdownExecutorPool();
         _registry->onShutdown();
+        ConfigServerTestFixture::tearDown();
     }
 
     CoordinatorStateTransitionController* controller() {

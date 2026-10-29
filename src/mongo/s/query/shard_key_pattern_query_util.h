@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -73,7 +47,7 @@ namespace mongo {
  *   { a : { b : { $eq : "hi" } } } --> returns {} because the query language treats this as
  *                                                 a : { $eq : { b : ... } }
  */
-MONGO_MOD_PUBLIC StatusWith<BSONObj> extractShardKeyFromBasicQuery(
+[[MONGO_MOD_PUBLIC]] StatusWith<BSONObj> extractShardKeyFromBasicQuery(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
@@ -88,8 +62,8 @@ StatusWith<BSONObj> extractShardKeyFromBasicQueryWithContext(
     const ShardKeyPattern& shardKeyPattern,
     const BSONObj& basicQuery);
 
-MONGO_MOD_PUBLIC BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
-                                                  const CanonicalQuery& query);
+[[MONGO_MOD_PUBLIC]] BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
+                                                      const CanonicalQuery& query);
 
 /**
  * Return an ordered list of bounds generated using a ShardKeyPattern and the bounds from the
@@ -111,7 +85,7 @@ MONGO_MOD_PUBLIC BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKe
  * are unsatisfied, an empty BoundList could return.
  *
  */
-MONGO_MOD_PUBLIC boost::optional<BoundList> flattenBounds(
+[[MONGO_MOD_PUBLIC]] boost::optional<BoundList> flattenBounds(
     const ShardKeyPattern& shardKeyPattern, const boost::optional<IndexBounds>& indexBounds);
 
 /**
@@ -124,12 +98,12 @@ MONGO_MOD_PUBLIC boost::optional<BoundList> flattenBounds(
  *
  * For queries which are trivially empty, returns boost::none.
  */
-MONGO_MOD_PUBLIC boost::optional<IndexBounds> getIndexBoundsForQuery(
+[[MONGO_MOD_PUBLIC]] boost::optional<IndexBounds> getIndexBoundsForQuery(
     const BSONObj& key, const CanonicalQuery& canonicalQuery);
 
 namespace shard_key_pattern_query_util {
 
-struct MONGO_MOD_PUBLIC QueryTargetingInfo {
+struct [[MONGO_MOD_PUBLIC]] QueryTargetingInfo {
     enum Description { kSingleKey, kMultipleKeys, kMinKeyToMaxKey };
 
     Description desc;
@@ -144,12 +118,12 @@ struct MONGO_MOD_PUBLIC QueryTargetingInfo {
  * 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed and assumes
  * that any non-collatable shard key was not hashed from a collatable type.
  */
-MONGO_MOD_PUBLIC void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                          const BSONObj& query,
-                                          const BSONObj& collation,
-                                          const ChunkManager& cm,
-                                          std::set<ShardId>* shardIds,
-                                          bool bypassIsFieldHashedCheck = false);
+[[MONGO_MOD_PUBLIC]] void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                              const BSONObj& query,
+                                              const BSONObj& collation,
+                                              const ChunkManager& cm,
+                                              std::set<ShardId>* shardIds,
+                                              bool bypassIsFieldHashedCheck = false);
 
 /**
  * Populates 'shardIds' with the shard ids for a query with given filter and collation. If the
@@ -162,7 +136,7 @@ MONGO_MOD_PUBLIC void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext
  * IMPORTANT: populating ChunkRanges can significantly degrade the execution time of this function.
  * If you only require shard IDs, consider using getShardIdsForQuery for better performance.
  */
-MONGO_MOD_PUBLIC void getShardIdsAndChunksForQuery(
+[[MONGO_MOD_PUBLIC]] void getShardIdsAndChunksForQuery(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const BSONObj& query,
     const BSONObj& collation,
@@ -176,11 +150,10 @@ MONGO_MOD_PUBLIC void getShardIdsAndChunksForQuery(
  * 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed and assumes
  * that any non-collatable shard key was not hashed from a collatable type.
  */
-MONGO_MOD_PUBLIC void getShardIdsForCanonicalQuery(OperationContext* opCtx,
-                                                   const CanonicalQuery& query,
-                                                   const ChunkManager& cm,
-                                                   std::set<ShardId>* shardIds,
-                                                   bool bypassIsFieldHashedCheck = false);
+[[MONGO_MOD_PUBLIC]] void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
+                                                       const ChunkManager& cm,
+                                                       std::set<ShardId>* shardIds,
+                                                       bool bypassIsFieldHashedCheck = false);
 
 /**
  * Populates 'shardIds' with the shard ids for a query with given filter. If 'info' is
@@ -193,8 +166,7 @@ MONGO_MOD_PUBLIC void getShardIdsForCanonicalQuery(OperationContext* opCtx,
  * If you only require shard IDs, consider using getShardIdsForCanonicalQuery for better
  * performance.
  */
-MONGO_MOD_PUBLIC void getShardIdsAndChunksForCanonicalQuery(
-    OperationContext* opCtx,
+[[MONGO_MOD_PUBLIC]] void getShardIdsAndChunksForCanonicalQuery(
     const CanonicalQuery& query,
     const ChunkManager& cm,
     std::set<ShardId>* shardIds,

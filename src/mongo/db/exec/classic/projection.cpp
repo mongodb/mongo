@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/classic/projection.h"
 
@@ -35,7 +9,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
@@ -166,6 +142,9 @@ std::unique_ptr<PlanStageStats> ProjectionStage::getStats() {
 
     auto projStats = std::make_unique<ProjectionStats>(_specificStats);
     projStats->projObj = _projObj.value_or(BSONObj{});
+    if (const auto* tracker = expressionMemoryTracker()) {
+        projStats->peakTrackedMemBytes = static_cast<uint64_t>(tracker->peakTrackedMemoryBytes());
+    }
     ret->specific = std::move(projStats);
 
     ret->children.emplace_back(child()->getStats());
@@ -181,7 +160,15 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
       _requestedMetadata{projection->metadataDeps()},
       _projectType{projection->type()},
       _executor{projection_executor::buildProjectionExecutor(
-          expCtx, projection, {}, projection_executor::kDefaultBuilderParams)} {}
+          expCtx, projection, {}, projection_executor::kDefaultBuilderParams)} {
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _memoryTracker =
+            OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
+}
 
 void ProjectionStageDefault::transform(WorkingSetMember* member) const {
     Document input;
@@ -222,9 +209,9 @@ void ProjectionStageDefault::transform(WorkingSetMember* member) const {
     auto projected = _requestedMetadata.any()
         ? attachMetadataToWorkingSetMember(
               _executor->applyTransformation(attachMetadataToDocument(std::move(input), member),
-                                             {}),
+                                             _expressionEvalCtx),
               member)
-        : _executor->applyTransformation(input, {});
+        : _executor->applyTransformation(input, _expressionEvalCtx);
 
     // An exclusion projection can return an unowned object since the output document is
     // constructed from the input one backed by BSON which is owned by the storage system, so we

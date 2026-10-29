@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/service_executor_utils.h"
 
 #include <cstddef>
 #include <exception>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -47,9 +22,11 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/thread_safety_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -57,6 +34,51 @@
 namespace mongo::transport {
 
 namespace {
+
+// Client thread renice counters. Production reporting is owned by whichever module registers a
+// ClientThreadNiceMetricsSink, see below.
+Atomic<int64_t> gClientThreadsRenicedCount{0};
+Atomic<int64_t> gClientThreadReniceFailedCount{0};
+Atomic<bool> gLoggedFirstRenice{false};
+Atomic<bool> gLoggedReniceFailure{false};
+
+synchronized_value<ClientThreadNiceEligibilityPredicate> gClientThreadNiceEligibilityPredicate;
+
+bool isClientThreadNiceEligible() {
+    auto predicate = gClientThreadNiceEligibilityPredicate.synchronize();
+    return *predicate && (*predicate)();
+}
+
+synchronized_value<ClientThreadNiceValueProvider> gClientThreadNiceValueProvider;
+
+int32_t getClientThreadNiceValue() {
+    auto provider = gClientThreadNiceValueProvider.synchronize();
+    return *provider ? (*provider)() : 0;
+}
+
+synchronized_value<ClientThreadNiceMetricsSink> gClientThreadNiceMetricsSink;
+
+void reportNiceValueObserved(int32_t niceValue) {
+    auto sink = gClientThreadNiceMetricsSink.synchronize();
+    if (sink->onNiceValueObserved) {
+        sink->onNiceValueObserved(niceValue);
+    }
+}
+
+void reportThreadReniced() {
+    auto sink = gClientThreadNiceMetricsSink.synchronize();
+    if (sink->onThreadReniced) {
+        sink->onThreadReniced();
+    }
+}
+
+void reportThreadReniceFailed() {
+    auto sink = gClientThreadNiceMetricsSink.synchronize();
+    if (sink->onThreadReniceFailed) {
+        sink->onThreadReniceFailed();
+    }
+}
+
 void* runFunc(void* ctx) {
     auto taskPtr =
         std::unique_ptr<unique_function<void()>>(static_cast<unique_function<void()>*>(ctx));
@@ -66,11 +88,89 @@ void* runFunc(void* ctx) {
 }
 }  // namespace
 
+int64_t getClientThreadsRenicedCount() {
+    return gClientThreadsRenicedCount.load();
+}
+
+int64_t getClientThreadReniceFailedCount() {
+    return gClientThreadReniceFailedCount.load();
+}
+
+void registerClientThreadNiceEligibilityPredicate(ClientThreadNiceEligibilityPredicate predicate) {
+    *gClientThreadNiceEligibilityPredicate.synchronize() = std::move(predicate);
+}
+
+void registerClientThreadNiceMetricsSink(ClientThreadNiceMetricsSink sink) {
+    *gClientThreadNiceMetricsSink.synchronize() = std::move(sink);
+}
+
+void registerClientThreadNiceValueProvider(ClientThreadNiceValueProvider provider) {
+    *gClientThreadNiceValueProvider.synchronize() = std::move(provider);
+}
+
+void applyClientThreadNiceValue() {
+    const int32_t niceValue = getClientThreadNiceValue();
+    reportNiceValueObserved(niceValue);
+
+    if (niceValue <= 0) {
+        return;
+    }
+
+    if (!isClientThreadNiceEligible()) {
+        return;
+    }
+
+#ifdef __linux__
+    // On Linux each thread is a task with its own nice value, and `PRIO_PROCESS` with `who == 0`
+    // targets the calling thread's TID, which is why this runs on the newly spawned client thread
+    // rather than on the acceptor.
+    errno = 0;
+    if (setpriority(PRIO_PROCESS, 0, niceValue) != 0) {
+        auto ec = lastSystemError();
+        gClientThreadReniceFailedCount.fetchAndAddRelaxed(1);
+        reportThreadReniceFailed();
+        if (!gLoggedReniceFailure.swap(true)) {
+            LOGV2_WARNING(13483700,
+                          "Failed to apply client thread nice value to a client connection thread; "
+                          "the connection will proceed at the default scheduling priority. This "
+                          "is logged once per process",
+                          "niceValue"_attr = niceValue,
+                          "errno"_attr = ec.value(),
+                          "error"_attr = errorMessage(ec));
+        }
+        return;
+    }
+
+    gClientThreadsRenicedCount.fetchAndAddRelaxed(1);
+    reportThreadReniced();
+    if (!gLoggedFirstRenice.swap(true)) {
+        LOGV2(13483701,
+              "Applying client thread nice value to client connection threads; client threads will "
+              "run at a lower CFS priority than internal threads. This is logged once per process",
+              "niceValue"_attr = niceValue);
+    }
+    LOGV2_DEBUG(13483702,
+                2,
+                "Applied client thread nice value to client connection thread",
+                "niceValue"_attr = niceValue);
+#else
+    // Not supported outside Linux; log once so a misconfigured arm is visible.
+    if (!gLoggedReniceFailure.swap(true)) {
+        LOGV2_WARNING(13483703,
+                      "Client thread nice value is set but is only supported on Linux; ignoring",
+                      "niceValue"_attr = niceValue);
+    }
+#endif
+}
+
 Status launchServiceWorkerThread(unique_function<void()> task) {
 
     try {
 #if defined(_WIN32)
-        stdx::thread([task = std::move(task)]() mutable { task(); }).detach();
+        stdx::thread([task = std::move(task)]() mutable {
+            applyClientThreadNiceValue();
+            task();
+        }).detach();
 #else
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
@@ -116,6 +216,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) {
         task = [sigAltStackController = std::make_shared<stdx::support::SigAltStackController>(),
                 f = std::move(task)]() mutable {
             auto sigAltStackGuard = sigAltStackController->makeInstallGuard();
+            applyClientThreadNiceValue();
             f();
         };
 

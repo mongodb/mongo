@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_score.h"
 
@@ -64,9 +38,7 @@ using boost::intrusive_ptr;
  * avoids hitting QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests
  * ($scoreFusion is gated behind the same feature flag).
  */
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(score,
-                                     ScoreLiteParsed::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(score, ScoreLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
 REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(score,
                                                              DocumentSourceScore,
@@ -236,8 +208,7 @@ boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
             window_function::Expression::parse(
                 BSON("$minMaxScaler" << BSON("input" << BSON("$meta" << "score"))),
                 sortPattern,
-                expCtx.get())}},
-        SbeCompatibility::notCompatible);
+                expCtx.get())}});
 }
 
 /**
@@ -419,13 +390,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(
-        ErrorCodes::QueryFeatureNotAllowed,
-        "$score is not allowed in the current configuration. You may need to enable the "
-        "corresponding feature flag",
-        feature_flags::gFeatureFlagSearchHybridScoringFull.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(pExpCtx->getOperationContext()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "

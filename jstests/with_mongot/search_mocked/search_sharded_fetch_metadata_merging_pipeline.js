@@ -177,7 +177,9 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
         let mergingPipeline = explain.splitPipeline.mergerPart;
         // First element in merging pipeline must be a $mergeCursors stage.
         assert.eq(["$mergeCursors"], Object.keys(mergingPipeline[0]));
-        if (shouldReferenceSearchMeta || disablePipelineOptimization) {
+        // The $setVariableFromSubPipeline stage is only attached when a downstream stage
+        // references $$SEARCH_META, regardless of whether pipeline optimization ran.
+        if (shouldReferenceSearchMeta) {
             // Second element sets the variable given the sub-pipeline provided above.
             const acc = {
                 "$setVariableFromSubPipeline": {

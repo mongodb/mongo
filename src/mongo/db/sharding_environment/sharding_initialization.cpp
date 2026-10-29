@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/sharding_environment/sharding_initialization.h"
 
@@ -126,11 +100,11 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     const auto poolSize = taskExecutorPoolSize.value_or(TaskExecutorPool::getSuggestedPoolSize());
 
     for (size_t i = 0; i < poolSize; ++i) {
-        auto exec = makeShardingTaskExecutor(
-            executor::makeNetworkInterface("TaskExecutorPool-" + std::to_string(i),
-                                           std::make_unique<ShardingNetworkConnectionHook>(),
-                                           metadataHookBuilder(),
-                                           connPoolOptions));
+        auto exec = makeShardingTaskExecutor(executor::makeNetworkInterface(
+            "TaskExecutorPool-" + std::to_string(i),
+            {.connectionHook = std::make_unique<ShardingNetworkConnectionHook>(),
+             .metadataHook = metadataHookBuilder(),
+             .connectionPoolOptions = connPoolOptions}));
 
         executors.emplace_back(std::move(exec));
     }
@@ -189,22 +163,31 @@ Status initializeGlobalShardingState(
     boost::optional<size_t> taskExecutorPoolSize,
     std::function<std::unique_ptr<KeysCollectionClient>(ShardingCatalogClient*)> initKeysClient) {
 
-    ConnectionPool::Options connPoolOptions;
     std::shared_ptr<ShardRegistry> srsp(std::move(shardRegistry));
-    connPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
-        return std::make_shared<ShardingTaskExecutorPoolController>(srwp);
+    ConnectionPool::Options fixedConnPoolOptions;
+    fixedConnPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
+        return std::make_shared<ShardingTaskExecutorPoolController>(
+            srwp, ShardingTaskExecutorPoolController::PoolType::kFixed);
     };
 
     auto network = executor::makeNetworkInterface(
         "Sharding-Fixed",
-        std::make_unique<ShardingNetworkConnectionHook>(),
-        hookBuilder(),
-        connPoolOptions,
-        transport::TransportProtocol::MongoRPC,
-        serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
+        {
+            .connectionHook = std::make_unique<ShardingNetworkConnectionHook>(),
+            .metadataHook = hookBuilder(),
+            .connectionPoolOptions = std::move(fixedConnPoolOptions),
+            .trackRequestCounts =
+                serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer),
+        });
+
     auto networkPtr = network.get();
+    ConnectionPool::Options connPoolOptions;
+    connPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
+        return std::make_shared<ShardingTaskExecutorPoolController>(
+            srwp, ShardingTaskExecutorPoolController::PoolType::kArbitrary);
+    };
     auto executorPool = makeShardingTaskExecutorPool(
-        std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);
+        std::move(network), hookBuilder, std::move(connPoolOptions), taskExecutorPoolSize);
     executorPool->startup();
 
     auto& numHostsTargetedMetrics = NumHostsTargetedMetrics::get(opCtx);
@@ -213,7 +196,7 @@ Status initializeGlobalShardingState(
     const auto service = opCtx->getServiceContext();
     auto const grid = Grid::get(service);
 
-    grid->init(std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */),
+    grid->init(std::make_unique<ShardingCatalogClientImpl>(/*overrideConfigShard=*/nullptr),
                std::move(catalogCache),
                std::move(srsp),
                std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
@@ -309,11 +292,11 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     auto grid = Grid::get(opCtx);
     auto catalogClient = grid->catalogClient();
     auto catalogCache = grid->catalogCache();
-    auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernArgs::kMajority);
 
     for (auto& db : allDbs) {
         for (auto& nss : catalogClient->getCollectionNamespacesForDb(
-                 opCtx, db.getDbName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
+                 opCtx, db.getDbName(), repl::ReadConcernArgs::kMajority)) {
             auto resp = catalogCache->getCollectionRoutingInfo(opCtx, nss);
             if (!resp.isOK()) {
                 LOGV2_WARNING(6203600,
@@ -340,9 +323,8 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
     auto const grid = Grid::get(opCtx);
     std::vector<ShardType> allShards;
     try {
-        allShards = grid->catalogClient()
-                        ->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern)
-                        .value;
+        allShards =
+            grid->catalogClient()->getAllShards(opCtx, repl::ReadConcernArgs::kMajority).value;
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

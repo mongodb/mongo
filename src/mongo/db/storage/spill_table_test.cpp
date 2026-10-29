@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/spill_table.h"
 
@@ -34,7 +8,9 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
+#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
@@ -53,10 +29,11 @@ constexpr int32_t kCacheSizeMB = 50;
 
 class SpillTableTest : public StorageEngineTest {
 protected:
-    SpillTableTest()
-        : StorageEngineTest(StorageEngineTest::Options{}
-                                .setParameter("spillWiredTigerCacheSizeMinMB", kCacheSizeMB)
-                                .setParameter("spillWiredTigerCacheSizeMaxMB", kCacheSizeMB)) {}
+    Options makeServiceContextOptions() override {
+        return StorageEngineTest::makeServiceContextOptions()
+            .setParameter("spillWiredTigerCacheSizeMinMB", kCacheSizeMB)
+            .setParameter("spillWiredTigerCacheSizeMaxMB", kCacheSizeMB);
+    }
 };
 
 TEST_F(SpillTableTest, InsertRecords) {
@@ -109,7 +86,7 @@ TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
 
     auto writeConflict = enableWriteConflictForWrites(FailPoint::ModeOptions{
         .mode = FailPoint::Mode::random,
-        .val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * 0.1)});
+        .val = static_cast<FailPoint::ValType>(std::numeric_limits<int32_t>::max() * 0.1)});
     ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
 
     auto cursor = spillTable->getCursor(opCtx.get());
@@ -237,6 +214,63 @@ TEST_F(StorageEngineTest, TestSpillTableDropRetries) {
     cursor->detachFromOperationContext();
 
     EXPECT_GT(retries, 0);
+}
+
+/**
+ * Forwards to a real StorageEngine, except that dropSpillTable() throws for a designated ident.
+ */
+class SpillTableDropShim : public StorageEngineMock {
+public:
+    explicit SpillTableDropShim(StorageEngine& engine) : _engine(engine) {}
+
+    void failDropForIdent(std::string failIdent, Status statusToRaise) {
+        _failIdent = std::move(failIdent);
+        _statusToRaise = std::move(statusToRaise);
+    }
+
+    void dropSpillTable(RecoveryUnit& ru, std::string_view ident) override {
+        if (_failIdent && ident == *_failIdent) {
+            uassertStatusOK(_statusToRaise);
+        }
+        _engine.dropSpillTable(ru, ident);
+    }
+
+private:
+    StorageEngine& _engine;
+    boost::optional<std::string> _failIdent;
+    Status _statusToRaise = Status::OK();
+};
+
+TEST_F(SpillTableTest, DropFailureOnDestruction) {
+    constexpr int64_t kThresholdBytes = 1024;
+    const auto opCtx = makeOperationContext();
+
+    SpillTableDropShim shim{*_storageEngine};
+
+    auto* const spillEngine = _storageEngine->getSpillEngine();
+    auto ru = spillEngine->newRecoveryUnit();
+    auto rs = spillEngine->makeInternalRecordStore(
+        *ru, ident::generateNewInternalIdent(), KeyFormat::Long);
+    const auto ident = std::string(rs->getIdent());
+    auto spillTable =
+        std::make_unique<SpillTable>(std::move(ru),
+                                     std::move(rs),
+                                     shim,
+                                     *DiskSpaceMonitor::get(opCtx->getServiceContext()),
+                                     kThresholdBytes);
+
+    const auto obj = BSON("a" << 1);
+    std::vector<Record> records{{RecordId(), {obj.objdata(), obj.objsize()}}};
+    ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
+
+    shim.failDropForIdent(ident, {ErrorCodes::UnknownError, "simulated spill table drop failure"});
+
+    spillTable.reset();
+
+    // The failed drop leaves the table behind rather than terminating the process.
+    EXPECT_TRUE(spillIdentExists(opCtx.get(), ident));
+    _storageEngine->dropSpillTable(*spillEngine->newRecoveryUnit(), ident);
+    EXPECT_FALSE(spillIdentExists(opCtx.get(), ident));
 }
 
 }  // namespace

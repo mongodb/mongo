@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/plan_ranking_utils.h"
 
@@ -115,15 +89,16 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
     return static_cast<const MultiPlanStage*>(mps.get())->bestSolution();
 }
 
-const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
-                                 size_t numDocs,
-                                 OperationContext& opCtx,
-                                 int sampleSize,
-                                 std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
-                                 NamespaceString nss,
-                                 SamplingCEMethodEnum samplingStyle,
-                                 boost::optional<int> numChunks,
-                                 boost::optional<PlanningTimeProfile&> timeProfile) {
+std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
+    CanonicalQuery* cq,
+    size_t numDocs,
+    OperationContext& opCtx,
+    int sampleSize,
+    NamespaceString nss,
+    SamplingCEMethodEnum onTheFlySamplingMethod,
+    boost::optional<int> numChunks,
+    boost::optional<PlanningTimeProfile&> timeProfile,
+    boost::optional<std::vector<size_t>&> originalPlanHashes) {
     const auto collection = acquireCollection(
         &opCtx,
         CollectionAcquisitionRequest(nss,
@@ -141,10 +116,10 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                                     nss,
                                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                     static_cast<size_t>(sampleSize),
-                                                    samplingStyle,
+                                                    onTheFlySamplingMethod,
                                                     numChunks,
                                                     collCard,
-                                                    nullptr /*customerQueryExpCtx*/);
+                                                    /*customerQueryExpCtx=*/nullptr);
 
     QueryPlannerParams plannerParams{
         QueryPlannerParams::ArgsForSingleCollectionQuery{
@@ -152,8 +127,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
             .canonicalQuery = *cq,
             .collections = collectionsAccessor,
             .plannerOptions = QueryPlannerParams::DEFAULT,
-            .cbrEnabled = true,
-            .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
+            .planRanker = QueryPlanRankerEnum::kCostBased,
         },
     };
 
@@ -161,13 +135,17 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
     auto topLevelSampleFieldNames =
         ce::extractTopLevelFieldsFromMatchExpression(cq->getPrimaryMatchExpression());
     auto statusWithMultiPlanSolns =
-        QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames);
+        QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames.relevantIndexOutput());
+
+    if (originalPlanHashes) {
+        ASSERT(statusWithMultiPlanSolns.isOK());
+        for (const auto& soln : statusWithMultiPlanSolns.getValue()) {
+            originalPlanHashes->push_back(soln->hash());
+        }
+    }
 
     Timer generateSampleTimer;
-    samplingEstimator->generateSample(
-        topLevelSampleFieldNames.empty()
-            ? ce::ProjectionParams{ce::NoProjection{}}
-            : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+    samplingEstimator->generateSample(std::move(topLevelSampleFieldNames).toProjectionParams());
     double generateSampleTimeMS = generateSampleTimer.elapsed().count() / 1000.0;
 
     Timer planningTimer;
@@ -176,7 +154,8 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                                samplingEstimator.get(),
                                                nullptr,
                                                std::move(statusWithMultiPlanSolns.getValue()),
-                                               *cq);
+                                               *cq,
+                                               QueryCBRCEModeEnum::kSamplingCE);
     double planTimeMS = planningTimer.elapsed().count() / 1000.0;
 
     if (timeProfile.has_value()) {
@@ -185,7 +164,20 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
     }
 
     ASSERT(statusWithCBRSolns.isOK());
-    auto solutions = std::move(statusWithCBRSolns.getValue().solutions);
+    return std::move(statusWithCBRSolns.getValue().solutions);
+}
+
+const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
+                                 size_t numDocs,
+                                 OperationContext& opCtx,
+                                 int sampleSize,
+                                 std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
+                                 NamespaceString nss,
+                                 SamplingCEMethodEnum samplingStyle,
+                                 boost::optional<int> numChunks,
+                                 boost::optional<PlanningTimeProfile&> timeProfile) {
+    auto solutions =
+        cbrRankPlans(cq, numDocs, opCtx, sampleSize, nss, samplingStyle, numChunks, timeProfile);
     ASSERT(solutions.size() == 1);
     const QuerySolution* result = solutions[0].get();
     // The plan itself is owned by bestCBRPlan

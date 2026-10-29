@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_metrics.h"
 
@@ -233,13 +207,13 @@ public:
     void validateEstimatedRemainingTimeIfDisableMovingAverage(
         ReshardingMetrics* metrics, boost::optional<Milliseconds> expectedEstimate) {
         _validateEstimatedRemainingTime(
-            metrics, false /* enableEstimateBasedOnMovingAvg */, expectedEstimate);
+            metrics, /*enableEstimateBasedOnMovingAvg=*/false, expectedEstimate);
     }
 
     void validateEstimatedRemainingTimeIfEnableMovingAverage(
         ReshardingMetrics* metrics, boost::optional<Milliseconds> expectedEstimate) {
         _validateEstimatedRemainingTime(
-            metrics, true /* enableEstimateBasedOnMovingAvg */, expectedEstimate);
+            metrics, /*enableEstimateBasedOnMovingAvg=*/true, expectedEstimate);
     }
 
 private:
@@ -1809,6 +1783,27 @@ TEST_F(ReshardingMetricsTest, CoordinatorVerificationPreCommitTimeReported) {
     ASSERT_EQ(report.getIntField("verificationPreCommitTimeElapsedSecs"), 25);
 }
 
+TEST_F(ReshardingMetricsTest, CoordinatorDonorCloneCountFetchTimeReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    // Before start, elapsed should be the default (0).
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("donorCloneCountFetchTimeElapsedSecs"), 0);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration,
+                         clock->now());
+    clock->advance(Seconds(10));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("donorCloneCountFetchTimeElapsedSecs"), 10);
+
+    // After end time is set, duration is fixed.
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration, clock->now());
+    clock->advance(Seconds(100));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("donorCloneCountFetchTimeElapsedSecs"), 10);
+}
+
 TEST_F(ReshardingMetricsTest, CoordinatorDoesNotReportChangeStreamMonitorLagOrCrossPhase) {
     auto clock = getClockSource();
     auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
@@ -1898,6 +1893,7 @@ TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsAllDefaultsWhenNoData)
     auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
 
     auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("coordinatorDonorCloneCountFetchTimeElapsedMillis").Long(), -1);
     ASSERT_EQ(diag.getField("coordinatorVerificationPreApplyingTimeElapsedMillis").Long(), -1);
     ASSERT_EQ(diag.getField("coordinatorVerificationPreCommitTimeElapsedMillis").Long(), -1);
 }
@@ -1955,6 +1951,19 @@ TEST_F(ReshardingMetricsTest, RecipientDiagnosticMetricsCrossPhaseAndElapsed) {
     auto diag = metrics->getDiagnosticMetrics();
     ASSERT_EQ(diag.getField("recipientStrictConsistencyToMonitorCompletionMillis").Long(), 60000);
     ASSERT_EQ(diag.getField("recipientChangeStreamMonitorTotalTimeElapsedMillis").Long(), 60000);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsDonorCloneCountFetch) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration,
+                         clock->now());
+    clock->advance(Seconds(15));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kDonorCloneCountFetchDuration, clock->now());
+
+    auto diag = metrics->getDiagnosticMetrics();
+    ASSERT_EQ(diag.getField("coordinatorDonorCloneCountFetchTimeElapsedMillis").Long(), 15000);
 }
 
 TEST_F(ReshardingMetricsTest, CoordinatorDiagnosticMetricsVerificationPhases) {

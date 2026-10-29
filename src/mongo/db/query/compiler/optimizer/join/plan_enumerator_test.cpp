@@ -1,35 +1,9 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
@@ -93,8 +67,7 @@ public:
             jCtx,
             subsetCards,
             // Just assume all edges are 10% selective.
-            EdgeSelectivities(jCtx.joinGraph.numEdges(),
-                              {SelectivityType{0.1}, EstimationSource::Code}));
+            EdgeSelectivities(jCtx.joinGraph.numEdges(), makeJoinSelectivityEstimate(0.1)));
     }
 
     auto makeCoster(const JoinReorderingContext& jCtx, JoinCardinalityEstimator& ce) {
@@ -461,7 +434,7 @@ TEST_F(JoinPlanEnumeratorTest, LeftDeep8Nodes) {
 
 TEST_F(JoinPlanEnumeratorTest, LeftDeep8NodesINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-    testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8, true /* withIndexes */);
+    testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8, /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
@@ -471,7 +444,7 @@ TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
 
 TEST_F(JoinPlanEnumeratorTest, RightDeep8NodesINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-    testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8, true /* withIndexes */);
+    testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8, /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, ZigZag8Nodes) {
@@ -481,7 +454,7 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag8Nodes) {
 
 TEST_F(JoinPlanEnumeratorTest, ZigZag8NodesINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-    testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8, true /* withIndexes */);
+    testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8, /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
@@ -492,10 +465,35 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
                                         .mode = PlanEnumerationMode::ALL,
                                         .enableHJOrderPruning = false},
                     3,
-                    true /* withIndexes */);
+                    /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {
     testLargeSubset(nullptr /* No golden test here. */, PlanTreeShape::LEFT_DEEP, 10);
+}
+
+TEST_F(JoinPlanEnumeratorTest, DumpToBSON) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+
+    initGraph(3, /* withIndexes */ true);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
+    graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 2);
+
+    auto jCtx = makeContext();
+    // Enumerate via ALL to test the serialization for multiple plans per level.
+    auto ctx = makeEnumeratorContext(jCtx,
+                                     EnumerationStrategy{.planShape = PlanTreeShape::ZIG_ZAG,
+                                                         .mode = PlanEnumerationMode::ALL,
+                                                         .enableHJOrderPruning = false});
+    ctx.enumerateJoinSubsets();
+
+    // Emit one record per subset to mirror how the plan enumerator logs subsets.
+    for (size_t level = 0; level < jCtx.joinGraph.numNodes(); level++) {
+        for (const auto& subset : ctx.getSubsets(level)) {
+            goldenCtx.outStream() << ctx.subsetToBSON(subset).jsonString(ExtendedRelaxedV2_0_0,
+                                                                         /* pretty */ true)
+                                  << std::endl;
+        }
+    }
 }
 }  // namespace mongo::join_ordering

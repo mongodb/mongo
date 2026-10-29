@@ -2,7 +2,7 @@
  * Tests that the 'searchScoreDetails' metadata field is also accessible by the 'scoreDetails'
  * metadata field.
  *
- * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

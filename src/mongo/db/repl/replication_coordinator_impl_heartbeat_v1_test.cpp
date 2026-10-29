@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -129,8 +103,6 @@ auto makePrimaryHeartbeatResponseFrom(const ReplSetConfig& rsConfig,
 
 class ReplCoordHBV1Test : public ReplCoordTest {
 protected:
-    explicit ReplCoordHBV1Test() : ReplCoordTest(Options{}.useMockClock(true)) {}
-
     void assertMemberState(MemberState expected, std::string msg = "");
     ReplSetHeartbeatResponse receiveHeartbeatFrom(
         const ReplSetConfig& rsConfig,
@@ -172,7 +144,15 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+    // processHeartbeatV1 takes the heartbeat command's OperationContext. Reuse this thread's if one
+    // is already bound, otherwise make a temporary one for the call.
+    auto* opCtx = cc().getOperationContext();
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    if (!opCtx) {
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(opCtx, hbArgs, &response));
     return response;
 }
 
@@ -305,10 +285,10 @@ TEST_F(ReplCoordHBV1Test, RestartingHeartbeatsShouldOnlyCancelScheduledHeartbeat
     // Receive a request from node3 saying it's the primary, so that we restart scheduled
     // heartbeats.
     receiveHeartbeatFrom(rsConfig,
-                         3 /* senderId */,
+                         /*sourceId=*/3,
                          HostAndPort("node3", 12345),
-                         1 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/1,
+                         /*currentPrimaryId=*/3);
 
     enterNetwork();
 
@@ -366,10 +346,10 @@ TEST_F(ReplCoordHBV1Test,
 
     // We're a secondary and we receive a request from node3 saying it's the primary.
     receiveHeartbeatFrom(rsConfig,
-                         3 /* senderId */,
+                         /*sourceId=*/3,
                          HostAndPort("node3", 12345),
-                         1 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/1,
+                         /*currentPrimaryId=*/3);
 
     enterNetwork();
     std::set<std::string> expectedHosts{"node2", "node3"};
@@ -391,10 +371,10 @@ TEST_F(ReplCoordHBV1Test,
 
     // Heartbeat in a stale term shouldn't re-schedule heartbeats.
     receiveHeartbeatFrom(rsConfig,
-                         3 /* senderId */,
+                         /*sourceId=*/3,
                          HostAndPort("node3", 12345),
-                         0 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/0,
+                         /*currentPrimaryId=*/3);
     enterNetwork();
     ASSERT_FALSE(getNet()->hasReadyRequests());
     exitNetwork();
@@ -429,10 +409,10 @@ TEST_F(
 
     // Node 2 thinks 3 is the primary. We don't restart heartbeats for that.
     receiveHeartbeatFrom(getReplCoord()->getConfig(),
-                         2 /* senderId */,
+                         /*sourceId=*/2,
                          HostAndPort("node3", 12345),
-                         0 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/0,
+                         /*currentPrimaryId=*/3);
 
     {
         enterNetwork();
@@ -570,6 +550,7 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse)
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
 public:
     void setUp() override {
+        ReplCoordHBV1Test::setUp();
         BSONObj configBson =
             BSON("_id" << "mySet"
                        << "version" << initConfigVersion << "term" << initConfigTerm << "members"
@@ -770,7 +751,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
         if (field == "t") {
             continue;
         } else if (field == "config") {
-            finalRes.append("config", makeConfigObj(initConfigVersion + 1, boost::none /* term */));
+            finalRes.append("config", makeConfigObj(initConfigVersion + 1, /*term=*/boost::none));
         } else {
             finalRes.append(origResObj[field]);
         }
@@ -876,6 +857,7 @@ TEST_F(ReplCoordHBV1ReconfigTest, ScheduleImmediateHeartbeatToSpeedUpConfigCommi
             makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm + 1).getMutable();
         ReplSetConfigSettings settings;
         settings.setHeartbeatIntervalMillis(10000);
+        settings.setElectionTimeoutMillis(20000);
         mutableConfig.setSettings(settings);
         return ReplSetConfig(std::move(mutableConfig));
     }();
@@ -936,6 +918,7 @@ TEST_F(ReplCoordHBV1ReconfigTest, FindOwnHostForHeartbeatReconfigQuick) {
             makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm + 1).getMutable();
         ReplSetConfigSettings settings;
         settings.setHeartbeatIntervalMillis(10000);
+        settings.setElectionTimeoutMillis(20000);
         mutableConfig.setSettings(settings);
         return ReplSetConfig(std::move(mutableConfig));
     }();
@@ -1194,7 +1177,8 @@ TEST_F(ReplCoordHBV1Test,
     ASSERT(hbArgs.isInitialized());
 
     ReplSetHeartbeatResponse response;
-    Status status = getReplCoord()->processHeartbeatV1(hbArgs, &response);
+    Status status =
+        getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &response);
     ASSERT_EQUALS(ErrorCodes::NotYetInitialized, status.code());
 }
 
@@ -1605,7 +1589,7 @@ TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     stdx::thread heartbeatReponseThread([&] {
         Client::initThread("handleHeartbeatResponseForTest",
                            getGlobalServiceContext()->getService());
-        getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, 1 /* targetIndex */);
+        getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, /*targetIndex=*/1);
     });
 
     failpoint->waitForTimesEntered(timesEntered + 1);
@@ -1891,20 +1875,20 @@ void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
 
 void HBStepdownAndReconfigTest::sendHBResponseWithNewConfig() {
     // Send a heartbeat response from a secondary, with newer config.
-    sendHBResponse(2 /* targetIndex */,
-                   1 /* term */,
-                   3 /* configVersion */,
-                   1 /* configTerm */,
-                   true /* includeConfig */);
+    sendHBResponse(/*targetIndex=*/2,
+                   /*term=*/1,
+                   /*configVersion=*/3,
+                   /*configTerm=*/1,
+                   /*includeConfig=*/true);
 }
 
 void HBStepdownAndReconfigTest::sendHBResponseWithNewTerm() {
     // Send a heartbeat response from a secondary, with higher term.
-    sendHBResponse(1 /* targetIndex */,
-                   2 /* term */,
-                   2 /* configVersion */,
-                   1 /* configTerm */,
-                   false /* includeConfig */);
+    sendHBResponse(/*targetIndex=*/1,
+                   /*term=*/2,
+                   /*configVersion=*/2,
+                   /*configTerm=*/1,
+                   /*includeConfig=*/false);
 }
 
 Future<void> HBStepdownAndReconfigTest::startReconfigCommand() {

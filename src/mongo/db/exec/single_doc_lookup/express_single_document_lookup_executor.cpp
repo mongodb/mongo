@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/single_doc_lookup/express_single_document_lookup_executor.h"
 
 #include "mongo/db/exec/express/plan_executor_express.h"
+#include "mongo/db/exec/single_doc_lookup/local_lookup_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -38,9 +13,11 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -48,30 +25,33 @@
 
 namespace mongo::exec::agg {
 namespace {
-
-constexpr auto kIdField = "_id"_sd;
+using namespace std::literals::string_view_literals;
 
 /**
  * Build the Express PlanExecutor for an _id-equality lookup. Returns nullptr if the documentKey
- * carries no _id, the caller should treat this as kNotHandled.
+ * carries no _id, or if the collection is non-clustered and missing its _id index.
  */
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionAcquirer::Handle& coll,
-    const Document& documentKey) {
-    const Value idVal = documentKey[kIdField];
-    if (idVal.missing()) {
+    const Document& documentKey,
+    bool shouldApplyShardFilter) {
+    // If collection pointer is not defined, early exit as executor can not be made.
+    const auto& collPtr = coll.getCollectionPtr();
+    if (!collPtr) {
+        return nullptr;
+    }
+
+    const auto idFilter = makeIdEqualityFilter(documentKey);
+    if (!idFilter) {
         LOGV2_DEBUG(12841302,
                     1,
                     "ExpressSingleDocumentLookupExecutor: documentKey has no _id, falling back",
                     "documentKey"_attr = redact(documentKey.toBson()));
         return nullptr;
     }
-
-    BSONObjBuilder filterBuilder;
-    idVal.addToBsonObj(&filterBuilder, kIdField);
-    const BSONObj filter = filterBuilder.obj();
+    const BSONObj& filter = *idFilter;
 
     auto findCmd = std::make_unique<FindCommandRequest>(nss);
     findCmd->setFilter(filter);
@@ -80,20 +60,35 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
         .parsedFind = ParsedFindCommandParams{std::move(findCmd)},
     });
 
-    // No shard filter needed. Unlike a scatter-gathered find({_id}), the eligibility check already
-    // shard-key-targeted this documentKey to this shard as the unique owner, and the versioned
-    // acquisition confirms that ownership is current. With per-shard _id uniqueness, the doc found
-    // by _id here is the owned one, not an orphan.
+    // Apply the acquisition's shard filter so orphans physically present on this node are dropped
+    // post-read, unless the caller's eligibility has already checked that the shard key belongs to
+    // the local shard ('shouldApplyShardFilter' false). For callers running on bare _ids that may
+    // include orphans (e.g. $search/$vectorSearch idLookup) it is what drops them. The filter is
+    // only defined on sharded collections as getShardingFilter() tasserts otherwise.
     boost::optional<ScopedCollectionFilter> collectionFilter;
+    if (shouldApplyShardFilter && coll.collection().getShardingDescription().isSharded()) {
+        collectionFilter = coll.collection().getShardingFilter();
+    }
 
     // The find command carries no collation, so adopt the collection's default collation.
-    const auto& collPtr = coll.getCollectionPtr();
-    if (cq->getCollator() == nullptr && collPtr && collPtr->getDefaultCollator()) {
+    if (cq->getCollator() == nullptr && collPtr->getDefaultCollator()) {
         cq->setCollator(collPtr->getDefaultCollator()->clone());
     }
 
-    const bool isClusteredOnId = collPtr && collPtr->isClustered() &&
-        clustered_util::isClusteredOnId(collPtr->getClusteredInfo());
+    const bool isClusteredOnId =
+        collPtr->isClustered() && clustered_util::isClusteredOnId(collPtr->getClusteredInfo());
+
+    // A non-clustered collection is expected to always have its _id index. Its absence means
+    // something is wrong, decline.
+    if (!isClusteredOnId && !collPtr->getIndexCatalog()->haveIdIndex(opCtx)) {
+        LOGV2_DEBUG(13082300,
+                    1,
+                    "ExpressSingleDocumentLookupExecutor: missing _id index on non-clustered "
+                    "collection, falling back",
+                    "nss"_attr = nss);
+        return nullptr;
+    }
+
     return isClusteredOnId ? makeExpressExecutorForFindByClusteredId(opCtx,
                                                                      std::move(cq),
                                                                      coll.collection(),
@@ -106,18 +101,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
                                                             /*returnOwnedBson=*/true);
 }
 
-/**
- * Record index usage so $indexStats reflects the lookup..
- */
-void recordIndexUsage(const CollectionAcquirer::Handle& coll, PlanExecutor& exec) {
-    PlanSummaryStats summary;
-    exec.getPlanExplainer().getSummaryStats(&summary);
-    CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
-        coll.getCollectionPtr().get(),
-        summary.collectionScans,
-        summary.collectionScansNonTailable,
-        summary.indexesUsed);
-}
 }  // namespace
 
 SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::performLookup(
@@ -128,35 +111,48 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
     boost::optional<Timestamp> afterClusterTime) {
     OperationContext* opCtx = expCtx->getOperationContext();
 
-    // The eligibility runs the body under local routing and owns CAR error handling.
-    return _localEligibility->run(
-        expCtx,
-        nss,
-        documentKey,
-        [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
-            // The document does not live on local shard. Early exit.
-            if (!LocalLookupEligibility::isLocal(decision)) {
-                return {LookupResult::HandledStatus::kNotHandled, boost::none};
-            }
+    // Timed around the whole eligibility run (not just the terminal attempt) so the recorded
+    // latency reflects what the caller actually waited, including any StaleConfig-triggered
+    // routing refresh + retry.
+    Timer timer;
 
-            // Create ScopedSetShardRole given the local routing decision.
-            const auto& local = std::get<LocalLookupEligibility::Local>(decision);
-            auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
-            try {
+    // Wrap the code behind withCollectionGoneMappedToNotFound() to ensure relevant exceptions are
+    // mapped to LookupResult::HandledStatus::kDocumentNotFound.
+    LookupResult result = withCollectionGoneMappedToNotFound([&]() -> LookupResult {
+        // Express executor does not cache the acquisition and eligibility check is done before
+        // acquiring the collection and therefore we always pass NoHeldAcquisition.
+        return _localEligibility->run(
+            expCtx,
+            nss,
+            documentKey,
+            LocalLookupEligibility::NoHeldAcquisition{},
+            [&](const LocalLookupEligibility::Decision& decision) -> LookupResult {
+                // The document does not live on local shard. Early exit.
+                if (!LocalLookupEligibility::isLocal(decision)) {
+                    return {LookupResult::HandledStatus::kNotHandled, boost::none};
+                }
+
+                // Create ScopedSetShardRole given the local routing decision.
+                const auto& local = std::get<LocalLookupEligibility::Local>(decision);
+                auto shardRoleScope = createScopedShardRole(opCtx, nss, local);
                 auto coll = _collectionAcquirer->acquireCollection(opCtx, nss, collectionUUID);
                 if (!coll.exists()) {
                     return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
                 }
                 assertLocalLookupReadAtOrAfter(opCtx, afterClusterTime);
 
-                auto exec = makeExpressExecutor(opCtx, nss, coll, documentKey);
+                auto exec = makeExpressExecutor(
+                    opCtx, nss, coll, documentKey, !_eligibilityChecksShardKeyOwnership);
                 if (!exec) {
                     return {LookupResult::HandledStatus::kNotHandled, boost::none};
                 }
 
                 Document out;
                 const auto execState = exec->getNextDocument(out);
-                recordIndexUsage(coll, *exec);
+
+                PlanSummaryStats summary;
+                exec->getPlanExplainer().getSummaryStats(&summary);
+                recordIndexUsage(coll.getCollectionPtr().get(), summary, _planSummaryStatsSink);
 
                 switch (execState) {
                     case PlanExecutor::ExecState::ADVANCED:
@@ -169,20 +165,23 @@ SingleDocumentLookupExecutor::LookupResult ExpressSingleDocumentLookupExecutor::
                                       << "Unexpected executor state in "
                                          "ExpressSingleDocumentLookupExecutor::performLookup");
                 }
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                LOGV2_DEBUG(12841307,
-                            1,
-                            "Namespace not found while looking up document via Express path",
-                            "error"_attr = redact(ex));
-                return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
-            } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
-                LOGV2_DEBUG(12841308,
-                            1,
-                            "Collection UUID mismatch while looking up document via Express path",
-                            "error"_attr = redact(ex));
-                return {LookupResult::HandledStatus::kDocumentNotFound, boost::none};
-            }
-        });
+            });
+    });
+
+    if (_recorder) {
+        switch (result.status) {
+            case LookupResult::HandledStatus::kDocumentFound:
+                _recorder->recordFound(timer.elapsed());
+                break;
+            case LookupResult::HandledStatus::kDocumentNotFound:
+                _recorder->recordNotFound(timer.elapsed());
+                break;
+            case LookupResult::HandledStatus::kNotHandled:
+                _recorder->recordNotHandled();
+                break;
+        }
+    }
+    return result;
 }
 
 }  // namespace mongo::exec::agg

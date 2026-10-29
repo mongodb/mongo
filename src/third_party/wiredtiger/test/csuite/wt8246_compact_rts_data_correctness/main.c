@@ -280,9 +280,10 @@ static void
 check(WT_SESSION *session, const char *uri, char *value, int read_ts)
 {
     WT_CURSOR *cursor;
+    WT_DECL_RET;
     size_t val_1_size;
     uint64_t val1, val2, val3;
-    int i;
+    int i, retry_attempts;
     char *str_val;
     char tscfg[64];
 
@@ -295,8 +296,21 @@ check(WT_SESSION *session, const char *uri, char *value, int read_ts)
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
     for (i = 0; i < NUM_RECORDS; i++) {
-        cursor->set_key(cursor, i + 1);
-        testutil_check(cursor->search(cursor));
+        /*
+         * A long read transaction can race with eviction and be forced to roll back. Retry a
+         * bounded number of times before giving up.
+         */
+        for (retry_attempts = 0; retry_attempts < MAX_RETRIES; retry_attempts++) {
+            cursor->set_key(cursor, i + 1);
+            ret = cursor->search(cursor);
+            if (ret != WT_ROLLBACK)
+                break;
+            printf("Rollback search for key %d\n", i + 1);
+            testutil_check(session->rollback_transaction(session, NULL));
+            testutil_check(session->begin_transaction(session, tscfg));
+        }
+        testutil_check(ret);
+
         testutil_check(cursor->get_value(cursor, &val1, &val2, &val3, &str_val));
         testutil_assert(val_1_size == strlen(str_val));
         testutil_assert(memcmp(value, str_val, val_1_size) == 0);

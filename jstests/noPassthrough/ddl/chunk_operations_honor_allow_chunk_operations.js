@@ -8,7 +8,7 @@
  * Coverage for the legacy allowMigrations flag lives in chunk_operations_honor_allow_migrations.js.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";

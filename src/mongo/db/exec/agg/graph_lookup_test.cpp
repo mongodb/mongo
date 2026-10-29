@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
@@ -68,10 +42,11 @@ using GraphLookUpTest = AggregationContextFixture;
  */
 class DocumentSourceGraphLookUpSpillingTest : public GraphLookUpTest {
 public:
-    DocumentSourceGraphLookUpSpillingTest()
-        : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              MongoDScopedGlobalServiceContextForTest::Options{}.enableSpillEngine(),
-              shouldSetupTL)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+            MongoDScopedGlobalServiceContextForTest::Options{}.enableSpillEngine(),
+            shouldSetupTransportLayer());
+    }
 };
 
 //
@@ -247,7 +222,7 @@ TEST_F(GraphLookUpTest, ShouldResolveForeignShardedViewOnRetry) {
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
-    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"_sd}, {"to", 0}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"sv}, {"to", 0}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
@@ -282,7 +257,7 @@ TEST_F(GraphLookUpTest, ShouldPropagateWhenForeignShardedViewResolutionRepeats) 
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = exec::agg::MockStage::createForTest(std::move(inputs), expCtx);
 
-    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"_sd}, {"to", 0}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", "a"sv}, {"to", 0}}};
 
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "graph_lookup");
@@ -900,7 +875,8 @@ public:
         ++gEvaluations;
         if (ctx.tracker != nullptr) {
             ++gEvaluationsWithTracker;
-            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes();
+            gLastTrackerMaxBytes = ctx.tracker->maxAllowedMemoryUsageBytes(
+                getExpressionContext()->getOperationContext());
         }
         gLastStageName = ctx.stageName;
         return Value(0);
@@ -973,7 +949,7 @@ TEST_F(GraphLookUpTest, DoesNotThreadMemoryTrackerWhenExpressionMemoryTrackingDi
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 0);
 }
 
-TEST_F(GraphLookUpTest, MemoryTrackerLimitReflectsKnob) {
+TEST_F(GraphLookUpTest, MemoryTrackerHasNoPerStageLimit) {
     unittest::ServerParameterGuard queryMemTracking("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard exprMemTracking("featureFlagExpressionMemoryTracking", true);
     const long long customLimit = 2 * 1024 * 1024;
@@ -983,7 +959,7 @@ TEST_F(GraphLookUpTest, MemoryTrackerLimitReflectsKnob) {
     runGraphLookupWithObservingStartWith(getExpCtx());
 
     ASSERT_EQ(MemoryTrackerObservingExpression::gEvaluationsWithTracker, 1);
-    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, customLimit);
+    ASSERT_EQ(MemoryTrackerObservingExpression::gLastTrackerMaxBytes, INT64_MAX);
 }
 
 TEST_F(GraphLookUpTest, StageNameIsSetInEvaluationContext) {

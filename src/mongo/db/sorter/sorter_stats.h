@@ -1,54 +1,28 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 
-MONGO_MOD_PUB;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo {
 
 /**
  * For collecting cumulative stats of all sorters.
  */
 struct SorterTracker {
-    AtomicWord<long long> spilledRanges{0};
-    AtomicWord<long long> mergedSpills{0};
-    AtomicWord<long long> spilledKeyValuePairs{0};
-    AtomicWord<long long> bytesSpilled{0};
-    AtomicWord<long long> bytesSpilledUncompressed{0};
-    AtomicWord<long long> numSorted{0};
-    AtomicWord<long long> bytesSorted{0};
-    AtomicWord<long long> memUsage{0};
+    Atomic<long long> spilledRanges{0};
+    Atomic<long long> mergedSpills{0};
+    Atomic<long long> spilledKeyValuePairs{0};
+    Atomic<long long> bytesSpilled{0};
+    Atomic<long long> bytesSpilledUncompressed{0};
+    Atomic<long long> numSorted{0};
+    Atomic<long long> bytesSorted{0};
+    Atomic<long long> memUsage{0};
 };
 
 /**
@@ -61,7 +35,7 @@ public:
     void addSpilledDataSize(long long size);
     void addSpilledDataSizeUncompressed(long long size);
 
-    void incrementNumSpilledEntries();
+    void incrementNumSpilledEntries(long long n = 1);
 
     long long bytesSpilled() const {
         return _bytesSpilled.load();
@@ -78,9 +52,9 @@ public:
 private:
     SorterTracker* _sorterTracker;
 
-    AtomicWord<long long> _bytesSpilled;
-    AtomicWord<long long> _bytesSpilledUncompressed;
-    AtomicWord<long long> _numSpilledEntries;
+    Atomic<long long> _bytesSpilled;
+    Atomic<long long> _bytesSpilledUncompressed;
+    Atomic<long long> _numSpilledEntries;
 };
 
 
@@ -94,8 +68,8 @@ public:
     void addSpilledDataSize(long long size);
     void addSpilledDataSizeUncompressed(long long size);
 
-    AtomicWord<long long> opened;
-    AtomicWord<long long> closed;
+    Atomic<long long> opened;
+    Atomic<long long> closed;
 
     long long bytesSpilled() const {
         return _bytesSpilled.load();
@@ -108,8 +82,8 @@ public:
 private:
     SorterTracker* _sorterTracker;
 
-    AtomicWord<long long> _bytesSpilled;
-    AtomicWord<long long> _bytesSpilledUncompressed;
+    Atomic<long long> _bytesSpilled;
+    Atomic<long long> _bytesSpilledUncompressed;
 };
 
 /**
@@ -142,7 +116,10 @@ public:
     void decrementMemUsage(uint64_t memUsage);
     void resetMemUsage();
     void setMemUsage(uint64_t memUsage);
-    uint64_t memUsage() const;
+
+    uint64_t memUsage() const {
+        return _memUsage;
+    }
 
 private:
     uint64_t _spilledRanges = 0;         // Number of spills.

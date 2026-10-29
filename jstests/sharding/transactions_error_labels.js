@@ -4,6 +4,7 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     failCommandWithError,
@@ -47,7 +48,11 @@ const checkMongosResponse = function (
 ) {
     if (expectedErrorCode) {
         assert.eq(0, res.ok, tojson(res));
-        assert.eq(expectedErrorCode, res.code, tojson(res));
+        if (Array.isArray(expectedErrorCode)) {
+            assert.contains(res.code, expectedErrorCode, tojson(res));
+        } else {
+            assert.eq(expectedErrorCode, res.code, tojson(res));
+        }
     } else {
         assert.eq(1, res.ok, tojson(res));
     }
@@ -147,7 +152,15 @@ const runCommitTests = function (commandSentToShard) {
         closeConnection: true,
     });
     res = mongosSession.commitTransaction_forTesting();
-    checkMongosResponse(res, ErrorCodes.HostUnreachable, false /* expectedErrorLabel */, null);
+    // closeConnection peer-close (FIN or RST) now surfaces as ConnectionClosedByPeer;
+    // HostUnreachable is kept for any other network-failure path. Both are network errors and carry
+    // no transaction error label here.
+    checkMongosResponse(
+        res,
+        [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
+        false /* expectedErrorLabel */,
+        null,
+    );
     turnOffFailCommand(st.rs0);
 };
 
@@ -166,8 +179,10 @@ st.refreshCatalogCacheForNs(st.s, ns);
 // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
 // from the shards starting, aborting, and restarting the transaction due to needing to
 // refresh after the transaction has started.
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 
 let mongosSession = st.s.startSession();
 
@@ -248,7 +263,14 @@ failCommandWithError(st.rs0, {
     closeConnection: true,
 });
 res = startTransaction(mongosSession, dbName, collName);
-checkMongosResponse(res, ErrorCodes.HostUnreachable, "TransientTransactionError", null);
+// closeConnection peer-close (FIN or RST) now surfaces as ConnectionClosedByPeer; HostUnreachable
+// is kept for any other network-failure path.
+checkMongosResponse(
+    res,
+    [ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
+    "TransientTransactionError",
+    null,
+);
 turnOffFailCommand(st.rs0);
 assert.commandFailedWithCode(
     mongosSession.abortTransaction_forTesting(),

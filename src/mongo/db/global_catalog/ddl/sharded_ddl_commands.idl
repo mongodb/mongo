@@ -1,30 +1,5 @@
-# Copyright (C) 2020-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 # Contains internal DDL commands which are exchanged between Router and Shard/ConfigServer role and are linked both on MongoD and MongoS
 
@@ -528,7 +503,7 @@ structs:
                 description: "The expected collection timestamp."
 
     SetAllowChunkOperationsFields:
-        description: "Fields of _shardsvrSetAllowChunkOperations and _configsvrsvrSetAllowChunkOperations."
+        description: "Fields of _shardsvrSetAllowChunkOperations and _configsvrSetAllowChunkOperations."
         strict: false
         fields:
             allowChunkOperations:
@@ -1249,15 +1224,6 @@ commands:
         reply_type: OkReply
         chained_structs:
             SetAllowChunkOperationsFields: SetAllowChunkOperationsFields
-        fields:
-            # TODO (SERVER-127444): remove this field. We need to know the primary shard ID when
-            # _shardsvrSetAllowChunkOperations runs on a shard with non-authoritative metadata installed
-            # and it needs to install authorative metadata, but after SERVER-127444 this won't be
-            # necessary anymore.
-            primaryShardId:
-                type: shard_id
-                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
-                optional: false
 
     _configsvrSetAllowChunkOperations:
         command_name: _configsvrSetAllowChunkOperations
@@ -1270,3 +1236,24 @@ commands:
         reply_type: OkReply
         chained_structs:
             SetAllowChunkOperationsFields: SetAllowChunkOperationsFields
+
+    _shardsvrCommitChunkOperationsMetadata:
+        command_name: _shardsvrCommitChunkOperationsMetadata
+        cpp_name: ShardsvrCommitChunkOperationsMetadata
+        description: "Internal command to commit chunk operations metadata into the shard catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        fields:
+            newChunks:
+                type: array<object_owned>
+                description:
+                    "Chunk documents to insert into the shard catalog. The shard reconciles overlaps
+                    with pre-existing chunks locally, splitting or removing them so the durable
+                    catalog stays contiguous and non-overlapping."
+            receivingFirstChunk:
+                type: bool
+                description: "True when this shard owned no chunks for the collection before this operation."
+                default: false
+        reply_type: OkReply

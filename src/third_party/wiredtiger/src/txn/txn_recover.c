@@ -186,6 +186,7 @@ __txn_system_op_apply(WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const ui
             __wt_verbose_multi(session, WT_VERB_RECOVERY_ALL,
               "Backup ID: LSN [%s]: Clearing slot %" PRIu32, lsn_str, index);
             /* This is the result of a force stop, clear the entry. */
+            __wt_free(session, blk->id_str);
             WT_CLEAR(*blk);
         }
     } else
@@ -690,7 +691,7 @@ __recovery_txn_setup_initial_state(WT_SESSION_IMPL *session, WT_RECOVERY *r)
      * Now that timestamps extracted from the checkpoint metadata have been configured, configure
      * the pinned timestamp.
      */
-    __wti_txn_update_pinned_timestamp(session, true);
+    __wt_txn_update_pinned_timestamp(session, true);
 
     WT_ASSERT(session,
       !__wt_atomic_load_bool_relaxed(&conn->txn_global.has_stable_timestamp) &&
@@ -946,6 +947,7 @@ __metadata_clean_incomplete_table(WT_RECOVERY *r, const char *uri, const char *c
         __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_WARNING,
           "cannot remove incomplete table '%s' (%s, %s) in readonly mode", uri, colgroup_msg,
           file_msg);
+        ret = 0;
         goto done;
     }
 
@@ -955,6 +957,7 @@ __metadata_clean_incomplete_table(WT_RECOVERY *r, const char *uri, const char *c
     WT_WITH_SCHEMA_LOCK(r->session,
       WT_WITH_TABLE_WRITE_LOCK(
         r->session, ret = __wt_schema_drop(r->session, uri, drop_cfg, false)));
+    __wt_drop_pending_apply(r->session);
     WT_ERR(ret);
 
 err:
@@ -979,17 +982,15 @@ __recovery_file_scan(WT_RECOVERY *r)
       "scanning metadata to remove all incomplete tables");
 
     /* Scan through all table entries in the metadata and clean up incomplete tables. */
-    __recovery_metadata_scan_prefix(r, "table:", NULL, __metadata_clean_incomplete_table);
+    WT_RET(__recovery_metadata_scan_prefix(r, "table:", NULL, __metadata_clean_incomplete_table));
 
     __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO, "%s",
       "scanning metadata to find the largest file ID");
 
     /*
-     * Scan through all files and tiered entries in the metadata and gather information about each
-     * entry for recovery.
+     * Scan through all files in the metadata and gather information about each entry for recovery.
      */
-    WT_RET(__recovery_metadata_scan_prefix(r, "file:", ".wtobj", __recovery_setup_file));
-    WT_RET(__recovery_metadata_scan_prefix(r, "tiered:", NULL, __recovery_setup_file));
+    WT_RET(__recovery_metadata_scan_prefix(r, "file:", NULL, __recovery_setup_file));
 
     /*
      * Set the connection level file id tracker, as such upon creation of a new file we'll begin
@@ -1389,8 +1390,8 @@ done:
     } else {
         /* Although rollback to stable is not needed, we still need to set the durable timestamp. */
         WT_TXN_GLOBAL *txn_global = &conn->txn_global;
-        txn_global->has_durable_timestamp =
-          __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp);
+        __wt_atomic_store_bool_relaxed(&txn_global->has_durable_timestamp,
+          __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp));
         __wt_atomic_store_uint64_relaxed(
           &txn_global->durable_timestamp, __wt_get_stable_timestamp(session));
 

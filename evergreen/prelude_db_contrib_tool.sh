@@ -11,7 +11,11 @@ function use_db_contrib_tool_mongot {
     # Checking that this is not a downstream patch on mongod created by mongot's patch trigger.
     # In the case that it's not, download latest (eg HEAD of 10gen/mongot) or the
     # release (eg currently running in production on Atlas) mongot binary.
-    arch=$(uname -i)
+    # Use `uname -m` (machine) rather than `uname -i` (hardware platform): the latter reports
+    # "unknown" on some arm64 distros, which silently downgraded the download to x86_64 binaries.
+    # Match "linux"* rather than "linux-gnu"*: bash on SUSE is configured as
+    # x86_64-suse-linux and reports OSTYPE=linux, which the narrower glob rejects.
+    arch=$(uname -m)
     if [[ ! $(declare -p linux_x86_64_mongot_localdev_binary linux_aarch64_mongot_localdev_binary macos_x86_64_mongot_localdev_binary 2>/dev/null) ]]; then
 
         if [ "${download_mongot_release}" = "true" ]; then
@@ -20,7 +24,7 @@ function use_db_contrib_tool_mongot {
             mongot_version="latest"
         fi
 
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if [[ "$OSTYPE" == "linux"* ]]; then
             mongot_platform="linux"
         elif [[ "$OSTYPE" == "darwin"* ]]; then
             mongot_platform="macos"
@@ -39,7 +43,7 @@ function use_db_contrib_tool_mongot {
         db-contrib-tool setup-mongot-repro-env ${mongot_version} --platform=${mongot_platform} --architecture=${mongot_arch} --installDir=.
     else
         # This is a downstream patch, which means there is a patched mongot binary we need to install.
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if [[ "$OSTYPE" == "linux"* ]]; then
             if [[ $arch == "x86_64"* ]]; then
                 mongot_url=${linux_x86_64_mongot_localdev_binary}
             elif [[ $arch == "aarch64"* ]]; then

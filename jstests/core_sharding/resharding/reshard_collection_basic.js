@@ -15,7 +15,10 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
+import {
+    isReshardingVerificationEnabled,
+    ReshardCollectionCmdTest,
+} from "jstests/sharding/libs/reshard_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
 const shardNames = getShardNames(db);
@@ -393,11 +396,7 @@ if (featureFlagRelaxedMode) {
     );
 }
 
-const featureFlagReshardingVerification = FeatureFlagUtil.isPresentAndEnabled(
-    db,
-    "ReshardingVerification",
-);
-if (featureFlagReshardingVerification) {
+if (isReshardingVerificationEnabled(db)) {
     jsTest.log("Succeed if 'performVerification' parameter is set to true.");
 
     reshardCmdTest.assertReshardCollOk(

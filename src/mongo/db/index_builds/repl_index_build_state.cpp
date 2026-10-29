@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/index_builds/repl_index_build_state.h"
@@ -249,7 +223,7 @@ void ReplIndexBuildState::onThreadScheduled(OperationContext* opCtx) {
 
 void ReplIndexBuildState::completeSetup() {
     std::lock_guard lk(_mutex);
-    _indexBuildState.setState(IndexBuildState::kPostSetup, false /* skipCheck */);
+    _indexBuildState.setState(IndexBuildState::kPostSetup, /*skipCheck=*/false);
     _cleanUpRequired = true;
 }
 
@@ -258,7 +232,7 @@ void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
     // The index build might have been aborted/interrupted before reaching this point. Trying to
     // transtion to kInProgress would be an error.
     opCtx->checkForInterrupt();
-    _indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
+    _indexBuildState.setState(IndexBuildState::kInProgress, /*skipCheck=*/false);
 }
 
 void ReplIndexBuildState::setPostFailureState(const Status& status) {
@@ -284,7 +258,7 @@ void ReplIndexBuildState::setPostFailureState(const Status& status) {
     }
 
     _indexBuildState.setState(
-        IndexBuildState::kFailureCleanUp, false /* skipCheck */, boost::none, status);
+        IndexBuildState::kFailureCleanUp, /*skipCheck=*/false, boost::none, status);
 }
 
 void ReplIndexBuildState::setVotedForCommitReadiness(OperationContext* opCtx) {
@@ -311,7 +285,7 @@ void ReplIndexBuildState::commit(OperationContext* opCtx) {
 void ReplIndexBuildState::requestAbortFromPrimary() {
     invariant(mustReplicateCompletion(protocol));
     std::lock_guard lk(_mutex);
-    _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */);
+    _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, /*skipCheck=*/false);
 }
 
 Timestamp ReplIndexBuildState::getCommitTimestamp() const {
@@ -611,8 +585,8 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
     }
 
     _indexBuildState.setState(IndexBuildState::kFailureCleanUp,
-                              false /* skipCheck */,
-                              boost::none /* timestamp */,
+                              /*skipCheck=*/false,
+                              /*timestamp=*/boost::none,
                               error);
 
     auto serviceContext = opCtx->getServiceContext();
@@ -772,6 +746,30 @@ void ReplIndexBuildState::setVotedToCommitTime(const Date_t& time) {
 void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& time) {
     std::lock_guard lk(_mutex);
     _metrics.commitIndexOplogEntryTime = time;
+}
+
+void ReplIndexBuildState::setIndexBuildStartPhase(IndexBuildPhaseEnum phase) {
+    std::lock_guard lk(_mutex);
+    _metrics.startPhase = phase;
+}
+
+SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> ReplIndexBuildState::getOutcomeFuture()
+    const {
+    return _outcomePromise.getFuture();
+}
+
+void ReplIndexBuildState::fulfillOutcome(OperationContext* opCtx,
+                                         StatusWith<IndexCatalogStats> result) {
+    if (VersionContext::getDecoration(opCtx).isLongRunningOperation()) {
+        ClientLock lk(opCtx->getClient());
+        VersionContext::clearDecorationLongRunningMarker(lk, opCtx);
+    }
+
+    if (result.isOK()) {
+        _outcomePromise.emplaceValue(std::move(result.getValue()));
+    } else {
+        _outcomePromise.setError(result.getStatus());
+    }
 }
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {

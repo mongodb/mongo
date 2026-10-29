@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,7 +15,28 @@
 
 namespace mongo {
 namespace otel {
-namespace MONGO_MOD_PUBLIC traces {
+namespace [[MONGO_MOD_PUBLIC]] traces {
+
+/** The kind of span. */
+enum class SpanKind {
+    /** A span started and ended internally in the current process. */
+    kInternal,
+    /** A span started as the result of an incoming RPC for which a response will be sent. */
+    kServer,
+    /** A span started as part of sending an outgoing RPC for which a response will be received. */
+    kClient,
+    /**
+     * A span initiating some work that may be completed after this span ends. This could be a
+     * fire-and-forget RPC, or something starting internal background work.
+     */
+    kProducer,
+    /** A span for work initiated by a span of kind `kProducer`. */
+    kConsumer,
+};
+
+struct SpanOptions {
+    SpanKind kind = SpanKind::kInternal;
+};
 
 #ifdef MONGO_CONFIG_OTEL
 
@@ -54,10 +49,9 @@ namespace MONGO_MOD_PUBLIC traces {
     } while (0)
 
 /**
- * Span class is an RAII utility to create and save OpenTelemetry spans. A Span that has a
- * non-null _impl field is considered as valid and will generate a new OpenTelemetry's span upon
- * destruction. A Span that has an empty _impl field is a no-op Span and will not generate an
- * OpenTelemetry Span.
+ * Span class is an RAII utility to create and save OpenTelemetry spans. Whether or not the span
+ * is used within an exported OpenTelemetry trace is determined by a combination of whether its
+ * parent is in a trace and the sampling decision made by the `TracingSampler`.
  *
  * Spans should be created by calling the Span::start free function defined below to ensure new
  * Spans have a valid parent-child relationships with other Spans in the Trace.
@@ -68,9 +62,12 @@ class Span {
 public:
     /**
      * Starts a new Span with the provided `name` and using the provided `telemetryCtx` to allow for
-     * propagation of parent-child relationships.
+     * propagation of parent-child relationships. If a `telemetryCtx` is not provided but will be
+     * needed going forward, `telemetryCtx` will be populated with a newly created one.
      */
-    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name);
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                      SpanName name,
+                      SpanOptions options = {});
 
     /**
      * Wrapper around the other start function. It will also fetch and store the current
@@ -78,15 +75,29 @@ public:
      * OperationContext is available so that the calling code does not have to manage its own
      * TelemetryContext.
      */
-    static Span start(OperationContext* opCtx, SpanName name);
+    static Span start(OperationContext* opCtx, SpanName name, SpanOptions options = {});
 
     /**
-     * Similar to `start`, but only starts and returns a Span if there is an existing Span in the
-     * provided `opCtx`'s TelemetryContext. If there is no existing Span, a no-op Span is returned.
-     *
-     * TODO: SERVER-127463 Remove this once sampling decides whether we start a trace.
+     * Starts a new Span from an ingress source, which may be sampled differently than an
+     * internally-started span (e.g. a separate rate limit). Uses the presence of `telemetryCtx` to
+     * determine if the ingress span is part of an external trace. Defaults to SERVER span kind. If
+     * a context is created during this, `telemetryCtx` is updated in place.
      */
-    static Span startIfExistingTraceParent(OperationContext* opCtx, SpanName name);
+    static Span startIngressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                                 SpanName name,
+                                 SpanOptions options = {.kind = SpanKind::kServer});
+
+    /**
+     * Starts a new Span for an egress source. Egress spans are never sampled by the internal
+     * sampling mechanism; they are only started when created as a child of an already-sampled
+     * parent span. Defaults to CLIENT span kind.
+     */
+    static Span startEgressSpan(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                                SpanName name,
+                                SpanOptions options = {.kind = SpanKind::kClient});
+    static Span startEgressSpan(OperationContext* opCtx,
+                                SpanName name,
+                                SpanOptions options = {.kind = SpanKind::kClient});
 
     static std::shared_ptr<TelemetryContext> createTelemetryContext();
 
@@ -117,25 +128,26 @@ public:
     void setStatus(const Status& status);
 
 private:
-    /**
-     * Starts a new Span assuming we are in an environment where this is possible. `telemetryCtx`
-     * will be populated if it is currently nullptr.
-     */
-    static Span startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, std::string_view name);
+    struct StartSpanConfig {
+        SpanOptions opts;
+        bool bypassSampling = false;
+        bool preventSampling = false;
+    };
 
-    /**
-     * Starts a new Span assuming we are in an environment where this is possible. When there is no
-     * TelemetryContext on `opCtx`, `createIfMissing` determines whether one is created or a noop
-     * span is returned.
-     */
-    static Span startImpl(OperationContext* opCtx, std::string_view name, bool createIfMissing);
-
-    std::unique_ptr<SpanImpl> _impl;
-    /**
-     * Construction of Spans should be done through Span::start(traceable, name).
-     */
+    /** Construction of Spans should be done through Span::start(context, name). */
     Span();
     Span(std::unique_ptr<SpanImpl> impl);
+
+    // Internal start functions that allow bypassing the sampling mechanism to create the span
+    // unconditonally. These are used by the public start functions to control whether the span
+    // should be sampled or not.
+    static Span _start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                       SpanName name,
+                       StartSpanConfig config);
+    static Span _start(OperationContext* opCtx, SpanName name, StartSpanConfig config);
+
+    /** The actual span implementation. Null if this Span will not be part of an exported trace. */
+    std::unique_ptr<SpanImpl> _impl;
 };
 
 #else
@@ -150,14 +162,25 @@ private:
  */
 class Span {
 public:
-    static Span start(OperationContext* opCtx, SpanName) {
+    static Span start(OperationContext* opCtx, SpanName, SpanOptions = {}) {
         return Span{};
     }
-    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName) {
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName, SpanOptions = {}) {
         return Span{};
     }
-    // TODO: SERVER-127463 Remove this once sampling decides whether we start a trace.
-    static Span startIfExistingTraceParent(OperationContext* opCtx, SpanName) {
+    static Span startIngressSpan(std::shared_ptr<TelemetryContext>&,
+                                 SpanName,
+                                 SpanOptions = {.kind = SpanKind::kServer}) {
+        return Span{};
+    }
+    static Span startEgressSpan(std::shared_ptr<TelemetryContext>&,
+                                SpanName,
+                                SpanOptions = {.kind = SpanKind::kClient}) {
+        return Span{};
+    }
+    static Span startEgressSpan(OperationContext*,
+                                SpanName,
+                                SpanOptions = {.kind = SpanKind::kClient}) {
         return Span{};
     }
 
@@ -174,6 +197,6 @@ public:
 
 #endif
 
-}  // namespace MONGO_MOD_PUBLIC traces
+}  // namespace traces
 }  // namespace otel
 }  // namespace mongo

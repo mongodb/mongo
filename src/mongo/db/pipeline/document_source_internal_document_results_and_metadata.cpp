@@ -1,38 +1,14 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
+#include "mongo/db/pipeline/document_source_internal_stream_terminator.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/expression.h"
@@ -40,11 +16,15 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
+#include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+#include <variant>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -55,6 +35,16 @@ using boost::intrusive_ptr;
 namespace {
 
 constexpr int kMetaResultStreamType = 1;
+
+// Resolves a ShardedPlanSource down to the concrete spec: invokes the live callback for the
+// provider alternative, or returns the router-cached spec directly.
+const ShardedPlanSpec& resolveShardedPlanSpec(const ShardedPlanSource& source,
+                                              ExpressionContext* expCtx) {
+    if (auto* provider = std::get_if<DocResultsShardedPlanProvider>(&source)) {
+        return (*provider)(expCtx);
+    }
+    return std::get<ShardedPlanSpec>(source);
+}
 
 boost::intrusive_ptr<DocumentSource> makeReplaceRootDs(
     const boost::intrusive_ptr<ExpressionContext>& ctx) {
@@ -99,11 +89,20 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
         ? makeCopyFromExpressionContext(expCtx, expCtx->getNamespaceString(), expCtx->getUUID())
         : boost::intrusive_ptr<ExpressionContext>{};
 
+    // Sharded path (returnCursor): the metadata stream is a separate secondary cursor, so the
+    // Exchange must own the tracker (it can't depend on any one cursor's lifetime); it stays
+    // unreported since the consumer stages report their own memory. Non-sharded: the whole router
+    // runs on one opCtx, so the tracker stays there and the producer and all consumers share it.
+    const auto inputMemoryPolicy = docResultsAndMeta.getReturnCursor()
+        ? exec::agg::Exchange::InputMemoryPolicy::kOwnWithoutReporting
+        : exec::agg::Exchange::InputMemoryPolicy::kShareOperationTracker;
+
     auto exchange = make_intrusive<exec::agg::Exchange>(
         opCtx,
         buildStreamRoutingSpec(hasMeta),
         // Clone the source onto docExpCtx so the stage's expCtx matches the inner pipeline's.
-        Pipeline::create({docResultsAndMeta.getSourceStage()->clone(docExpCtx)}, docExpCtx));
+        Pipeline::create({docResultsAndMeta.getSourceStage()->clone(docExpCtx)}, docExpCtx),
+        inputMemoryPolicy);
 
     exec::agg::StageExpansion stages;
     stages.push_back(exec::agg::buildStage(
@@ -114,7 +113,11 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
         return stages;
 
     auto metaConsumer = make_intrusive<DocumentSourceExchange>(metaExpCtx, exchange, 1, nullptr);
-    auto metaPipeline = Pipeline::create({metaConsumer, makeReplaceRootDs(metaExpCtx)}, metaExpCtx);
+    // Terminates the meta consumer when the extension emits an EOS sentinel, unblocking the
+    // Exchange before the doc consumer's buffer fills.
+    auto streamTerminator = make_intrusive<DocumentSourceInternalStreamTerminator>(metaExpCtx);
+    auto metaPipeline = Pipeline::create(
+        {metaConsumer, streamTerminator, makeReplaceRootDs(metaExpCtx)}, metaExpCtx);
     metaPipeline->pipelineType = CursorTypeEnum::SearchMetaResult;
 
     // Sharded path: stash the meta pipeline on the DS so run_aggregate.cpp can retrieve it and
@@ -138,9 +141,8 @@ REGISTER_AGG_STAGES_MAPPING(_internalDocumentResultsAndMetadata,
                             DocumentSourceInternalDocumentResultsAndMetadata::id,
                             documentSourceInternalDocumentResultsAndMetadataToStagesFn);
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalDocumentResultsAndMetadata,
-                                     InternalDocumentResultsAndMetadataLiteParsed::parse,
-                                     AllowedWithApiStrict::kInternal);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalDocumentResultsAndMetadata,
+                                              InternalDocumentResultsAndMetadataLiteParsed::parse);
 
 DocumentSourceContainer internalDocumentResultsAndMetadataStageParamsToDocumentSourceFn(
     const std::unique_ptr<StageParams>& stageParams,
@@ -214,12 +216,16 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
         metadata = metaSpec;
     }
 
+    // We disable memory tracking for the two-cursor scenario, and must do it before the rest of
+    // the pipeline is parsed.
+    if (metadata.has_value() && params.getReturnCursor()) {
+        search_helpers::excludeOperationMemoryTrackingForSecondaryMetadataCursor(expCtx);
+    }
+
     auto stage = make_intrusive<DocumentSourceInternalDocumentResultsAndMetadata>(
         expCtx, std::move(sourceStage), std::move(metadata), params.getReturnCursor());
-    // The extension's distributed-plan callback is carried through the LiteParsed -> StageParams
-    // handoff and attached here so distributedPlanLogic() can produce a sharded merge plan.
-    if (const auto& provider = params.getShardedPlanProvider()) {
-        stage->setShardedPlanProvider(provider);
+    if (const auto& plan = params.getShardedPlan()) {
+        stage->setShardedPlan(*plan);
     }
     return {std::move(stage)};
 }
@@ -247,6 +253,16 @@ Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
     spec.setSource(_sourceStage->serialize(opts).getDocument().toBson());
     spec.setMetadata(_metadata);
     spec.setReturnCursor(_returnCursor);
+
+    // Serialize the merge plan into the IDL spec so a shard that re-parses this stage inside a
+    // subpipeline can reconstruct distributedPlanLogic() without the live callback.
+    const bool serializingForExecutionElsewhere =
+        (opts.isSerializingForRemoteDispatch || getExpCtx()->getInRouter()) &&
+        !opts.isShapifying() && !opts.isSerializingForExplain();
+    if (serializingForExecutionElsewhere && _shardedPlan) {
+        spec.setShardedPlanSpec(resolveShardedPlanSpec(*_shardedPlan, getExpCtx().get()));
+    }
+
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
@@ -258,7 +274,7 @@ void DocumentSourceInternalDocumentResultsAndMetadata::serializeToArray(
 
     // Below executionStats verbosity, PlanExecutorPipeline::writeExplainOps() does not merge in the
     // exec pipeline, so a single entry is correct.
-    if (!opts.verbosity || *opts.verbosity < ExplainOptions::Verbosity::kExecStats) {
+    if (!opts.verbosity || !explainPolicyFor(*opts.verbosity).hasExecStats()) {
         return;
     }
 
@@ -284,18 +300,30 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDocumentResultsAndMet
     const intrusive_ptr<ExpressionContext>& expCtx) const {
     auto cloned = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, _sourceStage->clone(expCtx), _metadata, _returnCursor);
-    if (_shardedPlanProvider) {
-        cloned->setShardedPlanProvider(_shardedPlanProvider);
-    }
+    cloned->_shardedPlan = _shardedPlan;
     return cloned;
+}
+
+void DocumentSourceInternalDocumentResultsAndMetadata::elideMetadata() {
+    _metadata = boost::none;
+    if (auto* wrapper = dynamic_cast<WrappedExtensionSourceHooks*>(_sourceStage.get())) {
+        wrapper->skipMetadataStream();
+    }
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetadata::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(12615007, "Expecting DocumentSource iterator pointing to this stage.", *itr == this);
+
+    // If metadata was already elided (e.g. by the router before serializing to shards),
+    // propagate that to the source stage so it stops producing the metadata stream.
+    if (!_metadata) {
+        elideMetadata();
+        return std::next(itr);
+    }
     // Shards only see their local pipeline view, so $$SEARCH_META refs in the merge
     // pipeline are invisible to them. Only the router runs metadata elision.
-    if (getExpCtx()->getNeedsMerge() || !_metadata) {
+    if (getExpCtx()->getNeedsMerge()) {
         return std::next(itr);
     }
 
@@ -307,8 +335,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetada
         LOGV2_DEBUG(12615008,
                     4,
                     "Eliding metadata stream as no downstream stage references $$SEARCH_META.");
-        _metadata = boost::none;
-        _sourceStage->skipMetadataStream();
+        elideMetadata();
     }
     return std::next(itr);
 }
@@ -316,27 +343,44 @@ DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetada
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
     const DistributedPlanContext* ctx) {
-    // This stage acts as transport layer, DPL info is provided by configured source stage via the
-    // callback. Without it, this stage has no distributed plan logic to provide.
-    if (!_shardedPlanProvider) {
+    // This stage acts as transport layer; the configured source stage supplies the DPL info via
+    // a callback. On the shard re-parse path inside a subpipeline the callback cannot survive
+    // BSON serialization, so we fall back to the cached spec the router stamped into the BSON.
+    const auto& expCtx = getExpCtx();
+    if (!_shardedPlan) {
         return boost::none;
     }
+    const ShardedPlanSpec& dplResult = resolveShardedPlanSpec(*_shardedPlan, expCtx.get());
 
     DistributedPlanLogic logic;
     logic.shardsStage = this;
     logic.needsSplit = false;
     logic.canMovePast = canMovePastDuringSplit;
 
-    const auto& expCtx = getExpCtx();
-    const auto& dplResult = _shardedPlanProvider(expCtx.get());
     tassert(12625501,
             str::stream() << kStageName << " DPL callback must return a non-empty sort pattern",
-            !dplResult.resultsSortPattern.isEmpty());
-    logic.mergeSortPattern = dplResult.resultsSortPattern.getOwned();
+            !dplResult.getResultsSortPattern().isEmpty());
+    logic.mergeSortPattern = dplResult.getResultsSortPattern().getOwned();
 
     // No metadata: only merge-sort is needed, no merging pipeline for metadata stream.
     if (!_metadata) {
         return logic;
+    }
+
+    // Metadata elision normally happens during optimization (doOptimizeAt); if optimization did
+    // not run, elide here based on the actual remainder of the pipeline so we don't attach a
+    // $setVariableFromSubPipeline stage that nothing reads. Shards only see their local pipeline
+    // view, so this only applies on the router.
+    if (ctx != nullptr && !expCtx->getNeedsMerge()) {
+        const auto& suffix = ctx->pipelineSuffix.getSources();
+        const bool referencesSearchMeta =
+            std::any_of(suffix.begin(), suffix.end(), [](const auto& stage) {
+                return search_helpers::hasReferenceToSearchMeta(*stage);
+            });
+        if (!referencesSearchMeta) {
+            elideMetadata();
+            return logic;
+        }
     }
 
     // Flip _returnCursor so the shard-side stage stashes the metadata stream as a secondary cursor
@@ -349,15 +393,16 @@ DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
 
     // Wrap the merge pipeline in $setVariableFromSubPipeline to bind
     // $$SEARCH_META on the router.
+    const auto& mergeOpt = dplResult.getMetaMergePipeline();
     tassert(12625502,
             str::stream() << kStageName
                           << " DPL callback must return a non-empty merge pipeline when "
                              "metadata is present",
-            !dplResult.metaMergePipeline.empty());
+            mergeOpt && !mergeOpt->empty());
+    const auto& mergePipeline = *mergeOpt;
     logic.mergingStages = {DocumentSourceSetVariableFromSubPipeline::create(
         expCtx,
-        pipeline_factory::makePipeline(
-            dplResult.metaMergePipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        pipeline_factory::makePipeline(mergePipeline, expCtx, pipeline_factory::kOptionsMinimal),
         Variables::kSearchMetaId)};
 
     return logic;

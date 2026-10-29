@@ -2,10 +2,14 @@
  * Tests whether the explain works for a single delete operation on a timeseries collection.
  *
  * @tags: [
+ *   uses_explain,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # To avoid multiversion tests
  *   requires_fcv_71,
+ *   # TODO SERVER-132091: Explain for deleteOne arbitrarily selects one shard and if the
+ *   # collection is spread across shards that could match no documents which breaks the test.
+ *   assumes_balancer_off,
  * ]
  */
 

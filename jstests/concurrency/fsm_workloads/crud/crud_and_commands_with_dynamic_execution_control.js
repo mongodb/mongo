@@ -3,6 +3,7 @@
  * as the execution control algorithm is changed dynamically at runtime.
  *
  * @tags: [
+ *   assumes_against_mongod_not_mongos,
  *   requires_replication,
  *   multiversion_incompatible,
  *  ]

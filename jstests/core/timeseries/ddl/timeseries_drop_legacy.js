@@ -17,6 +17,8 @@
  *   #  - The command is retryed, but now the main collection doesn't exist, so the buckets
  *   #    collection is dropped instead.
  *   requires_non_retryable_commands,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

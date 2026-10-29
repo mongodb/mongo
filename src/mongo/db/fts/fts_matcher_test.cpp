@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/fts/fts_matcher.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -140,6 +115,38 @@ TEST(FTSMatcher, MatcherDoesNotFilterStopWordsPos) {
     FTSMatcher m(q, FTSSpec(assertGet(FTSSpec::fixSpec(BSON("key" << BSON("x" << "text"))))));
 
     ASSERT(m.hasPositiveTerm(BSON("x" << "the")));
+}
+
+// A field value with an embedded NUL is historically truncated at the NUL (strlen semantics) before
+// matching, so text appearing after the NUL is invisible to the matcher. This test pins that
+// behavior: the phrase "dog", which lives after the NUL, must not match.
+//
+// It fails if there's a regression such that NUL truncation is somehow omitted, as accidentally
+// happened when the codebase was converted to `std::string_view` (in SERVER-32422).
+TEST(FTSMatcher, PositivePhraseStopsAtEmbeddedNul) {
+    // Runs a case- and diacritic-sensitive positive-phrase query against a document field value
+    // that contains an embedded NUL. Case- and diacritic-sensitive phrase matching compares the
+    // phrase against the raw field value directly (no tokenization), so this exercises the same
+    // raw-string comparison that the scoring boost does.
+    auto doMatch = [](BSONObj spec, BSONObj doc, const std::string& search) {
+        FTSQueryImpl q;
+        q.setQuery(search);
+        q.setLanguage("english");
+        q.setCaseSensitive(true);
+        q.setDiacriticSensitive(true);
+        ASSERT_OK(q.parse(TEXT_INDEX_VERSION_3));
+        FTSMatcher m(q, FTSSpec(assertGet(FTSSpec::fixSpec(spec))));
+        return m.positivePhrasesMatch(doc);
+    };
+    BSONObj spec = fromjson(R"({"key": {"x": "text"}})");
+
+    BSONObj plainDoc = fromjson(R"({"x": "catdog"})");
+    ASSERT_TRUE(doMatch(spec, plainDoc, R"("cat")"));
+    ASSERT_TRUE(doMatch(spec, plainDoc, R"("dog")"));
+
+    BSONObj nulDoc = fromjson(R"({"x": "cat\u0000dog"})");
+    ASSERT_TRUE(doMatch(spec, nulDoc, R"("cat")")) << "before NUL";
+    ASSERT_FALSE(doMatch(spec, nulDoc, R"("dog")")) << "after NUL is invisible";
 }
 
 // Returns whether a document indexed with text data 'doc' contains any positive terms from

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/curop_failpoint_helpers.h"
 
@@ -38,6 +12,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <mutex>
@@ -50,59 +25,88 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
+namespace {
+// Fields in a failpoint's data which scope the failpoint to a subset of the operations reaching a
+// 'waitWhileFailPointEnabled' callsite.
+constexpr auto kCommentFieldName = "comment"sv;
+constexpr auto kNssFieldName = "nss"sv;
+}  // namespace
+
 std::string CurOpFailpointHelpers::updateCurOpFailPointMsg(OperationContext* opCtx,
-                                                           const std::string& newMsg) {
+                                                           std::string_view newMsg) {
     std::lock_guard<Client> lk(*opCtx->getClient());
     auto oldMsg = CurOp::get(opCtx)->getFailPointMessage();
-    CurOp::get(opCtx)->setFailPointMessage(lk, newMsg.c_str());
+    CurOp::get(opCtx)->setFailPointMessage(lk, newMsg);
     return oldMsg;
 }
 
-void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
-                                                      OperationContext* opCtx,
-                                                      const std::string& failpointMsg,
-                                                      const std::function<void()>& whileWaiting,
-                                                      const NamespaceString& nss) {
-    invariant(failPoint);
-    failPoint->executeIf(
-        [&](const BSONObj& data) {
-            auto origCurOpFailpointMsg = updateCurOpFailPointMsg(opCtx, failpointMsg);
+bool CurOpFailpointHelpers::_shouldExecute(const BSONObj& data,
+                                           OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const std::function<bool(const BSONObj&)>& extraPred) {
+    // Hang only the queries matching the extraPred field if one is specified.
+    if (extraPred && !extraPred(data)) {
+        return false;
+    }
+    // Hang only the queries matching the comment field if one is specified.
+    if (auto targeted = data[kCommentFieldName]; !targeted.eoo()) {
+        auto comment = opCtx->getComment();
+        return comment && comment->woCompare(targeted) == 0;
+    }
+    // Hang only the queries matching the nss field if a non-empty one is specified. An
+    // empty 'nss' means "do not scope by namespace", which some tests rely on when they
+    // build the failpoint data unconditionally.
+    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, kNssFieldName);
+    if (!fpNss.isEmpty()) {
+        // The callsite must pass the namespace of the operation being evaluated, otherwise
+        // the scoping would be silently ignored and the failpoint would match every
+        // operation reaching this callsite.
+        uassert(13238000,
+                str::stream() << "failpoint data specifies a non-empty '" << kNssFieldName
+                              << "' but the callsite of waitWhileFailPointEnabled does not "
+                                 "pass a namespace",
+                !nss.isEmpty());
+        return fpNss == nss;
+    }
+    return true;
+}
 
-            const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
-            const bool shouldContinueOnInterrupt = data["shouldContinueOnInterrupt"].booleanSafe();
-            const Milliseconds sleepForMs = data.hasField("sleepFor")
-                ? Milliseconds(data["sleepFor"].numberInt())
-                : Milliseconds(10);
-            while (MONGO_unlikely(failPoint->shouldFail())) {
-                sleepFor(sleepForMs);
-                if (whileWaiting) {
-                    whileWaiting();
-                }
+void CurOpFailpointHelpers::_waitWhileFailPointEnabledImpl(
+    FailPoint::LockHandle& fpHandle,
+    OperationContext* opCtx,
+    std::string_view failpointMsg,
+    const std::function<void()>& whileWaiting) {
+    auto origCurOpFailpointMsg = updateCurOpFailPointMsg(opCtx, failpointMsg);
+    ON_BLOCK_EXIT([&] { updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg); });
 
-                // Check for interrupt so that an operation can be killed while waiting for the
-                // failpoint to be disabled, if the failpoint is configured to be interruptible.
-                //
-                // For shouldContinueOnInterrupt, an interrupt merely allows the code to continue
-                // past the failpoint; it is up to the code under test to actually check for
-                // interrupt.
-                if (shouldContinueOnInterrupt) {
-                    if (!opCtx->checkForInterruptNoAssert().isOK())
-                        break;
-                } else if (shouldCheckForInterrupt) {
-                    opCtx->checkForInterrupt();
-                }
-                if (data.hasField("sleepFor")) {
-                    break;
-                }
-            }
-            updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg);
-        },
-        [&](const BSONObj& data) {
-            if (data.hasField("comment") && opCtx->getComment()) {
-                return opCtx->getComment()->String() == data.getStringField("comment");
-            }
-            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"sv);
-            return nss.isEmpty() || fpNss.isEmpty() || fpNss == nss;
-        });
+    const bool shouldCheckForInterrupt =
+        fpHandle.getData()["shouldCheckForInterrupt"].booleanSafe();
+    const bool shouldContinueOnInterrupt =
+        fpHandle.getData()["shouldContinueOnInterrupt"].booleanSafe();
+    const Milliseconds sleepForMs = fpHandle.getData().hasField("sleepFor")
+        ? Milliseconds(fpHandle.getData()["sleepFor"].numberInt())
+        : Milliseconds(10);
+    while (MONGO_unlikely(fpHandle.isStillEnabled())) {
+        sleepFor(sleepForMs);
+        if (whileWaiting) {
+            whileWaiting();
+        }
+
+        // Check for interrupt so that an operation can be killed while waiting for the
+        // failpoint to be disabled, if the failpoint is configured to be interruptible.
+        //
+        // For shouldContinueOnInterrupt, an interrupt merely allows the code to continue
+        // past the failpoint; it is up to the code under test to actually check for
+        // interrupt.
+        if (shouldContinueOnInterrupt) {
+            if (!opCtx->checkForInterruptNoAssert().isOK())
+                break;
+        } else if (shouldCheckForInterrupt) {
+            opCtx->checkForInterrupt();
+        }
+        if (fpHandle.getData().hasField("sleepFor")) {
+            break;
+        }
+    }
 }
 }  // namespace mongo

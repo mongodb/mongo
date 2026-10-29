@@ -17,7 +17,7 @@ t.drop();
 
 // On a sharded cluster if the database doesn't exist, count will return an empty result instead
 // of a error.
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     // Create database
     assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }

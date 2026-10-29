@@ -296,8 +296,8 @@ The devcontainer automatically sets up a Python virtual environment:
 which python
 # Should show: /workspaces/mongo/python3-venv/bin/python
 
-# Check poetry is available
-poetry --version
+# Check uv is available
+uv --version
 ```
 
 #### 2.3 Test Bazel Build
@@ -456,8 +456,8 @@ docker system prune
 # Manually activate
 source /workspaces/mongo/python3-venv/bin/activate
 
-# Reinstall dependencies
-poetry install --no-root --sync
+# Reinstall dependencies (wraps `uv sync` and targets the activated venv)
+bash buildscripts/uv_sync.sh
 ```
 
 ### VS Code Extensions Not Working

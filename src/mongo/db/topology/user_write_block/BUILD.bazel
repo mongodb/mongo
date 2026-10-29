@@ -124,6 +124,7 @@ mongo_cc_library(
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
     ],
 )
 

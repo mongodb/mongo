@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 
@@ -139,7 +113,7 @@ Status canUpgradeToViewlessTimeseries(OperationContext* opCtx,
     auto inconsistencies = checkBucketCollectionInconsistencies(
         opCtx,
         bucketsColl,
-        false /* ensureViewExists */,
+        /*ensureViewExists=*/false,
         locks.mainAcq.isView() ? &locks.mainAcq.getView().getViewDefinition() : nullptr,
         mainColl.get());
     if (!inconsistencies.empty()) {
@@ -318,15 +292,15 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
             // Drop view and rename the buckets NSS over it.
             uassertStatusOK(db->dropView(opCtx, mainNs));
-            uassertStatusOK(db->renameCollection(opCtx, bucketsNs, mainNs, true /* stayTemp */));
+            uassertStatusOK(db->renameCollection(opCtx, bucketsNs, mainNs, /*stayTemp=*/true));
 
             // Clean up the buckets NSS metadata.
             CollectionWriter collWriter{opCtx, mainNs};
             Collection* writableColl = collWriter.getWritableCollection(opCtx);
             uassertStatusOK(writableColl->updateValidator(opCtx,
-                                                          BSONObj() /* newValidator */,
-                                                          boost::none /* validationLevel */,
-                                                          boost::none /* validatorAction */));
+                                                          /*newValidatorDoc=*/BSONObj(),
+                                                          /*newLevel=*/boost::none,
+                                                          /*newAction=*/boost::none));
 
             // Conservatively set the viewless-only 'fixedBucketing' option to false: a legacy
             // collection predates this option, so we cannot prove its buckets are fixed.
@@ -339,7 +313,7 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, bucketsColl->uuid(), true /* isUpgrade */);
+            opCtx, mainNs, bucketsColl->uuid(), /*isUpgrade=*/true);
 
         wuow.commit();
     });
@@ -405,7 +379,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             repl::UnreplicatedWritesBlock uwb(opCtx);
 
             // Rename the collection to the buckets NSS.
-            uassertStatusOK(db->renameCollection(opCtx, mainNs, bucketsNs, true /* stayTemp */));
+            uassertStatusOK(db->renameCollection(opCtx, mainNs, bucketsNs, /*stayTemp=*/true));
 
             // Only create the view on the primary shard.
             if (!skipViewCreation) {
@@ -416,7 +390,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 viewOptions.pipeline =
                     timeseries::generateViewPipeline(*mainColl->getTimeseriesOptions(), asArray);
                 uassertStatusOK(
-                    db->userCreateNS(opCtx, mainNs, viewOptions, /*createIdIndex=*/false));
+                    db->userCreateNS(opCtx, mainNs, viewOptions, /*createDefaultIndexes=*/false));
             }
 
             // Add validator to the buckets collection.
@@ -427,8 +401,8 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             uassertStatusOK(writableColl->updateValidator(
                 opCtx,
                 timeseries::generateTimeseriesValidator(bucketVersion, timeField),
-                boost::none /* validationLevel */,
-                boost::none /* validatorAction */));
+                /*newLevel=*/boost::none,
+                /*newAction=*/boost::none));
 
             // Strip the viewless-only 'fixedBucketing' option from the timeseries collection;
             // the viewful (legacy) format does not carry it.
@@ -439,7 +413,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, mainColl->uuid(), false /* isUpgrade */, skipViewCreation);
+            opCtx, mainNs, mainColl->uuid(), /*isUpgrade=*/false, skipViewCreation);
 
         wuow.commit();
     });
@@ -512,9 +486,9 @@ void forEachTimeseriesCollectionFromDb(OperationContext* opCtx,
 void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
         forEachTimeseriesCollectionFromDb(
-            opCtx, dbName, false /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
+            opCtx, dbName, /*isViewless=*/false, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
                 timeseries::upgradeToViewlessTimeseries(
-                    opCtx, std::move(locks), boost::none /* expectedUUID */);
+                    opCtx, std::move(locks), /*expectedUUID=*/boost::none);
             });
     }
 };
@@ -522,11 +496,11 @@ void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
 void downgradeAllTimeseriesFromViewless(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
         forEachTimeseriesCollectionFromDb(
-            opCtx, dbName, true /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
+            opCtx, dbName, /*isViewless=*/true, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
                 timeseries::downgradeFromViewlessTimeseries(opCtx,
                                                             std::move(locks),
-                                                            boost::none /* expectedUUID */,
-                                                            false /* skipViewCreation */);
+                                                            /*expectedUUID=*/boost::none,
+                                                            /*skipViewCreation=*/false);
             });
     }
 }
@@ -564,7 +538,7 @@ std::vector<BucketsCollectionInconsistency> checkBucketCollectionInconsistencies
         if (view) {
             if (view->viewOn() == nss && view->pipeline().size() == 1) {
                 const auto expectedViewPipeline = timeseries::generateViewPipeline(
-                    *bucketsColl->getTimeseriesOptions(), false /* asArray */);
+                    *bucketsColl->getTimeseriesOptions(), /*asArray=*/false);
                 const auto expectedInternalUnpackStage =
                     expectedViewPipeline
                         .getField(DocumentSourceInternalUnpackBucket::kStageNameInternal)

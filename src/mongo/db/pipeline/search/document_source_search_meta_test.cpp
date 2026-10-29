@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 
@@ -37,10 +11,12 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -57,8 +33,28 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
-class SearchMetaTest : service_context_test::WithSetupTransportLayer,
-                       public AggregationContextFixture {};
+// One spec per internal-only field. Used by both the external-client rejection test and the
+// internal-client acceptance test so the two stay in lock-step as fields are added.
+static const std::vector<std::pair<std::string, std::string>> kInternalSearchMetaFieldCases = {
+    {"mongotQuery",
+     R"({$searchMeta: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+    {"mergingPipeline", R"({$searchMeta: {mergingPipeline: [{$merge: {into: "secret"}}]}})"},
+    {"metadataMergeProtocolVersion", R"({$searchMeta: {metadataMergeProtocolVersion: 1}})"},
+    {"requiresSearchSequenceToken", R"({$searchMeta: {requiresSearchSequenceToken: true}})"},
+    {"requiresSearchMetaCursor", R"({$searchMeta: {requiresSearchMetaCursor: true}})"},
+    {"view",
+     R"({$searchMeta: {view: {name: "secretView", effectivePipeline: [{$match: {leaked: true}}]}}})"},
+    {"limit", R"({$searchMeta: {limit: 100}})"},
+    {"sortSpec", R"({$searchMeta: {sortSpec: {field: 1}}})"},
+    {"docsNeededBounds", R"({$searchMeta: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
+};
+
+class SearchMetaTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+};
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {
@@ -102,8 +98,8 @@ DEATH_TEST_F(SearchMetaDeathTest,
 
     // Simulate router sending featureFlagSearchExtension=true.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), true}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $searchMeta: {
@@ -125,8 +121,8 @@ TEST_F(SearchMetaTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
 
     // Simulate router sending featureFlagSearchExtension=false.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), false}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $searchMeta: {
@@ -138,6 +134,56 @@ TEST_F(SearchMetaTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
     // Should successfully parse using the fallback legacy implementation.
     ASSERT_DOES_NOT_THROW(LiteParsedDocumentSource::parse(
         nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx}));
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchMetaTest, ExternalClientCannotSupplyInternalSearchMetaFields) {
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    auto nss = getExpCtx()->getNamespaceString();
+    for (const auto& [fieldName, specJson] : kInternalSearchMetaFieldCases) {
+        SCOPED_TRACE(fieldName);
+        const auto specBson = fromjson(specJson);
+        auto lpds = SearchMetaLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
+        ASSERT_THROWS_CODE(lpds->validate(externalOpCtx.get()), AssertionException, 5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields.
+// Iterates the same case list as the external-client test so the two stay in sync.
+TEST_F(SearchMetaTest, InternalClientCanSupplyInternalSearchMetaFields) {
+    auto opCtx = getExpCtx()->getOperationContext();
+    auto nss = getExpCtx()->getNamespaceString();
+
+    for (const auto& [fieldName, specJson] : kInternalSearchMetaFieldCases) {
+        SCOPED_TRACE(fieldName);
+        const auto specBson = fromjson(specJson);
+        auto lpds = SearchMetaLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
+        ASSERT_DOES_NOT_THROW(lpds->validate(opCtx));
+    }
+}
+
+// createFromBson must accept a spec already in its serialized internal ('mongotQuery') form;
+// validation of those fields belongs to the LiteParse layer.
+TEST_F(SearchMetaTest, CreateFromBsonAcceptsSerializedInternalSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    auto fromNs = NamespaceString::createNamespaceString_forTest("unittests.$cmd.aggregate");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    const auto serializedSpec = fromjson(R"({
+        $searchMeta: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}, count: {type: "total"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: []
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceSearchMeta::createFromBson(serializedSpec.firstElement(), expCtx));
 }
 
 }  // namespace

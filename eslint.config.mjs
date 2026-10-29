@@ -367,8 +367,8 @@ export default [
         files: [
             "jstests/libs/begin_golden_test.js",
             "jstests/libs/golden_test.js",
-            "jstests/libs/override_methods/golden_overrides.js",
-            "jstests/libs/override_methods/sharded_golden_overrides.js",
+            "jstests/libs/override_methods/query/golden_overrides.js",
+            "jstests/libs/override_methods/query/sharded_golden_overrides.js",
             "jstests/libs/query/golden_test_utils.js",
             "jstests/libs/query/golden_sharding_utils.js",
             "jstests/query_golden/**/*.js",
@@ -418,6 +418,34 @@ export default [
         ignores: ["src/mongo/shell/debugger/vscode/**"],
         rules: {
             "mongodb/no-non-shell-imports": "error",
+        },
+    },
+    {
+        // Setup scripts loaded into the server-side JS scopes (the legacy in-process MozJS scope
+        // and the WASM scope) must stay classic scripts: neither has a filesystem-backed module
+        // loader, so module syntax here would load fine in the shell and fail only at runtime on
+        // the server. This rule is what lets these files be shared with the shell instead of
+        // forked -- see the note at the top of common/jsfiles/types.js.
+        files: [
+            "src/mongo/scripting/mozjs/common/jsfiles/**/*.js",
+            "src/mongo/scripting/mozjs/server/**/*.js",
+            "src/mongo/scripting/mozjs/wasm/jsfiles/**/*.js",
+        ],
+        rules: {
+            "no-restricted-syntax": [
+                "error",
+                {
+                    message:
+                        "Server-side JS setup scripts must be classic scripts: the server has no module loader. Do not use 'import' here.",
+                    selector: "ImportDeclaration, ImportExpression",
+                },
+                {
+                    message:
+                        "Server-side JS setup scripts must be classic scripts: the server has no module loader. Do not use 'export' here.",
+                    selector:
+                        "ExportNamedDeclaration, ExportDefaultDeclaration, ExportAllDeclaration",
+                },
+            ],
         },
     },
     {

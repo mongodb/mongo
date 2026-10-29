@@ -61,10 +61,9 @@ struct __wt_dhandle_clear_log {
     (F_ISSET(dhandle, WT_DHANDLE_DEAD) || !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN))
 
 /* Check if a handle could be reopened. */
-#define WT_DHANDLE_CAN_REOPEN(dhandle)                                                           \
-    (F_MASK(                                                                                     \
-       dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_DROPPED | WT_DHANDLE_OPEN | WT_DHANDLE_OUTDATED) == \
-      WT_DHANDLE_OPEN)
+#define WT_DHANDLE_CAN_REOPEN(dhandle)                                                             \
+    (F_MASK(dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_DROPPED | WT_DHANDLE_OPEN) == WT_DHANDLE_OPEN && \
+      !__wt_atomic_load_bool_relaxed(&(dhandle)->outdated))
 
 /* The metadata cursor's data handle. */
 #define WT_SESSION_META_DHANDLE(s) (((WT_CURSOR_BTREE *)((s)->meta_cursor))->dhandle)
@@ -86,7 +85,30 @@ struct __wt_dhandle_clear_log {
             WT_DHANDLE_ACQUIRE(dhandle);                                                   \
     } while (0)
 
+#define WT_DHANDLE_PREV(session, dhandle, head, headname, field)                           \
+    do {                                                                                   \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST)); \
+        if ((dhandle) == NULL)                                                             \
+            (dhandle) = TAILQ_LAST(head, headname);                                        \
+        else {                                                                             \
+            WT_DHANDLE_RELEASE(dhandle);                                                   \
+            (dhandle) = TAILQ_PREV(dhandle, headname, field);                              \
+        }                                                                                  \
+        if ((dhandle) != NULL)                                                             \
+            WT_DHANDLE_ACQUIRE(dhandle);                                                   \
+    } while (0)
+
 #define WT_DHANDLE_IS_CHECKPOINT(dhandle) ((dhandle)->checkpoint != NULL)
+
+/*
+ * WT_SHARED_BTREE_KIND --
+ *     Whether a tree is shared, and whether it is the live tree or a checkpoint view of it.
+ */
+typedef enum {
+    WT_SHARED_BTREE_NONE,      /* Not a shared tree */
+    WT_SHARED_BTREE_LIVE,      /* The live shared tree */
+    WT_SHARED_BTREE_CHECKPOINT /* A checkpoint view of a shared tree */
+} WT_SHARED_BTREE_KIND;
 
 /*
  * WT_WITH_DHANDLE_WRITE_LOCK_NOWAIT --
@@ -105,11 +127,18 @@ enum wt_dhandle_type {
     WT_DHANDLE_TYPE_BTREE = 0,
     WT_DHANDLE_TYPE_LAYERED,
     WT_DHANDLE_TYPE_TABLE,
-    WT_DHANDLE_TYPE_TIERED,
-    WT_DHANDLE_TYPE_TIERED_TREE
+    WT_DHANDLE_TYPE_NUM /* Number of types, must be last. */
 };
-/* Number of values above. */
-#define WT_DHANDLE_TYPE_NUM (1 + WT_DHANDLE_TYPE_TIERED_TREE)
+
+/* What a handle close does with the tree's pages. */
+typedef enum __wt_dhandle_close_action {
+    WT_DHANDLE_CLOSE_NONE,          /* Nothing to do, close the handle */
+    WT_DHANDLE_CLOSE_MARK_DEAD,     /* Keep the pages, let sweep discard them */
+    WT_DHANDLE_CLOSE_DISCARD_EARLY, /* Discard before closing the handle */
+    WT_DHANDLE_CLOSE_DISCARD_LATE,  /* Discard after closing the handle */
+    WT_DHANDLE_CLOSE_CHECKPOINT,    /* Flush and discard the tree, then close the handle */
+    WT_DHANDLE_CLOSE_INVALID        /* Combination of inputs that cannot occur */
+} WT_DHANDLE_CLOSE_ACTION;
 
 /*
  * WT_DATA_HANDLE --
@@ -132,14 +161,14 @@ struct __wt_data_handle {
     uint64_t orig_meta_hash;    /* Copy of base metadata hash */
     struct timespec orig_upd;   /* Time of original setup of meta base */
     /*
-     * Sessions holding a connection's data handle and queued tiered storage work units will hold
-     * references; sessions using a connection's data handle will have a non-zero in-use count.
-     * Instances of cached cursors referencing the data handle appear in session_cache_ref.
+     * Sessions holding a connection's data handle will hold references; sessions using a
+     * connection's data handle will have a non-zero in-use count. Instances of cached cursors
+     * referencing the data handle appear in session_cache_ref.
      */
     wt_shared uint32_t references;   /* References to this handle */
     wt_shared int32_t session_inuse; /* Sessions using this handle */
     uint32_t excl_ref;               /* Refs of handle by excl_session */
-    uint64_t timeofdeath;            /* Use count went to 0 */
+    wt_shared uint64_t timeofdeath;  /* Use count went to 0 */
     WT_SESSION_IMPL *excl_session;   /* Session with exclusive use, if any */
 
     WT_DATA_SOURCE *dsrc; /* Data source for this handle */
@@ -147,9 +176,8 @@ struct __wt_data_handle {
 
     wt_shared enum wt_dhandle_type type;
 
-#define WT_DHANDLE_BTREE(dhandle)                                                \
-    (__wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE || \
-      __wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_TIERED)
+#define WT_DHANDLE_BTREE(dhandle) \
+    (__wt_atomic_load_enum_relaxed(&(dhandle)->type) == WT_DHANDLE_TYPE_BTREE)
 
     bool compact_skip; /* If the handle failed to compact */
 
@@ -170,19 +198,33 @@ struct __wt_data_handle {
  * changed when a dhandle is locked exclusively.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_DHANDLE_DEAD 0x001u         /* Dead, awaiting discard */
-#define WT_DHANDLE_DISAGG_META 0x002u  /* Disaggregated storage metadata */
-#define WT_DHANDLE_DISCARD 0x004u      /* Close on release */
-#define WT_DHANDLE_DISCARD_KILL 0x008u /* Mark dead on release */
-#define WT_DHANDLE_DROPPED 0x010u      /* Handle is dropped */
-#define WT_DHANDLE_EXCLUSIVE 0x020u    /* Exclusive access */
-#define WT_DHANDLE_HS 0x040u           /* History store table */
-#define WT_DHANDLE_IS_METADATA 0x080u  /* Metadata handle */
-#define WT_DHANDLE_LOCK_ONLY 0x100u    /* Handle only used as a lock */
-#define WT_DHANDLE_OPEN 0x200u         /* Handle is open */
-#define WT_DHANDLE_OUTDATED 0x400u     /* Handle is outdated */
-                                       /* AUTOMATIC FLAG VALUE GENERATION STOP 12 */
+#define WT_DHANDLE_DEAD 0x001u                    /* Dead, awaiting discard */
+#define WT_DHANDLE_DISAGG_META 0x002u             /* Disaggregated storage metadata */
+#define WT_DHANDLE_DISCARD 0x004u                 /* Close on release */
+#define WT_DHANDLE_DISCARD_KILL 0x008u            /* Mark dead on release */
+#define WT_DHANDLE_DROPPED 0x010u                 /* Handle is dropped */
+#define WT_DHANDLE_EXCLUSIVE 0x020u               /* Exclusive access */
+#define WT_DHANDLE_HS 0x040u                      /* History store table */
+#define WT_DHANDLE_IS_METADATA 0x080u             /* Metadata handle */
+#define WT_DHANDLE_LOCK_ONLY 0x100u               /* Handle only used as a lock */
+#define WT_DHANDLE_OPEN 0x200u                    /* Handle is open */
+#define WT_DHANDLE_SHARED_BTREE_CHECKPOINT 0x400u /* Checkpoint view of a shared btree */
+#define WT_DHANDLE_SKIP_OPEN 0x800u               /* Do not open a closed handle */
+                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 12 */
     uint16_t flags;
+
+    /*
+     * Outdated means the handle's metadata has been superseded. Once set it is never cleared, and
+     * readers take it to mean:
+     * - don't hand this handle to a new user,
+     * - let the current users finish,
+     * - never write this handle's content back,
+     * - retire the handle promptly.
+     *
+     * Checkpoint pickup and step-down set it while another thread may concurrently read it, so it
+     * must be atomic.
+     */
+    wt_shared bool outdated; /* Handle's metadata has been superseded */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_DHANDLE_TS_ASSERT_READ_ALWAYS 0x1u /* Assert read always checking. */

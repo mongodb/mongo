@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
 
@@ -79,6 +53,46 @@ void DeblockedTagValStorage::release() {
     }
 }
 
+DeblockedTagVals Int64RecordIdBlock::deblock(boost::optional<DeblockedTagValStorage>& storage) {
+    if (!storage) {
+        DeblockedTagValStorage deblocked;
+        // The RecordId objects are owned by the _ridStorage vector.
+        deblocked.owned = false;
+        // We can safely initialize the tags to RecordId since the values are marked as unowned.
+        deblocked.tags.resize(_vals.size(), TypeTags::RecordId);
+        deblocked.tag = TypeTags::RecordId;
+        deblocked.isDense = true;
+        deblocked.vals.resize(_vals.size(), 0);
+        // Do a single allocation for all of the RecordIds, materializing and pointing to each in
+        // the same pass.
+        _ridStorage.resize(_vals.size());
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            _ridStorage[i] = RecordId(_vals[i]);
+            deblocked.vals[i] = value::bitcastFrom<RecordId*>(&_ridStorage[i]);
+        }
+        storage.emplace(std::move(deblocked));
+    }
+
+    return {_vals.size(),
+            _vals.empty() ? nullptr : storage->tags.data(),
+            _vals.empty() ? nullptr : storage->vals.data(),
+            TypeTags::RecordId,
+            true};
+}
+
+int Int64RecordIdBlock::getApproximateSize() const {
+    // The RecordIds live in _ridStorage, so account for its backing buffer directly rather than
+    // per deblocked value. This keeps the reported size independent of whether the block has been
+    // deblocked.
+    int result = sizeof(*this) + sizeof(int64_t) * _vals.capacity() +
+        sizeof(RecordId) * _ridStorage.capacity();
+    if (_deblockedStorage) {
+        result += sizeof(TypeTags) * _deblockedStorage->tags.capacity() +
+            sizeof(Value) * _deblockedStorage->vals.capacity();
+    }
+    return result;
+}
+
 std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) {
     return defaultMapImpl(op);
 }
@@ -90,6 +104,12 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
         tryDense().get_value_or(false)) {
         auto [lbTag, lbVal] = tryLowerBound();
         auto [ubTag, ubVal] = tryUpperBound();
+
+        // NaN is an outlier that compares false against everything, so a bound of NaN breaks the
+        // monotonicity assumption below. Fall back to processing the whole block in that case.
+        if (isNaN(lbTag, lbVal) || isNaN(ubTag, ubVal)) {
+            return nullptr;
+        }
 
         if (lbTag == ubTag && lbTag != value::TypeTags::Nothing) {
             auto minOwned = op.processSingle(lbTag, lbVal);
@@ -563,7 +583,7 @@ template value::TagValueView DoubleBlock::at(size_t idx);
 template value::TagValueView BoolBlock::at(size_t idx);
 
 void HeterogeneousBlock::push_back(TypeTags t, Value v) {
-    TagValueOwned owned{t, v};
+    TagValueOwned owned = TagValueOwned::fromRaw(t, v);
 
     _vals.push_back(v);
     _tags.push_back(t);

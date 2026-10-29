@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -67,7 +41,7 @@ namespace mongo {
  *
  * This class's chunk mapping is immutable once constructed.
  */
-class MONGO_MOD_PUBLIC CollectionMetadata {
+class [[MONGO_MOD_PUBLIC]] CollectionMetadata {
 public:
     /**
      * Instantiates a metadata object, which represents an unsharded collection. This 'isSharded'
@@ -91,7 +65,8 @@ public:
      * This is determined by comparing the collection version against the highest chunk version
      * among the changed chunks.
      */
-    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                   bool forceAllowGaps = false) const;
 
     /**
      * Returns a CollectionMetadata object for an untracked collection.
@@ -118,6 +93,16 @@ public:
         return _cm && getChunkManagerBase().hasRoutingTable();
     }
 
+    /**
+     * Returns true if the routing table holds only this shard's owned chunks and may have gaps in
+     * the key range (an authoritative shard-catalog filtering table). A legacy full routing table
+     * that holds every chunk of the collection does not allow gaps. Returns false when there is no
+     * routing table.
+     */
+    bool allowGaps() const {
+        return hasRoutingTable() && getChunkManagerBase().allowGaps();
+    }
+
     bool allowMigrations() const;
 
     /**
@@ -134,14 +119,10 @@ public:
     /**
      * Returns the current shard's placement version for the collection or UNTRACKED if it does not
      * have a routing table.
-     *
-     * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     ChunkVersion getShardPlacementVersion() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getVersion(nullptr /* opCtx */, _thisShardId)
-                    : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersion(_thisShardId)
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -149,14 +130,10 @@ public:
      * sharded. This value indicates the commit time of the latest placement change that this shard
      * participated in and is used to answer the question of "did any chunks move since some
      * timestamp".
-     *
-     * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     Timestamp getShardMaxValidAfter() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getMaxValidAfter(nullptr /* opCtx */, _thisShardId)
-                    : Timestamp(0, 0));
+        return (hasRoutingTable() ? getChunkManagerBase().getMaxValidAfter(_thisShardId)
+                                  : Timestamp(0, 0));
     }
 
     /**
@@ -167,14 +144,10 @@ public:
      * current chunk manager. Only use this function when logging the returned ChunkVersion. If the
      * caller must execute logic based on the returned ChunkVersion, use getShardPlacementVersion()
      * instead.
-     *
-     * TODO (SERVER-128786): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     ChunkVersion getShardPlacementVersionForLogging() const {
-        return (hasRoutingTable()
-                    ? getChunkManagerBase().getVersionForLogging(nullptr /* opCtx */, _thisShardId)
-                    : ChunkVersion::UNTRACKED());
+        return (hasRoutingTable() ? getChunkManagerBase().getVersionForLogging(_thisShardId)
+                                  : ChunkVersion::UNTRACKED());
     }
 
     /**
@@ -285,28 +258,21 @@ public:
     /**
      * Returns true if the document with the given key belongs to this chunkset. If the key is empty
      * returns false. If key is not a valid shard key, the behaviour is undefined.
-     *
-     * TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     bool keyBelongsToMe(const BSONObj& key) const {
         tassert(10016208, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().keyBelongsToShard(nullptr /* opCtx */, key, _thisShardId);
+        return getChunkManagerBase().keyBelongsToShard(key, _thisShardId);
     }
 
     /**
      * This finds the nearest chunk to a given 'key' owned by the current shard in the
      * specified chunk map scan 'direction', and returns it as a 'ChunkOwnership'. If the key is
      * empty returns false. If key is not a valid shard key, the behaviour is undefined.
-     *
-     * TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     ChunkManager::ChunkOwnership nearestOwnedChunk(const BSONObj& key,
                                                    ChunkMap::Direction direction) const {
         tassert(9526301, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().nearestOwnedChunk(
-            nullptr /* opCtx */, key, _thisShardId, direction);
+        return getChunkManagerBase().nearestOwnedChunk(key, _thisShardId, direction);
     }
 
     /**
@@ -319,13 +285,10 @@ public:
 
     /**
      * Returns true if the argument range overlaps any chunk.
-     *
-     * TODO (SERVER-128349): Remove the nullptr argument once we have a shardHandle access to the
-     * chunk manager.
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {
         tassert(10016209, "Expected a routing table to be initialized", hasRoutingTable());
-        return getChunkManagerBase().rangeOverlapsShard(nullptr /* opCtx */, range, _thisShardId);
+        return getChunkManagerBase().rangeOverlapsShard(range, _thisShardId);
     }
 
     /**

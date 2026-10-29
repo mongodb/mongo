@@ -10,7 +10,9 @@
                         }
                     },
                     "projection": {
-                        "k": false
+                        "_id": true,
+                        "a": true,
+                        "c": true
                     }
                 },
                 "embedPath": ""
@@ -69,15 +71,15 @@
     "resolvedPaths": [
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "b"
+            "underlyingFieldPath": "b"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "b"
+            "underlyingFieldPath": "b"
         }
     ],
     "prefix": [

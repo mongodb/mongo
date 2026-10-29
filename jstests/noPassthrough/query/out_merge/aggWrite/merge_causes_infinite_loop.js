@@ -5,6 +5,9 @@
  * following an update operation that changes its physical location. The purpose of this test is
  * to show that this behavior can be encountered when running a $merge aggregation which writes
  * to the collection being read from.
+ *
+ * @tags: [
+ * ]
  */
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("merge_causes_infinite_loop");

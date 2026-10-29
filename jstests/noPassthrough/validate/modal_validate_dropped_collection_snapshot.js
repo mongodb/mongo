@@ -63,17 +63,21 @@ describe("Offline validation of a dropped collection against an older snapshot",
         clearRawMongoProgramOutput();
     });
 
-    for (const validationCliFlag of ["--validate", "--validateParallel"]) {
-        it(`exits cleanly instead of crashing with an uncaught exception with \`${validationCliFlag}\``, () => {
+    for (const parallel of [false, true]) {
+        it(`exits cleanly instead of crashing with an uncaught exception with parallel=${parallel}`, () => {
+            const parallelParameters = parallel
+                ? ["--setParameter", "featureFlagParallelCollectionValidation=true"]
+                : [];
             const exitCode = runMongoProgram(
                 "mongod",
-                validationCliFlag,
+                "--validate",
                 "--dbpath",
                 dbpath,
                 "--port",
                 allocatePort(),
                 "--setParameter",
                 `collectionValidateOptions={options: {atClusterTime: ${tojson(snapshotTime)}}}`,
+                ...parallelParameters,
             );
 
             const output = rawMongoProgramOutput(".*");

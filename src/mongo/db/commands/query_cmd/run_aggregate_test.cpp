@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 
@@ -33,6 +7,8 @@
 #include "mongo/db/commands/db_command_test_fixture.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -42,7 +18,9 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/util/str.h"
 
 #include <string_view>
 
@@ -55,8 +33,12 @@ using namespace std::literals::string_view_literals;
  * This class is declared as a friend of OperationMemoryUsageTracker so it can access private
  * fields. As a result, it needs to be in the mongo namespace.
  */
-class RunAggregateTest : service_context_test::WithSetupTransportLayer,
-                         public DBCommandTestFixture {
+class RunAggregateTest : public DBCommandTestFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     void setUp() override {
         DBCommandTestFixture::setUp();
@@ -77,8 +59,7 @@ protected:
         AggregateCommandRequest request(std::move(nss));
         request.setPipeline({});
         auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
-        request.setIfrFlags(
-            std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+        request.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), true}});
         return request;
     }
 
@@ -159,8 +140,8 @@ protected:
                     Status{static_cast<ErrorCodes::Error>(errorCode), result["errmsg"].String()};
                 // We expect there to be no tracker attached to the opCtx at this point, because we
                 // always move it back to the Exchange object before returning.
-                std::unique_ptr<OperationMemoryUsageTracker> tracker =
-                    OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+                std::shared_ptr<OperationMemoryUsageTracker> tracker =
+                    OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
                 ASSERT_EQ(nullptr, tracker.get());
                 break;
             }
@@ -185,7 +166,7 @@ protected:
                 ASSERT_EQ(docs.size(), 0);
                 // Unfortunately, the operation memory tracker stays attached to the Exchage object,
                 // so we don't have a chance to examine it in this test.
-                ASSERT_FALSE(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+                ASSERT_FALSE(OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx));
             }
 
             // Let some other threads do some work.
@@ -293,8 +274,8 @@ protected:
                         params.nConsumers,
                         consumerId,
                         cursorId,
-                        params.nTotalDocs / params.nConsumers /* nExpectedDocs */,
-                        params.errorOffset.has_value() /* expectError */);
+                        /*nExpectedDocs=*/params.nTotalDocs / params.nConsumers,
+                        /*expectError=*/params.errorOffset.has_value());
                 });
             ASSERT_OK(swHandle);
             handles.push_back(swHandle.getValue());
@@ -428,19 +409,42 @@ private:
      * an internal error with the given message.
      */
     GetNextResult doGetNext() override {
-        GetNextResult result = MockStage::doGetNext();
+        auto result = MockStage::doGetNext();
         if (result.isAdvanced()) {
-            const Document& doc = result.getDocument();
-            FieldIterator it = doc.fieldIterator();
-            if (it.more() && it.fieldName() == "error") {
-                std::string errMsg = it.next().second.getString();
-                uasserted(ErrorCodes::InternalError, errMsg);
+            const auto& doc = result.getDocument();
+            auto it = doc.fieldIterator();
+            if (it.more()) {
+                const auto fieldName = it.fieldName();
+                const auto value = it.next().second;
+                if (fieldName == "error") {
+                    uasserted(ErrorCodes::InternalError, value.getString());
+                }
+                if (fieldName == "ifrRetry") {
+                    const auto flagName = value.getString();
+                    auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
+                    tassert(13130500,
+                            str::stream()
+                                << "Unknown IFR flag requested by $trackingMock: " << flagName,
+                            flag);
+                    auto ifrContext = getContext()->getIfrContext();
+                    tassert(
+                        13130501, "$trackingMock IFR retry requires an IFR context", ifrContext);
+                    if (ifrContext->getSavedFlagValue(*flag)) {
+                        uassertStatusOK(Status(IFRFlagRetryInfo(flagName),
+                                               "$trackingMock forced an IFR retry for testing"));
+                    }
+                }
+                if (fieldName == "ifrRetryUnknown") {
+                    // The unknown flag name resolves to null in disableIfrFlagAndResetResult,
+                    // hitting the tassert.
+                    uassertStatusOK(Status(IFRFlagRetryInfo(value.getString()),
+                                           "$trackingMock forced IFR retry with unknown flag"));
+                }
             }
             _tracker.add(doc.getApproximateSize());
         } else if (result.isEOF()) {
             _tracker.add(-_tracker.inUseTrackedMemoryBytes());
         }
-
         return result;
     }
 
@@ -507,8 +511,8 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
             CursorManager* cursorManager = CursorManager::get(opCtx->getServiceContext());
             ClientCursorPin pin =
                 unittest::assertGet(cursorManager->pinCursor(opCtx, cursorId, "getMore"));
-            std::unique_ptr<OperationMemoryUsageTracker> tracker =
-                OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
+            std::shared_ptr<OperationMemoryUsageTracker> tracker =
+                OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
             ASSERT(tracker);
             ASSERT_EQ(getTrackerOpCtx(tracker.get()), nullptr);
             // $trackingMock will always be increasing memory count with each document returned, so
@@ -518,7 +522,7 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
 
             prevMemoryInUse = tracker->inUseTrackedMemoryBytes();
 
-            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(tracker));
+            OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(tracker));
         }
 
         BSONObj getMoreCmdObj = fromjson(fmt::format(
@@ -628,5 +632,63 @@ TEST_F(RunAggregateTest, RunAggregateReadsIFRFlagsFromRequest) {
     // Validate that runAggregate correctly reads and processes IFR flags.
     ASSERT_TRUE(status.isOK());
 }
+
+TEST_F(RunAggregateTest, IFRRetryResetsPartiallyBuiltExplainReply) {
+    const auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
+    NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    AggregateCommandRequest request(std::move(nss));
+    request.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), true}});
+    request.setPipeline({BSON("$trackingMock" << BSON_ARRAY(BSON("ifrRetry" << flag.getName())))});
+    LiteParsedPipeline liteParsedPipeline(request, false);
+    const BSONObj cmdObj = request.toBSON();
+    rpc::OpMsgReplyBuilder replyBuilder;
+
+    ASSERT_OK(runAggregate(opCtx,
+                           request,
+                           liteParsedPipeline,
+                           cmdObj,
+                           {},
+                           ExplainOptions::Verbosity::kExecStats,
+                           &replyBuilder));
+
+    // Explain writes explainVersion before executing the pipeline. Without resetting the
+    // reply builder, the successful retry leaves two explainVersion fields.
+    const BSONObj reply = replyBuilder.releaseBody();
+    size_t explainVersionCount = 0;
+    for (const auto& element : reply) {
+        if (element.fieldNameStringData() == "explainVersion") {
+            ++explainVersionCount;
+        }
+    }
+    ASSERT_EQ(explainVersionCount, 1U) << reply;
+    ASSERT_TRUE(reply.hasField("stages")) << reply;
+}
+
+using RunAggregateDeathTest = RunAggregateTest;
+
+DEATH_TEST_F(RunAggregateDeathTest,
+             IFRRetryWithUnknownFlagTriggersAssertion,
+             "IFR retry referenced an unknown feature flag") {
+    const auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
+    NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    AggregateCommandRequest request(std::move(nss));
+    request.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), true}});
+    request.setPipeline(
+        {BSON("$trackingMock" << BSON_ARRAY(BSON("ifrRetryUnknown" << "noSuchFlag")))});
+    LiteParsedPipeline liteParsedPipeline(request, false);
+    const BSONObj cmdObj = request.toBSON();
+    rpc::OpMsgReplyBuilder replyBuilder;
+
+    [[maybe_unused]] auto status = runAggregate(opCtx,
+                                                request,
+                                                liteParsedPipeline,
+                                                cmdObj,
+                                                {},
+                                                ExplainOptions::Verbosity::kExecStats,
+                                                &replyBuilder);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -110,9 +110,11 @@ public:
   {
     // Don't allocate a no-op span for every StartSpan call, but use a static
     // singleton for this case.
-    static nostd::shared_ptr<trace::Span> noop_span(new trace::NoopSpan{this->shared_from_this()});
+    // intentionally leak
+    static auto noop_span =
+        new nostd::shared_ptr<trace::Span>(new trace::NoopSpan{this->shared_from_this()});
 
-    return noop_span;
+    return *noop_span;
   }
 
 #if OPENTELEMETRY_ABI_VERSION_NO == 1

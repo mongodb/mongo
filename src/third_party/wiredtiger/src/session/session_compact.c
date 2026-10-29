@@ -146,8 +146,6 @@ __compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
      */
     if (WT_PREFIX_MATCH(uri, "file:"))
         session->compact->file_count++;
-    if (WT_PREFIX_MATCH(uri, "tiered:"))
-        WT_RET(ENOTSUP);
 
     return (0);
 }
@@ -373,22 +371,6 @@ err:
 }
 
 /*
- * __wt_compact_check_eligibility --
- *     Function to check whether the specified URI is eligible for compaction.
- */
-bool
-__wt_compact_check_eligibility(WT_SESSION_IMPL *session, const char *uri)
-{
-    WT_UNUSED(session);
-
-    /* Tiered tables cannot be compacted. */
-    if (WT_SUFFIX_MATCH(uri, ".wtobj"))
-        return (false);
-
-    return (true);
-}
-
-/*
  * __wti_session_compact --
  *     WT_SESSION.compact method.
  */
@@ -471,8 +453,7 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
     WT_ERR(__wt_str_name_check(session, uri));
 
     if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
-      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:") &&
-      !WT_PREFIX_MATCH(uri, "tiered:")) {
+      !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "table:")) {
         if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
             ret = dsrc->compact == NULL ?
               __wt_object_unsupported(session, uri) :
@@ -481,10 +462,6 @@ __wti_session_compact(WT_SESSION *wt_session, const char *uri, const char *confi
             ret = __wt_bad_object_type(session, uri);
         goto err;
     }
-
-    /* Check the file is eligible for compaction. */
-    if (!__wt_compact_check_eligibility(session, uri))
-        WT_ERR(__wt_object_unsupported(session, uri));
 
     /* Setup the session handle's compaction state structure. */
     memset(&compact, 0, sizeof(WT_COMPACT_STATE));

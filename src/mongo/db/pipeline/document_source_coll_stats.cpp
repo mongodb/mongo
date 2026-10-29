@@ -1,37 +1,13 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 
@@ -92,6 +68,33 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
                 "$collStats supports targetAllNodes parameter only for sharded clusters",
                 pExpCtx->getInRouter() || pExpCtx->getFromRouter());
     }
+
+    // When running on a router:
+    // - If filtering is required by the metrics policy, set 'forceFiltered' to true to indicate to
+    //   shards that metrics should be filtered. This is required for filtering to work for external
+    //   clients since a router is an internal client so requests from it are not subject to metrics
+    //   filtering.
+    // - Otherwise, make sure that 'forceFiltered' is not set.
+    if (pExpCtx->getInRouter()) {
+        auto& metricsPolicyManager = MetricsPolicyManager::get(pExpCtx->getOperationContext());
+        if (metricsPolicyManager.requiresFiltering(pExpCtx->getOperationContext(),
+                                                   MetricsCategoryEnum::kCollStats,
+                                                   spec.getForceFiltered().value_or(false))) {
+            spec.setForceFiltered(true);
+        } else {
+            spec.setForceFiltered({});
+        }
+    }
+
+    // If 'forceFiltered' is set to true and this is a request from a router, assert that this node
+    // supports filtering. This is to prevent this node from silently returning unfiltered metrics.
+    if (spec.getForceFiltered().value_or(false) && pExpCtx->getFromRouter()) {
+        uassert(
+            ErrorCodes::IllegalOperation,
+            "'forceFiltered' is set by a router but this node does not support metrics filtering",
+            gFeatureFlagCollStatsMetricsFiltering.isEnabled());
+    }
+
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 

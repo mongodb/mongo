@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -116,7 +90,7 @@ protected:
                 .getChunkManager();
 
         std::set<ShardId> shardIds;
-        chunkManager.getShardIdsForRange(operationContext(), min, max, &shardIds);
+        chunkManager.getShardIdsForRange(min, max, &shardIds);
 
         _assertShardIdsMatch(expectedShardIds, shardIds);
     }
@@ -503,8 +477,8 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                                                         false,
                                                         epoch,
                                                         Timestamp(1, 1),
-                                                        boost::none /* timeseriesFields */,
-                                                        boost::none /* reshardingFields */,
+                                                        /*timeseriesFields=*/boost::none,
+                                                        /*reshardingFields=*/boost::none,
 
                                                         true,
                                                         {chunk0, chunk1});
@@ -518,15 +492,15 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                        ChunkHistory(Timestamp(1, 0), ShardId("1"))});
 
     PointInTimeChunkManager cm(makeStandaloneRoutingTableHistory(
-                                   oldRoutingTable.makeUpdated(boost::none /* timeseriesFields */,
-                                                               boost::none /* reshardingFields */,
+                                   oldRoutingTable.makeUpdated(/*timeseriesFields=*/boost::none,
+                                                               /*reshardingFields=*/boost::none,
                                                                true,
                                                                false, /* unsplittable */
                                                                {chunk1})),
                                Timestamp(5, 0));
 
     std::set<ShardId> shardIds;
-    cm.getShardIdsForRange(operationContext(), BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
+    cm.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);
     ASSERT_EQ(2, shardIds.size());
 
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -540,7 +514,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
     const auto epoch = OID::gen();
     const Timestamp collTimestamp{1, 1};
     auto chunkVec = chunks_test_util::genRandomChunkVector(
-        uuid, epoch, collTimestamp, 30 /* maxNumChunks */, 1 /* minNumChunks */);
+        uuid, epoch, collTimestamp, /*maxNumChunks=*/30, /*minNumChunks=*/1);
     auto chunks = chunks_test_util::toChunkInfoPtrVector(chunkVec);
 
     Timestamp clusterTime{Date_t::now()};
@@ -568,8 +542,8 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
                                            false,
                                            epoch,
                                            collTimestamp,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none /* reshardingFields */,
+                                           /*timeseriesFields=*/boost::none,
+                                           /*reshardingFields=*/boost::none,
                                            true,
                                            chunkVec);
     PointInTimeChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), clusterTime);
@@ -596,14 +570,13 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Pick a random shard key in the chunk.
         auto shardKey = chunks_test_util::calculateIntermediateShardKey(
-            (*chunkIt)->getMin(), (*chunkIt)->getMax(), 0.2 /* minKeyProb */);
+            (*chunkIt)->getMin(), (*chunkIt)->getMax(), /*minKeyProb=*/0.2);
 
         // Validate shard key is correctly identified as being owned by its shard & the same chunk
         // is found as the one we are curently looking at.
-        ASSERT(cm.keyBelongsToShard(operationContext(), shardKey, shardId));
+        ASSERT(cm.keyBelongsToShard(shardKey, shardId));
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, shardId, ChunkMap::Direction::Forward);
+            auto out = cm.nearestOwnedChunk(shardKey, shardId, ChunkMap::Direction::Forward);
             ASSERT(out.containsShardKey);
             ASSERT(out.nearestOwnedChunk);
             ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), (*chunkIt)->getMin());
@@ -613,8 +586,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Repeat for reverse direction.
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, shardId, ChunkMap::Direction::Backward);
+            auto out = cm.nearestOwnedChunk(shardKey, shardId, ChunkMap::Direction::Backward);
             ASSERT(out.containsShardKey);
             ASSERT(out.nearestOwnedChunk);
             ASSERT_BSONOBJ_EQ(out.nearestOwnedChunk->getMin(), (*chunkIt)->getMin());
@@ -624,10 +596,9 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Validate that if we use a different shard id, shard key is identified as an orphan, and
         // the correct next/previous chunk is returned (we cannot return the same chunk here).
-        ASSERT_FALSE(cm.keyBelongsToShard(operationContext(), shardKey, otherShard));
+        ASSERT_FALSE(cm.keyBelongsToShard(shardKey, otherShard));
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, otherShard, ChunkMap::Direction::Forward);
+            auto out = cm.nearestOwnedChunk(shardKey, otherShard, ChunkMap::Direction::Forward);
             ASSERT_FALSE(out.containsShardKey);
             if (expectedNextChunk) {
                 ASSERT(out.nearestOwnedChunk);
@@ -641,8 +612,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Repeat for reverse direction.
         {
-            auto out = cm.nearestOwnedChunk(
-                operationContext(), shardKey, otherShard, ChunkMap::Direction::Backward);
+            auto out = cm.nearestOwnedChunk(shardKey, otherShard, ChunkMap::Direction::Backward);
             ASSERT_FALSE(out.containsShardKey);
             if (expectedPrevChunk) {
                 ASSERT(out.nearestOwnedChunk);

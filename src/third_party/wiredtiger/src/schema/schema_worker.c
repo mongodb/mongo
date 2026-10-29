@@ -9,6 +9,31 @@
 #include "wt_internal.h"
 
 /*
+ * __schema_worker_awaits_publish --
+ *     Set skip if the URI maps to an already-open tree that is awaiting publication. Only a
+ *     resident handle is inspected: opening one here to read the flag would fault on the corrupted
+ *     table verify is meant to diagnose.
+ */
+static int
+__schema_worker_awaits_publish(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
+{
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+
+    *skipp = false;
+    ret = __wt_conn_dhandle_find(session, uri, NULL);
+    if (ret == WT_NOTFOUND)
+        return (0);
+    WT_RET(ret);
+
+    dhandle = session->dhandle;
+    *skipp = F_ISSET(dhandle, WT_DHANDLE_OPEN) && WT_DHANDLE_BTREE(dhandle) &&
+      F_ISSET_ATOMIC_32((WT_BTREE *)dhandle->handle, WT_BTREE_AWAITS_PUBLISH);
+    WT_DHANDLE_CLEAR(session);
+    return (0);
+}
+
+/*
  * __wti_execute_handle_operation --
  *     Apply a function to a handle, getting exclusive access if requested.
  */
@@ -17,6 +42,19 @@ __wti_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[], uint32_t open_flags)
 {
     WT_DECL_RET;
+    bool skip;
+
+    /*
+     * A tree awaiting publication has no on-disk data to verify, and the exclusive open would
+     * discard its in-memory content. Skip it.
+     */
+    if (FLD_ISSET(open_flags, WT_BTREE_VERIFY)) {
+        WT_WITH_HANDLE_LIST_READ_LOCK(
+          session, ret = __schema_worker_awaits_publish(session, uri, &skip));
+        WT_RET(ret);
+        if (skip)
+            return (0);
+    }
 
     /*
      * If the operation requires exclusive access, close any open file handles, including
@@ -36,37 +74,6 @@ __wti_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
 }
 
 /*
- * __schema_tiered_worker --
- *     Run a schema worker operation on each tier of a tiered data source.
- */
-static int
-__schema_tiered_worker(WT_SESSION_IMPL *session, const char *uri,
-  int (*file_func)(WT_SESSION_IMPL *, const char *[]),
-  int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags)
-{
-    WT_DATA_HANDLE *dhandle;
-    WT_DECL_RET;
-    WT_TIERED *tiered;
-    u_int i;
-
-    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, open_flags));
-    tiered = (WT_TIERED *)session->dhandle;
-
-    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
-        dhandle = tiered->tiers[i].tier;
-        if (dhandle == NULL)
-            continue;
-        WT_WITHOUT_DHANDLE(session,
-          ret = __wt_schema_worker(session, dhandle->name, file_func, name_func, cfg, open_flags));
-        WT_ERR(ret);
-    }
-
-err:
-    WT_TRET(__wt_session_release_dhandle(session));
-    return (ret);
-}
-
-/*
  * __schema_layered_stable_worker_verify --
  *     Verify the layered stable table.
  */
@@ -75,26 +82,66 @@ __schema_layered_stable_worker_verify(WT_SESSION_IMPL *session, const char *stab
   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags)
 {
+    WT_DECL_ITEM(ckpt_uri);
     WT_DECL_RET;
-    WT_CONNECTION_IMPL *conn = S2C(session);
+    wt_timestamp_t step_down_ts;
+    char ts_string[WT_TS_INT_STRING_SIZE];
+    const char *checkpoint_name = NULL;
+    bool leader;
+
     WT_ASSERT(session, stable_uri != NULL);
 
-    /* Verify the stable table of the layered table. */
-    WT_WITHOUT_DHANDLE(session,
-      ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
+    /* Sample the role once so the open and the error message below agree if it changes. */
+    leader = __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader);
 
-    /* On followers, it is possible not to have any stable table. This is a transient state. */
-    if (!conn->layered_table_manager.leader && ret == ENOENT) {
-        __wt_verbose_level(session, WT_VERB_VERIFY, WT_VERBOSE_DEBUG_2,
-          "Verify (layered): %s stable table not found on follower, it can be a transient state.",
-          stable_uri);
-        ret = 0;
+    if (leader) {
+        /* Verify the stable table of the layered table. */
+        WT_WITHOUT_DHANDLE(session,
+          ret = __wt_schema_worker(session, stable_uri, file_func, name_func, cfg, open_flags));
+
+        /*
+         * A table created after the step-down timestamp was set has no stable constituent, so there
+         * is nothing on the stable side to verify. The schema lock held here serializes the
+         * timestamp, making the relaxed load safe.
+         */
+        step_down_ts =
+          __wt_atomic_load_uint64_relaxed(&S2C(session)->txn_global.step_down_timestamp);
+        if (ret == ENOENT && step_down_ts != WT_TS_NONE) {
+            __wt_verbose_info(session, WT_VERB_LAYERED,
+              "%s: no stable constituent to verify, the step-down timestamp %s is set", stable_uri,
+              __wt_timestamp_to_string(step_down_ts, ts_string));
+            ret = 0;
+        }
+    } else {
+        WT_ERR(__wt_scr_alloc(session, 0, &ckpt_uri));
+
+        /* A follower always verifies the stable tree at the last picked-up checkpoint. */
+        WT_ERR_NOTFOUND_OK(
+          __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
+
+        /* There is nothing to verify before the first checkpoint is picked up. */
+        if (ret == WT_NOTFOUND) {
+            ret = 0;
+            goto err;
+        }
+
+        /* Use a URI with a "/<checkpoint name> suffix. */
+        WT_ERR(__wt_buf_fmt(session, ckpt_uri, "%s/%s", stable_uri, checkpoint_name));
+
+        /*
+         * Verify the stable table of the layered table. The open returns EBUSY when a concurrent
+         * pickup supersedes the checkpoint; the caller treats EBUSY as transient.
+         */
+        WT_WITHOUT_DHANDLE(session,
+          ret = __wt_schema_worker(session, ckpt_uri->data, file_func, name_func, cfg, open_flags));
     }
 
+err:
+    __wt_scr_free(session, &ckpt_uri);
+    __wt_free(session, checkpoint_name);
     if (ret != 0 && ret != EBUSY)
-        WT_RET_MSG(
-          session, ret, "Verify (layered): %s stable table verification failed", stable_uri);
-
+        WT_RET_MSG(session, ret, "Verify (layered): %s stable table verification failed on the %s",
+          stable_uri, leader ? "leader" : "follower");
     return (ret);
 }
 
@@ -112,7 +159,14 @@ __schema_layered_ingest_worker_verify(WT_SESSION_IMPL *session, const char *inge
     WT_ASSERT(session, ingest_uri != NULL);
 
     /* We don't verify the ingest table on a follower. */
-    if (!conn->layered_table_manager.leader)
+    if (!__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader))
+        return (0);
+
+    /*
+     * While a step-down timestamp is set, the leader directs writes to ingest, so it is expected to
+     * hold the post-cutoff content rather than be empty.
+     */
+    if (__wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)
         return (0);
 
     /* The ingest table on a leader has to be empty. Use a standard cursor to verify this. */
@@ -190,11 +244,10 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
     WT_SESSION *wt_session;
     WT_TABLE *table;
     u_int i;
-    bool is_tiered, skip;
+    bool skip;
 
     table = NULL;
     skip = false;
-    WT_NOT_READ(is_tiered, false);
 
     if (name_func != NULL)
         WT_ERR(name_func(session, uri, &skip));
@@ -202,12 +255,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
     /* If the callback said to skip this object, we're done. */
     if (skip)
         return (0);
-
-    /* Tiered tables do not support verify or salvage operations. */
-    is_tiered = WT_PREFIX_MATCH(uri, "object:") || WT_PREFIX_MATCH(uri, "tier:") ||
-      WT_PREFIX_MATCH(uri, "tiered:");
-    if (is_tiered && (file_func == __wt_salvage || file_func == __wt_verify))
-        WT_ERR(ENOTSUP);
 
     /* Get the btree handle(s) and call the underlying function. */
     if (WT_PREFIX_MATCH(uri, "file:")) {
@@ -237,11 +284,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
         for (i = 0; i < WT_COLGROUPS(table); i++) {
             colgroup = table->cgroups[i];
 
-            /* Verify is not implemented for tiered tables. */
-            if ((file_func == __wt_salvage || file_func == __wt_verify) &&
-              WT_PREFIX_MATCH(colgroup->source, "tiered:"))
-                WT_ERR(ENOTSUP);
-
             skip = false;
             if (name_func != NULL)
                 WT_ERR(name_func(session, colgroup->name, &skip));
@@ -269,8 +311,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
         }
     } else if (WT_PREFIX_MATCH(uri, "layered:") && file_func == __wt_verify) {
         WT_ERR(__schema_layered_worker_verify(session, uri, file_func, name_func, cfg, open_flags));
-    } else if (WT_PREFIX_MATCH(uri, "tiered:")) {
-        WT_ERR(__schema_tiered_worker(session, uri, file_func, name_func, cfg, open_flags));
     } else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
         wt_session = (WT_SESSION *)session;
         if (file_func == __wt_salvage && dsrc->salvage != NULL)

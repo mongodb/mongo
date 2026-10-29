@@ -227,8 +227,8 @@ __cursor_enter(WT_SESSION_IMPL *session)
      * If there are no other cursors positioned in the session, check whether the cache is full.
      */
     if (session->ncursors == 0)
-        WT_RET_ONLY(
-          __wt_evict_app_assist_worker_check(session, false, false, true, NULL), WT_ROLLBACK);
+        WT_RET_ONLY(__wt_evict_app_assist_worker_check(session, false, false, true, false, NULL),
+          WT_ROLLBACK);
     ++session->ncursors;
     return (0);
 }
@@ -301,9 +301,10 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
      * Release any page references we're holding. This can trigger eviction (for example, forced
      * eviction of big pages), so it must happen after releasing our snapshot above. Additionally,
      * there's a debug mode where an application can force the eviction in order to test or stress
-     * the system. Clear the reference so we never try the release twice.
+     * the system, unless eviction is disabled for the tree. Clear the reference so we never try the
+     * release twice.
      */
-    if (F_ISSET(cursor, WT_CURSTD_DEBUG_RESET_EVICT))
+    if (F_ISSET(cursor, WT_CURSTD_DEBUG_RESET_EVICT) && __wt_btree_eviction_enabled(CUR2BT(cbt)))
         WT_TRET_BUSY_OK(__wt_page_release_evict(session, cbt->ref, 0));
     else
         ret = __wt_page_release(session, cbt->ref, 0);
@@ -378,8 +379,9 @@ __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
     dhandle = session->dhandle;
 
     /* If we open a handle with a time of death set, clear it. */
-    if (__wt_atomic_add_int32(&dhandle->session_inuse, 1) == 1 && dhandle->timeofdeath != 0)
-        __wt_tsan_suppress_store_uint64(&dhandle->timeofdeath, 0);
+    if (__wt_atomic_add_int32(&dhandle->session_inuse, 1) == 1 &&
+      __wt_atomic_load_uint64_relaxed(&dhandle->timeofdeath) != 0)
+        __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, 0);
 }
 
 /*
@@ -398,8 +400,9 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
      * decrementing the use count, there's a chance that the data handle can be freed.
      */
     WT_ASSERT(session, __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0);
-    if (dhandle->timeofdeath != 0 && __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) == 1)
-        dhandle->timeofdeath = 0;
+    if (__wt_atomic_load_uint64_relaxed(&dhandle->timeofdeath) != 0 &&
+      __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) == 1)
+        __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, 0);
     (void)__wt_atomic_sub_int32(&dhandle->session_inuse, 1);
 }
 

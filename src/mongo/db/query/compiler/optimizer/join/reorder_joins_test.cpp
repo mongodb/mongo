@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -82,8 +57,16 @@ protected:
         std::set<NodeId> baseNodes;
         for (auto seed : seeds) {
             auto clonedMap = cloneSolnMap(jCtx.singleTableAccess.cbrCqQsns);
-            auto r = constructSolutionWithRandomOrder(
-                jCtx, nullptr, nullptr, seed, planShape, method, false /* No pruning. */, retries);
+            OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;
+            auto r = constructSolutionWithRandomOrder(jCtx,
+                                                      nullptr,
+                                                      nullptr,
+                                                      seed,
+                                                      planShape,
+                                                      method,
+                                                      false /* No pruning. */,
+                                                      retries,
+                                                      metrics);
             // For tests expecting an error, we uassert.
             uassertStatusOK(r.getStatus());
             auto v = std::move(r.getValue());
@@ -116,8 +99,8 @@ TEST_F(ReorderGraphTest, SimpleGraph) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -139,9 +122,9 @@ TEST_F(ReorderGraphTest, TwoJoins) {
         {.collName = "c", .embedPath = FieldPath{"c"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id3, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -164,8 +147,8 @@ TEST_F(ReorderGraphTest, SimpleINLJ) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -187,8 +170,8 @@ TEST_F(ReorderGraphTest, SimpleINLJSwapEdge) {
         {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     // Swap edge dir compared to previous.
@@ -215,9 +198,9 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
         {.collName = "c", .embedPath = FieldPath{"c"}, .filter = {}, .indexes = {BSON("c" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id3, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -265,10 +248,10 @@ TEST_F(ReorderGraphTest, JoinWithDeps) {
         {.collName = "f2", .embedPath = FieldPath{"f2"}, .filter = {}, .indexes = {}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
-        ResolvedPath{.nodeId = id3, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id3, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*f1.a*/);
@@ -293,8 +276,8 @@ TEST_F(ReorderGraphTest, INLJResidualPred) {
                                     .indexes = {BSON("b" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -318,8 +301,8 @@ TEST_F(ReorderGraphTest, INLJUseIndexPrefix) {
                                     .indexes = {BSON("b" << 1 << "c" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"b"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
@@ -342,8 +325,8 @@ TEST_F(ReorderGraphTest, AvoidINLJOverIneligibleIndex) {
                                     .indexes = {BSON("b" << 1 << "c" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"c"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.c*/);
@@ -377,10 +360,10 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
                                     .indexes = {BSON("c" << 1 << "d" << 1)}});
 
     resolvedPaths = {
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"a"}},
-        ResolvedPath{.nodeId = id1, .fieldName = FieldPath{"b"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"c"}},
-        ResolvedPath{.nodeId = id2, .fieldName = FieldPath{"d"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = id1, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"c"}},
+        ResolvedPath{.nodeId = id2, .underlyingFieldPath = FieldPath{"d"}},
     };
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 2 /*b.c*/);
@@ -505,6 +488,545 @@ TEST(IndexSatisfyingJoinPredicates, NoSatisfyingIndex) {
                                                      makeIndexedPredicate("c"),
                                                  });
     ASSERT_EQ(res, nullptr);
+}
+
+class CachedJoinPlanTest : public ReorderGraphTest {
+protected:
+    // Override to mark canonical queries as SBE-compatible so they satisfy planFromCache's
+    // shouldCacheQuery() check. In production, queries that reach the join plan cache are
+    // always cache-eligible; this makes test CQs match that invariant.
+    NodeId addNssWithEmbedding(ReorderGraphTest::TestNamespaceParams&& params) {
+        auto nss = NamespaceString::createNamespaceString_forTest("test", params.collName);
+        namespaces.push_back(nss);
+        auto cq = makeCanonicalQuery(nss, params.filter);
+        cq->setSbeCompatible(true);
+        auto plan = makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone());
+        cbrCqQsns.emplace(cq.get(), std::move(plan));
+        perCollIdxs.emplace(nss, makeIndexCatalogEntries(std::move(params.indexes)));
+        return *graph.addNode(nss, std::move(cq), params.embedPath);
+    }
+
+    std::unique_ptr<QuerySolution> makeSolnWithCacheData(NamespaceString nss) {
+        auto soln = makeCollScanPlan(std::move(nss));
+        auto scd = std::make_unique<SolutionCacheData>();
+        scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+        soln->cacheData = std::move(scd);
+        return soln;
+    }
+
+    // Build a CachedAccessPath node for the given namespace and NodeId with COLLSCAN cache data.
+    std::unique_ptr<CachedJoinPlan> makeCachedAccessPath(NodeId nodeId) {
+        auto scd = std::make_unique<SolutionCacheData>();
+        scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+        return std::make_unique<CachedJoinPlan>(
+            CachedAccessPath{.nodeId = nodeId, .solnCacheData = std::move(scd)});
+    }
+
+    JoinCostEstimate zeroCostEstimate() {
+        return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
+    }
+};
+
+TEST_F(CachedJoinPlanTest, BaseNodeToCachedAccessPath) {
+    auto nodeId =
+        addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto jCtx = makeContext();
+
+    auto soln = makeSolnWithCacheData(namespaces[0]);
+
+    JoinPlanNodeRegistry registry;
+    auto baseId = registry.registerBaseNode(nodeId, soln.get(), namespaces[0], zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, baseId);
+    ASSERT(result);
+    auto* ap = std::get_if<CachedAccessPath>(&result->node);
+    ASSERT_NE(ap, nullptr);
+    ASSERT_EQ(ap->nodeId, nodeId);
+    ASSERT_NE(ap->solnCacheData, nullptr);
+    ASSERT_EQ(ap->solnCacheData->solnType, SolutionCacheData::COLLSCAN_SOLN);
+}
+
+TEST_F(CachedJoinPlanTest, INLJRHSNodeToCachedInljNode) {
+    auto nodeId =
+        addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto jCtx = makeContext();
+
+    auto entries = makeIndexCatalogEntries({BSON("b" << 1)});
+    ASSERT_EQ(entries.size(), 1u);
+
+    JoinPlanNodeRegistry registry;
+    auto inljId = registry.registerINLJRHSNode(nodeId, 0, entries[0], namespaces[0]);
+
+    auto result = toCachedJoinPlan(jCtx, registry, inljId);
+    ASSERT(result);
+    auto* cached = std::get_if<CachedInljNode>(&result->node);
+    ASSERT_NE(cached, nullptr);
+    ASSERT_EQ(cached->nodeId, nodeId);
+    // makeIndexDescriptor always assigns the name "name".
+    ASSERT_EQ(cached->inljForeignIndexName, "name");
+}
+
+TEST_F(CachedJoinPlanTest, INLJJoinNodeToCachedJoinNode) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = {}, .filter = {}, .indexes = {BSON("b" << 1)}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB,
+                     .underlyingFieldPath = FieldPath{"b"},
+                     .fieldPathAfterRenames = FieldPath{"b_renamed"}},
+    };
+    auto edgeId = graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+
+    auto jCtx = makeContext();
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+
+    auto entries = makeIndexCatalogEntries({BSON("b" << 1)});
+    ASSERT_EQ(entries.size(), 1u);
+
+    JoinPlanNodeRegistry registry;
+    auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto inljBId = registry.registerINLJRHSNode(idB, *edgeId, entries[0], namespaces[1]);
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId = registry.registerJoinNode(
+        joinSubset, JoinMethod::INLJ, baseAId, inljBId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, joinId);
+    ASSERT(result);
+
+    auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(joinNode, nullptr);
+    ASSERT_EQ(joinNode->method, JoinMethod::INLJ);
+    ASSERT_EQ(joinNode->joinPredicates.size(), 1u);
+    ASSERT_EQ(joinNode->joinPredicates[0].leftField.fullPath(), "a");
+    ASSERT_EQ(joinNode->joinPredicates[0].rightField.fullPath(), "b_renamed");
+    ASSERT_EQ(joinNode->probePredicates.size(), 1u);
+    ASSERT_EQ(joinNode->probePredicates[0].leftField.fullPath(), "a");
+    ASSERT_EQ(joinNode->probePredicates[0].rightField.fullPath(), "b");
+    ASSERT(!joinNode->leftEmbeddingField.has_value());
+    ASSERT(!joinNode->rightEmbeddingField.has_value());
+
+    auto* leftAP = std::get_if<CachedAccessPath>(&joinNode->left->node);
+    ASSERT_NE(leftAP, nullptr);
+
+    auto* rightINLJ = std::get_if<CachedInljNode>(&joinNode->right->node);
+    ASSERT_NE(rightINLJ, nullptr);
+    ASSERT_EQ(rightINLJ->inljForeignIndexName, "name");
+}
+
+TEST_F(CachedJoinPlanTest, HJTwoBaseNodesToCachedJoinNode) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+
+    // PathId 0 maps to field "x" on node A; PathId 1 maps to field "y" on node B.
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"x"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"y"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*x*/, 1 /*y*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::HJ, leftId, rightId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, joinId);
+    ASSERT(result);
+    auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(joinNode, nullptr);
+    ASSERT_EQ(joinNode->method, JoinMethod::HJ);
+    ASSERT_EQ(joinNode->joinPredicates.size(), 1u);
+    ASSERT_EQ(joinNode->joinPredicates[0].leftField.fullPath(), "x");
+    ASSERT_EQ(joinNode->joinPredicates[0].rightField.fullPath(), "y");
+    ASSERT_EQ(joinNode->probePredicates.size(), 0u);
+    ASSERT(!joinNode->leftEmbeddingField.has_value());
+    ASSERT(!joinNode->rightEmbeddingField.has_value());
+
+    auto* leftAP = std::get_if<CachedAccessPath>(&joinNode->left->node);
+    ASSERT_NE(leftAP, nullptr);
+
+    auto* rightAP = std::get_if<CachedAccessPath>(&joinNode->right->node);
+    ASSERT_NE(rightAP, nullptr);
+}
+
+TEST_F(CachedJoinPlanTest, EmbeddingFieldPreserved) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::NLJ, leftId, rightId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, joinId);
+    auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(joinNode, nullptr);
+    ASSERT(!joinNode->leftEmbeddingField.has_value());
+    ASSERT(joinNode->rightEmbeddingField.has_value());
+    ASSERT_EQ(joinNode->rightEmbeddingField->fullPath(), "b");
+}
+
+TEST_F(CachedJoinPlanTest, NestedJoinNodeThreeCollections) {
+    // Graph: A -- B -- C, join plan is (A join B) join C.
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idC = addNssWithEmbedding({.collName = "c", .embedPath = {}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idC, .underlyingFieldPath = FieldPath{"c"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+    graph.addSimpleEqualityEdge(idB, idC, 1 /*b*/, 2 /*c*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+    auto solnC = makeSolnWithCacheData(namespaces[2]);
+
+    JoinPlanNodeRegistry registry;
+    auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto baseBId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+    auto baseCId = registry.registerBaseNode(idC, solnC.get(), namespaces[2], zeroCostEstimate());
+
+    // A join B
+    JoinSubset innerSubset(makeNodeSet(idA, idB));
+    auto innerJoinId = registry.registerJoinNode(
+        innerSubset, JoinMethod::NLJ, baseAId, baseBId, zeroCostEstimate());
+
+    // (A join B) join C
+    JoinSubset outerSubset(makeNodeSet(idA, idB, idC));
+    auto outerJoinId = registry.registerJoinNode(
+        outerSubset, JoinMethod::HJ, innerJoinId, baseCId, zeroCostEstimate());
+
+    auto result = toCachedJoinPlan(jCtx, registry, outerJoinId);
+    ASSERT(result);
+
+    // Outer node is a CachedJoinNode (HJ).
+    auto* outerJoin = std::get_if<CachedJoinNode>(&result->node);
+    ASSERT_NE(outerJoin, nullptr);
+    ASSERT_EQ(outerJoin->method, JoinMethod::HJ);
+
+    // Left child of outer is another CachedJoinNode (NLJ for A join B).
+    ASSERT(outerJoin->left);
+    auto* innerJoin = std::get_if<CachedJoinNode>(&outerJoin->left->node);
+    ASSERT_NE(innerJoin, nullptr);
+    ASSERT_EQ(innerJoin->method, JoinMethod::NLJ);
+
+    // Leaves are CachedAccessPaths for A, B, C.
+    auto* leafA = std::get_if<CachedAccessPath>(&innerJoin->left->node);
+    ASSERT_NE(leafA, nullptr);
+
+    auto* leafB = std::get_if<CachedAccessPath>(&innerJoin->right->node);
+    ASSERT_NE(leafB, nullptr);
+
+    auto* leafC = std::get_if<CachedAccessPath>(&outerJoin->right->node);
+    ASSERT_NE(leafC, nullptr);
+}
+
+TEST_F(CachedJoinPlanTest, CachedAccessPathToQSN) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto jCtx = makeContext();
+
+    auto cached = makeCachedAccessPath(idA);
+    auto qsn = fromCachedJoinPlan(operationContext(),
+                                  jCtx.joinGraph,
+                                  MultipleCollectionAccessor{},
+                                  jCtx.perCollIdxs,
+                                  *cached);
+
+    ASSERT_NE(qsn, nullptr);
+    ASSERT_EQ(qsn->getType(), STAGE_COLLSCAN);
+}
+
+TEST_F(CachedJoinPlanTest, INLJJoinRoundTrip) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = {}, .filter = {}, .indexes = {BSON("b" << 1)}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+    };
+    auto edgeId = graph.addSimpleEqualityEdge(idB, idA, 1 /*b*/, 0 /*a*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto entries = makeIndexCatalogEntries({BSON("b" << 1)});
+
+    JoinPlanNodeRegistry registry;
+    auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto inljBId = registry.registerINLJRHSNode(idB, *edgeId, entries[0], namespaces[1]);
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId = registry.registerJoinNode(
+        joinSubset, JoinMethod::INLJ, baseAId, inljBId, zeroCostEstimate());
+
+    auto cached = toCachedJoinPlan(jCtx, registry, joinId);
+    auto qsn = fromCachedJoinPlan(operationContext(),
+                                  jCtx.joinGraph,
+                                  MultipleCollectionAccessor{},
+                                  jCtx.perCollIdxs,
+                                  *cached);
+
+    ASSERT_NE(qsn, nullptr);
+    ASSERT_EQ(qsn->getType(), STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE);
+    auto* inljNode = dynamic_cast<IndexedNestedLoopJoinEmbeddingNode*>(qsn.get());
+    ASSERT_NE(inljNode, nullptr);
+    ASSERT_EQ(inljNode->probePredicates.size(), 1u);
+    ASSERT_EQ(inljNode->probePredicates[0].leftField.fullPath(), "a");
+    ASSERT_EQ(inljNode->probePredicates[0].rightField.fullPath(), "b");
+    ASSERT_EQ(qsn->children.size(), 2u);
+    ASSERT_EQ(qsn->children[0]->getType(), STAGE_COLLSCAN);
+    ASSERT_EQ(qsn->children[1]->getType(), STAGE_FETCH);
+}
+
+TEST_F(CachedJoinPlanTest, HJTwoBaseNodesRoundTrip) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"x"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"y"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*x*/, 1 /*y*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::HJ, leftId, rightId, zeroCostEstimate());
+
+    auto cached = toCachedJoinPlan(jCtx, registry, joinId);
+    auto qsn = fromCachedJoinPlan(operationContext(),
+                                  jCtx.joinGraph,
+                                  MultipleCollectionAccessor{},
+                                  jCtx.perCollIdxs,
+                                  *cached);
+
+    ASSERT_NE(qsn, nullptr);
+    ASSERT_EQ(qsn->getType(), STAGE_HASH_JOIN_EMBEDDING_NODE);
+    ASSERT_EQ(qsn->children.size(), 2u);
+    ASSERT_EQ(qsn->children[0]->getType(), STAGE_COLLSCAN);
+    ASSERT_EQ(qsn->children[1]->getType(), STAGE_COLLSCAN);
+
+    auto* hjNode = dynamic_cast<HashJoinEmbeddingNode*>(qsn.get());
+    ASSERT_NE(hjNode, nullptr);
+    ASSERT_EQ(hjNode->joinPredicates.size(), 1u);
+    ASSERT_EQ(hjNode->joinPredicates[0].leftField.fullPath(), "x");
+    ASSERT_EQ(hjNode->joinPredicates[0].rightField.fullPath(), "y");
+    ASSERT(!hjNode->leftEmbeddingField.has_value());
+    ASSERT(!hjNode->rightEmbeddingField.has_value());
+}
+
+TEST_F(CachedJoinPlanTest, EmbeddingFieldPreservedRoundTrip) {
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA, idB));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::NLJ, leftId, rightId, zeroCostEstimate());
+
+    auto cached = toCachedJoinPlan(jCtx, registry, joinId);
+    auto qsn = fromCachedJoinPlan(operationContext(),
+                                  jCtx.joinGraph,
+                                  MultipleCollectionAccessor{},
+                                  jCtx.perCollIdxs,
+                                  *cached);
+
+    ASSERT_NE(qsn, nullptr);
+    ASSERT_EQ(qsn->getType(), STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE);
+
+    auto* nljNode = dynamic_cast<NestedLoopJoinEmbeddingNode*>(qsn.get());
+    ASSERT_NE(nljNode, nullptr);
+    ASSERT(!nljNode->leftEmbeddingField.has_value());
+    ASSERT(nljNode->rightEmbeddingField.has_value());
+    ASSERT_EQ(nljNode->rightEmbeddingField->fullPath(), "b");
+}
+
+TEST_F(CachedJoinPlanTest, NestedJoinRoundTrip) {
+    // Graph: A -- B -- C, plan is (A NLJ B) HJ C.
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding({.collName = "b", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idC = addNssWithEmbedding({.collName = "c", .embedPath = {}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idC, .underlyingFieldPath = FieldPath{"c"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+    graph.addSimpleEqualityEdge(idB, idC, 1 /*b*/, 2 /*c*/);
+
+    auto jCtx = makeContext();
+
+    auto solnA = makeSolnWithCacheData(namespaces[0]);
+    auto solnB = makeSolnWithCacheData(namespaces[1]);
+    auto solnC = makeSolnWithCacheData(namespaces[2]);
+
+    JoinPlanNodeRegistry registry;
+    auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
+    auto baseBId = registry.registerBaseNode(idB, solnB.get(), namespaces[1], zeroCostEstimate());
+    auto baseCId = registry.registerBaseNode(idC, solnC.get(), namespaces[2], zeroCostEstimate());
+
+    JoinSubset innerSubset(makeNodeSet(idA, idB));
+    auto innerJoinId = registry.registerJoinNode(
+        innerSubset, JoinMethod::NLJ, baseAId, baseBId, zeroCostEstimate());
+
+    JoinSubset outerSubset(makeNodeSet(idA, idB, idC));
+    auto outerJoinId = registry.registerJoinNode(
+        outerSubset, JoinMethod::HJ, innerJoinId, baseCId, zeroCostEstimate());
+
+    auto cached = toCachedJoinPlan(jCtx, registry, outerJoinId);
+    auto qsn = fromCachedJoinPlan(operationContext(),
+                                  jCtx.joinGraph,
+                                  MultipleCollectionAccessor{},
+                                  jCtx.perCollIdxs,
+                                  *cached);
+
+    ASSERT_NE(qsn, nullptr);
+    ASSERT_EQ(qsn->getType(), STAGE_HASH_JOIN_EMBEDDING_NODE);
+    ASSERT_EQ(qsn->children.size(), 2u);
+
+    // Left child is the inner NLJ.
+    ASSERT_EQ(qsn->children[0]->getType(), STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE);
+    ASSERT_EQ(qsn->children[0]->children.size(), 2u);
+    ASSERT_EQ(qsn->children[0]->children[0]->getType(), STAGE_COLLSCAN);
+    ASSERT_EQ(qsn->children[0]->children[1]->getType(), STAGE_COLLSCAN);
+
+    // Right child is collection C.
+    ASSERT_EQ(qsn->children[1]->getType(), STAGE_COLLSCAN);
+}
+
+TEST_F(CachedJoinPlanTest, SelfJoinRoundTrip) {
+    // Graph: A -- A, plan is A NLJ A.
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idA2 = addNssWithEmbedding(
+        {.collName = "a", .embedPath = FieldPath("a"), .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"x"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idA2, 0, 0);
+
+    auto jCtx = makeContext();
+
+    auto solnA1 = makeSolnWithCacheData(namespaces[0]);
+    auto solnA2 = makeSolnWithCacheData(namespaces[0]);
+
+    JoinPlanNodeRegistry registry;
+    auto leftId = registry.registerBaseNode(idA, solnA1.get(), namespaces[0], zeroCostEstimate());
+    auto rightId = registry.registerBaseNode(idA2, solnA2.get(), namespaces[0], zeroCostEstimate());
+
+    JoinSubset joinSubset(makeNodeSet(idA));
+    auto joinId =
+        registry.registerJoinNode(joinSubset, JoinMethod::NLJ, leftId, rightId, zeroCostEstimate());
+
+    auto cached = toCachedJoinPlan(jCtx, registry, joinId);
+    auto qsn = fromCachedJoinPlan(operationContext(),
+                                  jCtx.joinGraph,
+                                  MultipleCollectionAccessor{},
+                                  jCtx.perCollIdxs,
+                                  *cached);
+
+    ASSERT_NE(qsn, nullptr);
+    ASSERT_EQ(qsn->getType(), STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE);
+    ASSERT_EQ(qsn->children.size(), 2u);
+    ASSERT_EQ(qsn->children[0]->getType(), STAGE_COLLSCAN);
+    ASSERT_EQ(qsn->children[1]->getType(), STAGE_COLLSCAN);
+}
+
+TEST_F(CachedJoinPlanTest, ConstructSolutionBottomUpPopulatesCachedJoinPlan) {
+    // Set up a simple 2-node join graph A -- B to exercise constructSolutionBottomUp.
+    auto idA = addNssWithEmbedding({.collName = "a", .embedPath = {}, .filter = {}, .indexes = {}});
+    auto idB = addNssWithEmbedding(
+        {.collName = "b", .embedPath = FieldPath{"b"}, .filter = {}, .indexes = {}});
+
+    resolvedPaths = {
+        ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
+        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+    };
+    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b.b*/);
+
+    // Provide catalog stats required by JoinCostEstimatorImpl.
+    for (const auto& nss : namespaces) {
+        catStats.collStats.emplace(nss, CollectionStats{1000.0, 1000.0});
+    }
+
+    // toCachedJoinPlan requires cacheData on each leaf solution. Replace plans in cbrCqQsns
+    // with fresh collscan plans that carry SolutionCacheData.
+    for (auto& [cq, soln] : cbrCqQsns) {
+        soln = makeSolnWithCacheData(cq->nss());
+    }
+
+    auto jCtx = makeContext();
+    FakeJoinCardinalityEstimator cardEstimator(jCtx);
+    JoinCostEstimatorImpl costEstimator(jCtx, cardEstimator);
+
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;  // Unused for testing.
+    auto swResult =
+        constructSolutionBottomUp(jCtx,
+                                  cardEstimator,
+                                  costEstimator,
+                                  EnumerationStrategy{.planShape = PlanTreeShape::ZIG_ZAG,
+                                                      .mode = PlanEnumerationMode::CHEAPEST,
+                                                      .enableHJOrderPruning = true},
+                                  true,
+                                  metrics);
+
+    ASSERT_OK(swResult.getStatus());
+    ASSERT_NE(nullptr, swResult.getValue().cachedJoinPlan);
 }
 
 }  // namespace mongo::join_ordering

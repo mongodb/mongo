@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -1009,7 +983,7 @@ private:
  * TODO SERVER-111488: This class (and the others in this file) should be private to the query
  * module.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef {
 public:
     class OpRef;
     class InsertOpRef;
@@ -1219,7 +1193,7 @@ private:
  * Because OpRef contains a WriteCommandRef that refers to a request object, code that uses the
  * OpRef class must ensure that a WriteOpRef does not outlive the referred-to request object.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::OpRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef::OpRef {
 public:
     explicit OpRef(WriteCommandRef cmdRef, int index) : _cmdRef(std::move(cmdRef)), _index(index) {
         tassert(10778512,
@@ -1501,7 +1475,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::UpdateOpRef : public WriteCommandRef::OpRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef::UpdateOpRef : public WriteCommandRef::OpRef {
 public:
     explicit UpdateOpRef(WriteCommandRef cmdRef, int index) : OpRef(std::move(cmdRef), index) {
         tassert(10778514, "Expected update op", _cmdRef.getOp(index).isUpdateOp());
@@ -1555,7 +1529,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT WriteCommandRef::DeleteOpRef : public WriteCommandRef::OpRef {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteCommandRef::DeleteOpRef : public WriteCommandRef::OpRef {
 public:
     explicit DeleteOpRef(WriteCommandRef cmdRef, int index) : OpRef(std::move(cmdRef), index) {
         tassert(10778515, "Expected delete op", _cmdRef.getOp(index).isDeleteOp());
@@ -1609,12 +1583,12 @@ inline WriteCommandRef::DeleteOpRef WriteCommandRef::OpRef::getDeleteOp() const 
  */
 using WriteOpRef = WriteCommandRef::OpRef;
 using InsertOpRef = WriteCommandRef::InsertOpRef;
-using UpdateOpRef MONGO_MOD_NEEDS_REPLACEMENT = WriteCommandRef::UpdateOpRef;
-using DeleteOpRef MONGO_MOD_NEEDS_REPLACEMENT = WriteCommandRef::DeleteOpRef;
+using UpdateOpRef [[MONGO_MOD_NEEDS_REPLACEMENT]] = WriteCommandRef::UpdateOpRef;
+using DeleteOpRef [[MONGO_MOD_NEEDS_REPLACEMENT]] = WriteCommandRef::DeleteOpRef;
 
 /**
  * Legacy 'BatchItemRef' type alias.
  */
-using BatchItemRef MONGO_MOD_NEEDS_REPLACEMENT = WriteOpRef;
+using BatchItemRef [[MONGO_MOD_NEEDS_REPLACEMENT]] = WriteOpRef;
 
 }  // namespace mongo

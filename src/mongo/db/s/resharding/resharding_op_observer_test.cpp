@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 
@@ -45,6 +19,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -83,9 +58,10 @@ BSONObj makeCoordinatorDocBson(const CommonReshardingMetadata& metadata,
     return doc.toBSON();
 }
 
-BSONObj makeDonorDocBson(const CommonReshardingMetadata& metadata) {
+BSONObj makeDonorDocBson(const CommonReshardingMetadata& metadata,
+                         DonorStateEnum state = DonorStateEnum::kPreparingToDonate) {
     DonorShardContext donorCtx;
-    donorCtx.setState(DonorStateEnum::kPreparingToDonate);
+    donorCtx.setState(state);
     ReshardingDonorDocument doc(std::move(donorCtx), {ShardId{"recipient1"}});
     doc.setCommonReshardingMetadata(metadata);
     return doc.toBSON();
@@ -135,7 +111,7 @@ protected:
 
     void doUpdate(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& updatedDoc) {
         auto [_, collPtr] = makeCollPtr(nss);
-        CollectionUpdateArgs updateArgs(BSONObj{} /* preImageDoc */);
+        CollectionUpdateArgs updateArgs(/*preImageDoc=*/BSONObj{});
         updateArgs.updatedDoc = updatedDoc;
         OplogUpdateEntryArgs update(&updateArgs, collPtr);
         // We add a WUOW here to transition recovery unit state from Inactive to InUnitOfWork. The
@@ -270,6 +246,46 @@ TEST_F(ReshardingOpObserverRegistryTest, DeleteRecipientDocUnregistersRecipientR
              makeRecipientDocBson(metadata));
 
     ASSERT_FALSE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, DeleteDonorDocLeavesRegistryUnchangedWhenPinTassertFires) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    registry().registerOperation(Role::kDonor, metadata);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    // No MODE_X lock is held here, so onDelete's call into _doPin()/_calculatePin() hits the
+    // lock-mode tassert before ever reaching the registry mutation.
+    ASSERT_THROWS_CODE(doDelete(opCtx.get(),
+                                NamespaceString::kDonorReshardingOperationsNamespace,
+                                makeDonorDocBson(metadata)),
+                       DBException,
+                       13413201);
+    // tassert leaves a tripwire flag set; clear it so the process-exit check doesn't abort the
+    // test binary for an assertion this test triggered intentionally.
+    assertionCount.tripwire.subtractAndFetch(1);
+
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+}
+
+TEST_F(ReshardingOpObserverRegistryTest, UpdateDonorDocLeavesRegistryUnchangedWhenPinTassertFires) {
+    auto opCtx = makeOperationContext();
+    auto metadata = makeMetadata();
+
+    registry().registerOperation(Role::kDonor, metadata);
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
+
+    // kDone would otherwise cause onUpdate to unregister the donor role, but no MODE_X lock is
+    // held here, so the call into _doPin()/_calculatePin() hits the lock-mode tassert first.
+    ASSERT_THROWS_CODE(doUpdate(opCtx.get(),
+                                NamespaceString::kDonorReshardingOperationsNamespace,
+                                makeDonorDocBson(metadata, DonorStateEnum::kDone)),
+                       DBException,
+                       13413201);
+    assertionCount.tripwire.subtractAndFetch(1);
+
+    ASSERT_TRUE(registry().getOperation(kSourceNss));
 }
 
 TEST_F(ReshardingOpObserverRegistryTest, DeleteOneRoleLeavesOtherRoles) {

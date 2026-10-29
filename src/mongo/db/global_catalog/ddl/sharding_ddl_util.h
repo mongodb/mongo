@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -45,7 +19,6 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -55,6 +28,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #include <memory>
 #include <vector>
@@ -73,41 +47,41 @@ class NamespacePlacementChanged;
 namespace sharding_ddl_util {
 
 template <typename CommandType>
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
     const std::map<ShardId, ShardVersion>& shardIdsToShardVersions,
     const ReadPreferenceSetting readPref,
     bool throwOnError) {
-    std::vector<ShardRef> shardRefs;
+    std::vector<ShardId> shardIds;
     std::vector<ShardVersion> shardVersions;
     for (auto const& [shardId, shardVersion] : shardIdsToShardVersions) {
-        shardRefs.push_back(ShardRef{shardId});
+        shardIds.push_back(shardId);
         shardVersions.push_back(shardVersion);
     }
     return sharding_ddl_util_detail::sendAuthenticatedCommandToShards(
-        opCtx, originalOpts, shardRefs, shardVersions, readPref, throwOnError);
+        opCtx, originalOpts, shardIds, shardVersions, readPref, throwOnError);
 }
 
 template <typename CommandType>
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     bool throwOnError = true) {
     return sharding_ddl_util_detail::sendAuthenticatedCommandToShards(
         opCtx,
         originalOpts,
-        shardRefs,
-        boost::none /* shardVersions */,
+        shardIds,
+        /*shardVersions=*/boost::none,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         throwOnError);
 }
 
 template <typename CommandType>
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedVersionedCommandTargetedByRoutingTable(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
@@ -122,27 +96,27 @@ sendAuthenticatedVersionedCommandTargetedByRoutingTable(
 /**
  * Given a Status, returns a new truncated version of the Status or a copy of the Status.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Status possiblyTruncateErrorStatus(const Status& status);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Status possiblyTruncateErrorStatus(const Status& status);
 
 /**
  * Creates a barrier after which we are guaranteed that all writes to the config server performed by
  * the previous primary have been majority commited and will be seen by the new primary.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void linearizeCSRSReads(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void linearizeCSRSReads(OperationContext* opCtx);
 
 /**
  * Erase tags metadata from config server for the given namespace, using the _configsvrRemoveTags
  * command as a retryable write to ensure idempotency.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void removeTagsMetadataFromConfig(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const OperationSessionInfo& osi);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void removeTagsMetadataFromConfig(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  const OperationSessionInfo& osi);
 
 /**
  * Erase collection metadata from config server and invalidate the locally cached one.
  * In particular remove the collection and chunks metadata associated with the given namespace.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void removeCollAndChunksMetadataFromConfig(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void removeCollAndChunksMetadataFromConfig(
     OperationContext* opCtx,
     const std::shared_ptr<Shard>& configShard,
     ShardingCatalogClient* catalogClient,
@@ -156,7 +130,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void removeCollAndChunksMetadataFromConfig(
  * Log the effects of a dropCollection commit by inserting a new document in config.placementHistory
  * (if not already present).
  */
-MONGO_MOD_NEEDS_REPLACEMENT void logDropCollectionCommitOnConfigPlacementHistory(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void logDropCollectionCommitOnConfigPlacementHistory(
     OperationContext* opCtx,
     const NamespacePlacementType& committedPlacementChange,
     const OperationSessionInfo& osi,
@@ -165,16 +139,16 @@ MONGO_MOD_NEEDS_REPLACEMENT void logDropCollectionCommitOnConfigPlacementHistory
 /**
  * Delete the query analyzer document associated to the passed in namespace.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void removeQueryAnalyzerMetadata(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const OperationSessionInfo& osi);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void removeQueryAnalyzerMetadata(OperationContext* opCtx,
+                                                                 const NamespaceString& nss,
+                                                                 const OperationSessionInfo& osi);
 
 /**
  * Delete the query analyzer documents associated to the passed in collection UUIDs
  * (note: using such a type instead of NamespaceString guarantees replay protection in step down
  * scenarios).
  */
-MONGO_MOD_NEEDS_REPLACEMENT void removeQueryAnalyzerMetadata(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void removeQueryAnalyzerMetadata(
     OperationContext* opCtx, const std::vector<UUID>& collectionUUIDs);
 
 /**
@@ -183,7 +157,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void removeQueryAnalyzerMetadata(
  * - Check that `dropTarget` is true if the destination collection exists
  * - Check that no tags exist for the destination collection
  */
-MONGO_MOD_NEEDS_REPLACEMENT void checkRenamePreconditions(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void checkRenamePreconditions(
     OperationContext* opCtx,
     const NamespaceString& toNss,
     const boost::optional<CollectionType>& optTargetCollType,
@@ -199,7 +173,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void checkRenamePreconditions(
  * If the collection is tracked as unsplittable and the request is for a splittable collection,
  * returns boost::none.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CreateCollectionResponse>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<CreateCollectionResponse>
 checkIfCollectionAlreadyTrackedWithOptions(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const BSONObj& key,
@@ -209,33 +183,33 @@ checkIfCollectionAlreadyTrackedWithOptions(OperationContext* opCtx,
 
 /**
  * Stops ongoing migrations and prevents future ones to start for the given nss.
- * If expectedCollectionUUID is set and doesn't match that of that collection, then this is a no-op.
+ * If the collection is not currently tracked by the global catalog, this is a no-op.
  * If expectedCollectionUUID is not set, no UUID check will be performed before stopping migrations.
  *
- * TODO (SERVER-127444): remove `primaryShardId`.
+ * The caller is responsible for guaranteeing that the identity of the collection (its existence
+ * and, if expectedCollectionUUID is set, its UUID) cannot change for the duration of this call.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void stopMigrations(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void stopMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& expectedCollectionUUID,
     std::function<OperationSessionInfo()> osiGenerator,
-    AuthoritativeMetadataAccessLevelEnum authoritativeState,
-    boost::optional<ShardId> primaryShardId = boost::none);
+    AuthoritativeMetadataAccessLevelEnum authoritativeState);
 
 /**
  * Resume migrations and balancing rounds for the given nss.
- * If expectedCollectionUUID is set and doesn't match that of the collection, then this is a no-op.
+ * If the collection is not currently tracked by the global catalog, this is a no-op.
  * If expectedCollectionUUID is not set, no UUID check will be performed before resuming migrations.
  *
- * TODO (SERVER-127444): remove `primaryShardId`.
+ * The caller is responsible for guaranteeing that the identity of the collection (its existence
+ * and, if expectedCollectionUUID is set, its UUID) cannot change for the duration of this call.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void resumeMigrations(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void resumeMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& expectedCollectionUUID,
     std::function<OperationSessionInfo()> osiGenerator,
-    AuthoritativeMetadataAccessLevelEnum authoritativeState,
-    boost::optional<ShardId> primaryShardId = boost::none);
+    AuthoritativeMetadataAccessLevelEnum authoritativeState);
 
 /**
  * Calls to the config server primary to get the collection document for the given nss.
@@ -245,28 +219,28 @@ MONGO_MOD_NEEDS_REPLACEMENT void resumeMigrations(
  * (authoritative behavior). You must call either stopMigrations or resumeMigrations and wait for
  * them to return without exception to have such guarantees.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
-                                                                    const NamespaceString& nss);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
+                                                                        const NamespaceString& nss);
 
 /*
  * Returns the UUID of the collection (if exists) using the catalog. It does not provide any locking
  * guarantees after the call.
  **/
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    bool allowViews = false);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
+                                                                        const NamespaceString& nss,
+                                                                        bool allowViews = false);
 
 /*
  * Performs a noop write locally with majority write concern.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void performNoopMajorityWriteLocally(OperationContext* opCtx);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void performNoopMajorityWriteLocally(OperationContext* opCtx);
 
 /**
  * Builds an UpdateCommandRequest that performs a no-op write by upserting a well-known document in
  * the server configuration namespace. Used to generate an oplog entry for establishing causality
  * barriers (e.g. waiting for majority write concern) without modifying real user data.
  */
-MONGO_MOD_NEEDS_REPLACEMENT write_ops::UpdateCommandRequest buildNoopWriteRequestCommand();
+[[MONGO_MOD_NEEDS_REPLACEMENT]] write_ops::UpdateCommandRequest buildNoopWriteRequestCommand();
 
 /**
  * Sends the _shardsvrParticipantBlock command to the specified shards.
@@ -286,10 +260,10 @@ MONGO_MOD_NEEDS_REPLACEMENT write_ops::UpdateCommandRequest buildNoopWriteReques
  *   - kWritesAllowed / kWritesAndReadsAllowed: authoritative mode. The shard catalog already holds
  *     reliable metadata, so clearing the cache is unnecessary and is skipped.
  */
-MONGO_MOD_PRIVATE void sendShardsvrParticipantBlockCommandToShards(
+[[MONGO_MOD_PRIVATE]] void sendShardsvrParticipantBlockCommandToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     CriticalSectionBlockTypeEnum blockType,
     boost::optional<BSONObj> reason,
     AuthoritativeMetadataAccessLevelEnum authoritativeMetadataAccessLevel,
@@ -301,10 +275,10 @@ MONGO_MOD_PRIVATE void sendShardsvrParticipantBlockCommandToShards(
 /**
  * Sends the _shardsvrDropCollectionParticipant command to the specified shards.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void sendDropCollectionParticipantCommandToShards(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void sendDropCollectionParticipantCommandToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     std::shared_ptr<executor::TaskExecutor> executor,
     const CancellationToken& token,
     const OperationSessionInfo& osi,
@@ -314,15 +288,15 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendDropCollectionParticipantCommandToShards(
     const boost::optional<UUID>& collectionUUID = boost::none,
     bool requireCollectionEmpty = false);
 
-MONGO_MOD_NEEDS_REPLACEMENT BSONObj getCriticalSectionReasonForRename(const NamespaceString& from,
-                                                                      const NamespaceString& to);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] BSONObj getCriticalSectionReasonForRename(
+    const NamespaceString& from, const NamespaceString& to);
 
 /**
  * Runs the given transaction chain on the catalog. Transaction will be remote if called by a shard.
  * Important: StmtsIds must be set in the transactionChain if the OperationSessionId is not empty
  * since we are spawning a transaction on behalf of a retryable operation.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void runTransactionOnShardingCatalog(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void runTransactionOnShardingCatalog(
     OperationContext* opCtx,
     txn_api::Callback&& transactionChain,
     const WriteConcernOptions& writeConcern,
@@ -333,7 +307,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void runTransactionOnShardingCatalog(
  * Same as `runTransactionOnShardingCatalog` but automatically adding StmtsIds to passed in
  * operations
  */
-MONGO_MOD_NEEDS_REPLACEMENT void runTransactionWithStmtIdsOnShardingCatalog(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void runTransactionWithStmtIdsOnShardingCatalog(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi,
@@ -342,9 +316,9 @@ MONGO_MOD_NEEDS_REPLACEMENT void runTransactionWithStmtIdsOnShardingCatalog(
 /**
  * Returns the default key pattern value for unsplittable collections.
  */
-MONGO_MOD_NEEDS_REPLACEMENT const KeyPattern& unsplittableCollectionShardKey();
+[[MONGO_MOD_NEEDS_REPLACEMENT]] const KeyPattern& unsplittableCollectionShardKey();
 
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CollectionType> getCollectionFromConfigServer(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<CollectionType> getCollectionFromConfigServer(
     OperationContext* opCtx, const NamespaceString& nss);
 
 /*
@@ -356,7 +330,7 @@ MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CollectionType> getCollectionFromCon
  * if the collection did not exist).
  * 4. Insert the placement information.
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::vector<BatchedCommandRequest>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::vector<BatchedCommandRequest>
 getOperationsToCreateOrShardCollectionOnShardingCatalog(const CollectionType& coll,
                                                         const std::vector<ChunkType>& chunks,
                                                         const ChunkVersion& placementVersion,
@@ -366,7 +340,7 @@ getOperationsToCreateOrShardCollectionOnShardingCatalog(const CollectionType& co
  * Compose the needed metadata to request the creation of an unsplittable collection (intended to be
  * used in combination with getOperationsToCreateOrShardCollectionOnShardingCatalog()).
  */
-MONGO_MOD_NEEDS_REPLACEMENT std::pair<CollectionType, std::vector<ChunkType>>
+[[MONGO_MOD_NEEDS_REPLACEMENT]] std::pair<CollectionType, std::vector<ChunkType>>
 generateMetadataForUnsplittableCollectionCreation(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const UUID& collectionUuid,
@@ -377,21 +351,21 @@ generateMetadataForUnsplittableCollectionCreation(OperationContext* opCtx,
  * Throws IllegalOperation if the cluster is not yet blocking direct shard operations. This ensures
  * that data cannot be migrated to a new shard before all direct shard operations have been blocked.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void assertDataMovementAllowed();
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void assertDataMovementAllowed();
 
 /*
  * Throws InvalidNamespace if the namespace length for the collection exceeds the maximum namespace
  * character limit.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void assertNamespaceLengthLimit(const NamespaceString& nss,
-                                                            bool isUnsharded);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void assertNamespaceLengthLimit(const NamespaceString& nss,
+                                                                bool isUnsharded);
 
 /**
  *  Commits a create of the database metadata to the shard catalog by sending the command
  * `_shardsvrCommitCreateDatabaseMetadata` to the appropiate shard. This command can be
  * used to update the database metadata of the shard catalog of any shard.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void commitCreateDatabaseMetadataToShardCatalog(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void commitCreateDatabaseMetadataToShardCatalog(
     OperationContext* opCtx,
     const DatabaseType& db,
     const OperationSessionInfo& osi,
@@ -403,7 +377,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void commitCreateDatabaseMetadataToShardCatalog(
  * `_shardsvrCommitDropDatabaseMetadata` to the appropiate shard. This command can be
  * used to update the database metadata of the shard catalog of any shard.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void commitDropDatabaseMetadataToShardCatalog(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void commitDropDatabaseMetadataToShardCatalog(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const ShardId& shardId,
@@ -416,11 +390,11 @@ MONGO_MOD_NEEDS_REPLACEMENT void commitDropDatabaseMetadataToShardCatalog(
  * Each shard will fetch the authoritative collection and chunk metadata for the given namespace
  * `nss` from the config server and persist it locally in its own shard catalog.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void sendFetchCollMetadataToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
-    const ShardRef& primaryShardRef,
+    const std::vector<ShardId>& shardIds,
+    const ShardId& primaryShardId,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -430,7 +404,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
  * `primaryShardId`. Throws `RequestAlreadyFulfilled` if the collection is untracked.
  * TODO (SERVER-98118): Remove this once v9.0 becomes last-lts.
  */
-MONGO_MOD_PARENT_PRIVATE void cloneAuthoritativeCollectionMetadataToShards(
+[[MONGO_MOD_PARENT_PRIVATE]] void cloneAuthoritativeCollectionMetadataToShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardId& primaryShardId,
@@ -443,10 +417,10 @@ MONGO_MOD_PARENT_PRIVATE void cloneAuthoritativeCollectionMetadataToShards(
  *  Commits a refineCollectionShardKey operations to the shard catalog by sending the command
  * `_shardsvrCommitRefineCollectionShardKey` to all given shards.
  */
-MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
+[[MONGO_MOD_PRIVATE]] void commitRefineCollectionShardKeyToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -455,10 +429,10 @@ MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
  *  Commits a collMod operation to the shard catalog by sending the command
  * `_shardsvrCommitCollModCollectionMetadata` to all given shards.
  */
-MONGO_MOD_PRIVATE void commitCollModCollectionMetadataToShardCatalog(
+[[MONGO_MOD_PRIVATE]] void commitCollModCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -467,11 +441,11 @@ MONGO_MOD_PRIVATE void commitCollModCollectionMetadataToShardCatalog(
  *  Commits a dropCollection operation to the shard catalog by sending the command
  * `_shardsvrCommitDropCollectionMetadata` to all given shards.
  */
-MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
+[[MONGO_MOD_PRIVATE]] void commitDropCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& uuid,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -479,11 +453,16 @@ MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
 /**
  *  Commits a shardCollection operation to the shard catalog by sending the command
  * `_shardsvrCommitCreateCollectionMetadata` to all given shards.
+ *
+ * `primaryShardId` tells the shards which one must keep a collection entry when it owns no chunks
+ * (the database primary always tracks the collection). When omitted it defaults to the shard
+ * running this code, which is correct only when that shard is the database primary. Callers that
+ * run elsewhere - such as the migration donor - must pass the real database primary shard.
  */
-MONGO_MOD_PRIVATE void commitCreateCollectionMetadataToShardCatalog(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void commitCreateCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -492,10 +471,10 @@ MONGO_MOD_PRIVATE void commitCreateCollectionMetadataToShardCatalog(
  *  Persists collection entry for given collection operation to the shard catalog by sending
  *  the command `_shardsvrCommitCreateCollectionChunklessMetadata` to all given shards.
  */
-MONGO_MOD_PRIVATE void commitCreateCollectionChunklessMetadataToShardCatalog(
+[[MONGO_MOD_PRIVATE]] void commitCreateCollectionChunklessMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
@@ -504,35 +483,74 @@ MONGO_MOD_PRIVATE void commitCreateCollectionChunklessMetadataToShardCatalog(
  *  Commits a renameCollection operation to the shard catalog by sending the command
  * `_shardsvrCommitRenameCollectionMetadata` to all given shards.
  */
-MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
+[[MONGO_MOD_PRIVATE]] void commitRenameCollectionMetadataToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& fromNss,
     const NamespaceString& toNss,
     const boost::optional<UUID>& sourceUuid,
     const boost::optional<UUID>& targetUuid,
     const boost::optional<UUID>& newTargetUuid,
-    const std::vector<ShardRef>& shardRefs,
+    AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
+    const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
 
 /**
- * Based on the FCV, get whether the DDL needs to act according to the database
+ * Commits chunk operation metadata to the shard catalog by sending
+ * `_shardsvrCommitChunkOperationsMetadata` to each given shard.
+ *
+ * `newChunkDocs` are the changed chunks in config BSON format, as produced by the global catalog
+ * commit. Each shard re-parses and validates them against its authoritative collection entry and
+ * reconciles any overlaps with its existing durable chunks locally.
+ *
+ * The caller is responsible for ensuring that `newChunkDocs` contains the relevant chunks that must
+ * be sent to the specified shards. This method does not assert that every chunk is currently owned
+ * by a target shard, because unowned chunks may still need to be sent to preserve history for
+ * point-in-time reads.
+ *
+ * `receivingFirstChunk` marks that the target shards owned no chunks for the collection before this
+ * operation, in which case they bootstrap the collection metadata from the global catalog instead
+ * of applying an incremental delta. Only pass true for a shard that is genuinely gaining its first
+ * chunk (e.g. a migration recipient); split/merge and donor commits leave it false.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void commitChunkOperationsMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::vector<BSONObj> newChunkDocs,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token,
+    bool receivingFirstChunk = false);
+
+/**
+ * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * or collection metadata authoritativeness.
  */
-MONGO_MOD_NEEDS_REPLACEMENT AuthoritativeMetadataAccessLevelEnum
+[[MONGO_MOD_NEEDS_REPLACEMENT]] AuthoritativeMetadataAccessLevelEnum
 getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,
                                            const ServerGlobalParams::FCVSnapshot& snapshot);
 
+/**
+ * Reads the featureCompatibilityVersion document from the given shard's admin.system.version
+ * collection and returns the parsed FCV.
+ *
+ * TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+ */
+[[MONGO_MOD_PRIVATE]] multiversion::FeatureCompatibilityVersion getShardFCV(OperationContext* opCtx,
+                                                                            const ShardId& shardId);
 
 /**
- * Based on the FCV, get whether the DDL needs to operate with shards referred to by:
- * - Pre-upgrade: their ShardId exclusively (pre-upgrade);
- * - setFCV in progress: their UUID (preferably) or ShardId (fallback);
- * - Post-upgrade: their UUID.
+ * Rejects movePrimary when the donor or receiver is in an FCV transition (upgrade/downgrade). This
+ * simplifies the set of considerations to have when running movePrimary since it could lead to
+ * correctness issues. For more details see SERVER-132179.
  */
-MONGO_MOD_NEEDS_REPLACEMENT ShardIdentificationTypeEnum getGrantedShardIdentificationType(
-    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot);
+[[MONGO_MOD_PRIVATE]] void assertShardsAreNotInFCVTransitionsForMovePrimary(
+    OperationContext* opCtx,
+    const ShardId& recipientShardId,
+    AuthoritativeMetadataAccessLevelEnum donorAccessLevel);
+
 /*
  * Provided a collection UUID, returns the ID of one of the shards that are currently owning its
  * chunks (or boost:node when the collection is untracked or non-existing).
@@ -540,33 +558,33 @@ MONGO_MOD_NEEDS_REPLACEMENT ShardIdentificationTypeEnum getGrantedShardIdentific
  * requested and ensures a stable value across calls as long as the queried routing table isn't
  * modified.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<ShardId> pickShardOwningCollectionChunks(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<ShardId> pickShardOwningCollectionChunks(
     OperationContext* opCtx, const UUID& collUuid);
 
 /**
  * Returns the list of shards that currently own chunks for the given collection UUID.
  * Queries config.chunks to determine the current placement.
  */
-MONGO_MOD_PRIVATE std::vector<ShardRef> getListOfShardsOwningChunksForCollection(
+[[MONGO_MOD_PRIVATE]] std::vector<ShardId> getListOfShardsOwningChunksForCollection(
     OperationContext* opCtx, const UUID& collUuid);
 
 /**
  * Upserts a placement history entry within a transaction. This should be called from within
  * a transaction chain passed to runTransactionOnShardingCatalog().
  */
-MONGO_MOD_PRIVATE void upsertPlacementHistoryDocInTransaction(
+[[MONGO_MOD_PRIVATE]] void upsertPlacementHistoryDocInTransaction(
     const txn_api::TransactionClient& txnClient,
     const NamespaceString& nss,
     const boost::optional<UUID>& uuid,
     const Timestamp& timestamp,
-    std::vector<ShardRef>&& shards,
+    const std::vector<ShardId>& shards,
     int stmtId);
 
 /**
  * Deletes the collection entry from config.collections within a transaction.
  * Returns whether the deletion was actually executed (true) or was a no-op (false).
  */
-MONGO_MOD_PRIVATE bool deleteTrackedCollectionInTransaction(
+[[MONGO_MOD_PRIVATE]] bool deleteTrackedCollectionInTransaction(
     const txn_api::TransactionClient& txnClient,
     const NamespaceString& nss,
     const boost::optional<UUID>& uuid,
@@ -575,15 +593,15 @@ MONGO_MOD_PRIVATE bool deleteTrackedCollectionInTransaction(
 /**
  * Updates zone assignments (config.tags) from old namespace to new namespace within a transaction.
  */
-MONGO_MOD_PRIVATE void updateZonesInTransaction(const txn_api::TransactionClient& txnClient,
-                                                const NamespaceString& oldNss,
-                                                const NamespaceString& newNss);
+[[MONGO_MOD_PRIVATE]] void updateZonesInTransaction(const txn_api::TransactionClient& txnClient,
+                                                    const NamespaceString& oldNss,
+                                                    const NamespaceString& newNss);
 
 /**
  * Upserts a collection entry in config.collections within a transaction.
  * This is used when creating or updating tracked collection metadata.
  */
-MONGO_MOD_PRIVATE void upsertTrackedCollectionInTransaction(
+[[MONGO_MOD_PRIVATE]] void upsertTrackedCollectionInTransaction(
     const txn_api::TransactionClient& txnClient, const CollectionType& collType, int stmtId);
 
 /**
@@ -591,7 +609,7 @@ MONGO_MOD_PRIVATE void upsertTrackedCollectionInTransaction(
  * matching the commit of a sharding DDL operation, meant to drive the behavior of change stream
  * readers.
  */
-MONGO_MOD_NEEDS_REPLACEMENT void generatePlacementChangeNotificationOnShard(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void generatePlacementChangeNotificationOnShard(
     OperationContext* opCtx,
     const NamespacePlacementChanged& placementChangeNotification,
     const ShardId& shard,
@@ -602,26 +620,26 @@ MONGO_MOD_NEEDS_REPLACEMENT void generatePlacementChangeNotificationOnShard(
 /*
  * Returns true if the given error would be retried by a ShardingCoordinator.
  */
-MONGO_MOD_PRIVATE bool isRetriableErrorForDDLCoordinator(const Status& status);
+[[MONGO_MOD_PRIVATE]] bool isRetriableErrorForDDLCoordinator(const Status& status);
 
-struct MONGO_MOD_PRIVATE ComputeAllMergeableChunksOnShardResult {
+struct [[MONGO_MOD_PRIVATE]] ComputeAllMergeableChunksOnShardResult {
     std::vector<ChunkType> newChunks;
     ChunkVersion newVersion;
     BSONObj firstMergeableChunkMin;
     int numMergedChunks;
 };
 
-MONGO_MOD_PRIVATE ComputeAllMergeableChunksOnShardResult
-computeAllMergeableChunksOnShard(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const ShardId& shardId,
-                                 BSONObj firstMergeableChunkMin,
-                                 std::shared_ptr<Shard> configShard,
-                                 const NamespaceString& chunksNamespace,
-                                 CollectionType coll,
-                                 boost::optional<ChunkVersion> originalVersion = boost::none,
-                                 int maxNumberOfChunksToMerge = INT_MAX,
-                                 int maxTimeProcessingChunksMS = INT_MAX);
+[[MONGO_MOD_PRIVATE]] ComputeAllMergeableChunksOnShardResult computeAllMergeableChunksOnShard(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& shardId,
+    BSONObj firstMergeableChunkMin,
+    std::shared_ptr<Shard> configShard,
+    const NamespaceString& chunksNamespace,
+    CollectionType coll,
+    boost::optional<ChunkVersion> originalVersion = boost::none,
+    int maxNumberOfChunksToMerge = INT_MAX,
+    int maxTimeProcessingChunksMS = INT_MAX);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

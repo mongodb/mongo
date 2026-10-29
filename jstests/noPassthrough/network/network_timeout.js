@@ -4,6 +4,8 @@
  * cluster `find` will use a higher level API that will retry on retryable error codes.
  *
  * @tags: [
+ *   # Uses $where with server-side JS, which requires server-side scripting.
+ *   requires_scripting,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -11,7 +13,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Skip various checks that require talking to shard primaries (a primary is dropped as part
 // of the test).
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;

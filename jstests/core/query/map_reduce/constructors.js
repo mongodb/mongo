@@ -12,11 +12,9 @@
 //   # Time-series collections are views which don't support map-reduce
 //   exclude_from_timeseries_crud_passthrough,
 //   uses_map_reduce_internal_merge_pipeline,
-//   # TODO SERVER-127318 (PR #54257): re-enable on WASM once per-request JS context cost is
-//   # eliminated.
-//   mozjs_wasm_unsupported,
+//   # TODO SERVER-128404: ASAN build has incompatible signal handling with Wasmtime's OOM path.
+//   incompatible_aubsan,
 // ]
-
 // Takes a list of constructors and returns a new list with an extra entry for each constructor with
 // "new" prepended
 const out = db.map_reduce_constructors_out;

@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_library")
 
 py_library(
@@ -15,6 +15,10 @@ py_library(
         ),
         dependency(
             "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "pydantic-settings",
             group = "evergreen",
         ),
     ],

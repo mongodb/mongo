@@ -1,5 +1,9 @@
 /**
  * Verify that collection, index and query types unsupported by CBR fallback to multiplanning.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {
     getAllPlans,
@@ -8,13 +12,18 @@ import {
     isExpress,
     isSubplannerCompositePlan,
     planHasStage,
+    assertChosenRanker,
+    ChosenRanker,
+    PlanRankerReason,
 } from "jstests/libs/query/analyze_plan.js";
 import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {Stage} from "jstests/noPassthroughWithMongod/query/cbr/cbr_expect_helpers.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -225,6 +234,111 @@ function testSortKeyGenerator() {
     assert.commandWorked(coll.dropIndexes());
 }
 
+function testUnionBelowIntersection() {
+    // With hash intersection enabled, the planner can enumerate plans that contain an
+    // intersection of unions. Such plans are unsupported by CBR, so they
+    // must fallback to multiplanning.
+    // TODO SERVER-99091: Support intersections of unions.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}),
+    );
+
+    const unionColl = db.unionBelowIntersection;
+    unionColl.drop();
+    assert.commandWorked(
+        unionColl.insertMany([
+            {_id: 1, a: 1},
+            {_id: -1, a: 2},
+            {_id: 2, a: -5},
+        ]),
+    );
+    assert.commandWorked(unionColl.createIndex({a: 1}));
+
+    const query = {$or: [{_id: {$lt: 0}}, {a: 1}], a: {$gte: 0}};
+    const sort = {a: 1};
+
+    const explain = assert.commandWorked(
+        db.runCommand({
+            explain: {find: unionColl.getName(), filter: query, sort},
+            verbosity: "plannerStats",
+        }),
+    );
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kCBRInestimableNode);
+
+    const unionBelowIntersection = getAllPlans(explain)
+        .map((plan) => new Stage(plan))
+        .filter((plan) => plan.hasStage("AND_HASH") && plan.getStage("AND_HASH").hasStage("OR"));
+    assert.gt(unionBelowIntersection.length, 0, "no union below the intersection", {explain});
+    unionBelowIntersection.forEach((plan) => assertPlanNotCosted(plan.explain));
+
+    // The query must still plan and execute correctly via multiplanning.
+    assert.eq(unionColl.find(query).sort(sort).itcount(), 2);
+
+    unionColl.drop();
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: false}),
+    );
+}
+
+function testMergeSortBelowIntersection() {
+    // An indexed $or whose branches all provide the query sort is planned as a SORT_MERGE node.
+    // Like OR nodes, SORT_MERGE nodes below an intersection are unsupported by CBR and must
+    // fallback to multiplanning.
+    // TODO SERVER-99091: Support intersections of unions.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}),
+    );
+
+    const mergeSortColl = db.mergeSortBelowIntersection;
+    mergeSortColl.drop();
+    assert.commandWorked(
+        mergeSortColl.createIndexes([{sortFieldA: 1, sortFieldB: 1}, {extraField: 1}]),
+    );
+    assert.commandWorked(
+        mergeSortColl.insertMany([
+            {_id: 0, sortFieldA: 2, sortFieldB: 2, extraField: 1},
+            {_id: 1, sortFieldA: 1, sortFieldB: 3, extraField: 0},
+            {_id: 2, sortFieldA: 1, sortFieldB: 3, extraField: 1},
+            {_id: 3, sortFieldA: 3, sortFieldB: 0, extraField: 1},
+        ]),
+    );
+
+    const query = {
+        $or: [
+            {sortFieldA: 1, sortFieldB: 3},
+            {sortFieldA: 2, sortFieldB: 2},
+        ],
+        extraField: 1,
+    };
+    const sort = {sortFieldA: 1, sortFieldB: 1};
+    const explain = assert.commandWorked(
+        db.runCommand({
+            explain: {find: mergeSortColl.getName(), filter: query, sort},
+            verbosity: "plannerStats",
+        }),
+    );
+    assertChosenRanker(explain, ChosenRanker.kMultiPlanning, PlanRankerReason.kCBRInestimableNode);
+
+    const mergeSortBelowIntersection = getAllPlans(explain)
+        .map((plan) => new Stage(plan))
+        .filter((plan) => {
+            const andHash = plan.getStage("AND_HASH");
+            return andHash && andHash.children.some((child) => child.is("SORT_MERGE"));
+        });
+    assert.gt(mergeSortBelowIntersection.length, 0, "no sort-merge below an intersection", {
+        explain,
+    });
+    mergeSortBelowIntersection.forEach((plan) => assertPlanNotCosted(plan.explain));
+
+    // The query must still plan and execute correctly via multiplanning.
+    assert.eq(mergeSortColl.find(query).sort(sort).itcount(), 2);
+
+    mergeSortColl.drop();
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: false}),
+    );
+}
+
 function testLargeInList() {
     const bulk = coll.initializeUnorderedBulkOp();
     // Insert enough documents to have two non-trivial indexes worth ranking.
@@ -238,6 +352,16 @@ function testLargeInList() {
     // Use samplingCE so the test does not depend on histograms.
     const prevCEMode = assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "samplingCE"}),
+    );
+
+    // Sample by strides rather than by chunk. The documents above are inserted in 'a' order, so a
+    // chunk sample is a handful of contiguous 'a' ranges: when none of them falls in the queried
+    // range the sample observes no matching document, the scan is estimated at zero, and CBR
+    // abandons ranking and leaves the plans uncosted. A stride sample is spread over the whole
+    // collection, so it observes matches for any predicate that matches a reasonable fraction of
+    // it, whichever part of the 'a' range that predicate selects.
+    const prevStrideSampling = assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQuerySamplingByStrides: true}),
     );
 
     // CBR uses a CE cache for $in-lists with <= 1000 intervals; larger lists bypass the cache.
@@ -258,9 +382,15 @@ function testLargeInList() {
     // $in-list with > 1000 elements: CBR estimates it without the CE cache.
     testQuery({a: {$in: nonCacheableIn}, b: {$lt: 50}});
 
-    // Restore CE mode for the remaining tests.
+    // Restore CE mode and sampling technique for the remaining tests.
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryCBRCEMode: prevCEMode.was}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySamplingByStrides: prevStrideSampling.was,
+        }),
     );
     assert.commandWorked(coll.dropIndexes());
 }
@@ -285,6 +415,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "heuristicCE",
         }),
     );
@@ -302,6 +433,8 @@ try {
     testMinMaxIndexScan();
     testReturnKey();
     testSortKeyGenerator();
+    testUnionBelowIntersection();
+    testMergeSortBelowIntersection();
     testDistictScan();
     testLargeInList();
 } finally {
@@ -309,5 +442,8 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}),
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: false}),
     );
 }

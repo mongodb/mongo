@@ -5,8 +5,7 @@ import {
     featureFlagMandatesReplicatedTruncates,
     persistenceProviderRequiresReplicatedTruncates,
 } from "jstests/libs/query/replicated_truncates_utils.js";
-
-/* global retryOnRetryableError */
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 // Symbol used to override the constructor. Please do not use this, it's only meant to aid
 // in migrating the jstest corpus to proper module usage.
@@ -107,6 +106,9 @@ export class ReplSetTest {
             _constructStartNewInstances(this, Object.extend({}, opts, true));
         }
     }
+
+    // TODO(SERVER-113063): Remove this.
+    skipAwaitReplicationConfigVersionCheck = false;
 
     asCluster(conn, fn, keyFileParam = undefined) {
         return asCluster(this, conn, fn, keyFileParam);
@@ -894,17 +896,31 @@ export class ReplSetTest {
     awaitNodesAgreeOnPrimary(timeout, nodes, expectedPrimaryNode, runHangAnalyzerOnTimeout = true) {
         timeout = timeout || this.timeoutMS;
         nodes = nodes || this.nodes;
-        // indexOf will return the index of the expected node. If expectedPrimaryNode is undefined,
-        // indexOf will return -1.
-        const expectedPrimaryNodeIdx = this.nodes.indexOf(expectedPrimaryNode);
-        if (expectedPrimaryNodeIdx === -1) {
-            jsTest.log.info("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on any primary.");
-        } else {
+
+        let expectedPrimaryNodeIdx = -1;
+        if (expectedPrimaryNode !== undefined && expectedPrimaryNode !== null) {
+            // Must be a connection, not a node id. this.nodes holds connections, so an id would
+            // fall straight through indexOf() to -1 and silently downgrade this call to "agree
+            // on any primary" rather than checking the node the caller named.
+            assert(
+                expectedPrimaryNode.getDB,
+                "AwaitNodesAgreeOnPrimary: expectedPrimaryNode must be a connection, not a node" +
+                    ` id: ${expectedPrimaryNode}`,
+            );
+            expectedPrimaryNodeIdx = this.nodes.indexOf(expectedPrimaryNode);
+            assert.gte(
+                expectedPrimaryNodeIdx,
+                0,
+                `AwaitNodesAgreeOnPrimary: expectedPrimaryNode ${expectedPrimaryNode} is not a` +
+                    ` member of this ReplSetTest`,
+            );
             jsTest.log.info(
                 "AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on " +
                     expectedPrimaryNode.name +
                     " as primary.",
             );
+        } else {
+            jsTest.log.info("AwaitNodesAgreeOnPrimary: Waiting for nodes to agree on any primary.");
         }
 
         assert.soonNoExcept(
@@ -1523,13 +1539,12 @@ export class ReplSetTest {
                 // When latest is not equal to last-continuous, the transition to last-continuous is
                 // not allowed. Setting fromConfigServer allows us to bypass this restriction and
                 // test last-continuous.
-                assert.commandWorked(
-                    this.getPrimary().adminCommand({
-                        setFeatureCompatibilityVersion: fcv,
-                        fromConfigServer: true,
-                        confirm: true,
-                    }),
-                );
+                // Startup system index builds (e.g. config.transactions, config.system.sessions)
+                // can still be in flight here and hold a stale operation FCV, which makes setFCV
+                // fail with BackgroundOperationInProgressForNamespace. Retry until they drain.
+                setFCVWithRetryOnBackgroundOpInProgress(this.getPrimary(), fcv, {
+                    fromConfigServer: true,
+                });
                 checkFCV(this.getPrimary().getDB("admin"), fcv);
 
                 // The server has a practice of adding a reconfig as part of upgrade/downgrade logic
@@ -1542,65 +1557,7 @@ export class ReplSetTest {
             });
         }
 
-        // Wait for 2 keys to appear before adding the other nodes. This is to prevent replica
-        // set configurations from interfering with the primary to generate the keys. One example
-        // of problematic configuration are delayed secondaries, which impedes the primary from
-        // generating the second key due to timeout waiting for write concern.
-        let shouldWaitForKeys = true;
-        if (this.waitForKeys != undefined) {
-            shouldWaitForKeys = this.waitForKeys;
-            jsTest.log.info("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
-        } else {
-            Object.keys(this.nodeOptions).forEach((key) => {
-                let val = this.nodeOptions[key];
-                if (
-                    typeof val === "object" &&
-                    (val.hasOwnProperty("shardsvr") ||
-                        (val.hasOwnProperty("binVersion") &&
-                            // Should not wait for keys if version is less than 3.6
-                            MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1))
-                ) {
-                    shouldWaitForKeys = false;
-                    jsTest.log.info(
-                        "Set shouldWaitForKeys from node options: " + shouldWaitForKeys,
-                    );
-                }
-            });
-            if (this.startOptions != undefined) {
-                let val = this.startOptions;
-                if (
-                    typeof val === "object" &&
-                    (val.hasOwnProperty("shardsvr") ||
-                        (val.hasOwnProperty("binVersion") &&
-                            // Should not wait for keys if version is less than 3.6
-                            MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1))
-                ) {
-                    shouldWaitForKeys = false;
-                    jsTest.log.info(
-                        "Set shouldWaitForKeys from start options: " + shouldWaitForKeys,
-                    );
-                }
-            }
-        }
-        /**
-         * Blocks until the primary node generates cluster time sign keys.
-         */
-        if (shouldWaitForKeys) {
-            asCluster(this, this.nodes, (timeout) => {
-                jsTest.log.info("Waiting for keys to sign $clusterTime to be generated");
-                assert.soonNoExcept(
-                    (timeout) => {
-                        let keyCnt = this.getPrimary(timeout)
-                            .getCollection("admin.system.keys")
-                            .find({purpose: "HMAC"})
-                            .itcount();
-                        return keyCnt >= 2;
-                    },
-                    "Awaiting keys",
-                    timeout,
-                );
-            });
-        }
+        this.waitForClusterTimeKeys();
 
         // Allow nodes to find sync sources more quickly. We also turn down the heartbeat interval
         // to speed up the initiation process. We use a failpoint so that we can easily turn this
@@ -1922,7 +1879,9 @@ export class ReplSetTest {
     }
 
     /**
-     *  Blocks until the set is initialized with a primary.
+     * Blocks until the set is initialized with a primary and all non-arbiter members have reached
+     * SECONDARY, then waits for step-up writes (primary-only services + query analysis writer)
+     * and for cluster time key generation to complete.
      *  TODO SERVER-124472: Determine if initiateForDisagg needs additional functionality to
      *  match ASC ReplSetTest.initiate.
      */
@@ -1931,7 +1890,26 @@ export class ReplSetTest {
 
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
-        this.getPrimary(this.kDefaultTimeoutMS, 25 /* retryIntervalMS */);
+        const primary = this.getPrimary(this.timeoutMS, 25 /* retryIntervalMS */);
+
+        // Blocks until the remaining nodes have finished startup recovery and report SECONDARY.
+        // Without this, callers can observe nodes still in STARTUP2 and see spurious
+        // NotPrimaryOrSecondary failures or stale reads. Mirrors ReplSetTest.initiate, which
+        // awaits secondaries before waiting on step-up writes.
+        this.awaitSecondaryNodes(this.timeoutMS, null /* secondaries */, 25 /* retryIntervalMS */);
+
+        // A secondary can report SECONDARY before it has learned who the primary is (the primary is
+        // only elected after the initial election timeout, and secondaries learn about it via
+        // heartbeats). Without this, secondary-side paths that forward to the primary fail with
+        // PrimarySteppedDown "No primary exists currently" (e.g. analyzeShardKey on a secondary).
+        this.awaitNodesAgreeOnPrimary(this.timeoutMS);
+
+        // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
+        if (this._notX509Auth(primary) || primary.isTLS()) {
+            asCluster(this, primary, () => this.waitForStepUpWrites(primary));
+        }
+
+        this.waitForClusterTimeKeys();
 
         jsTest.log(
             "ReplSetTest initiateForDisagg took " +
@@ -2023,6 +2001,67 @@ export class ReplSetTest {
     }
 
     /**
+     * Blocks until the primary node generates cluster time sign keys.
+     */
+    waitForClusterTimeKeys() {
+        // Wait for 2 keys to appear before adding the other nodes. This is to prevent replica
+        // set configurations from interfering with the primary to generate the keys. One example
+        // of problematic configuration are delayed secondaries, which impedes the primary from
+        // generating the second key due to timeout waiting for write concern.
+        //
+        // Some nodes never generate keys at all, so waiting on them would hang until the test
+        // times out: shard servers do not sign cluster times, binaries older than 3.6 have no
+        // keys collection, and a node started with the 'disableKeyGeneration' failpoint has
+        // opted out of key generation explicitly.
+        const neverGeneratesKeys = (val) =>
+            typeof val === "object" &&
+            (val.hasOwnProperty("shardsvr") ||
+                (val.hasOwnProperty("binVersion") &&
+                    // Should not wait for keys if version is less than 3.6
+                    MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1) ||
+                // 'setParameter' may be an object or a comma-separated string.
+                (typeof val.setParameter === "object" &&
+                    val.setParameter.hasOwnProperty("failpoint.disableKeyGeneration")) ||
+                (typeof val.setParameter === "string" &&
+                    val.setParameter.includes("failpoint.disableKeyGeneration")));
+
+        let shouldWaitForKeys = true;
+        if (this.waitForKeys != undefined) {
+            shouldWaitForKeys = this.waitForKeys;
+            jsTest.log.info("Set shouldWaitForKeys from RS options: " + shouldWaitForKeys);
+        } else {
+            Object.keys(this.nodeOptions).forEach((key) => {
+                if (neverGeneratesKeys(this.nodeOptions[key])) {
+                    shouldWaitForKeys = false;
+                    jsTest.log.info(
+                        "Set shouldWaitForKeys from node options: " + shouldWaitForKeys,
+                    );
+                }
+            });
+            if (this.startOptions != undefined && neverGeneratesKeys(this.startOptions)) {
+                shouldWaitForKeys = false;
+                jsTest.log.info("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
+            }
+        }
+        if (shouldWaitForKeys) {
+            asCluster(this, this.nodes, (timeout) => {
+                jsTest.log.info("Waiting for keys to sign $clusterTime to be generated");
+                assert.soonNoExcept(
+                    (timeout) => {
+                        let keyCnt = this.getPrimary(timeout)
+                            .getCollection("admin.system.keys")
+                            .find({purpose: "HMAC"})
+                            .itcount();
+                        return keyCnt >= 2;
+                    },
+                    "Awaiting keys",
+                    timeout,
+                );
+            });
+        }
+    }
+
+    /**
      * Wait for writes which may happen when nodes are stepped up.  This currently includes
      * primary-only service writes and writes from the query analysis writer, the latter being
      * a replica-set-aware service for which there is no generic way to wait.
@@ -2057,8 +2096,8 @@ export class ReplSetTest {
     /**
      * If query sampling is supported, waits for the query analysis writer to finish setting up
      * after a primary is elected. This is useful for tests that expect particular write timestamps
-     * since the query analysis writer setup involves building indexes for the config.sampledQueries
-     * and config.sampledQueriesDiff collections.
+     * since the query analysis writer setup involves building indexes for the config.sampledQueries,
+     * config.sampledQueriesDiff, and config.analyzeShardKeySplitPoints collections.
      */
     waitForQueryAnalysisWriterSetup(primary) {
         primary = primary || this.getPrimary();
@@ -2086,8 +2125,15 @@ export class ReplSetTest {
             const sampledQueriesDiffIndexes = primary
                 .getCollection("config.sampledQueriesDiff")
                 .getIndexes();
+            const analyzeShardKeySplitPointsIndexes = primary
+                .getCollection("config.analyzeShardKeySplitPoints")
+                .getIndexes();
             // There should be two indexes: _id index and TTL index.
-            return sampledQueriesIndexes.length == 2 && sampledQueriesDiffIndexes.length == 2;
+            return (
+                sampledQueriesIndexes.length == 2 &&
+                sampledQueriesDiffIndexes.length == 2 &&
+                analyzeShardKeySplitPointsIndexes.length == 2
+            );
         }, "Timed out waiting for query analysis writer to finish setting up");
     }
 
@@ -2424,13 +2470,20 @@ export class ReplSetTest {
             ConfigMismatch: "ConfigMismatch",
         });
 
+        /**
+         * @param {ReplSetTest} rst
+         * @param {number} index
+         * @param {number} secondaryCount
+         */
         function checkProgressSingleNode(rst, index, secondaryCount) {
             let secondary = secondariesToCheck[index];
             let secondaryName = secondary.host;
 
             // TODO(SERVER-113063): Remove this skip.
             const shouldSkipConfigVersionCheck =
-                typeof TestData !== "undefined" && TestData.skipAwaitReplicationConfigVersionCheck;
+                rst.skipAwaitReplicationConfigVersionCheck ||
+                (typeof TestData !== "undefined" &&
+                    TestData.skipAwaitReplicationConfigVersionCheck);
             if (!shouldSkipConfigVersionCheck) {
                 let secondaryConfigVersion = asCluster(
                     rst,
@@ -2969,9 +3022,9 @@ export class ReplSetTest {
                                 jsTest.log.info(
                                     "checkDBHashesForReplSet dumping oplogs from all nodes",
                                 );
-                                this.dumpOplog(primary, {}, 100);
+                                this.dumpOplog(primary, {}, 1000);
                                 rst.getSecondaries().forEach((secondary) =>
-                                    this.dumpOplog(secondary, {}, 100),
+                                    this.dumpOplog(secondary, {}, 1000),
                                 );
                                 hasDumpedOplog = true;
                             }
@@ -3229,17 +3282,6 @@ export class ReplSetTest {
         options.setParameter.numInitialSyncConnectAttempts =
             options.setParameter.numInitialSyncConnectAttempts || 60;
 
-        // Reduce the initiating-set optimization threshold so it doesn't fire broadly in tests. The
-        // default threshold (3600s) would trigger for every freshly-initiated test replica set. With
-        // threshold=0, the shortcut only fires when `diff <= 0` (i.e. the sync source's stable
-        // recovery TS has not advanced past the initiating-set entry timestamp). NOTE: this still
-        // fires when stable TS == earliest TS (diff=0). Tests that check beginApplyingTimestamp or
-        // oplog batch sizes may need to explicitly disable the feature entirely via
-        // setParameter: {initialSyncWaitForSyncSourceLastStableRecoveryTs: false}.
-        options.setParameter.initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs =
-            options.setParameter
-                .initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs || 0;
-
         // The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds.
         // Reduce this to 100ms for faster shutdown.
         options.setParameter.shutdownTimeoutMillisForSignaledShutdown =
@@ -3300,8 +3342,12 @@ export class ReplSetTest {
                 MongoRunner.getBinVersionFor("9.0"),
             ) === -1;
         if (olderThan90) {
-            delete options.setParameter
-                .initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs;
+            // The MaxKey scan failpoints and the featureFlagMaxKeyDetection parameter were
+            // introduced in 9.0. Older binaries do not know them and would fail to start if they
+            // were passed as startup parameters.
+            delete options.setParameter["failpoint.hangBeforePersistingMaxKeyOrphanScanState"];
+            delete options.setParameter["failpoint.hangBeforePersistingMaxKeyZoneScanState"];
+            delete options.setParameter.featureFlagMaxKeyDetection;
         }
 
         if (tojson(options) != tojson({})) jsTest.log.info({options});
@@ -3382,6 +3428,8 @@ export class ReplSetTest {
      * @param {boolean} [options.startClean] Forces clearing the data directory.
      * @param {Object} [options.auth] Object that contains the auth details for admin credentials.
      *     Should contain the fields 'user' and 'pwd'.
+     *
+     * @returns the new connection(s) to the restarted node(s)
      */
     restart(n, options, signal, wait) {
         n = resolveToNodeId(this, n);
@@ -3773,13 +3821,58 @@ export class ReplSetTest {
     }
 
     /**
+     * Waits until 'node' reports one of 'states' as its own member state, via the 'myState' field
+     * of its own replSetGetStatus.
+     *
+     * Unlike waitForState, this asks the node itself rather than reading a peer's view of it, so
+     * it is safe to wait for SECONDARY here. Prefer awaitSecondaryNodes when SECONDARY is the only
+     * acceptable state. Use this when several states are acceptable, for instance
+     * [PRIMARY, SECONDARY] for a node that has just restarted and may come back as either, or
+     * [SECONDARY, RECOVERING] for a node whose initial sync may have finished or failed -- which
+     * 'hello' cannot distinguish.
+     *
+     * @param node is a single node, by id or conn
+     * @param states is a single state or list of states
+     * @param timeout how long to wait for one of the states to be reached
+     * @param retryIntervalMS how long to sleep between attempts
+     */
+    waitForMyState(node, states, timeout, retryIntervalMS) {
+        node = resolveToConnection(this, node);
+        timeout = timeout || this.timeoutMS;
+        retryIntervalMS = retryIntervalMS || 200;
+        const acceptable = Array.isArray(states) ? states : [states];
+        acceptable.forEach((state) =>
+            assert.eq(typeof state, "number", `state must be a ReplSetTest.State value: ${state}`),
+        );
+
+        let lastState;
+        jsTest.log.info("ReplSetTest waitForMyState: waiting on " + node.name, {acceptable});
+        assert.soonNoExcept(
+            () => {
+                // Transient failures are expected: the node may be restarting, or may close
+                // connections as it transitions between states.
+                const status = asCluster(this, node, () =>
+                    assert.commandWorked(node.adminCommand({replSetGetStatus: 1})),
+                );
+                lastState = status.myState;
+                return acceptable.includes(lastState);
+            },
+            () =>
+                `${node.name} did not reach any of ${tojson(acceptable)};` +
+                ` last observed myState was ${lastState}`,
+            timeout,
+            retryIntervalMS,
+        );
+    }
+
+    /**
      * Wait for a state indicator to go to a particular state or states.
      *
      * Note that this waits for the state as indicated by the primary node, if there is one. If not,
      * it will use the first live node.
      *
-     * Cannot be used to wait for a secondary state alone. To wait for a secondary state, use the
-     * function 'awaitSecondaryNodes' instead.
+     * Cannot be used to wait for a secondary state. To wait for a secondary state, use
+     * 'awaitSecondaryNodes', or 'waitForMyState' if other states are also acceptable.
      *
      * @param node is a single node, by id or conn
      * @param state is a single state or list of states
@@ -3787,9 +3880,11 @@ export class ReplSetTest {
      * @param reconnectNode indicates that we should reconnect to a node that stepped down
      */
     waitForState(node, state, timeout, reconnectNode) {
+        const requested = Array.isArray(state) ? state : [state];
         assert(
-            state != ReplSetTest.State.SECONDARY,
-            "To wait for a secondary state, use the function 'awaitSecondaryNodes' instead.",
+            !requested.includes(ReplSetTest.State.SECONDARY),
+            "To wait for a secondary state, use the function 'awaitSecondaryNodes' instead, or" +
+                " 'waitForMyState' if states other than SECONDARY are also acceptable.",
         );
         this._waitForIndicator(node, "state", state, timeout, reconnectNode);
     }
@@ -4214,7 +4309,13 @@ function asCluster(rst, conn, fn, keyFileParam = undefined) {
     }
 
     const unauthenticatedConns = connArray.filter((connection) => {
-        const connStatus = connection.adminCommand({connectionStatus: 1, showPrivileges: true});
+        // The connection may drop in suites that kill or step down nodes. The command is
+        // read-only, so retry it rather than failing the caller.
+        const connStatus = retryOnNetworkError(
+            () => connection.adminCommand({connectionStatus: 1, showPrivileges: true}),
+            ReplSetTest.kDefaultRetries,
+            1000,
+        );
         const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
         return !connIsAuthenticated;
     });

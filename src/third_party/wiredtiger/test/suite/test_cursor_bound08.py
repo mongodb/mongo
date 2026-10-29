@@ -94,12 +94,6 @@ class test_cursor_bound08(bound_base):
             evict_cursor.close()
         return cursor
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_bound_basic_stat_scenario(self):
         cursor = self.create_session_and_cursor()
 

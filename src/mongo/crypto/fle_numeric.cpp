@@ -1,49 +1,22 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/crypto/fle_numeric.h"
 
-#include <algorithm>
-
-#include <boost/container/small_vector.hpp>
-#include <boost/multiprecision/cpp_int/import_export.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/overflow_arithmetic.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <limits>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int/import_export.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 namespace mongo {
 
@@ -461,8 +434,9 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
     int64_t highCoefficent = value.getCoefficientHigh();
     int64_t lowCoefficient = value.getCoefficientLow();
 
-// use int128_t where possible on gcc/clang
-#ifdef __SIZEOF_INT128__
+// Use int128_t where possible on GCC/Clang. Clang-cl defines __SIZEOF_INT128__,
+// but Boost's MSVC configuration does not recognize __int128 as an arithmetic type.
+#if defined(__SIZEOF_INT128__) && !defined(_MSC_VER)
     __int128 cMax1 = 0x1ed09bead87c0;
     cMax1 <<= 64;
     cMax1 |= 0x378d8e63ffffffff;
@@ -472,7 +446,7 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
         dassert(cMaxStr == cMax);
     }
 #else
-    boost::multiprecision::uint128_t cMax("9999999999999999999999999999999999");
+    static const boost::multiprecision::uint128_t cMax("9999999999999999999999999999999999");
 #endif
     const int64_t eMin = -6176;
 

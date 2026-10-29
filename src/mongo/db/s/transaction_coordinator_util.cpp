@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/transaction_coordinator_util.h"
@@ -112,7 +86,7 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 const ReadPreferenceSetting kPrimaryReadPreference{ReadPreference::PrimaryOnly};
 
-BSONArray buildParticipantListMatchesConditions(const std::vector<ShardRef>& participantList) {
+BSONArray buildParticipantListMatchesConditions(const std::vector<ShardId>& participantList) {
     BSONArrayBuilder barr;
     for (const auto& participant : participantList) {
         barr.append(participant.toString());
@@ -128,11 +102,11 @@ BSONArray buildParticipantListMatchesConditions(const std::vector<ShardRef>& par
     return BSON_ARRAY(participantListContains << participantListHasSize);
 }
 
-std::string buildParticipantListString(const std::vector<ShardRef>& participantList) {
+std::string buildParticipantListString(const std::vector<ShardId>& participantList) {
     StringBuilder ss;
     ss << "[";
     for (const auto& participant : participantList) {
-        ss << participant.toString() << " ";
+        ss << participant << " ";
     }
     ss << "]";
     return ss.str();
@@ -151,7 +125,7 @@ repl::OpTime persistParticipantListBlocking(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-    const std::vector<ShardRef>& participantList) {
+    const std::vector<ShardId>& participantList) {
     LOGV2_DEBUG(22463,
                 3,
                 "Going to write participant list",
@@ -377,7 +351,7 @@ namespace {
 repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                                      const LogicalSessionId& lsid,
                                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                     std::vector<ShardRef> participantList,
+                                     std::vector<ShardId> participantList,
                                      const txn::CoordinatorCommitDecision& decision,
                                      std::vector<NamespaceString> affectedNamespaces) {
     const bool isCommit = decision.getDecision() == txn::CommitDecision::kCommit;
@@ -650,7 +624,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
         // immediately and try to delete the doc again.
         // TODO (SERVER-120584): Re-evaluate if the deletion of transaction coordinator doc should
         // continue to use w: 1.
-        deleteOp.setWriteConcern(WriteConcernOptions(1 /* numNodes */,
+        deleteOp.setWriteConcern(WriteConcernOptions(/*numNodes=*/1,
                                                      WriteConcernOptions::SyncMode::UNSET,
                                                      WriteConcernOptions::Timeout::kNoTimeoutVal));
         return deleteOp.serialize();

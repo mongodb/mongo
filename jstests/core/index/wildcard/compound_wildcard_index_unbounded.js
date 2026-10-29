@@ -3,6 +3,7 @@
  * cause any errors.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_70,
  *   # explain does not support majority read concern
  *   assumes_read_concern_local,

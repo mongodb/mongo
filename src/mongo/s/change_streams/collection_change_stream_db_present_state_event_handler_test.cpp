@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
 
@@ -33,7 +7,6 @@
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
 #include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
 #include "mongo/s/change_streams/control_events.h"
@@ -211,13 +184,13 @@ DEATH_TEST_REGEX_F(
 TEST_F(CollectionDbPresentStateEventHandlerStrictModeFixture,
        Given_MovePrimaryControlEventWithShards_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(60, 10);
-    ShardRef shardA("shardA");
-    ShardRef shardB("shardB");
+    ShardId shardA("shardA");
+    ShardId shardB("shardB");
     MovePrimaryControlEvent event{clusterTime, shardA, shardB};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardRef> shards = {shardB};
+    std::vector<ShardId> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -274,13 +247,13 @@ TEST_F(
     Timestamp clusterTime(60, 10);
     NamespacePlacementChangedControlEvent event{clusterTime, makeTestNss()};
 
-    ShardRef shardA("shardA");
-    ShardRef shardB("shardB");
-    ShardRef shardC("shardC");
-    ShardRef shardD("shardD");
+    ShardId shardA("shardA");
+    ShardId shardB("shardB");
+    ShardId shardC("shardC");
+    ShardId shardD("shardD");
     readerCtx().currentlyTargetedShards = {shardA, shardD};
 
-    std::vector<ShardRef> shards = {shardA, shardB, shardC};
+    std::vector<ShardId> shards = {shardA, shardB, shardC};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -421,13 +394,13 @@ DEATH_TEST_REGEX_F(
 TEST_F(CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,
        Given_MovePrimaryControlEventWithShards_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(60, 10);
-    ShardRef shardA("shardA");
-    ShardRef shardB("shardB");
+    ShardId shardA("shardA");
+    ShardId shardB("shardB");
     MovePrimaryControlEvent event{clusterTime, shardA, shardB};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardRef> shards = {shardB};
+    std::vector<ShardId> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -453,13 +426,13 @@ TEST_F(
     Timestamp clusterTime(60, 10);
     NamespacePlacementChangedControlEvent event{clusterTime, makeTestNss()};
 
-    ShardRef shardA("shardA");
-    ShardRef shardB("shardB");
-    ShardRef shardC("shardC");
-    ShardRef shardD("shardD");
+    ShardId shardA("shardA");
+    ShardId shardB("shardB");
+    ShardId shardC("shardC");
+    ShardId shardD("shardD");
     readerCtx().currentlyTargetedShards = {shardA, shardD};
 
-    std::vector<ShardRef> shards = {shardA, shardB, shardC};
+    std::vector<ShardId> shards = {shardA, shardB, shardC};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};

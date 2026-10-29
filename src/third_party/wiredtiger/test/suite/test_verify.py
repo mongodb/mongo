@@ -37,10 +37,6 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = f'{test_name}.a'
     nentries = 1000
 
-    # Returns the .wt file extension, or in the case
-    # of tiered storage, builds the .wtobj object name.
-    # Assumes that no checkpoints are done, so we
-    # are on the first object.
     def file_name(self, name):
         return self.initialFileName('table:' + name)
 
@@ -157,6 +153,30 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         self.verifyUntilSuccess(self.session, 'table:' + self.tablename)
         self.check_populate(self.tablename)
+
+    # The start message identifies the object by its file URI, which the disagg verify path does not
+    # produce in the same form.
+    @wttest.skip_for_hook("disagg", "Layered verify does not emit a single file URI")
+    def test_verify_api_logs_uri(self):
+        """
+        Test that verify emits an informational message identifying the object being verified. The
+        message is at the info verbosity level, off by default, so enable the verify category.
+        """
+        params = 'key_format=S,value_format=S'
+        self.session.create('table:' + self.tablename, params)
+        self.populate(self.tablename)
+        self.session.checkpoint()
+
+        self.conn.reconfigure('verbose=[verify:0]')
+        try:
+            self.verifyUntilSuccess(self.session, 'table:' + self.tablename)
+        finally:
+            self.conn.reconfigure('verbose=[]')
+
+        output = self.readStdout(50000)
+        self.assertTrue('verify: starting on ' in output and self.tablename in output,
+            'verify did not log the object being verified; stdout: ' + output)
+        self.cleanStdout()
 
     def test_verify_api_75pct_null(self):
         """

@@ -73,12 +73,13 @@ is_major_release()
 bflag()
 {
     # Return if the branch's format command takes the -B flag for backward compatibility.
-    test "$1" = "develop" && echo "-B "
+    test "$1" = "develop" && echo "-B"
+    test "$1" = "mongodb-9.0" && echo "-B"
     test "$1" = "mongodb-8.3" && echo "-B"
     test "$1" = "mongodb-8.2" && echo "-B"
     test "$1" = "mongodb-8.0" && echo "-B"
-    test "$1" = "mongodb-7.0" && echo "-B "
-    test "$1" = "mongodb-6.0" && echo "-B "
+    test "$1" = "mongodb-7.0" && echo "-B"
+    test "$1" = "mongodb-6.0" && echo "-B"
     return 0
 }
 
@@ -223,36 +224,38 @@ create_configs()
     fi
 
     echo "##################################################" > $file_name
-    echo "runs.type=row" >> $file_name                # WT-7379 - Temporarily disable column store tests
-    echo "block_cache=0" >> $file_name                # Not supported by newer releases, it is forcibly disabled internally.
-    echo "btree.huffman_value=0" >> $file_name        # WT-12456 - Never used, removed from newer releases
-    echo "btree.prefix=0" >> $file_name               # WT-7579 - Prefix testing isn't portable between releases
-    echo "btree.prefix_len=0" >> $file_name           # WT-15548 - Not supported by older releases
-    echo "cache=80" >> $file_name                     # Medium cache so there's eviction
-    echo "checksum=on" >> $file_name                  # WT-7851 Fix illegal checksum configuration
-    echo "checkpoints=1"  >> $file_name               # Force periodic writes
-    echo "compression=snappy"  >> $file_name          # We only build with snappy, force the choice
+    echo "runs.type=row" >> $file_name                          # WT-7379 - Temporarily disable column store tests
+    echo "block_cache=0" >> $file_name                          # Not supported by newer releases, it is forcibly disabled internally.
+    echo "btree.huffman_value=0" >> $file_name                  # WT-12456 - Never used, removed from newer releases
+    echo "btree.prefix=0" >> $file_name                         # WT-7579 - Prefix testing isn't portable between releases
+    echo "btree.prefix_len=0" >> $file_name                     # WT-15548 - Not supported by older releases
+    echo "cache=80" >> $file_name                               # Medium cache so there's eviction
+    echo "checksum=on" >> $file_name                            # WT-7851 Fix illegal checksum configuration
+    echo "checkpoints=1"  >> $file_name                         # Force periodic writes
+    echo "compression=snappy"  >> $file_name                    # We only build with snappy, force the choice
     echo "data_source=table" >> $file_name
-    echo "debug.background_compact=0" >> $file_name   # WT-13276 - Not supported by older releases
-    echo "debug.cursor_reposition=0" >> $file_name    # WT-10594 - Not supported by older releases
-    echo "debug.log_retention=0" >> $file_name        # WT-10434 - Not supported by older releases
-    echo "debug.realloc_malloc=0" >> $file_name       # WT-10111 - Not supported by older releases
-    echo "eviction.evict_use_softptr=0" >> $file_name # WT-14013 - Not supported by older releases
-    echo "in_memory=0" >> $file_name                  # Interested in the on-disk format
-    echo "leak_memory=1" >> $file_name                # Faster runs
-    echo "logging=1" >> $file_name                    # Test log compatibility
-    echo "logging_compression=snappy" >> $file_name   # We only built with snappy, force the choice
-    echo "obsolete_cleanup.method=off" >> $file_name  # WT-14142 - Not supported by older releases
-    echo "obsolete_cleanup.wait=0" >> $file_name      # WT-14142 - Not supported by older releases
-    echo "prefetch=0" >> $file_name                   # WT-12978 - Not supported by older releases
-    echo "prefetch.default=0" >> $file_name           # WT-16671 - Not supported by older releases
+    echo "debug.background_compact=0" >> $file_name             # WT-13276 - Not supported by older releases
+    echo "debug.cursor_reposition=0" >> $file_name              # WT-10594 - Not supported by older releases
+    echo "debug.disagg_slow_truncate_follower=0" >> $file_name  # WT-17686 - Not supported by older releases
+    echo "debug.log_retention=0" >> $file_name                  # WT-10434 - Not supported by older releases
+    echo "debug.realloc_malloc=0" >> $file_name                 # WT-10111 - Not supported by older releases
+    echo "debug.slow_truncate=0" >> $file_name                  # WT-17686 - Not supported by older releases
+    echo "eviction.evict_use_softptr=0" >> $file_name           # WT-14013 - Not supported by older releases
+    echo "in_memory=0" >> $file_name                            # Interested in the on-disk format
+    echo "leak_memory=1" >> $file_name                          # Faster runs
+    echo "logging=1" >> $file_name                              # Test log compatibility
+    echo "logging_compression=snappy" >> $file_name             # We only built with snappy, force the choice
+    echo "obsolete_cleanup.method=off" >> $file_name            # WT-14142 - Not supported by older releases
+    echo "obsolete_cleanup.wait=0" >> $file_name                # WT-14142 - Not supported by older releases
+    echo "prefetch=0" >> $file_name                             # WT-12978 - Not supported by older releases
+    echo "prefetch.default=0" >> $file_name                     # WT-16671 - Not supported by older releases
     echo "rows=1000000" >> $file_name
-    echo "salvage=0" >> $file_name                    # Faster runs
-    echo "statistics_log.sources=off" >> $file_name   # WT-12710 - Prevent statistics from enabling both 'all' and 'sources'
-    echo "stress.checkpoint=0" >> $file_name          # Faster runs
+    echo "salvage=0" >> $file_name                              # Faster runs
+    echo "statistics_log.sources=off" >> $file_name             # WT-12710 - Prevent statistics from enabling both 'all' and 'sources'
+    echo "stress.checkpoint=0" >> $file_name                    # Faster runs
     echo "timer=4" >> $file_name
     echo "verify=1" >> $file_name
-    echo "transaction.timestamps=0" >> $file_name     # WT-8601 - Timestamps do not work with logged tables
+    echo "transaction.timestamps=0" >> $file_name               # WT-8601 - Timestamps do not work with logged tables
     echo "##################################################" >> $file_name
 }
 
@@ -741,6 +744,7 @@ upgrade_to_latest=false
 # then the branch name itself will be used for the checkout
 declare -A gittags
 gittags['develop']="develop"
+gittags['mongodb-9.0']="mongodb-9.0"
 gittags['mongodb-8.3']="mongodb-8.3"
 gittags['mongodb-8.0']="mongodb-8.0"
 gittags['mongodb-7.0']="mongodb-7.0"
@@ -769,6 +773,7 @@ newer_release_branches=($NEWER_RELEASE_BRANCHES)
 patch_version_upgrade_downgrade_release_branches=($PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
 test_checkpoint_release_branches=($TEST_CHECKPOINT_RELEASE_BRANCHES)
 upgrade_to_latest_upgrade_downgrade_release_branches=($UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
+dirty_restart_release_branches=($DIRTY_RESTART_RELEASE_BRANCHES)
 
 declare -A scopes
 scopes[dirty_restart]="start from an unclean shutdown of a different version"
@@ -904,9 +909,9 @@ generate_compat_pairs()
             local next_major=$(( major + 1 ))
             local next_major_b="mongodb-${next_major}.0"
             if branch_in_array "$next_major_b" "${branches[@]}"; then
-                add_pair "$branch" "$next_major_b"
+                add_pair "$next_major_b" "$branch"
             elif branch_in_array "develop" "${branches[@]}"; then
-                add_pair "$branch" "develop"
+                add_pair "develop" "$branch"
             fi
 
         elif is_major_release "$branch"; then
@@ -923,9 +928,9 @@ generate_compat_pairs()
             local next_major=$(( major + 1 ))
             local next_major_b="mongodb-${next_major}.0"
             if branch_in_array "$next_major_b" "${branches[@]}"; then
-                add_pair "$branch" "$next_major_b"
+                add_pair "$next_major_b" "$branch"
             elif branch_in_array "develop" "${branches[@]}"; then
-                add_pair "$branch" "develop"
+                add_pair "develop" "$branch"
             fi
 
             # All configured minors of the same major X.Y (Y > 0)
@@ -1142,7 +1147,7 @@ if [ "$upgrade_to_latest" = true ]; then
 fi
 
 if [ "$dirty_restart" = true ]; then
-    for b in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
+    for b in "${dirty_restart_release_branches[@]}"; do
         create_configs "$b"
         pushd .
         build_branch "$b"
@@ -1151,8 +1156,8 @@ if [ "$dirty_restart" = true ]; then
 
     # Go over the release branches, from pair to pair. If a pair has the LHS different to the RHS,
     # treat that as a combination worth testing.
-    for b1 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
-        for b2 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
+    for b1 in "${dirty_restart_release_branches[@]}"; do
+        for b2 in "${dirty_restart_release_branches[@]}"; do
             if [[ "$b1" != "$b2" ]]; then
                 test_dirty_restart "$b1" "$b2"
             fi

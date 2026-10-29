@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -55,15 +28,16 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC scram {
+namespace [[MONGO_MOD_PUBLIC]] scram {
+using namespace std::literals::string_view_literals;
 
-constexpr auto kServerKeyConst = "Server Key"_sd;
-constexpr auto kClientKeyConst = "Client Key"_sd;
+constexpr auto kServerKeyConst = "Server Key"sv;
+constexpr auto kClientKeyConst = "Client Key"sv;
 
-constexpr auto kIterationCountFieldName = "iterationCount"_sd;
-constexpr auto kSaltFieldName = "salt"_sd;
-constexpr auto kStoredKeyFieldName = "storedKey"_sd;
-constexpr auto kServerKeyFieldName = "serverKey"_sd;
+constexpr auto kIterationCountFieldName = "iterationCount"sv;
+constexpr auto kSaltFieldName = "salt"sv;
+constexpr auto kStoredKeyFieldName = "storedKey"sv;
+constexpr auto kServerKeyFieldName = "serverKey"sv;
 
 const int kIterationCountMinimum = 4096;
 
@@ -333,5 +307,5 @@ private:
     std::shared_ptr<MemoryPolicy<HashBlock>> _ptr;
 };
 
-}  // namespace MONGO_MOD_PUBLIC scram
+}  // namespace scram
 }  // namespace mongo

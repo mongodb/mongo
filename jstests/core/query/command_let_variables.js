@@ -2,8 +2,7 @@
 // variables for use in expressions within the command.
 // Before 7.2, $rand was evaluated more than once in sharded find (SERVER-75927).
 // @tags: [
-//   # TODO SERVER-123918: remove the multiversion incompatible tag.
-//   multiversion_incompatible,
+//   uses_explain,
 //   # Requires a batch size greater than one.
 //   does_not_support_config_fuzzer,
 //   requires_fcv_81,
@@ -21,7 +20,8 @@
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanStage, getSingleNodeExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;
@@ -130,7 +130,7 @@ let explain = assert.commandWorked(
 );
 
 if (!isMongos) {
-    if (checkSbeFullFeatureFlagEnabled(testDB)) {
+    if (checkSbeFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB, "SbeUnwind")) {
         // $unwind should be pushed down to SBE.
         assert(planHasStage(testDB, explain, "UNWIND"), explain);
     } else {
@@ -142,7 +142,7 @@ if (!isMongos) {
     }
 }
 
-if (!isMongos && !TestData.testingReplicaSetEndpoint) {
+if (!isMongos) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
     // Must set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.

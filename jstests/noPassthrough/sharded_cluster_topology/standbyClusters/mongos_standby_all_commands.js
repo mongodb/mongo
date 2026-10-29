@@ -14,6 +14,7 @@
  * ]
  */
 
+import {isServerSideJavaScriptEnabled} from "jstests/libs/js_engine_util.js";
 import {StandbyClusterTestFixture} from "jstests/noPassthrough/libs/sharded_cluster_topology/standby_cluster_test_fixture.js";
 
 const dbName = "testDb";
@@ -55,7 +56,7 @@ const allCommands = {
         isAdminCommand: true,
     },
     aggregate: {command: {aggregate: collName, pipeline: [{$match: {}}], cursor: {}}},
-    analyze: {command: {analyze: collName}},
+    analyze: {command: {analyze: collName, mode: "histograms", key: "a"}},
     analyzeShardKey: {command: {analyzeShardKey: fullNs, key: {x: 1}}, isAdminCommand: true},
     appendOplogNote: {
         command: {appendOplogNote: 1, data: {a: 1}},
@@ -89,6 +90,10 @@ const allCommands = {
     },
     checkMetadataConsistency: {command: {checkMetadataConsistency: 1}, isAdminCommand: true},
     cleanupStructuredEncryptionData: {skip: "requires encrypted collection setup"},
+    clearJoinPlanCache: {
+        command: {clearJoinPlanCache: 1},
+        isAdminCommand: true,
+    },
     clearJumboFlag: {
         command: {clearJumboFlag: fullNs, bounds: [{x: MinKey}, {x: MaxKey}]},
         isAdminCommand: true,
@@ -183,6 +188,14 @@ const allCommands = {
         standbyAllowed: true,
     },
     getLog: {command: {getLog: "global"}, isAdminCommand: true, standbyAllowed: true},
+    getMetricsFilteringAllowlist: {
+        command: {getMetricsFilteringAllowlist: 1, category: "serverStatus"},
+        isAdminCommand: true,
+        standbyAllowed: true,
+        // The metrics filtering feature flags are not enabled in tests by default, so this
+        // command is expected to fail with IllegalOperation.
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+    },
     getMore: {skip: requiresCursor},
     getParameter: {
         command: {getParameter: 1, logLevel: 1},
@@ -407,6 +420,11 @@ const allCommands = {
         isAdminCommand: true,
     },
     update: {command: {update: collName, updates: [{q: {x: 999}, u: {x: 1000}}]}},
+    updateMetricsFilteringAllowlist: {
+        command: {updateMetricsFilteringAllowlist: 1, category: "serverStatus", add: ["test.path"]},
+        isAdminCommand: true,
+        standbyAllowed: true,
+    },
     updateRole: {skip: "no role to update without prior createRole succeeding"},
     updateSearchIndex: {skip: "requires mongot mock setup"},
     updateUser: {skip: "no user to update without prior createUser succeeding"},
@@ -479,6 +497,10 @@ function runStandbyAllCommandsTest({configShard}) {
     });
     assert.neq(null, mongos, "mongoS failed to start against standby config server");
 
+    // mapReduce with JS map/reduce functions needs a server-side JS engine, which is absent on some
+    // builds (e.g. ppc64le links scripting_none). Skip just that command there.
+    const jsEnabled = isServerSideJavaScriptEnabled(mongos);
+
     const listCommandsRes = assert.commandWorked(mongos.adminCommand({listCommands: 1}));
     const serverCommands = Object.keys(listCommandsRes.commands).sort();
 
@@ -491,6 +513,11 @@ function runStandbyAllCommandsTest({configShard}) {
 
         if (!test) {
             missing.push(cmdName);
+            continue;
+        }
+
+        if (!jsEnabled && cmdName === "mapReduce") {
+            jsTest.log.info(`Skipping ${cmdName}: server-side JS is unavailable on this build`);
             continue;
         }
 
@@ -508,11 +535,12 @@ function runStandbyAllCommandsTest({configShard}) {
 
         let ok;
         let detail;
+        let res;
         try {
             // maxTimeMS bounds commands that would otherwise wait the full server-selection
             // timeout looking for a primary; in standby clusters primary nodes are replaced
             // with injector nodes, so server selection never finds one.
-            const res = db.runCommand({...test.command, maxTimeMS: 2000});
+            res = db.runCommand({...test.command, maxTimeMS: 2000});
             ok = res.ok === 1;
             detail = ok ? "" : `[${res.code}] ${res.errmsg}`;
         } catch (e) {
@@ -520,11 +548,18 @@ function runStandbyAllCommandsTest({configShard}) {
             detail = `[exception] ${e.message}`;
         }
 
-        const expected = test.standbyAllowed === true;
-        if (ok && !expected) {
-            unexpectedlySucceeded.push(cmdName);
-        } else if (!ok && expected) {
+        const expectedSuccess = test.standbyAllowed && !test.expectedErrorCode;
+        if (ok && !expectedSuccess) {
+            unexpectedlySucceeded.push(`${cmdName}: ${detail}`);
+        } else if (!ok && expectedSuccess) {
             unexpectedlyFailed.push(`${cmdName}: ${detail}`);
+        } else if (!ok && test.expectedErrorCode !== undefined) {
+            // Check if it failed with the expected error code.
+            if (res && res.code !== test.expectedErrorCode) {
+                unexpectedlyFailed.push(
+                    `${cmdName}: expected error code ${test.expectedErrorCode} but got ${res.code} - ${detail}`,
+                );
+            }
         }
     }
 

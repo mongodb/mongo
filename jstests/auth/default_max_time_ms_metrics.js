@@ -10,8 +10,6 @@
  *   uses_transactions,
  *   requires_fcv_80,
  *   requires_scripting,
- *   # TODO(SERVER-127318) reenable this test.
- *   mozjs_wasm_unsupported,
  * ]
  */
 

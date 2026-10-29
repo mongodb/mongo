@@ -13,6 +13,55 @@ function bazel_test_results::label_to_prefix() {
     echo "${label}"
 }
 
+# Returns 0 if a directory holds a target's test outputs.
+# Usage: bazel_test_results::_has_test_outputs <dir>
+function bazel_test_results::_has_test_outputs() {
+    local -r dir="$1"
+    compgen -G "${dir}/shard_*_of_*" >/dev/null || [[ -f "${dir}/test.log" ]]
+}
+
+# Resolves the directory holding a target's bazel test logs, independent of the configuration the
+# target was analyzed in.
+# Usage: bazel_test_results::resolve_testlogs_dir <src_dir> <target_prefix>
+function bazel_test_results::resolve_testlogs_dir() {
+    local -r src_dir="$1"
+    local -r target_prefix="$2"
+
+    if bazel_test_results::_has_test_outputs "${src_dir}/bazel-testlogs/${target_prefix}"; then
+        echo "${src_dir}/bazel-testlogs/${target_prefix}"
+        return 0
+    fi
+
+    local -a candidates=()
+    local dir
+    shopt -s nullglob
+    for dir in "${src_dir}"/bazel-out/*/testlogs/"${target_prefix}"; do
+        if bazel_test_results::_has_test_outputs "${dir}"; then
+            candidates+=("${dir}")
+        fi
+    done
+    shopt -u nullglob
+
+    if [[ "${#candidates[@]}" -eq 0 ]]; then
+        echo "Error: no bazel test outputs for ${target_prefix} under" >&2
+        echo "  ${src_dir}/bazel-testlogs/${target_prefix}" >&2
+        echo "  ${src_dir}/bazel-out/*/testlogs/${target_prefix}" >&2
+        return 1
+    fi
+
+    if [[ "${#candidates[@]}" -gt 1 ]]; then
+        # A target's shard count decides its configuration, so a given label only ever produces
+        # results in one of them. Two means results left over from a revision where this suite was
+        # sharded differently, and picking either would be a guess.
+        echo "Error: ${#candidates[@]} testlogs directories for ${target_prefix}:" >&2
+        printf '  %s\n' "${candidates[@]}" >&2
+        echo "Expected exactly one." >&2
+        return 1
+    fi
+
+    echo "${candidates[0]}"
+}
+
 # Symlinks test logs from a per-shard test.outputs/build/TestLogs directory into Evergreen's
 # log ingestion folder. Must be invoked with the per-shard results directory as cwd.
 function bazel_test_results::symlink_test_logs() {

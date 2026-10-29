@@ -8,13 +8,13 @@
  *   # The implicitly_shard_accessed_collections.js override races with background shard create
  *   # collection ops triggered by active downgrade, causing ConflictingOperationInProgress.
  *   cannot_run_during_upgrade_downgrade,
- *   # TODO SERVER-127997: The mozjs-wasm engine is incompatible with ASAN/TSAN: libwasmtime_engine.so
- *   # initialization takes >5 minutes under memory pressure, exceeding the 300s await_ready()
- *   # timeout, and the Wasmtime rayon thread pool triggers TSAN CHECK failures.
- *   mozjs_wasm_unsupported,
+ *   # TODO SERVER-128404: Wasmtime's rayon thread pool bypasses TSAN's pthread_create interception,
+ *   # triggering a TSAN internal assertion (thr->slot == 0). Re-enable once SERVER-128404 is fixed.
+ *   tsan_incompatible,
+ *   # TODO SERVER-128404: ASAN build has incompatible signal handling with Wasmtime's OOM path.
+ *   incompatible_aubsan,
  * ]
  */
-
 const coll = db.return_bson_scalare_from_js_function;
 
 coll.drop();

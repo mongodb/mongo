@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -57,20 +31,20 @@ class DBException;
  *  In 'redact' mode (or if forceRedaction is true) replace all values with '###' and keep keys
  *  intact. In normal mode return objectToRedact.toString().
  */
-MONGO_MOD_PUBLIC BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] BSONObj redact(const BSONObj& objectToRedact, bool forceRedaction = false);
 
 /**
  *  In 'redact' mode (or if forceRedaction is true) return '###'.
  *  In normal mode return stringToRedact.
  */
-MONGO_MOD_PUBLIC std::string_view redact(std::string_view stringToRedact,
-                                         bool forceRedaction = false);
-MONGO_MOD_PUBLIC inline std::string_view redact(const char* stringToRedact,
-                                                bool forceRedaction = false) {
+[[MONGO_MOD_PUBLIC]] std::string_view redact(std::string_view stringToRedact,
+                                             bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] inline std::string_view redact(const char* stringToRedact,
+                                                    bool forceRedaction = false) {
     return redact(std::string_view(stringToRedact), forceRedaction);
 }
-MONGO_MOD_PUBLIC inline std::string_view redact(const std::string& stringToRedact,
-                                                bool forceRedaction = false) {
+[[MONGO_MOD_PUBLIC]] inline std::string_view redact(const std::string& stringToRedact,
+                                                    bool forceRedaction = false) {
     return redact(std::string_view(stringToRedact), forceRedaction);
 }
 
@@ -78,13 +52,13 @@ MONGO_MOD_PUBLIC inline std::string_view redact(const std::string& stringToRedac
  *  In 'redact' mode (or if forceRedaction is true) keep status code and replace reason with '###'.
  *  In normal mode return statusToRedact.toString().
  */
-MONGO_MOD_PUBLIC std::string redact(const Status& statusToRedact, bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] std::string redact(const Status& statusToRedact, bool forceRedaction = false);
 
 /**
  * In 'redact' mode (or if forceRedaction is true) keep exception type and replace causedBy
  * with '###'. In normal mode return exceptionToRedact.toString().
  */
-MONGO_MOD_PUBLIC std::string redact(const DBException& exceptionToRedact,
-                                    bool forceRedaction = false);
+[[MONGO_MOD_PUBLIC]] std::string redact(const DBException& exceptionToRedact,
+                                        bool forceRedaction = false);
 
 }  // namespace mongo

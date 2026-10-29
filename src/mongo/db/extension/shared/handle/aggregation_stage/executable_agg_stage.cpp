@@ -1,39 +1,19 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/util/fail_point.h"
 
 #include <string_view>
 
 namespace mongo::extension {
+
+// Test-only fail point that corrupts the GetNextResult the host sees, simulating an extension
+// that returns an OK status with a kAdvanced result whose byte view is empty or dangling.
+MONGO_FAIL_POINT_DEFINE(failExtensionGetNextInvalidResult);
 
 void ExecAggStageAPI::setSource(const ExecAggStageHandle& input) {
     invokeCAndConvertStatusToException([&]() { return _vtable().set_source(get(), input.get()); });
@@ -43,6 +23,22 @@ ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionCont
     ::MongoExtensionGetNextResult result = createDefaultExtensionGetNext();
     invokeCAndConvertStatusToException(
         [&]() { return _vtable().get_next(get(), execCtxPtr, &result); });
+
+    failExtensionGetNextInvalidResult.execute([&](const BSONObj& data) {
+        result.code = ::MongoExtensionGetNextResultCode::kAdvanced;
+        auto& container = (data.getStringField("field") == "resultMetadata")
+            ? result.resultMetadata
+            : result.resultDocument;
+        // Destroy a transferred kByteBuf before overwriting the container, else the owning
+        // pointer is dropped and the buffer leaks.
+        if (container.type == MongoExtensionByteContainerType::kByteBuf && container.bytes.buf) {
+            ExtensionByteBufHandle{container.bytes.buf};
+        }
+        container.type = MongoExtensionByteContainerType::kByteView;
+        container.bytes.view = ::MongoExtensionByteView{
+            reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(data.getIntField("data"))),
+            static_cast<size_t>(data.getIntField("len"))};
+    });
 
     return ExtensionGetNextResult::makeFromApiResult(result);
 }
@@ -55,7 +51,9 @@ OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
     MongoExtensionOperationMetrics* metrics = nullptr;
     invokeCAndConvertStatusToException([&]() { return _vtable().create_metrics(get(), &metrics); });
 
-    tassert(11213505, "Result of `create_metrics` was nullptr", metrics != nullptr);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "Result of `create_metrics` was nullptr",
+            metrics != nullptr);
 
     // Take ownership of the created metrics and return the result.
     return OwnedOperationMetricsHandle(metrics);
@@ -81,7 +79,9 @@ BSONObj ExecAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx,
             get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
-    tassert(11239500, "buffer returned from explain must not be null", buf);
+    tassert(ErrorCodes::ExtensionSerializationError,
+            "buffer returned from explain must not be null",
+            buf);
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.

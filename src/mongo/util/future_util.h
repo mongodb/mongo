@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/base/error_codes.h"
@@ -33,7 +7,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/retry_strategy.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -56,7 +30,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Returns a future which will be fulfilled at the given date.
@@ -69,7 +43,7 @@ ExecutorFuture<void> sleepUntil(std::shared_ptr<executor::TaskExecutor> executor
 ExecutorFuture<void> sleepFor(std::shared_ptr<executor::TaskExecutor> executor,
                               Milliseconds duration);
 
-namespace MONGO_MOD_FILE_PRIVATE future_util_details {
+namespace [[MONGO_MOD_FILE_PRIVATE]] future_util_details {
 
 /**
  * Error status to use if any AsyncTry loop has been canceled.
@@ -169,7 +143,7 @@ public:
      * that readies the returned future when the given duration has elapsed or token cancelled.
      */
     template <typename SleepableExecutor>
-    MONGO_MOD_PUBLIC auto on(SleepableExecutor executor, CancellationToken cancelToken) && {
+    [[MONGO_MOD_PUBLIC]] auto on(SleepableExecutor executor, CancellationToken cancelToken) && {
         auto loop =
             std::make_shared<TryUntilLoopWithDelay<SleepableExecutor>>(std::move(executor),
                                                                        std::move(_body),
@@ -316,7 +290,7 @@ public:
      * loop body.
      */
     template <typename DurationType>
-    MONGO_MOD_PUBLIC auto withDelayBetweenIterations(DurationType delay) && {
+    [[MONGO_MOD_PUBLIC]] auto withDelayBetweenIterations(DurationType delay) && {
         return AsyncTryUntilWithDelay(
             std::move(_body), std::move(_condition), ConstDelay<DurationType>(std::move(delay)));
     }
@@ -331,7 +305,7 @@ public:
      * backoff has been performed such as accumulating metrics.
      */
     template <typename BackoffType>
-    MONGO_MOD_PUBLIC auto withBackoffBetweenIterations(BackoffType backoff) && {
+    [[MONGO_MOD_PUBLIC]] auto withBackoffBetweenIterations(BackoffType backoff) && {
         return AsyncTryUntilWithDelay(
             std::move(_body), std::move(_condition), BackoffDelay<BackoffType>(std::move(backoff)));
     }
@@ -346,7 +320,7 @@ public:
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    MONGO_MOD_PUBLIC auto on(ExecutorPtr executor, CancellationToken cancelToken) && {
+    [[MONGO_MOD_PUBLIC]] auto on(ExecutorPtr executor, CancellationToken cancelToken) && {
         auto loop = std::make_shared<TryUntilLoop>(
             std::move(executor), std::move(_body), std::move(_condition), std::move(cancelToken));
         // Launch the recursive chain using the helper class.
@@ -504,8 +478,10 @@ struct DefaultExtractRetryParameters {
             errorLabels.resize(resultErrorLabels.size());
             std::ranges::copy(resultErrorLabels, errorLabels.begin());
 
-            return RetryStrategy::ResultStatus{
-                result.getStatus(), std::move(errorLabels), result.getOrigin()};
+            return RetryStrategy::ResultStatus{result.getStatus(),
+                                               std::move(errorLabels),
+                                               result.getOrigin(),
+                                               result.getBaseBackoffMS()};
         }
 
         return RetryStrategy::ResultStatus::makeOKResult(result.getOrigin());
@@ -559,7 +535,7 @@ std::vector<T> variadicArgsToVector(U&&... elems) {
     (vector.push_back(std::forward<U>(elems)), ...);
     return vector;
 }
-}  // namespace MONGO_MOD_FILE_PRIVATE future_util_details
+}  // namespace future_util_details
 
 /**
  * A fluent-style API for executing asynchronous, future-returning try-until loops.
@@ -639,8 +615,10 @@ public:
                     return true;
                 }
 
-                return !strategy->recordFailureAndEvaluateShouldRetry(
-                    result.getStatus(), result.getOrigin(), result.getErrorLabels());
+                return !strategy->recordFailureAndEvaluateShouldRetry(result.getStatus(),
+                                                                      result.getOrigin(),
+                                                                      result.getErrorLabels(),
+                                                                      result.getBaseBackoffMS());
             })
             .withBackoffBetweenIterations(RetryDelayAsBackoff{strategy});
     }
@@ -683,9 +661,9 @@ SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
         // Total number of input futures.
         const size_t numFuturesToWaitFor;
         // Tracks the number of input futures which have resolved with success so far.
-        AtomicWord<size_t> numResultsReturnedWithSuccess{0};
+        Atomic<size_t> numResultsReturnedWithSuccess{0};
         // Tracks whether or not the resultPromise has been set. Only used for the error case.
-        AtomicWord<bool> completedWithError{false};
+        Atomic<bool> completedWithError{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<ResultVector> resultPromise;
         // A vector containing the results of each input future.
@@ -743,9 +721,9 @@ SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
         // Total number of input futures.
         const size_t numFuturesToWaitFor;
         // Tracks the number of input futures which have resolved with success so far.
-        AtomicWord<size_t> numResultsReturnedWithSuccess{0};
+        Atomic<size_t> numResultsReturnedWithSuccess{0};
         // Tracks whether or not the resultPromise has been set. Only used for the error case.
-        AtomicWord<bool> completedWithError{false};
+        Atomic<bool> completedWithError{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<void> resultPromise;
     };
@@ -804,7 +782,7 @@ SemiFuture<ResultVector> whenAll(std::vector<FutureT>&& futures) {
         // Total number of input futures.
         const size_t numFuturesToWaitFor;
         // Tracks the number of input futures which have resolved so far.
-        AtomicWord<size_t> numReady{0};
+        Atomic<size_t> numReady{0};
         // A vector containing the results of each input future.
         ResultVector intermediateResult;
         // The promise corresponding to the resulting SemiFuture returned by this function.
@@ -859,7 +837,7 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
     struct SharedBlock {
         SharedBlock(Promise<Result> result) : resultPromise(std::move(result)) {}
         // Tracks whether or not the resultPromise has been set.
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<Result> resultPromise;
     };
@@ -929,7 +907,7 @@ SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToke
     struct SharedBlock {
         SharedBlock(Promise<Value> result) : resultPromise(std::move(result)) {}
         // Tracks whether or not the resultPromise has been set.
-        AtomicWord<bool> done{false};
+        Atomic<bool> done{false};
         // The promise corresponding to the resulting SemiFuture returned by this function.
         Promise<Value> resultPromise;
     };
@@ -964,4 +942,4 @@ SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToke
 }
 
 }  // namespace future_util
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

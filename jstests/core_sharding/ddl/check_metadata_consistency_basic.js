@@ -69,9 +69,7 @@ function assertNoInconsistencies() {
     assertNoInconsistencies();
 
     const kCollectionName = jsTestName() + "_sharded";
-    const kCollectionName2 = jsTestName() + "_unsharded";
     const kNss = db.getName() + "." + kCollectionName;
-    const kNss2 = db.getName() + "." + kCollectionName2;
     let kDDLCommands = [{enableSharding: db.getName()}, {shardCollection: kNss, key: {_id: 1}}];
 
     for (let cmd of kDDLCommands) {

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 
@@ -138,7 +112,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeOneWithExpectedUUID) {
 
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
-    upgradeToViewlessTimeseries(operationContext(), nss1, uuid1 /* expectedUUID */);
+    upgradeToViewlessTimeseries(operationContext(), nss1, /*expectedUUID=*/uuid1);
     assertIsViewlessTimeseries(nss1, uuid1);
 }
 
@@ -156,7 +130,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeOneWithExpectedUUID) {
 
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
-    downgradeFromViewlessTimeseries(operationContext(), nss1, uuid1 /* expectedUUID */);
+    downgradeFromViewlessTimeseries(operationContext(), nss1, /*expectedUUID=*/uuid1);
     assertIsViewfulTimeseries(nss1, uuid1);
 }
 
@@ -197,7 +171,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradedOptionsConsistentWithNewV
         opts1.timeseries->setFixedBucketing(OptionalBool{});
     if (opts2.timeseries)
         opts2.timeseries->setFixedBucketing(OptionalBool{});
-    ASSERT_BSONOBJ_EQ(opts1.toBSON(false /* includeUUID */), opts2.toBSON(false /* includeUUID */));
+    ASSERT_BSONOBJ_EQ(opts1.toBSON(/*includeUUID=*/false), opts2.toBSON(/*includeUUID=*/false));
 
     ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
     ASSERT(!collPtr2->getValidatorDoc().isEmpty());
@@ -221,8 +195,8 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradedOptionsConsistentWithNe
     auto collPtr2 = catalog->lookupCollectionByNamespace(operationContext(),
                                                          nss2.makeTimeseriesBucketsNamespace());
 
-    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(false /* includeUUID */),
-                      collPtr2->getCollectionOptions().toBSON(false /* includeUUID */));
+    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(/*includeUUID=*/false),
+                      collPtr2->getCollectionOptions().toBSON(/*includeUUID=*/false));
 
     ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
     ASSERT(!collPtr2->getValidatorDoc().isEmpty());
@@ -313,7 +287,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreation) {
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(
-        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+        operationContext(), nss1, /*expectedUUID=*/boost::none, /*skipViewCreation=*/true);
 
     auto opCtx = operationContext();
     auto catalog = CollectionCatalog::get(opCtx);
@@ -336,10 +310,10 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreationIdem
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     downgradeFromViewlessTimeseries(
-        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+        operationContext(), nss1, /*expectedUUID=*/boost::none, /*skipViewCreation=*/true);
 
     downgradeFromViewlessTimeseries(
-        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+        operationContext(), nss1, /*expectedUUID=*/boost::none, /*skipViewCreation=*/true);
 
     auto opCtx = operationContext();
     auto catalog = CollectionCatalog::get(opCtx);
@@ -465,7 +439,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     // Must pass skipViewCreation=true to match the non-primary shard scenario
     ASSERT_OK(
-        canDowngradeFromViewlessTimeseries(operationContext(), nss1, true /* skipViewCreation */));
+        canDowngradeFromViewlessTimeseries(operationContext(), nss1, /*skipViewCreation=*/true));
 }
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
@@ -528,7 +502,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
         CreateCommand cmd = CreateCommand(bucketsNss);
         cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("timestamp"));
         ASSERT_OK(createCollectionForApplyOps(
-            operationContext(), bucketsNss.dbName(), boost::none /*UUID*/, cmd.toBSON(), false));
+            operationContext(), bucketsNss.dbName(), /*ui=*/boost::none, cmd.toBSON(), false));
     }
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());

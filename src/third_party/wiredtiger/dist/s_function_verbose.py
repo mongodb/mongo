@@ -36,7 +36,7 @@ verbose_regex = re.compile('([0-9]+):\\s*__wt_verbose\\(.*?,(.*?)[\\"\\\']')
 bitwise_or_regex = re.compile(r'^.*(?<!\|)\|(?!\|).*$')
 for line in sys.stdin:
     # Find all uses of __wt_verbose in a given line, capturing the line number
-    # and 2nd paramter as groups.
+    # and 2nd parameter as groups.
     m = verbose_regex.findall(line)
     if len(m) != 0:
         for verb_match in m:

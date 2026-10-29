@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -176,7 +150,7 @@ public:
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
             auto [tag, val] = value::getPoisonValue();
             for (size_t idx = 0; idx < row.size(); idx++) {
-                row.reset(idx, false, tag, val);
+                row.reset(idx, value::TagValueView{tag, val});
             }
 #endif
         }
@@ -270,7 +244,6 @@ protected:
             return false;
         }
         switch (tag) {
-            case value::TypeTags::NumberDecimal:
             case value::TypeTags::StringBig:
             case value::TypeTags::Array:
             case value::TypeTags::ArraySet:
@@ -306,6 +279,12 @@ protected:
 };
 
 /**
+ * Prescribes whether a stage tracks intermediate rows during a trial run. Join stages use this to
+ * declare that they implement a join operator in a join-optimized plan.
+ */
+enum class IntermediateTrackingBehavior { kNone, kTrackIntermediateRows };
+
+/**
  * Provides methods to obtain execution statistics specific to a plan stage.
  *
  * Parameter 'T' is the typename of the class derived from this class. It's used to implement the
@@ -319,6 +298,8 @@ public:
         NoTracking = 0x0,
         TrackReads = 1 << 0,
         TrackResults = 1 << 1,
+        // Set on join stages that implement a join operator in a join-optimized plan.
+        TrackIntermediateRows = 1 << 2,
     };
 
     // Bit mask to accumulate what stats are tracked when a TrialRunTracker is attached.
@@ -332,10 +313,11 @@ public:
           _participateInTrialRunTracking(participateInTrialRunTracking),
           _trackingType(trackingType) {
         tassert(8804701,
-                "Expect individual stages to track only reads, as results are tracked in the base "
-                "CanTrackStats code",
+                "Expect individual stages to track only reads or intermediate rows, as results "
+                "are tracked in the base CanTrackStats code",
                 trackingType == TrialRunTrackingType::NoTracking ||
-                    trackingType == TrialRunTrackingType::TrackReads);
+                    trackingType == TrialRunTrackingType::TrackReads ||
+                    trackingType == TrialRunTrackingType::TrackIntermediateRows);
     }
 
     /**
@@ -503,6 +485,15 @@ protected:
     }
 
     /**
+     * The intermediate-row tracking behavior of this stage, inferred from its tracking type.
+     */
+    IntermediateTrackingBehavior intermediateTrackingBehavior() const {
+        return (_trackingType & TrialRunTrackingType::TrackIntermediateRows)
+            ? IntermediateTrackingBehavior::kTrackIntermediateRows
+            : IntermediateTrackingBehavior::kNone;
+    }
+
+    /**
      * If trial run tracker is attached, increments the read metric and terminates the trial run
      * with a special exception if metric has reached the limit.
      */
@@ -517,6 +508,14 @@ protected:
         }
     }
 
+    /** Reports a spill and terminates the trial run if the kNumSpills metric breaches. */
+    void trackSpill() {
+        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumSpills>(1)) {
+            uasserted(ErrorCodes::QueryTrialRunCompleted,
+                      str::stream() << "Trial run early exit in " << _commonStats.stageType);
+        }
+    }
+
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
             _commonStats.isEOF = true;
@@ -525,11 +524,21 @@ protected:
             _commonStats.advances++;
             _slotsAccessible = true;
 
-            if ((_trackingType & TrialRunTrackingType::TrackResults) && _tracker) {
-                bool trackerResult = _tracker->trackProgress<TrialRunTracker::kNumResults>(1);
-                tassert(8523903,
-                        "TrialRunTracker should not terminate plans on reaching kNumResults",
-                        !trackerResult);
+            if (_tracker) {
+                if (_trackingType & TrialRunTrackingType::TrackResults) {
+                    bool trackerResult = _tracker->trackProgress<TrialRunTracker::kNumResults>(1);
+                    tassert(8523903,
+                            "TrialRunTracker should not terminate plans on reaching kNumResults",
+                            !trackerResult);
+                }
+
+                if (_trackingType & TrialRunTrackingType::TrackIntermediateRows) {
+                    if (_tracker->trackProgress<TrialRunTracker::kNumIntermediateRows>(1)) {
+                        uasserted(ErrorCodes::QueryTrialRunCompleted,
+                                  str::stream()
+                                      << "Trial run early exit in " << _commonStats.stageType);
+                    }
+                }
             }
         }
         return state;
@@ -567,6 +576,10 @@ private:
             _tracker = tracker;
             result |= TrialRunTrackingType::TrackResults;
         }
+        if (_trackingType & TrialRunTrackingType::TrackIntermediateRows) {
+            _tracker = tracker;
+            result |= TrialRunTrackingType::TrackIntermediateRows;
+        }
         return result;
     }
 
@@ -591,6 +604,13 @@ private:
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
 };
+
+/**
+ * Evaluates the query-memory load-shedding decision. This is deliberately *not* inlined here:
+ * stages.h is included widely, and inlining the call would force every includer to depend on the
+ * query_memory_load_shedding library.
+ */
+void checkForQueryMemoryLoadShedding(OperationContext* opCtx);
 
 /**
  * Provides a method which can be used to check if the current operation has been interrupted.
@@ -666,6 +686,9 @@ public:
         if (--_interruptCounter == 0) {
             _interruptCounter = kInterruptCheckPeriod;
             opCtx->checkForInterrupt();
+            // Evaluate the query-memory load shedding decision. We also do this in
+            // PlanYieldPolicy::yieldOrInterrupt for the yielding path.
+            checkForQueryMemoryLoadShedding(opCtx);
         }
     }
 

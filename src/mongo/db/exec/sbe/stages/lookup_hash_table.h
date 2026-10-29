@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -55,7 +29,7 @@ using HashTableType = std::unordered_map<value::FixedSizeRow<1 /*N*/>,  // NOLIN
                                          value::FixedSizeSingleRowHasher,
                                          value::SingleRowFixedSizeRowEq>;
 using BufferType = std::vector<value::FixedSizeRow<1 /*N*/>>;
-using RecordIndexCollection = std::variant<std::vector<size_t>*, std::set<size_t>*>;
+using RecordIndexCollection = std::vector<size_t>;
 
 class LookupHashTable;
 
@@ -85,8 +59,8 @@ public:
      * Clears the iterator's state.
      */
     inline void clear() {
+        // Keep '_hashTableMatchVector's capacity across outer rows to avoid per-row reallocation.
         _hashTableMatchVector.clear();
-        _hashTableMatchSet.clear();
         _hashTableSearched = false;
 
         // Force the iterator to return 'kNoMatchingIndex' until it is reset to a new key.
@@ -97,14 +71,13 @@ public:
     /**
      * Returns all matching indices for the current hash keys.
      */
-    inline RecordIndexCollection getAllMatchingIndices() {
+    inline const RecordIndexCollection* getAllMatchingIndices() {
         if (_outerKeyIsArray) {
             initSearchArray();
-            return &_hashTableMatchSet;
         } else {
             initSearchScalar();
-            return &_hashTableMatchVector;
         }
+        return &_hashTableMatchVector;
     }
 
     /**
@@ -144,14 +117,13 @@ private:
     // Have we looked for the current individual key yet ('_hashTableMatchXyz' members are valid)?
     bool _hashTableSearched = false;
 
-    // If '_outerKeyIsArray' is false, a sorted vector of inner key match buffer indices.
-    std::vector<size_t> _hashTableMatchVector;
-    // If '_outerKeyIsArray' is false, the current position's index into '_hashTableMatchVector'.
+    // A sorted, de-duplicated vector of inner key match buffer indices for the current outer key
+    // (whether the outer key is a scalar or an array). Its capacity is retained across outer rows
+    // to avoid per-row allocation churn.
+    RecordIndexCollection _hashTableMatchVector;
+
+    // The current position's index into '_hashTableMatchVector'.
     size_t _hashTableMatchVectorIdx = 0;
-    // If '_outerKeyIsArray' is true, a sorted set of inner key match buffer indices.
-    std::set<size_t> _hashTableMatchSet;
-    // If '_outerKeyIsArray' is true, the current position in '_hashTableMatchSet'.
-    std::set<size_t>::const_iterator _hashTableMatchSetIter;
 };  // class LookupHashTableIter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +180,9 @@ public:
      * Opens a new, empty hash table, with a collator if one was provided.
      */
     void open() {
+        _memoryUseInBytesBeforeSpill =
+            loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill)
+                .get(_opCtx);
         init();
     }
 
@@ -274,8 +249,8 @@ private:
      */
     value::TagValueMaybeOwned normalizeStringIfCollator(value::TagValueView key) const;
 
-    boost::optional<std::vector<size_t>> readIndicesFromRecordStore(SpillingStore* rs,
-                                                                    value::TagValueView key);
+    boost::optional<RecordIndexCollection> readIndicesFromRecordStore(SpillingStore* rs,
+                                                                      value::TagValueView key);
 
     std::pair<RecordId, key_string::TypeBits> serializeKeyForRecordStore(
         value::TagValueView key) const;
@@ -288,11 +263,11 @@ private:
 
     void spillIndicesToRecordStore(SpillingStore* rs,
                                    value::TagValueView key,
-                                   const std::vector<size_t>& value);
+                                   const RecordIndexCollection& value);
 
     int64_t writeIndicesToRecordStore(SpillingStore* rs,
                                       value::TagValueView key,
-                                      const std::vector<size_t>& value,
+                                      const RecordIndexCollection& value,
                                       bool update);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,9 +288,9 @@ private:
     // buffered rows in '_buffer'.
     long long _computedTotalMemUsage = 0;
 
-    // Memory tracking and spilling to disk.
-    long long _memoryUseInBytesBeforeSpill =
-        loadMemoryLimit(StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill);
+    // Memory tracking and spilling to disk. Resolved in open(), which runs before use (with an
+    // OperationContext attached); there is none at construction time.
+    long long _memoryUseInBytesBeforeSpill = 0;
 
     // The portion of the inner collection hash table that has spilled to disk.
     std::unique_ptr<SpillingStore> _recordStoreHt;

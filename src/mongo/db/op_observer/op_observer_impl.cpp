@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -39,8 +13,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
-// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-#include "mongo/db/index_builds/primary_driven/tearable_side_write_redo_state.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_reserved.h"
@@ -50,8 +23,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -82,8 +57,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/container.h"
-// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -95,6 +68,11 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_attributes.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -126,6 +104,19 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
 
+auto& batchedWriteApplyOpsChainsTotalCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsTotal,
+        "Total number of batched writes split into a chain of multiple applyOps entries",
+        otel::metrics::MetricUnit::kEvents);
+
+auto& batchedWriteApplyOpsChainsWithContainerOpsCounter =
+    otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kBatchedWriteApplyOpsChainsWithContainerOps,
+        "Number of batched writes split into a chain of multiple applyOps entries that contained "
+        "at least one container operation",
+        otel::metrics::MetricUnit::kEvents);
+
 constexpr auto kNumRecordsFieldName = "numRecords"sv;
 constexpr auto kMsgFieldName = "msg"sv;
 constexpr long long kInvalidNumRecords = -1LL;
@@ -138,10 +129,67 @@ Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
 /**
  * Generates contents for the 'm' field of an OplogEntry.
  */
-repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(boost::optional<int32_t> replicatedSizeDelta,
+                                                       boost::optional<int64_t> docHash) {
     SingleOpSizeMetadata m;
     m.setSz(replicatedSizeDelta);
+    m.setH(docHash);
     return m;
+}
+
+// Returns true if a per-document validation hash should be recorded for a write to 'coll'. The
+// rolling collection hash is the hash's only consumer, so a namespace the replicated fast count
+// does not track gains nothing from one.
+//
+// Resharding's temporary collections are deliberately NOT excluded here even though the applier
+// skips verifying them: they are renamed onto the source namespace keeping their UUID, and the
+// fast count store is keyed by UUID, so suppressing their hashes would leave every resharded
+// collection permanently without one.
+bool shouldRecordValidationHash(OperationContext* opCtx, const CollectionPtr& coll) {
+    if (!repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
+        return false;
+    }
+    return repl::isCollectionHashEligible(coll);
+}
+
+// Attaches size metadata to the given oplog entry if there is a size delta or a validation hash to
+// record.
+template <typename OplogEntryOrOperation>
+void setSizeMetadata(OplogEntryOrOperation& entry,
+                     boost::optional<int32_t> replicatedSizeDelta,
+                     boost::optional<int64_t> docHash) {
+    if (replicatedSizeDelta || docHash) {
+        entry.setSizeMetadata(makeOperationSizeMetadata(replicatedSizeDelta, docHash));
+    }
+}
+
+// Computes the per-document validation hash if needed, and, if there is any size metadata to
+// record, attaches it to the given oplog entry.
+template <typename OplogEntryOrOperation>
+void setSizeMetadataIfNeeded(OplogEntryOrOperation& entry,
+                             boost::optional<int32_t> replicatedSizeDelta,
+                             const BSONObj& doc,
+                             bool useValidationHash) {
+    boost::optional<int64_t> docHash;
+    if (useValidationHash) {
+        docHash = repl::computeDocValidationHash(doc);
+    }
+    setSizeMetadata(entry, replicatedSizeDelta, docHash);
+}
+
+// Computes the update validation hash (over both the pre-image and post-image) if needed and
+// attaches any size metadata to the given oplog entry.
+template <typename OplogEntryOrOperation>
+void setUpdateSizeMetadataIfNeeded(OplogEntryOrOperation& entry,
+                                   boost::optional<int32_t> replicatedSizeDelta,
+                                   const BSONObj& preImage,
+                                   const BSONObj& postImage,
+                                   bool useValidationHash) {
+    boost::optional<int64_t> docHash;
+    if (useValidationHash) {
+        docHash = repl::computeUpdateValidationHash(preImage, postImage);
+    }
+    setSizeMetadata(entry, replicatedSizeDelta, docHash);
 }
 
 repl::OpTime logOperation(OperationContext* opCtx,
@@ -286,7 +334,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
         oplogEntry->setOpTime(args.updateArgs->oplogSlots.back());
     }
     opTimes.writeOpTime =
-        logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
+        logOperation(opCtx, oplogEntry, /*assignCommonFields=*/true, operationLogger);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
@@ -320,7 +368,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     oplogEntry->setObject(documentKey.getShardKeyAndId());
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     opTimes.writeOpTime =
-        logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
+        logOperation(opCtx, oplogEntry, /*assignCommonFields=*/true, operationLogger);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
@@ -376,15 +424,11 @@ void setIndexBuildO2(OperationContext* opCtx,
                      const UUID& indexBuildUUID,
                      const std::vector<IndexBuildInfo>& indexes,
                      const NamespaceString& nss) {
-    // Acquire one FCV snapshot so the two feature-flag checks see the same FCV value.
-    const auto vCtx = VersionContext::getDecoration(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool pdibEnabled =
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot);
+    const bool pdibEnabled = index_builds::primary_driven::enabled(opCtx, fcvSnapshot);
     const bool resumablePdibEnabled =
         feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot);
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
 
     repl::IndexBuildOplogEntryO2 o2;
     o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss, pdibEnabled));
@@ -427,7 +471,7 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
 void reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
                                                 OperationLogger* operationLogger,
                                                 MutableOplogEntry& oplogEntry) {
-    auto slots = operationLogger->getNextOpTimes(opCtx, /*count*/ 2, /*opTimeOffset*/ 1);
+    auto slots = operationLogger->getNextOpTimes(opCtx, /*count=*/2, /*opTimeOffset=*/1);
     oplogEntry.setOpTime(slots[1]);
 }
 
@@ -557,7 +601,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
         setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
@@ -634,7 +678,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
         setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
@@ -683,7 +727,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
         setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onSetMultikeyMetadata(OperationContext* opCtx,
@@ -701,7 +745,7 @@ void OpObserverImpl::onSetMultikeyMetadata(OperationContext* opCtx,
     oplogEntry.setObject(objectEntry.toBSON());
     oplogEntry.setNss(nss.getCommandNS());
 
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 namespace {
@@ -714,6 +758,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
                                         const std::vector<bool>& fromMigrate,
                                         const ShardingWriteRouter& shardingWriteRouter,
                                         const CollectionPtr& collectionPtr,
+                                        bool useReplicatedSizeCount,
                                         OperationLogger* operationLogger) {
     invariant(begin != end);
 
@@ -731,6 +776,18 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
               str::stream() << "recordIds' size: " << recordIds.size()
                             << ", is non-empty but not equal to count: " << count);
 
+    // Compute the per-document validation hashes before reserving any oplog slot below. A slot
+    // reserved by an uncommitted write holds back the oplog visibility point, so work done between
+    // the reservation and wuow.commit() delays oplog visibility for all concurrent writers.
+    const bool useValidationHash = shouldRecordValidationHash(opCtx, collectionPtr);
+    std::vector<int64_t> docHashes;
+    if (useValidationHash) {
+        docHashes.reserve(count);
+        for (size_t i = 0; i < count; i++) {
+            docHashes.push_back(repl::computeDocValidationHash(begin[i].doc));
+        }
+    }
+
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
     AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kLogOp);
 
@@ -740,6 +797,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     std::vector<Timestamp> timestamps(count);
     std::vector<BSONObj> bsonOplogEntries(count);
     std::vector<Record> records(count);
+
     for (size_t i = 0; i < count; i++) {
         // Make a copy from the template for each insert oplog entry.
         MutableOplogEntry oplogEntry = *oplogEntryTemplate;
@@ -762,9 +820,16 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
 
         const auto docKey = getDocumentKey(collectionPtr, insertedDoc).getShardKeyAndId();
         oplogEntry.setObject2(docKey);
-        if (isReplicatedFastCountEnabled(opCtx)) {
-            oplogEntry.setSizeMetadata(makeOperationSizeMetadata(insertedDoc.objsize()));
+
+        boost::optional<int32_t> replicatedSizeDelta;
+        if (useReplicatedSizeCount) {
+            replicatedSizeDelta = insertedDoc.objsize();
         }
+        boost::optional<int64_t> docHash;
+        if (useValidationHash) {
+            docHash = docHashes[i];
+        }
+        setSizeMetadata(oplogEntry, replicatedSizeDelta, docHash);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));
@@ -833,6 +898,19 @@ bool _skipOplogOps(const bool isOplogDisabled,
     }
 }
 
+// Clustered collections don't replicate record ids, so this op has none of its own. When the batch
+// groups operations by record id, derive this op's record id from its document key so it groups
+// with the other operations on the same record.
+boost::optional<RecordId> _groupRecordIdForClusteredOp(OperationContext* opCtx,
+                                                       const CollectionPtr& coll,
+                                                       const BSONObj& documentKey) {
+    if (!BatchedWriteContext::get(opCtx).hasAtomicOperationGroups() || !coll->isClustered()) {
+        return boost::none;
+    }
+    return uassertStatusOK(record_id_helpers::keyForDoc(
+        documentKey, coll->getClusteredInfo()->getIndexSpec(), coll->getDefaultCollator()));
+}
+
 }  // namespace
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
@@ -840,7 +918,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                const std::vector<RecordId>& recordIds,
-                               std::vector<bool> fromMigrate,
+                               const std::vector<bool>& fromMigrate,
                                bool defaultFromMigrate,
                                OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
@@ -864,8 +942,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
     const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
-
     if (inBatchedWrite) {
+        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll);
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
@@ -875,8 +953,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 shouldSetIsTimeseriesField(VersionContext::getDecoration(opCtx))) {
                 operation.setIsTimeseries(true);
             }
-            if (useReplicatedSizeCount) {
-                operation.setSizeMetadata(makeOperationSizeMetadata(iter->doc.objsize()));
+            {
+                boost::optional<int32_t> replicatedSizeDelta;
+                if (useReplicatedSizeCount) {
+                    replicatedSizeDelta = iter->doc.objsize();
+                }
+                setSizeMetadataIfNeeded(
+                    operation, replicatedSizeDelta, iter->doc, useValidationHash);
             }
 
             // versionContext is set in the batched write oplog entry, but not each individual op.
@@ -887,6 +970,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
             if (!recordIds.empty()) {
                 operation.setRecordId(recordIds[i++]);
+            } else if (auto groupId = _groupRecordIdForClusteredOp(opCtx, coll, docKey)) {
+                operation.setGroupRecordId(std::move(groupId));
             }
             operation.setInitializedStatementIds(iter->stmtIds);
             batchedWriteContext.addBatchedOperation(opCtx, operation);
@@ -904,6 +989,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
+        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll);
 
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
@@ -913,8 +999,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             if (!recordIds.empty()) {
                 operation.setRecordId(recordIds[i++]);
             }
-            if (useReplicatedSizeCount) {
-                operation.setSizeMetadata(makeOperationSizeMetadata(iter->doc.objsize()));
+            {
+                boost::optional<int32_t> replicatedSizeDelta;
+                if (useReplicatedSizeCount) {
+                    replicatedSizeDelta = iter->doc.objsize();
+                }
+                setSizeMetadataIfNeeded(
+                    operation, replicatedSizeDelta, iter->doc, useValidationHash);
             }
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
@@ -949,9 +1040,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                    first,
                                    last,
                                    recordIds,
-                                   std::move(fromMigrate),
+                                   fromMigrate,
                                    *shardingWriteRouter,
                                    coll,
+                                   useReplicatedSizeCount,
                                    _operationLogger.get());
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();
@@ -1017,6 +1109,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     }
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
+
+    const bool useValidationHash = shouldRecordValidationHash(opCtx, args.coll);
+
     OpTimeBundle opTime;
     if (inBatchedWrite) {
         repl::ReplOperation operation = MutableOplogEntry::makeUpdateOperation(
@@ -1026,14 +1121,19 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
-        if (args.replicatedSizeDelta) {
-            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
-        }
+        setUpdateSizeMetadataIfNeeded(operation,
+                                      args.replicatedSizeDelta,
+                                      args.updateArgs->preImageDoc,
+                                      args.updateArgs->updatedDoc,
+                                      useValidationHash);
         if (args.updateArgs->mustCheckExistenceForInsertOperations) {
             operation.setCheckExistenceForDiffInsert(true);
         }
         if (!args.updateArgs->replicatedRecordId.isNull()) {
             operation.setRecordId(args.updateArgs->replicatedRecordId);
+        } else if (auto groupId =
+                       _groupRecordIdForClusteredOp(opCtx, args.coll, args.updateArgs->criteria)) {
+            operation.setGroupRecordId(std::move(groupId));
         }
         if (args.coll->isNewTimeseriesWithoutView() &&
             shouldSetIsTimeseriesField(VersionContext::getDecoration(opCtx))) {
@@ -1103,9 +1203,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             operation.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
-        if (args.replicatedSizeDelta) {
-            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
-        }
+        setUpdateSizeMetadataIfNeeded(operation,
+                                      args.replicatedSizeDelta,
+                                      args.updateArgs->preImageDoc,
+                                      args.updateArgs->updatedDoc,
+                                      useValidationHash);
 
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
             invariant(!args.updateArgs->preImageDoc.isEmpty(),
@@ -1153,9 +1255,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             oplogEntry.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
-        if (args.replicatedSizeDelta) {
-            oplogEntry.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
-        }
+        setUpdateSizeMetadataIfNeeded(oplogEntry,
+                                      args.replicatedSizeDelta,
+                                      args.updateArgs->preImageDoc,
+                                      args.updateArgs->updatedDoc,
+                                      useValidationHash);
 
         opTime = replLogUpdate(opCtx, args, &oplogEntry, _operationLogger.get());
         if (opAccumulator) {
@@ -1211,6 +1315,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         return;
     }
 
+    const bool useValidationHash = shouldRecordValidationHash(opCtx, coll);
+
     OpTimeBundle opTime;
     if (inBatchedWrite) {
         repl::ReplOperation operation =
@@ -1221,10 +1327,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         operation.setFromMigrateIfTrue(args.fromMigrate);
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
+        } else if (auto groupId =
+                       _groupRecordIdForClusteredOp(opCtx, coll, documentKey.getShardKeyAndId())) {
+            operation.setGroupRecordId(std::move(groupId));
         }
-        if (args.replicatedSizeDelta) {
-            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
-        }
+        setSizeMetadataIfNeeded(operation, args.replicatedSizeDelta, doc, useValidationHash);
         if (coll->isNewTimeseriesWithoutView() &&
             shouldSetIsTimeseriesField(VersionContext::getDecoration(opCtx))) {
             operation.setIsTimeseries(true);
@@ -1259,9 +1366,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
         }
-        if (args.replicatedSizeDelta) {
-            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
-        }
+        setSizeMetadataIfNeeded(operation, args.replicatedSizeDelta, doc, useValidationHash);
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds({stmtId});
             if (args.retryableFindAndModifyLocation ==
@@ -1305,9 +1410,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             oplogEntry.setRecordId(args.replicatedRecordId);
         }
 
-        if (args.replicatedSizeDelta) {
-            oplogEntry.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
-        }
+        setSizeMetadataIfNeeded(oplogEntry, args.replicatedSizeDelta, doc, useValidationHash);
 
         opTime = replLogDelete(opCtx,
                                nss,
@@ -1341,14 +1444,37 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
 namespace {
 
-repl::ContainerKey toContainerKey(std::variant<int64_t, std::span<const char>> key) {
-    return std::visit([](auto k) { return repl::ContainerKey(k); }, key);
+// Returns true when the optimized batched container write format may be emitted.
+bool batchedContainerWritesEnabled(OperationContext* opCtx) {
+    return gFeatureFlagBatchedContainerWrites.isEnabledUseLastLTSFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+// Builds the 'o' field of a container insert oplog entry.
+repl::ContainerInsertOplogEntryO makeContainerInsertO(OperationContext* opCtx,
+                                                      repl::ContainerKey key,
+                                                      repl::ContainerVal value) {
+    repl::ContainerInsertOplogEntryO insertO;
+    insertO.setKey(std::move(key));
+    if (batchedContainerWritesEnabled(opCtx)) {
+        // If the value is empty or an empty array of values, omit it.
+        if (value.count() > 0) {
+            insertO.setValue(std::move(value));
+        }
+    } else {
+        massert(13064501,
+                "value must be BinData unless batched writes are enabled",
+                value.isBytesVal());
+        insertO.setValue(std::move(value));
+    }
+    return insertO;
 }
 
 OpTimeBundle logContainerInsert(OperationContext* opCtx,
                                 std::string_view container,
-                                std::variant<int64_t, std::span<const char>> key,
-                                std::span<const char> value,
+                                repl::ContainerKey key,
+                                repl::ContainerVal value,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     MutableOplogEntry entry;
@@ -1356,13 +1482,10 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
     entry.setNss(ns);
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerInsert);
-    repl::ContainerInsertOplogEntryO insertO;
-    insertO.setKey(toContainerKey(key));
-    insertO.setValue(repl::ContainerVal(value));
-    entry.setObject(insertO.toBSON());
+    entry.setObject(makeContainerInsertO(opCtx, std::move(key), std::move(value)).toBSON());
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, /*assignCommonFields=*/true, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1370,8 +1493,8 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
 
 void _onContainerInsert(OperationContext* opCtx,
                         std::string_view ident,
-                        std::variant<int64_t, std::span<const char>> key,
-                        std::span<const char> value,
+                        repl::ContainerKey key,
+                        repl::ContainerVal value,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
@@ -1387,10 +1510,7 @@ void _onContainerInsert(OperationContext* opCtx,
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setContainer(ident);
-        repl::ContainerInsertOplogEntryO insertO;
-        insertO.setKey(toContainerKey(key));
-        insertO.setValue(repl::ContainerVal(value));
-        op.setObject(insertO.toBSON());
+        op.setObject(makeContainerInsertO(opCtx, key, value).toBSON());
         return op;
     };
 
@@ -1422,7 +1542,7 @@ void _onContainerInsert(OperationContext* opCtx,
 
 OpTimeBundle logContainerDelete(OperationContext* opCtx,
                                 std::string_view container,
-                                std::variant<int64_t, std::span<const char>> key,
+                                repl::ContainerKey key,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     MutableOplogEntry entry;
@@ -1431,11 +1551,11 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerDelete);
     repl::ContainerDeleteOplogEntryO deleteO;
-    deleteO.setKey(toContainerKey(key));
+    deleteO.setKey(key);
     entry.setObject(deleteO.toBSON());
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, /*assignCommonFields=*/true, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1443,7 +1563,7 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
 
 void _onContainerDelete(OperationContext* opCtx,
                         std::string_view ident,
-                        std::variant<int64_t, std::span<const char>> key,
+                        repl::ContainerKey key,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
@@ -1460,7 +1580,7 @@ void _onContainerDelete(OperationContext* opCtx,
         op.setNss(ns);
         op.setContainer(ident);
         repl::ContainerDeleteOplogEntryO deleteO;
-        deleteO.setKey(toContainerKey(key));
+        deleteO.setKey(key);
         op.setObject(deleteO.toBSON());
         return op;
     };
@@ -1493,8 +1613,8 @@ void _onContainerDelete(OperationContext* opCtx,
 
 OpTimeBundle logContainerUpdate(OperationContext* opCtx,
                                 std::string_view container,
-                                std::variant<int64_t, std::span<const char>> key,
-                                std::span<const char> value,
+                                repl::ContainerKey key,
+                                repl::ContainerVal value,
                                 OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     MutableOplogEntry entry;
@@ -1503,14 +1623,14 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerUpdate);
     repl::ContainerUpdateOplogEntryO updateO;
-    updateO.setKey(toContainerKey(key));
+    updateO.setKey(key);
     updateO.setValue(repl::ContainerVal(value));
     updateO.setVersion(
         static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
     entry.setObject(updateO.toBSON());
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, /*assignCommonFields=*/true, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1518,8 +1638,8 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
 
 void _onContainerUpdate(OperationContext* opCtx,
                         std::string_view ident,
-                        std::variant<int64_t, std::span<const char>> key,
-                        std::span<const char> value,
+                        repl::ContainerKey key,
+                        repl::ContainerVal value,
                         OperationLogger& logger) {
     const auto& ns = NamespaceString::kContainerNamespace;
     auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
@@ -1536,8 +1656,8 @@ void _onContainerUpdate(OperationContext* opCtx,
         op.setNss(ns);
         op.setContainer(ident);
         repl::ContainerUpdateOplogEntryO updateO;
-        updateO.setKey(toContainerKey(key));
-        updateO.setValue(repl::ContainerVal(value));
+        updateO.setKey(key);
+        updateO.setValue(value);
         updateO.setVersion(
             static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
         op.setObject(updateO.toBSON());
@@ -1576,40 +1696,104 @@ void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        std::string_view ident,
                                        int64_t key,
                                        std::span<const char> value) {
-    _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
+    _onContainerInsert(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        std::string_view ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
-    _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
+    _onContainerInsert(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
+}
+
+void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       int64_t key,
+                                       std::span<const std::span<const char>> vals) {
+    if (batchedContainerWritesEnabled(opCtx) && vals.size() > 0) {
+        _onContainerInsert(opCtx,
+                           ident,
+                           repl::ContainerKey(key),
+                           repl::ContainerVal(std::vector(vals.begin(), vals.end())),
+                           *_operationLogger);
+    } else {
+        // TODO SERVER-134951 Remove fallback to key-by-key insert
+        for (size_t i = 0; i < vals.size(); ++i) {
+            _onContainerInsert(opCtx,
+                               ident,
+                               repl::ContainerKey(key + static_cast<int64_t>(i)),
+                               repl::ContainerVal(vals[i]),
+                               *_operationLogger);
+        }
+    }
+}
+
+void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       std::span<const std::span<const char>> keys,
+                                       std::span<const char> value) {
+    if (batchedContainerWritesEnabled(opCtx) && keys.size() > 0) {
+        _onContainerInsert(opCtx,
+                           ident,
+                           repl::ContainerKey(std::vector(keys.begin(), keys.end())),
+                           repl::ContainerVal(value),
+                           *_operationLogger);
+    } else {
+        // TODO SERVER-134951 Remove fallback to key-by-key insert
+        for (auto key : keys) {
+            _onContainerInsert(opCtx,
+                               ident,
+                               repl::ContainerKey(key),
+                               repl::ContainerVal(value),
+                               *_operationLogger);
+        }
+    }
 }
 
 void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
                                        std::string_view ident,
                                        int64_t key,
                                        std::span<const char> value) {
-    _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
+    _onContainerUpdate(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
                                        std::string_view ident,
                                        std::span<const char> key,
                                        std::span<const char> value) {
-    _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
+    _onContainerUpdate(
+        opCtx, ident, repl::ContainerKey(key), repl::ContainerVal(value), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                                        std::string_view ident,
                                        int64_t key) {
-    _onContainerDelete(opCtx, ident, key, *_operationLogger);
+    _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
                                        std::string_view ident,
                                        std::span<const char> key) {
-    _onContainerDelete(opCtx, ident, key, *_operationLogger);
+    _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
+}
+
+void OpObserverImpl::onContainerDelete(OperationContext* opCtx,
+                                       std::string_view ident,
+                                       std::span<const std::span<const char>> keys) {
+    if (batchedContainerWritesEnabled(opCtx) && keys.size() > 0) {
+        _onContainerDelete(opCtx,
+                           ident,
+                           repl::ContainerKey(std::vector(keys.begin(), keys.end())),
+                           *_operationLogger);
+    } else {
+        // TODO SERVER-134951 Remove fallback to key-by-key delete
+        for (auto key : keys) {
+            _onContainerDelete(opCtx, ident, repl::ContainerKey(key), *_operationLogger);
+        }
+    }
 }
 
 void OpObserverImpl::onInternalOpMessage(
@@ -1645,7 +1829,7 @@ void OpObserverImpl::onInternalOpMessage(
     if (wallClockTime) {
         oplogEntry.setWallClockTime(*wallClockTime);
     }
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onCreateCollection(
@@ -1784,7 +1968,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setObject(makeCollModCmdObj(collModOplogCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         auto opTime =
-            logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+            logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(7360104,
                   "Wrote oplog entry for collMod",
@@ -1826,7 +2010,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx,
     oplogEntry.setFromMigrate(markFromMigrate);
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360105,
               "Wrote oplog entry for dropDatabase",
@@ -1866,7 +2050,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     oplogEntry.setObject(BSON("drop" << collectionName.coll()));
     oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360106,
               "Wrote oplog entry for drop",
@@ -1902,7 +2086,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setObject(BSON("dropIndexes" << nss.coll() << "index" << indexName));
     oplogEntry.setObject2(indexInfo);
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360107,
               "Wrote oplog entry for dropIndexes",
@@ -1953,7 +2137,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     if (dropTargetUUID)
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360108,
               "Wrote oplog entry for renameCollection",
@@ -2023,7 +2207,7 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     }
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setObject(importCollection.toBSON());
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 namespace {
@@ -2067,10 +2251,11 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
                          std::vector<StmtId> stmtIdsWritten,
                          const bool updateTxnTable,
                          WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                         const bool isRetryableAtomicBatch,
                          OperationLogger* operationLogger) {
 
     const auto txnRetryCounter = opCtx->getTxnRetryCounter();
-    if (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations) {
+    if (oplogGroupingFormat == WriteUnitOfWork::nonAtomicGroup) {
         // If these operations have statement IDs, the applyOps is part of a retryable write so
         // we can use the normal oplog entry chain info call for it.
         if (!stmtIdsWritten.empty()) {
@@ -2084,29 +2269,34 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
             // No statement IDs; don't set prevWriteOpTimeInTransaction.
             oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
         }
-    } else if (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite) {
-        // This mode is only used with retryable writes; the entry is tagged retryable
-        // (multiOpType) below, so it must carry session info (lsid + txnNumber).
-        invariant(opCtx->isRetryableWrite());
-        // The whole batch is one atomic, retryable unit. At most one operation carries a stmtId and
-        // it may sit in any entry, so most entries in the batch arrive with an empty
-        // stmtIdsWritten; set the session and multiOpType metadata manually rather than via
-        // appendOplogEntryChainInfo, which requires a non-empty stmtIdsWritten.
-        oplogEntry->setSessionId(opCtx->getLogicalSessionId());
-        oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-        oplogEntry->setMultiOpType(repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
-        oplogEntry->setPrevWriteOpTimeInTransaction(
-            oplogEntry->getPrevWriteOpTimeInTransaction().value_or(repl::OpTime()));
+    } else if (oplogGroupingFormat == WriteUnitOfWork::atomicGroup) {
+        // An atomically-grouped batched write. A retryable batch is tagged retryable (multiOpType)
+        // below, so it must carry session info (lsid + txnNumber); a non-retryable batch carries
+        // neither.
+        if (isRetryableAtomicBatch) {
+            // The whole batch is one atomic, retryable unit. At most one operation carries a stmtId
+            // and it may sit in any entry, so most entries in the batch arrive with an empty
+            // stmtIdsWritten; set the session and multiOpType metadata manually rather than via
+            // appendOplogEntryChainInfo, which requires a non-empty stmtIdsWritten.
+            invariant(opCtx->isRetryableWrite());
+            oplogEntry->setSessionId(opCtx->getLogicalSessionId());
+            oplogEntry->setTxnNumber(opCtx->getTxnNumber());
+            oplogEntry->setMultiOpType(repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+            oplogEntry->setPrevWriteOpTimeInTransaction(
+                oplogEntry->getPrevWriteOpTimeInTransaction().value_or(repl::OpTime()));
+        } else {
+            // Non-retryable atomic batch: no session metadata.
+            oplogEntry->setSessionId(boost::none);
+            oplogEntry->setTxnNumber(boost::none);
+        }
     } else {
+        // Multi-document transaction.
         if (!stmtIdsWritten.empty()) {
             invariant(isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId()));
         }
 
         invariant(bool(txnRetryCounter) == bool(TransactionParticipant::get(opCtx)));
 
-        // Batched writes (that is, WUOWs with 'oplogGroupingFormat ==
-        // WriteUnitOfWork::kGroupForTransaction') are not associated with a txnNumber, so do not
-        // emit an lsid either.
         oplogEntry->setSessionId(opCtx->getTxnNumber() ? opCtx->getLogicalSessionId()
                                                        : boost::none);
         oplogEntry->setTxnNumber(opCtx->getTxnNumber());
@@ -2117,7 +2307,7 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
 
     try {
         auto writeOpTime =
-            logOperation(opCtx, oplogEntry, false /*assignCommonFields*/, operationLogger);
+            logOperation(opCtx, oplogEntry, /*assignCommonFields=*/false, operationLogger);
         if (updateTxnTable) {
             SessionTxnRecord sessionTxnRecord;
             sessionTxnRecord.setLastWriteOpTime(writeOpTime);
@@ -2190,7 +2380,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
             const auto oplogOpTime =
-                logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
+                logOperation(opCtx, oplogEntry, /*assignCommonFields=*/true, operationLogger);
             invariant(oplogEntry->getOpTime().isNull() || oplogEntry->getOpTime() == oplogOpTime);
 
             SessionTxnRecord sessionTxnRecord;
@@ -2276,6 +2466,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
                 std::move(stmtIdsWritten),
                 /*updateTxnTable=*/(firstOp || lastOp),
                 oplogGroupingFormat,
+                /*isRetryableAtomicBatch=*/false,
                 operationLogger);
         };
 
@@ -2285,7 +2476,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         transactionOperations.logOplogEntries(oplogSlots,
                                               applyOpsOplogSlotAndOperationAssignment,
                                               wallClockTime,
-                                              WriteUnitOfWork::kDontGroup,
+                                              WriteUnitOfWork::noGroup,
                                               logApplyOpsForUnpreparedTransaction,
                                               &imageToWrite);
     invariant(numOplogEntries > 0);
@@ -2307,34 +2498,34 @@ void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
 void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                           WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
                                           OpStateAccumulator* opAccumulator) {
-    // A batched write with oplogGroupingFormat kGroupForTransaction is a one-shot non-retryable
-    // transaction without a transaction number, which is forbidden in retryable writes and
-    // multi-document transactions.
-    dassert(oplogGroupingFormat != WriteUnitOfWork::kGroupForTransaction || !opCtx->getTxnNumber());
+    // Grouping oplog entries is forbidden inside a multi-document transaction.
+    dassert(!opCtx->inMultiDocumentTransaction());
 
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     auto* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
-
-    // Consume the "tearable side write" redo state on every committing path of this function.
-    // Disarm so an armed redo UUID never leaks onto the OperationContext (e.g. if the retry
-    // produced no side write because the build finished), and reset the per-attempt "flag
-    // persisted" marker. The detection logic below re-arms before it throws -- the only
-    // non-committing exit -- so an armed redo still survives the WriteUnitOfWork rollback for the
-    // retry.
-    //
-    // TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-    auto consumeTearableSideWriteRedoState = [&] {
-        auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-        redoState.disarm();
-        redoState.resetFlagPersisted();
-    };
 
     // Ensure that no one previously reserved any timestamps for this operation.
     invariant(batchedOps->isEmpty() ||
               !shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
 
+    // A batch is a retryable write only if it carries a retryable statement, not merely because it
+    // runs within one; an atomic batch may carry at most one.
+    bool isRetryableAtomicBatch = false;
+    if (oplogGroupingFormat == WriteUnitOfWork::atomicGroup && batchedOps->hasStatementIds()) {
+        auto numOpsWithStatementIds = batchedOps->getNumberOfOperationsWithStatementIds();
+        tassert(12782600,
+                fmt::format(
+                    "an atomically-grouped batched write must contain at most one operation with "
+                    "retryable statements, but found {}",
+                    numOpsWithStatementIds),
+                numOpsWithStatementIds == 1);
+        isRetryableAtomicBatch = true;
+    }
+    if (opAccumulator) {
+        opAccumulator->isRetryableAtomicBatch = isRetryableAtomicBatch;
+    }
+
     if (batchedOps->isEmpty()) {
-        consumeTearableSideWriteRedoState();
         return;
     } else if (batchedOps->numOperations() == 1) {
         MutableOplogEntry oplogEntry;
@@ -2359,7 +2550,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             case repl::OpTypeEnum::kContainerUpdate:
             case repl::OpTypeEnum::kContainerInsert: {
                 auto opTime = logOperation(
-                    opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+                    opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
                 auto wallClockTime = oplogEntry.getWallClockTime();
 
                 if (opAccumulator) {
@@ -2367,27 +2558,21 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                     opAccumulator->opTime.wallClockTime = wallClockTime;
                 }
 
-                SessionTxnRecord sessionTxnRecord;
-                sessionTxnRecord.setLastWriteOpTime(opTime);
-                sessionTxnRecord.setLastWriteDate(wallClockTime);
-                onWriteOpCompleted(
-                    opCtx, oplogEntry.getStatementIds(), sessionTxnRecord, oplogEntry.getNss());
+                // Only a write carrying a retryable statement may be recorded as the session's
+                // last write.
+                if (!oplogEntry.getStatementIds().empty()) {
+                    SessionTxnRecord sessionTxnRecord;
+                    sessionTxnRecord.setLastWriteOpTime(opTime);
+                    sessionTxnRecord.setLastWriteDate(wallClockTime);
+                    onWriteOpCompleted(
+                        opCtx, oplogEntry.getStatementIds(), sessionTxnRecord, oplogEntry.getNss());
+                }
 
-                consumeTearableSideWriteRedoState();
                 return;
             }
             default:
                 break;
         }
-    }
-
-    if (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite) {
-        auto numOpsWithStatementIds = batchedOps->getNumberOfOperationsWithStatementIds();
-        tassert(12782600,
-                fmt::format("kGroupForAtomicWrite WUOW must contain at most one operation with "
-                            "retryable statements, but found {}",
-                            numOpsWithStatementIds),
-                numOpsWithStatementIds <= 1);
     }
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
@@ -2399,47 +2584,22 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                     getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/false);
 
-    // A kGroupForPossiblyRetryableOperations write that spans multiple applyOps entries can be torn
-    // across those applyOps boundaries. If this occurs during a primary-driven index build, inform
-    // the build and throw a write conflict to redo the write before reserving any oplog slots.
-    //
-    // TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-    if (applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() > 1 &&
-        oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
-        feature_flags::gResumablePrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-        if (redoState.flagPersisted()) {
-            // The redo already persisted the flag ahead of the side write in this WUOW (the
-            // metadata update is part of this batch), so proceed to commit. Consume the signal.
-            redoState.disarm();
-        } else {
-            auto& ops = batchedOps->getOperationsForOpObserver();
-            // Only redo if the chain actually contains an index side write (a container insert).
-            // This is also required to avoid an endless redo loop; the redo must produce a side
-            // write.
-            bool hasSideWrite = std::any_of(ops.begin(), ops.end(), [](const auto& op) {
-                return op.getOpType() == repl::OpTypeEnum::kContainerInsert;
-            });
-            // The affected collection UUID is carried by the collection op, not the container ops.
-            auto it = std::find_if(
-                ops.rbegin(), ops.rend(), [](const auto& op) { return !!op.getUuid(); });
-            if (hasSideWrite && it != ops.rend()) {
-                // Arm the redo with the affected collection UUID and roll back this write. On the
-                // redo, IndexBuildInterceptor::sideWrite writes the abort sentinel ahead of the
-                // side write so it replicates first.
-                redoState.arm(*it->getUuid());
-                throwWriteConflictException(
-                    "Redoing a write that produced a tearable side write during a primary-driven "
-                    "index build.");
-            }
-        }
+    // nonAtomicGroup entries apply independently on secondaries, so a
+    // record's operations must not straddle an applyOps boundary. A single entry cannot tear a
+    // record, so only when the batch spilled to multiple entries do we make each record's
+    // operations contiguous and re-pack, keeping each record whole.
+    if (oplogGroupingFormat == WriteUnitOfWork::nonAtomicGroup &&
+        batchedWriteContext.hasAtomicOperationGroups() &&
+        applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() > 1) {
+        batchedOps->groupByRecordId();
+        // getApplyOpsInfo throws TransactionTooLarge if a single record's operations cannot fit one
+        // applyOps entry.
+        applyOpsOplogSlotAndOperationAssignment =
+            batchedOps->getApplyOpsInfo(getMaxNumberOfBatchedOperationsInSingleOplogEntry(),
+                                        getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
+                                        /*prepare=*/false,
+                                        /*respectAtomicGroups=*/true);
     }
-
-    // The multi-op path commits below; consume the redo state so it does not leak onto a later
-    // write on this OperationContext.
-    consumeTearableSideWriteRedoState();
 
     std::size_t opTimeOffset = 0;
     if (applyOpsOplogSlotAndOperationAssignment.numOperationsWithNeedsRetryImage > 0) {
@@ -2463,8 +2623,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     auto oplogSlots = _operationLogger->getNextOpTimes(
         opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired, opTimeOffset);
 
-    boost::optional<repl::ReplOperation::ImageBundle> noPrePostImage;
-
     if (!gFeatureFlagLargeBatchedOperations.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -2482,6 +2640,12 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
         // timestamps, violating the multi timestamp constraint. It's safe to ignore the multi
         // timestamp constraints here.
         shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
+
+        // Count this applyOps chain, plus the subset of chains that carried a container write.
+        batchedWriteApplyOpsChainsTotalCounter.add(1);
+        if (batchedWriteContext.hasContainerWrites()) {
+            batchedWriteApplyOpsChainsWithContainerOpsCounter.add(1);
+        }
     }
 
     // Storage transaction commit is the last place inside a transaction that can throw an
@@ -2504,27 +2668,38 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     }
 
     auto logApplyOpsForBatchedWrite =
-        [opCtx, operationLogger = _operationLogger.get()](
+        [opCtx, operationLogger = _operationLogger.get(), isRetryableAtomicBatch](
             repl::MutableOplogEntry* oplogEntry,
             bool firstOp,
             bool lastOp,
             std::vector<StmtId> stmtIdsWritten,
             WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
-            // Remove 'prevOpTime' when replicating as a single applyOps oplog entry.
-            // This preserves backwards compatibility with the legacy atomic applyOps oplog
-            // entry format that we use to replicate batched writes.
-            // OplogApplierImpl::_deriveOpsAndFillWriterVectors() enforces this restriction
-            // using an invariant added in SERVER-43651.
-            // For batched writes that replicate over a chain of applyOps oplog entries, we include
-            // 'prevOpTime' so that oplog application is able to consume all the linked operations,
-            // similar to large multi-document transactions. See SERVER-70572.
-            if (firstOp && lastOp) {
-                oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
+            if (firstOp) {
+                if (isRetryableAtomicBatch) {
+                    // Link this retryable write's first entry to the session's last write, so its
+                    // statements are chained into a single session history and stay retryable
+                    // after failover.
+                    const auto txnParticipant = TransactionParticipant::get(opCtx);
+                    oplogEntry->setPrevWriteOpTimeInTransaction(
+                        txnParticipant ? boost::make_optional(txnParticipant.getLastWriteOpTime())
+                                       : boost::none);
+                } else if (lastOp) {
+                    // Remove 'prevOpTime' when a non-retryable batch replicates as a single
+                    // applyOps oplog entry. This preserves backwards compatibility with the legacy
+                    // atomic applyOps oplog entry format that we use to replicate batched writes.
+                    // deriveOpsAndFillWriterVectors() enforces this restriction
+                    // using an invariant added in SERVER-43651. For batched writes that replicate
+                    // over a chain of applyOps oplog entries, we keep 'prevOpTime' so that oplog
+                    // application is able to consume all the linked operations, similar to large
+                    // multi-document transactions. See SERVER-70572.
+                    oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
+                }
             }
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
-            const bool updateTxnTable =
-                (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations) ||
-                (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite && lastOp);
+            // A nonAtomicGroup batch is only actually retryable when it carries statement ids.
+            const bool updateTxnTable = (oplogGroupingFormat == WriteUnitOfWork::nonAtomicGroup &&
+                                         !stmtIdsWritten.empty()) ||
+                (isRetryableAtomicBatch && lastOp);
             return logApplyOps(opCtx,
                                oplogEntry,
                                /*txnState=*/boost::none,
@@ -2532,18 +2707,24 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                std::move(stmtIdsWritten),
                                updateTxnTable,
                                oplogGroupingFormat,
+                               isRetryableAtomicBatch,
                                operationLogger);
         };
 
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
 
+    // Pass null: a batched write never persists a retryable findAndModify image, so there is
+    // nothing to extract here. Where images are stored in the image collection the invariant above
+    // guarantees a batched write carries none; otherwise the image is reconstructed on retry rather
+    // than persisted. The op still carries 'needsRetryImage' so that retry lookup can run. See
+    // find_and_modify_image_lookup_util.cpp.
     (void)batchedOps->logOplogEntries(oplogSlots,
                                       applyOpsOplogSlotAndOperationAssignment,
                                       wallClockTime,
                                       oplogGroupingFormat,
                                       logApplyOpsForBatchedWrite,
-                                      &noPrePostImage);
+                                      /*prePostImageToWriteToImageCollection=*/nullptr);
 
     // Ensure the transactionParticipant properly tracks the namespaces affected by a
     // retryable batched write.
@@ -2569,11 +2750,6 @@ void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     batchedWriteContext.clearBatchedOperations(opCtx);
     batchedWriteContext.setWritesAreBatched(false);
-
-    // Clear the per-attempt "flag persisted" marker so the next batched-write attempt on this
-    // OperationContext re-detects a tearable side write. The armed redo UUID is intentionally left
-    // set so it survives this rollback and is visible to the redo.
-    index_builds::primary_driven::getTearableSideWriteRedoState(opCtx).resetFlagPersisted();
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(OperationContext* opCtx,
@@ -2679,6 +2855,7 @@ void OpObserverImpl::onTransactionPrepare(
                     std::move(stmtIdsWritten),
                     /*updateTxnTable=*/(firstOp || lastOp),
                     oplogGroupingFormat,
+                    /*isRetryableAtomicBatch=*/false,
                     operationLogger);
             };
 
@@ -2692,7 +2869,7 @@ void OpObserverImpl::onTransactionPrepare(
         (void)transactionOperations.logOplogEntries(reservedSlots,
                                                     applyOpsOperationAssignment,
                                                     wallClockTime,
-                                                    WriteUnitOfWork::kDontGroup,
+                                                    WriteUnitOfWork::noGroup,
                                                     logApplyOpsForPreparedTransaction,
                                                     &imageToWrite);
         if (opAccumulator) {
@@ -2722,7 +2899,8 @@ void OpObserverImpl::onTransactionPrepare(
                     /*startOpTime=*/oplogSlot,
                     /*stmtIdsWritten=*/{},
                     /*updateTxnTable=*/true,
-                    WriteUnitOfWork::kDontGroup,
+                    WriteUnitOfWork::noGroup,
+                    /*isRetryableAtomicBatch=*/false,
                     _operationLogger.get());
     }
 }
@@ -2805,7 +2983,7 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
     oplogEntry.setNss(nss.isOplog() ? NamespaceString::kAdminCommandNamespace : nss.getCommandNS());
     oplogEntry.setUuid(coll->uuid());
     oplogEntry.setObject(objectEntry.toBSON());
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
@@ -2835,7 +3013,7 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(objectEntry.toBSON());
 
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onReplicatedIdentDrop(OperationContext* opCtx,
@@ -2845,7 +3023,7 @@ void OpObserverImpl::onReplicatedIdentDrop(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
     oplogEntry.setObject(BSON("dropIdent" << ident));
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onInitReplicatedFastCount(OperationContext* opCtx,
@@ -2856,7 +3034,7 @@ void OpObserverImpl::onInitReplicatedFastCount(OperationContext* opCtx,
     oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
     oplogEntry.setObject(BSON("initReplicatedFastCount" << 1));
     oplogEntry.setObject2(o2.toBSON());
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 }  // namespace mongo

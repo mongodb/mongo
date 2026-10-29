@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 
@@ -36,11 +10,16 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <list>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace mongo::replicated_fast_count {
 namespace {
+using namespace std::literals::string_view_literals;
+using test_helpers::makeContainerOplogEntry;
 
 class StreamingOplogDeltaAccumulatorTest : public CatalogTestFixture {
 protected:
@@ -86,7 +65,7 @@ protected:
 
     // Feeds an arbitrary BSON record straight to consumeRecord, bypassing the cursor + OplogEntry
     // round-trip. Used by the fast-lane tests that need to construct deliberately malformed or
-    // hand-shaped raw entries (e.g. non-string `op`, missing `sz`, custom `tid` field).
+    // hand-shaped raw entries (e.g. non-string `op`, custom `tid` field).
     OplogScanResult runAccumulatorRaw(StreamingOplogDeltaAccumulator::Options opts,
                                       const std::vector<BSONObj>& rawRecords) {
         StreamingOplogDeltaAccumulator acc(std::move(opts));
@@ -121,6 +100,37 @@ protected:
                 .opType = repl::OpTypeEnum::kNoop,
                 .nss = NamespaceString::createNamespaceString_forTest("test", "$cmd"),
                 .oField = BSON("msg" << "noop"),
+                .wallClockTime = Date_t::now(),
+            }}
+            .toBSON()
+            .getOwned();
+    }
+
+    // Builds the o2 of a repairReplicatedMetadata no-op entry.
+    BSONObj makeRepairO2(const test_helpers::NsAndUUID& coll,
+                         int64_t sz,
+                         int64_t ct,
+                         boost::optional<int64_t> hDiff = boost::none) {
+        BSONObjBuilder m;
+        m.append("sz", sz);
+        m.append("ct", ct);
+        if (hDiff) {
+            m.append("hDiff", *hDiff);
+        }
+        return BSON("type" << "repairReplicatedMetadata"
+                           << "uuid" << coll.uuid << "m" << m.obj());
+    }
+
+    // Builds a noop (`n`) oplog BSON carrying the supplied `o2`, mirroring the
+    // repairReplicatedMetadata entry shape: {op: "n", o: {msg: ...}, o2: {...}}.
+    BSONObj makeNoopWithO2Bson(Timestamp ts, BSONObj o2) {
+        return repl::DurableOplogEntry{
+            repl::DurableOplogEntryParams{
+                .opTime = opTimeAt(ts),
+                .opType = repl::OpTypeEnum::kNoop,
+                .nss = NamespaceString(),
+                .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
+                .o2Field = std::move(o2),
                 .wallClockTime = Date_t::now(),
             }}
             .toBSON()
@@ -224,10 +234,26 @@ protected:
     }
 
     // Builds a raw insert inner-op BSON for use inside an applyOps array.
-    BSONObj makeInnerInsertBson(const test_helpers::NsAndUUID& coll, int32_t sizeDelta) {
+    BSONObj makeInnerInsertBson(const test_helpers::NsAndUUID& coll,
+                                int32_t sizeDelta,
+                                boost::optional<int64_t> hash = boost::none) {
+        BSONObjBuilder m;
+        m.append("sz", sizeDelta);
+        if (hash) {
+            m.append("h", *hash);
+        }
         return BSON("op" << "i"
                          << "ns" << coll.nss.ns_forTest() << "ui" << coll.uuid << "o"
-                         << BSON("_id" << 1) << "m" << BSON("sz" << sizeDelta));
+                         << BSON("_id" << 1) << "m" << m.obj());
+    }
+
+    // Builds a raw container op (ci/cu/cd) inner-op BSON for use inside an applyOps array.
+    BSONObj makeInnerContainerOpBson(std::string_view opStr, std::string_view containerIdent) {
+        BSONObjBuilder b;
+        b.append("op", opStr);
+        b.append("container", containerIdent);
+        b.append("o", BSON("k" << 1));
+        return b.obj();
     }
 
     test_helpers::NsAndUUID collA = {.nss = NamespaceString::createNamespaceString_forTest(
@@ -236,9 +262,6 @@ protected:
     test_helpers::NsAndUUID collB = {.nss = NamespaceString::createNamespaceString_forTest(
                                          "streaming_accumulator_test", "collB"),
                                      .uuid = UUID::gen()};
-    test_helpers::NsAndUUID fastCountColl = {.nss = NamespaceString::makeGlobalConfigCollection(
-                                                 NamespaceString::kReplicatedFastCountStore),
-                                             .uuid = UUID::gen()};
     const UUID oplogUuid = UUID::gen();
 };
 
@@ -253,8 +276,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, SingleEntry_AccumulatesAndAdvancesTim
     const auto result = runAccumulator(
         {test_helpers::makeOplogEntry(ts, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 10);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 10);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -267,11 +290,11 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, MultipleEntries_LastTimestampIsLatest
                         test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 20),
                         test_helpers::makeOplogEntry(ts3, collB, repl::OpTypeEnum::kInsert, 30)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 30);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 30);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 2);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 30);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 30);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts3);
 }
 
@@ -285,26 +308,26 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TracksRawBytesAcrossAllReco
     const auto result =
         runAccumulator({.oplogUuid = oplogUuid}, {std::move(entry1), std::move(entry2)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 2);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, OplogUuid_TrackedEvenForInternalEntries) {
     const Timestamp ts1{1, 1};
-    auto entry = test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10);
+    auto entry = makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
     const int64_t expectedBytes = entry.getEntry().toBSON().objsize();
     const auto result = runAccumulator({.oplogUuid = oplogUuid}, {std::move(entry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 1);
     EXPECT_FALSE(result.lastTimestamp);
-    EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, InternalOnly_NoLastTimestamp) {
     const Timestamp ts1{1, 1};
-    const auto result = runAccumulator(
-        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+    const auto result = runAccumulator({makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     EXPECT_FALSE(result.lastTimestamp);
     EXPECT_TRUE(result.deltas.empty());
 }
@@ -313,12 +336,13 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, InternalThenUser_LastTimestampIsUserE
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
-        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10),
+        {makeContainerOplogEntry(
+             ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert),
          test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 50)});
     EXPECT_EQ(result.lastTimestamp, ts2);
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 50);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 50);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, UserThenInternal_LastTimestampDoesNotRegress) {
@@ -326,7 +350,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, UserThenInternal_LastTimestampDoesNot
     const Timestamp ts2{1, 2};
     const auto result = runAccumulator(
         {test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 50),
-         test_helpers::makeOplogEntry(ts2, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+         makeContainerOplogEntry(
+             ts2, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     // Internal entry must not advance lastTimestamp past the latest non-internal entry.
     EXPECT_EQ(result.lastTimestamp, ts1);
 }
@@ -335,7 +360,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_ErasesOplogUuidWhenOnlyInt
     const Timestamp ts1{1, 1};
     const auto result = runAccumulator(
         {.isCheckpoint = true, .oplogUuid = oplogUuid},
-        {test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+        {makeContainerOplogEntry(
+            ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -343,29 +369,30 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_ErasesOplogUuidWhenOnlyInt
 TEST_F(StreamingOplogDeltaAccumulatorTest, Checkpoint_KeepsOplogUuidWhenUserEntriesPresent) {
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
-    auto fastCountEntry =
-        test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10);
+    auto fastCountEntry = makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
     auto userEntry = test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, 50);
     const int64_t expectedOplogBytes =
         fastCountEntry.getEntry().toBSON().objsize() + userEntry.getEntry().toBSON().objsize();
     const auto result = runAccumulator({.isCheckpoint = true, .oplogUuid = oplogUuid},
                                        {std::move(fastCountEntry), std::move(userEntry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedOplogBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 2);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedOplogBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 2);
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, NonCheckpoint_KeepsOplogUuidEvenWithNoUserEntries) {
     const Timestamp ts1{1, 1};
-    auto entry = test_helpers::makeOplogEntry(ts1, fastCountColl, repl::OpTypeEnum::kInsert, 10);
+    auto entry = makeContainerOplogEntry(
+        ts1, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert);
     const int64_t expectedBytes = entry.getEntry().toBSON().objsize();
     const auto result =
         runAccumulator({.isCheckpoint = false, .oplogUuid = oplogUuid}, {std::move(entry)});
     ASSERT_TRUE(result.deltas.contains(oplogUuid));
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.size, expectedBytes);
-    EXPECT_EQ(result.deltas.at(oplogUuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.size, expectedBytes);
+    EXPECT_EQ(result.deltas.at(oplogUuid).metadata.sizeCount.count, 1);
     EXPECT_FALSE(result.lastTimestamp);
 }
 
@@ -382,8 +409,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, PartialTxn_FollowedByNonApplyOps_Chai
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     // The regular insert for collB is counted normally.
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 70);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 70);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
@@ -428,7 +455,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ContainerOpOnUserIdent_Advan
     // ci/cu/cd targeting a non-fast-count ident are still counted-no-delta (ts advances).
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({makeContainerOpBson(ts, "ci"_sd, "collection-user-ident"_sd)});
+        runAccumulatorRaw({makeContainerOpBson(ts, "ci"sv, "collection-user-ident"sv)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
@@ -440,7 +467,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // checkpoint store itself). The container field stores the ident string, not the namespace.
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({makeContainerOpBson(ts, "ci"_sd, ident::kFastCountMetadataStore)});
+        runAccumulatorRaw({makeContainerOpBson(ts, "ci"sv, ident::kFastCountMetadataStore)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
 }
@@ -449,10 +476,59 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_DirectCrudOnFastCountStore_NoTimestampAdvance) {
     const Timestamp ts{1, 1};
-    const auto result = runAccumulator(
-        {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, /*sz=*/10)});
+    const auto result = runAccumulator({test_helpers::makeContainerOplogEntry(
+        ts, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
+}
+
+// ----- Layer 1: classifyForFastLane / ts validation -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_MalformedTsCrud_FallsThroughToLayer3) {
+    // SERVER-131366: an entry whose `ts` is not a timestamp must never be processed by a fast
+    // lane. Layer 1 routes it to Layer 3, whose IDL parser rejects the malformed `ts` instead of
+    // silently counting the entry as processed.
+    BSONObjBuilder b;
+    b.append("op", "i");
+    b.append("ns", collA.nss.ns_forTest());
+    collA.uuid.appendToBuilder(&b, "ui");
+    b.append("ts", "notatimestamp");
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSON("_id" << 1));
+    b.append("m", BSON("sz" << 10));
+    ASSERT_THROWS(runAccumulatorRaw({b.obj()}), DBException);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_MissingTsNoop_FallsThroughToLayer3) {
+    // Same contract for the kCountedNoDelta lane: a noop entry with no `ts` at all falls to
+    // Layer 3, which surfaces the missing required field.
+    BSONObjBuilder b;
+    b.append("op", "n");
+    b.append("ns", NamespaceString::createNamespaceString_forTest("test", "$cmd").ns_forTest());
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSON("msg" << "noop"));
+    ASSERT_THROWS(runAccumulatorRaw({b.obj()}), DBException);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_FastCountStoreSkipWithMalformedTs_FallsThroughToLayer3) {
+    // Even kFastCountStoreSkip is guarded: a container op on the fast-count ident with a
+    // malformed `ts` is no longer silently skipped, it is routed to Layer 3.
+    BSONObjBuilder b;
+    b.append("op", "ci");
+    b.append("ns", collA.nss.ns_forTest());
+    collA.uuid.appendToBuilder(&b, "ui");
+    b.append("ts", 12345);
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSONObj());
+    b.append("container", ident::kFastCountMetadataStore);
+    ASSERT_THROWS(runAccumulatorRaw({b.obj()}), DBException);
 }
 
 // ----- Layer 2: tryRecordFastCrud shape handling -----
@@ -461,9 +537,54 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudMissingM_NoDeltas) {
     // CRUD entry without `m` size metadata is treated as no-delta. ts still advances.
     const Timestamp ts{1, 1};
     const auto result = runAccumulatorRaw(
-        {makeRawCrudBson(ts, "i"_sd, collA.nss, collA.uuid, /*mField=*/boost::none)});
+        {makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, /*mField=*/boost::none)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudWithHash_FoldsHashIntoDelta) {
+    // The fast lane reads `h` off the size metadata with no feature-flag check, matching Layer 3.
+    const Timestamp ts{1, 1};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << hash))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 10, .count = 1}));
+    EXPECT_EQ(hash, result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_TwoCrudEntries_XorsHashesForOneCollection) {
+    // Two operations on one collection fold together with XOR.
+    const int64_t hash1 = 0x0123456789abcdef;
+    const int64_t hash2 = 0x1122334455667788;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(
+             Timestamp{1, 1}, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << hash1)),
+         makeRawCrudBson(
+             Timestamp{1, 2}, "i"sv, collA.nss, collA.uuid, BSON("sz" << 20 << "h" << hash2))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 30, .count = 2}));
+    EXPECT_EQ(hash1 ^ hash2, result.deltas.at(collA.uuid).metadata.hash);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerOpWithHash_FoldsHashIntoDelta) {
+    // Layer 2.5 routes each inner op through the same fast CRUD path, so inner hashes fold too.
+    const Timestamp ts{1, 1};
+    const int64_t hash1 = 0x0123456789abcdef;
+    const int64_t hash2 = 0x1122334455667788;
+    const auto result =
+        runAccumulatorRaw({makeApplyOpsBson(ts,
+                                            BSON_ARRAY(makeInnerInsertBson(collA, 10, hash1)
+                                                       << makeInnerInsertBson(collA, 20, hash2)))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 30, .count = 2}));
+    EXPECT_EQ(hash1 ^ hash2, result.deltas.at(collA.uuid).metadata.hash);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDeltas) {
@@ -473,9 +594,45 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDe
         NamespaceString::createNamespaceString_forTest("local", "rs.oplog.rs.archive");
     const Timestamp ts{1, 1};
     const auto result =
-        runAccumulatorRaw({makeRawCrudBson(ts, "i"_sd, localNss, UUID::gen(), BSON("sz" << 10))});
+        runAccumulatorRaw({makeRawCrudBson(ts, "i"sv, localNss, UUID::gen(), BSON("sz" << 10))});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudPresentMAbsentSz_NoDeltasOnInsert) {
+    // On insert, SingleOpSizeMetadata without `sz` is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, /*mField=*/BSONObj())});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudPresentMAbsentSz_NoDeltasOnUpdate) {
+    // On update, SingleOpSizeMetadata without `sz` is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "u"sv, collA.nss, collA.uuid, /*mField=*/BSONObj())});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudPresentMAbsentSz_NoDeltasOnDelete) {
+    // On delete, SingleOpSizeMetadata without `sz` is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts, "d"sv, collA.nss, collA.uuid, /*mField=*/BSONObj())});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudNonNumericSz_FallsThroughToLayer3) {
+    // A non-numeric `sz` is malformed, so the fast lane falls back to Layer 3. Layer 3's IDL parser
+    // surfaces the error.
+    const Timestamp ts{1, 1};
+    ASSERT_THROWS(runAccumulatorRaw({makeRawCrudBson(
+                      ts, "i"sv, collA.nss, collA.uuid, BSON("sz" << "notanumber"))}),
+                  DBException);
 }
 
 // ----- Layer 2.5: tryFastApplyOps applyOps shapes -----
@@ -498,21 +655,21 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
         ts, BSON_ARRAY(makeInnerInsertBson(collA, 100) << makeInnerInsertBson(collB, 200)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 200);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 200);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 1);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
 TEST_F(StreamingOplogDeltaAccumulatorTest,
        FastLane_ApplyOpsAllInternalInnerOps_NoTimestampAdvance) {
     // applyOps where every inner op targets the fast-count store maps to kAllInternal: the
-    // entry is skipped entirely (no ts advance), mirroring `operationsOnFastCountStores`.
+    // entry is skipped entirely (no ts advance).
     const Timestamp ts{1, 1};
-    const auto applyOpsBson =
-        makeApplyOpsBson(ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 50)));
+    const auto applyOpsBson = makeApplyOpsBson(
+        ts, BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_FALSE(result.lastTimestamp);
@@ -523,12 +680,13 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     // Mixed inner ops: internal-store inner ops are silently dropped, user-collection inner ops
     // contribute deltas. ts advances because at least one user op was observed.
     const Timestamp ts{1, 1};
-    const auto applyOpsBson = makeApplyOpsBson(
-        ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 1) << makeInnerInsertBson(collA, 100)));
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts,
+                         BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)
+                                    << makeInnerInsertBson(collA, 100)));
     const auto result = runAccumulatorRaw({applyOpsBson});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
-    EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -544,6 +702,43 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerNonCrud_FallsTh
     const auto applyOpsBson = makeApplyOpsBson(ts, BSON_ARRAY(innerNoop));
     const auto result = runAccumulatorRaw({applyOpsBson});
     EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsContainerInnerOps_AdvancesTimestampNoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts, BSON_ARRAY(makeInnerContainerOpBson("ci"sv, "internal-sorter-0"sv)));
+    const auto result = runAccumulatorRaw({applyOpsBson});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsAllFastCountIdentContainerOps_NoTimestampAdvance) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson = makeApplyOpsBson(
+        ts,
+        BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)
+                   << makeInnerContainerOpBson("cu"sv, ident::kFastCountMetadataStore)));
+    const auto result = runAccumulatorRaw({applyOpsBson});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_FALSE(result.lastTimestamp);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsMixedFastCountIdentContainerAndUserOp_OnlyUserDeltaRecorded) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts,
+                         BSON_ARRAY(makeInnerContainerOpBson("ci"sv, ident::kFastCountMetadataStore)
+                                    << makeInnerInsertBson(collA, 100)));
+    const auto result = runAccumulatorRaw({applyOpsBson});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 1);
+    EXPECT_EQ(result.deltas.size(), 1u);
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -567,11 +762,389 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     mArr.append(BSON("uuid" << collB.uuid << "sz" << int64_t{500} << "ct" << int64_t{5}));
     const auto result = runAccumulatorRaw({makeCommitTxnBson(ts, mArr.arr())});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 300);
-    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 3);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.size, 300);
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount.count, 3);
     ASSERT_TRUE(result.deltas.contains(collB.uuid));
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 500);
-    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 5);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.size, 500);
+    EXPECT_EQ(result.deltas.at(collB.uuid).metadata.sizeCount.count, 5);
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudHashWithoutSz_FallsThroughToLayer3) {
+    // The fast lane requires `sz`, so it must not handle a hash-only entry itself; it falls through
+    // so Layer 3 reports it and folds the hash in against a zero size and count delta.
+    const Timestamp ts{1, 1};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result =
+        runAccumulatorRaw({makeRawCrudBson(ts, "i"sv, collA.nss, collA.uuid, BSON("h" << hash))});
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_RecordsExplicitDiff) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, makeRepairO2(collA, 100, 5))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 100, .count = 5}));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepair_FoldsWithCrudDeltaForSameCollection) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const auto result =
+        runAccumulatorRaw({makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10)),
+                           makeNoopWithO2Bson(ts2, makeRepairO2(collA, -3, -1))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 7, .count = 0}));
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_PreservesExistingHashFromPriorCrud) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << hash)),
+         makeNoopWithO2Bson(ts2, makeRepairO2(collA, -3, -1))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 7, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_RecordsHashDiff) {
+    const Timestamp ts{1, 1};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto result =
+        runAccumulatorRaw({makeNoopWithO2Bson(ts, makeRepairO2(collA, 100, 5, hash))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 100, .count = 5}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashOnly_ZeroSizeCount) {
+    const Timestamp ts{1, 1};
+    const int64_t hash = 0x0123456789abcdef;
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("hDiff" << hash));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, hash);
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_FoldsHashDiffWithPriorCrudHash) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t crudHash = 0x0123456789abcdef;
+    const int64_t repairHash = 0x0011223344556677;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << crudHash)),
+         makeNoopWithO2Bson(ts2, makeRepairO2(collA, 0, 0, repairHash))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 10, .count = 1}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, crudHash ^ repairHash);
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_ZeroHashDiffIsIdentity) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t crudHash = 0x0123456789abcdef;
+    const auto result = runAccumulatorRaw(
+        {makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << crudHash)),
+         makeNoopWithO2Bson(ts2, makeRepairO2(collA, -3, -1, 0))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 7, .count = 0}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, crudHash);
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepairHashDiff_AbsentWindowHashStaysAbsent) {
+    // A hash diff folds by XOR and absence absorbs: a collection whose window hash is absent
+    // (here, a CRUD entry carrying `sz` but no `h`) stays absent, so the repair's `hDiff` cannot
+    // seed a hash on its own.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t repairHash = 0x0011223344556677;
+    const auto result =
+        runAccumulatorRaw({makeRawCrudBson(ts1, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10)),
+                           makeNoopWithO2Bson(ts2, makeRepairO2(collA, 0, 0, repairHash))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 10, .count = 1}));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.hash, boost::none);
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericHashDiff_Ignored) {
+    // `hDiff` is present but malformed: the whole entry is ignored, even though `sz` is
+    // well-formed.
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100 << "hDiff"
+                                             << "notanumber"));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+// A set records exactly its value, overriding a nonzero hash already in the window.
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashSet_RecordsSetHash) {
+    // Differs from every set value, so a set that folded instead would be caught.
+    const int64_t priorHash = 0x0f0f0f0f0f0f0f0f;
+    const std::vector<int64_t> setHashes{
+        // The hash of an empty collection: XOR with it is the identity, so only the nonzero prior
+        // distinguishes a set from a fold, and it must not be mistaken for an omitted field.
+        kEmptyCollectionValidationHash,
+        -1,
+        std::numeric_limits<int64_t>::min(),
+        std::numeric_limits<int64_t>::max(),
+        0x0123456789abcdef,
+    };
+    for (const int64_t setHash : setHashes) {
+        const auto result = runAccumulatorRaw(
+            {makeRawCrudBson(Timestamp(1, 1),
+                             "i"sv,
+                             collA.nss,
+                             collA.uuid,
+                             BSON("sz" << 10 << "h" << priorHash)),
+             makeNoopWithO2Bson(Timestamp(1, 2),
+                                BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid
+                                            << "m" << BSON("hSet" << setHash)))});
+        ASSERT_TRUE(result.deltas.contains(collA.uuid)) << setHash;
+        const auto& delta = result.deltas.at(collA.uuid);
+        EXPECT_EQ(delta.metadata.sizeCount, (CollectionSizeCount{.size = 10, .count = 1}))
+            << setHash;
+        EXPECT_EQ(delta.metadata.hash, setHash) << setHash;
+        EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet) << setHash;
+        EXPECT_EQ(result.lastTimestamp, Timestamp(1, 2)) << setHash;
+    }
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepairHashSet_OverridesPriorThenFoldsLater) {
+    // Whatever the window accumulated before the set (nothing, an absent hash, or a present one)
+    // is overridden, and both CRUD hashes and repair diffs after it fold into the set value. Size
+    // and count add up across the whole window regardless.
+    const int64_t setHash = 0x0011223344556677;
+    const int64_t laterCrudHash = 0x7766554433221100;
+    const int64_t laterRepairHash = 0x0f0f0f0f0f0f0f0f;
+    struct PriorEntry {
+        std::string name;
+        boost::optional<BSONObj> m;
+    };
+    const std::vector<PriorEntry> priors{
+        {"none", boost::none},
+        {"absentHash", BSON("sz" << 10)},
+        {"presentHash", BSON("sz" << 10 << "h" << int64_t{0x0123456789abcdef})},
+    };
+    for (const auto& prior : priors) {
+        std::vector<BSONObj> records;
+        if (prior.m) {
+            records.push_back(
+                makeRawCrudBson(Timestamp(1, 1), "i"sv, collA.nss, collA.uuid, *prior.m));
+        }
+        records.push_back(
+            makeNoopWithO2Bson(Timestamp(1, 2),
+                               BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid
+                                           << "m" << BSON("sz" << 5 << "hSet" << setHash))));
+        records.push_back(makeRawCrudBson(Timestamp(1, 3),
+                                          "i"sv,
+                                          collA.nss,
+                                          collA.uuid,
+                                          BSON("sz" << 20 << "h" << laterCrudHash)));
+        records.push_back(
+            makeNoopWithO2Bson(Timestamp(1, 4), makeRepairO2(collA, 0, 0, laterRepairHash)));
+
+        const auto result = runAccumulatorRaw(records);
+        ASSERT_TRUE(result.deltas.contains(collA.uuid)) << prior.name;
+        const auto& delta = result.deltas.at(collA.uuid);
+        const int64_t priorCount = prior.m ? 1 : 0;
+        const int64_t priorSize = prior.m ? 10 : 0;
+        EXPECT_EQ(delta.metadata.sizeCount,
+                  (CollectionSizeCount{.size = priorSize + 5 + 20, .count = priorCount + 1}))
+            << prior.name;
+        EXPECT_EQ(delta.metadata.hash, setHash ^ laterCrudHash ^ laterRepairHash) << prior.name;
+        EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet) << prior.name;
+        EXPECT_EQ(result.lastTimestamp, Timestamp(1, 4)) << prior.name;
+    }
+}
+
+// A later set overrides an earlier one in the same window.
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashSet_LastSetWins) {
+    const int64_t firstSet = 0x0011223344556677;
+    const int64_t betweenHash = 0x0123456789abcdef;
+    const int64_t secondSet = 0x7766554433221100;
+    const auto result = runAccumulatorRaw(
+        {makeNoopWithO2Bson(Timestamp(1, 1),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << firstSet))),
+         makeRawCrudBson(
+             Timestamp(1, 2), "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << betweenHash)),
+         makeNoopWithO2Bson(Timestamp(1, 3),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << secondSet)))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.metadata.sizeCount, (CollectionSizeCount{.size = 10, .count = 1}));
+    EXPECT_EQ(delta.metadata.hash, secondSet);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepairHashSet_LaterAbsentContributionLeavesHashAbsent) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("hSet" << int64_t{0x0011223344556677}));
+    const auto result =
+        runAccumulatorRaw({makeNoopWithO2Bson(ts1, o2),
+                           makeRawCrudBson(ts2, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.metadata.hash, boost::none);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
+}
+
+// A set on a collection created in the same window keeps the create, so the checkpoint still
+// inserts a fresh entry, now carrying the set hash.
+TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_AfterCreateKeepsCreatedState) {
+    const int64_t setHash = 0x0011223344556677;
+    const auto result = runAccumulatorRaw(
+        {test_helpers::makeCreateOplogEntry(Timestamp(1, 1), collA).getEntry().toBSON(),
+         makeNoopWithO2Bson(Timestamp(1, 2),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << setHash)))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.state, DDLState::kCreated);
+    EXPECT_EQ(delta.metadata.hash, setHash);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
+}
+
+// A set does not outlive the collection it was applied to: once the collection is dropped and a
+// collection with the same UUID is imported, the new collection starts from the import's absent
+// hash and folds as usual.
+TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_DropThenImportResetsToFold) {
+    const auto result = runAccumulatorRaw(
+        {makeNoopWithO2Bson(Timestamp(1, 1),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << int64_t{0x0011223344556677}))),
+         test_helpers::makeDropOplogEntry(Timestamp(1, 2), collA).getEntry().toBSON(),
+         test_helpers::makeImportCollectionOplogEntry(
+             Timestamp(1, 3), collA, /*numRecords=*/1, /*dataSize=*/10)
+             .getEntry()
+             .toBSON()});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.state, DDLState::kDroppedAndRecreated);
+    EXPECT_EQ(delta.metadata.hash, boost::none);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kFold);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashDiffAndHashSet_Ignored) {
+    const Timestamp ts{1, 1};
+    const auto o2 =
+        BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                    << BSON("sz" << 100 << "hDiff" << int64_t{1} << "hSet" << int64_t{2}));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericHashSet_Ignored) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100 << "hSet"
+                                             << "notanumber"));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopWithUnrelatedO2Type_NoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {makeNoopWithO2Bson(ts,
+                            BSON("type" << "someOtherNoopKind" << "uuid" << collA.uuid << "m"
+                                        << BSON("sz" << 1 << "ct" << 1)))});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairMissingUuid_Ignored) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata"
+                                << "m" << BSON("sz" << 100 << "ct" << 5));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_MissingCtDefaultsToZero) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 100, .count = 0}));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_MissingSzDefaultsToZero) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("ct" << 5));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 0, .count = 5}));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericSz_Ignored) {
+    // `sz` is present but malformed: the whole entry is ignored, even though `ct` is well-formed.
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << "notanumber" << "ct" << 5));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericCt_Ignored) {
+    // `ct` is present but malformed: the whole entry is ignored, even though `sz` is well-formed.
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100 << "ct" << "notanumber"));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairEmptyM_NoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto o2 =
+        BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m" << BSONObj());
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
 }
 
@@ -608,7 +1181,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     const Timestamp ts{1, 1};
     const auto result = runAccumulator(
         {.isCheckpoint = true, .oplogUuid = oplogUuid},
-        {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+        {test_helpers::makeContainerOplogEntry(
+            ts, ident::kFastCountMetadataStore, repl::OpTypeEnum::kContainerInsert)});
     // The only entry is an internal store write, so lastTimestamp never advances and finish()
     // erases the oplog self-delta, leaving no deltas.
     EXPECT_TRUE(result.deltas.empty());

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
@@ -88,13 +62,14 @@ using namespace std::literals::string_view_literals;
 
 class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture {
 protected:
-    RecipientServiceExternalStateTest()
-        : ShardCatalogCacheTestFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              MongoDScopedGlobalServiceContextForTest::Options{}
-                  .setCreateShardingState(false)
-                  .useMockClock(true)
-                  .useMockTickSource(true),
-              shouldSetupTL)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+            MongoDScopedGlobalServiceContextForTest::Options{}
+                .setCreateShardingState(false)
+                .useMockClock(true)
+                .useMockTickSource(true),
+            shouldSetupTransportLayer());
+    }
 
     void setUp() override {
         ShardCatalogCacheTestFixture::setUp();
@@ -116,10 +91,6 @@ protected:
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
         mongoDSessionCatalog->onStepUp(operationContext());
-    }
-
-    void tearDown() override {
-        ShardCatalogCacheTestFixture::tearDown();
     }
 
     void expectListCollections(const NamespaceString& nss,
@@ -158,18 +129,9 @@ protected:
                               BSON("level" << "local"
                                            << "afterClusterTime" << kDefaultFetchTimestamp));
 
-            // Ensure listIndexes always returns a 'collation' field.
-            std::vector<BSONObj> indexDocsWithCollation;
-            for (auto&& indexDoc : indexDocs) {
-                if (!indexDoc.hasField("collation")) {
-                    indexDocsWithCollation.emplace_back(
-                        indexDoc.addFields(BSON("collation" << BSON("locale" << "simple"))));
-                }
-            }
-
-            return BSON("ok" << 1 << "cursor"
-                             << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch"
-                                          << indexDocsWithCollation));
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch" << indexDocs));
         });
     }
 
@@ -208,7 +170,7 @@ protected:
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
                             version,
-                            ShardRef{"0"});
+                            {"0"});
             chunk.setName(OID::gen());
             version.incMinor();
 
@@ -233,7 +195,7 @@ protected:
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
                             version,
-                            ShardRef{"0"});
+                            {"0"});
             chunk.setName(OID::gen());
             version.incMinor();
 
@@ -289,7 +251,7 @@ protected:
     void verifyTempReshardingCollectionAndMetadata() {
         RecipientStateMachineExternalStateImpl externalState;
         externalState.ensureTempReshardingCollectionExistsWithIndexes(
-            operationContext(), kMetadata, kDefaultFetchTimestamp);
+            operationContext(), kMetadata, kDefaultFetchTimestamp, BSON("x" << 1));
 
         auto scopedCsr =
             CollectionShardingRuntime::acquireShared(operationContext(), kReshardingNss);
@@ -365,17 +327,15 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
                                                    kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple")),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "key"
                  << BSON("a" << 1 << "b"
                              << "hashed")
                  << "name"
-                 << "indexOne" << "collation" << BSON("locale" << "simple"))};
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
     const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple"))};
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
     auto future = launchAsync([&] {
         expectRefreshReturnForOriginalColl(
             kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
@@ -431,17 +391,15 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple")),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "key"
                  << BSON("a" << 1 << "b"
                              << "hashed")
                  << "name"
-                 << "indexOne" << "collation" << BSON("locale" << "simple"))};
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
     const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple"))};
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
 
     auto future = launchAsync([&] {
         expectRefreshReturnForOriginalColl(
@@ -510,7 +468,9 @@ TEST_F(RecipientServiceExternalStateTest,
                              << "hashed")
                  << "name"
                  << "indexOne")};
-
+    // When creating collection, only _id index should be created.
+    const std::vector<BSONObj> expectedIndexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
     // Create the collection and indexes to simulate retrying after a failover. Only include the id
     // index, because it is needed to create the collection.
     CollectionOptionsAndIndexes optionsAndIndexes = {
@@ -542,11 +502,6 @@ TEST_F(RecipientServiceExternalStateTest,
     verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
-
-    // When creating collection, only _id index should be created.
-    const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple"))};
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, expectedIndexes);
 }

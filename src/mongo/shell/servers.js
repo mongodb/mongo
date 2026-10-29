@@ -58,6 +58,10 @@ MongoRunner.getMongoShellPath = function () {
 };
 
 MongoRunner.getExtensionPath = function (shared_library_name) {
+    const testSrcDir = _getEnv("TEST_SRCDIR");
+    if (testSrcDir) {
+        return pathJoin(testSrcDir, "_main", "install-extensions", "lib", shared_library_name);
+    }
     return MongoRunner.getInstallPath("..", "lib", shared_library_name);
 };
 
@@ -135,13 +139,14 @@ MongoRunner.VersionSub = function (pattern, version) {
         print(`Running hang analyzer for pids [${pids}]`);
 
         const scriptPath = pathJoin(".", "buildscripts", "resmoke.py");
-        // We are using a raw "python" rather than selecting the approperate python here
-        // This is because as part of SERVER-79663 we noticed that servers.js is included in the legacy
-        // shell
+        // Prefer the interpreter resmoke itself is running under, exported as RESMOKE_PYTHON. When
+        // RESMOKE_PYTHON is unset we fall back to a raw "python": as part of SERVER-79663 we noticed
+        // that servers.js is included in the legacy shell.
         // See hang-analyzer argument options here:
         // https://github.com/10gen/mongo/blob/8636ede10bd70b32ff4b6cd115132ab0f22b89c7/buildscripts/resmokelib/hang_analyzer/hang_analyzer.py#L245
+        const python = _getEnv("RESMOKE_PYTHON") || "python";
         const args = [
-            "python",
+            python,
             scriptPath,
             "hang-analyzer",
             "-c",
@@ -217,7 +222,7 @@ MongoRunner.binVersionSubs = [
     new MongoRunner.VersionSub("latest", shellVersion()),
     new MongoRunner.VersionSub("last-continuous", fcvConstants.lastContinuous),
     new MongoRunner.VersionSub("last-lts", fcvConstants.lastLTS),
-    new MongoRunner.VersionSub("last-patch", shellVersion()),
+    new MongoRunner.VersionSub("last-patch", fcvConstants.latest),
 ];
 
 MongoRunner.getBinVersionFor = function (version) {
@@ -242,13 +247,18 @@ MongoRunner.getBinVersionFor = function (version) {
 };
 
 /**
- * Returns true if two version strings could represent the same version. This is true
+ * Returns true if two version strings could represent the same *version*. This is true
  * if, after passing the versions through getBinVersionFor, the versions share the same
  * value for every component (major, minor, and patch) up through the length of the
  * shorter version.
  *
  * That is, 3.2 compares equal to 3.2.4 (the patch component of the longer version is
  * not examined), but 3.2.3 does not compare equal to 3.2.4.
+ *
+ * Pre-release tags and git hashes are ignored where they trail the shorter version, so
+ * 9.1.0 and 9.1.0-rc1021 are the same version -- different *builds* of it. Use
+ * getBuildVersion() and isSameBuild() when builds must be told apart (e.g. a
+ * release-candidate last-patch binary vs the mainline build).
  *
  * Two versions whose pre-release or build metadata differ (e.g. 9.0.0-rc1 vs 9.0.0-rc2,
  * or two git hashes) are reported as not the same.
@@ -264,6 +274,31 @@ MongoRunner.areBinVersionsTheSame = function (versionA, versionB) {
         // non-numeric component such as a pre-release tag or git hash.
         return false;
     }
+};
+
+/**
+ * Returns the *build version* for a version string or alias (e.g. "latest",
+ * "last-patch"): the exact version string identifying a binary *build*, with aliases
+ * resolved. Two binaries are the same build if and only if their build versions are
+ * equal.
+ *
+ * Contrast with the *version* (see areBinVersionsTheSame()), which abstracts away
+ * pre-release tags and git hashes: 9.1.0 and 9.1.0-rc1021 are different builds of the
+ * same version.
+ */
+MongoRunner.getBuildVersion = function (version) {
+    return MongoRunner.getBinVersionFor(version);
+};
+
+/**
+ * Returns true if two version strings refer to the same *build*: their build versions
+ * (see getBuildVersion()) are exactly equal, pre-release tags and git hashes included.
+ *
+ * Same build implies same version (areBinVersionsTheSame()); the converse does not
+ * hold.
+ */
+MongoRunner.isSameBuild = function (versionA, versionB) {
+    return MongoRunner.getBuildVersion(versionA) === MongoRunner.getBuildVersion(versionB);
 };
 
 /**
@@ -771,11 +806,7 @@ MongoRunner.mongodOptions = function (opts = {}) {
     _removeSetParameterIfBeforeVersion(opts, "defaultConfigCommandTimeoutMS", "7.3.0");
     _removeSetParameterIfBeforeVersion(opts, "enableAutoCompaction", "7.3.0");
     _removeSetParameterIfBeforeVersion(opts, "opentelemetryTraceDirectory", "8.3.0");
-    _removeSetParameterIfBeforeVersion(
-        opts,
-        "initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs",
-        "9.0.0",
-    );
+    _removeSetParameterIfBeforeVersion(opts, "reshardingDocumentVerification", "9.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";
@@ -1354,6 +1385,14 @@ function appendSetParameterArgs(argArray) {
                 }
             }
         } else if (baseProgramName === "mongod") {
+            // TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
+            if (programMajorMinorVersion >= 900) {
+                argArray.push(
+                    "--setParameter",
+                    "featureFlagListIndexesAlwaysIncludesSimpleCollation=false",
+                );
+            }
+
             if (jsTestOptions().roleGraphInvalidationIsFatal) {
                 argArray.push(...["--setParameter", "roleGraphInvalidationIsFatal=true"]);
             }

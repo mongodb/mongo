@@ -178,8 +178,9 @@ private:
 
   OPENTELEMETRY_API_SINGLETON static nostd::shared_ptr<RuntimeContextStorage> &GetStorage() noexcept
   {
-    static nostd::shared_ptr<RuntimeContextStorage> context(GetDefaultStorage());
-    return context;
+    // intentionally leak
+    static auto context = new nostd::shared_ptr<RuntimeContextStorage>(GetDefaultStorage());
+    return *context;
   }
 };
 

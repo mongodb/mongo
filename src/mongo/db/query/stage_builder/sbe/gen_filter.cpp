@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -155,12 +130,12 @@ struct MatchExpressionVisitorContext {
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
                                   bool isFilterOverIxscan,
-                                  bool canUsePathArrayness)
+                                  boost::optional<NamespaceString> pathArraynessNss)
         : state{state},
           rootSlot{rootSlot},
           slots{slots},
           isFilterOverIxscan{isFilterOverIxscan},
-          canUsePathArrayness{canUsePathArrayness} {
+          pathArraynessNss{std::move(pathArraynessNss)} {
         tassert(
             7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
@@ -212,9 +187,9 @@ struct MatchExpressionVisitorContext {
     boost::optional<SbSlot> rootSlot;
     const PlanStageSlots* slots = nullptr;
     bool isFilterOverIxscan = false;
-    // When true, the filter runs over raw documents from expCtx->getNamespaceString(), so
-    // PathArrayness data for that namespace may be consulted to elide traverseF.
-    bool canUsePathArrayness = false;
+    // When set, the filter runs over raw documents from this namespace, whose PathArrayness
+    // metadata may be consulted to elide traverseF.
+    boost::optional<NamespaceString> pathArraynessNss;
 };
 
 enum class LeafTraversalMode {
@@ -284,7 +259,7 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     auto makeResultExpr = [&](const SbExpr& innerInputExpr, bool innerCanPathBeArray) -> SbExpr {
         return isLeafField ? makePredicate(innerInputExpr.clone())
                            : generateTraverseF(innerInputExpr.clone(),
-                                               boost::none /* topLevelFieldSlot */,
+                                               /*topLevelFieldSlot=*/boost::none,
                                                fp,
                                                level + 1,
                                                frameIdGenerator,
@@ -296,27 +271,24 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     };
 
     if (omitTraverseF) {
-        return makeResultExpr(fieldExpr, false /* canPathBeArray */);
+        auto& opDebug = CurOp::get(state.opCtx)->debug();
+        opDebug.pathArraynessSimplified = true;
+        return makeResultExpr(fieldExpr, /*canPathBeArray=*/false);
     }
 
     auto lambdaFrameId = frameIdGenerator->generate();
     auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
 
-    auto resultExpr = makeResultExpr(lambdaParam, true /* canPathBeArray */);
+    auto resultExpr = makeResultExpr(lambdaParam, /*canPathBeArray=*/true);
 
     if (isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) {
         return b.makeLet(
             lambdaFrameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(resultExpr));
     }
 
-    // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
-    if (needsNothingCheck) {
-        // Add a check that will return false if the lambda's parameter is not an object. This
-        // effectively allows us to skip over cases where we would be calling getField() on a scalar
-        // value or an array and getting back Nothing. The subset of such cases where we should
-        // return true is handled by the previous level before execution would reach here.
+    if (needsNothingCheck && state.legacyDottedPathNullSemantics) {
+        // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
         auto cond = b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsObject, lambdaParam.clone()));
-
         resultExpr = b.makeIf(std::move(cond), std::move(resultExpr), b.makeBoolConstant(false));
     }
 
@@ -340,18 +312,36 @@ SbExpr generateTraverseF(SbExpr inputExpr,
 
     // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
     if (needsNothingCheck) {
-        // If the result of getField() was Nothing or a scalar value, then don't bother traversing
-        // the remaining levels of the path and just decide now if we should return true or false
-        // for this value.
-        traverseFExpr =
-            b.makeIf(b.makeFillEmptyFalse(
-                         b.makeFunction(sbe::EFn::kTypeMatch,
-                                        fieldExpr.clone(),
-                                        b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
-                                                            getBSONTypeMask(BSONType::object)))),
-                     std::move(traverseFExpr),
-                     !inputExpr.isNull() ? b.makeFunction(sbe::EFn::kExists, inputExpr.clone())
-                                         : b.makeBoolConstant(true));
+        if (!state.legacyDottedPathNullSemantics) {
+            // If the result of getField() was Nothing or a scalar value, then don't bother
+            // traversing the remaining levels of the path and just decide now to return true for
+            // this value.
+            traverseFExpr = b.makeIf(b.makeFillEmptyFalse(b.makeFunction(
+                                         sbe::EFn::kTypeMatch,
+                                         fieldExpr.clone(),
+                                         b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                                             getBSONTypeMask(BSONType::object)))),
+                                     std::move(traverseFExpr),
+                                     b.makeBoolConstant(true));
+            // Since a non-existent document is considered equal to Null, an array with no values
+            // also matches. Check for this case and return true without entering traverseF.
+            traverseFExpr = b.makeIf(
+                b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsArrayEmpty, fieldExpr.clone())),
+                b.makeBoolConstant(true),
+                std::move(traverseFExpr));
+        } else {
+            // Pre-SERVER-36681 behavior: skip traversal for non-array/non-object fields,
+            // falling back to an existence check on the parent.
+            traverseFExpr =
+                b.makeIf(b.makeFillEmptyFalse(b.makeFunction(
+                             sbe::EFn::kTypeMatch,
+                             fieldExpr.clone(),
+                             b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                                 getBSONTypeMask(BSONType::object)))),
+                         std::move(traverseFExpr),
+                         !inputExpr.isNull() ? b.makeFunction(sbe::EFn::kExists, inputExpr.clone())
+                                             : b.makeBoolConstant(true));
+        }
     }
 
     if (frameId) {
@@ -432,9 +422,15 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             "Expected either input expr or top-level field slot to be defined",
             !frame.inputExpr.isNull() || topLevelFieldSlot.has_value());
 
-    const bool canPathBeArray = !context->canUsePathArrayness ||
-        context->state.expCtx->canPathBeArrayForNss(path,
-                                                    context->state.expCtx->getNamespaceString());
+    // $elemMatch object expressions push a frame before visiting the child.
+    const bool canPathBeArray = !isFieldPathOnRootDoc || !context->pathArraynessNss.has_value() ||
+        context->state.expCtx->canPathBeArrayForNss(path, *context->pathArraynessNss);
+
+    // Update metrics.
+    if (context->pathArraynessNss.has_value()) {
+        auto& opDebug = CurOp::get(context->state.opCtx)->debug();
+        opDebug.pathArraynessLeadingFilter = true;
+    }
 
     frame.pushExpr(generateTraverseF(frame.inputExpr.clone(),
                                      topLevelFieldSlot,
@@ -962,10 +958,12 @@ public:
         // 'bsonRegex' and are considered equal to any of the regexes. For the case where both
         // regexes and equalities are present, we use the "logicOr" operator to combine the logic
         // for equalities with the logic for regexes.
-        sbe::value::TagValueOwned pcreRegexes{sbe::value::makeNewArray()};
+        sbe::value::TagValueOwned pcreRegexes =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
         auto pcreArr = sbe::value::getArrayView(pcreRegexes.value());
 
-        sbe::value::TagValueOwned regexSet{sbe::value::makeNewArraySet()};
+        sbe::value::TagValueOwned regexSet =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet());
         auto regexArrSet = sbe::value::getArraySetView(regexSet.value());
 
         if (auto& regexes = expr->getRegexes(); regexes.size() > 0) {
@@ -973,7 +971,7 @@ public:
 
             for (auto&& r : regexes) {
                 auto [pcreRegexTag, pcreRegexVal] =
-                    sbe::makeNewPcreRegex(r->getString(), r->getFlags());
+                    sbe::makeNewPcreRegex(r->getString(), r->getFlags()).releaseToRaw();
                 pcreArr->push_back_raw(pcreRegexTag, pcreRegexVal);
 
                 auto [regexSetTag, regexSetVal] =
@@ -1295,15 +1293,22 @@ SbExpr generateFilter(StageBuilderState& state,
                       boost::optional<SbSlot> rootSlot,
                       const PlanStageSlots& slots,
                       bool isFilterOverIxscan,
-                      bool canUsePathArrayness) {
+                      const boost::optional<NamespaceString>& pathArraynessNss) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
         return SbExpr{};
     }
 
-    MatchExpressionVisitorContext context{
-        state, rootSlot, root, &slots, isFilterOverIxscan, canUsePathArrayness};
+    const bool canUsePathArrayness = pathArraynessNss.has_value() &&
+        state.expCtx->getQueryKnobConfiguration().getEnablePathArraynessTraverseFElision();
+
+    MatchExpressionVisitorContext context{state,
+                                          rootSlot,
+                                          root,
+                                          &slots,
+                                          isFilterOverIxscan,
+                                          canUsePathArrayness ? pathArraynessNss : boost::none};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};
@@ -1322,7 +1327,8 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
     // Build an array set of bit positions for the bitmask, and remove duplicates in the
     // bitPositions vector since duplicates aren't handled in the match expression parser by
     // checking if an item has already been seen.
-    sbe::value::TagValueOwned bitPosArr{sbe::value::makeNewArray()};
+    sbe::value::TagValueOwned bitPosArr =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
 
     auto arr = sbe::value::getArrayView(bitPosArr.value());
     if (bitPositions.size()) {
@@ -1595,7 +1601,7 @@ SbExpr generateRegexExpr(StageBuilderState& state,
             return compiledRegexSlot;
         } else {
             auto [compiledRegexTag, compiledRegexVal] =
-                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
+                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()).releaseToRaw();
             return b.makeConstant(compiledRegexTag, compiledRegexVal);
         }
     }();

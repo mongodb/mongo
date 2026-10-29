@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 
@@ -149,7 +123,7 @@ StageConstraints DocumentSourceVectorSearch::constraints(PipelineSplitState pipe
 
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kFirst,
-                                 HostTypeRequirement::kAnyShard,
+                                 HostTypeRequirement::kTargetedShards,
                                  DiskUseRequirement::kNoDiskUse,
                                  FacetRequirement::kNotAllowed,
                                  TransactionRequirement::kNotAllowed,
@@ -164,6 +138,14 @@ StageConstraints DocumentSourceVectorSearch::constraints(PipelineSplitState pipe
 }
 
 Value DocumentSourceVectorSearch::serialize(const query_shape::SerializationOptions& opts) const {
+    // For re-parseable output, strip the synthesized 'view' field — the LiteParse layer rejects
+    // it from non-internal clients, and it will be re-bound on re-parse.
+    if (opts.serializeForReparse) {
+        auto spec = _stageSpec.hasField(kViewFieldName) ? _stageSpec.removeField(kViewFieldName)
+                                                        : _stageSpec;
+        return Value(Document{{kStageName, std::move(spec)}});
+    }
+
     if (!opts.isKeepingLiteralsUnchanged()) {
         BSONObjBuilder builder;
 
@@ -233,17 +215,21 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
 
     auto spec = elem.embeddedObject();
 
-    // Validate the source of the view if it exists on the spec, otherwise check expCtx for the
-    // view.
+    // Reject any user attempt to inject the security-trusted, mongod-owned fields (the mongot
+    // command name, collection UUID, and authorized view name) into the $vectorSearch spec.
+    search_helpers::validateUserSpecDoesNotOverrideTrustedFields(spec);
+
+    // Source the view from the spec if present, otherwise from expCtx. Rejection of an
+    // externally-supplied 'view' field happens at the LiteParse layer
+    // (validateInternalSearchFieldsNotSetByUser); by the time we reach createFromBson, a 'view'
+    // field on the spec is either internal-client-supplied or was synthesized by a prior parse
+    // (e.g. $rankFusion's hybrid-search reparse path).
     boost::optional<SearchQueryViewSpec> view = search_helpers::getViewFromBSONObj(spec);
-    if (view) {
-        search_helpers::validateViewNotSetByUser(expCtx, spec);
-    } else if ((view = search_helpers::getViewFromExpCtx(expCtx))) {
+    if (!view && (view = search_helpers::getViewFromExpCtx(expCtx))) {
         spec = spec.addField(BSON(kViewFieldName << view->toBSON()).firstElement());
     }
 
     if (view) {
-        search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
         search_index_view_validation::validate(*view);
     }
 

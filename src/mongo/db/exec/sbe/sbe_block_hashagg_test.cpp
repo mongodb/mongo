@@ -1,39 +1,16 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #include <algorithm>
 #include <functional>
@@ -105,13 +82,11 @@ public:
     }
 
     static TypedValue makeArray(std::vector<TypedValue> vals) {
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard(arrTag, arrVal);
+        value::TagValueOwned arrOwner = value::TagValueOwned::fromRaw(value::makeNewArray());
         for (auto [t, v] : vals) {
-            value::getArrayView(arrVal)->push_back_raw(t, v);
+            value::getArrayView(arrOwner.value())->push_back(value::TagValueOwned::fromRaw(t, v));
         }
-        guard.reset();
-        return {arrTag, arrVal};
+        return arrOwner.releaseToRaw();
     }
 
     // This helper takes an array of groupby results and compares to the expectedMap of group ID to
@@ -163,10 +138,10 @@ public:
 
                 // Check the expected results for each accumulator.
                 for (size_t accIdx = 0; accIdx < expectedVals.size(); accIdx++) {
-                    assertValuesEqual(results[accIdx + keySize][rowIdx].first,
-                                      results[accIdx + keySize][rowIdx].second,
-                                      value::TypeTags::NumberInt32,
-                                      value::bitcastTo<int32_t>(expectedVals[accIdx]));
+                    ASSERT_SBE_VALUE_EQ(results[accIdx + keySize][rowIdx].first,
+                                        results[accIdx + keySize][rowIdx].second,
+                                        value::TypeTags::NumberInt32,
+                                        value::bitcastTo<int32_t>(expectedVals[accIdx]));
                 }
 
                 // Delete from the expected map so we know we get the results exactly once.
@@ -263,7 +238,7 @@ public:
                                                      std::move(aggs),
                                                      allowDiskUse,
                                                      std::move(mergingExprs),
-                                                     nullptr /* yieldPolicy */,
+                                                     /*yieldPolicy=*/nullptr,
                                                      kEmptyPlanNodeId,
                                                      true,
                                                      forceIncreasedSpilling);
@@ -280,24 +255,26 @@ public:
             if (!bucket.ids.empty()) {
                 for (auto& id : bucket.ids) {
                     auto clone = id->clone();
-                    arr->push_back_raw(value::TypeTags::valueBlock,
-                                       value::bitcastFrom<value::ValueBlock*>(clone.release()));
+                    arr->push_back(value::TagValueOwned::fromRaw(
+                        value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(clone.release())));
                 }
             } else {
-                auto [cpTag, cpVal] =
-                    value::copyValue(bucket.scalarId.first, bucket.scalarId.second);
-                arr->push_back_raw(cpTag, cpVal);
+                arr->push_back(value::TagValueOwned::fromRaw(
+                    value::copyValue(bucket.scalarId.first, bucket.scalarId.second)));
             }
 
             // Append corresponding bitset.
             auto bitsetBlock = makeBoolBlock(bucket.bitset);
-            arr->push_back_raw(sbe::value::TypeTags::valueBlock,
-                               value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release()));
+            arr->push_back(value::TagValueOwned::fromRaw(
+                sbe::value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())));
 
             for (const auto& block : bucket.dataBlocks) {
                 auto clone = block->clone();
-                arr->push_back_raw(value::TypeTags::valueBlock,
-                                   value::bitcastFrom<value::ValueBlock*>(clone.release()));
+                arr->push_back(value::TagValueOwned::fromRaw(
+                    value::TypeTags::valueBlock,
+                    value::bitcastFrom<value::ValueBlock*>(clone.release())));
             }
 
             bucketVals.push_back(std::pair(arrTag, arrVal));
@@ -314,7 +291,7 @@ public:
                                    makeFn,
                                    forceSpill,
                                    assertStageStats);
-        value::ValueGuard resultGuard{result};
+        value::TagValueOwned resultOwner = value::TagValueOwned::fromRaw(result);
         assertResultMatchesMap(result, expectedResultsMap, expectedOutputBlockSizes);
     }
 
@@ -411,29 +388,165 @@ public:
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
-                                  false /* allowDiskUse */,
-                                  false /* forceIncreasedSpilling */,
+                                  /*allowDiskUse=*/false,
+                                  /*forceIncreasedSpilling=*/false,
                                   assertNoSpillStats);
         runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
-                                  true /* allowDiskUse */,
-                                  true /* forceIncreasedSpilling */,
+                                  /*allowDiskUse=*/true,
+                                  /*forceIncreasedSpilling=*/true,
                                   assertFirstBatchSpillingStats);
         runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
-                                  true /* allowDiskUse */,
-                                  false /* forceIncreasedSpilling */,
+                                  /*allowDiskUse=*/true,
+                                  /*forceIncreasedSpilling=*/false,
                                   assertForceSpillingStats);
 
     }  // runBlockHashAggTest
 
+    // Returns the (inUse, peak) memory-tracking stats currently recorded in this operation's CurOp.
+    // The SBE BlockHashAggStage's memory tracker reports these values to CurOp via the
+    // operation-wide memory tracker.
+    std::pair<int64_t, int64_t> getCurOpMemoryStats() {
+        CurOp* curOp = CurOp::get(operationContext());
+        return {curOp->getInUseTrackedMemoryBytes(), curOp->getPeakTrackedMemoryBytes()};
+    }
+
+    // Bundle that keeps a prepared-and-run BlockHashAggStage (plus everything it depends on) alive
+    // so a caller can inspect memory-tracking state before the stage is destroyed.
+    struct RunResult {
+        std::unique_ptr<CompileCtx> ctx;
+        std::unique_ptr<PlanStage> stage;
+        value::TagValueOwned results;
+    };
+
+    // Builds a BlockHashAggStage that groups a set of scalar-key buckets and sums an integer data
+    // block per group, runs it to completion, and returns the still-open stage so the caller can
+    // inspect its memory tracker and the CurOp stats.
+    RunResult runScalarKeySumBlockHashAgg() {
+        constexpr size_t kNumScanSlots = 3;  // scalar id, bitset, data block.
+
+        // Build one bucket per distinct group key so that a handful of groups are held in memory.
+        std::vector<TypedValue> bucketVals;
+        for (int32_t id = 0; id < 20; ++id) {
+            value::TagValueOwned rowOwner = value::TagValueOwned::fromRaw(value::makeNewArray());
+            auto* row = value::getArrayView(rowOwner.value());
+
+            row->push_back(value::TagValueOwned::fromRaw(makeInt32(id)));
+
+            auto bitsetBlock = makeBoolBlock({true, true, true});
+            row->push_back(value::TagValueOwned::fromRaw(
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())));
+
+            auto dataBlock = makeInt32sBlock({1, 2, 3});
+            row->push_back(value::TagValueOwned::fromRaw(
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(dataBlock->clone().release())));
+
+            bucketVals.push_back(rowOwner.releaseToRaw());
+        }
+        value::TagValueOwned inputOwned = value::TagValueOwned::fromRaw(makeArray(bucketVals));
+
+        auto makeStageFn = [this](value::SlotVector scanSlots,
+                                  std::unique_ptr<PlanStage> scanStage) {
+            value::SlotVector idSlots{scanSlots[0]};
+            value::SlotVector outputSlots{scanSlots[0]};
+            auto bitsetInSlot = scanSlots[1];
+
+            auto accumulatorBitset = generateSlotId();
+            auto internalSlot = generateSlotId();
+            value::SlotVector dataInSlots{scanSlots[2]};
+            value::SlotVector accDataSlots{internalSlot};
+
+            BlockAggExprTupleVector aggs;
+            auto outputSlot = generateSlotId();
+            aggs.emplace_back(
+                outputSlot,
+                BlockAggExprTuple{nullptr,
+                                  makeFunction(EFn::kValueBlockAggSum,
+                                               makeE<EVariable>(accumulatorBitset),
+                                               makeE<EVariable>(internalSlot)),
+                                  makeFunction(EFn::kSum, makeE<EVariable>(internalSlot))});
+            outputSlots.push_back(outputSlot);
+
+            auto mergeInternalSlot = generateSlotId();
+            SlotExprPairVector mergingExprs;
+            mergingExprs.emplace_back(mergeInternalSlot,
+                                      makeFunction(EFn::kSum, makeE<EVariable>(mergeInternalSlot)));
+
+            auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
+                                                     idSlots,
+                                                     bitsetInSlot,
+                                                     dataInSlots,
+                                                     accDataSlots,
+                                                     accumulatorBitset,
+                                                     std::move(aggs),
+                                                     /*allowDiskUse=*/false,
+                                                     std::move(mergingExprs),
+                                                     /*yieldPolicy=*/nullptr,
+                                                     kEmptyPlanNodeId,
+                                                     true,
+                                                     /*forceIncreasedSpilling=*/false);
+            return std::make_pair(outputSlots, std::move(outStage));
+        };
+
+        auto ctx = makeCompileCtx();
+        auto [scanSlots, scanStage] =
+            generateVirtualScanMulti(kNumScanSlots, std::move(inputOwned));
+        auto [outputSlots, stage] = makeStageFn(scanSlots, std::move(scanStage));
+        auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
+        value::TagValueOwned results =
+            value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), resultAccessors));
+        return {std::move(ctx), std::move(stage), std::move(results)};
+    }
+
 private:
     std::unique_ptr<Lock::GlobalLock> _globalLock;
 };
+
+// The SBE BlockHashAggStage's operation memory tracker only pushes memory-usage updates to CurOp
+// when usage crosses a chunk boundary. With a chunk size larger than anything this small
+// aggregation consumes, the tracker never crosses a boundary, so nothing is reported to CurOp while
+// the stage still holds its memory, even though the stage-local tracker reflects the exact usage.
+TEST_F(BlockHashAggStageTest, MemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                             100 * 1024 * 1024);
+
+    auto run = runScalarKeySumBlockHashAgg();
+
+    // The stage-local tracker reflects exact, non-zero usage that is still being held.
+    ASSERT_GT(run.stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(run.stage->getMemoryTracker()->peakTrackedMemoryBytes(), 0);
+
+    // But because usage never crossed the (large) chunk boundary, CurOp was never updated.
+    auto [curOpInUse, curOpPeak] = getCurOpMemoryStats();
+    ASSERT_EQ(curOpInUse, 0);
+    ASSERT_EQ(curOpPeak, 0);
+}
+
+// With a chunk size of 1 byte the tracker reports on essentially every add(), so CurOp ends up
+// mirroring the stage-local tracker's usage. This confirms that the SBE BlockHashAggStage's tracker
+// actually consults the chunk-size knob.
+TEST_F(BlockHashAggStageTest, MemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
+    unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
+
+    auto run = runScalarKeySumBlockHashAgg();
+
+    auto stageInUse = run.stage->getMemoryTracker()->inUseTrackedMemoryBytes();
+    auto stagePeak = run.stage->getMemoryTracker()->peakTrackedMemoryBytes();
+    ASSERT_GT(stageInUse, 0);
+
+    auto [curOpInUse, curOpPeak] = getCurOpMemoryStats();
+    ASSERT_EQ(curOpInUse, stageInUse);
+    ASSERT_EQ(curOpPeak, stagePeak);
+}
 
 TEST_F(BlockHashAggStageTest, NoData) {
     std::vector<Bucket> buckets;

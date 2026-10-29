@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,6 +7,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/type_system/type.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -84,6 +60,63 @@ struct DeadField {
     boost::intrusive_ptr<mongo::DocumentSource> stage;
     /// The field path that was introduced.
     FieldPath path;
+};
+
+/**
+ * Classifies where a field path came from, resolved by a single hop (see resolveFieldOrigin).
+ */
+enum class FieldOriginKind : uint8_t {
+    /**
+     * The field path passed through unchanged from the pipeline input (the base document).
+     * The reported input path is the same as the queried path.
+     * Examples:
+     * 1. {$project: {a: 1}}
+     * 2. {$set: {b: 1}}
+     *    > the origin of 'a' is {kBaseDocument, inputField="a"}
+     */
+    kBaseDocument,
+    /**
+     * The field path is a value-preserving alias of another path (a "simple" rename). The aliased
+     * path is reported. Prefix-aliases are also applied.
+     * Examples:
+     * 1. {$set: {a: '$b'}}
+     *    > The origin of 'a' is {kAlias, inputField="b"}
+     *    > The origin of 'a.x' is {kAlias, inputField="b.x"}
+     *    > The origin of 'a.x.y' is {kAlias, inputField="b.x.y"}
+     * 2. {$set: {a: '$b.c'}} (requires canPathBeArray('b') == false to guard array traversal)
+     *    > The origin of 'a' is {kAlias, inputField="b.c"}
+     * 3. {$set: {'a.b': '$c'}} (requires canPathBeArray('a') == false to guard reshaping)
+     *    > The origin of 'a.b' is {kAlias, inputField="c"}
+     * If the requirements are not met, the origin kind is reported as kOther.
+     */
+    kAlias,
+    /**
+     * The field path is produced by a sub-pipeline (e.g. a $lookup "as" field). The path from the
+     * sub-pipeline is reported.
+     * Examples:
+     * 1. {$lookup: {as: 'a', pipeline: [{$set: 'b'}]}}, {$unwind: 'a'}
+     *    > The origin of 'a.b' is {kSubpipeline, inputField='b'}
+     *    > The origin of 'a.b.x' is {kSubpipeline, inputField='b.x'}
+     */
+    kSubpipeline,
+    /**
+     * The field path is modified in any other way which prevents further origin resolution.
+     * This could be because the path is removed, computed, reshaped, required array traversal of
+     * the source path and so on.
+     */
+    kOther,
+};
+
+/**
+ * Result of resolving a field path's origin.
+ */
+struct FieldOrigin {
+    /// The kind of operation which produced the path in the query.
+    FieldOriginKind kind;
+    /// The stage which modified the field. nullptr only for kBaseDocument.
+    boost::intrusive_ptr<mongo::DocumentSource> modifyingStage;
+    /// The prior path which produced the path in the query. none only for kOther.
+    boost::optional<std::string> inputField;
 };
 
 /**
@@ -161,10 +194,59 @@ public:
     boost::optional<Value> getConstant(const DocumentSource* stage, PathRef path) const;
 
     /**
+     * Returns the result of getType(). Only used for testing.
+     */
+    type_system::Type getType_forTest(const DocumentSource* stage, PathRef path) const;
+
+    /**
+     * Returns the stages we run type inference on when getType() is called for the given stage and
+     * path.
+     */
+    std::vector<const DocumentSource*> getPossiblyNarrowingStages_forTest(
+        const DocumentSource* stage, PathRef path) const;
+
+    /**
      * Returns the dependency graph for the sub-pipeline of the given stage (e.g. $lookup,
      * $unionWith), or nullptr if the stage has no sub-pipeline.
      */
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* stage) const;
+
+    /**
+     * Returns the field path, visible at the input of 'stage', that is a value-preserving alias of
+     * the base-document (collection) field 'baseDocumentPath'. If 'stage' is nullptr, resolves at
+     * the end of the pipeline. Returns boost::none when no visible alias exists.
+     *
+     * Prefix aliases are resolved: querying 'b.x' returns 'a.x' for {$project: {a: '$b'}}.
+     * When several aliases reach the queried path, the one that yields the fewest visible path
+     * components is returned, breaking ties lexicographically.
+     *
+     * Examples:
+     * 1. {$project: {a: '$b'}}
+     *    getBaseDocumentFieldAlias(nullptr, "b") -> "a"
+     *    getBaseDocumentFieldAlias(nullptr, "b.x") -> "a.x"
+     *    getBaseDocumentFieldAlias(nullptr, "c") -> boost::none (unknown field)
+     * 2. {$set: {a: '$b'}}
+     *    getBaseDocumentFieldAlias(nullptr, "b") -> "a"
+     * 3. {$project: {'p.q': '$a', r: '$a.x', s: '$a.x'}}
+     *    getBaseDocumentFieldAlias(nullptr, "a.x") -> "r"
+     *    'p.q' resolves to 'p.q.x', which is longer than 'r' and 's', and 'r' wins.
+     */
+    boost::optional<FieldPath> getBaseDocumentFieldAlias(const DocumentSource* stage,
+                                                         PathRef baseDocumentPath) const;
+
+    /**
+     * Like 'getBaseDocumentFieldAlias', but returns every aliasing path rather than the shortest.
+     */
+    OrderedPathSet getAllBaseDocumentFieldAliases_forTest(const DocumentSource* stage,
+                                                          PathRef baseDocumentPath) const;
+
+    /**
+     * Resolves 'path', as seen at the input of 'stage', back by a single hop toward its origin.
+     * If 'stage' is nullptr, the path is resolved as it appears at the end of the pipeline.
+     *
+     * See FieldOrigin for more information.
+     */
+    FieldOrigin resolveFieldOrigin(const DocumentSource* stage, PathRef path) const;
 
     /**
      * Invalidate and recompute the graph from the stage pointed to by 'stageIt' onwards. If
@@ -240,6 +322,17 @@ public:
     BSONObj toBSON() const;
 
 private:
+    /**
+     * Returns the type of the path at the input of 'stage'. If nothing can be said about the type,
+     * returns Type::any(). If 'stage' is nullptr, the path is evaluated as it appears at the end of
+     * the pipeline.
+     *
+     * The result is the type of the aggregation expression '$<path>'. This is not necessarily the
+     * same type the matcher sees for 'path', since the matcher's array traversal semantics are
+     * different in some cases.
+     */
+    type_system::Type getType(const DocumentSource* stage, PathRef path) const;
+
     class Impl;
     std::unique_ptr<Impl> _impl;
 };

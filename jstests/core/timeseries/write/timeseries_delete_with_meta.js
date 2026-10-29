@@ -3,9 +3,12 @@
  * bucket document by targeting them with their meta field value.
  *
  * @tags: [
+ *   uses_explain,
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
+ *   # This test uses multi-deletes (limit: 0), which cannot be retried during FCV time-series transformations.
+ *   requires_multi_updates,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  * ]
@@ -55,10 +58,16 @@ TimeseriesTest.run((insert) => {
                 testDB.runCommand({explain: deleteCommand, verbosity: "executionStats"}),
             );
             jsTestLog(tojson(explain));
+            // Check the executed plan rather than the winning query plan: when the delete is
+            // multi-planned, the V3 explain shape shows the candidates' find-shaped trial trees
+            // in the query planner section, and the write stage root appears only in the
+            // execution section (where it is present in the legacy shape too).
+            const executionStages = explain.executionStats.executionStages;
             assert(
-                planHasStage(testDB, explain.queryPlanner.winningPlan, "BATCHED_DELETE") ||
-                    planHasStage(testDB, explain.queryPlanner.winningPlan, "DELETE") ||
-                    planHasStage(testDB, explain.queryPlanner.winningPlan, "TS_MODIFY"),
+                planHasStage(testDB, executionStages, "BATCHED_DELETE") ||
+                    planHasStage(testDB, executionStages, "DELETE") ||
+                    planHasStage(testDB, executionStages, "TS_MODIFY"),
+                explain,
             );
         }
 

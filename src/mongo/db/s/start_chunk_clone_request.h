@@ -1,39 +1,13 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -51,6 +25,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObjBuilder;
 template <typename T>
@@ -62,7 +37,7 @@ class StatusWith;
 class StartChunkCloneRequest {
 public:
     static constexpr auto kSupportsCriticalSectionDuringCatchUp =
-        "supportsCriticalSectionDuringCatchUp"_sd;
+        "supportsCriticalSectionDuringCatchUp"sv;
 
     /**
      * Parses the input command and produces a request corresponding to its arguments.
@@ -74,6 +49,8 @@ public:
      * Constructs a start chunk clone command with the specified parameters and writes it to the
      * builder, without closing the builder. The builder must be empty, but callers are free to
      * append more fields once the command has been constructed.
+     *
+     * TODO (SERVER-127253) Make enclosingChunk parameter non-optional once v9.0 branches out.
      */
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
@@ -87,7 +64,9 @@ public:
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
                                 const BSONObj& shardKeyPattern,
-                                const MigrationSecondaryThrottleOptions& secondaryThrottle);
+                                const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                                const boost::optional<ChunkRange>& enclosingChunk,
+                                bool isAuthoritative);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -134,12 +113,28 @@ public:
         return _maxKey;
     }
 
+    // The donor chunk enclosing the migrated range.
+    // Present only on the authoritative path (driven by the MoveRangeCoordinator), so its presence
+    // is also the signal that the recipient should run the shard-catalog PIT-reachability check.
+    const boost::optional<ChunkRange>& getEnclosingChunk() const {
+        return _enclosingChunk;
+    }
+
     const BSONObj& getShardKeyPattern() const {
         return _shardKeyPattern;
     }
 
     const MigrationSecondaryThrottleOptions& getSecondaryThrottle() const {
         return _secondaryThrottle;
+    }
+
+    // Whether the migration is driven by a MoveRangeCoordinator, which commits authoritatively.
+    // On the authoritative path the recipient does not need to force a filtering-metadata refresh
+    // when it starts receiving the chunk, because the post-migration metadata is installed into the
+    // shard catalog directly. Absent on the legacy path, which defaults this to false.
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    bool isAuthoritative() const {
+        return _isAuthoritative;
     }
 
 private:
@@ -168,11 +163,21 @@ private:
     BSONObj _minKey;
     BSONObj _maxKey;
 
+    // The donor chunk that encloses the migrated range (equal to it for a whole-chunk move, wider
+    // for a moveRange that splits the chunk). Absent on requests from a pre-upgrade donor and on
+    // the legacy (non-authoritative) path.
+    // TODO (SERVER-127253) Make this parameter non-optional once v9.0 branches out.
+    boost::optional<ChunkRange> _enclosingChunk;
+
     // Shard key pattern used by the collection
     BSONObj _shardKeyPattern;
 
     // The parsed secondary throttle options
     MigrationSecondaryThrottleOptions _secondaryThrottle;
+
+    // Whether the migration commits authoritatively (driven by a MoveRangeCoordinator).
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    bool _isAuthoritative{false};
 };
 
 }  // namespace mongo

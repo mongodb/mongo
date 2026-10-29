@@ -242,15 +242,25 @@ const zoneShardingTestCases = [
         index: {[metaField]: 1, [timeField]: 1},
         shardKey: {[metaField]: 1, [timeField]: 1},
     });
-    assert.commandWorked(
-        mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: collNss}),
-    );
-    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+    if (
+        !FeatureFlagUtil.isPresentAndEnabled(
+            mongo.getPrimaryShard(dbName),
+            "AuthoritativeShardsCRUD",
+        )
+    ) {
         assert.commandWorked(
-            mongo.getPrimaryShard(dbName).adminCommand({
-                _flushRoutingTableCacheUpdates: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-            }),
+            mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: collNss}),
         );
+        if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+            assert.commandWorked(
+                mongo.getPrimaryShard(dbName).adminCommand({
+                    _flushRoutingTableCacheUpdates: getTimeseriesCollForDDLOps(
+                        db,
+                        coll,
+                    ).getFullName(),
+                }),
+            );
+        }
     }
     const shardingStateRes = mongo.getPrimaryShard(dbName).adminCommand({shardingState: 1});
     const shardingStateColls = shardingStateRes.versions;

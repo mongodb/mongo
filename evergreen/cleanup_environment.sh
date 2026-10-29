@@ -12,6 +12,7 @@ rm -rf \
     mongo-*.zst \
     ~/.aws \
     ~/.boto \
+    ~/.netrc \
     venv \
     /data/install \
     /data/multiversion

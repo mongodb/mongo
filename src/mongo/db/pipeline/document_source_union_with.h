@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -68,6 +41,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 struct UnionWithSharedState {
     enum class ExecutionProgress {
@@ -109,22 +83,21 @@ struct UnionWithSharedState {
 };
 
 
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceUnionWith final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$unionWith"_sd;
+    static constexpr std::string_view kStageName = "$unionWith"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     // Builds a DocumentSourceUnionWith from pre-parsed StageParams.
-    // Performs expCtx-dependent validations (hasForeignDB, hybrid search timeseries).
+    // Performs expCtx-dependent validations (hybrid search timeseries).
     static DocumentSourceContainer createFromStageParams(
         UnionWithStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
-                            std::vector<BSONObj> pipeline,
-                            bool hasForeignDB = false);
+                            std::vector<BSONObj> pipeline);
 
     // Constructor used by createFromStageParams(): accepts pre-parsed StageParams for the
     // subpipeline together with the user-facing fields that the copy constructor and serialize()
@@ -136,8 +109,7 @@ public:
                             NamespaceString unionNss,
                             StageParamsPipeline subpipelineStageParams,
                             std::vector<BSONObj> userPipeline,
-                            ResolvedNamespace resolvedBackingNss,
-                            bool hasForeignDB);
+                            ResolvedNamespace resolvedBackingNss);
 
     // Expose a constructor that skips the parsing step for testing purposes.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -170,7 +142,7 @@ public:
         StageConstraints unionConstraints(
             StreamType::kStreaming,
             PositionRequirement::kNone,
-            HostTypeRequirement::kAnyShard,
+            HostTypeRequirement::kTargetedShards,
             DiskUseRequirement::kNoDiskUse,
             FacetRequirement::kAllowed,
             TransactionRequirement::kNotAllowed,
@@ -270,9 +242,6 @@ public:
                                                  DocumentSourceContainer* container);
 
     boost::intrusive_ptr<DocumentSource> optimize() {
-        // Propagate query settings from the parent before optimizing.
-        _sharedState->_pipeline->getContext()->setQuerySettingsIfNotPresent(
-            getExpCtx()->getQuerySettings());
         pipeline_optimization::optimizePipeline(*_sharedState->_pipeline);
         return this;
     }
@@ -284,12 +253,16 @@ private:
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 
-    // Builds the complete {$unionWith: {coll: ..., db: ..., pipeline: ...}} Value from
-    // pre-computed components. Handles collectionless and cross-db variations.
-    Value buildUnionWithResult(Value pipelineValue, Value db, Value coll) const;
+    // Builds the complete {$unionWith: {coll: ..., pipeline: ...}} Value from
+    // pre-computed components. Handles collectionless variations.
+    Value buildUnionWithResult(Value pipelineValue, Value coll) const;
 
     // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
     Value legacyUnionWithSerialize(const query_shape::SerializationOptions& opts) const;
+
+    // Appends the internal-only isHybridSearch flag to a serialized spec when appropriate.
+    void appendIsHybridSearchFlag(MutableDocument& spec,
+                                  const query_shape::SerializationOptions& opts) const;
 
     std::shared_ptr<UnionWithSharedState> _sharedState;
 
@@ -312,10 +285,6 @@ private:
     // $unionWith with a view. Otherwise we wouldn't be able to see details about the execution of
     // the view pipeline in the explain result.
     boost::optional<ResolvedNamespace> _resolvedNsForView;
-
-    // States whether this unionWith is crossDB and thus needs to serialize the db name in the
-    // namespace.
-    bool _hasForeignDB = false;
 
     bool _fromNsIsAView = false;
 };

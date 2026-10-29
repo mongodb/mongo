@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -128,13 +102,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenBasicAscending) {
                          BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4))},
                         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, TwoChildrenBasicDescending) {
@@ -143,13 +117,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenBasicDescending) {
          BSON_ARRAY(BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2) << BSON_ARRAY(1 << 1))},
         std::vector<value::SortDirection>{value::SortDirection::Descending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(5 << 4 << 3 << 2 << 1));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(5 << 4 << 3 << 2 << 1)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, TwoChildrenOneEmpty) {
@@ -157,13 +131,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenOneEmpty) {
         makeSortedMerge({BSONArray(), BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2))},
                         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 2)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, TwoChildrenWithDuplicates) {
@@ -172,13 +146,13 @@ TEST_F(SortedMergeStageTest, TwoChildrenWithDuplicates) {
                          BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2))},
                         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 1 << 1 << 2));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 1 << 1 << 2)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 
 TEST_F(SortedMergeStageTest, FiveChildren) {
@@ -191,13 +165,12 @@ TEST_F(SortedMergeStageTest, FiveChildren) {
                     << BSON_ARRAY(10 << 10) << BSON_ARRAY(11 << 11) << BSON_ARRAY(12 << 12))},
         std::vector<value::SortDirection>{value::SortDirection::Ascending});
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(1 << 1 << 1 << 1 << 2 << 3 << 4 << 4 << 5 << 10 << 11 << 12));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(1 << 1 << 1 << 1 << 2 << 3 << 4 << 4 << 5 << 10 << 11 << 12)));
 
-    auto [resultsTag, resultsVal] = getAllResults(sortedMerge.get(), resultAccessors[0]);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned results =
+        value::TagValueOwned::fromRaw(getAllResults(sortedMerge.get(), resultAccessors[0]));
 
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    ASSERT_TRUE(valueEquals(results.tag(), results.value(), expected.tag(), expected.value()));
 }
 }  // namespace mongo::sbe

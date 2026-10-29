@@ -1,18 +1,18 @@
 """Custom signing macros for test extensions."""
 
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 def _gpg_sign_impl(ctx):
     outs = []
-
-    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     for src in ctx.files.srcs:
         out = ctx.actions.declare_file(src.basename + ".sig")
         outs.append(out)
 
         # Inputs to this action
-        inputs = [src, ctx.file.key, ctx.file._gpg_signer]
+        host_python = ctx.exec_groups["host"].toolchains["@rules_python//python:toolchain_type"].py3_runtime
+        inputs = [src, ctx.file.key, ctx.file._gpg_signer] + host_python.files.to_list()
         pass_arg = ""
         if ctx.file.passphrase:
             inputs.append(ctx.file.passphrase)
@@ -41,23 +41,31 @@ def _gpg_sign_impl(ctx):
         # Needed for remote execution: gpg binaries use RUNPATH=$ORIGIN/../libs.
         inputs += ctx.files.gpg_libs
 
-        inputs += python.files.to_list()
-
-        # Run the signer via the hermetic python toolchain (no shell involved)
+        # GPG signing is a local release/provenance action. Invoke the host
+        # container's native Python instead of resolving a foreign Python
+        # execution toolchain on IBM hosts.
         ctx.actions.run(
+            executable = host_python.interpreter.path,
             inputs = inputs,
             outputs = [out],
             tools = [],
-            executable = python.interpreter.path,
             env = env,
             arguments = [
                 ctx.file._gpg_signer.path,
-                gpg_file.path,  # $1
-                ctx.file.key.path,  # $2
-                pass_arg,  # $3 (empty if none)
-                out.path,  # $4
-                src.path,  # $5,
+                gpg_file.path,
+                ctx.file.key.path,
+                pass_arg,  # empty if none
+                out.path,
+                src.path,
             ],
+            exec_group = "host",
+            # Defense in depth: the mnemonic is forced local by the cross-RBE
+            # wrapper, but signing inputs include key material that must never
+            # be uploaded to a remote worker on any build.
+            execution_requirements = {
+                "no-remote": "1",
+                "no-sandbox": "1",
+            },
             progress_message = "Signing {}".format(src.basename),
             mnemonic = "GpgSign",
         )
@@ -84,8 +92,12 @@ gpg_sign = rule(
             default = Label("//bazel:gpg_signer.py"),
         ),
     },
-    toolchains = ["@rules_python//python:toolchain_type"],
-    fragments = ["py"],
+    exec_groups = {
+        "host": exec_group(
+            exec_compatible_with = HOST_CONSTRAINTS,
+            toolchains = ["@rules_python//python:toolchain_type"],
+        ),
+    },
 )
 
 # Extensions must be signed in order to be loaded into the server. This macros allows users to build

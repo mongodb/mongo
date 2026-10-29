@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,14 +8,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
@@ -66,7 +40,7 @@ class WiredTigerKVEngineBase;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
-extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
+extern Atomic<std::int64_t> snapshotTooOldErrorCount;
 
 class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
@@ -75,11 +49,11 @@ public:
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
      * `WiredTigerConnection`. That constructor accesses the `WiredTigerKVEngine` to find the
-     * `WiredTigerOplogManager`. However, unit tests construct `WiredTigerRecoveryUnits` with a
+     * `StorageOplogManager`. However, unit tests construct `WiredTigerRecoveryUnits` with a
      * `WiredTigerConnection` that do not have a valid `WiredTigerKVEngine`. This constructor is
      * expected to only be useful in those cases.
      */
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc, StorageOplogManager* oplogManager);
     ~WiredTigerRecoveryUnit() override;
 
     static WiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
@@ -114,6 +88,12 @@ public:
     void clearCommitTimestamp() override;
 
     Timestamp getCommitTimestamp() const override;
+
+    void setSchemaEpoch(uint64_t schemaEpoch) override;
+
+    boost::optional<uint64_t> getSchemaEpoch() const override {
+        return _schemaEpoch;
+    }
 
     void setDurableTimestamp(Timestamp timestamp) override;
 
@@ -184,18 +164,23 @@ public:
         return _readOnce;
     };
 
+    void setSizeStatsCursor(bool sizeStatsCursor) override {
+        _sizeStatsCursor = sizeStatsCursor;
+    };
+
+    bool getSizeStatsCursor() const override {
+        return _sizeStatsCursor;
+    };
+
     std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() override;
 
     void ignoreAllMultiTimestampConstraints() override {
         _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = true;
     }
 
-    void setCacheMaxWaitTimeout(Milliseconds) override;
+    void setOperationTimeout(Milliseconds) override;
 
-    void optOutOfCacheEviction() override {
-        // 1 is a magic number in WiredTiger that opts this thread out of all optional eviction.
-        setCacheMaxWaitTimeout(Milliseconds(1));
-    }
+    void optOutOfCacheEviction() override;
 
     size_t getCacheDirtyBytes() override;
 
@@ -229,9 +214,27 @@ public:
     void setOperationContext(OperationContext* opCtx) override;
 
     /**
+     * Graceful stepdown requires that table creations be published with an epoch less than the
+     * stepdown epoch if the call to create() happened before the stepdown epoch was set, and
+     * greater than the stepdown epoch if the call to create() happened after the stepdown epoch was
+     * set. Failing to do this makes publish() fail, which is a fatal error, so we need to be able
+     * to detect if a stepdown epoch was set in between create() and when we allocate a schema
+     * epoch, and roll back the operation if that happens.
+     */
+    enum class StepdownState {
+        // The table was created before a stepdown epoch was set. This includes the case where no
+        // stepdown ever happens (i.e. the common case). If there is a stepdown epoch at commit
+        // time, the table's schema epoch must be less than the stepdown epoch.
+        before,
+        // The table was created after a stepdown epoch was set. At commit time the table's
+        // schema epoch must be greater than the stepdown epoch.
+        after,
+    };
+
+    /**
      * Annotates that this RecoveryUnit has created a table.
      */
-    void onCreateTable(const char* uri);
+    void onCreateTable(const char* uri, StepdownState state);
 
 protected:
     boost::optional<Timestamp> _determineCommitTimestamp() const override;
@@ -247,11 +250,12 @@ private:
 
     void _abort();
     void _commit(boost::optional<Timestamp> commitTime);
-    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
-                                 Timestamp commitTime,
-                                 bool needsAllDurablePin);
+    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine, bool needsAllDurablePin);
+    void _setAndValidateTableTimestamps(boost::optional<Timestamp> commitTimestamp);
+    void _publishTables(boost::optional<uint64_t> schemaEpoch);
 
     void _ensureSession();
+    void _resetPerTransactionState();
     void _txnClose(bool commit);
     void _txnOpen();
 
@@ -294,8 +298,8 @@ private:
      */
     void _updateMultiTimestampConstraint(Timestamp timestamp);
 
-    WiredTigerConnection* _connection;      // not owned
-    WiredTigerOplogManager* _oplogManager;  // not owned
+    WiredTigerConnection* _connection;   // not owned
+    StorageOplogManager* _oplogManager;  // not owned
     WiredTigerManagedSession _managedSession;
     WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
@@ -319,8 +323,17 @@ private:
     // new optime, and thus always call oplogDiskLocRegister() on the record store.
     bool _orderedCommit = true;
 
+    // True if the WT transaction was already released due to commit_transaction failure.
+    // We track this to transition the RecoveryUnit to the correct state, to prevent trying to
+    // rollback the WT transaction that was already released.
+    bool _wtTransactionReleasedOnCommitFailure = false;
+
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;
+
+    // When 'true', cursors opened on this unit accumulate a per-b-tree size summary as they
+    // traverse (debug=(size_stats)).
+    bool _sizeStatsCursor = false;
 
     bool _readSourcePinned = false;
 
@@ -339,18 +352,27 @@ private:
     std::unique_ptr<Timer> _timer;
     // The guaranteed 'no holes' point in the oplog. Forward cursor oplog reads can only read up to
     // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
-    // committed ('holes'). @see WiredTigerOplogManager::getOplogReadTimestamp
+    // committed ('holes'). @see StorageOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
+    boost::optional<uint64_t> _schemaEpoch;
 
     WiredTigerStats _sessionStatsAfterLastOperation;
 
-    Milliseconds _cacheMaxWaitTimeout{0};
+    bool _ignoreCacheSize = false;
+    Milliseconds _operationTimeout{0};
 
     // Detects any attempt to reconfigure options used by an open transaction.
     OpenSnapshotOptions _optionsUsedToOpenSnapshot;
 
-    // Tracks the uris of the tables created under this recovery unit.
-    std::vector<std::string> _createdTables;
+    // Tracks the tables created under this recovery unit, each with the timestamp of the write
+    // that introduces it (the current timestamp at creation, or the commit timestamp set later).
+    // Null when the transaction never sets a timestamp.
+    struct CreatedTable {
+        std::string uri;
+        Timestamp timestamp;
+        StepdownState stepdownState;
+    };
+    std::vector<CreatedTable> _createdTables;
 };
 
 // Constructs a WiredTigerCursor::Params instance from the given params and returns it.

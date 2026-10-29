@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/index/geo/s2_access_method.h"
@@ -169,11 +143,18 @@ StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
 }
 
 StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
-    const BSONObj& specObj, boost::optional<std::set<long long>> allowedVersions) {
+    const BSONObj& specObj,
+    const VersionContext& versionContext,
+    boost::optional<std::set<long long>> allowedVersions) {
     // If the spec object doesn't have field "2dsphereIndexVersion", add the default version
-    // based on the feature flag.
+    // based on the feature flag. Consult 'versionContext' so that an in-flight createIndex
+    // command with a pinned Operation FCV evaluates the flag against its captured FCV instead
+    // of the live FCV. Without this, a concurrent setFCV transition could change the live FCV
+    // between primary spec validation and oplog application on a secondary, causing the
+    // secondary to fatal-assert on a v4 spec it should accept (SERVER-125400).
     BSONElement indexVersionElt = specObj[kIndexVersionFieldName];
-    long long defaultVersion = static_cast<long long>(index2dsphere::getDefaultS2IndexVersion());
+    long long defaultVersion =
+        static_cast<long long>(index2dsphere::getDefaultS2IndexVersion(versionContext));
     if (indexVersionElt.eoo()) {
         // Validate the default version against allowed versions if provided.
         if (allowedVersions && !allowedVersions->contains(defaultVersion)) {
@@ -214,8 +195,9 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
             case S2_INDEX_VERSION_3:
                 break;
             case S2_INDEX_VERSION_4: {
-                // Gate version 4 behind feature flag.
-                if (index2dsphere::getDefaultS2IndexVersion() != S2_INDEX_VERSION_4) {
+                // Gate version 4 behind feature flag, consulting 'versionContext' so a
+                // captured Operation FCV (if any) is honored.
+                if (index2dsphere::getDefaultS2IndexVersion(versionContext) != S2_INDEX_VERSION_4) {
                     return Status(ErrorCodes::CannotCreateIndex,
                                   "2dsphereIndexVersion 4 requires feature flag "
                                   "'featureFlag2dsphereIndexVersion4' to be enabled");
@@ -230,8 +212,9 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
 }
 
 // static
-StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
-    return S2AccessMethod::_fixSpecHelper(specObj);
+StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj,
+                                            const VersionContext& versionContext) {
+    return S2AccessMethod::_fixSpecHelper(specObj, versionContext);
 }
 
 // static

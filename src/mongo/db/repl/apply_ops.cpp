@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/apply_ops.h"
 
@@ -33,6 +7,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/oplog_key_entry_handler.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -58,12 +35,14 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <array>
 #include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -76,6 +55,78 @@ namespace {
 
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
+
+}  // namespace
+
+namespace detail {
+
+// The DDL command ops whose applyOps execution resolves the target collection from the op's UUID
+// rather than from the collection named in the command body.
+constexpr std::array kUUIDTargetedDDLCommands{
+    OplogEntry::CommandType::kDrop,
+    OplogEntry::CommandType::kDropIndexes,
+    OplogEntry::CommandType::kCollMod,
+    OplogEntry::CommandType::kRenameCollection,
+};
+
+bool isAuthorizedForUUIDTargetedCommand(AuthorizationSession* authSession,
+                                        OplogEntry::CommandType cmdType,
+                                        const NamespaceString& nss) {
+    if (!authSession) {
+        return true;
+    }
+    switch (cmdType) {
+        case OplogEntry::CommandType::kDrop:
+            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropCollection);
+        case OplogEntry::CommandType::kDropIndexes:
+            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropIndex);
+        case OplogEntry::CommandType::kCollMod:
+            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::collMod);
+        case OplogEntry::CommandType::kRenameCollection: {
+            // Mirror the source-side requirements of renameCollection authorization: the caller
+            // must be able to read the source and either drop it (cross-database rename) or rename
+            // within its database.
+            const bool canReadSource =
+                authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::find);
+            const bool canDropSource =
+                authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropCollection);
+            const bool canRenameInDb = authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(nss.dbName()), ActionType::renameCollectionSameDB);
+            return canReadSource && (canDropSource || canRenameInDb);
+        }
+        default:
+            return true;
+    }
+}
+
+void checkAuthForUUIDTargetedCommand(OperationContext* opCtx, const OplogEntry& entry) {
+    const auto cmdType = entry.getCommandType();
+    if (!entry.getUuid() ||
+        !std::any_of(kUUIDTargetedDDLCommands.begin(),
+                     kUUIDTargetedDDLCommands.end(),
+                     [&](auto command) { return command == cmdType; })) {
+        return;
+    }
+
+    const auto nssFromUUID =
+        CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *entry.getUuid());
+    if (!nssFromUUID) {
+        return;
+    }
+
+    auto* authSession = AuthorizationSession::get(opCtx->getClient());
+    uassert(ErrorCodes::Unauthorized,
+            fmt::format("not authorized to run '{}' against the collection '{}' that the applyOps "
+                        "ui '{}' resolves to",
+                        entry.getObject().firstElement().fieldNameStringData(),
+                        nssFromUUID->toStringForErrorMsg(),
+                        entry.getUuid()->toString()),
+            isAuthorizedForUUIDTargetedCommand(authSession, cmdType, *nssFromUUID));
+}
+
+}  // namespace detail
+
+namespace {
 
 Status _applyOps(OperationContext* opCtx,
                  const ApplyOpsCommandInfo& info,
@@ -122,6 +173,11 @@ Status _applyOps(OperationContext* opCtx,
                     }
                     auto entry = uassertStatusOK(OplogEntry::parse(builder.done()));
 
+                    uassert(
+                        ErrorCodes::InvalidOptions,
+                        "applyOps command does not support the internal `needsRetryImage` field",
+                        !entry.getNeedsRetryImage());
+
                     // VersionContext fixes a FCV snapshot over the opCtx, making FCV-gated feature
                     // flags checks in secondaries behave as they did on the primary, thus ensuring
                     // correct application even if the FCV changed due to a concurrent setFCV.
@@ -134,6 +190,13 @@ Status _applyOps(OperationContext* opCtx,
                         case OpTypeEnum::kContainerInsert:
                         case OpTypeEnum::kContainerUpdate:
                         case OpTypeEnum::kContainerDelete: {
+                            // Container ops (ci/cu/cd) are internal-only. A direct applyOps
+                            // invocation may still run them when the container-writes feature flag
+                            // and test commands are both enabled. Every other oplogApplicationMode
+                            // is client-controlled and must not be trusted to indicate real oplog
+                            // application, so it is only permitted when
+                            // opCtx->writesAreReplicated() is false, i.e. this is genuinely not a
+                            // user-issued applyOps.
                             if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
                                 uassert(ErrorCodes::InvalidOptions,
                                         "Container ops are not enabled",
@@ -143,6 +206,10 @@ Status _applyOps(OperationContext* opCtx,
                                                     serverGlobalParams.featureCompatibility
                                                         .acquireFCVSnapshot()) &&
                                             getTestCommandsEnabled());
+                            } else {
+                                uassert(ErrorCodes::InvalidOptions,
+                                        "Container ops are not enabled",
+                                        !opCtx->writesAreReplicated());
                             }
                             auto op = ApplierOperation{&entry};
                             uassertStatusOK(
@@ -174,6 +241,10 @@ Status _applyOps(OperationContext* opCtx,
                                 uassertStatusOK(applyCommand_inlock(
                                     opCtx, ApplierOperation{&entry}, oplogApplicationMode));
                                 return Status::OK();
+                            }
+
+                            if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
+                                detail::checkAuthForUUIDTargetedCommand(opCtx, entry);
                             }
                             uassertStatusOK(applyCommand_inlock(
                                 opCtx, ApplierOperation{&entry}, oplogApplicationMode));
@@ -350,7 +421,7 @@ Status applyOps(OperationContext* opCtx,
         globalWriteLock.reset();
     }
     return _applyOps(
-        opCtx, info, dbName, oplogApplicationMode, result, &numApplied, nullptr /* opsBuilder */);
+        opCtx, info, dbName, oplogApplicationMode, result, &numApplied, /*opsBuilder=*/nullptr);
 }
 
 }  // namespace repl

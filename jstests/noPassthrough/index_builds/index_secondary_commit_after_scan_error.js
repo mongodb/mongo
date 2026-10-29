@@ -53,6 +53,9 @@ assert.commandWorked(
     secondaryDB.adminCommand({configureFailPoint: "failIndexBuildOnCommit", mode: "alwaysOn"}),
 );
 
+// On Windows builds, triggering a failure will result in writing a minidump, disable this.
+secondaryDB.adminCommand({setParameter: 1, win32MinidumpEnabled: false});
+
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 try {

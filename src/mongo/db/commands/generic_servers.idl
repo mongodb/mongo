@@ -1,30 +1,5 @@
-# Copyright (C) 2021-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 global:
     cpp_namespace: "mongo"
 
@@ -65,12 +40,24 @@ structs:
             memSizeMB: long
             memLimitMB: long
             numCores: int
-            numCoresAvailableToProcess: int
-            numPhysicalCores: int
-            numCpuSockets: int
-            cpuArch: string
-            numaEnabled: bool
-            numNumaNodes: int
+            numCoresAvailableToProcess:
+                type: int
+                optional: true
+            numPhysicalCores:
+                type: int
+                optional: true
+            numCpuSockets:
+                type: int
+                optional: true
+            cpuArch:
+                type: string
+                optional: true
+            numaEnabled:
+                type: bool
+                optional: true
+            numNumaNodes:
+                type: int
+                optional: true
 
     hostInfoOsReply:
         description: "hostInfo.os reply fields"
@@ -84,18 +71,23 @@ structs:
         is_command_reply: true
         fields:
             system: hostInfoSystemReply
-            os: hostInfoOsReply
+            os:
+                type: hostInfoOsReply
+                optional: true
 
             # extra is operating system specific
             extra:
                 description: "Extra system information from ProcessInfo"
                 type: object
+                optional: true
 
     getCmdLineOptsReply:
         description: "Command line options as passed to the server executable on startup"
         is_command_reply: true
         fields:
-            argv: array
+            argv:
+                type: array
+                optional: true
             parsed: object
 
 commands:

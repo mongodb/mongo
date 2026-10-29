@@ -1,0 +1,524 @@
+/**
+ * End to end test that DDL operations invalidate cached join plans, and only when they need to.
+ * Verifies via the serverStatus counters that after a join query shape has been cached (and is being
+ * served from the cache), a DDL operation on a referenced collection forces the next identical query
+ * to miss the cache and re-optimize -- but only if it changed an index relevant to that plan. A DDL
+ * which bumps the collection's version tag while leaving every node's relevant-index fingerprint
+ * intact must leave the entry usable, as should a DDL that drops or hides a relevant index that the
+ * cached plan does not use.
+ *
+ * @tags: [
+ *   requires_fcv_91,
+ *   requires_sbe,
+ * ]
+ */
+
+import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {getAllPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {assertAllJoinsUseMethod, joinPlanCacheStatsDelta} from "jstests/libs/query/join_utils.js";
+
+describe("join plan cache DDL invalidation", function () {
+    // Test-wide, created once in before(): the mongod stays up for the whole test.
+    let conn;
+    let db;
+    // Reset each test by resetCollections() (see beforeEach).
+    let baseColl;
+    let foreignColl;
+    let pipeline;
+    let runSpec;
+
+    before(function () {
+        conn = MongoRunner.runMongod({
+            setParameter: {
+                internalEnableJoinOptimization: true,
+                internalEnableJoinPlanCache: true,
+            },
+        });
+        db = conn.getDB(jsTestName());
+    });
+
+    after(function () {
+        MongoRunner.stopMongod(conn);
+    });
+
+    // (Re)creates the foreign collection in a known clean state with a fresh UUID. Extracted so the
+    // renameCollection test can recreate it at the same name (new UUID) to exercise UUID-mismatch
+    // invalidation.
+    function createForeignColl() {
+        foreignColl = db[jsTestName() + "_a"];
+        foreignColl.drop();
+        assert.commandWorked(
+            foreignColl.insertMany([
+                {a: 1, c: "foo", d: 1},
+                {a: 1, c: "bar", d: 2},
+                {a: 2, c: "baz", d: 1},
+                {a: 2, c: "qux", d: 2},
+            ]),
+        );
+        // Index for multikeyness info for path arrayness.
+        assert.commandWorked(foreignColl.createIndex({dummy: 1, a: 1, c: 1, d: 1}));
+    }
+
+    // (Re)creates the shared base + foreign collections in a known clean state and rebuilds the
+    // shared runSpec. Called from beforeEach so every test starts from pristine collections (no
+    // leftover indexes from a prior test).
+    function resetCollections() {
+        baseColl = db[jsTestName()];
+        baseColl.drop();
+        assert.commandWorked(
+            baseColl.insertMany([
+                {a: 1, b: 1, d: 1},
+                {a: 1, b: 2, d: 2},
+                {a: 2, b: 1, d: 1},
+                {a: 2, b: 2, d: 2},
+            ]),
+        );
+        // Index for multikeyness info for path arrayness.
+        assert.commandWorked(baseColl.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
+
+        createForeignColl();
+
+        pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    as: "foreignColl",
+                },
+            },
+            {$unwind: "$foreignColl"},
+        ];
+
+        // The shared runSpec passed to runOnce() by the tests that use the base+foreign pair.
+        runSpec = {coll: baseColl, pipeline, expectedResultCount: 8};
+    }
+
+    beforeEach(function () {
+        // Clear the plan cache and reset the collections to a known clean state as test may create indexes that shouldn't affect other tests.
+        assert.commandWorked(db.adminCommand({clearJoinPlanCache: 1}));
+        resetCollections();
+        // Reset the forced join method so a test that forces INLJ (and fails before resetting) can't
+        // leak that setting into later tests.
+        setForcedJoinMethod("any");
+    });
+
+    // Runs 'pipeline' on 'coll' once, asserts the result size, and returns whether that run hit or
+    // missed the join plan cache: {hit, miss} as booleans, derived from the change in the cumulative
+    // serverStatus counters. A run that is ineligible for join optimization (e.g. a referenced
+    // collection no longer exists) touches the cache for neither, so both are false.
+    function runOnce({coll, pipeline, expectedResultCount}) {
+        const {hitDelta, missDelta} = joinPlanCacheStatsDelta(db, () => {
+            assert.eq(coll.aggregate(pipeline).toArray().length, expectedResultCount);
+        });
+        assert.lte(hitDelta + missDelta, 1, "a single run cannot both hit and miss the cache", {
+            hitDelta,
+            missDelta,
+        });
+        return {hit: hitDelta === 1, miss: missDelta === 1};
+    }
+
+    // Primes the cache from a freshly reset collection state: the first run must miss and cache the
+    // plan, the second must be served from the cache (hit). Leaves the entry warm for the DDL under
+    // test. Relies on beforeEach's resetCollections making the first run a deterministic miss.
+    function primeCache(runSpec) {
+        assert.eq(runOnce(runSpec).miss, true, "first run should miss and cache the plan");
+        assert.eq(runOnce(runSpec).hit, true, "second run should be served from the cache");
+    }
+
+    // Forces (or clears, with "any") the join method for all joins. This is a server knob, not a
+    // query hint, so unlike a hint it does NOT disable the join plan cache.
+    function setForcedJoinMethod(method) {
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalJoinMethod: method}));
+    }
+
+    // Asserts, via a separate explain (which bypasses the plan cache), that every join in the shared
+    // pipeline's current plan is an indexed nested loop join -- i.e. it really uses the {a: 1} seek
+    // index. Guards the "index used by the cached plan" tests: if the plan stops using INLJ (e.g.
+    // heuristics change), this fails loudly instead of the test silently exercising an unused index.
+    function assertPipelineUsesInlj() {
+        assertAllJoinsUseMethod(baseColl.explain().aggregate(pipeline), "INLJ");
+    }
+
+    // Returns the indexes in 'candidates' that 'explain's winning plan does not read from.
+    function getUnusedIndexes(explain, candidates) {
+        const used = new Set(
+            getAllPlanStages(getWinningPlanFromExplain(explain))
+                .filter((stage) => stage.indexName !== undefined)
+                .map((stage) => stage.indexName),
+        );
+        return candidates.filter((name) => !used.has(name));
+    }
+
+    // The pipeline joins on 'a' and has no single-table predicates, so 'a' is the only field
+    // relevant to either node. An index whose key pattern avoids 'a' therefore bumps the
+    // collection version without changing any node's relevant-index fingerprint, and the entry
+    // must survive; an index on 'a' must invalidate it.
+
+    it("re-caches (misses) after createIndex on a relevant field of a referenced collection", function () {
+        primeCache(runSpec);
+
+        // A new index on the join field may enable an INLJ that was unavailable when the cached
+        // plan was chosen, so the entry must not be reused.
+        assert.commandWorked(foreignColl.createIndex({a: 1}));
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "run after createIndex on the foreign collection's join field should miss the cache",
+        );
+        // And it should be cached again afterwards.
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    it("does not invalidate after createIndex on an irrelevant field of a referenced collection", function () {
+        primeCache(runSpec);
+
+        assert.commandWorked(foreignColl.createIndex({e: 1}));
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after createIndex on an irrelevant field should still hit the cache",
+        );
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "a second run after an irrelevant DDL should also hit the cache",
+        );
+    });
+
+    it("does not invalidate after createIndex on an irrelevant field of the base collection", function () {
+        primeCache(runSpec);
+
+        assert.commandWorked(baseColl.createIndex({f: 1}));
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after createIndex on the base collection should still hit the cache",
+        );
+    });
+
+    it("does not invalidate after dropIndex on an irrelevant index in a referenced collection", function () {
+        // Create a throwaway index the join can never use, warm the cache, then drop it. The drop
+        // bumps the collection version, but the relevant-index fingerprints are unchanged, so the
+        // entry is revalidated rather than replanned.
+        assert.commandWorked(foreignColl.createIndex({ddltmp: 1}));
+
+        primeCache(runSpec);
+
+        assert.commandWorked(foreignColl.dropIndex({ddltmp: 1}));
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after dropIndex on an irrelevant index should still hit the cache",
+        );
+    });
+
+    it("does not invalidate after collMod on an irrelevant index of a referenced collection", function () {
+        // Use an auxiliary index the join does NOT use, so collMod refreshes an index entry (the
+        // thing that bumps the collection version) without changing the query's plan or its
+        // eligibility for the join plan cache. (collMod'ing a query-relevant index, e.g. hiding it,
+        // would make the query uncacheable and defeat the point of this test.)
+        assert.commandWorked(foreignColl.createIndex({aux: 1}));
+
+        primeCache(runSpec);
+
+        // collMod on an index routes through IndexCatalog::refreshEntry, which bumps
+        // collectionVersion; the fingerprints then show the change was irrelevant to this plan.
+        assert.commandWorked(
+            foreignColl.runCommand("collMod", {
+                index: {keyPattern: {aux: 1}, hidden: true},
+            }),
+        );
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after collMod on an irrelevant index should still hit the cache",
+        );
+    });
+
+    // An index DDL can also change the join plan cache key itself, because 'makeJoinPlanCacheKey'
+    // embeds each node's indexability discriminators, and those are built from every ready index
+    // on the collection (see CollectionQueryInfo::PlanCacheState). A path carrying a predicate
+    // gains discriminators when an index covers it, and a partial index adds a global one. So a
+    // DDL touching a *filtered* field produces a miss by looking up a different key, not by
+    // invalidating an entry -- which is why the tests above use the join field 'a', whose paths
+    // carry no single-table predicate and therefore contribute no discriminators.
+    it("revalidates the original entry when an index on a filtered field is created then dropped", function () {
+        // This pipeline filters the base collection on 'b', so 'b' is a predicate-bearing path and
+        // an index on it shifts this shape's key.
+        const filteredPipeline = [{$match: {b: {$gt: 0}}}, ...pipeline];
+        const filteredSpec = {
+            coll: baseColl,
+            pipeline: filteredPipeline,
+            expectedResultCount: 8,
+        };
+
+        // Caches an entry E under key K1, the key computed with no index on 'b'.
+        primeCache(filteredSpec);
+
+        // Creating {b: 1} adds discriminators for path 'b', so the same pipeline now hashes to a
+        // different key K2. The miss is a lookup of a key that has never been cached; E is
+        // untouched and still sits under K1.
+        assert.commandWorked(baseColl.createIndex({b: 1}));
+
+        assert.eq(
+            runOnce(filteredSpec).miss,
+            true,
+            "createIndex on a filtered field should move the shape to a new, uncached key",
+        );
+        assert.eq(runOnce(filteredSpec).hit, true, "the new key should now be cached");
+
+        // Dropping it restores the discriminators, so the shape hashes back to K1 and finds E.
+        // Two DDLs have bumped the base collection's version since E was cached, so its tags no
+        // longer validate -- but the catalog is back to the state E was planned against, so its
+        // relevant-index fingerprints still match and E is reused rather than replanned. This is
+        // the revalidation path, reached with a genuinely long-stale entry.
+        assert.commandWorked(baseColl.dropIndex({b: 1}));
+
+        assert.eq(
+            runOnce(filteredSpec).hit,
+            true,
+            "the original entry should be revalidated by its fingerprints despite stale tags",
+        );
+    });
+
+    it("re-caches (misses) when a relevant index appears alongside an irrelevant one", function () {
+        primeCache(runSpec);
+
+        // One collection's DDL is benign, the other's is not. Revalidating the first must not mask
+        // the second.
+        assert.commandWorked(baseColl.createIndex({f: 1}));
+        assert.commandWorked(foreignColl.createIndex({a: 1}));
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "a relevant change on one collection should invalidate despite a benign change on another",
+        );
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    it("re-caches (misses) after collMod unhides a relevant index", function () {
+        // Hidden indexes are excluded from the INLJ-eligible set, so while hidden this index is
+        // invisible to the fingerprints. Unhiding makes it usable, which the cache must react to
+        // the same way it reacts to a newly created index.
+        assert.commandWorked(foreignColl.createIndex({a: 1}, {hidden: true}));
+
+        primeCache(runSpec);
+
+        assert.commandWorked(
+            foreignColl.runCommand("collMod", {
+                index: {keyPattern: {a: 1}, hidden: false},
+            }),
+        );
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "run after unhiding a relevant index should miss the cache",
+        );
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    it("re-caches (misses) after dropIndex on an index used by the cached plan", function () {
+        // {a: 1} on the foreign collection provides an INLJ seek path on the join field 'a'. Force
+        // INLJ while priming so the cached plan deterministically uses this index (rather than a
+        // cost-based hash join on small data), and verify the plan shape. Reset the method before
+        // the drop so the post-drop re-plan can fall back to a hash join and stay cacheable.
+        assert.commandWorked(foreignColl.createIndex({a: 1}));
+
+        setForcedJoinMethod("INLJ");
+        primeCache(runSpec);
+        assertPipelineUsesInlj();
+        setForcedJoinMethod("any");
+
+        // Dropping an index the cached plan uses must invalidate it. The foreign collection keeps
+        // its other index, so the query stays eligible and the run is a miss, not a fallback.
+        assert.commandWorked(foreignColl.dropIndex({a: 1}));
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "run after dropIndex on an index used by the cached plan should miss the cache",
+        );
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    const CANDIDATE_SEEK_INDEXES = ["seekA", "seekAC"];
+
+    // Create 2 INLJ-eligible indexes on the join field such that the optimizer can consider 2 alternative indexes.
+    function createCandidateSeekIndexes() {
+        assert.commandWorked(foreignColl.createIndex({a: 1}, {name: "seekA"}));
+        assert.commandWorked(foreignColl.createIndex({a: 1, c: 1}, {name: "seekAC"}));
+    }
+
+    it("does not invalidate after dropIndex on a relevant index the cached plan does not use", function () {
+        createCandidateSeekIndexes();
+
+        setForcedJoinMethod("INLJ");
+        primeCache(runSpec);
+        assertPipelineUsesInlj();
+        const unused = getUnusedIndexes(
+            baseColl.explain().aggregate(pipeline),
+            CANDIDATE_SEEK_INDEXES,
+        );
+        // Guards against silently dropping the index the plan does use.
+        assert.eq(1, unused.length, "exactly one candidate index should go unused", {unused});
+        setForcedJoinMethod("any");
+
+        // Dropped index is INLJ-eligible and relevant to the join field but was not used so dropping it shouldn't invalidate the cache entry.
+        assert.commandWorked(foreignColl.dropIndex(unused[0]));
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after dropIndex on a relevant but unused index should still hit the cache",
+        );
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "a second run after the revalidated entry adopted the new state should also hit",
+        );
+    });
+
+    it("does not invalidate when an unused relevant index is dropped and recreated", function () {
+        // The fingerprints record the index set the optimizer weighed when it chose this plan, so
+        // recreating an identical index restores exactly that state: the plan is still the one the
+        // optimizer would pick, and replanning could not change it.
+        createCandidateSeekIndexes();
+
+        setForcedJoinMethod("INLJ");
+        primeCache(runSpec);
+        assertPipelineUsesInlj();
+        const unused = getUnusedIndexes(
+            baseColl.explain().aggregate(pipeline),
+            CANDIDATE_SEEK_INDEXES,
+        );
+        // Guards against silently dropping the index the plan does use.
+        assert.eq(1, unused.length, "exactly one candidate index should go unused", {unused});
+        setForcedJoinMethod("any");
+
+        const recreateSpec = foreignColl.getIndexes().find((index) => index.name === unused[0]);
+        assert.commandWorked(foreignColl.dropIndex(unused[0]));
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "dropping an unused relevant index should not invalidate",
+        );
+
+        assert.commandWorked(foreignColl.createIndex(recreateSpec.key, {name: recreateSpec.name}));
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "recreating that index restores the state the plan was chosen in, so it should still hit",
+        );
+    });
+
+    it("re-caches (misses) after a relevant index is recreated with a different definition", function () {
+        assert.commandWorked(foreignColl.createIndex({a: 1}, {name: "seek"}));
+
+        primeCache(runSpec);
+
+        // Same name, different key pattern. The fingerprint covers each index's full definition,
+        // not just its name, so this must not be mistaken for the index the plan was built
+        // against.
+        assert.commandWorked(foreignColl.dropIndex("seek"));
+        assert.commandWorked(foreignColl.createIndex({a: -1}, {name: "seek"}));
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "run after redefining a relevant index under the same name should miss the cache",
+        );
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    it("re-caches (misses) after collMod on an index used by the cached plan", function () {
+        // {a: 1} on the foreign collection provides an INLJ seek path on the join field 'a'. Force
+        // INLJ while priming so the cached plan deterministically uses this index, and verify the
+        // plan shape. Reset the method before the collMod so the post-collMod re-plan can fall back
+        // to a hash join and stay cacheable.
+        assert.commandWorked(foreignColl.createIndex({a: 1}));
+
+        setForcedJoinMethod("INLJ");
+        primeCache(runSpec);
+        assertPipelineUsesInlj();
+        setForcedJoinMethod("any");
+
+        // collMod-hiding an index the cached plan uses routes through refreshEntry and must
+        // invalidate. The foreign collection keeps its other index, so the query stays eligible and
+        // the run is a miss.
+        assert.commandWorked(
+            foreignColl.runCommand("collMod", {
+                index: {keyPattern: {a: 1}, hidden: true},
+            }),
+        );
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "run after collMod on an index used by the cached plan should miss the cache",
+        );
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+    });
+
+    it("does not invalidate on a DDL to an unrelated collection", function () {
+        primeCache(runSpec);
+
+        // A DDL on a collection not referenced by the query must NOT invalidate the cached plan.
+        const unrelatedColl = db["unrelated"];
+        assert.commandWorked(unrelatedColl.insert({x: 1}));
+        assert.commandWorked(unrelatedColl.createIndex({x: 1}));
+
+        assert.eq(
+            runOnce(runSpec).hit,
+            true,
+            "run after a DDL on an unrelated collection should still hit the cache",
+        );
+
+        unrelatedColl.drop();
+    });
+
+    // The following two tests document why renameCollection does NOT need to bump the collection
+    // version: correctness after a rename is preserved by (1) the eligibility gate requiring the
+    // referenced collection to exist, and (2) the per-collection UUID tag.
+    it("renaming a referenced collection away makes the query ineligible (no cache use)", function () {
+        primeCache(runSpec);
+
+        // Rename the foreign collection away. The pipeline still references the old name, which no
+        // longer exists, so the query is ineligible for join optimization and must not consult the
+        // join plan cache at all (neither a hit nor a miss). $unwind drops the now-empty lookups.
+        assert.commandWorked(foreignColl.renameCollection("rename_foreign_moved"));
+
+        const deltas = runOnce({...runSpec, expectedResultCount: 0});
+        assert.eq(deltas.hit, false, "ineligible query must not hit the join plan cache", deltas);
+        assert.eq(deltas.miss, false, "ineligible query must not miss the join plan cache", deltas);
+
+        db.getCollection("rename_foreign_moved").drop();
+    });
+
+    it("recreating a referenced collection at the old name invalidates via UUID mismatch", function () {
+        primeCache(runSpec);
+
+        // Move the foreign collection aside, then recreate a NEW collection at the same name with
+        // the same data and indexes. The new collection has a different UUID, so the cached entry
+        // (keyed on the same names) is found but its stored UUID no longer matches -> the run must
+        // miss and re-optimize, even though nothing bumped the version counter.
+        assert.commandWorked(foreignColl.renameCollection("rename_foreign_moved"));
+        createForeignColl();
+
+        assert.eq(
+            runOnce(runSpec).miss,
+            true,
+            "recreated collection with a new UUID must invalidate the cached plan",
+        );
+        assert.eq(runOnce(runSpec).hit, true, "run after re-caching should hit the cache");
+
+        db.getCollection("rename_foreign_moved").drop();
+    });
+});

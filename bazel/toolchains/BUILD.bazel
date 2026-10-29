@@ -1,0 +1,25 @@
+package(default_visibility = ["//visibility:public"])
+
+# Dedicated type for pycross actions that need the IBM target C++ toolchain.
+# Keeping it separate from Bazel's standard C++ type prevents ordinary exec
+# tools (for example protobuf bootstrap compilers) from selecting the target
+# toolchain merely because the IBM cross marker is enabled.
+toolchain_type(
+    name = "mongo_pycross_cc_toolchain_type",
+)
+
+# The protobuf module registers a generic protoc toolchain that is compatible
+# with every execution platform. IBM cross builds need a higher-priority
+# variant whose compiler is constrained to the marked foreign execution
+# platform; otherwise Bazel can build protoc for the IBM target and dispatch it
+# to an x86_64/aarch64 worker. The wrapper keeps this registration in the main
+# repository so the vendored protobuf sources remain usable by other consumers.
+toolchain(
+    name = "mongo_linux_cross_protoc_toolchain",
+    exec_compatible_with = [
+        "//bazel/platforms:use_mongo_linux_cross_execution",
+    ],
+    target_compatible_with = [],
+    toolchain = "@com_google_protobuf//bazel/private/toolchains:protoc_sources",
+    toolchain_type = "@com_google_protobuf//bazel/private:proto_toolchain_type",
+)

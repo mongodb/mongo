@@ -13,6 +13,7 @@ mongo_cc_library(
     srcs = [
         ":extension_agg_stage_static_properties_gen",
         ":extension_error_types_gen",
+        ":extension_privilege_gen",
         "//src/mongo/db/extension/shared:extension_agg_stage_static_properties_validator.cpp",
     ],
     hdrs = [
@@ -36,9 +37,18 @@ idl_generator(
 )
 
 idl_generator(
+    name = "extension_privilege_gen",
+    src = "extension_privilege.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "extension_agg_stage_static_properties_gen",
     src = "extension_agg_stage_static_properties.idl",
     deps = [
+        ":extension_privilege_gen",
         "//src/mongo/db:basic_types_gen",
     ],
 )

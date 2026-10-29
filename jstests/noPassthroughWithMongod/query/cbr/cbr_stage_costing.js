@@ -3,14 +3,23 @@
  * absolute costs, which may change on recalibration, we rather assert
  * on the general principles that should always hold.
  *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
-import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getRejectedPlans,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
+import {isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -30,19 +39,19 @@ coll.createIndex({b: 1});
 coll.createIndex({a: 1, b: 1});
 coll.createIndex({b: 1, a: 1});
 for (let fieldName of ["a", "a_multikey", "b", "c", "d", "e"]) {
-    db.coll.runCommand({analyze: collName, key: fieldName});
+    db.coll.runCommand({analyze: collName, mode: "histograms", key: fieldName});
 }
 
 const collOneRowName = collName + "_one_row";
 const collOneRow = db[collOneRowName];
 collOneRow.insert({a: 1, b: 1});
-collOneRow.runCommand({analyze: collOneRowName, key: "a"});
+collOneRow.runCommand({analyze: collOneRowName, mode: "histograms", key: "a"});
 collOneRow.createIndex({a: 1});
 
 const collZeroRowsName = collName + "_zero_rows";
 const collZeroRows = db[collZeroRowsName];
 collZeroRows.createIndex({a: 1});
-collZeroRows.runCommand({analyze: collZeroRows, key: "a"});
+collZeroRows.runCommand({analyze: collZeroRows, mode: "histograms", key: "a"});
 
 // Collection used to test NDV-based seek estimation for skip-scan index scans.
 // field 'unique' has 2000 distinct values; 'binary' has 2 values (0 or 1, half each).
@@ -66,6 +75,16 @@ function planCost(cursor) {
     const explain = cursor.explain();
     const winningPlan = getWinningPlanFromExplain(explain);
     return winningPlan.costEstimate;
+}
+
+/**
+ * Asserts that no plan for 'cursor' carries a cost.
+ */
+function assertNoPlanCosted(cursor) {
+    const explain = cursor.explain();
+    [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach((plan) => {
+        assert(!isPlanCosted(plan), "expected the plan to not be costed", {plan});
+    });
 }
 
 /**
@@ -116,6 +135,7 @@ function runTest(planRankerMode) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: planRankerMode,
             }),
         );
@@ -167,12 +187,6 @@ function runTest(planRankerMode) {
 
     // Some cost assertions require actual, non-heuristic cardinality estimates
     if (planRankerMode !== "heuristicCE") {
-        // IXSCAN cost for an interval containing no documents should be small. The CE for
-        // such an interval is approximate-source zero, which clampZeroEstimates clamps to
-        // 1, so the cost matches that of a one-document interval rather than collapsing to
-        // minCost.
-        assert.between(0.0, ixscanCost({predicate: {a: {$lt: 0}}, hint: {a: 1}}), 0.005);
-
         // IXSCAN cost for an interval containing one document should be small.
         assert.between(0.0, ixscanCost({predicate: {a: {$lte: 0}}, hint: {a: 1}}), 0.005);
 
@@ -197,9 +211,11 @@ function runTest(planRankerMode) {
             ixscanCost({predicate: {a: {$lt: 1000}}, hint: {a: 1}}),
         );
 
-        // IXSCAN of same number of keys over one or more than one interval should have similar
-        // cost.
         if (planRankerMode == "samplingCE") {
+            // An IXSCAN over an interval containing no documents is estimated to scan zero keys and that is
+            // considered non estimable under sampling.
+            assertNoPlanCosted(coll.find({a: {$lt: 0}}).hint({a: 1}));
+
             // IXSCAN of same number of keys over multiple intervals will estimate a higher than
             // expected cost; estimation of seeks doesn't predict that contiguous intervals will be
             // provided.
@@ -215,6 +231,21 @@ function runTest(planRankerMode) {
                 ixscanCost({predicate: {$or: [{a: 0}, {a: 2}, {a: 4}, {a: 6}]}, hint: {a: 1}}),
             );
         } else {
+            // The CE for an IXSCAN over an interval containing no documents is approximate-source
+            // zero, which clampZeroEstimates clamps to 1 rather than collapsing to zero.
+            const ixScan = getPlanStage(
+                coll
+                    .find({a: {$lt: 0}})
+                    .hint({a: 1})
+                    .explain(),
+                "IXSCAN",
+            );
+            assert.eq(1, ixScan.cardinalityEstimate, "expected a clamped IXSCAN estimate", {
+                ixScan,
+            });
+
+            // IXSCAN of same number of keys over one or more than one interval should have similar
+            // cost.
             assert.close(
                 ixscanCost({predicate: {a: {$lte: 3}}, hint: {a: 1}}),
                 ixscanCost({predicate: {$or: [{a: 0}, {a: 1}, {a: 2}, {a: 3}]}, hint: {a: 1}}),
@@ -351,8 +382,10 @@ function runTest(planRankerMode) {
      */
 
     if (planRankerMode !== "heuristicCE") {
-        // FETCH cost should be very small if there is nothing to fetch.
-        assert.lt(rootStageCost(coll.find({a: -1}).hint({a: 1})), 0.01);
+        if (planRankerMode === "samplingCE") {
+            // Under sampling, a plan with an index scan estimated to scan zero keys is non-estimable.
+            assertNoPlanCosted(coll.find({a: -1}).hint({a: 1}));
+        }
 
         // FETCH cost should be small if there is one document to fetch.
         assert.lt(rootStageCost(coll.find({a: 1}).hint({a: 1})), 0.01);

@@ -89,7 +89,10 @@ function testServerIngress() {
 
     let error = assert.throwsWithCode(() => {
         new Mongo(conn.host, undefined, clientOpts);
-    }, [ErrorCodes.SocketException, ErrorCodes.HostUnreachable]); // Different error depending on OS
+        // Error varies by OS/transport: the server aborting the TLS handshake surfaces as a
+        // graceful peer-close (ConnectionClosedByPeer), an abortive close (HostUnreachable), or a
+        // lower-level socket error (SocketException).
+    }, [ErrorCodes.SocketException, ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer]);
     assert(error.reason.includes("handshake failed"), error.reason);
     checkLog.containsRelaxedJson(conn, 22988, {error: {code: ErrorCodes.SSLHandshakeFailed}});
 

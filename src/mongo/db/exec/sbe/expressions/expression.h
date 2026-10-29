@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -265,15 +239,10 @@ auto makeAggExprVector(Ts&&... pack) {
  */
 class EConstant final : public EExpression {
 public:
-    EConstant(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
-    EConstant(std::string_view str) {
-        // Views are non-owning so we have to make a copy.
-        std::tie(_tag, _val) = value::makeNewString(str);
-    }
-
-    ~EConstant() override {
-        value::releaseValue(_tag, _val);
-    }
+    EConstant(value::TypeTags tag, value::Value val)
+        : _val(value::TagValueOwned::fromRaw(tag, val)) {}
+    EConstant(std::string_view str)
+        : _val(value::TagValueOwned::fromRaw(value::makeNewString(str))) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -282,12 +251,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const override;
     size_t estimateSize() const final;
     std::pair<value::TypeTags, value::Value> getConstant() const {
-        return {_tag, _val};
+        return _val.raw();
     }
 
 private:
-    value::TypeTags _tag;
-    value::Value _val;
+    value::TagValueOwned _val;
 };
 
 /**
@@ -642,13 +610,8 @@ private:
  */
 class EFail final : public EExpression {
 public:
-    EFail(ErrorCodes::Error code, std::string_view message) : _code(code) {
-        std::tie(_messageTag, _messageVal) = value::makeNewString(message);
-    }
-
-    ~EFail() override {
-        value::releaseValue(_messageTag, _messageVal);
-    }
+    EFail(ErrorCodes::Error code, std::string_view message)
+        : _code(code), _message(value::TagValueOwned::fromRaw(value::makeNewString(message))) {}
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -660,8 +623,7 @@ public:
 
 private:
     ErrorCodes::Error _code;
-    value::TypeTags _messageTag;
-    value::Value _messageVal;
+    value::TagValueOwned _message;
 };
 
 /**

@@ -24,6 +24,13 @@ const rst = new ReplSetTest({
     useBridge: true,
     nodes: 3,
     settings: {chainingAllowed: false},
+    nodeOptions: {
+        setParameter: {
+            // Force off replicated fast count so the test exercises the legacy size/count tracking
+            // path.
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    },
 });
 const nodes = rst.startSet();
 rst.initiate();

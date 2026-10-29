@@ -6,9 +6,12 @@
  *   requires_sharding,
  *   uses_change_streams,
  *   requires_fcv_90,
- *   # Sanitizer variants are too slow and can not add a shard within the given 'kFutureOffsetSecs' timeframe.
+ *   # Sanitizer variants are too slow and can not add a shard within the given 'kSetupTimeoutSecs' timeframe.
  *   incompatible_aubsan,
  *   tsan_incompatible,
+ *   # Continuous config server stepdowns make addShard/moveChunk slow enough to blow past
+ *   # 'kSetupTimeoutSecs', causing the "cluster time already past future start time" setup assert.
+ *   does_not_support_stepdowns,
  * ]
  */
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
@@ -21,6 +24,7 @@ import {
     ChangeStreamTest,
     addShardToCluster,
     getClusterTime,
+    withBalancerEnabled,
 } from "jstests/libs/query/change_stream_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
@@ -29,8 +33,16 @@ describe("future startAtOperationTime with addShard", function () {
         setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
     };
 
-    // Seconds ahead of current time to open the change stream.
-    const kFutureOffsetSecs = 20;
+    // Budget (seconds) for the first setup attempt to finish before the future start time.
+    const kSetupTimeoutSecs = 30;
+
+    // If the first attempt exceeds the budget, one retry derives a fresh budget from the measured
+    // setup latency.
+    const kRetryMultiplier = 2;
+    const kRetrySlackSecs = 10;
+
+    // Slack (seconds) tacked onto a scenario's budget when waiting for cluster time after setup.
+    const kWaitSlackSecs = 30;
 
     // Name of the new shard added to the ShardingTest.
     const newShardName = "newShard";
@@ -59,13 +71,19 @@ describe("future startAtOperationTime with addShard", function () {
             newShard = addShardToCluster(st, newShardName, 1, rsNodeOptions);
             fn();
         } finally {
-            removeShard(st, newShardName);
-            newShard.stopSet();
+            if (newShard) {
+                withBalancerEnabled(st.s, () => {
+                    removeShard(st, newShardName);
+                    newShard.stopSet();
+                });
+            }
         }
     }
 
     for (const version of ["v1", "v2"]) {
-        it(`${version} does not return pre-future events from new shard`, function () {
+        // Runs the scenario with the future start time 'budgetSecs' ahead of the current time.
+        // Throws an error carrying 'setupElapsedSecs' if the setup consumes the whole budget.
+        function runScenario(budgetSecs) {
             // Set up a sharded collection with all data on shard0.
             const collName = "coll_" + version;
             const coll = assertCreateCollection(db, collName);
@@ -74,9 +92,9 @@ describe("future startAtOperationTime with addShard", function () {
             );
             assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
 
-            // Capture current time and set future start time ahead.
+            // Capture current time and set future start time ahead of it.
             const currentTime = getClusterTime(db);
-            const futureStartTime = new Timestamp(currentTime.t + kFutureOffsetSecs, 0);
+            const futureStartTime = new Timestamp(currentTime.t + budgetSecs, 0);
 
             // Open a change stream at the future time.
             const csTest = new ChangeStreamTest(db);
@@ -108,12 +126,15 @@ describe("future startAtOperationTime with addShard", function () {
                 // Insert a document on the new shard BEFORE the future start time.
                 assert.commandWorked(coll.insert({_id: 100, when: "before_future_time"}));
 
-                // Timing guard: verify we are still before the future time.
-                assert.lt(
-                    getClusterTime(db).t,
-                    futureStartTime.t,
-                    "Test setup invalid: cluster time already past future start time",
-                );
+                // If setup consumed the whole budget, the new shard can no longer hold pre-future
+                // data, so the scenario cannot be verified. Signal a retry with an adaptive budget.
+                const currentClusterTime = getClusterTime(db);
+                if (bsonWoCompare(currentClusterTime, futureStartTime) >= 0) {
+                    csTest.cleanUp();
+                    const err = new Error(`Setup exceeded its ${budgetSecs}s budget`);
+                    err.setupElapsedSecs = currentClusterTime.t - currentTime.t;
+                    throw err;
+                }
 
                 // Wait until the cluster time passes the future start time.
                 assert.soon(
@@ -121,10 +142,10 @@ describe("future startAtOperationTime with addShard", function () {
                         const configsvrClusterTime = getClusterTime(
                             st.configRS.getPrimary().getDB("admin"),
                         );
-                        return configsvrClusterTime.t >= futureStartTime.t;
+                        return configsvrClusterTime.t > futureStartTime.t;
                     },
                     "Timed out waiting for cluster time to reach future start time",
-                    (kFutureOffsetSecs + 5) * 1000,
+                    (budgetSecs + kWaitSlackSecs) * 1000,
                 );
 
                 // Advance the cursor after the future time has passed.
@@ -162,6 +183,27 @@ describe("future startAtOperationTime with addShard", function () {
                 csTest.cleanUp();
                 assertDropCollection(db, collName);
             });
+        }
+
+        it(`${version} does not return pre-future events from new shard`, function () {
+            try {
+                runScenario(kSetupTimeoutSecs);
+            } catch (e) {
+                if (!e.setupElapsedSecs) {
+                    throw e;
+                }
+
+                assertDropCollection(db, "coll_" + version);
+
+                const retryBudget =
+                    Math.ceil(e.setupElapsedSecs * kRetryMultiplier) + kRetrySlackSecs;
+                jsTest.log.info(
+                    `Setup exceeded its ${kSetupTimeoutSecs}s budget; retrying once with a ` +
+                        `${retryBudget}s budget`,
+                    {setupElapsedSecs: e.setupElapsedSecs},
+                );
+                runScenario(retryBudget);
+            }
         });
     }
 });

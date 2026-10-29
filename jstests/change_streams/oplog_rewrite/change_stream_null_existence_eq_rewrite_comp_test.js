@@ -8,6 +8,7 @@
  *   uses_change_streams,
  *   # This test runs too long to be included in code coverage:
  *   incompatible_with_gcov,
+ *   requires_fcv_91,
  * ]
  */
 import {

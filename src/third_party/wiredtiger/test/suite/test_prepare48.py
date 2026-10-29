@@ -181,3 +181,89 @@ class test_prepare48(wttest.WiredTigerTestCase):
         self.assert_not_found(2, 55)
 
         cursor.close()
+
+    def test_aborted_prepared_over_removed_overflow(self):
+        # A rolled-back prepared insert sits over a deleted overflow value whose delete is
+        # globally visible, with the rollback timestamp ahead of stable. A checkpoint and a
+        # subsequent eviction of the same page each rewrite the page while the rolled-back
+        # prepared insert is still unresolved. Reads must keep seeing the key as deleted
+        # and the page must remain readable: the overflow value freed by the checkpoint
+        # must not reappear in the image written by the eviction.
+
+        # A small leaf_value_max forces the value to be stored as an overflow item.
+        self.session.create(
+            self.uri,
+            'key_format=i,value_format=S,'
+            'allocation_size=512,leaf_page_max=4KB,leaf_value_max=512,'
+            'memory_page_max=4KB')
+
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+
+        cursor = self.session.open_cursor(self.uri)
+
+        # key 1 is a permanent companion kept committed throughout, so the leaf never goes
+        # empty and stays in memory. key 2 carries the overflow value under test.
+        self.session.begin_transaction()
+        cursor[1] = 'committed'
+        cursor[2] = 'v_init' + 'A' * 4096
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
+
+        # Push the overflow value to disk, then evict so a later read brings back a clean
+        # page referencing the overflow value.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(21))
+        self.session.checkpoint()
+        self.force_evict(1, 20)
+
+        # Delete key 2 and checkpoint while oldest is still below the delete, so the new
+        # disk image keeps the overflow value with its delete time rather than removing
+        # it. Evict so a later read brings that image back.
+        self.session.begin_transaction()
+        cursor.set_key(2)
+        cursor.remove()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(31))
+        self.session.checkpoint()
+        self.force_evict(1, 20)
+
+        # Hold a positioned cursor on the page so it cannot be evicted and re-read
+        # underneath us: the checkpoint below must operate on the same in-memory page as
+        # the final eviction. Use an autocommit read so the pin holds no snapshot and does
+        # not hold global visibility back.
+        pin_session = self.conn.open_session()
+        pin_cursor = pin_session.open_cursor(self.uri)
+        pin_cursor.set_key(1)
+        self.assertEqual(pin_cursor.search(), 0)
+
+        # Prepared insert on key 2, rolled back with the rollback timestamp ahead of
+        # stable so the rollback is not yet durable. This also dirties the page so the
+        # next checkpoint rewrites it.
+        self.session.begin_transaction()
+        cursor[2] = 'prepared' + 'B' * 4096
+        self.session.prepare_transaction(
+            'prepare_timestamp=' + self.timestamp_str(40) +
+            ',prepared_id=' + self.prepared_id_str(99))
+        cursor.reset()
+        self.session.rollback_transaction(
+            'rollback_timestamp=' + self.timestamp_str(45))
+
+        # Advance oldest past the delete so the deleted overflow value is obsolete: no
+        # reader at any timestamp can see it any longer.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(31))
+
+        # Checkpoint with stable still below the prepare timestamp: the checkpoint image
+        # must not include the unstable prepared insert, and the obsolete overflow value
+        # is discarded.
+        self.session.checkpoint()
+
+        # Release the pin and evict the same page. The eviction rewrites the page while
+        # the rolled-back prepared insert is still unresolved; it must not resurrect the
+        # discarded overflow value in the image it writes.
+        pin_cursor.close()
+        pin_session.close()
+        self.force_evict(1, 31)
+
+        # The prepared insert was rolled back: key 2 reads as deleted.
+        self.assert_not_found(2, 45)
+
+        cursor.close()

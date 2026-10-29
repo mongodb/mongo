@@ -1,5 +1,77 @@
 """Custom configuration transitions."""
 
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+
+def _optimize_test_binaries_transition_impl(settings, attr):
+    if settings["//bazel/config:optimize_test_binaries"]:
+        return {
+            "//bazel/config:asan": False,
+            "//bazel/config:tsan": False,
+            "//bazel/config:ubsan": False,
+            "//bazel/config:linkstatic": True,
+            "//bazel/config:opt": "on",
+        }
+    return {
+        "//bazel/config:asan": settings["//bazel/config:asan"],
+        "//bazel/config:tsan": settings["//bazel/config:tsan"],
+        "//bazel/config:ubsan": settings["//bazel/config:ubsan"],
+        "//bazel/config:linkstatic": settings["//bazel/config:linkstatic"],
+        "//bazel/config:opt": settings["//bazel/config:opt"],
+    }
+
+optimize_test_binaries_transition = transition(
+    implementation = _optimize_test_binaries_transition_impl,
+    inputs = [
+        "//bazel/config:optimize_test_binaries",
+        "//bazel/config:asan",
+        "//bazel/config:tsan",
+        "//bazel/config:ubsan",
+        "//bazel/config:linkstatic",
+        "//bazel/config:opt",
+    ],
+    outputs = [
+        "//bazel/config:asan",
+        "//bazel/config:tsan",
+        "//bazel/config:ubsan",
+        "//bazel/config:linkstatic",
+        "//bazel/config:opt",
+    ],
+)
+
+def _optimize_test_binary_impl(ctx):
+    # Bazel 7 wraps attr.label+cfg targets in a list even for non-split transitions.
+    binary = ctx.attr.binary[0]
+    inner_exe = binary[DefaultInfo].files_to_run.executable
+
+    # Executable rules must produce their own output file; create a symlink.
+    exe_extension = ".exe" if ctx.target_platform_has_constraint(
+        ctx.attr._windows_constraint[platform_common.ConstraintValueInfo],
+    ) else ""
+    out = ctx.actions.declare_file(ctx.label.name + exe_extension)
+    ctx.actions.symlink(output = out, target_file = inner_exe)
+
+    return [
+        DefaultInfo(
+            files = depset(
+                [out] + [f for f in binary[DefaultInfo].files.to_list() if f != inner_exe],
+            ),
+            executable = out,
+            runfiles = binary[DefaultInfo].default_runfiles,
+        ),
+        binary[CcInfo],
+    ]
+
+optimize_test_binary = rule(
+    implementation = _optimize_test_binary_impl,
+    attrs = {
+        "binary": attr.label_list(
+            cfg = optimize_test_binaries_transition,
+        ),
+        "_windows_constraint": attr.label(default = "@platforms//os:windows"),
+    },
+    executable = True,
+)
+
 def _extensions_transition_impl(settings, attr):
     """
     Transition that enables bazel flags necessary to build extensions successfully.

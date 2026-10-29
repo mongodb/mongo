@@ -4,9 +4,6 @@
  * @tags: [requires_persistence]
  */
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {reconfig} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

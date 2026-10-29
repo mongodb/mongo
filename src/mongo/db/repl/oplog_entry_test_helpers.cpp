@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 
@@ -287,7 +261,7 @@ OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
     oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
     return makeCommandOplogEntry(
-        opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);
+        opTime, nss, oplogEntryBuilder.obj(), /*object2=*/boost::none, uuid);
 }
 
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
@@ -494,6 +468,7 @@ OplogEntry makeInsertOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+// TODO SERVER-131416: Rename to makeUpdateOplogEntryWithSingleOpMetadataNoSz
 OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
                                             const NamespaceString& nss,
                                             const BSONObj& documentToUpdate,
@@ -510,6 +485,7 @@ OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+// TODO SERVER-131416: Rename to makeDeleteOplogEntryWithSingleOpMetadataNoSz
 OplogEntry makeUpdateOplogEntryWithUpsert(OpTime opTime,
                                           const NamespaceString& nss,
                                           const BSONObj& documentToUpdate,
@@ -556,6 +532,66 @@ OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
     return {DurableOplogEntry(builder.obj())};
 }
 
+OplogEntry makeInsertOplogEntryWithRecordIdAndHash(OpTime opTime,
+                                                   const NamespaceString& nss,
+                                                   const UUID& uuid,
+                                                   const BSONObj& docToInsert,
+                                                   const RecordId& rid,
+                                                   int64_t hash) {
+    OplogEntry baseEntry = makeInsertOplogEntryWithRecordId(opTime, nss, uuid, docToInsert, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("h" << hash));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeInsertOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
+                                                           const NamespaceString& nss,
+                                                           const UUID& uuid,
+                                                           const BSONObj& docToInsert,
+                                                           const RecordId& rid) {
+    OplogEntry baseEntry = makeInsertOplogEntryWithRecordId(opTime, nss, uuid, docToInsert, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("sz" << docToInsert.objsize()));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeDeleteOplogEntryWithRecordIdAndHash(OpTime opTime,
+                                                   const NamespaceString& nss,
+                                                   const UUID& uuid,
+                                                   const BSONObj& docToDelete,
+                                                   const RecordId& rid,
+                                                   int64_t hash) {
+    OplogEntry baseEntry = makeDeleteOplogEntryWithRecordId(opTime, nss, uuid, docToDelete, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("h" << hash));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeUpdateOplogEntryWithRecordIdAndHash(OpTime opTime,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& documentToUpdate,
+                                                   const BSONObj& updatedDocument,
+                                                   const RecordId& rid,
+                                                   int64_t hash) {
+    OplogEntry baseEntry =
+        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSON("h" << hash));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
 OplogEntry makeUpdateOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
                                                            const NamespaceString& nss,
                                                            const BSONObj& documentToUpdate,
@@ -583,6 +619,35 @@ OplogEntry makeDeleteOplogEntryWithRecordIdAndSizeMetadata(OpTime opTime,
     BSONObjBuilder builder;
     builder.appendElements(baseEntry.getEntry().toBSON());
     builder.append("m", BSON("sz" << sizeDelta));
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeUpdateOplogEntryWithRecordIdWithoutSz(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& documentToUpdate,
+                                                     const BSONObj& updatedDocument,
+                                                     const RecordId& rid) {
+    OplogEntry baseEntry =
+        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSONObj());
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeDeleteOplogEntryWithRecordIdWithoutSz(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const UUID& uuid,
+                                                     const BSONObj& docToDelete,
+                                                     const RecordId& rid) {
+    OplogEntry baseEntry = makeDeleteOplogEntryWithRecordId(opTime, nss, uuid, docToDelete, rid);
+
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("m", BSONObj());
 
     return {DurableOplogEntry(builder.obj())};
 }

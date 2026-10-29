@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -51,19 +25,19 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
 /**
  * Returns 'true' if the given match expression is of the shape {_id: {$eq: ...}}.
  */
-bool isMatchIdHackEligible(const MatchExpression* me);
+bool isMatchIdHackEligible(MatchExpression* me);
 
 /**
  * Returns true if 'query' describes an exact-match query on _id.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool isSimpleIdQuery(const BSONObj& query);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isSimpleIdQuery(const BSONObj& query);
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,
  * without taking into account the collators.
  */
 inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand,
-                                                 const MatchExpression* me = nullptr) {
+                                                 MatchExpression* me = nullptr) {
     return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
         findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
         !findCommand.getSkip() &&
@@ -72,21 +46,12 @@ inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findC
 }
 
 /**
- * Upgrades the IDHACK eligibility flag on 'cq' if the parsed MatchExpression normalizes to a
- * simple _id equality (e.g. {_id: {$in: [v]}} → {_id: {$eq: v}}). This is a "late upgrade"
- * relative to the raw-BSON check done at ExpCtx build time, and must be called after the
- * collection is acquired so the collator can be compared. No-op if the flag is already set or
- * if the collators do not permit IDHACK.
+ * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
  */
-inline void maybeUpgradeIdHackFlag(CanonicalQuery& cq, const CollectionPtr& coll) {
-    if (cq.getExpCtx()->isIdHackQuery() || !coll)
-        return;
-    const bool collatorOK = cq.getFindCommandRequest().getCollation().isEmpty() ||
-        CollatorInterface::collatorsMatch(cq.getCollator(), coll->getDefaultCollator());
-    if (collatorOK &&
-        isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
-                                             cq.getPrimaryMatchExpression()))
-        cq.getExpCtx()->setIsIdHackQuery(true);
+inline bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& cq) {
+    return isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
+                                                cq.getPrimaryMatchExpression()) &&
+        CollatorInterface::collatorsMatch(cq.getCollator(), collection->getDefaultCollator());
 }
 
 /**
@@ -99,7 +64,7 @@ inline bool isEqualityExpressEligibleQuery(const CollectionPtr& collection,
     const auto& findCommand = cq.getFindCommandRequest();
     auto me = cq.getPrimaryMatchExpression();
 
-    if (internalQueryDisableSingleFieldExpressExecutor.load()) {
+    if (cq.getExpCtx()->getQueryKnobConfiguration().getDisableSingleFieldExpressExecutor()) {
         return false;
     }
 
@@ -147,12 +112,7 @@ inline ExpressEligibility isExpressEligible(OperationContext* opCtx,
         (cq.getProj() != nullptr && !cq.getProj()->isSimple())) {
         return ExpressEligibility::Ineligible;
     }
-    // Use the authoritative live check rather than the pre-computed isIdHackQuery() flag,
-    // which can be stale when a sub-query inherits an outer ExpressionContext (e.g. from
-    // $graphLookup/$lookup at runtime) whose flag was set for the outer _id point query.
-    if (isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
-                                             cq.getPrimaryMatchExpression()) &&
-        CollatorInterface::collatorsMatch(cq.getCollator(), coll->getDefaultCollator()) &&
+    if (isIdHackEligibleQuery(coll, cq) &&
         (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
          clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
         return ExpressEligibility::IdPointQueryEligible;

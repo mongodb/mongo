@@ -48,7 +48,7 @@ __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
      * evaluate to false and the counter will be reset, effectively marking the ref as available to
      * pre-fetch from.
      */
-    if (session->pf.prefetch_prev_ref_home == ref->home &&
+    if (session->pf.prefetch_prev_ref_home == (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home) &&
       session->pf.prefetch_skipped_with_parent < WT_PREFETCH_QUEUE_PER_TRIGGER) {
         ++session->pf.prefetch_skipped_with_parent;
         WT_STAT_CONN_INCR(session, prefetch_skipped_same_ref);
@@ -58,7 +58,7 @@ __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     session->pf.prefetch_skipped_with_parent = 0;
 
     /* Load and decompress a set of pages into the block cache. */
-    WT_INTL_FOREACH_BEGIN (session, ref->home, next_ref) {
+    WT_INTL_FOREACH_BEGIN (session, (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home), next_ref) {
         /* Don't let the pre-fetch queue get overwhelmed. */
         if (__wt_tsan_suppress_load_uint64(&conn->prefetch.queue_count) > WT_MAX_PREFETCH_QUEUE ||
           block_preload > WT_PREFETCH_QUEUE_PER_TRIGGER)
@@ -89,7 +89,7 @@ __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
         }
     }
     WT_INTL_FOREACH_END;
-    session->pf.prefetch_prev_ref_home = ref->home;
+    session->pf.prefetch_prev_ref_home = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
 
     WT_STAT_CONN_INCRV(session, prefetch_pages_queued, block_preload);
     return (ret);

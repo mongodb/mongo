@@ -4,34 +4,22 @@
  * LU IFR flags used to incrementally roll out the feature.
  *
  * Requires featureFlagGetExecutorDeferredEngineChoice and SBE to be enabled.
+ *
+ * @tags: [
+ *  # Join reordering may affect metrics expected by some of these test cases.
+ *  incompatible_with_join_optimization
+ * ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, describe, it} from "jstests/libs/mochalite.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const conn = MongoRunner.runMongod({
-    setParameter: {
-        featureFlagGetExecutorDeferredEngineChoice: true,
-    },
-});
+const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB(jsTestName());
 if (!checkSbeRestrictedOrFullyEnabled(db)) {
     jsTest.log.info("Skipping test because SBE is disabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
-
-// featureFlagSbeEqLookupUnwind is an IFR rollout flag that controls whether $lookup-$unwind runs
-// in SBE. disableUnreleasedIFRFlags disables it even though this test doesn't set it explicitly,
-// which would cause the queries to fall back to classic and prevent the lookupUnwind counters from
-// incrementing despite featureFlagGetExecutorDeferredEngineChoice being on.
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwind")) {
-    jsTest.log.info(
-        "Skipping test because featureFlagSbeEqLookupUnwind is disabled " +
-            "(e.g. by disableUnreleasedIFRFlags).",
-    );
     MongoRunner.stopMongod(conn);
     quit();
 }
@@ -73,6 +61,22 @@ assert.commandWorked(localOrIdx.createIndex({b: 1}));
 assert.commandWorked(foreignWithIdx.createIndex({b: 1}));
 assert.commandWorked(foreignDinlj.createIndex({b: 1}, {collation: {locale: "en", strength: 2}}));
 
+const counterToFeatureFlag = {
+    indexedLoopJoin: "SbeEqLookupUnwindIndexedLoopJoin",
+    nestedLoopJoin: "SbeEqLookupUnwindNestedLoopJoin",
+    hashLookup: "SbeEqLookupUnwindHashJoin",
+    dynamicIndexedLoopJoin: "SbeEqLookupUnwindDynamicIndexedLoopJoin",
+    localCollscan: "SbeEqLookupUnwindLocalCollscan",
+    localIxscanFetch: "SbeEqLookupUnwindLocalIxscanFetch",
+    localComplex: "SbeEqLookupUnwindLocalComplexDataAccessPlans",
+};
+
+function requiredFlagsEnabled(expectedCounters) {
+    return expectedCounters.every((counter) =>
+        FeatureFlagUtil.isPresentAndEnabled(db, counterToFeatureFlag[counter]),
+    );
+}
+
 function getLuCounters() {
     return db.serverStatus().metrics.query.lookupUnwind;
 }
@@ -103,6 +107,13 @@ function makeLuComplexPipeline(foreignCollName) {
 }
 
 function assertCounterIncrement(localColl, pipeline, options, expectedCounters) {
+    if (!requiredFlagsEnabled(expectedCounters)) {
+        jsTest.log.info("Skipping case because a required LU IFR feature flag is disabled", {
+            expectedCounters,
+        });
+        return;
+    }
+
     const beforeLookupUnwind = getLuCounters();
     const beforeLookup = getLookupCounters();
     localColl.aggregate(pipeline, options).toArray();

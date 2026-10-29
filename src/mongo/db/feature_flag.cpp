@@ -1,47 +1,37 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/feature_flag.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/feature_flag_gen.h"
+#include "mongo/db/ifr_unrecognized_flag_info.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/version_context_feature_flags_gen.h"
+#include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/ifr_sender_version.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
+#include "mongo/util/version.h"
 #include "mongo/util/version/releases.h"
 
+#include <charconv>
 #include <string_view>
+#include <utility>
+
+#include <absl/container/flat_hash_set.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
+
 void BinaryCompatibleFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {
     flagBuilder.append("value", _enabled);
     if (_enabled) {
@@ -257,6 +247,63 @@ std::vector<IncrementalRolloutFeatureFlag*>& getMutableAllIncrementalRolloutFeat
     static StaticImmortal<std::vector<IncrementalRolloutFeatureFlag*>> flags;
     return *flags;
 }
+
+// Cache of IFR flags whose 'serialize_on_outgoing_requests' version is greater than kLastLTS — the
+// list a receiver must conservatively disable when it gets a request from a sender that predates
+// the flag entirely. The set is fixed once all flags have registered (registration happens during
+// static initialization, before any MONGO_INITIALIZER runs), so we can populate this once and hand
+// out a const reference on every request instead of rebuilding a vector per call.
+std::vector<IncrementalRolloutFeatureFlag*>& getMutableFlagsIntroducedSinceLastLTS() {
+    static StaticImmortal<std::vector<IncrementalRolloutFeatureFlag*>> flags;
+    return *flags;
+}
+
+// Function-local static so 'VersionInfoInterface::instance()' is not touched until after
+// 'main()' has installed a provider. A namespace-scope 'static const' initializer here runs
+// during DSO '_init', before any 'MONGO_INITIALIZER' fires, and fatally asserts with fassert
+// 40278 ("valid version info has not been configured").
+const IFRSenderVersion& localSenderVersion() {
+    static const IFRSenderVersion v = makeLocalIFRSenderVersion();
+    return v;
+}
+
+// IFR flag introduction versions are currently declared at FCV (major.minor) granularity. This
+// generates a 'major.minor.0.<int_min>' IFRSenderVersion to help with comparisons.
+IFRSenderVersion toFullVersion(multiversion::FeatureCompatibilityVersion fcv) {
+    IFRSenderVersion version;
+    version.setMajor(multiversion::majorVersion(fcv));
+    version.setMinor(multiversion::minorVersion(fcv));
+    version.setPatch(0);
+    version.setExtra(std::numeric_limits<int>::min());
+    return version;
+}
+
+// Process-wide IFR wire-protocol counters. Each is bumped inline as `fromWire()` resolves a payload
+// and surfaced through the "ifr" serverStatus section (see incremental_rollout_metrics.cpp).
+Atomic<int64_t>& getWireInstallsCounter() {
+    static Atomic<int64_t> sCounter{0};
+    return sCounter;
+}
+
+Atomic<int64_t>& getUnknownWireFlagErrorsCounter() {
+    static Atomic<int64_t> sCounter{0};
+    return sCounter;
+}
+
+Atomic<int64_t>& getUnknownWireFlagsDroppedCounter() {
+    static Atomic<int64_t> sCounter{0};
+    return sCounter;
+}
+
+Atomic<int64_t>& getAbsentFlagsConservativeFalseCounter() {
+    static Atomic<int64_t> sCounter{0};
+    return sCounter;
+}
+
+Atomic<int64_t>& getAbsentFlagsLocalDefaultCounter() {
+    static Atomic<int64_t> sCounter{0};
+    return sCounter;
+}
 }  // namespace
 
 IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(
@@ -282,17 +329,60 @@ IncrementalRolloutFeatureFlag::IncrementalRolloutFeatureFlag(
     }
 }
 
-std::vector<IncrementalRolloutFeatureFlag*>
-IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests() {
-    auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    std::vector<IncrementalRolloutFeatureFlag*> flagsToSerialize;
+
+const std::vector<IncrementalRolloutFeatureFlag*>&
+IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS() {
+    // Populated once by the CacheIfrFlagsIntroducedSinceLastLTS MONGO_INITIALIZER below.
+    return getMutableFlagsIntroducedSinceLastLTS();
+}
+
+// (Generic FCV reference): This is a receiver-side conservative default. We do not gate by the
+// running FCV here — callers decide whether the defaulting should apply. Populated after all
+// IFR flags have registered via static init but before any request processing runs.
+MONGO_INITIALIZER(CacheIfrFlagsIntroducedSinceLastLTS)(InitializerContext*) {
+    auto& sinceLastLTSCache = getMutableFlagsIntroducedSinceLastLTS();
     for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
-        if (flag->_serializeOnOutgoingRequestsVersion &&
-            fcv.isGreaterThanOrEqualTo(*flag->_serializeOnOutgoingRequestsVersion)) {
-            flagsToSerialize.push_back(flag);
+        if (flag->shouldSerializeOnOutgoingRequests()) {
+            if (*flag->getSerializeOnOutgoingRequestsVersion() >
+                multiversion::GenericFCV::kLastLTS) {
+                sinceLastLTSCache.push_back(flag);
+            }
         }
     }
-    return flagsToSerialize;
+
+    // Build the shard-server "no ifrFlags" default context now that the flag list above is
+    // populated, so 'installForRequestWithoutIfrFlags()' can clone it instead of rebuilding it on
+    // every request.
+    IncrementalFeatureRolloutContext::initShardServerDefaultTemplate();
+}
+
+// static
+int64_t IncrementalRolloutFeatureFlag::getWireInstallsCount() {
+    return getWireInstallsCounter().load();
+}
+
+// static
+int64_t IncrementalRolloutFeatureFlag::getUnknownWireFlagErrorsCount() {
+    return getUnknownWireFlagErrorsCounter().load();
+}
+
+// static
+int64_t IncrementalRolloutFeatureFlag::getUnknownWireFlagsDroppedCount() {
+    return getUnknownWireFlagsDroppedCounter().load();
+}
+
+// static
+int64_t IncrementalRolloutFeatureFlag::getAbsentFlagsConservativeFalseCount() {
+    return getAbsentFlagsConservativeFalseCounter().load();
+}
+
+// static
+int64_t IncrementalRolloutFeatureFlag::getAbsentFlagsLocalDefaultCount() {
+    return getAbsentFlagsLocalDefaultCounter().load();
+}
+
+void IncrementalRolloutFeatureFlag::recordWireInstall(bool value) {
+    (value ? _numTrueWireInstalls : _numFalseWireInstalls).fetchAndAddRelaxed(1);
 }
 
 bool IncrementalRolloutFeatureFlag::checkEnabled() {
@@ -307,7 +397,9 @@ void IncrementalRolloutFeatureFlag::appendFlagStats(BSONArrayBuilder& flagStats)
         .append("value", _value.loadRelaxed())
         .append("falseChecks", static_cast<long long>(_numFalseChecks.loadRelaxed()))
         .append("trueChecks", static_cast<long long>(_numTrueChecks.loadRelaxed()))
-        .append("numToggles", static_cast<long long>(_numToggles.loadRelaxed()));
+        .append("numToggles", static_cast<long long>(_numToggles.loadRelaxed()))
+        .append("trueWireInstalls", static_cast<long long>(_numTrueWireInstalls.loadRelaxed()))
+        .append("falseWireInstalls", static_cast<long long>(_numFalseWireInstalls.loadRelaxed()));
 }
 
 void IncrementalRolloutFeatureFlag::appendFlagsStats(BSONArrayBuilder& flagStats) {
@@ -370,26 +462,172 @@ void IncrementalRolloutFeatureFlag::registerFlag(IncrementalRolloutFeatureFlag* 
     getMutableAllIncrementalRolloutFeatureFlags().push_back(flag);
 }
 
-IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(std::span<const BSONObj> flags) {
-    for (const auto& flagObj : flags) {
-        const auto& name = flagObj["name"];
-        uassert(11565102, "Expected 'name' field to be a string", name.type() == BSONType::string);
+// static
+IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext() = default;
+IncrementalFeatureRolloutContext::~IncrementalFeatureRolloutContext() = default;
 
-        const auto& value = flagObj["value"];
-        uassert(
-            11565103, "Expected 'value' field to be a boolean", value.type() == BSONType::boolean);
+std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::fromWire(
+    std::span<const IFRFlagWireEntry> flags, std::unique_ptr<IFRSenderVersion> senderVersion) {
+    return std::shared_ptr<IncrementalFeatureRolloutContext>(new IncrementalFeatureRolloutContext(
+        flags,
+        senderVersion ? std::move(senderVersion)
+                      : std::make_unique<IFRSenderVersion>(toFullVersion(
+                            multiversion::FeatureCompatibilityVersion::kVersion_8_3))));
+}
 
-        const auto flagName = name.valueStringData();
+// static
+std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::fromWireForTest(
+    std::span<const IFRFlagWireEntry> flags) {
+    // (Generic FCV Reference): For Testing.
+    return std::shared_ptr<IncrementalFeatureRolloutContext>(new IncrementalFeatureRolloutContext(
+        flags, std::make_unique<IFRSenderVersion>(localSenderVersion())));
+}
+
+// static
+std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::forTest(
+    std::span<const IFRFlagWireEntry> flags) {
+    return std::shared_ptr<IncrementalFeatureRolloutContext>(
+        new IncrementalFeatureRolloutContext(flags));
+}
+
+std::shared_ptr<IncrementalFeatureRolloutContext> IncrementalFeatureRolloutContext::clone() const {
+    auto copy = std::make_shared<IncrementalFeatureRolloutContext>();
+    copy->_savedFlagValues = _savedFlagValues;
+    if (_senderVersion) {
+        copy->_senderVersion = std::make_unique<IFRSenderVersion>(*_senderVersion);
+    }
+    // Intentionally do not copy '_cachedEgressMetadata': a freshly cloned context must start
+    // un-memoized so it can be installed on an opCtx (see the tassert in 'set()').
+    return copy;
+}
+
+// static
+IncrementalFeatureRolloutContext&
+IncrementalFeatureRolloutContext::mutableShardServerDefaultTemplate() {
+    // Default-constructed empty here; 'initShardServerDefaultTemplate()' fills it during startup.
+    static IncrementalFeatureRolloutContext instance;
+    return instance;
+}
+
+// static
+void IncrementalFeatureRolloutContext::initShardServerDefaultTemplate() {
+    auto& tmpl = mutableShardServerDefaultTemplate();
+    const auto& flags = IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS();
+    tmpl._savedFlagValues.clear();
+    tmpl._savedFlagValues.reserve(flags.size());
+    for (auto* flag : flags) {
+        tmpl._savedFlagValues[flag] = false;
+    }
+}
+
+// Constructor for IFRContext sent from wire.
+IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
+    std::span<const IFRFlagWireEntry> flags, std::unique_ptr<IFRSenderVersion> senderVersion)
+    : _senderVersion(std::move(senderVersion)) {
+    tassert(13013608,
+            "Expected sender version to be resolved by this point",
+            _senderVersion != nullptr);
+
+    // Count this as a wire install as soon as we begin processing the payload, rather than only on
+    // successful completion below: per-flag counters (recordWireInstall) are bumped inline as each
+    // flag is processed, so if a later flag in the payload throws, those per-flag bumps would
+    // otherwise be unmatched by any aggregate-counter increment for this request.
+    getWireInstallsCounter().fetchAndAddRelaxed(1);
+
+    // Track which active flags arrived so the post-loop can fill in the absent ones (scenario
+    // 4).
+    absl::flat_hash_set<const IncrementalRolloutFeatureFlag*> receivedFlags;
+
+    // Collect all scenario-3 (genuinely unrecognized) flags so we can report them together.
+    // Keyed by name so a payload that repeats an unknown flag collapses to a single entry.
+    UnrecognizedIFRFlagInfo::FlagMap unknownFlags;
+
+    for (const auto& wireEntry : flags) {
+        const auto flagName = wireEntry.getName();
+        const bool wireValue = wireEntry.getValue();
         auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
 
-        // Reaching this error should be impossible if the proper upgrade/downgrade procedure is
-        // followed. If triggered, it implies something went wrong with the IFR flag rollout (e.g.
-        // the flag was enabled before all binaries were upgraded).
-        tassert(ErrorCodes::UnrecognizedIFRFlag,
-                str::stream() << "Unrecognized IFR flag: " << flagName,
-                flag != nullptr);
+        if (flag != nullptr) {
+            // Scenario 1: recognized flag — store the sender's value. A flag appearing twice in one
+            // payload is a malformed request from the sender; treat it as a protocol error.
+            _savedFlagValues[flag] = wireValue;
+            tassert(13024005,
+                    str::stream() << "Sender specified IFR flag '" << flagName
+                                  << "' more than once",
+                    receivedFlags.insert(flag).second);
+            flag->recordWireInstall(wireValue);
+            // TODO SERVER-130479 Missing a possible scenario: flag was removed in an earlier
+            // version.
+        } else if (*_senderVersion <= localSenderVersion()) {
+            // Scenario 3: flag is genuinely unknown and the sender is no newer than this binary
+            // (compared at FCV granularity; patch-level precision is deferred with the
+            // flag-introduction-granularity work). A same-series-or-older sender should never
+            // produce a flag we don't recognize; treat it as a protocol error. Accumulate all
+            // such flags so they can be reported together. As with scenario 1, a repeated flag is a
+            // malformed request.
+            tassert(13024006,
+                    str::stream() << "Sender specified IFR flag '" << flagName
+                                  << "' more than once",
+                    unknownFlags.emplace(std::string(flagName), wireValue).second);
+        } else {
+            // Sender is newer than this binary (or no version info was provided). A flag unknown to
+            // us was added after our binary — silently drop with a rate-limited log so
+            // rolling-upgrade traffic stays quiet while misconfigurations are still visible.
+            static logv2::SeveritySuppressor suppressor(
+                Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+            if (auto sev = suppressor(); shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, sev)) {
+                LOGV2_DEBUG(13002301,
+                            sev.toInt(),
+                            "Dropped unrecognized IFR flag from wire",
+                            "flagName"_attr = flagName);
+            }
+            getUnknownWireFlagsDroppedCounter().fetchAndAddRelaxed(1);
+            _unknownWireFlags.emplace(std::string{flagName});
+        }
+    }
 
-        _savedFlagValues[flag] = value.boolean();
+    // Scenario 3 (deferred tripwire): a same-or-older sender should never produce a flag we don't
+    // recognize, so treat it as a programmer error. Report all such flags together, attaching the
+    // structured UnrecognizedIFRFlagInfo so callers can inspect the full set without re-parsing.
+    if (!unknownFlags.empty()) {
+        getUnknownWireFlagErrorsCounter().fetchAndAddRelaxed(1);
+        tasserted(makeUnrecognizedIFRFlagStatus(std::move(unknownFlags), *_senderVersion));
+    }
+
+    // Scenario 4: eagerly resolve active flags that were absent from the payload.
+    // A flag not sent by the sender is either new to our version (sender predates it) or was
+    // removed/promoted in a newer version the sender is running.
+    for (auto* flag : IncrementalRolloutFeatureFlag::getFlagsIntroducedSinceLastLTS()) {
+        if (_savedFlagValues.contains(flag)) {
+            continue;
+        }
+        const auto flagIntroVersion = flag->getSerializeOnOutgoingRequestsVersion();
+        tassert(
+            13013607,
+            "Expected getFlagsIntroducedSinceLastLTS to return only flags with 'flagIntroVersion' "
+            "specified",
+            flagIntroVersion);
+        if (*_senderVersion < toFullVersion(*flagIntroVersion)) {
+            // Sender predates this flag's introduction — conservative false.
+            getAbsentFlagsConservativeFalseCounter().fetchAndAddRelaxed(1);
+            _savedFlagValues[flag] = false;
+        } else {
+            // Sender is same/newer (or no version info) — use this binary's local default.
+            getAbsentFlagsLocalDefaultCounter().fetchAndAddRelaxed(1);
+            _savedFlagValues[flag] = flag->checkEnabled();
+        }
+    }
+}
+
+IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(
+    std::span<const IFRFlagWireEntry> flags) {
+    for (const auto& wireEntry : flags) {
+        const auto flagName = wireEntry.getName();
+        auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
+        tassert(11565106,
+                str::stream() << "Unknown IFR flag name in test: " << flagName,
+                flag != nullptr);
+        _savedFlagValues[flag] = wireEntry.getValue();
     }
 }
 
@@ -405,27 +643,58 @@ bool IncrementalFeatureRolloutContext::getSavedFlagValue(IncrementalRolloutFeatu
 
 void IncrementalFeatureRolloutContext::appendSavedFlagValues(BSONArrayBuilder& builder) const {
     for (auto&& [flag, savedValue] : _savedFlagValues) {
-        BSONObjBuilder flagBuilder(builder.subobjStart());
-        flagBuilder.append("name", flag->getName());
-        flagBuilder.appendBool("value", savedValue);
+        BSONObjBuilder entryBuilder(builder.subobjStart());
+        IFRFlagWireEntry{flag->getName(), savedValue}.serialize(&entryBuilder);
     }
 }
 
 void IncrementalFeatureRolloutContext::disableFlag(IncrementalRolloutFeatureFlag& flag) {
     _savedFlagValues.insert_or_assign(&flag, false);
+    _cachedEgressMetadata.reset();
 }
 
-std::vector<BSONObj> IncrementalFeatureRolloutContext::serializeFlagValues(
-    const std::vector<IncrementalRolloutFeatureFlag*>& flags) {
-    std::vector<BSONObj> result;
-    result.reserve(flags.size());
-    for (auto* flag : flags) {
-        result.push_back(BSONObjBuilder{}
-                             .append("name", flag->getName())
-                             .append("value", getSavedFlagValue(*flag))
-                             .obj());
+void IncrementalFeatureRolloutContext::appendToEgressMetadata(BSONObjBuilder* bob) {
+    // Memoize on first call: the same IFRContext may be consulted more than once during dispatch
+    // (e.g. per-shard restamping on retry). Since IFRContext is per-opCtx we can skip locking.
+    if (!_cachedEgressMetadata) {
+        BSONObjBuilder subBuilder;
+
+        const auto& outgoingSenderVersion = _senderVersion ? *_senderVersion : localSenderVersion();
+
+        if (outgoingSenderVersion >
+            toFullVersion(multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {
+            // The sender version.
+            BSONObjBuilder senderVersionBuilder(
+                subBuilder.subobjStart(GenericArguments::kIfrSenderVersionFieldName));
+            if (isInstalledFromWire()) {
+                _senderVersion->serialize(&senderVersionBuilder);
+            } else {
+                localSenderVersion().serialize(&senderVersionBuilder);
+            }
+            senderVersionBuilder.doneFast();
+        }
+
+        {
+            // The flags.
+            BSONArrayBuilder arr(subBuilder.subarrayStart(GenericArguments::kIfrFlagsFieldName));
+            for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
+                if (const auto versionIntroduced = flag->getSerializeOnOutgoingRequestsVersion()) {
+                    if (toFullVersion(*versionIntroduced) <= outgoingSenderVersion) {
+                        BSONObjBuilder entryBuilder(arr.subobjStart());
+                        IFRFlagWireEntry{flag->getName(), getSavedFlagValue(*flag)}.serialize(
+                            &entryBuilder);
+                    }
+                }
+            }
+        }
+
+        _cachedEgressMetadata = subBuilder.obj();
     }
-    return result;
+
+    // Append cached fields to the caller's builder.
+    for (const auto& elem : *_cachedEgressMetadata) {
+        bob->append(elem);
+    }
 }
 
 }  // namespace mongo

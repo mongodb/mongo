@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/credential.h"
@@ -57,14 +30,15 @@ namespace mongo {
 class BSONObj;
 class MongoURI;
 
-namespace MONGO_MOD_PUBLIC auth {
+namespace [[MONGO_MOD_PUBLIC]] auth {
+using namespace std::literals::string_view_literals;
 
 using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
 
-constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"_sd;
-constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"_sd;
-constexpr auto kClusterAuthenticate = "clusterAuthenticate"_sd;
-constexpr auto kAuthenticateCommand = "authenticate"_sd;
+constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"sv;
+constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"sv;
+constexpr auto kClusterAuthenticate = "clusterAuthenticate"sv;
+constexpr auto kAuthenticateCommand = "authenticate"sv;
 
 /**
  * On replication step down, should the current connection be killed or left open.
@@ -191,5 +165,5 @@ SpeculativeAuthType speculateInternalAuth(const HostAndPort& remoteHost,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
 
 
-}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace auth
 }  // namespace mongo

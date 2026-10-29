@@ -3,6 +3,7 @@
  * unpacking all buckets, while ensuring no incorrect results are created
 
  * @tags: [
+ *     uses_explain,
  *     # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *     # migrations may result in writes splitting between two primaries, and thus different
  *     # buckets.

@@ -1,5 +1,8 @@
 /**
  * Verifies that index-ineligible predicates under a $not do not get tagged with an index.
+ * @tags: [
+ *   uses_explain,
+ * ]
  */
 
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";

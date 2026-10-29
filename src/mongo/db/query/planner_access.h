@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,15 +9,18 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/record_id_range.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -201,26 +178,46 @@ public:
      *   (in) queryCollator - current query's collator
      *   (in) ccCollator - clustered collection's collator
      *   (in) clusterKeyFieldName - only "_id" is officially supported, but this may change someday
-     *   (out) recordRange - scan start/end bounds
-     *   (out) redundant - if provided, will be called with pointers to expressions which
-     *                     do not require a filter, _if_ the collection scan can enforce
-     *                     recordRange
+     *   (out) outRangeList - scan start/end bounds. This must initially be set to an unbounded
+     * RecordIdRangeList (which is the default constructor).
+     *   (out) outRangeListExact - if non-null, set to true iff the expression is entirely
+     * expressible as a range (eg. no non-range sub-conditions such as $mod,
+     * non-collation-compatible predicates, unsupported predicates). Only when this is true is
+     * outRangeList a tight representation of the expression's truth-set.
+     *   (in) visitor - if not null, a callback called in a post-order fashion for each node in the
+     * given expression that this function recurses into and has an exact range. Takes the following
+     * parameters:
+     *   - the node itself,
+     *   - the scan range inferred for its subtree.
      */
     [[nodiscard]] static bool handleRIDRangeScan(
         const MatchExpression* conjunct,
         const CollatorInterface* queryCollator,
         const CollatorInterface* ccCollator,
         std::string_view clusterKeyFieldName,
-        RecordIdRange& recordRange,
-        const std::function<void(const MatchExpression*)>& redundant = [](auto) {});
+        RecordIdRangeList& outRangeList,
+        bool* outRangeListExact = nullptr,
+        const std::function<void(const MatchExpression*, const RecordIdRangeList&)>& visitor =
+            nullptr);
 
     /**
-     * Removes elements from a MatchExpression tree, recursively.
+     * Removes from a MatchExpression tree any sub-expressions that are globally redundant given
+     * the scan's RecordId range list — i.e., conditions that are already enforced by the bounded
+     * collection scan and need not be re-evaluated as a filter.
      *
-     * Only descends into AndMatchExpressions.
+     * Descends into both $and and $or nodes.
      */
     static void simplifyFilter(std::unique_ptr<MatchExpression>& expr,
-                               const std::set<const MatchExpression*>& toRemove);
+                               const RecordIdRangeList& rangeList,
+                               const CollatorInterface* queryCollator,
+                               const CollatorInterface* ccCollator,
+                               std::string_view clusterKeyFieldName);
+
+    /**
+     * Returns true iff inner ⊆ outer (every RecordId in inner is also in outer).
+     */
+    static bool rangeListContainedIn(const RecordIdRangeList& inner,
+                                     const RecordIdRangeList& outer);
 
 private:
     /**
@@ -247,8 +244,23 @@ private:
          * Reset the scan building state in preparation for building a new scan.
          *
          * This always should be called prior to allocating a new 'currentScan'.
+         *
+         * If `isQueryParameterized` is true an Interval Evaluation Tree will be built for every key
+         * element.
          */
-        void resetForNextScan(IndexTag* newTag);
+        void resetForNextScan(IndexTag* newTag, bool isQueryParameterized);
+
+        interval_evaluation_tree::Builder* getCurrentIETBuilder() {
+            if (ietBuilders.empty()) {
+                return nullptr;
+            } else {
+                tassert(6334910,
+                        "IET Builder list size must be equal to the number of fields in the key "
+                        "pattern",
+                        ixtag->pos < ietBuilders.size());
+                return &ietBuilders[ixtag->pos];
+            }
+        }
 
         // The root of the MatchExpression tree for which we are currently building index
         // scans. Should be either an AND node or an OR node.
@@ -296,6 +308,11 @@ private:
         // the child predicates assigned to the current index is INEXACT_COVERED but none are
         // INEXACT_FETCH, then 'loosestBounds' is INEXACT_COVERED.
         IndexBoundsBuilder::BoundsTightness loosestBounds;
+
+        // The list of Interval Evaluation Tree builders used to build IETs for SBE. Every
+        // iet::Builder in the list corresponds to the corresponding element in the key pattern. The
+        // vector is empty if the query has no parameter markers.
+        std::vector<interval_evaluation_tree::Builder> ietBuilders;
 
     private:
         // Default constructor is not allowed.
@@ -459,7 +476,8 @@ private:
      */
     static void finishLeafNode(const CanonicalQuery& cq,
                                QuerySolutionNode* node,
-                               const IndexEntry& index);
+                               const IndexEntry& index,
+                               std::vector<interval_evaluation_tree::Builder> ietBuilders);
 
     /**
      * Fills in any missing bounds by calling finishLeafNode(...) for the scan contained in

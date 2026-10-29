@@ -1,5 +1,10 @@
 LEFT DEEP, 3 Nodes
 HJ order pruning enabled: 0
+numHashJoins: 3
+numNestedLoopJoins: 0
+numIndexedNestedLoopJoins: 0
+numRejectedNodes: 9
+numNodes: 6
 Level 0:
 001, 010, 100
 Level 1:
@@ -20,6 +25,11 @@ Output plans (best plan 0):
 
 RIGHT DEEP, 3 Nodes
 HJ order pruning enabled: 0
+numHashJoins: 3
+numNestedLoopJoins: 0
+numIndexedNestedLoopJoins: 0
+numRejectedNodes: 7
+numNodes: 6
 Level 0:
 001, 010, 100
 Level 1:

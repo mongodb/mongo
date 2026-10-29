@@ -30,6 +30,8 @@ assert.eq(1, admin.auth("root", "pass"), "Authentication for root user failed");
 
 jsTest.log.info("Check secondary config servers for authentication logs");
 st.configRS.getSecondaries().forEach((conn) => {
+    jsTest.log.info("Checking secondary config server: " + conn.host);
+
     // Get per-mech auth counter stats from serverStatus
     const admin = conn.getDB("admin");
     assert.soon(
@@ -58,16 +60,19 @@ st.configRS.getSecondaries().forEach((conn) => {
                 "Expected at least one egress SCRAM-SHA-256 speculativeAuthenticate success on " +
                     conn.host,
             );
-            assert.eq(
+            // Total auths may exceed successful:
+            // intra-cluster (__system) egress auths can transiently fail during cluster bring-up
+            // (e.g. a connection desync such as "ResponseId did not match sent message ID"),
+            assert.lte(
                 egressAuthSuccesses,
                 stats.egress.authenticate.total,
-                "SCRAM-SHA-256 egress authenticate successful count should equal total on " +
+                "SCRAM-SHA-256 egress authenticate successful count should not exceed total on " +
                     conn.host,
             );
-            assert.eq(
+            assert.lte(
                 egressSpecAuthSuccesses,
                 stats.egress.speculativeAuthenticate.total,
-                "SCRAM-SHA-256 egress speculativeAuthenticate successful count should equal total on " +
+                "SCRAM-SHA-256 egress speculativeAuthenticate successful count should not exceed total on " +
                     conn.host,
             );
         } else {

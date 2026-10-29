@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/transport/service_entry_point_test_fixture.h"
@@ -33,6 +7,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
@@ -42,19 +17,33 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/logv2/log.h"
 #include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/traces_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+
+#include <algorithm>
 
 #ifdef MONGO_CONFIG_OTEL
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 #endif
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
+
+using ::testing::Contains;
+using ::testing::IsEmpty;
 
 MONGO_REGISTER_COMMAND(TestCmdSucceeds).testOnly().forRouter().forShard();
 MONGO_REGISTER_COMMAND(TestCmdFailsRunInvocationWithResponse).testOnly().forRouter().forShard();
@@ -74,9 +63,8 @@ MONGO_REGISTER_COMMAND(TestCmdSupportsWriteConcern).testOnly().forRouter().forSh
 WriteConcernOptions TestCmdSupportsWriteConcern::expectedWriteConcern;
 
 void ServiceEntryPointTestFixture::setUp() {
-    // Minimal set up necessary for ServiceEntryPoint.
-    auto service = getGlobalServiceContext();
-    service->setStorageEngine(std::make_unique<StorageEngineMock>());
+    ServiceContextTest::setUp();
+    getServiceContext()->setStorageEngine(std::make_unique<StorageEngineMock>());
 }
 
 WriteConcernOptions ServiceEntryPointTestFixture::makeWriteConcernOptions(BSONObj wc) {
@@ -160,6 +148,28 @@ DbResponse ServiceEntryPointTestFixture::runCommandTestWithResponse(BSONObj cmdB
 void ServiceEntryPointTestFixture::assertResponseForClusterAndOperationTime(BSONObj response) {
     ASSERT(response.hasField("$clusterTime")) << ", response: " << response;
     ASSERT(response.hasField("operationTime")) << ", response: " << response;
+}
+
+void ServiceEntryPointTestFixture::waitUntilQueuedAtAdmission(OperationContext* opCtx,
+                                                              Date_t expectedAdmissionTime) {
+    ASSERT(IngressRequestAdmissionContext::get(opCtx).waitUntilQueued_forTest(Seconds(30)))
+        << "Timed out waiting for request associated with the provided opCtx to be queued in "
+           "the IRRL";
+
+    auto* clockSource =
+        static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
+    // Wait until the opCtx has started sleeping for its nap duration.
+    auto expectedAlarm = opCtx->hasDeadline()
+        ? std::min(opCtx->getDeadline(), expectedAdmissionTime)
+        : expectedAdmissionTime;
+
+    Timer t;
+    while (!clockSource->hasAlarmAt(expectedAlarm)) {
+        ASSERT_LT(t.elapsed(), Seconds(30))
+            << "Timed out waiting for thread associated with the provided opCtx to sleep for "
+               "the IRRL's prescribed nap-time";
+        sleepFor(Milliseconds(1));
+    }
 }
 
 void ServiceEntryPointTestFixture::testCommandSucceeds() {
@@ -572,41 +582,287 @@ void ServiceEntryPointTestFixture::runWriteConcernTestExpectClusterDefault(
     ASSERT_EQ(logs.countTextContaining("Applying default writeConcern"), 1);
 }
 
-#ifdef MONGO_CONFIG_OTEL
-void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromRequest() {
+void ServiceEntryPointTestFixture::testTelemetryContextDeserializedFromSection() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    otel::traces::OtelTracesCapturer capturer;
+    auto guard = otel::traces::setTraceSamplingFnForTest(
+        [](std::string_view, double) { return true; }, [] { return true; });
+
     auto opCtx = makeOperationContext();
 
-    // "traceparent" format: version-traceid-spanid-traceflags. "tracestate" can be any string.
-    BSONObjBuilder traceCtxBuilder;
-    traceCtxBuilder.append("traceparent",
-                           "00-11111111111111111111111111111111-1111111111111111-01");
-    traceCtxBuilder.append("tracestate", "dummystring");
+    const static HostAndPort kTestTargetHost = {HostAndPort("FakeHost", 12345)};
+    auto request = executor::RemoteCommandRequest{kTestTargetHost,
+                                                  DatabaseName::kAdmin,
+                                                  BSON(TestCmdSucceeds::kCommandName << 1),
+                                                  opCtx.get()};
+    auto opMsgRequest = static_cast<OpMsgRequest>(request);
+    opMsgRequest.telemetryContext = TelemetryContextSection{
+        OtelContextSection{"00-11111111111111111111111111111111-1111111111111111-01"}};
+    auto msg = opMsgRequest.serialize();
 
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append(TestCmdSucceeds::kCommandName, 1);
-    cmdBuilder.append("$traceCtx", traceCtxBuilder.obj());
-
-    runCommandTestWithResponse(cmdBuilder.obj(), opCtx.get());
+    auto swDbResponse = handleRequest(msg, opCtx.get());
+    EXPECT_EQ(Status::OK(), swDbResponse);
 
     auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
     auto retrievedCtx = holder.getTelemetryContext();
-    ASSERT_NE(retrievedCtx, nullptr);
+    EXPECT_NE(retrievedCtx, nullptr);
 
-    auto spanCtx = std::dynamic_pointer_cast<otel::traces::SpanTelemetryContextImpl>(retrievedCtx);
-    ASSERT_NE(spanCtx, nullptr);
-    auto span = spanCtx->getSpan();
-    ASSERT_TRUE(span->GetContext().IsValid());
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName), Not(IsEmpty()));
 }
 
-void ServiceEntryPointTestFixture::testTelemetryContextNotSetWhenNotInRequest() {
-    auto opCtx = makeOperationContext();
+void ServiceEntryPointTestFixture::testSpanNotCreatedWhenTelemetryContextNotSetInRequest() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    otel::traces::OtelTracesCapturer capturer;
+    // We want the sampler to return false so that the only reason the span would be kept is that
+    // the telemetry context is set to include a parent span.
+    auto samplerGuard = otel::traces::setTraceSamplingFnForTest(
+        [](std::string_view, double) { return false; }, [] { return true; });
 
+    auto opCtx = makeOperationContext();
     runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
 
-    auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx.get());
-    auto retrievedCtx = holder.getTelemetryContext();
-    ASSERT_EQ(retrievedCtx, nullptr);
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName), IsEmpty());
 }
-#endif  // MONGO_CONFIG_OTEL
+
+void ServiceEntryPointTestFixture::testIngressSpanHasServerKind() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    otel::traces::OtelTracesCapturer capturer;
+
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName),
+                Contains(otel::traces::HasKind(otel::traces::SpanKind::kServer)));
+}
+
+void ServiceEntryPointTestFixture::testIngressSpanHasConsumerKindForMoreToCome() {
+    if (!otel::traces::OtelTracesCapturer::canReadSpans()) {
+        GTEST_SKIP() << "OTel not configured";
+    }
+    otel::traces::OtelTracesCapturer capturer;
+
+    auto opCtx = makeOperationContext();
+    // A request with the moreToCome flag set is fire-and-forget; the ingress span should be marked
+    // as a consumer span rather than a server span.
+    auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+    OpMsg::setFlag(&msg, OpMsg::kMoreToCome);
+    auto swDbResponse = handleRequest(msg, opCtx.get());
+    ASSERT_OK(swDbResponse);
+
+    EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName),
+                Contains(otel::traces::HasKind(otel::traces::SpanKind::kConsumer)));
+}
+
+namespace {
+unittest::MinimumLoggedSeverityGuard enableRateLimiterLogging() {
+    return unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
+                                                logv2::LogSeverity::Debug(4)};
+}
+}  // namespace
+
+void ServiceEntryPointTestFixture::
+    testPendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled() {
+    auto guard = enableRateLimiterLogging();
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
+
+    admission::RateLimiter limiterForDeferredToken(
+        /*refreshRatePerSec=*/1.0,
+        /*burstCapacitySecs=*/1.0,
+        /*maxQueueDepth=*/1,
+        "PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled");
+
+    auto opCtx = makeOperationContext();
+    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
+    admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+        opCtx->getClient(), std::move(*queuedTokenResult));
+
+    auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+    ASSERT_OK(handleRequest(msg, opCtx.get()));
+
+    ASSERT_EQ(limiterForDeferredToken.stats().addedToQueue(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().removedFromQueue(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
+    ASSERT_EQ(limiterForDeferredToken.queued(), 0);
+}
+
+void ServiceEntryPointTestFixture::testQueuedAdmissionInterrupted() {
+    auto guard = enableRateLimiterLogging();
+
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        ThreadClient client("QueuedAdmissionInterrupted", getService());
+        unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
+                                                             true};
+
+        admission::RateLimiter limiterForDeferredToken(
+            /*refreshRatePerSec=*/1.0,
+            /*burstCapacitySecs=*/1.0,
+            /*maxQueueDepth=*/2,
+            "QueuedAdmissionInterrupted",
+            getGlobalServiceContext()->getTickSource());
+
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+        auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+        ASSERT_TRUE(queuedTokenResult);
+        ASSERT_FALSE(queuedTokenResult->isReady());
+
+        auto napDuration = queuedTokenResult->getNapDuration_forTest();
+        ASSERT_EQ(napDuration, Seconds(1));
+        admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+            opCtx->getClient(), std::move(*queuedTokenResult));
+
+        // handleRequest blocks in waitForAdmission while the queued token's napTime elapses. A
+        // background thread waits until the opCtx is blocking there, then kills it to trigger
+        // Interrupted.
+        auto expectedAdmissionTime =
+            getGlobalServiceContext()->getFastClockSource()->now() + napDuration;
+        auto interrupter = monitor.spawn([&] {
+            waitUntilQueuedAtAdmission(opCtx.get(), expectedAdmissionTime);
+            opCtx->markKilled(ErrorCodes::Interrupted);
+        });
+
+        auto msg = constructMessage(BSON("ping" << 1), opCtx.get());
+        auto swDbResponse = handleRequest(msg, opCtx.get());
+        interrupter.join();
+        ASSERT_OK(swDbResponse);
+        auto response = dbResponseToBSON(swDbResponse.getValue());
+        auto status = getStatusFromCommandResult(response);
+        ASSERT_EQ(status, ErrorCodes::Interrupted);
+        ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    });
+}
+
+void ServiceEntryPointTestFixture::testQueuedAdmissionRespectsMaxTimeMS() {
+    auto guard = enableRateLimiterLogging();
+
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        ThreadClient client("QueuedAdmissionRespectsMaxTimeMS", getService());
+
+        unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
+                                                             true};
+
+        auto* clockSource =
+            static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
+        auto* tickSource =
+            static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
+
+        // Create the limiter with the mock tick source so clock advancement controls token
+        // availability.
+        admission::RateLimiter limiterForDeferredToken(
+            /*refreshRatePerSec=*/1.0,
+            /*burstCapacitySecs=*/1.0,
+            /*maxQueueDepth=*/2,
+            "QueuedAdmissionRespectsMaxTimeMS",
+            tickSource);
+
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+        auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+        ASSERT_TRUE(queuedTokenResult);
+        ASSERT_FALSE(queuedTokenResult->isReady());
+
+        auto napDuration = queuedTokenResult->getNapDuration_forTest();
+        ASSERT_EQ(napDuration, Seconds(1));
+        admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+            opCtx->getClient(), std::move(*queuedTokenResult));
+
+        // The clockAdvancer thread waits until the opCtx is blocking in waitForAdmission, then
+        // advances the mock clock past the maxTimeMS deadline (well under the ~1000ms napTime) to
+        // trigger MaxTimeMSExpired.
+        auto maxTimeMS = Milliseconds(105);
+        auto expectedAdmissionTime = clockSource->now() + napDuration;
+        auto clockAdvancer = monitor.spawn([&] {
+            waitUntilQueuedAtAdmission(opCtx.get(), expectedAdmissionTime);
+
+            auto newTime = maxTimeMS + Milliseconds(1);
+            clockSource->advance(newTime);
+            tickSource->advance(newTime);
+        });
+
+        auto msg = constructMessage(
+            BSON("ping" << 1 << GenericArguments::kMaxTimeMSFieldName << maxTimeMS.count()),
+            opCtx.get());
+        auto swDbResponse = handleRequest(msg, opCtx.get());
+        clockAdvancer.join();
+        ASSERT_OK(swDbResponse);
+
+        const auto response = dbResponseToBSON(swDbResponse.getValue());
+        const auto status = getStatusFromCommandResult(response);
+        ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    });
+}
+
+void ServiceEntryPointTestFixture::testQueuedAdmissionWithLargeMaxTimeMSSucceeds() {
+    auto guard = enableRateLimiterLogging();
+
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        ThreadClient client("QueuedAdmissionWithLargeMaxTimeMSSucceeds", getService());
+        unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
+                                                             true};
+
+        auto* clockSource =
+            static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
+        auto* tickSource =
+            static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
+
+        auto opCtx = makeOperationContext();
+
+        // Needed to ensure workingTimeMillis is calculated using the test's mock tick source rather
+        // than the system one.
+        CurOp::get(opCtx.get())->setTickSource_forTest(tickSource);
+
+        admission::RateLimiter limiterForDeferredToken(
+            /*refreshRatePerSec=*/1.0,
+            /*burstCapacitySecs=*/1.0,
+            /*maxQueueDepth=*/2,
+            "QueuedAdmissionWithLargeMaxTimeMSSucceeds",
+            tickSource);
+
+        ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+        auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+        ASSERT_TRUE(queuedTokenResult);
+        ASSERT_FALSE(queuedTokenResult->isReady());
+        auto napDuration = queuedTokenResult->getNapDuration_forTest();
+        ASSERT_EQ(napDuration, Seconds(1));
+        admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+            client.get(), std::move(*queuedTokenResult));
+
+        // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
+        // 1 token/sec) elapses. A background thread waits until the opCtx is blocking, then
+        // advances the mock clock past the napTime to release the token and let the command
+        // succeed.
+        auto expectedAdmissionTime = clockSource->now() + napDuration;
+        auto clockAdvancer = monitor.spawn([&] {
+            waitUntilQueuedAtAdmission(opCtx.get(), expectedAdmissionTime);
+            // Advance the tick source first so that when the queued thread wakes up (due to the
+            // clockSource advancing) it will always observe the correct tick count.
+            tickSource->advance(Milliseconds(1001));
+            clockSource->advance(Milliseconds(1001));
+        });
+
+        auto msg = constructMessage(
+            BSON("ping" << 1 << GenericArguments::kMaxTimeMSFieldName << (60 * 1000)), opCtx.get());
+        auto swDbResponse = handleRequest(msg, opCtx.get());
+        clockAdvancer.join();
+
+        ASSERT_OK(swDbResponse);
+        ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())),
+                  Status::OK());
+        ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
+
+        // Time spent in the queue should not be represented in the "working" time.
+        ASSERT_LT(CurOp::get(opCtx.get())->debug().workingTimeMillis, Milliseconds(1000));
+    });
+}
 
 }  // namespace mongo

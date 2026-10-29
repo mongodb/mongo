@@ -3,31 +3,13 @@ import os
 import platform
 import subprocess
 import sys
-
-import requests
-import retry
+import tarfile
 
 from buildscripts.util.expansions import get_expansion
 
-# This script is used to gather code coverage data from the build and post it to coveralls.
+# This script is used to gather code coverage data from the build.
 # It is run as part of the Evergreen build process.
 # It is not intended to be run directly.
-
-
-@retry.retry(tries=3, delay=5)
-def retry_coveralls_report(args: list, env: dict[str, str]):
-    print("Running coveralls report...")
-    subprocess.run(args, env=env, check=True, encoding="utf-8")
-
-
-@retry.retry(tries=3, delay=5)
-def retry_coveralls_post(coveralls_report: str):
-    print("Posting to coveralls")
-    files = {"json_file": open(coveralls_report, "rb")}
-    response = requests.post("https://coveralls.io/api/v1/jobs", files=files)
-    print(response.text)
-    if not response.ok:
-        raise RuntimeError(f"Error while sending coveralls report: {response.status_code}")
 
 
 def get_bazel_coverage_report_file() -> str:
@@ -38,6 +20,101 @@ def get_bazel_coverage_report_file() -> str:
         bazel_output_location, "_coverage", "_coverage_report.dat"
     )
     return bazel_coverage_report_location
+
+
+BAZEL_COVERAGE_SUMMARY_FILE = "bazel-coverage-summary.txt"
+BAZEL_COVERAGE_REPORT_FILE = "bazel-coverage-report.tar.gz"
+BAZEL_COVERAGE_REPORT_MEMBER = "bazel-coverage-report.lcov"
+
+
+def _archive_coverage_report(report_path: str, archive_path: str) -> None:
+    """Compress the raw lcov report into the working directory for upload.
+
+    The report lives under bazel's output path, which s3.put can't reach, and a full-repo
+    tracefile is large but highly compressible, so it is archived rather than copied.
+
+    A tarball rather than a bare .gz specifically so the artifact opens by double-click on
+    macOS: Archive Utility rejects a plain gzip stream with "Error 79 - Inappropriate file
+    type or format", but handles tar.gz natively. The tar wrapper costs ~3% at the same
+    compression level, and this artifact exists to be downloaded and read by a human.
+    """
+    with tarfile.open(archive_path, "w:gz", compresslevel=9) as tar:
+        tar.add(report_path, arcname=BAZEL_COVERAGE_REPORT_MEMBER)
+    print(
+        f"[coverage-summary] archived raw lcov report to {archive_path} "
+        f"({os.path.getsize(report_path)} -> {os.path.getsize(archive_path)} bytes)"
+    )
+
+
+def _parse_lcov_line_coverage(report_path: str) -> dict[str, dict[int, int]]:
+    """Parse an lcov tracefile into {source_file: {line_number: hit_count}}.
+
+    A single source file can appear in more than one record when reports are merged, so hit
+    counts are accumulated per line rather than overwritten. Only DA: (line) records are read;
+    branch and function records are ignored.
+    """
+    per_file: dict[str, dict[int, int]] = {}
+    current: dict[int, int] | None = None
+    with open(report_path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith("SF:"):
+                current = per_file.setdefault(line[3:].strip(), {})
+            elif line.startswith("end_of_record"):
+                current = None
+            elif line.startswith("DA:") and current is not None:
+                # DA:<line>,<hits>[,<checksum>]
+                fields = line[3:].strip().split(",")
+                try:
+                    line_no = int(fields[0])
+                    hits = int(fields[1])
+                except (IndexError, ValueError):
+                    continue
+                current[line_no] = current.get(line_no, 0) + hits
+    return per_file
+
+
+def _write_coverage_summary(report_path: str, summary_path: str) -> None:
+    """Log summary coverage stats and write a per-file breakdown for upload as an artifact."""
+
+    per_file = _parse_lcov_line_coverage(report_path)
+
+    def covered_of(lines: dict[int, int]) -> int:
+        return sum(1 for hits in lines.values() if hits > 0)
+
+    total_executable = sum(len(lines) for lines in per_file.values())
+    total_covered = sum(covered_of(lines) for lines in per_file.values())
+
+    def percent(covered: int, executable: int) -> float:
+        return 100.0 * covered / executable if executable else 0.0
+
+    print(
+        f"[coverage-summary] files={len(per_file)} executable_lines={total_executable} "
+        f"covered_lines={total_covered} "
+        f"coverage={percent(total_covered, total_executable):.0f}% "
+        f"report={report_path} ({os.path.getsize(report_path)} bytes)"
+    )
+
+    with open(summary_path, "w", encoding="utf-8") as out:
+        out.write(f"Coverage report: {report_path}\n")
+        out.write(
+            f"Files: {len(per_file)}  Executable lines: {total_executable}  "
+            f"Covered lines: {total_covered}  "
+            f"Coverage: {percent(total_covered, total_executable):.0f}%\n\n"
+        )
+        out.write(f"{'Lines':>8} {'Exec':>8} {'Uncovered':>10} {'Cover':>8}  File\n")
+        for path, lines in sorted(per_file.items()):
+            executable = len(lines)
+            covered = covered_of(lines)
+            out.write(
+                f"{executable:>8} {covered:>8} {executable - covered:>10} "
+                f"{percent(covered, executable):>7.0f}%  {path}\n"
+            )
+        out.write(
+            f"\n{total_executable:>8} {total_covered:>8} "
+            f"{total_executable - total_covered:>10} "
+            f"{percent(total_covered, total_executable):>7.0f}%  TOTAL\n"
+        )
+    print(f"[coverage-summary] wrote per-file breakdown to {summary_path}")
 
 
 def main():
@@ -64,38 +141,11 @@ def main():
             "No git repo found in working directory. Code coverage needs git repo to function."
         )
 
-    coveralls_token = get_expansion("coveralls_token")
-    assert coveralls_token is not None, "Coveralls token was not found"
-    github_pr_number = get_expansion("github_pr_number", "")
-    revision_order_id = get_expansion("revision_order_id")
-
-    # this keeps coverage reports consistent across evergreen tasks and merge queue maneuvers
-    github_commit = get_expansion("github_commit")
-
     bazel_coverage_report_location = get_bazel_coverage_report_file()
     if os.path.exists(bazel_coverage_report_location):
         print("Found bazel coverage report.")
-        version_id = get_expansion("version_id")
-        task_id = get_expansion("task_id")
-
-        args = [
-            "coveralls",
-            "report",
-            bazel_coverage_report_location,
-            "--service-name=travis-ci",
-            f"--repo-token={coveralls_token}",
-            f"--job-id={revision_order_id}",
-            f"--build-url=https://spruce.mongodb.com/version/{version_id}/",
-            f"--job-url=https://spruce.mongodb.com/task/{task_id}/",
-        ]
-        if github_pr_number:
-            args.append(
-                f"--pull-request={github_pr_number}",
-            )
-
-        my_env = os.environ.copy()
-        my_env["COVERALLS_GIT_COMMIT"] = github_commit
-        retry_coveralls_report(args, my_env)
+        _write_coverage_summary(bazel_coverage_report_location, BAZEL_COVERAGE_SUMMARY_FILE)
+        _archive_coverage_report(bazel_coverage_report_location, BAZEL_COVERAGE_REPORT_FILE)
         # no gcda files are generated from bazel coverage so we can exit early here
         return 0
 
@@ -120,12 +170,6 @@ def main():
     if not has_bazel_gcno:
         raise RuntimeError("Neither bazel coverage nor gcno files were found.")
 
-    my_env = os.environ.copy()
-    my_env["COVERALLS_REPO_TOKEN"] = coveralls_token
-    my_env["TRAVIS_PULL_REQUEST"] = github_pr_number
-    my_env["TRAVIS_JOB_ID"] = revision_order_id
-    my_env["TRAVIS_COMMIT"] = github_commit
-
     coveralls_report = "gcovr-coveralls.json"
 
     args = [
@@ -143,7 +187,7 @@ def main():
         "--exclude",
         ".*bazel-out/.*",
         "--exclude",
-        ".*external/mongo_toolchain/.*",
+        ".*external/.*mongo_toolchain.*",
         "--exclude",
         r".*src/.*_gen\.(h|hpp|cpp)",
         "--exclude",
@@ -177,7 +221,7 @@ def main():
 
     print("Running gcovr command")
     process = subprocess.run(
-        args, env=my_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8"
+        args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8"
     )
     print(process.stdout)
     if process.returncode != 0:
@@ -186,7 +230,6 @@ def main():
     if not os.path.exists(coveralls_report):
         raise RuntimeError(f"Could not find coveralls json report at {coveralls_report}")
 
-    retry_coveralls_post(coveralls_report)
     return 0
 
 

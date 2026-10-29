@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -49,6 +23,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
@@ -199,7 +174,7 @@ bool facetSubPipelinesTargetView(const vector<pair<string, vector<BSONObj>>>& ra
 
             if (targetNss) {
                 if (auto it = resolvedNamespaces.find(*targetNss);
-                    it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+                    it != resolvedNamespaces.end() && it->second.isInvolvedNamespaceAView()) {
                     return true;
                 }
             }
@@ -224,10 +199,13 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     std::vector<FacetPipeline> facetPipelines,
     const intrusive_ptr<ExpressionContext>& expCtx,
-    size_t bufferSizeBytes,
+    boost::optional<size_t> bufferSizeBytes,
     size_t maxOutputDocBytes) {
+    size_t resolvedBufferSizeBytes = bufferSizeBytes.value_or(
+        static_cast<size_t>(loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes)
+                                .get(expCtx->getOperationContext())));
     return new DocumentSourceFacet(
-        std::move(facetPipelines), expCtx, bufferSizeBytes, maxOutputDocBytes);
+        std::move(facetPipelines), expCtx, resolvedBufferSizeBytes, maxOutputDocBytes);
 }
 
 Value DocumentSourceFacet::serialize(const query_shape::SerializationOptions& opts) const {
@@ -235,8 +213,8 @@ Value DocumentSourceFacet::serialize(const query_shape::SerializationOptions& op
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
         auto&& facet = _facets[facetId];
         if (opts.isSerializingForExplain()) {
-            bool canAddExecPipelineExplain =
-                opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
+            bool canAddExecPipelineExplain = opts.verbosity &&
+                explainPolicyFor(*opts.verbosity).hasExecStats() &&
                 _execStatsWrapper->isStatsProviderAttached();
             auto explain = canAddExecPipelineExplain
                 ? mergeExplains(facet.pipeline->writeExplainOps(opts),
@@ -317,8 +295,9 @@ StageConstraints DocumentSourceFacet::constraints(PipelineSplitState state) cons
     }
 
     // Clear the captured merging shard if 'host' is incompatible with merging on a shard.
-    if (!(host == HostTypeRequirement::kNone || host == HostTypeRequirement::kRunOnceAnyNode ||
-          host == HostTypeRequirement::kAnyShard)) {
+    if (!(host == HostTypeRequirement::kNone ||
+          host == HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode ||
+          host == HostTypeRequirement::kTargetedShards)) {
         mergeShardId = boost::none;
     }
 

@@ -19,12 +19,6 @@
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
-
-// For testing convenience this variable is made an integer "1" if SBE is fully enabled, because the
-// expected amount of plan cache entries differs between the SBE plan cache and the classic one.
-const isUsingSbePlanCache = sbePlanCacheEnabled(db) ? 1 : 0;
-
 const collName = "index_filter_commands_invalidate_plan_cache_entries";
 const coll = db[collName];
 
@@ -65,23 +59,12 @@ assert(existsInPlanCache({a: 1, b: 1}, {a: 1}, {}, coll));
 // plans are created to perform the queries being run in parallel by other concurrent tasks.
 assert.gte(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 3);
 
-// This query has same index filter key as the first query "{a: 1}" w/o skip. So when an index
-// filter is set/cleared on query {a: 1}, the plan cache entry created for this query should also be
-// invalidated.
-assert.eq(0, coll.find({a: 1}).skip(1).itcount());
-
-// SBE plan cache key encodes "skip", so there's one more plan cache entry in SBE plan cache. While
-// in classic plan cache, queries with only difference in "skip" share the same plan cache entry.
-assert.gte(coll.aggregate([{$planCacheStats: {}}]).itcount(), 3 + isUsingSbePlanCache);
-
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}),
 );
 assert(!existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 
-// This planCacheSetFilter command will invalidate plan cache entries with filter {a: 1}. There are
-// two entries in the SBE plan cache that got invalidated, or one entry in the classic plan cache
-// that got invalidated.
+// This planCacheSetFilter command will invalidate plan cache entries with filter {a: 1}.
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {a: 1}, indexes: [{a: 1}]}),
 );

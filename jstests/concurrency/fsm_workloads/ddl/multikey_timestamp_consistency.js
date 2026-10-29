@@ -59,6 +59,7 @@
  * and the preceding timestamp.
  *
  * @tags: [
+ *   assumes_against_mongod_not_mongos,
  *   uses_transactions,
  *   featureFlagReplicateMultikeynessInTransactions,
  *   requires_replication,
@@ -100,12 +101,22 @@ export const $config = (function () {
     //   QueryPlanKilled: an in-flight plan executor (e.g. EXPRESS_UPDATE) was killed when the
     //     collection was dropped underneath it.
     function isCollDropError(e) {
-        return (
-            e.code === ErrorCodes.NamespaceNotFound ||
-            e.code === ErrorCodes.CollectionUUIDMismatch ||
-            e.code === ErrorCodes.OperationNotSupportedInTransaction ||
-            e.code === ErrorCodes.QueryPlanKilled
-        );
+        const tolerated = [
+            ErrorCodes.NamespaceNotFound,
+            ErrorCodes.CollectionUUIDMismatch,
+            ErrorCodes.OperationNotSupportedInTransaction,
+            ErrorCodes.QueryPlanKilled,
+        ];
+        // A non-txn write that races a drop returns ok:1 at the command level with the real
+        // failure nested in writeErrors (e.g. QueryPlanKilled when the plan executor is killed
+        // mid-update), so e.code is undefined and only the writeError carries the code. When
+        // writeErrors are present they are the authoritative source: tolerate iff every nested
+        // write error is a coll-drop race (a single non-tolerated error makes the whole thing
+        // non-tolerable). Only when there are no writeErrors do we check the top-level e.code.
+        if (Array.isArray(e.writeErrors) && e.writeErrors.length > 0) {
+            return e.writeErrors.every((we) => tolerated.includes(we.code));
+        }
+        return tolerated.includes(e.code);
     }
 
     // Returns true and best-effort aborts any leftover transaction on the session if `e` is a
@@ -116,10 +127,26 @@ export const $config = (function () {
     // when there was no leftover transaction (e.g. for non-txn states).
     function tolerateCollDropError(state, e) {
         if (!isCollDropError(e)) return false;
-        assert.commandWorkedOrFailedWithCode(
-            state.session.abortTransaction_forTesting(),
-            ErrorCodes.NoSuchTransaction,
-        );
+
+        const driverStateErrors = [
+            "Cannot call abortTransaction twice.",
+            "Cannot call abortTransaction after calling commitTransaction.",
+            "There is no active transaction to abort on this session.",
+        ];
+
+        try {
+            assert.commandWorkedOrFailedWithCode(
+                state.session.abortTransaction_forTesting(),
+                ErrorCodes.NoSuchTransaction,
+            );
+        } catch (abortEx) {
+            // At this point we don't know the exact state of the session object. If we called
+            // abortTransaction_forTesting while it was at an incorrect state, it will throw one
+            // of the errors in the list, which we can just ignore. Anything else is rethrown.
+            if (!driverStateErrors.includes(abortEx.message)) {
+                throw abortEx;
+            }
+        }
         return true;
     }
     // Number of pre-existing collections in the shared pool. Each pool collection has both a
@@ -849,16 +876,18 @@ export const $config = (function () {
             db[myCollName].drop();
 
             // Tolerate IndexBuildAborted: another thread may drop the coll again while these
-            // index builds are running.
-            assert.commandWorkedOrFailedWithCode(
-                db[myCollName].createIndex({"$**": 1}),
+            // index builds are running. createIndexes fails with ConflictingOperationInProgress
+            // after exhausting its retries when the collection keeps being dropped and recreated
+            // concurrently.
+            assert.commandWorkedOrFailedWithCode(db[myCollName].createIndex({"$**": 1}), [
                 ErrorCodes.IndexBuildAborted,
-            );
+                ErrorCodes.ConflictingOperationInProgress,
+            ]);
             for (const f of REGULAR_INDEX_FIELDS) {
-                assert.commandWorkedOrFailedWithCode(
-                    db[myCollName].createIndex({[f]: 1}),
+                assert.commandWorkedOrFailedWithCode(db[myCollName].createIndex({[f]: 1}), [
                     ErrorCodes.IndexBuildAborted,
-                );
+                    ErrorCodes.ConflictingOperationInProgress,
+                ]);
             }
         },
 
@@ -876,14 +905,17 @@ export const $config = (function () {
             //   IndexNotFound: another thread already dropped this index.
             //   NamespaceNotFound: dropAndRecreateColl dropped the collection.
             //   IndexBuildAborted: a concurrent dropIndexes/dropCollection aborted our build.
+            //   ConflictingOperationInProgress: createIndexes gives up with this error after
+            //     exhausting its retries against repeated concurrent drops and recreates of the
+            //     collection.
             assert.commandWorkedOrFailedWithCode(db[myCollName].dropIndex(target), [
                 ErrorCodes.IndexNotFound,
                 ErrorCodes.NamespaceNotFound,
             ]);
-            assert.commandWorkedOrFailedWithCode(
-                db[myCollName].createIndex(target),
+            assert.commandWorkedOrFailedWithCode(db[myCollName].createIndex(target), [
                 ErrorCodes.IndexBuildAborted,
-            );
+                ErrorCodes.ConflictingOperationInProgress,
+            ]);
         },
 
         // Batch pressure.

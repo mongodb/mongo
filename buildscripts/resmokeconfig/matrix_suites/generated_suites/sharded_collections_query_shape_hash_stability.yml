@@ -20,7 +20,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
-        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+        await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
@@ -28,13 +28,13 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
     num_shards: 2
@@ -100,6 +100,7 @@ selector:
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
     - jstests/core/timeseries/write/timeseries_insert_after_update.js
     - jstests/core/timeseries/write/timeseries_closed_update_delete.js
+    - jstests/core/timeseries/write/timeseries_write_jsonschema_non_object.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

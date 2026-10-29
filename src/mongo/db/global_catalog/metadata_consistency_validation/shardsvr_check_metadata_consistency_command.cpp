@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -40,6 +14,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
@@ -63,12 +38,14 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/metadata_consistency_checks/non_existing_database_metadata_checks.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -124,7 +101,7 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     auto rawDatabases{uassertStatusOK(configServer->exhaustiveFindOnConfig(
                                           opCtx,
                                           ReadPreferenceSetting{ReadPreference::Nearest},
-                                          repl::ReadConcernLevel::kMajorityReadConcern,
+                                          repl::ReadConcernArgs::kMajority,
                                           NamespaceString::kConfigDatabasesNamespace,
                                           BSON(DatabaseType::kPrimaryFieldName << thisShardId),
                                           BSONObj() /* No sorting */,
@@ -193,6 +170,21 @@ public:
                 uassert(ErrorCodes::InterruptedDueToReplStateChange,
                         "Not primary while attempting to start a metadata consistency check",
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
+            }
+
+            if (TestingProctor::instance().isEnabled() && getTestCommandsEnabled()) {
+                _secondaryMode =
+                    request().getCommonFields().get_checkSecondariesMode().value_or_eval([&] {
+                        const auto mode = opCtx->getClient()->getPrng().trueWithProbability(0.5)
+                            ? CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp
+                            : CheckMetadataConsistencySecondaryModeEnum::kCheckAtSecondaryTimestamp;
+
+                        LOGV2(12922304,
+                              "Running checkMetadataConsistency with random secondary mode",
+                              "secondaryMode"_attr = idl::serialize(mode));
+
+                        return mode;
+                    });
             }
 
             auto response = [&] {
@@ -273,8 +265,8 @@ public:
                 const auto dbNss = NamespaceStringUtil::deserialize(db.getDbName(), nss.coll());
                 ScopedSetShardRole scopedSetShardRole(opCtx,
                                                       dbNss,
-                                                      boost::none /* shardVersion */,
-                                                      db.getVersion() /* databaseVersion */);
+                                                      /*shardVersion=*/boost::none,
+                                                      /*databaseVersion=*/db.getVersion());
 
                 const auto dbCheckWithDeadlineIfSet = [&] {
                     auto checkMetadataForDb = [&]() {
@@ -292,6 +284,9 @@ public:
                             });
                             DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                                 opCtx, dbNss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
+                            auto& stats = ShardingStatistics::get(opCtx).checkMetadataStatistics;
+                            auto recorder = stats.registerDatabaseDDLLockForStatistics();
+
                             tassert(
                                 9504001,
                                 "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
@@ -373,7 +368,22 @@ public:
                 }
             }
 
-            return _mergeCursors(opCtx, nss, std::move(cursors));
+            auto localInconsistencies = metadata_consistency_util::
+                checkShardCatalogCollectionsConsistentWithAuthoritativeness(opCtx);
+
+            // TODO SERVER-133990: We should also check on secondaries.
+            auto nonExistingDatabaseInconsistencies =
+                non_existing_database_metadata_consistency_checks::
+                    checkNonExistingDatabaseMetadataConsistency(
+                        opCtx,
+                        ShardingState::get(opCtx)->shardId(),
+                        metadata_consistency_util::RSNodeMode::kPrimary);
+            localInconsistencies.insert(
+                localInconsistencies.end(),
+                std::make_move_iterator(nonExistingDatabaseInconsistencies.begin()),
+                std::make_move_iterator(nonExistingDatabaseInconsistencies.end()));
+
+            return _mergeCursors(opCtx, nss, std::move(cursors), std::move(localInconsistencies));
         }
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
@@ -382,6 +392,9 @@ public:
                     hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                     DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                         opCtx, nss.dbName(), kDDLLockReason, MODE_S};
+                    auto& stats = ShardingStatistics::get(opCtx).checkMetadataStatistics;
+                    auto recorder = stats.registerDatabaseDDLLockForStatistics();
+
                     tassert(9504002,
                             "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                             !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
@@ -397,7 +410,7 @@ public:
                 }
             }();
 
-            return _mergeCursors(opCtx, nss, std::move(dbCursors));
+            return _mergeCursors(opCtx, nss, std::move(dbCursors), {});
         }
 
         Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
@@ -405,13 +418,16 @@ public:
                 hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                 DDLLockManager::ScopedCollectionDDLLock dbDDLLock{
                     opCtx, nss, kDDLLockReason, MODE_S};
+                auto& stats = ShardingStatistics::get(opCtx).checkMetadataStatistics;
+                auto recorder = stats.registerCollectionDDLLockForStatistics();
+
                 tassert(9504003,
                         "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                         !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
                 return _establishCursorOnParticipants(opCtx, nss);
             }();
 
-            return _mergeCursors(opCtx, nss, std::move(collCursors));
+            return _mergeCursors(opCtx, nss, std::move(collCursors), {});
         }
 
         /*
@@ -432,6 +448,7 @@ public:
             const auto shardOpKey = UUID::gen();
             ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
             participantRequest.setCommonFields(request().getCommonFields());
+            participantRequest.getCommonFields().set_checkSecondariesMode(_secondaryMode);
             participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
             participantRequest.setCursor(request().getCursor());
             auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -466,8 +483,8 @@ public:
                                             nss,
                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                             requests,
-                                            false /* allowPartialResults */,
-                                            nullptr /* RoutingContext */,
+                                            /*allowPartialResults=*/false,
+                                            /*routingCtx=*/nullptr,
                                             Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
                                             {shardOpKey, configOpKey});
             tassert(9504004,
@@ -478,7 +495,8 @@ public:
 
         CursorInitialReply _mergeCursors(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         std::vector<RemoteCursor>&& cursors) {
+                                         std::vector<RemoteCursor>&& cursors,
+                                         std::vector<MetadataInconsistencyItem>&& inconsistencies) {
 
             ResolvedNamespaceMap resolvedNamespaces;
             resolvedNamespaces[nss] = {nss, std::vector<BSONObj>{}};
@@ -496,12 +514,13 @@ public:
             auto pipeline = Pipeline::create({std::move(docSourceMergeStage)}, expCtx);
             auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));
 
-            return metadata_consistency_util::createInitialCursorReplyMongod(opCtx,
-                                                                             nss,
-                                                                             {} /*inconsistencies*/,
-                                                                             request().getCursor(),
-                                                                             request().toBSON(),
-                                                                             std::move(exec));
+            return metadata_consistency_util::createInitialCursorReplyMongod(
+                opCtx,
+                nss,
+                std::move(inconsistencies),
+                request().getCursor(),
+                request().toBSON(),
+                std::move(exec));
         }
 
         NamespaceString ns() const override {
@@ -520,6 +539,9 @@ public:
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
                             ActionType::internal));
         }
+
+        // TODO (SERVER-131057): consider getting rid of this variable.
+        boost::optional<CheckMetadataConsistencySecondaryModeEnum> _secondaryMode;
     };
 };
 MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencyCommand).forShard();

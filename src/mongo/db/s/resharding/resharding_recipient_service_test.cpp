@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
@@ -238,13 +212,13 @@ public:
                                                _sourceUUID,
                                                BSON(_currentShardKey << 1),
                                                false, /* unsplittable */
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
         return CollectionRoutingInfo{
             CurrentChunkManager(
@@ -322,7 +296,7 @@ public:
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
         stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
         resharding::clearCollectionMetadata(
-            opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+            opCtx, namespacesToRefresh, /*scheduleAsyncRefresh=*/true);
     }
 
     void ensureReshardingStashCollectionsEmpty(
@@ -686,7 +660,7 @@ BSONObj makeTestDocumentUpdateStatement() {
 void runRandomizedLocking(OperationContext* opCtx,
                           Locker& locker,
                           const ResourceId& resId,
-                          AtomicWord<bool>& keepRunning) {
+                          Atomic<bool>& keepRunning) {
     PseudoRandom random = PseudoRandom(123456);
 
     while (keepRunning.load()) {
@@ -781,9 +755,9 @@ public:
     using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
     using enum ExternalStateForTestImpl::ExternalFunction;
 
-    ReshardingRecipientServiceTest()
-        : repl::PrimaryOnlyServiceMongoDTest(
-              Options{}.useIndexBuildsCoordinator(std::make_unique<IndexBuildsCoordinatorMock>())) {
+    Options makeServiceContextOptions() override {
+        return repl::PrimaryOnlyServiceMongoDTest::makeServiceContextOptions()
+            .useIndexBuildsCoordinator(std::make_unique<IndexBuildsCoordinatorMock>());
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
@@ -2549,7 +2523,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             auto persistedRecipientState = persistedRecipientDoc.getMutableState().getState();
 
             checkRecipientMetrics(
-                testOptions, testRecipientMetrics, persistedRecipientDoc, boost::none /* currOp */);
+                testOptions, testRecipientMetrics, persistedRecipientDoc, /*currOp=*/boost::none);
             checkCoordinatorMetrics(testOptions,
                                     testRecipientMetrics,
                                     persistedCoordinatorDoc,
@@ -2869,6 +2843,11 @@ TEST_F(ReshardingRecipientServiceTest, RetryableErrorDuringChangeStreamsMonitorT
           "test"_attr = unittest::getTestName(),
           "testOptions"_attr = testOptions);
 
+    // Guard on kStrictConsistency transition so that reshardDoneCatchUp oplog does not race with
+    // writeToCollection, which can cause the recreated monitor to report the wrong delta.
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      RecipientStateEnum::kStrictConsistency};
+
     // Fire the failpoint once with a retryable error. The monitor should clean up, recreate
     // itself from the last persisted resume token, and complete normally.
     auto fp = globalFailPointRegistry().find(
@@ -2883,6 +2862,10 @@ TEST_F(ReshardingRecipientServiceTest, RetryableErrorDuringChangeStreamsMonitorT
     notifyToStartCloning(opCtx.get(), *recipient, doc);
     awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
     notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+    stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
+    stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
+
     awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
     notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
@@ -2911,7 +2894,7 @@ TEST_F(ReshardingRecipientServiceTest,
     ASSERT_OK(swDocumentsDelta.getStatus());
     ASSERT_EQ(swDocumentsDelta.getValue(), 0);
 
-    recipient->abort(false /* isUserCancelled */);
+    recipient->abort(/*isUserCancelled=*/false);
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
@@ -2927,7 +2910,7 @@ TEST_F(ReshardingRecipientServiceTest,
     auto swDocumentsDelta = recipient->awaitChangeStreamsMonitorCompleted().getNoThrow(opCtx.get());
     ASSERT_EQ(swDocumentsDelta.getStatus(), ErrorCodes::IllegalOperation);
 
-    recipient->abort(false /* isUserCancelled */);
+    recipient->abort(/*isUserCancelled=*/false);
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
@@ -3352,7 +3335,7 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
         // Start a thread to create randomized lock/unlock contention.
         const ResourceId resId(RESOURCE_COLLECTION, doc.getTempReshardingNss());
         Locker locker(opCtx->getServiceContext());
-        AtomicWord<bool> keepRunning{true};
+        Atomic<bool> keepRunning{true};
         stdx::thread lockThread(
             [&] { runRandomizedLocking(opCtx.get(), locker, resId, keepRunning); });
 
@@ -3447,6 +3430,34 @@ TEST_F(ReshardingRecipientServiceTest, StepDownBeforeRunFulfillsCompletionPromis
               ErrorCodes::InterruptedDueToReplStateChange);
 
     fp.setMode(FailPoint::off);
+}
+
+TEST_F(ReshardingRecipientServiceTest, OnReshardingFieldsChangesTassertsInAuthoritativePath) {
+    auto testOptions = makeBasicTestOptions().front();
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto commonMetadata = doc.getCommonReshardingMetadata();
+    commonMetadata.setAuthoritativeMetadataAccessLevel(
+        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
+    doc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+    RecipientStateMachine recipient{checked_cast<ReshardingRecipientService*>(_service),
+                                    doc,
+                                    std::make_unique<ExternalStateForTest>(),
+                                    getServiceContext()};
+
+    auto opCtx = makeOperationContext();
+    auto reshardingFields = TypeCollectionReshardingFields{doc.getReshardingUUID()};
+    reshardingFields.setState(CoordinatorStateEnum::kApplying);
+
+    // onReshardingFieldsChanges throws when called in the authoritative path.
+    ASSERT_THROWS_WITH_CHECK(recipient.onReshardingFieldsChanges(
+                                 opCtx.get(), reshardingFields, /*noChunksToCopy=*/false),
+                             DBException,
+                             [](const DBException& ex) {
+                                 EXPECT_EQ(ex.code(), 12862901);
+                                 assertionCount.tripwire.subtractAndFetch(1);
+                             });
 }
 
 }  // namespace

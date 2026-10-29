@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -61,12 +34,13 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalUnpackBucket);
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(ExternalUnpackBucket);
 
-struct MONGO_MOD_PRIVATE InternalUnpackBucketSharedState {
+struct [[MONGO_MOD_PRIVATE]] InternalUnpackBucketSharedState {
     // It's beneficial to do as much filtering at the bucket level as possible to avoid unpacking
     // buckets that wouldn't contribute to the results anyway. There is a generic mechanism that
     // allows to swap $match stages with this one (see 'getModifiedPaths()'). It lets us split out
@@ -81,21 +55,21 @@ struct MONGO_MOD_PRIVATE InternalUnpackBucketSharedState {
     timeseries::BucketUnpacker _bucketUnpacker;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceInternalUnpackBucket : public DocumentSource {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DocumentSourceInternalUnpackBucket : public DocumentSource {
 public:
-    static constexpr std::string_view kStageNameInternal = "$_internalUnpackBucket"_sd;
-    static constexpr std::string_view kStageNameExternal = "$_unpackBucket"_sd;
-    static constexpr std::string_view kInclude = "include"_sd;
-    static constexpr std::string_view kExclude = "exclude"_sd;
-    static constexpr std::string_view kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"_sd;
-    static constexpr std::string_view kUsesExtendedRange = "usesExtendedRange"_sd;
-    static constexpr std::string_view kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
-    static constexpr std::string_view kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"_sd;
-    static constexpr std::string_view kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
-    static constexpr std::string_view kWholeBucketFilter = "wholeBucketFilter"_sd;
-    static constexpr std::string_view kEventFilter = "eventFilter"_sd;
-    static constexpr std::string_view kFixedBuckets = "fixedBuckets"_sd;
-    static constexpr std::string_view kSbeCompatible = "sbeCompatible"_sd;
+    static constexpr std::string_view kStageNameInternal = "$_internalUnpackBucket"sv;
+    static constexpr std::string_view kStageNameExternal = "$_unpackBucket"sv;
+    static constexpr std::string_view kInclude = "include"sv;
+    static constexpr std::string_view kExclude = "exclude"sv;
+    static constexpr std::string_view kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"sv;
+    static constexpr std::string_view kUsesExtendedRange = "usesExtendedRange"sv;
+    static constexpr std::string_view kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"sv;
+    static constexpr std::string_view kIncludeMinTimeAsMetadata = "includeMinTimeAsMetadata"sv;
+    static constexpr std::string_view kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"sv;
+    static constexpr std::string_view kWholeBucketFilter = "wholeBucketFilter"sv;
+    static constexpr std::string_view kEventFilter = "eventFilter"sv;
+    static constexpr std::string_view kFixedBuckets = "fixedBuckets"sv;
+    static constexpr std::string_view kSbeCompatible = "sbeCompatible"sv;
 
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -293,11 +267,11 @@ public:
     }
 
     bool usesExtendedRange() const {
-        return _usesExtendedRange;
+        return _sharedState->_bucketUnpacker.getUsesExtendedRange();
     }
 
     void setUsesExtendedRange(bool val) {
-        _usesExtendedRange = val;
+        _sharedState->_bucketUnpacker.setUsesExtendedRange(val);
     }
 
     void setIncludeMaxTimeAsMetadata() {
@@ -439,13 +413,6 @@ private:
     // unchanged. Then we can push down certain $match and $group queries.
     bool _fixedBuckets = false;
 
-    // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
-    // the _id index, as _id is truncated to 32 bits. Note that this is a per-shard attribute (some
-    // shards of a collection may have extended range data while others do not), so when mongos
-    // sends a pipeline containing this stage to mongod, it will omit this value, as it may be
-    // different from the DB primary shard.
-    bool _usesExtendedRange = false;
-
     int _bucketMaxSpanSeconds;
 
     int _bucketMaxCount = 0;
@@ -487,4 +454,4 @@ private:
     boost::optional<bool> _isSbeCompatible = boost::none;
     boost::optional<SbeCompatibility> _isEventFilterSbeCompatible = boost::none;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

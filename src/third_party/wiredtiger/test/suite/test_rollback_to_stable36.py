@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 # Check the behavior of a fast-truncated page where the truncation is not stable but
 # everything else on the page is.
 
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable36(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all),verbose=(rts:5)'
     session_config = 'isolation=snapshot'
@@ -156,13 +155,11 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         if self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)
-        stat_cursor.close()
 
         # Checkpoint.
         self.session.checkpoint()
@@ -175,13 +172,11 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
 
         # Currently rolling back a fast-truncate works by instantiating the pages and
         # rolling back the instantiated updates, so we should see some page instantiations.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        read_deleted = stat_cursor[stat.conn.cache_read_deleted][2]
+        read_deleted = self.get_stat(stat.conn.cache_read_deleted)
         if self.trunc_with_remove:
             self.assertEqual(read_deleted, 0)
         else:
             self.assertGreater(read_deleted, 0)
-        stat_cursor.close()
 
         # Validate the data; we should see all of it, since the truncations weren't stable.
         self.check(ds, value_a, nrows, 15)

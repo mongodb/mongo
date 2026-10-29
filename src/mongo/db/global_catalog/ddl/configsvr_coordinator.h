@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,6 +12,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -58,8 +33,8 @@
 
 namespace mongo {
 
-MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinatorMetadata
-extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigsvrCoordinatorMetadata extractConfigsvrCoordinatorMetadata(
+    const BSONObj& stateDoc);
 
 /**
  * ConfigsvrCoordinators are POS instances that run on the configsvr and represent cluster
@@ -67,7 +42,7 @@ extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc);
  * such operations. Concrete operations extend ConfigsvrCoordinator and implement their specific
  * bussiness logic on '_runImpl'
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ConfigsvrCoordinator
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ConfigsvrCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ConfigsvrCoordinator> {
 public:
     explicit ConfigsvrCoordinator(const BSONObj& stateDoc);
@@ -95,6 +70,17 @@ protected:
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
 
+    /**
+     * Invoked by `run()` at the start of every execution. Coordinators that persist a session
+     * override this to perform a causality barrier that invalidates any retryable writes issued by
+     * previous executions (an earlier attempt of this instance, or a previous primary) before doing
+     * any work. The override is expected to be a no-op when no session has been persisted yet, so
+     * it is safe to call unconditionally, including on the very first execution.
+     */
+    virtual void _performCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token) {}
+
     virtual const ConfigsvrCoordinatorMetadata& metadata() const = 0;
 
     void interrupt(Status status) noexcept final;
@@ -118,8 +104,9 @@ private:
 };
 
 template <class StateDoc, class Phase>
-class MONGO_MOD_UNFORTUNATELY_OPEN ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator,
-                                                              public OperationSessionPersistence {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConfigsvrCoordinatorImpl
+    : public ConfigsvrCoordinator,
+      public OperationSessionPersistence {
 public:
     ConfigsvrCoordinatorImpl(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),
@@ -213,6 +200,38 @@ protected:
             newMetadata.setSession(CoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
             doc.setConfigsvrCoordinatorMetadata(newMetadata);
         });
+    }
+
+    void _performCausalityBarrier(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token) override {
+        {
+            // Only issue a barrier if a previous execution already established a session and may
+            // therefore have issued retryable writes to participants. If no session has been
+            // persisted yet there is nothing to invalidate.
+            std::lock_guard lk{_docMutex};
+            if (!_doc.getConfigsvrCoordinatorMetadata().getSession()) {
+                return;
+            }
+        }
+
+        // Bumps the session's txnNumber (persisting it with majority write concern) and performs a
+        // noop retryable write on all shards and the config server. Any retryable write issued by a
+        // previous execution (or by a rogue primary in a split-brain scenario) carries a lower
+        // txnNumber on the same session and will therefore be rejected by the participants.
+        auto opCtxHolder = makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        auto barrier = _makeCausalityBarrier(executor, token);
+        _sessionTracker.performCausalityBarrier(opCtx, *barrier);
+    }
+
+    /**
+     * Builds the CausalityBarrier used by `_performCausalityBarrier`. Overridable so tests can
+     * inject a barrier that records invocations instead of contacting participants.
+     */
+    virtual std::unique_ptr<CausalityBarrier> _makeCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token) {
+        return std::make_unique<AllShardsAndConfigCausalityBarrier>(**executor, token);
     }
 
     template <typename Func>

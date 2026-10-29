@@ -230,67 +230,67 @@ output: {
     "resolvedPaths": [
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "s1"
+            "underlyingFieldPath": "s1"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "s1"
+            "underlyingFieldPath": "s1"
         },
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "s2"
+            "underlyingFieldPath": "s2"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "s2"
+            "underlyingFieldPath": "s2"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "s3"
+            "underlyingFieldPath": "s3"
         },
         {
             "nodeId": {"$numberInt":"3"},
-            "fieldName": "s3"
+            "underlyingFieldPath": "s3"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "b"
+            "underlyingFieldPath": "b"
         },
         {
             "nodeId": {"$numberInt":"3"},
-            "fieldName": "b"
+            "underlyingFieldPath": "b"
         },
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "s4"
+            "underlyingFieldPath": "s4"
         },
         {
             "nodeId": {"$numberInt":"4"},
-            "fieldName": "s4"
+            "underlyingFieldPath": "s4"
         },
         {
             "nodeId": {"$numberInt":"3"},
-            "fieldName": "c"
+            "underlyingFieldPath": "c"
         },
         {
             "nodeId": {"$numberInt":"4"},
-            "fieldName": "c"
+            "underlyingFieldPath": "c"
         },
         {
             "nodeId": {"$numberInt":"4"},
-            "fieldName": "d"
+            "underlyingFieldPath": "d"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "d"
+            "underlyingFieldPath": "d"
         }
     ],
     "prefix": [

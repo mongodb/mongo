@@ -12,6 +12,8 @@ load(
     "//upb/cmake:build_defs.bzl",
     "staleness_test",
 )
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
 _stages = ["_stage0", "_stage1", ""]
 
@@ -56,7 +58,7 @@ def bootstrap_cc_library(name, visibility = [], deps = [], bootstrap_deps = [], 
           upb_proto_library().
     """
     for stage in _stages:
-        native.cc_library(
+        cc_library(
             name = name + stage,
             deps = deps + [dep + stage for dep in bootstrap_deps],
             visibility = _stage_visibility(stage, visibility),
@@ -80,7 +82,7 @@ def bootstrap_cc_binary(name, visibility = [], deps = [], bootstrap_deps = [], *
           upb_proto_library().
     """
     for stage in _stages:
-        native.cc_binary(
+        cc_binary(
             name = name + stage,
             deps = deps + [dep + stage for dep in bootstrap_deps],
             visibility = _stage_visibility(stage, visibility),
@@ -212,7 +214,7 @@ def bootstrap_upb_proto_library(
     _stage0_proto_staleness_test(name, src_files, src_rules, strip_prefix)
 
     # stage0 uses checked-in protos, and has no MiniTable.
-    native.cc_library(
+    cc_library(
         name = name + "_stage0",
         srcs = _generated_hdrs_and_srcs(src_files, "stage0", "upb"),
         hdrs = [bootstrap_hdr],
@@ -229,7 +231,7 @@ def bootstrap_upb_proto_library(
     _generate_stage1_proto(name, src_files, src_rules, "upb", kwargs)
     _generate_stage1_proto(name, src_files, src_rules, "upb_minitable", kwargs)
 
-    native.cc_library(
+    cc_library(
         name = name + "_minitable_stage1",
         srcs = _generated_files(src_files, "stage1", "upb_minitable", "c"),
         hdrs = _generated_files(src_files, "stage1", "upb_minitable", "h"),
@@ -240,7 +242,7 @@ def bootstrap_upb_proto_library(
         ] + [dep + "_minitable_stage1" for dep in deps],
         **kwargs
     )
-    native.cc_library(
+    cc_library(
         name = name + "_stage1",
         srcs = _generated_files(src_files, "stage1", "upb", "h"),
         hdrs = [bootstrap_hdr],
@@ -259,7 +261,7 @@ def bootstrap_upb_proto_library(
         deps = proto_lib_deps,
         **kwargs
     )
-    native.cc_library(
+    cc_library(
         name = name,
         hdrs = [bootstrap_hdr],
         deps = [name + "_upb_proto"],

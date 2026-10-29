@@ -6,8 +6,7 @@
  * jstests/with_mongot/e2e/metadata/meta_dependency_validation.js.
  *
  * TODO SERVER-99965 Fix this for $geoNear-related metadata on sharded collections.
- * featureFlagRankFusionFull is required to enable use of "score".
- * @tags: [assumes_unsharded_collection, featureFlagRankFusionFull]
+ * @tags: [assumes_unsharded_collection]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";

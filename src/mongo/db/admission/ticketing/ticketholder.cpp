@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/ticketing/ticketholder.h"
 
@@ -51,6 +25,7 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            AcquisitionCallback acquisitionCallback,
                            WaitedAcquisitionCallback waitedAcquisitionCallback,
                            ReleaseCallback releaseCallback,
+                           StartQueueingCallback startQueueingCallback,
                            ResizePolicy resizePolicy,
                            SemaphoreType semaphore)
     : _trackPeakUsed(trackPeakUsed),
@@ -60,7 +35,8 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
       _reportDelinquentOpCallback(delinquentCallback),
       _reportAcquisitionOpCallback(acquisitionCallback),
       _reportWaitedAcquisitionOpCallback(waitedAcquisitionCallback),
-      _reportReleaseOpCallback(releaseCallback) {
+      _reportReleaseOpCallback(releaseCallback),
+      _reportStartQueueingOpCallback(startQueueingCallback) {
     switch (semaphore) {
         case SemaphoreType::kCompeting:
             _semaphore = std::make_unique<UnorderedTicketSemaphore>(numTickets, maxQueueDepth);
@@ -100,7 +76,7 @@ bool TicketHolder::resize(OperationContext* opCtx, int newSize, Date_t deadline)
                 // Take tickets one-by-one without releasing.
                 for (auto remaining = -difference; remaining > 0; remaining--) {
                     if (!_semaphore->acquire(
-                            opCtx, &admCtx, effectiveDeadline, true /* interruptible */)) {
+                            opCtx, &admCtx, effectiveDeadline, /*interruptible=*/true)) {
                         // We timed out getting a ticket, fail the resize.
                         return false;
                     }
@@ -161,6 +137,10 @@ boost::optional<Ticket> TicketHolder::_waitForTicketUntilMaybeInterruptible(
     _holderStats.totalAddedQueue.fetchAndAddRelaxed(1);
     auto queuedAdmissions = admCtx->getAdmissions();
     _holderStats.queuedOperationsTotalAdmissions.fetchAndAddRelaxed(queuedAdmissions);
+
+    if (_reportStartQueueingOpCallback) {
+        _reportStartQueueingOpCallback(admCtx);
+    }
 
     ON_BLOCK_EXIT([&] {
         auto waitDelta =
@@ -231,6 +211,9 @@ void TicketHolder::appendExemptStats(BSONObjBuilder& b) const {
 void TicketHolder::appendHolderStats(BSONObjBuilder& b) const {
     _appendQueueStats(b, _holderStats);
     _delinquencyStats.appendStats(b);
+    BSONArrayBuilder histogramBuilder(b.subarrayStart("queueWaitTimeMicros"));
+    _queueWaitTimeHistogram.appendStats(histogramBuilder);
+    histogramBuilder.done();
 }
 
 void TicketHolder::appendTicketStats(BSONObjBuilder& b) const {
@@ -357,6 +340,10 @@ void TicketHolder::setPeakUsed_forTest(int used) {
 void TicketHolder::incrementDelinquencyStats(
     const admission::execution_control::DelinquencyStats& newStats) {
     _delinquencyStats += newStats;
+}
+
+void TicketHolder::recordQueueWaitTime(Microseconds queueWaitTime) {
+    _queueWaitTimeHistogram.record(queueWaitTime);
 }
 
 }  // namespace mongo

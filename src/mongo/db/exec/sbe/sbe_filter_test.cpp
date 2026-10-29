@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::FilterStage.
@@ -52,12 +26,10 @@ namespace mongo::sbe {
 using FilterStageTest = PlanStageTestFixture;
 
 TEST_F(FilterStageTest, ConstantFilterAlwaysTrueTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
-        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23))));
 
-    auto [expectedTag, expectedVal] = value::copyValue(inputTag, inputVal);
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto expected = value::TagValueOwned::fromRaw(value::copyValue(input.tag(), input.value()));
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a constant FilterStage whose filter expression is always boolean true.
@@ -69,18 +41,16 @@ TEST_F(FilterStageTest, ConstantFilterAlwaysTrueTest) {
         return std::make_pair(scanSlot, std::move(filter));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(FilterStageTest, ConstantFilterAlwaysFalseTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
-        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23))));
 
-    auto [expectedTag, expectedVal] = value::makeNewArray();
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto expected = value::TagValueOwned::fromRaw(value::makeNewArray());
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a constant FilterStage whose filter expression is always boolean false.
@@ -92,18 +62,16 @@ TEST_F(FilterStageTest, ConstantFilterAlwaysFalseTest) {
         return std::make_pair(scanSlot, std::move(filter));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(FilterStageTest, FilterAlwaysTrueTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
-        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23))));
 
-    auto [expectedTag, expectedVal] = value::copyValue(inputTag, inputVal);
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto expected = value::TagValueOwned::fromRaw(value::copyValue(input.tag(), input.value()));
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a non-constant FilterStage whose filter expression is always boolean true.
@@ -115,18 +83,16 @@ TEST_F(FilterStageTest, FilterAlwaysTrueTest) {
         return std::make_pair(scanSlot, std::move(filter));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(FilterStageTest, FilterAlwaysFalseTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(
-        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23))));
 
-    auto [expectedTag, expectedVal] = value::makeNewArray();
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto expected = value::TagValueOwned::fromRaw(value::makeNewArray());
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a non-constant FilterStage whose filter expression is always boolean false.
@@ -138,20 +104,19 @@ TEST_F(FilterStageTest, FilterAlwaysFalseTest) {
         return std::make_pair(scanSlot, std::move(filter));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(FilterStageTest, FilterIsNumberTest) {
     using namespace std::literals;
 
-    auto [inputTag, inputVal] = stage_builder::makeValue(
-        BSON_ARRAY(12LL << "42" << BSON_ARRAY(2.5) << 7.5 << BSON("34" << 56)));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(12LL << "42" << BSON_ARRAY(2.5) << 7.5 << BSON("34" << 56))));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(12LL << 7.5));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(12LL << 7.5)));
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a FilterStage whose filter expression is "isNumber(scanSlot)".
@@ -163,21 +128,19 @@ TEST_F(FilterStageTest, FilterIsNumberTest) {
         return std::make_pair(scanSlot, std::move(filter));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTest(inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
 TEST_F(FilterStageTest, FilterLessThanTest) {
-    auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(
+    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(
         BSON_ARRAY(2.8 << 3) << BSON_ARRAY(7LL << 5.0) << BSON_ARRAY(4LL << 4.3)
                              << BSON_ARRAY(8 << 8) << BSON_ARRAY("1" << 2) << BSON_ARRAY(1 << "2")
-                             << BSON_ARRAY(4.9 << 5) << BSON_ARRAY(6.0 << BSON_ARRAY(11.0))));
-    value::ValueGuard inputGuard{inputTag, inputVal};
+                             << BSON_ARRAY(4.9 << 5) << BSON_ARRAY(6.0 << BSON_ARRAY(11.0)))));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON_ARRAY(2.8 << 3) << BSON_ARRAY(4LL << 4.3) << BSON_ARRAY(4.9 << 5)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    auto expected = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(2.8 << 3) << BSON_ARRAY(4LL << 4.3) << BSON_ARRAY(4.9 << 5))));
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         // Build a FilterStage whose filter expression is "slot0 < slot1".
@@ -189,8 +152,8 @@ TEST_F(FilterStageTest, FilterLessThanTest) {
         return std::make_pair(scanSlots, std::move(filter));
     };
 
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(2, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 

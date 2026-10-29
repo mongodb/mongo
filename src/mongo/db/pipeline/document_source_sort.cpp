@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_sort.h"
 
@@ -43,6 +17,7 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/sorter/file_based_spiller.h"
@@ -52,6 +27,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <array>
 #include <iterator>
 #include <list>
 #include <memory>
@@ -141,6 +117,7 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
     // API. Both fields are const, so they remain in sync for the lifetime of the object.
     : DocumentSource(kStageName, pExpCtx, sortOrder),
       _sortExecutor(std::make_shared<SortExecutor<Document>>(
+          pExpCtx->getOperationContext(),
           sortOrder,
           options.limit,
           loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes),
@@ -152,6 +129,25 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
             !_sortExecutor->sortPattern().empty());
 }
 
+
+std::unique_ptr<SortLiteParsed> SortLiteParsed::parse(const NamespaceString& nss,
+                                                      const BSONElement& spec,
+                                                      const LiteParserOptions& options) {
+    // '$_internalLimit' and '$_internalOutputSortKeyMetadata' are internal fields that should be
+    // rejected if supplied from an external client.
+    if (options.opCtx && spec.type() == BSONType::object) {
+        static constexpr std::array kInternalFieldNames{DocumentSourceSort::kInternalLimit,
+                                                        DocumentSourceSort::kInternalOutputSortKey};
+        const auto specObj = spec.embeddedObject();
+        for (const auto& field : kInternalFieldNames) {
+            if (specObj.hasField(field)) {
+                assertAllowedInternalIfRequired(
+                    options.opCtx, field, AllowedWithClientType::kInternal);
+            }
+        }
+    }
+    return std::make_unique<SortLiteParsed>(spec);
+}
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(sort, SortLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
@@ -198,7 +194,7 @@ void DocumentSourceSort::serializeForBoundedSort(
               {"limit"sv, opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
     }}};
 
-    if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity && explainPolicyFor(*opts.verbosity).hasExecStats()) {
         auto& stats = _timeSorter->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
@@ -248,7 +244,7 @@ void DocumentSourceSort::serializeWithVerbosity(
                                               : Value())
                 << "outputSortKeyMetadata" << (_outputSortKeyMetadata ? Value(true) : Value()))));
 
-    if (opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity && explainPolicyFor(*opts.verbosity).hasExecStats()) {
         auto& stats = _sortExecutor->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
@@ -425,7 +421,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
 
     SortOptions opts;
     opts.maxMemoryUsageBytes =
-        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
+        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes)
+            .get(expCtx->getOperationContext());
 
     if (limit) {
         opts.Limit(limit.value());
@@ -514,8 +511,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     auto ds = DocumentSourceSort::create(expCtx, pat);
 
     SortOptions opts;
-    opts.MaxMemoryUsageBytes(
-        loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes));
+    opts.MaxMemoryUsageBytes(loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes)
+                                 .get(expCtx->getOperationContext()));
     if (BSONElement limitElem = args["limit"]) {
         uassert(6588100,
                 "$_internalBoundedSort limit must be a non-negative number if specified",

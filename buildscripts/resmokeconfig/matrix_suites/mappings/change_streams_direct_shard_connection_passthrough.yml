@@ -1,0 +1,10 @@
+base_suite: change_streams
+overrides:
+  - "change_streams.direct_shard_connection_fixture_no_validate"
+  - "change_streams.base_eval"
+eval:
+  - "change_streams.direct_shard_connection_eval"
+  - "change_streams.causal_consistency_eval"
+excludes:
+  - "change_streams.direct_shard_excludes"
+  - "change_streams.direct_shard_connection_excludes_files"

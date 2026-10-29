@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,7 +11,9 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
-#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range_list.h"
+#include "mongo/db/query/util/named_enum.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -62,7 +38,7 @@ using PlanStageKey = const PlanStage*;
  *
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT SpecificStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SpecificStats {
     virtual ~SpecificStats() {}
 
     /**
@@ -87,7 +63,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SpecificStats {
 struct CommonStats {
     CommonStats() = delete;
 
-    CommonStats(std::string_view type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
+    CommonStats(std::string_view type) : CommonStats(type, /*originalPlanStage=*/nullptr) {}
 
     CommonStats(std::string_view type, PlanStageKey originalPlanStage)
         : stageTypeStr(type),
@@ -313,11 +289,11 @@ struct CollectionScanStats : public SpecificStats {
 
     bool tailable{false};
 
-    // The start location of a forward scan and end location for a reverse scan.
-    boost::optional<RecordIdBound> minRecord;
+    // The set of RecordId ranges being scanned (mirrors CollectionScanParams::rangeList).
+    RecordIdRangeList rangeList;
 
-    // The end location of a reverse scan and start location for a forward scan.
-    boost::optional<RecordIdBound> maxRecord;
+    // Number of seeks performed (initial + inter-range seeks for multi-interval scans).
+    size_t seeks = 0;
 };
 
 struct CountStats : public SpecificStats {
@@ -422,7 +398,7 @@ struct CountScanStats : public SpecificStats {
 /**
  * SERVER-112776: Remove 'data_movement' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT DeleteStats : public SpecificStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] DeleteStats : public SpecificStats {
     DeleteStats() = default;
 
     std::unique_ptr<SpecificStats> clone() const final {
@@ -451,7 +427,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT DeleteStats : public SpecificStats {
 /**
  * SERVER-112776: Remove 'ttl' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT BatchedDeleteStats : public DeleteStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] BatchedDeleteStats : public DeleteStats {
     BatchedDeleteStats() = default;
 
     // Unlike a standard multi:true delete, BatchedDeleteStage can complete with PlanStage::IS_EOF
@@ -529,6 +505,7 @@ struct DistinctScanStats : public SpecificStats {
     bool isUnique = false;
     bool isShardFiltering = false;
     bool isFetching = false;
+    bool unwindsArrays = false;
     // TODO SERVER-92983: Remove once feature flag is removed.
     bool isShardFilteringDistinctScanEnabled = false;
 
@@ -768,14 +745,67 @@ struct MultiPlanStats : public SpecificStats {
     boost::optional<std::string> replanReason;
 
     // Total number of works across all candidate plans.
-    int totalWorks = 0;
+    int64_t totalWorks = 0;
     // Total number of documents returned across all candidate plans.
-    int numResultsFound = 0;
+    int64_t numResultsFound = 0;
     // Number of candidate plans considered.
     int numCandidatePlans = 0;
     // True if we exited the multi-planner early due to one plan hitting EOF or filling a batch
     bool earlyExit = false;
 };
+
+/**
+ * How a candidate plan's multi-planner trial period ended. Recorded per candidate, unlike
+ * MultiPlanStats::earlyExit, which is a single trial-wide flag that conflates the two early-exit
+ * reasons and says nothing about which plan caused the exit.
+ *
+ * Recorded for every candidate that ran a trial, including one whose trial ended by failing
+ * (kFailed) - a partially executed candidate still carries trial counters and still appears among
+ * the rejected plans, so it has a stop condition to report like any other. Only a candidate that
+ * never ran at all (e.g. one built from a cached plan, or a plan the cost-based ranker rejected
+ * without executing) has none.
+ *
+ * Every condition states what happened to this candidate specifically: the trial period ends for
+ * all candidates at once, but the two conditions that do not describe an early exit of this
+ * candidate's own distinguish whether it ran out of budget or was cut short by a sibling.
+ */
+// clang-format off
+#define MULTI_PLANNER_STOP_CONDITION_TABLE(X)                                                    \
+    /* The candidate's execution tree reached EOF: it exhausted its results before the trial's */\
+    /* work budget. */                                                                           \
+    X(kEof, "EOF")                                                                               \
+    /* The candidate buffered a full batch without reaching EOF. */                              \
+    X(kFullBatch, "fullBatch")                                                                    \
+    /* The candidate met no early-exit condition and used up the trial's per-plan work budget. */ \
+    X(kExhaustedBudget, "exhaustedBudget")                                                        \
+    /* The candidate met no early-exit condition, but another candidate did and ended the trial */\
+    /* period for everyone. This candidate's trial was stopped short with budget left, so its  */ \
+    /* counters say nothing about how it would have fared over a full trial - typically only a */ \
+    /* handful of works. Distinct from kExhaustedBudget precisely because a plan that got three */\
+    /* works of a ten-thousand-work budget did not exhaust anything. */                           \
+    X(kTrialEndedEarly, "trialEndedEarly")                                                        \
+    /* The candidate's trial ended because the plan failed in a recoverable fashion (exceeding  */ \
+    /* an allowed resource consumption, e.g. a blocking sort over its memory limit with disk    */ \
+    /* use disallowed). The multi-planner keeps such a candidate - the trial continues for the  */ \
+    /* others and only an all-candidates failure is fatal - so it is ranked out but still shown */ \
+    /* among the rejected plans, with the partial counters it accumulated before failing and no */ \
+    /* score, since a failed candidate is never scored. */                                        \
+    X(kFailed, "failed")                                                                          \
+    /* The candidate stopped because the results it had stashed reached the trial's memory cap.  */\
+    /* SBE-only: the SBE trial buffers whole documents and caps their total size, which the      */ \
+    /* classic trial has no counterpart for. */                                               \
+    X(kStashSizeLimit, "stashSizeLimit")
+// clang-format on
+
+QUERY_UTIL_NAMED_ENUM_DEFINE(MultiPlannerStopCondition, MULTI_PLANNER_STOP_CONDITION_TABLE)
+#undef MULTI_PLANNER_STOP_CONDITION_TABLE
+
+/**
+ * The stop condition's name, as reported by explain.
+ */
+inline std::string_view toStringView(MultiPlannerStopCondition condition) {
+    return toStringData(condition);
+}
 
 struct OrStats : public SpecificStats {
     OrStats() = default;
@@ -823,12 +853,17 @@ struct ProjectionStats : public SpecificStats {
 
     // Object specifying the projection transformation to apply.
     BSONObj projObj;
+
+    // Peak memory (in bytes) tracked while evaluating the projection's expressions. Only populated
+    // for PROJECTION_DEFAULT when both featureFlagQueryMemoryTracking and
+    // featureFlagExpressionMemoryTracking are enabled; zero otherwise.
+    uint64_t peakTrackedMemBytes = 0;
 };
 
 /**
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on this struct.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT SortStats : public SpecificStats {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SortStats : public SpecificStats {
     SortStats() = default;
     SortStats(uint64_t limit, uint64_t maxMemoryUsageBytes)
         : limit(limit), maxMemoryUsageBytes(maxMemoryUsageBytes) {}
@@ -954,6 +989,11 @@ struct IntervalStats {
     long long numResultsBuffered = 0;
     // Number of documents in this interval returned to the parent stage.
     long long numResultsReturned = 0;
+    // Number of documents in this interval that passed the distance checks but were rejected by
+    // the residual predicate pushed into this stage. Without a pushed-down predicate this is
+    // always 0. Interval sizing must account for these, since they measure local document density
+    // just as well as the documents that were returned.
+    long long numRejectedByFilter = 0;
 
     // Min distance of this interval - always inclusive.
     double minDistanceAllowed = -1;

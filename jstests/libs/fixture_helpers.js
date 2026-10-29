@@ -3,7 +3,6 @@
  * replica set, a sharded cluster, etc.
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var FixtureHelpers = (function () {
@@ -239,22 +238,54 @@ export var FixtureHelpers = (function () {
             }
         }
 
-        let connList = [];
-        if (isMongos(db)) {
-            const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
+        // Map of host to connection function, to make sure there is only one connection per host.
+        const completed = new Map();
 
-            for (let shardObj of shardObjs) {
-                connList = connList.concat(
-                    getRequestedConns(new Mongo(shardObj.host, undefined, {gRPC: false})),
+        function mapOnce() {
+            let connList = [];
+            if (isMongos(db)) {
+                const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
+
+                for (let shardObj of shardObjs) {
+                    connList = connList.concat(
+                        getRequestedConns(new Mongo(shardObj.host, undefined, {gRPC: false})),
+                    );
+                }
+            } else {
+                connList = getRequestedConns(
+                    new Mongo(db.getMongo().host, undefined, {gRPC: db.getMongo().isGRPC()}),
                 );
             }
-        } else {
-            connList = getRequestedConns(
-                new Mongo(db.getMongo().host, undefined, {gRPC: db.getMongo().isGRPC()}),
-            );
+
+            return connList.map((conn) => {
+                if (!completed.has(conn.host)) {
+                    completed.set(conn.host, func(conn.getDB(db.getName())));
+                }
+                return completed.get(conn.host);
+            });
         }
 
-        return connList.map((conn) => func(conn.getDB(db.getName())));
+        if (!TestData.shardsAddedRemoved || !isMongos(db)) {
+            return mapOnce();
+        }
+
+        // Retry if the shards were changed. Only the nodes that are not completed yet are visited.
+        let result;
+        assert.soon(() => {
+            try {
+                result = mapOnce();
+                return true;
+            } catch (e) {
+                if (!isNetworkError(e)) {
+                    throw e;
+                }
+                jsTest.log.info("Retrying on a network error, a shard may have been removed", {
+                    error: tojson(e),
+                });
+                return false;
+            }
+        }, "Timed out while running a function on each shard node");
+        return result;
     }
 
     /**

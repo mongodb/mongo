@@ -126,13 +126,19 @@ export const $config = (function () {
                     ErrorCodes.WriteConflict,
                     ErrorCodes.SnapshotUnavailable,
                     ErrorCodes.ExceededTimeLimit,
+                    ErrorCodes.IncompleteTransactionHistory,
                 ]);
+                const transientErrorMessages = [
+                    "was converted into a distributed transaction",
+                    "Cannot retry a retryable write that has been converted into a transaction",
+                ];
                 if (
                     transientErrorCodes.has(err.code) &&
-                    err.errmsg.includes("was converted into a distributed transaction")
+                    transientErrorMessages.some((msg) => err.errmsg.includes(msg))
                 ) {
                     jsTest.log(
-                        "Ignoring transient error during an update operation after a WouldChangeOwningShard error",
+                        "Ignoring transient error during an update operation after a " +
+                            `WouldChangeOwningShard error. code: ${err.code}, errmsg: "${err.errmsg}"`,
                     );
                     return;
                 }

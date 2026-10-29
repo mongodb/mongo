@@ -57,8 +57,8 @@ class test_layered_prepare08(wttest.WiredTigerTestCase):
 
         Sequence:
           1. Stable btree has committed keys [1, 3, 5] from a leader checkpoint.
-          2. Ingest btree has exactly one prepared key [2] (prepare_timestamp=15).
-          3. cursor.next() at read_timestamp=20 triggers WT_PREPARE_CONFLICT: stable
+          2. Ingest btree has exactly one prepared key [2] (prepare_timestamp=25).
+          3. cursor.next() at read_timestamp=30 triggers WT_PREPARE_CONFLICT: stable
              advances to key 1, ingest hits prepared key 2 (WT_CURSTD_KEY_INT cleared,
              ref still set; current_cursor left NULL).
           4. The prepared transaction is rolled back.  Key 2 vanishes from the ingest.
@@ -90,21 +90,21 @@ class test_layered_prepare08(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_f)
 
         # --- Phase 3: write exactly one prepared key (key 2) into the follower ingest --
-        # prepare_timestamp=15 falls within the read_timestamp=20 window, so a reader at
-        # ts=20 encounters WT_PREPARE_CONFLICT rather than skipping the prepared record.
+        # prepare_timestamp=25 falls within the read_timestamp=30 window, so a reader at
+        # ts=30 encounters WT_PREPARE_CONFLICT rather than skipping the prepared record.
         session_prep = conn_f.open_session()
         cursor_prep = session_prep.open_cursor(self.uri)
         session_prep.begin_transaction()
         cursor_prep[2] = 'prepared_value'
         session_prep.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(15) +
+            'prepare_timestamp=' + self.timestamp_str(25) +
             ',prepared_id=' + self.prepared_id_str(1))
         cursor_prep.close()
 
         # --- Phase 4: open read cursor and trigger the prepare conflict --------------
         session_r = conn_f.open_session()
         cursor_r = session_r.open_cursor(self.uri)
-        session_r.begin_transaction('read_timestamp=' + self.timestamp_str(20))
+        session_r.begin_transaction('read_timestamp=' + self.timestamp_str(30))
 
         # First next(): fresh-start path positions stable at key 1 and advances ingest
         # to prepared key 2, returning WT_PREPARE_CONFLICT.
@@ -113,7 +113,7 @@ class test_layered_prepare08(wttest.WiredTigerTestCase):
         # --- Phase 5: roll back the prepared transaction ----------------------------
         # Key 2 is now absent from the ingest btree.
         session_prep.rollback_transaction(
-            'rollback_timestamp=' + self.timestamp_str(30))
+            'rollback_timestamp=' + self.timestamp_str(40))
         session_prep.close()
 
         # --- Phase 6: retry next()

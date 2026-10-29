@@ -1,7 +1,7 @@
 """Repository rules for shfmt binary download"""
 
 load("//bazel:utils.bzl", "retry_download")
-load("@bazel_rules_mongo//utils:platforms_normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
+load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
 
 URLS_MAP = {
     "linux_aarch64": {
@@ -57,10 +57,7 @@ exports_files(["shfmt"])
 
     return None
 
-_shfmt = repository_rule(
+shfmt = repository_rule(
     implementation = _shfmt_download,
     attrs = {},
 )
-
-def shfmt():
-    _shfmt(name = "shfmt")

@@ -15,6 +15,8 @@
 #include <catch2/catch.hpp>
 
 #include "wt_internal.h"
+
+#include "src/cursor/cur_layered_private.h"
 #include "wrappers/connection_wrapper.h"
 #include "truncate_list_helpers.hpp"
 
@@ -38,9 +40,13 @@ do_in_committed_transaction(WT_SESSION_IMPL *session, const Op operation)
 {
     auto *iface = &session->iface;
 
+    // Writes to disaggregated tables must carry a commit timestamp.
+    static int commit_ts = 0;
+    const std::string ts_config = "commit_timestamp=" + std::to_string(++commit_ts);
+
     CHECK(iface->begin_transaction(iface, nullptr) == 0);
     const int ret = operation();
-    CHECK(iface->commit_transaction(iface, nullptr) == 0);
+    CHECK(iface->commit_transaction(iface, ts_config.c_str()) == 0);
 
     return ret;
 }
@@ -138,7 +144,7 @@ public:
     [[nodiscard]] WT_LAYERED_TABLE *
     layered_table() const
     {
-        auto *layered_cursor = reinterpret_cast<WT_CURSOR_LAYERED *>(_cursor);
+        auto *layered_cursor = reinterpret_cast<WTI_CURSOR_LAYERED *>(_cursor);
         return reinterpret_cast<WT_LAYERED_TABLE *>(layered_cursor->dhandle);
     }
 
@@ -160,7 +166,7 @@ public:
         auto key_item = make_item(key_str);
 
         return __wt_layered_table_truncate_detect_write_conflict(
-          session, layered_table(), &key_item);
+          session, &layered_table()->truncate_list, layered_table()->collator, &key_item);
     }
 
     int
@@ -171,8 +177,8 @@ public:
         auto start_item = make_item(start_str);
         auto stop_item = make_item(stop_str);
 
-        return __wt_layered_table_truncate_detect_non_ingest_write_conflict(
-          session, layered_table(), &start_item, &stop_item);
+        return __wt_layered_table_truncate_detect_non_ingest_write_conflict(session,
+          &layered_table()->truncate_list, layered_table()->collator, &start_item, &stop_item);
     }
 
 private:

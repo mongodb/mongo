@@ -50,6 +50,7 @@ mongo_cc_library(
     deps = [
         ":resolved_view",
         "//src/mongo/db/pipeline:lite_parsed_desugarer",
+        "//src/mongo/db/pipeline/search:mongot_extension_name",
     ],
 )
 

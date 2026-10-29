@@ -2,7 +2,7 @@
  * Tests that having a view defined with $search/$vectorSearch works correctly at the top level
  * command, inside a $unionWith, and inside a $lookup.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_82 ]
+ * @tags: [ requires_fcv_82 ]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

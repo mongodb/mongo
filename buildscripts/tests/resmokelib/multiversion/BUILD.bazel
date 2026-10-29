@@ -1,4 +1,37 @@
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "test_dsc_release",
+    srcs = [
+        "__init__.py",
+        "test_dsc_release.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/multiversion:dsc_release",
+        dependency("boto3"),
+        dependency("evergreen-py"),
+        dependency("packaging"),
+        dependency("structlog"),
+    ],
+)
+
+py_test(
+    name = "test_dsc_release_sources",
+    srcs = [
+        "__init__.py",
+        "test_dsc_release_sources.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/multiversion",
+        "//buildscripts/resmokelib/multiversion:dsc_release",
+        dependency("structlog"),
+    ],
+)
 
 py_test(
     name = "test_multiversion_service",

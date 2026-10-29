@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/express/plan_executor_express.h"
 
@@ -54,7 +28,7 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/write_conflict_storm.h"
+#include "mongo/db/query/write_conflict_backoff.h"
 #include "mongo/db/query/write_ops/canonical_delete.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
@@ -320,24 +294,19 @@ public:
 private:
     void readyPlanExecution(express::Ready,
                             size_t& numUnavailabilityYieldsSinceLastSuccess,
-                            size_t& numWriteConflictYieldsSinceLastSuccess,
-                            WCStormWaiterGuard& stormGuard);
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
     void readyPlanExecution(express::WaitingForYield,
                             size_t& numUnavailabilityYieldsSinceLastSuccess,
-                            size_t& numWriteConflictYieldsSinceLastSuccess,
-                            WCStormWaiterGuard& stormGuard);
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
     void readyPlanExecution(express::WaitingForBackoff,
                             size_t& numUnavailabilityYieldsSinceLastSuccess,
-                            size_t& numWriteConflictYieldsSinceLastSuccess,
-                            WCStormWaiterGuard& stormGuard);
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
     void readyPlanExecution(express::WaitingForCondition result,
                             size_t& numUnavailabilityYieldsSinceLastSuccess,
-                            size_t& numWriteConflictYieldsSinceLastSuccess,
-                            WCStormWaiterGuard& stormGuard);
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
     void readyPlanExecution(express::Exhausted,
                             size_t& numUnavailabilityYieldsSinceLastSuccess,
-                            size_t& numWriteConflictYieldsSinceLastSuccess,
-                            WCStormWaiterGuard& stormGuard);
+                            size_t& numWriteConflictYieldsSinceLastSuccess);
 
     OperationContext* _opCtx;
     std::unique_ptr<CanonicalQuery> _cq;
@@ -400,7 +369,6 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
 
         size_t numUnavailabilityYieldsSinceLastSuccess = 0;
         size_t numWriteConflictYieldsSinceLastSuccess = 0;
-        WCStormWaiterGuard stormGuard;
 
         checkFailPointPlanExecAlwaysFails(nss());
 
@@ -427,8 +395,7 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
                 [&, this](auto result) {
                     this->readyPlanExecution(std::move(result),
                                              numUnavailabilityYieldsSinceLastSuccess,
-                                             numWriteConflictYieldsSinceLastSuccess,
-                                             stormGuard);
+                                             numWriteConflictYieldsSinceLastSuccess);
                 },
                 std::move(progress));
         }
@@ -446,51 +413,39 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
 template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::Ready,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
-                                                   size_t& numWriteConflictYieldsSinceLastSuccess,
-                                                   WCStormWaiterGuard& stormGuard) {
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
     // Born ready B).
     numUnavailabilityYieldsSinceLastSuccess = 0;
     numWriteConflictYieldsSinceLastSuccess = 0;
-    stormGuard.release();
 }
 
 template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
-                                                   size_t& numWriteConflictYieldsSinceLastSuccess,
-                                                   WCStormWaiterGuard& stormGuard) {
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
     // No increasing write conflict metric as it was already increased before this point
     // in ExceptionRecoveryPolicy::recoverFromNonFatalWriteException
     auto writeConflictsInARow = ++numWriteConflictYieldsSinceLastSuccess;
 
-    // Check storm circuit breaker while still holding the ticket. Throws
-    // WriteConflictRetryLimitExceeded if the per-op retry cap is exceeded.
-    checkWriteConflictStorm(_opCtx, stormGuard, writeConflictsInARow);
-
     // When release-ticket backoff is enabled, we yield the ticket before sleeping so other
-    // writers can make progress. However, after
-    // 'gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles' consecutive conflicts we fall back
-    // to sleeping while holding the ticket. Holding the ticket throttles concurrent writers from
-    // entering the conflict zone, which helps break a write-conflict storm.
-    const bool releaseTicketEnabled = internalQueryEnableWriteConflictBackoffWithoutTicket.load();
-    const bool fallbackToHoldTicket = releaseTicketEnabled &&
-        static_cast<int64_t>(writeConflictsInARow) >
-            gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles.load();
-
-    if (releaseTicketEnabled && !fallbackToHoldTicket) {
+    // writers can make progress.
+    if (internalQueryEnableWriteConflictBackoffWithoutTicket.load()) {
         _plan.temporarilyReleaseResourcesAndYield(_opCtx, [this, writeConflictsInARow]() {
             if (MONGO_unlikely(expressExecutorHangBeforeLogAndBackoff.shouldFail())) {
                 expressExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
             }
-            logWriteConflictAndBackoff(writeConflictsInARow,
-                                       "plan execution",
-                                       "write contention during express execution"sv,
-                                       NamespaceStringOrUUID(_nss));
+            write_conflict_backoff::logAndBackoff(_opCtx,
+                                                  writeConflictsInARow,
+                                                  "plan execution",
+                                                  "write contention during express execution"sv,
+                                                  NamespaceStringOrUUID(_nss));
         });
     } else {
         if (MONGO_unlikely(expressExecutorHangBeforeLogAndBackoff.shouldFail())) {
             expressExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
         }
+        // Log and backoff while holding the ticket. Use the legacy stepped schedule here: the
+        // exponential ramp sleeps up to ~2x capMs, far too long to hold a ticket through.
         logWriteConflictAndBackoff(writeConflictsInARow,
                                    "plan execution",
                                    "write contention during express execution"sv,
@@ -502,8 +457,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
 template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
-                                                   size_t& numWriteConflictYieldsSinceLastSuccess,
-                                                   WCStormWaiterGuard&) {
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
     // Capture count before incrementing so the lambda sees the pre-increment value.
     auto numUnavailabilityAttempts = numUnavailabilityYieldsSinceLastSuccess++;
     _plan.temporarilyReleaseResourcesAndYield(
@@ -526,8 +480,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
 template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForCondition result,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
-                                                   size_t& numWriteConflictYieldsSinceLastSuccess,
-                                                   WCStormWaiterGuard&) {
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, [this, &result]() {
         refresh_util::waitForCriticalSectionToComplete(this->_opCtx, result.waitSignal()).ignore();
     });
@@ -536,12 +489,10 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForCondition 
 template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::Exhausted,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
-                                                   size_t& numWriteConflictYieldsSinceLastSuccess,
-                                                   WCStormWaiterGuard& stormGuard) {
+                                                   size_t& numWriteConflictYieldsSinceLastSuccess) {
     // No execution to get ready for.
     numUnavailabilityYieldsSinceLastSuccess = 0;
     numWriteConflictYieldsSinceLastSuccess = 0;
-    stormGuard.release();
 }
 
 template <class IteratorChoice, class WriteOperationChoice>
@@ -889,12 +840,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
                                              std::move(chosenShardFilter),
                                              express::IdentityProjection());
             return {new PlanExecutorExpress(opCtx,
-                                            nullptr /* cq */,
+                                            /*cq=*/nullptr,
                                             precision,
                                             collection,
                                             std::move(plan),
                                             recoveryPolicy,
-                                            false /* returnOwnedBson */),
+                                            /*returnOwnedBson=*/false),
                     PlanExecutor::Deleter(opCtx)};
         },
         std::move(iterator),
@@ -1047,10 +998,10 @@ boost::optional<IndexForExpressEquality> getIndexForExpressEquality(
         if (const auto* bestCoveringEntry =
                 findBestCoveringIndexEntry(indexes, *dependencies, cq, data, collationRelevant)) {
             return IndexForExpressEquality(std::move(*bestCoveringEntry),
-                                           true /*coversProjection*/);
+                                           /*coversProjection=*/true);
         }
     }
-    return IndexForExpressEquality(std::move(*bestEntry), false /*coversProjection*/);
+    return IndexForExpressEquality(std::move(*bestEntry), /*coversProjection=*/false);
 }
 
 }  // namespace mongo

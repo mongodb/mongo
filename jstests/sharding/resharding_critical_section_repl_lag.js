@@ -6,11 +6,13 @@
  * on all shards, and having replication lag on the config shard can cause various reads against
  * the sharding metadata collection to fail with timeout errors.
  * @tags: [
- *   config_shard_incompatible
+ *   config_shard_incompatible,
+ *   resource_intensive,
  * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
@@ -73,16 +75,42 @@ moveCollThread.start();
 
 fp.wait();
 
+// In disaggregated storage the majority commit point is advanced by the log service rather than
+// by secondary acknowledgements, so pausing secondaries does not create majority replication lag.
+// Freeze each primary's commit point instead.
+const disagg = isDisagg(st.rs0.getPrimary());
+
+function stallMajorityReplication(rs) {
+    if (disagg) {
+        return configureFailPoint(
+            rs.getPrimary(),
+            "hangBeforeUpdatingCommittedOpTimeFromLogServer",
+        );
+    }
+    rs.awaitReplication();
+    stopServerReplication(rs.getSecondaries());
+    return null;
+}
+
+// Restores majority replication on 'rs', and returns once the commit point can advance again.
+function resumeMajorityReplication(rs, commitFp) {
+    if (disagg) {
+        commitFp.off();
+        return;
+    }
+    // A single secondary is enough to restore majority replication on a 3-node replica set.
+    restartServerReplication(rs.getSecondaries()[0]);
+}
+
 jsTest.log(
     "Introduce majority replication lag greater than the threshold for engaging the " +
         "critical section on both the donor and recipient",
 );
-st.rs0.awaitReplication();
-st.rs1.awaitReplication();
-stopServerReplication(st.rs0.getSecondaries());
-stopServerReplication(st.rs1.getSecondaries());
+const rs0CommitFp = stallMajorityReplication(st.rs0);
+const rs1CommitFp = stallMajorityReplication(st.rs1);
 
-sleep(remainingReshardingOperationTimeThresholdMillis + 1);
+// Make a write on each primary. In disagg, the commit point update for this write hits the
+// failpoint, so the commit point can no longer advance past it.
 assert.commandWorked(
     st.rs0
         .getPrimary()
@@ -92,6 +120,24 @@ assert.commandWorked(
     st.rs1
         .getPrimary()
         .adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}),
+);
+if (disagg) {
+    rs0CommitFp.wait();
+    rs1CommitFp.wait();
+}
+
+sleep(remainingReshardingOperationTimeThresholdMillis + 1);
+// These writes are applied locally but cannot be committed, so they are more than the threshold
+// ahead of the commit point.
+assert.commandWorked(
+    st.rs0
+        .getPrimary()
+        .adminCommand({appendOplogNote: 1, data: {replLagNoop: 2}, writeConcern: {w: 1}}),
+);
+assert.commandWorked(
+    st.rs1
+        .getPrimary()
+        .adminCommand({appendOplogNote: 1, data: {replLagNoop: 3}, writeConcern: {w: 1}}),
 );
 fp.off();
 
@@ -106,7 +152,7 @@ jsTest.log(
     "Re-enable majority replication on the recipient and verify that the critical section " +
         "cannot be started due to the replication lag on the donor",
 );
-restartServerReplication(st.rs0.getSecondaries()[0]);
+resumeMajorityReplication(st.rs0, rs0CommitFp);
 sleep(reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis);
 assertReshardingInApplyingState(st.s, ns);
 
@@ -114,10 +160,15 @@ jsTest.log(
     "Re-enable majority replication on the donor and verify that the critical section " +
         "can now be started",
 );
-restartServerReplication(st.rs1.getSecondaries()[0]);
+resumeMajorityReplication(st.rs1, rs1CommitFp);
 moveCollThread.join();
 
-jsTest.log("Re-enable replication on the remaining secondaries on both the donor and recipient");
-restartServerReplication(st.rs0.getSecondaries());
-restartServerReplication(st.rs1.getSecondaries());
+if (!disagg) {
+    jsTest.log(
+        "Re-enable replication on the remaining secondaries on both the donor and recipient",
+    );
+    restartServerReplication(st.rs0.getSecondaries());
+    restartServerReplication(st.rs1.getSecondaries());
+}
+
 st.stop();

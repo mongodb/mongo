@@ -2,13 +2,14 @@
 // able to be covered when they aren't on the shard key since the document needs to be fetched in
 // order to apply the SHARDING_FILTER stage.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   requires_getmore,
 // ]
 
 // Test indexing of decimal numbers
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 let t = db.decimal_indexing;
 t.drop();
@@ -43,7 +44,7 @@ assert.eq(
     "query for x equal to decimal 0.10 returns wrong value",
 );
 assert(
-    isIndexOnly(db, qplan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(qplan)),
     "query on decimal should be covered: " + tojson(qplan),
 );
 

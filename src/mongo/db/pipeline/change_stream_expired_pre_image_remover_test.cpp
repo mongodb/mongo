@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 
@@ -70,9 +44,8 @@ private:
 
 class ChangeStreamExpiredPreImageRemoverTest : public ServiceContextTest {
 public:
-    ChangeStreamExpiredPreImageRemoverTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
+    void setUp() override {
+        ServiceContextTest::setUp();
 
         getServiceContext()->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
 
@@ -112,7 +85,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest, FCVSnapshotNotInitialized) {
     // Deliberately un-initialize FCV snapshot.
     serverGlobalParams.mutableFCV.reset();
 
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 1 /* term */);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/1);
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 }
 
@@ -121,7 +94,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     setPersistenceProviderWithFlag(true);
     setReplicatedTruncatesFeatureFlag(false);
 
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 1 /* term */);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/1);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 }
@@ -131,7 +104,32 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     setPersistenceProviderWithFlag(false);
     setReplicatedTruncatesFeatureFlag(true);
 
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 1 /* term */);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/1);
+    ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
+              _preImagesRemover->getJobContext_forTest());
+}
+
+TEST_F(
+    ChangeStreamExpiredPreImageRemoverTest,
+    ExpectReplicatedTruncatesToRemainOnFCVChangeWhenUsingReplicatedTruncatesViaPersistenceProvider) {
+    // When the persistence provider mandates replicated truncates
+    // (e.g. disaggregated storage), an FCV change must not flip the running job to local truncates,
+    // even when the FCV-gated feature flag is disabled. Otherwise the job restarts in a mode the
+    // per-pass guard rejects, so it perpetually self-skips and never removes pre-images.
+    setPersistenceProviderWithFlag(true);
+    setReplicatedTruncatesFeatureFlag(false);
+
+    // Start the job as the primary. It must use replicated truncates.
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
+    ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
+              _preImagesRemover->getJobContext_forTest());
+
+    // An FCV change must be a no-op here: the persistence provider still mandates replicated
+    // truncates regardless of the feature flag, so the same job keeps running unchanged.
+    // (Generic FCV reference): feature flag test
+    ServerGlobalParams::FCVSnapshot newFcvSnapshot(multiversion::GenericFCV::kLatest);
+    _preImagesRemover->onFCVChange(_opCtx.get(), newFcvSnapshot);
+
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 }
@@ -142,7 +140,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     setReplicatedTruncatesFeatureFlag(false);
 
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), true /* isMajority */, false /* isRollback */);
+        _opCtx.get(), /*isMajority=*/true, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 }
@@ -156,7 +154,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 
     // Step up. This should enable the removal job.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 }
@@ -170,7 +168,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 
     // Step up. This should not enable the removal job.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 }
 
@@ -180,7 +178,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     setReplicatedTruncatesFeatureFlag(true);
 
     _preImagesRemover->onStartup(_opCtx.get());
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -198,7 +196,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -216,7 +214,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
     _preImagesRemover->onStartup(_opCtx.get());
 
     // Start removal job.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -234,7 +232,7 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest,
 
     // Start removal job.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -254,12 +252,12 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
     // Make ourselves the primary. The job should still be running.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -288,12 +286,12 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
     // Make ourselves the primary. The same job should still be running.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -319,7 +317,7 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -343,7 +341,7 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -368,12 +366,12 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
     // Make ourselves the primary. The job should still be running.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -402,12 +400,12 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
     // Make ourselves the primary. The same job should still be running.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -433,7 +431,7 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -457,7 +455,7 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -481,7 +479,7 @@ TEST_F(
     setReplicatedTruncatesFeatureFlag(true);
 
     // Make ourselves the primary and start the job.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -509,7 +507,7 @@ TEST_F(
 
     // Start the job.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -534,7 +532,7 @@ TEST_F(
 
     // Job should not be running on a secondary.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 
     // Change FCV to last LTS.
@@ -558,7 +556,7 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -582,7 +580,7 @@ TEST_F(
     setReplicatedTruncatesFeatureFlag(true);
 
     // Make ourselves the primary and start the job.
-    _preImagesRemover->onStepUpComplete(_opCtx.get(), 42 /*term*/);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), /*term=*/42);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = true}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -610,7 +608,7 @@ TEST_F(
 
     // Start the job.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 
@@ -635,7 +633,7 @@ TEST_F(
 
     // Job should not be running on a secondary.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ(boost::none, _preImagesRemover->getJobContext_forTest());
 
     // Change FCV to last continuous.
@@ -659,7 +657,7 @@ TEST_F(
 
     // Start removal job. This should not use replicated truncates.
     _preImagesRemover->onConsistentDataAvailable(
-        _opCtx.get(), false /*isMajority*/, false /*isRollback*/);
+        _opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((PreImagesRemovalJobContext{.id = 1, .usesReplicatedTruncates = false}),
               _preImagesRemover->getJobContext_forTest());
 

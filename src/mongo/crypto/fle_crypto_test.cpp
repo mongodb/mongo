@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/crypto/fle_crypto.h"
 
@@ -1579,55 +1553,6 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2_InvalidArgs) 
                        9697302);
 }
 
-TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
-    ConstDataRange empty(0, 0);
-    auto serverToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
-    ServerDerivedFromDataToken serverDataDerivedToken(serverToken.asPrfBlock());
-
-    // cipherTextSize minimum enforced by libmongocrypt is 17 (16 byte IV + 1 byte CTR)
-    constexpr size_t minCipherTextLen = 17;
-    constexpr size_t mblockSize = sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
-    constexpr size_t typeOffset = 1 + UUID::kNumBytes;
-    constexpr size_t edgeCountOffset = typeOffset + 1;
-
-    std::vector<uint8_t> equalityInput(1 + UUID::kNumBytes + 1 + minCipherTextLen + mblockSize);
-    equalityInput.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
-    std::vector<uint8_t> rangeInput(1 + UUID::kNumBytes + 1 + 1 + minCipherTextLen + mblockSize);
-    rangeInput.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValueV2);
-    rangeInput.at(edgeCountOffset) = 1;
-
-    // first, test that the shortest valid buffers can be parsed successfully
-    ASSERT_DOES_NOT_THROW(FLE2IndexedEqualityEncryptedValueV2{equalityInput});
-    ASSERT_DOES_NOT_THROW(FLE2IndexedRangeEncryptedValueV2{rangeInput});
-
-    // test parsing equality as range fails
-    ASSERT_THROWS_CODE(FLE2IndexedRangeEncryptedValueV2{equalityInput}, DBException, 9588706);
-
-    // test parsing range as equality fails
-    ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2{rangeInput}, DBException, 9588708);
-
-    std::vector<size_t> truncatedLengths = {
-        0, 1, 10, typeOffset, /*edgeCountOffset, edgeCountOffset + 1,
-        edgeCountOffset + 1 + mblockSize*/};
-
-    // test short inputs for equality payload
-    for (auto& testLength : truncatedLengths) {
-        std::vector<uint8_t> testBuf(testLength);
-        std::copy(equalityInput.begin(), equalityInput.begin() + testLength, testBuf.begin());
-        ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2{testBuf},
-                           DBException,
-                           ErrorCodes::LibmongocryptError);
-    }
-
-    // test short inputs for range payload
-    for (auto& testLength : truncatedLengths) {
-        std::vector<uint8_t> testBuf(testLength);
-        std::copy(rangeInput.begin(), rangeInput.begin() + testLength, testBuf.begin());
-        ASSERT_THROWS_CODE(
-            FLE2IndexedRangeEncryptedValueV2{testBuf}, DBException, ErrorCodes::LibmongocryptError);
-    }
-}
-
 // Test correct encryption/decryption of metadata block
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2TagAndEncryptedMetadataBlock_RoundTrip) {
     const ServerDerivedFromDataToken token(
@@ -1703,8 +1628,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken);
 
     auto encryptedTokens =
-        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */, boost::none)
-            .encrypt(ecocToken);
+        StateCollectionTokensV2(escDataCounterkey, /*leaf=*/false, boost::none).encrypt(ecocToken);
     ASSERT_EQ(encryptedTokens.toCDR().length(), crypto::aesCTRIVSize + sizeof(PrfBlock) + 1);
     iupayload.setEncryptedTokens(encryptedTokens);
     iupayload.setIndexKeyId(indexKeyId);
@@ -1924,7 +1848,7 @@ static FLE2InsertUpdatePayloadV2 generateTestIUPV2ForTextSearch(BSONElement elem
             StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                         exact.getEscDerivedToken().asPrfBlock()),
                                     boost::none,
-                                    1 /* msize */)
+                                    /*msize=*/1)
                 .encrypt(ecocToken));
     }
     return iupayload;
@@ -1971,7 +1895,7 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
                 StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                             ts.getEscDerivedToken().asPrfBlock()),
                                         boost::none,
-                                        0 /* msize */)
+                                        /*msize=*/0)
                     .encrypt(ecocToken));
         } else if (type == QueryTypeEnum::Suffix) {
             tsts.getSuffixTokenSets().push_back({});
@@ -1993,7 +1917,7 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
                 StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                             ts.getEscDerivedToken().asPrfBlock()),
                                         boost::none,
-                                        0 /* msize */)
+                                        /*msize=*/0)
                     .encrypt(ecocToken));
         } else if (type == QueryTypeEnum::Prefix) {
             tsts.getPrefixTokenSets().push_back({});
@@ -2015,7 +1939,7 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
                 StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                             ts.getEscDerivedToken().asPrfBlock()),
                                         boost::none,
-                                        0 /* msize */)
+                                        /*msize=*/0)
                     .encrypt(ecocToken));
         }
     }
@@ -2265,12 +2189,13 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
     }
 }
 
-// Binary layout of FLE2IndexedTextEncryptedValue:
-//   fle_blob_subtype(1) + S_KeyId(16) + bson_type(1) + edge_count(4) + substr_tag_count(4) +
-//   suffix_tag_count(4) + ...
-// The count fields are at these offsets:
-static constexpr size_t kFLE2TextSubstrCountOffset = 22;  // 1 + 16 + 1 + 4
-static constexpr size_t kFLE2TextSuffixCountOffset = 26;  // 1 + 16 + 1 + 4 + 4
+static constexpr size_t kFLE2IEVHeaderSize = 1 + UUID::kNumBytes + 1;  // 18, common to IEV types
+static constexpr size_t kFLE2IEVMinCipherTextLen =
+    17;  // ciphertext size minimum enforced by libmongocrypt is 17 (16 byte IV + 1 byte CTR)
+static constexpr size_t kFLE2IEVMblockLen =
+    sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
+static constexpr size_t kFLE2TextSubstrCountOffset = kFLE2IEVHeaderSize + sizeof(uint32_t);
+static constexpr size_t kFLE2TextSuffixCountOffset = kFLE2TextSubstrCountOffset + sizeof(uint32_t);
 
 // Helper to write a little-endian uint32 into a byte vector at a given offset.
 static void writeU32LE(std::vector<uint8_t>& buf, size_t offset, uint32_t val) {
@@ -2280,33 +2205,135 @@ static void writeU32LE(std::vector<uint8_t>& buf, size_t offset, uint32_t val) {
     buf[offset + 3] = (val >> 24) & 0xFF;
 }
 
-TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_ViolatingTagCountHeader) {
-    auto doc = BSON("sample" << "ssssssssss");
-    EDCServerPayloadInfo payload;
-    auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
-    payload.counts = std::vector<uint64_t>(1);
-    std::vector<PrfBlock> tags = EDCServerCollection::generateTagsForTextSearch(payload);
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2IndexedEqualityEncryptedValueV2_ParseErrors) {
+    // First, test the shortest valid buffer can be parsed successfully
+    auto validBuf =
+        std::vector<uint8_t>(kFLE2IEVHeaderSize + kFLE2IEVMinCipherTextLen + kFLE2IEVMblockLen);
+    validBuf.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
+    ASSERT_DOES_NOT_THROW(FLE2IndexedEqualityEncryptedValueV2{validBuf});
 
-    auto serverPayload =
-        FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts);
-    auto validBuf = uassertStatusOK(serverPayload.serialize());
-    ASSERT_GTE(validBuf.size(), kFLE2TextSuffixCountOffset + 4);
-
-    // Case 1: simple underflow — edge_count(1) < substr(1) + suffix(0) + 1 = 2.
-    {
-        auto buf = validBuf;
-        writeU32LE(buf, kFLE2TextSubstrCountOffset, 1);
-        ASSERT_THROWS(FLE2IndexedTextEncryptedValue(buf), DBException);
+    // Test short inputs for equality payload
+    std::vector<size_t> truncatedLengths = {0,
+                                            kFLE2IEVHeaderSize - 1,
+                                            kFLE2IEVHeaderSize,
+                                            kFLE2IEVHeaderSize + 1,
+                                            kFLE2IEVHeaderSize + kFLE2IEVMblockLen,
+                                            validBuf.size() - 1};
+    for (auto& testLength : truncatedLengths) {
+        std::vector<uint8_t> buf(testLength);
+        std::copy(validBuf.begin(), validBuf.begin() + testLength, buf.begin());
+        ASSERT_THROWS_CODE(
+            FLE2IndexedEqualityEncryptedValueV2{buf}, DBException, ErrorCodes::LibmongocryptError);
     }
 
-    // Case 2: overflow bypass — substr(UINT32_MAX) + suffix(1) + 1 wraps to 1 in uint32_t
-    // but equals 4294967297 in uint64_t, still exceeding edge_count(1).
-    {
-        auto buf = validBuf;
-        writeU32LE(buf, kFLE2TextSubstrCountOffset, std::numeric_limits<uint32_t>::max());
-        writeU32LE(buf, kFLE2TextSuffixCountOffset, 1);
-        ASSERT_THROWS(FLE2IndexedTextEncryptedValue(buf), DBException);
+    // Test with invalid blob type
+    auto buf = validBuf;
+    buf[0] = 255;
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2(buf), DBException, ErrorCodes::LibmongocryptError);
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2IndexedRangeEncryptedValueV2_ParseErrors) {
+    constexpr size_t kHeaderSize = kFLE2IEVHeaderSize + sizeof(uint8_t);
+
+    // First, test the shortest valid buffer can be parsed successfully
+    auto validBuf =
+        std::vector<uint8_t>(kHeaderSize + kFLE2IEVMinCipherTextLen + kFLE2IEVMblockLen);
+    validBuf.at(kFLE2IEVHeaderSize) = 1;  // total edge count
+    validBuf.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValueV2);
+    ASSERT_DOES_NOT_THROW(FLE2IndexedRangeEncryptedValueV2{validBuf});
+
+    // Test short inputs for range payload
+    std::vector<size_t> truncatedLengths = {0,
+                                            kHeaderSize - 1,
+                                            kHeaderSize,
+                                            kHeaderSize + 1,
+                                            kHeaderSize + kFLE2IEVMblockLen,
+                                            validBuf.size() - 1};
+    for (auto& testLength : truncatedLengths) {
+        std::vector<uint8_t> buf(testLength);
+        std::copy(validBuf.begin(), validBuf.begin() + testLength, buf.begin());
+        ASSERT_THROWS_CODE(
+            FLE2IndexedRangeEncryptedValueV2{buf}, DBException, ErrorCodes::LibmongocryptError);
     }
+
+    // Test edge count is zero
+    auto buf = validBuf;
+    buf.at(kFLE2IEVHeaderSize) = 0;
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2(buf), DBException, ErrorCodes::LibmongocryptError);
+
+    // Test with invalid blob type
+    buf = validBuf;
+    buf[0] = 255;
+    ASSERT_THROWS_CODE(
+        FLE2IndexedRangeEncryptedValueV2(buf), DBException, ErrorCodes::LibmongocryptError);
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2IndexedTextEncryptedValue_ParseErrors) {
+    constexpr size_t kHeaderSize = kFLE2IEVHeaderSize + 3 * sizeof(uint32_t);
+
+    // First, test the shortest valid buffer can be parsed successfully
+    auto validBuf =
+        std::vector<uint8_t>(kHeaderSize + kFLE2IEVMinCipherTextLen + kFLE2IEVMblockLen);
+    validBuf.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2TextIndexedValue);
+    writeU32LE(validBuf, kFLE2IEVHeaderSize, 1);  // total edge count
+    writeU32LE(validBuf, kFLE2TextSubstrCountOffset, 0);
+    writeU32LE(validBuf, kFLE2TextSuffixCountOffset, 0);
+    ASSERT_DOES_NOT_THROW(FLE2IndexedTextEncryptedValue{validBuf});
+
+    // Test edge count exceeds limit
+    auto buf = validBuf;
+    writeU32LE(buf, kFLE2IEVHeaderSize, EncryptionInformationHelpers::kFLE2PerFieldTagLimit + 1);
+    ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue(buf), DBException, 12773701);
+
+    // Test edge count is zero
+    writeU32LE(buf, kFLE2IEVHeaderSize, 0);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue(buf), DBException, ErrorCodes::LibmongocryptError);
+
+    // Test input buffer less than kHeaderSize
+    std::vector<size_t> truncatedLengths = {0, kHeaderSize - 1};
+    for (auto& length : truncatedLengths) {
+        std::vector<uint8_t> shortBuf(length);
+        std::copy(validBuf.begin(), validBuf.begin() + length, shortBuf.begin());
+        ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue{shortBuf}, DBException, 12773700);
+    }
+
+    // Test with invalid blob type
+    buf = validBuf;
+    buf[0] = 255;
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue(buf), DBException, ErrorCodes::LibmongocryptError);
+
+    // Test input buffers where total edge_count = 1, but the length after kHeaderSize is
+    // less than min ciphertext length & mblock length
+    truncatedLengths = {kHeaderSize, kHeaderSize + kFLE2IEVMblockLen, validBuf.size() - 1};
+
+    for (auto& length : truncatedLengths) {
+        std::vector<uint8_t> shortBuf(length);
+        std::copy(validBuf.begin(), validBuf.begin() + length, shortBuf.begin());
+        ASSERT_THROWS_CODE(
+            FLE2IndexedTextEncryptedValue{shortBuf}, DBException, ErrorCodes::LibmongocryptError);
+    }
+
+    // Test total tags > number of metadata blocks in buffer
+    buf = validBuf;
+    writeU32LE(buf, kFLE2IEVHeaderSize, 1024);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue{buf}, DBException, ErrorCodes::LibmongocryptError);
+
+    // substring + suffix overflow
+    // substr(UINT32_MAX) + suffix(1) + 1 wraps to 1 in uint32_t
+    // but equals 4294967297 in uint64_t, still exceeding edge_count(14).
+    buf = validBuf;
+    writeU32LE(buf, kFLE2IEVHeaderSize, 10);                    // set edge_count = 10
+    writeU32LE(buf, kFLE2TextSuffixCountOffset, 1);             // set suffix count = 1
+    buf.insert(buf.end(), kFLE2IEVMblockLen * 9, '\0');         // add 9 additional mblocks
+    ASSERT_DOES_NOT_THROW(FLE2IndexedTextEncryptedValue{buf});  // assert it works
+    writeU32LE(buf, kFLE2TextSubstrCountOffset, std::numeric_limits<uint32_t>::max());
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue{buf}, DBException, ErrorCodes::LibmongocryptError);
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
@@ -2395,7 +2422,7 @@ TEST_F(ServiceContextTest, FLE_EDC_RangeParamtersFlow_Find) {
 
     auto result = client.encryptPlaceholders(obj, markedDoc, keyVault);
 
-    auto rangePayload = ParsedFindRangePayload(result.firstElement(), ""_sd, boost::none);
+    auto rangePayload = ParsedFindRangePayload(result.firstElement(), ""sv, boost::none);
 
     ASSERT_EQ(rangePayload.precision.get(), 4);
     ASSERT_EQ(rangePayload.trimFactor.get(), 5);
@@ -2789,7 +2816,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestSubstringParameterLimits) {
     auto doOneFieldTest = [](const std::vector<QueryTypeConfig>& qtc, boost::optional<int> error) {
         EncryptedFieldConfig efc;
         EncryptedField field{UUID::gen(), "field"};
-        field.setBsonType("string"_sd);
+        field.setBsonType("string"sv);
         field.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{qtc});
         efc.setFields({field});
         if (error) {
@@ -3054,7 +3081,7 @@ TEST_F(ServiceContextTest, FLE_Update_Basic) {
 
     auto clientEncryptedDoc = client.encryptPlaceholders(inputDoc, markedDoc, keyVault);
 
-    auto finalDoc = encryptDocument(clientEncryptedDoc, true /*finalizeForUpdate*/);
+    auto finalDoc = encryptDocument(clientEncryptedDoc, /*finalizeForUpdate=*/true);
     std::cout << finalDoc << std::endl;
 
     ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
@@ -3091,7 +3118,7 @@ TEST_F(ServiceContextTest, FLE_Update_BadPush) {
     auto clientEncryptedDoc = client.encryptPlaceholders(inputDoc, markedDoc, keyVault);
 
     ASSERT_THROWS_CODE(
-        encryptDocument(clientEncryptedDoc, true /*finalizeForUpdate*/), DBException, 6371511);
+        encryptDocument(clientEncryptedDoc, /*finalizeForUpdate=*/true), DBException, 6371511);
 }
 
 TEST_F(ServiceContextTest, FLE_Update_PushToSafeContent) {
@@ -3108,7 +3135,7 @@ TEST_F(ServiceContextTest, FLE_Update_PushToSafeContent) {
     auto clientEncryptedDoc = client.encryptPlaceholders(inputDoc, markedDoc, keyVault);
 
     ASSERT_THROWS_CODE(
-        encryptDocument(clientEncryptedDoc, true /*finalizeForUpdate*/), DBException, 6371511);
+        encryptDocument(clientEncryptedDoc, /*finalizeForUpdate=*/true), DBException, 6371511);
 }
 
 TEST_F(ServiceContextTest, FLE_Update_PushToOtherfield) {
@@ -3123,7 +3150,7 @@ TEST_F(ServiceContextTest, FLE_Update_PushToOtherfield) {
     auto markedDoc = BSON("$push" << BSON("abc" << 123) << "$set" << placeholderDoc);
     auto clientEncryptedDoc = client.encryptPlaceholders(inputDoc, markedDoc, keyVault);
 
-    auto finalDoc = encryptDocument(clientEncryptedDoc, true /*finalizeForUpdate*/);
+    auto finalDoc = encryptDocument(clientEncryptedDoc, /*finalizeForUpdate=*/true);
     std::cout << finalDoc << std::endl;
 
     ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
@@ -5330,20 +5357,18 @@ TEST_F(EdgeTestFixture, getEdgesLengthDate) {
     }
 }
 
-class AnchorPaddingFixture : public ServiceContextTest {
-public:
+class AnchorPaddingTest : public ServiceContextTest {};
+
+TEST_F(AnchorPaddingTest, GeneratePaddingDocument) {
     static constexpr auto kAnchorPaddingRootHex =
         "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"sv;
+    const AnchorPaddingRootToken rootToken{decodePrf(kAnchorPaddingRootHex)};
+    auto keyToken = AnchorPaddingKeyToken::deriveFrom(rootToken);
+    auto valueToken = AnchorPaddingValueToken::deriveFrom(rootToken);
 
-    const AnchorPaddingRootToken _rootToken{decodePrf(kAnchorPaddingRootHex)};
-    const AnchorPaddingKeyToken _keyToken = AnchorPaddingKeyToken::deriveFrom(_rootToken);
-    const AnchorPaddingValueToken _valueToken = AnchorPaddingValueToken::deriveFrom(_rootToken);
-};
-
-TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
-    constexpr std::uint64_t kId = 42;
+    static constexpr uint64_t kId = 42;
     auto doc =
-        ESCCollectionAnchorPadding::generatePaddingDocument(&hmacCtx, _keyToken, _valueToken, kId);
+        ESCCollectionAnchorPadding::generatePaddingDocument(&hmacCtx, keyToken, valueToken, kId);
     ASSERT_EQ(doc.nFields(), 2UL);
 
     // _id := F_k(bot || id)
@@ -5372,7 +5397,7 @@ TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
         ASSERT_EQ(valueElem.binDataType(), BinDataGeneral);
         int len = 0;
         const char* value = valueElem.binData(len);
-        auto swDecrypt = FLEUtil::decryptData(_valueToken.toCDR(), ConstDataRange(value, len));
+        auto swDecrypt = FLEUtil::decryptData(valueToken.toCDR(), ConstDataRange(value, len));
         ASSERT_OK(swDecrypt.getStatus());
         auto dec = std::move(swDecrypt.getValue());
         ASSERT_TRUE(std::all_of(dec.begin(), dec.end(), [](auto b) { return b == 0; }));
@@ -5391,6 +5416,52 @@ TEST_F(ServiceContextTest, fleEncryptAndDecrypt) {
     auto decrypt2 = uassertStatusOK(FLEUtil::decryptData(key, encrypt2));
     ASSERT_EQ(decrypt1, decrypt2);
     ASSERT_EQ(decrypt1, plaintext);
+}
+
+namespace {
+QueryTypeConfig textQtcWithType(QueryTypeEnum qt) {
+    QueryTypeConfig q;
+    q.setQueryType(qt);
+    q.setContention(4);
+    return q;
+}
+
+EncryptedField fieldWithQueries(std::vector<QueryTypeConfig> qtcs) {
+    EncryptedField ef(UUID::gen(), "encrypted");
+    ef.setBsonType("string"sv);
+    ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtcs)});
+    return ef;
+}
+}  // namespace
+
+TEST(FLECrypto, GetQueryTypeMatchingReturnsFirstMatch) {
+    auto field = fieldWithQueries(
+        {textQtcWithType(QueryTypeEnum::Suffix), textQtcWithType(QueryTypeEnum::Prefix)});
+
+    auto suffixResult =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Suffix; });
+    ASSERT(suffixResult);
+    ASSERT(suffixResult->getQueryType() == QueryTypeEnum::Suffix);
+
+    auto prefixResult =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Prefix; });
+    ASSERT(prefixResult);
+    ASSERT(prefixResult->getQueryType() == QueryTypeEnum::Prefix);
+}
+
+TEST(FLECrypto, GetQueryTypeMatchingNoMatchReturnsNone) {
+    auto field = fieldWithQueries({textQtcWithType(QueryTypeEnum::Prefix)});
+    auto result =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Suffix; });
+    ASSERT_FALSE(result);
+}
+
+TEST(FLECrypto, GetQueryTypeMatchingNoQueriesReturnsNone) {
+    EncryptedField field(UUID::gen(), "encrypted");
+    field.setBsonType("int"sv);
+    auto result =
+        getQueryTypeMatching(field, [](QueryTypeEnum qt) { return qt == QueryTypeEnum::Suffix; });
+    ASSERT_FALSE(result);
 }
 
 }  // namespace mongo

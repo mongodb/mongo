@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -62,7 +35,8 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+using namespace std::literals::string_view_literals;
 class BSONObj;
 
 class FieldIterator;
@@ -115,24 +89,24 @@ public:
         const Document& rhs;
     };
 
-    static constexpr std::string_view metaFieldTextScore = "$textScore"_sd;
-    static constexpr std::string_view metaFieldRandVal = "$randVal"_sd;
-    static constexpr std::string_view metaFieldSortKey = "$sortKey"_sd;
-    static constexpr std::string_view metaFieldGeoNearDistance = "$dis"_sd;
-    static constexpr std::string_view metaFieldGeoNearPoint = "$pt"_sd;
-    static constexpr std::string_view metaFieldSearchScore = "$searchScore"_sd;
-    static constexpr std::string_view metaFieldSearchHighlights = "$searchHighlights"_sd;
-    static constexpr std::string_view metaFieldSearchScoreDetails = "$searchScoreDetails"_sd;
-    static constexpr std::string_view metaFieldSearchRootDocumentId = "$searchRootDocumentId"_sd;
-    static constexpr std::string_view metaFieldSearchSortValues = "$searchSortValues"_sd;
-    static constexpr std::string_view metaFieldIndexKey = "$indexKey"_sd;
-    static constexpr std::string_view metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
-    static constexpr std::string_view metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
-    static constexpr std::string_view metaFieldScore = "$score"_sd;
-    static constexpr std::string_view metaFieldScoreDetails = "$scoreDetails"_sd;
-    static constexpr std::string_view metaFieldStream = "$stream"_sd;
+    static constexpr std::string_view metaFieldTextScore = "$textScore"sv;
+    static constexpr std::string_view metaFieldRandVal = "$randVal"sv;
+    static constexpr std::string_view metaFieldSortKey = "$sortKey"sv;
+    static constexpr std::string_view metaFieldGeoNearDistance = "$dis"sv;
+    static constexpr std::string_view metaFieldGeoNearPoint = "$pt"sv;
+    static constexpr std::string_view metaFieldSearchScore = "$searchScore"sv;
+    static constexpr std::string_view metaFieldSearchHighlights = "$searchHighlights"sv;
+    static constexpr std::string_view metaFieldSearchScoreDetails = "$searchScoreDetails"sv;
+    static constexpr std::string_view metaFieldSearchRootDocumentId = "$searchRootDocumentId"sv;
+    static constexpr std::string_view metaFieldSearchSortValues = "$searchSortValues"sv;
+    static constexpr std::string_view metaFieldIndexKey = "$indexKey"sv;
+    static constexpr std::string_view metaFieldVectorSearchScore = "$vectorSearchScore"sv;
+    static constexpr std::string_view metaFieldSearchSequenceToken = "$searchSequenceToken"sv;
+    static constexpr std::string_view metaFieldScore = "$score"sv;
+    static constexpr std::string_view metaFieldScoreDetails = "$scoreDetails"sv;
+    static constexpr std::string_view metaFieldStream = "$stream"sv;
     static constexpr std::string_view metaFieldChangeStreamControlEvent =
-        "$changeStreamControlEvent"_sd;
+        "$changeStreamControlEvent"sv;
     static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
                                                       metaFieldRandVal,
                                                       metaFieldSortKey,
@@ -232,7 +206,17 @@ public:
 
     /// True if this document has no fields.
     bool empty() const {
-        return !_storage || storage().iterator().atEnd();
+        if (!_storage) {
+            return true;
+        }
+        // Fast path: an unmodified document has no cached fields other than mirrors of fields that
+        // are still in the backing BSON, so it is empty exactly when its BSON is. This avoids
+        // constructing a full DocumentStorageIterator. Documents whose BSON carries metadata are
+        // excluded because those fields are hidden from iteration but still counted by isEmpty().
+        if (!_storage->isModified() && !_storage->bsonHasMetadata()) {
+            return _storage->bsonObjIsEmpty();
+        }
+        return storage().iterator().atEnd();
     }
 
     /// Create a new FieldIterator that can be used to examine the Document's fields in order.
@@ -1034,4 +1018,4 @@ inline MutableValue MutableValue::getField(Position pos) {
 inline MutableValue MutableValue::getField(std::string_view key) {
     return MutableDocument(*this).getField(key);
 }
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

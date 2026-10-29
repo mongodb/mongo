@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   uses_explain,
+ * ]
+ */
 // Ensure that explain command errors if the inner command has a $db field that doesn't match the
 // outer command.
 assert.commandFailedWithCode(

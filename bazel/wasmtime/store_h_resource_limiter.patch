@@ -1,0 +1,41 @@
+--- a/include/wasmtime/store.h
++++ b/include/wasmtime/store.h
+@@ -111,6 +111,38 @@ WASM_API_EXTERN void wasmtime_store_limiter(wasmtime_store_t *store,
+                                             int64_t instances, int64_t tables,
+                                             int64_t memories);
+ 
++/**
++ * \brief Callback invoked by the resource limiter before every `memory.grow`.
++ *
++ * \param current current linear memory size in bytes
++ * \param desired requested new size in bytes
++ * \param maximum module-declared ceiling in bytes, or -1 if unbounded
++ * \param data opaque user data registered with wasmtime_store_resource_limiter
++ * \return true to allow the grow, false to deny it (memory.grow returns -1)
++ */
++typedef bool (*wasmtime_memory_growing_cb)(size_t current,
++                                           size_t desired,
++                                           int64_t maximum,
++                                           void *data);
++
++/**
++ * \brief Registers a callback-based resource limiter on the store.
++ *
++ * The \p memory_growing_cb callback is invoked before every `memory.grow`
++ * instruction; returning false denies the grow.  This is mutually exclusive
++ * with wasmtime_store_limiter — the last call wins.
++ *
++ * The \p data pointer is passed unchanged to every callback invocation and to
++ * \p finalizer.  The caller is responsible for keeping \p data alive for the
++ * lifetime of the store.  \p finalizer is called when the store is dropped and
++ * may be NULL.
++ */
++WASM_API_EXTERN void
++wasmtime_store_resource_limiter(wasmtime_store_t *store,
++                                wasmtime_memory_growing_cb memory_growing_cb,
++                                void *data,
++                                void (*finalizer)(void *data));
++
+ /**
+  * \brief Deletes a store.
+  */

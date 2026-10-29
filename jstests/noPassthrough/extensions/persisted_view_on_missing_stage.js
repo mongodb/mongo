@@ -2,13 +2,19 @@
  * Tests that querying a persisted view that references an extension stage ($testFoo from
  * libfoo_mongo_extension.so) fails if the extension is no longer loaded in the host.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * The view must survive a restart, so this test cannot run on ephemeral storage engines.
+ *
+ * @tags: [
+ *   featureFlagExtensionsAPI,
+ *   requires_persistence,
+ * ]
  */
 
 import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
     checkPlatformCompatibleWithExtensions,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -19,6 +25,7 @@ const optionsWithExtension = {
     dbpath: dbpath,
     noCleanData: true,
     loadExtensions: extensionNames[0],
+    extensionsConfigPath: getExtensionConfDir(),
     setParameter: {featureFlagExtensionStubParsers: true},
 };
 const optionsWithoutExtension = {

@@ -1,0 +1,27 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+    mod_visibility: needs_replacement
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    IFRFlagWireEntry:
+        description: >-
+            A single Incremental Feature Rollout (IFR) flag value as it appears in the 'ifrFlags'
+            wire format, used to propagate a consistent view of feature flags between nodes.
+        # Non-strict so the per-entry wire schema stays extensible: a future binary can add a field
+        # to each entry and older parsers will ignore it rather than reject the whole command,
+        # matching the lenient parsing this replaced and the other internal wire structs in
+        # generic_argument.idl.
+        strict: false
+        fields:
+            name:
+                type: string
+                description: "The name of the IFR feature flag."
+            value:
+                type: bool
+                description: "The value of the IFR feature flag."

@@ -4,6 +4,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 set -o errexit
 set -o verbose
 
+if [[ "${project:-}" != "mongodb-mongo-master" ]]; then
+    echo "monitor_build_status must run from the mongodb-mongo-master project, but is running from '${project:-}'" >&2
+    exit 1
+fi
+
 cd src
 activate_venv
 

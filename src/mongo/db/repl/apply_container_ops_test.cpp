@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/namespace_string.h"
@@ -33,14 +7,17 @@
 #include "mongo/db/repl/container_oplog_entry_serialization.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -56,24 +33,25 @@ namespace {
 StatusWith<UniqueBuffer> _get(OperationContext* opCtx,
                               std::string_view ident,
                               std::span<const char> key) {
-    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    return storage_engine_direct_crud::get(*storageEngine, *ru, ident, key);
+    auto* kvEngine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    return kvEngine->getDirectCursor(ru, ident)->get(key);
 }
 
 StatusWith<UniqueBuffer> _get(OperationContext* opCtx, std::string_view ident, int64_t key) {
-    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
-    return storage_engine_direct_crud::get(*storageEngine, *ru, ident, key);
+    auto* kvEngine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    return kvEngine->getDirectCursor(ru, ident)->get(key);
 }
 
 /**
  * Applies a single container oplog entry as a secondary.
  */
-Status applyContainerOpHelper(OperationContext* opCtx, const OplogEntry& e) {
+Status applyContainerOpHelper(OperationContext* opCtx,
+                              const OplogEntry& e,
+                              OplogApplication::Mode mode = OplogApplication::Mode::kSecondary) {
     auto op = ApplierOperation{&e};
-    return applyContainerOperations(
-        opCtx, std::span<const ApplierOperation>{&op, 1}, OplogApplication::Mode::kSecondary);
+    return applyContainerOperations(opCtx, std::span<const ApplierOperation>{&op, 1}, mode);
 }
 
 DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
@@ -270,6 +248,165 @@ TEST_F(ApplyContainerOpsTest, ContainerOpUpdateNonexistentKeyFails) {
     auto entry = makeContainerUpdateOplogEntry(OpTime(), _intIdent, kMissing, v);
     auto status = applyContainerOpHelper(_opCtx.get(), entry);
     ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpDeleteNonexistentKeyFails) {
+    int64_t kInserted = 1;
+    int64_t kMissing = 2;
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+
+    // Insert a key so the container is non-empty.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeContainerInsertOplogEntry(OpTime(), _intIdent, kInserted, v)));
+
+    // Deleting a different, non-existent key should fail.
+    auto entry = makeContainerDeleteOplogEntry(OpTime(), _intIdent, kMissing);
+    auto status = applyContainerOpHelper(_opCtx.get(), entry);
+    ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+}
+
+class ApplyFastCountContainerOpsTest : public ApplyContainerOpsTest {
+protected:
+    void setUp() override {
+        ApplyContainerOpsTest::setUp();
+
+        auto* se = getServiceContext()->getStorageEngine();
+        auto ru = se->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        _fastCountRS = se->getEngine()->makeInternalRecordStore(
+            *ru, ident::kFastCountMetadataStore, KeyFormat::String);
+        swt.commit();
+    }
+
+    OplogEntry makeUpdateMissingKey() {
+        return makeContainerUpdateOplogEntry(OpTime(),
+                                             ident::kFastCountMetadataStore,
+                                             BSONBinData{_key, 2, BinDataGeneral},
+                                             BSONBinData("A", 1, BinDataGeneral));
+    }
+
+    OplogEntry makeInsertExistingKey() {
+        auto v = BSONBinData("A", 1, BinDataGeneral);
+        ASSERT_OK(applyContainerOpHelper(
+            _opCtx.get(),
+            makeContainerInsertOplogEntry(
+                OpTime(), ident::kFastCountMetadataStore, BSONBinData{_key, 2, BinDataGeneral}, v),
+            OplogApplication::Mode::kInitialSync));
+        return makeContainerInsertOplogEntry(OpTime(),
+                                             ident::kFastCountMetadataStore,
+                                             BSONBinData{_key, 2, BinDataGeneral},
+                                             BSONBinData("B", 1, BinDataGeneral));
+    }
+
+    OplogEntry makeDeleteMissingKey() {
+        return makeContainerDeleteOplogEntry(
+            OpTime(), ident::kFastCountMetadataStore, BSONBinData{_key, 2, BinDataGeneral});
+    }
+
+    StatusWith<UniqueBuffer> getKey() {
+        return _get(_opCtx.get(), ident::kFastCountMetadataStore, std::span<const char>(_key, 2));
+    }
+
+    const char _key[3] = "K1";
+    std::unique_ptr<RecordStore> _fastCountRS;
+};
+
+// During initial sync oplog application, the seeded fast count store legitimately diverges from
+// the state the sync source's oplog assumes, so mismatching container writes self-heal.
+
+TEST_F(ApplyFastCountContainerOpsTest, InitialSyncUpdateNonexistentKeyIsPromotedToInsert) {
+    // A replicated fast count store seeded by initial sync may be missing entries the sync
+    // source flushes later. Updates for missing keys must succeed so the store self-heals.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeUpdateMissingKey(), OplogApplication::Mode::kInitialSync));
+
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "A", 1));
+}
+
+TEST_F(ApplyFastCountContainerOpsTest, InitialSyncInsertExistingKeyIsPromotedToUpdate) {
+    // A replicated fast count store seeded by initial sync may already hold an entry that a
+    // replayed flush from the sync source inserts. Inserts for existing keys must overwrite.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeInsertExistingKey(), OplogApplication::Mode::kInitialSync));
+
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "B", 1));
+}
+
+TEST_F(ApplyFastCountContainerOpsTest, InitialSyncDeleteNonexistentKeyIsNoOp) {
+    // A replicated fast count store seeded by initial sync may be missing entries for
+    // collections dropped on the sync source. Deletes for missing keys must be a no-op.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeDeleteMissingKey(), OplogApplication::Mode::kInitialSync));
+
+    ASSERT_EQ(getKey().getStatus(), ErrorCodes::NoSuchKey);
+}
+
+// In steady state the strictness of fast count container writes is governed by the persistence
+// provider's relaxContainerOplogConstraints(). Attached storage (the default provider) relaxes
+// the constraints: each node owns its physical container state and initial sync cannot seed
+// container contents for unreplicated namespaces (e.g. the oplog's own fast count entry), so
+// mismatching writes self-heal. Disaggregated storage keeps the usual exactness guarantees.
+
+TEST_F(ApplyFastCountContainerOpsTest, SecondarySelfHealsWhenProviderRelaxesConstraints) {
+    // The default test provider is attached storage, which relaxes container oplog constraints.
+    ASSERT_TRUE(rss::ReplicatedStorageService::get(getServiceContext())
+                    .getPersistenceProvider()
+                    .relaxContainerOplogConstraints());
+
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeDeleteMissingKey()));
+    ASSERT_EQ(getKey().getStatus(), ErrorCodes::NoSuchKey);
+
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeUpdateMissingKey()));
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "A", 1));
+
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeInsertExistingKey()));
+    g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "B", 1));
+}
+
+class ApplyFastCountContainerOpsStrictProviderTest : public ApplyFastCountContainerOpsTest {
+protected:
+    // Mimics disaggregated storage's strict container op application on top of the attached
+    // provider so the test does not depend on the enterprise module.
+    class StrictContainerConstraintsProvider : public rss::AttachedPersistenceProvider {
+        bool relaxContainerOplogConstraints() const override {
+            return false;
+        }
+    };
+
+    void setUp() override {
+        ApplyFastCountContainerOpsTest::setUp();
+        rss::ReplicatedStorageService::get(getServiceContext())
+            .setPersistenceProvider(std::make_unique<StrictContainerConstraintsProvider>());
+    }
+};
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, SecondaryUpdateNonexistentKeyFails) {
+    ASSERT_EQ(applyContainerOpHelper(_opCtx.get(), makeUpdateMissingKey()), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, SecondaryInsertExistingKeyFails) {
+    ASSERT_EQ(applyContainerOpHelper(_opCtx.get(), makeInsertExistingKey()), ErrorCodes::KeyExists);
+}
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, SecondaryDeleteNonexistentKeyFails) {
+    ASSERT_EQ(applyContainerOpHelper(_opCtx.get(), makeDeleteMissingKey()), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyFastCountContainerOpsStrictProviderTest, InitialSyncStillSelfHeals) {
+    // Initial sync mode self-heals regardless of the provider.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeUpdateMissingKey(), OplogApplication::Mode::kInitialSync));
+    auto g = getKey();
+    ASSERT_OK(g.getStatus());
+    ASSERT_EQ(0, std::memcmp(g.getValue().get(), "A", 1));
 }
 
 TEST_F(ApplyContainerOpsTest, ContainerOpUpdateOplogVersion) {
@@ -596,137 +733,555 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsRejectMismatchedExistingCommitTimestam
     ru->clearCommitTimestamp();
 }
 
-TEST_F(ApplyContainerOpsTest, ParseContainerFormatFailures) {
-    int64_t k = 1;
-    auto v = BSONBinData("V", 1, BinDataGeneral);
-    auto wrongTypeV = "notBinData";
-    auto wrongTypeK = "notBinDataOrInt64";
-    auto version = static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1);
+/*
+ * Container operations ('ci', 'cd', and 'cu') must take the following form:
+ *
+ * {
+ *   ...                            // base oplog entry fields
+ *   "op": "ci" | "cd" | "cu",
+ *   "container": <string>,
+ *   "o": {
+ *     "k": <BinData | NumberLong> | Array[BinData]>,
+ *     "v": <BinData | Array[BinData]>                  // only allowed for "ci" and "cu"
+ *     "$v": <NumberLong>                               // only allowed for "cu"
+ *   }
+ * }
+ */
+class ApplyContainerOpsParseContainerFormatFailuresTest : public ApplyContainerOpsTest {
+public:
+    ApplyContainerOpsParseContainerFormatFailuresTest() : _v("V", 1, BinDataGeneral) {}
 
-    auto baseInsert = [&]() {
+protected:
+    DurableOplogEntryParams BaseInsert() {
         return makeBaseParams(
-            _nss, _intIdent, OpTypeEnum::kContainerInsert, BSON("k" << k << "v" << v));
-    };
-    auto baseDelete = [&]() {
-        return makeBaseParams(_nss, _intIdent, OpTypeEnum::kContainerDelete, BSON("k" << k));
-    };
-    auto baseUpdate = [&]() {
+            _nss, _intIdent, OpTypeEnum::kContainerInsert, BSON("k" << _k << "v" << _v));
+    }
+
+    DurableOplogEntryParams BaseDelete() {
+        return makeBaseParams(_nss, _intIdent, OpTypeEnum::kContainerDelete, BSON("k" << _k));
+    }
+
+    DurableOplogEntryParams BaseUpdate() {
         return makeBaseParams(_nss,
                               _intIdent,
                               OpTypeEnum::kContainerUpdate,
-                              BSON("k" << k << "v" << v << "$v" << version));
-    };
-
-    /*
-     * Container operations ('ci', 'cd', and 'cu') must take the following form:
-     *
-     * {
-     *   ...                            // base oplog entry fields
-     *   "op": "ci" | "cd" | "cu",
-     *   "container": <string>,
-     *   "o": {
-     *     "k": <BinData | NumberLong>,
-     *     "v": <BinData>               // only allowed for "ci" and "cu"
-     *     "$v": <NumberLong>           // only allowed for "cu"
-     *   }
-     * }
-     */
-
-    // missing container - insert, delete, update
-    {
-        auto p = baseInsert();
-        p.container = boost::none;
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
-    }
-    {
-        auto p = baseDelete();
-        p.container = boost::none;
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
-    }
-    {
-        auto p = baseUpdate();
-        p.container = boost::none;
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+                              BSON("k" << _k << "v" << _v << "$v" << _version));
     }
 
-    // missing key - insert, delete, update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+    static constexpr int64_t _k = 1;
+    BSONBinData _v;
+    static constexpr auto _wrongTypeV = "notBinData";
+    static constexpr auto _wrongTypeK = "notBinDataOrInt64";
+    static constexpr auto _version =
+        static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1);
+};
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingContainerInsert) {
+    auto p = BaseInsert();
+    p.container = boost::none;
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingContainerDelete) {
+    auto p = BaseDelete();
+    p.container = boost::none;
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingContainerUpdate) {
+    auto p = BaseUpdate();
+    p.container = boost::none;
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+}
+
+// missing key
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingKeyInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingKeyDelete) {
+    auto p = BaseDelete();
+    p.oField = BSONObj();
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingKeyUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("v" << _v << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// key type must be binData or numberLong
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _wrongTypeK << "v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeDelete) {
+    auto p = BaseDelete();
+    p.oField = BSON("k" << _wrongTypeK);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _wrongTypeK << "v" << _v << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeInsertWithoutValue) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _wrongTypeK);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MissingValueUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// value type must be binData or array of binData
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidValueTypeInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _k << "v" << _wrongTypeV);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+}
+
+// key type must be int or array of binData with array-type value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidKeyTypeArrayValueInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << _wrongTypeK << "v" << BSON_ARRAY(BSONBinData("V", 1, BinDataGeneral)));
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+// key type must be int or array of binData with array-type value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidBinDataKeyTypeArrayValueInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << BSONBinData("K", 1, BinDataGeneral) << "v"
+                        << BSON_ARRAY(BSONBinData("V", 1, BinDataGeneral)));
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13174600);
+}
+
+// array lengths must match with array-typed keys and values
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, MismatchedKeyValueArrayLengthsInsert) {
+    auto p = BaseInsert();
+    p.oField = BSON("k" << BSON_ARRAY(BSONBinData("K1", 2, BinDataGeneral)
+                                      << BSONBinData("K2", 2, BinDataGeneral))
+                        << "v" << BSON_ARRAY(BSONBinData("V", 1, BinDataGeneral)));
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13174600);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidValueTypeUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << _wrongTypeV << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+}
+
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, InvalidArrayTypeUpdate) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << BSON_ARRAY(BSONBinData()) << "$v" << _version);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 13064101);
+}
+
+// delete: cannot contain value
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, DeleteWithValue) {
+    auto p = BaseDelete();
+    p.oField = BSON("k" << _k << "v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704704);
+}
+
+// update: missing version
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, UpdateMissingVersion) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << _v);
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// update: version must be numeric
+TEST_F(ApplyContainerOpsParseContainerFormatFailuresTest, UpdateNonNumericVersion) {
+    auto p = BaseUpdate();
+    p.oField = BSON("k" << _k << "v" << _v << "$v" << "notANumber");
+    ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+}
+
+// Builds a container OplogEntry ('ci'/'cu'/'cd') with a caller-supplied, verbatim 'o' field so that
+// the batched (range) encodings can be applied end to end. Constructing the DurableOplogEntry runs
+// the same container 'o' validation as production.
+OplogEntry makeContainerBatchEntry(const NamespaceString& nss,
+                                   std::string_view ident,
+                                   OpTypeEnum type,
+                                   const BSONObj& o) {
+    return OplogEntry(DurableOplogEntry(makeBaseParams(nss, ident, type, o)));
+}
+
+// Int-keyed range insert: a NumberLong base key plus an array of values, with the i-th value
+// written at key (base + i).
+TEST_F(ApplyContainerOpsTest, BatchInsertIntKeyedRange) {
+    const int64_t base = 100;
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+    auto v2 = BSONBinData("C", 1, BinDataGeneral);
+
+    auto o = BSON("k" << base << "v" << BSON_ARRAY(v0 << v1 << v2));
+    auto entry = makeContainerBatchEntry(_nss, _intIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    auto g0 = _get(_opCtx.get(), _intIdent, base);
+    auto g1 = _get(_opCtx.get(), _intIdent, base + 1);
+    auto g2 = _get(_opCtx.get(), _intIdent, base + 2);
+    ASSERT_OK(g0.getStatus());
+    ASSERT_OK(g1.getStatus());
+    ASSERT_OK(g2.getStatus());
+    EXPECT_EQ(0, std::memcmp(g0.getValue().get(), v0.data, v0.length));
+    EXPECT_EQ(0, std::memcmp(g1.getValue().get(), v1.data, v1.length));
+    EXPECT_EQ(0, std::memcmp(g2.getValue().get(), v2.data, v2.length));
+}
+
+// Int-keyed range insert rolls back entirely if a mid-range write fails.
+TEST_F(ApplyContainerOpsTest, BatchInsertIntKeyedRangeMidFailureRollsBack) {
+    const int64_t base = 1;
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+
+    // Pre-insert 'base + 1' so the second write of the range collides and fails.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeContainerInsertOplogEntry(OpTime(), _intIdent, base + 1, v)));
+
+    auto n0 = BSONBinData("X", 1, BinDataGeneral);
+    auto n1 = BSONBinData("Y", 1, BinDataGeneral);
+    auto o = BSON("k" << base << "v" << BSON_ARRAY(n0 << n1));
+    auto entry = makeContainerBatchEntry(_nss, _intIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_NOT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    // The first write ('base') was rolled back with the failed op.
+    ASSERT_EQ(_get(_opCtx.get(), _intIdent, base).getStatus(), ErrorCodes::NoSuchKey);
+}
+
+// Bytes-keyed range insert: an array of BinData keys, each inserted with an empty value.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRange) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k2, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral)));
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (const char* k : {k1, k2, k3}) {
+        ASSERT_OK(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k, 2)).getStatus());
     }
-    {
-        auto p = baseDelete();
-        p.oField = BSONObj();
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// An array of keys with a single value. Each key should have the same value applied.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeWithSingleValue) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k2, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral))
+                      << "v" << v);
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (const char* k : {k1, k2, k3}) {
+        auto val = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k, 2));
+        ASSERT_OK(val);
+        EXPECT_EQ(0, std::memcmp(val.getValue().get(), v.data, v.length));
     }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("v" << v << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+}
+
+// An array of keys with multiple values. Each key should have its own value.
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeWithValueRange) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+    auto v1 = BSONBinData("V1", 2, BinDataGeneral);
+    auto v2 = BSONBinData("V2", 2, BinDataGeneral);
+    auto v3 = BSONBinData("V3", 2, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k2, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral))
+                      << "v" << BSON_ARRAY(v1 << v2 << v3));
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    auto getK1 = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k1, 2));
+    ASSERT_OK(getK1);
+    EXPECT_EQ(0, std::memcmp(getK1.getValue().get(), v1.data, v1.length));
+
+    auto getK2 = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k2, 2));
+    ASSERT_OK(getK2);
+    EXPECT_EQ(0, std::memcmp(getK2.getValue().get(), v2.data, v2.length));
+
+    auto getK3 = _get(_opCtx.get(), _bytesIdent, std::span<const char>(k3, 2));
+    ASSERT_OK(getK3);
+    EXPECT_EQ(0, std::memcmp(getK3.getValue().get(), v3.data, v3.length));
+}
+
+// Bytes-keyed range delete: an array of BinData keys to remove.
+TEST_F(ApplyContainerOpsTest, BatchDeleteBytesKeyedRange) {
+    const char k1[] = "K1", k2[] = "K2", k3[] = "K3";
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+    for (const char* k : {k1, k2, k3}) {
+        ASSERT_OK(applyContainerOpHelper(
+            _opCtx.get(),
+            makeContainerInsertOplogEntry(OpTime(), _bytesIdent, {k, 2, BinDataGeneral}, v)));
     }
 
-    // key type must be binData or numberLong - insert, delete, update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("k" << wrongTypeK << "v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1, 2, BinDataGeneral)
+                                    << BSONBinData(k3, 2, BinDataGeneral)));
+    auto entry = makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerDelete, o);
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    ASSERT_EQ(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k1, 2)).getStatus(),
+              ErrorCodes::NoSuchKey);
+    ASSERT_OK(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k2, 2)).getStatus());
+    ASSERT_EQ(_get(_opCtx.get(), _bytesIdent, std::span<const char>(k3, 2)).getStatus(),
+              ErrorCodes::NoSuchKey);
+}
+
+// End-to-end within the container layer: build the 'o' field through the container serializer
+// (ContainerInsertOplogEntryO::toBSON, which drives ContainerKey/ContainerVal::serialize) rather
+// than by hand, then apply it. This exercises the serialize -> parse -> apply round trip -- as
+// close to "generate then apply" as is possible until batched-write generation exists.
+TEST_F(ApplyContainerOpsTest, BatchInsertIntKeyedRangeSerializedRoundTrip) {
+    const int64_t base = 200;
+    constexpr std::string_view a = "a", b = "b", c = "c";
+    std::vector<std::span<const char>> values{
+        {a.data(), a.size()}, {b.data(), b.size()}, {c.data(), c.size()}};
+
+    ContainerInsertOplogEntryO o;
+    o.setKey(ContainerKey(base));
+    o.setValue(ContainerVal(values));
+
+    auto entry = makeContainerBatchEntry(_nss, _intIdent, OpTypeEnum::kContainerInsert, o.toBSON());
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (int64_t i = 0; i < 3; ++i) {
+        auto g = _get(_opCtx.get(), _intIdent, base + i);
+        ASSERT_OK(g.getStatus());
+        ASSERT_EQ(0, std::memcmp(g.getValue().get(), values[i].data(), values[i].size()));
     }
-    {
-        auto p = baseDelete();
-        p.oField = BSON("k" << wrongTypeK);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsTest, BatchInsertBytesKeyedRangeSerializedRoundTrip) {
+    constexpr std::string_view k1 = "K1", k2 = "K2", k3 = "K3";
+    std::vector<std::span<const char>> keys{
+        {k1.data(), k1.size()}, {k2.data(), k2.size()}, {k3.data(), k3.size()}};
+
+    ContainerInsertOplogEntryO o;
+    o.setKey(ContainerKey(keys));
+    // No value: a bytes-keyed range insert writes empty values.
+
+    auto entry =
+        makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerInsert, o.toBSON());
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    for (std::string_view k : {k1, k2, k3}) {
+        ASSERT_OK(
+            _get(_opCtx.get(), _bytesIdent, std::span<const char>(k.data(), k.size())).getStatus());
     }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << wrongTypeK << "v" << v << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12270900);
+}
+
+TEST_F(ApplyContainerOpsTest, BatchDeleteBytesKeyedRangeSerializedRoundTrip) {
+    constexpr std::string_view k1 = "K1", k2 = "K2";
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+    for (std::string_view k : {k1, k2}) {
+        ASSERT_OK(applyContainerOpHelper(
+            _opCtx.get(),
+            makeContainerInsertOplogEntry(
+                OpTime(), _bytesIdent, {k.data(), static_cast<int>(k.size()), BinDataGeneral}, v)));
     }
 
-    // missing value - insert and update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("k" << k);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
-    }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+    std::vector<std::span<const char>> keys{{k1.data(), k1.size()}, {k2.data(), k2.size()}};
+    ContainerDeleteOplogEntryO o;
+    o.setKey(ContainerKey(keys));
+
+    auto entry =
+        makeContainerBatchEntry(_nss, _bytesIdent, OpTypeEnum::kContainerDelete, o.toBSON());
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+
+    ASSERT_EQ(
+        _get(_opCtx.get(), _bytesIdent, std::span<const char>(k1.data(), k1.size())).getStatus(),
+        ErrorCodes::NoSuchKey);
+    ASSERT_EQ(
+        _get(_opCtx.get(), _bytesIdent, std::span<const char>(k2.data(), k2.size())).getStatus(),
+        ErrorCodes::NoSuchKey);
+}
+
+// Applying a packed container entry directly (as the applyOps command path and serial
+// recovery/initial-sync transaction application do) must leave the container in exactly the state
+// produced by applying the single-key entries that OplogApplierUtils::expandBatchedContainerOps()
+// derives from it (as steady-state secondary application does). Without this, the two paths could
+// drift and only one of them would be covered.
+class ContainerOpExpansionEquivalenceTest : public ApplyContainerOpsTest {
+protected:
+    void setUp() override {
+        ApplyContainerOpsTest::setUp();
+
+        // Mirror idents, so the packed entry and its expansion can be applied side by side and
+        // compared.
+        auto* se = getServiceContext()->getStorageEngine();
+        _bytesIdentB = se->generateNewInternalIdent();
+        _intIdentB = se->generateNewInternalIdent();
+        auto ru = se->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        _trsBytesB = se->getEngine()->makeInternalRecordStore(*ru, _bytesIdentB, KeyFormat::String);
+        _trsIntB = se->getEngine()->makeInternalRecordStore(*ru, _intIdentB, KeyFormat::Long);
+        swt.commit();
     }
 
-    // value type must be binData - insert and update
-    {
-        auto p = baseInsert();
-        p.oField = BSON("k" << k << "v" << wrongTypeV);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
-    }
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "v" << wrongTypeV << "$v" << version);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+    // Applies 'o' as one packed entry against 'packedIdent', then applies the expansion of the same
+    // 'o' against 'expandedIdent'. Asserts the entry really was packed and reports how many
+    // single-key entries it expanded into.
+    size_t applyPackedAndExpanded(OpTypeEnum type,
+                                  const BSONObj& o,
+                                  std::string_view packedIdent,
+                                  std::string_view expandedIdent) {
+        auto packed = makeContainerBatchEntry(_nss, packedIdent, type, o);
+        ASSERT_OK(applyContainerOpHelper(_opCtx.get(), packed));
+
+        auto toExpand = makeContainerBatchEntry(_nss, expandedIdent, type, o);
+        auto expanded = OplogApplierUtils::expandBatchedContainerOp(toExpand);
+        ASSERT_TRUE(expanded.has_value()) << "entry was not recognized as packed: " << o.toString();
+        for (const auto& single : *expanded) {
+            ASSERT_OK(applyContainerOpHelper(_opCtx.get(), single));
+        }
+        return expanded->size();
     }
 
-    // delete: cannot contain value
-    {
-        auto p = baseDelete();
-        p.oField = BSON("k" << k << "v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704704);
+    // Asserts both idents hold 'expected' at 'key'.
+    void assertBothHave(std::span<const char> key, BSONBinData expected) {
+        for (std::string_view ident :
+             {std::string_view(_bytesIdent), std::string_view(_bytesIdentB)}) {
+            auto got = _get(_opCtx.get(), ident, key);
+            ASSERT_OK(got.getStatus()) << "missing in ident " << ident;
+            ASSERT_EQ(0, std::memcmp(got.getValue().get(), expected.data, expected.length));
+        }
     }
 
-    // update: missing version
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "v" << v);
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::IDLFailedToParse);
+    void assertBothHave(int64_t key, BSONBinData expected) {
+        for (std::string_view ident : {std::string_view(_intIdent), std::string_view(_intIdentB)}) {
+            auto got = _get(_opCtx.get(), ident, key);
+            ASSERT_OK(got.getStatus()) << "missing key " << key << " in ident " << ident;
+            ASSERT_EQ(0, std::memcmp(got.getValue().get(), expected.data, expected.length));
+        }
     }
 
-    // update: version must be numeric
-    {
-        auto p = baseUpdate();
-        p.oField = BSON("k" << k << "v" << v << "$v" << "notANumber");
-        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, ErrorCodes::TypeMismatch);
+    void assertBothMissing(std::span<const char> key) {
+        ASSERT_EQ(_get(_opCtx.get(), _bytesIdent, key).getStatus(), ErrorCodes::NoSuchKey);
+        ASSERT_EQ(_get(_opCtx.get(), _bytesIdentB, key).getStatus(), ErrorCodes::NoSuchKey);
     }
+
+    void assertBothMissing(int64_t key) {
+        ASSERT_EQ(_get(_opCtx.get(), _intIdent, key).getStatus(), ErrorCodes::NoSuchKey);
+        ASSERT_EQ(_get(_opCtx.get(), _intIdentB, key).getStatus(), ErrorCodes::NoSuchKey);
+    }
+
+    static std::span<const char> span(std::string_view s) {
+        return {s.data(), s.size()};
+    }
+
+    std::string _bytesIdentB;
+    std::string _intIdentB;
+    std::unique_ptr<RecordStore> _trsBytesB;
+    std::unique_ptr<RecordStore> _trsIntB;
+};
+
+// Branch: array of bytes keys sharing one value.
+TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithSingleValue) {
+    constexpr std::string_view k1 = "K1", k2 = "K2", k3 = "K3";
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k3.data(), 2, BinDataGeneral))
+                      << "v" << v);
+    ASSERT_EQ(3,
+              applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _bytesIdent, _bytesIdentB));
+
+    for (std::string_view k : {k1, k2, k3}) {
+        assertBothHave(span(k), v);
+    }
+}
+
+// Branch: array of bytes keys with no value at all, which must stay absent rather than becoming an
+// empty BinData.
+TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayWithNoValue) {
+    constexpr std::string_view k1 = "K1", k2 = "K2";
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral)));
+    ASSERT_EQ(2,
+              applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _bytesIdent, _bytesIdentB));
+
+    for (std::string_view k : {k1, k2}) {
+        ASSERT_OK(_get(_opCtx.get(), _bytesIdent, span(k)).getStatus());
+        ASSERT_OK(_get(_opCtx.get(), _bytesIdentB, span(k)).getStatus());
+    }
+}
+
+// Branch: keys and values paired off positionally.
+TEST_F(ContainerOpExpansionEquivalenceTest, PairedKeyAndValueArrays) {
+    constexpr std::string_view k1 = "K1", k2 = "K2";
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral))
+                      << "v" << BSON_ARRAY(v1 << v2));
+    ASSERT_EQ(2,
+              applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _bytesIdent, _bytesIdentB));
+
+    // Pairing must be positional, not shuffled.
+    assertBothHave(span(k1), v1);
+    assertBothHave(span(k2), v2);
+}
+
+// Branch: int base key with an array of values, writing at consecutive keys.
+TEST_F(ContainerOpExpansionEquivalenceTest, IntKeyedRange) {
+    const int64_t base = 100;
+    auto v0 = BSONBinData("A", 1, BinDataGeneral);
+    auto v1 = BSONBinData("B", 1, BinDataGeneral);
+    auto v2 = BSONBinData("C", 1, BinDataGeneral);
+
+    auto o = BSON("k" << base << "v" << BSON_ARRAY(v0 << v1 << v2));
+    ASSERT_EQ(3, applyPackedAndExpanded(OpTypeEnum::kContainerInsert, o, _intIdent, _intIdentB));
+
+    assertBothHave(base, v0);
+    assertBothHave(base + 1, v1);
+    assertBothHave(base + 2, v2);
+
+    // The range must not run past its length in either path.
+    assertBothMissing(base + 3);
+    assertBothMissing(base - 1);
+}
+
+// Branch: array of bytes keys to delete, leaving untargeted keys alone.
+TEST_F(ContainerOpExpansionEquivalenceTest, BytesKeyArrayDelete) {
+    constexpr std::string_view k1 = "K1", k2 = "K2", k3 = "K3";
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    for (std::string_view ident : {std::string_view(_bytesIdent), std::string_view(_bytesIdentB)}) {
+        for (std::string_view k : {k1, k2, k3}) {
+            ASSERT_OK(applyContainerOpHelper(
+                _opCtx.get(),
+                makeContainerInsertOplogEntry(
+                    OpTime(), ident, BSONBinData(k.data(), 2, BinDataGeneral), v)));
+        }
+    }
+
+    auto o = BSON("k" << BSON_ARRAY(BSONBinData(k1.data(), 2, BinDataGeneral)
+                                    << BSONBinData(k2.data(), 2, BinDataGeneral)));
+    ASSERT_EQ(2,
+              applyPackedAndExpanded(OpTypeEnum::kContainerDelete, o, _bytesIdent, _bytesIdentB));
+
+    assertBothMissing(span(k1));
+    assertBothMissing(span(k2));
+    assertBothHave(span(k3), v);
 }
 
 }  // namespace

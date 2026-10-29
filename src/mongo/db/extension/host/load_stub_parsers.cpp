@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/host/load_stub_parsers.h"
 
@@ -34,6 +8,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 
 #include <fstream>
@@ -45,17 +20,14 @@
 namespace mongo::extension::host {
 namespace {
 using namespace std::literals::string_view_literals;
-const std::filesystem::path& getExtensionStubParserFile() {
-    static const std::filesystem::path kExtensionStubParserPath = [] {
-        constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
-        if (getTestCommandsEnabled()) {
-            return std::filesystem::current_path() /
-                std::filesystem::path{"src/mongo/db/extension/test_examples"} / kFileName;
-        }
-        return ExtensionLoader::kExtensionConfigPath / kFileName;
-    }();
-
-    return kExtensionStubParserPath;
+std::filesystem::path getExtensionStubParserDirectory() {
+    if (getTestCommandsEnabled()) {
+        return serverGlobalParams.cwd /
+            std::filesystem::path{"src/mongo/db/extension/test_examples"};
+    }
+    // In production, the stub parsers are expected to be found in the same directory as the
+    // extension configuration files.
+    return std::filesystem::path(serverGlobalParams.extensionsConfigPath);
 }
 
 /**
@@ -101,7 +73,14 @@ void registerStubParser(std::string stageName, std::string message, FeatureFlag*
 }
 
 void registerUnloadedExtensionStubParsers() {
-    const auto extensionStubParserFile = getExtensionStubParserFile();
+    const auto extensionStubParserDirectory = getExtensionStubParserDirectory();
+    if (extensionStubParserDirectory.empty()) {
+        LOGV2_DEBUG(
+            12773201, 2, "No stub parser file for unloaded extension - no directory provided");
+        return;
+    }
+    constexpr auto kFileName = "aggregation_stage_fallback_parsers.json";
+    const auto extensionStubParserFile = extensionStubParserDirectory / kFileName;
     if (!std::filesystem::exists(extensionStubParserFile)) {
         LOGV2_DEBUG(10918501,
                     2,

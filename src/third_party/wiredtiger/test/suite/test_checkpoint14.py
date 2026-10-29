@@ -39,7 +39,6 @@ from wtscenario import make_scenarios
 # inconsistent checkpoints and reading both of them.
 
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
@@ -129,9 +128,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
                 time.sleep(1)
 
             session2.commit_transaction()
@@ -156,9 +153,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
                 time.sleep(1)
 
             session2.commit_transaction()
@@ -184,20 +179,5 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.check(ds, self.first_checkpoint, nrows, value_a)
         self.check(ds, self.second_checkpoint, nrows, value_b)
 
-        # If we haven't died yet, pretend to crash, and run RTS to see if the
-        # (second) checkpoint was inconsistent. Unfortunately we can't readily
-        # check on both.
+        # If we haven't died yet, pretend to crash and run RTS over the checkpoints.
         simulate_crash_restart(self, ".", "RESTART")
-
-        # Make sure we did get an inconsistent checkpoint.
-        #
-        # Disable this crosscheck until we have a more reliable way to generate inconsistent
-        # checkpoints (checkpoints with a torn transaction) on demand. The current method
-        # waits until the checkpoint has started to begin committing, but there's still a
-        # race where the checkpoint thread starts another checkpoint after the commit is
-        # finished. Consequently, occasional failures occur in the testbed, which are a waste
-        # of everyone's time.
-        #stat_cursor = self.session.open_cursor('statistics:', None, None)
-        #inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
-        #stat_cursor.close()
-        #self.assertGreater(inconsistent_ckpt, 0)

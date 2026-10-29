@@ -22,10 +22,18 @@
  *   assumes_balancer_off,
  *   assumes_no_implicit_index_creation,
  *   requires_getmore,
+ *   # This test runs many queries and can be slow in some passthroughs.
+ *   query_intensive_pbt,
  * ]
  */
 
 import {LcgRandom} from "jstests/libs/lcg_random.js";
+import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
+
+if (isSlowBuild(db)) {
+    jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    quit();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // GLOBAL CONSTANTS
@@ -539,7 +547,6 @@ class AggStageUnwind {
         // The $unwind: value object.
         this._self = {
             path: aggPipeline.getFieldNameRefManaged(),
-            includeArrayIndex: aggPipeline.getFieldNameManaged(),
             preserveNullAndEmptyArrays: aggPipeline.getBoolLiteralManaged(),
         };
     } // constructor

@@ -8,6 +8,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kConfig = "config";
@@ -42,13 +43,50 @@ const st = new ShardingTest({
 });
 
 function cleanUpSystemSessions(st) {
+    // Retry deletes to be resilient to stepdowns. We don't use retryWrites here because we are doing
+    // some multi-deletes which don't support retryWrites.
+    const kNumRetries = 10;
+    const kRetrySleepMs = 200;
+
+    let configDB = st.s.getDB(kConfig);
     // Unshard and drop system.sessions.
-    st.rs0.getPrimary().getDB(kConfig).getCollection(kSystemSessions).drop();
-    let uuid = st.config.collections.find({_id: kNs}).toArray()[0].uuid;
-    st.config.collections.remove({_id: kNs});
-    st.config.chunks.remove({uuid: uuid});
-    assert.eq(0, st.config.collections.find().toArray().length);
-    assert.eq(0, st.config.chunks.find().toArray().length);
+    let uuid = configDB.getCollection("collections").find({_id: kNs}).toArray()[0].uuid;
+    // Shard local drops
+    retryOnRetryableError(
+        () => {
+            st.rs0.getPrimary().getDB(kConfig).getCollection(kSystemSessions).drop();
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB(kConfig)
+                    .getCollection("shard.catalog.collections")
+                    .deleteOne({_id: kNs}),
+            );
+            assert.commandWorked(
+                st.rs0
+                    .getPrimary()
+                    .getDB(kConfig)
+                    .getCollection("shard.catalog.chunks")
+                    .deleteMany({uuid: uuid}),
+            );
+        },
+        kNumRetries,
+        kRetrySleepMs,
+    );
+    // Config server drops plus clear the config server's authoritative shard catalog entry.
+    retryOnRetryableError(
+        () => {
+            assert.commandWorked(configDB.getCollection("collections").deleteOne({_id: kNs}));
+            assert.commandWorked(configDB.getCollection("chunks").deleteMany({uuid: uuid}));
+            assert.commandWorked(
+                configDB.getCollection("shard.catalog.collections").deleteOne({_id: kNs}),
+            );
+        },
+        kNumRetries,
+        kRetrySleepMs,
+    );
+    assert.eq(0, configDB.getCollection("collections").find().toArray().length);
+    assert.eq(0, configDB.getCollection("chunks").find().toArray().length);
     // force a refresh
     st.s.getDB(kConfig).getCollection(kSystemSessions).findOne();
 }
@@ -78,6 +116,19 @@ function runTest(st, createFn) {
         result[0].unsplittable,
         "config.system.collection must exists as sharded, but found " + tojson(result),
     );
+
+    // The config server is the DB primary for config.system.sessions,
+    // so it must have the authoritative shard catalog entry.
+    const shardCatalogEntry = st.config.shard.catalog.collections.findOne({_id: kNs});
+    if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "AuthoritativeShardsCRUD")) {
+        assert(
+            shardCatalogEntry,
+            "config.system.sessions missing from the authoritative shard catalog",
+        );
+        assert.eq(result[0].uuid, shardCatalogEntry.uuid);
+    } else {
+        assert.eq(null, shardCatalogEntry);
+    }
 }
 
 jsTest.log("Creating system.sessions as unsharded");

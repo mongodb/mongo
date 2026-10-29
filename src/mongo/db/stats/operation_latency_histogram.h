@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -35,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace mongo {
 namespace operation_latency_histogram_details {
@@ -45,6 +20,13 @@ constexpr int kHistogramsCount = static_cast<int>(Command::ReadWriteType::kLast)
 
 // Retuns the inclusive lower bounds of the histogram buckets.
 std::array<uint64_t, kMaxBuckets> getLowerBounds();
+
+/**
+ * Returns the same bucket edges as explicit OTel bucket boundaries, in microseconds, for OTel
+ * histograms that should stay comparable with opLatencies. Lower bound [0] (value 0) is omitted:
+ * OTel's implicit first bucket covers (-inf, 2].
+ */
+std::vector<double> makeOperationLatencyBucketBoundaries();
 
 template <typename DataType>
 struct HistogramData {
@@ -69,6 +51,12 @@ struct OperationLatencyHistogramOptions {
      * the number of fields added when calling `append`. This should always be at least 1.
      */
     int logBucketScalingFactor = 1;
+
+    /*
+     * If false, the `transactions` histogram is excluded when calling `append`. This is useful for
+     * instances that never record transactions.
+     */
+    bool includeTransactions = true;
 };
 
 /**
@@ -93,8 +81,8 @@ public:
     void increment(uint64_t latency, Command::ReadWriteType type, bool isQueryableEncryptionOp);
 
     /**
-     * Appends the four histograms with latency totals and operation counts. If `slowMSBucketsOnly`
-     * is true, values above `slowMSBucketsOnly` are aggregated into a single bucket. The recorded
+     * Appends the histograms with latency totals and operation counts. If `slowMSBucketsOnly` is
+     * true, values above `slowMSBucketsOnly` are aggregated into a single bucket. The recorded
      * value of this bucket won't be exactly `slowMSBucketsOnly` but will be the smallest available
      * bucket threshold above it.
      */
@@ -103,6 +91,7 @@ public:
 private:
     bool _includeEmptyBuckets;
     int _logBucketScalingFactor;
+    bool _includeTransactions;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 
@@ -119,6 +108,7 @@ public:
 private:
     bool _includeEmptyBuckets;
     int _logBucketScalingFactor;
+    bool _includeTransactions;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 }  // namespace mongo

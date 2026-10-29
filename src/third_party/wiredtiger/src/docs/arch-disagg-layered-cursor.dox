@@ -18,10 +18,10 @@ maintained in sync with implementation changes.
 
 @subsection layered-cursor-underlying Underlying cursors
 
-The main parts of the `WT_CURSOR_LAYERED` structure are three underlying `WT_CURSOR` fields: `iface`,
+The main parts of the `WTI_CURSOR_LAYERED` structure are three underlying `WT_CURSOR` fields: `iface`,
 `ingest_cursor` and `stable_cursor`.
 - `iface` is the first member of the structure and is the only part visible to users. Customers interact
-exclusively with this cursor; they are unaware of the `WT_CURSOR_LAYERED` structure itself. The iface
+exclusively with this cursor; they are unaware of the `WTI_CURSOR_LAYERED` structure itself. The iface
 cursor does not point to any real B-tree; all information is propagated from the underlying constituent
 cursors (`ingest_cursor` and `stable_cursor`).
 - `ingest_cursor` and `stable_cursor` are allocated dynamically and stored as pointers because there may

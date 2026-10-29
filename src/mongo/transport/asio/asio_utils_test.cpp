@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/asio/asio_utils.h"
 
@@ -36,6 +10,10 @@
 #include <string_view>
 
 #include <asio.hpp>
+
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/util/net/ssl.hpp"
+#endif
 
 namespace mongo::transport {
 namespace {
@@ -180,6 +158,24 @@ TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
     TCPSocketPair sockets;
     sockets.clientSocket().non_blocking(true);
     peekPastBuffer(sockets.serverSocket(), sockets.clientSocket(), "example"sv);
+}
+// A graceful peer close maps to ErrorCodes::ConnectionClosedByPeer on all platforms: a non-TLS FIN
+// (eof), a TLS close without close_notify (stream_truncated), or an abortive close
+// (connection_reset / connection_aborted). The reason carries ec.message(), so the transport modes
+// stay distinguishable in diagnostics under the single code.
+TEST(ASIOUtils, PeerClosedMapsToConnectionClosedByPeer) {
+    ASSERT_EQ(errorCodeToStatus(asio::error::eof).code(), ErrorCodes::ConnectionClosedByPeer);
+    ASSERT_EQ(errorCodeToStatus(asio::error::connection_reset).code(),
+              ErrorCodes::ConnectionClosedByPeer);
+    ASSERT_EQ(errorCodeToStatus(asio::error::connection_aborted).code(),
+              ErrorCodes::ConnectionClosedByPeer);
+#ifdef MONGO_CONFIG_SSL
+    ASSERT_EQ(errorCodeToStatus(asio::ssl::error::stream_truncated).code(),
+              ErrorCodes::ConnectionClosedByPeer);
+    // Same code, distinct reasons: ec.message() differs between eof and stream_truncated.
+    ASSERT_NE(errorCodeToStatus(asio::error::eof).reason(),
+              errorCodeToStatus(asio::ssl::error::stream_truncated).reason());
+#endif
 }
 }  // namespace
 }  // namespace mongo::transport

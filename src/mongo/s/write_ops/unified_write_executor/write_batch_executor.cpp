@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
@@ -103,7 +77,7 @@ BulkWriteCommandReply parseBulkWriteCommandReplySingleOp(const BSONObj& response
         }
 
         auto cursor =
-            BulkWriteCommandResponseCursor(/*cursorId*/ 0,
+            BulkWriteCommandResponseCursor(/*id=*/0,
                                            std::vector<BulkWriteReplyItem>{std::move(replyItem)},
                                            NamespaceString::makeBulkWriteNSS(boost::none));
         return BulkWriteCommandReply(std::move(cursor), 0, 0, 0, 0, 0, 0);
@@ -119,7 +93,7 @@ write_ops::FindAndModifyCommandReply parseFindAndModifyCommandReply(const BSONOb
     //
     // In this case, we create a FindAndModifyCommandReply with an OK status and n=0.
     if (responseData.isEmpty()) {
-        write_ops::FindAndModifyLastError lastError(/*n*/ 0);
+        write_ops::FindAndModifyLastError lastError(/*numDocs=*/0);
         lastError.setUpdatedExisting(false);
 
         write_ops::FindAndModifyCommandReply reply;
@@ -149,7 +123,7 @@ bool isTransientTxnError(bool inTransaction,
                 ErrorReply::parse(*responseData, IDLParserContext("ErrorReply_UnifiedWriteExec")));
         } else {
             return isTransientTransactionError(
-                status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false);
+                status.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false);
         }
     }
     return false;
@@ -176,7 +150,7 @@ NoRetryWriteBatchResponse executeOpInInternalTransaction(OperationContext* opCtx
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, /*resourceYielder*/ nullptr, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
 
     ResponseType response;
     auto swRes = txn.runNoThrow(
@@ -721,7 +695,7 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequestObj(
     auto cmdObj = request.toBSON();
 
     if (shouldAppendReadWriteConcern) {
-        cmdObj = applyReadWriteConcern(opCtx, /*appendRC*/ true, /*appendWC*/ true, cmdObj);
+        cmdObj = applyReadWriteConcern(opCtx, /*setRC=*/true, /*setWC=*/true, cmdObj);
     }
 
     BSONObjBuilder builder(cmdObj);
@@ -1050,15 +1024,14 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     std::vector<AsyncRequestsSender::Request> requestsToSend;
 
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {
-        auto request =
-            buildRequest(opCtx,
-                         shardRequest.ops,
-                         shardRequest.versionByNss,
-                         shardRequest.nssIsViewfulTimeseries,
-                         shardRequest.sampleIds,
-                         errorsOnly,
-                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                         IsEmbeddedCommand::No);
+        auto request = buildRequest(opCtx,
+                                    shardRequest.ops,
+                                    shardRequest.versionByNss,
+                                    shardRequest.nssIsViewfulTimeseries,
+                                    shardRequest.sampleIds,
+                                    errorsOnly,
+                                    /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
+                                    IsEmbeddedCommand::No);
         auto requestObj = buildRequestObj(opCtx,
                                           std::move(request),
                                           ShouldAppendLsidAndTxnNumber::Yes,
@@ -1105,7 +1078,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                           shardRequest.ops,
                                                           inTransaction,
                                                           std::move(arsResponse.shardHostAndPort),
-                                                          ShardId(shardId));
+                                                          shardId);
 
         const bool isShutdownError = shardResponse.isShutdownError();
 
@@ -1233,7 +1206,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                    {}, /* nssIsViewfulTimeseries */
                                    sampleIds,
                                    errorsOnly,
-                                   boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                                   /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                                    IsEmbeddedCommand::No);
 
     // Remove the "legacyRuntimeConstants" field if it's present.
@@ -1293,7 +1266,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         }
     }();
 
-    return NoRetryWriteBatchResponse::make(reply, /*wce*/ boost::none, writeOp, inTransaction);
+    return NoRetryWriteBatchResponse::make(reply, /*wce=*/boost::none, writeOp, inTransaction);
 }
 
 DatabaseName WriteBatchExecutor::getExecutionDatabase() const {

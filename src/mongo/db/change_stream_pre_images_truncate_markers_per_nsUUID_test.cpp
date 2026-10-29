@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 
 #include "mongo/db/change_stream_options_manager.h"
@@ -124,8 +98,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersNoFullMarkers1PreI
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({},
                                 kPreImage1,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage1) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage1),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -147,8 +121,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarker1PreImag
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({makeWholeMarker(kPreImage1, 1, bytes(kPreImage1))},
                                 kPreImage1,
-                                0 /* leftoverRecordsCount */,
-                                0 /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/0,
+                                /*partialMarkerBytes=*/0,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -174,8 +148,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarkerNoLeftov
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({makeWholeMarker(kPreImage2, 2, preImageBytesTotal)},
                                 kPreImage2,
-                                0 /* leftoverRecordsCount */,
-                                0 /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/0,
+                                /*partialMarkerBytes=*/0,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -201,8 +175,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarkerLeftover
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({makeWholeMarker(kPreImage2, 2, bytesPreImage1And2)},
                                 kPreImage3,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage3) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage3),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -277,8 +251,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIncludeMinAndMax) 
         makeInitialSetOfMarkers({makeWholeMarker(kPreImageMin, 1, bytes(kPreImageMin)),
                                  makeWholeMarker(kPreImageMax, 1, bytes(kPreImageMax))},
                                 kPreImageMax,
-                                0 /* leftoverRecordsCount */,
-                                0 /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/0,
+                                /*partialMarkerBytes=*/0,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -310,8 +284,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
                                      makeWholeMarker(kPreImage1, 1, bytes(kPreImage1)),
                                      makeWholeMarker(kPreImageMax, 1, bytes(kPreImageMax))},
                                     kPreImageMax,
-                                    0 /* leftoverRecordsCount */,
-                                    0 /* leftoverRecordsBytes */,
+                                    /*partialMarkerRecords=*/0,
+                                    /*partialMarkerBytes=*/0,
                                     CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
         ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
     }
@@ -329,8 +303,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
              makeWholeMarker(kPreImageOther, 1, bytes(kPreImageOther)),
              makeWholeMarker(kPreImageOtherMax, 1, bytes(kPreImageOtherMax))},
             kPreImageOtherMax,
-            0 /* leftoverRecordsCount */,
-            0 /* leftoverRecordsBytes */,
+            /*partialMarkerRecords=*/0,
+            /*partialMarkerBytes=*/0,
             CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
         ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
@@ -600,8 +574,8 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshTracksNewInsert) {
     const auto initialSetOfMarkers =
         makeInitialSetOfMarkers({},
                                 kPreImage1,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage1) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage1),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     PreImagesTruncateMarkersPerNsUUID nsUUIDTruncateMarkers{
         kNsUUID, initialSetOfMarkers, minBytesPerMarker};
@@ -627,8 +601,8 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshAfterRollbackOfTrac
     const auto initialSetOfMarkers =
         makeInitialSetOfMarkers({},
                                 kPreImage1,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage1) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage1),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     PreImagesTruncateMarkersPerNsUUID nsUUIDTruncateMarkers{
         kNsUUID, initialSetOfMarkers, minBytesPerMarker};
@@ -650,10 +624,12 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshAfterRollbackOfTrac
 class PreImageTruncateMarkerExpiryTestFixture : public ServiceContextMongoDTest,
                                                 public ChangeStreamPreImageTestConstants {
 public:
-    PreImageTruncateMarkerExpiryTestFixture()
-        : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = getClient()->makeOperationContext();
         auto service = getServiceContext();
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
@@ -670,6 +646,7 @@ public:
 
     void tearDown() override {
         _opCtx.reset();
+        ServiceContextMongoDTest::tearDown();
     }
 
     ClockSourceMock* clockSource() {
@@ -889,12 +866,12 @@ public:
         const auto expireAfterSeconds = getExpireAfterSeconds();
 
         const auto minBytesPerMarker = 1;
-        const auto initialMarkers = makeInitialSetOfMarkers(
-            {makeWholeMarker(kPreImage1, 1 /* records */, bytes(kPreImage1))},
-            kPreImage1,
-            0 /* leftoverRecordsCount */,
-            0 /* leftoverRecordsBytes */,
-            CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+        const auto initialMarkers =
+            makeInitialSetOfMarkers({makeWholeMarker(kPreImage1, /*records=*/1, bytes(kPreImage1))},
+                                    kPreImage1,
+                                    /*partialMarkerRecords=*/0,
+                                    /*partialMarkerBytes=*/0,
+                                    CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
         PreImagesTruncateMarkersPerNsUUID truncateMarkers(
             kNsUUID, std::move(initialMarkers), minBytesPerMarker);

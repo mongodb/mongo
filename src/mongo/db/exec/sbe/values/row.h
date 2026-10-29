@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -90,34 +64,25 @@ public:
         SlotAccessorHelper::dassertValidSlotValue(self.tags()[idx], self.values()[idx]);
         if (self.owned()[idx]) {
             self.owned()[idx] = false;
-            return {self.tags()[idx], self.values()[idx]};
+            return TagValueOwned::fromRaw(self.tags()[idx], self.values()[idx]);
         } else {
-            return value::copyValue(self.tags()[idx], self.values()[idx]);
+            return TagValueOwned::fromRaw(value::copyValue(self.tags()[idx], self.values()[idx]));
         }
     }
 
-    // 'idx' is the index of the column to reset.
-    void reset(size_t idx, bool own, value::TypeTags tag, value::Value val) {
-        RowType& self = *static_cast<RowType*>(this);
-        if (self.owned()[idx]) {
-            value::releaseValue(self.tags()[idx], self.values()[idx]);
-            self.owned()[idx] = false;
-        }
-        self.values()[idx] = val;
-        self.tags()[idx] = tag;
-        self.owned()[idx] = own;
+    void reset(size_t idx, value::TagValueMaybeOwned tagValue) {
+        auto [owned, tag, val] = tagValue.releaseToRaw();
+        reset_raw(idx, owned, tag, val);
     }
 
-    void reset(size_t idx, value::TagValueMaybeOwned val) {
-        auto [owned, tag, value] = val.releaseToRaw();
-        reset(idx, owned, tag, value);
+    void reset(size_t idx, value::TagValueOwned tagValue) {
+        auto [tag, val] = tagValue.releaseToRaw();
+        reset_raw(idx, /*own=*/true, tag, val);
     }
 
-    void reset(size_t idx, value::TagValueOwned val) {
-        auto [tag, value] = val.releaseToRaw();
-        reset(idx, true, tag, value);
+    void reset(size_t idx, value::TagValueView tagValue) {
+        reset_raw(idx, /*own=*/false, tagValue.tag, tagValue.value);
     }
-
 
     // The following methods are used by the sorter only.
     struct SorterDeserializeSettings {
@@ -152,6 +117,22 @@ public:
         boost::optional<size_t> numPrefixValsToRead = boost::none);
     void serializeIntoKeyString(key_string::Builder& builder,
                                 const CollatorInterface* collator = nullptr) const;
+
+private:
+    // Raw primitive shared by the typed reset() overloads. Callers outside RowBase must use the
+    // typed overloads (reset(TagValueView/TagValueOwned/TagValueMaybeOwned)), which encode
+    // ownership in the type and eliminate the risk of a mismatch between the 'own' flag and the
+    // actual ownership of the value.
+    // 'idx' is the index of the column to reset.
+    void reset_raw(size_t idx, bool own, value::TypeTags tag, value::Value val) {
+        RowType& self = *static_cast<RowType*>(this);
+        if (self.owned()[idx]) {
+            value::releaseValue(self.tags()[idx], self.values()[idx]);
+        }
+        self.values()[idx] = val;
+        self.tags()[idx] = tag;
+        self.owned()[idx] = own;
+    }
 
 protected:
     void release() noexcept {

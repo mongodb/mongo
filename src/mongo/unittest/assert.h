@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /*
  * ASSERTion macros for the C++ unit testing framework.
@@ -56,7 +30,7 @@
 
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Fail unconditionally, reporting the given message.
@@ -75,12 +49,16 @@ MONGO_MOD_PUBLIC;
  */
 #define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
 
+#define EXPECT_OK(EXPRESSION) EXPECT_EQ(::mongo::Status::OK(), (EXPRESSION))
+
 /**
  * Asserts that a status code is anything but OK.
  * TODO(gtest) Try expressing as `ASSERT_THAT(EXRESSION, Not(IsOk()))` which should accept Status
  * and StatusWith (and maybe ErrorCode).
  */
 #define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
+
+#define EXPECT_NOT_OK(EXPRESSION) EXPECT_NE(::mongo::Status::OK(), (EXPRESSION))
 
 /*
  * Binary comparison assertions.
@@ -142,7 +120,7 @@ MONGO_MOD_PUBLIC;
     ASSERT_THROWS_EXCEPTION_MATCHING(                               \
         expression,                                                 \
         exceptionType,                                              \
-        ::testing::Property("what", &exceptionType::what, ::testing::StrEq(expectedWhat)))
+        ::mongo::unittest::match::WhatIs(::mongo::unittest::match::AsStringView(expectedWhat)))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
@@ -150,9 +128,7 @@ MONGO_MOD_PUBLIC;
  */
 #define ASSERT_THROWS_CODE(expression, exceptionType, expectedCode) \
     ASSERT_THROWS_EXCEPTION_MATCHING(                               \
-        expression,                                                 \
-        exceptionType,                                              \
-        ::testing::Property("code", &exceptionType::code, expectedCode))
+        expression, exceptionType, ::mongo::unittest::match::CodeIs(expectedCode))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
@@ -163,9 +139,9 @@ MONGO_MOD_PUBLIC;
     ASSERT_THROWS_EXCEPTION_MATCHING(                                                      \
         expression,                                                                        \
         exceptionType,                                                                     \
-        ::testing::AllOf(                                                                  \
-            ::testing::Property("code", &exceptionType::code, expectedCode),               \
-            ::testing::Property("what", &exceptionType::what, ::testing::StrEq(expectedWhat))))
+        ::testing::AllOf(::mongo::unittest::match::CodeIs(expectedCode),                   \
+                         ::mongo::unittest::match::WhatIs(                                 \
+                             ::mongo::unittest::match::AsStringView(expectedWhat))))
 
 /**
  * Compiles if expr doesn't compile.
@@ -228,20 +204,29 @@ MONGO_MOD_PUBLIC;
 #define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS) \
     ASSERT_THAT(BIG_STRING, ::testing::HasSubstr(CONTAINS))
 
+#define EXPECT_STRING_CONTAINS(BIG_STRING, CONTAINS) \
+    EXPECT_THAT(BIG_STRING, ::testing::HasSubstr(CONTAINS))
+
 #define ASSERT_STRING_OMITS(BIG_STRING, CONTAINS) \
     ASSERT_THAT(BIG_STRING, ::testing::Not(::testing::HasSubstr(CONTAINS)))
+
+#define EXPECT_STRING_OMITS(BIG_STRING, CONTAINS) \
+    EXPECT_THAT(BIG_STRING, ::testing::Not(::testing::HasSubstr(CONTAINS)))
 
 /** TODO(gtest) Consider using a PCRE2 matcher to better match existing behavior. */
 #define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX) \
     ASSERT_THAT(BIG_STRING, ::testing::ContainsRegex(REGEX))
 
+#define EXPECT_STRING_SEARCH_REGEX(BIG_STRING, REGEX) \
+    EXPECT_THAT(BIG_STRING, ::testing::ContainsRegex(REGEX))
+
 namespace mongo::unittest {
 namespace assert_details {
 template <typename Exception>
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS inline boost::optional<std::string> evaluateExceptionMatcher(
-    std::invocable auto expression,
-    std::string_view expressionText,
-    testing::Matcher<Exception> matcher) {
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] inline boost::optional<std::string>
+evaluateExceptionMatcher(std::invocable auto expression,
+                         std::string_view expressionText,
+                         testing::Matcher<Exception> matcher) {
     if (testing::StringMatchResultListener listener;
         !testing::ExplainMatchResult(match::Throws<Exception>(matcher), expression, &listener)) {
         return fmt::format(

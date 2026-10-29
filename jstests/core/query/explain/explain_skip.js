@@ -2,6 +2,7 @@
  * Tests that explain reports the skip stage statistics correctly.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   assumes_against_mongod_not_mongos,
  * ]

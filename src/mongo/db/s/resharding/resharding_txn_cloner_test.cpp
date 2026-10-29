@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
@@ -136,8 +110,11 @@
 namespace mongo {
 namespace {
 
-class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
-                                public ShardServerTestFixtureWithCatalogCacheLoaderMock {
+class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
@@ -201,16 +178,15 @@ class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
         public:
             StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
                 for (const auto& shardId : _shardIds) {
                     const ConnectionString cs = ConnectionString::forReplicaSet(
                         shardId.toString(), {makeHostAndPort(shardId)});
                     ShardType sType;
-                    sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
+                    sType.setName(cs.getSetName());
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };
@@ -335,12 +311,12 @@ protected:
         if (multiDocTxn) {
             txnParticipant.beginOrContinue(opCtx,
                                            {txnNum},
-                                           false /* autocommit */,
+                                           /*autocommit=*/false,
                                            TransactionParticipant::TransactionActions::kStart);
         } else {
             txnParticipant.beginOrContinue(opCtx,
                                            {txnNum},
-                                           boost::none /* autocommit */,
+                                           /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
         }
     }
@@ -447,7 +423,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "insert");
@@ -466,7 +442,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -503,7 +479,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -619,8 +595,8 @@ private:
                         AuthorizationSession::get(*client)->grantInternalAuthorization();
                     },
             }),
-            executor::makeNetworkInterface(
-                "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));
+            executor::makeNetworkInterface("TestReshardCloneConfigTransactionsNetwork",
+                                           {.metadataHook = std::move(hookList)}));
 
         return executor;
     }
@@ -836,7 +812,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
         auto future = runCloner(cloner);
 
-        onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
+        onCommandReturnTxnBatch(txns, CursorId{0}, /*isFirstBatch=*/true);
 
         auto status = future.getNoThrow();
         ASSERT_OK(status);
@@ -854,7 +830,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
         auto future = runCloner(cloner);
 
-        onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
+        onCommandReturnTxnBatch(txns, CursorId{0}, /*isFirstBatch=*/true);
 
         auto status = future.getNoThrow();
         ASSERT_OK(status);
@@ -885,7 +861,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     // has been processed.
     onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
                             CursorId{123},
-                            true /* isFirstBatch */);
+                            /*isFirstBatch=*/true);
     onCommand([&](const executor::RemoteCommandRequest& request) {
         // Simulate a stepdown.
         cancelSource.cancel();
@@ -908,7 +884,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     future = runCloner(cloner);
 
     onCommandReturnTxnBatch(
-        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, false /* isFirstBatch */);
+        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, /*isFirstBatch=*/false);
 
     status = future.getNoThrow();
     ASSERT_OK(status);
@@ -931,7 +907,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
     auto future = runCloner(cloner, cancelSource.token());
 
-    onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
+    onCommandReturnTxnBatch({txns.front()}, CursorId{123}, /*isFirstBatch=*/true);
 
     // Simulate the cloning operation being canceled as the batch was being filled.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -1019,7 +995,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
     ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
     auto future = runCloner(cloner);
 
-    onCommandReturnTxnBatch({}, CursorId{0}, true /* isFirstBatch */);
+    onCommandReturnTxnBatch({}, CursorId{0}, /*isFirstBatch=*/true);
 
     auto status = future.getNoThrow();
     ASSERT_OK(status);

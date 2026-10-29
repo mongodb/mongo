@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,7 +15,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class CurOpFailpointHelpers {
 public:
@@ -50,12 +24,13 @@ public:
      * returns the original value of the field.
      */
     static std::string updateCurOpFailPointMsg(OperationContext* opCtx,
-                                               const std::string& failpointMsg);
+                                               std::string_view failpointMsg);
 
     /**
      * This helper function works much like FailPoint::pauseWhileSet(opCtx), but additionally
      * calls whileWaiting() at regular intervals. Finally, it also sets the 'msg' field of the
-     * opCtx's CurOp to the given string while the failpoint is active.
+     * opCtx's CurOp to the given string while the failpoint is active. Counts as one entry into the
+     * FailPoint.
      *
      * whileWaiting() may be used to do anything the caller needs done while hanging in the
      * failpoint. For example, the caller may use whileWaiting() to release and reacquire locks in
@@ -67,11 +42,53 @@ public:
      * The field "shouldContinueOnInterrupt" may be set to 'true' to cause this method to continue
      * on interrupt without asserting, regardless of whether the field "shouldCheckForInterrupt" is
      * set.
+     *
+     * The failpoint's data may scope the failpoint to a subset of the operations reaching the
+     * callsite: "extraPred" must return true if present, a "comment" field matches only operations
+     * carrying an equal comment, and an "nss" field matches only operations on that namespace.
+     * "comment" takes precedence over "nss". A callsite which may be targeted by "nss" must pass
+     * 'nss'; supplying "nss" in the data without it uasserts, rather than silently matching every
+     * operation.
      */
-    static void waitWhileFailPointEnabled(FailPoint* failPoint,
-                                          OperationContext* opCtx,
-                                          const std::string& failpointMsg,
-                                          const std::function<void()>& whileWaiting = nullptr,
-                                          const NamespaceString& nss = {});
+    static void waitWhileFailPointEnabled(
+        FailPoint* failPoint,
+        OperationContext* opCtx,
+        std::string_view failpointMsg,
+        const std::function<void()>& whileWaiting = {},
+        const NamespaceString& nss = {},
+        const std::function<bool(const BSONObj&)>& extraPred = {}) {
+        invariant(failPoint);
+        // `scopedIf` returns a single LockHandle and counts as exactly one activation. Because that
+        // handle is held for the whole impl wait loop, a concurrent setMode(off) -- e.g. a
+        // `configureFailPoint` command disabling this failpoint -- blocks until the loop observes
+        // the disable and returns. Callers rely on that handshake: when their disable command
+        // returns, the paused thread has provably resumed past the failpoint.
+        if (auto fpHandle = failPoint->scopedIf(
+                [&](const BSONObj& data) { return _shouldExecute(data, opCtx, nss, extraPred); });
+            MONGO_unlikely(fpHandle.isActive())) {
+            _waitWhileFailPointEnabledImpl(fpHandle, opCtx, failpointMsg, whileWaiting);
+        }
+    }
+
+private:
+    /**
+     * Returns true if the failpoint should execute given the provided data and opCtx. A
+     * non-callable`extraPred` has no effect, but a callable one must return true for this function
+     * to return true. If `opCtx` has a comment, it must match the "comment" field of `data`, and
+     * otherwise if `nss` is provided it must match `data`'s "nss" field.
+     */
+    static bool _shouldExecute(const BSONObj& data,
+                               OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const std::function<bool(const BSONObj&)>& extraPred);
+
+    /**
+     * Continuously executes "whileWaiting" until the failpoint is disabled or the loop is
+     * interrupted (if interruptible). Requires that `fpHandle.isActive()` is true.
+     */
+    static void _waitWhileFailPointEnabledImpl(FailPoint::LockHandle& fpHandle,
+                                               OperationContext* opCtx,
+                                               std::string_view failpointMsg,
+                                               const std::function<void()>& whileWaiting);
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command still works correctly when the shard key values exceeds
  * the memory limit for aggregation.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [requires_fcv_70, requires_profiling]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -13,6 +13,13 @@ const kSize100kB = 100 * 1024;
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
+
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS,
+};
 
 /**
  * Finds the profiler entries for all aggregate and count commands with the given comment on the
@@ -89,10 +96,6 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
             frequency: 1,
         });
     }
-    // The write concern to use when inserting documents into test collections. Waiting for the
-    // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-    // command with readPreference "secondaryPreferred".
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(conn, numNodesPerRS);
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
@@ -166,10 +169,6 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
         sign *= -1;
     }
-    // The write concern to use when inserting documents into test collections. Waiting for the
-    // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
-    // command with readPreference "secondaryPreferred".
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);

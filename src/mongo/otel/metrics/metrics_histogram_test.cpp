@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/metrics/metrics_histogram.h"
 
@@ -436,6 +410,61 @@ TEST(HistogramImplWithAttributesTest, SerializationWithMultipleAttributesBucketC
         BSON(key << BSON("(-inf, 2)" << BSON("count" << 1LL) << "[2, 4)" << BSON("count" << 2LL)
                                      << "[4, inf)" << BSON("count" << 1LL) << "totalCount"
                                      << 4LL)));
+}
+
+template <typename T>
+class NoopHistogramTest : public testing::Test {};
+
+TYPED_TEST_SUITE(NoopHistogramTest, HistogramTypes);
+
+TYPED_TEST(NoopHistogramTest, RecordDoesNotThrow) {
+    Histogram<TypeParam>& histogram = *NoopHistogram<TypeParam>::instance();
+    // The Histogram interface exposes no read-back, so there is nothing on the NoopHistogram itself
+    // to observe; this only confirms record() is callable and does not throw.
+    histogram.record(0);
+    histogram.record(std::numeric_limits<TypeParam>::max());
+    histogram.record(42, {});
+}
+
+TYPED_TEST(NoopHistogramTest, InstanceIsShared) {
+    EXPECT_EQ(NoopHistogram<TypeParam>::instance(), NoopHistogram<TypeParam>::instance());
+}
+
+TEST(HistogramBucketKeyCacheTest, BucketCountsOutputIsStableAcrossRepeatedSerialization) {
+    auto histogram = createHistogramBucketCountsFormatExplicitBoundaries<int64_t>({2, 4});
+    histogram->record(3);
+
+    BSONObj first = histogram->serializeToBson("h");
+    BSONObj second = histogram->serializeToBson("h");
+
+    ASSERT_BSONOBJ_EQ(first, second);
+    ASSERT_EQ(first.getObjectField("h").getIntField("totalCount"), 1);
+}
+
+#ifdef MONGO_CONFIG_OTEL
+TEST(HistogramBucketKeyCacheTest, BucketKeysSurviveReset) {
+    auto histogram = createHistogramBucketCountsFormatExplicitBoundaries<int64_t>({2, 4});
+    histogram->record(3);
+    BSONObj before = histogram->serializeToBson("h");
+
+    auto meter = opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter");
+    histogram->reset(meter.get());
+
+    BSONObj after = histogram->serializeToBson("h");
+    // Same field names, counts zeroed.
+    ASSERT_EQ(before.getObjectField("h").nFields(), after.getObjectField("h").nFields());
+    ASSERT_EQ(after.getObjectField("h").getIntField("totalCount"), 0);
+}
+#endif  // MONGO_CONFIG_OTEL
+
+TEST(HistogramBucketCountsTest, EmitsZeroBuckets) {
+    auto histogram = createHistogramBucketCountsFormatExplicitBoundaries<int64_t>({2, 4});
+    histogram->record(3);
+
+    BSONObj hist = histogram->serializeToBson("h").getObjectField("h").getOwned();
+
+    ASSERT_TRUE(hist.hasField("(-inf, 2)"));
+    ASSERT_TRUE(hist.hasField("[4, inf)"));
 }
 
 }  // namespace mongo::otel::metrics

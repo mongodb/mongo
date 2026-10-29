@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,9 +9,11 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_policy.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -57,23 +33,38 @@ class PlanExplainerImpl final : public PlanExplainer {
 public:
     PlanExplainerImpl(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo)
         : PlanExplainer{explainInfo}, _root{root} {}
+
+    /**
+     * 'isExplain' states whether the executor serves an explain command. For explains whose
+     * MultiPlanStage is still in the execution tree (pure multiplanning), the constructor - which
+     * runs after plan selection and before the explained query executes - snapshots the trial
+     * statistics into _explainData, into the same slots the ranking strategies populate on the
+     * other paths; normal queries skip that stats-tree copy.
+     *
+     * TODO SERVER-132012: replace the flag with an explain-specialized subclass chosen at the
+     * factory.
+     */
     PlanExplainerImpl(PlanStage* root,
                       boost::optional<size_t> cachedPlanHash,
                       boost::optional<std::string> replanReason,
-                      boost::optional<PlanExplainerData> maybeExplainData)
-        : _root{root},
-          _cachedPlanHash(cachedPlanHash),
-          _replanReason(std::move(replanReason)),
-          _explainData(maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                                    : PlanExplainerData{}) {}
-    const ExplainVersion& getVersion() const final;
+                      boost::optional<PlanExplainerData> maybeExplainData,
+                      bool isExplain,
+                      boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
+
+    bool isSbeExplainer() const final {
+        return false;
+    }
     bool areThereRejectedPlansToExplain() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
+    boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const final {
+        return _planSelectionStrategy;
+    }
     PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
+    std::vector<ExplainPlanEntry> getPlanEntries(
+        const ExplainPolicy& policy,
+        PlanStatsFormat format,
+        PlanSelectionStrategy decidingPlanRanker) const final;
     std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
                                                      ExplainOptions::Verbosity) const;
 
@@ -85,20 +76,85 @@ public:
         return _explainData.ceSamplingMetadata;
     }
 
+    boost::optional<StringMap<std::vector<ce::PersistedNDVEntry>>> getFieldStatsMetadata()
+        const override {
+        if (_explainData.fieldStatsMetadata.empty()) {
+            return boost::none;
+        }
+        return _explainData.fieldStatsMetadata;
+    }
+
+    boost::optional<PlanRankerReason> getPlanRankerReason() const override {
+        return _explainData.planRankerReason;
+    }
+
 private:
     /**
-     * A helper that formats the plan stats into a BSON object and collects summary stats.
+     * The shared per-plan formatting core: serializes one plan's stats tree (depending on 'policy')
+     * and collects its summary stats. 'solutionHash', when present, is the plan's QuerySolution
+     * hash. It is used to decide the "isCached" flag and to emit "solutionHashUnstable". Reused by
+     * the winning-, rejected-, and per-plan-entry accessors.
      */
     PlanStatsDetails _formatPlanStats(const PlanStageStats* stats,
-                                      ExplainOptions::Verbosity verbosity,
+                                      const ExplainPolicy& policy,
                                       boost::optional<size_t> planIdx,
-                                      boost::optional<double> score) const;
+                                      boost::optional<double> score,
+                                      boost::optional<size_t> solutionHash) const;
+
+    std::vector<ExplainPlanEntry> _getPlanEntriesLegacy(const ExplainPolicy& policy) const;
+    std::vector<ExplainPlanEntry> _getPlanEntriesV3(const ExplainPolicy& policy,
+                                                    PlanSelectionStrategy decidingPlanRanker) const;
 
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
     boost::optional<std::string> _replanReason;
     PlanExplainerData _explainData;
+    boost::optional<PlanSelectionStrategy> _planSelectionStrategy;
 };
+
+/**
+ * Serializes the stats tree 'stats' into 'bob' in the V3 explain node shape: structural fields
+ * (stage, planNodeId, keyPattern, filter, ...) stay flat on the node, children always nest as the
+ * "inputStages" array, and a MultiPlanStage node is skipped by following its 'planIdx' child (like
+ * the legacy serializer).
+ *
+ * Per-node statistics go under a sparse "statistics" subobject:
+ * - "costBased": the cost-based ranker's estimates; present iff 'estimates' has an entry for the
+ *   node's QSN.
+ * - "multiPlanEstimate"/"multiPlanFinalize": the multi-planning trial counters, split per trial
+ *   phase; emitted iff 'isTrialTree' and 'explainPolicy' requests per-candidate statistics.
+ *   'estimateStats' is the plan's candidate-rooted capped-phase stats, nullptr when the trial
+ *   had no capped phase. Without it, a single "multiPlanFinalize" carries the cumulative
+ *   counters. With it, "multiPlanEstimate"  carries the snapshot's counters and
+ *   "multiPlanFinalize" the increments accumulated after the boundary, emitted only for nodes
+ *   that did work then.
+ *
+ * 'topLevelBob' is only read: it tracks the size of the whole explain object for the size guard.
+ */
+void statsToBsonV3(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
+                   const cost_based_ranker::EstimateMap& estimates,
+                   const PlanStageStats& stats,
+                   const PlanStageStats* estimateStats,
+                   const ExplainPolicy& explainPolicy,
+                   bool isTrialTree,
+                   boost::optional<size_t> planIdx,
+                   BSONObjBuilder* bob,
+                   const BSONObjBuilder* topLevelBob);
+
+/**
+ * Appends the cost-based ranker's estimates for 'node' into the per-node "statistics" subobject
+ * 'statisticsBob'.
+ */
+void appendCostBasedStatsV3(StageType nodeType,
+                            const cost_based_ranker::QSNEstimate& est,
+                            BSONObjBuilder& statisticsBob);
+
+/**
+ * Returns the cost-based ranker's cost estimate for the plan rooted at 'rootQsn', or boost::none
+ * when that plan was not costed (or 'rootQsn' is null).
+ */
+boost::optional<double> rootCostOf(const cost_based_ranker::EstimateMap& estimates,
+                                   const QuerySolutionNode* rootQsn);
 
 /**
  * Retrieves the first stage of a given type from the plan tree, or nullptr if no such stage is

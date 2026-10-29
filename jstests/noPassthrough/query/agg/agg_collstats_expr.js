@@ -31,53 +31,74 @@ function runShardingTestExists(shardDistribution) {
     const config = mongos.getDB("config");
     const shards = config.shards.find().toArray();
     const namespace = dbName + "." + collName;
+    const primaryShard = shards[0]._id;
 
     /* Shard the collection. */
-    assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: shards[0]._id}));
+    assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: primaryShard}));
     assert.commandWorked(admin.runCommand({shardCollection: namespace, key: {a: 1}}));
 
     const coll = mongos.getCollection(namespace);
 
-    const length = shardDistribution.length;
-    let curr = 0;
-    let startChunk = curr;
+    const numShards = shardDistribution.length;
 
-    for (let i = 0; i < length; i++) {
-        for (
-            startChunk = curr;
-            shardDistribution[i] != null && curr < startChunk + shardDistribution[i];
-            curr++
-        ) {
-            /* Insert shardDistribution[i] documents into the current chunk.*/
-            assert.commandWorked(coll.insert({a: curr}));
+    // Distribute chunks and documents across shards according to the given shardDistribution.
+    // shardDistribution[i] is the number of documents to insert on shard i.
+    // shardDistribution[i] can be null, in which case shard i doesn't own any chunks.
+    let currentValue = 0;
+    let nextMinKey = {a: MinKey};
+    let firstOwningShard = -1;
+    const placements = [];
+    for (let i = 0; i < numShards; i++) {
+        if (shardDistribution[i] == null) {
+            // Shard i doesn't own any chunks, so skip it.
+            continue;
+        }
+        if (firstOwningShard < 0) {
+            firstOwningShard = i;
         }
 
-        /* We need to ensure that we don't split at the same location as we spit previously.  */
-        if (shardDistribution[i] == 0) {
-            curr++;
+        // Reserve shardDistribution[i] shard-key values for this shard's chunk.
+        const values = [];
+        for (let d = 0; d < shardDistribution[i]; d++, currentValue++) {
+            values.push(currentValue);
         }
 
-        /* If the i-th shard is supposed to have documents then split the chunk to the right of
-         * where it is supposed to end. Otherwise do not split the chunk. */
-        if (shardDistribution[i] != null) {
-            assert.commandWorked(st.splitAt(namespace, {a: curr}));
-        }
+        // Ensure a distinct split point even when the shard has no documents.
+        currentValue++;
 
-        /* Move the "next" chunk to the next shard */
+        placements.push({min: nextMinKey, max: {a: currentValue}, shard: shards[i]._id, values});
+        nextMinKey = {a: currentValue};
+    }
+
+    // The trailing chunk is empty; give it to the first shard that owns documents.
+    placements.push({
+        min: nextMinKey,
+        max: {a: MaxKey},
+        shard: shards[firstOwningShard]._id,
+        values: [],
+    });
+
+    for (const placement of placements) {
+        if (placement.shard === primaryShard) {
+            continue; /* stays on the primary */
+        }
         assert.commandWorked(
             admin.runCommand({
-                moveChunk: namespace,
-                find: {a: curr + 1},
-                to: shards[(i + 1) % length]._id,
+                moveRange: namespace,
+                min: placement.min,
+                max: placement.max,
+                toShard: placement.shard,
             }),
         );
     }
 
-    /* Move the remaining chunk to the first shard which is supposed to have documents. */
-    for (let j = 0; shardDistribution[j] == null && j < length; j++)
-        assert.commandWorked(
-            admin.runCommand({moveChunk: namespace, find: {a: curr + 1}, to: shards[j + 1]._id}),
-        );
+    // Now that every range lives on its final shard, insert the documents so each one lands
+    // directly on the shard that owns it.
+    for (const placement of placements) {
+        for (const value of placement.values) {
+            assert.commandWorked(coll.insert({a: value}));
+        }
+    }
 
     const counts = coll.aggregate([{"$collStats": {"count": {}}}]).toArray();
 

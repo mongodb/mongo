@@ -36,7 +36,9 @@ static void config_checkpoint(void);
 static void config_checksum(TABLE *);
 static void config_compact(void);
 static void config_compression(TABLE *, const char *);
+static void config_disagg_key_provider(void);
 static void config_disagg_storage(void);
+static void config_disagg_victim_cache(void);
 static void config_encryption(void);
 static bool config_explicit(TABLE *, const char *);
 static const char *config_file_type(u_int);
@@ -54,7 +56,6 @@ static void config_pct(TABLE *);
 static void config_prefetch(void);
 static void config_run_length(void);
 static void config_statistics(void);
-static void config_tiered_storage(void);
 static void config_transaction(void);
 static bool config_var(TABLE *);
 
@@ -146,6 +147,15 @@ config_random(TABLE *table, bool table_only)
 
         /* Configure key prefixes only rarely, 5% if the length isn't set explicitly. */
         if (cp->off == V_TABLE_BTREE_PREFIX_LEN && mmrand(&g.extra_rnd, 1, 100) > 5)
+            continue;
+
+        /*
+         * The stable-dhandle delay stalls only the follower's stable checkpoint cursor opens; under
+         * multi-node the leader waits at a rendezvous for the follower to finish, so the delay can
+         * starve the follower past the task budget and hang the leader. Don't random-enable it
+         * there.
+         */
+        if (cp->off == V_GLOBAL_STRESS_DISAGG_STABLE_DHANDLE_DELAY && disagg_is_multi_node())
             continue;
 
         /*
@@ -491,8 +501,8 @@ config_run(void)
     config_off(NULL, "ops.salvage");
 
     /* Order can be important, don't shuffle without careful consideration. */
-    config_tiered_storage();                         /* Tiered storage */
     config_disagg_storage();                         /* Disaggregated storage */
+    config_disagg_key_provider();                    /* Disaggregated key provider */
     config_transaction();                            /* Transactions */
     config_backup_incr();                            /* Incremental backup */
     config_prefetch();                               /* Prefetch */
@@ -508,6 +518,9 @@ config_run(void)
 
     /* Configure the cache last, cache size depends on everything else. */
     config_cache();
+
+    /* The budget is scaled from the cache size, so this follows config_cache(). */
+    config_disagg_victim_cache();
 
     /* Adjust run length if needed. */
     config_run_length();
@@ -671,6 +684,8 @@ config_backward_compatible(void)
 
     BC_CHECK("disk.mmap_all", DISK_MMAP_ALL);
     BC_CHECK("block_cache", BLOCK_CACHE);
+    BC_CHECK("disagg.victim_cache", DISAGG_VICTIM_CACHE);
+    BC_CHECK("disagg.victim_cache.size", DISAGG_VICTIM_CACHE_SIZE);
     BC_CHECK("stress.hs_checkpoint_delay", STRESS_HS_CHECKPOINT_DELAY);
     BC_CHECK("stress.hs_search", STRESS_HS_SEARCH);
     BC_CHECK("stress.hs_sweep", STRESS_HS_SWEEP);
@@ -1397,44 +1412,6 @@ config_statistics(void)
 }
 
 /*
- * config_tiered_storage --
- *     Tiered storage configuration.
- */
-static void
-config_tiered_storage(void)
-{
-    const char *storage_source;
-
-    storage_source = GVS(TIERED_STORAGE_STORAGE_SOURCE);
-
-    g.tiered_storage_config =
-      (strcmp(storage_source, "off") != 0 && strcmp(storage_source, "none") != 0);
-    if (g.tiered_storage_config) {
-        /* Tiered storage requires timestamps. */
-        config_off(NULL, "transaction.implicit");
-        config_single(NULL, "transaction.timestamps=on", true);
-
-        /* If we are flushing, we need a checkpoint thread. */
-        if (GV(TIERED_STORAGE_FLUSH_FREQUENCY) > 0)
-            config_single(NULL, "checkpoint=on", false);
-
-        /* Salvage and verify are not supported for tiered storage. */
-        config_off(NULL, "ops.salvage");
-        config_off(NULL, "ops.verify");
-
-        /* Backup is not supported for tiered tables. */
-        config_off(NULL, "backup");
-        config_off(NULL, "backup.incremental");
-
-        /* Compact is not supported for tiered tables. */
-        config_off(NULL, "ops.compaction");
-        config_off(NULL, "background_compact");
-    } else
-        /* Never try flush to tiered storage unless running with tiered storage. */
-        config_single(NULL, "tiered_storage.flush_frequency=0", true);
-}
-
-/*
  * config_disagg_storage --
  *     Disaggregated storage configuration.
  */
@@ -1475,6 +1452,52 @@ config_disagg_storage(void)
          */
         if (!config_explicit(NULL, "debug.disagg_slow_truncate_follower"))
             config_single(NULL, "debug.disagg_slow_truncate_follower=on", false);
+
+        /*
+         * The async step-down fires off the timer, and its drain needs the workers to keep
+         * committing until it completes. Anything that stops them early stalls the drain: an
+         * operation count, or the global stop timestamp predictable replay posts as it winds down.
+         */
+        if (GV(DISAGG_STEPDOWN_ASYNC)) {
+            if (GV(RUNS_PREDICTABLE_REPLAY))
+                testutil_die(EINVAL,
+                  "Invalid configuration: disagg.stepdown_async is incompatible with "
+                  "runs.predictable_replay.");
+            if (config_explicit(NULL, "runs.ops") && GV(RUNS_OPS) != 0)
+                testutil_die(EINVAL,
+                  "Invalid configuration: disagg.stepdown_async with disagg.mode=switch requires "
+                  "a timer-based run; set runs.ops=0.");
+            if (!config_explicit(NULL, "runs.ops"))
+                config_single(NULL, "runs.ops=0", false);
+
+            /*
+             * Workers are throttled while a step-down pauses their writes, whether or not
+             * ops.throttle is on; pin the sleep so the randomly chosen default cannot make that
+             * throttle meaningless.
+             */
+            if (!config_explicit(NULL, "ops.throttle.sleep_us"))
+                config_single(NULL, "ops.throttle.sleep_us=1000", false);
+
+            /*
+             * Prepared and truncate operations aren't accounted for by the async step-down drain,
+             * so either could straddle step_down_ts and break the checkpoint's boundary guarantee.
+             */
+            if (config_explicit(NULL, "ops.prepare"))
+                WARN("%s", "turning off ops.prepare to work with disagg.stepdown_async");
+            config_off(NULL, "ops.prepare");
+            if (config_explicit(NULL, "ops.truncate"))
+                WARN("%s", "turning off ops.truncate to work with disagg.stepdown_async");
+            config_off_all("ops.truncate");
+
+            /*
+             * The step-down checkpoint's duration counts against the same wall clock as the drain
+             * and pause timeouts above; slowing every dirty internal page it writes can run the
+             * total past the run's abort timer with no workload progress to show for it.
+             */
+            if (config_explicit(NULL, "debug.slow_checkpoint"))
+                WARN("%s", "turning off debug.slow_checkpoint to work with disagg.stepdown_async");
+            config_off(NULL, "debug.slow_checkpoint");
+        }
     } else {
         g.disagg_leader = strcmp(mode, "leader") == 0;
         /* Leader and follower modes always exercise fast truncate. */
@@ -1498,9 +1521,87 @@ config_disagg_storage(void)
     /* Compaction is not supported for disaggregated storage. */
     config_off(NULL, "ops.compaction");
     config_off(NULL, "background_compact");
+}
 
-    /*  Tiered storage is not supported with disagg */
-    config_single(NULL, "tiered_storage.storage_source=off", true);
+/*
+ * Memory the victim cache may use, per run, per node. Enough that re-reads hit retained pages and
+ * the budget forces evictions during a run.
+ */
+#define VICTIM_CACHE_BUDGET_MB 128
+
+/*
+ * config_disagg_victim_cache --
+ *     Page log victim cache configuration.
+ */
+static void
+config_disagg_victim_cache(void)
+{
+    uint64_t size_mb;
+    char buf[64];
+
+    /* A size the user set is the switch: non-zero turns the cache on, zero turns it off. */
+    if (config_explicit(NULL, "disagg.victim_cache.size") &&
+      !config_explicit(NULL, "disagg.victim_cache")) {
+        if (GV(DISAGG_VICTIM_CACHE_SIZE) != 0)
+            config_single(NULL, "disagg.victim_cache=1", true);
+        else
+            config_off(NULL, "disagg.victim_cache");
+    }
+
+    /* The victim cache lives in the page log, so a run without one has nowhere to put pages. */
+    if (!g.disagg_storage_config) {
+        if (config_explicit(NULL, "disagg.victim_cache"))
+            WARN("%s", "turning off disagg.victim_cache, the run has no page log");
+        config_off(NULL, "disagg.victim_cache");
+    }
+
+    /* Of the page logs, only PALite implements the caching hooks. */
+    else if (strcmp(GVS(DISAGG_PAGE_LOG), "palite") != 0) {
+        if (config_explicit(NULL, "disagg.victim_cache"))
+            WARN("turning off disagg.victim_cache, the %s page log implements no victim cache",
+              GVS(DISAGG_PAGE_LOG));
+        config_off(NULL, "disagg.victim_cache");
+    }
+
+    /* An in-memory connection never offers pages to the victim cache, so the knob is pointless. */
+    else if (GV(RUNS_IN_MEMORY)) {
+        if (config_explicit(NULL, "disagg.victim_cache"))
+            WARN("%s", "turning off disagg.victim_cache to work with runs.in_memory");
+        config_off(NULL, "disagg.victim_cache");
+    }
+
+    if (GV(DISAGG_VICTIM_CACHE) && !config_explicit(NULL, "disagg.victim_cache.size")) {
+        /* A fifth of the cache, capped. The memory is extra, not taken from the cache. */
+        size_mb = (uint64_t)WT_MIN(VICTIM_CACHE_BUDGET_MB, (GV(CACHE) + 4) / 5);
+        testutil_snprintf(buf, sizeof(buf), "disagg.victim_cache.size=%" PRIu64, size_mb);
+        config_single(NULL, buf, false);
+    }
+
+    if (!GV(DISAGG_VICTIM_CACHE))
+        config_off(NULL, "disagg.victim_cache.size");
+}
+
+/*
+ * config_disagg_key_provider --
+ *     Disaggregated key provider mode configuration (0=off, 1=pull, 2=push).
+ */
+static void
+config_disagg_key_provider(void)
+{
+    if (!g.disagg_storage_config) {
+        config_single(NULL, "disagg.key_provider=0", false);
+        return;
+    }
+
+    if (!config_explicit(NULL, "disagg.key_provider")) {
+        uint32_t r = mmrand(&g.extra_rnd, 1, 10);
+        if (r <= 5)
+            config_single(NULL, "disagg.key_provider=2", false); /* 50% push */
+        else if (r <= 7)
+            config_single(NULL, "disagg.key_provider=1", false); /* 20% pull */
+        else
+            config_single(NULL, "disagg.key_provider=0", false); /* 30% off */
+    }
 }
 
 /*

@@ -4,6 +4,7 @@
  *   - The hint option should support both the name of the index, and an index spec object.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
  *   # Ignore because the find command is rewritten for TS collections before reaching the failpoint.

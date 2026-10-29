@@ -1,42 +1,22 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/version/releases.h"
 
+#include <array>
 #include <string_view>
+#include <utility>
 
 namespace mongo::query_settings {
 namespace {
@@ -44,7 +24,8 @@ using namespace std::literals::string_view_literals;
 
 class QuerySettingsValidationTestFixture : public ServiceContextTest {
 protected:
-    QuerySettingsValidationTestFixture() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         ShardingState::create(getServiceContext());
         expCtx = make_intrusive<ExpressionContextForTest>();
         query_settings::QuerySettingsService::initializeForTest(getServiceContext());
@@ -63,8 +44,7 @@ protected:
 void assertInvalidQueryWithAnyQuerySettings(OperationContext* opCtx,
                                             const BSONObj& representativeQuery,
                                             size_t errorCode) {
-    auto representativeQueryInfo =
-        createRepresentativeInfo(opCtx, representativeQuery, boost::none);
+    auto representativeQueryInfo = createRepresentativeInfo(opCtx, representativeQuery);
     ASSERT_THROWS_CODE(QuerySettingsService::get(opCtx).validateQueryCompatibleWithAnyQuerySettings(
                            representativeQueryInfo),
                        DBException,
@@ -75,8 +55,7 @@ void assertInvalidQueryAndQuerySettingsCombination(OperationContext* opCtx,
                                                    const BSONObj& representativeQuery,
                                                    const QuerySettings& querySettings,
                                                    size_t errorCode) {
-    auto representativeQueryInfo =
-        createRepresentativeInfo(opCtx, representativeQuery, boost::none);
+    auto representativeQueryInfo = createRepresentativeInfo(opCtx, representativeQuery);
     ASSERT_THROWS_CODE(QuerySettingsService::get(opCtx).validateQueryCompatibleWithQuerySettings(
                            representativeQueryInfo, querySettings),
                        DBException,
@@ -85,8 +64,8 @@ void assertInvalidQueryAndQuerySettingsCombination(OperationContext* opCtx,
 
 NamespaceSpec makeNamespace(std::string_view dbName, std::string_view collName) {
     NamespaceSpec ns;
-    ns.setDb(
-        DatabaseNameUtil::deserialize(boost::none, dbName, SerializationContext::stateDefault()));
+    ns.setDb(DatabaseNameUtil::deserialize(
+        /* tenantId */ boost::none, dbName, SerializationContext::stateDefault()));
     ns.setColl(collName);
     return ns;
 }
@@ -131,27 +110,27 @@ TEST_F(QuerySettingsValidationTestFixture,
     QuerySettings rejectionSettings;
     rejectionSettings.setReject(true);
 
+    // $joinPlanCacheStats refuses to parse unless both of these are enabled.
+    unittest::ServerParameterGuard joinOptGuard{"internalEnableJoinOptimization", true};
+    unittest::ServerParameterGuard joinPlanCacheGuard{"internalEnableJoinPlanCache", true};
+
     auto collectionlessNss = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
-    const stdx::unordered_set<std::string_view, StringMapHasher>
-        collectionLessRejectionIncompatibleStages = {
-            "$querySettings"sv,
-            "$listSessions"sv,
-            "$listSampledQueries"sv,
-            "$queryStats"sv,
-            "$currentOp"sv,
-            "$listCatalog"sv,
-            "$listLocalSessions"sv,
-        };
 
-    for (auto&& stage : QuerySettingsService::getRejectionIncompatibleStages()) {
-        // Avoid testing these stages, as they require more complex setup.
-        if (stage == "$listLocalSessions" || stage == "$listSessions" ||
-            stage == "$listSampledQueries") {
-            continue;
-        }
-
+    // Stages that bypass query settings rejection. $listLocalSessions, $listSessions and
+    // $listSampledQueries are omitted as they require more complex setup.
+    for (auto&& [stage, isCollectionless] : std::array<std::pair<std::string_view, bool>, 9>{{
+             {"$querySettings"sv, true},
+             {"$planCacheStats"sv, false},
+             {"$joinPlanCacheStats"sv, true},
+             {"$collStats"sv, false},
+             {"$indexStats"sv, false},
+             {"$queryStats"sv, true},
+             {"$currentOp"sv, true},
+             {"$listCatalog"sv, true},
+             {"$listSearchIndexes"sv, false},
+         }}) {
         auto aggCmdBSON = [&]() {
-            if (collectionLessRejectionIncompatibleStages.contains(stage)) {
+            if (isCollectionless) {
                 return BSON("aggregate" << collectionlessNss.coll() << "$db"
                                         << collectionlessNss.db_forTest() << "pipeline"
                                         << BSON_ARRAY(BSON(stage << BSONObj())));
@@ -176,10 +155,9 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotUseUuidAsNs) {
     const BSONObj representativeQ = BSON("find" << uuid1Res.getValue() << "$db"
                                                 << "testDB"
                                                 << "filter" << BSON("a" << BSONNULL));
-    ASSERT_THROWS_CODE(
-        createRepresentativeInfo(expCtx->getOperationContext(), representativeQ, boost::none),
-        DBException,
-        7746605);
+    ASSERT_THROWS_CODE(createRepresentativeInfo(expCtx->getOperationContext(), representativeQ),
+                       DBException,
+                       7746605);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSameColl) {
@@ -208,6 +186,13 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotHaveDefaultValues)
     ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746604);
 }
 
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsMaxTimeMSZeroIsNormalizedToUnset) {
+    QuerySettings querySettings;
+    querySettings.setMaxTimeMS(0);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_EQUALS(querySettings.getMaxTimeMS(), boost::none);
+}
+
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoDbSpecified) {
     QuerySettings querySettings;
     NamespaceSpec ns;
@@ -221,7 +206,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoCollSpec
     QuerySettings querySettings;
     NamespaceSpec ns;
     ns.setDb(DatabaseNameUtil::deserialize(
-        boost::none /* tenantId */, "dbName"sv, SerializationContext::stateDefault()));
+        /* tenantId */ boost::none, "dbName"sv, SerializationContext::stateDefault()));
     querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
     service().simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 8727501);
@@ -311,14 +296,16 @@ TEST_F(QuerySettingsValidationTestFixture,
        QueryShapeConfigurationsValidationFailsOnBSONObjectTooLarge) {
     QueryShapeConfigurationsWithTimestamp config;
     QuerySettings querySettings;
-    std::string largeString(10 * 1024 * 1024, 'a');
-    const BSONObj query = BSON("find" << "testColl" << "$db" << "testDB" << "filter"
-                                      << BSON("$gt" << BSON(largeString << 1)));
+    // Two ~10MB hint keys (a single BSON object cannot exceed BSONObjMaxUserSize = 16MB, so the
+    // overflow must come from two separate objects) push the serialized configuration past the
+    // 16MB limit.
+    std::string largeString1(10 * 1024 * 1024, 'a');
+    std::string largeString2(10 * 1024 * 1024, 'b');
     querySettings.setIndexHints({{
-        IndexHintSpec(makeNamespace("testDB", "testColl"), {IndexHint(BSON(largeString << 1))}),
+        IndexHintSpec(makeNamespace("testDB", "testColl"),
+                      {IndexHint(BSON(largeString1 << 1)), IndexHint(BSON(largeString2 << 1))}),
     }});
     QueryShapeConfiguration queryShapeConfiguration(query_shape::QueryShapeHash(), querySettings);
-    queryShapeConfiguration.setRepresentativeQuery(query);
     config.queryShapeConfigurations = {queryShapeConfiguration};
     ASSERT_THROWS_CODE(service().validateQueryShapeConfigurations(config),
                        DBException,
@@ -357,6 +344,53 @@ TEST_F(QuerySettingsValidationTestFixture, ValidateRejectsDuplicateKnobs) {
     settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(
         BSON("testIntKnobWire" << 5 << "testIntKnobWire" << 10)));
     ASSERT_THROWS_CODE(service().validateQuerySettings(settings), DBException, 12366201);
+}
+
+// FCV validation of user-provided knob overrides: knobs whose minFcv exceeds the current FCV are
+// rejected (12955401).
+
+TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsAcceptsSupportedKnobsOnLatestFcv) {
+    QueryFCVEnvironmentForTest::setUp();
+    // (Generic FCV reference): FCV-gated query knob validation test.
+    unittest::EnsureFCV fcv(multiversion::GenericFCV::kLatest);
+
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(
+        BSON("testIntKnobWire" << 5 << "testLowFcvKnobWire" << 5)));
+    service().validateQueryKnobs(settings);
+}
+
+// A user write with a knob that is being downgraded away must be rejected during the whole FCV
+// transition; otherwise it can be persisted behind the downgrade migration's stripping pass and
+// survive at the downgraded FCV.
+TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsMidDowngrade) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
+    QueryFCVEnvironmentForTest::setUp();
+    // (Generic FCV reference): FCV-gated query knob validation test.
+    unittest::EnsureFCV fcv(multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
+
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5)));
+    ASSERT_THROWS(service().validateQueryKnobs(settings), DBException);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, ValidateQueryKnobsRejectsKnobsOnLowerStableFcv) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-133009)";
+
+    QueryFCVEnvironmentForTest::setUp();
+    // (Generic FCV reference): FCV-gated query knob validation test.
+    unittest::EnsureFCV fcv(multiversion::GenericFCV::kLastLTS);
+
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << 5)));
+    ASSERT_THROWS(service().validateQueryKnobs(settings), DBException);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, ValidateRejectsKnobOverrideParseErrors) {
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSON("totallyUnknownKnob" << 1)));
+    ASSERT_THROWS_CODE(service().validateQuerySettings(settings), DBException, 12194501);
 }
 
 }  // namespace

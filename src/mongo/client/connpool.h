@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -52,7 +26,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class BSONObjBuilder;
 
@@ -87,12 +61,9 @@ class PoolForHost {
     PoolForHost& operator=(const PoolForHost&) = delete;
 
 public:
-    // Sentinel value indicating pool has no cleanup limit
-    static const int kPoolSizeUnlimited;
-
     friend class DBConnectionPool;
 
-    PoolForHost();
+    PoolForHost() = default;
     ~PoolForHost();
 
     /**
@@ -234,6 +205,10 @@ public:
     void shutdown();
 
 private:
+    // Sentinel value indicating pool has no cleanup limit
+    static constexpr int kPoolSizeUnlimited{-1};
+    static constexpr int kDefaultMaxInUse{std::numeric_limits<int>::max()};
+
     struct StoredConnection {
         StoredConnection(std::unique_ptr<DBClientBase> c);
 
@@ -252,27 +227,27 @@ private:
     };
 
     std::string _hostName;
-    double _socketTimeoutSecs;
+    double _socketTimeoutSecs{0.0};
     std::stack<StoredConnection> _pool;
 
-    int64_t _created;
-    uint64_t _minValidCreationTimeMicroSec;
-    ConnectionString::ConnectionType _type;
+    int64_t _created{0};
+    uint64_t _minValidCreationTimeMicroSec{0};
+    ConnectionString::ConnectionType _type{ConnectionString::ConnectionType::kInvalid};
 
     // The maximum number of connections we'll save in the pool
-    int _maxPoolSize;
+    int _maxPoolSize{kPoolSizeUnlimited};
 
     // The maximum number of connections allowed to be in-use in this pool
-    int _maxInUse;
+    int _maxInUse{kDefaultMaxInUse};
 
     // The number of currently active connections from this pool
-    int _checkedOut;
+    int _checkedOut{0};
 
     // The number of connections that we did not reuse because they went bad.
-    int _badConns;
+    int _badConns{0};
 
     // Whether our parent DBConnectionPool object is in destruction
-    bool _parentDestroyed;
+    bool _parentDestroyed{false};
 
     // Time it took for the last connection to be established
     Milliseconds _connTime;
@@ -281,10 +256,10 @@ private:
 
     stdx::condition_variable _cv;
 
-    AtomicWord<bool> _inShutdown;
+    Atomic<bool> _inShutdown{false};
 };
 
-class MONGO_MOD_OPEN DBConnectionHook {
+class [[MONGO_MOD_OPEN]] DBConnectionHook {
 public:
     virtual ~DBConnectionHook() = default;
     virtual void onCreate(DBClientBase* conn) {}
@@ -376,8 +351,8 @@ public:
      * Gets the time it took for the last connection to be established from the PoolMap given a host
      * and timeout.
      */
-    MONGO_MOD_PUBLIC Milliseconds getPoolHostConnTime_forTest(const std::string& host,
-                                                              double timeout) const;
+    [[MONGO_MOD_PUBLIC]] Milliseconds getPoolHostConnTime_forTest(const std::string& host,
+                                                                  double timeout) const;
 
     /**
      * Gets the number of connections available in the pool.
@@ -426,6 +401,8 @@ public:
     void shutdown();
 
 private:
+    static constexpr int kDefaultIdleTimeout{std::numeric_limits<int>::max()};
+
     class Detail;
 
     DBConnectionPool(DBConnectionPool& p);
@@ -450,19 +427,19 @@ private:
     typedef std::map<PoolKey, PoolForHost, poolKeyCompare> PoolMap;  // servername -> pool
 
     mutable std::mutex _mutex;
-    std::string _name;
+    std::string _name{"dbconnectionpool"};
 
     // The maximum number of connections we'll save in the pool per-host
     // PoolForHost::kPoolSizeUnlimited is a sentinel value meaning "no limit"
     // 0 effectively disables the pool
-    int _maxPoolSize;
+    int _maxPoolSize{PoolForHost::kPoolSizeUnlimited};
 
-    int _maxInUse;
-    Minutes _idleTimeout;
+    int _maxInUse{PoolForHost::kDefaultMaxInUse};
+    Minutes _idleTimeout{kDefaultIdleTimeout};
 
     PoolMap _pools;
 
-    AtomicWord<bool> _inShutdown;
+    Atomic<bool> _inShutdown{false};
 
     // pointers owned by me, right now they leak on shutdown
     // _hooks itself also leaks because it creates a shutdown race condition
@@ -498,7 +475,7 @@ public:
     }
 
 private:
-    static AtomicWord<int> _numConnections;
+    static Atomic<int> _numConnections;
 };
 
 /** Use to get a connection from the pool.  On exceptions things
@@ -573,4 +550,4 @@ private:
     const double _socketTimeoutSecs;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

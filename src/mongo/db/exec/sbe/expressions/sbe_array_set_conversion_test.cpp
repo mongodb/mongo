@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,22 +26,22 @@ public:
      * Run the compiled expression and assert that the result is equal to Nothing.
      */
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(runVal, 0);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     /**
      * Run the compiled expression and assert that the result is equal to 'expectedValues'.
      */
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr, BSONArray expectedValues) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQ(value::TypeTags::ArraySet, runTag);
+        ASSERT_EQ(value::TypeTags::ArraySet, result.tag());
 
-        value::ArraySet* arrSet = value::getArraySetView(runVal);
+        value::ArraySet* arrSet = value::getArraySetView(result.value());
         value::ValueSetType& values = arrSet->values();
 
         size_t expectedItems = 0;
@@ -78,7 +52,7 @@ public:
                 << "Value " << std::make_pair(tag, val) << " not found in result";
             expectedItems++;
         }
-        ASSERT_EQ(expectedItems, arrSet->size()) << std::make_pair(runTag, runVal);
+        ASSERT_EQ(expectedItems, arrSet->size()) << std::make_pair(result.tag(), result.value());
     }
 
     /**

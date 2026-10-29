@@ -109,7 +109,6 @@ __wt_block_salvage_next(
 
     *eofp = 0;
 
-    /* Salvage isn't implemented (yet) for tiered trees. */
     objectid = 0;
 
     fh = block->fh;

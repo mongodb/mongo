@@ -1,44 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/planner_analysis.h"
 
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <cstring>
-
-#include <s2cellid.h>
-
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,8 +16,12 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/match_expression_walker.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/sbe_pushdown_util.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
@@ -64,17 +33,30 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
+#include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
+#include <cstring>
+#include <limits>
 #include <set>
 #include <string_view>
 #include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -91,6 +73,10 @@ using std::vector;
 //
 
 namespace {
+
+// Rate-limits $lookup rejection logging per foreign namespace.
+logv2::KeyedSeveritySuppressor<std::string> maxEstimatedScanBytesRejectionLogSeverity{
+    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 
 /**
  * Walk the tree 'root' and output all leaf nodes into 'leafNodes'.
@@ -433,14 +419,25 @@ void geoSkipValidationOn(const std::set<std::string_view>& twoDSphereFields,
     //
     // This does not mean that there is necessarily an IXSCAN using this 2dsphere index,
     // only that there exists a 2dsphere index on this field.
-    MatchExpression* expr = solnRoot->filter.get();
-    if (expr) {
+    const auto skipValidationIfGeoOn2dSphereField = [&](MatchExpression* expr) {
+        if (!expr) {
+            return;
+        }
         std::string_view nodeField = expr->path();
         if (expr->matchType() == MatchExpression::GEO &&
             twoDSphereFields.find(nodeField) != twoDSphereFields.end()) {
             GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(expr);
             gme->setCanSkipValidation(true);
         }
+    };
+
+    skipValidationIfGeoOn2dSphereField(solnRoot->filter.get());
+
+    // A $geoNear node carries a second, document-level predicate that was pushed down from the
+    // FETCH which used to sit above it (see pushResidualFilterIntoGeoNear). It is evaluated on the
+    // fetched document just like 'filter' was, so the same reasoning applies to it.
+    if (auto* residualFilter = getGeoNearDocFilter(*solnRoot); residualFilter) {
+        skipValidationIfGeoOn2dSphereField(residualFilter->get());
     }
 
     for (auto&& child : solnRoot->children) {
@@ -621,7 +618,7 @@ std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
     auto projection = projection_ast::parseAndAnalyze(query.getExpCtx(),
                                                       *projectionBSON,
                                                       ProjectionPolicies::findProjectionPolicies(),
-                                                      true /* shouldOptimize */);
+                                                      /*shouldOptimize=*/true);
     // We don't actually have a projection on the query, so we use a projection specification
     // generated for this distinct() to determine if we need a FETCH or if this query can be
     // covered.
@@ -629,7 +626,7 @@ std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
                              std::move(solnRoot),
                              hasSortStage,
                              std::move(projection),
-                             true /* mayProvideAdditionalFields */);
+                             /*mayProvideAdditionalFields=*/true);
 }
 
 /**
@@ -787,20 +784,27 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         return;
     }
 
-    // Look for a GROUP => PROJECTION_SIMPLE where the dependency set of the PROJECTION_SIMPLE
-    // is a super set of the dependency set of the GROUP. If so, the projection isn't needed and
-    // it can be elminated.
+    // Look for a GROUP node whose immediate child is a PROJECTION that whose effects are invisible
+    // and can be eliminated. This is true when every field the group reads is passed through
+    // unchanged by the projection (i.e. isFieldRetainedExactly returns true for each required
+    // field). This covers both simple inclusion projections and mixed projections that have
+    // computed fields alongside plain pass-throughs, as long as the group only touches the
+    // pass-through fields.
     if (solnRoot->getType() == StageType::STAGE_GROUP) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
         QuerySolutionNode* projectNodeCandidate = groupNode->children[0].get();
         if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
-            // only eliminate inclusion projections
-            projection && projection.value()->isInclusionOnly() &&
-            // only eliminate when group depends on a subset of fields
-            !groupNode->needWholeDocument &&
-            // only eliminate projections which preserve all fields used by the group
-            isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
+            // The group must not require the full document (e.g. $$ROOT).
+            projection && !groupNode->needWholeDocument &&
+            // Either the group has no field dependencies (e.g. $count), so any projection is
+            // safe to drop, or every field the group reads is passed through unchanged by the
+            // projection.
+            std::all_of(groupNode->requiredFields.begin(),
+                        groupNode->requiredFields.end(),
+                        [&proj = projection.value()](const std::string& f) {
+                            return proj->isFieldRetainedExactly(f);
+                        })) {
             // Attach the projectNode's child directly as the groupNode's child, eliminating the
             // project node.
             groupNode->children[0] = std::move(projectNodeCandidate->children[0]);
@@ -813,38 +817,113 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     }
 }
 
-// Determines whether 'index' is eligible for executing the right side of a pushed down $lookup over
-// 'foreignField'. If this function returns true, i.e. the index is eligible, the collation of the
-// index should also be checked using 'isIndexCollationCompatible'. Only an eligible index with
-// compatible collation can be used in INLJ in SBE.
-bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
+// Returns true if 'index' is a wildcard index whose projection covers 'foreignField'.
+bool wildcardIndexProjectionCoversField(const IndexEntry& index, const std::string& foreignField) {
+    auto* wildcardProjection = index.indexPathProjection;
+    tassert(
+        6408201, "wildcardProjection must be non-null for Wildcard Indexes", wildcardProjection);
+    return projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
+                                                                foreignField);
+}
+
+// Returns true if 'index' is a single-path, non-partial wildcard index covering 'foreignField'.
+// Compound and partial wildcard indexes are excluded: DILJ's runtime guards don't account for
+// documents a partial filter would exclude, and compound wildcard indexes aren't supported here.
+bool isSinglePathWildcardIndexCoveringField(const IndexEntry& index,
+                                            const std::string& foreignField) {
+    if (index.type != INDEX_WILDCARD || index.keyPattern.nFields() != 1 || index.filterExpr) {
+        return false;
+    }
+    return wildcardIndexProjectionCoversField(index, foreignField);
+}
+
+// Returns true if the partial filter expression of 'index' (if any) is compatible with using the
+// index for the right side of a $lookup pushed into SBE. At runtime the Dynamic Indexed Loop Join
+// decides per local key whether the index covers it by evaluating the filter against the foreign
+// field. For this to be sound, the filter must reference exactly the foreign field and the foreign
+// field is constrained to be non-dotted. The reasons are below.
+bool isPartialFilterCompatibleWithLookupPushdown(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                 const IndexEntry& index,
                                                  const std::string& foreignField) {
+    // Not a partial index, no constraint needed.
+    if (!index.filterExpr) {
+        return true;
+    }
+
+    // The foreign field must be non-dotted. To evaluate the partial filter against a dotted foreign
+    // field, we have to materialize a nested object matching the path at runtime for each local
+    // key; we avoid that cost and complexity, so dotted foreign fields fall back to the classic
+    // engine.
+    if (foreignField.find('.') != std::string::npos) {
+        return false;
+    }
+
+    // The DILJ evaluates the partial filter at runtime via generateFilter(), so the filter must be
+    // an expression SBE can compile. The partial-index grammar permits operators that the SBE
+    // filter builder does not support (notably $geoWithin / $geoIntersects). Such indexes fall back
+    // to the classic engine.
+    auto matchExpCtx = ExpressionContextBuilder{}.build();
+    auto swMatchExp = MatchExpressionParser::parse(index.filterExpr->serialize(), matchExpCtx);
+    tassert(11651501, "Match expression should be parsable.", swMatchExp.isOK());
+
+    const auto& queryKnob = expCtx->getQueryKnobConfiguration();
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
+    const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
+        queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
+    if (matchExpCtx->getSbeCompatibility() < minRequiredCompatibility) {
+        return false;
+    }
+
+    // If the filter referenced any other field, two foreign documents sharing the same
+    // foreign-field value could differ on index membership, and the per-key decision would be
+    // unsound.
+    DepsTracker deps;
+    dependency_analysis::addDependencies(index.filterExpr, &deps);
+    return !deps.needWholeDocument && deps.fields.size() == 1 &&
+        *deps.fields.begin() == foreignField;
+}
+
+// Determines whether 'index' is eligible for executing the right side of a pushed down $lookup over
+// 'foreignField'. If eligible, the collation should also be checked with
+// 'isIndexCollationCompatible': a collation-compatible index with no partial filter can use INLJ
+// in SBE, while a sparse, collation-incompatible, and/or (compatibly) partial-filtered index must
+// use DILJ. Wildcard indexes are always sparse, so an eligible wildcard index always routes to
+// DILJ.
+bool isIndexEligibleForRightSideOfLookupPushdown(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                 const IndexEntry& index,
+                                                 const std::string& foreignField) {
+    if (index.type == INDEX_WILDCARD) {
+        return isSinglePathWildcardIndexCoveringField(index, foreignField);
+    }
     return (index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-        index.keyPattern.firstElement().fieldName() == foreignField && !index.filterExpr &&
-        !index.sparse;
+        index.keyPattern.firstElement().fieldName() == foreignField &&
+        isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField);
 }
 
 // Returns true if 'index' can be used for the right side of a $lookup in the classic engine but
-// not in SBE. This applies to two cases:
-//   - Sparse or partial B-tree/hashed indexes on the foreign field: SBE does not support these
-//     and would fall back to a collection scan, so classic should be preferred.
-//   - Wildcard indexes that cover the foreign field: classic can leverage them but SBE cannot.
-bool isIndexEligibleForRightSideOfLookupOnlyInClassic(const IndexEntry& index,
-                                                      const std::string& foreignField) {
-    if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
-        index.keyPattern.firstElement().fieldName() == foreignField &&
-        (index.sparse || index.filterExpr)) {
-        return true;
-    }
+// not in SBE. This applies to:
+//   - Compound or partial wildcard indexes covering the foreign field: classic can leverage these
+//     but SBE cannot. A single-path, non-partial wildcard index is handled by
+//     'isIndexEligibleForRightSideOfLookupPushdown' instead.
+//   - Partial B-tree/hashed indexes on the foreign field whose filter references a field other
+//     than the foreign field: SBE's DILJ can only evaluate a partial filter that depends solely on
+//     the foreign-field value, so these are handled by classic.
+bool isIndexEligibleForRightSideOfLookupOnlyInClassic(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const IndexEntry& index,
+    const std::string& foreignField) {
     if (index.type == INDEX_WILDCARD) {
-        auto* wildcardProjection = index.indexPathProjection;
-        tassert(6408201,
-                "wildcardProjection must be non-null for Wildcard Indexes",
-                wildcardProjection);
-        return projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
-                                                                    foreignField);
+        if (!wildcardIndexProjectionCoversField(index, foreignField)) {
+            return false;
+        }
+        // Single-path, non-partial wildcard indexes are handled by
+        // 'isIndexEligibleForRightSideOfLookupPushdown' instead; compound or partial ones stay
+        // classic-only.
+        return index.keyPattern.nFields() != 1 || index.filterExpr;
     }
-    return false;
+    return (index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
+        index.keyPattern.firstElement().fieldName() == foreignField && index.filterExpr &&
+        !isPartialFilterCompatibleWithLookupPushdown(expCtx, index, foreignField);
 }
 
 // Determines whether 'index' has collation compatible with the collation used for the local
@@ -881,14 +960,15 @@ bool shouldReverseScanForSort(QuerySolutionNode* solnRoot,
 }
 }  // namespace
 
-bool QueryPlannerAnalysis::isEligibleForHashJoin(const CollectionInfo& foreignCollInfo) {
-    return !internalQueryDisableLookupExecutionUsingHashJoin.load() && foreignCollInfo.exists &&
+bool QueryPlannerAnalysis::isEligibleForHashJoin(const QueryKnobConfiguration& knobs,
+                                                 const CollectionInfo& foreignCollInfo) {
+    return !knobs.getDisableLookupExecutionUsingHashJoin() && foreignCollInfo.exists &&
         foreignCollInfo.stats.noOfRecords <=
-        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
+        knobs.getCollectionMaxNoOfDocumentsToChooseHashJoin() &&
         foreignCollInfo.stats.approximateDataSizeBytes <=
-        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin.load() &&
+        knobs.getCollectionMaxDataSizeBytesToChooseHashJoin() &&
         foreignCollInfo.stats.storageSizeBytes <=
-        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
+        knobs.getCollectionMaxStorageSizeBytesToChooseHashJoin();
 }
 
 // static
@@ -923,21 +1003,33 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
             expression::assumeImpreciseInternalExprNodesReturnTrue(std::move(root.filter));
     }
 
+    // $geoNear nodes carry a second, document-level predicate pushed down from the FETCH that
+    // used to sit above them (see pushResidualFilterIntoGeoNear). It is evaluated on the fetched
+    // document, so the same reasoning applies to it as to 'filter' on a fetched node.
+    if (auto* residualFilter = getGeoNearDocFilter(root); residualFilter && *residualFilter) {
+        *residualFilter =
+            expression::assumeImpreciseInternalExprNodesReturnTrue(std::move(*residualFilter));
+    }
+
     for (auto& child : root.children) {
         removeImpreciseInternalExprFilters(params, *child);
     }
 }
 
-// Checks if there is an index that can be used if the $lookup is pushed to SBE. It returns a tuple
-// {boost::optional<IndexEntry>, bool}. The left side contains an eligible index or boost::none if
-// no such index exits. The right side is a flag denoting whether the eligible index has also
-// compatible collation. An eligible index with compatible collation can be used in the Indexed
-// Nested Loop Join (INLJ) strategy while an eligible index without a compatible collation can be
-// used in the Dynamic Indexed Loop Join (DILJ) strategy.
+// Checks if there is an index that can be used if the $lookup is pushed to SBE. Returns a tuple of
+// an eligible index (or boost::none if none exists) and whether it's collation-compatible with the
+// query. A non-sparse, collation-compatible index with no partial filter uses INLJ; otherwise DILJ
+// is used. Wildcard indexes are always sparse-like, so an eligible wildcard index always uses DILJ.
 std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideOfLookupPushdown(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
     const std::string& foreignField,
     std::vector<IndexEntry> indexes,
     const CollatorInterface* collator) {
+    // Wildcard indexes omit documents missing the indexed path just like a sparse index, even
+    // though their catalog 'sparse' flag isn't set until expanded for a specific field below.
+    auto isEffectivelySparse = [](const IndexEntry& index) {
+        return index.sparse || index.type == INDEX_WILDCARD;
+    };
     std::sort(indexes.begin(), indexes.end(), [&](const IndexEntry& left, const IndexEntry& right) {
         if (!CollatorInterface::collatorsMatch(left.collator, right.collator)) {
             if (CollatorInterface::collatorsMatch(left.collator, collator)) {
@@ -946,6 +1038,21 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
             if (CollatorInterface::collatorsMatch(collator, right.collator)) {
                 return false;
             }
+        }
+
+        // Prefer non-partial indexes, so that when a full index is available it is chosen and the
+        // more efficient Indexed Loop Join strategy can be used instead of Dynamic Indexed Loop
+        // Join.
+        const bool leftPartial = static_cast<bool>(left.filterExpr);
+        const bool rightPartial = static_cast<bool>(right.filterExpr);
+        if (leftPartial != rightPartial) {
+            return !leftPartial;
+        }
+
+        // Prefer a non-sparse index over a sparse (or sparse-like, i.e. wildcard) one, since it
+        // can use the faster INLJ instead of DILJ.
+        if (isEffectivelySparse(left) != isEffectivelySparse(right)) {
+            return !isEffectivelySparse(left);
         }
         const auto nFieldsLeft = left.keyPattern.nFields();
         const auto nFieldsRight = right.keyPattern.nFields();
@@ -961,12 +1068,22 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
     });
     // Indexes with compatible collation are at the front.
     for (const auto& index : indexes) {
-        if (isIndexEligibleForRightSideOfLookupPushdown(index, foreignField)) {
-            if (isIndexCollationCompatible(index, collator)) {
-                return {index, true};
-            }
-            return {index, false};
+        if (!isIndexEligibleForRightSideOfLookupPushdown(expCtx, index, foreignField)) {
+            continue;
         }
+        if (index.type == INDEX_WILDCARD) {
+            // The raw wildcard IndexEntry's keyPattern is a placeholder (e.g. {"$**": 1}); expand
+            // it into a concrete {foreignField: 1} entry so downstream code can treat it like any
+            // other eligible index.
+            std::vector<IndexEntry> expanded;
+            wildcard_planning::expandWildcardIndexEntry(index, {foreignField}, &expanded);
+            if (expanded.empty()) {
+                // The wildcard index cannot answer 'foreignField'; try the next candidate.
+                continue;
+            }
+            return {expanded[0], isIndexCollationCompatible(expanded[0], collator)};
+        }
+        return {index, isIndexCollationCompatible(index, collator)};
     }
 
     return {boost::none, false};
@@ -974,7 +1091,9 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
 
 // static
 bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
-    const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::string& foreignField,
+    const std::vector<IndexEntry>& fullIndexList) {
 
     bool foundClassicOnlyIndex = false;
 
@@ -983,13 +1102,13 @@ bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
         LOGV2_DEBUG(
             6408200, 3, "Relevant index", "indexNumber"_attr = i, "index"_attr = index.toString());
 
-        if (isIndexEligibleForRightSideOfLookupPushdown(index, foreignField)) {
+        if (isIndexEligibleForRightSideOfLookupPushdown(expCtx, index, foreignField)) {
             // SBE can use this index (via INLJ, DINLJ, or HJ), so there is no reason to prefer
             // classic.
             return false;
         }
 
-        if (isIndexEligibleForRightSideOfLookupOnlyInClassic(index, foreignField)) {
+        if (isIndexEligibleForRightSideOfLookupOnlyInClassic(expCtx, index, foreignField)) {
             foundClassicOnlyIndex = true;
         }
     }
@@ -998,11 +1117,14 @@ bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
 
 // static
 QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
+    const CanonicalQuery& query,
     const NamespaceString& foreignCollName,
     const std::string& foreignField,
-    const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
-    bool allowDiskUse,
-    const CollatorInterface* collator) {
+    const std::map<NamespaceString, CollectionInfo>& collectionsInfo) {
+    auto allowDiskUse = query.getExpCtx()->getAllowDiskUse();
+    auto collator = query.getCollator();
+    const auto& knobs = query.getExpCtx()->getQueryKnobConfiguration();
+
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
     if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {  // NOLINT
         return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
@@ -1012,13 +1134,52 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
         foreignCollItr->second.collscanDirection.value_or(NaturalOrderHint::Direction::kForward);
 
     // Check if an eligible index exists for indexed loop join strategy.
-    const auto [foreignIndex, isCollationCompatible] =
+    const auto [foreignIndex, collationCompatibleForDilj] =
         determineForeignIndexForRightSideOfLookupPushdown(
-            foreignField, foreignCollItr->second.indexes, collator);
+            query.getExpCtx(), foreignField, foreignCollItr->second.indexes, collator);
 
     const auto lookupStrategy = [&]() -> EqLookupNode::LookupStrategy {
-        if (foreignIndex && isCollationCompatible) {
+        // A non-sparse index with compatible collation and without a partial filter can be used
+        // directly via INLJ. A sparse index or an index with partial filter cannot (both omit
+        // some foreign docs in the index), so it must fall through to HashJoin or the dynamic
+        // indexed loop join, which decide safety at run time.
+        if (foreignIndex && collationCompatibleForDilj && !foreignIndex->sparse &&
+            !foreignIndex->filterExpr) {
             return EqLookupNode::LookupStrategy::kIndexedLoopJoin;
+        }
+        // Reject all remaining strategies (kDynamicIndexedLoopJoin, kHashJoin,
+        // kNestedLoopJoin) when COLLECTION_EXCEEDS_SCAN_BYTES is set. kDynamicIndexedLoopJoin is
+        // included because it has a runtime nested-loop fallback that scans the full foreign
+        // collection when local key values are strings/arrays/objects; we cannot rule that out at
+        // plan time.
+        if (foreignCollItr->second.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) {
+            if (QueryPlannerCommon::isMaxEstimatedScanBytesDryRun(foreignCollItr->second)) {
+                LOGV2(10130234,
+                      "maxEstimatedScanBytesDryRun: $lookup foreign collection scan would be "
+                      "rejected by maxEstimatedScanBytes",
+                      "namespace"_attr = foreignCollName.toStringForErrorMsg(),
+                      "estimatedSize"_attr =
+                          foreignCollItr->second.maxEstimatedScanBytesCollectionSize,
+                      "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
+                maxEstimatedScanBytesMetrics::maxEstimatedScanDryRunWouldReject.increment();
+            } else {
+                LOGV2_DEBUG(
+                    13466403,
+                    maxEstimatedScanBytesRejectionLogSeverity(foreignCollName.toStringForErrorMsg())
+                        .toInt(),
+                    "Query rejected by maxEstimatedScanBytes: $lookup foreign collection "
+                    "scan "
+                    "requires an unbounded COLLSCAN on a collection that exceeds the "
+                    "configured size threshold",
+                    "namespace"_attr = foreignCollName.toStringForErrorMsg(),
+                    "estimatedSize"_attr =
+                        foreignCollItr->second.maxEstimatedScanBytesCollectionSize,
+                    "threshold"_attr = foreignCollItr->second.maxEstimatedScanBytesThreshold);
+                maxEstimatedScanBytesMetrics::maxEstimatedScanRejected.increment();
+                uasserted(ErrorCodes::NoQueryExecutionPlans,
+                          "Query rejected by maxEstimatedScanBytes: plan requires an unbounded "
+                          "COLLSCAN on a collection that exceeds the configured size threshold");
+            }
         }
         const bool tableScanForbidden = foreignCollItr->second.options &
             (QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::STRICT_NO_TABLE_SCAN);
@@ -1026,14 +1187,17 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
                 "No foreign index and table scan disallowed",
                 !tableScanForbidden);
 
-        if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
+        if (allowDiskUse && isEligibleForHashJoin(knobs, foreignCollItr->second)) {
             // No index with compatible collation. Use HashJoin.
             return EqLookupNode::LookupStrategy::kHashJoin;
         }
 
         if (foreignIndex) {
-            // There is an index with incompatible collation. Use dynamic indexed loop join to
-            // benefit from it in case the data type ignores the collation.
+            // The eligible index has an incompatible collation, is sparse, and/or has a partial
+            // filter. Use the dynamic indexed loop join, which decides per local key at run time
+            // whether the index can be used (collation-independent type, non-null/-missing key for
+            // a sparse index, and/or a local value that satisfies the partial filter expression) or
+            // a collection scan is required.
             return EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin;
         }
 
@@ -1048,7 +1212,7 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
     // $natural hinted scan direction is not relevant for IndexedLoopJoin, but is passed here
     // for consistency.
     if (foreignIndex) {
-        return {lookupStrategy, std::move(foreignIndex), scanDirection};
+        return {lookupStrategy, std::move(foreignIndex), scanDirection, collationCompatibleForDilj};
     }
     return {lookupStrategy, boost::none, scanDirection};
 }
@@ -1060,6 +1224,12 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
     std::set<std::string_view> twoDSphereFields;
     for (const IndexEntry& indexEntry : params.mainCollectionInfo.indexes) {
         if (indexEntry.type != IndexType::INDEX_2DSPHERE) {
+            continue;
+        }
+
+        // Partial indexes don't validate unmatched documents on insertion, so they cannot
+        // guarantee every stored value was already validated.
+        if (indexEntry.filterExpr) {
             continue;
         }
 
@@ -1081,6 +1251,61 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
     }
 }
 
+namespace {
+/**
+ * If 'solnRoot' is a FETCH whose only job is to apply a residual filter over a $geoNear node, push
+ * that filter into the $geoNear node's 'residualFilter' and drop the FETCH.
+ * Trailing $match expressions are currently not merged into geo stages.
+ * TODO SERVER-134855: adjust this comment once this is possible.
+ *
+ * This is result-equivalent: the same MatchExpression is evaluated against the same documents,
+ * just lower in the tree. The geo node already reports fetched() == true and provides all fields,
+ * so removing the FETCH above it is legal. NearStage evaluates 'residualFilter' after the distance
+ * check for the current interval, so the predicate still sees exactly the documents the FETCH
+ * above would have seen -- which matters because a predicate such as $expr can throw on a
+ * document. The win is that documents the predicate rejects no longer pay for BSON ownership or
+ * the distance sorter inside the near stage.
+ *
+ * Note this deliberately uses 'residualFilter', not 'filter': GeoNear2DStage routes
+ * GeoNearParams::filter to its covered IndexScan as a KEY-level filter, which masserts on a
+ * predicate naming a field that is not in the index key pattern.
+ */
+void pushResidualFilterIntoGeoNear(std::unique_ptr<QuerySolutionNode>& solnRoot) {
+    if (solnRoot->getType() != STAGE_FETCH || !solnRoot->filter || solnRoot->children.size() != 1) {
+        return;
+    }
+
+    QuerySolutionNode* child = solnRoot->children[0].get();
+    const StageType childType = child->getType();
+    if (childType != STAGE_GEO_NEAR_2D && childType != STAGE_GEO_NEAR_2DSPHERE) {
+        return;
+    }
+
+    // This is the only place that ever populates 'residualFilter', and it runs once per solution,
+    // so the node cannot already carry one.
+    auto setDocFilter = [&](auto* geoNode) {
+        tassert(13351401,
+                "$geoNear node already has a residual document filter",
+                !geoNode->residualFilter);
+        geoNode->residualFilter = std::move(solnRoot->filter);
+    };
+
+    if (childType == STAGE_GEO_NEAR_2D) {
+        setDocFilter(static_cast<GeoNear2DNode*>(child));
+    } else {
+        setDocFilter(static_cast<GeoNear2DSphereNode*>(child));
+    }
+
+    // Replace the FETCH with its (now filtering) child.
+    solnRoot = std::move(solnRoot->children[0]);
+}
+}  // namespace
+
+// static
+void QueryPlannerAnalysis::rewriteGeo(std::unique_ptr<QuerySolutionNode>& solnRoot) {
+    pushResidualFilterIntoGeoNear(solnRoot);
+}
+
 BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
     BSONObjBuilder sortBob;
     BSONObjIterator kpIt(indexKeyPattern);
@@ -1100,6 +1325,10 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
 // static
 bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
                                           std::unique_ptr<QuerySolutionNode>* solnRoot) {
+    // Upper bound the number of scan leaves is capped at, so it can't overflow and wrap past the
+    // cap.
+    static constexpr size_t kMaxValue = std::numeric_limits<size_t>::max();
+
     vector<QuerySolutionNode*> explodableNodes;
 
     std::unique_ptr<QuerySolutionNode>* toReplace = structureOKForExplode(solnRoot);
@@ -1161,7 +1390,16 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             if (!isOilExplodable(oil, iet)) {
                 break;
             }
-            numScans *= oil.intervals.size();
+
+            // If multiplying would overflow size_t, use the max value so the cap below still
+            // catches it.
+            const size_t numIntervals = oil.intervals.size();
+            if (numIntervals != 0 && numScans > kMaxValue / numIntervals) {
+                numScans = kMaxValue;
+            } else {
+                numScans *= numIntervals;
+            }
+
             kpIt.next();
             ++boundsIdx;
         }
@@ -1222,8 +1460,13 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             }
         }
 
-        // Do some bookkeeping to see how many ixscans we'll create total.
-        totalNumScans += numScans;
+        // Do some bookkeeping to see how many ixscans we'll create total. If addition would
+        // overflow size_t, use the max value so the cap below still catches it.
+        if (totalNumScans > kMaxValue - numScans) {
+            totalNumScans = kMaxValue;
+        } else {
+            totalNumScans += numScans;
+        }
 
         // And for this scan how many fields we expand.
         fieldsToExplode.push_back(boundsIdx);
@@ -1394,7 +1637,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
     // See if solnRoot gives us the sort.  If so, we're done.
     if (analyzeNonBlockingSort(
-            params, sortObj, findCommand.getHint(), true /*reverseScanIfNeeded*/, solnRoot.get())) {
+            params, sortObj, findCommand.getHint(), /*reverseScanIfNeeded=*/true, solnRoot.get())) {
         return solnRoot;
     }
 
@@ -1409,6 +1652,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
     if (!solnRoot->fetched()) {
         const bool sortIsCovered = std::all_of(sortObj.begin(), sortObj.end(), [&](BSONElement e) {
+            // Meta expression sort components (e.g. {$meta: "randVal"}) cannot be covered by
+            // index keys for they require metadata generation which only happens after a fetch.
+            // The element value is an object ({$meta: ...}) rather than a numeric direction.
+            if (!e.isNumber()) {
+                return false;
+            }
             // Note that hasField() will return 'false' in the case that this field is a
             // string and there is a non-simple collation on the index. This will lead to
             // encoding of the field from the document on fetch, despite having read the
@@ -1430,12 +1679,20 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     size_t sortLimit = findCommand.getLimit() ? static_cast<size_t>(*findCommand.getLimit()) +
             static_cast<size_t>(findCommand.getSkip().value_or(0))
                                               : 0;
+    const uint64_t maxMemoryUsageBytes =
+        query.getExpCtx()->getQueryKnobConfiguration().getQueryMaxBlockingSortMemoryUsageBytes();
     if (canUseSimpleSort(*solnRoot, query)) {
-        sortNode = std::make_unique<SortNodeSimple>(
-            std::move(solnRoot), sortObj, sortLimit, LimitSkipParameterization::Disabled);
+        sortNode = std::make_unique<SortNodeSimple>(std::move(solnRoot),
+                                                    sortObj,
+                                                    sortLimit,
+                                                    LimitSkipParameterization::Disabled,
+                                                    maxMemoryUsageBytes);
     } else {
-        sortNode = std::make_unique<SortNodeDefault>(
-            std::move(solnRoot), sortObj, sortLimit, LimitSkipParameterization::Disabled);
+        sortNode = std::make_unique<SortNodeDefault>(std::move(solnRoot),
+                                                     sortObj,
+                                                     sortLimit,
+                                                     LimitSkipParameterization::Disabled,
+                                                     maxMemoryUsageBytes);
     }
     sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
     solnRoot = std::move(sortNode);
@@ -1452,6 +1709,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     auto soln = std::make_unique<QuerySolution>();
 
     soln->indexFilterApplied = params.indexFiltersApplied;
+
+    rewriteGeo(solnRoot);
 
     solnRoot->computeProperties();
 

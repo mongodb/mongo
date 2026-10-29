@@ -376,6 +376,8 @@ declare class Mongo {
         options: object,
     ): GenericReplyFieldsAnd<Commands[ReqType]["res"]>;
 
+    withoutTelemetryContext<T>(fn: () => T): T;
+
     /**
      * Get the current log verbosity levels for all components.
      * @param driverSession Optional session to use

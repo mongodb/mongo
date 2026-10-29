@@ -1,6 +1,7 @@
 /**
  * Analyzes execution stats for indexed distinct.
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   assumes_read_concern_local,
  *   # Explain will return different plan than expected when a collection becomes a time-series

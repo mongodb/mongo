@@ -9,7 +9,7 @@ package(default_visibility = ["//visibility:public"])
 mongo_cc_library(
     name = "resource",
     srcs = glob(["**/*.cc"]),
-    hdrs = glob(["**/*.h"]),
+    hdrs = glob(["**/*.h"], allow_empty = True),
     include_prefix = "src/resource",
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [

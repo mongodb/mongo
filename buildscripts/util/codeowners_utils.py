@@ -73,7 +73,9 @@ class Owners:
         return codeowners
 
     def get_jira_team_from_codeowner(self, codeowner: str) -> list[str]:
-        return self.co_jira_map[codeowner]
+        # Codeowners with no usable JIRA team are mapped to a null entry, which
+        # yaml loads as `[None]`; report them as owning nothing instead.
+        return [team for team in self.co_jira_map[codeowner] if team]
 
     def get_jira_team_owner(self, file_path: str) -> list[str]:
         return [

@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo::extension {
 
@@ -212,17 +187,30 @@ struct ExtensionGetNextResult {
      */
     static ExtensionGetNextResult makeAdvancedFromApiResult(
         ::MongoExtensionGetNextResult& apiResult) {
+        if (isEmptyByteContainer(apiResult.resultDocument)) {
+            // An Advanced result must carry a valid result document; an empty/dangling byte view
+            // (e.g. Rust Vec::as_ptr() on an empty Vec) is a contract violation. Surface it as a
+            // query-level error instead of building a BSONObj from it.
+            uasserted(ErrorCodes::ExtensionSerializationError,
+                      "Extension returned kAdvanced with an empty result document");
+        }
+
+        auto doc = ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument);
+
         // send back metadata only if present
         return isEmptyByteContainer(apiResult.resultMetadata)
-            ? advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument))
-            : advanced(ExtensionBSONObj::makeFromByteContainer(apiResult.resultDocument),
+            ? advanced(std::move(doc))
+            : advanced(std::move(doc),
                        ExtensionBSONObj::makeFromByteContainer(apiResult.resultMetadata));
     };
 
+    // Whether the container has no bytes that can be parsed as a BSON document. In addition to
+    // genuinely empty containers, this also returns true for invalid byte views (null data with a
+    // non-zero length, or a non-null pointer with len 0) that must not be dereferenced.
     static bool isEmptyByteContainer(const ::MongoExtensionByteContainer& container) {
         switch (container.type) {
             case MongoExtensionByteContainerType::kByteView:
-                return container.bytes.view.data == nullptr && container.bytes.view.len == 0;
+                return container.bytes.view.data == nullptr || container.bytes.view.len == 0;
             case MongoExtensionByteContainerType::kByteBuf:
                 return container.bytes.buf == nullptr;
             default:
@@ -236,21 +224,30 @@ struct ExtensionGetNextResult {
      * MongoExtensionGetNextResult struct has an invalid code, asserts in that case.
      */
     static ExtensionGetNextResult makeFromApiResult(::MongoExtensionGetNextResult& apiResult) {
+        // get_next() transfers ownership of any kByteBuf to the host regardless of the result
+        // code, but only the kAdvanced path consumes the transferred bytes. Reclaim them on every
+        // other path (including any assertions) so a misbehaving extension cannot leak a buffer.
+        ScopeGuard reclaimTransferredBytes([&] {
+            destroyTransferredBytes(apiResult.resultDocument);
+            destroyTransferredBytes(apiResult.resultMetadata);
+        });
+
         ExtensionGetNextResult result;
         switch (apiResult.code) {
             case ::MongoExtensionGetNextResultCode::kAdvanced: {
                 result = ExtensionGetNextResult::makeAdvancedFromApiResult(apiResult);
+                reclaimTransferredBytes.dismiss();
                 break;
             }
             case ::MongoExtensionGetNextResultCode::kPauseExecution:
-                result = ExtensionGetNextResult::pauseExecution();
-                break;
             case ::MongoExtensionGetNextResultCode::kEOF: {
-                result = ExtensionGetNextResult::eof();
+                result = (apiResult.code == ::MongoExtensionGetNextResultCode::kPauseExecution)
+                    ? ExtensionGetNextResult::pauseExecution()
+                    : ExtensionGetNextResult::eof();
                 break;
             }
             default:
-                tasserted(10956803,
+                tasserted(ErrorCodes::ExtensionError,
                           str::stream()
                               << "Invalid MongoExtensionGetNextResultCode: " << apiResult.code);
         }
@@ -272,7 +269,7 @@ struct ExtensionGetNextResult {
                 break;
             }
             case GetNextCode::kPauseExecution: {
-                tassert(10956802,
+                tassert(ErrorCodes::ExtensionError,
                         str::stream()
                             << "If the ExtensionGetNextResult code is kPauseExecution, then "
                                "there are currently no results to return so "
@@ -286,7 +283,7 @@ struct ExtensionGetNextResult {
                 break;
             }
             case GetNextCode::kEOF: {
-                tassert(10956805,
+                tassert(ErrorCodes::ExtensionError,
                         str::stream()
                             << "If the ExtensionGetNextResult code is kEOF, then there are no "
                                "results to return so ExtensionGetNextResult shouldn't have a "
@@ -305,9 +302,18 @@ struct ExtensionGetNextResult {
     }
 
 private:
+    // Destroys a kByteBuf whose ownership was transferred to the host by an extension when the
+    // current path does not consume it. kByteView memory is owned by the extension and must not
+    // be freed here.
+    static void destroyTransferredBytes(::MongoExtensionByteContainer& container) {
+        if (container.type == MongoExtensionByteContainerType::kByteBuf && container.bytes.buf) {
+            ExtensionByteBufHandle{container.bytes.buf};
+        }
+    }
+
     // Internal helper for populating an output ::MongoExtensionGetNextResult.
     void _toAdvancedApiResult(::MongoExtensionGetNextResult& outputResult) {
-        tassert(10956801,
+        tassert(ErrorCodes::ExtensionError,
                 "If the ExtensionGetNextResult code is kAdvanced, then ExtensionGetNextResult "
                 "should have a result to return.",
                 resultDocument.has_value());

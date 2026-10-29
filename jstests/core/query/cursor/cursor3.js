@@ -1,6 +1,7 @@
 // Test inequality bounds combined with ordering for a single-field index.
 // BUG 1079 (fixed)
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 // ]
 

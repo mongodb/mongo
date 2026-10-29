@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/validate/collection_validation.h"
 
@@ -84,6 +58,11 @@ struct DataSpec {
     int numFields{0};     // range(1): number of integer fields "a1".."aN" per document.
     int payloadBytes{0};  // range(2): size of an additional string field, in bytes (0 = omit).
     int numIndexes{0};    // range(3): number of secondary indexes, on fields "a1".."aK".
+    int arrayLength{0};   // range(4): if > 0, field "a1" is an array of this length (making an
+                          // index on it multikey). Only "a1" is arrayed so this axis varies index
+                          // key count without also growing document size.
+    bool deprecatedType{false};  // range(5): if nonzero, every document carries a deprecated-type
+                                 // (Symbol) field, which BSON validation reports as non-conformant.
 };
 
 // Creates 'numIndexes' secondary indexes on the (empty) collection, keyed on fields a1..aK. Must be
@@ -118,10 +97,24 @@ size_t insertRecords(OperationContext* opCtx, const DataSpec& spec) {
             BSONObjBuilder builder;
             builder.append("_id", id);
             for (int f = 1; f <= spec.numFields; ++f) {
-                builder.append("a" + std::to_string(f), id * spec.numFields + f);
+                const auto field = "a" + std::to_string(f);
+                const int base = id * spec.numFields + f;
+                if (spec.arrayLength > 0 && f == 1) {
+                    // An array value makes any index on this field multikey; the key generator
+                    // emits one index key per element.
+                    BSONArrayBuilder arr(builder.subarrayStart(field));
+                    for (int e = 0; e < spec.arrayLength; ++e) {
+                        arr.append(int64_t{base} * spec.arrayLength + e);
+                    }
+                } else {
+                    builder.append(field, base);
+                }
             }
             if (spec.payloadBytes > 0) {
                 builder.append("p", payload);
+            }
+            if (spec.deprecatedType) {
+                builder.appendSymbol("d", "x");
             }
             auto obj = builder.obj();
             totalBytes += obj.objsize();
@@ -145,6 +138,8 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
         .numFields = static_cast<int>(state.range(1)),
         .payloadBytes = static_cast<int>(state.range(2)),
         .numIndexes = static_cast<int>(state.range(3)),
+        .arrayLength = static_cast<int>(state.range(4)),
+        .deprecatedType = state.range(5) != 0,
     };
 
     ValidateBenchmarkFixture fixture;
@@ -162,7 +157,7 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
             kNss,
             collection_validation::ValidationOptions{
                 mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
-            &results));
+            results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
     }
@@ -176,28 +171,35 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
 // Baseline shape: 4 small fields, no payload, no secondary indexes. Sweeps record count.
 void RecordCountArgs(benchmark::internal::Benchmark* b) {
     for (int n : {1'000, 10'000, 100'000}) {
-        b->Args({n, 4, 0, 0});
+        b->Args({n, 4, 0, 0, 0, 0});
     }
 }
 
 // Fixed record count; sweeps document size via a string payload field.
 void DocSizeArgs(benchmark::internal::Benchmark* b) {
     for (int payload : {0, 256, 4'096, 16'384}) {
-        b->Args({50'000, 4, payload, 0});
+        b->Args({50'000, 4, payload, 0, 0, 0});
     }
 }
 
 // Fixed record count; sweeps the number of (small) fields per document, stressing BSON traversal.
 void FieldCountArgs(benchmark::internal::Benchmark* b) {
     for (int fields : {1, 8, 32, 128}) {
-        b->Args({50'000, fields, 0, 0});
+        b->Args({50'000, fields, 0, 0, 0, 0});
     }
 }
 
 // Fixed record count; sweeps the number of secondary indexes (keyed on a1..aK; needs >= K fields).
 void IndexCountArgs(benchmark::internal::Benchmark* b) {
     for (int indexes : {0, 1, 2, 4}) {
-        b->Args({50'000, 4, 0, indexes});
+        b->Args({50'000, 4, 0, indexes, 0, 0});
+    }
+}
+
+// Fixed record count; with and without a deprecated BSON type field in every document.
+void DeprecatedTypeArgs(benchmark::internal::Benchmark* b) {
+    for (const bool deprecatedType : {false, true}) {
+        b->Args({50'000, 4, 0, 0, 0, deprecatedType});
     }
 }
 
@@ -235,6 +237,34 @@ BENCHMARK_CAPTURE(BM_Validate,
                   collection_validation::ValidateMode::kForegroundFull)
     ->Apply(IndexCountArgs);
 
+// Multikey axis (full validation traverses one index key per array element). A single field and a
+// single index so that nearly all index-validation work is the multikey work being swept.
+BENCHMARK_CAPTURE(BM_Validate,
+                  ForegroundFull_Multikey,
+                  collection_validation::ValidateMode::kForegroundFull)
+    ->RangeMultiplier(4)
+    ->Ranges({
+        {10'000, 10'000},  // numRecords fixed
+        {1, 1},            // numFields fixed
+        {0, 0},            // payloadBytes fixed
+        {1, 1},            // numIndexes fixed
+        {0, 1024},         // arrayLen sweeps: 0, 1, 4, 16, 64, 256, 1024
+        {0, 0}             // deprecatedType off
+    });
+
+// Deprecated-type axis (non-conformant documents take an extra structural validation pass).
+BENCHMARK_CAPTURE(BM_Validate,
+                  Foreground_DeprecatedType,
+                  collection_validation::ValidateMode::kForeground)
+    ->Apply(DeprecatedTypeArgs);
+BENCHMARK_CAPTURE(BM_Validate,
+                  ForegroundFull_DeprecatedType,
+                  collection_validation::ValidateMode::kForegroundFull)
+    ->Apply(DeprecatedTypeArgs);
+BENCHMARK_CAPTURE(BM_Validate,
+                  ForegroundFullCheckBSON_DeprecatedType,
+                  collection_validation::ValidateMode::kForegroundFullCheckBSON)
+    ->Apply(DeprecatedTypeArgs);
 // ── Timeseries variant ────────────────────────────────────────────────────────
 
 const NamespaceString kTsNss =
@@ -244,6 +274,9 @@ const NamespaceString kTsUserNss =
 
 // One hour per bucket matches the default "seconds" granularity span.
 constexpr int64_t kBucketSpanSeconds = 3600;
+
+// range(2) of the timeseries benchmarks: records per record store slice, 0 = single-threaded.
+constexpr int kParallelTargetRecordsPerSlice = 500;
 
 CollectionOptions makeTimeseriesOptions(const UUID& uuid) {
     CollectionOptions opts;
@@ -310,6 +343,7 @@ size_t insertTimeseriesBuckets(OperationContext* opCtx,
 void BM_ValidateTimeseries(benchmark::State& state, collection_validation::ValidateMode mode) {
     const int numBuckets = static_cast<int>(state.range(0));
     const int measurementsPerBucket = static_cast<int>(state.range(1));
+    const int64_t targetRecordsPerSlice = state.range(2);
 
     const UUID uuid = UUID::gen();
     ValidateBenchmarkFixture fixture;
@@ -321,18 +355,30 @@ void BM_ValidateTimeseries(benchmark::State& state, collection_validation::Valid
     const size_t totalBytes =
         insertTimeseriesBuckets(opCtx, numBuckets, measurementsPerBucket, opts);
 
+    int64_t numSlices = 1;
     for (auto _ : state) {
         ValidateResults results;
         uassertStatusOK(collection_validation::validate(
             opCtx,
             kTsNss,
             collection_validation::ValidationOptions{
-                mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
-            &results));
+                mode,
+                collection_validation::RepairMode::kNone,
+                /*logDiagnostics=*/false,
+                currentValidationVersion,
+                /*verifyConfigurationOverride=*/boost::none,
+                /*readTimestamp=*/boost::none,
+                /*hashPrefixes=*/boost::none,
+                /*revealHashedIds=*/boost::none,
+                targetRecordsPerSlice > 0 ? boost::optional<int64_t>(targetRecordsPerSlice)
+                                          : boost::none},
+            results));
         invariant(results.isValid());
+        numSlices = results.getNumRecordStoreSlices().value_or(1);
         benchmark::DoNotOptimize(results);
     }
 
+    state.counters["slices"] = numSlices;
     state.SetItemsProcessed(state.iterations() * numBuckets);
     state.SetBytesProcessed(state.iterations() * totalBytes);
     fixture.tearDown();
@@ -341,26 +387,32 @@ void BM_ValidateTimeseries(benchmark::State& state, collection_validation::Valid
 // Sweeps bucket count at fixed 10 measurements/bucket.
 void TimeseriesBucketCountArgs(benchmark::internal::Benchmark* b) {
     for (int buckets : {1'000, 10'000, 50'000}) {
-        b->Args({buckets, 10});
+        for (int targetRecordsPerSlice : {0, kParallelTargetRecordsPerSlice}) {
+            b->Args({buckets, 10, targetRecordsPerSlice});
+        }
     }
 }
 
 // Sweeps measurements/bucket at fixed 10k buckets, stressing BSONColumn decode cost.
 void TimeseriesMeasurementsPerBucketArgs(benchmark::internal::Benchmark* b) {
     for (int measurements : {1, 10, 50, 100}) {
-        b->Args({10'000, measurements});
+        for (int targetRecordsPerSlice : {0, kParallelTargetRecordsPerSlice}) {
+            b->Args({10'000, measurements, targetRecordsPerSlice});
+        }
     }
 }
 
 BENCHMARK_CAPTURE(BM_ValidateTimeseries,
                   ForegroundFull_TS_BucketCount,
                   collection_validation::ValidateMode::kForegroundFull)
-    ->Apply(TimeseriesBucketCountArgs);
+    ->Apply(TimeseriesBucketCountArgs)
+    ->UseRealTime();
 
 BENCHMARK_CAPTURE(BM_ValidateTimeseries,
                   ForegroundFull_TS_MeasurementsPerBucket,
                   collection_validation::ValidateMode::kForegroundFull)
-    ->Apply(TimeseriesMeasurementsPerBucketArgs);
+    ->Apply(TimeseriesMeasurementsPerBucketArgs)
+    ->UseRealTime();
 
 }  // namespace
 }  // namespace mongo

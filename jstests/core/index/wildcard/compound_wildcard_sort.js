@@ -1,6 +1,7 @@
 /**
  * Tests that a compound wildcard index can be used to support non-blocking sorts via index scan.
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   # We may choose a different plan if other indexes are created, which would break the test.
  *   assumes_no_implicit_index_creation,

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,7 +8,9 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/validate/size_limited_bsonobj_heap.h"
 #include "mongo/db/validate/validate_state.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
@@ -47,12 +23,14 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 namespace collection_validation {
-// forwards declaring RepairMode to avoid adding validate_option to core headers
+// forwards declaring RepairMode and SliceStrategy to avoid adding validate_option and
+// record_store_slicer to core headers
 enum class RepairMode;
+enum class SliceStrategy;
 }  // namespace collection_validation
 
 class ValidateResultsIf {
@@ -152,8 +130,17 @@ public:
         _isMultikey = isMultikey;
     }
 
+    int64_t getKeyBytesTraversed() const {
+        return _keyBytesTraversed;
+    }
+
+    void addKeyBytesTraversed(int64_t keyBytesTraversed) {
+        _keyBytesTraversed += keyBytesTraversed;
+    }
+
 private:
     int64_t _keysTraversed = 0;
+    int64_t _keyBytesTraversed = 0;
     int64_t _keysRemovedFromRecordStore = 0;
     BSONObj _spec = {};
     bool _hasStructuralDamage = false;
@@ -163,6 +150,19 @@ private:
 using ValidateResultsMap = std::map<std::string, IndexValidateResults>;
 
 // Validation results for an entire collection.
+/**
+ * Describes how evenly a parallel record store traversal divided the records across its slices.
+ * Sizes are record counts.
+ */
+struct RecordStoreTraversalParallelMetrics {
+    collection_validation::SliceStrategy sliceStrategy{};
+    long long sliceCount = 0;
+    long long minSliceSize = 0;
+    long long maxSliceSize = 0;
+    double meanSliceSize = 0;
+    double stddevSliceSize = 0;
+};
+
 class ValidateResults final : public ValidateResultsIf {
 public:
     bool isValid() const override {
@@ -184,13 +184,17 @@ public:
         _uuid = std::move(uuid);
     }
 
+    const boost::optional<UUID>& getUUID() const {
+        return _uuid;
+    }
+
     const std::vector<BSONObj>& getExtraIndexEntries() const {
-        return _extraIndexEntries;
+        return _extraIndexEntries.entries();
     }
     void addExtraIndexEntry(BSONObj entry);
 
     const std::vector<BSONObj>& getMissingIndexEntries() const {
-        return _missingIndexEntries;
+        return _missingIndexEntries.entries();
     }
     void addMissingIndexEntry(BSONObj entry);
 
@@ -206,6 +210,67 @@ public:
     }
     void setCollectionHash(SHA256Block collectionHash) {
         _collectionHash = std::move(collectionHash);
+    }
+
+    boost::optional<uint64_t> getXxh3CollectionHash() const {
+        return _xxh3CollectionHash;
+    }
+    void setXxh3CollectionHash(uint64_t xxh3CollectionHash) {
+        _xxh3CollectionHash = xxh3CollectionHash;
+    }
+
+    /**
+     * The collection hash this validation expected, and whether the hash it accumulated matched.
+     *
+     * This is the value that the replicated metadata system holds on disk that is brought
+     * forward to the validate timestamp by replaying the oplog from the point it is valid-as-of.
+     * Absent when no expected value could be derived.
+     */
+    boost::optional<int64_t> getExpectedXxh3CollectionHash() const {
+        return _expectedXxh3CollectionHash;
+    }
+    void setExpectedXxh3CollectionHash(int64_t expected) {
+        _expectedXxh3CollectionHash = expected;
+    }
+
+    /**
+     * Why the comparison of the accumulated collection hash against the replicated metadata
+     * system's hash did or did not happen.
+     */
+    enum class HashComparison {
+        // The replicated metadata system is not tracking this collection.
+        kNotTracked,
+        // The scan read an earlier instant than the replayed oplog would describe.
+        kPinnedReadTimestamp,
+        // Tracked, but nothing has been flushed for this collection yet.
+        kNoPersistedEntry,
+        // An entry exists but carries no hash.
+        kNoPersistedHash,
+        // Some oplog entry in the replayed range carried no per-document hash, so not every write
+        // in that range could be accounted for and the folded value is incomplete.
+        kIncompleteDelta,
+        // The comparison threw. Reported rather than propagated so validate can continue.
+        kComparisonFailed,
+        // An expected value was derived but not yet compared. Never reported.
+        kComparable,
+        kMatched,
+        kMismatched,
+    };
+
+    /**
+     * Records the outcome of comparing the accumulated collection hash against the expected one,
+     * adding a warning when they disagree. Returns true if they matched.
+     */
+    bool recordHashComparison(uint64_t accumulated, int64_t expected);
+
+    /**
+     * Why the comparison against the replicated collection hash did or did not happen.
+     */
+    const boost::optional<HashComparison>& getHashComparison() const {
+        return _hashComparison;
+    }
+    void setHashComparison(HashComparison comparison) {
+        _hashComparison = comparison;
     }
 
     const boost::optional<SHA256Block>& getMetadataHash() const {
@@ -262,12 +327,40 @@ public:
         _numInvalidDocuments = numInvalidDocuments;
     }
 
+    long long incrementNumInvalidDocuments(long long increment = 1) {
+        _numInvalidDocuments = _numInvalidDocuments.value_or(0) + increment;
+        return *_numInvalidDocuments;
+    }
+
     void setNumNonCompliantDocuments(long long numNonCompliantDocuments) {
         _numNonCompliantDocuments = numNonCompliantDocuments;
     }
 
+    long long incrementNumNonCompliantDocuments(long long increment = 1) {
+        _numNonCompliantDocuments = _numNonCompliantDocuments.value_or(0) + increment;
+        return *_numNonCompliantDocuments;
+    }
+
     void setNumRecords(long long numRecords) {
         _numRecords = numRecords;
+    }
+
+    long long incrementNumRecords(long long increment = 1) {
+        _numRecords = _numRecords.value_or(0) + increment;
+        return *_numRecords;
+    }
+
+    boost::optional<long long> getNumRecords() const {
+        return _numRecords;
+    }
+
+    void setDataSize(long long dataSize) {
+        _dataSize = dataSize;
+    }
+
+    // Total bytes of record data read during the record store traversal.
+    boost::optional<long long> getDataSize() const {
+        return _dataSize;
     }
 
     const std::set<Timestamp>& getRecordTimestamps() const {
@@ -331,6 +424,19 @@ public:
         return _repairMode;
     }
 
+    boost::optional<long long> getNumRecordStoreSlices() const {
+        return _numRecordStoreSlices;
+    }
+
+    const boost::optional<RecordStoreTraversalParallelMetrics>&
+    getRecordStoreTraversalParallelMetrics() const {
+        return _recordStoreTraversalParallelMetrics;
+    }
+
+    void setRecordStoreTraversalParallelMetrics(RecordStoreTraversalParallelMetrics metrics) {
+        _recordStoreTraversalParallelMetrics = metrics;
+    }
+
     void setRepairMode(collection_validation::RepairMode mode);
 
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
@@ -345,11 +451,11 @@ public:
 private:
     boost::optional<UUID> _uuid;
     boost::optional<NamespaceString> _nss;
+    // Up to 1MB of "inconsistency" errors will be kept, i.e. missing/extra index fields.
+    static constexpr size_t kMaxIndexInconsistencySize = 1 * 1024 * 1024;
 
-    size_t _extraIndexEntriesUsedBytes = 0;
-    size_t _missingIndexEntriesUsedBytes = 0;
-    std::vector<BSONObj> _extraIndexEntries;
-    std::vector<BSONObj> _missingIndexEntries;
+    SizeLimitedBSONObjHeap _extraIndexEntries{kMaxIndexInconsistencySize};
+    SizeLimitedBSONObjHeap _missingIndexEntries{kMaxIndexInconsistencySize};
     std::vector<RecordId> _corruptRecords;
 
     bool _repaired = false;
@@ -364,9 +470,13 @@ private:
     boost::optional<long long> _numInvalidDocuments;
     boost::optional<long long> _numNonCompliantDocuments;
     boost::optional<long long> _numRecords;
+    boost::optional<long long> _dataSize;
 
     // Hashes computed for extended validate.
     boost::optional<SHA256Block> _collectionHash;
+    boost::optional<uint64_t> _xxh3CollectionHash;
+    boost::optional<int64_t> _expectedXxh3CollectionHash;
+    boost::optional<HashComparison> _hashComparison;
     boost::optional<SHA256Block> _metadataHash;
     boost::optional<stdx::unordered_map<std::string, std::pair<std::string, int>>> _partialHashes;
     boost::optional<stdx::unordered_map<std::string, std::vector<BSONObj>>> _revealedIds;
@@ -382,6 +492,18 @@ private:
 
     // Maps index names to index-specific validation results.
     ValidateResultsMap _indexResultsMap;
+
+    // Collection Scan Metadata
+    // Populate only if parallel record store scan. Reports the number of slices scanned in Phase 1
+    // traversal.
+    boost::optional<long long> _numRecordStoreSlices;
+    // Populate only if parallel record store scan.
+    boost::optional<RecordStoreTraversalParallelMetrics> _recordStoreTraversalParallelMetrics;
 };
+
+/**
+ * Renders a hash comparison outcome for the validate reply.
+ */
+std::string_view toString(ValidateResults::HashComparison comparison);
 
 }  // namespace mongo

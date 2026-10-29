@@ -2,6 +2,9 @@
  * Tests batch-deleting a large range of data using a given predicate.
  * TODO SERVER-97166 Re-evaluate if this test does not need to rely on getMores
  * This test does not rely on getMores on purpose.
+ * @tags: [
+ *   uses_explain,
+ * ]
  */
 
 export function runBatchedMultiDeletesTest(coll, queryPredicate) {

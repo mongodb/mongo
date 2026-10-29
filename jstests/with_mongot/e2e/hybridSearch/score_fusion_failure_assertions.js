@@ -7,8 +7,6 @@
  * TODO SERVER-100404: Re-enable this for sharded queries.
  * @tags: [
  *   assumes_unsharded_collection,
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_82
  * ]
  */

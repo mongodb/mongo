@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains a test framework for testing sbe::PlanStages.
@@ -33,47 +7,21 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
-#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional/optional.hpp>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-
 namespace mongo::sbe {
 
-void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
-                                             value::Value lhsVal,
-                                             value::TypeTags rhsTag,
-                                             value::Value rhsVal) {
-    const auto equal = valueEquals(lhsTag, lhsVal, rhsTag, rhsVal);
-    if (!equal) {
-        std::stringstream ss;
-        ss << "assertValuesEqual failure: " << std::make_pair(lhsTag, lhsVal)
-           << " != " << std::make_pair(rhsTag, rhsVal);
-        LOGV2(5075401, "{msg}", "msg"_attr = ss.str());
-    }
-    ASSERT_TRUE(equal);
-}
-
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
-    value::TypeTags arrTag,
-    value::Value arrVal,
-    PlanNodeId planNodeId /*= kEmptyPlanNodeId*/,
-    bool owned /*=true*/) {
-    invariant(sbe::value::isArray(arrTag));
+    value::TagValueMaybeOwned arr, PlanNodeId planNodeId /*= kEmptyPlanNodeId*/) {
+    invariant(sbe::value::isArray(arr.tag()));
 
     auto outputSlot = _slotIdGenerator->generate();
-    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId,
-                                                         outputSlot,
-                                                         arrTag,
-                                                         arrVal,
-                                                         nullptr /*yieldPolicy*/,
-                                                         true /*participateInTrialRunTracking*/,
-                                                         owned /*owned*/);
+    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId, outputSlot, std::move(arr));
 
     // Return the VirtualScanStage and its output slot.
     return {outputSlot, std::move(virtualScan)};
@@ -82,7 +30,7 @@ std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::gener
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     const BSONArray& array) {
     auto [arrTag, arrVal] = stage_builder::makeValue(array);
-    return generateVirtualScan(arrTag, arrVal);
+    return generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, arrTag, arrVal));
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
@@ -94,7 +42,8 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots,
     invariant(numSlots >= 1);
 
     // Generate a mock scan with a single output slot.
-    auto [scanSlot, scanStage] = generateVirtualScan(arrTag, arrVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, arrTag, arrVal));
 
     // Create a ProjectStage that will read the data from 'scanStage' and split it up
     // across multiple output slots.
@@ -115,6 +64,12 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots,
     return {std::move(projectSlots),
             sbe::makeS<sbe::ProjectStage>(
                 std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
+}
+
+std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
+PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots, value::TagValueOwned arr) {
+    auto [arrTag, arrVal] = arr.releaseToRaw();
+    return generateVirtualScanMulti(numSlots, arrTag, arrVal);
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
@@ -164,9 +119,8 @@ std::vector<value::SlotAccessor*> PlanStageTestFixture::prepareTree(CompileCtx* 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
     PlanStage* stage, value::SlotAccessor* accessor) {
     // Allocate an array to hold the results.
-    auto [resultsTag, resultsVal] = value::makeNewArray();
-    value::ValueGuard guard{resultsTag, resultsVal};
-    auto resultsView = value::getArrayView(resultsVal);
+    value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto resultsView = value::getArrayView(resultsOwned.value());
     // Loop and repeatedly call getNext() until we reach the end, storing the values produced
     // into the array.
     size_t i = 0;
@@ -182,8 +136,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
         }
     }
 
-    guard.reset();
-    return {resultsTag, resultsVal};
+    return resultsOwned.releaseToRaw();
 }
 
 void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* accessor) {
@@ -194,23 +147,20 @@ void PlanStageTestFixture::exhaustStage(PlanStage* stage, value::SlotAccessor* a
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMulti(
     PlanStage* stage, std::vector<value::SlotAccessor*> accessors, bool forceSpill) {
     // Allocate an SBE array to hold the results.
-    auto [resultsTag, resultsVal] = value::makeNewArray();
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
-    auto resultsView = value::getArrayView(resultsVal);
+    value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto resultsView = value::getArrayView(resultsOwned.value());
 
     // Loop and repeatedly call getNext() until we reach the end.
     size_t j = 0;
     for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), ++j) {
         // Create a new SBE array (`arr`) containing the values produced by each SlotAccessor
         // and insert `arr` into the array of results.
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard{arrTag, arrVal};
-        auto arrView = value::getArrayView(arrVal);
+        value::TagValueOwned arrOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto arrView = value::getArrayView(arrOwned.value());
         for (size_t i = 0; i < accessors.size(); ++i) {
             arrView->push_back(accessors[i]->getCopyOfValue());
         }
-        guard.reset();
-        resultsView->push_back_raw(arrTag, arrVal);
+        resultsView->push_back_raw(arrOwned.releaseToRaw());
 
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).
@@ -222,15 +172,14 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
 
         if (forceSpill && resultsView->size() % 3 == 0) {
             // check the forceSpill stage
-            stage->forceSpill(nullptr /*yieldPolicy*/);
+            stage->forceSpill(/*yieldPolicy=*/nullptr);
             if (stage->getMemoryTracker()) {
                 ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
             }
         }
     }
 
-    resultsGuard.reset();
-    return {resultsTag, resultsVal};
+    return resultsOwned.releaseToRaw();
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
@@ -239,7 +188,8 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
     value::Value inputVal,
     const MakeStageFn<value::SlotId>& makeStage) {
     // Generate a mock scan from `input` with a single output slot.
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
 
     // Call the `makeStage` callback to create the PlanStage that we want to test, passing in
     // the mock scan subtree and its output slot.
@@ -252,20 +202,42 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
     return getAllResults(stage.get(), resultAccessor);
 }
 
+std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
+    value::TypeTags inputTag,
+    value::Value inputVal,
+    const MakeStageWithEnvFn<value::SlotId>& makeStage) {
+    stage_builder::Environment env{std::make_unique<RuntimeEnvironment>()};
+
+    return runTest(&env.ctx,
+                   inputTag,
+                   inputVal,
+                   [&](value::SlotId scanSlots, std::unique_ptr<PlanStage> scanStage) {
+                       return makeStage(scanSlots, std::move(scanStage), env);
+                   });
+}
+
 void PlanStageTestFixture::runTest(value::TypeTags inputTag,
                                    value::Value inputVal,
                                    value::TypeTags expectedTag,
                                    value::Value expectedVal,
                                    const MakeStageFn<value::SlotId>& makeStage) {
-    // Set up a ValueGuard to ensure `expected` gets released.
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    // Set up a TagValueOwned to ensure `expected` gets released.
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
     auto ctx = makeCompileCtx();
-    auto [resultsTag, resultsVal] = runTest(ctx.get(), inputTag, inputVal, makeStage);
+    value::TagValueOwned resultsOwned =
+        value::TagValueOwned::fromRaw(runTest(ctx.get(), inputTag, inputVal, makeStage));
 
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
     // Compare the results produced with the expected output and assert that they match.
-    assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(resultsOwned.tag(), resultsOwned.value(), expectedTag, expectedVal);
+}
+
+void PlanStageTestFixture::runTest(value::TagValueOwned input,
+                                   value::TagValueOwned expected,
+                                   const MakeStageFn<value::SlotId>& makeStage) {
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
+    runTest(inputTag, inputVal, expectedTag, expectedVal, makeStage);
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(
@@ -304,15 +276,14 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         const MakeStageFn<value::SlotVector>& makeStageMulti,
                                         bool forceSpill,
                                         const AssertStageStatsFn& assertStageStats) {
-    // Set up a ValueGuard to ensure `expected` gets released.
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    // Set up a TagValueOwned to ensure `expected` gets released.
+    value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
-    auto [resultsTag, resultsVal] = runTestMulti(
-        numInputSlots, inputTag, inputVal, makeStageMulti, forceSpill, assertStageStats);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsOwned = value::TagValueOwned::fromRaw(runTestMulti(
+        numInputSlots, inputTag, inputVal, makeStageMulti, forceSpill, assertStageStats));
 
     // Compare the results produced with the expected output and assert that they match.
-    assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
+    ASSERT_SBE_VALUE_EQ(resultsOwned.tag(), resultsOwned.value(), expectedTag, expectedVal);
 }
 
 }  // namespace mongo::sbe

@@ -1,39 +1,15 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -47,30 +23,30 @@ class SBEBuiltinSetOpTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
                                 std::pair<value::TypeTags, value::Value> expectedArray) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(isArray(tag));
-        auto [cmpTag, cmpVal] =
-            value::compareValue(tag, val, expectedArray.first, expectedArray.second);
+        ASSERT(isArray(result.tag()));
+        auto [cmpTag, cmpVal] = value::compareValue(
+            result.tag(), result.value(), expectedArray.first, expectedArray.second);
         ASSERT_EQUALS(cmpTag, sbe::value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT_EQUALS(tag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(val, 0);
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     void runAndAssertBoolean(const vm::CodeFragment* compiledExpr, bool expected) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
 
-        ASSERT(tag == value::TypeTags::Boolean);
-        ASSERT_EQUALS(value::bitcastTo<bool>(val), expected);
+        ASSERT(result.tag() == value::TypeTags::Boolean);
+        ASSERT_EQUALS(value::bitcastTo<bool>(result.value()), expected);
     }
 };
 
@@ -86,17 +62,17 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetUnion) {
     slotAccessor1.reset(arrTag1, arrVal1);
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 3));
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(1 << 2 << 3 << 5));
-    value::ValueGuard resGuard(resArrTag, resArrVal);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    value::TagValueOwned unionResult =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3 << 5)));
+    runAndAssertExpression(compiledExpr.get(), {unionResult.tag(), unionResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = value::makeNewArray();
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag1, resArrVal1] = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+    value::TagValueOwned unionResult1 =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
+    runAndAssertExpression(compiledExpr.get(), {unionResult1.tag(), unionResult1.value()});
 }
 
 TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
@@ -153,17 +129,19 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
     slotAccessor1.reset(arrTag1, arrVal1);
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 3));
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(2 << 3));
-    value::ValueGuard resGuard(resArrTag, resArrVal);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    value::TagValueOwned intersectionResult =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(2 << 3)));
+    runAndAssertExpression(compiledExpr.get(),
+                           {intersectionResult.tag(), intersectionResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = value::makeNewArray();
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag1, resArrVal1] = value::makeNewArraySet();
-    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+    value::TagValueOwned intersectionResult1 =
+        value::TagValueOwned::fromRaw(value::makeNewArraySet());
+    runAndAssertExpression(compiledExpr.get(),
+                           {intersectionResult1.tag(), intersectionResult1.value()});
 }
 
 TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
@@ -194,23 +172,23 @@ TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
     slotAccessor1.reset(arrTag1, arrVal1);
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 7));
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(1 << 3));
-    value::ValueGuard resGuard(resArrTag, resArrVal);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    value::TagValueOwned diffResult =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 3)));
+    runAndAssertExpression(compiledExpr.get(), {diffResult.tag(), diffResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3 << 1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(2 << 5 << 7));
     slotAccessor2.reset(arrTag2, arrVal2);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+    runAndAssertExpression(compiledExpr.get(), {diffResult.tag(), diffResult.value()});
 
     std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
     slotAccessor1.reset(arrTag1, arrVal1);
     std::tie(arrTag2, arrVal2) = value::makeNewArray();
     slotAccessor2.reset(arrTag2, arrVal2);
-    auto [resArrTag1, resArrVal1] = makeArraySet(BSON_ARRAY(1 << 2 << 3));
-    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
-    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+    value::TagValueOwned diffResult1 =
+        value::TagValueOwned::fromRaw(makeArraySet(BSON_ARRAY(1 << 2 << 3)));
+    runAndAssertExpression(compiledExpr.get(), {diffResult1.tag(), diffResult1.value()});
 }
 
 TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {
@@ -333,5 +311,62 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor2.reset(arrTag2, arrVal2);
     runAndAssertNothing(compiledExpr.get());
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetUnionWithinLimitSucceeds) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setUnionExpr =
+        makeFunction(EFn::kSetUnion, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setUnionExpr);
+
+    const std::string largeStr(1024, 'a');
+    BSONArrayBuilder builder1;
+    BSONArrayBuilder builder2;
+    for (int i = 0; i < 5; ++i) {
+        builder1.append(largeStr + std::to_string(i));
+        builder2.append(largeStr + std::to_string(i + 5));
+    }
+    auto [arrTag1, arrVal1] = makeArray(builder1.arr());
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(builder2.arr());
+    slotAccessor2.reset(arrTag2, arrVal2);
+
+    // 10 unique strings * ~1025 bytes = ~10KB; limit set well above that.
+    unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                         20 * 1024};
+    auto [resTag, resVal] = runCompiledExpression(compiledExpr.get());
+    value::TagValueOwned guard = value::TagValueOwned::fromRaw(resTag, resVal);
+
+    ASSERT(value::isArray(resTag));
+    ASSERT_EQUALS(value::getArraySetView(resVal)->size(), 10u);
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetUnionExceedsMemoryLimit) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setUnionExpr =
+        makeFunction(EFn::kSetUnion, makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setUnionExpr);
+
+    const std::string largeStr(1024, 'a');
+    BSONArrayBuilder builder1;
+    BSONArrayBuilder builder2;
+    for (int i = 0; i < 5; ++i) {
+        builder1.append(largeStr + std::to_string(i));
+        builder2.append(largeStr + std::to_string(i + 5));
+    }
+    auto [arrTag1, arrVal1] = makeArray(builder1.arr());
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(builder2.arr());
+    slotAccessor2.reset(arrTag2, arrVal2);
+
+    unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                         10 * 1024};
+    ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 }  // namespace mongo::sbe

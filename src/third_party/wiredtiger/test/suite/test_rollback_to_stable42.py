@@ -85,8 +85,6 @@ class test_rollback_to_stable42(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values)
 
     def test_reopen_after_delete(self):
-        if 'tiered' in self.hook_names:
-            self.skipTest("We cannot reliably remove specific file names under tiered storage")
         if os.name == 'nt':
             self.skipTest("Windows doesn't like removing a file with another process using it")
 

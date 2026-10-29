@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/accumulator_multi.h"
 
@@ -33,12 +7,14 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -122,7 +98,7 @@ Value ExpressionFromAccumulatorN<AccumulatorLastN>::evaluate(const Document& roo
 }
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx, internalQueryTopNAccumulatorBytes.load()) {}
+    : AccumulatorState(expCtx, MemoryUsageLimit{query_knobs::kTopNAccumulatorBytes}) {}
 
 long long AccumulatorN::validateN(const Value& input) {
     // Obtain the value for 'n' and error if it's not a positive integral.
@@ -262,9 +238,11 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
         return _valueComp.compare(a.first, b.first) * _sense < 0;
     };
 
-    auto sz = static_cast<int64_t>(val.getApproximateSize());
-
+    // Defer computing getApproximateSize() until we know we will keep the value. In steady state
+    // the heap is full and most incoming values are rejected by the comparison below, so computing
+    // the (recursively-walked) approximate size up front would be wasted work on the common path.
     if (static_cast<long long>(_heap.size()) < *_n) {
+        auto sz = static_cast<int64_t>(val.getApproximateSize());
         _heap.push_back({val, sz});
         std::push_heap(_heap.begin(), _heap.end(), heapComp);
         _memUsageTracker.add(sz);
@@ -273,9 +251,11 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
         // The heap root is strictly worse than val (larger for kMin, smaller for kMax), so evict
         // it and insert val. Adjust memory before modifying the heap so the tracker stays
         // consistent if checkMemUsage throws.
+        auto sz = static_cast<int64_t>(val.getApproximateSize());
         std::pop_heap(_heap.begin(), _heap.end(), heapComp);
         _memUsageTracker.add(sz - _heap.back().second);
-        _heap.back() = {val, sz};
+        _heap.back().first = val;
+        _heap.back().second = sz;
         std::push_heap(_heap.begin(), _heap.end(), heapComp);
         checkMemUsage();
     }
@@ -348,26 +328,25 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 }
 
 void AccumulatorFirstLastN::_processValue(const Value& val) {
-    auto valToProcess = val.missing() ? Value(BSONNULL) : val;
-
-    if (_ringCount == static_cast<size_t>(*_n)) {
+    if (_ring.size() == static_cast<size_t>(*_n)) {
         if (_variant == Sense::kFirst) {
             // Once _ring contains 'n' elements and this is $firstN, we don't need to call process
-            // anymore.
+            // anymore. Return before copying 'val' since it is discarded here.
             _needsInput = false;
             return;
         }
         // $lastN full: evict the oldest slot. The stored size lets us update the tracker without
         // recomputing getApproximateSize() on the outgoing value.
+        auto valToProcess = val.missing() ? Value(BSONNULL) : val;
         const int64_t newSize = valToProcess.getApproximateSize();
         _memUsageTracker.add(newSize - _ring[_ringHead].second);
         _ring[_ringHead] = {std::move(valToProcess), newSize};
         _ringHead = (_ringHead + 1) % _ring.size();
     } else {
+        auto valToProcess = val.missing() ? Value(BSONNULL) : val;
         const int64_t newSize = valToProcess.getApproximateSize();
         _memUsageTracker.add(newSize);
         _ring.push_back({std::move(valToProcess), newSize});
-        ++_ringCount;
     }
 
     checkMemUsage();
@@ -408,14 +387,14 @@ void AccumulatorFirstLastN::reset() {
     _ring.shrink_to_fit();
     _memUsageTracker.set(sizeof(*this));
     _ringHead = 0;
-    _ringCount = 0;
 }
 
 Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
     std::vector<Value> result;
-    result.reserve(_ringCount);
-    for (size_t i = 0; i < _ringCount; ++i) {
-        result.emplace_back(_ring[(_ringHead + i) % _ring.size()].first);
+    size_t const n = _ring.size();
+    result.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        result.emplace_back(_ring[(_ringHead + i) % n].first);
     }
     return Value{std::move(result)};
 }

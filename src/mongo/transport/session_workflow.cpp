@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/transport/session_workflow.h"
@@ -37,6 +11,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/egress_response_rate_limiter.h"
+#include "mongo/db/admission/egress_response_rate_limiter_gen.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/client.h"
@@ -57,7 +33,7 @@
 #include "mongo/executor/split_timer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
@@ -74,6 +50,7 @@
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/session_workflow_p.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
@@ -530,6 +507,13 @@ private:
     /** Writes the completed work response to the Session. */
     void _sendResponse();
 
+    /**
+     * Throttles the egress of an IngressRequestRateLimiter rejection reply for user/application
+     * connections, using the SessionManager's shutdown-cancellable Interruptible. No-op unless
+     * the current work item is a rate-limit rejection and the limiter is enabled and applicable.
+     */
+    void _maybeThrottleEgressResponse();
+
     void _onLoopError(Status error);
 
     void _cleanupSession(const Status& status);
@@ -559,7 +543,7 @@ private:
     ServiceEntryPoint* _sep;
     RunnerAndSource _taskRunner;
 
-    AtomicWord<bool> _isTerminated{false};
+    Atomic<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
 
     bool _inFirstIteration = true;
@@ -578,6 +562,18 @@ public:
 
     bool isExhaust() const {
         return _isExhaust;
+    }
+
+    /**
+     * True when the work was rejected by the IngressRequestRateLimiter. Used by the egress response
+     * rate-limiter gate in _sendResponse to decide whether to pace the reply.
+     */
+    bool isRateLimitRejection() const {
+        return _isRateLimitRejection;
+    }
+
+    void markRateLimitRejection() {
+        _isRateLimitRejection = true;
     }
 
     void initOperation() {
@@ -668,7 +664,7 @@ public:
             auto inRequest = OpMsgRequest::parse(in(), client);
             const BSONObj& body = inRequest.body;
             const auto& [cmd, firstElement] = body.firstElement();
-            if (cmd != "getMore"_sd)
+            if (cmd != "getMore"sv)
                 return boost::none;
             return inRequest;
         } catch (const DBException& e) {
@@ -687,6 +683,7 @@ private:
     Impl* _swf;
     Message _in;
     bool _isExhaust = false;
+    bool _isRateLimitRejection = false;
     ServiceContext::UniqueOperationContext _opCtx;
     boost::optional<MessageCompressorId> _compressorId;
     boost::optional<Message> _out;
@@ -729,9 +726,27 @@ std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receive
     }
 }
 
+void SessionWorkflow::Impl::_maybeThrottleEgressResponse() {
+    if (MONGO_likely(!_work->isRateLimitRejection() ||
+                     !admission::gEgressResponseRateLimiterEnabled.load())) {
+        return;
+    }
+    auto* sm = session()->getTransportLayer()->getSessionManager();
+    if (!sm) {
+        return;
+    }
+    DisconnectShutdownAwareInterruptible interruptible{
+        sm->getShutdownToken(), session().get(), _serviceContext->getPreciseClockSource()};
+    admission::EgressResponseRateLimiter::get(_serviceContext)
+        .throttle(&interruptible, _serviceContext->getPreciseClockSource())
+        .ignore();
+}
+
 void SessionWorkflow::Impl::_sendResponse() {
     if (!_work->hasOut())
         return;
+
+    _maybeThrottleEgressResponse();
 
     try {
         sessionWorkflowDelayOrFailSendMessage.execute([this](auto&& data) {
@@ -773,7 +788,7 @@ namespace {
 
 Message makeRateLimitRejectionMessage(rpc::Protocol protocol,
                                       bool allowRetries,
-                                      long long retryAfterMs) {
+                                      long long baseBackoffMS) {
     const auto replyBuilder = rpc::makeReplyBuilder(protocol);
     replyBuilder->setCommandReply(admission::IngressRequestRateLimiter::rejectionStatus(), {});
 
@@ -793,8 +808,8 @@ Message makeRateLimitRejectionMessage(rpc::Protocol protocol,
             arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
         }
 
-        if (allowRetries && retryAfterMs > 0) {
-            commandBodyBob.append(kRetryAfterMSFieldName, retryAfterMs);
+        if (allowRetries && baseBackoffMS > 0) {
+            commandBodyBob.append(kBaseBackoffMSFieldName, baseBackoffMS);
         }
     }
 
@@ -803,53 +818,53 @@ Message makeRateLimitRejectionMessage(rpc::Protocol protocol,
 
 // A process-wide, immutable, pre-built OP_MSG rejection response for
 // IngressRequestRateLimitExceeded errors. The body is identical across all such rejections except
-// for two per-rejection fields: the wire-header responseTo, and (when present) the retryAfterMS
+// for two per-rejection fields: the wire-header responseTo, and (when present) the baseBackoffMS
 // value. Callers obtain an owned copy via the static makeResponse() entry point, which
 // selects the appropriate cached variant and stamps the per-rejection fields.
 class RejectionResponseTemplate {
 public:
-    static Message makeResponse(bool allowRetries, long long retryAfterMs) {
-        return templateFor(allowRetries, retryAfterMs > 0).stamp(retryAfterMs);
+    static Message makeResponse(bool allowRetries, long long baseBackoffMS) {
+        return templateFor(allowRetries, baseBackoffMS > 0).stamp(baseBackoffMS);
     }
 
 private:
-    explicit RejectionResponseTemplate(bool allowRetries, bool withRetryAfter) {
+    explicit RejectionResponseTemplate(bool allowRetries, bool withBaseBackoff) {
         // The rejection fast path only ever serves OP_MSG requests, so assume kOpMsg.
         Message responseMsg = makeRateLimitRejectionMessage(
-            rpc::Protocol::kOpMsg, allowRetries, withRetryAfter ? 1 : 0);
+            rpc::Protocol::kOpMsg, allowRetries, withBaseBackoff ? 1 : 0);
 
         // Zero out responseTo; it is stamped per-rejection at send time.
         responseMsg.header().setResponseToMsgId(0);
 
-        if (allowRetries && withRetryAfter) {
-            // retryAfterMS is the last field appended to the body (see
+        if (allowRetries && withBaseBackoff) {
+            // baseBackoffMS is the last field appended to the body (see
             // makeRateLimitRejectionMessage) and the template has no trailing bytes after the BSON
             // document, so its 8-byte value occupies the bytes immediately before the document
             // terminator.
-            _retryAfterValueOffset = static_cast<int>(responseMsg.size() - sizeof(long long) - 1);
+            _baseBackoffValueOffset = static_cast<int>(responseMsg.size() - sizeof(long long) - 1);
         }
 
         _template = std::move(responseMsg);
     }
 
     // Returns the cached variant, built once on first use.
-    static const RejectionResponseTemplate& templateFor(bool retryable, bool withRetryAfter) {
+    static const RejectionResponseTemplate& templateFor(bool retryable, bool withBaseBackoff) {
         static const RejectionResponseTemplate kNoRetry{/*allowRetries=*/false,
-                                                        /*withRetryAfter=*/false};
-        static const RejectionResponseTemplate kRetryableNoRetryAfter{/*allowRetries=*/true,
-                                                                      /*withRetryAfter=*/false};
-        static const RejectionResponseTemplate kRetryableWithRetryAfter{/*allowRetries=*/true,
-                                                                        /*withRetryAfter=*/true};
+                                                        /*withBaseBackoff=*/false};
+        static const RejectionResponseTemplate kRetryableNoBaseBackoff{/*allowRetries=*/true,
+                                                                       /*withBaseBackoff=*/false};
+        static const RejectionResponseTemplate kRetryableWithBaseBackoff{/*allowRetries=*/true,
+                                                                         /*withBaseBackoff=*/true};
 
         if (!retryable) {
             return kNoRetry;
         } else {
-            return withRetryAfter ? kRetryableWithRetryAfter : kRetryableNoRetryAfter;
+            return withBaseBackoff ? kRetryableWithBaseBackoff : kRetryableNoBaseBackoff;
         }
     }
 
     // Copies the template into a fresh owned buffer and stamps the per-rejection fields.
-    Message stamp(long long retryAfterMs) const {
+    Message stamp(long long baseBackoffMS) const {
         // Pre-reserve the checksum's worth of slack so appendChecksum's realloc check finds enough
         // room downstream and doesn't have to grow the buffer at all.
         const size_t templateSize = _template.size();
@@ -857,18 +872,18 @@ private:
         memcpy(buf.get(), _template.buf(), templateSize);
 
         Message msg(std::move(buf));
-        if (_retryAfterValueOffset >= 0) {
-            DataView(msg.buf()).write<LittleEndian<long long>>(retryAfterMs,
-                                                               _retryAfterValueOffset);
+        if (_baseBackoffValueOffset >= 0) {
+            DataView(msg.buf()).write<LittleEndian<long long>>(baseBackoffMS,
+                                                               _baseBackoffValueOffset);
         }
         return msg;
     }
 
     // The pre-built OP_MSG rejection response, used as an immutable template
     Message _template;
-    // Byte offset within the template of the 8-byte little-endian retryAfterMS value, or -1 if this
-    // template has no retryAfterMS field.
-    int _retryAfterValueOffset = -1;
+    // Byte offset within the template of the 8-byte little-endian baseBackoffMS value, or -1 if
+    // this template has no baseBackoffMS field.
+    int _baseBackoffValueOffset = -1;
 };
 
 }  // namespace
@@ -883,17 +898,17 @@ DbResponse makeDbResponseErrorForRateLimiting(const Message& message) {
     }
 
     auto allowRetries = admission::gIngressRequestRateLimiterAllowRetries.loadRelaxed();
-    const long long retryAfterMs = getOverloadRetryAfterMS();
+    const long long baseBackoffMS = getExternalClientBaseBackoffMS();
 
     // Fast path for OP_MSG rejections, which are the overwhelmingly common case when the ingress
     // rate limiter is enabled.
     if (MONGO_likely(rpc::protocolForMessage(message) == rpc::Protocol::kOpMsg)) {
         return DbResponse{.response =
-                              RejectionResponseTemplate::makeResponse(allowRetries, retryAfterMs)};
+                              RejectionResponseTemplate::makeResponse(allowRetries, baseBackoffMS)};
     }
 
     return DbResponse{.response = makeRateLimitRejectionMessage(
-                          rpc::protocolForMessage(message), allowRetries, retryAfterMs)};
+                          rpc::protocolForMessage(message), allowRetries, baseBackoffMS)};
 }
 
 Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
@@ -909,12 +924,13 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
     _work->decompressRequest();
 
-    if (const auto admitted = _rateLimit(); !admitted) {
-        return makeDbResponseErrorForRateLimiting(_work->in());
-    }
-
     globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kIngress,
                                         _work->in().size());
+
+    if (const auto admitted = _rateLimit(); !admitted) {
+        _work->markRateLimitRejection();
+        return makeDbResponseErrorForRateLimiting(_work->in());
+    }
 
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
@@ -982,7 +998,10 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     // the dbresponses continue to indicate the exhaust stream should continue.
     _nextWork = work.synthesizeExhaust(response);
 
-    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kIngress, toSink.size());
+    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kIngress,
+                                         toSink.size(),
+                                         getConnectionPurpose(session().get()),
+                                         getReplicationId(session().get()));
 
     beforeCompressingExhaustResponse.executeIf(
         [&](auto&&) {}, [&](auto&&) { return work.hasCompressorId() && _nextWork; });
@@ -1044,8 +1063,7 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         try {
             if (MONGO_unlikely(_inFirstIteration)) {
                 session()->prelude();
-                if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabled() &&
-                    gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
+                if (gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
                     // This enforces the connection establishment rate limit by possibly sleeping
                     // the current thread ("queued") or throwing an exception ("rejected").
                     uassertStatusOK(session()

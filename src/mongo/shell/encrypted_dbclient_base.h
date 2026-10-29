@@ -1,39 +1,11 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_range.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -58,7 +30,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/rpc/message.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/unique_message.h"
@@ -98,6 +69,7 @@
 #include <js/Value.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 constexpr std::size_t kEncryptedDBCacheSize = 50;
 
@@ -105,24 +77,24 @@ constexpr uint8_t kIntentToEncryptBit = 0x00;
 constexpr uint8_t kDeterministicEncryptionBit = 0x01;
 constexpr uint8_t kRandomEncryptionBit = 0x02;
 
-static constexpr auto kExplain = "explain"_sd;
+static constexpr auto kExplain = "explain"sv;
 
-constexpr std::array<std::string_view, 16> kEncryptedCommands = {"aggregate"_sd,
-                                                                 "count"_sd,
-                                                                 "delete"_sd,
-                                                                 "distinct"_sd,
+constexpr std::array<std::string_view, 16> kEncryptedCommands = {"aggregate"sv,
+                                                                 "count"sv,
+                                                                 "delete"sv,
+                                                                 "distinct"sv,
                                                                  kExplain,
-                                                                 "find"_sd,
-                                                                 "findandmodify"_sd,
-                                                                 "findAndModify"_sd,
-                                                                 "getMore"_sd,
-                                                                 "insert"_sd,
-                                                                 "update"_sd,
-                                                                 "create"_sd,
-                                                                 "createIndexes"_sd,
-                                                                 "collMod"_sd,
-                                                                 "bulkWrite"_sd,
-                                                                 "_getCompactionTokens"_sd};
+                                                                 "find"sv,
+                                                                 "findandmodify"sv,
+                                                                 "findAndModify"sv,
+                                                                 "getMore"sv,
+                                                                 "insert"sv,
+                                                                 "update"sv,
+                                                                 "create"sv,
+                                                                 "createIndexes"sv,
+                                                                 "collMod"sv,
+                                                                 "bulkWrite"sv,
+                                                                 "_getCompactionTokens"sv};
 
 class EncryptedDBClientBase : public DBClientBase,
                               public mozjs::EncryptionCallbacks,

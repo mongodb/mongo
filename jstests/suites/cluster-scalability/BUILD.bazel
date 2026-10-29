@@ -15,6 +15,7 @@
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load(":common.bzl", "SHARDING_DATA")
 load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_base",
@@ -29,6 +30,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough.yml",
     data = [
         "//buildscripts/resmokeconfig:matrix_suites/mappings/sharded_collections_jscore_passthrough.yml",
@@ -37,9 +39,9 @@ resmoke_suite_test(
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 40,
+    shard_count = 16,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "jscore",
         "sharding",
     ],
@@ -56,6 +58,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/sharding.yml",
     data = [
         "//jstests/concurrency/fsm_libs:shard_fixture.js",
@@ -63,11 +66,10 @@ resmoke_suite_test(
         "//jstests/sharding/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:proxy_protocol_server",
     ] + SHARDING_DATA,
-    shard_count = 50,
+    shard_count = 100,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
-        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122831) proxy_protocol_connect.js fails with "Unable to start program ss: No such file or directory" in remote execution
         "sharding",
     ],
     target_compatible_with = select({
@@ -84,6 +86,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_csrs_continuous_config_stepdown",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/sharding_csrs_continuous_config_stepdown.yml",
     data = [
         "//jstests/concurrency/fsm_libs:shard_fixture.js",
@@ -91,12 +94,11 @@ resmoke_suite_test(
         "//jstests/sharding/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:proxy_protocol_server",
     ] + SHARDING_DATA,
-    shard_count = 50,
+    shard_count = 75,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "csrs",
-        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122831) proxy_protocol_connect.js fails with "Unable to start program ss: No such file or directory" in remote execution
         "non_live_record",
         "sharding",
     ],
@@ -126,6 +128,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough.yml",
     data = [
         "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_jscore_passthrough.yml",
@@ -133,9 +136,9 @@ resmoke_suite_test(
         "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 50,
+    shard_count = 26,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "sharding",
@@ -153,6 +156,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "analyze_shard_key_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/analyze_shard_key_jscore_passthrough.yml",
     shard_count = 20,
     tags = [
@@ -168,13 +172,13 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough.yml",
-    shard_count = 20,
+    shard_count = 10,
     tags = [
         "ci-default",
         "common",
         "multi_shard",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -185,14 +189,14 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_jscore_passthrough.yml",
-    shard_count = 20,
+    shard_count = 11,
     tags = [
         "ci-default",
         "common",
         "multi_shard",
         "multi_stmt",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -204,7 +208,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough.yml",
-    shard_count = 20,
+    shard_count = 10,
     tags = [
         "ci-default",
         "multi_shard",
@@ -219,9 +223,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough.yml",
-    shard_count = 20,
+    shard_count = 9,
     tags = [
         "ci-default",
+        "incompatible_debug_mode",
         "multi_shard",
     ],
     deps = [
@@ -234,7 +239,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "multi_stmt_txn_jscore_passthrough_with_migration",
     config = "//buildscripts/resmokeconfig:suites/multi_stmt_txn_jscore_passthrough_with_migration.yml",
-    shard_count = 20,
+    shard_count = 13,
     tags = [
         "ci-default",
         "multi_stmt",
@@ -249,7 +254,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/retryable_writes_jscore_passthrough.yml",
-    shard_count = 20,
+    shard_count = 14,
     tags = [
         "ci-default",
         "retry",
@@ -263,7 +268,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_stepdown_passthrough",
     config = "//buildscripts/resmokeconfig:suites/retryable_writes_jscore_stepdown_passthrough.yml",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "ci-default",
         "retry",
@@ -297,7 +302,6 @@ resmoke_suite_test(
     resmoke_args = [
         "--excludeWithAnyTags=uses_snapshot_read_concern",
     ],
-    shard_count = 20,
     tags = [
         "ci-default",
         "jscore",
@@ -314,10 +318,10 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "sharding_hello_failures",
     config = "//buildscripts/resmokeconfig:suites/sharding_hello_failures.yml",
-    shard_count = 4,
     tags = [
         "ci-default",
         "concurrency",
+        "incompatible_debug_mode",
         "sharded",
     ],
     deps = [
@@ -329,6 +333,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "config_fuzzer_sharding_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough.yml",
     data = [
         "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_jscore_passthrough.yml",
@@ -346,6 +351,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "sharded",
     ],
@@ -365,6 +371,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "config_fuzzer_concurrency_sharded_replication_with_balancer",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer.yml",
     data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
     resmoke_args = [
@@ -378,9 +385,9 @@ resmoke_suite_test(
         "ci-default",
         "concurrency",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "incompatible_with_bazel_remote_test",
-        "resources:cpu:2",
         "sharded",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
@@ -399,6 +406,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "config_fuzzer_sharding_jscore_passthrough_with_balancer",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_balancer.yml",
     data = [
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
@@ -414,8 +422,8 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
-        "resources:cpu:2",
         "sharded",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
@@ -425,6 +433,281 @@ resmoke_suite_test(
         "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_resharding_with_lightweight_stepdowns",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_resharding_with_lightweight_stepdowns.yml",
+    tags = [
+        "ci-default",
+        "concurrency",
+        "has_bazel_target",
+        "incompatible_debug_mode",
+        "large",
+        "sharded",
+        "stepdowns",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_with_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_with_config_shard.yml",
+    shard_count = 23,
+    tags = [
+        "ci-all-variants",
+        "cluster_scalability_only",
+        "jscore",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharding_config_shard.yml",
+    shard_count = 50,
+    tags = [
+        "ci-all-variants",
+        "cluster_scalability_only",
+        "common",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_task_executor_pool_size_8",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_task_executor_pool_size_8.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "common",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_config_shard",
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_config_shard.yml",
+    shard_count = 27,
+    tags = [
+        "ci-all-variants",
+        "cluster_scalability_only",
+        "common",
+        "jscore",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_max_mirroring_opportunistic_secondary_targeting",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_max_mirroring_opportunistic_secondary_targeting.yml",
+    shard_count = 50,
+    tags = [
+        "ci-all-variants",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+[
+    resmoke_suite_test(
+        name = suite_name,
+        size = "large",
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/{}.yml".format(suite_name),
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 36,
+        tags = [
+            "ci-default",
+            "multiversion",
+            "multiversion_passthrough",
+        ],
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+        ],
+    )
+    # The last-patch entry only produces a task once resmoke resolves a last-patch
+    # peer from the branch's release tags; on master it resolves none, so nothing runs.
+    for suite_name, multiversion in {
+        "sharding_jscore_passthrough_last_lts_new_old_old_new": "last-lts",
+        "sharding_jscore_passthrough_last_continuous_new_old_old_new": "last-continuous",
+        "sharding_jscore_passthrough_last_patch_new_old_old_new": "last-patch",
+    }.items()
+]
+
+[
+    resmoke_suite_test(
+        name = suite_name,
+        size = "large",
+        config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/{}.yml".format(suite_name),
+        data = [
+            "//jstests/libs/config_files:set_shardingrole_configsvr.json",
+            "//jstests/libs/config_files:set_shardingrole_shardsvr.json",
+            "//jstests/libs/config_files:timezone_info",
+            "//jstests/sharding/libs:proxy_protocol_server",
+        ],
+        multiversion_deps = [
+            "//bazel/resmoke/multiversion:{}".format(multiversion),
+        ],
+        resmoke_args = [
+            "--runNoFeatureFlagTests",
+        ],
+        shard_count = 140,
+        tags = [
+            "ci-default",
+            "default",
+            "multiversion",
+            "random_multiversion_ds",
+        ],
+        deps = [
+            "//src/mongo/db:mongod",
+            "//src/mongo/s:mongos",
+            "//src/mongo/shell:mongo",
+            "//src/mongo/tools/mongobridge_tool:mongobridge",
+        ],
+    )
+    # The last-patch entry only produces a task once resmoke resolves a last-patch
+    # peer from the branch's release tags; on master it resolves none, so nothing runs.
+    for suite_name, multiversion in {
+        "sharding_last_continuous": "last-continuous",
+        "sharding_last_lts": "last-lts",
+        "sharding_last_patch": "last-patch",
+    }.items()
+]
+
+jstestfuzz_generate(
+    name = "resharding_fuzzer_idempotency_tests",
+    extra_args = [
+        "--numDonors",
+        "3",
+        "--numRecipients",
+        "3",
+        "--inPlace",
+        "no",
+    ],
+    npm_command = "resharding-fuzzer",
+    num_generated_files = 50,
+)
+
+resmoke_suite_test(
+    name = "resharding_fuzzer_idempotency",
+    srcs = [":resharding_fuzzer_idempotency_tests"],
+    config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
+    tags = [
+        "non_required",
+        "random_name",
+        "require_npm",
+        "resharding_fuzzer",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "resharding_timeseries_fuzzer_tests",
+    extra_args = [
+        "--opType",
+        "timeseriesReshardCollection",
+        "--numDonors",
+        "3",
+        "--numRecipients",
+        "3",
+        "--inPlace",
+        "yes",
+        "--electionMech",
+        "stepup",
+        "--electionRole",
+        "donor",
+        "--electionRole",
+        "recipient",
+    ],
+    npm_command = "resharding-fuzzer",
+    num_generated_files = 50,
+)
+
+resmoke_suite_test(
+    name = "resharding_timeseries_fuzzer",
+    srcs = [":resharding_timeseries_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
+    shard_count = 11,
+    tags = [
+        "ci-default",
+        "feature_flag_guarded",
+        "incompatible_disaggregated_storage",
+        "random_name",
+        "require_npm",
+        "requires_all_feature_flags",
+    ],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",

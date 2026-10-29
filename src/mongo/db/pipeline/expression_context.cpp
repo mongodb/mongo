@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/pipeline/expression_context.h"
 
 #include "mongo/base/error_codes.h"
@@ -34,8 +8,13 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/version_context.h"
@@ -49,6 +28,30 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
+SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
+    if (!_expressionFallbackTracker) {
+        if (getOperationContext() &&
+            !_params.excludeExpressionFallbackFromOperationMemoryTracking &&
+            !_params.excludeOperationMemoryTracking &&
+            feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+            feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+            // Memory tracking is enabled and an OperationContext is available: wire the fallback to
+            // the operation-wide tracker so expression memory on call sites without a stage tracker
+            // still counts toward the operation's total memory usage. Per-stage attribution is lost
+            // (all such usage is lumped together), but whole-query accounting stays accurate.
+            _expressionFallbackTracker =
+                OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*this);
+        } else {
+            // Memory tracking is disabled, there is no OperationContext, or this context is
+            // excluded from operation-wide memory tracking: fall back to a standalone tracker
+            // that just enforces the per-expression safety cap.
+            _expressionFallbackTracker.emplace(
+                MemoryUsageLimit{query_knobs::kMaxSingleExpressionMemoryUsageBytes});
+        }
+    }
+    return *_expressionFallbackTracker;
+}
 
 ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
     : variablesParseState(variables.useIdGenerator()),
@@ -64,9 +67,13 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
 
     _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
 
-    // Default IFRContext for code paths that don't go through run_aggregate or cluster_aggregate.
+    // The IFRContext is per-operation: it is installed on the opCtx in the command's
+    // InvocationBaseInternal ctor, so any ExpressionContext built while executing a command
+    // observes the operation's feature-flag values -- including any disabled on an IFR retry --
+    // through get(opCtx).
     if (!_params.ifrContext) {
-        _params.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+        _params.ifrContext = _params.opCtx ? IncrementalFeatureRolloutContext::get(_params.opCtx)
+                                           : std::make_shared<IncrementalFeatureRolloutContext>();
     }
 
     // Disallow disk use if in read-only mode.
@@ -126,6 +133,10 @@ void ExpressionContext::InterruptChecker::checkForInterruptVerySlow() {
     CurOp::get(_expressionContext->getOperationContext())->maybeLogSlowQuery();
 }
 
+void ExpressionContext::InterruptChecker::checkForQueryMemoryLoadShedding(OperationContext* opCtx) {
+    uassertStatusOK(queryMemoryCheckLoadShedding(opCtx));
+}
+
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(
     std::unique_ptr<CollatorInterface> newCollator) {
     // This constructor of CollatorStash is private, so we can't use make_unique().
@@ -172,6 +183,18 @@ void ExpressionContext::stopExpressionCounters() {
             _expressionCounters->windowAccumulatorExprCountersMap);
     }
     _expressionCounters.reset();
+}
+
+void ExpressionContext::checkAndIncrementMemoryIntensiveExprCount(std::string_view exprName) {
+    ++_memoryIntensiveExprCount;
+    const auto limit =
+        static_cast<uint32_t>(internalQueryMaxMemoryIntensiveExpressions.loadRelaxed());
+    uassert(12876600,
+            str::stream() << "Pipeline contains too many memory-intensive expressions. " << exprName
+                          << " caused the count to reach " << _memoryIntensiveExprCount
+                          << ", which exceeds the limit of " << limit
+                          << " (internalQueryMaxMemoryIntensiveExpressions).",
+            _memoryIntensiveExprCount <= limit);
 }
 
 void ExpressionContext::initializeReferencedSystemVariables() {

@@ -9,6 +9,7 @@ selector:
     - jstests/fle2/**/*.js
     - jstests/core_sharding/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 
   exclude_files:
     # The following tests fail because a certain command or functionality is not supported on
@@ -82,9 +83,18 @@ selector:
     # Resharding is not permitted during fcv upgrade and downgrade.
     - jstests/core_sharding/resharding/*.js
 
-    # This test assumes query settings representative queries are stored in the cluster parameter,
-    # which is not the case if featureFlagPQSBackfill is on.
-    - jstests/core/query/query_settings/query_settings_size_limits.js
+    # This test sends a maximum-size batch update. During FCV upgrade/downgrade,
+    # auth-shard metadata work clears and recovers unsharded collection filtering metadata, which
+    # can cause the batch to return NoProgressMade.
+    # TODO (SERVER-98118): Remove this exclusion once FCV upgrade/downgrade does not clear unsharded
+    # collection filtering metadata.
+    - jstests/core/query/batch_write/batch_write_command_update.js
+
+    # This test expects a large bulk insert to succeed, which is not guaranteed due to the auth
+    # shards FCV upgrade/downgrade.
+    # TODO (SERVER-98118): Remove this exclusion once FCV upgrade/downgrade does not clear unsharded
+    # collection filtering metadata.
+    - jstests/core/txns/bulk_write_getMore.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
@@ -96,10 +106,6 @@ selector:
     - featureFlagTimeseriesUpdatesSupport
     # TODO: SERVER-78068 Remove Feature Flag for PM-2983
     - featureFlagRecordIdsReplicated
-    # TODO: SERVER-85426 Remove Feature Flag for SPM-3541
-    - featureFlagRankFusionBasic
-    - featureFlagRankFusionFull
-    - featureFlagSearchHybridScoringFull
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
     # Exclude tests that require a specific fcv.
@@ -108,6 +114,7 @@ selector:
     - requires_fcv_82
     - requires_fcv_83
     - requires_fcv_90
+    - requires_fcv_91
     # Exclude tests that are not compatible with upgrade/downgrade.
     - cannot_run_during_upgrade_downgrade
     - requires_2_or_more_shards
@@ -145,5 +152,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
     num_rs_nodes_per_shard: 2

@@ -41,12 +41,10 @@ class test_eviction01(wttest.WiredTigerTestCase):
     nrows = 100
     iterations = 500
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
+    @wttest.skip_for_hook(
+        "disagg",
+        "deferred btree publication changes eviction timing and bumps the no-progress stat",
+        param="schema_epochs")
     def test_eviction(self):
         uri = f"table:{self.test_name}"
         ds = SimpleDataSet(self, uri, self.nrows, key_format='S', value_format='u')
@@ -60,5 +58,5 @@ class test_eviction01(wttest.WiredTigerTestCase):
             self.session.rollback_transaction()
         cursor.close()
 
-        self.assertGreater(self.get_stat(stat.conn.cache_eviction_dirty), 0)
+        self.assertStatGreaterSoon(stat.conn.cache_eviction_dirty, 0)
         self.assertEqual(self.get_stat(stat.conn.cache_eviction_blocked_no_progress), 0)

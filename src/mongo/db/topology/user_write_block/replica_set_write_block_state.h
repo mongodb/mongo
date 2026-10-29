@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,7 +8,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_block_reason_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <array>
@@ -49,10 +23,10 @@ namespace mongo {
 // can be incremented. Deletes are not included since they are validated separately by
 // checkReplicaSetDeletionsAllowed and tracked through their own counter.
 // TODO (SERVER-125476): Change the enum modularity to PRIVATE
-enum class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
 
 // TODO (SERVER-125476): Change the class modularity to PRIVATE
-class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockState {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ReplicaSetWriteBlockState {
 public:
     ReplicaSetWriteBlockState() = default;
 
@@ -127,7 +101,13 @@ public:
      * Returns whether replica set deletions blocking is enabled, disregarding a specific namespace
      * and the state of WriteBlockBypass. Used for serverStatus.
      */
-    MONGO_MOD_FILE_PRIVATE bool isReplicaSetDeletionsBlockingEnabled_forTest() const;
+    bool isReplicaSetDeletionsBlockingEnabled() const;
+
+    /**
+     * Increments the per-reason enable counter without changing whether write blocking is active.
+     * Used when an active block's allowDeletions policy changes.
+     */
+    void incrementReplicaSetWritesBlockCounter(ReplicaSetWritesBlockReasonEnum reason);
 
     /**
      * Reports replica set write blocking counters, specifying one counter per blocking reason.
@@ -154,6 +134,13 @@ public:
     Status checkIfIndexBuildAllowedToStart(OperationContext* opCtx,
                                            const NamespaceString& nss) const;
 
+    /**
+     * Checks that an incoming resharding operation is allowed to start on this replica set as a
+     * recipient. Returns ReplicaSetWritesBlocked if incoming resharding is disallowed, OK
+     * otherwise.
+     */
+    Status checkIfIncomingReshardingAllowedToStart(OperationContext* opCtx) const;
+
 private:
     struct WriteBlockInfo {
         bool blocked{false};
@@ -163,11 +150,11 @@ private:
     // Atomic<T> enforces lock-free access at compile time.
     Atomic<WriteBlockInfo> _writeBlockInfo{WriteBlockInfo{}};
     Atomic<bool> _deletionsBlocked{false};
-    std::array<AtomicWord<std::uint64_t>, idlEnumCount<ReplicaSetWritesBlockReasonEnum>>
+    std::array<Atomic<std::uint64_t>, idlEnumCount<ReplicaSetWritesBlockReasonEnum>>
         _replicaSetWritesBlockCounters{};
-    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedInserts{0};
-    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedUpdates{0};
-    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedDeletes{0};
+    mutable Atomic<std::uint64_t> _replicaSetWritesBlockRejectedInserts{0};
+    mutable Atomic<std::uint64_t> _replicaSetWritesBlockRejectedUpdates{0};
+    mutable Atomic<std::uint64_t> _replicaSetWritesBlockRejectedDeletes{0};
     Atomic<bool> _userIndexBuildsBlocked{false};
 };
 

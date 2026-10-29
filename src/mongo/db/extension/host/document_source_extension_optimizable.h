@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
@@ -44,6 +18,7 @@
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/wrapped_extension_source_hooks.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
@@ -68,7 +43,8 @@ using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
  */
 class ExpandableStageParams : public StageParams {
 public:
-    ExpandableStageParams(AggStageParseNodeHandle parseNode) : _parseNode(std::move(parseNode)) {}
+    ExpandableStageParams(AggStageParseNodeHandle parseNode, BSONObj originalStage)
+        : _parseNode(std::move(parseNode)), _originalStage(originalStage.getOwned()) {}
 
     static const Id& id;
 
@@ -80,8 +56,14 @@ public:
         return std::move(_parseNode);
     }
 
+    BSONObj releaseOriginalStage() {
+        return std::move(_originalStage);
+    }
+
 private:
     AggStageParseNodeHandle _parseNode;
+    // The original user-provided stage object, e.g. {$myStage: {...}}.
+    BSONObj _originalStage;
 };
 
 /**
@@ -111,7 +93,8 @@ private:
  * DocumentSourceExtensionOptimizable is the concrete implementation for extension stages that can
  * participate in query optimization and execution.
  */
-class DocumentSourceExtensionOptimizable : public DocumentSource {
+class DocumentSourceExtensionOptimizable : public DocumentSource,
+                                           public WrappedExtensionSourceHooks {
 public:
     /**
      * A LiteParsedDocumentSource implementation for extension stages mapping to an
@@ -139,7 +122,7 @@ public:
               _options(options),
               _expanded([&] {
                   auto expandedList = expand();
-                  tassert(10905600,
+                  tassert(ErrorCodes::ExtensionError,
                           "LiteParsedExpandable must not have an empty expanded pipeline",
                           !expandedList.empty());
 
@@ -148,7 +131,8 @@ public:
               }()) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            return std::make_unique<ExpandableStageParams>(_parseNode->clone());
+            return std::make_unique<ExpandableStageParams>(_parseNode->clone(),
+                                                           getOriginalBson().wrap().getOwned());
         }
 
         /**
@@ -224,6 +208,12 @@ public:
             });
         }
 
+        bool isScoreDetailsStage() const override {
+            return std::any_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
+                return stage->isScoreDetailsStage();
+            });
+        }
+
         bool isSelectionStage() const override {
             return std::all_of(_expanded.begin(), _expanded.end(), [](const auto& stage) {
                 return stage->isSelectionStage();
@@ -235,9 +225,8 @@ public:
             return {.canRunOnTimeseries = false};
         }
 
-        // View resolution should happen *after* desugaring, so this should be unreachable.
         FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
-            MONGO_UNREACHABLE_TASSERT(12197200);
+            return _expanded.front()->getFirstStageViewApplicationPolicy();
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
@@ -337,7 +326,7 @@ public:
             if (const auto& requiredPrivileges = _properties.getRequiredPrivileges()) {
                 for (const auto& rp : *requiredPrivileges) {
                     tassert(
-                        11350602,
+                        ErrorCodes::ExtensionError,
                         "Only 'namespace' resourcePattern is supported for extension privileges",
                         rp.getResourcePattern() ==
                             MongoExtensionPrivilegeResourcePatternEnum::kNamespace);
@@ -347,7 +336,7 @@ public:
                         actions.addAction(static_properties_util::toActionType(entry.getAction()));
                     }
 
-                    tassert(11350600,
+                    tassert(ErrorCodes::ExtensionError,
                             "requiredPrivileges.actions must not be empty.",
                             !actions.empty());
                     Privilege::addPrivilegeToPrivilegeVector(
@@ -360,6 +349,11 @@ public:
 
         bool isInitialSource() const override {
             return !_properties.getRequiresInputDocSource();
+        }
+
+        // Extension stages are unsupported on timeseries collections.
+        Constraints constraints() const override {
+            return {.canRunOnTimeseries = false};
         }
 
         bool requiresAuthzChecks() const override {
@@ -395,6 +389,8 @@ public:
         bool isRankedStage() const override;
 
         bool isScoredStage() const override;
+
+        bool isScoreDetailsStage() const override;
 
         bool isSelectionStage() const override;
 
@@ -438,9 +434,15 @@ public:
 
         if (expCtx->getInLookup() && !hybridSearchFlagEnabled) {
             const auto stageName = std::string(astNode->getName());
+            // Throw the IFR retry error for extension $vectorSearch in $lookup when
+            // featureFlagExtensionsInsideHybridSearch is disabled.
+            search_helpers::throwIfrKickbackIfNecessary(
+                search_helpers::isExtensionVectorSearchStage(stageName),
+                feature_flags::gFeatureFlagVectorSearchExtension,
+                vector_search_metrics::inLookupKickbackRetryCount,
+                "The $vectorSearch extension stage is not supported in a $lookup");
             // Throw the IFR retry error for extension $search/$searchMeta in $lookup when
-            // featureFlagExtensionsInsideHybridSearch is disabled. $vectorSearch is handled
-            // separately via LookupRequirement::kNotAllowed and is not covered here.
+            // featureFlagExtensionsInsideHybridSearch is disabled.
             search_helpers::throwIfrKickbackIfNecessary(
                 search_helpers::isExtensionSearchStage(stageName),
                 feature_flags::gFeatureFlagSearchExtension,
@@ -522,10 +524,6 @@ public:
         return _logicalStage->getDocsNeededBounds();
     }
 
-    void skipMetadataStream() override {
-        _logicalStage->skipMetadataStream();
-    }
-
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
@@ -572,6 +570,30 @@ public:
      * Pushes the pipeline dependencies to the underlying extension logical stage.
      */
     void applyPipelineSuffixDependencies(const host_connector::PipelineDependenciesAdapter& deps);
+
+    /**
+     * Overridden from WrappedExtensionSourceHooks. Builds the boundary adapter and forwards to the
+     * overload above.
+     */
+    void applyPipelineSuffixDependencies(const DepsTracker& deps,
+                                         const std::set<std::string>& builtinVarRefs) override;
+
+    /**
+     * Overridden from WrappedExtensionSourceHooks. Notifies the underlying extension logical stage
+     * that the metadata stream has been elided.
+     */
+    void skipMetadataStream() override {
+        _logicalStage->skipMetadataStream();
+    }
+
+    /**
+     * Overridden from WrappedExtensionSourceHooks. Enqueues this stage's own in-place extension
+     * rules onto 'ctx'.
+     */
+    void dispatchInPlaceRules(
+        rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) const override {
+        dispatchExtensionRules(ctx, kInPlace);
+    }
 
 protected:
     /**

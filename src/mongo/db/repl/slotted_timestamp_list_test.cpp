@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/slotted_timestamp_list.h"
 
@@ -109,17 +83,17 @@ TEST(SlottedTimestampList, EraseMiddleAndReuseFreeSlots) {
     SlottedTimestampList list;
     std::vector<std::list<Timestamp>::const_iterator> positions;
 
-    insertN(list, 0 /*startValue*/, 5 /*N*/, positions);
+    insertN(list, /*startValue=*/0, /*N=*/5, positions);
     checkListValues(list, {0, 1, 2, 3, 4});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 1 /*startIndex*/, 2 /*N*/, positions);
+    eraseN(list, /*startIndex=*/1, /*N=*/2, positions);
     checkListValues(list, {0, 3, 4});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 10 /*startValue*/, 5 /*N*/, positions);
+    insertN(list, /*startValue=*/10, /*N=*/5, positions);
     checkListValues(list, {0, 3, 4, 10, 11, 12, 13, 14});
 
     ASSERT_EQ(list.getCapacity_forTest(), 8);
@@ -129,7 +103,7 @@ TEST(SlottedTimestampList, ClearAndEraseTimestamps) {
     SlottedTimestampList list;
     std::vector<std::list<Timestamp>::const_iterator> positions;
 
-    insertN(list, 0 /*startValue*/, 5 /*N*/, positions);
+    insertN(list, /*startValue=*/0, /*N=*/5, positions);
     checkListValues(list, {0, 1, 2, 3, 4});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
@@ -139,17 +113,17 @@ TEST(SlottedTimestampList, ClearAndEraseTimestamps) {
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 0 /*startValue*/, 3 /*N*/, positions);
+    insertN(list, /*startValue=*/0, /*N=*/3, positions);
     checkListValues(list, {0, 1, 2});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 1 /*startIndex*/, 2 /*N*/, positions);
+    eraseN(list, /*startIndex=*/1, /*N=*/2, positions);
     checkListValues(list, {0});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 20 /*startValue*/, 6 /*N*/, positions);
+    insertN(list, /*startValue=*/20, /*N=*/6, positions);
     checkListValues(list, {0, 20, 21, 22, 23, 24, 25});
 
     ASSERT_EQ(list.getCapacity_forTest(), 7);
@@ -191,15 +165,15 @@ TEST(SlottedTimestampList, EraseAllFIFOAndReuseSlots) {
     SlottedTimestampList list;
     std::vector<SlottedTimestampList::const_iterator> iters;
 
-    insertN(list, 0 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/0, /*N=*/5, iters);
     checkListValues(list, {0, 1, 2, 3, 4});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 0 /* startIndex */, 5 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/5, iters);
     checkListValues(list, {});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 5 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/5, /*N=*/5, iters);
     checkListValues(list, {5, 6, 7, 8, 9});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
@@ -212,16 +186,16 @@ TEST(SlottedTimestampList, EraseAllLIFOAndReuseSlots) {
     SlottedTimestampList list;
     std::vector<SlottedTimestampList::const_iterator> iters;
 
-    insertN(list, 0 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/0, /*N=*/5, iters);
     checkListValues(list, {0, 1, 2, 3, 4});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
     std::reverse(iters.begin(), iters.end());
-    eraseN(list, 0 /* startIndex */, 5 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/5, iters);
     checkListValues(list, {});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 5 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/5, /*N=*/5, iters);
     checkListValues(list, {5, 6, 7, 8, 9});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
@@ -234,19 +208,19 @@ TEST(SlottedTimestampList, EraseHalfFIFOHalfLIFOAndResuseSlots) {
     SlottedTimestampList list;
     std::vector<SlottedTimestampList::const_iterator> iters;
 
-    insertN(list, 0 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/0, /*N=*/5, iters);
     checkListValues(list, {0, 1, 2, 3, 4});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 0 /* startIndex */, 3 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/3, iters);
     checkListValues(list, {3, 4});
 
     std::reverse(iters.begin(), iters.end());
-    eraseN(list, 0 /* startIndex */, 2 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/2, iters);
     checkListValues(list, {});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 5 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/5, /*N=*/5, iters);
     checkListValues(list, {5, 6, 7, 8, 9});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 

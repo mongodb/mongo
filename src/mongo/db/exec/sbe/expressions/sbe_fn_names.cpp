@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 
@@ -76,30 +50,14 @@ static constexpr EFnEntry kEFnByName[] = {
     {"aggCollSetUnion"sv,                    EFn::kAggCollSetUnion},
     {"aggCollSetUnionCapped"sv,              EFn::kAggCollSetUnionCapped},
     {"aggConcatArraysCapped"sv,              EFn::kAggConcatArraysCapped},
-    {"aggCovarianceAdd"sv,                   EFn::kAggCovarianceAdd},
-    {"aggCovariancePopFinalize"sv,           EFn::kAggCovariancePopFinalize},
-    {"aggCovarianceRemove"sv,                EFn::kAggCovarianceRemove},
-    {"aggCovarianceSampFinalize"sv,          EFn::kAggCovarianceSampFinalize},
-    {"aggDenseRank"sv,                       EFn::kAggDenseRank},
-    {"aggDenseRankColl"sv,                   EFn::kAggDenseRankColl},
-    {"aggDerivativeFinalize"sv,              EFn::kAggDerivativeFinalize},
     {"aggDoubleDoubleSum"sv,                 EFn::kAggDoubleDoubleSum},
-    {"aggExpMovingAvg"sv,                    EFn::kAggExpMovingAvg},
-    {"aggExpMovingAvgFinalize"sv,            EFn::kAggExpMovingAvgFinalize},
     {"aggFirstN"sv,                          EFn::kAggFirstN},
     {"aggFirstNFinalize"sv,                  EFn::kAggFirstNFinalize},
     {"aggFirstNMerge"sv,                     EFn::kAggFirstNMerge},
     {"aggFirstNNeedsMoreInput"sv,            EFn::kAggFirstNNeedsMoreInput},
-    {"aggIntegralAdd"sv,                     EFn::kAggIntegralAdd},
-    {"aggIntegralFinalize"sv,                EFn::kAggIntegralFinalize},
-    {"aggIntegralInit"sv,                    EFn::kAggIntegralInit},
-    {"aggIntegralRemove"sv,                  EFn::kAggIntegralRemove},
     {"aggLastN"sv,                           EFn::kAggLastN},
     {"aggLastNFinalize"sv,                   EFn::kAggLastNFinalize},
     {"aggLastNMerge"sv,                      EFn::kAggLastNMerge},
-    {"aggLinearFillAdd"sv,                   EFn::kAggLinearFillAdd},
-    {"aggLinearFillCanAdd"sv,                EFn::kAggLinearFillCanAdd},
-    {"aggLinearFillFinalize"sv,              EFn::kAggLinearFillFinalize},
     {"aggMaxN"sv,                            EFn::kAggMaxN},
     {"aggMaxNFinalize"sv,                    EFn::kAggMaxNFinalize},
     {"aggMaxNMerge"sv,                       EFn::kAggMaxNMerge},
@@ -108,53 +66,6 @@ static constexpr EFnEntry kEFnByName[] = {
     {"aggMinN"sv,                            EFn::kAggMinN},
     {"aggMinNFinalize"sv,                    EFn::kAggMinNFinalize},
     {"aggMinNMerge"sv,                       EFn::kAggMinNMerge},
-    {"aggRank"sv,                            EFn::kAggRank},
-    {"aggRankColl"sv,                        EFn::kAggRankColl},
-    {"aggRankFinalize"sv,                    EFn::kAggRankFinalize},
-    {"aggRemovableAddToSetAdd"sv,            EFn::kAggRemovableAddToSetAdd},
-    {"aggRemovableAddToSetRemove"sv,         EFn::kAggRemovableAddToSetRemove},
-    {"aggRemovableAvgFinalize"sv,            EFn::kAggRemovableAvgFinalize},
-    {"aggRemovableBottomNAdd"sv,             EFn::kAggRemovableBottomNAdd},
-    {"aggRemovableBottomNFinalize"sv,        EFn::kAggRemovableBottomNFinalize},
-    {"aggRemovableBottomNInit"sv,            EFn::kAggRemovableBottomNInit},
-    {"aggRemovableBottomNRemove"sv,          EFn::kAggRemovableBottomNRemove},
-    {"aggRemovableConcatArraysAdd"sv,        EFn::kAggRemovableConcatArraysAdd},
-    {"aggRemovableConcatArraysFinalize"sv,   EFn::kAggRemovableConcatArraysFinalize},
-    {"aggRemovableConcatArraysInit"sv,       EFn::kAggRemovableConcatArraysInit},
-    {"aggRemovableConcatArraysRemove"sv,     EFn::kAggRemovableConcatArraysRemove},
-    {"aggRemovableFirstNAdd"sv,              EFn::kAggRemovableFirstNAdd},
-    {"aggRemovableFirstNFinalize"sv,         EFn::kAggRemovableFirstNFinalize},
-    {"aggRemovableFirstNInit"sv,             EFn::kAggRemovableFirstNInit},
-    {"aggRemovableFirstNRemove"sv,           EFn::kAggRemovableFirstNRemove},
-    {"aggRemovableLastNAdd"sv,               EFn::kAggRemovableLastNAdd},
-    {"aggRemovableLastNFinalize"sv,          EFn::kAggRemovableLastNFinalize},
-    {"aggRemovableLastNInit"sv,              EFn::kAggRemovableLastNInit},
-    {"aggRemovableLastNRemove"sv,            EFn::kAggRemovableLastNRemove},
-    {"aggRemovableMaxNFinalize"sv,           EFn::kAggRemovableMaxNFinalize},
-    {"aggRemovableMinMaxNAdd"sv,             EFn::kAggRemovableMinMaxNAdd},
-    {"aggRemovableMinMaxNCollInit"sv,        EFn::kAggRemovableMinMaxNCollInit},
-    {"aggRemovableMinMaxNInit"sv,            EFn::kAggRemovableMinMaxNInit},
-    {"aggRemovableMinMaxNRemove"sv,          EFn::kAggRemovableMinMaxNRemove},
-    {"aggRemovableMinNFinalize"sv,           EFn::kAggRemovableMinNFinalize},
-    {"aggRemovablePushAdd"sv,                EFn::kAggRemovablePushAdd},
-    {"aggRemovablePushFinalize"sv,           EFn::kAggRemovablePushFinalize},
-    {"aggRemovablePushRemove"sv,             EFn::kAggRemovablePushRemove},
-    {"aggRemovableSetCommonCollInit"sv,      EFn::kAggRemovableSetCommonCollInit},
-    {"aggRemovableSetCommonFinalize"sv,      EFn::kAggRemovableSetCommonFinalize},
-    {"aggRemovableSetCommonInit"sv,          EFn::kAggRemovableSetCommonInit},
-    {"aggRemovableSetUnionAdd"sv,            EFn::kAggRemovableSetUnionAdd},
-    {"aggRemovableSetUnionRemove"sv,         EFn::kAggRemovableSetUnionRemove},
-    {"aggRemovableStdDevAdd"sv,              EFn::kAggRemovableStdDevAdd},
-    {"aggRemovableStdDevPopFinalize"sv,      EFn::kAggRemovableStdDevPopFinalize},
-    {"aggRemovableStdDevRemove"sv,           EFn::kAggRemovableStdDevRemove},
-    {"aggRemovableStdDevSampFinalize"sv,     EFn::kAggRemovableStdDevSampFinalize},
-    {"aggRemovableSumAdd"sv,                 EFn::kAggRemovableSumAdd},
-    {"aggRemovableSumFinalize"sv,            EFn::kAggRemovableSumFinalize},
-    {"aggRemovableSumRemove"sv,              EFn::kAggRemovableSumRemove},
-    {"aggRemovableTopNAdd"sv,                EFn::kAggRemovableTopNAdd},
-    {"aggRemovableTopNFinalize"sv,           EFn::kAggRemovableTopNFinalize},
-    {"aggRemovableTopNInit"sv,               EFn::kAggRemovableTopNInit},
-    {"aggRemovableTopNRemove"sv,             EFn::kAggRemovableTopNRemove},
     {"aggSetUnion"sv,                        EFn::kAggSetUnion},
     {"aggSetUnionCapped"sv,                  EFn::kAggSetUnionCapped},
     {"aggState"sv,                           EFn::kAggState},
@@ -171,6 +82,7 @@ static constexpr EFnEntry kEFnByName[] = {
     {"atan"sv,                               EFn::kAtan},
     {"atan2"sv,                              EFn::kAtan2},
     {"atanh"sv,                              EFn::kAtanh},
+    {"avgFromAcc"sv,                         EFn::kAvgFromAcc},
     {"bitTestMask"sv,                        EFn::kBitTestMask},
     {"bitTestPosition"sv,                    EFn::kBitTestPosition},
     {"bitTestZero"sv,                        EFn::kBitTestZero},
@@ -223,6 +135,7 @@ static constexpr EFnEntry kEFnByName[] = {
     {"doubleDoublePartialSumFinalize"sv,     EFn::kDoubleDoublePartialSumFinalize},
     {"doubleDoubleSum"sv,                    EFn::kDoubleDoubleSum},
     {"doubleDoubleSumFinalize"sv,            EFn::kDoubleDoubleSumFinalize},
+    {"doubleDoubleSumFromAcc"sv,             EFn::kDoubleDoubleSumFromAcc},
     {"dropFields"sv,                         EFn::kDropFields},
     {"exists"sv,                             EFn::kExists},
     {"exp"sv,                                EFn::kExp},
@@ -286,12 +199,16 @@ static constexpr EFnEntry kEFnByName[] = {
     {"makeObj"sv,                            EFn::kMakeObj},
     {"makeOwn"sv,                            EFn::kMakeOwn},
     {"max"sv,                                EFn::kMax},
+    {"maxFromAcc"sv,                         EFn::kMaxFromAcc},
     {"mergeObjects"sv,                       EFn::kMergeObjects},
+    {"mergeObjectsForExpr"sv,                EFn::kMergeObjectsForExpr},
     {"millisecond"sv,                        EFn::kMillisecond},
     {"min"sv,                                EFn::kMin},
+    {"minFromAcc"sv,                         EFn::kMinFromAcc},
     {"minute"sv,                             EFn::kMinute},
     {"mod"sv,                                EFn::kMod},
     {"month"sv,                              EFn::kMonth},
+    {"mqlComparisonRank"sv,                  EFn::kMqlComparisonRank},
     {"newArray"sv,                           EFn::kNewArray},
     {"newArrayFromRange"sv,                  EFn::kNewArrayFromRange},
     {"newBsonObj"sv,                         EFn::kNewBsonObj},
@@ -327,7 +244,9 @@ static constexpr EFnEntry kEFnByName[] = {
     {"split"sv,                              EFn::kSplit},
     {"sqrt"sv,                               EFn::kSqrt},
     {"stdDevPopFinalize"sv,                  EFn::kStdDevPopFinalize},
+    {"stdDevPopFromAcc"sv,                   EFn::kStdDevPopFromAcc},
     {"stdDevSampFinalize"sv,                 EFn::kStdDevSampFinalize},
+    {"stdDevSampFromAcc"sv,                  EFn::kStdDevSampFromAcc},
     {"strLenBytes"sv,                        EFn::kStrLenBytes},
     {"strLenCP"sv,                           EFn::kStrLenCP},
     {"substrBytes"sv,                        EFn::kSubstrBytes},
@@ -385,6 +304,7 @@ static constexpr EFnEntry kEFnByName[] = {
     {"valueBlockLtScalar"sv,                 EFn::kValueBlockLtScalar},
     {"valueBlockLteScalar"sv,                EFn::kValueBlockLteScalar},
     {"valueBlockMod"sv,                      EFn::kValueBlockMod},
+    {"valueBlockMqlComparisonRank"sv,        EFn::kValueBlockMqlComparisonRank},
     {"valueBlockMult"sv,                     EFn::kValueBlockMult},
     {"valueBlockNeqScalar"sv,                EFn::kValueBlockNeqScalar},
     {"valueBlockNewFill"sv,                  EFn::kValueBlockNewFill},

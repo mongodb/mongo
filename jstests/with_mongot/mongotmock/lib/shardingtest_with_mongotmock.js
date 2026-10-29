@@ -102,10 +102,10 @@ export class ShardingTestWithMongotMock {
     }
 
     /**
-     *  Stop all of the nodes.
+     *  Stop all of the nodes. Any options are forwarded to the underlying ShardingTest stop.
      */
-    stop() {
-        this.st.stop();
+    stop(options = {}) {
+        this.st.stop(options);
 
         for (let mock of this._mongotMocks) {
             mock.stop();

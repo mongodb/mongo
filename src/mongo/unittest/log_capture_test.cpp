@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/unittest/log_capture.h"
 
@@ -47,10 +21,15 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::unittest {
 namespace {
+
+using ::testing::ElementsAre;
+using ::testing::ElementsAreArray;
+using ::testing::IsEmpty;
 
 TEST(LogCaptureTest, CountBSONContainingSubset1Element) {
     for (int multiplicity = 0; multiplicity < 4; ++multiplicity) {
@@ -63,13 +42,15 @@ TEST(LogCaptureTest, CountBSONContainingSubset1Element) {
 }
 
 TEST(LogCaptureTest, CountBSONContainingSubsetFindCommonFields) {
+    static constexpr int logId = 10903001;
     LogCaptureGuard logs;
-    LOGV2(10903001, "Test", "a"_attr = 1);
+    LOGV2(logId, "Test", "a"_attr = 1);
     logs.stop();
-    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 10903001)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << logId)), 1);
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("msg" << "Test")), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << logId << "msg" << "Test")), 1);
 
-    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 10903099)), 0);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << logId + 1)), 0);
 }
 
 
@@ -125,6 +106,138 @@ TEST(LogCaptureTest, CountBSONContainingSubsetUndefinedActsAsWildcard) {
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("msg" << BSONUndefined)), 1);
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSONUndefined)), 1);
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("attr" << BSON("a" << BSONUndefined))), 1);
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubset1Element) {
+    for (size_t multiplicity = 0; multiplicity < 4; ++multiplicity) {
+        SCOPED_TRACE(fmt::format("multiplicity={}", multiplicity));
+
+        LogCaptureGuard logs;
+        std::vector<size_t> expected(multiplicity);
+        for (size_t i = 0; i < multiplicity; ++i) {
+            LOGV2(13370711, "Xyzzy");
+            expected[i] = i;
+        }
+        logs.stop();
+
+        ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("msg" << "Xyzzy")),
+                    ElementsAreArray(expected));
+    }
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetFindCommonFields) {
+    static constexpr int logId = 13370712;
+    LogCaptureGuard logs;
+    LOGV2(logId, "Test", "a"_attr = 1);
+    logs.stop();
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("id" << logId)), ElementsAre(0));
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("msg" << "Test")), ElementsAre(0));
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("id" << logId << "msg" << "Test")),
+                ElementsAre(0));
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("id" << logId + 1)), IsEmpty());
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetFindAttrInt) {
+    LogCaptureGuard logs;
+    LOGV2(13370713, "Test", "a"_attr = 1);
+    logs.stop();
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("attr" << BSON("a" << 1))), ElementsAre(0));
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetFindAttrObj) {
+    LogCaptureGuard logs;
+    LOGV2(13370714, "Test", "obj"_attr = BSON("f1" << 1 << "f2" << "hi"));
+    logs.stop();
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(
+                    BSON("attr" << BSON("obj" << BSON("f1" << 1 << "f2" << "hi")))),
+                ElementsAre(0));
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetIgnoresExtraneousFields) {
+    LogCaptureGuard logs;
+    LOGV2(13370715, "Test", "a"_attr = 1, "b"_attr = 2);
+    logs.stop();
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("attr" << BSON("a" << 1))), ElementsAre(0));
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetAcceptsSubsets) {
+    LogCaptureGuard logs;
+    LOGV2(13370716, "Test", "obj"_attr = BSON("f" << 1 << "g" << 1));
+    logs.stop();
+    auto hasAttrObj = [&](BSONObj sub) {
+        return logs.indicesOfBSONContainingSubset(BSON("attr" << BSON("obj" << sub)));
+    };
+    ASSERT_THAT(hasAttrObj(BSONObj{}), ElementsAre(0));
+    ASSERT_THAT(hasAttrObj(BSON("f" << 1)), ElementsAre(0));
+    ASSERT_THAT(hasAttrObj(BSON("f" << 1 << "g" << 1)), ElementsAre(0));
+    ASSERT_THAT(hasAttrObj(BSON("f" << 1 << "g" << 1 << "h" << 1)), IsEmpty());
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetNotRecursive) {
+    LogCaptureGuard logs;
+    LOGV2(13370717, "Test", "a"_attr = 1);
+    logs.stop();
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("attr" << BSON("a" << 1))), ElementsAre(0));
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("a" << 1)), IsEmpty())
+        << "Do not match a deep node";
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetUndefinedActsAsWildcard) {
+    LogCaptureGuard logs;
+    LOGV2(13370718, "Test", "a"_attr = 1);
+    logs.stop();
+    ASSERT_EQ(logs.indicesOfBSONContainingSubset(BSON("id" << BSONUndefined)).size(), 1u);
+    ASSERT_EQ(logs.indicesOfBSONContainingSubset(BSON("msg" << BSONUndefined)).size(), 1u);
+    ASSERT_EQ(logs.indicesOfBSONContainingSubset(BSON("attr" << BSONUndefined)).size(), 1u);
+    ASSERT_EQ(logs.indicesOfBSONContainingSubset(BSON("attr" << BSON("a" << BSONUndefined))).size(),
+              1);
+}
+
+TEST(LogCaptureTest, IndicesOfBSONContainingSubsetReturnsCorrectIndices) {
+    LogCaptureGuard logs;
+    LOGV2(13370719, "First");
+    LOGV2(13370720, "Second", "a"_attr = 1);
+    LOGV2(13370721, "Third");
+    LOGV2(13370722, "Fourth", "a"_attr = 1);
+    logs.stop();
+
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("attr" << BSON("a" << 1))),
+                ElementsAre(1, 3));
+    ASSERT_THAT(logs.indicesOfBSONContainingSubset(BSON("msg" << "First")), ElementsAre(0));
+}
+
+TEST(LogCaptureTest, IndicesOfTextContaining1Element) {
+    for (size_t multiplicity = 0; multiplicity < 4; ++multiplicity) {
+        SCOPED_TRACE(fmt::format("multiplicity={}", multiplicity));
+
+        LogCaptureGuard logs;
+        std::vector<size_t> expected(multiplicity);
+        for (size_t i = 0; i < multiplicity; ++i) {
+            LOGV2(13370723, "Xyzzy");
+            expected[i] = i;
+        }
+        logs.stop();
+
+        ASSERT_THAT(logs.indicesOfTextContaining("Xyzzy"), ElementsAreArray(expected));
+    }
+}
+
+TEST(LogCaptureTest, IndicesOfTextContainingNoMatch) {
+    LogCaptureGuard logs;
+    LOGV2(13370724, "Test");
+    logs.stop();
+    ASSERT_THAT(logs.indicesOfTextContaining("NotFound"), IsEmpty());
+}
+
+TEST(LogCaptureTest, IndicesOfTextContainingReturnsCorrectIndices) {
+    LogCaptureGuard logs;
+    LOGV2(13370725, "First");
+    LOGV2(13370726, "Second match");
+    LOGV2(13370727, "Third");
+    LOGV2(13370728, "Fourth match");
+    logs.stop();
+
+    ASSERT_THAT(logs.indicesOfTextContaining("match"), ElementsAre(1, 3));
 }
 
 }  // namespace

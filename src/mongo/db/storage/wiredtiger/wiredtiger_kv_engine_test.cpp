@@ -1,52 +1,19 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <ostream>
-#include <string_view>
-#include <utility>
-
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/server_options.h"
@@ -64,7 +31,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
@@ -73,6 +39,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
@@ -84,6 +51,18 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
 
+#include <condition_variable>
+#include <cstring>
+#include <functional>
+#include <mutex>
+#include <ostream>
+#include <string_view>
+#include <utility>
+
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -184,12 +163,14 @@ public:
         : _repair(repair), _preciseCheckpoints(preciseCheckpoints) {}
 
     void setUp() override {
+        ServiceContextTest::setUp();
         _helper = std::make_unique<WiredTigerKVHarnessHelper>(
             getServiceContext(), _repair, _preciseCheckpoints);
     }
 
     void tearDown() override {
         _helper.reset();
+        ServiceContextTest::tearDown();
     }
 
 protected:
@@ -222,7 +203,7 @@ protected:
 
 class WiredTigerKVEngineRepairTest : public WiredTigerKVEngineTest {
 public:
-    WiredTigerKVEngineRepairTest() : WiredTigerKVEngineTest(true /* repair */) {}
+    WiredTigerKVEngineRepairTest() : WiredTigerKVEngineTest(/*repair=*/true) {}
 };
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
@@ -284,7 +265,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(*dataFilePath, tmpFile, err);
     ASSERT(!err) << err.message();
 
-    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
@@ -344,7 +325,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     // Dropping a collection might fail if we haven't checkpointed the data
     _helper->getWiredTigerKVEngine()->checkpoint();
 
-    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
@@ -466,7 +447,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 
     // Simulate the callback that queries config.transactions for the oldest active transaction.
     boost::optional<Timestamp> oldestActiveTxnTimestamp;
-    AtomicWord<bool> callbackShouldFail{false};
+    Atomic<bool> callbackShouldFail{false};
     auto callback = [&](Timestamp stableTimestamp) {
         using ResultType = StorageEngine::OldestActiveTransactionTimestampResult;
         if (callbackShouldFail.load()) {
@@ -607,7 +588,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(*dataFilePath));
     ASSERT(boost::filesystem::exists(renamedFilePath));
 
-    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // WiredTiger drops files asynchronously.
@@ -994,6 +975,158 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
     ASSERT_OK(_helper->getWiredTigerKVEngine()->recoverToStableTimestamp(*opCtxPtr.get()));
 }
 
+TEST_F(WiredTigerKVEngineTest, GetIndexStorageSizeReturnsBusyWhenStableFileBusy) {
+    auto opCtxPtr = _makeOperationContext();
+    FailPointEnableBlock failPoint("WTIndexStorageSizeReturnBusy");
+    // With the failpoint active, the stable-file statistics open is treated as EBUSY.
+    // getIndexStorageSize must surface this as the retryable ObjectIsBusy rather than a hard error.
+    EXPECT_EQ(ErrorCodes::ObjectIsBusy,
+              _helper->getWiredTigerKVEngine()
+                  ->getIndexStorageSize(opCtxPtr.get(), {"some-index-ident"})
+                  .getStatus()
+                  .code());
+}
+
+TEST_F(WiredTigerKVEngineTest, GetIndexStorageSizeAbsentStableFileContributesZero) {
+    auto opCtxPtr = _makeOperationContext();
+    // No .wt_stable checkpoint file exists for this ident, so the statistics open fails with
+    // NoSuchKey and the ident contributes zero without erroring.
+    const StatusWith<int64_t> swSize = _helper->getWiredTigerKVEngine()->getIndexStorageSize(
+        opCtxPtr.get(), {"nonexistent-index-ident"});
+    ASSERT_OK(swSize.getStatus());
+    EXPECT_EQ(swSize.getValue(), 0);
+}
+
+TEST_F(WiredTigerKVEngineTest, GetSharedHistoryStoreStorageSizeAbsentFileContributesZero) {
+    auto opCtxPtr = _makeOperationContext();
+    // Attached-storage WiredTiger cannot create WiredTigerSharedHS.wt_stable: the disaggregated
+    // block manager requires a page log. This fixture only covers the missing-file path.
+    const StatusWith<int64_t> swSize =
+        _helper->getWiredTigerKVEngine()->getSharedHistoryStoreStorageSize(opCtxPtr.get());
+    ASSERT_OK(swSize.getStatus());
+    EXPECT_EQ(swSize.getValue(), 0);
+}
+
+// Pausing auto-compact in background is applied asynchronously, so a pause issued while a
+// previous one is still being consumed is transiently rejected with ObjectIsBusy. Production wraps
+// these calls in a retry loop (see StorageEngineImpl::pauseAutoCompactForReplicaSetWritesBlock);
+// mirror that here so back-to-back reconfigures in the tests below are not racy.
+Status retryWhileAutoCompactBusy(const std::function<Status()>& op) {
+    Status status = Status::OK();
+    for (int attempt = 0; attempt < 600; ++attempt) {
+        status = op();
+        if (status != ErrorCodes::ObjectIsBusy) {
+            break;
+        }
+        sleepmillis(50);
+    }
+    return status;
+}
+
+// Pausing auto-compaction for a write block stops it without saving the active configuration (no
+// restore is performed after).
+TEST_F(WiredTigerKVEngineTest, AutoCompactPauseStopsCompaction) {
+    // canRunAutoCompact() requires checkpoints to be enabled.
+    storageGlobalParams.syncdelay.store(1);
+    ON_BLOCK_EXIT([] { storageGlobalParams.syncdelay.store(0); });
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtx = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    ASSERT_OK(engine->autoCompact(ru,
+                                  AutoCompactOptions{true /* enable */,
+                                                     false /* runOnce */,
+                                                     50 /* freeSpaceTargetMB */,
+                                                     {} /* excludedIdents */}));
+
+    ASSERT_OK(retryWhileAutoCompactBusy(
+        [&] { return engine->pauseAutoCompactForReplicaSetWritesBlock(ru); }));
+    ASSERT_OK(retryWhileAutoCompactBusy([&] {
+        return engine->autoCompact(ru,
+                                   AutoCompactOptions{true /* enable */,
+                                                      false /* runOnce */,
+                                                      51 /* freeSpaceTargetMB */,
+                                                      {} /* excludedIdents */});
+    }));
+    ASSERT_OK(retryWhileAutoCompactBusy([&] {
+        return engine->autoCompact(ru,
+                                   AutoCompactOptions{false /* enable */,
+                                                      false /* runOnce */,
+                                                      boost::none /* freeSpaceTargetMB */,
+                                                      {} /* excludedIdents */});
+    }));
+}
+
+// Pausing is idempotent: a second pause while nothing is active leaves compaction stopped.
+TEST_F(WiredTigerKVEngineTest, AutoCompactRepeatedPauseLeavesCompactionStopped) {
+    storageGlobalParams.syncdelay.store(1);
+    ON_BLOCK_EXIT([] { storageGlobalParams.syncdelay.store(0); });
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtx = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    ASSERT_OK(engine->autoCompact(ru,
+                                  AutoCompactOptions{true /* enable */,
+                                                     false /* runOnce */,
+                                                     50 /* freeSpaceTargetMB */,
+                                                     {} /* excludedIdents */}));
+
+    // The second pause finds nothing active and must leave compaction stopped.
+    ASSERT_OK(retryWhileAutoCompactBusy(
+        [&] { return engine->pauseAutoCompactForReplicaSetWritesBlock(ru); }));
+    ASSERT_OK(retryWhileAutoCompactBusy(
+        [&] { return engine->pauseAutoCompactForReplicaSetWritesBlock(ru); }));
+
+    ASSERT_OK(retryWhileAutoCompactBusy([&] {
+        return engine->autoCompact(ru,
+                                   AutoCompactOptions{true /* enable */,
+                                                      false /* runOnce */,
+                                                      51 /* freeSpaceTargetMB */,
+                                                      {} /* excludedIdents */});
+    }));
+    ASSERT_OK(retryWhileAutoCompactBusy([&] {
+        return engine->autoCompact(ru,
+                                   AutoCompactOptions{false /* enable */,
+                                                      false /* runOnce */,
+                                                      boost::none /* freeSpaceTargetMB */,
+                                                      {} /* excludedIdents */});
+    }));
+}
+
+TEST_F(WiredTigerKVEngineTest, AutoCompactPauseStopsRunOnceCompaction) {
+    storageGlobalParams.syncdelay.store(1);
+    ON_BLOCK_EXIT([] { storageGlobalParams.syncdelay.store(0); });
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtx = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    ASSERT_OK(engine->autoCompact(ru,
+                                  AutoCompactOptions{true /* enable */,
+                                                     true /* runOnce */,
+                                                     boost::none /* freeSpaceTargetMB */,
+                                                     {} /* excludedIdents */}));
+
+    ASSERT_OK(retryWhileAutoCompactBusy(
+        [&] { return engine->pauseAutoCompactForReplicaSetWritesBlock(ru); }));
+    ASSERT_OK(retryWhileAutoCompactBusy([&] {
+        return engine->autoCompact(ru,
+                                   AutoCompactOptions{true /* enable */,
+                                                      false /* runOnce */,
+                                                      50 /* freeSpaceTargetMB */,
+                                                      {} /* excludedIdents */});
+    }));
+    ASSERT_OK(retryWhileAutoCompactBusy([&] {
+        return engine->autoCompact(ru,
+                                   AutoCompactOptions{false /* enable */,
+                                                      false /* runOnce */,
+                                                      boost::none /* freeSpaceTargetMB */,
+                                                      {} /* excludedIdents */});
+    }));
+}
+
 std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
     return std::make_unique<WiredTigerKVHarnessHelper>(svcCtx);
 }
@@ -1099,6 +1232,46 @@ TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackup
     ASSERT_EQ(Timestamp::min(), engine->getBackupCheckpointTimestamp());
 }
 
+TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNestedCategories) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+
+    auto stats = engine->collectStorageStats();
+    ASSERT(stats);
+
+    // Ensure all 3 categories we expect are present.
+    for (std::string_view category : {"cache", "data-handle", "checkpoint"}) {
+        auto elem = (*stats)[category];
+        ASSERT(!elem.eoo()) << "missing category: " << category;
+        ASSERT_EQ(elem.type(), BSONType::object) << "category not an object: " << category;
+    }
+
+    // Check that a representative sample of fields are present.
+    const BSONObj cache = stats->getObjectField("cache");
+    for (std::string_view measurement : {"bytes read into cache",
+                                         "bytes written from cache",
+                                         "bytes currently in the cache",
+                                         "maximum bytes configured"}) {
+        auto elem = cache[measurement];
+        ASSERT(!elem.eoo()) << "missing cache measurement: " << measurement;
+        ASSERT(elem.isNumber()) << "cache measurement not numeric: " << measurement;
+    }
+
+    ASSERT(stats->getObjectField("data-handle")["connection data handles currently active"]
+               .isNumber());
+    ASSERT(stats->getObjectField("checkpoint")["most recent time (msecs)"].isNumber());
+}
+
+TEST_F(WiredTigerKVEngineTest, CollectStorageStatsReturnsNoneWhenConnectionNotReady) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+    ASSERT(engine->collectStorageStats());
+
+    engine->cleanShutdown(kMemLeakAllowed);
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
+    ASSERT(!engine->collectStorageStats());
+}
+
 using WiredTigerKVEngineTestDeathTest = WiredTigerKVEngineTest;
 DEATH_TEST_F(WiredTigerKVEngineTestDeathTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
     auto opCtx = _makeOperationContext();
@@ -1135,7 +1308,7 @@ protected:
     }
 
     Status removeIdent(std::string_view ident) {
-        return _helper->getWiredTigerKVEngine()->dropIdent(
+        return _helper->getEngine()->dropIdent(
             *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
     }
 
@@ -1221,7 +1394,7 @@ TEST_F(WiredTigerKVEngineTest, CheckSessionCacheMax) {
 class WiredTigerKVEngineTestWithPreciseCheckpoints : public WiredTigerKVEngineTest {
 public:
     WiredTigerKVEngineTestWithPreciseCheckpoints()
-        : WiredTigerKVEngineTest(false /* repair */, true /* preciseCheckpoints */) {}
+        : WiredTigerKVEngineTest(/*repair=*/false, /*preciseCheckpoints=*/true) {}
 
 protected:
     void createPreparedTransaction(OperationContext* opCtx,
@@ -1715,6 +1888,82 @@ TEST_F(WiredTigerKVEngineTest, IsColdCollectionRecordStore) {
     ASSERT_TRUE(coldRs->isColdCollection());
 }
 
+// Creates a record store via getRecordStore(), inserts a few records, and reads the in-memory
+// _sizeInfo, which _changeNumRecordsAndDataSize only mutates when the store was created with
+// tracksSizeAdjustments=true.
+int64_t insertRecordsAndGetSizeInfoCount(WiredTigerKVEngine* engine,
+                                         OperationContext* opCtx,
+                                         RecoveryUnit& ru,
+                                         const NamespaceString& nss,
+                                         const std::string& ident) {
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    const RecordStore::Options rsOptions;
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, rsOptions));
+        txn.commit();
+    }
+    auto rs = engine->getRecordStore(opCtx, nss, ident, rsOptions, UUID::gen());
+    ASSERT(rs);
+
+    constexpr int64_t kNumRecords = 3;
+    {
+        StorageWriteTransaction txn(ru);
+        for (int64_t i = 0; i < kNumRecords; ++i) {
+            const std::string doc = "record";
+            ASSERT_OK(
+                rs->insertRecord(opCtx, ru, doc.c_str(), doc.size() + 1, Timestamp()).getStatus());
+        }
+        txn.commit();
+    }
+    return rs->numRecords();
+}
+
+TEST_F(WiredTigerKVEngineTest, GetRecordStoreTracksSizeAdjustmentsWhenNotUsingReplicatedFastCount) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+
+    // The attached provider does not use replicated fast count, so getRecordStore() sets
+    // tracksSizeAdjustments=true and inserts are reflected in the sizeInfo.
+    ASSERT_FALSE(rss::ReplicatedStorageService::get(opCtxPtr.get())
+                     .getPersistenceProvider()
+                     .shouldUseReplicatedFastCount());
+    ASSERT_EQ(3,
+              insertRecordsAndGetSizeInfoCount(
+                  engine,
+                  opCtxPtr.get(),
+                  ru,
+                  NamespaceString::createNamespaceString_forTest("test.tracked"),
+                  "collection-tracked"));
+}
+
+TEST_F(WiredTigerKVEngineTest,
+       GetRecordStoreDoesNotTrackSizeAdjustmentsWhenUsingReplicatedFastCount) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+
+    // A provider that uses replicated fast count makes getRecordStore() set
+    // tracksSizeAdjustments=false, so _changeNumRecordsAndDataSize is a no-op and the sizeInfo
+    // stays zero even though records were inserted.
+    class ReplicatedFastCountProvider : public rss::AttachedPersistenceProvider {
+    public:
+        bool shouldUseReplicatedFastCount() const override {
+            return true;
+        }
+    };
+    rss::ReplicatedStorageService::get(getServiceContext())
+        .setPersistenceProvider(std::make_unique<ReplicatedFastCountProvider>());
+    ASSERT_EQ(0,
+              insertRecordsAndGetSizeInfoCount(
+                  engine,
+                  opCtxPtr.get(),
+                  ru,
+                  NamespaceString::createNamespaceString_forTest("test.untracked"),
+                  "collection-untracked"));
+}
+
 TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsNone) {
     auto* engine = _helper->getWiredTigerKVEngine();
     // WiredTiger's default config string uses storage_tier=none, which should be treated as unset.
@@ -1735,6 +1984,26 @@ TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsCold) {
 TEST_F(WiredTigerKVEngineTest, GetStorageTierFromStorageOptionsEmpty) {
     auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT_EQ(engine->getStorageTierFromStorageOptions(BSONObj()), boost::none);
+}
+
+TEST_F(WiredTigerKVEngineTest, MaterializationFrontierIgnoresLowerAndEqualNotifications) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto* conn = engine->getConn();
+    const auto first = Timestamp(10, 1).asULL();
+    const auto next = Timestamp(20, 1).asULL();
+
+    engine->setLastMaterializedLsn(first);
+    engine->setLastMaterializedLsn(first);
+    engine->setLastMaterializedLsn(first - 1);
+    ASSERT_EQ(EINVAL,
+              conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, first - 1));
+    ASSERT_EQ(0, conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, first));
+
+    engine->setLastMaterializedLsn(next);
+    engine->setLastMaterializedLsn(first);
+    ASSERT_EQ(EINVAL,
+              conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, next - 1));
+    ASSERT_EQ(0, conn->set_context_uint(conn, WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, next));
 }
 
 // Minimal FlushAllFilesObserver that records how many times it was notified.
@@ -1776,6 +2045,118 @@ TEST_F(WiredTigerKVEngineTest, FlushAllFilesNotifiesRegisteredObserver) {
     engine->setFlushAllFilesObserver(nullptr);
     engine->flushAllFiles(opCtx.get(), /*callerHoldsReadLock=*/false);
     ASSERT_EQ(1, observer.timesNotified);
+}
+
+/**
+ * A test helper which uses a custom collator to lock and unlock the WiredTiger schema lock. This
+ * takes advantage of that the customize callback is invoked with the locks held to enable us to
+ * test lock_wait=false behavior without relying on timing.
+ *
+ * As WiredTiger does not have a remove_collator() function, the WiredTigerKVEngine passed to this
+ * must be destroyed *before* this object.
+ */
+class BlockingCollator : WT_COLLATOR {
+public:
+    BlockingCollator(WiredTigerKVEngine& engine) : _engine(engine) {
+        compare = [](auto...) {
+            return 0;
+        };
+        customize = [](WT_COLLATOR* collator, auto...) {
+            auto* self = static_cast<BlockingCollator*>(collator);
+            std::unique_lock lk(self->_mutex);
+            self->_started = true;
+            self->_cv.notify_all();
+            self->_cv.wait(lk, [&] { return self->_released; });
+            return 0;
+        };
+        terminate = nullptr;
+
+        WT_CONNECTION* conn = engine.getConn();
+        ASSERT_EQ(conn->add_collator(conn, "lockBusyTestCollator", this, nullptr), 0);
+    }
+
+    /**
+     * Acquires the WiredTiger schema lock. Must not be called while already locked.
+     */
+    void lock() {
+        std::unique_lock lk(_mutex);
+        invariant(!_thread.joinable());
+        _thread = unittest::JoinThread([&] {
+            WiredTigerSession session(&_engine.getConnection());
+            ASSERT_EQ(session.create("table:lockBusyTestCollatorTable",
+                                     "key_format=S,value_format=S,collator=lockBusyTestCollator"),
+                      0);
+        });
+        _cv.wait(lk, [&] { return _started; });
+    }
+
+    /**
+     * Releases the WiredTiger schema lock. Must not be called when not locked.
+     */
+    void unlock() {
+        {
+            std::lock_guard lk(_mutex);
+            _released = true;
+        }
+        _cv.notify_all();
+        _thread.join();
+    }
+
+private:
+    WiredTigerKVEngine& _engine;
+    std::mutex _mutex;
+    std::condition_variable _cv;
+    unittest::JoinThread _thread;
+    bool _started = false;
+    bool _released = false;
+};
+
+TEST_F(WiredTigerKVEngineTest, DropIdentReturnsLockBusyWhenSchemaLockHeld) {
+    auto opCtxPtr = _makeOperationContext();
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    std::string ident = "collection-1234";
+    RecordStore::Options options;
+
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    {
+        StorageWriteTransaction swt(ru);
+        ASSERT_OK(
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        swt.commit();
+    }
+
+    // Dropping a collection might fail if we haven't checkpointed the data.
+    _helper->getWiredTigerKVEngine()->checkpoint();
+
+    auto* engine = _helper->getWiredTigerKVEngine();
+
+    BlockingCollator blockingCollator(*engine);
+    auto status = [&] {
+        std::lock_guard lock(blockingCollator);
+        return engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtxPtr.get()),
+                                 ident,
+                                 /*identHasSizeInfo=*/true,
+                                 /*schemaEpoch=*/boost::none,
+                                 /*waitForLocks=*/false);
+    }();
+    EXPECT_EQ(status, ErrorCodes::LockBusy);
+
+    // The WiredTigerKVEngine must be destroyed before the test collator as WiredTiger holds a
+    // pointer to it and will call terminate() on teardown
+    opCtxPtr.reset();
+    _helper.reset();
+}
+
+TEST_F(WiredTigerKVEngineTest, DumpAcceptsAllDebugInfoCategories) {
+    unittest::LogCaptureGuard logs;
+    _helper->getWiredTigerKVEngine()->dump();
+    logs.stop();
+
+    // A category WiredTiger doesn't know about makes debug_info() fail with EINVAL, so a successful
+    // dump means every category in the config string is still valid.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 6117700)), 1);
 }
 
 }  // namespace

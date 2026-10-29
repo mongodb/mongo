@@ -244,7 +244,7 @@ test_transaction_basic_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "basic";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -395,7 +395,7 @@ test_transaction_column_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "column";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -655,7 +655,7 @@ test_transaction_prepared_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "prepared";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -919,7 +919,7 @@ test_transaction_logged_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "logged";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -1100,7 +1100,7 @@ test_transaction_truncate_visible_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "truncate";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(
@@ -1202,7 +1202,7 @@ test_transaction_truncate_conflict_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "truncate";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(

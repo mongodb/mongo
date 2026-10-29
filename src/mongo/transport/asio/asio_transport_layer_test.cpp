@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/asio/asio_transport_layer.h"
 
@@ -36,13 +10,15 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_tcp_fast_open.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -426,6 +402,39 @@ TEST(AsioTransportLayer, CheckClientWRShutdownWithoutClose) {
     tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
         [&](ConnectionThread& client) { shutdown(client.socket().rawFD(), SHUT_WR); });
 }
+
+/**
+ * isConnected() must report false once the peer has shut down its write side, even when data the
+ * peer sent beforehand is still buffered unread on the socket. Detecting the half-close under
+ * buffered data requires POLLRDHUP, so this holds on Linux only. (SERVER-131398)
+ */
+TEST(AsioTransportLayer, IsConnectedFalseWithBufferedDataAfterClientWRShutdown) {
+    TestFixture tf;
+    Notification<test::SessionThread*> mockSessionCreated;
+    tf.sessionManager().setOnStartSession(
+        [&](test::SessionThread& st) { mockSessionCreated.set(&st); });
+
+    ConnectionThread connectThread(tf.tla().listenerMainPort());
+    connectThread.wait();
+
+    auto session = mockSessionCreated.get()->session();
+    ASSERT_TRUE(session->isConnected());
+
+    // Send a byte that the server never reads, then half-close the client side.
+    const char testByte = 'x';
+    ASSERT_EQ(::send(connectThread.socket().rawFD(), &testByte, sizeof(testByte), 0),
+              static_cast<ssize_t>(sizeof(testByte)));
+    ASSERT_TRUE(session->isConnected());
+
+    ::shutdown(connectThread.socket().rawFD(), SHUT_WR);
+
+    // The FIN is delivered asynchronously even over loopback, so allow some time for it to arrive.
+    const Date_t deadline = Date_t::now() + Seconds{10};
+    while (session->isConnected() && Date_t::now() < deadline) {
+        sleepFor(Milliseconds{10});
+    }
+    ASSERT_FALSE(session->isConnected());
+}
 #endif  // __linux__
 
 TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
@@ -456,7 +465,7 @@ TEST(AsioTransportLayer, StopAcceptingSessionsDuringListenerStartup) {
     auto startThread = stdx::thread([&] { ASSERT_OK(transportLayer->start()); });
 
     // Wait until the listener thread is paused at the failpoint.
-    (*failPoint)->waitForTimesEntered(failPoint->initialTimesEntered() + 1);
+    failPoint->waitForOneNewEntry();
 
     // Release the failpoint shortly after stopAcceptingSessions() has had time to  set the listener
     // state to kShuttingDown. This is necessary as stopAcceptingSessions cannot exit until the
@@ -589,12 +598,49 @@ TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
     connectThread.close();
 
     // On Mac, setsockopt will immediately throw a SocketException since the socket is closed.
-    // On Linux, we will throw HostUnreachable once we try to actually read the socket.
-    // We allow for either exception here.
+    // On Linux, reading the closed socket yields EOF, which maps to ConnectionClosedByPeer.
+    // We allow for any of these here.
     using namespace unittest::match;
-    ASSERT_THAT(
-        st.session()->sourceMessage().getStatus(),
-        StatusIs(AnyOf(Eq(ErrorCodes::HostUnreachable), Eq(ErrorCodes::SocketException)), Any()));
+    ASSERT_THAT(st.session()->sourceMessage().getStatus(),
+                StatusIs(AnyOf(Eq(ErrorCodes::HostUnreachable),
+                               Eq(ErrorCodes::SocketException),
+                               Eq(ErrorCodes::ConnectionClosedByPeer)),
+                         Any()));
+}
+
+TEST(AsioTransportLayer, ListenerProcessingTimeHistogram) {
+    TestFixture tf;
+    auto& duringFp = asioTransportLayerHangDuringAcceptCallback;
+    auto& beforeFp = asioTransportLayerHangBeforeAcceptCallback;
+    const auto duringEntered = duringFp.setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] {
+        duringFp.setMode(FailPoint::off);
+        beforeFp.setMode(FailPoint::off);
+    });
+
+    ConnectionThread connectThread(tf.tla().listenerMainPort());
+    duringFp.waitForTimesEntered(duringEntered + 1);
+    connectThread.wait();
+
+    // Resuming the callback with hangBefore enabled parks it right after its ScopeGuard (which
+    // records the processing time) but before the acceptor is re-armed, guaranteeing exactly one
+    // histogram entry.
+    const auto beforeEntered = beforeFp.setMode(FailPoint::alwaysOn);
+    duringFp.setMode(FailPoint::off);
+    beforeFp.waitForTimesEntered(beforeEntered + 1);
+
+    BSONObjBuilder bob;
+    tf.tla().appendStatsForServerStatus(&bob);
+    const auto output = bob.obj();
+    const auto histogramOutput = output["listenerProcessingTimeHistogram"].Obj();
+
+    long long bucketCounts = 0;
+    for (const auto& bucket : histogramOutput) {
+        if (bucket.fieldNameStringData() != "totalCount")
+            bucketCounts += bucket.Obj()["count"].Long();
+    }
+    ASSERT_EQ(bucketCounts, 1);
+    ASSERT_EQ(histogramOutput["totalCount"].Long(), 1);
 }
 
 /* check that timeouts actually time out */
@@ -1059,7 +1105,7 @@ TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
     Acceptor server(ioContext);
     server.setOnAccept([&](std::shared_ptr<Acceptor::Connection> conn) {
         LOGV2(7598701, "waiting for the client to reach the fail-point");
-        (*fp)->waitForTimesEntered(fp->initialTimesEntered() + 1);
+        fp->waitForOneNewEntry();
         LOGV2(6101604, "handling a connection by resetting it");
         conn->socket.set_option(asio::socket_base::linger(true, 0));
         conn->socket.close();
@@ -1213,6 +1259,7 @@ public:
     };
 
     void setUp() override {
+        ServiceContextTest::setUp();
         auto* svcCtx = getServiceContext();
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
@@ -1223,6 +1270,7 @@ public:
 
     void tearDown() override {
         getServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceContextTest::tearDown();
     }
 
     AsioTransportLayer& tla() {
@@ -1395,10 +1443,12 @@ TEST_F(AsioTransportLayerTLSHandshakeTest, SuccessfulHandshakes) {
         const otel::metrics::HistogramData histogramData =
             capturer.readInt64Histogram(MetricNames::kIngressTLSHandshakeLatency);
         EXPECT_EQ(histogramData.count, 2);
-        // We can't really control the latency in the test, but 100ms per handshake seems like a
-        // good upper bound for a unit test. If this causes significant flakiness, increase this
-        // value.
-        EXPECT_LE(histogramData.sum, 200);
+        // The recorded values are verified exactly, with a mocked tick source, in
+        // ingress_handshake_metrics_test.cpp. This is only an order-of-magnitude sanity check
+        // that the production call site records a plausible per-handshake duration in
+        // milliseconds (rather than e.g. raw ticks or an absolute timestamp), so it is
+        // intentionally far above any latency reachable on a slow test host.
+        EXPECT_LE(histogramData.sum, 20'000);
     }
 }
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -1462,6 +1512,8 @@ public:
             return {};
         }
 
+        void onLoadBalancerPeerSet(bool isLoadBalancerPeer) override {}
+
     private:
         void _join() {
             std::lock_guard lk{_mutex};
@@ -1490,6 +1542,7 @@ public:
     virtual void configureSessionManager(FirstSessionManager& mgr) {}
 
     void setUp() override {
+        ServiceContextTest::setUp();
         auto pf = makePromiseFuture<std::shared_ptr<Session>>();
         auto sessionManager = std::make_unique<FirstSessionManager>(std::move(pf.promise));
         configureSessionManager(*sessionManager);
@@ -1510,6 +1563,7 @@ public:
     void tearDown() override {
         _connThread.reset();
         getServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceContextTest::tearDown();
     }
 
     Client& client() {
@@ -1550,10 +1604,6 @@ private:
     Notification<void> _isReady;
     test::JoinThread _thread;
 };
-
-void waitForTimesEntered(const FailPointEnableBlock& fp, FailPoint::EntryCountT times) {
-    fp->waitForTimesEntered(fp.initialTimesEntered() + times);
-}
 
 TEST_F(IngressAsioNetworkingBatonTest, CanWait) {
     auto opCtx = client().makeOperationContext();
@@ -1650,7 +1700,7 @@ TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
 
         FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
 
         // This thread is an external observer to the baton, so the expected behavior is for
         // `cancelSession` to happen after `addSession`, and thus it must return `true`.
@@ -1686,7 +1736,7 @@ TEST_F(IngressAsioNetworkingBatonTest, CancelSessionTwiceWhileInPoll) {
                 ASSERT_EQ(state, Waitable::TimeoutState::NoTimeout);
             });
 
-            waitForTimesEntered(fp, 1);
+            fp.waitForOneNewEntry();
 
             // We should be able to cancel the session, but the second attempt should return false.
             ASSERT_TRUE(baton->cancelSession(*session));
@@ -1727,7 +1777,7 @@ TEST_F(IngressAsioNetworkingBatonTest, WaitAndNotify) {
         auto baton = opCtx->getBaton()->networking();
         FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
         baton->schedule([&](Status) { notification.set(); });
     });
 
@@ -1750,7 +1800,7 @@ TEST_F(IngressAsioNetworkingBatonTest, NotifyDuringPollWithSessions) {
     MilestoneThread thread([&](Notification<void>& isReady) {
         FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
         baton->notify();
     });
 
@@ -1771,7 +1821,7 @@ TEST_F(IngressAsioNetworkingBatonTest, NotifyDuringPollNoSessions) {
     MilestoneThread thread([&](Notification<void>& isReady) {
         FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
         baton->notify();
     });
 
@@ -1889,7 +1939,7 @@ TEST_F(IngressAsioNetworkingBatonTest, NotifyInterruptsRunUntilBeforeTimeout) {
         auto baton = opCtx->getBaton();
         FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
         baton->notify();
     });
 
@@ -1957,7 +2007,7 @@ TEST_F(IngressAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
 
         FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
 
         // This thread is an external observer to the baton, so the expected behavior is for
         // `cancelTimer` to happen after `waitUntil`, thus canceling the timer must return `true`.
@@ -1991,7 +2041,7 @@ TEST_F(IngressAsioNetworkingBatonTest, CancelTimerTwiceWhileInPoll) {
                 ASSERT_EQ(state, Waitable::TimeoutState::NoTimeout);
             });
 
-            waitForTimesEntered(fp, 1);
+            fp.waitForOneNewEntry();
 
             // We should be able to cancel the timer. A second attempt should return false
             ASSERT_TRUE(baton->cancelTimer(*timer));
@@ -2083,7 +2133,7 @@ TEST_F(EgressAsioNetworkingBatonTest, CancelAsyncOperationsInterruptsOngoingOper
         // thread.
         FailPointEnableBlock fp("asioTransportLayerBlockBeforeOpportunisticRead");
         isReady.set();
-        waitForTimesEntered(fp, 1);
+        fp.waitForOneNewEntry();
         es.session()->cancelAsyncOperations();
     });
 
@@ -2111,7 +2161,7 @@ TEST_F(EgressAsioNetworkingBatonTest, AsyncOpsMakeProgressWhenSessionAddedToDeta
 
     FailPointEnableBlock fp("asioTransportLayerBlockBeforeAddSession");
     ready.set();
-    waitForTimesEntered(fp, 1);
+    fp.waitForOneNewEntry();
 
     // Destroying the `opCtx` results in detaching the baton. At this point, the thread running
     // `asyncSourceMessage` has acquired the mutex that orders asynchronous operations (i.e.,
@@ -2155,6 +2205,139 @@ TEST_F(NetworkOperationTest, InterruptDuringRead) {
 }
 
 #endif  // __linux__
+
+class MockSessionManagerCommonWithHook : public MockSessionManagerCommon {
+public:
+    using MockSessionManagerCommon::MockSessionManagerCommon;
+    using OnStartSessionFn = std::function<void(std::shared_ptr<Session>)>;
+
+    void startSession(std::shared_ptr<Session> session) override {
+        MockSessionManagerCommon::startSession(session);
+        if (_onStartSession)
+            _onStartSession(std::move(session));
+    }
+
+    void setOnStartSession(OnStartSessionFn cb) {
+        _onStartSession = std::move(cb);
+    }
+
+private:
+    OnStartSessionFn _onStartSession;
+};
+
+class AsioTransportLayerWithMockSessionManagerCommonTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        auto* svcCtx = getServiceContext();
+        svcCtx->getService()->setServiceEntryPoint(
+            std::make_unique<test::ServiceEntryPointUnimplemented>());
+        auto sm = std::make_unique<MockSessionManagerCommonWithHook>(svcCtx);
+        _sessionManager = sm.get();
+        auto tla = makeTLA(std::move(sm));
+        _listenerPort = tla->listenerMainPort();
+        svcCtx->setTransportLayerManager(
+            std::make_unique<TransportLayerManagerImpl>(std::move(tla)));
+    }
+
+    void tearDown() override {
+        getServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceContextTest::tearDown();
+    }
+
+    MockSessionManagerCommonWithHook& sessionManager() {
+        return *_sessionManager;
+    }
+
+    int listenerPort() const {
+        return _listenerPort;
+    }
+
+    /**
+     * Returns a session accepted on the main port with the load balancer failpoint active,
+     * simulating a load-balanced connection for setIsLoadBalancerPeer tests.
+     */
+    std::shared_ptr<Session> makeLoadBalancedSession() {
+        Notification<std::shared_ptr<Session>> sessionCreated;
+        sessionManager().setOnStartSession(
+            [&](std::shared_ptr<Session> session) { sessionCreated.set(std::move(session)); });
+        auto connectThread = std::make_shared<ConnectionThread>(listenerPort(), &setNoLinger);
+        _connectThreads.push_back(std::move(connectThread));
+
+        auto session = sessionCreated.get();
+        clientIsConnectedToLoadBalancerPort.setMode(FailPoint::alwaysOn);
+        return session;
+    }
+
+    void tearDownLoadBalancedSessions() {
+        clientIsConnectedToLoadBalancerPort.setMode(FailPoint::off);
+        for (auto& t : _connectThreads)
+            t->wait();
+        _connectThreads.clear();
+    }
+
+private:
+    MockSessionManagerCommonWithHook* _sessionManager = nullptr;
+    int _listenerPort = 0;
+    std::vector<std::shared_ptr<ConnectionThread>> _connectThreads;
+};
+
+/**
+ * setIsLoadBalancerPeer tracks whether the session is a load balancer peer, and increments and
+ * decrements the number of load balancer sessions in the session manager accordingly.
+ */
+TEST_F(AsioTransportLayerWithMockSessionManagerCommonTest, SetIsLoadBalancerPeerBasic) {
+    auto session = makeLoadBalancedSession();
+    ON_BLOCK_EXIT([&] { tearDownLoadBalancedSessions(); });
+
+    ASSERT_FALSE(session->isLoadBalancerPeer());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_TRUE(session->isLoadBalancerPeer());
+    ASSERT_TRUE(session->bindsToOperationState());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_FALSE(session->isLoadBalancerPeer());
+    ASSERT_FALSE(session->bindsToOperationState());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+/**
+ * setIsLoadBalancerPeer is idempotent: calling it with the same value multiple times does not
+ * change the load balanced session count.
+ */
+TEST_F(AsioTransportLayerWithMockSessionManagerCommonTest, SetIsLoadBalancerPeerIsIdempotent) {
+    auto session = makeLoadBalancedSession();
+    ON_BLOCK_EXIT([&] { tearDownLoadBalancedSessions(); });
+
+    session->setIsLoadBalancerPeer(true);
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
+    session->setIsLoadBalancerPeer(false);
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+/**
+ * setIsLoadBalancerPeer rejects a connection claiming to be from a load balancer when the session
+ *  was not accepted on the load balancer port.
+ */
+DEATH_TEST(AsioSessionDeathTest,
+           SetIsLoadBalancerPeerRejectsNonLoadBalancerPortConnections,
+           "Client claimed to be from a loadBalancer, but is not on load balancer port") {
+    TestFixture tf;
+    Notification<test::SessionThread*> sessionCreated;
+    tf.sessionManager().setOnStartSession(
+        [&](test::SessionThread& st) { sessionCreated.set(&st); });
+
+    ConnectionThread connectThread(tf.tla().listenerMainPort(), &setNoLinger);
+
+    auto& st = *sessionCreated.get();
+    st.session()->setIsLoadBalancerPeer(true);
+}
 
 }  // namespace
 }  // namespace mongo::transport

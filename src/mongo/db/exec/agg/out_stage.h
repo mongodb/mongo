@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -60,12 +34,10 @@ public:
     OutStage(std::string_view stageName,
              const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
              NamespaceString outputNs,
-             const std::shared_ptr<TimeseriesOptions>& timeseries,
-             boost::optional<ShardId> mergeShardId)
+             const std::shared_ptr<TimeseriesOptions>& timeseries)
         : WriterStage<BSONObj>(stageName, pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
-          _timeseries(timeseries),
-          _mergeShardId(std::move(mergeShardId)) {}
+          _timeseries(timeseries) {}
 
 private:
     void doDispose() override;
@@ -153,6 +125,8 @@ private:
      */
     std::shared_ptr<TimeseriesOptions> validateTimeseries();
 
+    void quotaExceeded() override;
+
     static constexpr int kMaxCatalogRetryAttempts = 5;
 
     // Stash the writeConcern of the original command as the operation context may change by the
@@ -188,8 +162,6 @@ private:
     // changed during execution, which can cause incomplete results. This can happen if the primary
     // steps down during execution.
     boost::optional<UUID> _tempNsUUID = boost::none;
-
-    boost::optional<ShardId> _mergeShardId;
 
     // True when the temporary and final out collection must be created
     // as legacy timeseries collections.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
@@ -167,6 +141,7 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexConfig& config
 StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& engineName,
                                                               const std::string& sysIndexConfig,
                                                               const std::string& collIndexConfig,
+                                                              const std::string& providerConfig,
                                                               std::string_view tableName,
                                                               const IndexConfig& config,
                                                               bool isLogged) {
@@ -174,7 +149,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     // Separate out a prefix and suffix in the default string. User configuration will override
     // values in the prefix, but not values in the suffix.
-    ss << "type=file,internal_page_max=16k,leaf_page_max=16k,";
+    ss << "internal_page_max=16k,leaf_page_max=16k,";
     ss << "checksum=on,";
     if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
         ss << "prefix_compression=true,";
@@ -220,10 +195,13 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // Index metadata
     ss << generateAppMetadataString(config);
     if (isLogged) {
-        ss << "log=(enabled=true)";
+        ss << "log=(enabled=true),";
     } else {
-        ss << "log=(enabled=false)";
+        ss << "log=(enabled=false),";
     }
+
+    ss << "type=file,";
+    ss << providerConfig;
 
     LOGV2_DEBUG(51779, 3, "index create string", "str"_attr = ss.ss.str());
     return StatusWith<std::string>(ss);
@@ -425,7 +403,7 @@ boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     // Allow overwrite because it's faster and this is a read-only cursor.
     auto cursorParams =
-        getWiredTigerCursorParams(wtRu, _container.tableId(), true /* allowOverwrite */);
+        getWiredTigerCursorParams(wtRu, _container.tableId(), /*allowOverwrite=*/true);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     WT_CURSOR* c = curwrap.get();
 
@@ -443,6 +421,16 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx, RecoveryUnit& ru) {
 void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
                                               RecoveryUnit& ru,
                                               const key_string::View& keyString) const {
+    if (!rss::ReplicatedStorageService::get(opCtx)
+             .getPersistenceProvider()
+             .supportsVersionCursor()) {
+        LOGV2_WARNING(13351202,
+                      "Skipping printing index entry metadata because the persistence provider "
+                      "does not support version cursors",
+                      "index"_attr = _indexName);
+        return;
+    }
+
     // Printing the index entry metadata requires a new session. We cannot open other cursors when
     // there are open history store cursors in the session. We also need to make sure that the
     // existing session has not written data to avoid potential deadlocks.
@@ -850,7 +838,7 @@ public:
           _key(idx.getKeyStringVersion()) {
         auto& wtRu = WiredTigerRecoveryUnit::get(ru);
         // Allow overwrite because it's faster and this is a read-only cursor.
-        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
         _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
@@ -965,8 +953,7 @@ public:
         auto& wtRu = WiredTigerRecoveryUnit::get(ru);
         if (!_cursor) {
             // Allow overwrite because it's faster and this is a read-only cursor.
-            auto cursorParams =
-                getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+            auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
             _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
         }
 
@@ -1179,6 +1166,9 @@ protected:
         _lastMoveSkippedKey = false;
 
         if (_eof) {
+            if (_forward && _cursor) {
+                _cursor->onScanComplete();
+            }
             // In the normal case, _id will be updated in updatePosition. Making this reset
             // unconditional affects performance noticeably.
             _id = RecordId();
@@ -1483,7 +1473,7 @@ boost::optional<RecordId> WiredTigerIdIndex::findLoc(OperationContext* opCtx,
     // RecordId is stored in the WT value, not the key.
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     auto cursorParams =
-        getWiredTigerCursorParams(wtRu, _container.tableId(), true /* allowOverwrite */);
+        getWiredTigerCursorParams(wtRu, _container.tableId(), /*allowOverwrite=*/true);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();

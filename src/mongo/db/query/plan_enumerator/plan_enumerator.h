@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,10 +11,7 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
@@ -68,10 +39,11 @@ namespace plan_enumerator {
 using namespace plan_enumerator;
 
 struct PlanEnumeratorParams {
-    PlanEnumeratorParams()
-        : maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions.load()),
-          maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd.load()),
-          disableOrPushdown(disableMatchExpressionOptimization.shouldFail()) {}
+    explicit PlanEnumeratorParams(const QueryKnobConfiguration& knobConfig)
+        : maxSolutionsPerOr(static_cast<size_t>(knobConfig.getEnumerationMaxOrSolutions())),
+          maxIntersectPerAnd(static_cast<size_t>(knobConfig.getEnumerationMaxIntersectPerAnd())),
+          disableOrPushdown(disableMatchExpressionOptimization.shouldFail()),
+          enableIndexPruning(knobConfig.getPlannerEnableIndexPruning()) {}
 
     // Do we provide solutions that use more indices than the minimum required to provide
     // an indexed solution?
@@ -82,35 +54,38 @@ struct PlanEnumeratorParams {
     bool enumerateOrChildrenLockstep = false;
 
     // Not owned here.
-    MatchExpression* root;
+    MatchExpression* root = nullptr;
 
     // Not owned here.
-    const std::vector<IndexEntry>* indices;
+    const std::vector<IndexEntry>* indices = nullptr;
 
     // How many plans are we willing to ouput from an OR? We currently consider
     // all possibly OR plans, which means the product of the number of possibilities
     // for each clause of the OR. This could grow disastrously large.
-    size_t maxSolutionsPerOr;
+    size_t maxSolutionsPerOr = 0;
 
     // How many intersect plans are we willing to output from an AND?  Given that we pursue an
     // all-pairs approach, we could wind up creating a lot of enumeration possibilities for
     // certain inputs.
-    size_t maxIntersectPerAnd;
+    size_t maxIntersectPerAnd = 0;
 
     // Whether to disable OR-pushdown optimization. OR-pushdown assumes that the expression has been
     // simplified: for example, that single-child $or nodes are unwrapped. To avoid this, when
     // the 'disableMatchExpressionOptimization' failpoint is set, we also disable OR-pushdown.
-    bool disableOrPushdown;
+    bool disableOrPushdown = false;
 
-    const projection_ast::Projection* projection;
-    const boost::optional<SortPattern>* sort;
+    const projection_ast::Projection* projection = nullptr;
+    const boost::optional<SortPattern>* sort = nullptr;
     BSONObj shardKey;
 
     // Whether or not this is a distinct query.
-    bool distinct;
+    bool distinct = false;
 
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
-    bool shouldPruneDistinct;
+    bool shouldPruneDistinct = false;
+
+    // Whether to prune memo entries that use duplicate indexes.
+    bool enableIndexPruning = false;
 };
 
 /**
@@ -589,6 +564,9 @@ private:
 
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
     const bool _shouldPruneDistinct;
+
+    // Whether to prune memo entries that use duplicate indexes.
+    const bool _enableIndexPruning;
 };
 
 }  // namespace plan_enumerator

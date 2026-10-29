@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 
@@ -37,6 +11,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #include <chrono>
 #include <cstddef>
@@ -290,12 +265,11 @@ TEST(QueryKnobSnapshotCacheTest, WritersAreSerializedByIntentLock) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheUpdate");
-    const auto initial = fp->initialTimesEntered();
 
     auto aFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
     });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     auto bFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{1}, QueryKnobValue{2}, KnobSource::kSetParameter);
@@ -318,10 +292,9 @@ TEST(QueryKnobSnapshotCacheTest, HeldReadLockBlocksWriterInstall) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheRead");
-    const auto initial = fp->initialTimesEntered();
 
     auto readerFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     auto writerFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
@@ -340,12 +313,11 @@ TEST(QueryKnobSnapshotCacheTest, WriterBuildPhaseDoesNotBlockReaders) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheUpdate");
-    const auto initial = fp->initialTimesEntered();
 
     auto writerFut = std::async(std::launch::async, [&] {
         cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{2}, KnobSource::kSetParameter);
     });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     // Writer is parked after building, before taking the write lock. A concurrent reader
     // must see the pre-write value without blocking.
@@ -361,13 +333,12 @@ TEST(QueryKnobSnapshotCacheTest, ConcurrentReadersDontBlockEachOther) {
 
     boost::optional<FailPointEnableBlock> fp;
     fp.emplace("hangInQueryKnobSnapshotCacheRead");
-    const auto initial = fp->initialTimesEntered();
 
     auto readerAFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    (*fp)->waitForTimesEntered(initial + 1);
+    fp->waitForOneNewEntry();
 
     auto readerBFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
-    (*fp)->waitForTimesEntered(initial + 2);
+    fp->waitForNNewEntries(2);
 
     fp.reset();
     readerAFut.get();
@@ -399,6 +370,45 @@ TEST(QueryKnobSnapshotCacheTest, SnapshotReflectsSetParameterUpdateEnum) {
     }
     auto snap = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
     ASSERT_EQ(snap.get<TestKnobModeEnum>(test_knobs::testEnumKnob.id), TestKnobModeEnum::kAlpha);
+}
+
+// SERVER-130638: regression test for a stale thread-local cache after many knob updates.
+// '_version' used to be an Atomic<uint8_t>, so exactly 256 knob updates would bring it back to
+// the same value, and a thread whose cached snapshot matched the pre-wraparound value would see a
+// false cache hit in getThreadLocalSnapshot() and never refresh. This drives 256 updates (far more
+// than a uint8_t could survive) and confirms the thread-local cache still reflects the latest
+// value.
+//
+// updateKnobValue() is only reachable from production code through the registered query-knobs
+// listener, not through the public (const-only) instance() accessor, so this drives updates the
+// same way ServerParameterGuard does: through the real ServerParameter::set() path.
+TEST(QueryKnobSnapshotCacheTest, ThreadLocalCacheSurvivesManyUpdates) {
+    const auto& cache = QueryKnobSnapshotCache::instance();
+
+    const int initialValue = cache.getSnapshot().get<int>(test_knobs::testIntKnob.id);
+    auto before = cache.getThreadLocalSnapshot();
+    ASSERT_EQ(before.get<int>(test_knobs::testIntKnob.id), initialValue);
+
+    auto* serverParam = ServerParameterSet::getNodeParameterSet()->getIfExists("testIntKnob");
+    ASSERT(serverParam);
+    auto setValue = [&](int value) {
+        BSONObjBuilder b;
+        b.append("testIntKnob", value);
+        uassertStatusOK(serverParam->set(b.obj().firstElement(), boost::none));
+    };
+
+    ON_BLOCK_EXIT([&] { setValue(initialValue); });
+
+    // 256 updates would have wrapped the old uint8_t version counter back to the value 'before'
+    // observed. testIntKnob is validated to (0, 1000).
+    for (int i = 0; i < 256; i++) {
+        setValue(100 + i);
+    }
+    const int expectedCurrentValue = 100 + 255;
+    ASSERT_EQ(cache.getSnapshot().get<int>(test_knobs::testIntKnob.id), expectedCurrentValue);
+
+    auto after = cache.getThreadLocalSnapshot();
+    ASSERT_EQ(after.get<int>(test_knobs::testIntKnob.id), expectedCurrentValue);
 }
 
 }  // namespace

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,16 +23,16 @@ class SBEReplaceOneExprTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
                                 const std::string& expectedVal) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_TRUE(sbe::value::isString(tag));
-        ASSERT_EQUALS(sbe::value::getStringView(tag, val), expectedVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_TRUE(sbe::value::isString(result.tag()));
+        ASSERT_EQUALS(sbe::value::getStringView(result.tag(), result.value()), expectedVal);
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [tag, val] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(tag, val);
-        ASSERT_EQUALS(value::TypeTags::Nothing, tag);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(value::TypeTags::Nothing, result.tag());
     }
 
     void bindStringToSlot(value::OwnedValueAccessor& slot, const std::string& str) {

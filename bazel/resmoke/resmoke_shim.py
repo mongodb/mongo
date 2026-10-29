@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import random
@@ -58,6 +59,11 @@ def add_multiversion_exclude_tags(args):
             tag_field = "requires_fcv_tag_lts"
         elif version == "last-continuous":
             tag_field = "requires_fcv_tag_continuous"
+        elif version == "last-patch":
+            # A last-patch binary is in the same series as the version under test, so
+            # its FCV matches and the default tag set applies. This mirrors
+            # mongo-task-generator's get_fcv_tags_for_patch().
+            tag_field = "requires_fcv_tag"
         else:
             continue
         tags_str = config.get(tag_field, "")
@@ -84,6 +90,31 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--taskName=", "task_name")
     add_volatile_arg(args, "--variantName=", "build_variant")
     add_volatile_arg(args, "--versionId=", "version_id")
+
+
+def copy_jstestfuzz_metadata_to_undeclared_outputs():
+    """Copy jstestfuzz_generate metadata files from runfiles into the test outputs."""
+    test_srcdir = os.environ.get("TEST_SRCDIR")
+    out_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+    if not test_srcdir or not out_dir:
+        return
+    base = os.path.join(test_srcdir, "_main")
+    if not os.path.isdir(base):
+        return
+    metadata = {
+        ".jstestfuzz_seed": "jstestfuzz_seed.txt",
+        ".jstestfuzz_commit_sha": "jstestfuzz_commit_sha.txt",
+    }
+    for root, dirs, _ in os.walk(base, followlinks=False):
+        for d in dirs:
+            candidate = os.path.join(root, d)
+            if not os.path.isfile(os.path.join(candidate, ".jstestfuzz_seed")):
+                continue
+            for src_name, dst_name in metadata.items():
+                src = os.path.join(candidate, src_name)
+                if os.path.exists(src):
+                    shutil.copyfile(src, os.path.join(out_dir, dst_name))
+            return
 
 
 def inject_config_fuzz_seed(resmoke_args):
@@ -138,6 +169,32 @@ def setup_pythonpath():
     os.environ["PYTHONPATH"] = new_pythonpath
 
 
+def resolve_deps_path() -> str | None:
+    """Return the binary dependency path list for this resmoke test."""
+
+    deps_path_map_file = os.environ.get("DEPS_PATH_MAP_FILE")
+    test_target = os.environ.get("TEST_TARGET")
+    if deps_path_map_file and test_target:
+        with open(deps_path_map_file, "r", encoding="utf-8") as file:
+            deps_path_map = json.load(file)
+        deps_path = deps_path_map.get(test_target)
+        if deps_path:
+            return deps_path
+
+    return os.environ.get("DEPS_PATH")
+
+
+def add_deps_path_to_path():
+    deps_path = resolve_deps_path()
+    if not deps_path:
+        return
+
+    os.environ["DEPS_PATH"] = deps_path
+    os.environ["PATH"] += os.pathsep + os.pathsep.join(
+        [os.path.dirname(os.path.abspath(path)) for path in deps_path.split(":")]
+    )
+
+
 class ResmokeShimContext:
     def __init__(self):
         self.links = []
@@ -185,6 +242,15 @@ class ResmokeShimContext:
             os.environ["TMP"] = self.tmpdir_symlink
             os.environ["TEMP"] = self.tmpdir_symlink
 
+        # JVM-based test dependencies (mongot) write their perf data to a shared memory file
+        # at /tmp/hsperfdata_<user>/<pid>. HotSpot hardcodes /tmp on Linux, so this ignores the
+        # TMPDIR isolation above. Because each shard runs in its own PID namespace, concurrent
+        # shards produce identical pids and collide on the same file, which makes the JVM emit a
+        # "Cannot use file ... because it is locked by another process" warning on stdout.
+        # Keep perf data in private memory instead so there is no file to contend over.
+        java_tool_options = os.environ.get("JAVA_TOOL_OPTIONS", "")
+        os.environ["JAVA_TOOL_OPTIONS"] = (java_tool_options + " -XX:+PerfDisableSharedMem").strip()
+
         # Bazel will send SIGTERM on a test timeout. If all processes haven't terminated
         # after –-local_termination_grace_seconds (default 15s), Bazel will SIGKILL them instead.
         signal.signal(signal.SIGTERM, self._handle_interrupt)
@@ -196,6 +262,14 @@ class ResmokeShimContext:
             link = os.path.join(working_dir, entry.name)
             self.links.append(link)
             os.symlink(entry.path, link)
+
+        # If mongot binaries were provided via a mongot_setup, link them where
+        # resmoke's default mongot path (mongot-localdev/mongot) expects them.
+        mongot_dir = os.path.join(base_dir, "bazel", "resmoke", "mongot", "mongot-localdev")
+        mongot_link = os.path.join(working_dir, "mongot-localdev")
+        if os.path.isdir(mongot_dir) and not os.path.exists(mongot_link):
+            self.links.append(mongot_link)
+            os.symlink(mongot_dir, mongot_link)
 
         try:
             output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
@@ -236,6 +310,7 @@ class ResmokeShimContext:
 
 
 if __name__ == "__main__":
+    copy_jstestfuzz_metadata_to_undeclared_outputs()
     setup_pythonpath()
 
     sys.argv[0] = os.path.join(
@@ -269,13 +344,7 @@ if __name__ == "__main__":
     add_multiversion_exclude_tags(resmoke_args)
     inject_config_fuzz_seed(resmoke_args)
 
-    # Add each dep binary's directory to PATH. DEPS_PATH is set when running via Bazel
-    # without a pre-installed dist-test tree (i.e. not installed_dist_test_enabled).
-    deps_paths = [p for p in (os.environ.get("DEPS_PATH") or "").split(":") if p]
-    if deps_paths:
-        os.environ["PATH"] += os.pathsep + os.pathsep.join(
-            os.path.dirname(os.path.abspath(p)) for p in deps_paths
-        )
+    add_deps_path_to_path()
 
     ctx = ResmokeShimContext()
     ctx.create_short_symlinks()

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::LoopJoinStage.
@@ -33,6 +7,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -60,9 +35,9 @@ TEST_F(LoopJoinStageTest, LoopJoinNoPredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         nullptr /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*predicate=*/nullptr,
                                          kEmptyPlanNodeId);
 
     prepareTree(ctx.get(), loopJoin.get());
@@ -76,10 +51,10 @@ TEST_F(LoopJoinStageTest, LoopJoinNoPredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = outer->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
 }
@@ -96,9 +71,9 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         makeBoolConstant(true) /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*predicate=*/makeBoolConstant(true),
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
     auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
@@ -111,10 +86,10 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = outer->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
 }
@@ -131,9 +106,9 @@ TEST_F(LoopJoinStageTest, LoopJoinConstFalsePredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         makeBoolConstant(false) /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*predicate=*/makeBoolConstant(false),
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
 
@@ -153,10 +128,10 @@ TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         makeSV(innerScanSlot) /*innerProjects*/,
-                                         makeBoolConstant(false) /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*innerProjects=*/makeSV(innerScanSlot),
+                                         /*predicate=*/makeBoolConstant(false),
                                          JoinType::Left,
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
@@ -171,10 +146,10 @@ TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = outer->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i]);
+        ASSERT_SBE_VALUE_EQ(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i]);
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::Nothing, 0);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::Nothing, 0);
     }
     ASSERT_EQ(i, expected.size());
 }
@@ -193,8 +168,8 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
         EPrimBinary::eq, makeE<EVariable>(outerScanSlot), makeE<EVariable>(innerScanSlot));
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
                                          std::move(predicate),
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
@@ -207,7 +182,7 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
         ASSERT_LT(i, expected.size());
 
         auto [innerTag, innerVal] = inner->getViewOfValue();
-        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
+        ASSERT_SBE_VALUE_EQ(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
     }
     ASSERT_EQ(i, expected.size());
 }

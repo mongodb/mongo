@@ -1,39 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <limits>
+#include <memory>
 
 namespace mongo {
 
@@ -60,34 +37,33 @@ namespace mongo {
  * - RunAggregateTest: TransferOperationMemoryUsageTracker
  * - ClusterAggregateMemoryTrackingTest: MemoryTrackingWorksOnRouter
  */
-class OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] OperationMemoryUsageTracker
+    : public SimpleMemoryUsageTracker {
     OperationMemoryUsageTracker() = delete;
 
 public:
+    /**
+     * Whether attachToOpCtxIfAvailable() should also point the tracker's CurOp reporting target at
+     * the destination opCtx. See that method for details.
+     */
+    enum class ReportToCurOp { kNo, kYes };
+
     /**
      * When constructing a stage containing a SimpleMemoryUsageTracker, use this method to ensure
      * that we aggregate operation-wide memory stats.
      */
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerForStage(
         const ExpressionContext& expCtx,
-        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
+            std::numeric_limits<int64_t>::max()});
 
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerForSBE(
-        OperationContext* opCtx, int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+        OperationContext* opCtx,
+        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
+            std::numeric_limits<int64_t>::max()});
 
     static DeduplicatorReporter createDeduplicatorReporter(
-        std::function<void(int64_t, int64_t)> callback, int64_t chunkSize);
-
-    /**
-     * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
-     * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.
-     */
-    static SimpleMemoryUsageTracker createChunkedSimpleMemoryUsageTrackerForStage(
-        const ExpressionContext& expCtx,
-        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
-
-    static SimpleMemoryUsageTracker createChunkedSimpleMemoryUsageTrackerForSBE(
-        OperationContext* opCtx, int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+        std::function<void(int64_t, int64_t)> callback, int64_t serverStatusChunkSize);
 
     /**
      * When constructing a stage containing a MemoryUsageTracker, use this method to ensure that we
@@ -96,34 +72,63 @@ public:
     static MemoryUsageTracker createMemoryUsageTrackerForStage(
         const ExpressionContext& expCtx,
         bool allowDiskUse = false,
-        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
+            std::numeric_limits<int64_t>::max()});
 
     /**
-     * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
-     * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.
+     * Detach the operation's memory tracker from the operation context. Returns a co-owning
+     * reference to it (or nullptr if there was none).
      */
-    static MemoryUsageTracker createChunkedMemoryUsageTrackerForStage(
-        const ExpressionContext& expCtx,
-        bool allowDiskUse = false,
-        int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
-
-    void propagateStatsToCurOp() const {
-        CurOp::get(_opCtx)->setMemoryTrackingStats(inUseTrackedMemoryBytes(),
-                                                   peakTrackedMemoryBytes());
-    }
-
-    /**
-     * Move the memory tracker out from the operation context, if there is one there. The caller
-     * will take ownership of the tracker.
-     */
-    static std::unique_ptr<OperationMemoryUsageTracker> moveFromOpCtxIfAvailable(
+    static std::shared_ptr<OperationMemoryUsageTracker> detachFromOpCtxIfAvailable(
         OperationContext* opCtx);
 
     /**
-     * Passes ownership of the memory tracker from the caller to the given operation context.
+     * Attach the given memory tracker to the operation context. A null tracker is a no-op that
+     * leaves any tracker already parked on the opCtx by a sibling cursor in place.
+     *
+     * With ReportToCurOp::kYes, also point the tracker's CurOp reporting target at 'opCtx' and
+     * flush current stats to that CurOp. With kNo, the tracker is published for binding only and
+     * its CurOp reporting target is cleared.
      */
-    static void moveToOpCtxIfAvailable(OperationContext* opCtx,
-                                       std::unique_ptr<OperationMemoryUsageTracker> tracker);
+    static void attachToOpCtxIfAvailable(OperationContext* opCtx,
+                                         std::shared_ptr<OperationMemoryUsageTracker> tracker,
+                                         ReportToCurOp reportToCurOp = ReportToCurOp::kYes);
+
+    /**
+     * Returns a co-owning reference to the operation's memory tracker without removing it from the
+     * operation context, or nullptr if there is none. Unlike getOperationMemoryUsageTracker(), does
+     * not create one.
+     */
+    [[nodiscard]] static std::shared_ptr<OperationMemoryUsageTracker> getOwningIfExists(
+        OperationContext* opCtx);
+
+    /**
+     * Returns true if the given operation context currently holds a memory tracker. Unlike
+     * getOperationMemoryUsageTracker(), never creates one.
+     */
+    static bool hasTrackerOnOpCtx(OperationContext* opCtx);
+
+    /**
+     * Returns the operation's tracker if one exists, otherwise nullptr. Never creates one. Lets the
+     * load-shedding decision read tracked-memory size without forcing a tracker onto operations
+     * that don't track memory.
+     */
+    static OperationMemoryUsageTracker* getIfExists(OperationContext* opCtx);
+
+    /**
+     * Re-point 'tracker' at the operation memory tracker for 'opCtx'. For stages whose lifetime
+     * spans getMore opCtx swaps to re-bind after being detached, since the operation tracker lives
+     * on the OperationContext. No-op when memory tracking is disabled or when 'expCtx' excludes
+     * operation memory tracking, matching the create*ForStage() factories, so a stage built without
+     * a base stays standalone.
+     *
+     * TODO SERVER-131203: this is a stopgap and is NOT for general use -- it exists specifically to
+     * let BatchedEnrichmentStage rebind its tracker base across getMore opCtx swaps. Remove it once
+     * that stage's memory tracking is properly integrated with the operation memory tracker.
+     */
+    static void rebindToOperation(SimpleMemoryUsageTracker& tracker,
+                                  const ExpressionContext& expCtx,
+                                  OperationContext* opCtx);
 
     explicit OperationMemoryUsageTracker(OperationContext* opCtx);
 
@@ -133,14 +138,15 @@ private:
 
     static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 
-    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(OperationContext* opCtx,
-                                                                       int64_t maxMemoryUsageBytes,
-                                                                       int64_t chunkSize = 0);
+    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(
+        OperationContext* opCtx,
+        MemoryUsageLimit maxMemoryUsageBytes,
+        bool excludeOperationMemoryTracking = false);
     static MemoryUsageTracker createMemoryUsageTrackerImpl(const ExpressionContext& expCtx,
                                                            bool allowDiskUse,
-                                                           int64_t maxMemoryUsageBytes,
-                                                           int64_t chunkSize = 0);
+                                                           MemoryUsageLimit maxMemoryUsageBytes);
 
     OperationContext* _opCtx;
 };
+
 }  // namespace mongo

@@ -24,7 +24,12 @@
  */
 class connection_wrapper {
 public:
-    connection_wrapper(const std::string &db_home, const char *cfg_str = "create");
+    /*
+     * Pass an event handler to inspect what the connection writes to the error or message streams;
+     * some behavior is only reported there and is not visible in a return code.
+     */
+    connection_wrapper(const std::string &db_home, const char *cfg_str = "create",
+      WT_EVENT_HANDLER *event_handler = nullptr);
     ~connection_wrapper();
 
     /*

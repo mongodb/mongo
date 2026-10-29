@@ -2,6 +2,7 @@
  * Test using the forcedPlanSolutionHash parameter to the find and
  * explain commands.
  * @tags: [
+ *    uses_explain,
  *    assumes_unsharded_collection,
  *    assumes_against_mongod_not_mongos,
  *    # We modify the value of a query knob. setParameter is not persistent.
@@ -19,14 +20,6 @@
  * ]
  */
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
-
-// Enabling SBE affects plan enumeration under CBR.
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    quit();
-}
 
 const coll = db[jsTestName()];
 coll.drop();

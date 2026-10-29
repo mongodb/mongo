@@ -8,7 +8,7 @@ check_fast_mode_flag
 
 # Files potentially modified by config.sh.
 fc="format_config_def.c"
-fh="config.h"
+fh="format_config.h"
 
 # Go to the test/format directory where config.sh is located and run from.
 cd test/format

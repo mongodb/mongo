@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 
@@ -36,8 +11,8 @@ namespace mongo {
 
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
     auto& opDebug = CurOp::get(opCtx)->debug();
-    pinnedCursor->updateMetricsOnUnpin(opDebug.getAdditiveMetrics());
-    pinnedCursor->updateMetricsOnUnpin(opDebug.changeStreamMetrics);
+    pinnedCursor->updateMetricsOnUnpin(opDebug);
+    pinnedCursor->captureSupplementalMetricsIfNeeded(opDebug);
 
     // For a change stream query, we want to collect and update query stats on the initial query
     // and for every getMore.
@@ -51,7 +26,7 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
                                      opDebug.getQueryStatsInfo().keyHash,
                                      pinnedCursor->takeKey(),
                                      snapshot,
-                                     {} /* supplementalMetrics */,
+                                     pinnedCursor->takeSupplementalMetrics(),
                                      pinnedCursor->isChangeStreamQuery());
     }
 }
@@ -73,6 +48,43 @@ void collectQueryStatsMongod(OperationContext* opCtx,
                                  std::move(key),
                                  snapshot,
                                  query_stats::computeSupplementalQueryStatsMetrics(opDebug));
+}
+
+void collectQueryStatsMongodReadErrored(OperationContext* opCtx, ErrorCodes::Error errorCode) {
+    if (!feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
+        return;
+    }
+
+    // Writes register their key into the same OpDebug slot read below and nothing clears it on the
+    // error path, so without this guard a failing write would be attributed an error code.
+    // TODO SERVER-132417: Revisit when write command errors are supported.
+    if (CurOp::get(opCtx)->getReadWriteType() != Command::ReadWriteType::kRead) {
+        return;
+    }
+
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    auto& queryStatsInfo = opDebug.getQueryStatsInfo();
+
+    // Only record errors when there is a live key still owned by this operation. A null
+    // key means we do not record error information for:
+    //  - Errors that occur before the key was created (eg. command parsing, query shape
+    //  computation),
+    //    since registerRequest() is what makes a shape available to attribute to.
+    //  - Errors that occur once the key was moved onto a cursor. The ClientCursor constructor
+    //  std::moves
+    //    the key off OpDebug (eg. getMores), and on mongod that only happens after the first batch
+    //    is full, so a plan executor failure during that batch is still recorded here.
+    if (!queryStatsInfo.key) {
+        return;
+    }
+
+    // We deliberately do not call setEndOfOpMetrics here, as writeQueryStats/updateStatistics
+    // discards the partial timing/exec metrics for errored snapshots.
+    query_stats::QueryStatsSnapshot snapshot{};
+    snapshot.errorCode = errorCode;
+
+    query_stats::writeQueryStats(
+        opCtx, queryStatsInfo.keyHash, std::move(queryStatsInfo.key), snapshot);
 }
 
 }  // namespace mongo

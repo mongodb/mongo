@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -38,10 +11,12 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -54,12 +29,21 @@
  * they do not look at the structure of the documents themselves, just combine other things
  */
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ListOfMatchExpression : public MatchExpression {
 public:
+    using Expressions = std::vector<std::unique_ptr<MatchExpression>>;
+
+    /**
+     * Number of short-circuits recorded across this node's children after which the children are
+     * reordered and their counters reset.
+     */
+    static constexpr std::uint32_t kReorderIterations = 4096;
+
     ListOfMatchExpression(MatchType type,
                           clonable_ptr<ErrorAnnotation> annotation,
-                          std::vector<std::unique_ptr<MatchExpression>> expressions)
+                          Expressions expressions)
         : MatchExpression(type, std::move(annotation)), _expressions(std::move(expressions)) {}
 
     void add(std::unique_ptr<MatchExpression> e) {
@@ -81,7 +65,7 @@ public:
     /**
      * Returns the unmodifiable vector of the children of the current node.
      */
-    const std::vector<std::unique_ptr<MatchExpression>>& getChildren() const {
+    const Expressions& getChildren() const {
         return _expressions;
     }
 
@@ -111,11 +95,11 @@ public:
         return child;
     }
 
-    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+    Expressions* getChildVector() final {
         return &_expressions;
     }
 
-    const std::vector<std::unique_ptr<MatchExpression>>& getChildVector() const {
+    const Expressions& getChildVector() const {
         return _expressions;
     }
 
@@ -125,6 +109,34 @@ public:
         return MatchCategory::kLogical;
     }
 
+    /**
+     * Enables dynamic reordering of this node's child predicates based on their observed
+     * selectivity.
+     * Has no effect for nodes with fewer than two children, where there is nothing to reorder.
+     */
+    void allowReordering();
+
+    /**
+     * Records that the child pointed to by 'it' short-circuited the evaluation of this node, and
+     * reorders the children once 'kReorderIterations' short-circuits have accumulated.
+     *
+     * Called from the match expression evaluator on the hot path. No-op unless reordering was
+     * enabled via 'allowReordering()'.
+     *
+     * The reorder mutates the child vector that the caller is currently iterating over,
+     * which invalidates 'it' and the caller's loop iterators. This is safe only because every
+     * caller in 'exec/matcher/matcher.h' returns immediately after calling this function. Any
+     * caller that wants to keep iterating afterwards must re-obtain its iterators.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE void recordMatch(Expressions::const_iterator it) const {
+        if (_reorderingEnabled) {
+            (*it)->incrementShortCircuitCounter();
+            if (++_reorderHits >= kReorderIterations) {
+                _reorderPredicates();
+            }
+        }
+    }
+
 protected:
     void _debugList(StringBuilder& debug, int indentationLevel) const;
 
@@ -132,13 +144,30 @@ protected:
                      const query_shape::SerializationOptions& opts = {},
                      bool includePath = true) const;
 
+    bool _isReorderingEnabled() const {
+        return _reorderingEnabled;
+    }
+
+    /**
+     * Reorders the child predicates by observed short-circuit frequency, so that the child most
+     * likely to terminate evaluation early is evaluated first, then clears the counters to start a
+     * fresh measurement window.
+     */
+    void _reorderPredicates() const;
+
 private:
-    std::vector<std::unique_ptr<MatchExpression>> _expressions;
+    // Mutable because both statistics gathering and reordering operate on a const expression tree.
+    mutable Expressions _expressions;
+
+    // Short-circuits recorded across all children since the last reorder.
+    mutable std::uint32_t _reorderHits = 0;
+
+    bool _reorderingEnabled = false;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT AndMatchExpression : public ListOfMatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AndMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$and"_sd;
+    static constexpr std::string_view kName = "$and"sv;
 
     AndMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(AND, std::move(annotation), {}) {}
@@ -158,6 +187,9 @@ public:
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
+        }
+        if (_isReorderingEnabled()) {
+            self->allowReordering();
         }
         return self;
     }
@@ -181,7 +213,7 @@ public:
 
 class OrMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$or"_sd;
+    static constexpr std::string_view kName = "$or"sv;
 
     OrMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(OR, std::move(annotation), {}) {}
@@ -201,6 +233,9 @@ public:
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
+        }
+        if (_isReorderingEnabled()) {
+            self->allowReordering();
         }
         return self;
     }
@@ -224,7 +259,7 @@ public:
 
 class NorMatchExpression : public ListOfMatchExpression {
 public:
-    static constexpr std::string_view kName = "$nor"_sd;
+    static constexpr std::string_view kName = "$nor"sv;
 
     NorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(NOR, std::move(annotation), {}) {}
@@ -245,6 +280,9 @@ public:
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
+        if (_isReorderingEnabled()) {
+            self->allowReordering();
+        }
         return self;
     }
 
@@ -263,7 +301,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT NotMatchExpression final : public MatchExpression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NotMatchExpression final : public MatchExpression {
 public:
     static constexpr int kNumChildren = 1;
     explicit NotMatchExpression(MatchExpression* e,

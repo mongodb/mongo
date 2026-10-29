@@ -173,3 +173,21 @@ information from the node’s source.
 Incremental refreshes will happen whenever there has been a
 [placement version change](#placement-version-changes), while
 [collection generation changes](#generation-changes) will cause a full refresh.
+
+## Authoritative Shard Versioning Protocol
+
+Under the
+[authoritative shards](../shard_role/shard_catalog/README_sharding_catalog.md#authoritative-containers)
+model, a shard is the durable source of truth for the metadata it owns (`config.shard.catalog.*`).
+**Routers are unchanged:** they still attach `databaseVersion` / `shardVersion` and retry on
+`StaleConfig` / `StaleDbRoutingVersion` as described above.
+
+What changes is how the **shard** resolves a mismatch: it recovers filtering metadata from its local
+catalog instead of refreshing from the CSRS. That behaviour is gated by
+`featureFlagAuthoritativeShardsCRUD` / `featureFlagAuthoritativeShardsDDL`.
+
+How recovery works (algorithms, threads, actors, collection vs database paths):
+
+- [Shard Catalog Recovery](../shard_role/shard_catalog/README_shard_catalog_recovery.md)
+- Durable containers and cache coherency:
+  [Sharding Catalog — Cache recoverability](../shard_role/shard_catalog/README_sharding_catalog.md#cache-recoverability)

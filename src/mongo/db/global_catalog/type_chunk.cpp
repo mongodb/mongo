@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/type_chunk.h"
 
@@ -37,7 +11,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -114,27 +87,21 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
 
 ChunkType::ChunkType() = default;
 
-ChunkType::ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardRef shard)
+ChunkType::ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId)
     : _collectionUUID(collectionUUID),
       _range(range),
       _version(std::move(version)),
-      _shard(std::move(shard)) {}
+      _shard(std::move(shardId)) {}
 
 StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
     ChunkType chunk;
 
     {
-        BSONElement shardElem = source[shard.name()];
-        if (shardElem.eoo()) {
-            return {ErrorCodes::NoSuchKey,
-                    str::stream() << "The field '" << shard.name() << "' is missing"};
-        }
-        try {
-            chunk._shard = ShardRef::parse(shardElem);
-        } catch (const DBException& e) {
-            return e.toStatus().withContext(str::stream() << "The field '" << shard.name()
-                                                          << "' cannot be parsed");
-        }
+        std::string chunkShard;
+        Status status = bsonExtractStringField(source, shard.name(), &chunkShard);
+        if (!status.isOK())
+            return status;
+        chunk._shard = chunkShard;
     }
 
     {
@@ -402,7 +369,7 @@ BSONObj ChunkType::toConfigBSON(bool omitVersion) const {
     if (_range)
         _range->serialize(&builder);
     if (_shard)
-        getShard().serialize(shard.name(), &builder);
+        builder.append(shard.name(), getShard().toString());
     if (!omitVersion && _version)
         builder.appendTimestamp(lastmod.name(), _version->toLong());
     if (_estimatedSizeBytes)
@@ -421,7 +388,7 @@ BSONObj ChunkType::toShardBSON() const {
     invariant(_version);
     builder.append(minShardID.name(), _range->getMin());
     builder.append(ChunkRange::kMaxFieldName, _range->getMax());
-    getShard().serialize(shard.name(), &builder);
+    builder.append(shard.name(), getShard().toString());
     builder.appendTimestamp(lastmod.name(), _version->toLong());
     addHistoryToBSON(builder);
     return builder.obj();
@@ -449,8 +416,8 @@ void ChunkType::setVersion(const ChunkVersion& version) {
     _version = version;
 }
 
-void ChunkType::setShard(const ShardRef& shard) {
-    invariant(ShardRef::validate(shard));
+void ChunkType::setShard(const ShardId& shard) {
+    invariant(shard.isValid());
     _shard = shard;
 }
 
@@ -495,7 +462,7 @@ Status ChunkType::validate() const {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing version field");
     }
 
-    if (!_shard.has_value() || !ShardRef::validate(*_shard).isOK()) {
+    if (!_shard.has_value() || !_shard->isValid()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << shard.name() << " field");
     }

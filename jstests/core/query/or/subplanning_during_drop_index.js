@@ -19,7 +19,6 @@
  * exclude_from_timeseries_crud_passthrough,
  * ]
  */
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getDocModel} from "jstests/libs/property_test_helpers/models/document_models.js";
@@ -45,8 +44,6 @@ const indexCount = 10;
 const queryCount = 60;
 const iterations = 5; // Count of iterations the test makes before returning success.
 
-const is83orAbove = isFCVgte(db, "8.3");
-
 function generateDocuments() {
     jsTest.log.info("Generating (" + documentCount + ") documents");
 
@@ -64,7 +61,7 @@ function generateIndexes() {
 function generateQueries() {
     jsTest.log.info("Generating (" + queryCount + ") queries");
 
-    const aggModel = topLevelOrAggModel({is83orAbove: is83orAbove});
+    const aggModel = topLevelOrAggModel();
     const queryShapes = fc.sample(aggModel, {seed: randomSeed, numRuns: queryCount});
     // The query model creates a query shape with several possible constant values at the
     // leaves, so at this point we'll modify the shapes by picking only the first of those constants.

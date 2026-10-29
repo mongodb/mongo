@@ -2,6 +2,7 @@
  * Test that verifies the behavior of NearStage when memory limit is set.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_stable_shard_list,
  *   assumes_stable_collection_uuid,
  *   assumes_unsharded_collection,
@@ -73,7 +74,7 @@ runWithParamsAllNonConfigNodes(db, {internalNearStageMaxMemoryBytes: spillingLim
     } else {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-            [12227900],
+            [ErrorCodes.ExceededMemoryLimit],
         );
     }
 });
@@ -84,7 +85,7 @@ if (isSpillingEnabled) {
     runWithParamsAllNonConfigNodes(db, {internalNearStageMaxMemoryBytes: 1000}, () => {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-            [12227900],
+            [ErrorCodes.ExceededMemoryLimit],
         );
     });
 }

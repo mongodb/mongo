@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_all_indices_stage.h"
@@ -42,12 +15,10 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -57,6 +28,7 @@
 #include <vector>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class OperationContext;
 
@@ -103,7 +75,7 @@ public:
 
     static bool canUseSubplanning(const CanonicalQuery& query);
     static bool needsSubplanning(const CanonicalQuery& query) {
-        return internalQueryPlanOrChildrenIndependently.load() &&
+        return query.getExpCtx()->getQueryKnobConfiguration().getPlanOrChildrenIndependently() &&
             SubPlanningUtils::canUseSubplanning(query);
     }
 
@@ -118,7 +90,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static constexpr std::string_view kStageType = "SUBPLAN"_sd;
+    static constexpr std::string_view kStageType = "SUBPLAN"sv;
 
     /**
      * Selects a plan using subplanning. First uses the query planning results from
@@ -187,6 +159,26 @@ public:
     }
 
     /**
+     * Returns the strategy that selected the winning plan. Only meaningful after pickBestPlan().
+     *
+     * A rooted $or is planned per branch, and different branches can be decided differently: CBR
+     * ranks a branch when it can estimate all of its candidates, the multi-planner ranks a branch
+     * whose candidates CBR could not estimate (or every branch, when the ranker is the
+     * multi-planner), a branch with a cache entry is tagged from the cache, and a branch with a
+     * sole solution is tagged directly. There is therefore no single strategy for the operation,
+     * so this reports the highest-precedence strategy used by any branch, ordered multi-planner
+     * over CBR over a cache hit over a lone candidate.
+     *
+     * When subplanning is abandoned for the whole-query fallback, the fallback's own choice is
+     * reported instead, because that is the plan being run.
+     *
+     * TODO SERVER-131818: revisit this once CBR fully supports rooted $or. Collapsing the branches
+     * by precedence is a best-effort approximation; we likely want to report the list of per-branch
+     * strategies rather than a single one.
+     */
+    PlanSelectionStrategy planSelectionStrategy() const;
+
+    /**
      * Returns the MultiPlan stage.
      */
     MultiPlanStage* multiPlannerStage() {
@@ -223,5 +215,17 @@ private:
 
     // Indicates whether the sub planner has fallen back to multi planning.
     bool _usesMultiplanning = false;
+
+    // Indicates that per-branch planning was abandoned and a whole query plan was chosen instead,
+    // which is then what 'planSelectionStrategy()' reports on. Set only once that plan exists.
+    bool _usesWholeQueryPlan = false;
+
+    // Indicates whether at least one $or branch had more than one candidate solution and was
+    // therefore ranked by the multi-planner.
+    bool _anyBranchMultiPlanned = false;
+
+    // Indicates whether CBR estimated all of the candidates of at least one $or branch and chose
+    // that branch's winner.
+    bool _anyBranchCostBasedRanked = false;
 };
 }  // namespace mongo

@@ -45,13 +45,11 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "key_string_long_running_test",
+    size = "large",
     srcs = [
         "key_string_long_running_test.cpp",
     ],
-    tags = [
-        "cpu:2",
-        "mongo_unittest_eighth_group",
-    ],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":key_string_test_util",
     ],

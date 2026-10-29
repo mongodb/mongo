@@ -2,10 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-networking-and-observability
-  - "otel_opcounters*":
-    approvers:
-      - 10gen/query-integration-observability
-  - "otel_op_latency*":
-    approvers:
       - 10gen/query-integration-observability

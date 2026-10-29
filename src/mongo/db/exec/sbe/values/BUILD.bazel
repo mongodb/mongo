@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzztest")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzztest", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,6 +13,25 @@ mongo_cc_fuzztest(
     name = "sbe_value_fuzz_test",
     srcs = ["sbe_value_fuzz_test.cpp"],
     deps = [
+        ":document_tree_generator",
         "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_library(
+    name = "document_tree_generator",
+    testonly = True,
+    srcs = ["document_tree_generator.cpp"],
+    hdrs = ["document_tree_generator.h"],
+    # Add the same suppressions as mongo_cc_fuzztest to avoid tripping warnings from inside the
+    # fuzztest library and its dependencies.
+    copts = ["-Wno-sign-compare"],
+    target_compatible_with = select({
+        "//bazel/config:fsan_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "@fuzztest//fuzztest",
     ],
 )

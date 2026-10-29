@@ -1181,7 +1181,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
     __wt_writelock(session, &txn_global->rwlock);
     if (__wt_atomic_load_uint32_relaxed(&conn->version_cursor_count) == 0) {
         __wt_txn_pinned_timestamp(session, &pinned_ts);
-        txn_global->version_cursor_pinned_timestamp = pinned_ts;
+        __wt_atomic_store_uint64_relaxed(&txn_global->version_cursor_pinned_timestamp, pinned_ts);
     }
     (void)__wt_atomic_add_uint32(&conn->version_cursor_count, 1);
     __wt_writeunlock(session, &txn_global->rwlock);

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/startup_recovery.h"
 
@@ -35,7 +9,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_image_util.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -45,6 +21,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
@@ -52,10 +29,13 @@
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repair.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
@@ -283,9 +263,13 @@ auto downgradeError =
  * This validates that required collections have an _id index. If a collection is missing an _id
  * index, this function will build it if EnsureIndexPolicy is kBuildMissing.
  *
+ * kSkipMissingForInitialSync leaves the collection without an _id index. It is only used when
+ * the data is about to be discarded by a (repeated) initial sync, where building the index would
+ * be wasted work.
+ *
  * Returns a MustDowngrade error if any index builds on the required _id field fail.
  */
-enum class EnsureIndexPolicy { kBuildMissing, kError };
+enum class EnsureIndexPolicy { kBuildMissing, kError, kSkipMissingForInitialSync };
 Status ensureCollectionProperties(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   EnsureIndexPolicy ensureIndexPolicy) {
@@ -305,7 +289,12 @@ Status ensureCollectionProperties(OperationContext* opCtx,
         // does not exist before attempting to build it or returning an error.
         if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll)) {
             LOGV2(21001, "Collection is missing an _id index", logAttrs(*coll));
-            if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
+            if (EnsureIndexPolicy::kSkipMissingForInitialSync == ensureIndexPolicy) {
+                LOGV2(13350100,
+                      "Not building the missing _id index because this node is about to perform an "
+                      "initial sync, which will drop this collection",
+                      logAttrs(*coll));
+            } else if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto status = buildMissingIdIndex(opCtx, coll->ns());
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
@@ -577,10 +566,8 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
         return;
     }
 
-    const auto vCtx = VersionContext::getDecoration(opCtx);
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
-            vCtx, fcvSnapshot)) {
+    if (index_builds::primary_driven::enabled(
+            opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         for (auto&& [buildUUID, entry] : reconcileResult.indexBuildsToRestart) {
             std::vector<IndexBuildInfo> builds;
             builds.reserve(entry.indexSpecsAndIdents.size());
@@ -757,22 +744,70 @@ void startupRepair(OperationContext* opCtx,
     }
 }
 
+/**
+ * Runs collection_validation::validate() as its own operation, so that a validation slower than
+ * 'slowms' reports the same "Slow query" log line as the 'validate' command. 'validateOptions' are
+ * the options the validation was configured with, reported as part of the command.
+ */
+Status validateAndLogOperation(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& validateOptions,
+                               const collection_validation::ValidationOptions& options,
+                               ValidateResults& results) {
+    CurOp curOp;
+    curOp.push(opCtx);
+    {
+        BSONObjBuilder cmdObj;
+        cmdObj.append("validate", nss.coll());
+        cmdObj.appendElementsUnique(validateOptions);
+        ClientLock lk(opCtx->getClient());
+        // The registered command lets the log line redact and report the command as it does for
+        // the 'validate' command.
+        curOp.setGenericOpRequestDetails(
+            lk, nss, CommandHelpers::findCommand(opCtx, "validate"), cmdObj.obj(), dbMsg);
+    }
+    curOp.ensureStarted();
+    ON_BLOCK_EXIT([&] {
+        try {
+            curOp.completeAndLogOperation(
+                {logv2::LogComponent::kCommand, toLogService(opCtx->getService())},
+                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                    .getDatabaseProfileSettings(nss.dbName())
+                    .filter);
+        } catch (const DBException& e) {
+            LOGV2(13618301, "Unable to log offline validation operation", "error"_attr = e);
+        }
+    });
+    return collection_validation::validate(opCtx, nss, options, results);
+}
+
 // Performs collection validation for a singular collection.
 // Returns if the collection is valid, or the validation didn't complete correctly.
 StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
                                            NamespaceString nss,
                                            bool skipAtClusterTime = false) {
-    auto collectionValidateOptionsParam =
+    const auto collectionValidateOptionsParam =
         ServerParameterSet::getNodeParameterSet()->get<CollectionValidateOptionsServerParameter>(
             "collectionValidateOptions");
-    auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
-    auto parsedOptions = !validateOptions.isEmpty()
+    const auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
+
+    // Enabling parallel record store traversal disables sizeStats.
+    const bool enableSizeStats = !collection_validation::isRecordStoreSlicingEnabled(
+        collection_validation::getTargetRecordsPerRecordStoreSlice());
+
+    const auto parsedOptions = !validateOptions.isEmpty()
         ? collection_validation::parseValidateOptions(
-              opCtx, nss, validateOptions, skipAtClusterTime)
+              opCtx, nss, validateOptions, skipAtClusterTime, enableSizeStats)
         : collection_validation::ValidationOptions(
               collection_validation::ValidateMode::kForegroundFull,
               collection_validation::RepairMode::kNone,
-              /*logDiagnostics=*/false);
+              /*logDiagnostics=*/false,
+              currentValidationVersion,
+              /*verifyConfigurationOverride=*/boost::none,
+              /*readTimestamp=*/boost::none,
+              /*hashPrefixes=*/boost::none,
+              /*revealHashedIds=*/boost::none,
+              collection_validation::getTargetRecordsPerRecordStoreSlice());
     if (parsedOptions.getRepairMode() != collection_validation::RepairMode::kNone) {
         return Status{ErrorCodes::InvalidOptions,
                       "Repair is not allowed in offline validation mode"};
@@ -780,7 +815,7 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     ValidateResults validateResults;
     try {
         Status status =
-            collection_validation::validate(opCtx, nss, parsedOptions, &validateResults);
+            validateAndLogOperation(opCtx, nss, validateOptions, parsedOptions, validateResults);
 
         if (!status.isOK()) {
             LOGV2_ERROR(11790200,
@@ -788,22 +823,43 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
                         "nss"_attr = nss.toStringForErrorMsg(),
                         "error"_attr = status.toString());
             return status;
-        } else {
-            BSONObjBuilder results;
-            validateResults.appendToResultObj(&results, /*debug=*/false);
-            LOGV2_OPTIONS(9437301,
-                          {logv2::LogTruncation::Disabled},
-                          "Offline validation result",
-                          "results"_attr = results.done());
-            return validateResults.isValid();
         }
     } catch (const DBException& e) {
+        // When validating at 'atClusterTime', a collection present in the latest catalog may not
+        // have existed at that timestamp because it was created or renamed into place afterwards;
+        // validate() throws NamespaceNotFound. That is a valid catalog state rather than
+        // corruption, so skip the collection and continue validating the rest.
+        if (e.code() == ErrorCodes::NamespaceNotFound && parsedOptions.getReadTimestamp()) {
+            if (!gValidateCollectionName.empty()) {
+                // If validating a single collection, return non-OK status to indicate that the
+                // collection was not validated and return early.
+                LOGV2_ERROR(
+                    11790202,
+                    "Single collection validation failed to complete, see logs for more details",
+                    "nss"_attr = nss.toStringForErrorMsg(),
+                    "error"_attr = e.toString());
+                return e.toStatus();
+            }
+            LOGV2(11790100,
+                  "Skipping validation of collection because it did not exist at atClusterTime",
+                  "nss"_attr = nss.toStringForErrorMsg(),
+                  "atClusterTime"_attr = *parsedOptions.getReadTimestamp());
+            return true;
+        }
         LOGV2_ERROR(11790201,
                     "Collection validation failed to complete, see logs for more details",
                     "nss"_attr = nss.toStringForErrorMsg(),
                     "error"_attr = e.toString());
         return e.toStatus();
     }
+
+    BSONObjBuilder results;
+    validateResults.appendToResultObj(&results, /*debugging=*/false);
+    LOGV2_OPTIONS(9437301,
+                  {logv2::LogTruncation::Disabled},
+                  "Offline validation result",
+                  "results"_attr = results.done());
+    return validateResults.isValid();
 }
 
 OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
@@ -812,9 +868,6 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     invariant(!storageGlobalParams.queryableBackupMode);
     // Must have global write lock before beginning offlineValidateParallel
     invariant(globalWriteLock && globalWriteLock->isLocked());
-
-    const size_t numCores = ProcessInfo::getNumAvailableCores();
-    maxThreadCount = maxThreadCount == 0 ? numCores : std::min(maxThreadCount, numCores);
 
     // Must only be called before the server accepts network connections. The lighter per-worker
     // lock mode (IX at global, X at collection) relies on there being no concurrent writers or
@@ -826,19 +879,57 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
 
     auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
     serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
+    const auto dbNames = std::invoke([opCtx]() -> std::vector<DatabaseName> {
+        if (gValidateDbName.empty()) {
+            return CollectionCatalog::get(opCtx)->getAllDbNames();
+        }
+        return std::vector{DatabaseNameUtil::deserialize(
+            /*tenantId=*/boost::none,
+            gValidateDbName.data(),
+            SerializationContext(SerializationContext::Source::Catalog))};
+    });
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
+    for (const auto& dbName : dbNames) {
         databaseHolder->openDb(opCtx, dbName);
     }
 
+    globalWriteLock.reset();
+    Lock::GlobalLock catalogLock(opCtx, MODE_IS);
+    const auto catalog = CollectionCatalog::get(opCtx);
+
+    // Collect every namespace to validate along with its data size, so that the largest
+    // collections can be dispatched first. Scheduling longest-processing-time-first keeps a
+    // large collection from being picked up late and running as a long tail.
+    std::vector<std::pair<long long, NamespaceString>> collectionsBySize;
+    for (const auto& dbName : dbNames) {
+        for (const auto& coll : catalog->range(dbName)) {
+            collectionsBySize.emplace_back(coll->dataSize(opCtx), NamespaceString{coll->ns()});
+        }
+    }
+
+    // Sort descending by data size, breaking ties by namespace to keep dispatch order
+    // deterministic.
+    std::sort(collectionsBySize.begin(), collectionsBySize.end(), std::greater<>());
+
+    synchronized_value<OfflineValidateResults> results{OfflineValidateResults{
+        .allValidationComplete = true,
+        .allResultsValid = true,
+    }};
+
+    if (collectionsBySize.empty()) {
+        return results.get();
+    }
+
+    const size_t numCores = ProcessInfo::getNumAvailableCores();
+    maxThreadCount = maxThreadCount == 0 ? numCores : std::min(maxThreadCount, numCores);
+    // Do not exceed the number of collections
+    maxThreadCount = std::min(maxThreadCount, collectionsBySize.size());
     SingleProducerMultiConsumerQueue<NamespaceString> queue{
         {.maxQueueDepth = maxThreadCount * 4ULL}};
 
-    globalWriteLock.reset();
-
     auto threadPool = ThreadPool::make({
         .poolName = "ParallelOfflineValidate",
-        .threadNamePrefix = "ov",
+        .threadNamePrefix = "NamespaceValidationWorker",
         .maxThreads = maxThreadCount,
         .onCreateThread =
             [](const auto& threadName) {
@@ -846,11 +937,6 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
             },
     });
     threadPool->startup();
-
-    synchronized_value<OfflineValidateResults> results{OfflineValidateResults{
-        .allValidationComplete = true,
-        .allResultsValid = true,
-    }};
 
     // Create worker threads
     for (size_t i = 0; i < maxThreadCount; ++i) {
@@ -891,25 +977,10 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
         });
     }
 
-    Lock::GlobalLock catalogLock(opCtx, MODE_IS);
-    const auto catalog = CollectionCatalog::get(opCtx);
-
-    auto enqueueDb = [&](const DatabaseName& dbName) {
-        for (const auto& coll : catalog->range(dbName)) {
-            queue.push(NamespaceString{coll->ns()});
-        }
-    };
-
-    if (!gValidateDbName.empty()) {
-        const boost::optional<TenantId>& tenantId = boost::none;
-        enqueueDb(DatabaseNameUtil::deserialize(
-            tenantId,
-            gValidateDbName.data(),
-            SerializationContext(SerializationContext::Source::Catalog)));
-    } else {
-        for (const auto& dbName : catalog->getAllDbNames()) {
-            enqueueDb(dbName);
-        }
+    // The queue is FIFO and bounded, so pushing in sorted order is enough to control the order
+    // work is picked up in; `maxQueueDepth` only throttles how far ahead this producer may run.
+    for (auto&& [_, nss] : collectionsBySize) {
+        queue.push(std::move(nss));
     }
     queue.closeProducerEnd();
 
@@ -979,13 +1050,6 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
             offlineValidateResults.allValidationComplete && isComplete;
         offlineValidateResults.allResultsValid = offlineValidateResults.allResultsValid && isValid;
     }
-
-    if (offlineValidateResults.allResultsValid) {
-        LOGV2(9437303, "Offline validation detected no issues");
-    } else {
-        LOGV2(9437304, "Offline validation found issues in some collections, see logs for details");
-    }
-
     return offlineValidateResults;
 }
 
@@ -1035,11 +1099,25 @@ void startupRecovery(OperationContext* opCtx,
     const bool shouldClearNonLocalTmpCollections =
         !(hasReplSetConfigDoc(opCtx) || usingReplication);
 
+    // If the initial sync flag is set, an initial sync from a prior boot did not complete and this
+    // node will restart initial sync after startup recovery completes. Rebuilding the _id index
+    // before the retried initial sync will be wasted work.
+    const auto ensureIndexPolicy = [&] {
+        if (usingReplication &&
+            repl::ReplicationProcess::get(opCtx)->getConsistencyMarkers()->getInitialSyncFlag(
+                opCtx)) {
+            LOGV2(13350101,
+                  "Initial sync flag is set; skipping the build of any missing _id indexes because "
+                  "initial sync will drop all replicated data");
+            return EnsureIndexPolicy::kSkipMissingForInitialSync;
+        }
+        return EnsureIndexPolicy::kBuildMissing;
+    }();
+
     openDatabases(opCtx, [&](const DatabaseName& dbName) {
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
-        uassertStatusOK(
-            ensureCollectionProperties(opCtx, dbName, EnsureIndexPolicy::kBuildMissing));
+        uassertStatusOK(ensureCollectionProperties(opCtx, dbName, ensureIndexPolicy));
 
         if (usingReplication) {
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
@@ -1098,15 +1176,24 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
-    } else if (storageGlobalParams.validateParallel) {
-        const auto offlineValidateResults =
-            offlineValidateParallel(opCtx, std::move(lk), *storageGlobalParams.validateParallel);
-        if (!offlineValidateResults.allValidationComplete) {
-            uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
-                             "Offline validation didn't complete for some collections"});
-        }
     } else if (storageGlobalParams.validate) {
-        const auto offlineValidateResults = offlineValidate(opCtx);
+        // If the feature flag is enabled and a collection is not specified, run concurrent
+        // validations across the database instance.
+        const bool runParallel =
+            gFeatureFlagParallelCollectionValidation.isEnabled() && gValidateCollectionName.empty();
+
+        const auto offlineValidateResults = runParallel
+            ? offlineValidateParallel(
+                  opCtx, std::move(lk), gValidateParallelMaxConcurrentNamespaces.load())
+            : offlineValidate(opCtx);
+
+        if (offlineValidateResults.allResultsValid) {
+            LOGV2(9437303, "Offline validation detected no issues");
+        } else {
+            LOGV2(9437304,
+                  "Offline validation found issues in some collections, see logs for details");
+        }
+
         if (!offlineValidateResults.allValidationComplete) {
             uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
                              "Offline validation didn't complete for some collections"});

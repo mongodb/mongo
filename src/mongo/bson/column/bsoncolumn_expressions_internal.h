@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -185,6 +159,9 @@ public:
     // a type change.
     template <typename T>
     void append(const BSONElement& val) {
+        // An uncompressed literal is a real (non-missing) value, so record that the last value is
+        // not missing. This governs whether following simple8b blocks are treated as skips.
+        _lastMissing = false;
         // This if-else block handles when there were no type change.
         if constexpr (std::is_same_v<T, double>) {
             if (_type == BSONType::numberDouble) {
@@ -284,10 +261,16 @@ public:
         _working = CMaterializer::materializePreallocated(val);
         _workingIndex = _counter++;
         _type = val.type();
+        _lastMissing = false;
     }
 
     // Missing and repeat-last values do not affect comparison, but they count
     // toward the logical row index for correct index() reporting.
+    //
+    // We must still track whether the last value is missing (mirroring the materializing
+    // collector's isLastMissing()) so that decompressAllLiteral() takes the same branch and applies
+    // the same validation. appendMissing() intentionally does not update _lastMissing, matching the
+    // materializing collector where it does not update _last.
     void appendMissing() {
         ++_counter;
     }
@@ -295,10 +278,12 @@ public:
         ++_counter;
     }
     bool isLastMissing() {
-        return false;
+        return _lastMissing;
     }
     template <typename T>
-    void setLast(const BSONElement& val) {}
+    void setLast(const BSONElement& val) {
+        _lastMissing = val.eoo();
+    }
 
     // Position info is not supported
     void appendPositionInfo(int32_t n) {}
@@ -362,6 +347,9 @@ private:
     size_t _counter{0};
     size_t _workingIndex{0};
     size_t _index{0};
+    // Tracks whether the last appended value was missing, mirroring the materializing collector's
+    // _last. Initialized to true since no value has been appended yet.
+    bool _lastMissing = true;
 };
 
 /*
@@ -586,6 +574,9 @@ public:
 
     template <typename T>
     void append(const BSONElement& val) {
+        // An uncompressed literal is a real (non-missing) value, so record that the last value is
+        // not missing. This governs whether following simple8b blocks are treated as skips.
+        _lastMissing = false;
         if constexpr (std::is_same_v<T, double>) {
             if (_type == BSONType::numberDouble) {
                 append(BSONElementValue(val.value()).Double());
@@ -725,6 +716,7 @@ public:
         _minForType = CMaterializer::materializePreallocated(val);
         _maxForType = _minForType;
         _type = val.type();
+        _lastMissing = false;
     }
 
     // Does not update _last, should not be repeated by appendLast()
@@ -733,15 +725,20 @@ public:
     // Appends last value that was not Missing
     void appendLast() {}
 
+    // We must track whether the last value is missing (mirroring the materializing collector's
+    // isLastMissing()) so that decompressAllLiteral() takes the same branch and applies the same
+    // validation. appendMissing() intentionally does not update _lastMissing.
     bool isLastMissing() {
-        return false;
+        return _lastMissing;
     }
 
     // Sets the last value without appending anything. This should be called to update _last to be
     // the element in the reference object, and for missing top-level objects. Otherwise the append
     // methods will take care of updating _last as needed.
     template <typename T>
-    void setLast(const BSONElement& val) {}
+    void setLast(const BSONElement& val) {
+        _lastMissing = val.eoo();
+    }
 
     void appendPositionInfo(int32_t n) {}
 
@@ -771,6 +768,9 @@ private:
     Element _maxForType = _min;
     BSONType _type = BSONType::eoo;
     const StringDataComparator* _comparator;
+    // Tracks whether the last appended value was missing, mirroring the materializing collector's
+    // _last. Initialized to true since no value has been appended yet.
+    bool _lastMissing = true;
 };
 
 template <class CMaterializer>

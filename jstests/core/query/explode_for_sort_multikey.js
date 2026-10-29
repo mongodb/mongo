@@ -2,6 +2,7 @@
  * Test the "explode for sort" optimization when the index contains a multikey field after the sort
  * field. This is a regression test for SERVER-56865.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_81,
  *   # Makes assertions about the number of rejected plans
  *   assumes_no_implicit_index_creation,

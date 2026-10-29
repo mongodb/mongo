@@ -11,6 +11,12 @@ from shutil import rmtree
 
 import pexpect
 
+from buildscripts.tests.resmoke_end2end.nested_resmoke import stage_mongo_version_file
+
+
+def setUpModule():
+    stage_mongo_version_file()
+
 
 class _ResmokeSelftest(unittest.TestCase):
     @classmethod

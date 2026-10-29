@@ -5134,23 +5134,31 @@ class ScopedPrematureExitFile {
             premature_exit_filepath ? premature_exit_filepath : "") {
     // If a path to the premature-exit file is specified...
     if (!premature_exit_filepath_.empty()) {
-      // create the file with a single "0" character in it.  I/O
-      // errors are ignored as there's nothing better we can do and we
-      // don't want to fail the test because of this.
+      // Create the file with a single "0" character in it. Failure to open the
+      // file is logged but does not fail the test.
       FILE* pfile = posix::FOpen(premature_exit_filepath_.c_str(), "w");
-      fwrite("0", 1, 1, pfile);
-      fclose(pfile);
+      if (pfile != nullptr) {
+        file_created_ = true;
+        fwrite("0", 1, 1, pfile);
+        fclose(pfile);
+      } else {
+        const int error = errno;
+        GTEST_LOG_(ERROR) << "Failed to open premature exit filepath \""
+                          << premature_exit_filepath_ << "\" with error "
+                          << posix::StrError(error);
+      }
     }
   }
 
   ~ScopedPrematureExitFile() {
 #ifndef GTEST_OS_ESP8266
-    if (!premature_exit_filepath_.empty()) {
+    if (file_created_) {
       int retval = remove(premature_exit_filepath_.c_str());
       if (retval) {
+        const int error = errno;
         GTEST_LOG_(ERROR) << "Failed to remove premature exit filepath \""
                           << premature_exit_filepath_ << "\" with error "
-                          << retval;
+                          << posix::StrError(error);
       }
     }
 #endif
@@ -5158,6 +5166,7 @@ class ScopedPrematureExitFile {
 
  private:
   const std::string premature_exit_filepath_;
+  bool file_created_ = false;
 
   ScopedPrematureExitFile(const ScopedPrematureExitFile&) = delete;
   ScopedPrematureExitFile& operator=(const ScopedPrematureExitFile&) = delete;

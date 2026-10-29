@@ -2,6 +2,7 @@
 // Using GeoNearRandom because this test needs a lot of points in the index.
 // If there aren't enough points the test passes even if the code is broken.
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 //   requires_getmore,
 // ]

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/client/fetcher.h"
 
@@ -101,6 +75,7 @@ protected:
     Status status;
     boost::optional<HostAndPort> target;
     std::vector<std::string> errorLabels;
+    boost::optional<Milliseconds> baseBackoffMS;
     CursorId cursorId;
     NamespaceString nss;
     Fetcher::Documents documents;
@@ -153,6 +128,7 @@ void FetcherTest::clear() {
     elapsedMillis = Milliseconds(0);
     first = false;
     nextAction = Fetcher::NextAction::kInvalid;
+    baseBackoffMS = boost::none;
 }
 
 void FetcherTest::processNetworkResponse(const BSONObj& obj,
@@ -208,6 +184,7 @@ void FetcherTest::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     target = result.getOrigin();
+    baseBackoffMS = result.getBaseBackoffMS();
 
     if (callbackHook) {
         callbackHook(result, nextActionFromFetcher, getMoreBob);
@@ -662,6 +639,30 @@ TEST_F(FetcherTest, FindCommandFailedWithErrorLabels) {
     ASSERT_EQUALS(ErrorCodes::AdmissionQueueOverflow, status.code());
     ASSERT_EQUALS(source, target);
     ASSERT(std::ranges::equal(responseErrorLabels, errorLabels));
+}
+
+TEST_F(FetcherTest, FindCommandFailedForwardsBaseBackoffMS) {
+    ASSERT_OK(fetcher->schedule());
+    processNetworkResponse(BSON("ok" << 0 << "errmsg"
+                                     << "please back off"
+                                     << "code" << int(ErrorCodes::AdmissionQueueOverflow)
+                                     << "baseBackoffMS" << 100),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_EQUALS(ErrorCodes::AdmissionQueueOverflow, status.code());
+    ASSERT(baseBackoffMS);
+    ASSERT_EQUALS(Milliseconds(100), *baseBackoffMS);
+}
+
+TEST_F(FetcherTest, FindCommandFailedWithoutBaseBackoffMS) {
+    ASSERT_OK(fetcher->schedule());
+    processNetworkResponse(BSON("ok" << 0 << "errmsg"
+                                     << "bad hint"
+                                     << "code" << int(ErrorCodes::BadValue)),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+    ASSERT_FALSE(baseBackoffMS);
 }
 
 TEST_F(FetcherTest, CursorFieldMissing) {

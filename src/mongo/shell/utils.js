@@ -470,14 +470,8 @@ function jsTestOptions() {
                 ? TestData.skipValidationOnNamespaceNotFound
                 : true,
             skipValidationNamespaces: TestData.skipValidationNamespaces || [],
-            skipCheckingUUIDsConsistentAcrossCluster:
-                TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             skipCheckingIndexesConsistentAcrossCluster:
                 TestData.skipCheckingIndexesConsistentAcrossCluster || false,
-            skipCheckingCatalogCacheConsistencyWithShardingCatalog:
-                TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
-            skipAwaitingReplicationOnShardsBeforeCheckingUUIDs:
-                TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,

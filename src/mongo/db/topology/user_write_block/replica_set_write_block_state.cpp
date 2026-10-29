@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 
@@ -59,9 +33,17 @@ ReplicaSetWriteBlockState* ReplicaSetWriteBlockState::get(OperationContext* opCt
 
 void ReplicaSetWriteBlockState::enableReplicaSetWriteBlocking(
     ReplicaSetWritesBlockReasonEnum reason) {
-    _writeBlockInfo.store(WriteBlockInfo{.blocked = true, .reason = reason});
+    const auto previousInfo =
+        _writeBlockInfo.swap(WriteBlockInfo{.blocked = true, .reason = reason});
+    if (!previousInfo.blocked) {
+        _replicaSetWritesBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
+        LOGV2(12097000, "Blocking replica set writes", "reason"_attr = idl::serialize(reason));
+    }
+}
+
+void ReplicaSetWriteBlockState::incrementReplicaSetWritesBlockCounter(
+    ReplicaSetWritesBlockReasonEnum reason) {
     _replicaSetWritesBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
-    LOGV2(12097000, "Blocking replica set writes", "reason"_attr = idl::serialize(reason));
 }
 
 void ReplicaSetWriteBlockState::disableReplicaSetWriteBlocking() {
@@ -70,9 +52,6 @@ void ReplicaSetWriteBlockState::disableReplicaSetWriteBlocking() {
         LOGV2(12097001,
               "Unblocking replica set writes",
               "reason"_attr = idl::serialize(previousInfo.reason));
-    } else {
-        LOGV2(12097003,
-              "disableReplicaSetWriteBlocking called but replica set writes were not blocked");
     }
 }
 
@@ -83,19 +62,19 @@ void ReplicaSetWriteBlockState::checkReplicaSetWritesAllowed(
     const auto info = _writeBlockInfo.load();
     const bool writesAllowed = !info.blocked ||
         ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() || nss.isOnInternalDb() ||
-        nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile();
+        nss.isSystemDotProfile();
     if (!writesAllowed) {
         switch (opType) {
             case ReplicaSetWriteBlockRejectedWriteOp::kInsert:
-                _replicaSetWriteBlockRejectedInserts.fetchAndAdd(1);
+                _replicaSetWritesBlockRejectedInserts.fetchAndAdd(1);
                 break;
             case ReplicaSetWriteBlockRejectedWriteOp::kUpdate:
-                _replicaSetWriteBlockRejectedUpdates.fetchAndAdd(1);
+                _replicaSetWritesBlockRejectedUpdates.fetchAndAdd(1);
                 break;
         }
         uasserted(
             ErrorCodes::ReplicaSetWritesBlocked,
-            fmt::format("Replica set write blocked, reason: {}", idl::serialize(info.reason)));
+            fmt::format("Replica set writes blocked, reason: {}", idl::serialize(info.reason)));
     }
 }
 
@@ -123,7 +102,9 @@ Status ReplicaSetWriteBlockState::checkIfConvertToCappedAllowedToStart(
         !nss.isOnInternalDb()) {
         return Status(
             ErrorCodes::ReplicaSetWritesBlocked,
-            fmt::format("convertToCapped blocked, reason: {}", idl::serialize(info.reason)));
+            fmt::format(
+                "convertToCapped blocked because replica set writes are blocked, reason: {}",
+                idl::serialize(info.reason)));
     }
     return Status::OK();
 }
@@ -143,14 +124,14 @@ void ReplicaSetWriteBlockState::checkReplicaSetDeletionsAllowed(OperationContext
         nss.isSystemDotProfile();
     if (!deletesAllowed) {
         const auto info = _writeBlockInfo.load();
-        _replicaSetWriteBlockRejectedDeletes.fetchAndAdd(1);
+        _replicaSetWritesBlockRejectedDeletes.fetchAndAdd(1);
         uasserted(
             ErrorCodes::ReplicaSetWritesBlocked,
             fmt::format("Replica set writes blocked, reason: {}", idl::serialize(info.reason)));
     }
 }
 
-bool ReplicaSetWriteBlockState::isReplicaSetDeletionsBlockingEnabled_forTest() const {
+bool ReplicaSetWriteBlockState::isReplicaSetDeletionsBlockingEnabled() const {
     return _deletionsBlocked.load();
 }
 
@@ -178,11 +159,11 @@ void ReplicaSetWriteBlockState::appendReplicaSetWriteBlockRejectionMetrics(
     BSONObjBuilder& bob) const {
     BSONObjBuilder sub(bob.subobjStart("replicaSetWritesBlockRejected"));
     sub.appendNumber("inserts",
-                     static_cast<long long>(_replicaSetWriteBlockRejectedInserts.load()));
+                     static_cast<long long>(_replicaSetWritesBlockRejectedInserts.load()));
     sub.appendNumber("updates",
-                     static_cast<long long>(_replicaSetWriteBlockRejectedUpdates.load()));
+                     static_cast<long long>(_replicaSetWritesBlockRejectedUpdates.load()));
     sub.appendNumber("deletes",
-                     static_cast<long long>(_replicaSetWriteBlockRejectedDeletes.load()));
+                     static_cast<long long>(_replicaSetWritesBlockRejectedDeletes.load()));
 }
 
 
@@ -199,6 +180,18 @@ Status ReplicaSetWriteBlockState::checkIfIndexBuildAllowedToStart(
     if (_userIndexBuildsBlocked.load() && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() &&
         !nss.isOnInternalDb()) {
         return Status(ErrorCodes::ReplicaSetWritesBlocked, "Replica set writes blocked");
+    }
+    return Status::OK();
+}
+
+Status ReplicaSetWriteBlockState::checkIfIncomingReshardingAllowedToStart(
+    OperationContext* opCtx) const {
+    const auto info = _writeBlockInfo.load();
+    if ((info.blocked) && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled()) {
+        return Status(
+            ErrorCodes::ReplicaSetWritesBlocked,
+            fmt::format("Resharding blocked because replica set writes are blocked, reason: {}",
+                        idl::serialize(info.reason)));
     }
     return Status::OK();
 }

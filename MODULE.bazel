@@ -1,6 +1,6 @@
 # Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
-bazel_dep(name = "apple_support", version = "1.24.1", repo_name = "build_bazel_apple_support")
-bazel_dep(name = "bazel_features", version = "1.37.0")
+bazel_dep(name = "apple_support", version = "1.24.2", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "bazel_features", version = "1.43.0")
 
 bazel_features_deps = use_extension("//bazel:bzlmod.bzl", "bazel_features_deps")
 use_repo(bazel_features_deps, "bazel_features_globals", "bazel_features_version")
@@ -46,38 +46,44 @@ spidermonkey_wasi_repo = use_repo_rule(
 
 spidermonkey_wasi_repo(
     name = "spidermonkey_wasi",
-    sha256 = "e89f9a9959555bb08444412600e6a4594125e15d68145f97c6d88e6395be1d6b",
+    sha256 = "c4dac530b125bf9d09664a8d611db7e1775ab3b9f1b939b62a65c32a0362b289",
     urls = [
-        "https://mdb-build-public.s3.amazonaws.com/spidermonkey-wasm/FIREFOX_140_6_0esr_RELEASE/69d013e89378880007aaa010/spidermonkey-wasip2-release.tar.gz",
+        "https://mdb-build-public.s3.amazonaws.com/spidermonkey-wasm/FIREFOX_140_12_0esr_RELEASE/spidermonkey-wasip2-release.tar.gz",
     ] * 5,
 )
 
-# SourceGraph indexer
+# SCIP C++ indexer (patched build with aarch64-linux support)
 http_file(
     name = "scip-clang",
     executable = True,
-    sha256 = "9fc7d1c309f8adee1b8663efa802efa7363ef22ee06f4711117535e406690689",
+    sha256 = "f303e3a1501b0c669c193b67f594a321843f9e9acec381eb3b4df09dd2177a59",
     urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/sourcegraph/scip-clang/releases/download/v0.3.2/scip-clang-x86_64-linux",
+        "https://github.com/rakiz/cppgraph/releases/download/scip-clang-patched-v0.4.0-p6/scip-clang-patched-aarch64-linux",
     ] * 5,
 )
 
-# SourceGraph CLI
-http_file(
-    name = "scip-src",
-    executable = True,
-    sha256 = "eb3d627c4dad56b9f5d06634b90384104db065d410c4b338fa5e6558be4f3ad9",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/sourcegraph/src-cli/releases/download/6.4.0/src_linux_amd64",
-    ] * 5,
+bazel_dep(name = "rules_cc", version = "0.2.18")
+
+# rules_cc's built-in resource estimate for link actions is roughly 8x below what
+# linking our binaries actually costs, and two orders of magnitude below an LTO
+# link, so the local scheduler runs too many at once and OOMs the machine. The
+# patch replaces that estimate with one measured against our links. See
+# bazel/rules_cc/link_memory.patch for the measurements.
+#
+# This has to be a patch rather than a build setting: resource_set is only
+# settable by whoever creates the action. Setting it from our side would mean
+# per-target exec_properties, whose "cpp_link." prefix names an exec group that
+# also covers CppArchive and CppLTOIndexing - and those are forwarded to the
+# remote executor as platform properties, which EngFlow rejects outright.
+single_version_override(
+    module_name = "rules_cc",
+    patch_strip = 1,
+    patches = ["//bazel/rules_cc:link_memory.patch"],
+    version = "0.2.18",
 )
 
-bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
+bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 single_version_override(
@@ -85,46 +91,95 @@ single_version_override(
     version = "0.0.11",
 )
 
-# TODO SERVER-122884: move over from WORKSPACE
-# buf does not support s390x
-#bazel_dep(name = "aspect_rules_lint", version = "1.1.0")
-#single_version_override(
-#    module_name = "aspect_rules_lint",
-#    version = "1.1.0",
-#)
-
+bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_multirun", version = "0.9.0")
-bazel_dep(name = "aspect_bazel_lib", version = "2.13.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 single_version_override(
     module_name = "aspect_bazel_lib",
-    version = "2.13.0",
+    version = "2.22.5",
 )
 
-bazel_dep(name = "aspect_rules_js", version = "2.1.3")
+# Pinned to 2.7.0, the last release before rules_js switched npm_import from the
+# system `tar` to a hermetic bsdtar from aspect_bazel_lib (2.8.0). aspect_bazel_lib
+# only defines bsdtar for {darwin,linux}_{amd64,arm64} and windows_{amd64,arm64}
+# (BSDTAR_PLATFORMS in lib/private/tar_toolchain.bzl), so 2.8.0+ fails on ppc64le and
+# s390x with "unknown repo 'bsd_tar_linux_ppc64le'". Revisit when aspect_bazel_lib
+# gains bsdtar for those architectures.
+bazel_dep(name = "aspect_rules_js", version = "2.7.0")
 single_version_override(
     module_name = "aspect_rules_js",
-    version = "2.1.3",
+    version = "2.7.0",
 )
 
-bazel_dep(name = "rules_nodejs", version = "6.3.0")
+bazel_dep(name = "rules_nodejs", version = "6.7.5")
 single_version_override(
     module_name = "rules_nodejs",
-    version = "6.3.0",
+    version = "6.7.5",
 )
 
-bazel_dep(name = "rules_poetry", version = "")
-git_override(
-    module_name = "rules_poetry",
-    commit = "092d43107d13e711ac4ac92050d8b570bcc8ef43",
-    patches = ["//bazel/rules_poetry:rules_poetry.patch"],
-    remote = "https://github.com/mongodb-forks/rules_poetry",
-)
-
+# rules_pycross reads uv.lock directly and generates Bazel-native targets
+# (http_file for wheels, pycross_wheel_build for sdists). Pinned to 0.8.3,
+# the last stable release before the v2.0 API rework. The hub is named
+# `pypi` (see lock_import.import_uv() further down); callers reference deps
+# as `@pypi//:<pkg>` via the shim in //bazel/uv:defs.bzl.
 #
-## We need skylib to be able to use config_setting_group in rule_poetry below
-## https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
+# Patches (all upstream-worthy):
+#   uv_translator_url_source: handle url-sourced `[tool.uv.sources]` entries
+#     whose sdist sub-entry has no url field, synthesizing a PEP 517-shaped
+#     file name for URLs (like GitHub /archive/<sha>.tar.gz) whose basename
+#     isn't one. Hashes come from uv.lock — no translation-time fetching.
+#   wheel_library_windows_dll_path: inject Python DLL dir onto action PATH so
+#     wheel_installer.exe's launcher can LoadLibrary python313.dll on Windows.
+#   installer_repo_extract + installer_tools_build: extract the `installer`
+#     wheel at repo-rule time and expose as a py_library instead of via
+#     zipimport (Windows runfiles staging bug).
+#   wheel_build_cargo_home: default CARGO_HOME into the WheelBuild action
+#     sandbox so Rust-backed sdist builds don't reach for an unwritable
+#     $HOME/.cargo (carried over from mongo's old rules_poetry patch; no
+#     current lock entry needs it — insurance for the first one that does).
+#   wheel_build_no_werror: strip -Werror from the toolchain flags forwarded
+#     into sdist builds — third-party build systems aren't held to mongo's
+#     warning policy (clang otherwise fatals on the harmless -L../lib that
+#     python-build-standalone's sysconfig adds to compile lines).
+#   crossenv_glibc_teller: compile rules_pycross's glibc probe as C because
+#     WheelBuild forwards CFLAGS with -std=c11.
+bazel_dep(name = "rules_pycross", version = "0.8.3")
+single_version_override(
+    module_name = "rules_pycross",
+    patch_strip = 1,
+    patches = [
+        "//bazel/rules_pycross:uv_translator_url_source.patch",
+        "//bazel/rules_pycross:wheel_library_windows_dll_path.patch",
+        "//bazel/rules_pycross:installer_repo_extract.patch",
+        "//bazel/rules_pycross:installer_tools_build.patch",
+        "//bazel/rules_pycross:wheel_installer_patch_ng_runfiles.patch",
+        "//bazel/rules_pycross:wheel_build_cargo_home.patch",
+        "//bazel/rules_pycross:wheel_build_no_werror.patch",
+        "//bazel/rules_pycross:crossenv_glibc_teller.patch",
+        "//bazel/rules_pycross:crossenv_sys_platform_recursion.patch",
+        "//bazel/rules_pycross:cc_toolchain_cross_exec_platform.patch",
+        "//bazel/rules_pycross:wheel_build_cross_exec_platform.patch",
+        "//bazel/rules_pycross:wheel_library_cross_exec_platform.patch",
+        "//bazel/rules_pycross:target_environment_cross_exec_platform.patch",
+        "//bazel/rules_pycross:wheel_library_tool_runfiles.patch",
+    ],
+    version = "0.8.3",
+)
+
+# Required by rules_pycross's wheel-install helpers.
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
+single_version_override(
+    module_name = "rules_pkg",
+    patch_strip = 1,
+    patches = [
+        "//bazel/rules_pkg:pkg_tar_host_tool.patch",
+        "//bazel/rules_pkg:pkg_tar_tool_override.patch",
+        "//bazel/rules_pkg:pkg_zip_windows_dll_path.patch",
+    ],
+    version = "1.2.0",
+)
+
 bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
     module_name = "abseil-cpp",
@@ -156,6 +211,20 @@ bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 local_path_override(
     module_name = "grpc",
     path = "src/third_party/grpc/dist",
+)
+
+# envoy_api's older releases call native.java_proto_library, which Bazel 9 removed and autoloading
+# does not rewrite. The 2026-01-30 snapshot loads the rule properly.
+single_version_override(
+    module_name = "envoy_api",
+    version = "0.0.0-20260130-84e8436",
+)
+
+# cel-spec 0.15.0's BUILD files use the proto/cc/java rules as builtins, which Bazel 9 removed and
+# which autoloading does not reach in that repo. 0.25.3 carries the load statements.
+single_version_override(
+    module_name = "cel-spec",
+    version = "0.25.3",
 )
 
 # googleapis still requests older grpc-java releases that import repos from
@@ -198,7 +267,42 @@ local_path_override(
     path = "src/third_party/fuzztest/dist",
 )
 
-bazel_dep(name = "rules_python", version = "1.8.5")
+bazel_dep(name = "rules_python", version = "2.2.0")
+single_version_override(
+    module_name = "rules_python",
+    patch_strip = 1,
+    patches = [
+        # rules_python's ppc64le platform metadata uses legacy "ppc"
+        # identifiers, breaking two things: host-runtime detection (arch
+        # says "ppc", host detection says "ppc64le" -> no
+        # `python_<version>_host` repo -> rules_pycross's use_repo of it
+        # hard-fails module resolution) and the compatible_with constraint
+        # (cpu:ppc, while mongo's platforms declare cpu:ppc64le -> the
+        # pycross per-environment config_settings never match -> every
+        # @pypi wheel select() fails analysis on ppc64le). Upstream-worthy;
+        # see the patch header.
+        "//bazel/rules_python:host_platform_ppc64le.patch",
+        # Windows: under bootstrap_impl=script + venvs_use_declare_symlink=no,
+        # the stage-2 bootstrap recreates the venv at runtime by symlinking
+        # out of runfiles. Two host-dependent failure modes: paths beyond
+        # MAX_PATH (260) when LongPathsEnabled is off (WinError 87/3 —
+        # runfiles venv trees regularly exceed it), and outright symlink
+        # refusal without SeCreateSymbolicLinkPrivilege / Developer Mode
+        # (WinError 1314/87). Use \\?\ extended-length paths and fall
+        # back to copying, like CPython's venv module does. Upstream-worthy;
+        # see the patch header.
+        "//bazel/rules_python:bootstrap_runfiles_manifest.patch",
+        "//bazel/rules_python:stage2_bootstrap_runfiles_manifest.patch",
+        "//bazel/rules_python:bootstrap_windows_venv_robustness.patch",
+        # Windows: direct PyInfo import roots can contain wheel resources
+        # beyond MAX_PATH even when LongPathsEnabled is unset. Force those
+        # roots through the extended-length path form so importlib.resources
+        # can access nested package data. Upstream-worthy; see the patch
+        # header.
+        "//bazel/rules_python:site_init_windows_long_paths.patch",
+    ],
+    version = "2.2.0",
+)
 
 bazel_dep(name = "buildifier_prebuilt", version = "6.4.0", dev_dependency = True)
 single_version_override(
@@ -218,40 +322,207 @@ multitool = use_extension("@rules_multitool//multitool:extension.bzl", "multitoo
 multitool.hub(lockfile = "//tools/lint:multitool.lock.json")
 use_repo(multitool, "multitool")
 
-# TODO SERVER-122885: port over from WORKSPACE
-# currently breaks pyright
-##node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
-##node.toolchain(node_version = "18.20.4")
+###################### NODE / NPM ######################
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 
-##
-##npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
-##npm.npm_translate_lock(
-##    name = "npm",
-##    npmrc = "//:.npmrc",
-##    pnpm_lock = "//:pnpm-lock.yaml",
-##    verify_node_modules_ignored = "//:.bazelignore",
-##)
-##use_repo(npm, "npm")
-##
-##pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
-##use_repo(pnpm, "pnpm")
-#
+# Node.js runtime pinned to jstestfuzz's .nvmrc version. Only the root module
+# may name a node toolchain. The extension always passes register = False, so
+# this never competes with the default toolchain above; //bazel/resmoke selects
+# the platform repos explicitly.
+node.toolchain(
+    name = "nodejs16",
+    node_version = "16.18.1",
+)
+use_repo(
+    node,
+    "nodejs16_linux_amd64",
+    "nodejs16_linux_arm64",
+)
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
+###################### END NODE / NPM ######################
+
 setup_local_config_platform = use_repo_rule("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
 
 setup_local_config_platform(name = "internal_platforms_do_not_use")
 
-register_execution_platforms("@internal_platforms_do_not_use//host:host")
+# Keep the IBM cross execution platforms registered even for ordinary analysis.
+# rules_pycross's cross execution groups are optional at action time, but Bazel
+# resolves every declared group while analyzing a target. Registering these
+# platforms avoids making non-IBM targets fail resolution merely because the
+# group carries the cross-execution constraint; the groups are selected only
+# when an IBM target platform has that constraint.
+register_execution_platforms(
+    "@internal_platforms_do_not_use//host:host",
+    "//bazel/platforms:rhel8_amd64_cross",
+    "//bazel/platforms:rhel8_arm64_cross",
+    "//bazel/platforms:rhel9_amd64_cross",
+    "//bazel/platforms:rhel9_arm64_cross",
+    "//bazel/platforms:rhel10_amd64_cross",
+    "//bazel/platforms:rhel10_arm64_cross",
+)
 
-# TODO SERVER-122886: port over from WORKSPACE
-# cannot be moved without changing the path or creating a symlink
-# to _main~setup_mongo_toolchains~mongo_toolchain_v4 and _main~setup_mongo_toolchains~mongo_toolchain_v5
-##setup_mongo_toolchains_extension = use_extension("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchains_extension")
-##use_repo(
-##    setup_mongo_toolchains_extension,
-##    "mongo_toolchain_v4",
-##    "mongo_toolchain_v5",
-##)
+# The hermetic C/C++ toolchain, plus the gdb build that is pinned against it.
+setup_mongo_toolchains_extension = use_extension("//bazel:bzlmod.bzl", "setup_mongo_toolchains")
+use_repo(
+    setup_mongo_toolchains_extension,
+    "gdb_v5",
+    "mongo_toolchain_v5",
+)
+
+register_toolchains("@mongo_toolchain_v5//:mongo_toolchain")
+
 #
+# Native/third-party system-compiler toolchain. Only matches the host platform
+# when it is generated with USE_NATIVE_TOOLCHAIN=1 (which adds the
+# use_native_toolchain constraint), so it never competes with the hermetic
+# mongo toolchain on a normal build.
+setup_mongo_native_toolchain = use_repo_rule("//bazel/toolchains/cc/mongo_native:native_toolchain.bzl", "setup_mongo_native_toolchain")
+
+setup_mongo_native_toolchain(name = "mongo_native_toolchain")
+
+register_toolchains("@mongo_native_toolchain//:mongo_native_toolchain")
+
+# Shell formatter used by //bazel/format.
+shfmt = use_repo_rule("//bazel/format:shfmt.bzl", "shfmt")
+
+shfmt(name = "shfmt")
+
+# GPG bundle used by //bazel/signing and the mongot extension signing key rules.
+gpg_bundle_repo = use_repo_rule("//bazel/gpg:gpg.bzl", "gpg_bundle_repo")
+
+gpg_bundle_repo(name = "gpg")
+
+# db-contrib-tool, used to fetch multiversion server and mongot binaries.
+db_contrib_tool = use_repo_rule("//bazel/db_contrib_tool:db_contrib_tool.bzl", "db_contrib_tool")
+
+db_contrib_tool(name = "db_contrib_tool")
+
+# RBE sysroot dump. Consumed by @mongo_toolchain_v5's generated BUILD file only
+# when //bazel/config:use_rbe_sysroot_enabled is set.
+sysroot_dump = use_repo_rule("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "sysroot_dump")
+
+sysroot_dump(name = "rbe_sysroot")
+
+# Parallel compressors used by //bazel/install_rules when building archives.
+setup_pigz = use_repo_rule("//bazel/install_rules:pigz.bzl", "setup_pigz")
+
+setup_pigz(name = "pigz")
+
+setup_zstd = use_repo_rule("//bazel/install_rules:zstd.bzl", "setup_zstd")
+
+setup_zstd(name = "zstd")
+
+# mongot extension public signing key, embedded into secure builds.
+mongot_extension_signing_key_repo = use_repo_rule(
+    "//bazel/mongot_extension_signing_key:repository.bzl",
+    "mongot_extension_signing_key_repo",
+)
+
+mongot_extension_signing_key_repo(name = "mongot_extension_signing_key")
+
+coverity_toolchain = use_repo_rule("//bazel/coverity:coverity_toolchain.bzl", "coverity_toolchain")
+
+coverity_toolchain(name = "rules_coverity")
+
+# Prebuilt Windows Cyrus SASL. Not a bare http_archive because its generated
+# BUILD file has to embed this repo's canonical directory in a /LIBPATH: flag;
+# see the module docstring in windows_sasl.bzl.
+windows_sasl = use_repo_rule("//bazel/install_rules:windows_sasl.bzl", "windows_sasl")
+
+windows_sasl(name = "windows_sasl")
+
+# Locates the host's MSVC install and VC redistributables. Windows-only; the
+# generated BUILD file is empty elsewhere.
+windows_msvc = use_repo_rule("//bazel/install_rules:windows_msvc.bzl", "windows_msvc")
+
+windows_msvc(name = "local_windows_msvc")
+
+# aspect_rules_lint is pulled in as a plain http_archive rather
+# than as a bazel_dep: the module pulls in buf, which has no s390x build, and
+# a bazel_dep would drag that into the graph on every platform.
+http_archive(
+    name = "aspect_rules_lint",
+    sha256 = "f60e4a737a5e09402f5fa3bd182efa80dac5523ca4b9bc5c6fa8c06fbfb46630",
+    strip_prefix = "rules_lint-1.1.0",
+    url = "https://github.com/aspect-build/rules_lint/releases/download/v1.1.0/rules_lint-v1.1.0.tar.gz",
+)
+
+http_file(
+    name = "windows_libclang",
+    downloaded_file_path = "libclang.dll",
+    sha256 = "fd77bdb8098cd82ab918bf50e9b12743e1fc8e524fa64cb90e729fbe9cee9c15",
+    urls = [
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/windows_libclang/libclang.dll",
+    ] * 5,
+)
+
+http_archive(
+    name = "wix_toolset",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "wix_binaries",
+    srcs = select({
+        "@platforms//os:windows": glob(["*"]),
+        "//conditions:default": [],
+    }),
+)
+
+filegroup(
+    name = "candle",
+    srcs = select({
+        "@platforms//os:windows": ["candle.exe"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:windows": [":wix_binaries"],
+        "//conditions:default": [],
+    }),
+)
+
+filegroup(
+    name = "light",
+    srcs = select({
+        "@platforms//os:windows": ["light.exe"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:windows": [":wix_binaries"],
+        "//conditions:default": [],
+    }),
+)
+    """,
+    sha256 = "6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31",
+    urls = [
+        "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip",
+    ] * 5,
+)
+
+# This repository is normally created by db-contrib-tool or manually extracting
+# the binaries at the proper location.
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+new_local_repository(
+    name = "mongot_localdev",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+filegroup(
+    name = "mongot_binaries",
+    srcs = glob(["**"], exclude = ["BUILD.bazel", "WORKSPACE", "MODULE.bazel", "MODULE.bazel.lock", "REPO.bazel"]),
+)
+""",
+    path = "mongot-localdev",
+)
+
 setup_mongo_apple_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl", "setup_mongo_apple_toolchain_extension")
 use_repo(setup_mongo_apple_toolchains_extension, "mongo_apple_toolchain")
 
@@ -265,6 +536,60 @@ use_repo(setup_mongo_apple_cross_toolchains_extension, "mongo_apple_cross_toolch
 
 register_toolchains(
     "@mongo_apple_cross_toolchain//...",
+)
+
+setup_mongo_windows_cross_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows_cross:mongo_windows_cross_toolchain.bzl", "setup_mongo_windows_cross_toolchain_extension")
+use_repo(setup_mongo_windows_cross_toolchains_extension, "mongo_windows_cross_toolchain", "mongo_windows_cross_toolchain_files")
+
+register_toolchains(
+    "@mongo_windows_cross_toolchain//...",
+)
+
+setup_mongo_linux_cross_toolchains_extension = use_extension(
+    "//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl",
+    "setup_mongo_linux_cross_toolchains_extension",
+)
+use_repo(
+    setup_mongo_linux_cross_toolchains_extension,
+    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64",
+    "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64",
+    "mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64",
+)
+
+register_toolchains(
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64//:mongo_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_ppc64le_on_rhel8_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel8_s390x_on_rhel8_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_ppc64le_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel9_s390x_on_rhel9_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_ppc64le_on_rhel10_x86_64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_aarch64//:mongo_exec_toolchain",
+    "@mongo_linux_cross_toolchain_v5_rhel10_s390x_on_rhel10_x86_64//:mongo_exec_toolchain",
 )
 
 setup_mongo_python_toolchains = use_extension("//bazel:bzlmod.bzl", "setup_mongo_python_toolchains")
@@ -299,6 +624,14 @@ setup_evergreen_variables = use_repo_rule("//bazel/repository_rules:evergreen_va
 
 setup_evergreen_variables(name = "evergreen_variables")
 
+external_auth_aws_setup = use_repo_rule("//bazel/repository_rules:external_auth_aws_setup.bzl", "external_auth_aws_setup")
+
+external_auth_aws_setup(name = "external_auth_aws_setup")
+
+setup_libvoidstar = use_repo_rule("//bazel/repository_rules:libvoidstar.bzl", "setup_libvoidstar")
+
+setup_libvoidstar(name = "libvoidstar")
+
 setup_pgo_data = use_repo_rule("//bazel/repository_rules:pgo_data.bzl", "setup_pgo_data")
 
 setup_pgo_data(name = "pgo_data")
@@ -311,11 +644,11 @@ setup_bolt_data = use_repo_rule("//bazel/repository_rules:bolt_data.bzl", "setup
 
 setup_bolt_data(name = "bolt_data")
 
-mothra_repository = use_repo_rule("//bazel/repository_rules:mothra.bzl", "mothra_repository")
-
-# This repository is created in CI setup or by manually cloning the 10gen/mothra repo to ./mothra.
-# If the directory doesn't exist, a stub with empty teams will be created.
-mothra_repository(name = "mothra")
+jstestfuzz_repository = use_extension(
+    "//bazel/repository_rules:jstestfuzz_repository.bzl",
+    "jstestfuzz_repository",
+)
+use_repo(jstestfuzz_repository, "jstestfuzz", "jstestfuzz_deterministic")
 
 setup_mongo_windows_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl", "setup_mongo_windows_toolchain_extension")
 use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")
@@ -350,6 +683,17 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 # Make sure this version is set to one of those, or specify the hashes yourself
 rust.toolchain(
     edition = "2024",
+    extra_target_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "powerpc64le-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+        "wasm32-unknown-unknown",
+        "wasm32-wasip1",
+        "wasm32-wasip2",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+    ],
     versions = ["nightly/2026-02-12"],
 )
 
@@ -360,6 +704,33 @@ rust_host.host_tools(
     version = "nightly/2026-02-12",
 )
 use_repo(rust_host, "rust_host_tools_nightly")
+
+# The toolchains above can't carry per-target flags, so //bazel/toolchains/rust wraps
+# the linux-targeting ones to add mongo's rustc flags. Root module registrations take
+# precedence over the rules_rust registration of the unwrapped toolchains.
+# Keep in sync with mongo_rust_toolchain_repos() in
+# //bazel/toolchains/rust:mongo_rust_toolchain.bzl.
+use_repo(
+    rust,
+    "rust_linux_aarch64__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_aarch64__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_aarch64__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_aarch64__x86_64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__x86_64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__x86_64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools",
+)
+
+register_toolchains("//bazel/toolchains/rust:all")
 
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 crate.spec(
@@ -387,10 +758,16 @@ crate.annotation(
     patch_args = ["-p1"],
     patches = [
         "//bazel/wasmtime:store_rs.patch",
+        "//bazel/wasmtime:store_rs_resource_limiter.patch",
         "//bazel/wasmtime:store_h.patch",
+        "//bazel/wasmtime:store_h_resource_limiter.patch",
         "//bazel/wasmtime:store_hh.patch",
+        "//bazel/wasmtime:store_hh_resource_limiter.patch",
         "//bazel/wasmtime:val_raw_u8_list_h.patch",
         "//bazel/wasmtime:val_raw_u8_list_rs.patch",
+        "//bazel/wasmtime:config_wasm_backtrace_rs.patch",
+        "//bazel/wasmtime:config_wasm_backtrace_h.patch",
+        "//bazel/wasmtime:config_wasm_backtrace_hh.patch",
     ],
 )
 
@@ -402,6 +779,13 @@ crate.annotation(
 # (the test harness), and wasmtime-wave (the value serialisation layer) so
 # that all three agree on the Val enum layout.
 # TODO (SERVER-127394): Contribute these patches upstream to the wasmtime repo
+#
+# signals_sigaltstack_ss_disable.patch (BF-44398/BF-44848, wasmtime#13857):
+# Stack::drop munmaps the per-thread sigaltstack without SS_DISABLE, leaving a
+# dangling kernel registration. ASan's thread teardown then unmaps whatever
+# range is still registered, which by that point has been reused for live heap
+# allocations — corrupting the address space of unrelated threads on *aubsan
+# variants.
 crate.annotation(
     crate = "wasmtime",
     patch_args = ["-p1"],
@@ -409,6 +793,7 @@ crate.annotation(
         "//bazel/wasmtime:val_bytes_fast_path.patch",
         "//bazel/wasmtime:val_bytes_lift_fast_path.patch",
         "//bazel/wasmtime:val_bytes_wave_fast_path.patch",
+        "//bazel/wasmtime:signals_sigaltstack_ss_disable.patch",
     ],
 )
 crate.annotation(
@@ -444,6 +829,9 @@ crate.spec(
         "logging",
         "demangle",
         "cranelift",
+        # Cross-RBE AOT actions use the execution-platform CLI. Include every
+        # Cranelift backend so it can compile s390x Wasm from any host.
+        "all-arch",
         "profiling",
         "coredump",
         "addr2line",
@@ -479,7 +867,7 @@ crate.annotation(
     deps = ["@@//src/third_party/zstandard:zstd"],
 )
 
-# Update the lock file using "CARGO_BAZEL_REPIN=1 bazel sync --only=crates"
+# Update the lock file using "CARGO_BAZEL_REPIN=1 bazel mod deps --lockfile_mode=update"
 # You may need to delete the contents of crates.lock first
 crate.from_specs(
     cargo_lockfile = "//bazel:crates.toml",
@@ -535,7 +923,13 @@ wasi_deps = use_repo_rule(
     "setup_wasi_deps",
 )
 
-wasi_deps(name = "wasi_sdk")
+wasi_deps(
+    name = "wasi_sdk",
+    # Bump this whenever the host/execution SDK selection changes. The value
+    # is part of the repository key and prevents reuse of a stale archive
+    # hydrated for an IBM target architecture.
+    selection_version = "portable-exec-arch-v3",
+)
 
 spidermonkey_repo = use_repo_rule(
     "//src/mongo/scripting/mozjs/wasm:spidermonkey_repo.bzl",
@@ -548,3 +942,138 @@ spidermonkey_repo(
     sha256_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-sha256sum",
     version_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-version",
 )
+
+###################### PYTHON DEPS (uv + rules_pycross) ######################
+#
+# rules_pycross consumes uv.lock directly and generates Bazel-native targets:
+# every wheel is materialized via `http_file` (remote-cacheable), and any
+# sdist that has to be built becomes a `pycross_wheel_build` action
+# (remote-executable, sandbox-aware — unlike the WORKSPACE-phase `pip install`
+# that rules_python's `whl_library` repository_rule performs).
+#
+# The @pypi hub name is chosen to match the label shape assumed by
+# //bazel/uv:defs.bzl:dependency() — callers reference deps as @pypi//:<pkg>
+# with PEP 503 normalized names (lowercase, `-` separators).
+
+# rules_pycross's `environments.create_for_python_toolchains` extension
+# consumes rules_python's `@python_versions` toolchain repo to enumerate
+# per-platform PEP 425 tags and environment markers. We add a
+# `python.toolchain()` call here PURELY for that metadata — we do NOT
+# register these toolchains. Actual runtime Python selection stays with
+# mongo's own custom python-build-standalone toolchains registered further
+# up in this file (`@py_host`, `@py_linux_*`, `@py_macos_*`,
+# `@py_windows_x86_64`), which take precedence via their explicit
+# `register_toolchains(...)` calls.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.13")
+
+# `python.defaults()` (rules_python 2.x-only API) sets the default Python
+# version at the root-module level and takes precedence over any
+# `is_default = True` markings from transitive dependencies. Setting it
+# to 3.13 forces both target and exec toolchain resolution to pick 3.13
+# — critical for rules_pycross, whose per-wheel select() gates on
+# `_env_python_3.13_*` config_settings and would otherwise fail under
+# the exec config where transitive deps (grpc/protobuf/rules_pycross
+# itself) push python_version to 3.12.
+python.defaults(python_version = "3.13")
+use_repo(python, "python_versions", "pythons_hub")
+
+# Declare the (platform × python_version) matrix pycross should target.
+# `create_for_python_toolchains` walks @python_versions to emit one
+# `pycross_target_environment` JSON per (platform, version). rules_python's
+# runtime manifest includes s390x/ppc64le entries for 3.13 (host detection
+# on ppc64le additionally needs the host_platform_ppc64le.patch applied
+# above), so this covers every platform mongo builds for.
+environments = use_extension("@rules_pycross//pycross/extensions:environments.bzl", "environments")
+environments.create_for_python_toolchains(
+    name = "mongo_pycross_environments",
+    platforms = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "ppc64le-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+    ],
+)
+use_repo(environments, "mongo_pycross_environments")
+
+lock_import = use_extension("@rules_pycross//pycross/extensions:lock_import.bzl", "lock_import")
+lock_import.import_uv(
+    all_development_groups = True,
+    all_optional_groups = True,
+    # pycross builds sdists WITHOUT pip's build isolation, so PEP 517
+    # backends are not auto-provisioned. Nearly every sdist in this lock
+    # uses a setuptools-based backend (either `setuptools.build_meta`
+    # directly, the `:__legacy__` fallback for setup.py-only packages, or
+    # in-tree wrapper backends like pyyaml's `_pyyaml_pep517` and pyzstd's
+    # `pyzstd_pep517` that import setuptools at load time). Without this
+    # default, every such build fails with:
+    #   BuildBackendException: Backend '<name>' is not available.
+    # setuptools and wheel are pinned in the `compile` dependency group.
+    default_build_dependencies = [
+        "setuptools",
+        "wheel",
+    ],
+    lock_file = "//:uv.lock",
+    project_file = "//:pyproject.toml",
+    repo = "pypi",
+    # `uv lock --static-urls` is required by pycross so each locked package
+    # ships a concrete download URL rather than a URL template. See
+    # buildscripts/uv_sync.sh for the wrapper that enforces this.
+    require_static_urls = True,
+    target_environments = ["@mongo_pycross_environments//:environments"],
+)
+
+# `markdown-it-py` and `mdit-py-plugins` are mutually recursive: the former
+# lists `mdit-py-plugins` as an optional extra dependency, the latter
+# imports from `markdown-it-py`. Bazel refuses to configure a target graph
+# with cycles, so break the edge on the markdown-it-py side (matches what
+# the prior rules_poetry setup did via
+# `poetry(excludes = ["mdit-py-plugins"])` in WORKSPACE.bazel). Callers
+# that need mdit-py-plugins can still depend on it directly.
+lock_import.package(
+    name = "markdown-it-py",
+    ignore_dependencies = ["mdit-py-plugins"],
+    repo = "pypi",
+)
+
+# The published ct3 wheels contain precompiled bytecode under
+# Cheetah/Macros/__pycache__. Besides being non-portable, installer rejects
+# wheel-provided __pycache__ contents as a security risk. Keep the upstream
+# wheel usable while excluding only those generated files at install time.
+lock_import.package(
+    name = "ct3",
+    install_exclude_globs = ["**/__pycache__/**"],
+    repo = "pypi",
+)
+
+# //release-container is its own uv project with its own lock. It pins `docker==6.0.1` and
+# `urllib3==1.26.15`, which conflict with the versions in the root uv.lock, so it gets a separate
+# hub: depend on it as @release_container_pypi//:<pkg> (see `hub` in //bazel/uv:defs.bzl).
+# Every package in that lock ships a wheel, so no sdist build dependencies are needed.
+lock_import.import_uv(
+    all_development_groups = True,
+    lock_file = "//release-container:uv.lock",
+    project_file = "//release-container:pyproject.toml",
+    repo = "release_container_pypi",
+    require_static_urls = True,
+    target_environments = ["@mongo_pycross_environments//:environments"],
+)
+
+lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
+use_repo(lock_repos, "pypi", "release_container_pypi")
+###################### END PYTHON DEPS ######################
+
+bazel_dep(name = "bazel_rules_mongo", version = "0.0.0")
+local_path_override(
+    module_name = "bazel_rules_mongo",
+    path = "buildscripts/bazel_rules_mongo",
+)
+
+codeowners_validator_extension = use_extension("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator_extension")
+use_repo(codeowners_validator_extension, "codeowners_validator")
+
+codeowners_binary_extension = use_extension("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary_extension")
+use_repo(codeowners_binary_extension, "codeowners_binary")

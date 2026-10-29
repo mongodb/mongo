@@ -30,14 +30,17 @@
  */
 #include <test_util.h>
 
-#ifdef _WIN32
 /*
- * Explicitly export this function so it is visible when loading extensions.
+ * On Windows, explicitly export this function so it is visible when loading extensions.
  */
-__declspec(dllexport)
+#ifdef _WIN32
+#define EX_EXPORT __declspec(dllexport)
+#else
+#define EX_EXPORT
 #endif
-int
-add_my_encryptors(WT_CONNECTION *connection);
+
+EX_EXPORT
+int add_my_encryptors(WT_CONNECTION *connection);
 
 static const char *home;
 

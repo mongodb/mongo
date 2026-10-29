@@ -1,39 +1,15 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/accumulator_for_bucket_auto.h"
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -153,7 +129,7 @@ public:
         _memUsageTracker.set(sizeof(*this));
     }
 
-    void processInternal(const Value& input, bool /*merging*/) final;
+    void processInternal(const Value& input, /*merging=*/bool) final;
 
     Value getValue(bool toBeMerged) final {
         return _output.freezeToValue();
@@ -196,7 +172,7 @@ public:
     using KeyOutPair = std::pair<long long, Value>;
 
     AccumulatorPushConcatArraysCommonForBucketAuto(ExpressionContext* expCtx,
-                                                   int maxMemoryUsageBytes)
+                                                   MemoryUsageLimit maxMemoryUsageBytes)
         : AccumulatorState(expCtx, maxMemoryUsageBytes) {}
 
     // Called by 'processInternal', it adds the incoming 'input' as is to
@@ -238,9 +214,9 @@ public:
     }
 
     AccumulatorPushForBucketAuto(ExpressionContext* expCtx,
-                                 boost::optional<int> maxMemoryUsageBytes)
+                                 boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
         : AccumulatorPushConcatArraysCommonForBucketAuto(
-              expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+              expCtx, maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxPushBytes})) {
         _memUsageTracker.set(sizeof(*this));
     }
 
@@ -266,9 +242,10 @@ public:
     }
 
     AccumulatorConcatArraysForBucketAuto(ExpressionContext* expCtx,
-                                         boost::optional<int> maxMemoryUsageBytes)
+                                         boost::optional<MemoryUsageLimit> maxMemoryUsageBytes)
         : AccumulatorPushConcatArraysCommonForBucketAuto(
-              expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxConcatArraysBytes.load())) {
+              expCtx,
+              maxMemoryUsageBytes.value_or(MemoryUsageLimit{query_knobs::kMaxConcatArraysBytes})) {
         _memUsageTracker.set(sizeof(*this));
     }
 
@@ -444,7 +421,7 @@ void AccumulatorFirstLastNForBucketAuto<sense, single>::reset() {
 }
 
 template <FirstLastSense sense, bool single>
-Value AccumulatorFirstLastNForBucketAuto<sense, single>::getValue(bool /*toBeMerged*/) {
+Value AccumulatorFirstLastNForBucketAuto<sense, single>::getValue(/*toBeMerged=*/bool) {
     std::vector<Value> result;
     auto begin = _map.begin();
     auto end = _map.end();
@@ -473,7 +450,7 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorFirstLastNForBucketAuto<sense,
 }
 
 void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compoundInput,
-                                                           bool /*merging*/) {
+                                                           /*merging=*/bool) {
     // 'compoundInput' is made of two parts:
     // - 'input' is the value that the user specified in their {$mergeObjects: _}
     //   accumulator-expression.

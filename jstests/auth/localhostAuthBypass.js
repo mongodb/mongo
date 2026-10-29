@@ -2,6 +2,11 @@
 //
 // This test is to ensure that localhost authentication works correctly against a standalone
 // mongod whether it is hosted with "localhost" or a hostname.
+//
+// @tags: [
+//   # Authorized section runs mapReduce, which requires server-side scripting.
+//   requires_scripting,
+// ]
 import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 
 let baseName = "auth_server-6591";

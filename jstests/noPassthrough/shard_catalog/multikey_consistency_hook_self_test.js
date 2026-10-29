@@ -11,17 +11,24 @@
  * stops the secondary and rewrites _mdb_catalog.wt to flip the multikey flag and multikeyPaths for
  * the test index. The hook must fail reporting the divergence.
  *
+ * Finally verifies that the hook tolerates a collection dropped while its wildcard document
+ * sample read is yielded: the read is hung in yield with setYieldAllLocksHang, the collection is
+ * dropped underneath it, and the hook must exit successfully after the read fails with
+ * QueryPlanKilled.
+ *
  * @tags: [
+ *   featureFlagReplicateMultikeynessInTransactions,
  *   requires_persistence,
  *   requires_replication,
  *   requires_sharding,
  *   requires_snapshot_read,
  *   requires_wiredtiger,
- *   uses_atclustertime,
+ *   uses_transactions,
  * ]
  */
 
 import {rewriteCatalogTable} from "jstests/disk/libs/wt_file_helper.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -35,8 +42,8 @@ const kHookConfig = Object.freeze({
 const kWriteConcern = Object.freeze({w: "majority"});
 const kFeatureFlagParameter = Object.freeze({featureFlagReplicateMultikeynessInTransactions: true});
 
-function runMultikeyConsistencyHook(conn, topologyName) {
-    const awaitShell = startParallelShell(
+function startMultikeyConsistencyHook(conn) {
+    return startParallelShell(
         funWithArgs(
             async (host, hookConfig) => {
                 const conn = new Mongo(host);
@@ -51,7 +58,10 @@ function runMultikeyConsistencyHook(conn, topologyName) {
         undefined,
         true,
     );
+}
 
+function runMultikeyConsistencyHook(conn, topologyName) {
+    const awaitShell = startMultikeyConsistencyHook(conn);
     const exitCode = awaitShell({checkExitSuccess: false});
     assert.eq(0, exitCode, `${topologyName} multikey consistency hook exited non-zero`);
 }
@@ -128,6 +138,38 @@ describe("multikey consistency hook self-test", () => {
         }
     });
 
+    it("handles collections with numeric names", () => {
+        // Collection names that look like integers (e.g. "123") must be preserved as strings
+        // when the hook enumerates and accesses them. Bracket notation db["123"] causes
+        // SpiderMonkey to convert the key to an integer, which then reaches the server as
+        // a BSON numeric type in the listIndexes command, producing
+        // "Collection name has invalid type double".
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
+        rst.startSet();
+        rst.initiate();
+
+        try {
+            const primary = rst.getPrimary();
+            const testDB = primary.getDB(`${jsTestName()}_numeric`);
+            assert.commandWorked(testDB.dropDatabase());
+
+            // Create collections with purely numeric names.
+            for (const numCollName of ["0", "123", "0.3"]) {
+                const coll = testDB.getCollection(numCollName);
+                assert.commandWorked(
+                    coll.insert({_id: 0, a: [1, 2]}, {writeConcern: kWriteConcern}),
+                );
+                assert.commandWorked(coll.createIndex({a: 1}, {name: "a_1"}));
+            }
+            rst.awaitReplication();
+
+            // The hook must not throw "Collection name has invalid type double".
+            runMultikeyConsistencyHook(primary, "replica set with numeric-named collections");
+        } finally {
+            rst.stopSet();
+        }
+    });
+
     it("passes against a healthy sharded cluster through the Thread-worker path", () => {
         const st = new ShardingTest({
             mongos: 1,
@@ -158,7 +200,9 @@ describe("multikey consistency hook self-test", () => {
         const indexName = "a_1";
         const ns = `${dbName}.${collName}`;
 
-        const rst = new ReplSetTest({nodes: 2});
+        // The feature flag must be enabled so the hook actually performs its cross-member
+        // comparison; with it disabled the hook intentionally skips (see the legacy-path case).
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
         rst.startSet();
         rst.initiate();
 
@@ -283,6 +327,90 @@ describe("multikey consistency hook self-test", () => {
             );
             rst.awaitReplication();
             rst.stopSet();
+        }
+    });
+
+    it("tolerates a collection dropped while the wildcard sample read is yielded", () => {
+        const dbName = `${jsTestName()}_wc_drop_race`;
+        const collName = "coll";
+        const ns = `${dbName}.${collName}`;
+
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
+        rst.startSet();
+        rst.initiate();
+
+        const primary = rst.getPrimary();
+        let fp = null;
+        let awaitHook = null;
+        let priorYieldIterations = -1;
+
+        try {
+            const testDB = primary.getDB(dbName);
+            assert.commandWorked(testDB.dropDatabase());
+
+            const coll = testDB.getCollection(collName);
+            assert.commandWorked(
+                coll.insert({_id: 0, nested: {path: [1, 2]}}, {writeConcern: kWriteConcern}),
+            );
+            assert.commandWorked(coll.createIndex({"$**": 1}, {name: "wildcard_all_paths"}));
+            rst.awaitReplication();
+
+            // The hook samples a single document, so its read would otherwise finish without
+            // ever reaching a yield point. Force a yield after the first record accessed so the
+            // failpoint below can deterministically pause the read.
+            priorYieldIterations = assert.commandWorked(
+                primary.adminCommand({getParameter: 1, internalQueryExecYieldIterations: 1}),
+            ).internalQueryExecYieldIterations;
+            assert.commandWorked(
+                primary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+            );
+
+            // Only the hook's wildcard document sample read can enter this failpoint: it is
+            // scoped to the wildcard namespace, and the hook's listIndexes read uses an
+            // interrupt-only yield policy that never yields locks. Arming it before the hook
+            // starts guarantees the hang is the sample read.
+            fp = configureFailPoint(primary, "setYieldAllLocksHang", {namespace: ns});
+
+            awaitHook = startMultikeyConsistencyHook(primary);
+            fp.wait({maxTimeMS: 3 * 60 * 1000});
+
+            // Drop the collection while the sample read is yielded. When the read resumes it
+            // is killed with QueryPlanKilled, which the hook must tolerate exactly like the
+            // pre-existing NamespaceNotFound handling.
+            assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: kWriteConcern}));
+            fp.off();
+
+            const exitCode = awaitHook({checkExitSuccess: false});
+            awaitHook = null;
+            assert.eq(
+                0,
+                exitCode,
+                "hook treated a collection dropped during the wildcard sample read as fatal",
+            );
+        } finally {
+            // Teardown must always reach rst.stopSet() or failed runs leak mongod processes;
+            // keep each step independent so one failure does not mask the original error.
+            try {
+                if (fp) {
+                    fp.off();
+                }
+                if (awaitHook) {
+                    // The failpoint is off again, so the hook can finish on its own; do not
+                    // leave a leftover shell behind.
+                    awaitHook({checkExitSuccess: false});
+                }
+            } finally {
+                try {
+                    assert.commandWorked(
+                        primary.adminCommand({
+                            setParameter: 1,
+                            internalQueryExecYieldIterations: priorYieldIterations,
+                        }),
+                    );
+                } finally {
+                    rst.stopSet();
+                }
+            }
         }
     });
 });

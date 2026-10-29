@@ -1,37 +1,15 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -89,15 +67,10 @@ public:
         }
 
         auto filterBson = fromjson(tc.expr);
-        auto swMatchExpression =
-            MatchExpressionParser::parse(filterBson,
-                                         expCtx(),
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-        ASSERT_OK(swMatchExpression);
+        auto dsc = DocumentSourceMatch::parse(expCtx(), BSON("$match" << filterBson));
 
-        auto splitExprs =
-            splitJoinAndSingleCollectionPredicates(swMatchExpression.getValue().get(), letVars);
+        auto splitExprs = splitJoinAndSingleCollectionPredicates(
+            dynamic_cast<const DocumentSourceMatch*>(dsc.begin()->get()), letVars);
         if (!tc.canSplit) {
             ASSERT(!splitExprs.has_value());
             return;
@@ -342,12 +315,6 @@ TEST_F(PredicateExtractorTest, ComplexSingleTablePredicates) {
     });
 
     assertSplit({
-        .expr = "{$where: 'this.a==\"foo\"'}",
-        .canSplit = true,
-        .expectedSingleTablePredicates = "{$where: 'this.a==\"foo\"'}",
-    });
-
-    assertSplit({
         .expr = "{$expr: {$and: [{$gt: ['$a', '$b']}, {$eq: ['$c', 5]}]}}",
         .canSplit = true,
         .expectedSingleTablePredicates = "{$expr: {$and: [{$gt: ['$a', '$b']}, {$eq: ['$c', 5]}]}}",
@@ -444,20 +411,20 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
         letVars.emplace_back("a", def, idA);
     }
 
+    DocumentSourceContainer dsc;
     auto parseMatch = [&](std::string_view json) {
         auto bson = fromjson(json);
-        return uassertStatusOK(
-            MatchExpressionParser::parse(bson,
-                                         expCtx(),
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures));
+        dsc = DocumentSourceMatch::parse(expCtx(), BSON("$match" << bson));
+        auto match = dynamic_cast<const DocumentSourceMatch*>(dsc.begin()->get());
+        ASSERT_NE(nullptr, match);
+        return std::move(match);
     };
 
     // Variable reference on the right with a path suffix: '$$a.y' must resolve to local path
     // 'x.y' (the let variable's RHS 'x', concatenated with the trailing 'y').
     {
         auto me = parseMatch("{$expr: {$eq: ['$z', '$$a.y']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x.y", split->joinPredicates[0].localField().fullPath());
@@ -467,7 +434,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
     // Variable reference on the left side; same semantics.
     {
         auto me = parseMatch("{$expr: {$eq: ['$$a.y', '$z']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x.y", split->joinPredicates[0].localField().fullPath());
@@ -477,7 +444,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
     // Multi-component suffix on the variable reference.
     {
         auto me = parseMatch("{$expr: {$eq: ['$z', '$$a.y.w']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x.y.w", split->joinPredicates[0].localField().fullPath());
@@ -486,7 +453,7 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
     // No suffix.
     {
         auto me = parseMatch("{$expr: {$eq: ['$z', '$$a']}}");
-        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        auto split = splitJoinAndSingleCollectionPredicates(me, letVars);
         ASSERT(split.has_value());
         ASSERT_EQ(1, split->joinPredicates.size());
         ASSERT_EQ("x", split->joinPredicates[0].localField().fullPath());
@@ -498,34 +465,49 @@ TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
  */
 class ExtractExprPredicatesTest : public unittest::Test {
 public:
-    ExtractExprPredicatesTest()
-        : _expCtx(new ExpressionContextForTest()), _pathResolver{_baseNodeId, _resolvedPaths} {
-        _pathResolver.addNode(_firstNodeId, "first");
-        _pathResolver.addNode(_secondNodeId, "second");
-    }
-
-    auto createMatcher(const BSONObj& matchExpr) {
-        return uassertStatusOK(
-            MatchExpressionParser::parse(matchExpr,
-                                         _expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures));
-    }
+    static constexpr auto pipelineStr = R"([
+            {$lookup: {from: "first", as: "first", pipeline: []}},
+            {$unwind: "$first"},
+            {$lookup: {from: "second", as: "second", pipeline: []}},
+            {$unwind: "$second"}
+        ])";
 
     ExprPredicatesResult extract(std::string_view json) {
+        const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+        auto pipeline = makePipelineForTest(pipelineStr, {"first", "second"}, expCtx);
         auto bson = fromjson(json);
-        auto matchExpr = createMatcher(bson);
-        return extractExprPredicates(_pathResolver, matchExpr.get());
+        auto match = DocumentSourceMatch::create(bson, expCtx);
+        // Note: optimization results in $unwinds being absorbed.
+        auto* lookup1 = dynamic_cast<DocumentSourceLookUp*>(pipeline->getSources().begin()->get());
+        ASSERT_NE(lookup1, nullptr);
+        auto* lookup2 = dynamic_cast<DocumentSourceLookUp*>(pipeline->getSources().rbegin()->get());
+        ASSERT_NE(lookup2, nullptr);
+        pipeline->addFinalSource(match);
+
+        AggJoinModelFixture::markFieldsAsScalar(
+            *pipeline,
+            {"a", "b", "c", "d"},
+            {{"first", {"a", "b", "e"}}, {"second", {"a", "b", "c", "d", "e"}}});
+
+        auto canMainCollPathBeArray = [expCtx](std::string_view path) {
+            return expCtx->canPathBeArrayForNss(FieldRef(path), expCtx->getNamespaceString());
+        };
+        auto graph = pipeline::dependency_graph::DependencyGraph(pipeline->getSources(),
+                                                                 canMainCollPathBeArray);
+        PathResolver pathResolver(_baseNodeId, graph);
+
+        ASSERT_TRUE(pathResolver.trackEmbedPath(*lookup1, _firstNodeId));
+        ASSERT_TRUE(pathResolver.trackEmbedPath(*lookup2, _secondNodeId));
+
+        graph.resize(pipeline->getSources().end());
+        return extractExprPredicates(pathResolver, match.get());
     }
 
 protected:
     static constexpr NodeId _baseNodeId = 0;
     static constexpr NodeId _firstNodeId = 1;
     static constexpr NodeId _secondNodeId = 2;
-
-    const boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
-    std::vector<ResolvedPath> _resolvedPaths;
-    PathResolver _pathResolver;
 };
 
 /**
@@ -685,7 +667,7 @@ TEST_F(ExtractExprPredicatesTest, EqualityAgainstSystemVariableWithSubfield) {
 }
 
 /**
- * An expression that constains non-expr $eq predicate cannot be fully absorbed.
+ * An expression that contains non-expr $eq predicate cannot be fully absorbed.
  */
 TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
     static constexpr std::string_view json = R"(
@@ -699,5 +681,73 @@ TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
     auto result = extract(json);
     ASSERT_FALSE(result.expressionIsFullyAbsorbed);
     ASSERT_EQ(2, result.predicates.size());
+}
+
+/**
+ * The following tests pin down the 'reason' reported for each way a top-level $match can fail to be
+ * fully absorbed into the join graph. These reasons surface in query stats as the join-optimization
+ * fallback reason, so each JoinFallbackReason::kMatch* value gets a test that reaches it.
+ */
+void assertReason(const ExprPredicatesResult& result, JoinFallbackReason expected) {
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_TRUE(result.reason.has_value());
+    ASSERT_EQ(toStringData(*result.reason), toStringData(expected));
+}
+
+/**
+ * A $match predicate that isn't a $expr (or an $and of them) can't encode a join predicate.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchNonExprPredicate) {
+    auto result = extract("{'first.a': 2}");
+    assertReason(result, JoinFallbackReason::kMatchNonExprPredicate);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * A $expr containing an expression other than $and/$eq (here $or) is unsupported.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchUnsupportedExpression) {
+    auto result = extract("{$expr: {$or: [{$eq: ['$first.a', '$second.b']}]}}");
+    assertReason(result, JoinFallbackReason::kMatchUnsupportedExpression);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * Only equality comparisons can become join predicates.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchNonEqualityPredicate) {
+    auto result = extract("{$expr: {$gt: ['$first.a', '$second.b']}}");
+    assertReason(result, JoinFallbackReason::kMatchNonEqualityPredicate);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * Both sides of the equality must be field paths, not constants.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchNonFieldPathOperand) {
+    auto result = extract("{$expr: {$eq: ['$first.a', 5]}}");
+    assertReason(result, JoinFallbackReason::kMatchNonFieldPathOperand);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * A system-variable operand can't name a field of a collection, so it can't be a join predicate.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchVariableOperand) {
+    for (std::string_view json :
+         {"{$expr: {$eq: ['$first.a', '$$NOW']}}"sv, "{$expr: {$eq: ['$first.a', '$$NOW.x']}}"sv}) {
+        auto result = extract(json);
+        assertReason(result, JoinFallbackReason::kMatchVariableOperand);
+        ASSERT_EQ(0, result.predicates.size()) << json;
+    }
+}
+
+/**
+ * An equality between two fields of the same collection is a self-edge, not a join predicate.
+ */
+TEST_F(ExtractExprPredicatesTest, ReasonMatchPredicateOnSameNode) {
+    auto result = extract("{$expr: {$eq: ['$first.a', '$first.b']}}");
+    assertReason(result, JoinFallbackReason::kMatchPredicateOnSameNode);
+    ASSERT_EQ(0, result.predicates.size());
 }
 }  // namespace mongo::join_ordering

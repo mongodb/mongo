@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 
@@ -263,12 +237,8 @@ bool BackfillCoordinator::shouldBackfill(const boost::intrusive_ptr<ExpressionCo
         return false;
     }
 
-    // We shouldn't attempt the backfill if it's not enabled.
-    const bool isPQSBackfillEnabled = (!internalQuerySettingsDisableBackfill.load()) &&
-        feature_flags::gFeatureFlagPQSBackfill.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(expCtx->getOperationContext()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (!isPQSBackfillEnabled) {
+    // We shouldn't attempt the backfill if it's disabled via the server parameter.
+    if (internalQuerySettingsDisableBackfill.load()) {
         return false;
     }
 
@@ -383,10 +353,9 @@ ExecutorFuture<void> BackfillCoordinator::execute(
         getGlobalServiceContext()->getService()->makeClient("QuerySettingsBackfillManager");
     auto opCtxHolder = client->makeOperationContext();
     auto* opCtx = opCtxHolder.get();
-    const boost::optional<TenantId> tenantId = boost::none;
     auto&& service = QuerySettingsService::get(opCtx);
     auto [queryShapeConfigurations, clusterParameterTime] =
-        service.getAllQueryShapeConfigurations(tenantId);
+        service.getAllQueryShapeConfigurations();
 
     // Construct the query shape representative query array. Avoid copying over an entry if the
     // corresponding query shape configuration was removed in the meantime.
@@ -418,7 +387,6 @@ ExecutorFuture<void> BackfillCoordinator::execute(
                opCtx, std::move(representativeQueries), std::move(executor))
         .then([this,
                clusterParameterTime,
-               tenantId,
                client = std::move(client),
                opCtxHolder = std::move(opCtxHolder),
                nRepresentativeQueries](std::vector<QueryShapeHash> hashes) {
@@ -433,7 +401,7 @@ ExecutorFuture<void> BackfillCoordinator::execute(
                         "Succesfully inserted the backfilled representative queries",
                         "hashes"_attr = hashes,
                         "representativeQueriesInserted"_attr = nInsertedRepresentativeQueries);
-            _onCompletionHook(std::move(hashes), clusterParameterTime, tenantId);
+            _onCompletionHook(std::move(hashes), clusterParameterTime);
             tracker.incrementSucceededBackfills(nInsertedRepresentativeQueries);
             tracker.incrementFailedBackfills(nRepresentativeQueries -
                                              nInsertedRepresentativeQueries);

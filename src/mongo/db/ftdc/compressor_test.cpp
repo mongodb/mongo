@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/ftdc/compressor.h"
 
@@ -469,6 +443,74 @@ TEST_F(FTDCCompressorTest, TestFull) {
                                      << "key1" << 34 << "key2" << 45));
         ASSERT_HAS_SPACE(st);
     }
+}
+
+// RLE of zeros that fits strictly inside one metric (zeroesCount < sampleCount - j).
+// TestFull also covers long in-metric zero runs.
+TEST_F(FTDCCompressorTest, TestRLEZeroRunFitsInMetric) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("a" << 10 << "b" << 1));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 2));
+    ASSERT_HAS_SPACE(st);
+    // Three zeros on "a", then a non-zero so the run does not reach the end of the metric.
+    st = c.addSample(BSON("a" << 20 << "b" << 3));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 4));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 5));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 30 << "b" << 6));
+    ASSERT_HAS_SPACE(st);
+}
+
+// Zero run that fills exactly the remaining samples of a metric; the next metric starts non-zero.
+TEST_F(FTDCCompressorTest, TestRLEZeroRunExactRemainingSamples) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("a" << 10 << "b" << 1));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 2));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 3));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 4));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 5));
+    ASSERT_HAS_SPACE(st);
+}
+
+// Identical non-zero samples: every delta is zero, so one RLE run covers every metric.
+TEST_F(FTDCCompressorTest, TestRLEAllMetricsUnchanged) {
+    TestTie c;
+
+    BSONObj doc = BSON("a" << 7 << "b" << 11 << "c" << 13);
+    auto st = c.addSample(doc);
+    ASSERT_HAS_SPACE(st);
+    for (int i = 0; i < 20; ++i) {
+        st = c.addSample(doc);
+        ASSERT_HAS_SPACE(st);
+    }
+}
+
+// Trailing zeros of one metric concatenated with leading zeros of the next, so the decoder
+// must carry zeroesCount across the metric boundary (zeroesCount > sampleCount - j).
+TEST_F(FTDCCompressorTest, TestRLEZeroRunSpansMetrics) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("a" << 10 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 7));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("a" << 20 << "b" << 100 << "c" << 8));
+    ASSERT_HAS_SPACE(st);
 }
 
 template <typename T>

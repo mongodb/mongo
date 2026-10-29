@@ -106,7 +106,7 @@ replay_end_timed_run(void)
      * the intended stop timestamp. We pick a stop timestamp far enough in the future that it's
      * rather unlikely to happen.
      */
-    WT_RELEASE_WRITE_WITH_BARRIER(g.stop_timestamp, g.timestamp + 0x10000);
+    __wt_atomic_store_uint64_release(&g.stop_timestamp, g.timestamp + 0x10000);
 }
 
 /*
@@ -128,7 +128,7 @@ replay_maximum_committed(void)
     if (ts != WT_TS_NONE && __wt_atomic_add_uint32_v(&g.replay_calculate_committed, 1) % 20 != 0)
         return (ts);
 
-    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    ts = __wt_atomic_load_uint64_acquire(&g.timestamp);
     any_lane_in_use = false;
     testutil_check(pthread_rwlock_wrlock(&g.lane_lock));
     for (lane = 0; lane < LANE_COUNT; ++lane) {
@@ -249,11 +249,11 @@ replay_pick_timestamp(TINFO *tinfo)
             ts = __wt_atomic_add_uint64_v(&g.timestamp, 1);
             g.timestamp_copy = g.timestamp;
             lane = LANE_NUMBER(ts);
-            WT_ACQUIRE_READ_WITH_BARRIER(in_use, g.lanes[lane].in_use);
+            in_use = __wt_atomic_load_bool_acquire(&g.lanes[lane].in_use);
         } while (in_use);
 
         tinfo->replay_ts = ts;
-        WT_RELEASE_WRITE_WITH_BARRIER(g.lanes[lane].in_use, true);
+        __wt_atomic_store_bool_release(&g.lanes[lane].in_use, true);
         testutil_check(pthread_rwlock_unlock(&g.lane_lock));
         tinfo->lane = lane;
     }
@@ -490,9 +490,9 @@ replay_committed(TINFO *tinfo)
      * Updating the last commit timestamp for a lane in use allows read, oldest and stable
      * timestamps to advance.
      */
-    WT_RELEASE_WRITE_WITH_BARRIER(g.lanes[lane].last_commit_ts, tinfo->replay_ts);
+    __wt_atomic_store_uint64_release(&g.lanes[lane].last_commit_ts, tinfo->replay_ts);
     if (g.timestamp <= tinfo->replay_ts + LANE_COUNT) {
-        WT_RELEASE_WRITE_WITH_BARRIER(g.lanes[lane].in_use, false);
+        __wt_atomic_store_bool_release(&g.lanes[lane].in_use, false);
         tinfo->lane = LANE_NONE;
         tinfo->replay_ts = WT_TS_NONE;
     } else {

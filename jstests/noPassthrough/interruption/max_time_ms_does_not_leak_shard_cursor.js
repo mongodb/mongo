@@ -3,8 +3,7 @@
 //
 // @tags: [
 //  requires_scripting,
-//  # TODO SERVER-126787: Re-enable this test once MaxTimeMSExpired timeouts return the correct error code for WASM.
-//  mozjs_wasm_unsupported,
+//  resource_intensive,
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

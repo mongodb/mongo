@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -50,7 +24,8 @@
 
 #include <boost/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Interface for implementing retry behavior. Allows user to specify exactly how much time we
@@ -76,7 +51,7 @@ namespace MONGO_MOD_PUBLIC mongo {
  *
  *  See 'runWithRetryStrategy' for a reference usage of retry strategies.
  */
-class MONGO_MOD_OPEN RetryStrategy {
+class [[MONGO_MOD_OPEN]] RetryStrategy {
 public:
     virtual ~RetryStrategy() = default;
 
@@ -84,11 +59,18 @@ public:
      * Returns true if the request that generated the status and error labels should be retried.
      *
      * This function should be called at the end of each failed request.
+     *
+     * 'baseBackoffMS', when present, overrides the strategy's configured base backoff for
+     * computing the next retry delay. The server sends this value in a response for system
+     * overloaded errors when a different base backoff is configured. It is only applied when
+     * 'errorLabels' contains the 'SystemOverloadedError' label; otherwise it is ignored.
      */
     [[nodiscard]]
-    virtual bool recordFailureAndEvaluateShouldRetry(Status s,
-                                                     const boost::optional<HostAndPort>& origin,
-                                                     std::span<const std::string> errorLabels) = 0;
+    virtual bool recordFailureAndEvaluateShouldRetry(
+        Status s,
+        const boost::optional<HostAndPort>& origin,
+        std::span<const std::string> errorLabels,
+        boost::optional<Milliseconds> baseBackoffMS) = 0;
 
     /**
      * Records a successful request. Should be called at the end of successful request even if no
@@ -168,7 +150,8 @@ public:
         explicit(!std::convertible_to<U, T>) constexpr Result(const Result<U>& result)
             : _status{result._status},
               _valueOrError{convert_variant(result._valueOrError)},
-              _origin{result._origin} {}
+              _origin{result._origin},
+              _baseBackoffMS{result._baseBackoffMS} {}
 
         /**
          * Converting move constructor from another result type.
@@ -178,7 +161,8 @@ public:
         explicit(!std::convertible_to<U, T>) constexpr Result(Result<U>&& result)
             : _status{std::exchange(result._status, Status::OK())},
               _valueOrError{convert_variant(std::exchange(result._valueOrError, {}))},
-              _origin{std::exchange(result._origin, {})} {}
+              _origin{std::exchange(result._origin, {})},
+              _baseBackoffMS{std::exchange(result._baseBackoffMS, {})} {}
 
         /**
          * Converting constructor from status for error cases.
@@ -203,10 +187,14 @@ public:
          * This constructor is not constexpr only because HostAndPort cannot be used in constexpr
          * context.
          */
-        Result(Status s, std::vector<std::string> errorLabels, boost::optional<HostAndPort> origin)
+        Result(Status s,
+               std::vector<std::string> errorLabels,
+               boost::optional<HostAndPort> origin,
+               boost::optional<Milliseconds> baseBackoffMS)
             : _status{std::move(s)},
               _valueOrError{std::in_place_type<ErrorLabels>, std::move(errorLabels)},
-              _origin{std::move(origin)} {
+              _origin{std::move(origin)},
+              _baseBackoffMS{baseBackoffMS} {
             dassert(!_status.isOK());
         }
 
@@ -248,6 +236,10 @@ public:
 
         constexpr const boost::optional<HostAndPort>& getOrigin() const {
             return _origin;
+        }
+
+        boost::optional<Milliseconds> getBaseBackoffMS() const {
+            return _baseBackoffMS;
         }
 
         constexpr bool operator==(const T& value) const {
@@ -347,6 +339,7 @@ public:
         Status _status;
         ValueOrErrorLabels _valueOrError;
         boost::optional<HostAndPort> _origin;
+        boost::optional<Milliseconds> _baseBackoffMS;
     };
 
     using ResultStatus = Result<std::monostate>;
@@ -399,7 +392,8 @@ public:
     [[nodiscard]]
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override;
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override;
 
     void recordSuccess(const boost::optional<HostAndPort>& target) override {
         // Noop, as there's nothing to cleanup on success.
@@ -412,7 +406,7 @@ public:
     static RetryParameters getRetryParametersFromServerParameters();
 
     Milliseconds getNextRetryDelay() const override {
-        return _backoffWithJitter.getBackoffDelay();
+        return _backoffWithJitter.getBackoffDelay(_lastBaseBackoffMS);
     }
 
     const TargetingMetadata& getTargetingMetadata() const override {
@@ -426,6 +420,7 @@ private:
     std::int32_t _retryAttemptCount = 0;
     TargetingMetadata _targetingMetadata{.deprioritizedServers = {},
                                          .stats = std::make_shared<TargetingMetadata::Stats>()};
+    boost::optional<Milliseconds> _lastBaseBackoffMS;
 };
 
 /**
@@ -444,7 +439,8 @@ public:
     [[nodiscard]]
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override {
         return false;
     }
 
@@ -498,7 +494,7 @@ public:
          */
         void updateRateParameters(double returnRate, double capacity);
 
-        MONGO_MOD_PUBLIC double getBalance_forTest() const;
+        [[MONGO_MOD_PUBLIC]] double getBalance_forTest() const;
 
         /**
          * Appends the stats for the retry budget metrics.
@@ -567,7 +563,8 @@ public:
     [[nodiscard]]
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override;
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override;
 
     /**
      * Replenishes the retry budget to allow more retries.
@@ -606,9 +603,10 @@ struct RetryStrategyWithFailureRetryHook : RetryStrategy {
 
     bool recordFailureAndEvaluateShouldRetry(Status s,
                                              const boost::optional<HostAndPort>& target,
-                                             std::span<const std::string> errorLabels) override {
-        const bool shouldRetry =
-            _underlyingStrategy.recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+                                             std::span<const std::string> errorLabels,
+                                             boost::optional<Milliseconds> baseBackoffMS) override {
+        const bool shouldRetry = _underlyingStrategy.recordFailureAndEvaluateShouldRetry(
+            s, target, errorLabels, baseBackoffMS);
 
         if (shouldRetry) {
             _onRetryFunction(s);
@@ -662,7 +660,7 @@ private:
  *         [](const TargetingMetadata& targetingMetadata) -> RetryStrategy::Result<std::string_view>
  * {
  *             // on success.
- *             return "value"_sd;
+ *             return "value"sv;
  *             // on failure. Target is the host and port on which the request was performed.
  *             return {status, target, errorLabels};
  *         }
@@ -688,8 +686,10 @@ StatusWith<T> runWithRetryStrategy(Interruptible* interruptible,
     auto result = run();
 
     while (!result.isOK() &&
-           strategy.recordFailureAndEvaluateShouldRetry(
-               result.getStatus(), result.getOrigin(), result.getErrorLabels())) {
+           strategy.recordFailureAndEvaluateShouldRetry(result.getStatus(),
+                                                        result.getOrigin(),
+                                                        result.getErrorLabels(),
+                                                        result.getBaseBackoffMS())) {
         const auto delay = strategy.getNextRetryDelay();
 
         try {
@@ -713,4 +713,4 @@ StatusWith<T> runWithRetryStrategy(Interruptible* interruptible,
     return result;
 }
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

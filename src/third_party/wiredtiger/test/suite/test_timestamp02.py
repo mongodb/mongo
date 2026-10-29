@@ -45,12 +45,6 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         ('row', dict(extra_config='')),
     ])
 
-    def get_stat(self, stat_name):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        value = stat_cursor[stat_name][2]
-        stat_cursor.close()
-        return value
-
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
     def check(self, session, txn_config, expected):

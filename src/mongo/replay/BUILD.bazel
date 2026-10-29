@@ -65,6 +65,9 @@ mongo_cc_unit_test(
         "traffic_reader_test.cpp",
     ],
     tags = ["mongo_unittest_sixth_group"],
+    # Disabled as mongor is no longer under development or supported, and its
+    # tests were repeatedly generating BFs (see BF-41287).
+    target_compatible_with = ["@platforms//:incompatible"],
     deps = [
         ":mongor_lib",
         "//src/mongo/dbtests:mocklib",

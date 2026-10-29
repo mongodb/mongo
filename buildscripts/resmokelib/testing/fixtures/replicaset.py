@@ -1,6 +1,7 @@
 """Replica set fixture for executing JSTests against."""
 
 import os.path
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
@@ -16,6 +17,8 @@ from buildscripts.resmokelib.extensions import (
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
+    mongot_extension_requested,
     normalize_load_extensions,
 )
 from buildscripts.resmokelib.testing.fixtures import interface
@@ -76,7 +79,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         shard_logging_prefix=None,
         replicaset_logging_prefix=None,
         replset_name=None,
-        require_graceful_shutdown=False,
+        ignore_teardown_errors=False,
         use_auto_bootstrap_procedure=None,
         initial_sync_uninitialized_fcv=False,
         hide_initial_sync_node_from_conn_string=False,
@@ -86,6 +89,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         router_endpoint_for_mongot: Optional[int] = None,
         use_priority_ports=False,
         uds_path_prefix: Optional[str | bool] = None,
+        new_binary_set_parameters=None,
     ):
         """Initialize ReplicaSetFixture."""
 
@@ -97,6 +101,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.mongod_options = self.fixturelib.make_historic(
             certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
+        # Only merged into the new-binary half of a mixed-bin-versions node (see
+        # _builder.py:_new_mongod); the old-binary half never receives these, since a
+        # failpoint/setParameter that doesn't exist on the old binary would fail it to start.
+        self.new_binary_set_parameters = self.fixturelib.make_historic(
+            self.fixturelib.default_if_none(new_binary_set_parameters, {})
+        )
 
         # Process load_extensions: ["*"] means all, otherwise load named extensions.
         _load_exts = normalize_load_extensions(load_extensions)
@@ -104,6 +114,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             _load_exts = ["*"]
 
         self.loaded_extensions = None
+        # mongotHost is only known per-node, so defer the mongot extension's .conf to the child
+        # nodes (see _builder.py) and generate only the remainder now.
+        self._defer_mongot_extension = mongot_extension_requested(_load_exts, launch_mongot)
+        self._skip_extensions_signature_verification = skip_extensions_signature_verification
         if "*" in _load_exts:
             self.loaded_extensions = find_and_generate_all_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
@@ -114,12 +128,18 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 skip_extensions_signature_verification, self.config, self.mongod_options
             )
         elif _load_exts:
-            self.loaded_extensions = find_and_generate_named_extension_configs(
-                extension_names=_load_exts,
-                is_evergreen=self.config.EVERGREEN_TASK_ID,
-                logger=self.logger,
-                mongod_options=self.mongod_options,
+            generate_now = (
+                [n for n in _load_exts if n != get_mongot_extension_name()]
+                if self._defer_mongot_extension
+                else _load_exts
             )
+            if generate_now:
+                self.loaded_extensions = find_and_generate_named_extension_configs(
+                    extension_names=generate_now,
+                    is_evergreen=self.config.EVERGREEN_TASK_ID,
+                    logger=self.logger,
+                    mongod_options=self.mongod_options,
+                )
             add_extensions_signature_pub_key_path(
                 skip_extensions_signature_verification, self.config, self.mongod_options
             )
@@ -141,7 +161,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.replicaset_logging_prefix = replicaset_logging_prefix
         self.num_nodes = num_nodes
         self.replset_name = replset_name
-        self.require_graceful_shutdown = require_graceful_shutdown
+        self.ignore_teardown_errors = ignore_teardown_errors
         self.initial_sync_uninitialized_fcv = initial_sync_uninitialized_fcv
         self.hide_initial_sync_node_from_conn_string = hide_initial_sync_node_from_conn_string
         # Used by the enhanced multiversion system to signify multiversion mode.
@@ -211,6 +231,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def setup(self):
         """Set up the replica set."""
+        # Defer mongot readiness until after replSetInitiate.
+        for node in self._all_mongot_nodes():
+            node.defer_mongot_await_ready = True
+
         start_node = 0
         if self.use_auto_bootstrap_procedure:
             # We need to wait for the first node to finish auto-bootstrapping so that we can
@@ -316,6 +340,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # want to skip reconfiguring the replset (which adds the other nodes
             # to the auto-bootstrapped replset).
             self.logger.info("Configuration exists. Skipping initializing the replset.")
+            self._await_all_mongots_ready()
             return
 
         if self.write_concern_majority_journal_default is not None:
@@ -347,6 +372,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # When this is True, we are running in Antithesis & modify the config to surface more bugs
         if self.config.NOOP_MONGO_D_S_PROCESSES:
             repl_config["settings"]["electionTimeoutMillis"] = 2000
+            # electionTimeoutMillis must be strictly greater than heartbeatIntervalMillis
+            # (default 2000), so shorten the heartbeat interval rather than lengthening the
+            # election timeout.
+            repl_config["settings"]["heartbeatIntervalMillis"] = 1800
             repl_config["settings"]["chainingAllowed"] = False
             repl_config["settings"]["heartbeatTimeoutSecs"] = 1
             repl_config["settings"]["catchUpTimeoutMillis"] = 0
@@ -373,12 +402,82 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # nodes are subsequently added to the set, since such nodes cannot set their FCV to
             # "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
             # nodes of different binary versions to the replica set.
-            client.admin.command(
-                {
-                    "setFeatureCompatibilityVersion": self.fcv,
-                    "fromConfigServer": True,
-                }
-            )
+            #
+            # An in-flight index build that has pinned a stale Operation FCV will cause setFCV to
+            # fail with BackgroundOperationInProgressForNamespace (12587). Retry until the build
+            # drains; index builds are short-lived at fixture-setup time.
+            #
+            # A previous transition that stopped while cleaning up internal server metadata blocks
+            # any transition in the opposite direction (7428200 if a downgrade stopped, 10778001 if
+            # an upgrade did). The server only accepts continuing in the interrupted direction, so
+            # drive the FCV document's targetVersion to completion and then retry ours.
+            _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE = 12587
+            _COMMAND_NOT_SUPPORTED_ON_VIEW = 166
+            _INCOMPLETE_TRANSITION_CODES = (7428200, 10778001)
+            _SET_FCV_RETRY_TIMEOUT_SECS = 5 * 60
+            _SET_FCV_RETRY_INTERVAL_SECS = 0.2
+            start_time = time.monotonic()
+            while True:
+                try:
+                    client.admin.command(
+                        {
+                            "setFeatureCompatibilityVersion": self.fcv,
+                            "fromConfigServer": True,
+                        }
+                    )
+                    break
+                except pymongo.errors.OperationFailure as err:
+                    if (
+                        err.code != _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE
+                        and err.code not in _INCOMPLETE_TRANSITION_CODES
+                    ):
+                        raise
+                    elapsed = time.monotonic() - start_time
+                    if elapsed > _SET_FCV_RETRY_TIMEOUT_SECS:
+                        raise pymongo.errors.OperationFailure(
+                            f"setFeatureCompatibilityVersion({self.fcv}) still failing after"
+                            f" {elapsed:.1f}s: {err}",
+                            code=err.code,
+                        )
+                    if err.code in _INCOMPLETE_TRANSITION_CODES:
+                        fcv_doc = client.admin["system.version"].find_one(
+                            {"_id": "featureCompatibilityVersion"}
+                        )
+                        pending_fcv = (fcv_doc or {}).get("targetVersion")
+                        if pending_fcv is None:
+                            raise
+                        self.logger.info(
+                            "Completing an interrupted FCV transition to %s before retrying"
+                            " setFeatureCompatibilityVersion(%s) (%.1fs elapsed): %s",
+                            pending_fcv,
+                            self.fcv,
+                            elapsed,
+                            err,
+                        )
+                        try:
+                            client.admin.command(
+                                {
+                                    "setFeatureCompatibilityVersion": pending_fcv,
+                                    "fromConfigServer": True,
+                                }
+                            )
+                        except pymongo.errors.OperationFailure as completion_err:
+                            # Best effort: the retry below observes the same incomplete-transition
+                            # error and tries again.
+                            self.logger.info(
+                                "Failed to complete the interrupted FCV transition to %s: %s",
+                                pending_fcv,
+                                completion_err,
+                            )
+                    else:
+                        self.logger.info(
+                            "Retrying setFeatureCompatibilityVersion(%s) after"
+                            " BackgroundOperationInProgressForNamespace (%.1fs elapsed): %s",
+                            self.fcv,
+                            elapsed,
+                            err,
+                        )
+                    time.sleep(_SET_FCV_RETRY_INTERVAL_SECS)
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
@@ -389,6 +488,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # single voting member at a time.
             for ind in range(2, len(members) + 1):
                 self._add_node_to_repl_set(client, repl_config, ind, members)
+
+        # The replica set is initiated and has a primary; per-node mongot lease startup now has a
+        # valid replication source. Await mongot readiness on each node that launched one.
+        self._await_all_mongots_ready()
 
         self.removeshard_teardown_marker = False
 
@@ -404,6 +507,23 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
     def _all_mongots(self):
         """Return a list of all `mongot` `Process` instances in this fixture."""
         return [node.mongot for node in self.nodes]
+
+    def _all_mongot_nodes(self):
+        """Return the member nodes that may have launched a co-located mongot."""
+        nodes = list(self.nodes)
+        if self.initial_sync_node:
+            nodes.append(self.initial_sync_node)
+        return nodes
+
+    def _await_all_mongots_ready(self):
+        """
+        Await mongot readiness on every node once the replica set is initiated. Deferred out of each
+        node's setup() because mongot's lease manager needs an initiated replica set to replicate
+        from.
+        """
+        for node in self._all_mongot_nodes():
+            node.await_mongot_ready()
+            node.defer_mongot_await_ready = False
 
     def pids(self):
         """:return: all pids owned by this fixture if any."""
@@ -640,7 +760,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         )
         admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
 
-        # TODO(SERVER-119066): Remove when no longer necessary
+        # TODO(SERVER-132991): Remove once the old binary in DSC multiversion suites reports
+        # lastStableRecoveryTimestamp.
         mongod_options = self.nodes[0].get_mongod_options()
         disagg_enabled = mongod_options.get("set_parameters", {}).get(
             "disaggregatedStorageEnabled", False
@@ -813,11 +934,24 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         sync_node_conn = initial_sync_node.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
         sync_node_conn.admin.command(failpoint_off_cmd)
 
+    def delete_extension_configs_for_members(self):
+        """Delete extension .conf files generated by member nodes themselves.
+
+        Member teardown (FixtureTeardownHandler) never passes finished=True, so the owning
+        fixture must clean up for them at job end.
+        """
+        for node in self.nodes:
+            node_loaded_extensions = getattr(node, "loaded_extensions", None)
+            if node_loaded_extensions:
+                delete_extension_configs(node_loaded_extensions, self.logger)
+
     def _do_teardown(self, finished=False, mode=None):
         self.logger.info("Stopping all members of the replica set '%s'...", self.replset_name)
 
-        if finished and self.loaded_extensions:
-            delete_extension_configs(self.loaded_extensions, self.logger)
+        if finished:
+            if self.loaded_extensions:
+                delete_extension_configs(self.loaded_extensions, self.logger)
+            self.delete_extension_configs_for_members()
 
         running_at_start = self.is_running()
         if not running_at_start:
@@ -854,7 +988,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.teardown_counter += 1
         else:
             self.logger.error("Stopping the replica set fixture failed.")
-            if self.require_graceful_shutdown:
+            if not self.ignore_teardown_errors:
                 raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
@@ -953,6 +1087,15 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 )
             )
         self.logger.info("Read concern is available on all nodes")
+
+    # TODO(SERVER-131909): Remove this once disaggregated replica sets have elegant stepdown.
+    def should_stop_primary_before_stepup(self):
+        """Return whether the primary must exit before another node can be stepped up."""
+        return False
+
+    def requires_configsvr_replset_config(self):
+        """Return whether transitioning to a config server requires a replSetReconfig."""
+        return True
 
     def stop_primary(self, primary, background_reconfig, should_kill):
         """Stop the primary node method."""
@@ -1098,7 +1241,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # into Rollback (which causes it to close any open connections).
             return False
 
-    def restart_node(self, chosen, temporary_flags={}):
+    def restart_node(self, chosen, temporary_flags={}, timeout=None):
         """Restart the new step up node."""
         self.logger.info(
             "Waiting for the old primary on port %d of replica set '%s' to exit.",
@@ -1106,9 +1249,15 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.replset_name,
         )
 
-        exit_code = chosen.mongod.wait()
-        # This function is called after stop_primary() which could kill or cleanly shutdown the
-        # process. We therefore also allow an exit code of -9.
+        try:
+            exit_code = chosen.mongod.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise self.fixturelib.ServerFailure(
+                "Timed out after {}s waiting for mongod on port {} of replica set '{}' to "
+                "terminate.".format(timeout, chosen.port, self.replset_name)
+            )
+        # The process may have been killed or cleanly shut down. We therefore also allow an exit
+        # code of -9.
         if exit_code in (0, -interface.TeardownMode.KILL.value):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(chosen.port))
         else:
@@ -1375,7 +1524,18 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     if coll_name.endswith(".") or ".." in coll_name:
                         continue
                     # Skip collections that contain TTL indexes or TTL options.
-                    indexes = db.get_collection(coll_name).list_indexes()
+                    try:
+                        indexes = db.get_collection(coll_name).list_indexes()
+                    except pymongo.errors.OperationFailure as err:
+                        # If the replica set is running an older version, make an exclusion for
+                        # legacy timeseries collections because they are views and do not support
+                        # the listIndexes command
+                        if (
+                            err.code != _COMMAND_NOT_SUPPORTED_ON_VIEW
+                            or coll["type"] != "timeseries"
+                        ):
+                            raise
+
                     if any("expireAfterSeconds" in index for index in indexes):
                         continue
                     if "expireAfterSeconds" in coll["options"]:

@@ -10,6 +10,8 @@ import {
     assertExpectedResults,
     getLatestQueryStatsEntry,
     getQueryExecMetrics,
+    getQueryShapeHashFromSlowLogs,
+    getQueryStatsInsertCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
@@ -17,6 +19,67 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
+
+/**
+ * Returns the queryShapeHash of the most recent $queryStats entry for `collName` (null if none).
+ */
+export function getLatestQueryShapeHashFromQueryStats(mongosConn, collName, getQueryStatsFn) {
+    const entries = getQueryStatsFn(mongosConn, {
+        collName: collName,
+        customSort: {"metrics.latestSeenTimestamp": -1},
+    });
+    if (entries.length === 0) {
+        return null;
+    }
+    return entries[0].queryShapeHash;
+}
+
+/**
+ * Asserts that the queryShapeHash from mongos $queryStats matches the one in a mongod slow query log
+ * for the same command.
+ */
+export function assertQueryStatsAndMongodHashesMatch(
+    mongosConn,
+    collName,
+    comment,
+    mongodDB,
+    {getQueryStatsFn, testDesc = ""},
+) {
+    const queryStatsHash = getLatestQueryShapeHashFromQueryStats(
+        mongosConn,
+        collName,
+        getQueryStatsFn,
+    );
+    assert.neq(
+        queryStatsHash,
+        null,
+        `queryShapeHash should be present in $queryStats${testDesc ? " for " + testDesc : ""}`,
+    );
+
+    const mongodHash = getQueryShapeHashFromSlowLogs({testDB: mongodDB, queryComment: comment});
+    assert.neq(
+        mongodHash,
+        null,
+        `queryShapeHash should be present in mongod slow query logs${testDesc ? " for " + testDesc : ""}`,
+    );
+
+    assert.eq(
+        queryStatsHash,
+        mongodHash,
+        `queryShapeHash mismatch${testDesc ? " for " + testDesc : ""}: ` +
+            `$queryStats=${queryStatsHash}, mongod=${mongodHash}`,
+    );
+}
+
+/**
+ * Runs `command` through the router and asserts queryShapeHash is present in the mongos slow query
+ * log for it.
+ */
+export function testMongosHasQueryShapeHash(routerDB, command, comment) {
+    assert.commandWorked(routerDB.runCommand(command));
+    const hash = getQueryShapeHashFromSlowLogs({testDB: routerDB, queryComment: comment});
+    assert.neq(hash, null, "queryShapeHash should be present on mongos");
+}
 
 /**
  * Asserts that the most recent query stats entry for `coll` matches a single-execution write
@@ -51,13 +114,119 @@ export function assertWriteCmdQueryStatsSingleExec(
 }
 
 /**
- * Drops and re-populates a collection with 8 documents {v: 1} through {v: 8}, used as a standard
- * starting state for write command query stats tests.
+ * Runs `testFn` (which issues a delete and asserts its exact query stats metrics) on a freshly reset
+ * collection + query stats store, retrying until it passes or `maxAttempts` is exhausted.
+ *
+ * Debug builds can hit spurious WriteConflictExceptions that re-run a delete's COLLSCAN, which
+ * nondeterministically inflates the recorded docsExamined above its true value.
+ */
+export function retryDeleteMetricTestOnWriteConflict(ctxFn, testFn, maxAttempts = 5) {
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const {conn, coll} = ctxFn();
+        resetQueryStatsCollection(coll);
+        resetQueryStatsStore(conn, "1MB");
+        try {
+            testFn();
+            return;
+        } catch (e) {
+            lastError = e;
+        }
+    }
+    throw new Error(
+        `delete metric assertion never passed in ${maxAttempts} attempts (likely a real ` +
+            `regression, not transient write-conflict inflation): ${lastError}`,
+    );
+}
+
+/**
+ * Standalone-mongod fixture for query stats tests, with write-command sampling on.
+ */
+export function standaloneWriteCmdQueryStatsFixture(extraSetParameters = {}) {
+    return {
+        setupFn: () => {
+            const conn = MongoRunner.runMongod({
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1, ...extraSetParameters},
+            });
+            return {fixture: conn, testDB: conn.getDB("test")};
+        },
+        teardownFn: (conn) => MongoRunner.stopMongod(conn),
+    };
+}
+
+/**
+ * Two-shard sharded-cluster fixture for query stats tests, with write-command sampling on.
+ * Shards `collName` on {_id: 1}; when `moveChunk` is true (the default) it also splits at {_id: 1}
+ * and moves the upper chunk to the second shard so data is distributed across both shards.
+ */
+export function shardedWriteCmdQueryStatsFixture(
+    collName,
+    {moveChunk = true, extraSetParameters = {}} = {},
+) {
+    return {
+        setupFn: () => {
+            const st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {
+                    setParameter: {internalQueryStatsWriteCmdSampleRate: 1, ...extraSetParameters},
+                },
+            });
+            const testDB = st.s.getDB("test");
+            if (moveChunk) {
+                st.shardColl(testDB[collName], {_id: 1}, {_id: 1}, {_id: 1});
+            } else {
+                st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+            }
+            return {fixture: st, testDB};
+        },
+        teardownFn: (st) => st.stop(),
+    };
+}
+
+/**
+ * Asserts that `shardConn` has exactly one insert query stats entry recording a single execution.
+ */
+export function assertShardInsertMetricsSingleExec(shardConn, collName, {nInserted, keysInserted}) {
+    const shardEntries = getQueryStatsInsertCmd(shardConn, {collName});
+    assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {shardEntries});
+    assertAggregatedMetricsSingleExec(shardEntries[0], {
+        keysExamined: 0,
+        docsExamined: 0,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false,
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: nInserted,
+            nUpdateOps: 0,
+            nDeleteOps: 0,
+            keysInserted: keysInserted,
+            keysDeleted: 0,
+        },
+    });
+}
+
+/**
+ * Drops and re-populates a collection with 8 documents {_id: 999, v: 1} through {_id: 992, v: 8},
+ * used as a standard starting state for write command query stats tests.
  */
 export function resetQueryStatsCollection(coll) {
     coll.drop();
     assert.commandWorked(
-        coll.insert([{v: 1}, {v: 2}, {v: 3}, {v: 4}, {v: 5}, {v: 6}, {v: 7}, {v: 8}]),
+        coll.insert([
+            {_id: 999, v: 1},
+            {_id: 998, v: 2},
+            {_id: 997, v: 3},
+            {_id: 996, v: 4},
+            {_id: 995, v: 5},
+            {_id: 994, v: 6},
+            {_id: 993, v: 7},
+            {_id: 992, v: 8},
+        ]),
     );
 }
 
@@ -160,8 +329,10 @@ export function describeWriteCmdQueryStatsReplicaSetTests(label, bodyFn) {
         });
 
         beforeEach(function () {
-            resetQueryStatsStore(conn, "1MB");
+            // resetQueryStatsCollection must run first because its insert creates an extra query
+            // stats entry.
             resetQueryStatsCollection(coll);
+            resetQueryStatsStore(conn, "1MB");
         });
 
         bodyFn(() => ({conn, testDB, coll, collName}));
@@ -200,8 +371,69 @@ export function describeWriteCmdQueryStatsShardedTests(label, bodyFn) {
         });
 
         beforeEach(function () {
+            // resetQueryStatsCollection must run first because its insert creates an extra query
+            // stats entry.
             resetQueryStatsCollection(coll);
             resetQueryStatsStore(st.s, "1MB");
+        });
+
+        bodyFn(() => ({conn: st.s, st, testDB, coll, collName}));
+    });
+}
+
+/**
+ * Creates a standard write command query stats test suite on a sharded cluster split across two
+ * shards by _id:
+ *   - shard0: primary shard, holds documents where _id < 0
+ *   - shard1: holds documents where _id >= 0 (chunk moved here in before())
+ *
+ * beforeEach clears the collection and resets the query stats store on mongos + shards.
+ * bodyFn receives ctxFn() => {st, testDB, coll, collName}.
+ *
+ * @param {string} label - outer describe label
+ * @param {Function} bodyFn - function(ctxFn) that registers it() blocks
+ */
+export function describeWriteCmdQueryStatsCrossShardTests(label, bodyFn) {
+    describe(label, function () {
+        const collName = jsTestName() + "_cross_shard";
+        let st, testDB, coll;
+
+        before(function () {
+            st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {setParameter: {internalQueryStatsWriteCmdSampleRate: 1}},
+                rsOptions: {setParameter: {internalQueryStatsWriteCmdSampleRate: 1}},
+            });
+            testDB = st.s.getDB("test");
+            coll = testDB[collName];
+            assert.commandWorked(
+                testDB.adminCommand({
+                    enableSharding: testDB.getName(),
+                    primaryShard: st.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(
+                st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
+            assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: 0},
+                    to: st.shard1.shardName,
+                }),
+            );
+        });
+
+        after(function () {
+            st?.stop();
+        });
+
+        beforeEach(function () {
+            assert.commandWorked(coll.deleteMany({}));
+            resetQueryStatsStore(st.s, "1MB");
+            resetQueryStatsStore(st.shard0, "1MB");
+            resetQueryStatsStore(st.shard1, "1MB");
         });
 
         bodyFn(() => ({st, testDB, coll, collName}));
@@ -419,9 +651,12 @@ export function runMongosWriteMetricsTests({
                 undefined,
                 "assertExecMetrics requires keysPerDoc (index count on the collection)",
             );
-            // TODO SERVER-128278 remove special handling for deletes on sharded clusters. On sharded
-            // clusters, docsExamined may exceed the expected value, so we have to validate it
-            // differently, but we never expect it to be double the expected value.
+
+            // On sharded clusters, deletes can double-count docsExamined: the COLLSCAN phase counts
+            // each matching document once, and then the DELETE stage could re-fetch it from the
+            // shard, counting it a second time. So docsExamined may be anywhere in [expected,
+            // expected * 2]. When docsExaminedOverride is set, we assert the range rather than an
+            // exact value.
             let resolvedDocsExamined = docsExamined;
             if (docsExaminedOverride) {
                 const actual = getQueryExecMetrics(entry.metrics).docsExamined.sum;
@@ -429,7 +664,9 @@ export function runMongosWriteMetricsTests({
                 assert.lte(actual, docsExamined * 2);
                 resolvedDocsExamined = actual;
             }
-            // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will pass in the actual docsExamined value.
+
+            // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will
+            // pass in the actual docsExamined value.
             assertAggregatedMetricsSingleExec(entry, {
                 keysExamined,
                 docsExamined: resolvedDocsExamined,

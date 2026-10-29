@@ -19,7 +19,7 @@ InternalExprEqMatchExpression
     let [
         l11.0 = getField(s1, "_id") 
     ] 
-    in ((isArray(l11.0) ?: false) || (((l11.0 <=> 0) == 0) ?: (exists(l11.0) && typeMatch(l11.0, -65)))) 
+    in ((isArray(l11.0) ?: false) || (((l11.0 <=> 0) == 0) ?: (mqlComparisonRank(l11.0) == 2))) 
 
 # Golden test output of GoldenSbeFilterBuilderTestFixture/TestCompExpr
 InternalExprGTMatchExpression
@@ -27,7 +27,7 @@ InternalExprGTMatchExpression
     let [
         l14.0 = getField(s1, "_id") 
     ] 
-    in ((isArray(l14.0) ?: false) || (((l14.0 <=> 0) > 0) ?: ((exists(l14.0) && typeMatch(l14.0, -65)) > true))) 
+    in ((isArray(l14.0) ?: false) || (((l14.0 <=> 0) > 0) ?: (mqlComparisonRank(l14.0) > 2))) 
 
 # Golden test output of GoldenSbeFilterBuilderTestFixture/TestCompExpr
 InternalExprGTEMatchExpression
@@ -35,7 +35,7 @@ InternalExprGTEMatchExpression
     let [
         l17.0 = getField(s1, "_id") 
     ] 
-    in ((isArray(l17.0) ?: false) || (((l17.0 <=> 0) >= 0) ?: ((exists(l17.0) && typeMatch(l17.0, -65)) >= true))) 
+    in ((isArray(l17.0) ?: false) || (((l17.0 <=> 0) >= 0) ?: (mqlComparisonRank(l17.0) >= 2))) 
 
 # Golden test output of GoldenSbeFilterBuilderTestFixture/TestCompExpr
 InternalExprLTMatchExpression
@@ -43,7 +43,7 @@ InternalExprLTMatchExpression
     let [
         l20.0 = getField(s1, "_id") 
     ] 
-    in ((isArray(l20.0) ?: false) || (((l20.0 <=> 0) < 0) ?: ((exists(l20.0) && typeMatch(l20.0, -65)) < true))) 
+    in ((isArray(l20.0) ?: false) || (((l20.0 <=> 0) < 0) ?: (mqlComparisonRank(l20.0) < 2))) 
 
 # Golden test output of GoldenSbeFilterBuilderTestFixture/TestCompExpr
 InternalExprLTEMatchExpression
@@ -51,7 +51,7 @@ InternalExprLTEMatchExpression
     let [
         l23.0 = getField(s1, "_id") 
     ] 
-    in ((isArray(l23.0) ?: false) || (((l23.0 <=> 0) <= 0) ?: ((exists(l23.0) && typeMatch(l23.0, -65)) <= true))) 
+    in ((isArray(l23.0) ?: false) || (((l23.0 <=> 0) <= 0) ?: (mqlComparisonRank(l23.0) <= 2))) 
 
 # Golden test output of GoldenSbeFilterBuilderTestFixture/TestCompExpr
 LTEMatchExpression

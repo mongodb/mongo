@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,13 +15,14 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class ExtendedCanonicalV200Generator {
 public:
     void writeNull(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, "null"_sd);
+        appendTo(buffer, "null"sv);
     }
     void writeUndefined(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({"$undefined":true})"_sd);
+        appendTo(buffer, R"({"$undefined":true})"sv);
     }
 
     void writeString(fmt::memory_buffer& buffer, std::string_view str) const {
@@ -58,9 +33,9 @@ public:
 
     void writeBool(fmt::memory_buffer& buffer, bool val) const {
         if (val)
-            appendTo(buffer, "true"_sd);
+            appendTo(buffer, "true"sv);
         else
-            appendTo(buffer, "false"_sd);
+            appendTo(buffer, "false"sv);
     }
 
     void writeInt32(fmt::memory_buffer& buffer, int32_t val) const {
@@ -77,12 +52,12 @@ public:
             fmt::format_to(
                 std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberDouble":"{}"}})"), val);
         else if (std::isnan(val))
-            appendTo(buffer, R"({"$numberDouble":"NaN"})"_sd);
+            appendTo(buffer, R"({"$numberDouble":"NaN"})"sv);
         else if (std::isinf(val)) {
             if (val > 0)
-                appendTo(buffer, R"({"$numberDouble":"Infinity"})"_sd);
+                appendTo(buffer, R"({"$numberDouble":"Infinity"})"sv);
             else
-                appendTo(buffer, R"({"$numberDouble":"-Infinity"})"_sd);
+                appendTo(buffer, R"({"$numberDouble":"-Infinity"})"sv);
         } else {
             StringBuilder ss;
             ss << "Number " << val << " cannot be represented in JSON";
@@ -92,7 +67,7 @@ public:
 
     void writeDecimal128(fmt::memory_buffer& buffer, Decimal128 val) const {
         if (val.isNaN())
-            appendTo(buffer, R"({"$numberDecimal":"NaN"})"_sd);
+            appendTo(buffer, R"({"$numberDecimal":"NaN"})"sv);
         else if (val.isInfinite())
             fmt::format_to(std::back_inserter(buffer),
                            FMT_COMPILE(R"({{"$numberDecimal":"{}"}})"),
@@ -112,7 +87,7 @@ public:
 
     void writeDBRef(fmt::memory_buffer& buffer, std::string_view ref, OID id) const {
         // Collection names can unfortunately contain control characters that need to be escaped
-        appendTo(buffer, R"({"$ref":")"_sd);
+        appendTo(buffer, R"({"$ref":")"sv);
         str::escapeForJSON(buffer, ref);
 
         // OID is a hex string and does not need to be escaped
@@ -171,7 +146,7 @@ public:
                 static_cast<uint8_t>(data[14]),
                 static_cast<uint8_t>(data[15]));
         } else {
-            appendTo(buffer, R"({"$binary":{"base64":")"_sd);
+            appendTo(buffer, R"({"$binary":{"base64":")"sv);
             base64::encode(buffer, data);
             fmt::format_to(
                 std::back_inserter(buffer), FMT_COMPILE(R"(","subType":"{:x}"}}}})"), type);
@@ -181,38 +156,38 @@ public:
     void writeRegex(fmt::memory_buffer& buffer,
                     std::string_view pattern,
                     std::string_view options) const {
-        appendTo(buffer, R"({"$regularExpression":{"pattern":")"_sd);
+        appendTo(buffer, R"({"$regularExpression":{"pattern":")"sv);
         str::escapeForJSON(buffer, pattern);
-        appendTo(buffer, R"(","options":")"_sd);
+        appendTo(buffer, R"(","options":")"sv);
         str::escapeForJSON(buffer, options);
-        appendTo(buffer, R"("}})"_sd);
+        appendTo(buffer, R"("}})"sv);
     }
 
     void writeSymbol(fmt::memory_buffer& buffer, std::string_view symbol) const {
-        appendTo(buffer, R"({"$symbol":")"_sd);
+        appendTo(buffer, R"({"$symbol":")"sv);
         str::escapeForJSON(buffer, symbol);
-        appendTo(buffer, R"("})"_sd);
+        appendTo(buffer, R"("})"sv);
     }
 
     void writeCode(fmt::memory_buffer& buffer, std::string_view code) const {
-        appendTo(buffer, R"({"$code":")"_sd);
+        appendTo(buffer, R"({"$code":")"sv);
         str::escapeForJSON(buffer, code);
-        appendTo(buffer, R"("})"_sd);
+        appendTo(buffer, R"("})"sv);
     }
     void writeCodeWithScope(fmt::memory_buffer& buffer,
                             std::string_view code,
                             BSONObj const& scope) const {
-        appendTo(buffer, R"({"$code":")"_sd);
+        appendTo(buffer, R"({"$code":")"sv);
         str::escapeForJSON(buffer, code);
-        appendTo(buffer, R"(","$scope":)"_sd);
+        appendTo(buffer, R"(","$scope":)"sv);
         scope.jsonStringGenerator(*this, 0, false, buffer);
-        appendTo(buffer, R"(})"_sd);
+        appendTo(buffer, R"(})"sv);
     }
     void writeMinKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({"$minKey":1})"_sd);
+        appendTo(buffer, R"({"$minKey":1})"sv);
     }
     void writeMaxKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({"$maxKey":1})"_sd);
+        appendTo(buffer, R"({"$maxKey":1})"sv);
     }
     void writePadding(fmt::memory_buffer& buffer) const {}
 

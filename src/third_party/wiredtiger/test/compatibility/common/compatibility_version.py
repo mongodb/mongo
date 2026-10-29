@@ -47,7 +47,7 @@ class WTVersion:
         self.minor = 0
         if name == "this":
             self.group = 2
-        if name == "develop":
+        elif name == "develop":
             self.group = 1
         else:
             # Match patterns like mongodb-8.0, without prefix and suffix

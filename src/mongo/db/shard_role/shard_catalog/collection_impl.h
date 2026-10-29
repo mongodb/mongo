@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -58,7 +32,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -75,7 +49,13 @@
 
 namespace mongo {
 
-class MONGO_MOD_PRIVATE CollectionImpl final : public Collection {
+class FailPoint;
+
+// Defined in collection_impl.cpp; lets tests simulate a validator that was well formed on the
+// version that wrote it but not on this one (SERVER-134863).
+extern FailPoint allowSettingMalformedCollectionValidators;
+
+class [[MONGO_MOD_PRIVATE]] CollectionImpl final : public Collection {
 public:
     // Uses the collator factory to convert the BSON representation of a collator to a
     // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
@@ -139,6 +119,10 @@ public:
 
     BSONObj getValidatorDoc() const final {
         return _validator.validatorDoc.getOwned();
+    }
+
+    StatusWith<std::shared_ptr<MatchExpression>> getValidatorFilter() const final {
+        return _validator.filter;
     }
 
     std::pair<DocumentValidationResult, Status> checkValidation(
@@ -512,7 +496,7 @@ private:
         // set it from a const method on the Collection. In order to do this, we need to make it
         // mutable. Given that the value may only transition from false to true, but never back
         // again, and that we store and retrieve it atomically, this should be safe.
-        mutable AtomicWord<bool> _requiresTimeseriesExtendedRangeSupport{false};
+        mutable Atomic<bool> _requiresTimeseriesExtendedRangeSupport{false};
     };
 
     NamespaceString _ns;
@@ -536,7 +520,7 @@ private:
     bool _initialized = false;
 };
 
-class MONGO_MOD_PUBLIC CollectionImplFactory : public Collection::Factory {
+class [[MONGO_MOD_PUBLIC]] CollectionImplFactory : public Collection::Factory {
 public:
     std::shared_ptr<Collection> make(
         OperationContext* opCtx,

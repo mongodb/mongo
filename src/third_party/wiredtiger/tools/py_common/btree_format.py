@@ -56,6 +56,78 @@ except ImportError:
     HAVE_BSON = False
 
 #
+# History store keys
+#
+
+class HSKey(object):
+    '''
+    A decoded history store key (WT_HS_KEY_FORMAT, "IuQQ").
+    '''
+
+    def __init__(self, btree_id: int, key: bytes, hs_start_ts: int, hs_counter: int) -> None:
+        self.btree_id = btree_id
+        self.key = key
+        self.hs_start_ts = hs_start_ts
+        self.hs_counter = hs_counter
+        self.fields = []    # (encoded bytes, decoded description) per field, in key order
+
+    @staticmethod
+    def parse(data: bytes) -> Optional['HSKey']:
+        '''
+        Decode a history store key, or return None if the bytes do not decode cleanly.
+        '''
+        i = 0
+
+        def read() -> tuple:
+            nonlocal i
+            value, rest = binary_data.unpack_int(data[i:])
+            start = i
+            i = len(data) - len(rest)
+            return value, data[start:i]
+
+        try:
+            btree_id, btree_id_bytes = read()
+            key_size, key_size_bytes = read()
+            if key_size > len(data) - i:
+                return None
+            key = data[i:i + key_size]
+            i += key_size
+            hs_start_ts, hs_start_ts_bytes = read()
+            hs_counter, hs_counter_bytes = read()
+        except (IndexError, ValueError):
+            return None
+        if i != len(data):
+            return None
+
+        hs_key = HSKey(btree_id, key, hs_start_ts, hs_counter)
+        # The key is size-prefixed, so its encoded bytes include the size prefix.
+        hs_key.fields = [
+            (btree_id_bytes, f'btree_id={btree_id}'),
+            (key_size_bytes + key, f'key={hs_key.key_string()}'),
+            (hs_start_ts_bytes, f'hs_start_ts={binary_data.ts(hs_start_ts)}'),
+            (hs_counter_bytes, f'hs_counter={hs_counter}'),
+        ]
+        return hs_key
+
+    def key_string(self) -> str:
+        '''
+        Render the data store key as a quoted string, or hex if it has non-printable bytes.
+        '''
+        # String keys carry a nul terminator; other key formats do not.
+        trimmed = self.key[:-1] if self.key.endswith(b'\x00') else self.key
+        if trimmed and all(0x20 <= c < 0x7f for c in trimmed):
+            return '"' + trimmed.decode('ascii') + '"'
+        return self.key.hex(' ')
+
+    def lines(self) -> List[str]:
+        '''
+        Render each field as its encoded bytes followed by its decoded meaning, in key order.
+        '''
+        width = max(len(raw.hex(' ')) for raw, _ in self.fields)
+        return ['hs key:'] + [f'{raw.hex(" "):<{width}}  {desc}' for raw, desc in self.fields]
+
+
+#
 # Block File Header
 #
 
@@ -866,7 +938,8 @@ class WTPage:
         return page
 
     def print_page(self, *, split: bool = False,
-                   decode_as_bson: bool = False, disagg: bool = False):
+                   decode_as_bson: bool = False, disagg: bool = False,
+                   history_store: bool = False):
         p = Printer(self.raw_bytes, split=split)
         p.rint(self.page_header)
         p.rint(self.block_header)
@@ -879,7 +952,8 @@ class WTPage:
         elif self.page_header.type == PageType.WT_PAGE_ROW_INT or \
             self.page_header.type == PageType.WT_PAGE_ROW_LEAF:
             if self.cells is not None:
-                self.print_cells(p, decode_as_bson=decode_as_bson, disagg=disagg)
+                self.print_cells(p, decode_as_bson=decode_as_bson, disagg=disagg,
+                                 history_store=history_store)
         elif self.page_header.type == PageType.WT_PAGE_OVFL:
             # Use b_page.read() so that we can also print the raw bytes in the split mode
             b_page = self.raw_bytes
@@ -890,7 +964,10 @@ class WTPage:
 
         return
 
-    def print_cells(self, p, *, decode_as_bson: bool = False, disagg: bool = False):
+    def print_cells(self, p, *, decode_as_bson: bool = False, disagg: bool = False,
+                    history_store: bool = False):
+        # Internal page keys are separators, not history store keys.
+        hs_leaf = history_store and self.page_header.type == PageType.WT_PAGE_ROW_LEAF
         for cellnum, cell in enumerate(self.cells):
             p.begin_cell(cellnum)
             p.rint(cell.descriptor_string())
@@ -908,6 +985,13 @@ class WTPage:
                 elif cell.is_address and disagg:
                     addr = DisaggAddr.parse(cell.data)
                     p.rint(json.dumps(addr.__dict__))
+                elif cell.is_key and hs_leaf:
+                    hs_key = HSKey.parse(cell.data)
+                    if hs_key is None:
+                        p.rint(raw_bytes(cell.data))
+                    else:
+                        for line in hs_key.lines():
+                            p.rint(line)
                 else:
                     p.rint(raw_bytes(cell.data))
             except (IndexError, ValueError):

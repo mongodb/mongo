@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for mongo/db/exec/spool.cpp
@@ -37,6 +11,7 @@
 #include "mongo/db/exec/classic/mock_stage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -60,7 +35,14 @@ static const NamespaceString kNss = NamespaceString::createNamespaceString_forTe
 class SpoolStageTest : public ServiceContextMongoDTest {
 public:
     // The spool stage spills buffered results to disk, requiring the spill WiredTiger instance.
-    SpoolStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true).enableSpillEngine()) {
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useMockClock(true)
+            .enableSpillEngine();
+    }
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = makeOperationContext();
         _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build();
     }
@@ -146,8 +128,11 @@ public:
             expCtx()->setAllowDiskUse(maxAllowedDiskUsageBytes.has_value());
         }
 
-        unittest::ServerParameterGuard maxMemoryUsage("internalQueryMaxSpoolMemoryUsageBytes",
-                                                      maxAllowedMemoryUsageBytes);
+        // The memory limit knob resolves lazily on first use, after this function returns, so
+        // the guard must outlive the returned stage.
+        _maxMemoryUsageGuard.emplace(expCtx()->getOperationContext(),
+                                     "internalQueryMaxSpoolMemoryUsageBytes",
+                                     maxAllowedMemoryUsageBytes);
         unittest::ServerParameterGuard maxDiskUsage("internalQueryMaxSpoolDiskUsageBytes",
                                                     maxAllowedDiskUsageBytes.value_or(1));
 
@@ -160,6 +145,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     std::unique_ptr<unittest::TempDir> _tempDir;
+    boost::optional<QueryKnobGuardForTest> _maxMemoryUsageGuard;
 
     long _memUsage = 0;
 };
@@ -256,7 +242,7 @@ TEST_F(SpoolStageTest, onlyNeedYieldAndNeedTime) {
     workAndAssertStateAndRecordId(spool, PlanStage::NEED_YIELD);
     workAndAssertStateAndRecordId(spool, PlanStage::NEED_TIME);
     workAndAssertStateAndRecordId(
-        spool, PlanStage::NEED_YIELD, std::monostate{}, false /* childHasMoreRecords */);
+        spool, PlanStage::NEED_YIELD, std::monostate{}, /*childHasMoreRecords=*/false);
 
     assertEofState(spool);
     ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
@@ -271,7 +257,7 @@ TEST_F(SpoolStageTest, spillEveryRecordId) {
 
     const uint64_t maxAllowedMemoryUsageBytes = 1;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 2);
@@ -297,7 +283,7 @@ TEST_F(SpoolStageTest, spillEveryOtherRecordId) {
 
     const uint64_t maxAllowedMemoryUsageBytes = sizeof(RecordId) * 1.5;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 2);
@@ -328,7 +314,7 @@ TEST_F(SpoolStageTest, spillStringRecordId) {
 
     const uint64_t maxAllowedMemoryUsageBytes = sizeof(RecordId) + 1;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "this is a short string");
@@ -359,7 +345,7 @@ TEST_F(SpoolStageTest, forceSpill) {
 
     const uint64_t maxAllowedMemoryUsageBytes = 100 * 1024 * 1024;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "this is a short string");
@@ -386,8 +372,8 @@ TEST_F(SpoolStageTest, spillingDisabled) {
     mock->enqueueAdvanced(makeRecord(1));
 
     auto spool = makeSpool(std::move(mock),
-                           1 /* maxAllowedMemoryUsageBytes */,
-                           boost::none /* maxAllowedDiskUsageBytes */);
+                           /*maxAllowedMemoryUsageBytes=*/1,
+                           /*maxAllowedDiskUsageBytes=*/boost::none);
 
     WorkingSetID id;
     ASSERT_THROWS_CODE(
@@ -400,7 +386,7 @@ TEST_F(SpoolStageTest, maxDiskSpaceUsed) {
     mock->enqueueAdvanced(makeRecord(2));
 
     auto spool = makeSpool(
-        std::move(mock), 1 /* maxAllowedMemoryUsageBytes */, 1 /* maxAllowedDiskUsageBytes */);
+        std::move(mock), /*maxAllowedMemoryUsageBytes=*/1, /*maxAllowedDiskUsageBytes=*/1);
 
     WorkingSetID id;
     ASSERT_THROWS_CODE(spool.work(&id), AssertionException, 7443700);

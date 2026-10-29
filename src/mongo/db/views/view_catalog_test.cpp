@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -38,8 +12,12 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -99,6 +77,32 @@ constexpr auto kLargeString =
 const auto kOneKiBMatchStage = BSON("$match" << BSON("data" << kLargeString));
 const auto kTinyMatchStage = BSON("$match" << BSONObj());
 
+IncrementalRolloutFeatureFlag gTestIfrRetryTripFlag("testIfrRetryTripFlag",
+                                                    RolloutPhase::inDevelopment,
+                                                    true);
+class LiteParsedTestIfrRetryTripStage final
+    : public LiteParsedDocumentSourceDefault<LiteParsedTestIfrRetryTripStage> {
+public:
+    static constexpr auto kStageName = "$testIfrRetryTrip";
+
+    static std::unique_ptr<LiteParsedDocumentSource> parse(const NamespaceString& nss,
+                                                           const BSONElement& spec,
+                                                           const LiteParserOptions& options) {
+        if (options.ifrContext && options.ifrContext->getSavedFlagValue(gTestIfrRetryTripFlag)) {
+            uassertStatusOK(Status(IFRFlagRetryInfo(gTestIfrRetryTripFlag.getName()),
+                                   "LiteParsedTestIfrRetryTripStage kickback for test purposes"));
+        }
+        return std::make_unique<LiteParsedTestIfrRetryTripStage>(spec, options);
+    }
+
+    LiteParsedTestIfrRetryTripStage(const BSONElement& spec, const LiteParserOptions& options)
+        : LiteParsedDocumentSourceDefault(spec, options) {}
+
+    std::unique_ptr<StageParams> getStageParams() const override {
+        return std::make_unique<MatchStageParams>(_originalBson);
+    }
+};
+
 class ViewCatalogFixture : public CatalogTestFixture {
 public:
     ViewCatalogFixture()
@@ -112,6 +116,19 @@ public:
         _db = _createDatabase(_dbName);
         _createDatabase(DatabaseName::createDatabaseName_forTest(_dbName.tenantId(), "db1"));
         _createDatabase(DatabaseName::createDatabaseName_forTest(_dbName.tenantId(), "db2"));
+
+        static const bool kRegistered = [] {
+            gTestIfrRetryTripFlag.registerFlag();
+            LiteParsedDocumentSource::registerParser(
+                std::string{LiteParsedTestIfrRetryTripStage::kStageName},
+                {LiteParsedTestIfrRetryTripStage::parse,
+                 false,
+                 false,
+                 AllowedWithApiStrict::kAlways,
+                 AllowedWithClientType::kAny});
+            return true;
+        }();
+        (void)kRegistered;
     }
 
     void tearDown() override {
@@ -894,6 +911,41 @@ TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOn) {
     builder << kTinyMatchStage;
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, builder.arr()));
     ASSERT_EQ(lookup(operationContext(), viewName)->pipeline().size(), 1);
+}
+
+TEST_F(ViewCatalogFixture, CreateViewSucceedsAfterIfrFlagRetry) {
+    // LiteParsedTestIfrRetryTripStage throws IFRFlagRetry(gTestIfrRetryTripFlag) the first time it
+    // is lite-parsed with a fresh IFRContext (since gTestIfrRetryTripFlag defaults to enabled), and
+    // only stops throwing once the IFRContext reports the flag as disabled.
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    auto pipeline = BSON_ARRAY(BSON(LiteParsedTestIfrRetryTripStage::kStageName << BSONObj()));
+
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, pipeline, emptyCollation));
+
+    auto viewDefinition = lookup(operationContext(), viewName);
+    ASSERT(viewDefinition);
+    ASSERT_EQ(viewDefinition->pipeline().size(), 1);
+}
+
+TEST_F(ViewCatalogFixture, ModifyViewSucceedsAfterIfrFlagRetry) {
+    const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
+    const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
+
+    // Start with a view that has an empty (trivially valid) pipeline.
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+
+    // Now modify it to use a pipeline that trips IFRFlagRetry on the first lite-parse attempt.
+    // validatePipeline() should retry internally (disabling gTestIfrRetryTripFlag on its
+    // IFRContext) and succeed rather than letting the exception propagate out of modifyView().
+    auto pipeline = BSON_ARRAY(BSON(LiteParsedTestIfrRetryTripStage::kStageName << BSONObj()));
+
+    ASSERT_OK(modifyView(operationContext(), viewName, viewOn, pipeline));
+
+    auto viewDefinition = lookup(operationContext(), viewName);
+    ASSERT(viewDefinition);
+    ASSERT_EQ(viewDefinition->pipeline().size(), 1);
 }
 
 }  // namespace

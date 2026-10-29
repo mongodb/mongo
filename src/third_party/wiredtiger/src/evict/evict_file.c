@@ -40,7 +40,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
      * We need exclusive access to the file, we're about to discard the root page. Assert eviction
      * has been locked out.
      */
-    WT_ASSERT(session, btree->evict_disabled > 0 || !F_ISSET(dhandle, WT_DHANDLE_OPEN));
+    WT_ASSERT(session, !__wt_btree_eviction_enabled(btree) || !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
     /*
      * We do discard objects without pages in memory. If that's the case, we're done.
@@ -83,15 +83,14 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page)) {
             /*
              * When setting the reconciliation flags, remember to not enable history store eviction
-             * for the history store file itself. Also metadata file and disaggregated shared
-             * metadata don't have any associated history.
+             * for the history store file itself. The metadata trees don't have any associated
+             * history either.
              */
             rec_flags = WT_REC_EVICT | WT_REC_EVICT_CALL_CLOSING | WT_REC_CLEAN_AFTER_REC |
               WT_REC_VISIBLE_NO_SNAPSHOT;
-            if (!WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(dhandle) &&
-              !WT_IS_DISAGG_META(dhandle))
+            if (!WT_IS_HS(btree->dhandle) && !WT_IS_ANY_METADATA(dhandle))
                 rec_flags |= WT_REC_HS;
-            WT_ERR(__wt_reconcile(session, ref, NULL, rec_flags));
+            WT_ERR(__wt_reconcile(session, ref, NULL, rec_flags, NULL));
         }
 
         /*
@@ -122,7 +121,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) ||
                 __wt_page_can_evict(session, ref, NULL),
               "Page should be evictable during discard");
-            __wt_ref_out(session, ref);
+            __wt_ref_out_exclusive(session, ref);
             break;
         case WT_SYNC_CHECKPOINT:
         case WT_SYNC_WRITE_LEAVES:

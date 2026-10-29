@@ -1,50 +1,25 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/commit_split_chunk_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/ddl/split_chunk.h"
-#include "mongo/db/global_catalog/ddl/split_chunk_request_type.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
@@ -70,77 +45,6 @@ BSONObj makeCriticalSectionReason(const NamespaceString& nss) {
                   << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 }
 
-// Validates that the split request can proceed and reports whether it is an idempotent
-// no-op.
-// Returns true iff the request is an idempotent no-op; false otherwise.
-bool checkPreconditions(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const ShardsvrSplitChunkRequest& request) {
-    // Validate the request bounds and split points
-    const ChunkRange chunkRange(request.getMin(), request.getMax());
-    uassertStatusOK(ChunkRange::validate(chunkRange));
-    uassert(
-        ErrorCodes::InvalidOptions, "No split points provided", !request.getSplitKeys().empty());
-    const std::vector<BSONObj> splitKeys(request.getSplitKeys().begin(),
-                                         request.getSplitKeys().end());
-
-    // Read the CSR's allowChunkOperations flag up front.
-    // We snapshot the CSR before fetching CollectionMetadata so the metadata checks run against
-    // a stable view.
-    // The actual validation happens only after the idempotency check below, so this early read is
-    // intentional and separate from the later assertion.
-    const bool allowChunkOps =
-        CollectionShardingRuntime::acquireShared(opCtx, nss)->allowChunkOperations();
-
-    // Obtain the cluster-wide chunk layout by forcing a refresh from the global
-    // catalog.
-    auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
-
-    // Validate that the collection is sharded and that its identity (epoch / timestamp) still
-    // matches the request.
-    checkCollectionIdentity(opCtx, nss, request.getEpoch(), request.getTimestamp(), metadata);
-
-    // Validate structural correctness: shard-key pattern of the bounds, that the requested range
-    // exists as a single chunk on this shard, and that the split points are valid.
-    checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
-    checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
-    validateSplitPoints(opCtx, nss, metadata, chunkRange, splitKeys);
-
-    // Detect an idempotent no-op: if every requested split point already lies on a chunk boundary
-    // on this shard, a previous successful commit has already created the target chunks. In that
-    // case, return true.
-    //
-    // This check must happen before checking the allowChunkOperations flag, because the public
-    // idempotency contract requires retries to succeed even if chunk operations were disallowed
-    // after the original command completed successfully.
-    bool isAlreadyCommitted = true;
-    BSONObj cursor = chunkRange.getMin();
-    for (const auto& splitKey : splitKeys) {
-        ChunkType existingChunk;
-        if (!metadata.getNextChunk(cursor, &existingChunk) ||
-            existingChunk.getMin().woCompare(cursor) != 0 ||
-            existingChunk.getMax().woCompare(splitKey) != 0) {
-            isAlreadyCommitted = false;
-            break;
-        }
-        cursor = splitKey;
-    }
-    if (isAlreadyCommitted) {
-        return true;
-    }
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Can't execute splitChunks because chunk operations for this "
-                             "collection are disallowed. 'allowChunkOperations' flag is "
-                          << allowChunkOps << "; 'allowMigrations' flag is "
-                          << metadata.allowMigrations(),
-            allowChunkOps && metadata.allowMigrations());
-
-    return false;
-}
-
 void acquireCriticalSection(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const BSONObj& critSecReason) {
@@ -150,7 +54,7 @@ void acquireCriticalSection(OperationContext* opCtx,
         nss,
         critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/false);
     svc->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
@@ -166,32 +70,47 @@ void releaseCriticalSection(OperationContext* opCtx,
         ShardingRecoveryService::NoCustomAction());
 }
 
-void commitToGlobalCatalog(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           std::string_view shardName,
-                           const OID& epoch,
-                           const boost::optional<Timestamp>& timestamp,
-                           const ChunkRange& chunkRange,
-                           const std::vector<BSONObj>& splitKeys,
-                           OperationSessionInfo session) {
-    SplitChunkRequest request(nss, std::string{shardName}, epoch, timestamp, chunkRange, splitKeys);
-
-    BSONObjBuilder cmdBuilder;
-    request.appendAsConfigCommand(&cmdBuilder);
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                      defaultMajorityWriteConcernDoNotUse().toBSON());
-    session.serialize(&cmdBuilder);
+// Commits the split to the global catalog by issuing the idempotent '_configsvrCommitSplitChunk'
+// command and returns the resulting sub-chunks that the shard catalog must install.
+// 'shardVersionPreSplit' is the shard's placement version captured before the split; the config
+// server uses it to validate the request and to rebuild the same set of changed chunks on an
+// idempotent retry.
+std::vector<BSONObj> commitToGlobalCatalog(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const ShardId& shardId,
+                                           const ChunkRange& chunkRange,
+                                           const std::vector<BSONObj>& splitKeys,
+                                           const ChunkVersion& shardVersionPreSplit,
+                                           OperationSessionInfo session) {
+    ConfigSvrCommitSplitChunkRequest request(nss);
+    request.setDbName(DatabaseName::kAdmin);
+    request.setShard(shardId);
+    request.setRange(chunkRange);
+    request.setSplitPoints(splitKeys);
+    request.setShardVersionPreSplit(shardVersionPreSplit);
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, session);
 
     auto cmdResponse = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithIndefiniteRetries(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            cmdBuilder.obj(),
+            request.toBSON(),
             Shard::RetryPolicy::kIdempotent));
 
     uassertStatusOKWithContext(cmdResponse.commandStatus, "Failed to commit chunk split");
     uassertStatusOKWithContext(cmdResponse.writeConcernStatus, "Failed to commit chunk split");
+
+    auto response = ConfigSvrCommitSplitChunkResponse::parse(
+        cmdResponse.response, IDLParserContext("ConfigSvrCommitSplitChunkResponse"));
+
+    std::vector<BSONObj> changedChunks;
+    changedChunks.reserve(response.getChangedChunks().size());
+    for (const auto& chunk : response.getChangedChunks()) {
+        changedChunks.push_back(chunk.getOwned());
+    }
+    return changedChunks;
 }
 
 // Errors that ShardingCatalogManager::commitChunkSplit raises strictly before it modifies the
@@ -287,6 +206,82 @@ void SplitChunkCoordinator::_releaseLocks(OperationContext* opCtx) {
     _scopedSplitMergeChunk.reset();
 }
 
+// Validates that the split request can proceed and reports whether it is an idempotent
+// no-op. Returns true iff the request is an idempotent no-op; false otherwise.
+bool SplitChunkCoordinator::_checkPreconditions(OperationContext* opCtx) {
+    const auto& nss = this->nss();
+    // Validate the request bounds and split points
+    const ChunkRange chunkRange(_request.getMin(), _request.getMax());
+    uassertStatusOK(ChunkRange::validate(chunkRange));
+    uassert(
+        ErrorCodes::InvalidOptions, "No split points provided", !_request.getSplitKeys().empty());
+    const std::vector<BSONObj> splitKeys(_request.getSplitKeys().begin(),
+                                         _request.getSplitKeys().end());
+
+    // Anticipate any BSONTooLarge error that might occur after committing on the config server.
+    // Once the config server commit succeeds, the operation cannot be rolled back, so we must
+    // avoid failing with a non-retryable error.
+    //
+    // Assume the worst case: each split point is stored three times in the coordinator document:
+    // once in the list of split points, and once each as the min and max bounds of the updated
+    // chunks.
+    long long estimatedMetadataSize = chunkRange.getMin().objsize() + chunkRange.getMax().objsize();
+    for (const auto& splitKey : splitKeys) {
+        estimatedMetadataSize += 3 * splitKey.objsize();
+    }
+    estimatedMetadataSize = 2 * estimatedMetadataSize;
+
+    uassert(ErrorCodes::BSONObjectTooLarge,
+            str::stream() << "Refusing to split chunk " << chunkRange.toString()
+                          << ": estimated resulting chunk metadata (~" << estimatedMetadataSize
+                          << " bytes) would exceed the maximum BSON object size ("
+                          << BSONObjMaxUserSize << " bytes)",
+            estimatedMetadataSize < BSONObjMaxUserSize);
+
+    auto [metadata, allowChunkOps] = _getCollectionMetadata(opCtx);
+    // Validate that the collection is sharded and that its identity (epoch / timestamp) still
+    // matches the request.
+    checkCollectionIdentity(opCtx, nss, _request.getEpoch(), _request.getTimestamp(), metadata);
+
+    // Validate structural correctness: shard-key pattern of the bounds, that the requested range
+    // exists as a single chunk on this shard, and that the split points are valid.
+    checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+    checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
+    validateSplitPoints(opCtx, nss, metadata, chunkRange, splitKeys);
+
+    // Detect an idempotent no-op: if every requested split point already lies on a chunk boundary
+    // on this shard, a previous successful commit has already created the target chunks. In that
+    // case, return true.
+    //
+    // This check must happen before checking the allowChunkOperations flag, because the public
+    // idempotency contract requires retries to succeed even if chunk operations were disallowed
+    // after the original command completed successfully.
+    bool isAlreadyCommitted = true;
+    BSONObj cursor = chunkRange.getMin();
+    for (const auto& splitKey : splitKeys) {
+        ChunkType existingChunk;
+        if (!metadata.getNextChunk(cursor, &existingChunk) ||
+            existingChunk.getMin().woCompare(cursor) != 0 ||
+            existingChunk.getMax().woCompare(splitKey) != 0) {
+            isAlreadyCommitted = false;
+            break;
+        }
+        cursor = splitKey;
+    }
+    if (isAlreadyCommitted) {
+        return true;
+    }
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't execute splitChunks because chunk operations for this "
+                             "collection are disallowed. 'allowChunkOperations' flag is "
+                          << allowChunkOps << "; 'allowMigrations' flag is "
+                          << metadata.allowMigrations(),
+            allowChunkOps && metadata.allowMigrations());
+
+    return false;
+}
+
 ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -295,6 +290,7 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
     };
 
     return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] { _checkCriticalSection(); })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
             [this, anchor = shared_from_this()](auto* opCtx) {
@@ -309,7 +305,25 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = ChunkRange(_request.getMin(), _request.getMax()).toString());
 
-                _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
+                _registerChunkOperationStarted(opCtx);
+
+                _alreadyCommitted = _checkPreconditions(opCtx);
+
+                // Capture and persist the shard's placement version before the first commit
+                // attempt. The configsvr commit is idempotent on this version, so it must remain
+                // stable across retries and failovers; otherwise a retry that ran after the commit
+                // already applied would observe the post-split version and rebuild no chunks.
+                if (!_alreadyCommitted && !_doc.getShardVersionPreSplit()) {
+                    auto cm = uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                            opCtx, nss()));
+                    const CollectionMetadata metadata(std::move(cm),
+                                                      ShardingState::get(opCtx)->shardId());
+
+                    auto newDoc = _doc;
+                    newDoc.setShardVersionPreSplit(metadata.getShardPlacementVersion());
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                }
             }))
         .then(_buildPhaseHandler(Phase::kAcquireCriticalSection,
                                  shouldExecuteIfNotCommitted,
@@ -331,23 +345,33 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                 auto chunkRange = ChunkRange(_request.getMin(), _request.getMax());
                 std::vector<BSONObj> splitKeys(_request.getSplitKeys().begin(),
                                                _request.getSplitKeys().end());
-                const std::string shardName{_request.getFrom()};
-                const auto& expectedEpoch = _request.getEpoch();
-                const auto& expectedTimestamp = _request.getTimestamp();
 
                 LOGV2(12117800,
                       "Committing split chunk operation to the global catalog",
                       logAttrs(nss()),
                       "range"_attr = chunkRange.toString());
 
-                commitToGlobalCatalog(opCtx,
-                                      nss(),
-                                      shardName,
-                                      expectedEpoch,
-                                      expectedTimestamp,
-                                      chunkRange,
-                                      splitKeys,
-                                      getNewSession(opCtx));
+
+                // Set during kCheckPreconditions, before this phase can run. Assert explicitly
+                // instead of dereferencing an empty optional if that ever changes.
+                tassert(12933302,
+                        "Expected persisted pre-split shard version before committing split to the "
+                        "global catalog",
+                        _doc.getShardVersionPreSplit());
+
+                auto changedChunks = commitToGlobalCatalog(opCtx,
+                                                           nss(),
+                                                           ShardingState::get(opCtx)->shardId(),
+                                                           chunkRange,
+                                                           splitKeys,
+                                                           *_doc.getShardVersionPreSplit(),
+                                                           getNewSession(opCtx));
+
+                // Persist the changed chunks so the shard catalog commit phase can install them
+                // even after a failover, without contacting the config server again.
+                auto newDoc = _doc;
+                newDoc.setChangedChunks(std::move(changedChunks));
+                _updateStateDocument(opCtx, std::move(newDoc));
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
                 // primary will start-up from a configTime that is inclusive of the metadata update
@@ -363,14 +387,30 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
                       logAttrs(nss()),
                       "range"_attr = ChunkRange(_request.getMin(), _request.getMax()).toString());
 
-                // Install the new chunk layout into the local shard catalog.
-                sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                // A committed split always produces at least one changed chunk. Reaching this
+                // phase without any means the global catalog commit result was not persisted,
+                // which would silently install nothing into the shard catalog.
+                tassert(12933301,
+                        "Expected persisted changed chunks after committing split to the global "
+                        "catalog",
+                        _doc.getChangedChunks() && !_doc.getChangedChunks()->empty());
+
+                // Forward the committed chunks to the shard catalog.
+                // Note that all the updated chunks are relevant for both shards donor and recipient
+                // to persist the PIT read history.
+                sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
                     opCtx,
                     nss(),
+                    *_doc.getChangedChunks(),
                     {ShardingState::get(opCtx)->shardId()},
                     getNewSession(opCtx),
                     executor,
                     token);
+
+                // A split of one chunk on N points yields N + 1 chunks.
+                ShardingStatistics::get(opCtx)
+                    .chunkOperationsStatistics.registerSplitChunkResultingChunks(
+                        _request.getSplitKeys().size() + 1);
             }))
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSection,
@@ -390,6 +430,12 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
             }
 
             const auto phase = _doc.getPhase();
+
+            // If the phase is unset, there's no persisted document, so there is nothing to cleanup.
+            if (phase == Phase::kUnset) {
+                uassertStatusOK(status);
+                MONGO_UNREACHABLE_TASSERT(13380600);
+            }
 
             // Before the kGlobalCatalogCommit phase the split has not been committed anywhere, so
             // a non-retryable error is safe to abort on. Persist an abort reason so the critical

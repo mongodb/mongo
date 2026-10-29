@@ -65,7 +65,6 @@ class test_cursor_bound01(bound_base, DisaggConfigMixin):
     def conn_extensions(self, extlist):
         DisaggConfigMixin.conn_extensions(self, extlist)
 
-    @wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
     def test_bound_api(self):
         if (self.key_format == 'r' and self.uri == 'layered:'):
             return

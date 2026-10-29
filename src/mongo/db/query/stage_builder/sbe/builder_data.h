@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -138,52 +112,6 @@ struct Environment {
     sbe::CompileCtx ctx;
 };
 
-struct PlanStageMetadataSlots {
-    boost::optional<sbe::value::SlotId> searchScoreSlot;
-    boost::optional<sbe::value::SlotId> searchHighlightsSlot;
-    boost::optional<sbe::value::SlotId> searchDetailsSlot;
-    boost::optional<sbe::value::SlotId> searchSortValuesSlot;
-    boost::optional<sbe::value::SlotId> sortKeySlot;
-    boost::optional<sbe::value::SlotId> searchSequenceToken;
-
-    void reset() {
-        searchScoreSlot.reset();
-        searchHighlightsSlot.reset();
-        searchDetailsSlot.reset();
-        searchSortValuesSlot.reset();
-        sortKeySlot.reset();
-        searchSequenceToken.reset();
-    }
-
-    sbe::value::SlotVector getSlotVector() {
-        auto slots = sbe::makeSV();
-        if (auto slot = searchScoreSlot) {
-            slots.push_back(*slot);
-        }
-
-        if (auto slot = searchHighlightsSlot) {
-            slots.push_back(*slot);
-        }
-
-        if (auto slot = searchDetailsSlot) {
-            slots.push_back(*slot);
-        }
-
-        if (auto slot = searchSortValuesSlot) {
-            slots.push_back(*slot);
-        }
-
-        if (auto slot = searchSequenceToken) {
-            slots.push_back(*slot);
-        }
-
-        if (auto slot = sortKeySlot) {
-            slots.push_back(*slot);
-        }
-        return slots;
-    }
-};
-
 /**
  * This struct used to hold all of a PlanStageData's immutable data.
  */
@@ -191,7 +119,6 @@ struct PlanStageStaticData {
     // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
     boost::optional<sbe::value::SlotId> resultSlot;
     boost::optional<sbe::value::SlotId> recordIdSlot;
-    PlanStageMetadataSlots metadataSlots;
 
     // Scan direction if this plan has a collection scan: 1 means forward; -1 means reverse.
     int direction{1};
@@ -229,7 +156,7 @@ struct PlanStageStaticData {
     std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
 
     // Stores data to restore collection scan bounds for a cached auto-parameterized SBE plan for
-    // every clustered collection scan used by the plan.
+    // non-multi-range clustered collection scans used by the plan.
     std::vector<ParameterizedClusteredScanSlots> clusteredCollBoundsInfos;
 
     /**

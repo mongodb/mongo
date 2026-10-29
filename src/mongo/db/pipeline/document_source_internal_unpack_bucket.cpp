@@ -1,44 +1,8 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
-#include <cstddef>
-#include <cstdint>
-
-#include <s2cellid.h>
-
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -82,12 +46,22 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <list>
 #include <ostream>
 #include <string>
 #include <string_view>
 #include <tuple>
+
+#include <s2cellid.h>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -442,8 +416,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     boost::intrusive_ptr<Expression> expr,
     const timeseries::BucketUnpacker& bucketUnpacker,
     int bucketMaxSpanSeconds,
-    bool fixedBuckets,
-    bool usesExtendedRange) {
+    bool fixedBuckets) {
     // We allow the $group stage to be rewritten if the _id field only consists of these 3 options:
     // 1. If the _id field is constant.
     // 2. If the _id field is an expression whose fieldPaths are at or under the metaField.
@@ -462,7 +435,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
 
     // Option 3: Currently the only allowed field path not on the metaField is $dateTrunc on the
     // timeField if the buckets are fixed and do not use an extended range.
-    if (fixedBuckets && !usesExtendedRange &&
+    if (fixedBuckets && !bucketUnpacker.getUsesExtendedRange() &&
         bucketUnpacker.providesField(bucketUnpacker.getTimeField())) {
         return handleDateTruncRewrite(
             pExpCtx, expr, bucketUnpacker.getTimeField(), bucketMaxSpanSeconds);
@@ -606,8 +579,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     const std::vector<std::string>& idFieldNames,
     const timeseries::BucketUnpacker& bucketUnpacker,
     int bucketMaxSpanSeconds,
-    bool fixedBuckets,
-    bool usesExtendedRange) {
+    bool fixedBuckets) {
     tassert(7823400,
             "idFieldNames must be empty or the same size as idFieldExpressions",
             (idFieldNames.empty() && idFieldExpressions.size() == 1) ||
@@ -616,12 +588,8 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fieldsAndExprs;
     const bool isIdFieldAnExpr = idFieldNames.empty();
     for (std::size_t i = 0; i < idFieldExpressions.size(); ++i) {
-        auto expr = rewriteGroupByElement(pExpCtx,
-                                          idFieldExpressions[i],
-                                          bucketUnpacker,
-                                          bucketMaxSpanSeconds,
-                                          fixedBuckets,
-                                          usesExtendedRange);
+        auto expr = rewriteGroupByElement(
+            pExpCtx, idFieldExpressions[i], bucketUnpacker, bucketMaxSpanSeconds, fixedBuckets);
         if (!expr) {
             return {};
         }
@@ -692,7 +660,7 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     if (eventFilterBson) {
         // Optimizing '_eventFilter' here duplicates predicates in $expr expressions.
         // TODO SERVER-79692 remove the 'shouldOptimize' boolean.
-        setEventFilter(eventFilterBson.get(), false /* shouldOptimize */);
+        setEventFilter(eventFilterBson.get(), /*shouldOptimize=*/false);
     }
     if (wholeBucketFilterBson) {
         _wholeBucketFilterBson = wholeBucketFilterBson->getOwned();
@@ -940,7 +908,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         // Using the bucket span associated with the default granularity seconds.
         timeseries::getMaxSpanSecondsFromGranularity(BucketGranularityEnum::Seconds),
         assumeClean,
-        false /* fixedBuckets */);
+        /*fixedBuckets=*/false);
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(
@@ -1203,7 +1171,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
     // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
     // finite.
-    auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
+    auto deps = getRestPipelineDependencies(itr, container, /*includeEventFilter=*/true);
     if (auto dependencyProj =
             deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
         !dependencyProj.isEmpty()) {
@@ -1311,8 +1279,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::i
                                                      idFieldNames,
                                                      _sharedState->_bucketUnpacker,
                                                      _bucketMaxSpanSeconds,
-                                                     _fixedBuckets,
-                                                     _usesExtendedRange);
+                                                     _fixedBuckets);
     if (!rewrittenIdExpression) {
         return {};
     }
@@ -1812,8 +1779,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
         // Unlike other rewrites for this stage, this rewrite affects a $match stage that is
         // *before* the unpack stage. So we need to apply this rewrite first, before the others,
         // which might cause us to return early.
-        if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get()); prevMatch &&
-            !getExpCtx()->getInRouter() && !_sharedState->_bucketUnpacker.getUsesExtendedRange()) {
+        if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get());
+            prevMatch && !getExpCtx()->getInRouter() && !usesExtendedRange()) {
             MatchExpression* matchExpr = prevMatch->getMatchExpression();
             bool updated = generateBucketLevelIdPredicates(matchExpr);
             if (updated) {
@@ -1821,6 +1788,34 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
                 prevMatch->rebuild(predObj);
             }
             _checkIfNeedsIdPredicates = false;
+        }
+    }
+
+    // Shard-side event filter pruning for fixed buckets.
+    // A pipeline that arrived from the router with fixedBuckets=false will have its post-unpack
+    // $match already processed: a loose $match inserted before us, and _eventFilter set inside us.
+    // After populateUnpackBucketStagesFromCollection sets fixedBuckets=true, we check here whether
+    // the event filter is made redundant by the fixed-bucket alignment guarantee. Safety checks:
+    //   1. fixedBuckets=true and !usesExtendedRange (no clamping near Date_t::min()).
+    //   2. _eventFilter is present.
+    //   3. A $match stage immediately precedes us (belt-and-suspenders: confirms the bucket-level
+    //      filter actually exists before we drop per-event evaluation).
+    //   4. createPredicatesOnBucketLevelField returns rewriteProvidesExactMatchPredicate=true
+    //      (the predicate is aligned to bucket boundaries, so the bucket filter is tight).
+    if (_fixedBuckets && !usesExtendedRange() && _sharedState->_eventFilter &&
+        itr != container->begin() &&
+        dynamic_cast<const DocumentSourceMatch*>(std::prev(itr)->get())) {
+        auto predicates = createPredicatesOnBucketLevelField(_sharedState->_eventFilter.get());
+        if (predicates.rewriteProvidesExactMatchPredicate) {
+            _sharedState->_eventFilter.reset();
+            _eventFilterBson = {};
+            _eventFilterDeps = DepsTracker{};
+            // The router (which didn't yet know fixedBuckets=true) may have already computed a
+            // wholeBucketFilter alongside the now-redundant event filter. As elsewhere in this
+            // file: if the event filter is dropped, a wholeBucketFilter is no longer needed.
+            _sharedState->_wholeBucketFilter.reset();
+            _wholeBucketFilterBson = {};
+            return itr;
         }
     }
 
@@ -1986,7 +1981,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
     {
         // Check if the rest of the pipeline needs any fields. For example we might only be
         // interested in $count.
-        auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
+        auto deps = getRestPipelineDependencies(itr, container, /*includeEventFilter=*/true);
         if (deps.hasNoRequirements() && !hasAlreadyAbsorbedProjectSpec) {
             _sharedState->_bucketUnpacker.setBucketSpec(
                 {_sharedState->_bucketUnpacker.getTimeField(),
@@ -2044,11 +2039,11 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
 
         if (!predicates.rewriteProvidesExactMatchPredicate) {
             // Push the original event predicate into the unpacking stage.
-            setEventFilter(nextMatch->getQuery(), true /* shouldOptimize */);
+            setEventFilter(nextMatch->getQuery(), /*shouldOptimize=*/true);
         }
 
         container->erase(std::next(itr));
-        auto deps = getRestPipelineDependencies(itr, container, false /* includeEventFilter */);
+        auto deps = getRestPipelineDependencies(itr, container, /*includeEventFilter=*/false);
         if (deps.fields.empty()) {
             _unpackToBson = true;
         }

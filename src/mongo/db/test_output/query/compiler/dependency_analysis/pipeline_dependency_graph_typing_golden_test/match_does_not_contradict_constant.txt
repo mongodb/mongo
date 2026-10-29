@@ -1,0 +1,25 @@
+VARIATION MatchDoesNotContradictConstant
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "y": {
+                    "$const": "str"
+                }
+            }
+        },
+        {
+            "$match": {
+                "y": {
+                    "$type": "string"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $set:0
+    y: any
+  end of pipeline
+    y: string|array(S)
+

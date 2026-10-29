@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,12 +12,13 @@
 #include "mongo/db/stats/opcounters.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_counter.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -60,7 +35,7 @@
 #include <absl/meta/type_traits.h>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class NetworkCounter {
 public:
@@ -72,13 +47,25 @@ public:
     NetworkCounter& operator=(const NetworkCounter&) = delete;
 
     // Increment the counters for the number of bytes read directly off the wire
-    void hitPhysicalIn(ConnectionType connectionType, long long bytes);
-    void hitPhysicalOut(ConnectionType connectionType, long long bytes);
+    // connectionPurpose is used for purpose-specific metrics such as replication
+    void hitPhysicalIn(ConnectionType connectionType,
+                       long long bytes,
+                       ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
+    void hitPhysicalOut(ConnectionType connectionType,
+                        long long bytes,
+                        ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
+                        boost::optional<int64_t> replicationId = boost::none);
 
     // Increment the counters for the number of bytes passed out of the TransportLayer to the
     // server
-    void hitLogicalIn(ConnectionType connectionType, long long bytes);
-    void hitLogicalOut(ConnectionType connectionType, long long bytes);
+    // connectionPurpose is used for purpose-specific metrics such as replication
+    void hitLogicalIn(ConnectionType connectionType,
+                      long long bytes,
+                      ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
+    void hitLogicalOut(ConnectionType connectionType,
+                       long long bytes,
+                       ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
+                       boost::optional<int64_t> replicationId = boost::none);
 
     // Increment the counter for the number of slow dns resolution operations.
     void incrementNumSlowDNSOperations();
@@ -106,18 +93,23 @@ public:
 private:
     // Physical byte counters — not OTel-exported.
     // TODO SERVER-127423: Replace these with OTel-exported counters.
-    CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesIn{0};
-    CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesOut{0};
-    CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesIn{0};
-    CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesOut{0};
+    CacheExclusive<Atomic<long long>> _ingressPhysicalBytesIn{0};
+    CacheExclusive<Atomic<long long>> _ingressPhysicalBytesOut{0};
+    CacheExclusive<Atomic<long long>> _egressPhysicalBytesIn{0};
+    CacheExclusive<Atomic<long long>> _egressPhysicalBytesOut{0};
 
+    // Physical byte counter for replication connections
+    otel::metrics::Counter<int64_t>& _replicationSecondaryPhysicalBytesIn;
     // Logical ingress counters.
     otel::metrics::Counter<int64_t>& _ingressLogicalBytesIn;
     otel::metrics::Counter<int64_t>& _ingressNumRequests;
     otel::metrics::Counter<int64_t>& _ingressLogicalBytesOut;
+    otel::metrics::Counter<int64_t, int64_t>& _replicationPrimaryLogicalBytesOut;
+    otel::metrics::Counter<int64_t, int64_t>& _replicationPrimaryPhysicalBytesOut;
 
     // Logical egress counters.
     otel::metrics::Counter<int64_t>& _egressLogicalBytesIn;
+    otel::metrics::Counter<int64_t>& _replicationSecondaryLogicalBytesIn;
     otel::metrics::Counter<int64_t>& _egressNumRequests;
     otel::metrics::Counter<int64_t>& _egressLogicalBytesOut;
 
@@ -126,7 +118,7 @@ private:
 
     // Counter of inbound connections at runtime.
     // TODO SERVER-127423: Replace this with an OTel-exported counter.
-    CacheExclusive<AtomicWord<std::int64_t>> _tfoAccepted{0};
+    CacheExclusive<Atomic<std::int64_t>> _tfoAccepted{0};
 
     // TFO info determined at startup.
     std::int64_t _tfoKernelSetting{0};
@@ -190,8 +182,8 @@ public:
 
 private:
     struct SuccessCounter {
-        AtomicWord<long long> total;
-        AtomicWord<long long> successful;
+        Atomic<long long> total;
+        Atomic<long long> successful;
         void appendAsSubobj(BSONObjBuilder& bob, std::string_view fieldName) const;
     };
     struct MechanismData {
@@ -208,9 +200,9 @@ private:
     };
     using MechanismMap = std::map<std::string, MechanismData, std::less<>>;
 
-    AtomicWord<long long> _saslSupportedMechanismsReceived;
-    AtomicWord<long long> _ingressAuthenticationCumulativeMicros;
-    AtomicWord<long long> _egressAuthenticationCumulativeMicros;
+    Atomic<long long> _saslSupportedMechanismsReceived;
+    Atomic<long long> _ingressAuthenticationCumulativeMicros;
+    Atomic<long long> _egressAuthenticationCumulativeMicros;
     // Mechanism maps are initialized at startup to contain all possible mechanisms. Mechanisms not
     // present in the authenticationMechanisms setParam are marked as egress only; this is
     // because this parameter only restricts which mechanisms can be used for ingress.  After
@@ -366,14 +358,17 @@ public:
     enum SuffixStyle { kDotSuffix, kUpperCaseSuffix };
 
     SpillingCounters(std::string stageName, SuffixStyle suffixStyle = kDotSuffix)
-        : spills(
-              *MetricBuilder<Counter64>{"query." + stageName + _getSuffix(suffixStyle, "spills")}),
+        : spills(*MetricBuilder<Counter64>{"query." + stageName + _getSuffix(suffixStyle, "spills")}
+                      .setRole(ClusterRole::ShardServer)),
           spilledBytes(*MetricBuilder<Counter64>{"query." + stageName +
-                                                 _getSuffix(suffixStyle, "spilledBytes")}),
+                                                 _getSuffix(suffixStyle, "spilledBytes")}
+                            .setRole(ClusterRole::ShardServer)),
           spilledRecords(*MetricBuilder<Counter64>{"query." + stageName +
-                                                   _getSuffix(suffixStyle, "spilledRecords")}),
+                                                   _getSuffix(suffixStyle, "spilledRecords")}
+                              .setRole(ClusterRole::ShardServer)),
           spilledDataStorageSize(*MetricBuilder<Counter64>{
-              "query." + stageName + _getSuffix(suffixStyle, "spilledDataStorageSize")}) {}
+              "query." + stageName + _getSuffix(suffixStyle, "spilledDataStorageSize")}
+                                      .setRole(ClusterRole::ShardServer)) {}
 
     SpillingCounters(SpillingCounters&) = delete;
     SpillingCounters& operator=(const SpillingCounters&) = delete;
@@ -442,19 +437,25 @@ public:
     }
 
     // Counters for lookup join strategies.
-    Counter64& nestedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"};
-    Counter64& indexedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"};
-    Counter64& hashLookupCounter = *MetricBuilder<Counter64>{"query.lookup.hashLookup"};
+    Counter64& nestedLoopJoinCounter =
+        *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"}.setRole(ClusterRole::ShardServer);
+    Counter64& indexedLoopJoinCounter =
+        *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"}.setRole(ClusterRole::ShardServer);
+    Counter64& hashLookupCounter =
+        *MetricBuilder<Counter64>{"query.lookup.hashLookup"}.setRole(ClusterRole::ShardServer);
     Counter64& dynamicIndexedLoopJoinCounter =
-        *MetricBuilder<Counter64>{"query.lookup.dynamicIndexedLoopJoin"};
+        *MetricBuilder<Counter64>{"query.lookup.dynamicIndexedLoopJoin"}.setRole(
+            ClusterRole::ShardServer);
 
     // Duplicate spilling counters, not deleted to maintain backward compatibility.
     // Counter tracking hashLookup spills in lookup stages that get pushed down.
     Counter64& hashLookupSpillToDisk =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"};
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"}.setRole(
+            ClusterRole::ShardServer);
     // Counter tracking hashLookup spilled bytes in lookup stages that get pushed down.
     Counter64& hashLookupSpillToDiskBytes =
-        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDiskBytes"};
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDiskBytes"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern LookupPushdownCounters lookupPushdownCounters;
 
@@ -484,17 +485,95 @@ public:
         localComplexCounter.incrementRelaxed(luLocalComplex);
     }
 
-    Counter64& inljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.indexedLoopJoin"};
-    Counter64& nljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.nestedLoopJoin"};
-    Counter64& hjCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.hashLookup"};
+    Counter64& inljCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.indexedLoopJoin"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& nljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.nestedLoopJoin"}.setRole(
+        ClusterRole::ShardServer);
+    Counter64& hjCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.hashLookup"}.setRole(
+        ClusterRole::ShardServer);
     Counter64& dinljCounter =
-        *MetricBuilder<Counter64>{"query.lookupUnwind.dynamicIndexedLoopJoin"};
-    Counter64& localCollscanCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.localCollscan"};
+        *MetricBuilder<Counter64>{"query.lookupUnwind.dynamicIndexedLoopJoin"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& localCollscanCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localCollscan"}.setRole(
+            ClusterRole::ShardServer);
     Counter64& localIxscanFetchCounter =
-        *MetricBuilder<Counter64>{"query.lookupUnwind.localIxscanFetch"};
-    Counter64& localComplexCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.localComplex"};
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localIxscanFetch"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& localComplexCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localComplex"}.setRole(
+            ClusterRole::ShardServer);
 };
 extern LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
+
+/**
+ * Counters tracking non-leading pushdown operators.
+ */
+class NonLeadingPushdownCounters {
+public:
+    NonLeadingPushdownCounters() = default;
+    NonLeadingPushdownCounters(const NonLeadingPushdownCounters&) = delete;
+    NonLeadingPushdownCounters& operator=(const NonLeadingPushdownCounters&) = delete;
+
+    void incrementCounters(bool nlpMatch, bool nlpProject, bool nlpAddFields, bool nlpReplaceRoot) {
+        if (nlpMatch)
+            matchCounter.incrementRelaxed(1);
+        if (nlpProject)
+            projectCounter.incrementRelaxed(1);
+        if (nlpAddFields)
+            addFieldsCounter.incrementRelaxed(1);
+        if (nlpReplaceRoot)
+            replaceRootCounter.incrementRelaxed(1);
+    }
+
+    Counter64& matchCounter = *MetricBuilder<Counter64>{"query.nonLeadingPushdown.match"}.setRole(
+        ClusterRole::ShardServer);
+    Counter64& projectCounter =
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.project"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& addFieldsCounter =
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.addFields"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& replaceRootCounter =
+        *MetricBuilder<Counter64>{"query.nonLeadingPushdown.replaceRoot"}.setRole(
+            ClusterRole::ShardServer);
+};
+extern NonLeadingPushdownCounters nonLeadingPushdownCounters;
+
+/**
+ * Counters tracking pathArrayness usage and behavior.
+ *
+ * TODO(SERVER-131708): add remaining metrics related to pathArrayness usage.
+ */
+class PathArraynessCounters {
+public:
+    PathArraynessCounters() = default;
+    PathArraynessCounters(const PathArraynessCounters&) = delete;
+    PathArraynessCounters& operator=(const PathArraynessCounters&) = delete;
+
+    void incrementPerQuery(bool leadingFilter, bool leadingFilterSimplified) {
+        if (leadingFilter)
+            leadingFilterCounter.incrementRelaxed(1);
+        if (leadingFilterSimplified)
+            leadingFilterSimplifiedCounter.incrementRelaxed(1);
+    }
+
+    void incrementInvalidation() {
+        queriesFailedDueToInvalidationCounter.incrementRelaxed(1);
+    }
+
+    Counter64& leadingFilterCounter =
+        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilter"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& leadingFilterSimplifiedCounter =
+        *MetricBuilder<Counter64>{"query.pathArrayness.leadingFilterSimplified"}.setRole(
+            ClusterRole::ShardServer);
+    Counter64& queriesFailedDueToInvalidationCounter =
+        *MetricBuilder<Counter64>{"query.pathArrayness.queriesFailedDueToInvalidation"}.setRole(
+            ClusterRole::ShardServer);
+};
+extern PathArraynessCounters pathArraynessCounters;
 
 /** Counters tracking group stats across all execution engines. */
 class GroupCounters : public SpillingCounters {
@@ -1009,4 +1088,4 @@ struct ServerStatusMetricPolicySelection<DurationCounter64<D>> {
     using type = Policy;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

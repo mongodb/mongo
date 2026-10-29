@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/balancer_configuration_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/modules.h"
@@ -75,7 +49,7 @@ class StatusWith;
  * TODO SERVER-107399 Remove this class once done, as users should no longer directly update this
  * document.
  */
-class MONGO_MOD_PUBLIC BalancerSettingsType {
+class [[MONGO_MOD_PUBLIC]] BalancerSettingsType {
 public:
     /**
      * Part of schema to enforce on config.settings document relating to documents with _id:
@@ -105,7 +79,7 @@ private:
  *
  * chunksize: { value: <value in MB between 1 and 1024> }
  */
-class MONGO_MOD_PUBLIC ChunkSizeSettingsType {
+class [[MONGO_MOD_PUBLIC]] ChunkSizeSettingsType {
 public:
     // The key under which this setting is stored on the config server
     static const char kKey[];
@@ -160,7 +134,7 @@ private:
  *
  * automerge: { enabled: <true|false> }
  */
-class MONGO_MOD_PUBLIC AutoMergeSettingsType {
+class [[MONGO_MOD_PUBLIC]] AutoMergeSettingsType {
 public:
     // The key under which this setting is stored on the config server
     static const char kKey[];
@@ -191,7 +165,7 @@ private:
 /**
  * Contains settings, which control the behaviour of the balancer.
  */
-class MONGO_MOD_PUBLIC BalancerConfiguration {
+class [[MONGO_MOD_PUBLIC]] BalancerConfiguration {
     BalancerConfiguration(const BalancerConfiguration&) = delete;
     BalancerConfiguration& operator=(const BalancerConfiguration&) = delete;
 
@@ -209,37 +183,38 @@ public:
      * Non-blocking method, which checks whether the balancer is enabled (without checking for the
      * balancing window).
      */
-    MONGO_MOD_PRIVATE mongo::BalancerModeEnum getBalancerMode() const;
+    [[MONGO_MOD_PRIVATE]] mongo::BalancerModeEnum getBalancerMode() const;
 
     /**
      * Synchronous method, which writes the balancer mode to the configuration data.
      */
-    MONGO_MOD_PRIVATE Status setBalancerMode(OperationContext* opCtx, mongo::BalancerModeEnum mode);
+    [[MONGO_MOD_PRIVATE]] Status setBalancerMode(OperationContext* opCtx,
+                                                 mongo::BalancerModeEnum mode);
 
     /**
      * Returns whether balancing is allowed based on both the enabled state of the balancer and the
      * balancing window.
      */
-    MONGO_MOD_PRIVATE bool shouldBalance(OperationContext* opCtx) const;
-    MONGO_MOD_PRIVATE bool shouldBalanceForAutoMerge(OperationContext* opCtx) const;
+    [[MONGO_MOD_PRIVATE]] bool shouldBalance(OperationContext* opCtx) const;
+    [[MONGO_MOD_PRIVATE]] bool shouldBalanceForAutoMerge(OperationContext* opCtx) const;
 
     /**
      * Returns the secondary throttle options for the balancer.
      */
-    MONGO_MOD_PRIVATE MigrationSecondaryThrottleOptions getSecondaryThrottle() const;
+    [[MONGO_MOD_PRIVATE]] MigrationSecondaryThrottleOptions getSecondaryThrottle() const;
 
     /**
      * Returns whether the balancer should wait for deletion of orphaned chunk data at the end of
      * each migration.
      */
-    MONGO_MOD_PRIVATE bool waitForDelete() const;
+    [[MONGO_MOD_PRIVATE]] bool waitForDelete() const;
 
     /**
      * Returns whether the balancer should attempt to schedule migrations of 'large' chunks. If
      * false, the balancer will instead mark these chunks as 'jumbo', meaning they will not be
      * scheduled for any split or move in the future.
      */
-    MONGO_MOD_PRIVATE bool attemptToBalanceJumboChunks() const;
+    [[MONGO_MOD_PRIVATE]] bool attemptToBalanceJumboChunks() const;
 
     /**
      * Returns the max chunk size after which a chunk would be considered jumbo.
@@ -251,9 +226,9 @@ public:
     /**
      * Change the cluster wide auto merge settings.
      */
-    MONGO_MOD_PRIVATE Status changeAutoMergeSettings(OperationContext* opCtx, bool enable);
+    [[MONGO_MOD_PRIVATE]] Status changeAutoMergeSettings(OperationContext* opCtx, bool enable);
 
-    MONGO_MOD_PRIVATE bool shouldAutoMerge() const {
+    [[MONGO_MOD_PRIVATE]] bool shouldAutoMerge() const {
         return _shouldAutoMerge.loadRelaxed();
     }
 
@@ -266,31 +241,31 @@ public:
      * This method is thread-safe but it doesn't make sense to be called from more than one thread
      * at a time.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT Status refreshAndCheck(OperationContext* opCtx);
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] Status refreshAndCheck(OperationContext* opCtx);
 
     /**
      * Constructs a settings object with the default values. To be used when no balancer settings
      * have been specified.
      */
-    MONGO_MOD_PRIVATE BalancerSettings createDefaultSettings();
+    [[MONGO_MOD_PRIVATE]] BalancerSettings createDefaultSettings();
 
     /**
      * Interprets the BSON content as balancer settings and extracts the respective values.
      */
-    MONGO_MOD_PRIVATE StatusWith<BalancerSettings> getSettingsFromBSON(OperationContext* opCtx,
-                                                                       const BSONObj& obj);
+    [[MONGO_MOD_PRIVATE]] StatusWith<BalancerSettings> getSettingsFromBSON(OperationContext* opCtx,
+                                                                           const BSONObj& obj);
 
     /**
      * Returns true if either 'now' is in the balancing window or if no balancing window exists.
      */
-    MONGO_MOD_PRIVATE bool isTimeInBalancingWindow(OperationContext* opCtx,
-                                                   const boost::posix_time::ptime& now) const;
+    [[MONGO_MOD_PRIVATE]] bool isTimeInBalancingWindow(OperationContext* opCtx,
+                                                       const boost::posix_time::ptime& now) const;
 
 
     /**
      * Modify the balancer settings directly. This is used for testing purposes only.
      */
-    MONGO_MOD_PRIVATE void setBalancerSettingsForTest(const BalancerSettings& settings) {
+    [[MONGO_MOD_PRIVATE]] void setBalancerSettingsForTest(const BalancerSettings& settings) {
         std::lock_guard<std::mutex> lk(_balancerSettingsMutex);
         _balancerSettings = settings;
     }
@@ -321,8 +296,8 @@ private:
 
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value
     // is read on the critical path after each write operation, that's why it is cached.
-    AtomicWord<unsigned long long> _maxChunkSizeBytes;
-    AtomicWord<bool> _shouldAutoMerge;
+    Atomic<unsigned long long> _maxChunkSizeBytes;
+    Atomic<bool> _shouldAutoMerge;
 
     // Mutex used to serialize the balancer configuration refreshes. It should be taken in exclusive
     // mode to prevent having more than one refresh happening at the same time.

@@ -213,13 +213,12 @@ export function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {},
             return;
         }
 
-        if (ns) {
-            assert.commandWorked(
-                rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}),
-            );
-        }
-
         if (!FeatureFlagUtil.isPresentAndEnabled(rs.test.getPrimary(), "AuthoritativeShardsCRUD")) {
+            if (ns) {
+                assert.commandWorked(
+                    rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}),
+                );
+            }
             dbNames.forEach((dbName) => {
                 assert.commandWorked(
                     rs.test.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName}),

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -76,26 +50,45 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
                                             ClusterClientCursorParams&&);
 
 /**
- *  Returns the collation and if the collation matches the collection's collation for aggregation
- * targeting 'nss' with the following semantics:
+ * The result of resolveCollectionInfo() below: the collection info an aggregation needs from the
+ * primary shard -- the collation, plus whether the collection is an untracked viewless timeseries
+ * collection.
+ */
+struct ResolvedCollectionInfo {
+    BSONObj collation;
+    ExpressionContextCollationMatchesDefault collationMatchesDefault;
+
+    // Whether 'nss' is an untracked viewless timeseries collection. Only ever true when
+    // resolveCollectionInfo() contacted the primary shard (see below); false otherwise, including
+    // when we never needed to check.
+    bool untrackedIsViewlessTimeseries = false;
+};
+
+/**
+ * Determines whether correctly handling this aggregation requires contacting the primary shard
+ * for an untracked collection, and does so if it does. Reports the collation to use (and whether
+ * it matches the collection's default) with the following semantics:
  *  - Return 'collation' if the aggregation is collectionless.
  *  - If 'nss' is tracked, we return 'collation' if it is non-empty. If it is empty, we return the
  * collection default collation if there is one and the simple collation otherwise.
- *  - If 'nss' is untracked, we return an empty BSONObj as we will infer the correct collation when
- * the command reaches the primary shard. The exception is when
- * 'requiresCollationForParsingUnshardedAggregate' is true: in this case, we must contact the
- * primary shard to infer the collation as it is required during parsing.
+ *  - If 'nss' is untracked and 'requiresCollationForParsingUnshardedAggregate' is false, we return
+ * an empty BSONObj (or 'collation', if the caller supplied one) as we will infer the correct
+ * collation when the command reaches the primary shard.
+ *  - If 'nss' is untracked and 'requiresCollationForParsingUnshardedAggregate' is true, we always
+ * contact the primary shard, even if the caller already supplied 'collation': that contact is also
+ * how we learn whether the collection is an untracked viewless timeseries collection which callers
+ * need to correctly defer the pipeline's mandatory timeseries rewrite -- and thus optimization --
+ * to the shard.
  *
  *  TODO SERVER-81991: Delete 'requiresCollationForParsingUnshardedAggregate' parameter once all
  * unsharded collections are tracked in the sharding catalog as unsplittable along with their
  * collation.
  */
-std::pair<BSONObj, ExpressionContextCollationMatchesDefault> getCollation(
-    OperationContext* opCtx,
-    const boost::optional<CollectionRoutingInfo>& cri,
-    const NamespaceString& nss,
-    const BSONObj& collation,
-    bool requiresCollationForParsingUnshardedAggregate);
+ResolvedCollectionInfo resolveCollectionInfo(OperationContext* opCtx,
+                                             const boost::optional<CollectionRoutingInfo>& cri,
+                                             const NamespaceString& nss,
+                                             const BSONObj& collation,
+                                             bool requiresCollationForParsingUnshardedAggregate);
 
 /**
  * This structure contains information for targeting an aggregation pipeline in a sharded cluster.

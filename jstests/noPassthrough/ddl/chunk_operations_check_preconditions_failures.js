@@ -4,7 +4,7 @@
  * is left held, and no coordinator state document is left behind.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";

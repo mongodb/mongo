@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -51,7 +24,8 @@
 
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
+using namespace std::literals::string_view_literals;
 
 class BSONObj;
 template <typename Allocator>
@@ -150,37 +124,37 @@ class Duration {
 public:
     static constexpr std::string_view unit_short() {
         if constexpr (std::is_same_v<Duration, Nanoseconds>) {
-            return "ns"_sd;
+            return "ns"sv;
         } else if constexpr (std::is_same_v<Duration, Microseconds>) {
-            return "\xce\xbcs"_sd;
+            return "\xce\xbcs"sv;
         } else if constexpr (std::is_same_v<Duration, Milliseconds>) {
-            return "ms"_sd;
+            return "ms"sv;
         } else if constexpr (std::is_same_v<Duration, Seconds>) {
-            return "s"_sd;
+            return "s"sv;
         } else if constexpr (std::is_same_v<Duration, Minutes>) {
-            return "min"_sd;
+            return "min"sv;
         } else if constexpr (std::is_same_v<Duration, Hours>) {
-            return "hr"_sd;
+            return "hr"sv;
         } else if constexpr (std::is_same_v<Duration, Days>) {
-            return "d"_sd;
+            return "d"sv;
         }
         return std::string_view{};
     }
     static constexpr std::string_view mongoUnitSuffix() {
         if constexpr (std::is_same_v<Duration, Nanoseconds>) {
-            return "Nanos"_sd;
+            return "Nanos"sv;
         } else if constexpr (std::is_same_v<Duration, Microseconds>) {
-            return "Micros"_sd;
+            return "Micros"sv;
         } else if constexpr (std::is_same_v<Duration, Milliseconds>) {
-            return "Millis"_sd;
+            return "Millis"sv;
         } else if constexpr (std::is_same_v<Duration, Seconds>) {
-            return "Seconds"_sd;
+            return "Seconds"sv;
         } else if constexpr (std::is_same_v<Duration, Minutes>) {
-            return "Minutes"_sd;
+            return "Minutes"sv;
         } else if constexpr (std::is_same_v<Duration, Hours>) {
-            return "Hours"_sd;
+            return "Hours"sv;
         } else if constexpr (std::is_same_v<Duration, Days>) {
-            return "Days"_sd;
+            return "Days"sv;
         }
         return std::string_view{};
     }
@@ -195,7 +169,7 @@ public:
      * OtherDuration. That is, if OtherDuration::period > period.
      */
     template <typename OtherDuration>
-    struct MONGO_MOD_FILE_PRIVATE IsHigherPrecisionThan {
+    struct [[MONGO_MOD_FILE_PRIVATE]] IsHigherPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
         MONGO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
@@ -209,7 +183,7 @@ public:
      * OtherDuration. That is, if OtherDuration::period > period.
      */
     template <typename OtherDuration>
-    struct MONGO_MOD_FILE_PRIVATE IsLowerPrecisionThan {
+    struct [[MONGO_MOD_FILE_PRIVATE]] IsLowerPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
         MONGO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
@@ -545,4 +519,4 @@ constexpr auto deduceChronoDuration(const Rep& count) {
     return std::chrono::duration<Rep, Per>{count};
 }
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

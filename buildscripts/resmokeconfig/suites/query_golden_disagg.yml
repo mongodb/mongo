@@ -6,7 +6,7 @@ selector:
   exclude_files:
     - jstests/query_golden/libs/**/*.js
     - jstests/query_golden/test_inputs/**/*.js
-    - jstests/query_golden/join_opt/plan_stability*.js
+    - jstests/query_golden/join_opt/**/*.js
   exclude_with_any_tags:
     # TODO SERVER-121517: Remove after updating test to account for profiling level > 0 not being supported in disagg.
     - requires_profiling
@@ -17,7 +17,7 @@ executor:
       eval: |
         // Keep the following imports in sync with query_golden_*.yml.
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
-        await import("jstests/libs/override_methods/golden_overrides.js");
+        await import("jstests/libs/override_methods/query/golden_overrides.js");
         import {beginGoldenTest} from "jstests/libs/query_optimization/begin_golden_test.js";
         beginGoldenTest("jstests/query_golden/expected_output");
         // Enforce plain log format until json format is the default.
@@ -34,5 +34,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-    # TODO(SERVER-120518): change num_nodes to 2
-    num_nodes: 1
+    num_nodes: 2

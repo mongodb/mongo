@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,7 +10,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/js_regex.h"
@@ -58,14 +32,14 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-using ScriptingFunction MONGO_MOD_PUBLIC = unsigned long long;
-using NativeFunction MONGO_MOD_PUBLIC = BSONObj (*)(const BSONObj& args, void* data);
+using ScriptingFunction [[MONGO_MOD_PUBLIC]] = unsigned long long;
+using NativeFunction [[MONGO_MOD_PUBLIC]] = BSONObj (*)(const BSONObj& args, void* data);
 typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 
 class DBClientBase;
 class OperationContext;
 
-class MONGO_MOD_OPEN Scope {
+class [[MONGO_MOD_OPEN]] Scope {
     Scope(const Scope&) = delete;
     Scope& operator=(const Scope&) = delete;
 
@@ -108,6 +82,9 @@ public:
     virtual void setObject(const char* field, const BSONObj& obj, bool readOnly = true) = 0;
     virtual void setBoolean(const char* field, bool val) = 0;
     virtual void setFunction(const char* field, const char* code) = 0;
+
+    // Deletes a property from the scope's JS global object (used for system.js scope cleanup).
+    virtual void deleteGlobal(std::string_view name) = 0;
 
     virtual int type(const char* field) = 0;
 
@@ -221,15 +198,15 @@ protected:
     DatabaseName _localDBName;
     int64_t _loadedVersion;
     std::set<std::string> _storedNames;
-    static AtomicWord<long long> _lastVersion;
+    static Atomic<long long> _lastVersion;
     FunctionCacheMap _cachedFunctions;
     Date_t _createTime;
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
 };
 
-enum class MONGO_MOD_PUB ExecutionEnvironment { Server, TestRunner };
+enum class [[MONGO_MOD_PUBLIC]] ExecutionEnvironment { Server, TestRunner };
 
-class MONGO_MOD_OPEN ScriptEngine : public KillOpListenerInterface {
+class [[MONGO_MOD_OPEN]] ScriptEngine : public KillOpListenerInterface {
     ScriptEngine(const ScriptEngine&) = delete;
     ScriptEngine& operator=(const ScriptEngine&) = delete;
 
@@ -258,6 +235,15 @@ public:
 
     virtual int getJSHeapLimitMB() const = 0;
     virtual void setJSHeapLimitMB(int limit) = 0;
+
+    /**
+     * Whether to abort on an unrecoverable JavaScript out-of-memory condition, so that the kernel
+     * writes a core dump of the exhausted heap.
+     */
+    virtual bool getJSAbortOnOutOfMemory() const {
+        return false;
+    }
+    virtual void setJSAbortOnOutOfMemory(bool value) {}
     virtual bool getJSUseLegacyMemoryTracking() const = 0;
     virtual void setJSUseLegacyMemoryTracking(bool shouldUseLegacy) = 0;
 
@@ -319,8 +305,8 @@ void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-MONGO_MOD_PUB ScriptEngine* getGlobalScriptEngine();
-MONGO_MOD_PUB void setGlobalScriptEngine(ScriptEngine* impl);
+[[MONGO_MOD_PUBLIC]] ScriptEngine* getGlobalScriptEngine();
+[[MONGO_MOD_PUBLIC]] void setGlobalScriptEngine(ScriptEngine* impl);
 
 /**
  * Registers a stable kill-op proxy with the given ServiceContext. The proxy delegates interrupt

@@ -46,6 +46,14 @@ testRound(0.9, 1.0);
 testRound(-1.2, -1.0);
 testRound(NumberDecimal("-1.6"), NumberDecimal("-2"));
 
+// $round on doubles rounds ties to even (banker's rounding), not half-away-from-zero. These
+// exercise the precision-0 double path: ties-to-even gives 0/2/4/-2, whereas a naive
+// half-away-from-zero round (std::round) would give 1/3/4/-3.
+testRound(0.5, 0.0);
+testRound(2.5, 2.0);
+testRound(3.5, 4.0);
+testRound(-2.5, -2.0);
+
 // Test $trunc and $round with two arguments.
 testTrunc(1.298, 1, 0);
 testTrunc(1.298, 1.2, 1);
@@ -135,7 +143,7 @@ assertErrorCode(coll, [{$project: {a: {$trunc: [1, -21]}}}], 51083);
 assertErrorCode(coll, [{$project: {a: {$round: [1, NumberDecimal("1.4")]}}}], 51082);
 assertErrorCode(coll, [{$project: {a: {$trunc: [1, 10.5]}}}], 51082);
 assertErrorCode(coll, [{$project: {a: {$round: [0, NaN]}}}], 31109);
-assertErrorCode(coll, [{$project: {a: {$round: [0, NumberDecimal("NaN")]}}}], 51082);
+assertErrorCode(coll, [{$project: {a: {$round: [0, NumberDecimal("NaN")]}}}], [31109, 51082]);
 assertErrorCode(coll, [{$project: {a: {$round: [BinData(0, ""), 0]}}}], 51081);
 assertErrorCode(coll, [{$project: {a: {$round: [0, BinData(0, "")]}}}], 16004);
 assertErrorCode(coll, [{$project: {a: {$round: MinKey}}}], 51081);

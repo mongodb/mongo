@@ -5,6 +5,7 @@
  * filter.
  *
  * @tags: [
+ *    uses_explain,
  *    # the test conflicts with hidden wildcard indexes
  *    assumes_no_implicit_index_creation,
  *    does_not_support_stepdowns,

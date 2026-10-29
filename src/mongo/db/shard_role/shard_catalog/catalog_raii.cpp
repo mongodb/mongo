@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 
@@ -209,7 +183,7 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(OperationContext* opCtx,
     return AutoGetDb(opCtx,
                      nsOrUUID.dbName(),
                      isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
-                     boost::none /* tenantLockMode */,
+                     /*tenantLockMode=*/boost::none,
                      deadline,
                      std::move(dbLockOptions));
 }
@@ -407,8 +381,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
             uassert(StaleConfigInfo(_resolvedNss,
                                     *receivedShardVersion,
-                                    ShardVersion::UNTRACKED() /* wantedVersion */,
-                                    ShardingState::get(opCtx)->asShardRef(opCtx)),
+                                    /*wanted=*/ShardVersion::UNTRACKED(),
+                                    ShardingState::get(opCtx)->shardId()),
                     str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view therefore the shard "
                                   << "version attached to the request must be unset or UNTRACKED",
@@ -431,8 +405,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     uassert(StaleConfigInfo(_resolvedNss,
                             *receivedShardVersion,
-                            boost::none /* wantedVersion */,
-                            ShardingState::get(opCtx)->asShardRef(opCtx)),
+                            /*wanted=*/boost::none,
+                            ShardingState::get(opCtx)->shardId()),
             str::stream() << "No metadata for namespace " << _resolvedNss.toStringForErrorMsg()
                           << " therefore the shard "
                           << "version attached to the request must be unset, UNTRACKED or IGNORED",
@@ -453,7 +427,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisitio
     : _acquisition(acquisition), _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _storedCollection = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, _acquisition->nss(), boost::none /*readTimestamp*/));
+        opCtx, _acquisition->nss(), /*readTimestamp=*/boost::none));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [this, opCtx]() mutable {
@@ -484,7 +458,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
     : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _storedCollection = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, nss, boost::none /*readTimestamp*/));
+        opCtx, nss, /*readTimestamp=*/boost::none));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
@@ -654,15 +628,13 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
             opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow, globalLkOptions);
     }
 
-    _stashedCatalog = CollectionCatalog::get(opCtx);
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    // The oplog is a special collection that is always present in the catalog and can't be dropped,
-    // so it will be found by the lookup.
-    // We also stash the catalog, so the Collection* returned by the lookup will not be invalidated
-    // by any catalog changes.
-    // The initialization here is therefore safe.
-    _oplog = CollectionPtr::CollectionPtr_UNSAFE(
-        _stashedCatalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace));
+    // Retain the collection itself rather than the catalog, so the Collection* stays valid without
+    // also keeping every other collection in that catalog version alive. The lookup returns null if
+    // the oplog does not exist, which callers of getCollection() must handle.
+    _oplogCollection =
+        CollectionCatalog::get(opCtx)->lookupOplogCollectionForFastPath_UNSAFE(opCtx);
+    _oplog = CollectionPtr::CollectionPtr_UNSAFE(_oplogCollection.get());
 }
 
 }  // namespace mongo

@@ -110,7 +110,7 @@ class test_layered_cursor12(wttest.WiredTigerTestCase):
 
     def remove_follower(self, keys):
         """Remove keys on the follower (local deletes). keys is a list of integers."""
-        cursor = self.session_follow.open_cursor(self.uri)
+        cursor = self.session_follow.open_cursor(self.uri, None, 'overwrite=false')
         for k in keys:
             key = self.fmt_key(k)
             self.session_follow.begin_transaction()

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/shell/shell_options.h"
@@ -50,7 +24,7 @@
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_options_client_gen.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -144,18 +118,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
     logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
         mongo::logv2::LogComponent::kDefault, minimumLoggedSeveity);
 
-    // `objcheck` option is part of `serverGlobalParams` to avoid making common parts depend upon
-    // the client options.  The option is set to false in clients by default.
-    if (params.count("objcheck")) {
-        serverGlobalParams.objcheck = true;
-    } else if (params.count("noobjcheck")) {
-        serverGlobalParams.objcheck = false;
-    } else {
-        serverGlobalParams.objcheck = false;
-    }
-
-    // Similar to 'objcheck' above, 'crashOnInvalidBSONError' must be common to both the server
-    // and shell for linking reasons.
+    // `crashOnInvalidBSONError` option is part of `serverGlobalParams` to avoid making common parts
+    // depend upon the client options.
     if (params.count("crashOnInvalidBSONError")) {
         serverGlobalParams.crashOnInvalidBSONError = true;
     }

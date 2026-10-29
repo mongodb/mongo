@@ -33,7 +33,6 @@ import wiredtiger
 # The bug occurred when an aborted prepared update at the tail of an update chain was incorrectly
 # causing has_newer_updates to be set in __rec_upd_select_inmem, which then triggered an assertion
 # failure in __split_multi_inmem.
-@wttest.skip_for_hook("tiered", "In-memory tests do not support tiered storage")
 class test_prepare44(wttest.WiredTigerTestCase):
     """Test that eviction of in-memory pages with aborted prepared updates
     does not trigger an assertion failure when preserve_prepared is enabled."""

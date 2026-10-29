@@ -176,8 +176,11 @@ public:
      *
      * Prior to this function call, it's asserted that bounded cursor returns with either a
      * valid key or with WT_NOTFOUND.
+     *
+     * Returns WT_ROLLBACK if the transaction was rolled back while validating, in which case no
+     * conclusion can be drawn and the caller must restart the transaction.
      */
-    void
+    int
     validate_bound_search_near(int range_ret, int range_exact, scoped_cursor &bounded_cursor,
       scoped_cursor &normal_cursor, const std::string &search_key, const bound_set &bounds)
     {
@@ -212,31 +215,35 @@ public:
 
             normal_cursor->set_key(normal_cursor.get(), key);
             /* Position the normal cursor on the found key from range cursor. */
-            testutil_check(normal_cursor->search(normal_cursor.get()));
+            int ret = normal_cursor->search(normal_cursor.get());
+            testutil_assert(ret == 0 || ret == WT_ROLLBACK);
+            if (ret == WT_ROLLBACK)
+                return (WT_ROLLBACK);
 
             /*
              * Call different validation methods depending on whether the search key is inside or
              * outside the range.
              */
             if (search_key_inside_range)
-                validate_successful_search_near_inside_range(
-                  normal_cursor, range_exact, search_key);
-            else {
-                testutil_assert(range_exact != 0);
-                validate_successful_search_near_outside_range(
-                  normal_cursor, lower_bound, upper_bound, above_lower_key);
-            }
+                return (validate_successful_search_near_inside_range(
+                  normal_cursor, range_exact, search_key));
+
+            testutil_assert(range_exact != 0);
+            return (validate_successful_search_near_outside_range(
+              normal_cursor, lower_bound, upper_bound, above_lower_key));
             /* Range cursor has not found anything within the set bounds. */
-        } else
-            validate_search_near_not_found(normal_cursor, lower_bound, upper_bound);
+        }
+        return (validate_search_near_not_found(normal_cursor, lower_bound, upper_bound));
     }
 
     /*
      * Validate that if the search key is inside the bounded range, that the range cursor has
      * returned a record that is visible and is a viable record that is closest to the search key.
      * We can use exact to perform this validation.
+     *
+     * Returns WT_ROLLBACK if the transaction was rolled back while validating.
      */
-    void
+    int
     validate_successful_search_near_inside_range(
       scoped_cursor &normal_cursor, int range_exact, const std::string &search_key)
     {
@@ -259,9 +266,11 @@ public:
 
             /* Check that the previous key is less than the search key. */
             ret = normal_cursor->prev(normal_cursor.get());
-            testutil_assert(ret == WT_NOTFOUND || ret == 0);
+            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK || ret == 0);
+            if (ret == WT_ROLLBACK)
+                return (WT_ROLLBACK);
             if (ret == WT_NOTFOUND)
-                return;
+                return (0);
             testutil_check(normal_cursor->get_key(normal_cursor.get(), &key));
             testutil_assert(custom_lexicographical_compare(key, search_key, false));
             /*
@@ -273,12 +282,15 @@ public:
 
             /* Check that the next key is greater than the search key. */
             ret = normal_cursor->next(normal_cursor.get());
-            testutil_assert(ret == WT_NOTFOUND || ret == 0);
+            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK || ret == 0);
+            if (ret == WT_ROLLBACK)
+                return (WT_ROLLBACK);
             if (ret == WT_NOTFOUND)
-                return;
+                return (0);
             testutil_check(normal_cursor->get_key(normal_cursor.get(), &key));
             testutil_assert(!custom_lexicographical_compare(key, search_key, true));
         }
+        return (0);
     }
 
     /*
@@ -287,8 +299,10 @@ public:
      * checking if the position of the search key is greater than the range or smaller than the
      * range. Further perform a next or prev call on the normal cursor and we expect that the key is
      * outside of the range.
+     *
+     * Returns WT_ROLLBACK if the transaction was rolled back while validating.
      */
-    void
+    int
     validate_successful_search_near_outside_range(scoped_cursor &normal_cursor,
       const bound &lower_bound, const bound &upper_bound, bool larger_search_key)
     {
@@ -296,9 +310,11 @@ public:
                                       normal_cursor->prev(normal_cursor.get());
         auto lower_key = lower_bound.get_key();
         auto upper_key = upper_bound.get_key();
+        testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
+        if (ret == WT_ROLLBACK)
+            return (WT_ROLLBACK);
         if (ret == WT_NOTFOUND)
-            return;
-        testutil_assert(ret == 0);
+            return (0);
 
         const char *key;
         testutil_check(normal_cursor->get_key(normal_cursor.get(), &key));
@@ -311,13 +327,17 @@ public:
         auto below_upper_key = upper_key.empty() ||
           custom_lexicographical_compare(key, upper_key, upper_bound.get_inclusive());
         testutil_assert(!(above_lower_key && below_upper_key));
+
+        return (0);
     }
 
     /*
      * Validate that the normal cursor is positioned at a key that is outside of the bounded range,
      * and that no visible keys exist in the bounded range.
+     *
+     * Returns WT_ROLLBACK if the transaction was rolled back while validating.
      */
-    void
+    int
     validate_search_near_not_found(
       scoped_cursor &normal_cursor, const bound &lower_bound, const bound &upper_bound)
     {
@@ -336,13 +356,17 @@ public:
 
         testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
         if (ret == WT_ROLLBACK)
-            return;
+            return (WT_ROLLBACK);
         /*
          * If search near has positioned the cursor before the lower key, perform a next() to to
          * place the cursor in the first record in the range.
          */
-        if (exact < 0)
+        if (exact < 0) {
             ret = normal_cursor->next(normal_cursor.get());
+            testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
+            if (ret == WT_ROLLBACK)
+                return (WT_ROLLBACK);
+        }
 
         /*
          * Validate that there are no keys in the bounded range that the range cursor could have
@@ -350,6 +374,8 @@ public:
          */
         const char *key;
         while (ret != WT_NOTFOUND) {
+            if (ret == WT_ROLLBACK)
+                return (WT_ROLLBACK);
             testutil_assert(ret == 0);
 
             testutil_check(normal_cursor->get_key(normal_cursor.get(), &key));
@@ -369,6 +395,8 @@ public:
 
             ret = normal_cursor->next(normal_cursor.get());
         }
+
+        return (0);
     }
 
     void
@@ -526,12 +554,22 @@ public:
                 bounded_cursor->set_key(bounded_cursor.get(), srch_key.c_str());
                 auto ret = bounded_cursor->search_near(bounded_cursor.get(), &exact);
                 testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
-                if (ret == WT_ROLLBACK)
-                    continue;
+                /*
+                 * A rolled-back transaction cannot be committed, and any further operation on it
+                 * only returns WT_ROLLBACK, so start again with a new transaction and a new read
+                 * timestamp.
+                 */
+                if (ret == WT_ROLLBACK) {
+                    tc->rollback();
+                    break;
+                }
 
                 /* Verify the bound search_near result using the normal cursor. */
-                validate_bound_search_near(
-                  ret, exact, bounded_cursor, normal_cursor, srch_key, bound_pair);
+                if (validate_bound_search_near(ret, exact, bounded_cursor, normal_cursor, srch_key,
+                      bound_pair) == WT_ROLLBACK) {
+                    tc->rollback();
+                    break;
+                }
 
                 /*
                  * If search near was successful, use the key it's currently positioned on as the
@@ -549,8 +587,10 @@ public:
                     ret = bounded_cursor->search(bounded_cursor.get());
 
                     testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
-                    if (ret == WT_ROLLBACK)
-                        continue;
+                    if (ret == WT_ROLLBACK) {
+                        tc->rollback();
+                        break;
+                    }
                     validate_bound_search(ret, bounded_cursor, range_key_copy, bound_pair);
                 }
 
@@ -754,12 +794,14 @@ public:
             while (tc->active() && tc->running()) {
                 int ret = cursor_traversal(bounded_cursor, normal_cursor, bound_pair.get_lower(),
                   bound_pair.get_upper(), true);
-                if (ret != 0)
+                if (ret != 0) {
                     /*
                      * The only error we expect to handle is WT_ROLLBACK. Crash for any other error.
                      */
                     testutil_assert(ret == WT_ROLLBACK);
-                else {
+                    tc->rollback();
+                    break;
+                } else {
                     /*
                      * Reset the position of the normal cursor here, we don't reset the bounded
                      * cursor as we expect it to have walked off the end of the range. Additionally
@@ -769,6 +811,10 @@ public:
                     ret = cursor_traversal(bounded_cursor, normal_cursor, bound_pair.get_lower(),
                       bound_pair.get_upper(), false);
                     testutil_assert(ret == 0 || ret == WT_ROLLBACK);
+                    if (ret == WT_ROLLBACK) {
+                        tc->rollback();
+                        break;
+                    }
                 }
                 tc->add_op();
                 if (tc->get_op_count() >= tc->get_target_op_count())

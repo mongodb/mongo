@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/commands/query_cmd/cluster_find_and_modify_cmd.h"
 
@@ -161,7 +135,7 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -601,7 +575,7 @@ void expandLetParams(OperationContext* opCtx,
                               {nss, ResolvedNamespace(nss, std::vector<BSONObj>{})}})
                           .fromRouter(true)
                           .bypassDocumentValidation(true)
-                          .explain(boost::none /* verbosity */)
+                          .explain(/*verbosity=*/boost::none)
                           .runtimeConstants(runtimeConstants)
                           .letParameters(letParams)
                           .build();
@@ -689,10 +663,10 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
 
             if (cri.hasRoutingTable()) {
                 auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-                    opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
+                    opCtx, nss, cri, collation, /*verbosity=*/boost::none, let, rc);
                 if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                                  nss,
-                                                                 false /* isUpdateOrDelete */,
+                                                                 /*isUpdateOrDelete=*/false,
                                                                  isUpsert,
                                                                  query,
                                                                  collation,
@@ -726,7 +700,7 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
                         cmdRequest,
                         applyReadWriteConcern(
                             opCtx, false, false, makeExplainCmd(opCtx, cmdRequest, verbosity)),
-                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                         isTimeseriesLogicalRequest,
                         &bob,
                         /*eligibleForSampling=*/false);
@@ -828,8 +802,11 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
         return;
     }
 
-    if (processFLEFindAndModify(opCtx, originalRequest, result) == FLEBatchResult::kProcessed) {
-        return;
+    if (prepareForFLERewrite(opCtx, originalRequest.getEncryptionInformation())) {
+        if (processFLEFindAndModify(opCtx, originalRequest, result) == FLEBatchResult::kProcessed) {
+            return;
+        }
+        // fall through
     }
 
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
@@ -893,7 +870,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                                                                        nss,
                                                                        cri,
                                                                        collation,
-                                                                       boost::none /* verbosity */,
+                                                                       /*verbosity=*/boost::none,
                                                                        letParams,
                                                                        runtimeConstants);
 
@@ -901,7 +878,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
 
             if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                              nss,
-                                                             false /* isUpdateOrDelete */,
+                                                             /*isUpdateOrDelete=*/false,
                                                              isUpsert,
                                                              query,
                                                              collation,
@@ -945,7 +922,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                             nss,
                             cmdRequest,
                             cmdRequest.toBSON(),
-                            boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                            /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                             isTimeseriesLogicalRequest,
                             &result);
             }
@@ -959,7 +936,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                         nss,
                         cmdRequest,
                         cmdRequest.toBSON(),
-                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                         isTimeseriesLogicalRequest,
                         &result);
         }
@@ -1069,7 +1046,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(
         prepareCmdObjForPassthrough(opCtx,
                                     cmdRequest.toBSON(),
                                     nss,
-                                    true /* eligibleForSampling */,
+                                    /*eligibleForSampling=*/true,
                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     // TODO SERVER-108928 - Handle this inside of prepareCmdObjForPassthrough.
@@ -1092,7 +1069,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(
 
     if (swRes.isOK()) {
         if (swRes.getValue().getResponse().isEmpty()) {
-            write_ops::FindAndModifyLastError lastError(0 /* n */);
+            write_ops::FindAndModifyLastError lastError(/*numDocs=*/0);
             lastError.setUpdatedExisting(false);
 
             write_ops::FindAndModifyCommandReply findAndModifyResponse;
@@ -1135,12 +1112,12 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
                                                   const BSONObj& originalExplainObj,
                                                   ExplainOptions::Verbosity verbosity,
                                                   BSONObjBuilder* result) {
-    auto cmdObjForPassthrough = prepareCmdObjForPassthrough(
-        opCtx,
-        originalExplainObj,
-        nss,
-        false /* eligibleForSampling */,
-        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
+    auto cmdObjForPassthrough =
+        prepareCmdObjForPassthrough(opCtx,
+                                    originalExplainObj,
+                                    nss,
+                                    /*eligibleForSampling=*/false,
+                                    /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
     auto explainObj = translateExplainObjForRawData(opCtx, cmdObjForPassthrough, nss);
 
@@ -1272,7 +1249,7 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         if (write_without_shard_key::useTwoPhaseProtocol(
                 opCtx,
                 nss,
-                false /* isUpdateOrDelete */,
+                /*isUpdateOrDelete=*/false,
                 cmdRequest.getUpsert().value_or(false),
                 cmdRequest.getQuery(),
                 cmdRequest.getCollation().value_or(BSONObj{}),
@@ -1291,7 +1268,7 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                         nss,
                         cmdRequestNoWC,
                         cmdRequestNoWC.toBSON(),
-                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                         isTimeseriesViewRequest,
                         result);
         }

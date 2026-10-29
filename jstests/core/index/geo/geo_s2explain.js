@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   uses_explain,
+ * ]
+ */
 // Test to check whether the number of intervals in a geoNear query equals
 // the number of inputStages it completes
 

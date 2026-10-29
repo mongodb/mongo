@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   does_not_support_stepdowns,
 // ]
 

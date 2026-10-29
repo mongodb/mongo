@@ -1,0 +1,3 @@
+# Golden test output of GoldenSbeFilterBuilderArraynessTestFixture/TestPathArraynessTraverseFElisionKnobDisabled
+TraverseFRetained_KnobDisabled
+traverseF(getField(s1, "a"), lambda(l3.0) { traverseF(getField(move(l3.0), "b"), lambda(l4.0) { ((move(l4.0) == 1) ?: false) }, false) }, false) 

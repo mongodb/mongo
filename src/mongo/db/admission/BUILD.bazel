@@ -78,10 +78,11 @@ mongo_cc_library(
     ],
     deps = [
         ":app_name_exemption_matcher",
-        ":ingress_admission_context",
+        ":ingress_request_admission_context",
         ":rate_limiter",
         ":rate_limiter_otel_metrics_recorder",
         "//src/mongo:base",
+        "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission/ticketing:admission_context",
@@ -124,6 +125,7 @@ mongo_cc_library(
     deps = [
         ":ingress_admission_control",
         ":ingress_request_rate_limiter",
+        ":write_throttler",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission/execution_control:ticketing_system",
@@ -143,6 +145,37 @@ mongo_cc_library(
     ],
 )
 
+# Kept in its own small library (like ingress_admission_context) so the ticketing queue-stats
+# library can depend on it without pulling in the write_throttler library (which would create a
+# dependency cycle through the ticketing admission_context).
+mongo_cc_library(
+    name = "write_throttler_admission_context",
+    srcs = [
+        "write_throttler_admission_context.cpp",
+    ],
+    hdrs = [
+        "write_throttler_admission_context.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "ingress_request_admission_context",
+    srcs = [
+        "ingress_request_admission_context.cpp",
+    ],
+    hdrs = [
+        "ingress_request_admission_context.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
+    ],
+)
+
 mongo_cc_library(
     name = "rate_limiter",
     srcs = [
@@ -153,7 +186,34 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
         "//src/third_party/folly:folly_token_bucket",
+    ],
+)
+
+idl_generator(
+    name = "egress_response_rate_limiter_gen",
+    src = "egress_response_rate_limiter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "egress_response_rate_limiter",
+    srcs = [
+        "egress_response_rate_limiter.cpp",
+        ":egress_response_rate_limiter_gen",
+    ],
+    hdrs = [
+        "egress_response_rate_limiter.h",
+    ],
+    deps = [
+        ":rate_limiter",
+        ":rate_limiter_otel_metrics_recorder",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
     ],
 )
 
@@ -183,6 +243,34 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "write_throttler_parameters_gen",
+    src = "write_throttler_parameters.idl",
+)
+
+# The IDL gen and the on_update definitions live in the same library (mirroring
+# ingress_request_rate_limiter): the gen's REGISTER block references
+# WriteThrottler::onUpdate*, so the symbols must resolve within one link unit to pass the
+# symbol checker. A separate parameters library would create a circular dep on write_throttler.
+mongo_cc_library(
+    name = "write_throttler",
+    srcs = [
+        "write_throttler.cpp",
+        ":write_throttler_parameters_gen",
+    ],
+    hdrs = [
+        "write_throttler.h",
+    ],
+    deps = [
+        ":rate_limiter",
+        ":write_throttler_admission_context",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
     ],
 )
 
@@ -244,6 +332,36 @@ mongo_cc_unit_test(
         ":rate_limiter",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "egress_response_rate_limiter_test",
+    srcs = [
+        "egress_response_rate_limiter_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":egress_response_rate_limiter",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "write_throttler_test",
+    srcs = [
+        "write_throttler_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":write_throttler",
+        ":write_throttler_admission_context",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
     ],
 )
 

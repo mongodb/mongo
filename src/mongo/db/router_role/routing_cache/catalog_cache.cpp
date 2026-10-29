@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 
@@ -45,7 +19,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -176,15 +149,6 @@ bool CollectionRoutingInfo::hasRoutingTable() const {
 }
 
 const ShardId& CollectionRoutingInfo::getDbPrimaryShardId() const {
-    const auto& shardRef = _dbInfo->getPrimary();
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Cannot represent shard " << shardRef
-                          << " as a ShardId because it is a UUID; use getShardRefAt() instead",
-            shardRef.isString());
-    return shardRef.getShardId();
-}
-
-const ShardRef& CollectionRoutingInfo::getDbPrimaryShardRef() const {
     return _dbInfo->getPrimary();
 }
 
@@ -200,17 +164,16 @@ ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
     return sv;
 }
 
-ShardVersion CollectionRoutingInfo::getShardVersion(OperationContext* opCtx,
-                                                    const ShardId& shardId) const {
-    auto sv = ShardVersionFactory::make(opCtx, getChunkManager(), shardId);
+ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) const {
+    auto sv = ShardVersionFactory::make(getChunkManager(), shardId);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }
     return sv;
 }
 
-AtomicWord<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
-AtomicWord<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
+Atomic<uint64_t> ComparableDatabaseVersion::_disambiguatingSequenceNumSource{1ULL};
+Atomic<uint64_t> ComparableDatabaseVersion::_forcedRefreshSequenceNumSource{1ULL};
 
 ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
     const boost::optional<DatabaseVersion>& version) {
@@ -221,7 +184,7 @@ ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersi
 
 ComparableDatabaseVersion
 ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh() {
-    return ComparableDatabaseVersion(boost::none /* version */,
+    return ComparableDatabaseVersion(/*version=*/boost::none,
                                      _disambiguatingSequenceNumSource.fetchAndAdd(1),
                                      _forcedRefreshSequenceNumSource.addAndFetch(2) - 1);
 }
@@ -322,6 +285,10 @@ CatalogCache::~CatalogCache() {
 }
 
 void CatalogCache::shutDownAndJoin() {
+    if (_hasShutDownAndJoined.swap(true)) {
+        return;
+    }
+
     // The CatalogCache must be shuted down before shutting down the CatalogCacheLoader as the
     // CatalogCache may try to schedule work on CatalogCacheLoader and fail.
     _executor.shutdown();
@@ -358,7 +325,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
         // finding the CatalogCache thread pool is full when the aggregation itself needs to refresh
         // the cache (i.e. $unionWith).
         return CachedDatabaseInfo{
-            DatabaseType(dbName, ShardRef{ShardId::kConfigServerId}, DatabaseVersion::makeFixed())};
+            DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed())};
     }
 
     Timer t{};
@@ -547,7 +514,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(OperationContext* opCtx,
                                                                          const NamespaceString& nss,
                                                                          bool allowLocks) {
-    return _getCollectionRoutingInfoAt(opCtx, nss, boost::none /* atClusterTime */, allowLocks);
+    return _getCollectionRoutingInfoAt(opCtx, nss, /*optAtClusterTime=*/boost::none, allowLocks);
 }
 
 void CatalogCache::_triggerPlacementVersionRefresh(const NamespaceString& nss) {
@@ -590,9 +557,9 @@ void CatalogCache::onStaleCollectionVersion(const NamespaceString& nss,
                                             const boost::optional<ShardVersion>& wantedVersion) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
-    const auto newChunkVersion = wantedVersion
-        ? ComparableChunkVersion::makeComparableChunkVersion(wantedVersion->placementVersion())
-        : ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
+    const auto newChunkVersion = (!wantedVersion || !wantedVersion->placementVersion().isSet())
+        ? ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh()
+        : ComparableChunkVersion::makeComparableChunkVersion(wantedVersion->placementVersion());
     _collectionCache.advanceTimeInStore(nss, newChunkVersion);
 }
 
@@ -676,6 +643,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
 
     _stats.report(&cacheStatsBuilder);
     _collectionCache.reportStats(&cacheStatsBuilder);
+    _databaseCache.reportStats(&cacheStatsBuilder);
 }
 
 void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const DatabaseName& dbName) {
@@ -724,7 +692,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
           },
           gCatalogCacheDatabaseMaxEntries),
       _catalogCacheLoader(catalogCacheLoader) {
-    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+    ObservableMutexRegistry::get().add("routerCacheMutexes", _mutex);
 }
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
@@ -736,7 +704,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
         LOGV2(8023400, "Hanging before refreshing cached database entry");
         blockDatabaseCacheLookup.pauseWhileSet();
     }
-    // TODO (SERVER-34164): Track and increment stats for database refreshes
+    _updateRefreshesStats(true);
 
     LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
 
@@ -760,8 +728,11 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
                                   "newDbVersion"_attr = newDbVersion,
                                   "oldDbVersion"_attr = previousDbVersion,
                                   "duration"_attr = Milliseconds(t.millis()));
+        _updateRefreshesStats(false);
         return CatalogCache::DatabaseCache::LookupResult(std::move(newDb), std::move(newDbVersion));
     } catch (const DBException& ex) {
+        _stats.countFailedDatabaseRefreshes.addAndFetch(1);
+        _updateRefreshesStats(false);
         LOGV2_FOR_CATALOG_REFRESH(24100,
                                   1,
                                   "Error refreshing cached database entry",
@@ -773,6 +744,26 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
         }
         throw;
     }
+}
+
+void CatalogCache::DatabaseCache::reportStats(BSONObjBuilder* builder) const {
+    _stats.report(builder);
+}
+
+void CatalogCache::DatabaseCache::_updateRefreshesStats(const bool add) {
+    if (add) {
+        _stats.numActiveDatabaseFullRefreshes.addAndFetch(1);
+        _stats.countDatabaseFullRefreshesStarted.addAndFetch(1);
+    } else {
+        _stats.numActiveDatabaseFullRefreshes.subtractAndFetch(1);
+    }
+}
+
+void CatalogCache::DatabaseCache::Stats::report(BSONObjBuilder* builder) const {
+    builder->append("numActiveFullDatabaseRefreshes", numActiveDatabaseFullRefreshes.load());
+    builder->append("countDatabaseFullRefreshesStarted", countDatabaseFullRefreshesStarted.load());
+
+    builder->append("countFailedDatabaseRefreshes", countFailedDatabaseRefreshes.load());
 }
 
 CatalogCache::CollectionCache::CollectionCache(
@@ -791,7 +782,7 @@ CatalogCache::CollectionCache::CollectionCache(
           },
           gCatalogCacheCollectionMaxEntries),
       _catalogCacheLoader(catalogCacheLoader) {
-    ObservableMutexRegistry::get().add("Router Cache Mutexes", _mutex);
+    ObservableMutexRegistry::get().add("routerCacheMutexes", _mutex);
 }
 
 void CatalogCache::CollectionCache::reportStats(BSONObjBuilder* builder) const {

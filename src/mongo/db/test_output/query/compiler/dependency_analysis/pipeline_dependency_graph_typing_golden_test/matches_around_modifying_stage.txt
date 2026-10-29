@@ -1,0 +1,32 @@
+VARIATION MatchesAroundModifyingStage
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$type": "string"
+                }
+            }
+        },
+        {
+            "$set": {
+                "x": "$y"
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: string|array(S)
+  after $set:1
+    x: any
+  end of pipeline
+    x: number|array(S)
+

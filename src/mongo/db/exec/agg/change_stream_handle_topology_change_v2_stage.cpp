@@ -1,38 +1,14 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_stage.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_metrics.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_pipeline_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
@@ -102,6 +78,13 @@ public:
 
         _mergeCursors->recognizeControlEvents();
 
+        // In ignore-removed-shards mode, promises made by a shard can be withdrawn when that shard
+        // is removed. Do not let the AsyncResultsMerger advance its high water mark from those
+        // promises; doing so would allow the client-visible post-batch resume token to regress.
+        if (_changeStream.getReadMode() == ChangeStreamReadMode::kIgnoreRemovedShards) {
+            _mergeCursors->disablePromisedSortKeyHighWaterMarkAdvancement();
+        }
+
         _initializationResumeToken = ResumeToken(resumeTokenData);
         LOGV2_DEBUG(12163604,
                     5,
@@ -109,7 +92,7 @@ public:
                     "changeStream"_attr = _changeStream.toString(),
                     "resumeToken"_attr = _initializationResumeToken,
                     "resumeTokenClusterTime"_attr = resumeTokenData.clusterTime);
-        setHighWaterMark(_initializationResumeToken.getClusterTime());
+        _mergeCursors->setHighWaterMark(_initializationResumeToken.toBSON());
 
         _originalAggregateCommand = expCtx->getOriginalAggregateCommand().getOwned();
     }
@@ -119,7 +102,7 @@ public:
                                  Timestamp atClusterTime,
                                  const stdx::unordered_set<ShardId>& shardIds) override {
         auto openedCursors =
-            openCursors(opCtx, atClusterTime, shardIds, false /* isConfigServer */, [&]() {
+            openCursors(opCtx, atClusterTime, shardIds, /*isConfigServer=*/false, [&]() {
                 // Build the change stream pipeline command to be run on the data shards.
                 // '_originalAggregateCommand' already contains the relevant match expressions
                 // for the oplog.
@@ -163,7 +146,7 @@ public:
                     expCtx->getNamespaceString(),
                     ReadPreferenceSetting::get(opCtx),
                     remotes,
-                    false /* allowPartialResults */);
+                    /*allowPartialResults=*/false);
             });
 
         tassert(12013801,
@@ -184,7 +167,7 @@ public:
 
         const auto shardId = getConfigShardId(opCtx);
         auto openedCursors =
-            openCursors(opCtx, atClusterTime, {shardId}, true /* isConfigServer */, [&]() {
+            openCursors(opCtx, atClusterTime, {shardId}, /*isConfigServer=*/true, [&]() {
                 // The change stream on the config server will be opened as a change stream on the
                 // "admin" namespace.
                 const NamespaceString nss = buildNamespaceForConfigServerPipeline();
@@ -210,6 +193,8 @@ public:
                     VersionContext::getDecoration(opCtx), aggReq, true);
                 aggReq.setNeedsMerge(true);
 
+                aggregation_request_helper::addQuerySettingsToRequest(aggReq, expCtx);
+
                 SimpleCursorOptions cursor;
                 cursor.setBatchSize(0);
                 aggReq.setCursor(cursor);
@@ -221,7 +206,7 @@ public:
                     aggReq.getNamespace(),
                     ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
                     {{shardId, aggReq.toBSON()}},
-                    false /* allowPartialResults */);
+                    /*allowPartialResults=*/false);
             });
 
         tassert(12013800,
@@ -233,7 +218,7 @@ public:
     }
 
     void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardIds) override {
-        closeCursors(shardIds, false /* isConfigServer */);
+        closeCursors(shardIds, /*isConfigServer=*/false);
 
         for (const auto& shardId : shardIds) {
             _currentlyTargetedDataShards.erase(shardId);
@@ -244,7 +229,7 @@ public:
         tassert(12013802,
                 "expected to have a cursor open on the config server when closing it",
                 _hasOpenConfigServerCursor);
-        closeCursors({getConfigShardId(opCtx)}, true /* isConfigServer */);
+        closeCursors({getConfigShardId(opCtx)}, /*isConfigServer=*/true);
         _hasOpenConfigServerCursor = false;
     }
 
@@ -279,11 +264,19 @@ public:
                                             .toBson());
     }
 
+    void setPromisedSortKeyHighWaterMarkAdvancement(bool enabled) override {
+        if (enabled) {
+            _mergeCursors->enablePromisedSortKeyHighWaterMarkAdvancement();
+        } else {
+            _mergeCursors->disablePromisedSortKeyHighWaterMarkAdvancement();
+        }
+    }
+
     Timestamp getTimestampFromCurrentHighWaterMark() const override {
         // The high water mark returned by the 'AsyncResultsMerger' has the format
         // {"_data":"..."}, so we can parse it directly.
         BSONObj highWaterMark = _mergeCursors->getHighWaterMark();
-        return ResumeToken::parse(highWaterMark).getData().clusterTime;
+        return ResumeToken::extractClusterTime(highWaterMark);
     }
 
 private:
@@ -477,7 +470,7 @@ public:
     void openCursorsOnDataShards(Timestamp atClusterTime,
                                  const stdx::unordered_set<ShardId>& shardSet) override {
         if (!shardSet.empty()) {
-            _bufferedRequests.validateStateForDataShardsAction(shardSet, true /* isOpen */);
+            _bufferedRequests.validateStateForDataShardsAction(shardSet, /*isOpen=*/true);
             _bufferedRequests.openCursorsOnDataShards.emplace(
                 std::make_pair(atClusterTime, shardSet));
         }
@@ -493,7 +486,7 @@ public:
      */
     void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardSet) override {
         if (!shardSet.empty()) {
-            _bufferedRequests.validateStateForDataShardsAction(shardSet, false /* isOpen */);
+            _bufferedRequests.validateStateForDataShardsAction(shardSet, /*isOpen=*/false);
             _bufferedRequests.closeCursorsOnDataShards.emplace(shardSet);
         }
     }
@@ -505,7 +498,7 @@ public:
      * - no previous call to "openCursorOnConfigServer()" has been made in the same context.
      */
     void openCursorOnConfigServer(Timestamp atClusterTime) override {
-        _bufferedRequests.validateStateForConfigServerAction(true /* isOpen */);
+        _bufferedRequests.validateStateForConfigServerAction(/*isOpen=*/true);
         _bufferedRequests.openCursorOnConfigServer.emplace(atClusterTime);
     }
 
@@ -516,7 +509,7 @@ public:
      * - no previous call to "closeCursorOnConfigServer()" has been made in the same context.
      */
     void closeCursorOnConfigServer() override {
-        _bufferedRequests.validateStateForConfigServerAction(false /* isOpen */);
+        _bufferedRequests.validateStateForConfigServerAction(/*isOpen=*/false);
         _bufferedRequests.closeCursorOnConfigServer = true;
     }
 
@@ -822,9 +815,15 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamHandleTopologyChangeV2,
 
 ChangeStreamHandleTopologyChangeV2Stage::ChangeStreamHandleTopologyChangeV2Stage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::shared_ptr<ChangeStreamHandleTopologyChangeV2Stage::Parameters> params)
+    std::shared_ptr<ChangeStreamHandleTopologyChangeV2Stage::Parameters> params,
+    ChangeStreamTopologyChangeV2MetricsRecorder metrics)
     : Stage(DocumentSourceChangeStreamHandleTopologyChangeV2::kStageName, expCtx),
-      _params(std::move(params)) {}
+      _params(std::move(params)),
+      _metrics(metrics) {}
+
+ChangeStreamHandleTopologyChangeV2Stage::~ChangeStreamHandleTopologyChangeV2Stage() {
+    _decrementDegradedIfCounted();
+}
 
 std::string_view ChangeStreamHandleTopologyChangeV2Stage::stateToString(
     ChangeStreamHandleTopologyChangeV2Stage::State state) {
@@ -878,7 +877,7 @@ Timestamp ChangeStreamHandleTopologyChangeV2Stage::extractTimestampFromDocument(
     const Document& input) {
     // Extract cluster time from the current event via the sortkey metadata field. This does not
     // rely on the "_id" field being present in the event.
-    return ResumeToken::parse(input.metadata().getSortKey().getDocument()).getData().clusterTime;
+    return ResumeToken::extractClusterTime(input.metadata().getSortKey().getDocument());
 }
 
 DocumentSource::GetNextResult ChangeStreamHandleTopologyChangeV2Stage::doGetNext() {
@@ -1011,7 +1010,71 @@ void ChangeStreamHandleTopologyChangeV2Stage::_setState(
                 "changeStream"_attr = _params->changeStream,
                 "resumeTokenClusterTime"_attr = _params->resumeToken.clusterTime);
 
+    // Count the entry into the new state. Only reached for transitions that passed the validation
+    // above, so 'kUninitialized' (forbidden as a transition target) is never recorded.
+    _recordStateEntry(newState);
+
+    // Maintain the currently-degraded gauge: +1 when this stream enters degraded mode, -1 when it
+    // leaves. The validation above guarantees '_state != newState', so exactly one of the branches
+    // below can fire. '_degradedCounted' makes the adjustment idempotent across 'doDispose()' and
+    // any post-dispose transition.
+    if (newState == State::kFetchingDegradedGettingChangeEvent && !_degradedCounted) {
+        _metrics.incrementDegraded();
+        _degradedCounted = true;
+    } else if (_state == State::kFetchingDegradedGettingChangeEvent && _degradedCounted) {
+        _metrics.decrementDegraded();
+        _degradedCounted = false;
+    }
+
     _state = newState;
+}
+
+void ChangeStreamHandleTopologyChangeV2Stage::_recordStateEntry(State newState) const {
+    switch (newState) {
+        case State::kWaiting:
+            _metrics.waiting.add(1);
+            return;
+        case State::kFetchingInitialization:
+            _metrics.fetchingInitialization.add(1);
+            return;
+        case State::kFetchingGettingChangeEvent:
+            _metrics.fetchingGettingChangeEvent.add(1);
+            return;
+        case State::kFetchingStartingChangeStreamSegment:
+            _metrics.fetchingStartingChangeStreamSegment.add(1);
+            return;
+        case State::kFetchingNormalGettingChangeEvent:
+            _metrics.fetchingNormalGettingChangeEvent.add(1);
+            return;
+        case State::kFetchingDegradedGettingChangeEvent:
+            _metrics.fetchingDegradedGettingChangeEvent.add(1);
+            return;
+        case State::kDowngrading:
+            _metrics.downgrading.add(1);
+            return;
+        case State::kFinal:
+            _metrics.final.add(1);
+            return;
+        case State::kUninitialized:
+            // Transitions back to 'kUninitialized' are forbidden (tassert in _setState()).
+            break;
+    }
+    MONGO_UNREACHABLE_TASSERT(13565600);
+}
+
+void ChangeStreamHandleTopologyChangeV2Stage::doDispose() {
+    // A stage torn down while in degraded mode never leaves it via a state transition, so
+    // decrement the gauge here. '_decrementDegradedIfCounted()' guards against
+    // double-decrementing if a transition out of degraded mode already ran, or against disposing
+    // a non-degraded stage.
+    _decrementDegradedIfCounted();
+}
+
+void ChangeStreamHandleTopologyChangeV2Stage::_decrementDegradedIfCounted() {
+    if (_degradedCounted) {
+        _metrics.decrementDegraded();
+        _degradedCounted = false;
+    }
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_assertState(
@@ -1115,7 +1178,7 @@ AllocationToShardsStatus ChangeStreamHandleTopologyChangeV2Stage::_getAllocation
 
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateUninitialized() {
-    _assertState(State::kUninitialized, {} /* mode */, "_handleStateUninitialized");
+    _assertState(State::kUninitialized, /*expectedMode=*/{}, "_handleStateUninitialized");
 
     auto allocationToShardsStatus = _getAllocationToShardsStatus(_params->resumeToken.clusterTime);
 
@@ -1143,7 +1206,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateUninitialized() {
 
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
-    _assertState(State::kWaiting, {} /* mode */, "_handleStateWaiting");
+    _assertState(State::kWaiting, /*expectedMode=*/{}, "_handleStateWaiting");
 
     OperationContext* opCtx = getContext()->getOperationContext();
     Date_t now = opCtx->getServiceContext()->getPreciseClockSource()->now();
@@ -1221,7 +1284,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
     _assertState(
-        State::kFetchingInitialization, {} /* mode */, "_handleStateFetchingInitialization");
+        State::kFetchingInitialization, /*expectedMode=*/{}, "_handleStateFetchingInitialization");
 
     tassert(10657513, "should not have shardTargeter object", _shardTargeter == nullptr);
 
@@ -1248,7 +1311,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       false /* degradedMode */);
+                                       /*degradedMode=*/false);
 
     auto shardTargeterDecision = _shardTargeter->initialize(
         getContext()->getOperationContext(), _params->resumeToken.clusterTime, readerContext);
@@ -1273,7 +1336,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent() {
     _assertState(State::kFetchingGettingChangeEvent,
-                 ChangeStreamReadMode::kStrict /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kStrict,
                  "_handleStateFetchingGettingChangeEvent");
 
     auto input = pSource->getNext();
@@ -1291,7 +1354,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent(
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       false /* degradedMode */);
+                                       /*degradedMode=*/false);
 
     auto shardTargeterDecision = _shardTargeter->handleEvent(
         getContext()->getOperationContext(), input.getDocument(), readerContext);
@@ -1315,7 +1378,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent(
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStreamSegment() {
     _assertState(State::kFetchingStartingChangeStreamSegment,
-                 ChangeStreamReadMode::kIgnoreRemovedShards /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kIgnoreRemovedShards,
                  "_handleStateFetchingStartingChangeStreamSegment");
 
     // Shard targeter should always be already present here in non-testing mode, but it may be
@@ -1337,7 +1400,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       true /* degradedMode */);
+                                       /*degradedMode=*/true);
 
     auto [shardTargeterDecision, segmentEndTimestamp] = _shardTargeter->startChangeStreamSegment(
         getContext()->getOperationContext(), *_segmentStartTimestamp, readerContext);
@@ -1396,8 +1459,17 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
                         "expecting no config server cursor to be open",
                         !_params->cursorManager->isCursorOnConfigServerOpen());
 
+                // This is a bounded segment: a shard promise may point beyond the segment end, so
+                // do not let it advance the client-visible high water mark.
+                _params->cursorManager->setPromisedSortKeyHighWaterMarkAdvancement(false);
+
                 _setState(State::kFetchingDegradedGettingChangeEvent);
             } else {
+                // Unbounded segment: promises from the current shard set are valid, so allow them
+                // to advance the client-visible high water mark again. This keeps the post-batch
+                // resume token moving forward while shards are idle.
+                _params->cursorManager->setPromisedSortKeyHighWaterMarkAdvancement(true);
+
                 _setState(State::kFetchingNormalGettingChangeEvent);
             }
             return boost::none;
@@ -1409,7 +1481,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChangeEvent() {
     _assertState(State::kFetchingNormalGettingChangeEvent,
-                 ChangeStreamReadMode::kIgnoreRemovedShards /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kIgnoreRemovedShards,
                  "_handleStateFetchingNormalGettingChangeEvent");
 
     auto input = pSource->getNext();
@@ -1435,7 +1507,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       false /* degradedMode */);
+                                       /*degradedMode=*/false);
 
     auto shardTargeterDecision = _shardTargeter->handleEvent(
         getContext()->getOperationContext(), input.getDocument(), readerContext);
@@ -1476,6 +1548,10 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
                     // Adjust end timestamp of the current segment and transition to degraded mode.
                     _segmentEndTimestamp = extractTimestampFromDocument(input.getDocument()) + 1;
 
+                    // This segment is now bounded, so shard promises may point beyond its end. Do
+                    // not let them advance the client-visible high water mark.
+                    _params->cursorManager->setPromisedSortKeyHighWaterMarkAdvancement(false);
+
                     LOGV2_DEBUG(10657543,
                                 3,
                                 STAGE_LOG_PREFIX
@@ -1507,7 +1583,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChangeEvent() {
     _assertState(State::kFetchingDegradedGettingChangeEvent,
-                 ChangeStreamReadMode::kIgnoreRemovedShards /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kIgnoreRemovedShards,
                  "_handleStateFetchingDegradedGettingChangeEvent");
 
     tassert(
@@ -1582,7 +1658,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       true /* degradedMode */);
+                                       /*degradedMode=*/true);
 
     auto shardTargeterDecision = _shardTargeter->handleEvent(
         getContext()->getOperationContext(), input.getDocument(), readerContext);
@@ -1607,7 +1683,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_handleStateDowngrading() {
-    _assertState(State::kDowngrading, {} /* mode */, "_handleStateDowngrading");
+    _assertState(State::kDowngrading, /*expectedMode=*/{}, "_handleStateDowngrading");
 
     uasserted(ErrorCodes::RetryChangeStream, "Downgrading change stream reader to v1 version");
 }

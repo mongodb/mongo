@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -160,18 +134,24 @@ public:
                 nss,
                 chunkRange,
                 cloneRequest.getFromShardId(),
-                false /* waitForCompletionOfMigrationOps*/)));
+                /*waitForCompletionOfMigrationOps=*/false)));
 
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.
         uassertStatusOK(
             FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(opCtx, nss, boost::none));
 
-        // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
-        // storage. This is not required for correctness, but helps mitigate stalls on secondaries
-        // when a shard receives the first chunk for a collection with a large routing table.
-        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        // With authoritative shards secondaries are not refreshed via the oplog, therefore the
+        // following code is not necessary anymore.
+        // TODO (SERVER-127253): Remove this condition once v9.0 branches out.
+        if (!cloneRequest.isAuthoritative()) {
+            // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
+            // storage. This is not required for correctness, but helps mitigate stalls on
+            // secondaries when a shard receives the first chunk for a collection with a large
+            // routing table.
+            FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        }
 
         uassertStatusOK(MigrationDestinationManager::get(opCtx)->start(
             opCtx, nss, std::move(scopedReceiveChunk), cloneRequest, writeConcern));
@@ -275,7 +255,15 @@ public:
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
         auto const mdm = MigrationDestinationManager::get(opCtx);
 
-        Status const status = mdm->startCommit(sessionId);
+        // Whether the recipient must refresh its filtering metadata when it later releases the
+        // migration critical section. Defaults to true so a donor that does not send the field
+        // (legacy path) keeps the pre-existing refresh behavior.
+        // TODO (SERVER-127253) Remove this once v9.0 branches out
+        const bool clearShardCatalogCache = cmdObj.hasField("clearShardCatalogCache")
+            ? cmdObj["clearShardCatalogCache"].Bool()
+            : true;
+
+        Status const status = mdm->startCommit(sessionId, clearShardCatalogCache);
         mdm->report(result, opCtx, false);
         if (!status.isOK()) {
             LOGV2(22014, "_recvChunkCommit failed", "error"_attr = redact(status));
@@ -391,10 +379,17 @@ public:
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
         const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
 
+        // Whether the recipient must refresh its filtering metadata before releasing the critical
+        // section. Defaults to true so a donor that does not send the field (legacy path) keeps the
+        // pre-existing refresh behavior.
+        const bool clearShardCatalogCache = cmdObj.hasField("clearShardCatalogCache")
+            ? cmdObj["clearShardCatalogCache"].Bool()
+            : true;
+
         LOGV2_DEBUG(5899101, 2, "Received _recvChunkReleaseCritSec", "sessionId"_attr = sessionId);
 
         const auto mdm = MigrationDestinationManager::get(opCtx);
-        const auto status = mdm->exitCriticalSection(opCtx, sessionId);
+        const auto status = mdm->exitCriticalSection(opCtx, sessionId, clearShardCatalogCache);
         if (!status.isOK()) {
             LOGV2(5899109, "_recvChunkReleaseCritSec failed", "error"_attr = redact(status));
             uassertStatusOK(status);

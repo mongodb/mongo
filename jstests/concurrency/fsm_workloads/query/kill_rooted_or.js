@@ -67,6 +67,7 @@ export const $config = (function () {
                 res,
                 [
                     ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.ConflictingOperationInProgress,
                     ErrorCodes.IndexBuildAborted,
                     ErrorCodes.IndexBuildAlreadyInProgress,
                     ErrorCodes.NoMatchingDocument,
@@ -74,6 +75,7 @@ export const $config = (function () {
                 ],
                 [
                     ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.ConflictingOperationInProgress,
                     ErrorCodes.IndexBuildAborted,
                     ErrorCodes.NoMatchingDocument,
                     ErrorCodes.StaleConfig,
@@ -96,10 +98,13 @@ export const $config = (function () {
             // collection (as in the 'dropCollection' state of this test), then we run out of
             // retries and get a CannotImplicitlyCreateCollection error once in a while, which we
             // have to ignore.
+            // Similarly, createIndexes gives up with ConflictingOperationInProgress when the
+            // collection keeps being dropped and recreated while it retries the index build.
             assertWorkedOrFailedHandleTxnErrors(
                 coll.createIndex(indexSpec),
                 [
                     ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.ConflictingOperationInProgress,
                     ErrorCodes.IndexBuildAborted,
                     ErrorCodes.IndexBuildAlreadyInProgress,
                     ErrorCodes.NoMatchingDocument,
@@ -107,6 +112,7 @@ export const $config = (function () {
                 ],
                 [
                     ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.ConflictingOperationInProgress,
                     ErrorCodes.IndexBuildAborted,
                     ErrorCodes.NoMatchingDocument,
                     ErrorCodes.StaleConfig,

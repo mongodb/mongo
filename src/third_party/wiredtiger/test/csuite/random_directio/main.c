@@ -101,11 +101,6 @@ static const char *const uri_rev = "table:rev";
 #define ENV_CONFIG                                                                              \
     "create,log=(file_max=10M,enabled),statistics=(all),statistics_log=(json,on_close,wait=1)," \
     "transaction_sync=(enabled,method=%s)"
-#define ENV_CONFIG_TIER \
-    ",tiered_storage=(bucket=./bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
-#define ENV_CONFIG_TIER_EXT                                  \
-    ",extensions=(%s../../../ext/storage_sources/dir_store/" \
-    "libwiredtiger_dir_store.so=(early_load=true))"
 
 /* 64 spaces */
 #define SPACES "                                                                "
@@ -207,7 +202,6 @@ usage(void)
 {
     fprintf(stderr, "usage: %s [options]\n", progname);
     fprintf(stderr, "options:\n");
-    fprintf(stderr, "  %-20s%s\n", "-B", "use tiered storage, requires -C checkpoint [false]");
     fprintf(stderr, "  %-20s%s\n", "-C", "use checkpoint [false]");
     fprintf(stderr, "  %-20s%s\n", "-d data_size", "approximate size of keys and values [1000]");
     fprintf(stderr, "  %-20s%s\n", "-f schema frequency",
@@ -426,20 +420,6 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id, uint32_t o
 }
 
 /*
- * set_flush_tier_delay --
- *     Set up a random delay for the next flush_tier.
- */
-static void
-set_flush_tier_delay(WT_RAND_STATE *rnd)
-{
-    /*
-     * We are checkpointing with a random interval up to MAX_CKPT_INVL seconds, and we'll do a flush
-     * tier randomly every 0-10 seconds.
-     */
-    opts->tiered_flush_interval_us = __wt_random(rnd) % (10 * WT_MILLION + 1);
-}
-
-/*
  * thread_ckpt_run --
  *     Runner function for the checkpoint thread.
  */
@@ -450,12 +430,8 @@ thread_ckpt_run(void *arg)
     WT_THREAD_DATA *td;
     uint32_t sleep_time;
     int i;
-    char ckpt_flush_config[128];
-    bool flush_tier;
 
     td = (WT_THREAD_DATA *)arg;
-    testutil_snprintf(ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force)");
-    set_flush_tier_delay(&td->extra_rnd);
 
     /*
      * Keep a separate file with the records we wrote for checking.
@@ -463,15 +439,9 @@ thread_ckpt_run(void *arg)
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     for (i = 1;; ++i) {
         sleep_time = __wt_random(&td->extra_rnd) % MAX_CKPT_INVL;
-        flush_tier = false;
-        testutil_tiered_sleep(opts, session, sleep_time, &flush_tier);
-        testutil_check(session->checkpoint(session, flush_tier ? ckpt_flush_config : NULL));
+        __wt_sleep(sleep_time, 0);
+        testutil_check(session->checkpoint(session, NULL));
         printf("Checkpoint %d complete.\n", i);
-        if (flush_tier) {
-            testutil_tiered_flush_complete(opts, session, NULL);
-            printf("Finished a flush_tier\n");
-            set_flush_tier_delay(&td->extra_rnd);
-        }
         fflush(stdout);
     }
     /* NOTREACHED */
@@ -598,16 +568,10 @@ create_db(const char *method, uint32_t flags)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    char envconf[512], tierconf[128];
+    char envconf[512];
 
     WT_UNUSED(flags);
     testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG, method);
-    if (opts->tiered_storage) {
-        testutil_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "");
-        strcat(envconf, tierconf);
-        strcat(envconf, ENV_CONFIG_TIER);
-    }
-
     printf("create_db: wiredtiger_open configuration: %s\n", envconf);
     testutil_check(wiredtiger_open(opts->home, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -636,7 +600,7 @@ fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
     WT_THREAD_DATA *td;
     wt_thread_t *thr;
     uint32_t ckpt_id, i;
-    char envconf[512], tierconf[128];
+    char envconf[512];
 
     /* Allocate number of threads plus another for checkpoint. */
     thr = dcalloc(nth + 1, sizeof(*thr));
@@ -644,19 +608,8 @@ fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
     if (chdir(opts->home) != 0)
         testutil_die(errno, "Child chdir: %s", opts->home);
     testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG, method);
-    if (opts->tiered_storage) {
-        testutil_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "../");
-        strcat(envconf, tierconf);
-        strcat(envconf, ENV_CONFIG_TIER);
-    }
-
     printf("fill_db: wiredtiger_open configuration: %s\n", envconf);
     testutil_check(wiredtiger_open(".", NULL, envconf, &conn));
-
-    if (opts->tiered_storage) {
-        set_flush_tier_delay(&opts->extra_rnd);
-        testutil_tiered_begin(opts);
-    }
     datasize += 1; /* Add an extra byte for string termination */
     printf(
       "Create %" PRIu32 " writer threads. Schema frequency %" PRIu64 "\n", nth, schema_frequency);
@@ -869,7 +822,7 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
     uint64_t gotid, id;
     uint64_t *lastid;
     uint32_t gotth, kvsize, th, threadmap;
-    char checkdir[4096], dbgdir[4096], envconf[512], savedir[4096], tierconf[128];
+    char checkdir[4096], dbgdir[4096], envconf[512], savedir[4096];
     char *gotkey, *gotvalue, *keybuf, *p;
     char **large_arr;
 
@@ -902,11 +855,6 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
 
     printf("Open database, run recovery and verify content\n");
     testutil_snprintf(envconf, sizeof(envconf), TESTUTIL_ENV_CONFIG_REC);
-    if (opts->tiered_storage) {
-        testutil_snprintf(tierconf, sizeof(tierconf), ENV_CONFIG_TIER_EXT, "");
-        strcat(envconf, tierconf);
-        strcat(envconf, ENV_CONFIG_TIER);
-    }
     ret = wiredtiger_open(checkdir, NULL, envconf, &conn);
     /* If this fails, abort the child process before we die so we can see what it was doing. */
     if (ret != 0) {
@@ -1135,7 +1083,7 @@ main(int argc, char *argv[])
     uint32_t datasize, flags, i, interval, ncycles, nth, timeout;
     int ch, status;
     char *arg, *p;
-    char args[1024], buf[1024];
+    char args[1024];
     char cwd_start[PATH_MAX]; /* The working directory when we started */
     const char *method, *working_dir;
     bool populate_only, preserve, rand_th, rand_time, verify_only;
@@ -1170,7 +1118,7 @@ main(int argc, char *argv[])
         testutil_snprintf_len_set(p, sizeof(args) - (size_t)(p - args), &size, " %s", argv[i]);
         p += size;
     }
-    testutil_parse_begin_opt(argc, argv, "h:P:pT:", opts);
+    testutil_parse_begin_opt(argc, argv, "h:pT:", opts);
     while ((ch = __wt_getopt(progname, argc, argv, "Cd:f:h:i:m:n:PpS:T:t:v")) != EOF)
         switch (ch) {
         case 'C':
@@ -1259,9 +1207,6 @@ main(int argc, char *argv[])
     /* Among other things, this initializes the random number generators in the option structure. */
     testutil_parse_end_opt(opts);
 
-    if (opts->tiered_storage && !LF_ISSET(TEST_CKPT))
-        usage();
-
     testutil_work_dir_from_path(opts->home, PATH_MAX, working_dir);
 
     /* Remember the current working directory. */
@@ -1289,11 +1234,6 @@ main(int argc, char *argv[])
     printf("CONFIG:%s\n", args);
     if (!verify_only) {
         testutil_recreate_dir(opts->home);
-        if (opts->tiered_storage) {
-            testutil_snprintf(buf, sizeof(buf), "%s/bucket", opts->home);
-            testutil_mkdir(buf);
-        }
-
         __wt_random_init(NULL, &rnd);
         if (rand_time) {
             timeout = __wt_random(&rnd) % MAX_TIME;

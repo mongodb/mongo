@@ -1,0 +1,18 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/sharding/query/change_streams/*.js
+  exclude_with_any_tags:
+    - do_not_run_in_whole_db_passthrough
+    - assumes_change_streams_v1
+
+executor:
+  archive:
+    tests:
+      - jstests/sharding/query/change_streams/*reshard*.js
+  config:
+    shell_options:
+      nodb: ""
+      eval: >-
+        await import('jstests/libs/override_methods/query/implicit_whole_db_changestreams.js');

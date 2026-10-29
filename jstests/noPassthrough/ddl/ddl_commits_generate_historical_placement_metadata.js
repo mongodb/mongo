@@ -1017,7 +1017,12 @@ function testRenameCollection() {
             .limit(1)
             .toArray()[0].o.create;
         const expectedEntryTemplatesOnSourceDataBearingShard = [
-            makeCreateCollectionEntryTemplate(targetDbName, tempCollName),
+            makeCreateCollectionEntryTemplate(
+                targetDbName,
+                tempCollName,
+                null /* cappedCollectionSize */,
+                true /* temp */,
+            ),
             makeRenameCollectionEntryTemplate(targetDbName, tempCollName, targetCollName),
             // The source collection gets dropped...
             makeDropCollectionEntryTemplate(sourceDbName, sourceCollName),

@@ -87,10 +87,7 @@ class test_prepare31(test_prepare_preserve_prepare_base):
 
     def check_prepared_stat(self, expected_value):
         """Check the rec_time_window_prepared statistic."""
-        stat_cursor = self.session.open_cursor('statistics:')
-        rec_time_window_prepared = stat_cursor[wiredtiger.stat.dsrc.rec_time_window_prepared][2]
-        self.assertEqual(rec_time_window_prepared, expected_value)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(wiredtiger.stat.dsrc.rec_time_window_prepared), expected_value)
 
     def test_skip_aborted_prepare_update_if_stable_rollback_timestamp(self):
         self.setup_initial_data(self.uri)

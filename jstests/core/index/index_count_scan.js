@@ -5,6 +5,7 @@
 // from generating a COUNT_SCAN plan. Further, we do not allow stepdowns, since the code responsible
 // for retrying on interrupt is not prepared to handle aggregation explain.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   # Aggregation commands with explain can't run on stepdown suites because them may return
 //   # incomplete results if interrupted by a stepdown.
@@ -12,7 +13,11 @@
 //   # Explain for the aggregate command cannot run within a multi-document transaction.
 //   does_not_support_transactions,
 // ]
-import {getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStage,
+    getSingleNodeExplain,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_count;
 coll.drop();
@@ -43,10 +48,12 @@ const getQueryPlan = function (explain) {
     if (explain.stages) {
         explain = explain.stages[0].$cursor;
     }
-    let winningPlan = explain.queryPlanner.winningPlan;
-    return winningPlan.queryPlan
-        ? [winningPlan.queryPlan, winningPlan.slotBasedPlan]
-        : [winningPlan, null];
+    // 'getWinningPlanFromExplain()' already unwraps the 'queryPlan' field when the SBE engine is
+    // used, so the SBE plan must be requested separately.
+    return [
+        getWinningPlanFromExplain(explain),
+        getWinningPlanFromExplain(explain, true /* isSBEPlan */),
+    ];
 };
 
 const runAndVerify = function (expectedCount, pipeline, stage, sbePlanStage) {

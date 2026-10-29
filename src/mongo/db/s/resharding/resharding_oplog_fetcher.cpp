@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 
@@ -215,7 +189,7 @@ void insertOplogBatch(OperationContext* opCtx,
                       const ShardId& donorShard,
                       const std::vector<InsertStatement>& oplogBatch,
                       bool storeProgress) {
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
 
     uassertStatusOK(collection_internal::insertDocuments(
         opCtx, oplogBufferColl, oplogBatch.begin(), oplogBatch.end(), nullptr));
@@ -229,7 +203,7 @@ void insertOplogBatch(OperationContext* opCtx,
             BSON("$inc" << BSON(ReshardingOplogFetcherProgress::kNumEntriesFetchedFieldName
                                 << static_cast<long long>(oplogBatch.size())));
         auto updateResult = Helpers::upsert(
-            opCtx, oplogFetcherProgressColl, filter, updateMod, false /* fromMigrate */);
+            opCtx, oplogFetcherProgressColl, filter, updateMod, /*fromMigrate=*/false);
         invariant(updateResult.numDocsModified == 1 || !updateResult.upsertedId.isEmpty());
     }
 
@@ -265,14 +239,16 @@ Milliseconds calculateTimeToFetch(OperationContext* opCtx,
 const ReshardingDonorOplogId ReshardingOplogFetcher::kFinalOpAlreadyFetched{Timestamp::max(),
                                                                             Timestamp::max()};
 
-ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
-                                               UUID reshardingUUID,
-                                               UUID collUUID,
-                                               ReshardingDonorOplogId startAt,
-                                               ShardId donorShard,
-                                               ShardId recipientShard,
-                                               NamespaceString oplogBufferNss,
-                                               bool storeProgress)
+ReshardingOplogFetcher::ReshardingOplogFetcher(
+    std::unique_ptr<Env> env,
+    UUID reshardingUUID,
+    UUID collUUID,
+    ReshardingDonorOplogId startAt,
+    ShardId donorShard,
+    ShardId recipientShard,
+    NamespaceString oplogBufferNss,
+    bool storeProgress,
+    boost::optional<ForwardableOperationMetadata> forwardableOpMetadata)
     : _env(std::move(env)),
       _reshardingUUID(reshardingUUID),
       _collUUID(collUUID),
@@ -280,6 +256,7 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
       _recipientShard(recipientShard),
       _oplogBufferNss(oplogBufferNss),
       _storeProgress(storeProgress),
+      _forwardableOpMetadata(std::move(forwardableOpMetadata)),
       _startAt(startAt) {
     auto [p, f] = makePromiseFuture<void>();
     std::lock_guard lk(_mutex);
@@ -536,9 +513,9 @@ bool ReshardingOplogFetcher::_needToEstimateRemainingTimeBasedOnMovingAverage(
         // Only check the feature flag once since the setFCV command aborts any in-progress
         // resharding operation so no resharding operations can span multiple FCV versions.
         _supportEstimatingRemainingTimeBasedOnMovingAverage =
-            resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            resharding::isEnabledWithPinnedVersion(
+                _forwardableOpMetadata,
+                resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage);
     }
 
     return *_supportEstimatingRemainingTimeBasedOnMovingAverage &&
@@ -826,14 +803,14 @@ bool ReshardingOplogFetcher::consume(
                                       MODE_IX);
             }
 
-            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+            WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
             // deleteObjects returns the number of deleted docs, which matches the progress doc
             // increment exactly (including progress-mark noops counted by insertOplogBatch).
             const long long numDeleted =
                 deleteObjects(opCtx,
                               oplogBufferColl,
                               BSON("_id" << BSON("$gt" << originalStartAt.toBSON())),
-                              false /* justOne */);
+                              /*justOne=*/false);
 
             if (oplogFetcherProgressColl && numDeleted > 0) {
                 auto filter = BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName

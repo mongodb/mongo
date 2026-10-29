@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/search/search_helper.h"
 
@@ -59,6 +33,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -213,6 +188,28 @@ parseMongotResponseCursors(std::vector<std::unique_ptr<executor::TaskExecutorCur
     }
     return result;
 }
+
+// Single source of truth for the security-trusted, mongod-owned $vectorSearch field names. mongod
+// derives these from trusted sources (the target collection name, its UUID, and the authorized view
+// name) when building the command sent to mongot.
+constexpr std::array kVectorSearchTrustedFields{mongot_cursor::kVectorSearchCmd,
+                                                mongot_cursor::kCollectionUuidField,
+                                                mongot_cursor::kViewNameField};
+
+static const std::vector<std::string_view>& getInternalOnlyFieldNames() {
+    static const std::vector<std::string_view> fields = {
+        InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
+        InternalSearchMongotRemoteSpec::kMetadataMergeProtocolVersionFieldName,
+        InternalSearchMongotRemoteSpec::kMergingPipelineFieldName,
+        InternalSearchMongotRemoteSpec::kLimitFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
+        InternalSearchMongotRemoteSpec::kSortSpecFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+        InternalSearchMongotRemoteSpec::kDocsNeededBoundsFieldName,
+        InternalSearchMongotRemoteSpec::kViewFieldName,
+    };
+    return fields;
+}
 }  // namespace
 
 void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -236,8 +233,8 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // * Get a sortSpec.
     const auto cmdObj = [&]() {
         PlanShardedSearchSpec cmd(
-            std::string(expCtx->getNamespaceString().coll()) /* planShardedSearch */,
-            remoteSpec->getMongotQuery() /* query */);
+            /*planShardedSearch=*/std::string(expCtx->getNamespaceString().coll()),
+            /*query=*/remoteSpec->getMongotQuery());
 
         if (expCtx->getExplain()) {
             cmd.setExplain(
@@ -270,6 +267,18 @@ bool hasReferenceToSearchMeta(const DocumentSource& ds) {
     ds.addVariableRefs(&refs);
     return Variables::hasVariableReferenceTo(refs,
                                              std::set<Variables::Id>{Variables::kSearchMetaId});
+}
+
+void excludeOperationMemoryTrackingForSecondaryMetadataCursor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (expCtx->getExcludeOperationMemoryTracking()) {
+        return;
+    }
+    LOGV2_DEBUG(13090700,
+                4,
+                "Disabling operation memory tracking: this $search query establishes a secondary "
+                "metadata cursor that shares the operation's memory tracker");
+    expCtx->setExcludeOperationMemoryTracking(true);
 }
 
 bool canMovePastDuringSplit(const DocumentSource& ds) {
@@ -693,7 +702,7 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
             getSearchRemoteExplain(expCtx,
                                    searchMetaStage->getSearchQuery(),
                                    searchMetaStage->getRemoteCursorId(),
-                                   boost::none /* sortSpec */,
+                                   /*sortSpec=*/boost::none,
                                    mongot_cursor::getOptimizationFlagsForSearchMeta()));
         return explainMap;
     }
@@ -720,30 +729,21 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec) {
     return boost::none;
 }
 
-void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec) {
-    // During $rankFusion parsing, if there's more than 1 mongot input pipeline, a view key will be
-    // injected during the parsing of that mongot stage (ex: $search, $vectorSearch, $searchMeta).
-    // Since $rankFusion passes the serialized version of the parsed pipeline to a
-    // DocumentSource::UnionWith(..) constructor, that serialized pipeline eventually gets reparsed.
-    // Because the view key already exists in the pipeline and the internal client flag is not set,
-    // this internal client error gets thrown.
-
-    // To avoid that, the isHybridSearch flag is only set after the initial parsing of the
-    // user-provided $rankFusion/$scoreFusion pipeline and its value is checked here to avoid
-    // throwing an internal client error.
-    if (spec.hasField(kViewFieldName) && !expCtx->isHybridSearch()) {
-        assertAllowedInternalIfRequired(
-            expCtx->getOperationContext(), kViewFieldName, AllowedWithClientType::kInternal);
+void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec) {
+    for (const auto& name : getInternalOnlyFieldNames()) {
+        if (spec.hasField(name)) {
+            assertAllowedInternalIfRequired(opCtx, name, AllowedWithClientType::kInternal);
+        }
     }
 }
 
-void validateMongotIndexedViewsFF(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                  const std::vector<BSONObj>& effectivePipeline) {
-    // Queries on views with empty effective pipelines (i.e. identity views) are treated as queries
-    // on the underlying collection, therefore allowed on all FCV versions that support search.
-    uassert(ErrorCodes::OptionNotSupportedOnView,
-            "search stages are unsupported on views",
-            effectivePipeline.empty() || expCtx->isFeatureFlagMongotIndexedViewsEnabled());
+void validateUserSpecDoesNotOverrideTrustedFields(const BSONObj& spec) {
+    for (const auto& field : kVectorSearchTrustedFields) {
+        uassert(12961800,
+                str::stream() << "Cannot specify the reserved field '" << field
+                              << "' in a $vectorSearch stage",
+                !spec.hasField(field));
+    }
 }
 
 void promoteStoredSourceOrAddIdLookup(
@@ -818,8 +818,8 @@ std::unique_ptr<SearchNode> getSearchNode(NamespaceString nss, DocumentSource* s
         return std::make_unique<SearchNode>(std::move(nss),
                                             true,
                                             searchStage->getSearchQuery(),
-                                            boost::none /* limit */,
-                                            boost::none /* sortSpec */,
+                                            /*limit=*/boost::none,
+                                            /*sortSpec=*/boost::none,
                                             searchStage->getRemoteCursorId(),
                                             searchStage->getRemoteCursorVars());
     } else {

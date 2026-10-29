@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -57,6 +31,10 @@ public:
         // Number of physical reads performed during a trial run. Once a storage cursor advances,
         // it counts as a single physical read.
         kNumReads,
+        // Number of intermediate results produced by join operators during a trial run.
+        kNumIntermediateRows,
+        // Number of times the plan spilled to disk during a trial run.
+        kNumSpills,
         // Must always be the last element to hold the number of elements in the enum.
         kLastElem
     };
@@ -70,8 +48,11 @@ public:
      * Callers can also pass a value of boost::none to indicate that the given metric should not
      * be tracked.
      */
-    TrialRunTracker(boost::optional<size_t> maxNumResults, boost::optional<size_t> maxNumReads)
-        : _maxMetrics{maxNumResults, maxNumReads} {}
+    TrialRunTracker(boost::optional<size_t> maxNumResults,
+                    boost::optional<size_t> maxNumReads,
+                    boost::optional<size_t> maxNumIntermediateRows,
+                    boost::optional<size_t> maxNumSpills)
+        : _maxMetrics{maxNumResults, maxNumReads, maxNumIntermediateRows, maxNumSpills} {}
 
     /**
      * Constructs a 'TrialRunTracker' that also has an '_onMetricReached' function, which gets
@@ -82,8 +63,11 @@ public:
      */
     TrialRunTracker(std::function<bool(TrialRunMetric)> onMetricReached,
                     boost::optional<size_t> maxNumResults,
-                    boost::optional<size_t> maxNumReads)
-        : _maxMetrics{maxNumResults, maxNumReads}, _onMetricReached(std::move(onMetricReached)) {}
+                    boost::optional<size_t> maxNumReads,
+                    boost::optional<size_t> maxNumIntermediateRows,
+                    boost::optional<size_t> maxNumSpills)
+        : _maxMetrics{maxNumResults, maxNumReads, maxNumIntermediateRows, maxNumSpills},
+          _onMetricReached(std::move(onMetricReached)) {}
 
     /**
      * Increments the trial run metric specified as a template parameter 'metric' by the

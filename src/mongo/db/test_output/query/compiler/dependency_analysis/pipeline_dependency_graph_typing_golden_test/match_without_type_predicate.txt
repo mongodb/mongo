@@ -1,0 +1,16 @@
+VARIATION MatchWithoutTypePredicate
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$gt": 5
+                }
+            }
+        }
+    ]
+}
+output:
+  end of pipeline
+    x: any
+

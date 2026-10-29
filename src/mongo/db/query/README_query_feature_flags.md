@@ -1,8 +1,8 @@
 # Query Feature Flags
 
 This page offers some further recommendations and guidance about expanding the query language via a
-feature flag. Please ensure you are familiar with the overall context documented in
-[FCV_AND_FEATURE_FLAG_README.md][fcv_readme].
+feature flag. Please ensure you are familiar with the overall context documented in [the FCV and
+Feature Flag documentation][fcv_readme].
 
 ## Summary
 
@@ -283,7 +283,7 @@ cannot offer any more specific advice.
 
 <!-- Links -->
 
-[fcv_readme]: /src/mongo/db/repl/FCV_AND_FEATURE_FLAG_README.md
+[fcv_readme]: /src/mongo/db/README.md#fcv-and-feature-flags
 [version_context]: /src/mongo/db/version_context.h
 [good_parse_example]:
   https://github.com/mongodb/mongo/blob/8ac5a0c814a5e8a0f79825327fdf6c3aa118c0fa/src/mongo/db/pipeline/document_source.cpp#L135

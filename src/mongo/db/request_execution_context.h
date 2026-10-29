@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/otel/traces/span/span.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -39,7 +14,7 @@
 
 #include <memory>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -54,7 +29,7 @@ class Command;
  * Any access from a client thread that does not own the `opCtx`, or after the `opCtx` is
  * released is strictly forbidden.
  */
-class MONGO_MOD_OPEN RequestExecutionContext {
+class [[MONGO_MOD_OPEN]] RequestExecutionContext {
 public:
     RequestExecutionContext() = delete;
     RequestExecutionContext(const RequestExecutionContext&) = delete;
@@ -66,7 +41,8 @@ public:
         : _opCtx(opCtx),
           _message(std::move(message)),
           _dbmsg(std::make_unique<DbMessage>(_message.get())),
-          _started(started) {}
+          _started(started),
+          _hasMoreToComeFlag(OpMsg::isFlagSet(_message.get(), OpMsg::kMoreToCome)) {}
 
     auto getOpCtx() const {
         dassert(_isOnClientThread());
@@ -87,6 +63,11 @@ public:
         return *_dbmsg.get();
     }
 
+    bool hasMoreToComeFlag() const {
+        dassert(_isOnClientThread());
+        return _hasMoreToComeFlag;
+    }
+
     void setRequest(OpMsgRequest request) {
         dassert(_isOnClientThread() && !_request);
         _request = std::move(request);
@@ -94,6 +75,36 @@ public:
     const OpMsgRequest& getRequest() const {
         dassert(_isOnClientThread() && _request);
         return _request.get();
+    }
+
+    bool hasOtelSpan() const {
+        dassert(_isOnClientThread());
+        return _otelSpan.has_value();
+    }
+    void setOtelSpan(otel::traces::Span otelSpan) {
+        dassert(_isOnClientThread() && !_otelSpan);
+        _otelSpan = std::move(otelSpan);
+    }
+    const otel::traces::Span& getOtelSpan() const {
+        dassert(_isOnClientThread() && _otelSpan);
+        return *_otelSpan;
+    }
+    otel::traces::Span& getOtelSpan() {
+        dassert(_isOnClientThread() && _otelSpan);
+        return *_otelSpan;
+    }
+
+    void setTelemetryContext(std::shared_ptr<otel::TelemetryContext> telemetryContext) {
+        dassert(_isOnClientThread());
+        _telemetryContext = std::move(telemetryContext);
+    }
+    std::shared_ptr<otel::TelemetryContext>& getTelemetryContext() {
+        dassert(_isOnClientThread());
+        return _telemetryContext;
+    }
+    const std::shared_ptr<otel::TelemetryContext>& getTelemetryContext() const {
+        dassert(_isOnClientThread());
+        return _telemetryContext;
     }
 
     void setCommand(Command* command) {
@@ -123,9 +134,12 @@ private:
     boost::optional<Message> _message;
     std::unique_ptr<DbMessage> _dbmsg;
     const Date_t _started;
+    bool _hasMoreToComeFlag;
     boost::optional<OpMsgRequest> _request;
     Command* _command = nullptr;
     std::unique_ptr<rpc::ReplyBuilderInterface> _replyBuilder;
+    std::shared_ptr<otel::TelemetryContext> _telemetryContext;
+    boost::optional<otel::traces::Span> _otelSpan;
 };
 
 }  // namespace mongo

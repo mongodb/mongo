@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/planner/cluster_aggregation_planner.h"
 
@@ -85,7 +59,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -179,7 +153,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
         ReadPreferenceSetting::get(opCtx),
         sharded_agg_helpers::getDesiredRetryPolicy(opCtx));
 
-    auto response = ars.next(true /* forMergeCursors*/);
+    auto response = ars.next(/*forMergeCursors=*/true);
     tassert(6273807,
             "requested and received data from just one shard, but results are still pending",
             ars.done());
@@ -187,20 +161,34 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
 }
 
 /**
- * Contacts the primary shard for the collection default collation.
- *
- * TODO SERVER-79159: This function can be deleted once all unsharded collections are tracked in the
- * sharding catalog (at this point, it wont't be necessary to contact the primary shard for
- * collation information).
+ * Information about an untracked collection that can only be learned by contacting its primary
+ * shard (see getUntrackedCollectionInfo below).
  */
-BSONObj getUntrackedCollectionCollation(OperationContext* opCtx, const NamespaceString& nss) {
+struct UntrackedCollectionInfo {
+    BSONObj collation;
+    bool untrackedIsViewlessTimeseries = false;
+};
+
+/**
+ * Contacts 'nss's primary shard for information that the router cannot otherwise learn about an
+ * untracked collection: its default collation, and whether it is a viewless timeseries
+ * collection. Callers should only invoke this for untracked collections (i.e. when
+ * '!cri->hasRoutingTable()'), and only when that information is actually needed, since it
+ * requires a network round trip.
+ *
+ * TODO SERVER-79159: This function can be deleted once all unsharded collections are tracked in
+ * the sharding catalog (at this point, it won't be necessary to contact the primary shard for
+ * this information).
+ */
+UntrackedCollectionInfo getUntrackedCollectionInfo(OperationContext* opCtx,
+                                                   const NamespaceString& nss) {
     ListCollections listCollectionsCmd;
     listCollectionsCmd.setDbName(nss.dbName());
     listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
 
     sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
     const auto collectionsList = router.route(
-        "getUntrackedCollectionCollation"sv,
+        "getUntrackedCollectionInfo"sv,
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
             generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
 
@@ -215,30 +203,50 @@ BSONObj getUntrackedCollectionCollation(OperationContext* opCtx, const Namespace
             return cursorResult.docs;
         });
 
-    // Collection or collection info does not exist; return an empty collation object.
+    // Collection or collection info does not exist; return the defaults (empty collation, not a
+    // viewless timeseries collection).
     if (collectionsList.empty() || collectionsList.front().isEmpty()) {
-        return BSONObj();
+        return {};
     }
 
     auto collectionInfo = collectionsList.front();
 
-    // We inspect 'info' to infer the collection default collation.
-    BSONObj collationToReturn = CollationSpec::kSimpleSpec;
+    UntrackedCollectionInfo info;
+
+    // listCollections reports both viewless and legacy viewful timeseries collections with type
+    // "timeseries". Treating either as viewless conservatively defers optimization to the shard.
+    // TODO SERVER-111172: Remove the legacy viewful-timeseries qualification once 9.0 is last LTS.
+    info.untrackedIsViewlessTimeseries = collectionInfo["type"].type() == BSONType::string &&
+        collectionInfo["type"].valueStringData() == "timeseries";
+
+    // We inspect 'options' to infer the collection default collation.
+    info.collation = CollationSpec::kSimpleSpec;
     if (collectionInfo["options"].type() == BSONType::object) {
         BSONObj collectionOptions = collectionInfo["options"].Obj();
         BSONElement collationElement;
         auto status = bsonExtractTypedField(
             collectionOptions, "collation", BSONType::object, &collationElement);
         if (status.isOK()) {
-            collationToReturn = collationElement.Obj().getOwned();
+            info.collation = collationElement.Obj().getOwned();
             uassert(ErrorCodes::BadValue,
                     "Default collation in collection metadata cannot be empty.",
-                    !collationToReturn.isEmpty());
+                    !info.collation.isEmpty());
         } else if (status != ErrorCodes::NoSuchKey) {
             uassertStatusOK(status);
         }
     }
-    return collationToReturn;
+    return info;
+}
+
+/**
+ * Contacts the primary shard for the collection default collation.
+ *
+ * TODO SERVER-79159: This function can be deleted once all unsharded collections are tracked in the
+ * sharding catalog (at this point, it won't be necessary to contact the primary shard for
+ * collation information).
+ */
+BSONObj getUntrackedCollectionCollation(OperationContext* opCtx, const NamespaceString& nss) {
+    return getUntrackedCollectionInfo(opCtx, nss).collation;
 }
 
 ShardId pickMergingShard(OperationContext* opCtx,
@@ -313,14 +321,11 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                 // TODO SERVER-79159: Once all unsharded collections are tracked in the sharding
                 // catalog, this 'else' block can be deleted.
 
-                // We should only be contacting the primary shard if the only shard that we are
-                // targeting is the primary shard and a stage has designated a specific merging
-                // shard.
+                // The database primary must be the sole targeted shard for this lookup.
                 tassert(8596500,
                         "Contacting primary shard for collation in unexpected case",
                         targetedShards.size() == 1 &&
-                            *targetedShards.begin() == cri->getDbPrimaryShardId() &&
-                            hasSpecificMergeShard);
+                            *targetedShards.begin() == cri->getDbPrimaryShardId());
 
                 if (auto untrackedDefaultCollation =
                         getUntrackedCollectionCollation(mergeCtx->getOperationContext(), nss);
@@ -391,8 +396,8 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
 
     // Attach the read and write concerns if needed, and return the final command object.
     return applyReadWriteConcern(mergeCtx->getOperationContext(),
-                                 !(txnRouter && mergingShardContributesData), /* appendRC */
-                                 !mergeCtx->getExplain(),                     /* appendWC */
+                                 !(txnRouter && mergingShardContributesData), /* setRC */
+                                 !mergeCtx->getExplain(),                     /* setWC */
                                  mergeCmd.freeze().toBson());
 }
 
@@ -481,7 +486,9 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                             Grid::get(opCtx)->getCursorManager(),
                             privileges,
-                            expCtx->getTailableMode()));
+                            expCtx->getTailableMode(),
+                            /*routerSort=*/boost::none,
+                            expCtx->getAllowPartialResults()));
 
     // If the mergingShard returned an error and did not accept ownership it is our responsibility
     // to kill the cursors.
@@ -526,6 +533,11 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     params.batchSize = batchSize == 0 ? boost::none : boost::make_optional(batchSize);
     params.originatingPrivileges = privileges;
     params.remoteMetricsToInclude = remoteMetricsToInclude;
+    // Record 'allowPartialResults' on the router cursor. The $mergeCursors AsyncResultsMerger's own
+    // tolerance for unreachable shards is configured separately in buildArmParams(); this flag is
+    // what lets ClusterClientCursorImpl report 'partialResultsReturned' if the router itself hits
+    // maxTimeMS while partial results are allowed.
+    params.isAllowPartialResults = pipelineForMerging->getContext()->getAllowPartialResults();
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
         opCtx, std::move(pipelineForMerging), std::move(params));
@@ -562,6 +574,12 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
             responseBuilder.setInvalidated();
             cursorState = ClusterCursorManager::CursorState::Exhausted;
             break;
+        } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
+            if (ccc->partialResultsReturned()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+                break;
+            }
+            throw;
         }
 
         // Check whether we have exhausted the pipeline's results.
@@ -606,6 +624,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     bool exhausted = cursorState != ClusterCursorManager::CursorState::NotExhausted;
     int nShards = ccc->getNumRemotes();
 
+    const bool partialResultsReturned = ccc->partialResultsReturned();
+
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // Fill out the aggregation metrics in CurOp, and record queryStats metrics, before detaching
     // the cursor from its opCtx.
@@ -626,7 +646,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         tassert(12552800,
                 "expected a post batch resume token for change stream query on the sharded cluster",
                 !pbrt.isEmpty());
-        opDebug.changeStreamMetrics.setOptime(ResumeToken::parse(pbrt).getClusterTime());
+        opDebug.changeStreamMetrics.setOptime(ResumeToken::extractClusterTime(pbrt));
     }
 
     if (exhausted) {
@@ -636,9 +656,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         collectQueryStatsMongos(opCtx, ccc);
     }
 
-    ccc->detachFromOperationContext();
     CursorId clusterCursorId = 0;
     if (!exhausted) {
+        // Detach only when registering the cursor, so a later getMore can reattach a fresh opCtx.
+        // An exhausted cursor is instead disposed from its destructor, which needs a valid opCtx to
+        // kill the remotes. Detaching first would dispose with a null opCtx (backstopped by
+        // MergeCursorsStage::doDispose).
+        ccc->detachFromOperationContext();
         auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,
@@ -650,6 +674,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         opDebug.cursorid = clusterCursorId;
     }
 
+    responseBuilder.setPartialResultsReturned(partialResultsReturned);
     responseBuilder.done(clusterCursorId, requestedNss);
 
     auto bodyBuilder = replyBuilder.getBodyBuilder();
@@ -709,9 +734,9 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                                                 serializedCommand,
                                                                 consumerPipelines.back(),
                                                                 boost::none, /* exchangeSpec */
-                                                                false /* needsMerge */,
-                                                                boost::none /* explain */,
-                                                                boost::none /* readConcern */,
+                                                                /*needsMerge=*/false,
+                                                                /*explain=*/boost::none,
+                                                                /*readConcern=*/boost::none,
                                                                 remoteMetricsToInclude);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
@@ -951,7 +976,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
         // cursors will be later added by the ChangeStreamHandleTopologyChangeV2 stage.
         sharded_agg_helpers::partitionAndAddMergeCursorsSource(
             mongosPipeline.get(),
-            {} /* cursors */,
+            /*cursors=*/{},
             shardDispatchResults.splitPipeline->shardCursorsSortSpec,
             remoteMetricsToInclude);
         return runPipelineOnMongoS(namespaces,
@@ -979,7 +1004,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                                namespaces.requestedNss,
                                                                std::move(remoteCursor),
                                                                privileges,
-                                                               expCtx->getTailableMode()));
+                                                               expCtx->getTailableMode(),
+                                                               expCtx->getAllowPartialResults()));
         return appendCursorResponseToCommandResult(shardId, reply, result);
     }
 
@@ -1008,12 +1034,11 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                    remoteMetricsToInclude);
 }
 
-std::pair<BSONObj, ExpressionContextCollationMatchesDefault> getCollation(
-    OperationContext* opCtx,
-    const boost::optional<CollectionRoutingInfo>& cri,
-    const NamespaceString& nss,
-    const BSONObj& collation,
-    bool requiresCollationForParsingUnshardedAggregate) {
+ResolvedCollectionInfo resolveCollectionInfo(OperationContext* opCtx,
+                                             const boost::optional<CollectionRoutingInfo>& cri,
+                                             const NamespaceString& nss,
+                                             const BSONObj& collation,
+                                             bool requiresCollationForParsingUnshardedAggregate) {
 
     // If this is a collectionless aggregation, we immediately return the user-defined collation if
     // one exists, or an empty BSONObj otherwise.
@@ -1025,12 +1050,23 @@ std::pair<BSONObj, ExpressionContextCollationMatchesDefault> getCollation(
     // information if it is necessary for pipeline parsing. Otherwise, we infer the collation once
     // the command is executed on the primary shard.
     if (!cri->hasRoutingTable()) {
+        if (requiresCollationForParsingUnshardedAggregate) {
+            // Pipeline parsing depends on the collection collation, so we must contact the primary
+            // shard to resolve it. This also lets us learn whether the collection is viewless
+            // timeseries, which determines whether the mandatory timeseries rewrite, and therefore
+            // optimization, must be deferred to the shard.
+            auto info = getUntrackedCollectionInfo(opCtx, nss);
+            if (!collation.isEmpty()) {
+                return {collation,
+                        ExpressionContextCollationMatchesDefault::kNo,
+                        info.untrackedIsViewlessTimeseries};
+            }
+            return {info.collation,
+                    ExpressionContextCollationMatchesDefault::kYes,
+                    info.untrackedIsViewlessTimeseries};
+        }
         if (!collation.isEmpty()) {
             return {collation, ExpressionContextCollationMatchesDefault::kNo};
-        }
-        if (requiresCollationForParsingUnshardedAggregate) {
-            return {getUntrackedCollectionCollation(opCtx, nss),
-                    ExpressionContextCollationMatchesDefault::kYes};
         }
         return {BSONObj(), ExpressionContextCollationMatchesDefault::kYes};
     }
@@ -1081,7 +1117,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     BSONObj cmdObj = sharded_agg_helpers::createPassthroughCommandForShard(expCtx,
                                                                            serializedCommand,
                                                                            explain,
-                                                                           nullptr /* pipeline */,
+                                                                           /*pipeline=*/nullptr,
                                                                            boost::none,
                                                                            overrideBatchSize,
                                                                            remoteMetricsToInclude);
@@ -1133,7 +1169,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                     "expected a postBatchResumeToken in the shard response for a change stream "
                     "$_passthroughToShard cursor",
                     !pbrt.isEmpty());
-            opDebug.changeStreamMetrics.setOptime(ResumeToken::parse(pbrt).getClusterTime());
+            opDebug.changeStreamMetrics.setOptime(ResumeToken::extractClusterTime(pbrt));
         }
         result = uassertStatusOK(storePossibleCursor(
             opCtx,
@@ -1145,7 +1181,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
             Grid::get(opCtx)->getCursorManager(),
             privileges,
             expCtx->getTailableMode(),
-            boost::optional<BSONObj>(change_stream_constants::kSortSpec) /* routerSort */));
+            /*routerSort=*/boost::optional<BSONObj>(change_stream_constants::kSortSpec),
+            expCtx->getAllowPartialResults()));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped

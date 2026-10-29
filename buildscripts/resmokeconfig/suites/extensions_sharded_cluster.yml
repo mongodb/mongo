@@ -36,7 +36,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagExtensionsAPI: true
     mongos_options:
-      set_parameters:
-        featureFlagExtensionsAPI: true
+      set_parameters: {}

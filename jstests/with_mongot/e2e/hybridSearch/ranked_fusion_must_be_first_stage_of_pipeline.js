@@ -1,7 +1,7 @@
 /*
  * Tests that $rankFusion must not be any stage other than the first in an aggregation pipeline.
  *
- * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {

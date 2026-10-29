@@ -71,10 +71,7 @@ class test_layered_fast_truncate09(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
         self.session.checkpoint()
 
-        follower_config = (
-            'disaggregated=(role="follower",'
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")')
-        self.reopen_conn(config=follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
     def truncate_range(self, session, start, stop):
         c_start = session.open_cursor(self.uri)

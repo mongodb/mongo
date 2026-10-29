@@ -3,6 +3,7 @@
  * sometimes exists.
  *
  * @tags: [
+ *   uses_explain,
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,

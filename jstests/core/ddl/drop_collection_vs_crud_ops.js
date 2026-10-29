@@ -2,6 +2,7 @@
  * Test that executing commands after collection.drop() returns the expected results.
  *
  * @tags: [
+ *   uses_explain,
  *   # This test uses getNext explicitly, so is sensitive to cases where it is retried and/or run on
  *   # a secondary mongod
  *   assumes_standalone_mongod,

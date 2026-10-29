@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/gen_extract_field_paths.h"
 
 #include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -41,6 +16,12 @@ sbe::value::Path toPath(const T& fullPath) {
     sbe::value::Path ret;
 
     FieldPath fieldPath{fullPath};
+    size_t reserveSize = 1;
+    if (fieldPath.getPathLength() > 0) {
+        reserveSize += 2 * (fieldPath.getPathLength() - 1) + 1;
+    }
+    ret.reserve(reserveSize);
+
     for (size_t i = 0; i < fieldPath.getPathLength() - 1; ++i) {
         ret.emplace_back(sbe::value::Get{.field = std::string(fieldPath.getFieldName(i))});
         ret.emplace_back(sbe::value::Traverse{});
@@ -133,7 +114,7 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
                 extractFieldPathsReqs.set(slotName);
             }
         });
-        ExpressionWalker walker(&visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+        ExpressionWalker walker(&visitor, /*inVisitor=*/nullptr, /*postVisitor=*/nullptr);
         expression_walker::walk<const Expression>(expression, &walker);
     }
     if (!ok) {
@@ -144,7 +125,6 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
         return boost::none;
     }
 
-    auto childStageOutputsData = childStageOutputs.getSlotNameToIdMap();
     for (const std::string& pathExpr : extractFieldPathsReqs.getPathExprs()) {
         FieldPath fieldPath{pathExpr};
         tassert(11163705,
@@ -156,15 +136,18 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
     return boost::make_optional(extractFieldPathsReqs);
 }
 
-std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
-                                                          StageBuilderState& state,
-                                                          const PlanStageSlots& childStageOutputs,
-                                                          PlanStageReqs& extractFieldPathsReqs,
-                                                          const PlanNodeId nodeId) {
+std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(
+    SbStage stage,
+    StageBuilderState& state,
+    const PlanStageSlots& childStageOutputs,
+    const PlanStageReqs& extractFieldPathsReqs,
+    const PlanNodeId nodeId) {
     std::vector<std::pair<sbe::value::Path, sbe::value::SlotId>> outputs;
+    const auto& pathExprs = extractFieldPathsReqs.getPathExprs();
+    outputs.reserve(pathExprs.size());
 
     PlanStageSlots extractionOutputs;
-    for (const std::string& fullPath : extractFieldPathsReqs.getPathExprs()) {
+    for (const std::string& fullPath : pathExprs) {
         FieldPath fieldPath{fullPath};
         tassert(11087200,
                 "extract_field_paths does not extract toplevel fields that already have slots",
@@ -187,12 +170,14 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
         tassert(11163701,
                 "Expected only toplevel paths as input to extract_field_paths stage",
                 path.size() == 2);
-        std::pair<sbe::value::Path, sbe::value::SlotId> input = {path, p.second.getId()};
-        inputs.push_back(input);
+        std::pair<sbe::value::Path, sbe::value::SlotId> input = {std::move(path), p.second.getId()};
+        inputs.push_back(std::move(input));
     }
     tassert(11163700, "Expected nonempty inputs", !inputs.empty());
 
-    return {sbe::makeS<sbe::ExtractFieldPathsStage>(std::move(stage), inputs, outputs, nodeId),
-            extractionOutputs};
+    SbBuilder b{state, nodeId};
+    return {
+        b.makeExtractFieldPaths(std::move(stage), std::move(inputs), std::move(outputs), nodeId),
+        std::move(extractionOutputs)};
 }
 }  // namespace mongo::stage_builder

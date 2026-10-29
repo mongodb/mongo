@@ -76,10 +76,16 @@ class compact_util(wttest.WiredTigerTestCase):
         return self.get_stat(stat.dsrc.btree_compact_pages_rewritten, uri)
 
     def get_bg_compaction_files_skipped(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        skipped = stat_cursor[stat.conn.background_compact_skipped][2]
-        stat_cursor.close()
-        return skipped
+        return self.get_stat(stat.conn.background_compact_skipped)
+
+    def get_bg_compaction_fail(self):
+        return self.get_stat(stat.conn.background_compact_fail)
+
+    # The number of files the background compaction server has finished with, whether it compacted
+    # them or not. Unlike the running statistic, this is cumulative and outlives the server.
+    def get_bg_compaction_files_processed(self):
+        return self.get_bg_compaction_success() + self.get_bg_compaction_fail() + \
+            self.get_bg_compaction_files_skipped()
 
     # Return the size of the given file.
     def get_size(self, uri):
@@ -91,14 +97,6 @@ class compact_util(wttest.WiredTigerTestCase):
         cstat.close()
         return sz
 
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def populate(self, uri, start_key, num_keys, value=None, value_size=1024):
         c = self.session.open_cursor(uri, None)
         for k in range(start_key, num_keys):
@@ -108,9 +106,20 @@ class compact_util(wttest.WiredTigerTestCase):
                 c[k] = value
         c.close()
 
-    def turn_on_bg_compact(self, config = ''):
+    # Enable the background compaction server and wait until it has started. Configured with
+    # run_once, the server clears the running statistic as soon as it has walked the metadata once
+    # and never sets it again, so waiting on that statistic alone waits forever whenever the pass
+    # finishes before we get to look. A file the server has finished with is equally good proof
+    # that it started, so accept either.
+    def turn_on_bg_compact(self, config = '', timeout = 60):
+        files_processed = self.get_bg_compaction_files_processed()
         self.session.compact(None, f'background=true,{config}')
+        deadline = time.time() + timeout
         while not self.get_bg_compaction_running():
+            if self.get_bg_compaction_files_processed() > files_processed:
+                return
+            self.assertLess(time.time(), deadline,
+                f'background compaction did not start within {timeout} seconds')
             time.sleep(0.1)
 
     def turn_off_bg_compact(self):

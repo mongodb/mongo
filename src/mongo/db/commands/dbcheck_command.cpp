@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/commands/dbcheck_command.h"
@@ -225,14 +199,14 @@ DbCheckStartAndStopLogger::DbCheckStartAndStopLogger(OperationContext* opCtx,
     oplogEntry.setNss(nss);
     oplogEntry.setType(OplogEntriesEnum::Start);
 
-    auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*parameters*/,
-                                                boost::none /*nss*/,
-                                                boost::none /*collectionUUID*/,
+    auto healthLogEntry = dbCheckHealthLogEntry(/*parameters=*/boost::none,
+                                                /*nss=*/boost::none,
+                                                /*collectionUUID=*/boost::none,
                                                 SeverityEnum::Info,
                                                 "",
                                                 ScopeEnum::Cluster,
                                                 OplogEntriesEnum::Start,
-                                                boost::none /*data*/);
+                                                /*data=*/boost::none);
 
     // The namespace logged in the oplog entry is the admin command namespace, but the
     // namespace this dbcheck invocation is run on will be stored in the `o.dbCheck` field
@@ -256,7 +230,7 @@ DbCheckStartAndStopLogger::DbCheckStartAndStopLogger(OperationContext* opCtx,
     }
 
     HealthLogInterface::get(_opCtx)->log(*healthLogEntry);
-    auto status = _logOp(_opCtx, nss, tenantId, boost::none /*uuid*/, oplogEntry.toBSON());
+    auto status = _logOp(_opCtx, nss, tenantId, /*uuid=*/boost::none, oplogEntry.toBSON());
     if (!status.isOK()) {
         LOGV2(6202200, "Could not add start event to oplog", "error"_attr = status.getStatus());
     }
@@ -268,14 +242,14 @@ DbCheckStartAndStopLogger::~DbCheckStartAndStopLogger() {
     oplogEntry.setNss(nss);
     oplogEntry.setType(OplogEntriesEnum::Stop);
 
-    auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*parameters*/,
-                                                boost::none /*nss*/,
-                                                boost::none /*collectionUUID*/,
+    auto healthLogEntry = dbCheckHealthLogEntry(/*parameters=*/boost::none,
+                                                /*nss=*/boost::none,
+                                                /*collectionUUID=*/boost::none,
                                                 SeverityEnum::Info,
                                                 "",
                                                 ScopeEnum::Cluster,
                                                 OplogEntriesEnum::Stop,
-                                                boost::none /*data*/);
+                                                /*data=*/boost::none);
 
     // The namespace logged in the oplog entry is the admin command namespace, but the
     // namespace this dbcheck invocation is run on will be stored in the `o.dbCheck` field
@@ -302,7 +276,7 @@ DbCheckStartAndStopLogger::~DbCheckStartAndStopLogger() {
     // during stepdown will raise an exception. We want to ensure that we log the dbcheck stop
     // on stepdown.
     HealthLogInterface::get(_opCtx)->log(*healthLogEntry);
-    auto status = _logOp(_opCtx, nss, tenantId, boost::none /*uuid*/, oplogEntry.toBSON());
+    auto status = _logOp(_opCtx, nss, tenantId, /*uuid=*/boost::none, oplogEntry.toBSON());
     if (!status.isOK()) {
         LOGV2(6202201, "Could not add stop event to oplog", "error"_attr = status.getStatus());
     }
@@ -821,6 +795,10 @@ bool DbChecker::_shouldRetryExtraKeysCheck(OperationContext* opCtx,
     } else if (code == ErrorCodes::ObjectIsBusy) {
         isRetryableError = true;
         msg = "stopping dbCheck extra keys batch because a resource is in use";
+    } else if (code == ErrorCodes::SnapshotUnavailable) {
+        // This is a retryable error.
+        isRetryableError = true;
+        msg = "abandoning dbCheck batch after conflict with pending catalog operation";
     } else if (code == ErrorCodes::CommandNotSupportedOnView) {
         msg =
             "abandoning dbCheck batch because collection no longer exists, but there is a view "
@@ -925,7 +903,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         batchStats->nHasherConsecutiveIdenticalKeysAtEnd,
         batchStats->readTimestamp,
         batchStats->time,
-        boost::none /* collOpts */,
+        /*options=*/boost::none,
         batchStats->indexSpec);
 
     if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info ||
@@ -1092,7 +1070,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
     }
 
     auto opTimeSW = _logOp(
-        opCtx, _info.nss, boost::none /* tenantIdForStartStop */, _info.uuid, oplogBatch.toBSON());
+        opCtx, _info.nss, /*tenantIdForStartStop=*/boost::none, _info.uuid, oplogBatch.toBSON());
     if (!opTimeSW.isOK()) {
         return opTimeSW.getStatus();
     }
@@ -1252,7 +1230,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     // Set the index cursor's end position based on the inputted end parameter for when to stop
     // the dbcheck command.
     auto indexCursorEndKey = Helpers::toKeyFormat(_info.end);
-    indexCursor->setEndPosition(indexCursorEndKey, true /*inclusive*/);
+    indexCursor->setEndPosition(indexCursorEndKey, /*inclusive=*/true);
     int64_t numKeysInSnapshot = 0;
     int64_t numBytesInSnapshot = 0;
 
@@ -1834,8 +1812,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
                                                 stats.md5,
                                                 key_string::rehydrateKey(BSON("_id" << 1), start),
                                                 batchEnd,
-                                                batchEnd /*lastKeyChecked*/,
-                                                0 /*nConsecutiveIdenticalIndexKeysAtEnd*/,
+                                                /*lastKeyChecked=*/batchEnd,
+                                                /*nConsecutiveIdenticalIndexKeysAtEnd=*/0,
                                                 stats.readTimestamp,
                                                 stats.time);
         if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info || stats.logToHealthLog) {
@@ -2001,8 +1979,8 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
     }
 
     // Send information on this batch over the oplog.
-    auto opTimeSW = _logOp(
-        opCtx, _info.nss, boost::none /* tenantIdForStartStop */, _info.uuid, batch.toBSON());
+    auto opTimeSW =
+        _logOp(opCtx, _info.nss, /*tenantIdForStartStop=*/boost::none, _info.uuid, batch.toBSON());
     if (!opTimeSW.isOK()) {
         return opTimeSW.getStatus();
     }

@@ -14,6 +14,7 @@ import structlog
 
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path, mkdtemp_in_build_dir
 from buildscripts.util.download_utils import (
+    S3AccessError,
     download_from_s3_with_boto,
     download_from_s3_with_requests,
 )
@@ -56,7 +57,14 @@ def download_from_s3(url):
     else:
         # Prefer boto3 library when possible.
         # boto3 library is much faster because it use multipart download.
-        download_from_s3_with_boto(url, filename)
+        # A plain (non-presigned) mciuploads URL may point at a private object. boto attempts a signed
+        # request and falls back to anonymous access for public objects; it only errors when both are
+        # forbidden. Surface that as a DownloadError so callers get an actionable message instead of
+        # a masked 403 that later manifests as an unrelated failure (e.g. a broken image build).
+        try:
+            download_from_s3_with_boto(url, filename)
+        except S3AccessError as err:
+            raise DownloadError(f"{err} URL was not presigned: {url}") from err
 
     return filename
 

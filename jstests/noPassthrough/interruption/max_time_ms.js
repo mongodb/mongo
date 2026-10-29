@@ -5,6 +5,9 @@
  * @tags: [
  *   requires_sharding,
  *   requires_scripting,
+ *   # This test isn't heavy itself, but it's too timing-sensitive to run under very
+ *   # heavy load. The resource_intensive tag allows it to run with less interference.
+ *   resource_intensive,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

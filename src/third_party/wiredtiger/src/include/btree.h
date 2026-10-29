@@ -183,6 +183,12 @@ struct __wt_btree {
     wt_shared wt_timestamp_t prune_timestamp; /* Ingest table GC collection timestamp */
     wt_timestamp_t checkpoint_timestamp;      /* Stable table checkpoint timestamp */
 
+    /* For an ingest btree, an upper bound on the durable timestamp of any update it holds. */
+    wt_shared wt_timestamp_t max_ingest_write_ts;
+
+    /* For an unpublished btree, the smallest durable timestamp of any update it holds. */
+    wt_shared wt_timestamp_t min_unpublished_durable_ts;
+
 #define WT_SPLIT_DEEPEN_MIN_CHILD_DEF (10 * WT_THOUSAND)
     u_int split_deepen_min_child; /* Minimum entries to deepen tree */
 #define WT_SPLIT_DEEPEN_PER_CHILD_DEF 100
@@ -200,7 +206,6 @@ struct __wt_btree {
     bool intlpage_compadjust;     /* Run-time compression adjustment */
     uint64_t maxintlpage_precomp; /* Internal page pre-compression size */
 
-    WT_BUCKET_STORAGE *bstorage;    /* Bucket storage source */
     WT_KEYED_ENCRYPTOR *kencryptor; /* Page encryptor */
 
     WT_PAGE_LOG *page_log; /* Page and log service for disaggregated storage */
@@ -219,8 +224,8 @@ struct __wt_btree {
 
     bool hs_entries; /* Has entries in the history store table */
 
-    WT_BM *bm;          /* Block manager reference */
-    u_int block_header; /* WT_PAGE_HEADER_BYTE_SIZE */
+    WT_BM *bm;                     /* Block manager reference */
+    u_int block_header_write_size; /* The size of a block header when writing a new page */
 
     uint64_t write_gen;      /* Write generation */
     uint64_t base_write_gen; /* Write generation on startup. */
@@ -251,6 +256,39 @@ struct __wt_btree {
     wt_shared uint64_t bytes_inmem;       /* Cache bytes in memory. */
     wt_shared uint64_t bytes_internal;    /* Bytes in internal pages. */
     wt_shared uint64_t bytes_updates;     /* Bytes in updates. */
+
+    /*
+     * Cache-consumer tracking. Each entry is the value the tree must reach before the accounting
+     * path looks at this metric's ranking again. A newly opened tree starts at 0, so it is
+     * considered on its very first byte, which is where the entry gets its real value; a tree
+     * excluded from the rankings (metadata, the history store) instead starts at UINT64_MAX, set by
+     * __wt_cache_top_btree_open, so it is never considered at all. Keeping this here rather than
+     * reading the threshold from the connection is what keeps the check in the accounting path to a
+     * comparison against a cache line that is already being written.
+     */
+    wt_shared uint64_t cache_top_recheck_at[WT_CACHE_TOP_METRICS];
+
+    /*
+     * Which slot of a ranking this tree currently occupies, or WT_CACHE_TOP_NOT_TRACKED if it is
+     * not in that ranking. This lets the accounting path find and update the tree's own entry
+     * directly, without scanning the ranking to find it, and lets a path that must not take the
+     * ranking's lock (see __cache_top_levels_refresh) tell whether the tree is already tracked.
+     */
+    wt_shared uint8_t cache_top_slot[WT_CACHE_TOP_METRICS];
+    /* Bytes read into and evicted from cache, decayed over time. */
+    wt_shared uint64_t bytes_read_decayed;
+    wt_shared uint64_t bytes_read_decay_clock;
+    wt_shared uint64_t bytes_evict_decayed;
+    wt_shared uint64_t bytes_evict_decay_clock;
+
+    /*
+     * Reserved marker value for leaf_entry_ewma / approx_leaf_pages meaning "never tracked": the
+     * table's checkpoint metadata predates this tracking and no WT_STAT_TYPE_TREE_WALK correction
+     * has run since. Neither field is updated by ordinary split/reconciliation activity while it
+     * holds this value; both are set together, straight to their exact values, by the first
+     * corrective walk.
+     */
+#define WT_LEAF_STATS_UNKNOWN UINT64_MAX
 
     /*
      * Approximate average number of K/V pairs per row-store leaf page. Maintained as an EWMA
@@ -305,9 +343,7 @@ struct __wt_btree {
      * We flush pages from the tree (in order to make checkpoint faster), without a high-level lock.
      * To avoid multiple threads flushing at the same time, lock the tree.
      */
-    WT_SPINLOCK flush_lock;              /* Lock to flush the tree's pages */
-    uint64_t flush_most_recent_secs;     /* Wall clock time for the most recent flush */
-    wt_timestamp_t flush_most_recent_ts; /* Timestamp of the most recent flush */
+    WT_SPINLOCK flush_lock; /* Lock to flush the tree's pages */
 
 /*
  * All of the following fields live at the end of the structure so it's easier to clear everything
@@ -326,11 +362,13 @@ struct __wt_btree {
     uint64_t evict_priority;                   /* Relative priority of cached pages */
     uint32_t evict_walk_progress;              /* Eviction walk progress */
     uint32_t evict_walk_target;                /* Eviction walk target */
+    u_int evict_walk_ends;                     /* Walk end-of-tree count since the scan arrived */
     wt_shared u_int evict_walk_period;         /* Skip this many LRU walks */
     u_int evict_walk_saved;                    /* Saved walk skips for checkpoints */
     u_int evict_walk_skips;                    /* Number of walks skipped */
     wt_shared int32_t evict_disabled;          /* Eviction disabled count */
     bool evict_disabled_open;                  /* Eviction disabled on open */
+    bool evict_walk_dominating;                /* Current walk overrode the walk period */
     wt_shared volatile uint32_t evict_busy;    /* Count of threads in eviction */
     wt_shared volatile uint32_t prefetch_busy; /* Count of threads in prefetch */
     WT_EVICT_WALK_TYPE evict_start_type;
@@ -347,21 +385,40 @@ struct __wt_btree {
  * explanation.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 12 */
-#define WT_BTREE_BULK 0x0001000u            /* Bulk-load handle */
-#define WT_BTREE_CLOSED 0x0002000u          /* Handle closed */
-#define WT_BTREE_DISAGGREGATED 0x0004000u   /* In disaggregated storage */
-#define WT_BTREE_GARBAGE_COLLECT 0x0008000u /* Content becomes obsolete automatically */
-#define WT_BTREE_IGNORE_CACHE 0x0010000u    /* Cache-resident object */
-#define WT_BTREE_IN_MEMORY 0x0020000u       /* Cache-resident object */
-#define WT_BTREE_LOGGED 0x0040000u          /* Commit-level durability without timestamps */
-#define WT_BTREE_NO_CHECKPOINT 0x0080000u   /* Disable checkpoints */
-#define WT_BTREE_NO_EVICT 0x0100000u        /* Cache-resident object. Never run eviction on it. */
-#define WT_BTREE_READONLY 0x0200000u        /* Handle is readonly */
-#define WT_BTREE_SALVAGE 0x0400000u         /* Handle is for salvage */
-#define WT_BTREE_SKIP_CKPT 0x0800000u       /* Handle skipped checkpoint */
-#define WT_BTREE_VERIFY 0x1000000u          /* Handle is for verify */
-                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WT_BTREE_BULK 0x001000u            /* Bulk-load handle */
+#define WT_BTREE_CLOSED 0x002000u          /* Handle closed */
+#define WT_BTREE_DISAGGREGATED 0x004000u   /* In disaggregated storage */
+#define WT_BTREE_GARBAGE_COLLECT 0x008000u /* Content becomes obsolete automatically */
+#define WT_BTREE_IGNORE_CACHE 0x010000u    /* Cache-resident object */
+#define WT_BTREE_IN_MEMORY 0x020000u       /* Cache-resident object */
+#define WT_BTREE_LOGGED 0x040000u          /* Commit-level durability without timestamps */
+#define WT_BTREE_NO_EVICT 0x080000u        /* Cache-resident object. Never run eviction on it. */
+#define WT_BTREE_SALVAGE 0x100000u         /* Handle is for salvage */
+#define WT_BTREE_VERIFY 0x200000u          /* Handle is for verify */
+                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    /*
+     * These flags are only modified while the data handle is held exclusively, that is, at open, at
+     * close, or by an operation that has locked out all other users of the handle. Anything that
+     * can change while other threads are using the tree belongs in the atomic flags below.
+     */
     uint32_t flags;
+
+/*
+ * Atomic flags, use F_*_ATOMIC_32. Unlike the flags above, we expect to set and clear these flags
+ * concurrently without locking the btree.
+ */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_BTREE_AWAITS_PUBLISH 0x1u /* An unpublished btree, which will be published later */
+#define WT_BTREE_READONLY 0x2u       /* Handle is readonly */
+#define WT_BTREE_SKIP_CKPT 0x4u      /* Handle skipped checkpoint */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    wt_shared uint32_t flags_atomic;
+
+    /*
+     * The schema epoch that published the table's create, or WT_SCHEMA_EPOCH_NONE. Writers hold the
+     * schema lock; readers need not, so access it atomically.
+     */
+    wt_shared wt_timestamp_t create_schema_epoch;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
@@ -445,3 +502,17 @@ struct __wti_disk_leaf_merge_state {
     uint8_t *cell_ptr;
     uint32_t entries;
 };
+
+/*
+ * __wt_btree_stays_in_memory --
+ *     Return whether a btree must be kept in memory, i.e. no page may be written to disk. This is
+ *     true for an in-memory configured btree, and for a disaggregated btree that is still awaiting
+ *     publication: such a btree behaves as if in-memory until the flag is cleared, after which it
+ *     is written out and checkpointed normally.
+ */
+static WT_INLINE bool
+__wt_btree_stays_in_memory(WT_BTREE *btree)
+{
+    return (
+      F_ISSET(btree, WT_BTREE_IN_MEMORY) || F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH));
+}

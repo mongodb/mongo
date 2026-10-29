@@ -7,6 +7,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -230,33 +231,35 @@ function testStopRetryingOnFailover(st) {
 }
 
 function runTests() {
-    // This test exercises the legacy _flushReshardingStateChange retry path. When any of the
-    // flush-disabling feature flags are on, the coordinator skips sending
-    // _flushReshardingStateChange to participants, so the retry behavior under test cannot
-    // occur. We therefore force all four flags off here.
-    const setParameter = {
-        featureFlagReshardingCloneNoRefresh: false,
-        featureFlagReshardingInitNoRefresh: false,
-        featureFlagReshardingNoRefreshApplyingAndBlockingWrites: false,
-        featureFlagReshardingSkipCloningAndApplyingIfApplicable: false,
-        // The test also has to disable the feature flags for authoritative shards DDLs since
-        // they depend on these feature flags to be enabled.
-        featureFlagAuthoritativeShardsCRUD: false,
-        featureFlagAuthoritativeShardsDDL: false,
-    };
-
     const st = new ShardingTest({
         shards: 2,
         rs: {
             nodes: 3,
-            setParameter,
-        },
-        other: {
-            configOptions: {
-                setParameter,
-            },
         },
     });
+
+    // This test exercises the legacy _flushReshardingStateChange retry path, which only runs when
+    // the resharding no-refresh feature flags are disabled. Those flags (along with the
+    // authoritative-shards flags that depend on them) are FCV-gated and enabled by default on the
+    // latest FCV, so the only realistic way to disable them is to run on an older FCV.
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
+
+    // If the ReshardingCloneNoRefresh feature flag is enabled even when FCV is lastLTS, that means
+    // the legacy _flushReshardingStateChange refresh path is no longer exercised. Skip rather than
+    // have the test fail in that case.
+    //
+    // TODO (SERVER-98023): Remove this test entirely once the resharding no-refresh feature flags
+    // are removed.
+    if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ReshardingCloneNoRefresh")) {
+        jsTest.log.info(
+            "Skipping test: resharding no-refresh feature flags are enabled at " +
+                "lastLTSFCV, so the legacy refresh path cannot be exercised",
+        );
+        st.stop();
+        return;
+    }
 
     testRetryOnTransientError(st);
     testStopRetryingOnFailover(st);

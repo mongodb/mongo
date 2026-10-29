@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,6 +10,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
@@ -53,6 +28,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
@@ -208,6 +184,13 @@ class MigrationChunkClonerSource {
     MigrationChunkClonerSource& operator=(const MigrationChunkClonerSource&) = delete;
 
 public:
+    struct CloneStats {
+        long long xferModsDeletes{0};
+        long long xferModsUpserts{0};
+        long long sessionOplogEntriesToBeMigrated{0};
+        long long sessionOplogEntriesSkippedLowerBound{0};
+    };
+
     MigrationChunkClonerSource(OperationContext* opCtx,
                                const ShardsvrMoveRange& request,
                                const WriteConcernOptions& writeConcern,
@@ -223,11 +206,18 @@ public:
      *
      * NOTE: Must be called without any locks and must succeed, before any other methods are called
      * (except for cancelClone and [insert/update/delete]Op).
+     *
+     * The parameter 'enclosingChunk' is NOT the range to be moved; instead it is the chunk that
+     * encloses the migrated range. It is required by the recipient to know whether the migration
+     * should be aborted to prevent losing point-in-time accessibility.
+     * TODO (SERVER-127253) Make this parameter non-optional once v9.0 branches out.
      */
     Status startClone(OperationContext* opCtx,
                       const UUID& migrationId,
                       const LogicalSessionId& lsid,
-                      TxnNumber txnNumber);
+                      TxnNumber txnNumber,
+                      const boost::optional<ChunkRange>& enclosingChunk,
+                      bool isAuthoritative);
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate
@@ -253,9 +243,14 @@ public:
      * Returns statistics about the move. These are informational only and should not be
      * interpreted by the caller for any means other than reporting.
      *
+     * 'clearShardCatalogCache' tells the recipient whether it must refresh its filtering
+     * metadata when it later releases the migration critical section. The authoritative commit
+     * path installs the post-migration metadata directly, so it does not need the refresh.
+     * TODO (SERVER-127253) Remove clearShardCatalogCache once v9.0 branches out.
+     *
      * NOTE: Must be called without any locks.
      */
-    StatusWith<BSONObj> commitClone(OperationContext* opCtx);
+    StatusWith<BSONObj> commitClone(OperationContext* opCtx, bool clearShardCatalogCache);
 
     /**
      * Tells the recipient to abort the clone and cleanup any unused data. This method's
@@ -351,6 +346,13 @@ public:
             static_cast<bool>(_jumboChunkCloneState->clonerExec) && _forceJumbo;
     }
 
+    /* Whether the cloner has finished: it has either committed the clone on the recipient or been
+     * cancelled. */
+    bool isDone() const {
+        std::lock_guard<std::mutex> lk(_mutex);
+        return _state == kDone;
+    }
+
     /**
      * Called by the recipient shard. Transfers the accummulated local mods from source to
      * destination. Must not be called before all cloned objects have been fetched through calls to
@@ -414,6 +416,8 @@ public:
      * Returns the number of session oplog entries that need to be sent to the destination shard.
      */
     boost::optional<long long> getSessionOplogEntriesToBeMigratedSoFar();
+
+    CloneStats getCloneStats() const;
 
 private:
     friend class LogOpForShardingHandler;
@@ -592,6 +596,17 @@ private:
     void _cleanup(bool wasSuccessful);
 
     /**
+     * Schedules the specified command to be sent to the recipient shard, invoking 'callback' with
+     * the response. The remote command is aborted if it does not complete within 'timeout'; pass
+     * RemoteCommandRequest::kNoTimeout to let it run unbounded. Returns the handle of the scheduled
+     * callback, or the reason why it could not be scheduled.
+     */
+    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleRecipientCommand(
+        const BSONObj& cmdObj,
+        Milliseconds timeout,
+        executor::TaskExecutor::RemoteCommandCallbackFn callback);
+
+    /**
      * Synchronously invokes the recipient shard with the specified command and either returns the
      * command response (if succeeded) or the status, if the command failed.
      */
@@ -718,7 +733,7 @@ private:
     State _state{kNew};
 
     // Used to keep track of the critical section to mark transfer mods as non-deprioritizable
-    AtomicWord<bool> _prioritizeLocalOps{false};
+    Atomic<bool> _prioritizeLocalOps{false};
 
     CloneList _cloneList;
 
@@ -754,6 +769,9 @@ private:
 
     // Amount of delete xfer mods that have not yet reached the recipient.
     size_t _untransferredDeletesCounter{0};
+
+    long long _numXferModsDeletesTransferred{0};
+    long long _numXferModsUpsertsTransferred{0};
 
     // Amount of ops that are yet to be converted to update/delete xferMods.
     size_t _deferredUntransferredOpsCounter{0};

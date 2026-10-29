@@ -97,7 +97,10 @@ const testCases = [
 ];
 
 function assertPipelineField(conn, expectedPipeline) {
-    const entry = getLatestQueryStatsEntry(conn, {collName: collName});
+    const entry = getLatestQueryStatsEntry(conn, {
+        collName: collName,
+        commandName: "aggregate",
+    });
     const statsPipeline = getValueAtPath(entry, "key.queryShape.pipeline");
     assert.eq(statsPipeline, expectedPipeline);
 }
@@ -182,7 +185,8 @@ function validateChangeStreamAggKey(conn) {
         rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
         mongosOptions: {
             setParameter: {
-                internalQueryStatsRateLimit: -1,
+                internalQueryStatsSampleRate: 1,
+                internalQueryStatsWriteCmdSampleRate: 0,
             },
         },
     });

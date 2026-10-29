@@ -7,6 +7,7 @@
  * (indexesAffected=true). Both conditions must hold for the memory check to fire.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,
@@ -22,7 +23,7 @@
  * ]
  */
 
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.update_stage_memory_limit;
@@ -47,7 +48,7 @@ const explainRes = assert.commandWorked(
         verbosity: "queryPlanner",
     }),
 );
-if (getPlanStage(explainRes.queryPlanner.winningPlan, "UPDATE") === null) {
+if (getPlanStage(getWinningPlanFromExplain(explainRes), "UPDATE") === null) {
     jsTest.log.info(
         "Skipping test: UPDATE stage not found. " +
             "This stage is only used by the classic engine.",

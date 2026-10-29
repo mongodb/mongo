@@ -9,15 +9,19 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable, Sequence
 from typing import Optional
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
-from buildscripts.bazel_custom_formatter import validate_tcmalloc_cc_test_coverage
+from bazel.wrapper_hook.wrapper_util import get_terminal_stream
 
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
 LINT_FAILURE_DETAIL_ENV_VAR = "MONGO_BAZEL_LINT_FAILURE_FILE"
+# Keep this distinct from ordinary validation failures so callers can skip a
+# check whose Evergreen authentication flow is unavailable.
+AUTHENTICATION_FAILURE_EXIT_CODE = 75
 
 
 def _read_optional_bytes(path: pathlib.Path) -> bytes | None:
@@ -194,9 +198,95 @@ SUPPORTED_EXTENSIONS = (
     ".rs",
 )
 
+LINT_TARGET_COVERAGE = "target-coverage"
+LINT_SBOM = "sbom"
+LINT_QUICKMONGOLINT = "quickmongolint"
+LINT_ERRORCODES = "errorcodes"
+LINT_PYRIGHT = "pyright"
+LINT_MODULE_LOCKFILE = "module-lockfile"
+LINT_UV_LOCKFILE = "uv-lockfile"
+LINT_GENERATED_EVERGREEN = "generated-evergreen"
+LINT_COPYBARA_FORBIDDEN_TEXT = "copybara-forbidden-text"
+LINT_YAML = "yaml"
+LINT_RESMOKE_TAGS = "resmoke-tags"
+LINT_STREAMS_COVERAGE = "streams-coverage"
+LINT_MARKDOWN_LINKS = "markdown-links"
+LINT_FILE_SIZE = "file-size"
+LINT_MODULE_MAPPING = "module-mapping"
+LINT_DUPLICATE_LIBRARY = "duplicate-library"
+LINT_RULES_LINT = "rules-lint"
+
+ALL_LINT_CHECKS = frozenset(
+    {
+        LINT_TARGET_COVERAGE,
+        LINT_SBOM,
+        LINT_QUICKMONGOLINT,
+        LINT_ERRORCODES,
+        LINT_PYRIGHT,
+        LINT_MODULE_LOCKFILE,
+        LINT_UV_LOCKFILE,
+        LINT_GENERATED_EVERGREEN,
+        LINT_COPYBARA_FORBIDDEN_TEXT,
+        LINT_YAML,
+        LINT_RESMOKE_TAGS,
+        LINT_STREAMS_COVERAGE,
+        LINT_MARKDOWN_LINKS,
+        LINT_FILE_SIZE,
+        LINT_MODULE_MAPPING,
+        LINT_DUPLICATE_LIBRARY,
+        LINT_RULES_LINT,
+    }
+)
+
 
 class LinterFail(Exception):
     pass
+
+
+def _get_bazel_query_options(bazel_options: Sequence[str]) -> tuple[str, ...]:
+    """Return Bazel options that are valid for the query command."""
+    query_options: list[str] = []
+    skip_value = False
+    for option in bazel_options:
+        if skip_value:
+            skip_value = False
+            continue
+        if option in {
+            "--jobs",
+            "-j",
+            "--local_resources",
+            "--local_cpu_resources",
+            "--local_ram_resources",
+        }:
+            skip_value = True
+            continue
+        if option in {
+            "--verbose_failures",
+            "--noverbose_failures",
+            "--jobs=auto",
+        } or option.startswith(("--verbose_failures=", "--jobs=", "-j=")):
+            continue
+        if option.startswith(
+            ("--local_resources=", "--local_cpu_resources=", "--local_ram_resources=")
+        ):
+            continue
+        query_options.append(option)
+    return tuple(query_options)
+
+
+def _gitignored_files(files: Sequence[str]) -> frozenset[str]:
+    """Return the subset of `files` that are ignored by git (pattern-matched and untracked)."""
+    result = subprocess.run(
+        ["git", "check-ignore", "--stdin", "-z"],
+        input="\0".join(files),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # check-ignore exits 1 when no paths are ignored, which is not an error.
+    if result.returncode not in (0, 1):
+        raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stderr)
+    return frozenset(f for f in result.stdout.split("\0") if f)
 
 
 def create_build_files_in_new_js_dirs() -> None:
@@ -226,23 +316,53 @@ all_subpackage_javascript_files()
                         print(f"Created BUILD.bazel in {full_dir}")
 
 
-def list_files_with_targets(bazel_bin: str) -> list:
-    return [
-        line.strip()
-        for line in subprocess.run(
-            [bazel_bin, "query", 'kind("source file", deps(//...))', "--keep_going"],
-            capture_output=True,
-            text=True,
-            check=False,
-        ).stdout.splitlines()
-    ]
+def list_files_with_targets(
+    bazel_bin: str,
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
+) -> list:
+    query_options = _get_bazel_query_options(bazel_options)
+    result = subprocess.run(
+        [
+            bazel_bin,
+            *bazel_startup_options,
+            "query",
+            *query_options,
+            'kind("source file", deps(//...))',
+            "--keep_going",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # `--keep_going` returns 3 when unrelated packages have loading errors,
+    # while still producing the source labels needed by lint. Preserve those
+    # partial results, but do not turn a failed query with no usable output
+    # into an empty (and therefore misleadingly successful) target set.
+    if result.returncode != 0 and not result.stdout.strip():
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return [line.strip() for line in result.stdout.splitlines()]
 
 
 class LintRunner:
-    def __init__(self, keep_going: bool, bazel_bin: str):
+    def __init__(
+        self,
+        keep_going: bool,
+        bazel_bin: str,
+        bazel_options: Sequence[str] = (),
+        bazel_startup_options: Sequence[str] = (),
+    ):
         self.keep_going = keep_going
         self.bazel_bin = bazel_bin
+        self.bazel_options = tuple(bazel_options)
+        self.bazel_startup_options = tuple(bazel_startup_options)
         self.fail = False
+        self.skipped_reason: str | None = None
 
     def list_files_without_targets(
         self,
@@ -259,8 +379,6 @@ class LintRunner:
             "src/mongo/crypto/fle_options.cpp",
             # TODO(SERVER-101368): Remove the exemptions below once resolved.
             "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
-            # TODO(SERVER-101370): Remove the exemptions below once resolved.
-            "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongocxx/test_util/client_helpers.cpp",
             # TODO(SERVER-101371): Remove the exemptions below once resolved.
             "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
             # TODO(SERVER-101375): Remove the exemptions below once resolved.
@@ -295,9 +413,12 @@ class LintRunner:
             typed_files_in_targets_set.add(clean_file)
 
         # Create a new list of files that are in all_typed_files but not in typed_files_in_targets
+        ignored = _gitignored_files(all_typed_files)
         new_list = []
         for file in all_typed_files:
             if file not in typed_files_in_targets_set and file not in exempt_list:
+                if file in ignored:
+                    continue
                 if not any(subpath in file for subpath in exempted_subpaths):
                     new_list.append(file)
 
@@ -317,15 +438,48 @@ class LintRunner:
         else:
             print(f"All {type_name} files have BUILD.bazel targets!")
 
-    def run_bazel(self, target: str, args: list | None = None) -> bool:
+    def run_bazel(
+        self,
+        target: str,
+        args: list | None = None,
+        interactive: bool = False,
+        skip_on_auth_failure: bool = False,
+    ) -> bool:
         args = args or []
-        p = subprocess.run([self.bazel_bin, "run", target] + (["--"] + args if args else []))
+        # When the bazel target requires interaction from a user, ensure its output is sent to
+        # the configured terminal stream.
+        terminal = get_terminal_stream("MONGO_WRAPPER_STDERR_FD") if interactive else None
+        p = subprocess.run(
+            [
+                self.bazel_bin,
+                *self.bazel_startup_options,
+                "run",
+                *self.bazel_options,
+                target,
+            ]
+            + (["--"] + args if args else []),
+            stdout=terminal,
+            stderr=terminal,
+        )
+        if skip_on_auth_failure and p.returncode == AUTHENTICATION_FAILURE_EXIT_CODE:
+            self.skipped_reason = (
+                f"authentication is unavailable while running {target}; skipping this check"
+            )
+            return False
         if p.returncode != 0:
             self.fail = True
             if not self.keep_going:
                 raise LinterFail("Linter failed")
             return False
         return True
+
+    def check_copybara_forbidden_text(self, files_to_lint: list[str]) -> None:
+        print("Checking Copybara-synced files for forbidden text...")
+        # No file args means the checker scans the whole tracked tree; otherwise it
+        # restricts itself to the given changed files. Non-synced files are ignored
+        # by the checker either way.
+        if self.run_bazel("//buildscripts/copybara:forbidden_text_check", files_to_lint):
+            print("No forbidden text found in Copybara-synced files")
 
     def check_copybara_generated_evergreen(self, *, fix: bool, dry_run: bool) -> None:
         print("Checking generated Copybara Evergreen yaml...")
@@ -337,6 +491,60 @@ class LintRunner:
         if self.run_bazel("//buildscripts/copybara:generate_evergreen", ["--check"]):
             print("Generated Copybara Evergreen yaml is up to date")
 
+    def lint_resmoke_suite_tests(self, *, fix: bool, dry_run: bool) -> None:
+        print("Checking Evergreen/Bazel resmoke tag parity...")
+        # Run the resmoke_suite_test tags query here (outside the sub-tool's `bazel run`) to avoid
+        # a nested bazel invocation, and hand the result to the checker as a file.
+        query_options = _get_bazel_query_options(self.bazel_options)
+        query = subprocess.run(
+            [
+                self.bazel_bin,
+                *self.bazel_startup_options,
+                "query",
+                *query_options,
+                "attr('tags','resmoke_suite_test',//...)",
+                "--output=build",
+                "--keep_going",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if not query.stdout.strip():
+            print("Failed to query resmoke_suite_test targets:")
+            print(query.stderr)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("bazel query for resmoke_suite_test targets failed")
+            return
+
+        if query.returncode != 0:
+            # With --keep_going, a BUILD that fails to load is skipped and its targets drop out of
+            # the results, surfacing as misleading "unknown target" violations. Make the broken
+            # BUILD the visible failure instead.
+            errors = "\n".join(line for line in query.stderr.splitlines() if "ERROR" in line)
+            print("A BUILD file failed to load, so some resmoke_suite_test targets are missing:")
+            print(errors or query.stderr)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("bazel query for resmoke_suite_test targets had load errors")
+            return
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".build", delete=False, encoding="utf-8"
+        ) as info_file:
+            info_file.write(query.stdout)
+            info_path = info_file.name
+
+        try:
+            # The checker has no preview mode; under --dry-run just run the (read-only) check.
+            args = [f"--target-info-build={info_path}"]
+            if fix and not dry_run:
+                args.append("--fix")
+            self.run_bazel("//buildscripts:lint_resmoke_suite_tests", args)
+        finally:
+            os.unlink(info_path)
+
     def refresh_module_lockfile(
         self,
         *,
@@ -346,17 +554,79 @@ class LintRunner:
     ) -> None:
         lockfile_path = lockfile_path or REPO_ROOT / "MODULE.bazel.lock"
         lockfile_display = _display_path(lockfile_path)
+
+        if not fix:
+            print(f"Checking {lockfile_display}...")
+            result = subprocess.run(
+                [
+                    self.bazel_bin,
+                    *self.bazel_startup_options,
+                    "mod",
+                    "deps",
+                    "--lockfile_mode=error",
+                ],
+                check=False,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            if result.returncode == 0:
+                print(f"{lockfile_display} is up to date.")
+                return
+
+            summary = f"{lockfile_display} is out of date"
+            print(summary + ".")
+            if _get_lint_failure_detail_path() is not None:
+                _record_lint_failure_detail(summary)
+            print("Run the following to attempt to fix the issue automatically:")
+            print("\tbazel run lint --fix")
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail(summary)
+            return
+
         original_contents = _read_optional_bytes(lockfile_path)
 
+        # `refresh` is preferred because it avoids unrelated lockfile churn, but
+        # Bazel can report that it cannot regenerate a changed module-extension
+        # digest. Retry with `update`, which is the mode Bazel recommends for
+        # that failure.
+        lockfile_mode = "refresh"
         print(f"Refreshing {lockfile_display}...")
         result = subprocess.run(
-            [self.bazel_bin, "mod", "deps", "--lockfile_mode=refresh"],
+            [
+                self.bazel_bin,
+                *self.bazel_startup_options,
+                "mod",
+                "deps",
+                f"--lockfile_mode={lockfile_mode}",
+            ],
             check=False,
             stdout=sys.stdout,
             stderr=sys.stderr,
         )
 
         refreshed_contents = _read_optional_bytes(lockfile_path)
+
+        if result.returncode != 0:
+            if refreshed_contents != original_contents:
+                _restore_optional_bytes(lockfile_path, original_contents)
+
+            print(f"Retrying {lockfile_display} with `--lockfile_mode=update`...")
+            lockfile_mode = "update"
+            result = subprocess.run(
+                [
+                    self.bazel_bin,
+                    *self.bazel_startup_options,
+                    "mod",
+                    "deps",
+                    f"--lockfile_mode={lockfile_mode}",
+                ],
+                check=False,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            refreshed_contents = _read_optional_bytes(lockfile_path)
+
         changed = refreshed_contents != original_contents
 
         if result.returncode != 0:
@@ -372,7 +642,8 @@ class LintRunner:
                 print(f"{lockfile_display} is up to date.")
                 return
             print(
-                f"{lockfile_display} would be updated by `bazel mod deps --lockfile_mode=refresh`:"
+                f"{lockfile_display} would be updated by "
+                f"`bazel mod deps --lockfile_mode={lockfile_mode}`:"
             )
             _print_unified_diff(lockfile_path, original_contents, refreshed_contents)
             _restore_optional_bytes(lockfile_path, original_contents)
@@ -380,27 +651,13 @@ class LintRunner:
 
         if fix:
             if changed:
-                print(f"Updated {lockfile_display} via `bazel mod deps --lockfile_mode=refresh`.")
+                print(
+                    f"Updated {lockfile_display} via "
+                    f"`bazel mod deps --lockfile_mode={lockfile_mode}`."
+                )
             else:
                 print(f"{lockfile_display} is up to date.")
             return
-
-        if not changed:
-            print(f"{lockfile_display} is up to date.")
-            return
-
-        summary = f"{lockfile_display} has diffs after refresh"
-        diff = _get_unified_diff(lockfile_path, original_contents, refreshed_contents)
-        print(f"{lockfile_display} has diffs after `bazel mod deps --lockfile_mode=refresh`.")
-        if _get_lint_failure_detail_path() is not None:
-            _record_lint_failure_detail(_format_lint_failure_detail(summary, diff))
-        elif diff:
-            print(diff, end="")
-        print("Run the following to attempt to fix the issue automatically:")
-        print("\tbazel run lint --fix")
-        self.fail = True
-        if not self.keep_going:
-            raise LinterFail(summary)
 
     def simple_file_size_check(self, files_to_lint: list[str]):
         for file in files_to_lint:
@@ -412,11 +669,11 @@ class LintRunner:
                 if not self.keep_going:
                     raise LinterFail("File too large")
 
-    def check_duplicate_lib_names(self):
+    def check_duplicate_lib_names(self, buildozer: str | None = None):
         """Check for duplicate mongo_cc_library names using buildozer."""
         print("Checking for duplicate cc_library names...")
 
-        buildozer = _get_buildozer()
+        buildozer = buildozer or _get_buildozer()
         if not buildozer:
             self.fail = True
             if not self.keep_going:
@@ -559,6 +816,8 @@ def _source_label_to_workspace_path(label: str) -> str | None:
     local_repository_prefixes = {
         "@bazel_rules_mongo": "buildscripts/bazel_rules_mongo",
         "@@bazel_rules_mongo": "buildscripts/bazel_rules_mongo",
+        "@@bazel_rules_mongo~": "buildscripts/bazel_rules_mongo",
+        "@@bazel_rules_mongo+": "buildscripts/bazel_rules_mongo",
     }
 
     if label.startswith("//"):
@@ -610,15 +869,34 @@ def _get_rules_lint_source_labels_for_changed_files(
 def _get_rules_lint_targets_for_source_labels(
     bazel_bin: str,
     source_labels: list[str],
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
 ) -> list[str]:
     """Return Bazel rule targets that directly own the given source-file labels."""
     owner_targets = []
     seen = set()
 
     for source_label in source_labels:
-        query = f'kind(".* rule", same_pkg_direct_rdeps({source_label}))'
+        owner_rules = f'kind(".* rule", same_pkg_direct_rdeps({source_label}))'
+        # rust_test targets created with `crate = ":lib"` compile the library's sources (including
+        # #[cfg(test)] modules) but depend on the library rule rather than on the individual source
+        # files, so same_pkg_direct_rdeps on the source does not find them.
+        crate_test_rules = f'attr("crate", ".*", same_pkg_direct_rdeps({owner_rules}))'
+        relevant_rules = f"({owner_rules} union {crate_test_rules})"
+        # Manual targets are often negative analysis fixtures. They intentionally fail during
+        # analysis and must not be pulled into the rules_lint build just because they depend on a
+        # changed source file.
+        query = f'{relevant_rules} except attr("tags", "manual", {relevant_rules})'
+        query_options = _get_bazel_query_options(bazel_options)
         result = subprocess.run(
-            [bazel_bin, "query", query, "--output=label"],
+            [
+                bazel_bin,
+                *bazel_startup_options,
+                "query",
+                *query_options,
+                query,
+                "--output=label",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -643,11 +921,15 @@ def _get_rules_lint_targets_for_changed_files(
     bazel_bin: str,
     files_to_lint: list[str],
     files_with_targets: list[str],
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
 ) -> list[str]:
     """Return Bazel rule targets that own changed files supported by rules_lint."""
     return _get_rules_lint_targets_for_source_labels(
         bazel_bin,
         _get_rules_lint_source_labels_for_changed_files(files_to_lint, files_with_targets),
+        bazel_options,
+        bazel_startup_options,
     )
 
 
@@ -666,6 +948,35 @@ def _should_check_copybara_generated_evergreen(lint_all: bool, files_to_lint: li
     return any(
         file in copybara_files or file.startswith(copybara_prefixes) for file in files_to_lint
     )
+
+
+def _file_defines_resmoke_suite_test(path: str) -> bool:
+    """Return whether the given BUILD file references a resmoke_suite_test target."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return "resmoke_suite_test" in fh.read()
+    except OSError:
+        return False
+
+
+def _should_check_evg_bazel_tag_parity(lint_all: bool, files_to_lint: list[str]) -> bool:
+    """Return whether lint should check Evergreen/Bazel resmoke tag parity.
+
+    resmoke_suite_test targets are not confined to jstests/suites (they also live under
+    buildscripts, src/mongo, etc.), so trigger on any changed BUILD file that defines one,
+    regardless of location, plus any change to the Evergreen resmoke task YAML.
+    """
+    if lint_all:
+        return True
+    tasks_prefix = "etc/evergreen_yml_components/tasks/"
+    for file in files_to_lint:
+        if file.startswith(tasks_prefix) and file.endswith(".yml"):
+            return True
+        if os.path.basename(file) in ("BUILD", "BUILD.bazel") and _file_defines_resmoke_suite_test(
+            file
+        ):
+            return True
+    return False
 
 
 def get_parsed_args(args):
@@ -722,11 +1033,31 @@ def lint_mod(lint_runner: LintRunner):
     # subprocess.run([bazel_bin, "run", "//modules_poc:browse", "--", "merged_decls.json", "--parse-only"], check=True)
 
 
-def run_rules_lint(bazel_bin: str, args: list[str]):
+def run_rules_lint(
+    bazel_bin: str,
+    args: list[str],
+    *,
+    candidate_files: list[str] | None = None,
+    lint_all_override: bool | None = None,
+    buildozer: str | None = None,
+    bazel_options: Sequence[str] = (),
+    bazel_startup_options: Sequence[str] = (),
+    enabled_checks: frozenset[str] | None = None,
+    files_with_targets_provider: Callable[[], list[str]] | None = None,
+) -> str | None:
     parsed_args, args = get_parsed_args(args)
-    if platform.system() == "Windows":
-        print("eslint not supported on windows")
-        raise LinterFail("Unsupported platform")
+    enabled_checks = enabled_checks or ALL_LINT_CHECKS
+    single_check = len(enabled_checks) == 1
+
+    def should_run(check: str, predicate: bool) -> bool:
+        # Single-check calls have already passed the unified manifest matcher.
+        # Trust that trigger so deleted and old rename paths can still run
+        # whole-repository validators even though they are not content inputs.
+        return check in enabled_checks and (single_check or predicate)
+
+    if platform.system() == "Windows" and LINT_RULES_LINT in enabled_checks:
+        print("rules_lint is unsupported on Windows")
+        return "rules_lint is unsupported on Windows"
 
     if parsed_args.origin_branch == "auto":
         from git import Repo
@@ -735,31 +1066,48 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
 
         parsed_args.origin_branch = get_default_origin_branch(Repo())
 
-    if parsed_args.fix:
+    if parsed_args.fix and LINT_TARGET_COVERAGE in enabled_checks:
         create_build_files_in_new_js_dirs()
 
     keep_going = parsed_args.keep_going
-    lr = LintRunner(keep_going, bazel_bin)
-    lr.refresh_module_lockfile(fix=parsed_args.fix, dry_run=parsed_args.dry_run)
+    lr = LintRunner(keep_going, bazel_bin, bazel_options, bazel_startup_options)
+    if LINT_MODULE_LOCKFILE in enabled_checks:
+        lr.refresh_module_lockfile(fix=parsed_args.fix, dry_run=parsed_args.dry_run)
 
-    files_with_targets = list_files_with_targets(bazel_bin)
-    lr.list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"])
-    lr.list_files_without_targets(files_with_targets, "idl", "idl", ["src"])
-    lr.list_files_without_targets(
-        files_with_targets,
-        "javascript",
-        "js",
-        ["src/mongo", "jstests"],
+    needs_target_list = bool(enabled_checks & {LINT_TARGET_COVERAGE, LINT_RULES_LINT})
+    files_with_targets = (
+        files_with_targets_provider()
+        if needs_target_list and files_with_targets_provider is not None
+        else list_files_with_targets(bazel_bin, bazel_options, bazel_startup_options)
+        if needs_target_list
+        else []
     )
-    lr.list_files_without_targets(
-        files_with_targets,
-        "python",
-        "py",
-        ["src/mongo", "buildscripts", "evergreen"],
+    if LINT_TARGET_COVERAGE in enabled_checks:
+        lr.list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"])
+        lr.list_files_without_targets(files_with_targets, "idl", "idl", ["src"])
+        lr.list_files_without_targets(
+            files_with_targets,
+            "javascript",
+            "js",
+            ["src/mongo", "jstests"],
+        )
+        lr.list_files_without_targets(
+            files_with_targets,
+            "python",
+            "py",
+            ["src/mongo", "buildscripts", "evergreen"],
+        )
+    lint_all = (
+        lint_all_override
+        if lint_all_override is not None
+        else parsed_args.all or "..." in args or "//..." in args
     )
-    lint_all = parsed_args.all or "..." in args or "//..." in args
-    files_to_lint = [arg for arg in args if not arg.startswith("-")]
-    if not lint_all and not files_to_lint:
+    files_to_lint = (
+        list(candidate_files)
+        if candidate_files is not None
+        else [arg for arg in args if not arg.startswith("-")]
+    )
+    if candidate_files is None and not lint_all and not files_to_lint:
         origin_branch = parsed_args.origin_branch
         max_distance = 100
         distance = _git_distance([f"{origin_branch}..HEAD"])
@@ -768,7 +1116,7 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
                 f"The number of commits between current branch and origin branch ({origin_branch}) is too large: {distance} commits (> {max_distance} commits)."
             )
             print(
-                "Please update your local branch with the latest changes from origin, or use `bazel run lint -- --origin-branch=other_branch` to select a different origin branch"
+                "Please update your local branch with the latest changes from origin, or use `bazel run lint --origin-branch=other_branch` to select a different origin branch"
             )
             lint_all = True
         else:
@@ -778,10 +1126,19 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
                 if file.endswith((SUPPORTED_EXTENSIONS))
             ]
 
-    if lint_all or "sbom.private.json" in files_to_lint:
-        lr.run_bazel("//buildscripts:sbom_linter")
+    if should_run(
+        LINT_COPYBARA_FORBIDDEN_TEXT,
+        lint_all or bool(files_to_lint),
+    ):
+        lr.check_copybara_forbidden_text([] if lint_all else files_to_lint)
 
-    if lint_all or any(file.endswith((".h", ".cpp")) for file in files_to_lint):
+    if should_run(LINT_SBOM, lint_all or "sbom.private.json" in files_to_lint):
+        lr.run_bazel("//buildscripts/tests/sbom_linter:sbom_linter")
+
+    if should_run(
+        LINT_QUICKMONGOLINT,
+        lint_all or any(file.endswith((".h", ".cpp")) for file in files_to_lint),
+    ):
         lr.run_bazel("//buildscripts:quickmongolint", ["lint"])
 
     # TODO(SERVER-124155): re-enable once the codebase is free of existing violations
@@ -795,66 +1152,108 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     #         "//buildscripts:todo_linter", ["lint-patch", "--branch", parsed_args.origin_branch]
     #     )
 
-    if lint_all or any(
-        file.endswith((".cpp", ".c", ".h", ".py", ".idl")) for file in files_to_lint
+    if should_run(
+        LINT_ERRORCODES,
+        lint_all
+        or any(file.endswith((".cpp", ".c", ".h", ".py", ".idl")) for file in files_to_lint),
     ):
         lr.run_bazel("//buildscripts:errorcodes", ["--quiet"])
 
-    existing_python_files = _get_existing_python_files(files_to_lint)
-    if lint_all:
-        lr.run_bazel("//buildscripts:pyrightlint", ["lint-all"])
-    elif existing_python_files:
-        lr.run_bazel("//buildscripts:pyrightlint", ["lints"] + existing_python_files)
+    if LINT_PYRIGHT in enabled_checks:
+        existing_python_files = _get_existing_python_files(files_to_lint)
+        if lint_all:
+            lr.run_bazel("//buildscripts:pyrightlint", ["lint-all"])
+        elif existing_python_files:
+            lr.run_bazel("//buildscripts:pyrightlint", ["lints"] + existing_python_files)
 
-    if lint_all or "poetry.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
-        lr.run_bazel("//buildscripts:poetry_lock_check")
+    if should_run(
+        LINT_UV_LOCKFILE,
+        lint_all or "uv.lock" in files_to_lint or "pyproject.toml" in files_to_lint,
+    ):
+        lr.run_bazel("//buildscripts:uv_lock_check")
 
-    if _should_check_copybara_generated_evergreen(lint_all, files_to_lint):
+    if should_run(
+        LINT_GENERATED_EVERGREEN,
+        _should_check_copybara_generated_evergreen(lint_all, files_to_lint),
+    ):
         lr.check_copybara_generated_evergreen(
             fix=parsed_args.fix,
             dry_run=parsed_args.dry_run,
         )
 
-    if lint_all or any(file.endswith(".yml") for file in files_to_lint):
+    if should_run(
+        LINT_YAML,
+        lint_all or any(file.endswith((".yml", ".yaml")) for file in files_to_lint),
+    ):
         print("Linting evergreen yaml...")
         lr.run_bazel(
             "buildscripts:validate_evg_project_config",
             [
                 f"--evg-project-name={parsed_args.lint_yaml_project}",
+                "--quiet",
             ],
+            # This runs `evergreen login`, which may need the user to complete a device auth flow.
+            interactive=True,
+            skip_on_auth_failure=True,
         )
+        if lr.skipped_reason is not None:
+            return lr.skipped_reason
         lr.run_bazel("//buildscripts:yamllinters")
         print("No errors found in evergreen yaml")
 
-    if lint_all or any(
-        "jstests/streams" in file or "modules/streams/suites/streams" in file
-        for file in files_to_lint
+    if should_run(
+        LINT_RESMOKE_TAGS,
+        _should_check_evg_bazel_tag_parity(lint_all, files_to_lint),
+    ):
+        lr.lint_resmoke_suite_tests(fix=parsed_args.fix, dry_run=parsed_args.dry_run)
+
+    if should_run(
+        LINT_STREAMS_COVERAGE,
+        lint_all
+        or any(
+            "jstests/streams" in file or "modules/streams/suites/streams" in file
+            for file in files_to_lint
+        ),
     ):
         lr.run_bazel("//buildscripts:streams_suite_coverage_linter")
 
-    if lint_all or any(file.endswith(".md") for file in files_to_lint):
+    if should_run(
+        LINT_MARKDOWN_LINKS,
+        lint_all or any(file.endswith(".md") for file in files_to_lint),
+    ):
         lr.run_bazel("//buildscripts:markdown_link_linter", ["--root=src/mongo", "--verbose"])
 
-    if lint_all or parsed_args.large_files:
-        lr.run_bazel("buildscripts:large_file_check", ["--exclude", "src/third_party/*"])
-    else:
-        lr.simple_file_size_check(files_to_lint)
+    if should_run(LINT_FILE_SIZE, True):
+        if lint_all or parsed_args.large_files:
+            lr.run_bazel("buildscripts:large_file_check", ["--exclude", "src/third_party/*"])
+        else:
+            lr.simple_file_size_check(files_to_lint)
 
-    if lint_all or any(
-        file.endswith((".cpp", ".c", ".h", ".hpp", ".idl", ".inl", ".defs"))
-        for file in files_to_lint
+    if should_run(
+        LINT_MODULE_MAPPING,
+        lint_all
+        or any(
+            file.endswith((".cpp", ".c", ".h", ".hpp", ".idl", ".inl", ".defs"))
+            for file in files_to_lint
+        ),
     ):
         lint_mod(lr)
 
-    if lint_all or any(
-        file.endswith((".bazel", ".bzl")) or os.path.basename(file) in ("BUILD", "BUILD.bazel")
-        for file in files_to_lint
+    if should_run(
+        LINT_DUPLICATE_LIBRARY,
+        lint_all
+        or any(
+            file.endswith((".bazel", ".bzl")) or os.path.basename(file) in ("BUILD", "BUILD.bazel")
+            for file in files_to_lint
+        ),
     ):
-        lr.check_duplicate_lib_names()
-        validate_tcmalloc_cc_test_coverage(generate_report=False, fix=False, bazel_bin=bazel_bin)
+        lr.check_duplicate_lib_names(buildozer=buildozer)
 
     if lr.fail:
         raise LinterFail("Linter(s) failed")
+
+    if LINT_RULES_LINT not in enabled_checks:
+        return
 
     # Default to linting changed files in rules_lint if no path was passed in.
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
@@ -862,6 +1261,8 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
             bazel_bin,
             files_to_lint,
             files_with_targets,
+            bazel_options,
+            bazel_startup_options,
         )
         if not rules_lint_targets:
             print("No changed files with rules_lint owner targets; skipping rules_lint.")
@@ -958,7 +1359,10 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         )
 
         subprocess.run(
-            [bazel_bin, "build"] + fix_args, check=True, stdout=sys.stdout, stderr=sys.stderr
+            [bazel_bin, *bazel_startup_options, "build", *bazel_options] + fix_args,
+            check=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
         )
 
         applied_patch_contents: set[str] = set()
@@ -988,7 +1392,19 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     # Check pass: always run without fix mode to find remaining violations.
     # Runs after the fix pass (if any) so that auto-fixed violations are no longer
     # reported, but unfixable violations still cause a non-zero exit.
-    subprocess.run([bazel_bin, "build"] + args, check=True, stdout=sys.stdout, stderr=sys.stderr)
+    #
+    # check=True: any bazel-level failure fails lint immediately — a broken
+    # BUILD file in the change under lint, an aspect failure, or an owner
+    # target that is explicitly requested but platform-incompatible on the
+    # running host (e.g. //bazel/wrapper_hook:wrapper_hook on macOS via its
+    # transitive setup_clang_tidy dep). Fail-fast is deliberate: CI should
+    # surface these rather than skip them.
+    subprocess.run(
+        [bazel_bin, *bazel_startup_options, "build", *bazel_options] + args,
+        check=True,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
 
     failing_reports = 0
     for report in _jq_files(".out", buildevents_path):

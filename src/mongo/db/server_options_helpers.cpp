@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/server_options_helpers.h"
 
@@ -35,11 +9,6 @@
 #define SYSLOG_NAMES
 #include <syslog.h>
 #endif
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,7 +21,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_format.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/fail_point.h"
@@ -60,7 +29,14 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <system_error>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -120,6 +96,36 @@ Status setExtensionsSignaturePubKeyPath(const moe::Environment& params) {
                   "extensions signature secure compilation mode. In secure mode the key "
                   "used for extensions signature verification is not configurable.");
 #endif  // not MONGO_CONFIG_EXT_SECURE
+}
+
+Status setExtensionsConfigPath(const moe::Environment& params) {
+    moe::Value extensionsConfigPathValue = params["processManagement.extensionsConfigPath"];
+    if (extensionsConfigPathValue.isEmpty()) {
+        return Status::OK();
+    }
+
+    std::filesystem::path configPath = extensionsConfigPathValue.as<std::string>();
+    if (configPath.empty()) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsConfigPath` option was specified, "
+                      "but path was empty.");
+    }
+
+    std::error_code ec;
+    if (!std::filesystem::exists(configPath, ec)) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsConfigPath` option was specified, "
+                      "but the provided path does not exist or is not accessible.");
+    }
+
+    if (!std::filesystem::is_directory(configPath, ec)) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsConfigPath` option was specified, "
+                      "but the provided path is not a directory or is not accessible.");
+    }
+
+    serverGlobalParams.extensionsConfigPath = configPath.string();
+    return Status::OK();
 }
 
 }  // namespace
@@ -507,6 +513,10 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (auto err = setExtensionsSignaturePubKeyPath(params); !err.isOK()) {
+        return err;
+    }
+
+    if (auto err = setExtensionsConfigPath(params); !err.isOK()) {
         return err;
     }
 

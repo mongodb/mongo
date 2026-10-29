@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 
@@ -45,10 +19,12 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/decorable.h"
@@ -99,19 +75,7 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
 
 void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& querySettings = expCtx->getQuerySettings();
-    if (!querySettings.toBSON().isEmpty()) {
-        request.setQuerySettings(querySettings);
-    }
-}
-
-void addIfrFlagsToRequest(AggregateCommandRequest& request,
-                          std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    tassert(11565104, "IFRContext cannot be null", ifrContext);
-    auto flagsToSerialize = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
-    if (!flagsToSerialize.empty()) {
-        request.setIfrFlags(ifrContext->serializeFlagValues(flagsToSerialize));
-    }
+    query_settings::addQuerySettingsToRequest(expCtx->getOperationContext(), request);
 }
 
 void validate(const AggregateCommandRequest& aggregate,
@@ -169,8 +133,23 @@ void validate(const AggregateCommandRequest& aggregate,
                         hintElem.value() == BSON(query_request_helper::kNaturalSortField << 1)));
     }
 
+    if (aggregate.getResumeAfter() || aggregate.getStartAt()) {
+        uassert(12848200,
+                "$_resumeAfter is not supported for collectionless aggregations",
+                !nss.isCollectionlessAggregateNS());
+    }
+
     if (client) {
         assertInternalParamsAreSetByInternalClients(client, aggregate);
+
+        // '$_isHybridSearch' is set internally for a desugared $rankFusion/$scoreFusion pipeline by
+        // the router. It should be checked here against the request as it came off the wire, rather
+        // than in the generic command request validation checks as those are re-run by the router
+        // against potentially mutated requests, still under the user's own external client.
+        uassert(13212500,
+                str::stream() << "BSON field '" << AggregateCommandRequest::kIsHybridSearchFieldName
+                              << "' is an unknown field",
+                isInternalOrDirectClient(client) || !aggregate.getIsHybridSearch().has_value());
     }
 }
 
@@ -213,6 +192,13 @@ void validateRequestWithClient(const OperationContext* opCtx,
     if (request.getIfrFlags()) {
         uassert(11516201,
                 "BSON field 'ifrFlags' is an unknown field",
+                isInternalThreadOrClient || client->isInDirectClient());
+    }
+
+    // Forbid users from passing '$_translatedForViewlessTimeseries' explicitly.
+    if (request.getTranslatedForViewlessTimeseries()) {
+        uassert(13088600,
+                "BSON field '$_translatedForViewlessTimeseries' is an unknown field",
                 isInternalThreadOrClient || client->isInDirectClient());
     }
 }

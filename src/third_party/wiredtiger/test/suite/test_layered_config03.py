@@ -55,12 +55,6 @@ class test_layered_config03(wttest.WiredTigerTestCase):
         ('shared', dict(prefix='table:')),
     ])
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def generate_random_string(self, length):
         characters = string.ascii_letters + string.digits + string.punctuation
         random_string = ''.join(random.choices(characters, k=length))

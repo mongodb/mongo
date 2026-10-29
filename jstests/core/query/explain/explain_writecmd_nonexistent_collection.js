@@ -1,13 +1,18 @@
 // Test explaining a delete command against a non-existent collection.
 //
 // @tags: [
+//    uses_explain,
 //    requires_non_retryable_writes,
 //    requires_fastcount,
 //    assumes_no_implicit_collection_creation_after_drop,
 //    requires_fcv_81,
 //]
 //
-import {getPlanStages, planHasStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
 
 function assertCollectionDoesNotExist(collName) {
     const collectionList = db.getCollectionInfos({name: collName});
@@ -22,10 +27,10 @@ coll.drop();
 let explain = assert.commandWorked(
     db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit: 0}]}}),
 );
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
-let eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "EOF"), explain);
+let eofStages = getPlanStages(getWinningPlanFromExplain(explain), "EOF");
 eofStages.forEach((stage) => assert.eq(stage.type, "nonExistentNamespace"));
-assert(!planHasStage(db, explain.queryPlanner.winningPlan, "DELETE"), explain);
+assert(!planHasStage(db, getWinningPlanFromExplain(explain), "DELETE"), explain);
 
 assertCollectionDoesNotExist(collName);
 
@@ -35,10 +40,10 @@ explain = assert.commandWorked(
         explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: false}]},
     }),
 );
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
-eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "EOF"), explain);
+eofStages = getPlanStages(getWinningPlanFromExplain(explain), "EOF");
 eofStages.forEach((stage) => assert.eq(stage.type, "nonExistentNamespace"));
-assert(!planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"), explain);
+assert(!planHasStage(db, getWinningPlanFromExplain(explain), "UPDATE"), explain);
 assertCollectionDoesNotExist(collName);
 
 // Explain of an update with upsert:true returns an EOF plan, and does not create a collection.
@@ -47,8 +52,8 @@ explain = assert.commandWorked(
         explain: {update: collName, updates: [{q: {a: 1}, u: {$set: {b: 1}}, upsert: true}]},
     }),
 );
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
-eofStages = getPlanStages(explain.queryPlanner.winningPlan, "EOF");
+assert(planHasStage(db, getWinningPlanFromExplain(explain), "EOF"), explain);
+eofStages = getPlanStages(getWinningPlanFromExplain(explain), "EOF");
 eofStages.forEach((stage) => assert.eq(stage.type, "nonExistentNamespace"));
-assert(!planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"), explain);
+assert(!planHasStage(db, getWinningPlanFromExplain(explain), "UPDATE"), explain);
 assertCollectionDoesNotExist(collName);

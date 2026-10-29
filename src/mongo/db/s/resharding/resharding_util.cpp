@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_util.h"
 
@@ -49,6 +23,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -72,6 +47,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -98,6 +74,46 @@ namespace resharding {
 using namespace std::literals::string_view_literals;
 
 namespace {
+
+// Runs a $collStats aggregation to get the total estimated collection size across all shards that
+// own chunks. Returns boost::none if the aggregation fails.
+boost::optional<long long> estimateCollectionSizeBytes(OperationContext* opCtx,
+                                                       const NamespaceString& nss) {
+    std::vector<BSONObj> pipeline = {
+        BSON("$collStats" << BSON("storageStats" << BSONObj())),
+        BSON("$group" << BSON("_id" << BSONNULL << "totalSize"
+                                    << BSON("$sum" << "$storageStats.size")))};
+    AggregateCommandRequest aggRequest(nss, pipeline);
+
+    // The caller holds the FCV region while this runs, so the aggregation must be bounded. See
+    // SERVER-133988.
+    const auto deadline = opCtx->fastClockSource().now() +
+        Milliseconds{gReshardingCollectionSizeEstimationTimeoutMS.load()};
+    BSONObjBuilder resultBuilder;
+    try {
+        opCtx->runWithDeadline(deadline, ErrorCodes::MaxTimeMSExpired, [&] {
+            uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
+                                                           ClusterAggregate::Namespaces{nss, nss},
+                                                           aggRequest,
+                                                           PrivilegeVector(),
+                                                           boost::none,
+                                                           &resultBuilder));
+        });
+        BSONObj result = resultBuilder.obj();
+        auto resultArr = result["cursor"]["firstBatch"].Array();
+        if (resultArr.empty()) {
+            return boost::none;
+        }
+        return resultArr[0]["totalSize"].safeNumberLong();
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(12752703,
+                      "Failed to estimate collection size for resharding validation",
+                      "nss"_attr = nss,
+                      "error"_attr = ex.toStatus());
+        return boost::none;
+    }
+}
+
 /**
  * Given a constant rate of time per unit of work:
  *    totalTime / totalWork == elapsedTime / elapsedWork
@@ -260,6 +276,38 @@ std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext*
     return zones;
 }
 
+std::vector<ReshardingZoneType> selectZonesForParticipantShardsAndChunks(
+    OperationContext* opCtx,
+    const boost::optional<ReshardingProvenanceEnum>& provenance,
+    const boost::optional<std::vector<ReshardingZoneType>>& requestedZones,
+    bool forceRedistribution,
+    const NamespaceString& sourceNss) {
+    std::vector<ReshardingZoneType> zones;
+    if (isUnshardCollection(provenance)) {
+        // Since the resulting collection of an unshardCollection operation cannot have zones, we
+        // do not need to account for existing zones in the original collection. Existing zones
+        // from the original collection will be deleted after the unsharding operation commits.
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify zones when unsharding a collection.",
+                !requestedZones);
+    } else if (requestedZones) {
+        zones = *requestedZones;
+
+        ShardingCatalogManager& shardingCatalogManager = *ShardingCatalogManager::get(opCtx);
+
+        // This is a best effort check that all of the zones exist. It does not provide any
+        // guarantee that the zones will remain stable during the resharding operation.
+        for (const auto& zone : zones) {
+            shardingCatalogManager.checkZoneExists(opCtx, std::string(zone.getZone()));
+        }
+    } else if (forceRedistribution) {
+        // If zones are not provided by the user for same-key resharding, we should use the
+        // existing zones for this resharding operation.
+        zones = getZonesFromExistingCollection(opCtx, sourceNss);
+    }
+    return zones;
+}
+
 std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
@@ -298,12 +346,12 @@ std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
 
     // Emits transaction entries chronologically.
     stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(
-        expCtx, true /* includeCommitTransactionTimestamp */));
+        expCtx, /*includeCommitTransactionTimestamp=*/true));
 
     // Converts oplog entries with kNeedsRetryImageFieldName into the old style pair of
     // update/delete oplog and pre/post image no-op oplog.
     stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(
-        expCtx, true /* includeCommitTransactionTimestamp */));
+        expCtx, /*includeCommitTransactionTimestamp=*/true));
 
     // Adds _id to all events in the stream.
     stages.emplace_back(DocumentSourceReshardingAddResumeId::create(expCtx));
@@ -451,7 +499,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
     stdx::unordered_set<ShardId> shardIds;
     for (const auto& shard : shardDistribution) {
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-            opCtx, shard.getShard(), false /* allowNonShardIdIdentifiers */));
+            opCtx, shard.getShard(), /*allowNonShardIdIdentifiers=*/false));
         uassert(ErrorCodes::InvalidOptions,
                 "ShardKeyRange should have a pair of min/max or none of them",
                 !(shard.getMax().has_value() ^ shard.getMin().has_value()));
@@ -590,7 +638,10 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
     }());
 }
 
-void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification) {
+namespace {
+// Common validation once we know whether the verification feature flag is enabled.
+void validatePerformVerificationImpl(bool verificationFeatureFlagEnabled,
+                                     OptionalBool performVerification) {
     if (!performVerification.value_or(false)) {
         return;
     }
@@ -598,13 +649,27 @@ void validatePerformVerification(const VersionContext& vCtx, OptionalBool perfor
             str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when featureFlagReshardingVerification is not enabled",
-            resharding::gFeatureFlagReshardingVerification.isEnabled(
-                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            verificationFeatureFlagEnabled);
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when reshardingDocumentVerification is false",
             resharding::gReshardingDocumentVerification.load());
+}
+}  // namespace
+
+void validatePerformVerification(const boost::optional<ForwardableOperationMetadata>& fom,
+                                 OptionalBool performVerification) {
+    validatePerformVerificationImpl(
+        resharding::isEnabledWithPinnedVersion(fom, resharding::gFeatureFlagReshardingVerification),
+        performVerification);
+}
+
+void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification) {
+    validatePerformVerificationImpl(
+        resharding::gFeatureFlagReshardingVerification.isEnabled(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+        performVerification);
 }
 
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
@@ -613,10 +678,10 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     const CollectionType& collEntry,
     const ShardId& dbPrimary,
     const NamespaceString& nss,
-    const bool& setProvenance) {
-
+    const bool& setProvenance,
+    CollSizeEstimator collSizeEstimator) {
     auto coordinatorDoc = ReshardingCoordinatorDocument(
-        std::move(CoordinatorStateEnum::kUnused), {} /* donorShards */, {} /* recipientShards */);
+        std::move(CoordinatorStateEnum::kUnused), /*donorShards=*/{}, /*recipientShards=*/{});
 
     // Generate the resharding metadata for the ReshardingCoordinatorDocument.
     auto reshardingUUID = UUID::gen();
@@ -657,13 +722,25 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     // entire operation lifetime, even across FCV transitions. If the opCtx already carries an OFCV,
     // capture that; otherwise fall back to the global snapshot.
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    ForwardableOperationMetadata fom(opCtx);
-    if (!fom.getVersionContext() &&
-        feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
-                                                               fcv)) {
-        fom.setVersionContext(VersionContext{fcv});
+
+    // (Generic FCV reference): upgrading/downgrading FCV is represented as multi field object,
+    // trying to store this will cause an invariant later, so don't try to store it here.
+    // Don't throw here as well as it won't allow new reshardCollection command requests from
+    // joining active resharding. Instead, defer the assertion to
+    // ReshardingCoordinatorService::checkIfConflictsWithOtherInstances.
+    if (!fcv.isUpgradingOrDowngrading()) {
+        commonMetadata.setStartingFCV(fcv.getVersion());
     }
-    commonMetadata.setForwardableOpMetadata(std::move(fom));
+
+    {
+        ForwardableOperationMetadata fom(opCtx);
+        if (!fom.getVersionContext() &&
+            feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
+                                                                   fcv)) {
+            fom.setVersionContext(VersionContext{fcv});
+        }
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
+    }
 
     coordinatorDoc.setSourceKey(collEntry.getKeyPattern().toBSON());
     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
@@ -675,20 +752,47 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setUnique(request.getUnique());
     coordinatorDoc.setCollation(request.getCollation());
 
+    const auto forwardableMetadata =
+        coordinatorDoc.getCommonReshardingMetadata().getForwardableOpMetadata();
     auto performVerification = request.getPerformVerification();
     if (!performVerification.has_value() &&
-        resharding::gFeatureFlagReshardingVerification.isEnabled(
-            VersionContext::getDecoration(opCtx), fcv) &&
+        isEnabledWithPinnedVersion(forwardableMetadata,
+                                   resharding::gFeatureFlagReshardingVerification) &&
         resharding::gReshardingDocumentVerification.load()) {
         performVerification = true;
+    }
+    if (performVerification.value_or(false)) {
+        const auto threshold =
+            resharding::gReshardingDocumentValidationMaxCollectionSizeBytes.load();
+        if (threshold < std::numeric_limits<long long>::max()) {
+            const auto collSizeBytes = collSizeEstimator ? collSizeEstimator(opCtx, nss)
+                                                         : estimateCollectionSizeBytes(opCtx, nss);
+            if (!collSizeBytes) {
+                LOGV2_WARNING(
+                    12752701,
+                    "Skipping resharding validation because collection size could not be estimated",
+                    "nss"_attr = nss,
+                    "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
+                performVerification = false;
+            } else if (*collSizeBytes > threshold) {
+                LOGV2_WARNING(12752702,
+                              "Skipping resharding validation because estimated collection "
+                              "size exceeds the configured threshold",
+                              "nss"_attr = nss,
+                              "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID(),
+                              "collectionSizeBytes"_attr = *collSizeBytes,
+                              "threshold"_attr = threshold);
+                performVerification = false;
+            }
+        }
     }
     coordinatorDoc.setPerformVerification(performVerification);
 
     coordinatorDoc.setRecipientOplogBatchTaskCount(request.getRecipientOplogBatchTaskCount());
     coordinatorDoc.setRelaxed(request.getRelaxed());
 
-    if (!resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
-            VersionContext::getDecoration(opCtx), fcv)) {
+    if (!isEnabledWithPinnedVersion(forwardableMetadata,
+                                    resharding::gfeatureFlagReshardingNumSamplesPerChunk)) {
         uassert(ErrorCodes::InvalidOptions,
                 "Resharding with numSamplesPerChunk is not enabled, reject numSamplesPerChunk "
                 "parameter",
@@ -698,22 +802,15 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setDemoMode(request.getDemoMode());
     auto telemetryContext =
         otel::TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
-    if (telemetryContext) {
+    // TODO(SERVER-133103): The telemetry context should not be on the sharding document.
+    if (telemetryContext && telemetryContext->hasActiveTrace()) {
         auto telemetryCtxBSON = otel::traces::TelemetryContextSerializer::toBSON(telemetryContext);
         coordinatorDoc.setTelemetryContext(telemetryCtxBSON);
     }
 
-    if (const auto& vCtx = VersionContext::getDecoration(opCtx);
-        feature_flags::gAuthoritativeShardsDDL.isEnabled(vCtx, fcv)) {
-        tassert(ErrorCodes::IllegalOperation,
-                "Authoritative shards requires no shard refreshes to be executed",
-                resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(vCtx, fcv) &&
-                    resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(vCtx, fcv) &&
-                    resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites.isEnabled(
-                        vCtx, fcv) &&
-                    resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
-                        vCtx, fcv));
-        auto authoritativeLevel = feature_flags::gAuthoritativeShardsCRUD.isEnabled(vCtx, fcv)
+    if (isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsDDL)) {
+        auto authoritativeLevel =
+            isEnabledWithPinnedVersion(forwardableMetadata, feature_flags::gAuthoritativeShardsCRUD)
             ? ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed
             : ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
         coordinatorDoc.setAuthoritativeMetadataAccessLevel(authoritativeLevel);
@@ -888,17 +985,81 @@ CancelableOperationContext makeReshardingOperationContext(
 VersionContext getVersionContextOrDefault(
     const boost::optional<ForwardableOperationMetadata>& fom) {
     // TODO(SERVER-99655): Simplify when 9.0 is last LTS and we always have a FOM with
-    // VersionContext. Remove kDefaultVersionContext and assert VersionContext::hasOperationFCV.
-
-    // Empty VersionContext means use current value of globalFCV. The only time we expect
-    // versionContext to be empty in resharding code is when FCV is in v8.0. So we must
-    // override the default behavior by providing a default VersionContext.
-    const auto kDefaultVersionContext =
-        VersionContext(multiversion::FeatureCompatibilityVersion::kVersion_8_0);
+    // VersionContext. Remove the default computation below and assert
+    // VersionContext::hasOperationFCV.
     if (fom) {
-        return fom->getVersionContext().value_or(kDefaultVersionContext);
+        if (auto vc = fom->getVersionContext()) {
+            return *vc;
+        }
     }
-    return kDefaultVersionContext;
+
+    // When the ForwardableOperationMetadata carries no pinned FCV, we supply a default so that
+    // participants resolve to the same FCV as the coordinator. This happens in two cases, keyed off
+    // the FCV that resharding started in (resharding can never start in a transitional FCV):
+    //
+    // (1) Started in FCV v8.0 (so global FCV is v8.0 or v8.0 -> v9.0): the coordinator never pinned
+    // an FCV in its FOM, and neither did the participants, so we default to v8.0 (kLastLTS).
+    // (2) Started in FCV v8.3 (so global FCV is v8.3 or v8.3 -> v9.0): the coordinator pinned v8.3
+    // in its FOM, but the participants don't have it because the coordinator reaches them via the
+    //     refresh path, so we default to v8.3 (kLastContinuous).
+    //
+    // At FCV 9.0, the coordinator doc is always created with forwardable op metadata containing a
+    // pinned FCV which is also propagated to the participants.
+    using GenericFCV = multiversion::GenericFCV;
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+
+    // we can't replace the ifs with a switch case, as it is possible that lastLTS ==
+    // lastContinuous; when this happens, kUpgradingFromLastLTSToLatest ==
+    // kUpgradingFromLastContinuousToLatest
+
+    // (Generic FCV reference): these generic references are used to determine the default
+    // FCV when no VersionContext is set in ForwardableOperationMetadata.
+    // Case (1): resharding started in kLastLTS.
+    if (fcv == GenericFCV::kLastLTS || fcv == GenericFCV::kUpgradingFromLastLTSToLatest) {
+        return VersionContext{GenericFCV::kLastLTS};
+    }
+    // Case (2): resharding started in kLastContinuous.
+    if (fcv == GenericFCV::kLastContinuous ||
+        fcv == GenericFCV::kUpgradingFromLastContinuousToLatest) {
+        return VersionContext{GenericFCV::kLastContinuous};
+    }
+    tasserted(13001300,
+              "Expected global FCV to be kLastLTS or kLastContinuous (or upgrading from "
+              "those to kLatest) when no VersionContext is set in "
+              "ForwardableOperationMetadata");
+}
+
+bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetadata>& fom,
+                                const FCVGatedFeatureFlag& flag) {
+    return flag.isEnabled(getVersionContextOrDefault(fom),
+                          serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+bool isFCVTheSame(const CommonReshardingMetadata& metadata,
+                  const multiversion::FeatureCompatibilityVersion& fcv) {
+    // (Generic FCV reference): the coordinator doc predates the startingFCV field, so it can only
+    // have been created on an older binary, which implies the FCV was not kLatest.
+    using GenericFCV = multiversion::GenericFCV;
+
+    // TODO SERVER-132341: startingFCV should always be present in post v9.0.
+    auto startingFCV = metadata.getStartingFCV();
+    if (!startingFCV) {
+        return fcv == GenericFCV::kLastLTS || fcv == GenericFCV::kLastContinuous;
+    }
+
+    // Note: startingFCV cannot be upgrading/downgrading versions because we disallow them during
+    // the creation of the coordinator document.
+    return *startingFCV == fcv;
+}
+
+std::string getStartingFCVString(const CommonReshardingMetadata& metadata) {
+    auto startingFCV = metadata.getStartingFCV();
+    // TODO SERVER-132341: startingFCV should always be present in post v9.0.
+    if (!startingFCV) {
+        return "uninitialized";
+    }
+
+    return std::string{multiversion::toString(*startingFCV)};
 }
 
 boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
@@ -912,7 +1073,7 @@ boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
     // Sharded source: orphans must be filtered out, which only stays covered with an index that
     // contains the full shard key.
     if (auto idx = findShardKeyPrefixedIndex(
-            opCtx, collection, *shardKeyPattern, true /* requireSingleKey */)) {
+            opCtx, collection, *shardKeyPattern, /*requireSingleKey=*/true)) {
         return idx->keyPattern();
     }
 

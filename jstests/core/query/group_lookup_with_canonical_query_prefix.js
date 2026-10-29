@@ -2,6 +2,7 @@
  * Tests that an aggregation pipeline with stages only allowed with 'trySbeEngine' runs correctly
  * when wrapped with a $group, or $lookup. This makes the query use SBE.
  * @tags: [
+ *    uses_explain,
  *    assumes_unsharded_collection,
  *    assumes_against_mongod_not_mongos,
  *    not_allowed_with_signed_security_token,

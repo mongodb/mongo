@@ -454,7 +454,7 @@ wt_print_debug_log(WT_CONNECTION *conn, const char *file)
         throw model::wiredtiger_exception("Cannot open a session: ", ret);
     model::wiredtiger_session_guard session_guard(session);
 
-    WT_LSN start_lsn;
+    WT_LSN start_lsn{};
     WT_ASSIGN_LSN(&start_lsn, &((WT_CONNECTION_IMPL *)conn)->log_mgr.log->first_lsn);
     ret = __wt_txn_printlog(session, file, WT_TXN_PRINTLOG_UNREDACT, &start_lsn, nullptr);
     if (ret != 0)

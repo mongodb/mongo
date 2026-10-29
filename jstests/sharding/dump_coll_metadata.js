@@ -1,6 +1,7 @@
 //
 // Tests that we can dump collection metadata via getShardVersion()
 //
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
@@ -19,7 +20,9 @@ function getCollMetadataWithRefresh(node, collName) {
     let shardVersionRes;
 
     assert.soon(() => {
-        assert.commandWorked(node.adminCommand({_flushRoutingTableCacheUpdates: collName}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(node, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(node.adminCommand({_flushRoutingTableCacheUpdates: collName}));
+        }
         let res = assert.commandWorked(
             node.adminCommand({getShardVersion: collName, fullMetadata: true}),
         );

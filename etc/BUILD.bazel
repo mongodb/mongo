@@ -1,6 +1,13 @@
 load("//bazel:mongo_src_rules.bzl", "symlink")
+load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
+
+py_test(
+    name = "set_up_workstation_test",
+    srcs = ["set_up_workstation_test.py"],
+    data = ["set_up_workstation.sh"],
+)
 
 exports_files([
     "lsan.suppressions",
@@ -8,9 +15,23 @@ exports_files([
     "burn_in_tests.yml",
     "extensions.yml",
     "evergreen_yml_components/copybara/copybara_gen.yml",
+    "evergreen_yml_components/tasks/compile_tasks.yml",
+    "evergreen_yml_components/variants/ibm/test_release.yml",
     "backports_required_for_multiversion_tests.yml",
     "coverity_config_schema.json",
 ])
+
+# The master and nightly Evergreen project configs and everything they include, for tests that evaluate it.
+filegroup(
+    name = "evergreen_config",
+    srcs = [
+        "evergreen.yml",
+        "evergreen_nightly.yml",
+        "//:monguard/.evergreen/config_mongodb_master.yml",
+        "//:monguard/.evergreen/config_tasks.yml",
+        "//src/mongo/db/modules/atlas:evergreen_config",
+    ] + glob(["evergreen_yml_components/**"]),
+)
 
 # This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't
 # exist in cc_binary. Instead, we add the denylists to srcs as header files to make them visible to

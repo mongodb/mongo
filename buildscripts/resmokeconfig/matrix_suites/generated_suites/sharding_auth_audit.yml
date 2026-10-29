@@ -15,6 +15,7 @@ executor:
       - jstests/sharding/*reshard*.js
   config:
     shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       global_vars:
         TestData:
           auditDestination: console
@@ -51,7 +52,6 @@ selector:
     - jstests/sharding/cluster_time_across_add_shard.js
     - jstests/sharding/set_user_write_block_mode.js
     - jstests/sharding/drop_config_db.js
-    - jstests/sharding/block_replica_set_writes.js
   exclude_with_any_tags:
     - assumes_change_streams_v1
   roots:

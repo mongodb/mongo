@@ -1,53 +1,35 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/ticketing/unordered_ticket_semaphore.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/random.h"
+
+#include <algorithm>
+#include <random>
 
 
 namespace mongo {
-
 namespace {
 
-Date_t nextDeadline(Date_t until) {
+Date_t nextDeadline(Date_t until, Date_t now, Milliseconds pollInterval) {
+    return std::min(until, now + pollInterval);
+}
+
+Milliseconds jitteredPollInterval(Milliseconds basePollInterval) {
     // Timed waits can be problematic if we have a large number of waiters, since each time we
     // check for interrupt we risk waking up all waiting threads at the same time. We introduce
     // some jitter here to try to reduce the impact of a thundering herd of waiters woken at
     // the same time.
-    constexpr auto kBaseInterval = 500;
     constexpr double kJitterFactor = 0.2;
     static thread_local XorShift128 urbg(SecureRandom().nextInt64());
-    int32_t offset = std::uniform_int_distribution<int32_t>(-kJitterFactor * kBaseInterval,
-                                                            kBaseInterval * kJitterFactor)(urbg);
-    return std::min(until, Date_t::now() + Milliseconds{kBaseInterval + offset});
+    const auto base = basePollInterval.count();
+    int32_t offset =
+        std::uniform_int_distribution<int32_t>(-kJitterFactor * base, kJitterFactor * base)(urbg);
+    return basePollInterval + Milliseconds{offset};
 }
+
 }  // namespace
 
 bool UnorderedTicketSemaphore::tryAcquire() {
@@ -79,12 +61,17 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
             return true;
         }
 
-        Date_t deadline = nextDeadline(until);
+        Date_t deadline =
+            nextDeadline(until, Date_t::now(), jitteredPollInterval(_basePollInterval));
 
         if (!hasStartedWaiting) {
+            // Read maxWaiters before we increment _waiters so callers can rely on
+            // changes to maxWaiters not affecting any waiters already visible in
+            // the count returned by waiters().
+            const auto maxWaiters = _maxWaiters.loadRelaxed();
             const auto previousWaiters = _waiters.fetchAndAdd(1);
             hasStartedWaiting = true;
-            if (previousWaiters >= _maxWaiters.loadRelaxed()) {
+            if (previousWaiters >= maxWaiters) {
                 admCtx->recordOperationLoadShed();
                 uasserted(
                     ErrorCodes::AdmissionQueueOverflow,
@@ -92,13 +79,22 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
             }
         }
 
-        _permits.waitUntil(0, deadline);
+        // Take the current permit count. If it is positive, loop to retry acquisition immediately.
+        // Otherwise, wait for the observed non-positive value to change. If it remains unchanged
+        // through the final deadline, the ticket acquisition fails.
+        const auto observedPermits = _permits.load();
+        if (observedPermits > 0) {
+            continue;
+        }
+
+        const auto waitResult = _permits.waitUntil(observedPermits, deadline);
 
         if (interruptible) {
             opCtx->checkForInterrupt();
         }
 
-        if (deadline == until) {
+        // We enter here only if no newly available permit woke this waiter early.
+        if (!waitResult && deadline == until) {
             if (!interruptible) {
                 // Uninterruptible wait - just return timeout
                 return false;

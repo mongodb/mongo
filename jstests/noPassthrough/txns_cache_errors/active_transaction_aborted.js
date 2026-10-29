@@ -11,40 +11,46 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-function applyCachePressure(host, threadId) {
+function applyCachePressure(host, threadId, stopLatch) {
     const mongo = new Mongo(host);
-    const db = mongo.getDB("test");
 
     let largeDoc = {a: 1, x: "a".repeat(0.5 * 1024 * 1024)};
     let sessions = [];
 
-    while (db.serverStatus().metrics.storage.cancelledCacheEvictions <= 0) {
-        // Pin some cache by creating a large document in a txn we never end.
-        let session = mongo.startSession();
-        session.startTransaction();
-        session.getDatabase("test").runCommand({"insert": "c", documents: [largeDoc]});
-        sessions.push(session);
-    }
-
-    for (let i = 0; i < sessions.length; i++) {
-        sessions[i].abortTransaction_forTesting();
+    try {
+        while (stopLatch.getCount() > 0) {
+            // Pin some cache by creating a large document in a txn we never end.
+            let session = mongo.startSession();
+            session.startTransaction();
+            session.getDatabase("test").runCommand({"insert": "c", documents: [largeDoc]});
+            sessions.push(session);
+        }
+    } finally {
+        for (let i = 0; i < sessions.length; i++) {
+            try {
+                sessions[i].abortTransaction_forTesting();
+                sessions[i].endSession();
+            } catch (error) {
+                // The transaction may already have been aborted, or the server may already be gone.
+            }
+        }
     }
     jsTestLog("Thread " + threadId + " completed with " + sessions.length + " sessions");
 }
 
 function testIdleAbort() {
-    // Use a high number of threads to maximize the odds that one of them will be active.
-    const kNumThreads = 50;
-
     let replSet = new ReplSetTest({
         nodes: 1,
         nodeOptions: {
-            // Shrink the cache to cause cache pressure sooner.
-            wiredTigerEngineConfigString: "cache_size=256M",
+            // Shrink the cache to cause cache pressure sooner, and keep WiredTiger from giving up
+            // on eviction while the cache is stuck.
+            wiredTigerCacheSizeGB: 0.256,
+            wiredTigerEngineConfigString: "cache_stuck_timeout_ms=600000",
             setParameter: {
-                // Make idle-timeout occur more for this test.
-                transactionLifetimeLimitSeconds: 10,
-                // Disable cache-pressure aborts so we can observer idle-aborts.
+                // Start with a long lifetime so the churn transactions below can accumulate
+                // pinned dirty data. It is lowered once the cache is full.
+                transactionLifetimeLimitSeconds: 24 * 60 * 60,
+                // Disable cache-pressure aborts so only the idle aborter can kill transactions.
                 cachePressureQueryPeriodMilliseconds: 0,
             },
         },
@@ -52,33 +58,50 @@ function testIdleAbort() {
     replSet.startSet();
     replSet.initiate();
 
-    // Spawn a bunch of threads to create cache pressure.
-    let threads = [];
-    for (let t = 0; t < kNumThreads; t++) {
-        const thread = new Thread(applyCachePressure, replSet.getPrimary().host, t);
-        thread.start();
-        threads.push(thread);
-    }
+    const primary = replSet.getPrimary();
+    const db = primary.getDB("test");
+    const adminDb = primary.getDB("admin");
 
-    // Wait for an active txn to be killed.
-    //
-    // Here we count the number of sessions pulled out of eviction. This way of counting active
-    // aborts is the most critical for preventing stalls, other ways of aborting active sessions
-    // (e.g. by waiting for the thread to acknowledge its opctx is cancelled) are not as concerning.
-    const db = replSet.getPrimary().getDB("test");
-    assert.soon(() => {
-        return db.serverStatus().metrics.storage.cancelledCacheEvictions > 0;
-    }, "Timed out waiting for an active txn to be killed");
+    const stopLatch = new CountDownLatch(1);
+    const churn = new Thread(applyCachePressure, primary.host, 0, stopLatch);
+    churn.start();
 
-    for (let t = 0; t < threads.length; t++) {
+    try {
+        // Wait until eviction has run out of pages to evict: everything left in the cache is
+        // pinned by the churn transactions, so their inserts can only park in the
+        // eviction-assist loop.
+        assert.soon(
+            () => {
+                return db.serverStatus().wiredTiger.cache["eviction empty score"] == 100;
+            },
+            "timed out waiting for the cache to fill up",
+            240000,
+        );
+
+        // Lower the transaction lifetime. The churn transactions started before this point keep
+        // pinning the cache, but every transaction started after it expires one second after it
+        // begins. Their inserts park in the eviction-assist loop, and the idle aborter
+        // interrupts them while they are parked.
+        assert.commandWorked(
+            adminDb.runCommand({setParameter: 1, transactionLifetimeLimitSeconds: 1}),
+        );
+
+        assert.soon(
+            () => {
+                return db.serverStatus().metrics.storage.cancelledCacheEvictions > 0;
+            },
+            "timed out waiting for the idle aborter to interrupt a parked transaction",
+            240000,
+        );
+    } finally {
+        stopLatch.countDown();
         try {
-            threads[t].join();
+            churn.join();
         } catch (error) {
             jsTestLog("Ignoring non-critical error " + error);
         }
+        replSet.stopSet();
     }
-
-    replSet.stopSet();
 }
 
 function testCachePressureAbort() {
@@ -111,49 +134,49 @@ function testCachePressureAbort() {
     let res = oldestSession.getDatabase("test").runCommand({"insert": "c", documents: [{test: 1}]});
 
     // Spawn a bunch of threads to create cache pressure.
+    const stopLatch = new CountDownLatch(1);
     let threads = [];
     for (let t = 0; t < kNumThreads; t++) {
-        const thread = new Thread(applyCachePressure, primary.host, t);
+        const thread = new Thread(applyCachePressure, primary.host, t, stopLatch);
         thread.start();
         threads.push(thread);
     }
 
-    let iter = 1;
-    while (res.ok) {
-        res = oldestSession.getDatabase("test").runCommand({"insert": "c", documents: [{test: 1}]});
-        iter++;
-    }
-    jsTestLog(res);
-
-    // Verify that the active oldest transaction is aborted.
-    // There are two ways active oldest transactions are aborted: either the server-side
-    // cache-pressure-abort or the WT-side cache-stuck check. For purpose of this test we will allow
-    // either abort mechanism, since we only care that active transactions can be aborted while
-    // under cache pressure, we don't mind who does it.
-    let db = primary.getDB("test");
-    let serverTriggered = db.serverStatus().metrics.storage.cancelledCacheEvictions > 0;
-    let wtTriggered =
-        res.code == ErrorCodes.WriteConflict &&
-        res.errmsg.includes("-31800: Transaction has the oldest pinned transaction ID");
-
-    jsTestLog(
-        "Oldest transaction aborted after " +
-            iter +
-            " inserts. ServerTriggered=" +
-            serverTriggered +
-            " wtTriggered=" +
-            wtTriggered,
-    );
-    assert(serverTriggered || wtTriggered);
-
-    replSet.stopSet();
-
-    for (let t = 0; t < threads.length; t++) {
-        try {
-            threads[t].join();
-        } catch (error) {
-            jsTestLog("Ignoring non-critical error " + error);
+    try {
+        let iter = 1;
+        while (res.ok) {
+            res = oldestSession
+                .getDatabase("test")
+                .runCommand({"insert": "c", documents: [{test: 1}]});
+            iter++;
         }
+        jsTestLog(res);
+
+        // Verify that the active oldest transaction is aborted.
+        // There are two ways active oldest transactions are aborted: either the server-side
+        // cache-pressure-abort or the WT-side cache-stuck check. For purpose of this test we will
+        // allow either abort mechanism, since we only care that active transactions can be aborted
+        // while under cache pressure, we don't mind who does it.
+        let db = primary.getDB("test");
+        let serverTriggered = db.serverStatus().metrics.storage.cancelledCacheEvictions > 0;
+        let wtTriggered =
+            res.code == ErrorCodes.WriteConflict &&
+            res.errmsg.includes("-31800: Transaction has the oldest pinned transaction ID");
+
+        jsTestLog("Oldest transaction aborted", {inserts: iter, serverTriggered, wtTriggered});
+        assert(serverTriggered || wtTriggered);
+
+        oldestSession.endSession();
+    } finally {
+        stopLatch.countDown();
+        for (let t = 0; t < threads.length; t++) {
+            try {
+                threads[t].join();
+            } catch (error) {
+                jsTestLog("Ignoring non-critical error " + error);
+            }
+        }
+        replSet.stopSet();
     }
 }
 

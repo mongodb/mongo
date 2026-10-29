@@ -35,7 +35,16 @@ fi
 
 resmoke_test_flags=""
 if [[ -n "${test_flags}${extra_test_flags}" ]]; then
-    resmoke_test_flags="--test-flags='${test_flags} ${extra_test_flags}'"
+    # Join without a dangling separator space when one of the two is empty (a trailing
+    # space would be escaped by %q and then absorb the next argument under eval below).
+    all_test_flags="${test_flags}"
+    if [[ -n "$all_test_flags" && -n "${extra_test_flags}" ]]; then
+        all_test_flags="$all_test_flags "
+    fi
+    all_test_flags="$all_test_flags${extra_test_flags}"
+    # The flags may themselves contain quotes (e.g --mongodSetParameters='{...}'), which would
+    # otherwise break out of the single quotes and scramble the argument boundaries.
+    resmoke_test_flags=$(printf '%q' "--test-flags=$all_test_flags")
 fi
 
 activate_venv

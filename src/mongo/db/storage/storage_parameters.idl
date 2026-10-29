@@ -1,30 +1,5 @@
-# Copyright (C) 2019-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     cpp_namespace: "mongo"
@@ -70,7 +45,7 @@ server_parameters:
     operationMemoryPoolBlockInitialSizeKB:
         description: "Initial block size in KB for the per operation temporary object memory pool"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gOperationMemoryPoolBlockInitialSizeKB
         default: 1
         validator:
@@ -80,7 +55,7 @@ server_parameters:
     operationMemoryPoolBlockMaxSizeKB:
         description: "Maximum block size in KB for the per operation temporary object memory pool"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gOperationMemoryPoolBlockMaxSizeKB
         default: 2048
         validator:
@@ -90,7 +65,7 @@ server_parameters:
     indexMaxNumGeneratedKeysPerDocument:
         description: "Maximum number of index keys a single document is allowed to generate"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int32_t>
+        cpp_vartype: Atomic<int32_t>
         cpp_varname: gIndexMaxNumGeneratedKeysPerDocument
         default: 100000
         validator:
@@ -107,7 +82,7 @@ server_parameters:
     timeseriesValidateCompressedBuckets:
         description: "Validate that there is no data loss before committing compressed timeseries buckets"
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: gValidateTimeseriesCompression
         default: true
         redact: false
@@ -116,7 +91,7 @@ server_parameters:
         description: "Maximum number of documents that we will insert in a single batch."
         set_at: [startup, runtime]
         cpp_varname: "internalInsertMaxBatchSize"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 500
         validator:
             gt: 0
@@ -128,7 +103,7 @@ server_parameters:
             format for batched writes is in use. See batchedDeletesTargetBatchDocs and
             maxNumberOfTransactionOperationsInSingleOplogEntry.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxNumberOfBatchedOperationsInSingleOplogEntry
         default: 2147483647 # INT_MAX
         validator: {gte: 1}
@@ -140,7 +115,7 @@ server_parameters:
             format for batched writes is in use.
             See batchedDeletesTargetStagedDocBytes and BSONObjMaxUserSize.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes
         default: 16777216 # 16 MB
         validator: {gte: 1}
@@ -151,7 +126,7 @@ server_parameters:
             Maximum number of inserts that cross-db collection renames can batch into one applyOps
             oplog entry.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxNumberOfInsertsBatchInsertsForRenameAcrossDatabases
         default: 500
         validator: {gte: 1, lte: 16777216}
@@ -162,7 +137,7 @@ server_parameters:
             Maximum size (bytes) of each batched applyOps oplog entry for cross-db collection renames.
             If any one document exceeds this limit, falls back to a plain insert oplog entry for that doc.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gMaxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes
         default:
             4194304 # 4 MB, an arbitrary but conservative fraction of the 16 MB BSON limit. Similar
@@ -173,7 +148,7 @@ server_parameters:
     collectionSamplingLogIntervalSeconds:
         description: "The approximate interval between log messages indicating collection sampling progress. Once interval seconds have elapsed since the last log message, a progress message will be logged after the current sample is completed. A value of zero will disable this logging."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gCollectionSamplingLogIntervalSeconds
         deprecated_name:
             - oplogSamplingLogIntervalSeconds
@@ -201,7 +176,7 @@ server_parameters:
     cachePressureEvictionStallThresholdProportion:
         description: "To adjust the thread pressure sensitivity proportion in detecting cache pressure for the storage engine."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: gCachePressureEvictionStallThresholdProportion
         default: 0.95
         validator: {gte: 0, lte: 1}
@@ -210,7 +185,7 @@ server_parameters:
     cachePressureEvictionStallDetectionWindowSeconds:
         description: "The duration of time to allow cache pressure statistics to accumulate and average."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<int>"
+        cpp_vartype: "Atomic<int>"
         cpp_varname: gCachePressureEvictionStallDetectionWindowSeconds
         default: 20
         validator: {gte: 1}
@@ -219,7 +194,7 @@ server_parameters:
     cachePressureExponentiallyDecayingMovingAverageAlphaValue:
         description: "The alpha value used to calculate the exponentially decaying moving average of total tickets."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: gCachePressureExponentiallyDecayingMovingAverageAlphaValue
         default: 0.1
         validator: {gte: 0, lte: 1}
@@ -255,17 +230,6 @@ feature_flags:
         cpp_varname: gFeatureFlagLargeBatchedOperations
         default: true
         version: 8.0
-        fcv_gated: true
-    featureFlagDocumentSourceListCatalog:
-        description: "When enabled, allow the use of the $listCatalog aggregation stage"
-        cpp_varname: feature_flags::gDocumentSourceListCatalog
-        default: true
-        version: 6.0
-        fcv_gated: true
-    featureFlagInternalWritesAreReplicatedTransactionally:
-        description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
-        cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
-        default: false
         fcv_gated: true
     featureFlagTimeseriesDeletesSupport:
         description: "Enable support for arbitrary deletes on time-series collections"

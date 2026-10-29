@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/agg/batched_enrichment_stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/single_doc_lookup/scoped_batched_lookup.h"
 #include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -49,22 +24,19 @@ namespace mongo::exec::agg {
  * event's clusterTime) and attaches it as the 'fullDocument' field. Its construction is based on
  * DocumentSourceChangeStreamAddPostImage (in updateLookup mode), which handles the optimization
  * part.
+ *
+ * Built on BatchedEnrichmentStage: events are buffered and enriched in batches inside a single
+ * resource scope, so the lookup executor never holds catalog state across upstream getNext() calls.
+ * The production batch size is governed by the factory (batch-of-1 unless a caching executor makes
+ * batching pay), so behaviour is byte-for-byte the per-event path; batching only changes when.
  */
-class ChangeStreamUpdateLookupStage final : public Stage {
+class ChangeStreamUpdateLookupStage final : public BatchedEnrichmentStage {
 public:
     ChangeStreamUpdateLookupStage(std::string_view stageName,
                                   const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                  std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
-
-    void detachFromOperationContext() override {
-        Stage::detachFromOperationContext();
-        _lookupExecutor->detachFromOperationContext();
-    }
-
-    void reattachToOperationContext(OperationContext* opCtx) override {
-        Stage::reattachToOperationContext(opCtx);
-        _lookupExecutor->reattachToOperationContext(opCtx);
-    }
+                                  std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor,
+                                  Limits limits,
+                                  BatchedEnrichmentStatsRecorder batchStatsRecorder);
 
     /**
      * Test-only: returns the injected SingleDocumentLookupExecutor so wiring tests can assert the
@@ -76,9 +48,18 @@ public:
 
 private:
     /**
-     * Performs the lookup to retrieve the full document.
+     * Opens / closes the per-batch resource scope over the lookup executor chain. closeBatch()
+     * releases any attached catalog state (idempotent; a no-op for Express, which caches nothing).
      */
-    GetNextResult doGetNext() final;
+    void beginBatch() override;
+    void closeBatch() noexcept override;
+
+    /**
+     * Enriches one buffered event: for an update event, attaches the looked-up post-image as
+     * 'fullDocument'; any other event passes through unchanged. Never drops an event, so it always
+     * returns an engaged optional.
+     */
+    boost::optional<Document> enrich(Document event) override;
 
     /**
      * Extracts the lookup parameters from the update event and invokes the injected executor.
@@ -96,5 +77,10 @@ private:
      * collection-level streams (fixed namespace, no per-event parse).
      */
     ChangeStream _changeStream;
+
+    /**
+     * The active per-batch resource scope, present only while a batch is being enriched.
+     */
+    boost::optional<ScopedBatchedLookup> _batch;
 };
 }  // namespace mongo::exec::agg

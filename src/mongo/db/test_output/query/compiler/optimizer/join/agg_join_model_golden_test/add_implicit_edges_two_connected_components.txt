@@ -219,31 +219,31 @@ output: {
     "resolvedPaths": [
         {
             "nodeId": {"$numberInt":"0"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"1"},
-            "fieldName": "a"
+            "underlyingFieldPath": "a"
         },
         {
             "nodeId": {"$numberInt":"2"},
-            "fieldName": "b"
+            "underlyingFieldPath": "b"
         },
         {
             "nodeId": {"$numberInt":"3"},
-            "fieldName": "c"
+            "underlyingFieldPath": "c"
         },
         {
             "nodeId": {"$numberInt":"3"},
-            "fieldName": "d"
+            "underlyingFieldPath": "d"
         },
         {
             "nodeId": {"$numberInt":"4"},
-            "fieldName": "d"
+            "underlyingFieldPath": "d"
         },
         {
             "nodeId": {"$numberInt":"5"},
-            "fieldName": "e"
+            "underlyingFieldPath": "e"
         }
     ],
     "prefix": [

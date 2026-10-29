@@ -72,6 +72,26 @@ signal_timer(int signo)
 }
 
 /*
+ * abort_with_state_dump --
+ *     Dump transaction and cache state, then abort the process. The two-minute alarm limits our
+ *     exposure: if the library is deadlocked, the dump might just join the mess.
+ */
+void
+abort_with_state_dump(WT_CONNECTION *conn, const char *reason)
+{
+    fprintf(stderr, "%s\n", reason);
+    fprintf(stderr, "%s\n", "dumping cache and transaction state, then aborting the process");
+
+    set_alarm(120);
+
+    (void)conn->debug_info(conn, "txn");
+    (void)conn->debug_info(conn, "cache");
+
+    __wt_abort(NULL);
+    /* NOTREACHED */
+}
+
+/*
  * set_alarm --
  *     Set a timer.
  */
@@ -134,6 +154,7 @@ locks_init(WT_CONNECTION *conn)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     lock_init(session, &g.backup_lock);
     lock_init(session, &g.prepare_commit_lock);
+    lock_init(session, &g.timestamp_lock);
     testutil_check(session->close(session, NULL));
 }
 
@@ -149,6 +170,7 @@ locks_destroy(WT_CONNECTION *conn)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     lock_destroy(session, &g.backup_lock);
     lock_destroy(session, &g.prepare_commit_lock);
+    lock_destroy(session, &g.timestamp_lock);
     testutil_check(session->close(session, NULL));
 }
 
@@ -177,7 +199,7 @@ main(int argc, char *argv[])
     READ_SCAN_ARGS scan_args;
     WT_DECL_RET;
     uint64_t now, start;
-    u_int leader_ops_seconds, ops_seconds, reps;
+    u_int leader_ops_seconds, ops_seconds, reps, total_reps;
     int ch;
     const char *config, *home;
     bool is_backup, quiet_flag, verify_only;
@@ -252,6 +274,9 @@ main(int argc, char *argv[])
     /* Initialize lock to ensure single threading for lane operations in predictable replay. */
     testutil_check(pthread_rwlock_init(&g.lane_lock, NULL));
 
+    /* Initialize lock protecting the key rotation push history from concurrent step-down. */
+    testutil_check(pthread_rwlock_init(&g.key_push_lock, NULL));
+
     /*
      * Initialize the tables array and default to multi-table testing if not in backward-compatible
      * mode.
@@ -298,10 +323,10 @@ main(int argc, char *argv[])
         config_single(NULL, *argv, true);
 
     /*
-     * Let the command line -q flag override values configured from other sources. Regardless, don't
-     * go all verbose if we're not talking to a terminal.
+     * Let the command line -q flag override values configured from other sources. Multi-node runs
+     * retain configured verbosity for their separate leader and follower logs.
      */
-    if (quiet_flag || !isatty(1))
+    if ((quiet_flag || !isatty(1)) && !disagg_is_multi_node())
         GV(QUIET) = 1;
 
     /* Configure the random number generators. */
@@ -346,12 +371,12 @@ main(int argc, char *argv[])
         /* For disagg follower node pick up the latest checkpoint. */
         if (g.disagg_storage_config && !g.disagg_leader)
             follower_read_latest_checkpoint();
-        timestamp_init();
         /* Update the oldest and stable timestamps if they have been previously set. */
         ret = timestamp_query("get=oldest_timestamp", &g.oldest_timestamp);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
         ret = timestamp_query("get=stable_timestamp", &g.stable_timestamp);
         testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+        timestamp_init();
         locks_init(g.wts_conn);
     } else {
         wts_create_home();
@@ -359,6 +384,9 @@ main(int argc, char *argv[])
         trace_init();
         wts_create_database();
         wts_open(g.home, &g.wts_conn, true);
+        /* Follower: seed an initial key before the first step-up checkpoint. */
+        if (!g.disagg_leader)
+            disagg_key_push_initial(g.wts_conn, false);
         timestamp_init();
     }
     wts_prepare_discover(g.wts_conn);
@@ -401,12 +429,24 @@ main(int argc, char *argv[])
          * expected to generate minimal cache activity. Content written in follower mode is not
          * evictable, extended time in this role can lead to cache overflow. The leader occupies the
          * remaining time.
+         *
+         * With async step-down, the leader -> follower transition and the follower window both
+         * happen inside operations() (the background step-down thread reconfigures to follower and
+         * grants the workers DISAGG_SWITCH_FOLLOWER_OPS_SEC). A rep can start as leader or as
+         * follower (if the previous rep ended stepped down), and disagg_switch_roles() only
+         * performs the step-up, since step-down is already handled asynchronously.
          */
         leader_ops_seconds = ops_seconds != 0 ? (ops_seconds - DISAGG_SWITCH_FOLLOWER_OPS_SEC) : 0;
 
-        for (reps = 1; reps <= (FORMAT_OPERATION_REPS * 2); ++reps) {
+        /*
+         * With async step-down each rep covers both the leader and follower phases inside
+         * operations(); otherwise a rep runs a single phase, so double the count to alternate.
+         */
+        total_reps =
+          GV(DISAGG_STEPDOWN_ASYNC) ? FORMAT_OPERATION_REPS : (FORMAT_OPERATION_REPS * 2);
+        for (reps = 1; reps <= total_reps; ++reps) {
             ops_seconds = g.disagg_leader ? leader_ops_seconds : DISAGG_SWITCH_FOLLOWER_OPS_SEC;
-            operations(ops_seconds, reps, (FORMAT_OPERATION_REPS * 2));
+            operations(ops_seconds, reps, total_reps);
             disagg_switch_roles();
         }
     }

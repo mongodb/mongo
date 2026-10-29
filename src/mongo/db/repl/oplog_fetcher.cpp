@@ -1,42 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/oplog_fetcher.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -57,6 +24,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/repl_network_traffic_stats.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_process.h"
@@ -66,7 +34,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -74,6 +42,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -83,6 +52,14 @@
 #include <algorithm>
 #include <mutex>
 #include <string_view>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -130,8 +107,6 @@ BSONObj OplogBatchStats::getReport() const {
 auto& oplogBatchStats = *MetricBuilder<OplogBatchStats>("repl.network.getmores");
 // The oplog entries read via the oplog reader
 auto& opsReadStats = *MetricBuilder<Counter64>{"repl.network.ops"};
-// The bytes read via the oplog reader
-auto& networkByteStats = *MetricBuilder<Counter64>{"repl.network.bytes"};
 
 auto& readersCreatedStats = *MetricBuilder<Counter64>{"repl.network.readersCreated"};
 
@@ -157,6 +132,28 @@ Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
     // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
     // We never wait longer than 30 seconds.
     return std::min((config.getElectionTimeoutPeriod() / 2), maximumAwaitDataTimeoutMS);
+}
+
+const int firstOplogEntryQueryMaxAttempts = 10;
+
+/**
+ * Returns true(after logging and backing off) if the query for first oplog entry fails
+ * with a retryable error, up to the set `firstOplogEntryQueryMaxAttempts`.
+ */
+bool retryFirstOplogEntryQuery(const Status& status, int attempt) {
+    if (!ErrorCodes::isRetriableError(status.code()) ||
+        attempt >= firstOplogEntryQueryMaxAttempts) {
+        return false;
+    }
+    logAndBackoff(11403200,
+                  MONGO_LOGV2_DEFAULT_COMPONENT,
+                  logv2::LogSeverity::Warning(),
+                  attempt,
+                  "Retrying query for first oplog entry from the sync source due to retriable "
+                  "error",
+                  "remainingAttempts"_attr = firstOplogEntryQueryMaxAttempts - attempt,
+                  "error"_attr = status);
+    return true;
 }
 }  // namespace
 
@@ -242,8 +239,10 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(config.initialLastFetched),
-      _createClientFn(
-          [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
+      _createClientFn([] {
+          return std::make_unique<DBClientConnection>(DBClientConnectionOptions{
+              .autoReconnect = true, .connectionPurpose = ConnectionPurpose::kReplication});
+      }),
       _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
       _awaitDataTimeout(calculateAwaitDataTimeout(config.replSetConfig)),
@@ -252,7 +251,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
     invariant(!_lastFetched.isNull());
     invariant(onShutdownCallbackFn);
     invariant(enqueueDocumentsFn);
-    ObservableMutexRegistry::get().add("OplogFetcher::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("oplogFetcherMutex", _mutex);
 }
 
 OplogFetcher::~OplogFetcher() {
@@ -419,7 +418,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
     }
 
     _setMetadataWriterAndReader();
-    auto cursorStatus = _createNewCursor(true /* initialFind */);
+    auto cursorStatus = _createNewCursor(/*initialFind=*/true);
     while (true) {
         Status status{Status::OK()};
         {
@@ -914,7 +913,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
 
     // Increment stats. We read all of the docs in the query.
     opsReadStats.increment(info.networkDocumentCount);
-    networkByteStats.increment(info.networkDocumentBytes);
+    recordOplogBytesReceived(static_cast<int64_t>(info.networkDocumentBytes));
 
     oplogBatchStats.recordMillis(_lastBatchElapsedMS, documents.empty());
 
@@ -1047,16 +1046,31 @@ Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
     // Check to see if the sync source's first oplog entry is later than 'lastFetched'. If it is, we
     // are too stale to sync from this node. If it isn't, we should go into rollback instead.
     BSONObj remoteFirstOplogEntry;
-    try {
-        // Query for the first oplog entry in the sync source's oplog.
-        FindCommandRequest findRequest{_nss};
-        findRequest.setSort(BSON("$natural" << 1));
-        // Since this function is called after the first batch, the exhaust stream has not been
-        // started yet. As a result, using the same connection is safe.
-        remoteFirstOplogEntry = _conn->findOne(std::move(findRequest));
-    } catch (DBException& e) {
-        // If an error occurs with the query, throw an error.
-        return Status(ErrorCodes::TooStaleToSyncFromSource, e.reason());
+
+    for (int attempts = 1;; ++attempts) {
+        try {
+            // Query for the first oplog entry in the sync source's oplog.
+            FindCommandRequest findRequest{_nss};
+            findRequest.setSort(BSON("$natural" << 1));
+            // Since this function is called after the first batch, the exhaust stream has not been
+            // started yet. As a result, using the same connection is safe.
+            remoteFirstOplogEntry = _conn->findOne(std::move(findRequest));
+            break;
+        } catch (DBException& e) {
+            if (retryFirstOplogEntryQuery(e.toStatus(), attempts)) {
+                continue;
+            }
+            LOGV2(11403201,
+                  "No longer retrying query for first oplog entry from the sync source",
+                  "syncSource"_attr = _config.source,
+                  "attempts"_attr = attempts,
+                  "error"_attr = e.toStatus());
+            // If an error occurs with the query, throw an error.
+            return Status(ErrorCodes::InvalidSyncSource,
+                          fmt::format("failed to query the first oplog entry from sync"
+                                      "source: {}",
+                                      e.reason()));
+        }
     }
 
     StatusWith<OpTime> remoteFirstOpTimeResult = OpTime::parseFromOplogEntry(remoteFirstOplogEntry);

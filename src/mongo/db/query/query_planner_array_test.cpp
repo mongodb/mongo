@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -2176,16 +2150,106 @@ TEST_F(QueryPlannerTest, CannotHoistNegatedPredFromElemMatchIntoSiblingOrWithMul
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-// TODO SERVER-125857: We should be able to an $or pushdown here.
+// The negation and the $or share the same $elemMatch context. Both predicates are
+// evaluated against the same array element, so the index bounds may be compounded.
 TEST_F(QueryPlannerTest, OrOfRangesUnderElemMatchWithNegation) {
-    addIndex(BSON("arr.a" << 1 << "arr.b" << 1));
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1), multikeyPaths);
     runQuery(fromjson("{arr: {$elemMatch: {a: {$ne: 1}, $or: [{b: {$lt: 2}}, {b: {$gt: 3}}]}}}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+
+    // {'arr.a': {$ne: 1}} is pushed into both branches, so each can be compounded with 'arr.b'.
+    assertSolutionExists(
+        "{fetch: {node: {or: {nodes: ["
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [[-Infinity, 2, true, false]]}}},"
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [[3, Infinity, false, true]]}}}]}}}}");
+
+    // No pushdown; {'arr.a': {$ne: 1}} is indexed directly and 'arr.b' is unconstrained.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+// As above, but without the $elemMatch. The predicates no longer share an $elemMatch context, so
+// they can be satisfied by different array elements, hence, the negation is not pushed into the
+// $or.
+TEST_F(QueryPlannerTest, NegationOrPushdownBlockedWithoutElemMatch) {
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1), multikeyPaths);
+    runQuery(fromjson("{'arr.a': {$ne: 1}, $or: [{'arr.b': {$lt: 2}}, {'arr.b': {$gt: 3}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
         "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+    assertSolutionDoesntExist(
+        "{fetch: {node: {or: {nodes: ["
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}}},"
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}}}]}}}}");
+}
+
+// TODO SERVER-133013: Enable $or-pushdown of negation when the parent $elemMatch is not a root
+// Similar to 'OrOfRangesUnderElemMatchWithNegation', but the $elemMatch is in conjunction with a
+// sibling predicate. The negation and the $or still share the same $elemMatch context, so the
+// pushdown would be correct here as well, but it is currently not implemented.
+TEST_F(QueryPlannerTest, OrOfRangesUnderElemMatchWithNegationAndSiblingPredicate) {
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1), multikeyPaths);
+    runQuery(fromjson(
+        "{extra: 5, arr: {$elemMatch: {a: {$ne: 1}, $or: [{b: {$lt: 2}}, {b: {$gt: 3}}]}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+
+    // No pushdown; {'arr.a': {$ne: 1}} is indexed directly and 'arr.b' is unconstrained.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+    assertSolutionDoesntExist(
+        "{fetch: {node: {or: {nodes: ["
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}}},"
+        "{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}}}]}}}}");
+}
+
+// As 'OrOfRangesUnderElemMatchWithNegation', but the negated predicate is on a path which contains
+// a second array level ('arr.a' is multikey as well). The $elemMatch context is still shared, so
+// the pushdown is performed. The index bounds over-approximate the matching documents and the
+// $elemMatch kept as a residual filter in the FETCH stage rejects the false positives.
+TEST_F(QueryPlannerTest, OrOfRangesUnderElemMatchWithNegationOnNestedArray) {
+    MultikeyPaths multikeyPaths{{0U, 1U}, {0U}};
+    addIndex(BSON("arr.a.c" << 1 << "arr.b" << 1), multikeyPaths);
+    runQuery(
+        fromjson("{arr: {$elemMatch: {'a.c': {$ne: 1}, $or: [{b: {$lt: 2}}, {b: {$gt: 3}}]}}}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+
+    // {'arr.a.c': {$ne: 1}} is pushed into both branches, so each can be compounded with 'arr.b'.
+    assertSolutionExists(
+        "{fetch: {node: {or: {nodes: ["
+        "{ixscan: {pattern: {'arr.a.c': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a.c': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [[-Infinity, 2, true, false]]}}},"
+        "{ixscan: {pattern: {'arr.a.c': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a.c': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
+        " 'arr.b': [[3, Infinity, false, true]]}}}]}}}}");
+
+    // No pushdown; {'arr.a.c': {$ne: 1}} is indexed directly and 'arr.b' is unconstrained.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'arr.a.c': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a.c': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
         " 'arr.b': [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 

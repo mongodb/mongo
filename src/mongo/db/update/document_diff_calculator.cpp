@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/update/document_diff_calculator.h"
 
@@ -482,7 +456,7 @@ void IndexUpdateIdentifier::determineAffectedIndexes(ArrayDiffReader* reader,
 }
 
 boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, size_t padding) {
-    if (auto diffNode = computeDocDiff(pre, post, false /* ignoreSizeLimit */, padding)) {
+    if (auto diffNode = computeDocDiff(pre, post, /*ignoreSizeLimit=*/false, padding)) {
         auto diff = diffNode->serialize();
         if (diff.objsize() < post.objsize()) {
             return diff;
@@ -494,14 +468,14 @@ boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, 
 
 Diff computeOplogDiff_forTest(const BSONObj& pre, const BSONObj& post) {
     // Compute the full document differences between 'pre' and 'post'.
-    auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0 /* padding */);
+    auto diffNode = computeDocDiff(pre, post, /*ignoreSizeLimit=*/true, /*padding=*/0);
     tassert(7639006, "diffNode should always have a value", diffNode);
     return diffNode->serialize();
 }
 
 boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post) {
     // Compute the full document differences between 'pre' and 'post'.
-    auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0);
+    auto diffNode = computeDocDiff(pre, post, /*ignoreSizeLimit=*/true, 0);
     BSONObjBuilder bob;
     serializeInlineDiff(diffNode.get(), &bob);
     if (bob.bb().len() >= BSONObjMaxUserSize) {

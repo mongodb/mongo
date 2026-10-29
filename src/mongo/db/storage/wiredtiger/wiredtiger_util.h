@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
@@ -36,12 +11,14 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <span>
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-inline constexpr auto kWiredTigerEngineName = "wiredTiger"_sd;
+inline constexpr auto kWiredTigerEngineName = "wiredTiger"sv;
 
 class BSONObjBuilder;
 class OperationContext;
@@ -99,8 +76,13 @@ private:
     WiredTigerUtil();
 
 public:
-    static constexpr std::string_view kConfigStringField = "configString"_sd;
-    static constexpr std::string_view kTableUriPrefix = "table:"_sd;
+    static constexpr std::string_view kConfigStringField = "configString"sv;
+    static constexpr std::string_view kTableUriPrefix = "table:"sv;
+    static constexpr std::string_view kFileUriPrefix = "file:"sv;
+    // Suffix of the file backing the stable (checkpointed) table of a disaggregated ident.
+    static constexpr std::string_view kStableFileSuffix = ".wt_stable"sv;
+    static constexpr std::string_view kSharedHistoryStoreFileUri =
+        "file:WiredTigerSharedHS.wt_stable"sv;
     static constexpr double memoryThresholdPercentage = 0.8;
 
     static std::string buildTableUri(std::string_view ident);
@@ -250,6 +232,13 @@ public:
     static Status checkTableCreationOptions(const BSONElement& configElem);
 
     /**
+     * Rejects a WiredTiger config string that enables 'import', or that sets 'source' to anything
+     * but empty. Mongod never sets 'source' itself, so empty is the only value that should ever
+     * appear here.
+     */
+    static Status checkConfigStringBannedKeys(std::string_view config);
+
+    /**
      * Reads individual statistics using URI.
      * List of statistics keys WT_STAT_* can be found in wiredtiger.h.
      */
@@ -264,6 +253,21 @@ public:
                                                            const std::string& uri,
                                                            const std::string& config,
                                                            int statisticsKey);
+
+    /**
+     * Reads back the per-b-tree size summary that a debug=(size_stats) cursor accumulated onto the
+     * b-tree backing 'tableUri' as it traversed, and emits it as a single log line. The URI
+     * included in the log line is the on-disk file backing the b-tree not 'tableUri'.
+     */
+    static void logStorageSizeStats(WiredTigerSession& session, const std::string& tableUri);
+
+    static constexpr int kLeafPageSizeHistogramMaxBuckets = 9;
+
+    // Zero publishedBuckets/publishedCeiling: 9 buckets, ceiling maxLeafPage.
+    static BSONArray buildLeafPageSizeHistogram(int64_t publishedBuckets,
+                                                int64_t publishedCeiling,
+                                                int64_t maxLeafPage,
+                                                std::span<const int64_t> bucketCounts);
 
     static int64_t getEphemeralIdentSize(WiredTigerSession& session, const std::string& uri);
 
@@ -392,7 +396,7 @@ public:
     /**
      * Truncates the table identified by uri, removing all entries from it.
      */
-    static void truncate(WiredTigerRecoveryUnit& ru, std::string_view uri);
+    static void truncate(WiredTigerRecoveryUnit& ru, const std::string& uri);
 
     static uint64_t genTableId();
 
@@ -409,22 +413,12 @@ public:
     };
 
     /**
-     * Given two configuration strings, concatenates them together with a ','. It's the callers
-     * responsibility to ensure both input configs are valid.
-     * Example:
-     *      - configA = "exclusive=true"
-     *      - configB = "key_format=q"
-     *      - returns "exclusive=true,key_format=q"
-     */
-    static std::string concatConfigs(const std::string& configA, const std::string& configB);
-
-    /**
      * Helper for handling WT eviction events. Returns non-zero to indicate that WT should not take
      * part in optional eviction on this session, and zero otherwise
      */
     static int handleWtEvictionEvent(WT_SESSION* session);
 
-    MONGO_MOD_PRIVATE static long long getCancelledCacheMetric_forTest();
+    [[MONGO_MOD_PRIVATE]] static long long getCancelledCacheMetric_forTest();
 
     /**
      * Dumps the complete contents of the WiredTiger metadata table to the log output.

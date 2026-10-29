@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
@@ -40,8 +14,11 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/sharding_environment/client/shard.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -70,6 +47,20 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRemovingCoordinatorDocument);
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+MONGO_FAIL_POINT_DEFINE(hangNonAuthoritativeDDLBeforeDDLLock);
+// Suspends any coordinator matching 'operationType' before it starts executing the handler for
+// 'phase'. The criteria can be further restricted by specifying an optional 'nss'.
+//  Following the full description of the expected schema for the failpoint 'data' section:
+//   - 'operationType': string matching the coordinator's CoordinatorType (e.g.
+//   "createCollection_V4")
+//   - 'phase': string matching the serialized value of the phase being entered (as defined by the
+//   enum in its RecoveryDocument)
+//   - 'nss' (optional): string matching the coordinator's original namespace. If omitted, the
+//   coordinator is matched regardless of its namespace.
+MONGO_FAIL_POINT_DEFINE(suspendDDLCoordinatorOnPhase);
+// Pauses on the first execution, after the in-progress index build check and before _runImpl.
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildInProgressCheck);
 
 ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(const BSONObj& coorDoc) {
     return ShardingCoordinatorMetadata::parse(coorDoc,
@@ -217,12 +208,25 @@ void ShardingCoordinator::interrupt(Status status) {
                 logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
     // Resolve any unresolved promises to avoid hanging.
-    std::lock_guard<std::mutex> lg(_mutex);
-    if (!_constructionCompletionPromise.getFuture().isReady()) {
-        _constructionCompletionPromise.setError(status);
+    {
+        std::lock_guard<std::mutex> lg(_mutex);
+        if (!_constructionCompletionPromise.getFuture().isReady()) {
+            _constructionCompletionPromise.setError(status);
+        }
+        if (!_completionPromise.getFuture().isReady()) {
+            _completionPromise.setError(status);
+        }
     }
-    if (!_completionPromise.getFuture().isReady()) {
-        _completionPromise.setError(status);
+
+    try {
+        _onInterrupt(status);
+    } catch (const DBException& ex) {
+        // TODO SERVER-114180: Write this in a cleaner way.
+        try {
+            tasserted(13157103,
+                      str::stream() << "_onInterrupt() hook should not throw: " << ex.toStatus());
+        } catch (const AssertionException&) {
+        }
     }
 }
 
@@ -250,12 +254,35 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
         .then([this, executor, token, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
+
+            if (metadata().getAuthoritativeMetadataAccessLevel() ==
+                AuthoritativeMetadataAccessLevelEnum::kNone) {
+                hangNonAuthoritativeDDLBeforeDDLLock.pauseWhileSet();
+            }
+
             return _acquireLocksAsync(opCtx, executor, token);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             // Check preconditions again now that we have the locks.
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
+
+            // If this shard became authoritative between creating the coordinator and acquiring the
+            // DDL locks, an authoritative DDL on the same DB/collection may already have completed.
+            // Throw an error retried at the shard entry point, recreating the coordinator as
+            // authoritative. This check guards against the interleaving described in SERVER-131535.
+            // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+            if (_firstExecution &&
+                metadata().getAuthoritativeMetadataAccessLevel() ==
+                    AuthoritativeMetadataAccessLevelEnum::kNone) {
+                uassert(ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition,
+                        "DDL coordinator must transition to the authoritative model",
+                        sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                            kVersionContextIgnored_UNSAFE,
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ==
+                            AuthoritativeMetadataAccessLevelEnum::kNone);
+            }
+
             _checkCoordinatorPreconditions(opCtx, /*afterAcquiringLocks=*/true);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
@@ -269,9 +296,11 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             return _translateTimeseriesNss(executor, token);
         })
         .then([this, anchor = shared_from_this()] {
-            std::lock_guard<std::mutex> lg(_mutex);
-            if (!_constructionCompletionPromise.getFuture().isReady()) {
-                _constructionCompletionPromise.emplaceValue();
+            {
+                std::lock_guard<std::mutex> lg(_mutex);
+                if (!_constructionCompletionPromise.getFuture().isReady()) {
+                    _constructionCompletionPromise.emplaceValue();
+                }
             }
 
             hangBeforeRunningCoordinatorInstance.pauseWhileSet();
@@ -304,9 +333,29 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             return status;
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            return AsyncTry([this, executor, token] {
+            return AsyncTry([this,
+                             executor,
+                             token,
+                             indexBuildCheckShouldRun = _firstExecution]() mutable {
+                       // If the coordinator has already decided to abort, head straight to cleanup.
+                       // The causality barrier below must not run on this path: cleanup is terminal
+                       // and may need to contact participants that are unreachable (e.g. the very
+                       // shard whose unavailability caused the abort).
                        if (const auto& status = getAbortReason()) {
                            return _cleanupOnAbort(executor, token, *status);
+                       }
+
+                       if (!_firstExecution) {
+                           // On any re-execution, perform a causality barrier to invalidate any
+                           // retryable writes issued by previous executions before doing any work.
+                           // This is done implicitly here so individual coordinators don't have to.
+                           _performCausalityBarrier(executor, token);
+                       }
+
+                       if (indexBuildCheckShouldRun) {
+                           _checkIndexBuildsInProgress(executor, token);
+                           indexBuildCheckShouldRun = false;
+                           hangAfterIndexBuildInProgressCheck.pauseWhileSet();
                        }
 
                        return _runImpl(executor, token);
@@ -365,6 +414,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                 .withBackoffBetweenIterations(kExponentialBackoff)
                 .on(**executor, CancellationToken::uncancelable());
         })
+        .thenRunOn(_service->getInstanceCleanupExecutor())
         .onCompletion([this, executor, token, anchor = shared_from_this()](const Status& status) {
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
@@ -393,11 +443,14 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             if (cleanup()) {
                 try {
                     if (!completionStatus.isOK()) {
-                        LOGV2_ERROR(
-                            7524000,
-                            "Failed sharding coordinator",
-                            logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                                     "reason"_attr = redact(completionStatus)});
+                        const auto redactedReason = redact(completionStatus);
+                        const auto attrs = logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                                    "reason"_attr = redactedReason};
+                        if (_shouldLogCompletionErrorAsWarning(completionStatus)) {
+                            LOGV2_WARNING(13580300, "Failed sharding coordinator", attrs);
+                        } else {
+                            LOGV2_ERROR(7524000, "Failed sharding coordinator", attrs);
+                        }
                     }
 
                     hangBeforeRemovingCoordinatorDocument.pauseWhileSet();
@@ -499,6 +552,8 @@ std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
     CoordinatorGenericPhase newPhase,
     std::function<bool(OperationContext*)>&& shouldExecute,
     std::function<void(OperationContext*)>&& handlerFn) {
+    handlerFn = _decoratePhaseHandlerGeneric(newPhase, std::move(handlerFn));
+
     return [=, this] {
         const auto currPhase = [this] {
             std::lock_guard lk{_docMutex};
@@ -523,6 +578,33 @@ std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
             // Persist the new phase if this is the first time we are executing it.
             _enterPhaseGeneric(newPhase);
         }
+
+        // Optionally suspend here if a matching 'suspendDDLCoordinatorOnPhase' failpoint is active.
+        suspendDDLCoordinatorOnPhase.executeIf(
+            [&](const BSONObj&) { suspendDDLCoordinatorOnPhase.pauseWhileSet(opCtx); },
+            [&](const BSONObj& data) {
+                auto suspendExecution =
+                    data.getStringField("operationType") == idl::serialize(operationType()) &&
+                    data.getStringField("phase") == serializeGenericPhase(newPhase);
+
+                // If an 'nss' field is specified, additionally require it to match the
+                // coordinator's original namespace. If absent, do not constrain on the namespace.
+                if (const auto nssElem = data.getField("nss"); !nssElem.eoo()) {
+                    suspendExecution = suspendExecution &&
+                        NamespaceStringUtil::deserialize(
+                            boost::none, nssElem.str(), SerializationContext::stateDefault()) ==
+                            originalNss();
+                }
+
+                if (suspendExecution) {
+                    LOGV2_DEBUG(13073500,
+                                1,
+                                "Pausing sharding coordinator on phase",
+                                logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                         "failpointData"_attr = redact(data)});
+                }
+                return suspendExecution;
+            });
 
         return handlerFn(opCtx);
     };
@@ -642,6 +724,35 @@ void RecoverableShardingCoordinator::triggerCleanup(OperationContext* opCtx, con
 
 void RecoverableShardingCoordinator::_onCleanup(OperationContext* opCtx) {
     releaseSession(opCtx);
+}
+
+void RecoverableShardingCoordinator::_performCausalityBarrier(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    {
+        // The barrier advances the session and persists it into the state document via
+        // writeSession(), which updates an already-existing document. If the document has not been
+        // persisted yet (e.g. the coordinator hit a retriable error and is re-executing before
+        // reaching its first phase), there is no document to update and no previously-issued
+        // retryable write to invalidate, so the barrier must be skipped.
+        std::lock_guard lk{_docMutex};
+        if (!getDoc().getShardingCoordinatorMetadata().getRecoveredFromDisk()) {
+            return;
+        }
+    }
+
+    // The barrier bumps the OSI via getNextSession(). Coordinators forbid invalidating the OSI
+    // while they are in a phase whose correctness depends on a stable session, e.g. a phase that
+    // retries an idempotent retryable write and must reuse the same lsid/txnNumber on every
+    // attempt. In that case the barrier must be skipped: bumping the session here would not only
+    // trip the OSI-stability invariant but also break the idempotency the phase relies on.
+    if (!_allowedToInvalidateOSI()) {
+        return;
+    }
+
+    auto opCtxHolder = makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    auto barrier = _getExternalState()->makeCausalityBarrier(**executor, token);
+    performCausalityBarrier(opCtx, *barrier);
 }
 
 boost::optional<OperationSessionInfo> RecoverableShardingCoordinator::readSession(

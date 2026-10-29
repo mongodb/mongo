@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/s/query/planner/cluster_aggregate.h"
@@ -157,10 +131,14 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
                                  const AggregateCommandRequest& request,
                                  const NamespaceString& executionNs) {
     auto req = request;
+    // 'allowPartialResults' is a router-only option and must never be forwarded to a shard. Strip
+    // it from the passthrough serialization, which is used both for the command echoed back in
+    // explain output and for the command dispatched to a designated merging shard.
+    req.setAllowPartialResults(OptionalBool());
 
     // Reset all generic arguments besides those needed for the aggregation itself.
-    // Other generic arguments that need to be set like txnNumber, lsid, etc. will be attached
-    // later.
+    // Other generic arguments that need to be set like txnNumber, lsid, ifrFlags, etc. will be
+    // attached later.
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
     auto maxTimeMS = req.getMaxTimeMS();
     auto readConcern = req.getReadConcern();
@@ -171,13 +149,6 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
     req.setRawData(rawData);
-
-    // If the wire RC has no level, fall back to opCtx so the dispatcher's CWRC-merged RC
-    // reaches the shard. Otherwise keep the wire RC untouched (master semantics).
-    // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes RC there.
-    if (!req.getReadConcern() || !req.getReadConcern()->hasLevel()) {
-        req.setReadConcern(repl::ReadConcernArgs::get(expCtx->getOperationContext()));
-    }
 
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
 
@@ -196,8 +167,6 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
             req.setOriginalQueryShapeHash(queryShapeHash);
         }
     }
-
-    aggregation_request_helper::addIfrFlagsToRequest(req, expCtx->getIfrContext());
 
     auto cmdObj =
         isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs
@@ -234,7 +203,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     // Create the expression context, and set 'inRouter' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
-    const bool canBeRejected = query_settings::canPipelineBeRejected(request.getPipeline());
     auto mergeCtx = ExpressionContextBuilder{}
                         .fromRequest(opCtx, request)
                         .explain(verbosity)
@@ -247,7 +215,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .mayDbProfile(true)
                         .inRouter(true)
                         .collUUID(uuid)
-                        .canBeRejected(canBeRejected)
                         .collationMatchesDefault(collationMatchesDefault)
                         .build();
 
@@ -300,7 +267,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
             std::set<ShardId> shardIdsForNs;
             // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
             // result is only used to update stats.
-            cri->getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(opCtx, &shardIdsForNs);
+            cri->getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(&shardIdsForNs);
             for (const auto& shardId : shardIdsForNs) {
                 shardsIds.insert(shardId);
             }
@@ -322,7 +289,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
                 // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
                 // result is only used to update stats.
                 resolvedNsCri.getChunkManager().getAllShardIds_UNSAFE_NotPointInTime(
-                    opCtx, &shardIdsForNs);
+                    &shardIdsForNs);
                 for (const auto& shardId : shardIdsForNs) {
                     shardsIds.insert(shardId);
                 }
@@ -357,6 +324,7 @@ void performValidationChecks(const OperationContext* opCtx,
                              const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
+    liteParsedPipeline.validateAllowPartialResults(request);
     aggregation_request_helper::validateRequestWithClient(opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 
@@ -436,10 +404,18 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
 }
 
 /**
+ * The result of parsePipelineAndRegisterQueryStats() below.
+ */
+struct ParsedAggregationPipeline {
+    std::unique_ptr<Pipeline> pipeline;
+    bool untrackedIsViewlessTimeseries = false;
+};
+
+/**
  * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
  * registers the pre-optimized pipeline with query stats collection.
  */
-std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
+ParsedAggregationPipeline parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
     const ClusterAggregate::Namespaces& nsStruct,
     AggregateCommandRequest& request,
@@ -459,14 +435,18 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // collation, and since collectionless aggregations generally run on the 'admin'
     // database, the standard logic would attempt to resolve its non-existent UUID and
     // collation by sending a specious 'listCollections' command to the config servers.
-    auto [collationObj, collationMatchesDefault] = hasChangeStream
-        ? std::pair(request.getCollation().value_or(BSONObj()),
-                    ExpressionContextCollationMatchesDefault::kYes)
-        : cluster_aggregation_planner::getCollation(opCtx,
-                                                    cri,
-                                                    nsStruct.executionNss,
-                                                    request.getCollation().value_or(BSONObj()),
-                                                    requiresCollationForParsingUnshardedAggregate);
+    const cluster_aggregation_planner::ResolvedCollectionInfo collectionInfo = hasChangeStream
+        ? cluster_aggregation_planner::
+              ResolvedCollectionInfo{request.getCollation().value_or(BSONObj()),
+                                     ExpressionContextCollationMatchesDefault::kYes}
+        : cluster_aggregation_planner::resolveCollectionInfo(
+              opCtx,
+              cri,
+              nsStruct.executionNss,
+              request.getCollation().value_or(BSONObj()),
+              requiresCollationForParsingUnshardedAggregate);
+    const BSONObj& collationObj = collectionInfo.collation;
+    const auto collationMatchesDefault = collectionInfo.collationMatchesDefault;
 
     bool extensionsInHybridSearchEnabled = ifrContext &&
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
@@ -476,7 +456,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         auto requestCollator =
             uassertStatusOK(collatorFactory->makeFromBSON(*request.getCollation()));
         for (const auto& [nss, rn] : preResolvedNamespaces) {
-            if (!rn.involvedNamespaceIsAView) {
+            if (!rn.isInvolvedNamespaceAView()) {
                 continue;
             }
             const BSONObj& viewCollation = rn.getDefaultCollation();
@@ -507,7 +487,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                               nsStruct.executionNss,
                               nsStruct.requestedNss,
                               collationObj,
-                              boost::none /* uuid */,
+                              /*uuid=*/boost::none,
                               std::move(resolvedNamespacesForExpCtx),
                               hasChangeStream,
                               verbosity,
@@ -537,18 +517,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         search_helpers::checkAndSetViewOnExpCtx(
             expCtx,
             LiteParsedPipeline(
-                *originalRequest, false, LiteParserOptions{.ifrContext = expCtx->getIfrContext()}),
+                *originalRequest,
+                false,
+                LiteParserOptions{.ifrContext = expCtx->getIfrContext(), .opCtx = opCtx}),
             *resolvedView,
             viewName);
-
-        if (request.getIsHybridSearch()) {
-            uassert(ErrorCodes::OptionNotSupportedOnView,
-                    "$rankFusion and $scoreFusion are currently unsupported on views",
-                    feature_flags::gFeatureFlagSearchHybridScoringFull
-                        .isEnabledUseLatestFCVWhenUninitialized(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-        }
     }
 
     // Clone and desugar the pipeline if it wasn't already desugared earlier during view handling.
@@ -581,16 +554,13 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             *pipeline,
             expCtx);
     }};
-    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
-    });
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     {
         auto& service = query_settings::QuerySettingsService::get(opCtx);
-        auto querySettings = service.lookupQuerySettingsWithRejectionCheck(
-            expCtx, queryShapeHash, nsStruct.executionNss, request.getQuerySettings());
-        expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
+        service.initializeSettingsForQuery(expCtx, queryShapeHash, request.getQuerySettings());
     }
 
     // Skip query stats recording for queryable encryption queries.
@@ -609,7 +579,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         pipeline = Pipeline::parseFromLiteParsed(clonedLPP, expCtx);
     }
 
-    // TODO SERVER-117803 Delete this duplicated check.
+    // TODO SERVER-121094 Delete this duplicated check.
     if (cri && cri->hasRoutingTable()) {
         pipeline->validateWithCollectionMetadata(cri.get());
     }
@@ -618,7 +588,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         pipeline->setTranslated();
     }
 
-    return pipeline;
+    return {std::move(pipeline), collectionInfo.untrackedIsViewlessTimeseries};
 }
 
 Status _parseQueryStatsAndReturnEmptyResult(
@@ -631,6 +601,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
     bool alreadyDesugared = false,
     ResolvedNamespaceMap preResolvedNamespaces = {}) {
 
@@ -666,12 +637,12 @@ Status _parseQueryStatsAndReturnEmptyResult(
         liteParsedPipeline.requiresCollationForParsingUnshardedAggregate();
 
     try {
-        auto pipeline =
+        auto parsedPipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                namespaces,
                                                request,
                                                liteParsedPipeline,
-                                               boost::none /* CollectionRoutingInfo */,
+                                               /*cri=*/boost::none,
                                                hasChangeStream,
                                                shouldDoFLERewrite,
                                                requiresCollationForParsingUnshardedAggregate,
@@ -679,10 +650,10 @@ Status _parseQueryStatsAndReturnEmptyResult(
                                                originalRequest,
                                                verbosity,
                                                alreadyDesugared,
-                                               nullptr /* ifrContext */,
+                                               std::move(ifrContext),
                                                std::move(preResolvedNamespaces));
 
-        pipeline->validateCommon(false);
+        parsedPipeline.pipeline->validateCommon(false);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         // Ignore redundant NamespaceNotFound errors.
         LOGV2_DEBUG(8396400,
@@ -739,6 +710,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                 originalRequest,
                 verbosity,
                 res,
+                ifrContext,
                 alreadyDesugared,
                 std::move(preResolvedNamespaces));
         }
@@ -827,7 +799,7 @@ Status runAggregateImpl(OperationContext* opCtx,
     // any policy other than "specific shard only".
     auto [pipeline, expCtx] =
         [&]() -> std::tuple<std::unique_ptr<Pipeline>, boost::intrusive_ptr<ExpressionContext>> {
-        auto pipeline =
+        auto [pipeline, untrackedIsViewlessTimeseries] =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                namespaces,
                                                request,
@@ -861,7 +833,7 @@ Status runAggregateImpl(OperationContext* opCtx,
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
         if (shouldDoFLERewrite) {
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+            if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
                 pipeline = processFLEPipelineS(opCtx,
                                                namespaces.executionNss,
                                                request.getEncryptionInformation().value(),
@@ -874,7 +846,12 @@ Status runAggregateImpl(OperationContext* opCtx,
 
         pipelineCtx->initializeReferencedSystemVariables();
 
-        // Optimize the pipeline if:
+        const bool rawData = request.getRawData().value_or(false);
+        const bool timeseriesRewriteDeferredToShard = untrackedIsViewlessTimeseries && !rawData;
+
+        // Untracked viewless timeseries collections must defer their rewrite to a shard unless this
+        // is a rawData query, which does not require the rewrite. Otherwise, optimize the pipeline
+        // if any of:
         // - We have a valid routing table.
         // - We know the collection's collation.
         // - We have a change stream.
@@ -883,9 +860,10 @@ Status runAggregateImpl(OperationContext* opCtx,
         // This is because the results of optimization may depend on knowing the collation.
         // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
         // tracked as unsplittable collections in the sharding catalog.
-        if (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
-            hasChangeStream || shouldDoFLERewrite ||
-            pipelineCtx->getNamespaceString().isCollectionlessAggregateNS()) {
+        if (!timeseriesRewriteDeferredToShard &&
+            (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
+             hasChangeStream || shouldDoFLERewrite ||
+             pipelineCtx->getNamespaceString().isCollectionlessAggregateNS())) {
             pipeline_optimization::optimizePipeline(*pipeline);
 
             // Validate the pipeline post-optimization.
@@ -896,14 +874,14 @@ Status runAggregateImpl(OperationContext* opCtx,
                        "Skipping optimization!",
                        "routingTableIsAvailable"_attr = routingTableIsAvailable,
                        "requiresCollation..."_attr = requiresCollationForParsingUnshardedAggregate,
+                       "rawData"_attr = rawData,
+                       "timeseriesRewriteDeferredToShard"_attr = timeseriesRewriteDeferredToShard,
                        "hasChangeStream"_attr = hasChangeStream,
                        "shouldDoFLERewrite"_attr = shouldDoFLERewrite,
                        "collectionLess"_attr =
                            pipelineCtx->getNamespaceString().isCollectionlessAggregateNS());
         }
 
-        // TODO SERVER-89546: Ideally extractDocsNeededBounds should be called internally within
-        // DocumentSourceSearch.
         if (search_helpers::isSearchPipeline(pipeline.get())) {
             // We won't reach this if the whole pipeline passes through with the "specific shard"
             // policy. That's okay since the shard will have access to the entire pipeline to
@@ -943,26 +921,27 @@ Status runAggregateImpl(OperationContext* opCtx,
         explain_common::generateQueryKnobs(expCtx, &result);
     }
 
-    // Here we modify the original 'request' object by copying the query settings from 'expCtx' into
-    // it.
-    //
-    // In case when the original 'request' fails with the 'CommandOnShardedViewNotSupportedOnMongod'
-    // exception, we retrieve the view definition and run the resolved/expanded request. The
-    // resolved/expanded request must use the query settings matching the original request.
-    //
-    // By attaching the query settings to the original request object we can re-use the query
-    // settings even though the original 'expCtx' object has been already destroyed.
+    // Attach the query settings, and the 'maxTimeMS' resolved from them, to both request objects:
+    //   - 'request' is this attempt's local copy (see its construction above) and is what builds
+    //     the commands dispatched to the shards;
+    //   - 'req' is the caller-owned parameter, which outlives this attempt. If the pipeline fails
+    //     with 'CommandOnShardedViewNotSupportedOnMongod' we retrieve the view definition and run
+    //     the resolved/expanded request, which must use the same query settings - and by then this
+    //     'expCtx' (and 'request') are gone, so 'req' is what carries them into the retry.
     const auto& querySettings = expCtx->getQuerySettings();
-    if (!query_settings::isDefault(querySettings)) {
-        request.setQuerySettings(querySettings);
-        req.setQuerySettings(querySettings);
-    }
+    query_settings::applyToShardRequest(request, querySettings, isExplain);
+    query_settings::applyToShardRequest(req, querySettings, isExplain);
 
     // Need to explicitly assign expCtx because lambdas can't capture structured bindings.
     auto status = [&](auto& expCtx) {
         IncludeMetrics remoteMetricsToInclude;
-        remoteMetricsToInclude.setQueryStats(query_stats::shouldRequestRemoteMetrics(
-            CurOp::get(expCtx->getOperationContext())->debug()));
+        // Request per-shard CursorMetrics (docsExamined/bytesRead) either when query stats sampling
+        // needs them, or for change stream cursors, which aggregate these totals in the
+        // AsyncResultsMerger to report the changeStreams.cursor.docsExamined/bytesRead throughput
+        // counters on the router.
+        const auto& aggOpDebug = CurOp::get(expCtx->getOperationContext())->debug();
+        remoteMetricsToInclude.setQueryStats(query_stats::shouldRequestRemoteMetrics(aggOpDebug) ||
+                                             aggOpDebug.isChangeStreamQuery);
         boost::optional<query_shape::QueryShapeHash> queryShapeHash =
             CurOp::get(opCtx)->debug().getQueryShapeHash();
         try {
@@ -1120,17 +1099,15 @@ ResolvedNamespace chainViews(boost::optional<ResolvedNamespace> currentView,
 }  // namespace
 
 
-Status ClusterAggregate::runAggregate(
-    OperationContext* opCtx,
-    const Namespaces& namespaces,
-    AggregateCommandRequest& request,
-    const PrivilegeVector& privileges,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result,
-    std::string_view comment,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      const Namespaces& namespaces,
+                                      AggregateCommandRequest& request,
+                                      const PrivilegeVector& privileges,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
+                                      BSONObjBuilder* result,
+                                      std::string_view comment) {
     return runAggregate(
-        opCtx, namespaces, request, {request}, privileges, verbosity, result, comment, ifrContext);
+        opCtx, namespaces, request, {request}, privileges, verbosity, result, comment);
 }
 
 void makeEOFExplainResult(OperationContext* opCtx,
@@ -1155,11 +1132,11 @@ void makeEOFExplainResult(OperationContext* opCtx,
     auto expCtx =
         makeExpressionContext(opCtx,
                               request,
-                              boost::none /* cri */,
+                              /*cri=*/boost::none,
                               namespaces.executionNss,
                               namespaces.requestedNss,
                               BSONObj(), /* collation obj */
-                              boost::none /* uuid */,
+                              /*uuid=*/boost::none,
                               resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces()),
                               liteParsedPipeline.hasChangeStream(),
                               verbosity,
@@ -1176,9 +1153,14 @@ void makeEOFExplainResult(OperationContext* opCtx,
             *pipeline,
             expCtx);
     }};
-    CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, namespaces.executionNss);
-    });
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
+
+    // Resolve the query settings for this operation. The regular resolution point in
+    // 'runAggregateImpl' is never reached on this path, and serializing the explain output below
+    // reads knobs that query settings may override.
+    query_settings::QuerySettingsService::get(opCtx).initializeSettingsForQuery(
+        expCtx, queryShapeHash, request.getQuerySettings());
 
     explain_common::generateQueryShapeHash(opCtx, result);
     explain_common::generateServerInfo(result);
@@ -1210,6 +1192,14 @@ struct RetryState {
     bool alreadyDesugared = false;
     // The result of view resolution - contains a map containing all views resolved by the shard.
     ResolvedNamespaceMap preResolvedNamespaces;
+
+    void reset(const ClusterAggregate::Namespaces& initialNamespaces, bool initAlreadyDesugared) {
+        resolvedView = boost::none;
+        preResolvedNamespaces.clear();
+        originalRequest = boost::none;
+        currentNamespaces = initialNamespaces;
+        alreadyDesugared = initAlreadyDesugared;
+    }
 };
 
 PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
@@ -1258,6 +1248,7 @@ boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
     const RetryState& state,
     AggregateCommandRequest& request,
     boost::optional<LiteParsedPipeline> userLPP,
+    OperationContext* opCtx,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     bool isRetrying = !state.ifrFlagsToDisableOnRetries.empty() || state.resolvedView ||
         !state.preResolvedNamespaces.empty();
@@ -1271,7 +1262,8 @@ boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
         return userLPP;
     }
 
-    return LiteParsedPipeline(request, false, LiteParserOptions{.ifrContext = ifrContext});
+    return LiteParsedPipeline(
+        request, false, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
 }
 
 // Schedules `flag` to be disabled on the next retry iteration and clears any partially-built
@@ -1302,6 +1294,10 @@ void handleViewKickback(
         opCtx,
         "hangBeforeRetryingAggregateAfterViewKickback");
 
+    tassert(12941000,
+            "Expected a non-null IncrementalFeatureRolloutContext when handling a view kickback",
+            ifrContext);
+
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         txnRouter.onViewResolutionError(opCtx, requestedNss);
     }
@@ -1312,7 +1308,7 @@ void handleViewKickback(
     // resolution information.
     // TODO SERVER-121094 Remove when feature flag is removed.
     auto kickedBackView = ex.extraInfo<ResolvedNamespace>();
-    const bool hybridSearchFlagEnabled = ifrContext &&
+    const bool hybridSearchFlagEnabled =
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
 
     bool foundNewViewEntry = false;
@@ -1323,7 +1319,7 @@ void handleViewKickback(
                 foundNewViewEntry = true;
                 auto [insertedIt, _] = state.preResolvedNamespaces.emplace(rn.getNamespace(), rn);
                 insertedIt->second.setLiteParserOptions(std::make_shared<LiteParserOptions>(
-                    LiteParserOptions{.ifrContext = ifrContext}));
+                    LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx}));
             } else {
                 // Already had an entry for this namespace; treat as a non-progressing
                 // re-kickback for this entry. Keep the existing entry to preserve any
@@ -1367,32 +1363,48 @@ void handleViewKickback(
 
 void handleIFRFlagRetry(const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
                         RetryState& state,
+                        OperationContext* opCtx,
+                        const ClusterAggregate::Namespaces& namespaces,
+                        bool alreadyDesugared,
                         BSONObjBuilder* result) {
-    disableIfrFlagAndResetResult(IncrementalRolloutFeatureFlag::findByName(
-                                     ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
-                                 state,
-                                 result);
+    auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
+    tassert(13248905, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
+    std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
+    auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+    tassert(13248902,
+            str::stream() << "IFR retry referenced an unknown feature flag: " << disabledFlagName,
+            flag);
+
+    disableIfrFlagAndResetResult(flag, state, result);
+
+    // Restart from scratch: discard every piece of view resolution state accumulated by previous
+    // attempts so that the next attempt re-runs the user's original request, with the offending
+    // flag(s) disabled, as if it were the first attempt.
+    state.reset(namespaces, alreadyDesugared);
+
+    // We are abandoning this attempt and re-planning the pipeline from scratch, so every
+    // participant the attempt enrolled has to be aborted and dropped.
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter.onViewResolutionError(opCtx, namespaces.requestedNss);
+    }
 }
 }  // namespace
 
-Status ClusterAggregate::runAggregate(
-    OperationContext* opCtx,
-    const Namespaces& namespaces,
-    AggregateCommandRequest& request,
-    const LiteParsedPipeline& liteParsedPipeline,
-    const PrivilegeVector& privileges,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result,
-    std::string_view comment,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
-    // flag values throughout the operation, including retries on view errors.
-    if (!ifrContext) {
-        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-    }
+Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      const Namespaces& namespaces,
+                                      AggregateCommandRequest& request,
+                                      const LiteParsedPipeline& liteParsedPipeline,
+                                      const PrivilegeVector& privileges,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
+                                      BSONObjBuilder* result,
+                                      std::string_view comment,
+                                      bool alreadyDesugared) {
+    // Source the per-operation IFRContext from the opCtx
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
 
     RetryState retryState;
     retryState.currentNamespaces = namespaces;
+    retryState.alreadyDesugared = alreadyDesugared;
 
     // Main retry body.
     auto body = [&](RetryState& state) -> Status {
@@ -1418,9 +1430,9 @@ Status ClusterAggregate::runAggregate(
             }
         });
 
-        LiteParsedPipeline liteParsedToUse =
-            maybeRebuildLiteParsedPipelineForRetry(state, currentRequest, userLPP, ifrContext)
-                .value_or(liteParsedPipeline);
+        LiteParsedPipeline liteParsedToUse = maybeRebuildLiteParsedPipelineForRetry(
+                                                 state, currentRequest, userLPP, opCtx, ifrContext)
+                                                 .value_or(liteParsedPipeline);
 
         // Check if we need a CollectionRouter.
         const bool requiresCollectionRouter = needsCollectionRouter(liteParsedToUse, state);
@@ -1496,8 +1508,10 @@ Status ClusterAggregate::runAggregate(
                 currentRequest.setPipeline(patchedPipeline);
 
                 // Recreate LiteParsedPipeline from the newly patched request.
-                liteParsedToUse = LiteParsedPipeline(
-                    currentRequest, false, LiteParserOptions{.ifrContext = ifrContext});
+                liteParsedToUse =
+                    LiteParsedPipeline(currentRequest,
+                                       false,
+                                       LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
             }
 
             aggregationStatus = runAggregateImpl(opCtx,
@@ -1607,6 +1621,7 @@ Status ClusterAggregate::runAggregate(
                                                         state.originalRequest,
                                                         verbosity,
                                                         result,
+                                                        ifrContext,
                                                         state.alreadyDesugared,
                                                         state.preResolvedNamespaces);
         }
@@ -1622,7 +1637,7 @@ Status ClusterAggregate::runAggregate(
         };
 
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
-        handleIFRFlagRetry(ex, state, result);
+        handleIFRFlagRetry(ex, state, opCtx, namespaces, alreadyDesugared, result);
     };
 
     try {
@@ -1653,21 +1668,65 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
     bool alreadyDesugared) {
+    // Source the per-operation IFRContext from the opCtx.
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
 
-    return runAggregateImpl(opCtx,
-                            routingCtx,
-                            namespaces,
-                            request,
-                            liteParsedPipeline,
-                            privileges,
-                            resolvedView,
-                            originalRequest,
-                            verbosity,
-                            result,
-                            ifrContext,
-                            alreadyDesugared);
+    // The caller derived this aggregation from another command (a count, distinct or find over a
+    // viewless timeseries collection) and translated the namespaces of 'routingCtx' in order to do
+    // so, so the aggregation has to execute against that same routing table.
+    RetryState retryState;
+    retryState.currentNamespaces = namespaces;
+    retryState.alreadyDesugared = alreadyDesugared;
+
+    auto body = [&](RetryState& state) -> Status {
+        // Disable the IFR flags accumulated by previous attempts, as 'runAggregate()' does.
+        for (auto* ifrFlag : state.ifrFlagsToDisableOnRetries) {
+            ifrContext->disableFlag(*ifrFlag);
+        }
+
+        const LiteParsedPipeline liteParsedToUse =
+            maybeRebuildLiteParsedPipelineForRetry(
+                state, request, /*userLPP=*/boost::none, opCtx, ifrContext)
+                .value_or(liteParsedPipeline);
+
+        // 'request' is deliberately reused across attempts rather than copied per attempt.
+        // 'runAggregateImpl()' runs against its own copy, and the only state it writes back here is
+        // query settings it resolved - which is idempotent, and which subsequent attempts
+        // should reuse rather than re-resolve. Unlike 'ClusterAggregate::runAggregate()' there is
+        // no per-attempt request to build, because this entry point never resolves a view.
+        auto status = runAggregateImpl(opCtx,
+                                       routingCtx,
+                                       state.currentNamespaces,
+                                       request,
+                                       liteParsedToUse,
+                                       privileges,
+                                       resolvedView,
+                                       originalRequest,
+                                       verbosity,
+                                       result,
+                                       ifrContext,
+                                       state.alreadyDesugared,
+                                       state.preResolvedNamespaces);
+
+        // Throw so that a kickback reported as a Status is retried too.
+        uassertStatusOK(status);
+        return status;
+    };
+
+    auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
+        handleIFRFlagRetry(ex, state, opCtx, namespaces, alreadyDesugared, result);
+    };
+
+    try {
+        return retryOnWithState("ClusterAggregate::runAggregateWithRoutingCtx",
+                                std::move(retryState),
+                                kDefaultMaxRetries,
+                                body,
+                                makeErrorHandler<ErrorCodes::IFRFlagRetry>(onIFRError));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 Status ClusterAggregate::retryOnViewOrIFRKickbackError(
@@ -1677,13 +1736,9 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     const NamespaceString& requestedNss,
     const PrivilegeVector& privileges,
     boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    // Create IFRContext if not provided.
-    if (!ifrContext) {
-        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-    }
-
+    BSONObjBuilder* result) {
+    // Source the per-operation IFRContext from the opCtx.
+    auto ifrContext = IncrementalFeatureRolloutContext::get(opCtx);
     result->resetToEmpty();
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
@@ -1693,7 +1748,12 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     // If this is an IFR retry, pre-disable the flag.
     if (std::holds_alternative<IFRFlagRetryInfo>(errInfo)) {
         const auto& ifrInfo = std::get<IFRFlagRetryInfo>(errInfo);
-        auto* flag = IncrementalRolloutFeatureFlag::findByName(ifrInfo.getDisabledFlagName());
+        std::string_view disabledFlagName = ifrInfo.getDisabledFlagName();
+        auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+        tassert(13248901,
+                str::stream() << "IFR retry referenced an unknown feature flag: "
+                              << disabledFlagName,
+                flag);
         ifrContext->disableFlag(*flag);
 
         // For IFR retries, just call runAggregate with the original request.
@@ -1704,8 +1764,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
                             privileges,
                             verbosity,
                             result,
-                            "ClusterAggregate::retryOnViewOrIFRKickbackError"sv,
-                            ifrContext);
+                            "ClusterAggregate::retryOnViewOrIFRKickbackError"sv);
     }
 
     // For view retries, we need to build the resolved request before calling runAggregate.
@@ -1717,15 +1776,24 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     auto resolved = PipelineResolver::buildResolvedMongosViewRequest(
         opCtx, request, resolvedView, requestedNss, verbosity, ifrContext, helpers, {});
 
-    // Now call runAggregate with the resolved namespace and request.
+    // When view resolution returns a LiteParsedPipeline, the resolved pipeline has already been
+    // desugared. Thread it and the 'alreadyDesugared' signal through so runAggregate does not
+    // re-validate the resolved pipeline under the external client, which would reject
+    // server-generated internal stages.
+    const bool alreadyDesugared = resolved.liteParsedPipeline.has_value();
+    LiteParsedPipeline liteParsedPipeline = alreadyDesugared
+        ? std::move(*resolved.liteParsedPipeline)
+        : LiteParsedPipeline(resolved.resolvedRequest);
+
     return runAggregate(opCtx,
                         Namespaces{requestedNss, resolvedView.getResolvedNamespace()},
                         resolved.resolvedRequest,
+                        liteParsedPipeline,
                         privileges,
                         verbosity,
                         result,
                         "ClusterAggregate::retryOnViewOrIFRKickbackError"sv,
-                        ifrContext);
+                        alreadyDesugared);
 }
 
 }  // namespace mongo

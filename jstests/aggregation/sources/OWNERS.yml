@@ -13,9 +13,12 @@ filters:
   - "collection_uuid_coll_stats_index_stats.js":
     approvers:
       - 10gen/query-optimization
+  - "internal_search_id_lookup*.js":
+    approvers:
+      - 10gen/query-integration-search
   - "multiple_unpack_bucket_error.js":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "search_stage_error.js":
     approvers:
       - 10gen/query-integration-search
@@ -26,5 +29,14 @@ filters:
     approvers:
       - 10gen/query-optimization
   - "lookup_unwind_sbe_pushdown.js":
+    approvers:
+      - 10gen/query-execution
+  - "lookup_equijoin_semantics_sparse.js":
+    approvers:
+      - 10gen/query-execution
+  - "lookup_equijoin_semantics_wildcard.js":
+    approvers:
+      - 10gen/query-execution
+  - "lookup_equijoin_semantics_lib.js":
     approvers:
       - 10gen/query-execution

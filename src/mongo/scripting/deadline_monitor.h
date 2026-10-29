@@ -1,35 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 // IWYU pragma: no_include "cxxabi.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
@@ -39,6 +13,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -115,7 +90,9 @@ public:
             _tasks.emplace(task, deadline);
         }
 
-        if (deadline < _nearestDeadlineWallclock) {
+        // Notify the monitor thread when either the nearest deadline moves earlier, or this is the
+        // first task in the queue.
+        if (deadline < _nearestDeadlineWallclock || _tasks.size() == 1) {
             _nearestDeadlineWallclock = deadline;
             _newDeadlineAvailable.notify_one();
         }
@@ -154,19 +131,21 @@ private:
                 lastInterruptCycle = now;
             }
 
-            // wait for a task to be added or a deadline to expire
+            // Wait for a task to be added, a deadline to expire, or the next interrupt cycle to
+            // come due. Waking for the interrupt cycle even when a (possibly much later) task
+            // deadline exists is what keeps the isKillPending() pass above periodic; that pass
+            // is how kills recorded only on a task's OperationContext (killOp, maxTimeMS expiry,
+            // client disconnect -- see SERVER-130767) reach a thread stuck inside JS.
             if (_nearestDeadlineWallclock > now) {
                 MONGO_IDLE_THREAD_BLOCK;
-                if (_nearestDeadlineWallclock == Date_t::max()) {
-                    if ((interruptInterval.count() > 0) &&
-                        (_nearestDeadlineWallclock - now > interruptInterval)) {
-                        _newDeadlineAvailable.wait_for(lk, interruptInterval.toSystemDuration());
-                    } else {
-                        _newDeadlineAvailable.wait(lk);
-                    }
+                auto waitDeadline = _nearestDeadlineWallclock;
+                if ((interruptInterval.count() > 0) && !_tasks.empty()) {
+                    waitDeadline = std::min(waitDeadline, lastInterruptCycle + interruptInterval);
+                }
+                if (waitDeadline == Date_t::max()) {
+                    _newDeadlineAvailable.wait(lk);
                 } else {
-                    _newDeadlineAvailable.wait_until(lk,
-                                                     _nearestDeadlineWallclock.toSystemTimePoint());
+                    _newDeadlineAvailable.wait_until(lk, waitDeadline.toSystemTimePoint());
                 }
                 continue;
             }

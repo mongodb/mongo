@@ -2,6 +2,7 @@
  * Tests index usage on meta and time fields for timeseries collections.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return

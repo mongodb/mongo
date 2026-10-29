@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/execution_control/execution_control_init.h"
 
@@ -50,59 +24,79 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
         static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
     };
 
-    auto acquisitionCb = [](AdmissionContext* admCtx, AdmissionContext::Priority priority) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition(priority);
+    // The acquisition and waited-acquisition callbacks need to know which ticket queue (normal- or
+    // low-priority) actually served the operation. We bind that identity here, where each holder is
+    // constructed, rather than reading it from the AdmissionContext: when prioritization is
+    // disabled a low-priority operation runs in the normal pool, so its live priority would not
+    // reflect the queue it actually used.
+    auto makeAcquisitionCb = [](ExecutionAdmissionContext::QueueType queue) {
+        return [queue](AdmissionContext* admCtx, AdmissionContext::Priority priority) {
+            static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition(priority,
+                                                                                        queue);
+        };
     };
 
-    auto waitedAcquisitionCb = [](AdmissionContext* admCtx, Microseconds timeQueued) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionWaitedAcquisition(
-            timeQueued);
+    auto makeWaitedAcquisitionCb = [](ExecutionAdmissionContext::QueueType queue) {
+        return [queue](AdmissionContext* admCtx, Microseconds timeQueued) {
+            static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionWaitedAcquisition(
+                timeQueued, queue);
+        };
     };
 
     auto releaseCb = [](AdmissionContext* admCtx, Microseconds timeProcessed) {
         static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionRelease(timeProcessed);
     };
 
+    auto startQueueingCb = [](AdmissionContext* admCtx) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionStartQueueing();
+    };
+
     return std::make_unique<TicketingSystem>(
         svcCtx,
         TicketingSystem::RWTicketHolder{
-            std::make_unique<TicketHolder>(svcCtx,
-                                           gConcurrentReadTransactions.load(),
-                                           true /* trackPeakUsed */,
-                                           gReadMaxQueueDepth.load(),
-                                           delinquentCb,
-                                           acquisitionCb,
-                                           waitedAcquisitionCb,
-                                           releaseCb),
-            std::make_unique<TicketHolder>(svcCtx,
-                                           gConcurrentWriteTransactions.load(),
-                                           true /* trackPeakUsed */,
-                                           gWriteMaxQueueDepth.load(),
-                                           delinquentCb,
-                                           acquisitionCb,
-                                           waitedAcquisitionCb,
-                                           releaseCb)},
+            std::make_unique<TicketHolder>(
+                svcCtx,
+                gConcurrentReadTransactions.load(),
+                /*trackPeakUsed=*/true,
+                gReadMaxQueueDepth.load(),
+                delinquentCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                releaseCb,
+                startQueueingCb),
+            std::make_unique<TicketHolder>(
+                svcCtx,
+                gConcurrentWriteTransactions.load(),
+                /*trackPeakUsed=*/true,
+                gWriteMaxQueueDepth.load(),
+                delinquentCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
+                releaseCb,
+                startQueueingCb)},
         TicketingSystem::RWTicketHolder{
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentReadLowPriorityTransactions),
-                false /* trackPeakUsed */,
+                /*trackPeakUsed=*/false,
                 gReadLowPriorityMaxQueueDepth.load(),
                 delinquentCb,
-                acquisitionCb,
-                waitedAcquisitionCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
                 releaseCb,
+                startQueueingCb,
                 TicketHolder::ResizePolicy::kGradual,
                 TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions),
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions),
-                false /* trackPeakUsed */,
+                /*trackPeakUsed=*/false,
                 gWriteLowPriorityMaxQueueDepth.load(),
                 delinquentCb,
-                acquisitionCb,
-                waitedAcquisitionCb,
+                makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
+                makeWaitedAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
                 releaseCb,
+                startQueueingCb,
                 TicketHolder::ResizePolicy::kGradual,
                 TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions)},
         algorithm);

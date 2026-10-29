@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/bucket_compression.h"
 
@@ -165,6 +139,42 @@ TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
     for (const auto columnIt : decompressed->getObjectField(timeseries::kBucketDataFieldName)) {
         assertNoDuplicateIndexFieldNames(columnIt.Obj());
     }
+}
+
+TEST(TimeseriesBucketCompression, IgnoresExistingControlCountOnUncompressedBucket) {
+    // An uncompressed bucket has no legal 'control.count', but a direct bucket write that bypasses
+    // the strict bucket validator can stuff a value in there. Compression must discard it and
+    // derive the count from the measurements, rather than inheriting or duplicating it.
+    BSONObjBuilder bucketBuilder;
+    for (const auto& elem : sampleBucket) {
+        if (elem.fieldNameStringData() != timeseries::kBucketControlFieldName) {
+            bucketBuilder.append(elem);
+            continue;
+        }
+        BSONObjBuilder controlBuilder(
+            bucketBuilder.subobjStart(timeseries::kBucketControlFieldName));
+        controlBuilder.appendElements(elem.Obj());
+        controlBuilder.append(timeseries::kBucketControlCountFieldName, 999);
+    }
+
+    auto compressed =
+        timeseries::compressBucket(bucketBuilder.obj(),
+                                   "t"sv,
+                                   NamespaceString::createNamespaceString_forTest("test.foo"),
+                                   true);
+    ASSERT_TRUE(compressed.compressedBucket.has_value());
+
+    // Exactly one 'count' field, holding the number of measurements actually in the bucket.
+    const BSONObj control =
+        compressed.compressedBucket->getObjectField(timeseries::kBucketControlFieldName);
+    size_t numCountFields = 0;
+    for (const auto& controlField : control) {
+        if (controlField.fieldNameStringData() == timeseries::kBucketControlCountFieldName) {
+            ++numCountFields;
+        }
+    }
+    EXPECT_EQ(1, numCountFields);
+    EXPECT_EQ(5, control[timeseries::kBucketControlCountFieldName].Int());
 }
 
 TEST(TimeseriesBucketCompression, CannotDecompressUncompressedBucket) {

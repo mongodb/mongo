@@ -2,6 +2,10 @@
  * Establish the multiplanning replanning behavior that we would like to preserve.
  * Verify that CBR is able to choose a plan that gets cached.
  * Verify that CBR is able to be invoked during replanning.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {
@@ -9,19 +13,13 @@ import {
     getCachedPlanForQuery,
     assertPlanHasIxScanStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
+import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
-// SBE plans can get cached in the classic plan cache, and some metrics are different for SBE plans
-// in the classic cache vs classic plans in the classic cache.
-const isSbeEnabled = checkSbeFullyEnabled(db);
-
-// TODO: SERVER-117555: Enable SBE variants with classic plan cache.
-if (isSbeEnabled) {
-    jsTest.log.info("Skipping test because the SBE plan cache is enabled");
-    quit();
-}
+// CBR cannot rank plans for SBE-targeted queries when the deferred engine choice is disabled:
+// PlanRanker::rankPlans() forces such queries onto the multiplanner, so the CBR fallback
+// strategies below are never exercised and their expectations would not hold.
+const canRunCbrPhases = !checkSbeFullyEnabled(db) || isDeferredGetExecutorEnabled(db);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -71,7 +69,7 @@ function runInitialCacheTest(isMultiplanning) {
 
     let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
     assert.eq(entry.isActive, false);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
@@ -88,7 +86,7 @@ function runInitialCacheTest(isMultiplanning) {
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
 
     assert.eq(entry.isActive, true);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
@@ -105,7 +103,7 @@ function runReplanningTest(isMultiplanning) {
     coll.getPlanCache().clear();
 
     coll.find(bIndexQuery).toArray();
-    let currWorks = isSbeEnabled ? 1000 : 501;
+    let currWorks = 501;
 
     // The plan cache should now hold an inactive entry.
     let entry = getCachedPlanForQuery(db, coll, bIndexQuery);
@@ -114,7 +112,7 @@ function runReplanningTest(isMultiplanning) {
     const entryPlanCacheKey = entry.planCacheKey;
     assert.eq(entry.isActive, false);
     assert.eq(entryWorks, currWorks);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
 
     // Running the query again activates the cache entry.
     coll.find(bIndexQuery).toArray();
@@ -122,29 +120,13 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.isActive, true);
     assert.eq(entry.works, entryWorks);
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
 
-    const strategy = assert.commandWorked(
-        db.adminCommand({
-            getParameter: 1,
-            automaticCEPlanRankingStrategy: 1,
-        }),
-    )["automaticCEPlanRankingStrategy"];
-    // We happen to use CBR to pick the winning plan for 'bIndexQuery' with CBRCostBasedRankerChoice,
-    // and MP with CBRForNoMultiplanningResults.
-    if (isMultiplanning || strategy === "CBRForNoMultiplanningResults") {
-        assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
-        assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
-    } else if (
-        strategy == "CBRCostBasedRankerChoice" ||
-        strategy === "HistogramCEWithHeuristicFallback"
-    ) {
-        // TODO SERVER-116684: Change these assertions.
-        assert.eq(entry.creationExecStats.length, 1);
-        assert.eq(entry.candidatePlanScores.length, 1);
-    } else {
-        assert(false, `Unhandled strategy: ${strategy}`);
-    }
+    // 'bIndexQuery' matches no documents, so CBR estimates one of the index scans to zero and
+    // abandons ranking altogether, handing both candidates to MP. This holds for every CBR
+    // fallback strategy, so MP always picks the winner here.
+    assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
+    assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
 
     // This query will trigger replanning since the number of works is vastly higher than the cached plan.
     // Because of this, the new plan will not be active at first.
@@ -152,7 +134,7 @@ function runReplanningTest(isMultiplanning) {
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     assert.eq(entry.isActive, false);
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
@@ -184,18 +166,16 @@ function runReplanningTest(isMultiplanning) {
         entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     }
 
-    // The cache entry is now active, with a number of works that is accurate to the aIndexQuery's number of works.
-    // The 10000 (when SBE is not enabled) comes from the limit of the number of works the multiplanner can do
-    // before it chooses a winning plan. In this case, since there are only 2 documents that match the query,
-    // by the time we get to 10000 works, we will not have filled a batch. When SBE is enabled we record the
-    // number of keys examined (10000) + the number of docs examined (10000) at the time we stop multiplanning
-    // for the plan cache entry.
+    // The cache entry is now active, with a number of works that is accurate to the aIndexQuery's
+    // number of works. The 10000 comes from the limit of the number of works the multiplanner can
+    // do before it chooses a winning plan. In this case, since there are only 2 documents that
+    // match the query, by the time we get to 10000 works, we will not have filled a batch.
     assert(entry.isActive);
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
-    assert.eq(entry.works, isSbeEnabled ? 20000 : 10000);
+    assert.eq(entry.works, 10000);
 }
 
-const prevCBRConfig = getCBRConfig(db);
+const prevPlanRankerConfig = getPlanRankerConfig(db);
 
 const prevQueryKnobs = assert.commandWorked(
     db.adminCommand({
@@ -219,31 +199,36 @@ try {
     runReplanningTest(true /* isMultiplanning */);
 
     // 2: Run with CBR fallback strategies.
-    db.adminCommand({
-        setParameter: 1,
-        featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
-    });
+    if (canRunCbrPhases) {
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "mixed",
+            internalQueryCBRCEMode: "samplingCE",
+        });
 
-    const cbrFallbackStrategies = [
-        "CBRForNoMultiplanningResults",
-        "CBRCostBasedRankerChoice",
-        // TODO SERVER-118487: Re-enable this fallback strategy, we pick the plan with index scan on 'a' for 'bIndexQuery'.
-        // "HistogramCEWithHeuristicFallback",
-    ];
+        const cbrFallbackStrategies = ["NoMultiplanningResults", "EstimateRankingEffort"];
 
-    for (const cbrFallbackStrategy of cbrFallbackStrategies) {
-        jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
-        db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy});
-        runInitialCacheTest(false /* isMultiplanning */);
+        for (const cbrFallbackStrategy of cbrFallbackStrategies) {
+            jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryMixedPlanRankingStrategy: cbrFallbackStrategy,
+            });
+            runInitialCacheTest(false /* isMultiplanning */);
 
-        jsTest.log.info("Running replanningTest", {cbrFallbackStrategy});
-        runReplanningTest(false /* isMultiplanning */);
+            jsTest.log.info("Running replanningTest", {cbrFallbackStrategy});
+            runReplanningTest(false /* isMultiplanning */);
+        }
+    } else {
+        jsTest.log.info(
+            "Skipping CBR fallback strategies: SBE is enabled without deferred engine choice",
+        );
     }
 
     // TODO SERVER-116989: Run tests under the non-release CBR configurations (e.g. sampling).
 } finally {
-    setCBRConfig(db, prevCBRConfig);
+    setPlanRankerConfig(db, prevPlanRankerConfig);
 
     assert.commandWorked(
         db.adminCommand({

@@ -133,18 +133,28 @@ static int
 handle_progress(
   WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *operation, uint64_t progress)
 {
+    SAP *sap;
+    WT_DECL_RET;
     char buf[256];
+    const char *msg;
 
     (void)handler;
 
-    if (session->app_private != NULL) {
-        testutil_snprintf(buf, sizeof(buf), "%s %s", (char *)session->app_private, operation);
-        track(buf, progress);
-        return (0);
-    }
+    /*
+     * Session application private information holds the operation's tracking tag, not a string
+     * itself.
+     */
+    sap = session->app_private;
+    if ((sap != NULL && sap->track != NULL)) {
+        testutil_snprintf(buf, sizeof(buf), "%s %s", sap->track, operation);
+        msg = buf;
+    } else
+        msg = operation;
 
-    track(operation, progress);
-    return (0);
+    int bytes_written =
+      progress == 0 ? printf("%s\n", msg) : printf("%s: %" PRIu64 "\n", msg, progress);
+    ret = fflush(stdout);
+    return (bytes_written < 0 ? EIO : (ret == EOF ? errno : 0));
 }
 
 static WT_EVENT_HANDLER event_handler = {NULL, handle_message, handle_progress, NULL, NULL};
@@ -179,6 +189,8 @@ configure_timing_stress(char **p, size_t max)
         CONFIG_APPEND(*p, ",prepare_checkpoint_delay");
     if (GV(STRESS_COMPACT_SLOW))
         CONFIG_APPEND(*p, ",compact_slow");
+    if (GV(STRESS_DISAGG_STABLE_DHANDLE_DELAY))
+        CONFIG_APPEND(*p, ",disagg_stable_dhandle_delay");
     if (GV(STRESS_EVICT_REPOSITION))
         CONFIG_APPEND(*p, ",evict_reposition");
     if (GV(STRESS_FAILPOINT_EVICTION_SPLIT))
@@ -342,57 +354,15 @@ configure_disagg_storage(const char *home, char **p, size_t max, char *ext_cfg, 
       /* page_log_home        */ disagg_is_multi_node() ? g.home_page_log : (char *)home,
       /* drain_threads        */ GV(DISAGG_DRAIN_THREADS),
       /* page_log_map_size_mb */ 2048, /* 2 Gigabytes for storage memory map */
-      /* page_log_verbose     */ GV(DISAGG_PAGE_LOG_VERBOSE));
+      /* page_log_verbose     */ GV(DISAGG_PAGE_LOG_VERBOSE),
+      /* victim_cache_size_mb */
+      GV(DISAGG_VICTIM_CACHE) ? GV(DISAGG_VICTIM_CACHE_SIZE) : 0);
 
     testutil_disagg_storage_configuration(
       &opts, home, disagg_cfg, sizeof(disagg_cfg), ext_cfg, ext_cfg_size);
     CONFIG_APPEND(*p, ",%s", disagg_cfg);
-}
-
-/*
- * configure_tiered_storage --
- *     Configure tiered storage settings for opening a connection.
- */
-static void
-configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, size_t ext_cfg_size)
-{
-    TEST_OPTS opts;
-    char tiered_cfg[1024];
-
-    if (!g.tiered_storage_config) {
-        testutil_assert(ext_cfg_size > 0);
-        ext_cfg[0] = '\0';
-        return;
-    }
-
-    memset(&opts, 0, sizeof(opts));
-    opts.tiered_storage = true;
-
-    /*
-     * We need to cast these values. Normally, testutil allocates and fills these strings based on
-     * command line arguments and frees them when done. Format doesn't use the standard test command
-     * line parser and doesn't rely on testutil to free anything in this struct. We're only using
-     * the options struct on a temporary basis to help create the tiered storage configuration.
-     */
-    opts.tiered_storage_source = (char *)GVS(TIERED_STORAGE_STORAGE_SOURCE);
-    opts.home = (char *)home;
-    opts.build_dir = (char *)BUILDDIR;
-
-    /*
-     * Have testutil create the bucket directory for us when using the directory store.
-     */
-    opts.make_bucket_dir = true;
-
-    /*
-     * Use an absolute path for the bucket directory when using the directory store. Then we can
-     * create copies of the home directory to be used for backup, and we'll be able to find the
-     * bucket.
-     */
-    opts.absolute_bucket_dir = true;
-
-    testutil_tiered_storage_configuration(
-      &opts, home, tiered_cfg, sizeof(tiered_cfg), ext_cfg, ext_cfg_size);
-    CONFIG_APPEND(*p, ",%s", tiered_cfg);
+    CONFIG_APPEND(*p, ",disaggregated=(stepdown_write_mirroring=%s)",
+      GV(DISAGG_STEPDOWN_WRITE_MIRRORING) ? "true" : "false");
 }
 
 /*
@@ -403,8 +373,9 @@ configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, 
 static void
 configure_prefetch(char **p, size_t max)
 {
-    CONFIG_APPEND(*p, ",prefetch=(available=%s,default=%s)", GV(PREFETCH) ? "true" : "false",
-      GV(PREFETCH_DEFAULT) ? "true" : "false");
+    if (GV(PREFETCH))
+        CONFIG_APPEND(
+          *p, ",prefetch=(available=true,default=%s)", GV(PREFETCH_DEFAULT) ? "true" : "false");
 }
 
 /*
@@ -435,6 +406,17 @@ configure_obsolete_cleanup(char **p, size_t max)
     CONFIG_APPEND(*p, "]");
 }
 
+/*
+ * configure_verbose --
+ *     Configure verbose messaging. WT_VERBOSE_INFO adds the lifecycle markers that identify which
+ *     phase the run had reached.
+ */
+static void
+configure_verbose(char **p, size_t max)
+{
+    CONFIG_APPEND(*p, ",verbose=[all:0]");
+}
+
 #define EXTENSION_PATH(path) (access((path), R_OK) == 0 ? (path) : "")
 
 /*
@@ -443,11 +425,11 @@ configure_obsolete_cleanup(char **p, size_t max)
  *     entries are present and so no extension goes missing on reopen.
  */
 static void
-configure_extensions(char **p, size_t max, const char *disagg_ext_cfg, const char *tiered_ext_cfg)
+configure_extensions(char **p, size_t max, const char *disagg_ext_cfg)
 {
     CONFIG_APPEND(*p,
       ",extensions_strict=true,extensions=["
-      "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", %s, %s]",
+      "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", %s]",
       /* Collators. */
       REVERSE_PATH,
       /* Compressors. */
@@ -456,9 +438,7 @@ configure_extensions(char **p, size_t max, const char *disagg_ext_cfg, const cha
       /* Encryptors. */
       EXTENSION_PATH(ROTN_PATH), EXTENSION_PATH(SODIUM_PATH),
       /* Page log. */
-      disagg_ext_cfg[0] != '\0' ? disagg_ext_cfg : "\"\"",
-      /* Storage source. */
-      tiered_ext_cfg[0] != '\0' ? tiered_ext_cfg : "\"\"");
+      disagg_ext_cfg[0] != '\0' ? disagg_ext_cfg : "\"\"");
 }
 
 /*
@@ -470,7 +450,7 @@ create_database(const char *home, WT_CONNECTION **connp)
 {
     WT_CONNECTION *conn;
     size_t max;
-    char config[8 * 1024], disagg_ext_cfg[1024], *p, tiered_ext_cfg[1024];
+    char config[8 * 1024], disagg_ext_cfg[1024], *p;
     const char *s, *sources;
 
     p = config;
@@ -563,9 +543,6 @@ create_database(const char *home, WT_CONNECTION **connp)
     /* Optional disaggregated storage. */
     configure_disagg_storage(home, &p, max, disagg_ext_cfg, sizeof(disagg_ext_cfg));
 
-    /* Optional tiered storage. */
-    configure_tiered_storage(home, &p, max, tiered_ext_cfg, sizeof(tiered_ext_cfg));
-
     /* Optional prefetch. */
     configure_prefetch(&p, max);
 
@@ -573,7 +550,10 @@ create_database(const char *home, WT_CONNECTION **connp)
     configure_obsolete_cleanup(&p, max);
 
     /* Extensions. */
-    configure_extensions(&p, max, disagg_ext_cfg, tiered_ext_cfg);
+    configure_extensions(&p, max, disagg_ext_cfg);
+
+    /* Verbose messaging. */
+    configure_verbose(&p, max);
 
     /*
      * Put configuration file configuration options second to last. Put command line configuration
@@ -589,6 +569,10 @@ create_database(const char *home, WT_CONNECTION **connp)
         testutil_die(ENOMEM, "wiredtiger_open configuration buffer too small");
 
     testutil_checkfmt(wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
+
+    /* Leader: seed an initial key before the create-time close checkpoint. */
+    if (g.disagg_leader)
+        disagg_key_push_initial(conn, true);
 
     *connp = conn;
 }
@@ -762,7 +746,7 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
 {
     WT_CONNECTION *conn;
     size_t max;
-    char config[8 * 1024], disagg_ext_cfg[1024], *p, tiered_ext_cfg[1024];
+    char config[8 * 1024], disagg_ext_cfg[1024], *p;
     const char *enc, *s;
 
     *connp = NULL;
@@ -771,7 +755,6 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
     max = sizeof(config);
     config[0] = '\0';
     disagg_ext_cfg[0] = '\0';
-    tiered_ext_cfg[0] = '\0';
 
     /* Configuration settings that are not persistent between open calls. */
     enc = encryptor_at_open();
@@ -793,9 +776,6 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
     /* Optional disaggregated storage. */
     configure_disagg_storage(home, &p, max, disagg_ext_cfg, sizeof(disagg_ext_cfg));
 
-    /* Optional tiered storage. */
-    configure_tiered_storage(home, &p, max, tiered_ext_cfg, sizeof(tiered_ext_cfg));
-
     /* Optional live restore. */
     configure_live_restore(&p, max);
 
@@ -806,7 +786,10 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
     configure_obsolete_cleanup(&p, max);
 
     /* Extensions. */
-    configure_extensions(&p, max, disagg_ext_cfg, tiered_ext_cfg);
+    configure_extensions(&p, max, disagg_ext_cfg);
+
+    /* Verbose messaging. */
+    configure_verbose(&p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (GV(RUNS_IN_MEMORY) != 0)
@@ -946,6 +929,69 @@ stats_data_source(TABLE *table, void *arg)
 }
 
 /*
+ * stats_conn_value --
+ *     Return a single connection statistic's value.
+ */
+static int64_t
+stats_conn_value(WT_CURSOR *cursor, int stat_key)
+{
+    int64_t v;
+
+    cursor->set_key(cursor, stat_key);
+    testutil_check(cursor->search(cursor));
+    testutil_check(cursor->get_value(cursor, NULL, NULL, &v));
+    return (v);
+}
+
+/*
+ * stats_victim_cache_print --
+ *     Report what the page log's victim cache did over the run.
+ *
+ * Zero counts are legitimate: a run can enable the cache and never populate it.
+ */
+static void
+stats_victim_cache_print(WT_SESSION *session, FILE *fp)
+{
+    WT_CURSOR *cursor;
+    int64_t app_puts, cold_skipped, put_failures, put_time, puts;
+
+    testutil_assert(fprintf(fp, "\n\n====== Victim cache:\n") >= 0);
+
+    if (!GV(DISAGG_VICTIM_CACHE)) {
+        testutil_assert(fprintf(fp, "disabled\n") >= 0);
+        return;
+    }
+
+    wt_wrap_open_cursor(session, "statistics:", NULL, &cursor);
+    puts = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUTS);
+    app_puts = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_APP_THREAD_PUTS);
+    cold_skipped = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_COLD_NOT_CACHED);
+    put_failures = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_FAILURES);
+    put_time = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_TIME);
+    testutil_check(cursor->close(cursor));
+
+    testutil_assert(fprintf(fp,
+                      "enabled, %" PRIu32 "MB\n"
+                      "pages cached=%" PRId64 "\n"
+                      "pages cached by application threads=%" PRId64 "\n"
+                      "cold pages not cached=%" PRId64 "\n"
+                      "failed page inserts=%" PRId64 "\n"
+                      "time spent adding pages=%" PRId64 "us\n"
+                      "average per page=%" PRId64 "us\n",
+                      GV(DISAGG_VICTIM_CACHE_SIZE), puts, app_puts, cold_skipped, put_failures,
+                      put_time, puts == 0 ? 0 : put_time / puts) >= 0);
+
+    if (GV(QUIET))
+        return;
+
+    printf("--- victim cache: %" PRIu32 "MB, %" PRId64 " pages cached (%" PRId64
+           " by application threads), %" PRId64 " failed ---\n",
+      GV(DISAGG_VICTIM_CACHE_SIZE), puts, app_puts, put_failures);
+    if (puts == 0)
+        printf("--- victim cache: enabled but nothing was cached ---\n");
+}
+
+/*
  * wts_stats --
  *     Dump the run's statistics.
  */
@@ -968,6 +1014,9 @@ wts_stats(void)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
     stats_data_print(session, "statistics:", fp);
+
+    if (g.disagg_storage_config)
+        stats_victim_cache_print(session, fp);
 
     args.fp = fp;
     args.session = session;

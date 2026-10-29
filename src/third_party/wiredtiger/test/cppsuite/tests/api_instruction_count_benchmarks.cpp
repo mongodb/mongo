@@ -57,8 +57,8 @@ public:
     void
     custom_operation(thread_worker *tc) override final
     {
-        /* The test expects no more than one collection. */
-        testutil_assert(tc->collection_count == 1);
+        /* The test expects exactly one collection. */
+        testutil_assert(tc->db.get_collection_count() == 1);
 
         /* Assert that we are running in memory. */
         testutil_assert(_config->get_bool(IN_MEMORY));

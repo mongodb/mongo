@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/canonical_query.h"
@@ -47,7 +21,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
@@ -109,7 +83,7 @@ CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
            params.isCountLike,
            params.isSearchQuery,
            params.aggWithNonEmptyPipeline,
-           true /*optimizeMatchExpression*/);
+           /*optimizeMatchExpression=*/true);
 }
 
 CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {
@@ -147,7 +121,7 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
            false,  // The parent query countLike is independent from the subquery countLike.
            baseQuery.isSearchQuery(),
            baseQuery.aggWithNonEmptyPipeline(),
-           false /*optimizeMatchExpression*/);
+           /*optimizeMatchExpression=*/false);
 
     if (baseQuery.getDistinct().has_value()) {
         setDistinct(CanonicalDistinct(baseQuery.getDistinct().get()));
@@ -174,17 +148,6 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
 
     if (parsedFind->proj) {
-        // The projection will be optimized only if the query is not compatible with SBE or there's
-        // no user-specified "let" variable. This is to prevent the user-defined variable being
-        // optimized out. We will optimize the projection later after we are certain that the query
-        // is ineligible for SBE.
-        // When the deferred engine choice path is enabled, it is safe to always optimize because
-        // the SBE plan cache is not used, so there is no risk of caching an optimized-away
-        // variable reference.
-        bool shouldOptimizeProj = expCtx->getIfrContext()->getSavedFlagValue(
-                                      feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice) ||
-            expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
-            !_findCommand->getLet();
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized
             // MatchExpression. For example, a rooted-$or of equalities won't work to produce the
@@ -197,12 +160,10 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                                                           _primaryMatchExpression.get(),
                                                           _findCommand->getFilter(),
                                                           *parsedFind->savedProjectionPolicies,
-                                                          shouldOptimizeProj));
+                                                          true /* shouldOptimize */));
         } else {
             _proj.emplace(std::move(*parsedFind->proj));
-            if (shouldOptimizeProj) {
-                _proj->optimize();
-            }
+            _proj->optimize();
         }
 
         _metadataDeps = _proj->metadataDeps();
@@ -224,13 +185,18 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
             _metadataDeps.set(DocumentMetadataFields::kSortKey);
         }
     }
-    setCqPipeline(std::move(cqPipeline), false /* containsEntirePipeline */);
+    setCqPipeline(std::move(cqPipeline), /*containsEntirePipeline=*/false);
     _isCountLike = isCountLike;
     _isSearchQuery = isSearchQuery;
     _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;
 
-    _disablePlanCache = internalQueryDisablePlanCache.load() ||
-        _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache;
+    _disablePlanCache =
+        // IDHACK should never be cached.
+        _expCtx->isIdHackQuery() ||
+        // The plan cache has been explicitly disabled for this query.
+        _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache ||
+        // Obey the caching configuration set by the user.
+        _expCtx->getQueryKnobConfiguration().getDisablePlanCache();
     _maxMatchExpressionParams = loadMaxMatchExpressionParams();
     // The tree must always be valid after normalization.
     dassert(parsed_find_command::validateAndGetAvailableMetadata(_primaryMatchExpression.get(),

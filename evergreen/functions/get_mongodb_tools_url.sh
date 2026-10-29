@@ -23,6 +23,24 @@ get_mongodb_tools_url() {
                 return 1
                 ;;
             esac
+        elif [ "$ID" == "rhel" ]; then
+            case $arch in
+            "x86_64" | "aarch64")
+                case $VERSION_ID in
+                "8.8")
+                    database_tools_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-rhel88-${arch}-${mongodb_tools_version}.tgz"
+                    ;;
+                *)
+                    echo "Unsupported RHEL version: $VERSION_ID"
+                    return 1
+                    ;;
+                esac
+                ;;
+            *)
+                echo "Unsupported architecture: $arch"
+                return 1
+                ;;
+            esac
         else
             echo "Unsupported Linux distribution: $ID"
             return 1

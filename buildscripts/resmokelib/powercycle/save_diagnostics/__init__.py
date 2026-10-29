@@ -23,7 +23,7 @@ class TarEC2Artifacts(PowercycleCommand):
             if self.is_windows():
                 ec2_artifacts = f"{ec2_artifacts} {powercycle_constants.EVENT_LOGPATH}"
 
-        cmd = f"{tar_cmd} czf ec2_artifacts.tgz {ec2_artifacts}"
+        cmd = f"{tar_cmd} czf ec2_artifacts.tgz --ignore-failed-read {ec2_artifacts}"
 
         self.remote_op.operation(SSHOperation.SHELL, cmd, None)
 
@@ -109,8 +109,18 @@ class CopyRemoteMongoCoredumps(PowercycleCommand):
             core_suffix = "core"
 
         remote_dir = powercycle_constants.REMOTE_DIR
-        # Core file may not exist so we ignore the return code.
-        self.remote_op.operation(SSHOperation.SHELL, f"{remote_dir}/*.{core_suffix}", None, True)
+        core_glob = f"{remote_dir}/*.{core_suffix}"
+        # Core files may not exist, so check for them remotely before copying, rather than
+        # letting a missing-file scp failure retry and eventually raise. This operation raises an
+        # Exception on any nonzero return code. Use ls, not `[ -e glob ]`, since the unquoted glob
+        # expands to multiple arguments when 2+ core files match, and `[` treats that as an error.
+        _, output = self.remote_op.operation(
+            SSHOperation.SHELL, f"ls {core_glob} > /dev/null 2>&1 && echo found; true", None
+        )
+        if "found" not in output:
+            return
+
+        self.remote_op.operation(SSHOperation.COPY_FROM, core_glob, None)
 
 
 class CopyEC2MonitorFiles(PowercycleCommand):
@@ -121,7 +131,8 @@ class CopyEC2MonitorFiles(PowercycleCommand):
     def execute(self) -> None:
         """:return: None."""
         tar_cmd = "tar" if "tar" not in self.expansions else self.expansions["tar"]
-        cmd = f"{tar_cmd} czf ec2_monitor_files.tgz {powercycle_constants.EC2_MONITOR_FILES}"
+        # As above, the monitor files are not guaranteed to have been produced.
+        cmd = f"{tar_cmd} czf ec2_monitor_files.tgz --ignore-failed-read {powercycle_constants.EC2_MONITOR_FILES}"
 
         self.remote_op.operation(SSHOperation.SHELL, cmd, None)
         self.remote_op.operation(SSHOperation.COPY_FROM, "ec2_monitor_files.tgz", None)

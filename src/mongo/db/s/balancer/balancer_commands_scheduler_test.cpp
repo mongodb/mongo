@@ -1,36 +1,8 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/balancer/balancer_commands_scheduler.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -44,7 +16,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/type_shard.h"
-#include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
@@ -65,6 +36,11 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {
@@ -186,7 +162,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
     moveRangeRequestBase.setMax({});
 
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), shardsvrRequest, WriteConcernOptions(), false /* issuedByRemoteUser */);
+        operationContext(), shardsvrRequest, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
     ASSERT_OK(futureResponse.getNoThrow());
     remoteResponsesFuture.default_timed_get();
     _scheduler.stop();
@@ -241,8 +217,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
                                    chunk.getRange(),
                                    ShardVersionFactory::make(chunk.getVersion()),
                                    KeyPattern(BSON("x" << 1)),
-                                   false /* issuedByRemoteUser */,
-                                   (kDefaultMaxChunkSizeBytes / 100) * 25 /* maxSize */);
+                                   /*estimatedValue=*/false,
+                                   /*maxSize=*/(kDefaultMaxChunkSizeBytes / 100) * 25);
     auto swReceivedDataSize = futureResponse.getNoThrow();
     ASSERT_OK(swReceivedDataSize.getStatus());
     auto receivedDataSize = swReceivedDataSize.getValue();
@@ -290,7 +266,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveCollectionRequest) {
 
     auto catalogClient = ShardingCatalogManager::get(operationContext())->localCatalogClient();
     const auto dbEntry = catalogClient->getDatabase(
-        operationContext(), kNss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+        operationContext(), kNss.dbName(), repl::ReadConcernArgs::kMajority);
     auto futureResponse = _scheduler.requestMoveCollection(
         operationContext(), kNss, kShardId0, kShardId1, dbEntry.getVersion());
     ASSERT_OK(futureResponse.getNoThrow());
@@ -307,7 +283,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
     _scheduler.start(operationContext());
     auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), req, WriteConcernOptions(), false /* issuedByRemoteUser */);
+        operationContext(), req, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
     ASSERT_EQUALS(futureResponse.getNoThrow(), timeoutError);
     remoteResponsesFuture.default_timed_get();
     _scheduler.stop();
@@ -316,7 +292,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
 TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
     auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), req, WriteConcernOptions(), false /* issuedByRemoteUser */);
+        operationContext(), req, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
     ASSERT_EQUALS(futureResponse.getNoThrow(),
                   Status(ErrorCodes::BalancerInterrupted,
                          "Request rejected - balancer scheduler is stopped"));
@@ -331,7 +307,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfUnsubmittedBeforeBalancer
         auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
 
         futureResponse = _scheduler.requestMoveRange(
-            operationContext(), req, WriteConcernOptions(), false /* issuedByRemoteUser */);
+            operationContext(), req, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
         _scheduler.stop();
         remoteResponsesFuture.default_timed_get();
     }

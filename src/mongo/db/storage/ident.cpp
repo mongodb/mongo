@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/ident.h"
 
@@ -213,11 +187,9 @@ boost::optional<ParsedIdent> parseIdent(std::string_view str) {
     // index with directoryPerDB=true, or an index with directoryForIndexes=true and
     // directoryPerDB=false. We assume here that the unique tag won't start with a known ident type,
     // and thus it's a collection in the db named "index".
-    if (auto identType = getIdentType(tok2->head)) {
+    if (auto parsed = validateIdent(tok1->head, tok2->head, tok2->tail)) {
         // Format 3: "$dbName/$identType-$uniqueTag"
-        if (!ident::validateTag(tok2->tail))
-            return boost::none;
-        return ParsedIdent{*identType, tok2->tail, tok1->head};
+        return parsed;
     }
     if (auto identType = getIdentType(tok1->head)) {
         // Format 2: "$identType/$uniqueTag"
@@ -315,6 +287,11 @@ bool isCollectionIdent(std::string_view ident) {
     // they are not eligible for orphan recovery through repair.
     auto parsed = parseIdent(ident);
     return parsed && parsed->identType == IdentType::collection;
+}
+
+bool isIndexIdent(std::string_view ident) {
+    auto parsed = parseIdent(ident);
+    return parsed && parsed->identType == IdentType::index;
 }
 
 bool validateTag(std::string_view uniqueTag) {

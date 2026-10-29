@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -56,16 +30,16 @@ namespace mongo::collection_internal {
 using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
 
 
-enum class MONGO_MOD_NEEDS_REPLACEMENT StoreDeletedDoc { Off, On };
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] StoreDeletedDoc { Off, On };
 
-enum class MONGO_MOD_NEEDS_REPLACEMENT RetryableWrite { kYes, kNo };
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] RetryableWrite { kYes, kNo };
 
 /**
  * Constants used for the opDiff argument in updateDocument and updateDocumentWithDamages.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 constexpr const BSONObj* kUpdateAllIndexes = nullptr;
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 constexpr const BSONObj* kUpdateNoIndexes = &BSONObj::kEmptyObject;
 
 /**
@@ -78,7 +52,7 @@ constexpr const BSONObj* kUpdateNoIndexes = &BSONObj::kEmptyObject;
  *
  * NOTE: It is up to caller to commit the indexes.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    const BSONObj& doc,
@@ -92,7 +66,7 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
  *
  * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 Status insertDocuments(OperationContext* opCtx,
                        const CollectionPtr& collection,
                        std::vector<InsertStatement>::const_iterator begin,
@@ -106,7 +80,7 @@ Status insertDocuments(OperationContext* opCtx,
  *
  * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 Status insertDocument(OperationContext* opCtx,
                       const CollectionPtr& collection,
                       const InsertStatement& doc,
@@ -125,7 +99,7 @@ Status insertDocument(OperationContext* opCtx,
  * 'indexesAffected' is optional. When not null, will be set to whether any indexes were updated
  * 'opDebug' is argument. When not null, will be used to record operation statistics.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 void updateDocument(OperationContext* opCtx,
                     const CollectionPtr& collection,
                     const RecordId& oldLocation,
@@ -141,7 +115,7 @@ void updateDocument(OperationContext* opCtx,
  * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on success.
  * Returns the contents of the updated document.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               const CollectionPtr& collection,
                                               const RecordId& loc,
@@ -158,7 +132,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
  * Deletes the document with the given RecordId from the collection. For a description of the
  * parameters, see the overloaded function below.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 void deleteDocument(OperationContext* opCtx,
                     const CollectionPtr& collection,
                     StmtId stmtId,
@@ -185,7 +159,7 @@ void deleteDocument(OperationContext* opCtx,
  * unindexing.
  * @param retryableWrite: whether it's a retryable write, @see write_stage_common::isRetryableWrite
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 void deleteDocument(OperationContext* opCtx,
                     const CollectionPtr& collection,
                     Snapshotted<BSONObj> doc,
@@ -220,7 +194,7 @@ void deleteDocument(OperationContext* opCtx,
  * narrowly scoped internal cases (such as startup recovery) where the caller guarantees the range
  * is safe to truncate.
  */
-MONGO_MOD_NEEDS_REPLACEMENT
+[[MONGO_MOD_NEEDS_REPLACEMENT]]
 repl::OpTime truncateRange(OperationContext* opCtx,
                            const CollectionPtr& collection,
                            const RecordId& minRecordId,

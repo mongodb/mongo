@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/fts/fts_spec.h"
 
@@ -204,6 +178,31 @@ TEST(FTSSpec, ScoreSingleField1) {
     ASSERT_EQUALS(m["cat"], m["sat"]);
     ASSERT_EQUALS(m["cat"], m["run"]);
     ASSERT(m["cat"] > 0);
+}
+
+// A field value whose only token is identical to the (untokenized) raw field value receives a
+// small boost (adjustment of +0.1). An embedded NUL in the value should not change the fact that
+// the sole token "cat" matches the raw value: strlen-style truncation historically made
+// "cat\0..." look like "cat". This test pins that boost-equivalence.
+TEST(FTSSpec, ScoreSingleFieldWithEmbeddedNul) {
+    auto doScore = [&](BSONObj specDoc, BSONObj doc) {
+        TermFrequencyMap m;
+        FTSSpec spec(assertGet(FTSSpec::fixSpec(specDoc)));
+        spec.scoreDocument(doc, &m);
+        return m;
+    };
+    BSONObj specDoc = fromjson(R"({
+        "key": {
+            "title": "text",
+            "text": "text"
+        },
+        "weights": {
+            "title": 10
+        }
+    })");
+    ASSERT_EQ(doScore(specDoc, fromjson(R"({"title": "cat\u0000"})")),
+              doScore(specDoc, fromjson(R"({"title": "cat"})")))
+        << "Trailing NUL on a value must not affect its score.";
 }
 
 TEST(FTSSpec, ScoreMultipleField1) {

@@ -65,12 +65,6 @@ class test_layered_delta05(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="leader"),{self.delta_config},'
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def insert(self, kv, ts):
         cursor = self.session.open_cursor(self.uri, None, None)
         for k, v in kv.items():
@@ -111,9 +105,9 @@ class test_layered_delta05(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         if (self.delta_type == 'both' or self.delta_type == 'leaf_only'):
-            self.assertGreater(self.get_stat(stat.conn.rec_page_delta_leaf), 0)
+            self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.rec_page_delta_internal), 0)
+            self.assertStatGreaterSoon(stat.conn.rec_page_delta_internal, 0)
         if (self.delta_type == 'none'):
             self.assertEqual(self.get_stat(stat.conn.rec_page_delta_leaf), 0)
             self.assertEqual(self.get_stat(stat.conn.rec_page_delta_internal), 0)
@@ -126,7 +120,7 @@ class test_layered_delta05(wttest.WiredTigerTestCase):
 
         # Assert that we have constructed at least one internal page delta.
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.cache_read_internal_delta), 0)
+            self.assertStatGreaterSoon(stat.conn.cache_read_internal_delta, 0)
         else:
             self.assertEqual(self.get_stat(stat.conn.cache_read_internal_delta), 0)
 
@@ -139,7 +133,7 @@ class test_layered_delta05(wttest.WiredTigerTestCase):
 
         # Assert that we have constructed at least one internal page delta.
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.cache_read_internal_delta), 0)
+            self.assertStatGreaterSoon(stat.conn.cache_read_internal_delta, 0)
         else:
             self.assertEqual(self.get_stat(stat.conn.cache_read_internal_delta), 0)
 
@@ -181,9 +175,9 @@ class test_layered_delta05(wttest.WiredTigerTestCase):
 
         # Assert that we have written at least one internal page delta.
         if (self.delta_type == 'both' or self.delta_type == 'leaf_only'):
-            self.assertGreater(self.get_stat(stat.conn.rec_page_delta_leaf), 0)
+            self.assertStatGreaterSoon(stat.conn.rec_page_delta_leaf, 0)
         if (self.delta_type == 'both' or self.delta_type == 'internal_only'):
-            self.assertGreater(self.get_stat(stat.conn.rec_page_delta_internal), 0)
+            self.assertStatGreaterSoon(stat.conn.rec_page_delta_internal, 0)
         if (self.delta_type == 'none'):
             self.assertEqual(self.get_stat(stat.conn.rec_page_delta_leaf), 0)
             self.assertEqual(self.get_stat(stat.conn.rec_page_delta_internal), 0)

@@ -6,7 +6,6 @@
 
 // Don't check for UUID index consistency,orphans and routine table across the cluster at the end,
 // since the test shuts down a mongos
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckRoutingTableConsistency = true;

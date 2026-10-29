@@ -36,7 +36,7 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           sessionOptions:
-            maybeUseCausalConsistency: true
+            causalConsistency: true
             readConcern:
               level: majority
             readPreference:
@@ -56,14 +56,14 @@ executor:
         enableElectionHandoff: 0
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
       syncdelay: 5
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 2
     num_rs_nodes_per_shard: 3
@@ -78,6 +78,10 @@ executor:
       randomize_kill: true
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            runningWithShardStepdowns: true
     - class: ValidateCollections
       shell_options:
         global_vars:
@@ -107,7 +111,6 @@ selector:
     - jstests/core/**/operation_latency_histogram.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
-    - jstests/core/ddl/create_collection.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js

@@ -40,20 +40,37 @@ typedef enum {
 } WTI_CHECKPOINT_STATE;
 
 /*
+ * WTI_CHECKPOINT_DB_CONFIG --
+ *     Checkpoint configuration, parsed once per database checkpoint or file checkpoint.
+ */
+struct __wti_checkpoint_db_config {
+    bool can_skip;
+    bool database_size_fix;
+    bool force;
+    bool use_timestamp;
+    /* Not NUL-terminated, length in name_len */
+    const char *name;
+    size_t name_len;
+    bool named;
+    /* Checkpoints to drop, empty if none */
+    WT_CONFIG_ITEM drop;
+    /* Original configuration */
+    const char **cfg;
+};
+
+/*
  * WTI_CKPT_HANDLE_STATS --
  *     Statistics related to handles.
  */
 struct __wti_ckpt_handle_stats {
-    uint64_t apply;           /* handles applied */
-    uint64_t apply_time;      /* applied handles gather time */
-    uint64_t drop;            /* handle checkpoints dropped */
-    uint64_t drop_time;       /* handle checkpoints dropped time */
-    uint64_t lock;            /* handles locked */
-    uint64_t lock_time;       /* handles locked time */
-    uint64_t meta_check;      /* handles metadata check */
-    uint64_t meta_check_time; /* handles metadata check time */
-    uint64_t skip;            /* handles skipped */
-    uint64_t skip_time;       /* skipped handles gather time */
+    uint64_t apply;      /* handles applied */
+    uint64_t apply_time; /* applied handles gather time */
+    uint64_t drop;       /* handle checkpoints dropped */
+    uint64_t drop_time;  /* handle checkpoints dropped time */
+    uint64_t lock;       /* handles locked */
+    uint64_t lock_time;  /* handles locked time */
+    uint64_t skip;       /* handles skipped */
+    uint64_t skip_time;  /* skipped handles gather time */
 };
 
 /*
@@ -101,6 +118,8 @@ struct __wti_ckpt_timer {
 extern int __wti_checkpoint_parallel_commit(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_checkpoint_parallel_release_snapshot(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_checkpoint_parallel_rollback(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 
 #ifdef HAVE_UNITTEST

@@ -39,6 +39,8 @@ executor:
             - ReshardCollectionInterruptedDueToFCVChange
             - Interrupted
             - MovePrimaryInProgress
+            - BackgroundOperationInProgressForNamespace
+            - BackgroundOperationInProgressForDatabase
           migrationRetryJitterMS: 2000
           migrationRetryMatchFCVErrors: true
           migrationRetryWriteErrors: true

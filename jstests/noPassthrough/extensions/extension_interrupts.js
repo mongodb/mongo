@@ -12,6 +12,7 @@ import {
     checkPlatformCompatibleWithExtensions,
     generateExtensionConfigs,
     deleteExtensionConfigs,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -149,6 +150,7 @@ const extensionNames = generateExtensionConfigs("libinterrupt_mongo_extension.so
 try {
     const conn = MongoRunner.runMongod({
         loadExtensions: extensionNames[0],
+        extensionsConfigPath: getExtensionConfDir(),
     });
     assert.neq(null, conn, "failed to start mongod");
 

@@ -2,6 +2,7 @@
  * Tests that an index properly reports multikeyness and multikey paths metadata in the presence of
  * successful and unsuccessful inserts.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  * ]
  */

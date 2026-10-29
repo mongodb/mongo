@@ -42,6 +42,10 @@
       # Query settings application is skipped for queries targeting collections containing encryption information.
       - jstests/core/query/queryable_encryption/**/*.js
       - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+      # This test issues an aggregation containing the internal-only '$_internalIndexKey' expression
+      # over an internal-client connection. The override sets query settings over a separate,
+      # external connection, on which the representative query is rejected with error 5491300.
+      - jstests/core/query/index_key_expression.js
     exclude_with_any_tags:
       - assumes_standalone_mongod
       - does_not_support_repeated_reads
@@ -147,18 +151,18 @@
 - name: eval_cursor_hints_to_query_settings
   value:
     eval: >-
-      await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+      await import("jstests/libs/override_methods/query/make_cursor_hints_into_query_settings.js");
 
 - name: eval_index_filters_to_query_settings
   value:
     eval: >-
-      await import("jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+      await import("jstests/libs/override_methods/query/make_index_filters_into_query_settings.js");
       db.adminCommand({configureFailPoint: 'querySettingsPlanCacheInvalidation', mode: 'alwaysOn'});
 
 - name: eval_implicit_query_settings_fallback
   value:
     eval: >-
-      await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+      await import("jstests/libs/override_methods/query/implicit_query_settings_fallback.js");
 
 - name: sharding_temporarily_enforce_1_mongos
   value:

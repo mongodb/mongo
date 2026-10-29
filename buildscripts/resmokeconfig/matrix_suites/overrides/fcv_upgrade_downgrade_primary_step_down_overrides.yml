@@ -56,6 +56,11 @@
         - class: ContinuousStepdown
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
+          shell_options:
+            global_vars:
+              TestData:
+                # TODO SERVER-108424: get rid of runningWithShardStepdowns once only viewless timeseries are supported
+                runningWithShardStepdowns: true
         - class: ValidateCollections
           shell_options:
             global_vars:
@@ -99,10 +104,10 @@
                 readPreference:
                   mode: "primary"
                 retryWrites: true
-                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
-                # causal consistency should not be required to read your own writes on the new primary
-                # after the old one is killed.
-                maybeUseCausalConsistency: true
+                # Always use causal consistency. A non-causal majority read can be admitted by the
+                # old primary before a concurrent stepdown and execute on it after it has demoted,
+                # silently missing majority-committed writes from the new primary.
+                causalConsistency: true
               # Inform the tests that we are running with stepdown hook
               runningWithConfigStepdowns: true
               runningWithShardStepdowns: true
@@ -119,13 +124,6 @@
       - featureFlagTimeseriesUpdatesSupport
       # TODO: SERVER-78068 Remove Feature Flag for PM-2983
       - featureFlagRecordIdsReplicated
-      # TODO: SERVER-85426 Remove Feature Flag for SPM-3541
-      - featureFlagRankFusionBasic
-      - featureFlagRankFusionFull
-      - featureFlagSearchHybridScoringFull
-      - featureFlagRankFusion
-      # TODO: SERVER-86544 remove feature flag for SPM-3672
-      - featureFlagMongotIndexedViews
       # Transactions are aborted upon fcv upgrade or downgrade.
       - uses_transactions
       # Exclude tests that require a specific fcv.
@@ -134,6 +132,7 @@
       - requires_fcv_82
       - requires_fcv_83
       - requires_fcv_90
+      - requires_fcv_91
       # Exclude tests that are not compatible with upgrade/downgrade.
       - cannot_run_during_upgrade_downgrade
 
@@ -154,6 +153,7 @@
                 rollback: 2
               storage:
                 recovery: 2
+            failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
             failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         all_nodes_electable: true
         num_nodes: 3
@@ -170,6 +170,7 @@
           set_parameters:
             enableElectionHandoff: 0
             enableTestCommands: 1
+            failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
             failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         configsvr_options:
           num_nodes: 3

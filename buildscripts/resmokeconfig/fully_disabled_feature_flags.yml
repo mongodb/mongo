@@ -14,16 +14,15 @@
 # if featureFlagAllMongodsAreSharded is re-enabled.
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
-- featureFlagSearchInSbe
-# TODO SERVER-96993: re-enable 'featureFlagFixedBucketingOptimizations'.
-- featureFlagFixedBucketingOptimizations
 - featureFlagGaplessFTDC
 # TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
 - featureFlagSbeFull
 # TODO (SERVER-108818): test primary-driven index builds in allFeatureFlag variant.
 - featureFlagPrimaryDrivenIndexBuilds
 - featureFlagResumablePrimaryDrivenIndexBuilds
-- featureFlagContainerWrites
+# TODO (SERVER-133236): Remove once the pipelined oplog applier works end-to-end, so it
+# can bake in the all-feature-flags variants before being enabled by default.
+- featureFlagPipelinedOplogApplier
 # TODO SERVER-117454: Enable the feature flag in the all-feature-flags variant.
 - featureFlagReplicatedFastCount
 # TODO (SERVER-117324): Remove featureFlagDisallowFindAndModifyImageCollection
@@ -34,9 +33,21 @@
 # (--streams_release_build=True) to compile the streams code into the binary. Variants that
 # support streams should explicitly enable this flag.
 - featureFlagStreams
-# TODO SERVER-127411: Enable in all-feature-flags after shard UUID migration is complete.
-- featureFlagUniqueShardIdentifiers
-- featureFlagUniqueShardIdentifiersDDL
-# TODO (SERVER-127746): Remove featureFlagKEKPushMode when fully implemented WiredTiger API
-# for push mode is available.
-- featureFlagKEKPushMode
+# TODO SERVER-130858: Enable in the all-feature-flags variant.
+- featureFlagContinuousInternodeValidationPerDocument
+# TODO SERVER-131999: Enable in the all-feature-flags variant.
+- featureFlagContinuousInternodeValidationPerCollection
+# Metrics filtering cannot be enabled by default in tests because that is expected to cause
+# tests that depend on metrics not in the allowlists to fail.
+- featureFlagMetricsFiltering
+- featureFlagServerStatusMetricsFiltering
+- featureFlagReplSetGetStatusMetricsFiltering
+- featureFlagCollStatsMetricsFiltering
+# TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
+- featureFlagListIndexesAlwaysIncludesSimpleCollation
+# TODO SERVER-137546: Remove or re-enable featureFlagSbeDisableUnpackBucketPruning
+- featureFlagSbeDisableUnpackBucketPruning
+# Enabling this flag skips registering the built-in search index management commands until a mongot
+# extension provides replacements. Enabling it in the all-feature-flags variants would break
+# existing legacy search passthrough tests.
+- featureFlagExtensionSearchIndexManagement

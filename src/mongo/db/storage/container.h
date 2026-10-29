@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,7 +11,7 @@
 #include <memory>
 #include <span>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace container {
 
 /**
@@ -68,9 +42,9 @@ enum class UpdateOplogEntryVersion {
  * from, where the keys are integers and the values are byte arrays. Multiple container instances
  * may refer to the same ident.
  */
-class MONGO_MOD_OPEN IntegerKeyedContainer {
+class [[MONGO_MOD_OPEN]] IntegerKeyedContainer {
 public:
-    class MONGO_MOD_OPEN Cursor {
+    class [[MONGO_MOD_OPEN]] Cursor {
     public:
         virtual ~Cursor() = default;
 
@@ -104,6 +78,10 @@ public:
                           int64_t key,
                           std::span<const char> value,
                           container::ExistingKeyPolicy policy) = 0;
+    virtual Status insert(RecoveryUnit& ru,
+                          std::span<const int64_t> keys,
+                          std::span<const std::span<const char>> values,
+                          container::ExistingKeyPolicy policy) = 0;
 
     /**
      * Updates the value at the given key. The key must already exist. Must be in an active storage
@@ -128,9 +106,9 @@ public:
  * where the keys and values are both byte arrays. Multiple container instances may refer to the
  * same ident.
  */
-class MONGO_MOD_OPEN StringKeyedContainer {
+class [[MONGO_MOD_OPEN]] StringKeyedContainer {
 public:
-    class MONGO_MOD_OPEN Cursor {
+    class [[MONGO_MOD_OPEN]] Cursor {
     public:
         virtual ~Cursor() = default;
 
@@ -164,6 +142,10 @@ public:
                           std::span<const char> key,
                           std::span<const char> value,
                           container::ExistingKeyPolicy policy) = 0;
+    virtual Status insert(RecoveryUnit& ru,
+                          std::span<const std::span<const char>> keys,
+                          std::span<const std::span<const char>> values,
+                          container::ExistingKeyPolicy policy) = 0;
 
     /**
      * Updates the value at the given key. The key must already exist. Must be in an active storage
@@ -185,4 +167,4 @@ public:
     virtual std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const = 0;
 };
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

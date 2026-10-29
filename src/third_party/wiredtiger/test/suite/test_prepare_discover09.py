@@ -36,7 +36,6 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-@wttest.skip_for_hook("tiered", "Layered tables are not supported with tiered storage")
 @disagg_test_class
 class test_prepare_discover09(wttest.WiredTigerTestCase):
     conn_base_config = ('cache_size=10MB,statistics=(all),'

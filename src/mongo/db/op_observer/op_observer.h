@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -66,7 +40,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class DocumentKey;
 struct IndexBuildInfo;
@@ -99,6 +73,9 @@ struct OpStateAccumulator : Decorable<OpStateAccumulator> {
 
     // ApplyOpsEntries used for changestreams with batched writes.
     std::vector<TransactionOperations::ApplyOpsInfo::ApplyOpsEntry> applyOpsEntries;
+
+    // Whether an atomically-grouped batched write is retryable.
+    bool isRetryableAtomicBatch = false;
 
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;
@@ -184,7 +161,7 @@ struct IndexCollModInfo {
  * to perform the operation being observed are still held. These rules should apply for all observer
  * methods unless otherwise specified.
  */
-class MONGO_MOD_PUB OpObserver {
+class [[MONGO_MOD_PUBLIC]] OpObserver {
 public:
     using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
 
@@ -275,7 +252,7 @@ public:
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
                            const std::vector<RecordId>& recordIds,
-                           std::vector<bool> fromMigrate,
+                           const std::vector<bool>& fromMigrate,
                            bool defaultFromMigrate,
                            OpStateAccumulator* opAccumulator = nullptr) = 0;
 
@@ -311,6 +288,16 @@ public:
                                    std::span<const char> key,
                                    std::span<const char> value) = 0;
 
+    virtual void onContainerInsert(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   std::span<const std::span<const char>> keys,
+                                   std::span<const char> value) = 0;
+
+    virtual void onContainerInsert(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   int64_t key,
+                                   std::span<const std::span<const char>> vals) = 0;
+
     virtual void onContainerUpdate(OperationContext* opCtx,
                                    std::string_view ident,
                                    int64_t key,
@@ -328,6 +315,10 @@ public:
     virtual void onContainerDelete(OperationContext* opCtx,
                                    std::string_view ident,
                                    std::span<const char> key) = 0;
+
+    virtual void onContainerDelete(OperationContext* opCtx,
+                                   std::string_view ident,
+                                   std::span<const std::span<const char>> keys) = 0;
 
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.
@@ -765,6 +756,18 @@ public:
                                                 const repl::OplogEntry& op) = 0;
 
     /**
+     * Called to clear every CSS entry on the applying node.
+     */
+    virtual void onInvalidateAllCollectionMetadata(OperationContext* opCtx,
+                                                   const repl::OplogEntry& op) = 0;
+
+    /**
+     * Called to clear every DSS entry on the applying node.
+     */
+    virtual void onInvalidateAllDatabaseMetadata(OperationContext* opCtx,
+                                                 const repl::OplogEntry& op) = 0;
+
+    /**
      * Called when the authoritative CSS needs to update the value of allowChunkOperations.
      */
     virtual void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
@@ -773,8 +776,8 @@ public:
      * Called when new chunks need to be updated/inserted to the sharding collection metadata of a
      * collection.
      */
-    virtual void onApplyCollectionShardingStateDelta(OperationContext* opCtx,
-                                                     const repl::OplogEntry& op) = 0;
+    virtual void onUpdateCollectionMetadata(OperationContext* opCtx,
+                                            const repl::OplogEntry& op) = 0;
 
     /**
      * Called when 'truncateRange' is called on a collection.
@@ -857,7 +860,7 @@ private:
  * is cleared. It is intended for use as a scope object in `OpObserverRegistry` to manage
  * re-entrancy.
  */
-class MONGO_MOD_PRIVATE OpObserver::ReservedTimes {
+class [[MONGO_MOD_PRIVATE]] OpObserver::ReservedTimes {
     ReservedTimes(const ReservedTimes&) = delete;
     ReservedTimes& operator=(const ReservedTimes&) = delete;
 
@@ -873,4 +876,4 @@ private:
     Times& _times;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

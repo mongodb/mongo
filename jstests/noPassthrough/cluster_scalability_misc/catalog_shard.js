@@ -41,10 +41,9 @@ function flushRoutingAndDBCacheUpdates(conn) {
     if (!FeatureFlagUtil.isPresentAndEnabled(conn, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
         assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
+        assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: "does.not.exist"}));
     }
-
-    assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: "does.not.exist"}));
 }
 
 function getCatalogShardChunks(conn) {
@@ -485,11 +484,13 @@ const newShardName = assert.commandWorked(
     );
 
     // Logical sessions collection.
-    assert.commandWorked(
-        st.configRS
-            .getPrimary()
-            .adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
-    );
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(
+            st.configRS
+                .getPrimary()
+                .adminCommand({_flushRoutingTableCacheUpdates: "config.system.sessions"}),
+        );
+    }
     assert.commandWorked(
         st.configRS.getPrimary().getCollection("config.system.sessions").insert({x: 1}),
     );

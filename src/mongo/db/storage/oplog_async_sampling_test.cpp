@@ -1,33 +1,8 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
@@ -51,6 +26,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
@@ -122,7 +98,8 @@ protected:
 
     std::shared_ptr<OplogTruncateMarkers> beginMarkerCreation(OperationContext* opCtx,
                                                               RecordStore& rs) {
-        auto initialSetOfMarkers = OplogTruncateMarkers::beginMarkerCreation(opCtx, rs);
+        auto initialSetOfMarkers = OplogTruncateMarkers::beginMarkerCreation(
+            opCtx, rs, OplogTruncateMarkers::estimateOplogSize(rs));
         return std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers), *rs.oplog());
     }
 
@@ -428,6 +405,118 @@ TEST_F(AsyncOplogTruncationTest, AwaitHasExpiredOplogAbandonsSnapshot) {
     // The snapshot opened while evaluating the predicate must have been abandoned before returning.
     ASSERT_FALSE(ru.isActive());
 }
+
+// Waits until the currently-installed maintainer thread has produced its initial markers and
+// reached the hangOplogCapMaintainerThread failpoint.
+void waitUntilMaintainerThreadRunning(OperationContext* opCtx,
+                                      FailPoint* hangFp,
+                                      FailPoint::EntryCountT timesEnteredBefore) {
+    std::shared_ptr<OplogTruncateMarkers> installedMarkers;
+    for (int i = 0; i < 200 && !installedMarkers; ++i) {  // up to ~20s
+        installedMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
+        if (!installedMarkers) {
+            sleepmillis(100);
+        }
+    }
+    ASSERT(installedMarkers) << "Thread did not install truncate markers within timeout";
+    hangFp->waitForTimesEntered(timesEnteredBefore + 1);
+}
+
+TEST_F(AsyncOplogTruncationTest, StartReplacesStillRunningMaintainerThread) {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
+
+    insertOplog(1, 100);
+
+    // Pin whichever thread is running inside its main loop so it is running.
+    auto* hangFp = globalFailPointRegistry().find("hangOplogCapMaintainerThread");
+    ASSERT(hangFp);
+    auto timesEnteredBefore = hangFp->setMode(FailPoint::alwaysOn);
+
+    // First start via the public lifecycle API.
+    startOplogCapMaintainerThread(
+        getServiceContext(), /*isReplSet=*/true, /*shouldSkipOplogSampling=*/false);
+    auto* first = OplogCapMaintainerThread::get(getServiceContext());
+    ASSERT(first) << "startOplogCapMaintainerThread did not install a thread";
+    waitUntilMaintainerThreadRunning(getOperationContext(), hangFp, timesEnteredBefore);
+    ASSERT_TRUE(first->running());
+
+    // Second start while the first is still running, make sure we don't crash.
+    startOplogCapMaintainerThread(getServiceContext(), true, false);
+
+    // Verify the second thread starts and gets to a running state.
+    hangFp->waitForTimesEntered(timesEnteredBefore + 2);
+
+    auto* second = OplogCapMaintainerThread::get(getServiceContext());
+    ASSERT(second) << "second start did not install a thread";
+    ASSERT_TRUE(second->running());
+
+    // Clean up.
+    hangFp->setMode(FailPoint::off);
+    stopOplogCapMaintainerThread(getServiceContext(),
+                                 Status(ErrorCodes::ShutdownInProgress, "test cleanup"));
+    ASSERT_FALSE(OplogCapMaintainerThread::get(getServiceContext())->running());
+}
+
+class AsyncOplogTruncationDeathTest : public AsyncOplogTruncationTest {};
+
+// The lifecycle invariant is retained: calling set() directly while a thread is running causes
+// a crash.
+DEATH_TEST_F(AsyncOplogTruncationDeathTest,
+             SetInvariantsWhenReplacingRunningThreadDirectly,
+             "Tried to reset the OplogCapMaintainerThread") {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
+
+    insertOplog(1, 100);
+
+    auto* hangFp = globalFailPointRegistry().find("hangOplogCapMaintainerThread");
+    ASSERT(hangFp);
+    auto timesEnteredBefore = hangFp->setMode(FailPoint::alwaysOn);
+
+    auto first = std::make_unique<OplogCapMaintainerThread>();
+    auto* firstRaw = first.get();
+    OplogCapMaintainerThread::set(getServiceContext(), std::move(first));
+    firstRaw->go();
+    waitUntilMaintainerThreadRunning(getOperationContext(), hangFp, timesEnteredBefore);
+    ASSERT_TRUE(firstRaw->running());
+
+    // Direct set() while a thread is running trips invariant(!maintainerThread->running()).
+    OplogCapMaintainerThread::set(getServiceContext(),
+                                  std::make_unique<OplogCapMaintainerThread>());
+}
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+// Check that a second maintainer thread started without going through the registered start
+// path (bypassing set()) trips the per-ServiceContext dassert in run(). Debug builds only, since
+// dassert compiles out in release.
+DEATH_TEST_F(AsyncOplogTruncationDeathTest,
+             SecondUnregisteredRunningThreadTripsDassert,
+             "More than one OplogCapMaintainerThread is running") {
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
+
+    insertOplog(1, 100);
+
+    auto* hangFp = globalFailPointRegistry().find("hangOplogCapMaintainerThread");
+    ASSERT(hangFp);
+    auto timesEnteredBefore = hangFp->setMode(FailPoint::alwaysOn);
+
+    // A first, properly registered thread, pinned running so the per-ServiceContext active count
+    // is 1.
+    auto first = std::make_unique<OplogCapMaintainerThread>();
+    auto* firstRaw = first.get();
+    OplogCapMaintainerThread::set(getServiceContext(), std::move(first));
+    firstRaw->go();
+    waitUntilMaintainerThreadRunning(getOperationContext(), hangFp, timesEnteredBefore);
+
+    // A second thread started directly, without set(). Its run() sees the active count already at 1
+    // and trips the dassert. wait() blocks until that thread aborts the process.
+    auto second = std::make_unique<OplogCapMaintainerThread>();
+    second->go();
+    second->wait();
+}
+#endif  // defined(MONGO_CONFIG_DEBUG_BUILD)
 
 
 }  // namespace repl

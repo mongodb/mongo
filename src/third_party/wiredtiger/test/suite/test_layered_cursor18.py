@@ -265,7 +265,9 @@ class test_layered_cursor18(wttest.WiredTigerTestCase):
 
         # Leader: key=1, value=1.
         c = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         c['1'] = '1'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         c.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
@@ -273,21 +275,21 @@ class test_layered_cursor18(wttest.WiredTigerTestCase):
 
         # Follower ingest: key=2, value=2 (visible before first call).
         cf = self.session_follow.open_cursor(self.uri)
+        self.session_follow.begin_transaction()
         cf['2'] = '2'
+        self.session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         cursor = self.session_follow.open_cursor(self.uri)
         self.follow_next(cursor, '1', '1', explicit_txn=first_explicit_txn)
 
         # Update ingest key=2 to value=22 between calls.
+        self.session_follow.begin_transaction()
         cf['2'] = '22'
+        self.session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         cf.close()
 
-        if first_explicit_txn or second_explicit_txn:
-            # Isolation boundary detected: ingest cursor re-searched, new value visible.
-            self.follow_next(cursor, '2', '22', explicit_txn=second_explicit_txn)
-        else:
-            # Both autocommit: consistent scan, new write not visible.
-            self.follow_next(cursor, '2', '2', explicit_txn=second_explicit_txn)
+        # The intervening commit released the snapshot, so the new value is visible.
+        self.follow_next(cursor, '2', '22', explicit_txn=second_explicit_txn)
         cursor.close()
 
     def snapshot_gen_ingest_prev(self, first_explicit_txn, second_explicit_txn):
@@ -296,7 +298,9 @@ class test_layered_cursor18(wttest.WiredTigerTestCase):
 
         # Leader: key=2, value=2.
         c = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         c['2'] = '2'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         c.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
@@ -304,21 +308,21 @@ class test_layered_cursor18(wttest.WiredTigerTestCase):
 
         # Follower ingest: key=1, value=1 (visible before first call).
         cf = self.session_follow.open_cursor(self.uri)
+        self.session_follow.begin_transaction()
         cf['1'] = '1'
+        self.session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         cursor = self.session_follow.open_cursor(self.uri)
         self.follow_prev(cursor, '2', '2', explicit_txn=first_explicit_txn)
 
         # Update ingest key=1 to value=11 between calls.
+        self.session_follow.begin_transaction()
         cf['1'] = '11'
+        self.session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         cf.close()
 
-        if first_explicit_txn or second_explicit_txn:
-            # Isolation boundary detected: ingest cursor re-searched, new value visible.
-            self.follow_prev(cursor, '1', '11', explicit_txn=second_explicit_txn)
-        else:
-            # Both autocommit: consistent scan, new write not visible.
-            self.follow_prev(cursor, '1', '1', explicit_txn=second_explicit_txn)
+        # The intervening commit released the snapshot, so the new value is visible.
+        self.follow_prev(cursor, '1', '11', explicit_txn=second_explicit_txn)
         cursor.close()
 
     def test_snapshot_gen_ingest_next_txn_txn(self):

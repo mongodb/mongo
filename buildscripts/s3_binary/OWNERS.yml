@@ -3,3 +3,8 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-build
+  # Test Infrastructure owns the pinned binaries it bumps here (db-contrib-tool and
+  # friends); the surrounding upload/download tooling stays with Build.
+  - "hashes.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure

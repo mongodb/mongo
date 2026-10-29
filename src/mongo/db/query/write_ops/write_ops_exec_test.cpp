@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 
@@ -36,11 +10,16 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/write_ops/parsed_writes_common.h"
+#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
@@ -64,7 +43,151 @@ using namespace std::literals::string_view_literals;
 class WriteOpsExecTest : public CatalogTestFixture {
 protected:
     using CatalogTestFixture::setUp;
+
+    struct DuplicateKeyRetryCase {
+        std::string_view query;
+        std::string_view keyPattern;
+        std::string_view keyValue;
+        // Used instead of 'keyValue' when set, for values that cannot be expressed as JSON.
+        BSONObj keyValueObj;
+        std::string_view queryCollation;
+        std::string_view indexCollation;
+        bool upsert = true;
+        bool multi = false;
+        int retryAttempts = 0;
+    };
+
+    /** Returns whether an upsert failing with the given duplicate key error may be retried. */
+    bool shouldRetryDuplicateKey(const DuplicateKeyRetryCase& testCase) {
+        auto opCtx = operationContext();
+
+        // Build the upsert request.
+        auto modification =
+            write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$set: {x: 1}}"));
+        write_ops::UpdateOpEntry update(fromjson(testCase.query), std::move(modification));
+        update.setUpsert(testCase.upsert);
+        update.setMulti(testCase.multi);
+        if (!testCase.queryCollation.empty()) {
+            update.setCollation(fromjson(testCase.queryCollation));
+        }
+        UpdateRequest request(update);
+        request.setNamespaceString(
+            NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test.retry"));
+
+        // CanonicalQuery reads its collator from the ExpressionContext, so the request
+        // collation must be resolved onto it for the retry check to see it.
+        std::unique_ptr<CollatorInterface> requestCollator;
+        if (const auto& collation = request.getCollation(); !collation.isEmpty()) {
+            const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+            requestCollator = uassertStatusOK(collatorFactory->makeFromBSON(collation));
+        }
+        auto expCtx = ExpressionContextBuilder{}
+                          .fromRequest(opCtx, request)
+                          .collator(std::move(requestCollator))
+                          .build();
+        auto cq = uassertStatusOK(parseWriteQueryToCQ(expCtx.get(), request));
+
+        const auto indexCollation =
+            testCase.indexCollation.empty() ? BSONObj{} : fromjson(testCase.indexCollation);
+        const auto keyValue =
+            testCase.keyValueObj.isEmpty() ? fromjson(testCase.keyValue) : testCase.keyValueObj;
+        DuplicateKeyErrorInfo dupKeyError(
+            fromjson(testCase.keyPattern), keyValue, indexCollation, std::monostate{}, boost::none);
+        return write_ops_exec::shouldRetryDuplicateKeyException(
+            opCtx, request, *cq, dupKeyError, testCase.retryAttempts);
+    }
 };
+
+TEST_F(WriteOpsExecTest, RetryDuplicateKeyWhenEqualitiesMatchKeyValues) {
+    ASSERT_TRUE(shouldRetryDuplicateKey(
+        {.query = "{a: 1, b: 2}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyForNonUpsertUpdate) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 1, b: 2}",
+                                          .keyPattern = "{a: 1, b: 1}",
+                                          .keyValue = "{'': 1, '': 2}",
+                                          .upsert = false}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenMaxRetryAttemptsExceeded) {
+    unittest::ServerParameterGuard maxRetries("upsertMaxRetryAttemptsOnDuplicateKeyError", 1);
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 1, b: 2}",
+                                          .keyPattern = "{a: 1, b: 1}",
+                                          .keyValue = "{'': 1, '': 2}",
+                                          .retryAttempts = 2}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenQueryCoversOnlyPartOfIndexKey) {
+    ASSERT_FALSE(shouldRetryDuplicateKey(
+        {.query = "{a: 1}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyForNonEqualityQuery) {
+    ASSERT_FALSE(shouldRetryDuplicateKey(
+        {.query = "{a: {$gt: 1}}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenKeyValuesMismatch) {
+    ASSERT_FALSE(shouldRetryDuplicateKey(
+        {.query = "{a: 1, b: 2}", .keyPattern = "{a: 1, b: 1}", .keyValue = "{'': 1, '': 3}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyForMultiUpdate) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 1, b: 2}",
+                                          .keyPattern = "{a: 1, b: 1}",
+                                          .keyValue = "{'': 1, '': 2}",
+                                          .multi = true}));
+}
+
+TEST_F(WriteOpsExecTest, RetryDuplicateKeyWithMatchingCollation) {
+    // A collated index stores collation comparison strings as keys, so the duplicate key error
+    // reports the comparison string of the offending value rather than the value itself.
+    const auto collator =
+        uassertStatusOK(CollatorFactoryInterface::get(operationContext()->getServiceContext())
+                            ->makeFromBSON(fromjson("{locale: 'en', strength: 2}")));
+    // A case-insensitive collator makes 'foo' equal to 'FOO'.
+    ASSERT_TRUE(
+        shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                 .keyPattern = "{a: 1}",
+                                 .keyValueObj = BSON("" << collator->getComparisonString("FOO")),
+                                 .queryCollation = "{locale: 'en', strength: 2}",
+                                 .indexCollation = "{locale: 'en', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenCollatedKeyValueDiffers) {
+    const auto collator =
+        uassertStatusOK(CollatorFactoryInterface::get(operationContext()->getServiceContext())
+                            ->makeFromBSON(fromjson("{locale: 'en', strength: 2}")));
+    ASSERT_FALSE(
+        shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                 .keyPattern = "{a: 1}",
+                                 .keyValueObj = BSON("" << collator->getComparisonString("bar")),
+                                 .queryCollation = "{locale: 'en', strength: 2}",
+                                 .indexCollation = "{locale: 'en', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenQueryAndIndexCollationsDiffer) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                          .keyPattern = "{a: 1}",
+                                          .keyValue = "{'': 'foo'}",
+                                          .queryCollation = "{locale: 'en', strength: 2}",
+                                          .indexCollation = "{locale: 'fr', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenOnlyQueryHasCollation) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                          .keyPattern = "{a: 1}",
+                                          .keyValue = "{'': 'foo'}",
+                                          .queryCollation = "{locale: 'en', strength: 2}"}));
+}
+
+TEST_F(WriteOpsExecTest, DoNotRetryDuplicateKeyWhenOnlyIndexHasCollation) {
+    ASSERT_FALSE(shouldRetryDuplicateKey({.query = "{a: 'foo'}",
+                                          .keyPattern = "{a: 1}",
+                                          .keyValue = "{'': 'foo'}",
+                                          .indexCollation = "{locale: 'en', strength: 2}"}));
+}
 
 TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
     // Basic test case.
@@ -131,7 +254,7 @@ TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
 TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
     // Basic test case.
     OID id = OID::createFromString("629e1e680958e279dc29a989"sv);
-    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), false /* multi */);
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), /*multi=*/false);
     ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
 
     // Add a collation.
@@ -298,7 +421,7 @@ TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
         NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "delete_test");
     write_ops::DeleteCommandRequest deleteReq(ns);
     // Basic test case.
-    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), false /* multi */);
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), /*multi=*/false);
     deleteReq.setDeletes({deleteOpEntry});
 
     ASSERT(write_ops::verifySizeEstimate(deleteReq));
@@ -527,7 +650,7 @@ public:
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    const std::vector<RecordId>& recordIds,
-                   std::vector<bool> fromMigrate,
+                   const std::vector<bool>& fromMigrate,
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator) override {
         auto& dest = inBatch ? current_batch_docs : unbatched_docs;
@@ -542,8 +665,11 @@ public:
 
 class WriteOpsExecOplogTest : public CatalogTestFixture {
 public:
-    explicit WriteOpsExecOplogTest(Options options = {})
-        : CatalogTestFixture(options.useReplSettings(true)) {}
+    explicit WriteOpsExecOplogTest(Options options = {}) : _options(std::move(options)) {}
+
+    Options makeServiceContextOptions() override {
+        return std::move(_options).useReplSettings(true);
+    }
 
 protected:
     void setUp() override {
@@ -555,6 +681,7 @@ protected:
         opObserverRegistry->addObserver(std::move(opObserverMock));
     }
 
+    Options _options;
     OpObserverMock* _opObserverMock;
 };
 

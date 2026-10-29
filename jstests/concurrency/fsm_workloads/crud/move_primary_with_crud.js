@@ -86,14 +86,9 @@ export const $config = (function () {
             }
             this.lastId = kInitialCollSize - 1;
 
-            // Session with retryable writes is required to recover from a primary node step-down
-            // event during bulk insert processing.
-            this.session = db.getMongo().startSession({retryWrites: true});
-            let sessionColl = this.session.getDatabase(db.getName()).getCollection(this.collName);
-
             assertCommandWorked(
                 () => {
-                    let bulkOp = sessionColl.initializeUnorderedBulkOp();
+                    let bulkOp = coll.initializeUnorderedBulkOp();
                     for (let i = 0; i < kInitialCollSize; ++i) {
                         bulkOp.insert({_id: i, updateCount: 0});
                     }

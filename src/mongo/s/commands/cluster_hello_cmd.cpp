@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -37,6 +11,7 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -49,6 +24,7 @@
 #include "mongo/db/repl/hello/hello_auth.h"
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -57,8 +33,10 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/mongos_topology_coordinator.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/idl/idl_command_parser.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -66,6 +44,7 @@
 #include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/load_balancer_support.h"
+#include "mongo/transport/backpressure_connection_metrics.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/assert_util.h"
@@ -88,6 +67,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -204,6 +184,19 @@ public:
         if (ClientMetadata::tryFinalize(client)) {
             isInitialHandshake = true;
             audit::logClientMetadata(client);
+
+            // Record client backpressure protocol version for connection metrics.
+            if (auto session = client->session()) {
+                BackpressureVersionMetrics::get(session.get())
+                    ->setVersionFromHelloField(
+                        cmd.getBackpressure().value_or(IDLAnyType{}).getElement());
+            }
+        }
+
+        if (!isInitialHandshake) {
+            if (auto updateDoc = cmd.getClientUpdate()) {
+                ClientMetadata::logClientMetadataUpdate(client, *updateDoc);
+            }
         }
 
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
@@ -219,6 +212,33 @@ public:
                     clientTopologyVersion->getCounter() >= 0);
 
             uassert(51759, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
+
+            auto minWait = repl::minWaitForStreamingHelloMillis.load();
+            if (minWait > 0 && *maxAwaitTimeMS < minWait) {
+                auto* authSession = AuthorizationSession::get(opCtx->getClient());
+                if (!authSession || !authSession->isAuthenticated()) {
+                    bool willAbort = repl::abortStreamingHelloWithSmallTimeout.load();
+                    static auto& logSeverity = *new logv2::SeveritySuppressor{
+                        Seconds{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(3)};
+                    LOGV2_DEBUG(9830102,
+                                logSeverity().toInt(),
+                                "Pre-auth streamable hello with maxAwaitTimeMS below minimum; "
+                                "will reject with InvalidOptions if willAbort is true, otherwise "
+                                "will clamp maxAwaitTimeMS up to minWaitForStreamingHelloMillis",
+                                "maxAwaitTimeMS"_attr = *maxAwaitTimeMS,
+                                "minWaitForStreamingHelloMillis"_attr = minWait,
+                                "willAbort"_attr = willAbort);
+
+                    uassert(ErrorCodes::InvalidOptions,
+                            fmt::format("maxAwaitTimeMS of {} ms is below the minimum of {} ms",
+                                        *maxAwaitTimeMS,
+                                        minWait),
+                            !willAbort);
+
+                    // Clamp the effective timeout to the configured minimum.
+                    maxAwaitTimeMS = minWait;
+                }
+            }
 
             deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
                 Milliseconds(*maxAwaitTimeMS);

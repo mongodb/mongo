@@ -1,34 +1,9 @@
-# Copyright (C) 2018-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http:#www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     cpp_namespace: "mongo::explain"
-    mod_visibility: pub
+    mod_visibility: public
 
 enums:
     Verbosity:
@@ -49,6 +24,36 @@ enums:
             # At this verbosity level, we generate the execution stats for each rejected plan as
             # well as the winning plan.
             kExecAllPlans: "allPlansExecution"
+
+            # V3 explain verbosity modes. They are additive: each one includes the contents of the
+            # previous. Supplying any of them causes explain to generate "explainVersion: '3'".
+            #
+            # The order of these enum values is not content-significant. Explain content decisions
+            # go through ExplainPolicy / explainPolicyFor() (see explain_policy.h) rather than
+            # ordinal comparisons of this enum. Relational operators on the enum are deleted so that
+            # no such comparison can compile. Reordering or inserting values here can therefore
+            # never change explain content semantics.
+            #
+            # These values remain positioned between kExecAllPlans and kInternal only as a
+            # historical artifact and to keep the underlying integer serialization stable; the
+            # placement carries no meaning.
+
+            # A very compact representation of the plan structure with minimal stable structural
+            # information about the chosen plans.
+            kPlanSummary: "planSummary"
+
+            # Shows the plan structure with more detail than kPlanSummary. Excludes multi-planning,
+            # cost-based ranking, and execution statistics.
+            kPlannerChoice: "plannerChoice"
+
+            # Shows the plan structure with associated multi-planning and/or cost-based ranking
+            # statistics, including the trial-phase statistics currently reported via
+            # "allPlansExecution".
+            kPlannerStats: "plannerStats"
+
+            # In addition to kPlannerStats, also runs the winning plan and adds its execution
+            # statistics. This is the V3 counterpart of kExecStats.
+            kExecStatsV3: "execStats"
 
             # This verbosity is set aside for miscellaneous information. It includes virtual machine
             # bytecode for the slot-based execution engine.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 
@@ -42,6 +16,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -51,6 +26,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -122,14 +98,28 @@ template <class Service, class StateMachine, class ReshardingDocument>
 void createReshardingStateMachine(OperationContext* opCtx,
                                   const ReshardingDocument& doc,
                                   bool throwOnNotPrimaryError) {
+    if constexpr (std::is_same_v<Service, ReshardingRecipientService>) {
+        if (!doc.getSkipCloningAndApplying().value_or(false)) {
+            uassertStatusOK(
+                ReplicaSetWriteBlockState::get(opCtx)->checkIfIncomingReshardingAllowedToStart(
+                    opCtx));
+        }
+    }
+
     try {
         // Inserting the resharding state document must happen synchronously with the shard version
         // refresh for the w:majority wait from the resharding coordinator to mean that this replica
         // set shard cannot forget about being a participant.
         ensureStateDocumentInserted<StateMachine>(opCtx, doc);
 
-        reshardingInterruptAfterInsertStateMachineDocument.execute(
-            [&opCtx](const BSONObj& data) { opCtx->markKilled(); });
+        reshardingInterruptAfterInsertStateMachineDocument.execute([&opCtx](const BSONObj& data) {
+            // If an 'errorCode' is provided, instead throw that error directly.
+            if (auto errorCodeElem = data["errorCode"]) {
+                uasserted(ErrorCodes::Error(errorCodeElem.safeNumberInt()),
+                          "Failing createReshardingStateMachine due to failpoint");
+            }
+            opCtx->markKilled();
+        });
 
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(Service::kServiceName);
@@ -157,6 +147,10 @@ template void createReshardingStateMachine<ReshardingRecipientService,
                                            RecipientStateMachine,
                                            ReshardingRecipientDocument>(
     OperationContext*, const ReshardingRecipientDocument&, bool);
+
+void waitForStateDocumentMajorityCommitted(OperationContext* opCtx) {
+    waitForMajority(opCtx, opCtx->getCancellationToken()).get(opCtx);
+}
 
 namespace {
 /*
@@ -225,7 +219,7 @@ bool isCurrentShardPrimary(OperationContext* opCtx, const NamespaceString& nss) 
         //
         // TODO SERVER-96115 Use the CatalogClient to fetch DB info and avoid this forced refresh
         const auto& catalogCache = Grid::get(opCtx)->catalogCache();
-        catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none /* wantedVersion */);
+        catalogCache->onStaleDatabaseVersion(nss.dbName(), /*wantedVersion=*/boost::none);
         return uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
     }();
     return dbInfo->getPrimary() == ShardingState::get(opCtx)->shardId();
@@ -244,7 +238,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
                                                                   ReshardingRecipientDocument>(
             opCtx, reshardingFields.getReshardingUUID())) {
         recipientStateMachine->get()->onReshardingFieldsChanges(
-            opCtx, reshardingFields, !metadata.currentShardHasAnyChunks() /* noChunksToCopy */);
+            opCtx, reshardingFields, /*noChunksToCopy=*/!metadata.currentShardHasAnyChunks());
         return;
     }
 
@@ -484,8 +478,6 @@ void clearCollectionMetadata(OperationContext* opCtx,
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
             scopedCsr->clearCollectionMetadata(opCtx);
-            // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
-            scopedCsr->setNonAuthoritative();
         }
 
         if (!scheduleAsyncRefresh) {
@@ -497,7 +489,7 @@ void clearCollectionMetadata(OperationContext* opCtx,
             auto opCtx = tc->makeOperationContext();
             uassertStatusOK(FilteringMetadataCache::get(opCtx.get())
                                 ->onShardVersionMismatch(
-                                    opCtx.get(), nss, boost::none /* chunkVersionReceived */));
+                                    opCtx.get(), nss, /*chunkVersionReceived=*/boost::none));
         })
             .until([](const Status& status) {
                 if (!status.isOK()) {

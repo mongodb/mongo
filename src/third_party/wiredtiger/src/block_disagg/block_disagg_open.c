@@ -16,11 +16,9 @@
  *     for and instantiate a storage source.
  */
 int
-__wt_block_disagg_manager_create(
-  WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage, const char *filename)
+__wt_block_disagg_manager_create(WT_SESSION_IMPL *session, const char *filename)
 {
     WT_UNUSED(session);
-    WT_UNUSED(bstorage);
     WT_UNUSED(filename);
 
     /*
@@ -85,12 +83,19 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
       (uint64_t)S2BT(session)->id);
 
     conn = S2C(session);
+    tableid = S2BT(session)->id;
     hash = __wt_hash_city64(filename, strlen(filename));
     bucket = hash & (conn->hash_size - 1);
     __wt_spin_lock(session, &conn->block_lock);
     TAILQ_FOREACH (block, &conn->blockhash[bucket], hashq) {
-        /* TODO: Should check to make sure this is the right type of block */
-        if (strcmp(filename, block->name) == 0) {
+        /*
+         * Match the table as well as the name: a recreated table takes the name of the table it
+         * replaced but addresses a new table, so it must not adopt a handle that outlived the drop.
+         *
+         * FIXME-WT-18453: the list holds both block types and nothing here tells them apart, so a
+         * plain block reads its own fields as a table ID.
+         */
+        if (strcmp(filename, block->name) == 0 && ((WT_BLOCK_DISAGG *)block)->tableid == tableid) {
             ++block->ref;
             *blockp = block;
             __wt_spin_unlock(session, &conn->block_lock);
@@ -113,7 +118,6 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
     if (WT_STREQ(block_disagg->name, WT_HS_FILE_SHARED))
         F_SET(block_disagg, WT_BLOCK_DISAGG_HS);
 
-    tableid = S2BT(session)->id;
     block_disagg->tableid = tableid;
 
     WT_ERR(S2BT(session)->page_log->pl_open_handle(
@@ -186,6 +190,28 @@ __wt_block_disagg_ckpt_size(WT_SESSION_IMPL *session, const char *uri, uint64_t 
 }
 
 /*
+ * __block_disagg_ckpt_size_dhandle --
+ *     Return the checkpoint size for the current dhandle. A follower's checkpoint dhandle name
+ *     keeps its checkpoint suffix, which is not a metadata key; strip it so the size lookup finds
+ *     the table's metadata entry instead of silently returning zero.
+ */
+static int
+__block_disagg_ckpt_size_dhandle(WT_SESSION_IMPL *session, uint64_t *sizep)
+{
+    WT_DECL_ITEM(name_buf);
+    WT_DECL_RET;
+    const char *uri;
+
+    uri = session->dhandle->name;
+    WT_ERR(__wt_dhandle_shared_base_name(session, &uri, NULL, &name_buf));
+    WT_ERR(__wt_block_disagg_ckpt_size(session, uri, sizep));
+
+err:
+    __wt_scr_free(session, &name_buf);
+    return (ret);
+}
+
+/*
  * __wti_block_disagg_stat --
  *     Set the statistics for a live block handle. For disaggregated storage there is no underlying
  *     file, so block_size is sourced from the most recent checkpoint in the metadata.
@@ -199,7 +225,7 @@ __wti_block_disagg_stat(
     WT_UNUSED(block_disagg);
 
     WT_STAT_WRITE(session, stats, block_magic, WT_BLOCK_MAGIC);
-    WT_RET(__wt_block_disagg_ckpt_size(session, session->dhandle->name, &ckpt_size));
+    WT_RET(__block_disagg_ckpt_size_dhandle(session, &ckpt_size));
     WT_STAT_WRITE(session, stats, block_size, (int64_t)ckpt_size);
     return (0);
 }
@@ -216,7 +242,7 @@ __wti_block_disagg_manager_size(WT_BM *bm, WT_SESSION_IMPL *session, wt_off_t *s
 
     WT_UNUSED(bm);
 
-    WT_RET(__wt_block_disagg_ckpt_size(session, session->dhandle->name, &ckpt_size));
+    WT_RET(__block_disagg_ckpt_size_dhandle(session, &ckpt_size));
     *sizep = (wt_off_t)ckpt_size;
     return (0);
 }

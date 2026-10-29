@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 
@@ -55,7 +29,7 @@ TsBucketToCellBlockStage::TsBucketToCellBlockStage(std::unique_ptr<PlanStage> in
                                                    PlanNodeId nodeId,
                                                    bool participateInTrialRunTracking)
     : PlanStage("ts_bucket_to_cellblock"sv,
-                nullptr /* yieldPolicy */,
+                /*yieldPolicy=*/nullptr,
                 nodeId,
                 participateInTrialRunTracking),
       _bucketSlotId(bucketSlot),
@@ -223,7 +197,7 @@ void TsBucketToCellBlockStage::doSaveState() {
         auto [cellBlockTag, cellBlockVal] = _blocksOutAccessor[i].getViewOfValue();
 
         _blocksOutAccessor[i].reset(
-            value::TagValueOwned{value::copyValue(cellBlockTag, cellBlockVal)});
+            value::TagValueOwned::fromRaw(value::copyValue(cellBlockTag, cellBlockVal)));
     }
 
     if (_metaOutSlotId) {
@@ -248,17 +222,17 @@ void TsBucketToCellBlockStage::initCellBlocks() {
             "Number of cell blocks doesn't match the number of accessors",
             cellBlocks.size() == _blocksOutAccessor.size());
     for (size_t i = 0; i < cellBlocks.size(); ++i) {
-        _blocksOutAccessor[i].reset(
-            value::TagValueOwned{value::TypeTags::cellBlock,
-                                 value::bitcastFrom<value::CellBlock*>(cellBlocks[i].release())});
+        _blocksOutAccessor[i].reset(value::TagValueOwned::fromRaw(
+            value::TypeTags::cellBlock,
+            value::bitcastFrom<value::CellBlock*>(cellBlocks[i].release())));
     }
 
     // Initialize an all-1s bitset.
-    _bitmapOutAccessor.reset(value::TagValueOwned{
+    _bitmapOutAccessor.reset(value::TagValueOwned::fromRaw(
         value::TypeTags::valueBlock,
         value::bitcastFrom<value::ValueBlock*>(
             std::make_unique<value::MonoBlock>(
                 nMeasurements, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
-                .release())});
+                .release())));
 }
 }  // namespace mongo::sbe

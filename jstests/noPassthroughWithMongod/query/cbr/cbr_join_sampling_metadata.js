@@ -15,7 +15,12 @@
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
 import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
 import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
-import {dropSamplesColl} from "jstests/libs/query/persistent_samples_utils.js";
+import {
+    assertPersistedSampleMetadataAbsent,
+    assertPersistedSampleMetadataPresent,
+    dropSamplesColl,
+    getExpectedSamplingMethod,
+} from "jstests/libs/query/persistent_samples_utils.js";
 
 const ordersName = jsTestName() + "_orders";
 const productsName = jsTestName() + "_products";
@@ -127,6 +132,7 @@ describe("ceSamplingMetadata in join explain", function () {
                 "expected sampleTechnique to be a known technique",
                 {ordersMeta, validTechniques},
             );
+            assertPersistedSampleMetadataAbsent(ordersMeta);
 
             const productsMeta = ceSamplingMetadata[productsNs];
             assert(productsMeta, "expected ceSamplingMetadata entry for products namespace", {
@@ -155,6 +161,7 @@ describe("ceSamplingMetadata in join explain", function () {
                 "expected sampleTechnique to be a known technique",
                 {productsMeta, validTechniques},
             );
+            assertPersistedSampleMetadataAbsent(productsMeta);
         });
     });
 
@@ -167,12 +174,15 @@ describe("ceSamplingMetadata in join explain", function () {
             return;
         }
 
+        const samplingMethod = "random";
+        const expectedSamplingMethodUsed = getExpectedSamplingMethod(db, samplingMethod);
+
         // Create persisted samples for both collections.
         assert.commandWorked(
             db.runCommand({
                 analyze: ordersName,
                 mode: "sample",
-                samplingMethod: "random",
+                samplingMethod: samplingMethod,
                 sampleSize: joinSampleSize,
             }),
         );
@@ -180,19 +190,9 @@ describe("ceSamplingMetadata in join explain", function () {
             db.runCommand({
                 analyze: productsName,
                 mode: "sample",
-                samplingMethod: "random",
+                samplingMethod: samplingMethod,
                 sampleSize: joinSampleSize,
             }),
-        );
-
-        // TODO SERVER-128713: remove knob setting once persistent samples and sequential scan work
-        // together. Sequential scan mode bypasses tryLoadPersistentSample, so disable it for this
-        // test and restore it afterwards.
-        const origSeqScan = assert.commandWorked(
-            db.adminCommand({getParameter: 1, internalQuerySamplingBySequentialScan: 1}),
-        ).internalQuerySamplingBySequentialScan;
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}),
         );
 
         try {
@@ -262,10 +262,11 @@ describe("ceSamplingMetadata in join explain", function () {
                 // Assert on value of "sampleTechnique" here because we explicitly set it in this testcase.
                 assert.eq(
                     ordersMeta.sampleTechnique,
-                    "random",
-                    "expected random sampling technique for orders",
+                    expectedSamplingMethodUsed,
+                    `expected sampling technique ${expectedSamplingMethodUsed} for orders`,
                     {ordersMeta},
                 );
+                assertPersistedSampleMetadataPresent(ordersMeta);
 
                 const productsMeta = ceSamplingMetadata[products.getFullName()];
                 assert(productsMeta, "expected ceSamplingMetadata entry for products namespace", {
@@ -292,19 +293,13 @@ describe("ceSamplingMetadata in join explain", function () {
                 // Assert on value of "sampleTechnique" here because we explicitly set it in this testcase.
                 assert.eq(
                     productsMeta.sampleTechnique,
-                    "random",
-                    "expected random sampling technique for products",
+                    expectedSamplingMethodUsed,
+                    `expected sampling technique ${expectedSamplingMethodUsed} for products`,
                     {productsMeta},
                 );
+                assertPersistedSampleMetadataPresent(productsMeta);
             });
         } finally {
-            // TODO SERVER-128713: remove knob restore once persistent samples and sequential scan work together.
-            assert.commandWorked(
-                db.adminCommand({
-                    setParameter: 1,
-                    internalQuerySamplingBySequentialScan: origSeqScan,
-                }),
-            );
             dropSamplesColl(db);
         }
     });

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -240,10 +214,13 @@ public:
         }
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
-        if (resharding::gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
-                .isEnabled(VersionContext::getDecoration(opCtx),
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+    void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx,
+        const boost::optional<ForwardableOperationMetadata>& forwardableMetadata) override {
+        if (resharding::isEnabledWithPinnedVersion(
+                forwardableMetadata,
+                resharding::
+                    gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites) &&
             resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
             // Unless explicitly opted out, abort any unprepared transactions that may be running on
             // the donor shard. This helps prevent the donor from not being to acquire the critical
@@ -280,7 +257,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::cons
 
 void ReshardingDonorService::stepDown_forTest() {
     LOGV2(12755406, "Performing resharding donor service stepdown for test");
-    onStepDown();
+    onStepDown_forTest();
 }
 
 void ReshardingDonorService::stepUp_forTest() {
@@ -510,15 +487,12 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 const bool mustClearMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
                     ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
 
-                // Clear filtering metadata for the temp resharding namespace;
-                // We force a refresh to make sure that the placement information is updated
-                // in cache after abort decision before the donor state document is deleted.
-                if (mustClearMetadata) {
+                // Clear filtering metadata for the temp resharding namespace, since the collection
+                // will no longer exist.
+                {
                     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
                         opCtx.get(), _metadata.getTempReshardingNss());
                     scopedCsr->clearCollectionMetadata(opCtx.get());
-                    // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
-                    scopedCsr->setNonAuthoritative();
                 }
 
                 const auto onReleaseCriticalSectionAction =
@@ -531,7 +505,19 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         *onReleaseCriticalSectionAction,
-                        false /*throwIfReasonDiffers*/);
+                        /*throwIfReasonDiffers=*/false);
+
+                // If for any reason the operation got aborted while the critical section is held
+                // and the release in resharding::withCriticalSectionForTempCollection fails then we
+                // force a release of the critical section for the temp collection here.
+                ShardingRecoveryService::get(opCtx.get())
+                    ->releaseRecoverableCriticalSection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _critSecReason,
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                        *onReleaseCriticalSectionAction,
+                        /*throwIfReasonDiffers=*/false);
 
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                     resharding::getCurrentTime());
@@ -690,11 +676,31 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
 boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    return _metrics->reportForCurrentOp();
+    auto obj = _metrics->reportForCurrentOp();
+    BSONObjBuilder b(std::move(obj));
+    // TODO(SERVER-99655): Remove this try/catch once getVersionContextOrDefault() can no longer
+    // throw.
+    try {
+        b.append("versionContext",
+                 resharding::getVersionContextOrDefault(_forwardableOpMetadata).toBSON());
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(13001301,
+                    2,
+                    "Failed to report versionContext in $currentOp",
+                    "error"_attr = ex.toStatus());
+    }
+    return b.obj();
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
+    // onReshardingFieldsChanges is driven by shard version refreshes. In the authoritative path,
+    // the coordinator drives participant state directly so this method must never be reached.
+    tassert(12862900,
+            "onReshardingFieldsChanges must not be called in the authoritative shards path",
+            _metadata.getAuthoritativeMetadataAccessLevel() ==
+                ReshardingAuthoritativeMetadataAccessLevelEnum::kNone);
+
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         abort(reshardingFields.getUserCanceled().value());
         return;
@@ -919,7 +925,7 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = _makeOperationContext(factory);
-        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
+        _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get(), _forwardableOpMetadata);
 
         const bool mustClearMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
             ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
@@ -1000,29 +1006,30 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
-        resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
 
-        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
-            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-            // TODO SERVER-127215: Mark this as not upgrading once rename recovers from disk once it
-            // finishes.
-            //
-            // Force the rename to act as if it is upgrading in order to force a recovery at the
-            // end. Ideally this should be false since:
-            // 1. Resharding cannot commit during an FCV upgrade
-            // 2. The shard already contains the metadata for both "from" and "to" collections and
-            //    thus can assume it's living in a fully authoritative world.
-            bool isUpgrading = true;
+        const bool mustClearCollectionMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
+        resharding::withCriticalSectionForTempCollection(
+            opCtx.get(),
+            _metadata.getTempReshardingNss(),
+            _critSecReason,
+            mustClearCollectionMetadata,
+            [&] {
+                resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(),
+                                                                                  _metadata);
 
-            shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
-                opCtx.get(),
-                _metadata.getTempReshardingNss(),
-                _metadata.getReshardingUUID(),
-                _metadata.getSourceNss(),
-                _metadata.getSourceUUID(),
-                isUpgrading,
-                _metadata.getPrimaryShardId() == ShardingState::get(opCtx.get())->shardId());
-        }
+                if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _metadata.getReshardingUUID(),
+                        _metadata.getSourceNss(),
+                        _metadata.getSourceUUID(),
+                        _metadata.getPrimaryShardId() ==
+                            ShardingState::get(opCtx.get())->shardId());
+                }
+            });
     } else {
         auto opCtx = _makeOperationContext(factory);
         // Allow bypassing user write blocking. The check has already been performed on the
@@ -1036,10 +1043,15 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
             ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             shard_catalog_commit_for_resharding::commitDropCollection(
                 opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
-            // Make sure to also clear out the state of the temporary resharding as it now no longer
-            // exists since it got renamed to the final namespace.
-            shard_catalog_commit_for_resharding::commitDropCollection(
-                opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
+            resharding::withCriticalSectionForTempCollection(
+                opCtx.get(), _metadata.getTempReshardingNss(), _critSecReason, false, [&] {
+                    // Make sure to also clear out the state of the temporary resharding as it now
+                    // no longer exists since it got renamed to the final namespace.
+                    shard_catalog_commit_for_resharding::commitDropCollection(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        _metadata.getReshardingUUID());
+                });
         }
     }
 
@@ -1107,7 +1119,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                 auto opCtx = _makeOperationContext(factory);
 
                 ChangeStreamsMonitorContext changeStreamsMonitorCtx(startAtOperationTime,
-                                                                    0 /* documentsDelta */);
+                                                                    /*documentsDelta=*/0);
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
 
                 // Wait for the write above to be majority committed to make sure it cannot be
@@ -1541,7 +1553,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
                       coll,
                       BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
                            << _metadata.getReshardingUUID()),
-                      true /* justOne */);
+                      /*justOne=*/true);
 
         wuow.commit();
     });

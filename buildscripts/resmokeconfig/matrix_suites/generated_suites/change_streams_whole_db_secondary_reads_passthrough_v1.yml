@@ -17,8 +17,8 @@ executor:
         globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
         await import('jstests/libs/override_methods/set_read_preference_secondary.js');;
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');;
-        await import('jstests/libs/override_methods/implicit_whole_db_changestreams.js');;
-        await import('jstests/libs/override_methods/implicit_change_stream_v1.js');
+        await import('jstests/libs/override_methods/query/implicit_whole_db_changestreams.js');;
+        await import('jstests/libs/override_methods/query/implicit_change_stream_v1.js');
       global_vars:
         TestData:
           defaultReadConcernLevel: null

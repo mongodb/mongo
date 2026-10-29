@@ -2,6 +2,7 @@
  * Test the distinct command with views.
  *
  * @tags: [
+ *   uses_explain,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   requires_fcv_71,

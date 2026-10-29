@@ -1,35 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
+
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -49,7 +23,6 @@
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -66,6 +39,9 @@
 
 #include <system_error>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -363,23 +339,27 @@ void ClusterCommandTestFixture::testSnapshotReadConcernWithAfterClusterTime(
 }
 
 void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted) {
-    // Test that the legacy option is set correctly when the feature flag is disabled.
-    // TODO (SERVER-123320): Remove this test completely when the feature flag is removed.
-    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", false);
     const std::string fieldName = "includeQueryStatsMetrics";
 
     // The given command should not set includeQueryStatsMetrics.
     ASSERT(cmd[fieldName].eoo());
-    ASSERT(cmd["includeMetrics"].eoo());
 
     BSONObj cmdIncludeTrue = cmd.addField(BSON(fieldName << true).firstElement());
     BSONObj cmdIncludeFalse = cmd.addField(BSON(fieldName << false).firstElement());
 
     auto expectFieldIs = [&](bool value) {
         return [value, &fieldName](const executor::RemoteCommandRequest& request) {
-            auto elt = request.cmdObj[fieldName];
-            ASSERT(!elt.eoo());
-            ASSERT_EQ(value, elt.boolean());
+            int n = 0;
+            BSONElement elt;
+            for (auto&& e : request.cmdObj) {
+                if (e.fieldNameStringData() == fieldName) {
+                    elt = e;
+                    ++n;
+                }
+            }
+            // A duplicate field fatals debug/ASAN mongos in OpMsgBuilder (40474).
+            ASSERT_EQ(n, 1);
+            ASSERT_EQ(elt.boolean(), value);
         };
     };
 
@@ -392,6 +372,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
         // to false.
         unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", -1);
+        unittest::ServerParameterGuard sampleRate("internalQueryStatsSampleRate", 1.0);
 
         runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
         runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
@@ -401,6 +382,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
     {
         // Rate limit is 0 i.e., every request is rate-limited.
         unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", 0);
+        unittest::ServerParameterGuard sampleRate("internalQueryStatsSampleRate", 0.0);
 
         // If the user doesn't give includeQueryStatsMetrics, we won't insert the field.
         runCommandInspectRequests(cmd, expectNoField, isTargeted);
@@ -408,59 +390,6 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         // If the user passed us includeQueryStatsMetrics, we'll pass it through.
         runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
         runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
-    }
-}
-
-void ClusterCommandTestFixture::testIncludeMetricsQueryStats(BSONObj cmd, bool isTargeted) {
-    // Test that the new option is set correctly when the feature flag is enabled.
-    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", true);
-
-    // The given command should not set includeQueryStatsMetrics or includeMetrics.
-    ASSERT(cmd["includeQueryStatsMetrics"].eoo());
-    ASSERT(cmd["includeMetrics"].eoo());
-
-    // Build variants with the legacy field; command handling converts it to includeMetrics.
-    BSONObj cmdIncludeTrue = cmd.addField(BSON("includeQueryStatsMetrics" << true).firstElement());
-    BSONObj cmdIncludeFalse =
-        cmd.addField(BSON("includeQueryStatsMetrics" << false).firstElement());
-
-    auto expectMetricsEnabled = [](const executor::RemoteCommandRequest& request) {
-        auto im = request.cmdObj["includeMetrics"];
-        ASSERT(!im.eoo()) << "expected includeMetrics to be present";
-        ASSERT_EQ(true, im["queryStats"].boolean());
-        ASSERT(request.cmdObj["includeQueryStatsMetrics"].eoo());
-    };
-
-    auto expectNoMetrics = [](const executor::RemoteCommandRequest& request) {
-        auto im = request.cmdObj["includeMetrics"];
-        ASSERT(im.eoo() || !im["queryStats"].boolean())
-            << "expected includeMetrics.queryStats to be absent or false";
-        ASSERT(request.cmdObj["includeQueryStatsMetrics"].eoo());
-    };
-
-    {
-        // No rate limit i.e., no requests are rate limited and each one is allowed to gather
-        // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
-        // to false.
-        unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", -1);
-
-        runCommandInspectRequests(cmd, expectMetricsEnabled, isTargeted);
-        runCommandInspectRequests(cmdIncludeTrue, expectMetricsEnabled, isTargeted);
-        runCommandInspectRequests(cmdIncludeFalse, expectMetricsEnabled, isTargeted);
-    }
-
-    {
-        // Rate limit is 0 i.e., every request is rate-limited.
-        unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", 0);
-
-        // If the user doesn't request metrics, we won't set includeMetrics.
-        runCommandInspectRequests(cmd, expectNoMetrics, isTargeted);
-
-        // If the user passed includeQueryStatsMetrics=true, convert to includeMetrics.queryStats.
-        runCommandInspectRequests(cmdIncludeTrue, expectMetricsEnabled, isTargeted);
-
-        // If the user passed includeQueryStatsMetrics=false, metrics are not requested.
-        runCommandInspectRequests(cmdIncludeFalse, expectNoMetrics, isTargeted);
     }
 }
 

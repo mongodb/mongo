@@ -6,7 +6,7 @@
  *
  * Each test case includes running an explain to ensure the user and view stages are in the correct
  * order.
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

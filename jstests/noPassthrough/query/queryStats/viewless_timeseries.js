@@ -202,7 +202,10 @@ function runTest(conn, sharded = false) {
 }
 
 const options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {
+        internalQueryStatsSampleRate: 1,
+        internalQueryStatsWriteCmdSampleRate: 0,
+    },
 };
 
 // Test Unsharded

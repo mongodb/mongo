@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,12 +13,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata_synchronizer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/waiter_list.h"
@@ -72,7 +47,7 @@ namespace mongo {
  * ScopedSharedCollectionShardingRuntime and ScopedExclusiveCollectionShardingRuntime helper
  * classes.
  */
-class MONGO_MOD_USE_REPLACEMENT(CollectionShardingState) CollectionShardingRuntime final
+class [[MONGO_MOD_USE_REPLACEMENT(CollectionShardingState)]] CollectionShardingRuntime final
     : public CollectionShardingState,
       public Decorable<CollectionShardingRuntime> {
     CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
@@ -208,8 +183,7 @@ public:
     };
 
     /**
-     * Updates the collection's filtering metadata without changing whether the CSR is currently
-     * authoritative or non-authoritative.
+     * Updates the collection's filtering metadata.
      */
     void setCollectionMetadata(OperationContext* opCtx,
                                CollectionMetadata newMetadata,
@@ -267,12 +241,20 @@ public:
      * 'orphanRange' to be processed, even if the collection does not exist in the storage catalog.
      * It will block until the minimum of the operation context's timeout deadline or 'deadline' is
      * reached.
+     *
+     * 'isAuthoritative' selects how a not-known (kUnknown) filtering metadata is treated: when
+     * true, the metadata is recovered from the durable shard catalog and the wait is retried (a
+     * concurrent metadata commit may have transiently cleared it); when false, the historical
+     * behavior of failing with ConflictingOperationInProgress is preserved. This is not derived
+     * from a local feature-flag check: the migration recipient passes whether the migration is
+     * authoritative as communicated by the donor.
      */
     static Status waitForClean(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& collectionUuid,
                                ChunkRange orphanRange,
-                               Date_t deadline);
+                               Date_t deadline,
+                               bool refreshMetadataIfUnknown = false);
 
     /**
      * Returns a future marked as ready when all the ongoing queries retaining the range complete
@@ -286,8 +268,9 @@ public:
      *
      * To invoke this method, the criticalSectionSignal must not be hold by a different thread.
      */
-    void setPlacementVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
-                                                 CancellationSource cancellationSource);
+    void setPlacementVersionRecoverRefreshFuture(
+        SharedSemiFuture<void> future,
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition);
 
     /**
      * If there an ongoing placement version recover/refresh, it returns the shared semifuture to be
@@ -308,8 +291,7 @@ public:
      * The invalidation will be skipped if the provided collectionUUID doesn't match the UUID of the
      * metadataManager.
      */
-    void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
-                                                        const ChunkVersion& shardVersion,
+    void invalidateRangePreserversOlderThanShardVersion(const ChunkVersion& shardVersion,
                                                         const UUID& collectionUUID);
 
     /*
@@ -322,24 +304,20 @@ public:
     SharedSemiFuture<void> registerWaiterForChunkVersion(OperationContext* opCtx,
                                                          const ShardVersion& expectedVersion) const;
 
-    enum class AuthoritativeState {
-        /*
-         * The CSS is non-authoritative, meaning refreshes have to undergo the legacy protocol
-         * requiring interactions with the CSRS and or primary node in the replset.
-         */
-        kNonAuthoritative,
-        /*
-         * The CSS's latest state is authoritative, meaning any ownership/versioning decisions can
-         * be made solely by information present on the node without any external communication.
-         */
-        kAuthoritative
-    };
-    AuthoritativeState getAuthoritativeState() const;
-    void setNonAuthoritative();
-    void setAuthoritative();
+    void setMetadataSynchronizer(std::shared_ptr<CollectionMetadataSynchronizer> synchronizer);
+    std::shared_ptr<CollectionMetadataSynchronizer> getMetadataSynchronizer() const;
 
-    void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
-    std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;
+    /**
+     * True when authoritative disk recovery found an empty shard catalog for this collection.
+     * While set, further recovery must serialize with the database primary critical section to
+     * classify the collection as untracked or unowned.
+     */
+    bool needsDbPrimaryClassification() const {
+        return _needsDbPrimaryClassification;
+    }
+    void setNeedsDbPrimaryClassification(bool needs) {
+        _needsDbPrimaryClassification = needs;
+    }
 
     bool allowChunkOperations() const;
     void setAllowChunkOperations(bool allowChunkOperations);
@@ -349,15 +327,17 @@ private:
 
     struct PlacementVersionRecoverOrRefresh {
     public:
-        PlacementVersionRecoverOrRefresh(SharedSemiFuture<void> future,
-                                         CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
+        PlacementVersionRecoverOrRefresh(
+            SharedSemiFuture<void> future,
+            ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition)
+            : future(std::move(future)),
+              recovererTrackerAcquisition(std::move(recovererTrackerAcquisition)) {}
 
         // Tracks ongoing placement version recover/refresh.
         SharedSemiFuture<void> future;
 
-        // Cancellation source to cancel the ongoing recover/refresh placement version.
-        CancellationSource cancellationSource;
+        // Keeps the recovery registered with ShardCatalogRecovererTracker until completion.
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition;
     };
 
     /**
@@ -403,8 +383,6 @@ private:
         kTracked     // metadata for this collection is registered in the sharding catalog
     } _metadataType;
 
-    AuthoritativeState _authoritativeState = AuthoritativeState::kNonAuthoritative;
-
     // If the collection state is known and is untracked or unowned, this will be nullptr.
     //
     // If the collection state is known and is tracked, this will point to the metadata
@@ -430,8 +408,8 @@ private:
     // Used for testing to check the number of times a new MetadataManager has been installed.
     std::uint64_t _numMetadataManagerChanges{0};
 
-    // Tracks ongoing placement version recover/refresh. Eventually set to the semifuture to wait on
-    // and a CancellationSource to cancel it
+    // Tracks ongoing placement version recover/refresh. Holds the future to wait on and the tracker
+    // acquisition used to cancel it.
     boost::optional<PlacementVersionRecoverOrRefresh> _placementVersionInRecoverOrRefresh;
 
     // List of waiters currently waiting for the CSS/CSR to have the required placement version.
@@ -441,7 +419,12 @@ private:
 
     // Tracks the fact that concurrent recovery of the collection's sharding metadata is taking
     // place by a concurrent thread handling a shard version mismatch
-    std::shared_ptr<CollectionCacheRecoverer> _collectionRecoverer;
+    std::shared_ptr<CollectionMetadataSynchronizer> _metadataSynchronizer;
+
+    // True when authoritative disk recovery found an empty shard catalog for this collection.
+    // While set, further recovery must serialize with the database primary critical section to
+    // classify the collection as untracked or unowned.
+    bool _needsDbPrimaryClassification{false};
 
     bool _allowChunkOperations{true};
 };
@@ -456,7 +439,7 @@ private:
  * Entering the critical section doesn't serialise with concurrent recovery/refresh, because
  * causally such refreshes would have happened *before* the critical section was entered.
  */
-class MONGO_MOD_USE_REPLACEMENT(ShardingMigrationCriticalSection) CollectionCriticalSection {
+class [[MONGO_MOD_USE_REPLACEMENT(ShardingMigrationCriticalSection)]] CollectionCriticalSection {
     CollectionCriticalSection(const CollectionCriticalSection&) = delete;
     CollectionCriticalSection& operator=(const CollectionCriticalSection&) = delete;
 

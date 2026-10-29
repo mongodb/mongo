@@ -5,6 +5,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
@@ -34,12 +35,16 @@ assert.commandWorked(
 assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: shard1.shardName}));
 
 // Force refreshes to avoid getting stale config errors
-assert.commandWorked(shard0.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
-assert.commandWorked(shard1.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
+if (!FeatureFlagUtil.isPresentAndEnabled(shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(shard0.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
+    assert.commandWorked(shard1.adminCommand({_flushRoutingTableCacheUpdates: localNs}));
+}
 st.refreshCatalogCacheForNs(st.s, localNs);
 
-assert.commandWorked(shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
-assert.commandWorked(shard1.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+if (!FeatureFlagUtil.isPresentAndEnabled(shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+    assert.commandWorked(shard1.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+}
 st.refreshCatalogCacheForNs(st.s, foreignNs);
 
 const session = st.s.startSession();

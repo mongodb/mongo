@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/rpc/op_msg.h"
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -40,13 +13,17 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
 #include <bitset>
@@ -81,8 +58,15 @@ bool containsUnknownRequiredFlags(uint32_t flags) {
 enum class Section : uint8_t {
     kBody = 0,
     kDocSequence = 1,
-    kSecurityToken = 2,
+    // kSecurityToken = 2, // Never used in production - support removed.
+    kTelemetry = 3,
 };
+
+// Generous upper bound for the OP_MSG telemetry section. The section only ever carries small
+// W3C trace-context propagation fields (a 55-byte traceparent and, in the future, a tracestate
+// that the W3C spec recommends vendors cap at 512 bytes). 4 KB leaves ample headroom while
+// bounding how much a malformed or malicious peer can make us materialize on the parse path.
+constexpr int kMaxTelemetrySectionSize = 4 * 1024;
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 // All fields including size, requestId, and responseTo must already be set. The size must
@@ -175,7 +159,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // with comments.
     bool haveBody = false;
     OpMsg msg;
-    std::string_view securityToken;
     while (!sectionsBuf.atEof()) {
         const auto sectionKind = sectionsBuf.read<Section>();
         switch (sectionKind) {
@@ -184,7 +167,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                         "Multiple body sections in message",
                         !haveBody);
                 haveBody = true;
-                msg.body = sectionsBuf.read<Validated<BSONObj>>();
+                msg.body = BSONObj{sectionsBuf.read<rpc::ValidatedBSONObj>()};
                 uassertStatusOK(msg.body.validateBSONObjSize(kOpMsgReplyBSONBufferMaxSize));
                 break;
             }
@@ -209,25 +192,25 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 
                 msg.sequences.push_back({std::string{name}});
                 while (!seqBuf.atEof()) {
-                    auto obj = seqBuf.read<Validated<BSONObj>>();
+                    BSONObj obj{seqBuf.read<rpc::ValidatedBSONObj>()};
                     // For document sequences, each document must be within the 16MB document
                     // limit. See the OP_MSG documentation for further details on the size
                     // limits:
                     // https://github.com/mongodb/specifications/blob/master/source/message/OP_MSG.md#sections.
-                    uassertStatusOK(obj.val.validateBSONObjSize().addContext(
-                        "Parsing opMsg DocSequence failed"));
-                    msg.sequences.back().objs.push_back(obj);
+                    uassertStatusOK(
+                        obj.validateBSONObjSize().addContext("Parsing opMsg DocSequence failed"));
+                    msg.sequences.back().objs.push_back(std::move(obj));
                 }
                 break;
             }
 
-            case Section::kSecurityToken: {
-                // if op_msg is parsed by mongoBridge, bridge has a backup check since multitenancy
-                // should be false
-                uassert(ErrorCodes::Unauthorized,
-                        "Unsupported Security Token provided",
-                        gMultitenancySupport || serverGlobalParams.isMongoBridge);
-                securityToken = sectionsBuf.readCStr();
+            case Section::kTelemetry: {
+                uassert(ErrorCodes::BadValue,
+                        "Multiple telemetry context sections in message",
+                        !msg.telemetryContext);
+                BSONObj bsonContext{sectionsBuf.read<rpc::ValidatedBSONObj>()};
+                uassertStatusOK(bsonContext.validateBSONObjSize(kMaxTelemetrySectionSize));
+                msg.telemetryContext = TelemetryContextSection::parse(bsonContext);
                 break;
             }
 
@@ -258,16 +241,14 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 *checksum == calculateChecksum(message));
     }
 #endif
-    if (gMultitenancySupport) {
-        msg.validatedTenancyScope =
-            auth::ValidatedTenancyScopeFactory::parse(client, securityToken);
-    }
 
     return msg;
 } catch (const DBException& ex) {
+    static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
+        Seconds{1}, logv2::LogSeverity::Debug(1), logv2::LogSeverity::Debug(2)};
     LOGV2_DEBUG_OPTIONS(
         22632,
-        1,
+        (*logSuppressor)().toInt(),
         {logv2::LogComponent::kOpMsg},
         "invalid message: {ex_code} {ex} -- {hexdump_message_singleData_view2ptr_message_size}",
         "ex_code"_attr = ex.code(),
@@ -358,35 +339,29 @@ OpMsgRequest OpMsgRequestBuilder::create(
 }
 
 namespace {
-void serializeHelper(const std::vector<OpMsg::DocumentSequence>& sequences,
-                     const BSONObj& body,
-                     const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope,
-                     OpMsgBuilder* output) {
-    if (validatedTenancyScope) {
-        auto securityToken = validatedTenancyScope->getOriginalToken();
-        if (!securityToken.empty()) {
-            output->setSecurityToken(securityToken);
-        }
-    }
-    for (auto&& seq : sequences) {
+void serializeHelper(const OpMsg& msg, OpMsgBuilder* output) {
+    for (auto&& seq : msg.sequences) {
         auto docSeq = output->beginDocSequence(seq.name);
         for (auto&& obj : seq.objs) {
             docSeq.append(obj);
         }
     }
-    output->beginBody().appendElements(body);
+    if (msg.telemetryContext) {
+        output->setTelemetryContext(*msg.telemetryContext);
+    }
+    output->beginBody().appendElements(msg.body);
 }
 }  // namespace
 
 Message OpMsg::serialize() const {
     OpMsgBuilder builder;
-    serializeHelper(sequences, body, validatedTenancyScope, &builder);
+    serializeHelper(*this, &builder);
     return builder.finish();
 }
 
 Message OpMsg::serializeWithoutSizeChecking() const {
     OpMsgBuilder builder;
-    serializeHelper(sequences, body, validatedTenancyScope, &builder);
+    serializeHelper(*this, &builder);
     return builder.finishWithoutSizeChecking();
 }
 
@@ -403,10 +378,17 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
     }
 }
 
-void OpMsgBuilder::setSecurityToken(std::string_view token) {
-    invariant(_state == kEmpty);
-    _buf.appendStruct(Section::kSecurityToken);
-    _buf.appendCStr(token);
+void OpMsgBuilder::setTelemetryContext(const TelemetryContextSection& telemetryContext) {
+    invariant((_state == kEmpty) || (_state == kDocSequence));
+    invariant(!_openBuilder);
+    const auto bson = telemetryContext.toBSON();
+    uassert(ErrorCodes::BSONObjectTooLarge,
+            fmt::format("Telemetry context section size {} exceeds maximum {}",
+                        bson.objsize(),
+                        kMaxTelemetrySectionSize),
+            bson.objsize() <= kMaxTelemetrySectionSize);
+    _buf.appendStruct(Section::kTelemetry);
+    _buf.appendBuf(bson.objdata(), bson.objsize());
 }
 
 auto OpMsgBuilder::beginDocSequence(std::string_view name) -> DocSequenceBuilder {
@@ -445,7 +427,7 @@ BSONObjBuilder OpMsgBuilder::resumeBody() {
     return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag(), _buf, _bodyStart);
 }
 
-AtomicWord<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
+Atomic<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
 
 Message OpMsgBuilder::finish() {
     const auto size = _buf.len();

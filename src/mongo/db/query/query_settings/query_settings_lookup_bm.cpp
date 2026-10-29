@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -43,13 +17,11 @@
 namespace mongo::query_settings {
 namespace {
 
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
+static auto const kSerializationContext = SerializationContext{
+    SerializationContext::Source::Command, SerializationContext::CallerType::Request};
 
-NamespaceString makeNamespace(const boost::optional<TenantId>& tenantId = boost::none) {
-    auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, "db");
+NamespaceString makeNamespace() {
+    auto dbName = DatabaseName::createDatabaseName_forTest(/* tenantId */ boost::none, "db");
     return NamespaceString::createNamespaceString_forTest(dbName, "coll");
 }
 
@@ -88,8 +60,10 @@ std::unique_ptr<ParsedFindCommand> generateSmallParsedFindRequest(
     bob.appendElements(BSON("find" << nss.coll() << "$db"
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter));
-    auto findCmd = query_request_helper::makeFromFindCommand(
-        std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
+    auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
+                                                             /*vts=*/boost::none,
+                                                             /* tenantId */ boost::none,
+                                                             kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
 }
 
@@ -122,8 +96,10 @@ std::unique_ptr<ParsedFindCommand> generateMediumParsedFindRequest(
     bob.appendElements(BSON("find" << nss.coll() << "$db"
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter << "projection" << rawProjection));
-    auto findCmd = query_request_helper::makeFromFindCommand(
-        std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
+    auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
+                                                             /*vts=*/boost::none,
+                                                             /* tenantId */ boost::none,
+                                                             kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
 }
 
@@ -165,7 +141,7 @@ std::unique_ptr<ParsedFindCommand> generateLargeParsedFindRequest(
     const boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     BSONObjBuilder& bob) {
-    PseudoRandom randomNumberGenerator(1 /* seed */);
+    PseudoRandom randomNumberGenerator(/*seed=*/1);
     auto rawFilter =
         BSON("$or" << BSON_ARRAY(BSON(generateFieldName() << 1)
                                  << BSON(generateFieldName() << BSON("$ne" << 1))
@@ -184,8 +160,10 @@ std::unique_ptr<ParsedFindCommand> generateLargeParsedFindRequest(
     bob.appendElements(BSON(
         "find" << nss.coll() << "$db" << nss.dbName().serializeWithoutTenantPrefix_UNSAFE()
                << "filter" << rawFilter << "projection" << rawProjection << "sort" << rawSort));
-    auto findCmd = query_request_helper::makeFromFindCommand(
-        std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
+    auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
+                                                             /*vts=*/boost::none,
+                                                             /* tenantId */ boost::none,
+                                                             kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
 }
 
@@ -214,6 +192,25 @@ class QuerySettingsLookupBenchmark : public benchmark::Fixture {
 public:
     QuerySettingsLookupBenchmark() {}
 
+    void SetUp(benchmark::State& state) override {
+        std::lock_guard lk(_setupMutex);
+        if (!_configuredThreads++) {
+            // Setup FCV.
+            // (Generic FCV reference): required for enabling the feature flag.
+            serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+
+            // On the first launch, initialize global service context and initialize the query
+            // settings.
+            setGlobalServiceContext(ServiceContext::make());
+            query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
+            _internalQuerySettingsDisableBackfillFlag.emplace(
+                "internalQuerySettingsDisableBackfill", true);
+
+            auto numberOfExistingSettings = state.range(0);
+            populateQueryShapeConfigurations(state, numberOfExistingSettings);
+        }
+    }
+
     void TearDown(benchmark::State& state) override {
         std::lock_guard lk(_setupMutex);
         if (--_configuredThreads) {
@@ -224,13 +221,10 @@ public:
     }
 
     // Populates the system with dummy query shape configurations.
-    void populateQueryShapeConfigurations(benchmark::State& state,
-                                          const boost::optional<TenantId>& tenantId,
-                                          int dummyQuerySettingsCount) {
+    void populateQueryShapeConfigurations(benchmark::State& state, int dummyQuerySettingsCount) {
         auto client = getGlobalServiceContext()->getService()->makeClient("setup");
         auto opCtx = client->makeOperationContext();
-        auto expCtx =
-            ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(makeNamespace(tenantId)).build();
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(makeNamespace()).build();
         std::vector<QueryShapeConfiguration> queryShapeConfigs;
 
         auto generateQueryShapeConfiguration =
@@ -239,19 +233,16 @@ public:
             BSONObjBuilder bob;
             auto parsedFind = request_generator::generateSmallParsedFindRequest(expCtx, nss, bob);
             query_shape::FindCmdShape findCmdShape(*parsedFind, expCtx);
-            auto query = bob.obj();
 
             QuerySettings querySettings;
             querySettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-            QueryShapeConfiguration result(
+            return QueryShapeConfiguration(
                 findCmdShape.sha256Hash(opCtx.get(), kSerializationContext), querySettings);
-            result.setRepresentativeQuery(query);
-            return result;
         };
 
         for (auto i = 0; i < dummyQuerySettingsCount; i++) {
             queryShapeConfigs.push_back(
-                generateQueryShapeConfiguration(makeNamespace(tenantId), generateFieldName()));
+                generateQueryShapeConfiguration(makeNamespace(), generateFieldName()));
         }
 
         // Set the custom counter of the settings total size.
@@ -264,26 +255,16 @@ public:
 
         // Update the qurey shape configurations present in the system.
         QuerySettingsService::get(opCtx.get())
-            .setAllQueryShapeConfigurations(
-                QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigs),
-                                                      LogicalTime(Timestamp(1))},
-                tenantId);
+            .setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp{
+                std::move(queryShapeConfigs), LogicalTime(Timestamp(1))});
         benchmark::ClobberMemory();
-    }
-
-    boost::optional<TenantId> tenantId(int threadId) const {
-        if (!isMultitenacyEnabled()) {
-            return boost::none;
-        }
-        return TenantId(OID::fromTerm(threadId));
     }
 
     void runBenchmark(benchmark::State& state) {
         auto client = getGlobalServiceContext()->getService()->makeClient(
             str::stream() << "thread: " << state.thread_index);
         auto opCtx = client->makeOperationContext();
-        auto tid = tenantId(state.thread_index);
-        auto ns = makeNamespace(tid);
+        auto ns = makeNamespace();
         auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(ns).build();
 
         bool isTestingHitCase = state.range(0) > 0 && state.range(2) == 1;
@@ -301,22 +282,19 @@ public:
                     query_shape::FindCmdShape(*parsedFindRequest, expCtx)
                         .sha256Hash(opCtx.get(), kSerializationContext),
                     querySettings};
-                hitQueryShapeConfiguration.setRepresentativeQuery(bob.asTempObj().getOwned());
 
                 // Update the query shape configurations by adding a new one, which will be used for
                 // the lookup.
                 auto queryShapeConfigurationsWithTimestamp =
                     query_settings::QuerySettingsService::get(opCtx.get())
-                        .getAllQueryShapeConfigurations(tid);
+                        .getAllQueryShapeConfigurations();
                 auto&& queryShapeConfigurations =
                     queryShapeConfigurationsWithTimestamp.queryShapeConfigurations;
                 queryShapeConfigurations.push_back(hitQueryShapeConfiguration);
 
                 QuerySettingsService::get(opCtx.get())
-                    .setAllQueryShapeConfigurations(
-                        QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigurations),
-                                                              LogicalTime(Timestamp(2))},
-                        tid);
+                    .setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp{
+                        std::move(queryShapeConfigurations), LogicalTime(Timestamp(2))});
             }
 
             return parsedFindRequest;
@@ -336,11 +314,9 @@ public:
             auto queryShapeHash =
                 deferredShape().getValue()->sha256Hash(opCtx.get(), kSerializationContext);
             benchmark::DoNotOptimize(querySettingsService.lookupQuerySettingsWithRejectionCheck(
-                expCtx, queryShapeHash, ns, boost::none));
+                expCtx, queryShapeHash, boost::none));
         }
     }
-
-    virtual bool isMultitenacyEnabled() const = 0;
 
 protected:
     std::mutex _setupMutex;
@@ -349,76 +325,11 @@ protected:
     size_t _configuredThreads = 0;
 
     boost::optional<unittest::ServerParameterGuard> _querySettingsFeatureFlag;
-    boost::optional<unittest::ServerParameterGuard> _multitenancyFeatureFlag;
     boost::optional<unittest::ServerParameterGuard> _internalQuerySettingsDisableBackfillFlag;
 };
 
-class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBenchmark {
-    void SetUp(benchmark::State& state) override {
-        std::lock_guard lk(_setupMutex);
-        if (!_configuredThreads++) {
-            // Setup FCV.
-            // (Generic FCV reference): required for enabling the feature flag.
-            serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-
-            // On the first launch, initialize global service context and initialize the query
-            // settings.
-            setGlobalServiceContext(ServiceContext::make());
-            query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
-            _internalQuerySettingsDisableBackfillFlag.emplace(
-                "internalQuerySettingsDisableBackfill", true);
-
-            // Query settings are populated only for a single tenant (global scope).
-            auto numberOfExistingSettings = state.range(0);
-            populateQueryShapeConfigurations(
-                state, boost::none /* tenantId */, numberOfExistingSettings);
-        }
-    }
-
-    bool isMultitenacyEnabled() const override {
-        return false;
-    }
-};
-
-class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchmark {
-    void SetUp(benchmark::State& state) override {
-        std::lock_guard lk(_setupMutex);
-        if (!_configuredThreads++) {
-            // Setup FCV.
-            // (Generic FCV reference): required for enabling the feature flag.
-            serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-
-            // On the first launch, initialize global service context and initialize the query
-            // settings.
-            setGlobalServiceContext(ServiceContext::make());
-            query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
-
-            // Initialize the feature flags.
-            _multitenancyFeatureFlag.emplace("multitenancySupport", true);
-            _internalQuerySettingsDisableBackfillFlag.emplace(
-                "internalQuerySettingsDisableBackfill", true);
-        }
-
-        // Query settings are populated for every tenant.
-        auto numberOfExistingSettings = state.range(0);
-        populateQueryShapeConfigurations(
-            state, tenantId(state.thread_index), numberOfExistingSettings);
-    }
-
-    bool isMultitenacyEnabled() const override {
-        return true;
-    }
-};
-
-BENCHMARK_DEFINE_F(QuerySettingsNotMultitenantLookupBenchmark, BM_QuerySettingsLookup)
+BENCHMARK_DEFINE_F(QuerySettingsLookupBenchmark, BM_QuerySettingsLookup)
 (benchmark::State& state) {
-    // Run benchmark in non multi-tenant setup.
-    runBenchmark(state);
-}
-
-BENCHMARK_DEFINE_F(QuerySettingsMultiTenantLookupBenchmark, BM_QuerySettingsLookup)
-(benchmark::State& state) {
-    // Run the benchmark in multi-tenant setup. Each thread will act as a separate tenant.
     runBenchmark(state);
 }
 
@@ -428,14 +339,14 @@ BENCHMARK_DEFINE_F(QuerySettingsMultiTenantLookupBenchmark, BM_QuerySettingsLook
  * - No query settings are set
  * - A single query setting is set in order to measure the impact of QueryShapeHash computation on
  * the lookup
- * - Maximum amount of query settings per tenant: 16MB, which equals around 75_500 query settings
+ * - Maximum amount of query settings: 16MB, which equals around 75_500 query settings
  *
  * The lookup will be performed for small, medium and large queries.
  * The lookup performance will be tested for both miss and hit cases.
  * Query settings lookup benchmark will run on a single thread as well as on multiple threads.
  *
  * The reasoning behind various configurations is to understand the query settings lookup cost and
- * how does it differ when running in different setups.
+ * how it changes with query shape and concurrency.
  */
 #define ADD_ARGS()                                                          \
     ArgsProduct({{0, 1, 75500},                                             \
@@ -445,8 +356,6 @@ BENCHMARK_DEFINE_F(QuerySettingsMultiTenantLookupBenchmark, BM_QuerySettingsLook
                  {0, 1}})                                                   \
         ->ThreadRange(1, ProcessInfo::getNumAvailableCores())
 
-BENCHMARK_REGISTER_F(QuerySettingsNotMultitenantLookupBenchmark, BM_QuerySettingsLookup)
-    ->ADD_ARGS();
-BENCHMARK_REGISTER_F(QuerySettingsMultiTenantLookupBenchmark, BM_QuerySettingsLookup)->ADD_ARGS();
+BENCHMARK_REGISTER_F(QuerySettingsLookupBenchmark, BM_QuerySettingsLookup)->ADD_ARGS();
 }  // namespace
 }  // namespace mongo::query_settings

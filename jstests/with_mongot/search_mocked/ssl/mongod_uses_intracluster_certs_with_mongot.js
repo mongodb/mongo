@@ -33,13 +33,15 @@ const pipeline = [{$search: {query: "cakes", path: "title"}}];
 coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 
-// Perform a $search query and assert that the connection fails due to invalid certificates.
-// We cannot assert on a specific error message because it will vary based on the transport
-// protocol used.
+// Perform a $search query and assert the connection fails due to invalid certificates: mongod
+// presents its intracluster cert to mongot, which doesn't trust it and tears the connection down
+// during the TLS handshake. Whether the peer-close is a graceful FIN or an abortive RST, the egress
+// client now classifies it as ConnectionClosedByPeer; a lower-level socket failure can surface as
+// SocketException, and a failed connect as HostUnreachable. We accept any of the three.
 assertErrCodeAndErrMsgContains(
     coll,
     pipeline,
-    [ErrorCodes.SocketException, ErrorCodes.HostUnreachable],
+    [ErrorCodes.SocketException, ErrorCodes.HostUnreachable, ErrorCodes.ConnectionClosedByPeer],
     "",
 );
 

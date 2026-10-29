@@ -1,30 +1,5 @@
-# Copyright (C) 2019-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 global:
     cpp_namespace: "mongo"
     mod_visibility: public
@@ -66,6 +41,19 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
+    maxOplogTruncationPointSizeMB:
+        description: >-
+            Maximum target size of a single oplog truncation point, bounding how much oplog may be
+            truncated in a single operation. Takes precedence over the maxOplogTruncationPoints
+            parameters. A truncation point may exceed this size by up to one oplog write batch.
+            0 disables the cap.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: gMaxOplogTruncateMarkerSizeMB
+        default: 51200 # 50GB
+        validator: {gte: 0, lte: 1073741824} # gte 0; lte 1PB (in MB)
+        redact: false
+
     oplogTruncationCheckPeriodSeconds:
         description: "The number of seconds the oplog truncation thread wakes up periodically to check and truncate oplog."
         set_at: [startup, runtime]
@@ -90,4 +78,20 @@ server_parameters:
         cpp_varname: gOplogSamplingAsyncYieldIntervalMs
         default: 100
         validator: {gte: -1}
+        redact: false
+
+    oplogTruncationMaxSpanHoursPerPass:
+        description: >-
+            Maximum hours of oplog that time-based truncation may remove in a single pass, so a
+            large backlog is reclaimed gradually instead of in one large truncate. 0 disables the
+            cap. Currently only honored by persistence providers that support time-based oplog
+            truncation; size-based truncation paths ignore it for now.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gOplogTruncationMaxSpanHoursPerPass
+        default: 1
+        validator:
+            gte: 0
+            # ~100 years.
+            lte: 876000
         redact: false

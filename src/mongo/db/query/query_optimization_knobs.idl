@@ -1,30 +1,5 @@
-# Copyright (C) 2026-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 imports:
     - "mongo/db/topology/cluster_parameters/cluster_server_parameter.idl"
@@ -36,30 +11,42 @@ global:
         - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/db/query/util/memory_util.h"
-        - "mongo/platform/atomic_word.h"
-    mod_visibility: public
+        - "mongo/platform/atomic.h"
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
 
 enums:
-    QueryPlanRankerMode:
+    QueryPlanRanker:
+        mod_visibility: public
+        description: "Enum for possible values for internalQueryPlanRanker."
+        type: string
+        values:
+            kMultiPlanner: "multiPlanning"
+            kCostBased: "costBased"
+            kMixed: "mixed"
+
+    QueryCBRCEMode:
+        mod_visibility: public
         description: "Enum for possible values for internalQueryCBRCEMode."
         type: string
         values:
-            kAutomaticCE: "automaticCE"
             # This mode is for testing purposes only, it is not meant to be efficient at all.
             kExactCE: "exactCE"
             kHistogramCE: "histogramCE"
             kSamplingCE: "samplingCE"
             kHeuristicCE: "heuristicCE"
 
-    QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode:
-        description: "Enum for possible values for QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode."
+    QueryMixedPlanRankingStrategy:
+        mod_visibility: public
+        description: "Enum for possible values for QueryMixedPlanRankingStrategy when the plan ranker is mixed."
         type: string
         values:
-            kCBRForNoMultiplanningResults: "CBRForNoMultiplanningResults"
-            kCBRCostBasedRankerChoice: "CBRCostBasedRankerChoice"
-            kHistogramCEWithHeuristicFallback: "HistogramCEWithHeuristicFallback"
+            kNoMultiplanningResults: "NoMultiplanningResults"
+            kEstimateRankingEffort: "EstimateRankingEffort"
 
     SamplingCEMethod:
+        mod_visibility: public
         description: "Enum for supported sampling methods."
         type: string
         values:
@@ -67,6 +54,7 @@ enums:
             kChunk: "chunk"
 
     SamplingSource:
+        mod_visibility: public
         description: >-
             Controls where CE samples come from. kPersistentSample attempts to read a
             previously persisted sample from the per-database system.stats.samples
@@ -78,6 +66,7 @@ enums:
             kOnTheFlySample: "onTheFlySample"
 
     SamplingConfidenceInterval:
+        mod_visibility: public
         description: "Enum for supported confidence intervals for sampling estimates."
         type: string
         values:
@@ -86,6 +75,7 @@ enums:
             k99: "99"
 
     JoinReorderMode:
+        mod_visibility: public
         description: "Enum for possible values for JoinReorderMode."
         type: string
         values:
@@ -93,6 +83,7 @@ enums:
             kRandom: "random"
 
     JoinPlanTreeShape:
+        mod_visibility: public
         description: "Enum for possible join plan shapes."
         type: string
         values:
@@ -101,6 +92,7 @@ enums:
             kZigZag: "zigZag"
 
     ForcedJoinMethod:
+        mod_visibility: public
         description: "Enum for forcing a specific join method."
         type: string
         values:
@@ -110,6 +102,7 @@ enums:
             kNLJ: "NLJ"
 
     TransformHoistPolicy:
+        mod_visibility: public
         description: "Controls when the independent prefix of a $project or $addFields is hoisted past the preceding stage."
         type: string
         values:
@@ -119,6 +112,7 @@ enums:
 
 structs:
     InternalQueryCutoffForSampleFromRandomCursorStorage:
+        mod_visibility: public
         description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
         inline_chained_structs: true
         chained_structs:
@@ -145,11 +139,17 @@ server_parameters:
             and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationWorks"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10000
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planEvaluationWorks
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanEvaluationCollFraction:
         description: >-
@@ -160,7 +160,7 @@ server_parameters:
             and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationCollFraction"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.3
         validator:
             gte: 0.0
@@ -169,6 +169,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planEvaluationCollFraction
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanTotalEvaluationCollFraction:
         description: >-
@@ -179,7 +182,7 @@ server_parameters:
             and this parameter.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanTotalEvaluationCollFraction"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 2.0
         validator:
             gte: 0.0
@@ -187,19 +190,25 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planTotalEvaluationCollFraction
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanEvaluationMaxResults:
         description: "Stop working plans once a plan returns this many results."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationMaxResults"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 101
         validator:
-            gte: 0
+            gt: 0
         redact: false
         annotations:
             query_knob:
                 wire_name: planEvaluationMaxResults
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySBEPlanEvaluationMaxMemoryBytes:
         description: >-
@@ -207,12 +216,18 @@ server_parameters:
             on update because this might affect replanning.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEPlanEvaluationMaxMemoryBytes"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbePlanEvaluationMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanTieBreakingWithIndexHeuristics:
         description: >-
@@ -221,9 +236,15 @@ server_parameters:
             contiguous prefix of equality predicates in any index.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanTieBreakingWithIndexHeuristics"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planTieBreakingWithIndexHeuristics
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryForceIntersectionPlans:
         description: >-
@@ -231,53 +252,88 @@ server_parameters:
             plans to be chosen when possible.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryForceIntersectionPlans"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: forceIntersectionPlans
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableIndexIntersection:
         description: "Controls whether the planner will generate and consider index intersection plans."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableIndexIntersection"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableIndexIntersection
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableHashIntersection:
         description: "Controls whether we use hash-based intersection for rooted $and queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableHashIntersection"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableHashIntersection
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableSortIndexIntersection:
         description: "Controls whether we use sort-based intersection for rooted $and queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableSortIndexIntersection"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableSortIndexIntersection
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerEnableIndexPruning:
         description: "Prunes unnecessary candidate plans so we trial less duplicate options."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerEnableIndexPruning"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableIndexPruning
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryConcurrentMultiPlanningThreshold:
+        mod_visibility: needs_replacement
         description: "The number of concurrent trialing multiplan candidates required to enable the MultiPlan rate limiter."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryConcurrentMultiPlanningThreshold"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 32000
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: concurrentMultiPlanningThreshold
 
     internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
+        mod_visibility: needs_replacement
         description: >-
             The maximum number of concurrent trialing multiplan candidates per plan cache key.
             If the MultiPlan rate limiter is enabled and we reach this number of trailing candidates
@@ -285,11 +341,14 @@ server_parameters:
             finished or an active plan cache entry is added.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxConcurrentMultiPlanJobsPerCacheKey"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 320
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxConcurrentMultiPlanJobsPerCacheKey
 
     #
     # Plan cache
@@ -299,24 +358,35 @@ server_parameters:
         description: "Disables caching of query plans for both classic and SBE engines."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryDisablePlanCache"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: disablePlanCache
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryCacheMaxEntriesPerCollection:
+        mod_visibility: needs_replacement
         description: >-
             The maximum number of entries allowed in a given collection's plan cache. Applies
             only to the classic plan cache, not to the SBE plan cache.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheMaxEntriesPerCollection"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         deprecated_name: "internalQueryCacheSize"
         default: 5000
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheMaxEntriesPerCollection
 
     internalQueryCacheMaxSizeBytesBeforeStripDebugInfo:
+        mod_visibility: needs_replacement
         description: >-
             Limits the amount of debug info stored across all plan caches in the system. Once
             the estimate of the number of bytes used across all plan caches exceeds this threshold, then
@@ -326,46 +396,62 @@ server_parameters:
             only to the classic plan cache, not to the SBE plan cache.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheMaxSizeBytesBeforeStripDebugInfo"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 512 * 1024 * 1024
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheMaxSizeBytesBeforeStripDebugInfo
 
     internalQueryCacheEvictionRatio:
+        mod_visibility: needs_replacement
         description: >-
             How many times more works must we perform in order to justify plan cache eviction
             and replanning?
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheEvictionRatio"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 10.0
         validator:
             gte: 0.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheEvictionRatio
 
     internalQueryCacheWorksGrowthCoefficient:
+        mod_visibility: needs_replacement
         description: >-
             How quickly the the 'works' value in an inactive cache entry will grow. It grows
             exponentially. The value of this server parameter is the base.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheWorksGrowthCoefficient"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 2.0
         validator:
             gt: 1.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheWorksGrowthCoefficient
 
     internalQueryCacheDisableInactiveEntries:
+        mod_visibility: needs_replacement
         description: "Whether or not cache entries can be marked as 'inactive'."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheDisableInactiveEntries"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: cacheDisableInactiveEntries
 
     planCacheSize:
+        mod_visibility: needs_replacement
         description: >-
             The maximum amount of memory that the system will allocate for the plan cache.
             It takes value value in one of the two formats:
@@ -385,36 +471,48 @@ server_parameters:
     #
 
     internalPipelineLengthLimit:
+        mod_visibility: needs_replacement
         description: "The maximum length allowed for an aggregation pipeline."
         set_at: [startup, runtime]
         cpp_varname: "internalPipelineLengthLimit"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default:
             expr: "defaultInternalPipelineLengthLimit()"
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: pipelineLengthLimit
 
     internalMaxSubPipelineViewDepth:
+        mod_visibility: needs_replacement
         description: "The maximum length allowed for an aggregation sub-pipeline view."
         set_at: [startup, runtime]
         cpp_varname: "internalMaxSubPipelineViewDepth"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 20
         test_only: true
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxSubPipelineViewDepth
 
     internalPartialFilterExpressionMaxDepth:
+        mod_visibility: needs_replacement
         description: "The maximum depth allowed for a partialFilterExpression."
         set_at: [startup, runtime]
         cpp_varname: "internalPartialFilterExpressionMaxDepth"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default: 4
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: partialFilterExpressionMaxDepth
 
     #
     # Planning and enumeration
@@ -423,7 +521,7 @@ server_parameters:
         description: "How many indexed solutions will QueryPlanner::plan output?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerMaxIndexedSolutions"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         validator:
             gte: 0
@@ -431,6 +529,46 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: plannerMaxIndexedSolutions
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    maxEstimatedScanBytes:
+        description: >-
+            Reject queries at plan time when the plan requires an unbounded COLLSCAN on a
+            collection whose estimated data size in bytes exceeds this threshold. The threshold is
+            compared against the collection's uncompressed logical size (equivalent to
+            collStats.size), not the on-disk compressed size. -1 (default) disables the check.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxEstimatedScanBytes"
+        cpp_vartype: Atomic<long long>
+        default: -1
+        redact: false
+        validator:
+            gte: -1
+        annotations:
+            query_knob:
+                wire_name: maxEstimatedScanBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    maxEstimatedScanBytesDryRun:
+        description: >-
+            When true, a query that maxEstimatedScanBytes would reject is instead logged and
+            counted (query.maxEstimatedScanBytes.dryRunWouldReject), but allowed to proceed. No-op
+            when maxEstimatedScanBytes is -1 (disabled).
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxEstimatedScanBytesDryRun"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxEstimatedScanBytesDryRun
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnumerationPreferLockstepOrEnumeration:
         description: >-
@@ -449,37 +587,61 @@ server_parameters:
             the same fields and have the same indexes available, as in this example.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnumerationPreferLockstepOrEnumeration"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enumerationPreferLockstepOrEnumeration
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnumerationMaxOrSolutions:
         description: "How many solutions will the enumerator consider at each OR?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnumerationMaxOrSolutions"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enumerationMaxOrSolutions
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryEnumerationMaxIntersectPerAnd:
         description: "How many intersections will the enumerator consider at each AND?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnumerationMaxIntersectPerAnd"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 3
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enumerationMaxIntersectPerAnd
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlanOrChildrenIndependently:
         description: "Do we want to plan each child of the OR independently?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanOrChildrenIndependently"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planOrChildrenIndependently
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxScansToExplode:
         description: >-
@@ -487,7 +649,7 @@ server_parameters:
             during explodeForSort?
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxScansToExplode"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 200
         validator:
             gte: 0
@@ -495,6 +657,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: maxScansToExplode
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerGenerateCoveredWholeIndexScans:
         description: >-
@@ -502,9 +667,31 @@ server_parameters:
             to a COLLSCAN.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerGenerateCoveredWholeIndexScans"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerGenerateCoveredWholeIndexScans
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    internalQueryPlannerEnableCountScanForUnfilteredCount:
+        description: >-
+            Allow the planner to generate a COUNT_SCAN of the _id index for count requests with
+            no query predicate, rather than falling back to a COLLSCAN.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPlannerEnableCountScanForUnfilteredCount"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableCountScanForUnfilteredCount
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryPlannerUseMultiplannerForSingleSolutions:
         description: >-
@@ -512,34 +699,47 @@ server_parameters:
             Used for testing to increase multiplanning and replanning test coverage.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerUseMultiplannerForSingleSolutions"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
+        test_only: true
         redact: false
         annotations:
             query_knob:
                 wire_name: plannerUseMultiplannerForSingleSolutions
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryIgnoreUnknownJSONSchemaKeywords:
+        mod_visibility: needs_replacement
         description: "Ignore unknown JSON Schema keywords."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryIgnoreUnknownJSONSchemaKeywords"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: ignoreUnknownJSONSchemaKeywords
 
     internalQueryPlannerIgnoreIndexWithCollationForRegex:
+        mod_visibility: needs_replacement
         description: "Do we want to leverage indexes with collation for regex predicates?"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerIgnoreIndexWithCollationForRegex"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerIgnoreIndexWithCollationForRegex
 
     internalEnableJoinOptimization:
+        mod_visibility: needs_replacement
         description: "Enable cost-based reordering of $lookup-$unwind pairs producing SBE plans."
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinOptimization"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -547,17 +747,27 @@ server_parameters:
                 wire_name: enableJoinOptimization
 
     internalQueryExplainJoinCostComponents:
+        mod_visibility: needs_replacement
         description: >-
             When true, explain output for join embedding nodes includes a 'joinCostComponents'
             sub-object with the detailed cost breakdown (docsProcessed, docsOutput,
-            sequentialIOPages, randomIOPages, localOpCost).
+            numDocsTransmitted, sequentialIOPages, randomIOPages, localOpCost, totalCost). For
+            indexed nested loop join nodes it also includes a 'cardinalityRHSBeforeJoinPred' field
+            reporting the RHS cardinality before the join predicate is applied (i.e. after the
+            RHS's own single-table predicates). Join embedding nodes additionally include an
+            'ndvEstimates' array with the NDV estimate and its provenance ('ndv' and 'ndvSource')
+            for each join edge the node applies.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryExplainJoinCostComponents"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: explainJoinCostComponents
 
     internalJoinReorderMode:
+        mod_visibility: public
         description: "Picks which method is used to reorder joins (when enabled)."
         set_at: [startup, runtime]
         cpp_class:
@@ -571,6 +781,7 @@ server_parameters:
                 wire_name: joinReorderMode
 
     internalJoinPlanTreeShape:
+        mod_visibility: public
         description: "Picks which tree shape to use for bottom-up join enumeration (when enabled)."
         set_at: [startup, runtime]
         cpp_class:
@@ -591,7 +802,7 @@ server_parameters:
             specifified in the aggregation pipeline.
         set_at: [startup, runtime]
         cpp_varname: internalMaxNodesInJoinGraph
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gt: 1
@@ -608,7 +819,7 @@ server_parameters:
             order as specifified in the aggregation pipeline.
         set_at: [startup, runtime]
         cpp_varname: internalMaxEdgesInJoinGraph
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 256
         validator:
             gt: 0
@@ -624,7 +835,7 @@ server_parameters:
             implicit edge finding.
         set_at: [startup, runtime]
         cpp_varname: internalMaxNumberNodesConsideredForImplicitEdges
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 4
         validator:
             gte: 0
@@ -634,32 +845,25 @@ server_parameters:
             query_knob:
                 wire_name: maxNumberNodesConsideredForImplicitEdges
 
-    internalInferSingleTablePredicates:
-        description: "Infer and propagate single table predicates across equivalence classes. This "
-        set_at: [startup, runtime]
-        cpp_varname: "internalInferSingleTablePredicates"
-        cpp_vartype: AtomicWord<bool>
-        default: true
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: inferSingleTablePredicates
-
     internalQueryMaxPipelineRewrites:
+        mod_visibility: needs_replacement
         description: "Maximum number of pipeline rewrite rules to apply"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxPipelineRewrites"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1_000_000
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxPipelineRewrites
 
     internalRandomJoinOrderSeed:
         description: "Select a seed for randomized join reordering."
         set_at: [startup, runtime]
         cpp_varname: "internalRandomJoinOrderSeed"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 44
         redact: false
         annotations:
@@ -670,7 +874,7 @@ server_parameters:
         description: "Whether or not to prune un-promising HJ orders during join plan enumeration"
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinEnumerationHJOrderPruning"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -681,14 +885,15 @@ server_parameters:
         description: "Whether or not to use index uniqueness metadata during join optimization"
         set_at: [startup, runtime]
         cpp_varname: "internalEnableJoinOptimizationUseIndexUniqueness"
-        cpp_vartype: AtomicWord<bool>
-        default: false
+        cpp_vartype: Atomic<bool>
+        default: true
         redact: false
         annotations:
             query_knob:
                 wire_name: enableJoinOptimizationUseIndexUniqueness
 
     internalJoinMethod:
+        mod_visibility: public
         description: >-
             Forces all joins produced by the join optimizer to use the specified method.
             When set to "any" (default), the optimizer picks the method itself.
@@ -707,9 +912,12 @@ server_parameters:
         description: "If true, use the grammar-based parser and CST to parse queries."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryEnableCSTParser"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableCSTParser
 
     internalQueryCutoffForSampleFromRandomCursor:
         description: "The maximum sample ratio for random cursor."
@@ -720,6 +928,7 @@ server_parameters:
         redact: false
 
     internalQueryAutoParameterizationMaxParameterCount:
+        mod_visibility: needs_replacement
         description: >-
             The maximum numbers of parameters that query auto-parameterization can extract from a query.
             If auto parameterizating a query would result in a greater number of parameters than the limit,
@@ -727,101 +936,158 @@ server_parameters:
             If set to 0, then no limit will be applied.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryAutoParameterizationMaxParameterCount"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 512
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: autoParameterizationMaxParameterCount
 
     internalQueryEnableBooleanExpressionsSimplifier:
+        mod_visibility: needs_replacement
         description: >-
             Boolean expression simplifier converts filter expression into Disjunctive Normal
             Form and applies some simplifications.
         set_at: [startup, runtime]
         cpp_varname: internalQueryEnableBooleanExpressionsSimplifier
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableBooleanExpressionsSimplifier
 
     internalQueryMaximumNumberOfUniquePredicatesToSimplify:
+        mod_visibility: needs_replacement
         description: >-
             If the number of unique predicates in an expression is larger than
             'maximumNumberOfUniquePredicates' the expression is considered too big to be simplified.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaximumNumberOfUniquePredicatesToSimplify
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maximumNumberOfUniquePredicatesToSimplify
 
     internalQueryMaximumNumberOfMintermsInSimplifier:
+        mod_visibility: needs_replacement
         description: "Maximum number of minterms allowed during boolean transformations."
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaximumNumberOfMintermsInSimplifier
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1000
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maximumNumberOfMintermsInSimplifier
 
     internalQueryMaxNumPrimeImplicants:
+        mod_visibility: needs_replacement
         description: "Threshold capping number of prime implicants generated by Petrick's method."
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaxNumPrimeImplicants
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10000
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxNumPrimeImplicants
 
     internalQueryMaxSizeFactorToSimplify:
+        mod_visibility: needs_replacement
         description: >-
             If the simplified expression is larger than the original expression's size times
             `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaxSizeFactorToSimplify
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 1.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxSizeFactorToSimplify
 
     internalQueryDoNotOpenContainedOrsInSimplifier:
+        mod_visibility: needs_replacement
         description: >-
             If the original expression contains AND operator it is still simplified but the
             common predicate of the simplified conjunctive terms are taken out of brackets.
         set_at: [startup, runtime]
         cpp_varname: internalQueryDoNotOpenContainedOrsInSimplifier
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
-        redact: false
-
-    internalQueryCBRCEMode:
-        description: "Cardinality estimation mode for the cost-based ranker."
-        set_at: [startup, runtime]
-        cpp_class:
-            name: QueryPlanRankerMode
-            data: WithOnUpdateHook<synchronized_value<QueryPlanRankerModeEnum>>
-        default:
-            expr: QueryPlanRankerModeEnum::kAutomaticCE
         redact: false
         annotations:
             query_knob:
-                wire_name: planRankerMode
+                wire_name: doNotOpenContainedOrsInSimplifier
+
+    internalQueryPlanRanker:
+        mod_visibility: public
+        description: >-
+            Top-level parameter to control query plan ranker.
+            The featureFlagCostBasedRanker has a precedence: if it is false the only possible
+            ranker is the multiPlanner.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: QueryPlanRanker
+            data: WithOnUpdateHook<synchronized_value<QueryPlanRankerEnum>>
+        default:
+            expr: QueryPlanRankerEnum::kMixed
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: planRanker
                 pqs_settable: true
                 fcv:
                     min: "9.0"
 
-    automaticCEPlanRankingStrategy:
-        description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
+    internalQueryCBRCEMode:
+        mod_visibility: public
+        description: >-
+            Second-level parameter to control cardinality estimation (CE) mode when
+            the cost-based plan ranker is chosen by the internalQueryPlanRanker.
+            When the internalQueryPlanRanker is set to mixed, this parameter is overriden by the
+            samplingCE. The parameter has no effect for multiPlanner.
         set_at: [startup, runtime]
         cpp_class:
-            name: QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode
-            data: WithOnUpdateHook<synchronized_value<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>>
+            name: QueryCBRCEMode
+            data: WithOnUpdateHook<synchronized_value<QueryCBRCEModeEnum>>
         default:
-            expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRForNoMultiplanningResults
+            expr: QueryCBRCEModeEnum::kSamplingCE
         redact: false
         annotations:
             query_knob:
-                wire_name: automaticCEPlanRankingStrategy
+                wire_name: cbrCEMode
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    internalQueryMixedPlanRankingStrategy:
+        mod_visibility: public
+        description: >-
+            Second-level parameter to control the plan ranking strategy when
+            the top-level internalQueryPlanRanker is set to mixed. The parameter has
+            no effect for multiPlanner and costBased values of internalQueryPlanRanker.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: QueryMixedPlanRankingStrategy
+            data: WithOnUpdateHook<synchronized_value<QueryMixedPlanRankingStrategyEnum>>
+        default:
+            expr: QueryMixedPlanRankingStrategyEnum::kNoMultiplanningResults
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: mixedPlanRankingStrategy
                 pqs_settable: true
                 fcv:
                     min: "9.0"
 
     samplingConfidenceInterval:
+        mod_visibility: public
         description: >-
             Define target confidence interval for sampling cardinality estimates used for
             cost-based optimization. Supported values are 90%, 95%, and 99%.
@@ -847,7 +1113,7 @@ server_parameters:
             than 10% lead to very wide confidence interval and poor estimate accuracy.
         set_at: [startup, runtime]
         cpp_varname: samplingMarginOfError
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 5.0
         validator:
             gte: 1.0
@@ -860,10 +1126,31 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
-    internalQuerySamplingCEMethod:
+    internalSamplingSizeOverride:
         description: >-
-            Control sampling CE method. There two supported sampling CE method, random and
-            chunk-based.
+            Directly specify the number of documents to sample for cardinality estimation in
+            CBR. When set to a positive value, bypasses the
+            samplingConfidenceInterval and samplingMarginOfError parameters entirely.
+            A value of 0 (the default) means the sample size is derived from those two parameters.
+        set_at: [startup, runtime]
+        cpp_varname: internalSamplingSizeOverride
+        cpp_vartype: Atomic<int>
+        default: 0
+        validator:
+            gte: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingSizeOverride
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
+    internalQuerySamplingCEMethod:
+        mod_visibility: public
+        description: >-
+            Control sampling CE method for on-the-fly sampling behavior. There are two supported
+            sampling CE methods, random and chunk-based.
         set_at: [startup, runtime]
         cpp_class:
             name: CBRSamplingCEMethod
@@ -878,8 +1165,28 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    internalQuerySamplingCEMethodForPersistentSamples:
+        mod_visibility: public
+        description: >-
+            Control which sampling method the persistent-sample read path attempts to load before
+            falling back to on-the-fly sampling.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: PersistentSampleCEMethod
+            data: WithOnUpdateHook<synchronized_value<SamplingCEMethodEnum>>
+        default:
+            expr: SamplingCEMethodEnum::kRandom
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingCEMethodForPersistentSamples
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     # TODO SERVER-63949: Consolidate CBRSamplingCEMethod and JoinSamplingCEMethod.
     internalJoinOptimizationSamplingCEMethod:
+        mod_visibility: public
         description: Control sampling CE method for the join optimization codepath.
         set_at: [startup, runtime]
         cpp_class:
@@ -893,6 +1200,7 @@ server_parameters:
                 wire_name: joinOptimizationSamplingCEMethod
 
     internalQueryNumChunksForChunkBasedSampling:
+        mod_visibility: needs_replacement
         description: >-
             The number of chunk for chunk-based sampling method to form a sample. The number
             of chunk does not affect the size of a sample but does affect the size of a chunk. The size of
@@ -902,7 +1210,7 @@ server_parameters:
             and the performance of the sampling process.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryNumChunksForChunkBasedSampling"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 10
         validator:
             gt: 0
@@ -912,18 +1220,22 @@ server_parameters:
                 wire_name: numChunksForChunkBasedSampling
 
     internalQuerySamplingBySequentialScan:
+        mod_visibility: needs_replacement
         description:
             Indicate sampling CE to generate a repeatable sample by sequentially scanning
             documents from the start of the target collection. This sampling method is useful for testing
             purposes and should not be used in production.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySamplingBySequentialScan"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingBySequentialScan
 
-    # TODO SERVER-127563: Revisit the naming and organization of CBR-related knobs
     internalQuerySamplingByStrides:
+        mod_visibility: needs_replacement
         description:
             Indicate sampling CE to generate a repeatable sample by sequentially scanning
             the target collection and filtering to documents whose _id satisfies
@@ -931,16 +1243,36 @@ server_parameters:
             This sampling method is useful for testing purposes and should not be used in production.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySamplingByStrides"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingByStrides
+
+    internalQueryEnablePersistentNDVStats:
+        description: >-
+            Enables consulting persistent NDV (number of distinct values) statistics, built by the
+            analyze command, during sampling-based cardinality estimation. Only takes effect when
+            featureFlagPersistentStats is also enabled.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryEnablePersistentNDVStats"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enablePersistentNDVStats
 
     internalJoinPlanSamplingSize:
         description: For queries running through join optimization, control the sample size.
         set_at: [startup, runtime]
         cpp_varname: "internalJoinPlanSamplingSize"
-        cpp_vartype: AtomicWord<int>
-        default: 1000
+        cpp_vartype: Atomic<int>
+        # Derived from the Kolmogorov statistic: with critical value 1.63 (alpha = 0.01) and
+        # precision 0.05, a sample of (1.63 / 0.05)^2 ~= 1063 documents bounds the error of the
+        # sample's empirical CDF to within 5% with 99% confidence.
+        default: 1063
         validator:
             gt: 0
         redact: false
@@ -954,7 +1286,7 @@ server_parameters:
             as potential plans for single table plan fragments.
         set_at: [startup, runtime]
         cpp_varname: "internalJoinEnumerateCollScanPlans"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -969,7 +1301,7 @@ server_parameters:
             as many levels as nodes in the join graph.
         set_at: [startup, runtime]
         cpp_varname: "internalMinAllPlansEnumerationSubsetLevel"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         validator:
             gte: 0
@@ -987,7 +1319,7 @@ server_parameters:
             have at most as many levels as nodes in the join graph.
         set_at: [startup, runtime]
         cpp_varname: "internalMaxAllPlansEnumerationSubsetLevel"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 64
         validator:
             gte: 0
@@ -1003,38 +1335,55 @@ server_parameters:
             the cost of multi-planning.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryNumWorksPerPlanForMPEstimation"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 384
         validator:
             gt: 100
             lt: 10000
         redact: false
+        annotations:
+            query_knob:
+                wire_name: numWorksPerPlanForMPEstimation
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice:
         description: >-
             The minimum ratio by which the cost of CBR should be better than the remaining
-            multi-planning cost while choosing between them during AutomaticCE.
+            multi-planning cost while choosing between them under the mixed plan ranker.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 2.0
         validator:
             gte: 1.0
             lte: 10.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: minRequiredImprovementRatioForCostBasedRankerChoice
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryExtraPredicateForReversedIn:
+        mod_visibility: needs_replacement
         description: >-
             Enable an optimization for queries like {$expr: {$in: [<const>, "$fieldpath"]}} that generates
             an extra predicate in order to allow indexes on $fieldpath to be used. This optimization
             is applied irrespective of this query knob if we are dealing with a FLE query.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: internalQueryExtraPredicateForReversedIn
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: extraPredicateForReversedIn
 
     internalQueryPermitMatchSwappingForComplexRenames:
+        mod_visibility: needs_replacement
         description: >-
             Caution! This knob is used in production and must not be removed before consulting with
             the QO team.
@@ -1048,15 +1397,18 @@ server_parameters:
             reshaping operation.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPermitMatchSwappingForComplexRenames"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: permitMatchSwappingForComplexRenames
 
     internalEnablePipelineOptimizationAdditionalTestingRules:
         description: "Whether or not to enable pipeline optimization rules with Testing tag."
         set_at: [startup, runtime]
         cpp_varname: "internalEnablePipelineOptimizationAdditionalTestingRules"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         redact: false
         annotations:
@@ -1064,19 +1416,23 @@ server_parameters:
                 wire_name: enablePipelineOptimizationAdditionalTestingRules
 
     internalEnableDependencyGraphValidation:
+        mod_visibility: needs_replacement
         description: "Enable insertion of $_internalAssertDataAssumptions stages to validate dependency graph arrayness analysis."
         set_at: [startup, runtime]
         cpp_varname: "internalEnableDependencyGraphValidation"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: false
         test_only: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableDependencyGraphValidation
 
     internalEnablePathArrayness:
         description: "Whether or not to use PathArrayness when applying optimizations"
         set_at: [startup, runtime]
         cpp_varname: "internalEnablePathArrayness"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
         annotations:
@@ -1089,11 +1445,18 @@ server_parameters:
             possible in those queries where an index is leveraged to provide sorting.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlannerPushdownFilterToIxscanForSort"
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerPushdownFilterToIxscanForSort
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryTransformHoistPolicy:
+        mod_visibility: public
         description: >-
             Controls when the independent prefix of a $project or $addFields is hoisted past the
             preceding stage. "never" disables hoisting entirely; "forMatchPushdown" hoists only
@@ -1101,12 +1464,16 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: TransformHoistPolicy
-            data: synchronized_value<TransformHoistPolicyEnum>
+            data: WithOnUpdateHook<synchronized_value<TransformHoistPolicyEnum>>
         default:
             expr: TransformHoistPolicyEnum::kForMatchPushdown
         redact: false
+        annotations:
+            query_knob:
+                wire_name: transformHoistPolicy
 
     internalQueryTransformHoistMaximumPaths:
+        mod_visibility: needs_replacement
         description: >-
             Maximum number of modified paths (computed fields and renames) in a $project or
             $addFields for which the hoist transformation will be attempted. Projections with more
@@ -1114,9 +1481,42 @@ server_parameters:
             internalQueryTransformHoistPolicy is always.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryTransformHoistMaximumPaths"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         default: 1024
         validator: {gte: 0}
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: transformHoistMaximumPaths
+
+    internalEnableJoinPlanCache:
+        description: >-
+            Enables the join plan cache. Join-eligible queries will consult the cache when this is enabled.
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinPlanCache"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinPlanCache
+
+    internalQueryJoinPlanCacheSize:
+        # Marked as public as this knob cannot be accessed via the QueryKnobConfiguration framework.
+        # It is accessed only during startup during global initialization of the server at which
+        # point there is no OperationContext available to access the QueryKnobConfiguration.
+        mod_visibility: public
+        description: >-
+            The maximum amount of memory that the system will allocate for the join plan cache.
+            It takes a value in one of the two formats:
+            1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%. Capped at 25%.
+            2. <number>(GB|MB|KB|B), indicates the amount of memory in GB, MB, KB or bytes. E.g.: 1.5GB, 100MB. Capped at 500GB.
+        set_at: [startup]
+        cpp_varname: "internalQueryJoinPlanCacheSize"
+        cpp_vartype: synchronized_value<std::string>
+        default: "16MB"
+        validator:
+            callback: memory_util::validatePlanCacheSize
         redact: false
 # Note for adding additional query knobs:
 #

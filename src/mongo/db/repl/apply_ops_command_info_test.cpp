@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/apply_ops_command_info.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::repl::apply_ops_command_info_details {
@@ -73,3 +48,48 @@ TEST(ApplyOpsCommandInfoTest, TestParseAreOpsCrudOnlyMultipleOps) {
 }
 
 }  // namespace mongo::repl::apply_ops_command_info_details
+
+namespace mongo::repl {
+namespace {
+
+TEST(ApplyOpsChainHelpersTest, RemainingApplyOpsChainOpsSaturatesAtZero) {
+    // The common case: more still to collect than already collected.
+    ASSERT_EQ(3U, remainingApplyOpsChainOps(5, 2));
+    ASSERT_EQ(1U, remainingApplyOpsChainOps(5, 4));
+
+    // Exactly collected, and the underflow guard: collected must never wrap to a huge size_t,
+    // which would send a chain walk looking for entries that do not exist.
+    ASSERT_EQ(0U, remainingApplyOpsChainOps(5, 5));
+    ASSERT_EQ(0U, remainingApplyOpsChainOps(2, 5));
+    ASSERT_EQ(0U, remainingApplyOpsChainOps(0, 0));
+}
+
+TEST(ApplyOpsChainHelpersTest, NumOperationsInApplyOpsCountsEntries) {
+    ASSERT_EQ(1U, numOperationsInApplyOps(Value(BSON_ARRAY(BSON("op" << "i")))));
+    ASSERT_EQ(3U,
+              numOperationsInApplyOps(
+                  Value(BSON_ARRAY(BSON("op" << "i") << BSON("op" << "u") << BSON("op" << "d")))));
+
+    // A missing applyOps array (e.g. a commitTransaction entry) counts as zero operations.
+    ASSERT_EQ(0U, numOperationsInApplyOps(Value()));
+}
+
+TEST(ApplyOpsCommandInfoTest, ParsesAllowEndOfTransactionMarker) {
+    const auto withTrueMarker = ApplyOpsCommandInfo::parse(
+        BSON("applyOps" << BSON_ARRAY(BSON("op" << "i")) << "allowEndOfTransaction" << true));
+    ASSERT_TRUE(withTrueMarker.getAllowEndOfTransaction());
+    ASSERT_TRUE(*withTrueMarker.getAllowEndOfTransaction());
+
+    const auto withFalseMarker = ApplyOpsCommandInfo::parse(
+        BSON("applyOps" << BSON_ARRAY(BSON("op" << "i")) << "allowEndOfTransaction" << false));
+    ASSERT_TRUE(withFalseMarker.getAllowEndOfTransaction());
+    ASSERT_FALSE(*withFalseMarker.getAllowEndOfTransaction());
+
+    const auto withoutMarker =
+        ApplyOpsCommandInfo::parse(BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"))));
+    ASSERT_FALSE(withoutMarker.getAllowEndOfTransaction().has_value());
+}
+
+}  // namespace
+}  // namespace mongo::repl
+

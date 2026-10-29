@@ -1,5 +1,8 @@
 // Tests the behavior of a change stream on a whole database in a sharded cluster.
 // @tags: [
+//   # Already whole-db scoped natively, so passthrough is redundant here.
+//   do_not_run_in_whole_db_passthrough,
+//   do_not_run_in_whole_cluster_passthrough,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]

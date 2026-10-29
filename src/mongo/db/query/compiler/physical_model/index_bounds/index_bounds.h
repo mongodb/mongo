@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,12 +10,13 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <span>
 #include <string>
 #include <vector>
 
 namespace mongo {
 
-enum class MONGO_MOD_NEEDS_REPLACEMENT BoundInclusion {
+enum class [[MONGO_MOD_NEEDS_REPLACEMENT]] BoundInclusion {
     kExcludeBothStartAndEndKeys,
     kIncludeStartKeyOnly,
     kIncludeEndKeyOnly,
@@ -51,7 +26,7 @@ enum class MONGO_MOD_NEEDS_REPLACEMENT BoundInclusion {
 /**
  * An ordered list of intervals for one field.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT OrderedIntervalList {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] OrderedIntervalList {
     OrderedIntervalList() {}
     OrderedIntervalList(const std::string& n) : name(n) {}
 
@@ -130,7 +105,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT OrderedIntervalList {
  * Tied to an index.  Permissible values for all fields in the index.  Requires the index to
  * interpret.  Previously known as FieldRangeVector.
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT IndexBounds {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexBounds {
     IndexBounds() : isSimpleRange(false), boundInclusion(BoundInclusion::kIncludeStartKeyOnly) {}
 
     // For each indexed field, the values that the field is allowed to take on.
@@ -229,6 +204,24 @@ size_t estimate(const IndexBoundsChecker&);
 }  // namespace sbe::size_estimator
 
 /**
+ * The states of a key from an index scan. See IndexBoundsChecker::checkKey.
+ */
+enum class KeyState {
+    VALID,
+    MUST_ADVANCE,
+    DONE,
+};
+
+/**
+ * Relative position of a key to an interval.
+ */
+enum class IntervalPosition {
+    BEHIND = -1,
+    WITHIN = 0,
+    AHEAD = 1,
+};
+
+/**
  * A helper used by IndexScan to navigate an index.
  */
 class IndexBoundsChecker {
@@ -251,15 +244,6 @@ public:
      * should emit no results.
      */
     bool getStartSeekPoint(IndexSeekPoint* out);
-
-    /**
-     * The states of a key from an index scan.  See checkKey below.
-     */
-    enum KeyState {
-        VALID,
-        MUST_ADVANCE,
-        DONE,
-    };
 
     /**
      * Is 'key' a valid key?  Note that this differs from checkKey, which assumes that it
@@ -307,21 +291,12 @@ public:
                                      bool forward);
 
     /**
-     * Relative position of a key to an interval.
-     */
-    enum Location {
-        BEHIND = -1,
-        WITHIN = 0,
-        AHEAD = 1,
-    };
-
-    /**
      * Returns BEHIND/WITHIN/AHEAD for a single interval. 'direction' must be derived from
      * OrderedIntervalList::computeDirection()
      */
-    static Location intervalCmp(const Interval& interval,
-                                const BSONElement& key,
-                                Interval::Direction direction);
+    static IntervalPosition intervalCmp(const Interval& interval,
+                                        const BSONElement& key,
+                                        Interval::Direction direction);
 
     /**
      * If 'elt' is in any interval, return WITHIN and set 'newIntervalIndex' to the index of the
@@ -336,14 +311,39 @@ public:
      *
      * TODO(efficiency): Start search from a given index.
      */
-    static Location findIntervalForField(const BSONElement& elt,
-                                         const OrderedIntervalList& oil,
-                                         int expectedDirection,
-                                         size_t* newIntervalIndex);
+    static IntervalPosition findIntervalForField(const BSONElement& elt,
+                                                 const OrderedIntervalList& oil,
+                                                 int expectedDirection,
+                                                 size_t* newIntervalIndex);
 
-private:
+    const IndexBounds* bounds() const {
+        return _bounds;
+    }
+
+    std::vector<size_t>& curInterval() {
+        return _curInterval;
+    }
+
+    const std::vector<int>& expectedDirection() const {
+        return _expectedDirection;
+    }
+
     /**
-     * Find the first field in the key that isn't within the interval we think it is.  Returns
+     * A key decomposed into its per-field values. 'values' points into storage owned by the
+     * checker and is invalidated by the next parseKey() call.
+     */
+    struct KeyComponents {
+        BSONObj obj;
+        std::span<const BSONElement> values;
+    };
+
+    /**
+     * Decomposes 'key' into its per-field values for the helpers below to operate on.
+     */
+    KeyComponents parseKey(const BSONObj& key);
+
+    /**
+     * Find the first field of 'key' that isn't within the interval we think it is.  Returns
      * false if every field is in the interval we think it is.  Returns true and populates out
      * parameters if a field isn't in the interval we think it is.
      *
@@ -351,18 +351,31 @@ private:
      * 'where' is the leftmost field that isn't in the interval we think it is.
      * 'what' is the orientation of the field with respect to that interval.
      */
-    bool findLeftmostProblem(const std::vector<BSONElement>& keyValues,
-                             size_t* where,
-                             Location* what);
+    bool findLeftmostProblem(const KeyComponents& key, size_t* where, IntervalPosition* what) const;
 
     /**
-     * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of the
-     * index key and still be within valid index bounds.
-     *
-     * keyValues are the elements of the index key in order.
+     * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of 'key'
+     * and still be within valid index bounds.
      */
-    bool spaceLeftToAdvance(size_t fieldsToCheck, const std::vector<BSONElement>& keyValues);
+    bool spaceLeftToAdvance(const KeyComponents& key, size_t fieldsToCheck) const;
 
+    /**
+     * Used when checkKey() has determined a component of the current `key` is ahead or behind
+     * its interval. Sets `out` to the next seek point depending on if where=ahead or behind.
+     * `prefixLen` is the position of the component that is before or after its interval.
+     *
+     * where=BEHIND: The field is before its interval, so we keep the first `prefixLen` fields
+     * as-is and set the remaining fields to the start point of their intervals.
+     *
+     * where=AHEAD: The field is past the interval, so we set the first exclusive seek point to
+     * `prefixLen`-1, to seek to the next key past the first `prefixLen` fields.
+     */
+    void buildSeekPoint(const KeyComponents& key,
+                        size_t prefixLen,
+                        IntervalPosition where,
+                        IndexSeekPoint* out) const;
+
+private:
     // The actual bounds.  Must outlive this object.  Not owned by us.
     const IndexBounds* _bounds;
 

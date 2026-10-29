@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/rewrites/matcher/expression_simplifier.h"
 
@@ -512,6 +486,34 @@ TEST(ExpressionSimplifierTests, NorAlwaysBoolean) {
     assertSimplification(*parse(query), alwaysFalse);
     query = fromjson("{$or: [{$nor: [{$nor: [{$nor: [{$alwaysTrue : 1}]}]}]}, {$alwaysFalse: 1}]}");
     assertSimplification(*parse(query), alwaysFalse);
+}
+
+// (a & ~b) | ~a | (a & b) is a tautology: every assignment of 'a' and 'b' satisfies at least one
+// disjunct, so it must simplify to always-true. Note that the simplification produces the two
+// single-literal disjuncts 'a' and '~a', which is what SERVER-131802 mishandled.
+TEST(ExpressionSimplifierTests, OrWithComplementaryLiteralsIsAlwaysTrue) {
+    auto query = fromjson("{$or: [{a: 1, b: {$ne: 1}}, {a: {$ne: 1}}, {a: 1, b: 1}]}");
+    // Always-true is represented by an empty $and (matches every document).
+    auto expected = fromjson("{}");
+    assertSimplification(query, expected);
+}
+
+TEST(ExpressionSimplifierTests, OrOfComplementaryConjunctionsIsNotAlwaysTrue) {
+    // (~a & b) | (a & c) cannot be simplified
+    auto query = fromjson("{$or: [{a: {$ne: 1}, b: 1}, {a: 1, c: 1}]}");
+    assertSimplification(query);
+}
+
+TEST(ExpressionSimplifierTests, OrOfLiteralAndComplementaryConjunction) {
+    // a | (~a & b) cannot be simplified
+    auto query = fromjson("{$or: [{a: 1}, {a: {$ne: 1}, b: 1}]}");
+    assertSimplification(query);
+}
+
+TEST(ExpressionSimplifierTests, OrOfNegatedLiteralAndComplementaryConjunction) {
+    // ~a | (a & b) cannot be simplified
+    auto query = fromjson("{$or: [{a: {$ne: 1}}, {a: 1, b: 1}]}");
+    assertSimplification(query);
 }
 
 }  // namespace

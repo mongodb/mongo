@@ -4,6 +4,7 @@ overrides:
   - "kill_primary.sharding_override_fixture"
   - "kill_primary.sharding_override_hooks"
   - "kill_primary.sharding_override_shell_options"
+  - "kill_primary.force_causal_consistency"
 
 extends:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
@@ -11,4 +12,3 @@ extends:
 
 excludes:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"
-  - "replica_sets_stepdown_selector.kill_stepdown_terminate_jscore_passthrough_extra_files"

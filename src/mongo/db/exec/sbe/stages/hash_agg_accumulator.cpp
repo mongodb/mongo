@@ -1,48 +1,69 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/hash_agg_accumulator.h"
 
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"  // countName, partialSumName
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 namespace mongo {
 namespace sbe {
+namespace {
+
+enum NativeMinMaxNStateIndices { kHeap = 0, kMemUsage = 1, kMaxSize = 2, kStateSize = 3 };
+
+template <class Comparator>
+int32_t minMaxNInsert(value::Array* heap,
+                      size_t maxSize,
+                      int32_t memUsage,
+                      int32_t memLimit,
+                      const Comparator& comp,
+                      value::TagValueOwned field) {
+    auto& elems = heap->values();
+
+    auto addMemUsage = [&](int32_t memAdded) {
+        memUsage += memAdded;
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream()
+                    << "Accumulator used too much memory and spilling to disk cannot reduce memory "
+                       "consumption any further. Memory limit: "
+                    << memLimit << " bytes",
+                memUsage < memLimit);
+    };
+
+    if (heap->size() < maxSize) {
+        addMemUsage(value::getApproximateSize(field.tag(), field.value()));
+        heap->push_back(std::move(field));
+        std::push_heap(elems.begin(), elems.end(), comp);
+    } else {
+        auto heapRoot = elems.front();
+        if (comp(field.raw(), heapRoot)) {
+            addMemUsage(-value::getApproximateSize(heapRoot.first, heapRoot.second) +
+                        value::getApproximateSize(field.tag(), field.value()));
+            std::pop_heap(elems.begin(), elems.end(), comp);
+            heap->setAt(maxSize - 1, std::move(field));
+            std::push_heap(elems.begin(), elems.end(), comp);
+        }
+    }
+
+    return memUsage;
+}
+}  // namespace
+
 void CompiledHashAggAccumulator::prepare(CompileCtx& ctx,
                                          value::SlotAccessor* accumulatorAccessor) {
     if (_optionalInitializerExpr) {
@@ -78,7 +99,7 @@ void CompiledHashAggAccumulator::prepareForMerge(CompileCtx& ctx,
 }
 
 void CompiledHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                            HashAggAccessor& accumulatorState) const {
+                                            value::AssignableSlotAccessor& accumulatorState) const {
     if (_optionalInitializerCode) {
         accumulatorState.reset(bytecode.run(_optionalInitializerCode.get()));
     }
@@ -133,8 +154,8 @@ void SinglePurposeHashAggAccumulator::prepareForMerge(CompileCtx& ctx,
     _recoverSpilledStateCode = _recoverSpilledStateExpr->compile(ctx);
 }
 
-void SinglePurposeHashAggAccumulator::accumulate(vm::ByteCode& bytecode,
-                                                 HashAggAccessor& accumulatorState) const {
+void SinglePurposeHashAggAccumulator::accumulate(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
     value::TagValueMaybeOwned field = bytecode.run(_transformCode.get());
 
     accumulateTransformedValue(std::move(field), accumulatorState);
@@ -193,8 +214,8 @@ std::vector<DebugPrinter::Block> SinglePurposeHashAggAccumulator::debugPrintMerg
     return debugOutput;
 }
 
-void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
-                                                         HashAggAccessor& accumulatorState) const {
+void ArithmeticAverageHashAggAccumulatorBase::initialize(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
     // Create the array for the sum of inputs. See enum AggSumValueElems for documentation of what
     // these fields mean. The kNonDecimalTotalSum and kNonDecimalTotalAddend must be NumberDouble
     // per tassert 5755312.
@@ -219,11 +240,11 @@ void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
     arrayState->push_back_raw(tagCount, valCount);
 
     // Set 'accState' to the initial state we just constructed.
-    accumulatorState.reset(value::TagValueOwned{tagState, valState});
+    accumulatorState.reset(value::TagValueOwned::fromRaw(tagState, valState));
 }
 
 void ArithmeticAverageHashAggAccumulatorBase::accumulateTransformedValue(
-    value::TagValueMaybeOwned field, HashAggAccessor& accState) const {
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     if (!value::isNumber(field.tag())) {
         return;
     }
@@ -244,7 +265,7 @@ void ArithmeticAverageHashAggAccumulatorBase::accumulateTransformedValue(
             "Expected count to have 64-bit integer type",
             countTagVal.tag == value::TypeTags::NumberInt64);
     arrayState->setAt(
-        1 /* idx */,
+        /*idx=*/1,
         countTagVal.tag,
         value::bitcastFrom<int64_t>(value::bitcastTo<int64_t>(countTagVal.value) + 1));
 }
@@ -322,7 +343,7 @@ void ArithmeticAverageHashAggAccumulatorTerminal::finalizePartialAggregate(
 
 void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
     value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
-    auto resultObj = value::TagValueOwned(value::makeNewObject());
+    auto resultObj = value::TagValueOwned::fromRaw(value::makeNewObject());
 
     tassert(8186813, "New object has unexpected type", resultObj.tag() == value::TypeTags::Object);
     value::Object* resultObject = value::getObjectView(resultObj.value());
@@ -356,12 +377,12 @@ void AddToSetHashAggAccumulator::singlePurposePrepare(CompileCtx& ctx) {
 }
 
 void AddToSetHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                            HashAggAccessor& accumulatorState) const {
+                                            value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
-void AddToSetHashAggAccumulator::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                            HashAggAccessor& accState) const {
+void AddToSetHashAggAccumulator::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     CollatorInterface* collator = nullptr;
     if (_collatorAccessor != nullptr) {
         auto [tagCollator, valCollator] = _collatorAccessor->getViewOfValue();
@@ -430,12 +451,12 @@ void AddToSetHashAggAccumulator::finalizePartialAggregate(
 }
 
 void PushHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                        HashAggAccessor& accumulatorState) const {
+                                        value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
-void PushHashAggAccumulator::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                        HashAggAccessor& accState) const {
+void PushHashAggAccumulator::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     value::TagValueMaybeOwned updatedState = vm::ByteCode::builtinAddToArrayCappedImpl(
         accState.copyOrMoveValue(), std::move(field), _sizeCap);
     accState.reset(std::move(updatedState));
@@ -499,12 +520,12 @@ void PushHashAggAccumulator::finalizePartialAggregate(value::TagValueOwned parti
 }
 
 void FirstHashAggAccumulator::initialize(vm::ByteCode& bytecode,
-                                         HashAggAccessor& accumulatorState) const {
+                                         value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::nothing());
 }
 
-void FirstHashAggAccumulator::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                         HashAggAccessor& accState) const {
+void FirstHashAggAccumulator::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     auto [tagAccumulatorState, _] = accState.getViewOfValue();
     if (tagAccumulatorState != value::TypeTags::Nothing) {
         // The accumulator state already has the first value.
@@ -541,13 +562,13 @@ void FirstHashAggAccumulator::finalizePartialAggregate(
     result.reset(std::move(partialAggregate));
 }
 
-void CountHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
-                                             HashAggAccessor& accumulatorState) const {
+void CountHashAggAccumulatorBase::initialize(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
     accumulatorState.reset(value::TagValueView::numberInt64(0));
 }
 
-void CountHashAggAccumulatorBase::accumulateTransformedValue(value::TagValueMaybeOwned field,
-                                                             HashAggAccessor& accState) const {
+void CountHashAggAccumulatorBase::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accState) const {
     auto [tagAccumulatorState, valAccumulatorState] = accState.getViewOfValue();
     tassert(11004208,
             "Expected count to have 64-bit integer type",
@@ -614,5 +635,145 @@ void CountHashAggAccumulatorPartial::finalizePartialAggregate(
     // faster than expected.
     result.reset(vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagCount, valCount));
 }
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorBase<S>::initialize(
+    vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
+    auto stateOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto* state = value::getArrayViewChecked(stateOwned);
+
+    state->push_back(value::TagValueOwned::fromRaw(value::makeNewArray()));
+    state->push_back(value::TagValueOwned::numberInt32(0));
+
+    auto maxSizeResult = bytecode.run(_maxSizeCode.get());
+    auto maxSizeConverted =
+        genericNumConvert(maxSizeResult.tag(), maxSizeResult.value(), value::TypeTags::NumberInt64);
+    uassert(13224210,
+            "Expected $minN/$maxN 'n' to be convertible to a 64-bit integer",
+            maxSizeConverted.tag() == value::TypeTags::NumberInt64);
+    auto maxSize = value::bitcastTo<int64_t>(maxSizeConverted.value());
+    uassert(13224211, "Expected $minN/$maxN 'n' to be positive", maxSize > 0);
+    state->push_back(value::TagValueOwned::numberInt64(maxSize));
+
+    accumulatorState.reset(std::move(stateOwned));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorBase<S>::singlePurposePrepare(CompileCtx& ctx) {
+    if (_collatorSlot) {
+        _collatorAccessor = ctx.getAccessor(*_collatorSlot);
+    }
+    _maxSizeCode = _maxSizeExpr->compile(ctx);
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+size_t MinMaxNHashAggAccumulatorBase<S>::estimateSize() const {
+    return SinglePurposeHashAggAccumulator::estimateSize() + size_estimator::estimate(_maxSizeExpr);
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+CollatorInterface* MinMaxNHashAggAccumulatorBase<S>::getCollator() const {
+    if (!_collatorAccessor) {
+        return nullptr;
+    }
+    auto [colTag, colVal] = _collatorAccessor->getViewOfValue();
+    tassert(13199700, "Collator has unexpected type", colTag == value::TypeTags::collator);
+    return value::getCollatorView(colVal);
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorBase<S>::accumulateTransformedValue(
+    value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accumulatorState) const {
+    if (value::isNullish(field.tag())) {
+        return;
+    }
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{getCollator()};
+
+    auto [stateTag, stateVal] = accumulatorState.getViewOfValue();
+    auto* state = value::getArrayViewChecked(stateTag, stateVal);
+    tassert(13224213,
+            "Expected $minN/$maxN accumulator state to have the correct number of elements",
+            state->size() == static_cast<size_t>(kStateSize));
+    auto* heap = value::getArrayViewChecked(state->getAt(kHeap));
+    auto memUsage = value::bitcastToChecked<int32_t>(state->getAt(kMemUsage));
+    auto maxSize = static_cast<size_t>(value::bitcastToChecked<int64_t>(state->getAt(kMaxSize)));
+
+    memUsage = minMaxNInsert(heap, maxSize, memUsage, _memLimit, comp, field.moveToOwned());
+
+    state->setAt(kMemUsage, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(memUsage));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorBase<S>::mergeRecoveredState(
+    value::TagValueMaybeOwned recoveredState,
+    value::MaterializedSingleRowAccessor& accumulatorState) const {
+    auto* recoveredStateArray =
+        value::getArrayViewChecked(recoveredState.tag(), recoveredState.value());
+    tassert(13224202,
+            "Expected recovered partial aggregate to have the correct number of elements",
+            recoveredStateArray->size() == static_cast<size_t>(kStateSize));
+    auto* recoveredHeap = value::getArrayViewChecked(recoveredStateArray->getAt(kHeap));
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{getCollator()};
+
+    auto [mergeStateTag, mergeStateVal] = accumulatorState.getViewOfValue();
+    auto* mergeState = value::getArrayViewChecked(mergeStateTag, mergeStateVal);
+    tassert(13224206,
+            "Expected merge partial aggregate to have the correct number of elements",
+            mergeState->size() == static_cast<size_t>(kStateSize));
+    auto* mergeHeap = value::getArrayViewChecked(mergeState->getAt(kHeap));
+    auto mergeMemUsage = value::bitcastToChecked<int32_t>(mergeState->getAt(kMemUsage));
+    auto maxSize =
+        static_cast<size_t>(value::bitcastToChecked<int64_t>(mergeState->getAt(kMaxSize)));
+
+    for (size_t i = 0; i < recoveredHeap->size(); ++i) {
+        value::TagValueOwned field = recoveredHeap->swapAt(i, value::TypeTags::Null, 0);
+        mergeMemUsage =
+            minMaxNInsert(mergeHeap, maxSize, mergeMemUsage, _memLimit, comp, std::move(field));
+    }
+
+    mergeState->setAt(
+        kMemUsage, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(mergeMemUsage));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+value::TagValueOwned MinMaxNHashAggAccumulatorBase<S>::extractHeap(
+    value::TagValueOwned partialAggregate) const {
+    auto* state = value::getArrayViewChecked(partialAggregate);
+    value::getArrayViewChecked(state->getAt(kHeap));
+    return state->swapAt(kHeap, value::TypeTags::Null, 0);
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorTerminal<S>::finalizePartialAggregate(
+    value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
+    auto heapOwned = this->extractHeap(std::move(partialAggregate));
+    auto* heap = value::getArrayViewChecked(heapOwned);
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{this->getCollator()};
+    std::sort_heap(heap->values().begin(), heap->values().end(), comp);
+
+    result.reset(std::move(heapOwned));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorPartial<S>::finalizePartialAggregate(
+    value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
+    // Partial aggregates don't need to be sorted; they are merged one-at-a-time.
+    // See MinMaxNHashAggAccumulatorBase<S>::mergeRecoveredState and AccumulatorN::processInternal.
+    result.reset(this->extractHeap(std::move(partialAggregate)));
+}
+
+template class MinMaxNHashAggAccumulatorBase<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulatorBase<AccumulatorMinMaxN::MinMaxSense::kMax>;
+template class MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMax>;
+template class MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMax>;
+
 }  // namespace sbe
 }  // namespace mongo

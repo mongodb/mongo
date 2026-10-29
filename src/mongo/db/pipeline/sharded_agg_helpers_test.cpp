@@ -1,36 +1,14 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -67,7 +45,7 @@ TEST_F(
     for (auto&& shardId : setupShards(3)) {
         ASSERT_EQ(getTargetedShards(expCtx(),
                                     PipelineDataSource::kGeneratesOwnDataOnce,
-                                    boost::none /* cri */,
+                                    /*cri=*/boost::none,
                                     BSONObj(),
                                     BSONObj(),
                                     shardId),
@@ -86,10 +64,10 @@ TEST_F(
 
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kGeneratesOwnDataOnce,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{shardId});
 
     future.default_timed_get();
@@ -101,10 +79,10 @@ TEST_F(ShardedAggHelpersFixture,
     setChangeStreamVersionToExpCtx(ChangeStreamReaderVersionEnum::kV1);
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kChangeStream,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               allShardIds);
 }
 
@@ -114,10 +92,10 @@ TEST_F(ShardedAggHelpersFixture,
     setChangeStreamVersionToExpCtx(ChangeStreamReaderVersionEnum::kV2);
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kChangeStream,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{});
 }
 
@@ -129,10 +107,10 @@ TEST_F(
     expCtx()->setNamespaceString(nss);
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kNormal,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               allShardIds);
 }
 
@@ -148,7 +126,7 @@ TEST_F(
                                 cri,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{ShardId("0")});
 }
 
@@ -164,7 +142,7 @@ TEST_F(
                                 cri,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{ShardId("0")});
 }
 
@@ -186,7 +164,7 @@ TEST_F(
                                 cri,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               expectedShardIds);
 }
 
@@ -244,6 +222,36 @@ TEST_F(
     });
 
     future.default_timed_get();
+}
+
+TEST_F(ShardedAggHelpersFixture, HasUnsourcedSetVariableStage) {
+    auto makeSetVariableStage = [&]() {
+        auto setVariableSpec =
+            BSON("$setVariableFromSubPipeline"
+                 << BSON("setVariable" << "$$SEARCH_META"
+                                       << "pipeline" << BSON_ARRAY(BSON("$match" << BSONObj()))));
+        return DocumentSourceSetVariableFromSubPipeline::createFromBson(
+            setVariableSpec.firstElement(), expCtx());
+    };
+
+    // A pipeline with no $setVariableFromSubPipeline stage is not unsourced.
+    auto pipelineWithoutSetVariable =
+        Pipeline::create({DocumentSourceMock::create(expCtx())}, expCtx());
+    ASSERT_FALSE(hasUnsourcedSetVariableStage(*pipelineWithoutSetVariable));
+
+    // A $setVariableFromSubPipeline whose sub-pipeline has no initial cursor source is unsourced:
+    // its sub-pipeline fronts a stage that requires an input document source.
+    auto setVariable = makeSetVariableStage();
+    auto unsourcedPipeline =
+        Pipeline::create({DocumentSourceMock::create(expCtx()), setVariable}, expCtx());
+    ASSERT_TRUE(hasUnsourcedSetVariableStage(*unsourcedPipeline));
+
+    // Once the metadata cursor source is attached to the sub-pipeline, the stage is sourced.
+    auto* setVariableStage =
+        dynamic_cast<DocumentSourceSetVariableFromSubPipeline*>(setVariable.get());
+    ASSERT(setVariableStage);
+    setVariableStage->addSubPipelineInitialSource(DocumentSourceMock::create(expCtx()));
+    ASSERT_FALSE(hasUnsourcedSetVariableStage(*unsourcedPipeline));
 }
 
 }  // namespace

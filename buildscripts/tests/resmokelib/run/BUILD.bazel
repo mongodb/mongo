@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_test")
 
 py_test(
@@ -46,6 +46,18 @@ py_test(
     srcs = [
         "__init__.py",
         "test_shuffle_tests.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_fail_on_test_selection_error",
+    srcs = [
+        "__init__.py",
+        "test_fail_on_test_selection_error.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

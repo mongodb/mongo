@@ -1,10 +1,7 @@
 /**
  * Tests that a change event which exceeds the 16MB limit will be split into multiple fragments.
  *
- * @tags: [
- *   # TODO SERVER-127094: Enable test on TSAN variant.
- *   incompatible_disaggregated_storage_tsan,
- * ]
+ * @tags: []
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

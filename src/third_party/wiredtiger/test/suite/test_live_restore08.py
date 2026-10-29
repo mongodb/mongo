@@ -36,12 +36,6 @@ from wtbackup import backup_base
 class test_live_restore08(backup_base):
     nrows = 10000
 
-    def get_stat(self, statistic):
-        stat_cursor = self.session.open_cursor("statistics:")
-        val = stat_cursor[statistic][2]
-        stat_cursor.close()
-        return val
-
     def wait_for_live_restore_complete(self):
         state = 0
         timeout = 120

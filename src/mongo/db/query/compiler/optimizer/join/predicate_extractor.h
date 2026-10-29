@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression.h"
@@ -37,16 +11,20 @@ namespace mongo::join_ordering {
 
 /**
  * Class representing an agg expression of the form {$eq: ['$foreignCollFieldPath',
- * '$$localCollVar']}, used in join predicate resolution.
+ * '$$localCollVar']} or a localField/foreignField join, used in join predicate resolution.
  */
-class JoinPredicateExpr {
+class ExtractedJoinPredicate {
 public:
     /**
-     * Note: this expects 'expr' & 'letVars' to outlive the returned instance. This doesn't take
-     * ownership of either.
+     * Note: this expects 'expr', 'letVars', & 'source' to outlive the returned instance. This
+     * doesn't take ownership of either.
      */
-    static JoinPredicateExpr make(const ExpressionCompare* expr,
-                                  const std::vector<LetVariable>& letVars);
+    static ExtractedJoinPredicate make(const DocumentSource* source,
+                                       const ExpressionCompare* expr,
+                                       const std::vector<LetVariable>& letVars);
+    static ExtractedJoinPredicate make(FieldPath localField,
+                                       FieldPath foreignField,
+                                       const DocumentSource* source);
 
     const FieldPath& localField() const {
         return _localField;
@@ -58,16 +36,38 @@ public:
 
     // Used by unit tests.
     auto serialize() const {
-        return _expr->serialize();
+        return _expr ? _expr->serialize() : Value(BSONNULL);
+    }
+
+    auto source() const {
+        return _source;
+    }
+
+    bool isExpr() const {
+        return _isExpr;
     }
 
 private:
-    JoinPredicateExpr(FieldPath localField, FieldPath foreignField, const ExpressionCompare* expr)
-        : _localField(std::move(localField)), _foreignField(std::move(foreignField)), _expr(expr) {}
+    ExtractedJoinPredicate(bool isExpr,
+                           FieldPath localField,
+                           FieldPath foreignField,
+                           const ExpressionCompare* expr,
+                           const DocumentSource* source)
+        : _isExpr{isExpr},
+          _localField(std::move(localField)),
+          _foreignField(std::move(foreignField)),
+          _expr(expr),
+          _source{source} {}
 
+    // Is this a $expr predicate (true) or a localFieldForeign field join (false)?
+    bool _isExpr;
     FieldPath _localField;
     FieldPath _foreignField;
+    // These track both the origin document source and the expression this was extracted from.
     const ExpressionCompare* _expr;
+    // In particular, _source is needed for dependency analysis, which operates on DocumentSource*'s
+    // in order to figure out where a field came from.
+    const DocumentSource* _source;
 };
 
 /**
@@ -79,7 +79,7 @@ struct SplitPredicatesResult {
     // {$eq: ['$fieldPathInForeignNSS', '$$varCorrespondingToPathInLocalNSS']}
     // Note that the order of operands is not guaranteed and there may be semantically duplicate
     // entries.
-    std::vector<JoinPredicateExpr> joinPredicates;
+    std::vector<ExtractedJoinPredicate> joinPredicates;
     // Residual predicate on the single table which does not contain any correlated predicates. In
     // other terms, this expression is able to be pushed down to the find layer.
     std::unique_ptr<MatchExpression> singleTablePredicates;
@@ -95,7 +95,7 @@ struct SplitPredicatesResult {
  * This function does not modify its inputs.
  */
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
-    const MatchExpression* matchExpr, const std::vector<LetVariable>& variables);
+    const DocumentSourceMatch* match, const std::vector<LetVariable>& variables);
 
 
 struct ExprPredicatesResult {
@@ -103,6 +103,10 @@ struct ExprPredicatesResult {
 
     // Extracted join predicates.
     std::vector<JoinPredicate> predicates;
+
+    // Reason why we may have failed to extract. Only set if a predicate field was rejected because
+    // it isn't a legal join predicate path.
+    boost::optional<JoinFallbackReason> reason;
 };
 
 /**
@@ -113,7 +117,9 @@ struct ExprPredicatesResult {
  * The 'expr' can be fully absorbed into join graph if it contains only proper join equality
  * predicates and $and's.
  * The function returns 'ExprPredicatesResult' which contains a list of join predicates and a
- * boolean value identifying whether the 'expr' was fully absorbed.
+ * boolean value identifying whether the 'expr' was fully absorbed, or a metrics 'reason' why this
+ * failed.
  */
-ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver, const MatchExpression* expr);
+ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver,
+                                           const DocumentSourceMatch* match);
 }  // namespace mongo::join_ordering

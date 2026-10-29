@@ -26,65 +26,171 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# Identify all FIXME comments in the codebase associated with a WT ticket and then confirm all of
-# these tickets are still open. If a closed ticket is found report the error.
+# Identify all FIXME comments in the codebase associated with a WT ticket and
+# then confirm all of these tickets are still open. If a closed ticket is found
+# report the error.
 
-import glob, os, re, subprocess, sys
+import argparse, datetime, json, os, pathlib, re, sys, urllib.request
+
+# Grace period: tickets closed as Done/Fixed on a feature branch need time to
+# merge back to the develop branch before their FIXMEs are flagged as outdated.
+# Any other resolution type, such as Duplicate or Won't Fix, is flagged
+# immediately.
+GRACE_PERIOD_DAYS = 50
+GRACE_PERIOD_RESOLUTIONS = {"Done", "Fixed"}
+
 
 def all_files():
     """
-    List all files in the codebase other than those in the .git and build directories.
+    List all files in the codebase other than those in the .git and build
+    directories.
     """
 
-    excluded_dirs = {"../.git"}
+    for p in pathlib.Path("..").rglob("*"):
+        if (
+            p.is_file()
+            and ".git" not in p.parts
+            and "CMakeFiles" not in p.parts
+        ):
+            yield str(p)
 
-    # The build folder can be identified by the presence of CMakeFiles
-    build_files = glob.glob('../**/CMakeFiles')
-    for file in build_files:
-        excluded_dirs.add(os.path.dirname(file))
-
-    search_function = 'find .. -type f '
-    for excluded_dir in excluded_dirs:
-        search_function += f'-not -path "{excluded_dir}/*" '
-
-    result = subprocess.run(search_function, shell=True, capture_output=True, text=True)
-    return result.stdout.split('\n')
 
 def find_fixme_tickets():
     """
-    Return all WT tickets that are associated with a FIXME comment in the codebase.
+    Return all WT tickets that are associated with a FIXME comment, together
+    with the file in which the FIXME was found.
     """
 
     fixme_tickets = set()
 
-    match_re = re.compile(r'FIX.?ME.*?(WT-[0-9]+)')
+    match_re = re.compile(r"FIX.?ME.*?(WT-[0-9]+)")
     for filepath in all_files():
         try:
-            with open(filepath, 'r') as file:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as file:
                 for match in match_re.finditer(file.read()):
                     fixme_tickets.add((match[1], filepath))
-        except Exception as e:
-            # There are files like *.png which cannot be read. In this case skip them silently.
+        except Exception:
+            # There are files like *.png which cannot be read. In this case
+            # skip them silently.
             pass
     return fixme_tickets
 
+
+def query_jira_ticket(ticket, token):
+    """Query Jira for a ticket's resolution and resolution date."""
+
+    url = (
+        f"https://jira.mongodb.org/rest/api/2/issue/{ticket}"
+        f"?fields=resolution,resolutiondate"
+    )
+
+    headers = {"Authorization": f"Bearer {token}"}
+    request = urllib.request.Request(url, headers=headers)
+
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            fields = json.loads(response.read()).get("fields", {})
+    except (urllib.error.URLError, json.JSONDecodeError):
+        fields = {}
+
+    resolution = fields.get("resolution") or {}
+    return resolution.get("name"), fields.get("resolutiondate")
+
+
+def is_outdated(resolution, resolution_date):
+    """Return True if a ticket's FIXME should be flagged as outdated."""
+
+    if resolution is None:
+        return False  # Ticket is not resolved.
+
+    if resolution not in GRACE_PERIOD_RESOLUTIONS:
+        return True  # Duplicate, Won't Fix, etc. are flagged immediately.
+
+    if resolution_date is None:
+        return True  # No resolution date info. Assume it's outdated.
+
+    # All other resolutions are flagged after a grace period.
+    date_format = "%Y-%m-%dT%H:%M:%S.%f%z"
+    iso_date = datetime.datetime.strptime(resolution_date, date_format)
+    days_since = (datetime.datetime.now(datetime.timezone.utc) - iso_date).days
+
+    return days_since >= GRACE_PERIOD_DAYS
+
+
+def label_ticket(ticket, token):
+    """Add the outdated-fixme label to a Jira ticket."""
+
+    url = f"https://jira.mongodb.org/rest/api/2/issue/{ticket}"
+
+    body = json.dumps(
+        {"update": {"labels": [{"add": "outdated-fixme"}]}}
+    ).encode()
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    request = urllib.request.Request(
+        url, data=body, method="PUT", headers=headers
+    )
+
+    urllib.request.urlopen(request, timeout=10).close()
+
+
+def parse_args():
+    """Return the parsed command line arguments."""
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--label-outdated",
+        action="store_true",
+        help="Add a 'outdated-fixme' label to each outdated ticket found.",
+    )
+
+    return parser.parse_args()
+
+
+def get_jira_token():
+    """Return the Jira token, or exit if it's unset."""
+
+    token_name = "JIRA_API_TOKEN"
+    token = os.environ.get(token_name)
+
+    if not token:
+        sys.exit(
+            f"This script requires the {token_name} environment variable to be set."
+        )
+
+    return token
+
+
 def main():
     """
-    Query JIRA for all tickets with a FIXME in the codebase. If any of these tickets are closed
-    report them all and return an error code.
+    Query JIRA for all tickets with a FIXME in the codebase. If any of these
+    tickets are closed, report them all and return an error code.
     """
-    closed_ticket_found=False
-    STATUS_CATEGORY_DONE='rest/api/2/statuscategory/3'
-    for (ticket, file) in sorted(find_fixme_tickets()):
-        rest_query = \
-            f"curl -s -X GET https://jira.mongodb.org/rest/api/2/issue/{ticket}?fields=status"
-        query_result = subprocess.run(rest_query, shell=True, capture_output=True, text=True).stdout
-        if STATUS_CATEGORY_DONE in query_result:
+    args = parse_args()
+    token = get_jira_token()
+
+    closed_ticket_found = False
+    outdated_tickets = set()
+
+    for ticket, file in sorted(find_fixme_tickets()):
+        query_result = query_jira_ticket(ticket, token)
+        if is_outdated(*query_result):
             print(f"{ticket} is a closed ticket that has a FIXME comment in {file}.")
-            closed_ticket_found=True
+            closed_ticket_found = True
+            outdated_tickets.add(ticket)
 
-    if closed_ticket_found:
-        sys.exit(1)
+    if args.label_outdated:
+        for ticket in outdated_tickets:
+            label_ticket(ticket, token)
 
-if __name__ == '__main__':
+    exit_code = 1 if closed_ticket_found else 0
+    sys.exit(exit_code)
+
+
+if __name__ == "__main__":
     main()

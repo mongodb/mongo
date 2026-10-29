@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/percentile_algo_discrete.h"
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -61,7 +36,7 @@ vector<double> generateNormal(size_t n) {
     auto seed = time(nullptr);
     LOGV2(7514410, "generateNormal", "seed"_attr = seed);
     std::mt19937 generator(seed);
-    boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
+    boost::random::normal_distribution<double> dist(/*mean=*/0.0, /*sigma=*/1.0);
 
     vector<double> inputs;
     inputs.reserve(n);
@@ -173,6 +148,34 @@ TEST(DiscretePercentileTest, Basic) {
     ASSERT_EQ(90.0, pctls[4]);
     ASSERT_EQ(99.0, pctls[5]);
     ASSERT_EQ(100.0, pctls[6]);
+}
+
+/**
+ * Direct tests for the shared discrete rank computation, which DiscretePercentile and TDigest both
+ * delegate to.
+ */
+TEST(DiscretePercentileTest, ComputeDiscreteRank) {
+    // p >= 1 maps to the maximum rank.
+    ASSERT_EQ(99, computeDiscreteRank(100, 1.0));
+    ASSERT_EQ(99, computeDiscreteRank(100, 1.5));
+
+    // Otherwise the rank is ceil(n * p) - 1, floored at 0.
+    ASSERT_EQ(0, computeDiscreteRank(100, 0.0));
+    ASSERT_EQ(0, computeDiscreteRank(100, 0.01));
+    ASSERT_EQ(9, computeDiscreteRank(100, 0.1));
+    ASSERT_EQ(49, computeDiscreteRank(100, 0.5));
+    ASSERT_EQ(89, computeDiscreteRank(100, 0.9));
+    ASSERT_EQ(98, computeDiscreteRank(100, 0.99));
+    ASSERT_EQ(99, computeDiscreteRank(100, 0.999));
+
+    // Small dataset edge cases.
+    ASSERT_EQ(0, computeDiscreteRank(1, 1.0));
+    ASSERT_EQ(0, computeDiscreteRank(1, 0.5));
+}
+
+TEST(DiscretePercentileTest, ComputeDiscreteRankRejectsNonFiniteP) {
+    ASSERT_TASSERT_CODE(computeDiscreteRank(100, std::numeric_limits<double>::quiet_NaN()),
+                        13448900);
 }
 
 TEST(DiscretePercentileTest, ComputeMultiplePercentilesAtOnce) {

@@ -32,7 +32,6 @@ import wttest, wtthread
 
 # Prior to a bugfix in WiredTiger it was possible to read a partial transaction if the config
 # ignore prepare was provided. This test demonstrates that case.
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_prepare28(wttest.WiredTigerTestCase):
     test_name = __qualname__
     conn_config= 'timing_stress_for_test=[prepare_resolution_2]'
@@ -63,10 +62,7 @@ class test_prepare28(wttest.WiredTigerTestCase):
 
         ooo_thread.join()
 
-        stat_cursor = self.session.open_cursor('statistics:')
-        race_prepare_commit = stat_cursor[wiredtiger.stat.conn.txn_read_race_prepare_commit][2]
-        self.assertGreater(race_prepare_commit, 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(wiredtiger.stat.conn.txn_read_race_prepare_commit, 0)
 
     def read_update(self):
         sleep(0.1)

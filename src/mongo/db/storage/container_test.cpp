@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/container.h"
 
@@ -35,6 +9,8 @@
 
 #include <functional>
 #include <string>
+
+#include <boost/range/combine.hpp>
 
 namespace mongo {
 namespace {
@@ -158,6 +134,126 @@ TEST(ContainerTest, IntegerKeyedContainer) {
 
 TEST(ContainerTest, StringKeyedContainer) {
     runContainerTest<StringKeyedContainer, std::span<const char>>(KeyFormat::String, "k1", "k2");
+}
+
+
+template <typename Container, typename Key>
+void runContainerTestWithBatchedInserts(KeyFormat keyFormat,
+                                        std::span<const Key> keysBatch1,
+                                        std::span<const Key> keysBatch2) {
+    auto harnessHelper = newRecordStoreHarnessHelper();
+    auto rs = harnessHelper->newRecordStore("test.container",
+                                            RecordStore::Options{.keyFormat = keyFormat});
+    auto& container = std::get<std::reference_wrapper<Container>>(rs->getContainer()).get();
+
+    auto opCtx = harnessHelper->newOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    // Tests that pass must insert batches of 2 keys only.
+    const std::vector<std::string> valuesBatch1{"v1", "v2"};
+    const std::vector<std::span<const char>> valuesBatch1Views(valuesBatch1.begin(),
+                                                               valuesBatch1.end());
+
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(container.insert(
+            ru, keysBatch1, valuesBatch1Views, container::ExistingKeyPolicy::reject))
+            << "Failed to insert into empty container";
+        txn.commit();
+
+        auto cursor = container.getCursor(ru);
+        for (auto&& [key, value] : boost::combine(keysBatch1, valuesBatch1)) {
+            const auto found = cursor->find(key);
+            ASSERT_TRUE(found) << "Failed to find key that should have been inserted";
+            EXPECT_EQ(std::string(found->data(), found->size()), value)
+                << "Read back key does not match written value";
+        }
+    }
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_NOT_OK(container.insert(
+            ru, keysBatch1, valuesBatch1Views, container::ExistingKeyPolicy::reject))
+            << "Expected rejection of existing keys";
+        txn.abort();
+    }
+
+
+    const std::vector<std::string> valuesBatch1Overwrite{"vv1", "vv2"};
+    const std::vector<std::span<const char>> valuesBatch1OverwriteViews(
+        valuesBatch1Overwrite.begin(), valuesBatch1Overwrite.end());
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(container.insert(
+            ru, keysBatch1, valuesBatch1OverwriteViews, container::ExistingKeyPolicy::overwrite))
+            << "Expected overwrite of existing keys";
+        txn.abort();
+    }
+
+    const std::vector<std::string> valuesBatch2{"w2", "w3"};
+    const std::vector<std::span<const char>> valuesBatch2Views(valuesBatch2.begin(),
+                                                               valuesBatch2.end());
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_NOT_OK(container.insert(
+            ru, keysBatch2, valuesBatch2Views, container::ExistingKeyPolicy::reject))
+            << "Expected rejection of a batch that partially overlaps existing keys";
+        txn.abort();
+
+        auto cursor = container.getCursor(ru);
+        const auto overlapping = cursor->find(keysBatch2.front());
+        ASSERT_TRUE(overlapping) << "Failed to find key that should have been inserted";
+        EXPECT_EQ(std::string(overlapping->data(), overlapping->size()), valuesBatch1.back())
+            << "Rejected batch must leave the existing value untouched";
+        ASSERT_FALSE(cursor->find(keysBatch2.back()))
+            << "Rejected batch must not insert its new key";
+    }
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(container.insert(
+            ru, keysBatch2, valuesBatch2Views, container::ExistingKeyPolicy::overwrite))
+            << "Expected overwrite of a batch that partially overlaps existing keys";
+        txn.commit();
+
+        auto cursor = container.getCursor(ru);
+        for (auto&& [key, value] : boost::combine(keysBatch2, valuesBatch2)) {
+            const auto found = cursor->find(key);
+            ASSERT_TRUE(found) << "Failed to find key that should have been inserted";
+            EXPECT_EQ(std::string(found->data(), found->size()), value)
+                << "Read back key does not match written value";
+        }
+        const auto untouched = cursor->find(keysBatch1.front());
+        ASSERT_TRUE(untouched) << "Failed to find key that should have been inserted";
+        EXPECT_EQ(std::string(untouched->data(), untouched->size()), valuesBatch1.front())
+            << "Overwriting batch must leave keys outside the batch untouched";
+    }
+}
+
+TEST(ContainerTest, IntegerKeyedContainerWithBatchedInserts) {
+    const std::vector<int64_t> batch1Keys{1, 2};
+    const std::vector<int64_t> batch2Keys{2, 3};
+    runContainerTestWithBatchedInserts<IntegerKeyedContainer, int64_t>(
+        KeyFormat::Long, batch1Keys, batch2Keys);
+}
+
+TEST(ContainerTest, StringKeyedContainerWithBatchedInserts) {
+    const std::vector<std::span<const char>> batch1Keys{"k1", "k2"};
+    const std::vector<std::span<const char>> batch2Keys{"k2", "k3"};
+    runContainerTestWithBatchedInserts<StringKeyedContainer, std::span<const char>>(
+        KeyFormat::String, batch1Keys, batch2Keys);
+}
+
+TEST(ContainerTest, RangeBasedContainerWritesMustHaveEqualSpansIntegerKeyed) {
+    const std::vector<int64_t> keys{1, 2, 3};
+    ASSERT_THROWS((runContainerTestWithBatchedInserts<IntegerKeyedContainer, int64_t>(
+                      KeyFormat::Long, keys, keys)),
+                  DBException);
+}
+
+TEST(ContainerTest, RangeBasedContainerWritesMustHaveEqualSpansStringKeyed) {
+    const std::vector<std::span<const char>> keys{"k1", "k2", "k3"};
+    ASSERT_THROWS((runContainerTestWithBatchedInserts<StringKeyedContainer, std::span<const char>>(
+                      KeyFormat::String, keys, keys)),
+                  DBException);
 }
 
 }  // namespace

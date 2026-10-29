@@ -1,0 +1,35 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-integration
+  - "internal_search_id_lookup*":
+    approvers:
+      - 10gen/query-integration-search
+  - "command_diagnostics*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "external_data_source*":
+    approvers:
+      - 10gen/query-integration-features
+  - "compute_mode.js":
+    approvers:
+      - 10gen/query-integration-features
+  - "hybrid_search_in_unionwith_on_sharded_view.js":
+    approvers:
+      - 10gen/query-integration-search
+  - "hybrid_search_on_sharded_view.js":
+    approvers:
+      - 10gen/query-integration-search
+  - "list_search_indexes_deprecated.js":
+    approvers:
+      - 10gen/query-integration-search
+  - "query_planner_params_diagnostics.js":
+    approvers:
+      - 10gen/query-integration-observability
+  - "set_window_fields_read_concern_snapshot.js":
+    approvers:
+      - 10gen/query-integration-features
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-integration-staff-leads

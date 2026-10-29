@@ -1,30 +1,5 @@
-# Copyright (C) 2019-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     cpp_namespace: "mongo"
@@ -69,6 +44,12 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_varname: "storageGlobalParams.noTableScan"
         redact: false
+        annotations:
+            query_knob:
+                wire_name: noTableScan
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     allowDocumentsGreaterThanMaxUserSize:
         description: >-
@@ -109,6 +90,18 @@ server_parameters:
             name: CollectionValidateOptionsServerParameter
             data: CollectionValidateOptions
             override_set: true
+        redact: false
+
+    validateParallelMaxConcurrentNamespaces:
+        description:
+            "Upper bound on the number of namespaces to validate in parallel. When this parameter
+            is not set or set to 0, it will use all available cores. This parameter can only be used
+            with --validate and featureFlagParallelCollectionValidation=true, otherwise it has no effect."
+        set_at: [startup]
+        cpp_varname: gValidateParallelMaxConcurrentNamespaces
+        cpp_vartype: Atomic<int>
+        validator: {gte: 0}
+        default: 0
         redact: false
 
 configs:
@@ -180,16 +173,6 @@ configs:
         description: "Run validation on all collections"
         arg_vartype: Switch
         source: [cli, ini]
-
-    validateParallel:
-        description: >-
-            Run validation on all collections in parallel; optional thread count clamped to the
-            number of available cores (default: number of available cores)
-        arg_vartype: Int
-        source: [cli, ini]
-        implicit: 0
-        validator:
-            gte: 0
 
     restore:
         description: >-

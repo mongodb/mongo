@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/flow_control.h"
 
@@ -185,6 +159,109 @@ TEST_F(FlowControlTest, QueryingSamples) {
                 << "Start: " << start << " End: " << end;
         }
     }
+}
+
+namespace {
+// Minimal provider for exercising the retention floor: only measurementAnchor() and the
+// sustainer timestamps participate in trimming.
+class FloorProvider : public FlowControl::TimestampProvider {
+public:
+    Timestamp getCurrSustainerTimestamp() const override {
+        return prev;
+    }
+    Timestamp getPrevSustainerTimestamp() const override {
+        return prev;
+    }
+    repl::TimestampAndWallTime getTargetTimestampAndWallTime() const override {
+        return {};
+    }
+    repl::TimestampAndWallTime getLastWriteTimestampAndWallTime() const override {
+        return {};
+    }
+    bool flowControlUsable() const override {
+        return true;
+    }
+    bool sustainerAdvanced() const override {
+        return true;
+    }
+    void update() override {}
+    Timestamp measurementAnchor() const override {
+        return floor;
+    }
+
+    Timestamp prev;
+    Timestamp floor;
+};
+}  // namespace
+
+TEST_F(FlowControlTest, TrimNeverPassesTheProviderMeasurementAnchor) {
+    auto provider = std::make_unique<FloorProvider>();
+    auto* floorProvider = provider.get();
+    auto fc = std::make_unique<FlowControl>(std::move(provider));
+
+    // Seconds-domain timestamps: isNull() is secs == 0, so a floor with zero seconds would
+    // read as "no constraint".
+    for (int idx = 1; idx <= 10; ++idx) {
+        fc->sample(Timestamp(idx, 0), 1);
+    }
+    const auto& samples = fc->_getSampledOpsApplied_forTest();
+    ASSERT_EQ(10u, samples.size());
+
+    // The provider still needs history from ts 4 on; FlowControl's own horizon would trim
+    // to 9. The floor caps the trim, so the history under it survives.
+    floorProvider->prev = Timestamp(9, 0);
+    floorProvider->floor = Timestamp(4, 0);
+    ASSERT_EQ(Timestamp(4, 0), fc->_trimTarget(Timestamp(9, 0)));
+    fc->_trimSamples(fc->_trimTarget(Timestamp(9, 0)));
+    ASSERT_EQ(7u, samples.size());
+    ASSERT_EQ(Timestamp(4, 0).asULL(), std::get<0>(samples.front()));
+
+    // A null floor is "no constraint": trimming follows FlowControl's own horizon again.
+    floorProvider->floor = Timestamp();
+    fc->_trimSamples(fc->_trimTarget(Timestamp(9, 0)));
+    ASSERT_EQ(2u, samples.size());
+}
+
+TEST_F(FlowControlTest, ApproximatingOpsFromBelowRetainedHistory) {
+    // Queries below the oldest retained sample resolve to the front and count from there —
+    // the long-standing behavior isHealthy's idle escape depends on (a below-front target
+    // reads a LARGE count, not -1, so genuine lag is not classified healthy). The
+    // unanswerable-below-front semantic lives only in _calculateNewTicketsForLag's
+    // resolveSampleAtOrBelow gate, deliberately not here.
+    for (int idx = 10; idx < 20; ++idx) {
+        flowControl->sample(Timestamp(idx), 1);
+    }
+    ASSERT_EQ(9, flowControl->_approximateOpsBetween(Timestamp(2), Timestamp(19)));
+    ASSERT_FALSE(flowControl->resolveSampleAtOrBelow(Timestamp(2)));
+}
+
+TEST_F(FlowControlTest, ResolvingSamplePositions) {
+    // Empty table: nothing to resolve.
+    ASSERT_FALSE(flowControl->resolveSampleAtOrBelow(Timestamp(5)));
+
+    // Samples at times 10, 20, ..., 100, five ops each.
+    for (int idx = 1; idx <= 10; ++idx) {
+        flowControl->sample(Timestamp(10 * idx), 5);
+    }
+
+    // Below the oldest sample: unanswerable, not zero.
+    ASSERT_FALSE(flowControl->resolveSampleAtOrBelow(Timestamp(9)));
+
+    // Exact hit, between samples (rounds down), and beyond the newest (clamps to it).
+    auto exact = flowControl->resolveSampleAtOrBelow(Timestamp(30));
+    ASSERT_TRUE(exact);
+    ASSERT_EQ(exact->timestamp, Timestamp(30));
+
+    auto between = flowControl->resolveSampleAtOrBelow(Timestamp(35));
+    ASSERT_TRUE(between);
+    ASSERT_EQ(between->timestamp, Timestamp(30));
+
+    auto beyond = flowControl->resolveSampleAtOrBelow(Timestamp(1000));
+    ASSERT_TRUE(beyond);
+    ASSERT_EQ(beyond->timestamp, Timestamp(100));
+
+    // The cumulative coordinates difference to the exact op count between the positions.
+    ASSERT_EQ(beyond->cumulativeOps - exact->cumulativeOps, 5 * 7);
 }
 
 TEST_F(FlowControlTest, QueryingLocksPerOp) {

@@ -10,6 +10,21 @@
 
 #include "evict_private.h"
 
+/*
+ * The important timestamps of each stage in an eviction. If an eviction takes a long time and times
+ * out, we can trace the time usage of each stage from this information.
+ */
+struct __wt_evict_timeline {
+    uint64_t evict_start;
+    uint64_t evict_finish;
+    uint64_t reentry_hs_evict_start;
+    uint64_t reentry_hs_evict_finish;
+    bool reentry_hs_eviction;
+
+    /* Filled in by the reconciliation this eviction drove, if it ran one. */
+    WT_RECONCILE_TIMELINE reconcile;
+};
+
 struct __wt_evict {
     wt_shared volatile uint64_t eviction_progress; /* Eviction progress count */
     uint64_t last_eviction_progress;               /* Tracked eviction progress */
@@ -208,8 +223,8 @@ static WT_INLINE bool __wt_evict_page_is_soon(WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_evict_page_is_soon_or_wont_need(WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static WT_INLINE int __wt_evict_app_assist_worker_check(
-  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, bool *didworkp)
+static WT_INLINE int __wt_evict_app_assist_worker_check(WT_SESSION_IMPL *session, bool busy,
+  bool readonly, bool interruptible, bool bounded, bool *didworkp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE void __wt_evict_clear_npos(WT_BTREE *btree);
 static WT_INLINE void __wt_evict_favor_clearing_dirty_cache(WT_SESSION_IMPL *session);
@@ -224,6 +239,12 @@ static WT_INLINE void __wt_evict_touch_page(
   WT_SESSION_IMPL *session, WT_PAGE *page, bool internal_only, bool wont_need);
 
 #ifdef HAVE_UNITTEST
+extern WTI_EVICT_VICTIM_REASON __ut_evict_page_victim_cache_eligible(WT_SESSION_IMPL *session,
+  WT_REF *ref, const WT_PAGE_HEADER **diskp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern const WT_PAGE_HEADER *__ut_evict_page_disagg_image(WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern const char *__ut_evict_page_victim_cache_reason_str(WTI_EVICT_VICTIM_REASON reason)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 
 #endif
 

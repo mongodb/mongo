@@ -1,38 +1,7 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/bson/json.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph_test_util.h"
 #include "mongo/unittest/golden_test.h"
@@ -46,21 +15,34 @@ public:
     struct TestCase {
         const std::string& name;
         const std::string& pipeline;
+        const std::vector<std::string> nonArrayPaths;
     };
 
     PipelineDependencyGraphGoldenTest()
         : _cfg{"src/mongo/db/test_output/query/compiler/dependency_analysis"} {}
 
     void runVariation(TestCase testCase) {
-        auto [name, pipelineStr] = testCase;
+        auto [name, pipelineStr, nonArrayPaths] = testCase;
         auto pipeline = parsePipeline(pipelineStr);
-        DependencyGraph graph(pipeline->getSources());
+
+        auto pathArrayness = std::make_shared<PathArrayness>();
+        for (const auto& path : nonArrayPaths) {
+            pathArrayness->addPath(path, {}, true);
+        }
+        pipeline->getContext()->setPathArraynessForNss(pipeline->getContext()->getNamespaceString(),
+                                                       pathArrayness);
+        auto canPathBeArray = [this, &pipeline](std::string_view path) -> bool {
+            return pipeline->getContext()->canPathBeArrayForNss(
+                FieldRef(path), pipeline->getContext()->getNamespaceString());
+        };
+
+        DependencyGraph graph(pipeline->getSources(), canPathBeArray);
 
         // Run the golden test portion.
         {
             unittest::GoldenTestContext ctx(&_cfg);
             ctx.outStream() << "VARIATION " << name << std::endl;
-            ctx.outStream() << "input: " << toString(pipeline) << std::endl;
+            ctx.outStream() << "input: " << toString(*pipeline) << std::endl;
             ctx.outStream() << "output: " << graph.toDebugString() << std::endl;
             ctx.outStream() << std::endl;
         }
@@ -81,33 +63,6 @@ private:
             std::string current = graph.toDebugString();
             ASSERT_EQ(base, current);
         });
-    }
-
-    static std::string toString(const std::unique_ptr<Pipeline>& pipeline) {
-        auto bson = pipeline->serializeToBson();
-        BSONArrayBuilder ba{};
-        ba.append(bson.begin(), bson.end());
-        return BSON("pipeline" << ba.arr()).jsonString(ExtendedRelaxedV2_0_0, true /*pretty*/);
-    }
-
-    std::unique_ptr<Pipeline> parsePipeline(const std::string& inputPipeJson) const {
-        const BSONObj inputBson = fromjson("{pipeline: " + inputPipeJson + "}");
-        std::vector<BSONObj> rawPipeline;
-        for (auto&& stageElem : inputBson["pipeline"].Array()) {
-            rawPipeline.push_back(stageElem.embeddedObject());
-        }
-        const NamespaceString kTestNss =
-            NamespaceString::createNamespaceString_forTest("test", "collection");
-        const NamespaceString kCollB =
-            NamespaceString::createNamespaceString_forTest("test", "coll_b");
-        AggregateCommandRequest request(kTestNss, rawPipeline);
-        boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(kTestNss);
-        ResolvedNamespaceMap resolvedNs;
-        resolvedNs.insert_or_assign(kTestNss, {kTestNss, std::vector<BSONObj>{}});
-        resolvedNs.insert_or_assign(kCollB, {kCollB, std::vector<BSONObj>{}});
-        ctx->setResolvedNamespaces(std::move(resolvedNs));
-        return pipeline_factory::makePipeline(
-            request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
     }
 
     unittest::GoldenTestConfig _cfg;
@@ -296,6 +251,22 @@ TEST_F(PipelineDependencyGraphGoldenTest, InclusionDottedKnownSubfields) {
         .pipeline = "[{$set: { 'a.b': 1, 'a.c': 2, 'a.d': 3 }},"
                     "{$project: { 'a.b': 1, 'a.d': 1 }},"
                     "{$match: { 'a.b': 1, 'a.c': 1, 'a.d': 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionAndModificationOfSubfields) {
+    runVariation({
+        .name = "InclusionAndModificationOfSubfields",
+        .pipeline = "[{$set: { 'a.b.c': 1 }},"
+                    " {$project: { 'a.str': 'value', 'a.b.c': 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ModificationOfSubfieldDropsPriorSiblings) {
+    runVariation({
+        .name = "ModificationOfSubfieldDropsPriorSiblings",
+        .pipeline = "[{$set: { 'a.b.c': 1 }},"
+                    " {$project: { 'a.str': 'value' }}]",
     });
 }
 
@@ -552,6 +523,13 @@ TEST_F(PipelineDependencyGraphGoldenTest, ConstantOverwritten) {
         .pipeline = "[{$set: {a: 1}},"
                     " {$set: {a: 2}}]",
     });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionDottedAfterPriorStage) {
+    runVariation({.name = "InclusionDottedPathAfterPriorStageIsNotArray",
+                  .pipeline = "[{$match: {x: 1}},"
+                              " {$project: {'a.b.c': 1, 'a.b.d.e': 1}}]",
+                  .nonArrayPaths = {"a.b.c"}});
 }
 
 }  // namespace

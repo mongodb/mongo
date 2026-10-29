@@ -6,7 +6,7 @@
  *    multiversion_incompatible,
  *    # TODO (SERVER-94095): Re-enable this test in aubsan and tsan once DEVPROD-10102 is resolved.
  *    incompatible_aubsan,
- *    incompatible_tsan,
+ *    tsan_incompatible,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

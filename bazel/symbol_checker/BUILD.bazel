@@ -1,6 +1,18 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "symbol_extractor.py",
     "symbol_checker.py",
 ])
+
+py_test(
+    name = "symbol_tools_test",
+    size = "small",
+    srcs = ["symbol_tools_test.py"],
+    data = [
+        "symbol_checker.py",
+        "symbol_extractor.py",
+    ],
+)

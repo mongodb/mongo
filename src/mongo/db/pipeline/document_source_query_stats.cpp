@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_query_stats.h"
 
@@ -35,13 +9,10 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source_query_stats_gen.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-
-#include <cstddef>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -50,10 +21,9 @@
 
 namespace mongo {
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
-                                                       DocumentSourceQueryStats::LiteParsed::parse,
-                                                       AllowedWithApiStrict::kNeverInVersion1,
-                                                       &feature_flags::gFeatureFlagQueryStats);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(queryStats,
+                                     DocumentSourceQueryStats::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(queryStats,
                                                    DocumentSourceQueryStats,
@@ -137,12 +107,33 @@ Value DocumentSourceQueryStats::serialize(const query_shape::SerializationOption
         hmacKey =
             Value(BSONBinData("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 32, BinDataType::Sensitive));
     }
-    return Value{Document{
-        {kStageName,
-         _transformIdentifiers
-             ? Document{{"transformIdentifiers",
-                         Document{{"algorithm", idl::serialize(_algorithm)}, {"hmacKey", hmacKey}}}}
-             : Document{}}}};
+
+    MutableDocument spec(
+        _transformIdentifiers
+            ? Document{{"transformIdentifiers",
+                        Document{{"algorithm", idl::serialize(_algorithm)}, {"hmacKey", hmacKey}}}}
+            : Document{});
+
+    if (opts.isSerializingForExplain() && _topKSortSpec) {
+        // Include the optimization hint in explain output so jstests can assert it fired.
+        spec.addField("topKSortOptimization",
+                      Value{Document{{"path", _topKSortSpec->dottedMetricsPath},
+                                     {"limit", _topKSortSpec->limit},
+                                     {"isAscending", _topKSortSpec->isAscending}}});
+    }
+
+    if (opts.isSerializingForExplain() && _keyHashLookupSet) {
+        // Include the keyHash lookup locations in explain output to assert the pushdown fired.
+        spec.addField(
+            "keyHashLookupLocations",
+            Value{std::vector<Value>(_keyHashLookupSet->begin(), _keyHashLookupSet->end())});
+    }
+
+    return Value{Document{{kStageName, spec.freeze()}}};
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::clone(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    return new DocumentSourceQueryStats(*this, expCtx);
+}
 }  // namespace mongo

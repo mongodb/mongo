@@ -1,46 +1,15 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <cstdlib>
-#include <ctime>
-
-#include <boost/random/exponential_distribution.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/random/uniform_real_distribution.hpp>
-#include <boost/random/weibull_distribution.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
+
+#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -49,6 +18,12 @@
 #include <random>
 #include <string>
 #include <utility>
+
+#include <boost/random/exponential_distribution.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/weibull_distribution.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -183,8 +158,8 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_SinglePoint) {
                    42.0,  // min
                    42.0,  // max
                    {{1, 42.0}},
-                   nullptr /* k1_limit */,
-                   1 /* delta */);
+                   /*k_limit=*/nullptr,
+                   /*delta=*/1);
     ASSERT_EQ(42.0, digest.computePercentile(0.1));
     ASSERT_EQ(42.0, digest.computePercentile(0.5));
     ASSERT_EQ(42.0, digest.computePercentile(0.9));
@@ -197,8 +172,8 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_Min) {
                    1.0,  // min
                    5.0,  // max
                    {{10, 3.7}},
-                   nullptr /* k1_limit */,
-                   1 /* delta */);
+                   /*k_limit=*/nullptr,
+                   /*delta=*/1);
     ASSERT_EQ(1.0, digest.computePercentile(0));
 }
 
@@ -209,8 +184,8 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_Max) {
                    1.0,  // min
                    5.0,  // max
                    {{10, 3.7}},
-                   nullptr /* k1_limit */,
-                   1 /* delta */);
+                   /*k_limit=*/nullptr,
+                   /*delta=*/1);
     ASSERT_EQ(5.0, digest.computePercentile(1));
 }
 
@@ -224,8 +199,8 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_EvenlyDistributed) {
                    1.0,                         // min
                    100.0,                       // max
                    {{100, (1.0 + 100.0) / 2}},  // the single centroid
-                   nullptr /* k1_limit */,
-                   1 /* delta */);
+                   /*k_limit=*/nullptr,
+                   /*delta=*/1);
 
     for (int i = 1; i < 10; ++i) {
         const double p = i / 10.0;
@@ -288,8 +263,8 @@ TEST(TDigestTest, GetPercentile_SinglePointCentroids) {
                        {1, 900.0},
                        {1, 10000.0},
                    },  // 100 datapoints total
-                   nullptr /* k1_limit */,
-                   1 /* delta */);
+                   /*k_limit=*/nullptr,
+                   /*delta=*/1);
 
     ASSERT_EQ(2.0, digest.computePercentile(0.02));
     ASSERT_EQ(800.0, digest.computePercentile(0.98));
@@ -379,7 +354,7 @@ TEST(TDigestTest, Incorporate_WithInfinities) {
     ASSERT_NE(-inf, *d.computePercentile(pFirstNonInf)) << "p:" << pFirstNonInf << " digest " << d;
 
     assertExpectedAccuracy(
-        sorted, d, {0.5} /* percentiles */, 0.020 /* accuracyError */, "Incorporate_Infinities");
+        sorted, d, /*percentiles=*/{0.5}, /*accuracyError=*/0.020, "Incorporate_Infinities");
 
     // 200 out of 1500 values are positive infinities
     const double pInfStart = 1 - 199.0 / 1500;
@@ -423,22 +398,22 @@ TEST(TDigestTest, Incorporate_Great_And_Small) {
     // 1. large negative numbers
     inputs[0] = std::numeric_limits<double>::lowest();
     for (size_t i = 1; i < 250; ++i) {
-        inputs[i] = std::nextafter(inputs[i - 1] /* from */, -1.0 /* to */);
+        inputs[i] = std::nextafter(/*from=*/inputs[i - 1], /*to=*/-1.0);
     }
     // 2. small negative numbers
     inputs[250] = -0.0;
     for (size_t i = 251; i < 500; ++i) {
-        inputs[i] = std::nextafter(inputs[i - 1] /* from */, -1.0 /* to */);
+        inputs[i] = std::nextafter(/*from=*/inputs[i - 1], /*to=*/-1.0);
     }
     // 3. small positive numbers
     inputs[500] = 0.0;
     for (size_t i = 501; i < 750; ++i) {
-        inputs[i] = std::nextafter(inputs[i - 1] /* from */, 1.0 /* to */);
+        inputs[i] = std::nextafter(/*from=*/inputs[i - 1], /*to=*/1.0);
     }
     // 4. large positive numbers
     inputs[750] = std::numeric_limits<double>::max();
     for (size_t i = 751; i < 1000; ++i) {
-        inputs[i] = std::nextafter(inputs[i - 1] /* from */, 1.0 /* to */);
+        inputs[i] = std::nextafter(/*from=*/inputs[i - 1], /*to=*/1.0);
     }
     vector<double> sorted = inputs;
     std::sort(sorted.begin(), sorted.end());
@@ -461,8 +436,8 @@ TEST(TDigestTest, Incorporate_Great_And_Small) {
 
     assertExpectedAccuracy(sorted,
                            d,
-                           {0.1, 0.4, 0.5, 0.6, 0.9} /* percentiles */,
-                           0.020 /* accuracyError */,
+                           /*percentiles=*/{0.1, 0.4, 0.5, 0.6, 0.9},
+                           /*accuracyError=*/0.020,
                            "Incorporate_Great_And_Small");
 }
 
@@ -817,25 +792,25 @@ typedef vector<double> (*DataGenerator)(size_t, size_t, bool, long);
 
 // Generates 'n' values in [0, 100] range with uniform distribution.
 vector<double> generateUniform(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
-    boost::random::uniform_real_distribution<double> dist(0 /* min */, 100 /* max */);
+    boost::random::uniform_real_distribution<double> dist(/*min=*/0, /*max=*/100);
     return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
 // Generates 'n' values from normal distribution with mean = 0.0 and sigma = 0.5.
 vector<double> generateNormal(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
-    boost::random::normal_distribution<double> dist(0.0 /* mean */, 0.5 /* sigma */);
+    boost::random::normal_distribution<double> dist(/*mean=*/0.0, /*sigma=*/0.5);
     return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
 // Generates 'n' values from exponential distribution with lambda = 1.0: p(x)=lambda*e^(-lambda*x).
 vector<double> generateExponential(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
-    boost::random::exponential_distribution<double> dist(1.0 /* lambda */);
+    boost::random::exponential_distribution<double> dist(/*lambda=*/1.0);
     return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
 // Generates 'n' values from weibull distribution with a : 1.0, b: 0.5 to produce a heavy tail.
 vector<double> generateWeibull(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
-    boost::random::weibull_distribution<double> dist(1.0 /* a */, 0.5 /* b */);
+    boost::random::weibull_distribution<double> dist(/*a=*/1.0, /*b=*/0.5);
     return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
@@ -879,7 +854,7 @@ TEST(TDigestTest, UniformDistribution_Mid) {
                              TDigest::k2,
                              generateUniform,
                              percentiles,
-                             0.005 /* accuracy */,
+                             /*accuracy=*/0.005,
                              "Uniform distribution mid");
 }
 TEST(TDigestTest, UniformDistribution_Extr) {
@@ -888,7 +863,7 @@ TEST(TDigestTest, UniformDistribution_Extr) {
                              TDigest::k2,
                              generateUniform,
                              percentiles,
-                             0.0005 /* accuracy */,
+                             /*accuracy=*/0.0005,
                              "Uniform distribution extr");
 }
 
@@ -898,7 +873,7 @@ TEST(TDigestTest, NormalDistribution_Mid) {
                              TDigest::k2,
                              generateNormal,
                              percentiles,
-                             0.005 /* accuracy */,
+                             /*accuracy=*/0.005,
                              "Normal distribution mid");
 }
 TEST(TDigestTest, NormalDistribution_Extr) {
@@ -907,7 +882,7 @@ TEST(TDigestTest, NormalDistribution_Extr) {
                              TDigest::k2,
                              generateNormal,
                              percentiles,
-                             0.0005 /* accuracy */,
+                             /*accuracy=*/0.0005,
                              "Normal distribution extr");
 }
 
@@ -917,7 +892,7 @@ TEST(TDigestTest, ExponentialDistribution_Mid) {
                              TDigest::k2,
                              generateExponential,
                              percentiles,
-                             0.005 /* accuracy */,
+                             /*accuracy=*/0.005,
                              "Exponential distribution mid");
 }
 TEST(TDigestTest, ExponentialDistribution_Extr) {
@@ -926,7 +901,7 @@ TEST(TDigestTest, ExponentialDistribution_Extr) {
                              TDigest::k2,
                              generateExponential,
                              percentiles,
-                             0.0005 /* accuracy */,
+                             /*accuracy=*/0.0005,
                              "Exponential distribution extr");
 }
 
@@ -936,7 +911,7 @@ TEST(TDigestTest, WeibullDistribution_Mid) {
                              TDigest::k2,
                              generateWeibull,
                              percentiles,
-                             0.005 /* accuracy */,
+                             /*accuracy=*/0.005,
                              "Exponential distribution mid");
 }
 TEST(TDigestTest, WeibullDistribution_Extr) {
@@ -945,7 +920,7 @@ TEST(TDigestTest, WeibullDistribution_Extr) {
                              TDigest::k2,
                              generateWeibull,
                              percentiles,
-                             0.0005 /* accuracy */,
+                             /*accuracy=*/0.0005,
                              "Exponential distribution extr");
 }
 
@@ -961,7 +936,7 @@ void runTestWithDuplicatesInData(DataGenerator dg,
                                  double accuracy,
                                  const char* msg) {
     const int delta = 500;
-    vector<double> inputs = dg(n, dupes, keepDupesTogether, 8235521 /*seed*/);
+    vector<double> inputs = dg(n, dupes, keepDupesTogether, /*seed=*/8235521);
 
     TDigest digest(TDigest::k2_limit, delta);
     for (auto val : inputs) {
@@ -983,32 +958,32 @@ TEST(TDigestTest, Duplicates_uniform_mid) {
 
     runTestWithDuplicatesInData(generateUniform,
                                 10'000 /* nUnique*/,
-                                10 /* dupes */,
-                                false /* keepDupesTogether*/,
+                                /*dupes=*/10,
+                                /*keepDupesTogether=*/false,
                                 percentiles,
-                                0.005 /* accuracy */,
+                                /*accuracy=*/0.005,
                                 "Uniform distribution with shuffled dupes mid (10'000x10)");
     runTestWithDuplicatesInData(generateUniform,
                                 10'000 /* nUnique*/,
-                                10 /* dupes */,
-                                true /* keepDupesTogether*/,
+                                /*dupes=*/10,
+                                /*keepDupesTogether=*/true,
                                 percentiles,
-                                0.005 /* accuracy */,
+                                /*accuracy=*/0.005,
                                 "Uniform distribution with clustered dupes mid (10'000x10)");
 
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
-                                100 /* dupes */,
-                                false /* keepDupesTogether*/,
+                                /*n=*/1000,
+                                /*dupes=*/100,
+                                /*keepDupesTogether=*/false,
                                 percentiles,
-                                0.01 /* accuracy */,
+                                /*accuracy=*/0.01,
                                 "Uniform distribution with shuffled dupes mid (1000x100)");
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
-                                100 /* dupes */,
-                                true /* keepDupesTogether*/,
+                                /*n=*/1000,
+                                /*dupes=*/100,
+                                /*keepDupesTogether=*/true,
                                 percentiles,
-                                0.01 /* accuracy */,
+                                /*accuracy=*/0.01,
                                 "Uniform distribution with clustered dupes mid (1000x100)");
 }
 
@@ -1017,32 +992,32 @@ TEST(TDigestTest, Duplicates_uniform_extr) {
 
     runTestWithDuplicatesInData(generateUniform,
                                 10'000 /* nUnique*/,
-                                10 /* dupes */,
-                                false /* keepDupesTogether*/,
+                                /*dupes=*/10,
+                                /*keepDupesTogether=*/false,
                                 percentiles,
-                                0.0005 /* accuracy */,
+                                /*accuracy=*/0.0005,
                                 "Uniform distribution with shuffled dupes extr (10'000x10)");
     runTestWithDuplicatesInData(generateUniform,
                                 10'000 /* nUnique*/,
-                                10 /* dupes */,
-                                true /* keepDupesTogether*/,
+                                /*dupes=*/10,
+                                /*keepDupesTogether=*/true,
                                 percentiles,
-                                0.0005 /* accuracy */,
+                                /*accuracy=*/0.0005,
                                 "Uniform distribution with clustered dupes extr (10'000x10)");
 
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
-                                100 /* dupes */,
-                                false /* keepDupesTogether*/,
+                                /*n=*/1000,
+                                /*dupes=*/100,
+                                /*keepDupesTogether=*/false,
                                 percentiles,
-                                0.005 /* accuracy */,
+                                /*accuracy=*/0.005,
                                 "Uniform distribution with shuffled dupes extr (1000x100)");
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
-                                100 /* dupes */,
-                                true /* keepDupesTogether*/,
+                                /*n=*/1000,
+                                /*dupes=*/100,
+                                /*keepDupesTogether=*/true,
                                 percentiles,
-                                0.005 /* accuracy */,
+                                /*accuracy=*/0.005,
                                 "Uniform distribution with clustered dupes extr (1000x100)");
 }
 
@@ -1063,8 +1038,8 @@ TEST(TDigestTest, Duplicates_all) {
     assertExpectedAccuracy(
         inputs,
         digest,
-        {0.0001, 0.001, 0.01, 0.1, 0.2, 0.5, 0.8, 0.9, 0.99, 0.999, 0.9999} /* percentiles */,
-        0.0 /* accuracy */,
+        /*percentiles=*/{0.0001, 0.001, 0.01, 0.1, 0.2, 0.5, 0.8, 0.9, 0.99, 0.999, 0.9999},
+        /*accuracyError=*/0.0,
         "All duplicates mid");
 }
 
@@ -1090,13 +1065,13 @@ TEST(TDigestTest, Duplicates_two_clusters) {
     assertIsValid(digest, TDigest::k2, delta, "Duplicates_two_clusters");
     assertExpectedAccuracy(sorted,
                            digest,
-                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
-                           0.01 /* accuracy */,
+                           /*percentiles=*/{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9},
+                           /*accuracyError=*/0.01,
                            "Duplicates two clusters mid");
     assertExpectedAccuracy(sorted,
                            digest,
-                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
-                           0.005 /* accuracy */,
+                           /*percentiles=*/{0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999},
+                           /*accuracyError=*/0.005,
                            "Duplicates two clusters extr");
 }
 
@@ -1117,7 +1092,7 @@ TEST(TDigestTest, Frankenstein_distribution) {
     for (const auto& chunk : chunks) {
         inputs.insert(inputs.end(), chunk.begin(), chunk.end());
     }
-    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(2023 /*seed*/));
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(/*seed=*/2023));
 
     const int delta = 500;
     TDigest digest(TDigest::k2_limit, delta);
@@ -1177,7 +1152,7 @@ std::pair<vector<vector<int>> /*errors*/, vector<int> /*# centroids*/> generateA
     long seed = 5670398;  // arbitrary
     for (int i = 0; i < nIterations; ++i) {
         std::cout << "*** iteration " << i << std::endl;
-        vector<double> data = dg(nUnique, 1 /* dupes */, false /* keepDupesTogether */, ++seed);
+        vector<double> data = dg(nUnique, /*dupes=*/1, /*keepDupesTogether=*/false, ++seed);
         vector<double> sorted = data;
         std::sort(sorted.begin(), sorted.end());
 

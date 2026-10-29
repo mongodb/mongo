@@ -13,6 +13,7 @@
 # python buildscripts/resmoke.py run --suites=core
 
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
 
 resmoke_suite_test(
     name = "aggregation_dependency_graph_validation_passthrough",
@@ -20,10 +21,10 @@ resmoke_suite_test(
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 3,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     deps = [
@@ -34,14 +35,15 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_disabled_optimization",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_disabled_optimization.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 3,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     target_compatible_with = select({
@@ -57,7 +59,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "aggregation_repeat_queries_multiplan_single_solutions",
     config = "//buildscripts/resmokeconfig:suites/aggregation_repeat_queries_multiplan_single_solutions.yml",
-    shard_count = 8,
+    shard_count = 3,
     tags = ["ci-default"],
     deps = [
         "//src/mongo/db:mongod",
@@ -68,7 +70,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "identity_views_passthrough",
     config = "//buildscripts/resmokeconfig:suites/identity_views_passthrough.yml",
-    shard_count = 8,
+    shard_count = 5,
     tags = ["ci-default"],
     deps = [
         "//src/mongo/db:mongod",
@@ -79,7 +81,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_cost_choice_aggregation_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_cost_choice_aggregation_passthrough.yml",
-    shard_count = 8,
+    shard_count = 2,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -93,7 +95,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_cost_choice_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_cost_choice_jscore_passthrough.yml",
-    shard_count = 8,
+    shard_count = 5,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -107,7 +109,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_no_multiplanning_results_aggregation_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_no_multiplanning_results_aggregation_passthrough.yml",
-    shard_count = 8,
+    shard_count = 2,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -121,7 +123,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "query_cbr_automatic_no_multiplanning_results_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_no_multiplanning_results_jscore_passthrough.yml",
-    shard_count = 8,
+    shard_count = 5,
     tags = [
         "blocked_in_query_alias",  # We explicitly specify this task in query alias
         "ci-default",
@@ -161,36 +163,6 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "query_cbr_histogram_aggregation_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/query_cbr_histogram_aggregation_passthrough.yml",
-    shard_count = 8,
-    tags = [
-        "blocked_in_query_alias",  # We explicitly specify this task in query alias
-        "ci-experimental",
-        "manual",  # Currently disabled due to an OOM in SERVER-109720. To be re-enabled in SERVER-109881. Remove "manual".
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
-    name = "query_cbr_histogram_jscore_passthrough",
-    config = "//buildscripts/resmokeconfig:suites/query_cbr_histogram_jscore_passthrough.yml",
-    shard_count = 8,
-    tags = [
-        "blocked_in_query_alias",  # We explicitly specify this task in query alias
-        "ci-experimental",
-        "manual",  # Currently disabled due to an OOM in SERVER-109720. To be re-enabled in SERVER-109881. Remove "manual".
-    ],
-    deps = [
-        "//src/mongo/db:mongod",
-        "//src/mongo/shell:mongo",
-    ],
-)
-
-resmoke_suite_test(
     name = "query_cbr_sampling_aggregation_passthrough",
     config = "//buildscripts/resmokeconfig:suites/query_cbr_sampling_aggregation_passthrough.yml",
     shard_count = 8,
@@ -219,12 +191,27 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "query_cbr_persistent_samples_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_persistent_samples_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "aggregation_repeat_queries_always_replan",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_repeat_queries_always_replan.yml",
-    shard_count = 8,
+    shard_count = 3,
     tags = [
         "aggregation",
         "ci-default",
+        "incompatible_debug_mode",
     ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
@@ -241,8 +228,11 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_repeat_queries_always_replan",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_repeat_queries_always_replan.yml",
-    shard_count = 8,
-    tags = ["ci-default"],
+    shard_count = 7,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+    ],
     target_compatible_with = select({
         "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
         "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
@@ -258,11 +248,383 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "core_wildcard_indexes",
     config = "//buildscripts/resmokeconfig:suites/core_wildcard_indexes.yml",
-    shard_count = 50,
+    shard_count = 7,
     tags = [
         "ci-default",
         "jscore",
     ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "json_schema",
+    config = "//buildscripts/resmokeconfig:suites/json_schema.yml",
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_classic",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_classic.yml",
+    data = [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
+    shard_count = 2,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_sharding",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_sharding.yml",
+    shard_count = 2,
+    tags = [
+        "blocked_in_join_opt_variant",
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # Requires src/mongo/db/query/benchmark/data_generator
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_tester_self_test",
+    config = "//buildscripts/resmokeconfig:suites/query_tester_self_test.yml",
+    data = [
+        "//src/mongo/db/query/query_tester/tests/selfTests:self_test_data",
+        "//src/mongo/db/query/query_tester/tests/selfTests/testlib:all_python_files",
+    ],
+    tags = [
+        "ci-default",
+        "incompatible_with_bazel_remote_test",  # requires `git`
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_cbr_automatic_cost_choice",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_cbr_automatic_cost_choice.yml",
+    data = [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
+    shard_count = 2,
+    tags = [
+        "blocked_in_query_alias",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_golden_cbr_automatic_no_multiplanning_results",
+    config = "//buildscripts/resmokeconfig:suites/query_golden_cbr_automatic_no_multiplanning_results.yml",
+    data = [
+        "//src/mongo/db/query/benchmark/data_generator:driver",
+    ],
+    shard_count = 2,
+    tags = [
+        "blocked_in_query_alias",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_expression_optimization_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "optimization",
+    ],
+    npm_command = "agg-expr-fuzzer",
+    num_generated_files = 400,
+)
+
+resmoke_suite_test(
+    name = "aggregation_expression_optimization_fuzzer",
+    srcs = [":aggregation_expression_optimization_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 20,
+    tags = [
+        "aggfuzzer",
+        "ci-all-variants",
+        "incompatible_development_variant",
+        "random_name",
+        "require_npm",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_optimization_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "optimization",
+        "--numPipelines=3000",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 400,
+)
+
+resmoke_suite_test(
+    name = "aggregation_optimization_fuzzer",
+    srcs = [":aggregation_optimization_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 50,
+    tags = [
+        "aggfuzzer",
+        "ci-all-variants",
+        "incompatible_development_variant",
+        "optimization",
+        "random_name",
+        "require_npm",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_optimization_fuzzer_deterministic_tests",
+    bundle = "@jstestfuzz_deterministic//:bundle",
+    extra_args = [
+        "--diffTestingMode",
+        "optimization",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 24,
+    seed = "1726779665485",
+    shard_count = 4,
+)
+
+resmoke_suite_test(
+    name = "aggregation_optimization_fuzzer_deterministic",
+    srcs = [":aggregation_optimization_fuzzer_deterministic_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 4,
+    tags = [
+        "auxiliary",
+        "ci-fuzzer-deterministic",
+        "incompatible_debug_mode",
+        "optimization",
+        "random_name",
+        "require_npm",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_1",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_1"],
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_1/generated_tests/*/"],
+    shard_count = 4,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+        "incompatible_with_bazel_remote_test",  # Requires `git`
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_2",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_2"],
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_2/generated_tests/*/"],
+    shard_count = 4,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+        "incompatible_with_bazel_remote_test",  # Requires `git`
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_3",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_3"],
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_3/generated_tests/*/"],
+    shard_count = 4,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+        "incompatible_with_bazel_remote_test",  # Requires `git`
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_generated_test_4",
+    srcs = ["//src/mongo/db/query/query_tester/tests:query_correctness_tests_4"],
+    config = "//buildscripts/resmokeconfig:suites/query_correctness_generated_test.yml",
+    config_roots = ["//src/mongo/db/query/query_tester/tests/query_correctness_tests_4/generated_tests/*/"],
+    shard_count = 4,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+        "incompatible_with_bazel_remote_test",  # Requires `git`
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_correctness_manual_test",
+    config = "//buildscripts/resmokeconfig:suites/query_tester_manual_test.yml",
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+        "incompatible_with_bazel_remote_test",  # requires `git`
+        "requires_all_feature_flags",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # The query_tester test kind treats each directory under manual_tests/ as a
+    # single test case. srcs auto-derive to those directories; directory
+    # granularity writes each as a test while still tracking its multiple files as inputs.
+    test_root_granularity = "directory",
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/query_tester:mongotest",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_explain_v3_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/core_explain_v3_passthrough.yml",
+    shard_count = 4,
+    tags = [
+        "blocked_in_query_alias",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "pbt_clustered_experiment_coll",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/pbt_clustered_experiment_coll.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",

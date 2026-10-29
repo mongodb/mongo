@@ -28,8 +28,10 @@ const serverParams = {
     setParameter: {
         // Needed to avoid spilling to disk, which changes memory metrics.
         allowDiskUseByDefault: false,
-        // Needed so that chunked memory tracking reaches CurOp
-        internalQueryMaxWriteToCurOpMemoryUsageBytes: 256,
+        // The operation-wide memory tracker only writes to CurOp when usage crosses a chunk
+        // boundary, and this workload stays well below the 1MB default, so make every update
+        // report.
+        internalQueryMaxWriteToCurOpMemoryUsageBytes: 1,
     },
 };
 

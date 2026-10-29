@@ -5,6 +5,12 @@ import subprocess
 import sys
 import unittest
 
+from buildscripts.tests.resmoke_end2end.nested_resmoke import stage_mongo_version_file
+
+
+def setUpModule():
+    stage_mongo_version_file()
+
 
 class TestMongoPath(unittest.TestCase):
     """Test that MONGO_PATH works for both load() and import()."""

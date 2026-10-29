@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/util/procparser.h"
@@ -45,15 +19,13 @@
 #include <fcntl.h>
 
 #include <boost/algorithm/string/constants.hpp>
-#include <boost/algorithm/string/finder.hpp>
-// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
 #include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/algorithm/string/finder.hpp>
 #include <boost/core/addressof.hpp>
 #include <boost/function/function_base.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/range/iterator_range_core.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include <boost/type_index/type_index_facade.hpp>
 
 #ifndef _WIN32
@@ -79,6 +51,8 @@
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
@@ -427,18 +401,10 @@ Status parseProcMemInfo(const std::vector<std::string_view>& keys,
             ++valueIt;
 
             // If there is one last token, check if it is actually "kB"
-            if (valueIt != StringSplitIterator()) {
-                std::string_view kbToken = stringDataFromRange(*valueIt);
-                auto keyWithSuffix = std::string{key};
-
-                if (kbToken == "kB") {
-                    keyWithSuffix.append("_kb");
-                }
-
-                builder->appendNumber(keyWithSuffix, static_cast<long long>(numVal));
-            } else {
-                builder->appendNumber(key, static_cast<long long>(numVal));
-            }
+            std::string reformattedKey;
+            if (valueIt != StringSplitIterator() && stringDataFromRange(*valueIt) == "kB")
+                key = reformattedKey = fmt::format("{}_kb", key);
+            builder->appendNumber(key, static_cast<long long>(numVal));
         });
 }
 
@@ -510,7 +476,7 @@ Status parseProcNetstat(const std::vector<std::string_view>& keys,
                     std::string_view stringValue = stringDataFromRange(*valuesIt);
                     uint64_t value;
                     if (NumberParser{}(stringValue, &value).isOK()) {
-                        builder->appendNumber(std::string{prefix} + std::string{key},
+                        builder->appendNumber(fmt::format("{}{}", prefix, key),
                                               static_cast<long long>(value));
                         foundKeys = true;
                     }
@@ -552,7 +518,7 @@ Status parseProcSockstat(const std::map<std::string_view, std::set<std::string_v
         // Start a new document with the line key as the name.
         BSONObjBuilder sub(builder->subobjStart(lineKey));
         ++partIt;
-        auto lineKeySet = bucketIt->second;
+        const auto& lineKeySet = bucketIt->second;
         while (partIt != StringSplitIterator()) {
             std::string_view key = stringDataFromRange(*partIt);
             if (!lineKeySet.count(key)) {
@@ -569,7 +535,7 @@ Status parseProcSockstat(const std::map<std::string_view, std::set<std::string_v
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Couldn't parse '" << stringValue << "' to number");
             }
-            sub.appendNumber(std::string{key}, value);
+            sub.appendNumber(key, value);
             foundKeys = true;
             ++partIt;
         }

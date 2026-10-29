@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 
@@ -46,9 +20,11 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
 
@@ -324,16 +300,15 @@ protected:
         public:
             StaticCatalogClient() = default;
 
-            repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-                OperationContext* opCtx,
-                repl::ReadConcernLevel readConcern,
-                BSONObj filter) override {
+            repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
                 for (const auto& shardId : makeThreeShardIdsList()) {
                     const ConnectionString cs = ConnectionString::forReplicaSet(
                         shardId.toString(), {HostAndPort(str::stream() << shardId << ":123")});
                     ShardType sType;
-                    sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
+                    sType.setName(cs.getSetName());
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };
@@ -524,7 +499,7 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsRunningBlockedTasks) {
 TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsNotYetScheduledTasks) {
     AsyncWorkScheduler async(getServiceContext());
 
-    AtomicWord<int> numInvocations{0};
+    Atomic<int> numInvocations{0};
 
     auto future1 =
         async.scheduleWorkIn(Milliseconds(1), [&numInvocations](OperationContext* opCtx) {
@@ -660,6 +635,77 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownAllowedFromScheduleWorkAtCallback) {
     });
 
     future.get();
+}
+
+// AsyncWorkScheduler schedules on the executor while holding '_mutex', and the callback re-acquires
+// '_mutex'. Block the scheduling thread holding '_mutex', shut the executor down, then let it
+// proceed: it must not self-deadlock, and scheduleWork must resolve with an error.
+TEST_F(AsyncWorkSchedulerTest, NoDeadlockWhenExecutorShutsDownWhileSchedulingUnderMutex) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    boost::optional<StatusWith<int>> result;
+    stdx::thread scheduler;
+    {
+        FailPointEnableBlock fpBlock("hangAfterShutdownCheckWhileHoldingSchedulerMutex");
+
+        scheduler = stdx::thread(
+            [&] { result = async.scheduleWork([](OperationContext*) { return 0; }).getNoThrow(); });
+
+        // Wait until the scheduling thread is blocked holding '_mutex', just past the shutdown
+        // check.
+        fpBlock.waitForOneNewEntry();
+
+        // Shut the executor down while the scheduling thread holds '_mutex' mid-schedule.
+        shutdownExecutorPool();
+    }  // Disabling the failpoint here releases the blocked thread.
+
+    // The scheduling thread must finish without deadlocking on '_mutex'.
+    scheduler.join();
+
+    ASSERT(result);
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result->getStatus());
+}
+
+// Regression test: the scheduler must stay alive while a scheduleRemoteCommand continuation that
+// captured a raw 'this' is still pending. The failpoint parks a worker after targeting but before
+// the command handle is registered, so join() must block until the command completes. Without the
+// fix join() returns in that window and the scheduler is freed under the continuation, which ASAN
+// catches as a use-after-free.
+TEST_F(AsyncWorkSchedulerTest, SchedulerStaysAliveUntilRemoteCommandCompletes) {
+    auto async = std::make_unique<AsyncWorkScheduler>(getServiceContext());
+
+    auto* fp = globalFailPointRegistry().find(
+        "hangTransactionCoordinatorAsyncWorkSchedulerBeforeSchedulingRemoteCommand");
+    ASSERT(fp);
+    // Enable via a scope block so the failpoint is always disabled on exit, even if the test
+    // aborts.
+    FailPointEnableBlock fpBlock(fp);
+
+    auto future = async->scheduleRemoteCommand(
+        kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
+
+    // Tears the scheduler down as soon as it looks idle. join() must block until the command
+    // completes; before the fix it returned early and freed the scheduler under the continuation.
+    stdx::thread owner([&] {
+        async->join();
+        async.reset();
+    });
+
+    // Wait until the worker is parked: targeting done, command handle not yet registered.
+    fpBlock.waitForOneNewEntry();
+
+    // Release the worker so the command can be sent, then service it.
+    fp->setMode(FailPoint::off);
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_BSONOBJ_EQ(BSON("TestCommand" << 1), request.cmdObj);
+        return BSON("ok" << 1);
+    });
+
+    // join() returns (and reset() runs) only after the command completed; no use-after-free.
+    owner.join();
+
+    ASSERT(future.isReady());
+    ASSERT_OK(future.getNoThrow().getStatus());
 }
 
 TEST_F(AsyncWorkSchedulerTest, DestroyingSchedulerCapturedInFutureCallback) {
@@ -833,7 +879,7 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
 TEST_F(DoWhileTest, LoopObeysShutdown) {
     AsyncWorkScheduler async(getServiceContext());
 
-    AtomicWord<int> numLoops{0};
+    Atomic<int> numLoops{0};
     auto future = doWhile(
         async,
         boost::none,

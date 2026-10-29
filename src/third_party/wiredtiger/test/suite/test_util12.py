@@ -30,6 +30,7 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
 # Utilities: wt write
+@wttest.skip_for_hook("disagg", "wt write is not supported in disaggregated storage mode")
 class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
     tablename = f'{test_name}.a'

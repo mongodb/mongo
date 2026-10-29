@@ -37,6 +37,7 @@ function testEnableTestCommandsEnabled(pipeline) {
 const pipelines = [
     [{$listMqlEntities: {entityType: "aggregationStages"}}],
     [{$listCachedAndActiveUsers: {}}],
+    [{$listQueryKnobs: {}}],
 ];
 
 for (const pipeline of pipelines) {

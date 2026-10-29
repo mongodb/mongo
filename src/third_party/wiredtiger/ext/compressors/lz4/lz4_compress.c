@@ -172,6 +172,12 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, siz
 
     wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
 
+    if (src_len < sizeof(LZ4_PREFIX)) {
+        (void)wt_api->err_printf(
+          wt_api, session, "WT_COMPRESSOR.decompress: source size is smaller than the size prefix");
+        return (WT_ERROR);
+    }
+
     /*
      * Retrieve the true length of the compressed block and source and the decompressed bytes to
      * return from the start of the source buffer.
@@ -180,7 +186,12 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, siz
 #ifdef WORDS_BIGENDIAN
     lz4_prefix_swap(&prefix);
 #endif
-    if (prefix.compressed_len + sizeof(LZ4_PREFIX) > src_len) {
+
+    /*
+     * We avoid the risk of overflow by using subtraction in this check. The stored size comes from
+     * disk, and if it is corrupted it might be close to the maximum integer value.
+     */
+    if (prefix.compressed_len > src_len - sizeof(LZ4_PREFIX)) {
         (void)wt_api->err_printf(
           wt_api, session, "WT_COMPRESSOR.decompress: stored size exceeds source size");
         return (WT_ERROR);

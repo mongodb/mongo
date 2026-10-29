@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/balancer/move_unsharded_policy.h"
 
@@ -57,19 +31,13 @@ int64_t getRandomIndex(const std::vector<T>& items) {
 }
 
 /**
- * Returns whether or not the cluster contains any sharded collections that can be balanced. If we
- * are draining, this includes config collections, otherwise this excludes any config collections.
+ * Returns whether or not the cluster contains any sharded collections that can be balanced.
  */
-bool clusterHasShardedCollections(OperationContext* opCtx, bool draining) {
+bool clusterHasShardedCollections(OperationContext* opCtx) {
     auto client = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
     BSONObjBuilder matchBuilder;
     matchBuilder.append(CollectionType::kUnsplittableFieldName, BSON("$ne" << true));
-    // Skip config.system.sessions if we are not draining as it isn't balanced as part of the random
-    // migrations failpoint. If we are draining shards, though, we need to include this collection.
-    if (!draining) {
-        matchBuilder.append(CollectionType::kNssFieldName, BSON("$regex" << "^(?!config\\.).*"));
-    }
 
     std::vector<BSONObj> rawPipelineStages{
         BSON("$match" << matchBuilder.obj()),
@@ -140,7 +108,7 @@ std::vector<std::pair<NamespaceString, ListCollectionsReplyItem>> getUntrackedCo
         const auto& localCatalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         BSONObj noSort{};
         return localCatalogClient->getCollections(
-            opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, noSort);
+            opCtx, dbName, repl::ReadConcernArgs::kMajority, noSort);
     }();
 
     for (const auto& trackedColl : trackedColls) {
@@ -287,8 +255,16 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 status.isA<ErrorCategory::WriteConcernError>() ||
                 status.isA<ErrorCategory::NeedRetargettingError>() ||
                 status.isA<ErrorCategory::NotPrimaryError>();
+            // TODO SERVER-131381: Remove this once the race where resharding starts before an FCV
+            // transition and completes before the FCV transition has a chance to abort it has been
+            // fixed.
+            //
+            // This is similar to ReshardCollectionInterruptedDueToFCVChange, but can occur when
+            // resharding completes before the FCV transition has a chance to abort it.
+            const bool isReshardingFCVMismatchError = status.code() == 13222300;
             // ReshardingImrpovements flag is not enabled (refer to SERVER-90675)
-            if (isErrorInAcceptableCategory || status.code() == 90675) {
+            if (isErrorInAcceptableCategory || status.code() == 90675 ||
+                isReshardingFCVMismatchError) {
                 return true;
             }
 
@@ -312,6 +288,7 @@ void MoveUnshardedPolicy::applyActionResult(OperationContext* opCtx,
                 case ErrorCodes::ReshardCollectionAborted:
                 case ErrorCodes::ReshardCollectionInProgress:
                 case ErrorCodes::ReshardCollectionTruncatedError:
+                case ErrorCodes::ReshardCollectionInterruptedDueToFCVChange:
                 case ErrorCodes::ShardNotFound:
                 case ErrorCodes::SnapshotTooOld:
                 case ErrorCodes::StaleDbVersion:
@@ -411,6 +388,13 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
+        // Probability of skipping a moveCollection in favor of a chunk migration when there are
+        // sharded collections that could be balanced.
+        double skipMoveCollectionThreshold = 0.6;
+        if (auto elem = sfp.getData()["skipMoveCollectionThreshold"]; elem.isNumber()) {
+            skipMoveCollectionThreshold = elem.numberDouble();
+        }
+
         // Don't issue moveCollection if reshardingMinimumOperationDuration is greater than 5
         // seconds to prevent tests from taking too long.
         if (resharding::gReshardingMinimumOperationDurationMillis.load() > 5000) {
@@ -447,13 +431,18 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
-
-        // Randomly skip moveCollections if there are sharded collections that could be balanced.
+        // Don't issue moveCollection if there are only two non-draining shards, as that would
+        // consume both, leaving the draining shard unable to migrate chunks off in this round.
         auto drainingShardIter = std::find_if(
             allShards.begin(), allShards.end(), [](const auto& stat) { return stat.isDraining; });
         bool isDraining = drainingShardIter != allShards.end();
-        if (opCtx->getClient()->getPrng().trueWithProbability(0.5) &&
-            clusterHasShardedCollections(opCtx, isDraining)) {
+        if (isDraining && randomizedAvailableShards.size() <= 2) {
+            return result;
+        }
+
+        // Randomly skip moveCollections if there are sharded collections that could be balanced.
+        if (opCtx->getClient()->getPrng().trueWithProbability(skipMoveCollectionThreshold) &&
+            clusterHasShardedCollections(opCtx)) {
             return result;
         }
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
 
@@ -727,7 +701,8 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
 
             return;
         }
-        case STAGE_GROUP: {
+        case STAGE_GROUP:
+        case STAGE_STREAMING_GROUP: {
             auto groupNode = static_cast<const GroupNode*>(qsNode);
 
             // Build a list of $group's output fields.
@@ -767,29 +742,20 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
 
             return;
         }
-        case STAGE_WINDOW: {
-            auto windowNode = static_cast<const WindowNode*>(qsNode);
+        case STAGE_EQ_LOOKUP_UNWIND: {
+            auto eqLookup = static_cast<const EqLookupNode*>(qsNode);
 
-            // Get the output fields of the window node and add them to the createdFieldSet.
-            FieldEffects::CreatedFieldVectorType createdFieldVec;
-            bool hasDottedPath = false;
-            for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
-                const auto& field = windowNode->outputFields[i].fieldName;
-                createdFieldVec.emplace_back(getTopLevelField(field), FieldEffect::kSet);
-                hasDottedPath |= (field.find('.') != std::string::npos);
-            }
-
-            if (hasDottedPath) {
+            if (eqLookup->joinField.getPathLength() > 1 || eqLookup->unwindSpec->indexPath) {
                 qsnInfo.setPostimageAllowedFields(&kUniverseFieldSet);
                 return;
             }
 
-            // The effects the window node has.
+            FieldEffects::CreatedFieldVectorType createdFieldVec;
+            createdFieldVec.emplace_back(eqLookup->joinField.fullPath(), FieldEffect::kSet);
+
             auto effects = FieldEffects(
                 FieldSet::makeUniverseSet(), FieldSet::makeEmptySet(), createdFieldVec);
 
-            // Compute the postimage allowed field set combining the pre-image effects with the
-            // window node effects.
             const auto& preimageAllowedFields =
                 *getQsnInfo(qsNode->children[0]).postimageAllowedFields;
             auto effectsOverPreimage = FieldEffects(preimageAllowedFields);
@@ -797,10 +763,7 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
 
             qsnInfo.effects.emplace(std::move(effects));
 
-            // Store the postimage allowed field set into the QsnInfo.
-            auto postimageAllowedFields = effectsOverPreimage.getAllowedFields();
-            qsnInfo.setPostimageAllowedFields(std::move(postimageAllowedFields));
-
+            qsnInfo.setPostimageAllowedFields(effectsOverPreimage.getAllowedFields());
             return;
         }
         case STAGE_PROJECTION_DEFAULT:

@@ -42,16 +42,10 @@ class test_bug019(wttest.WiredTigerTestCase):
     # single log file, so we know the underlying library will churn through
     # log files.
     def get_prealloc_used(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        prealloc = stat_cursor[stat.conn.log_prealloc_used][2]
-        stat_cursor.close()
-        return prealloc
+        return self.get_stat(stat.conn.log_prealloc_used)
 
     def get_prealloc_stat(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        prealloc = stat_cursor[stat.conn.log_prealloc_max][2]
-        stat_cursor.close()
-        return prealloc
+        return self.get_stat(stat.conn.log_prealloc_max)
 
     def populate(self, nentries, count):
         c = self.session.open_cursor(self.uri, None, None)
@@ -117,11 +111,10 @@ class test_bug019(wttest.WiredTigerTestCase):
             # iteration. There could be a race with the internal thread otherwise.
             self.prepfiles()
             self.populate(self.entries, i)
+            self.assertStatGreaterSoon(stat.conn.log_prealloc_used, used)
             newused = self.get_prealloc_used()
             self.pr("Iteration " + str(i))
             self.pr("previous used " + str(used) + " now " + str(newused))
-
-            self.assertTrue(used < newused)
             used = newused
 
             self.session.checkpoint()

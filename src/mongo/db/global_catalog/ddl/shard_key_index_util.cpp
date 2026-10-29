@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 
@@ -100,6 +74,32 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
 
 }  // namespace
 
+bool isAcceptableShardKeyIndexType(IndexType indexType) {
+    switch (indexType) {
+        case INDEX_BTREE:
+        case INDEX_HASHED:
+            return true;
+        case INDEX_COLUMN:
+        case INDEX_2D:
+        case INDEX_ENCRYPTED_RANGE:
+        case INDEX_HAYSTACK:
+        case INDEX_2DSPHERE:
+        case INDEX_2DSPHERE_BUCKET:
+        case INDEX_TEXT:
+        case INDEX_WILDCARD:
+            return false;
+        case INDEX_TYPE_COUNT:
+            MONGO_UNREACHABLE;
+        default:
+            tasserted(12867401,
+                      str::stream()
+                          << "All index types must be explicitly classified as allowed or "
+                             "disallowed for shard key use. "
+                          << "Index type " << toString(indexType) << " is not classified.");
+    }
+    MONGO_UNREACHABLE;
+}
+
 ShardKeyIndex::ShardKeyIndex(const IndexCatalogEntry* indexEntry) : _indexEntry(indexEntry) {
     tassert(6012300,
             "The indexEntry for ShardKeyIndex(const IndexCatalogEntry* indexEntry) must not "
@@ -131,6 +131,7 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
     const int kErrorCollation = 0x08;
     const int kErrorNotPrefix = 0x10;
     const int kErrorWildcard = 0x20;
+    const int kErrorIndexType = 0x40;
     int reasons = 0;
 
     auto desc = indexEntry->descriptor();
@@ -140,11 +141,13 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         reasons |= kErrorPartial;
     }
 
+    if (!isAcceptableShardKeyIndexType(desc->getIndexType())) {
+        reasons |=
+            desc->getIndexType() == IndexType::INDEX_WILDCARD ? kErrorWildcard : kErrorIndexType;
+    }
+
     if (desc->behavesAsSparse()) {
         reasons |= kErrorSparse;
-        if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-            reasons |= kErrorWildcard;
-        }
     }
 
     if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance)) {
@@ -188,6 +191,9 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         if (reasons & kErrorWildcard) {
             errors += " Index key is a wildcard index.";
         }
+        if (reasons & kErrorIndexType) {
+            errors += " Index type cannot be used for sharding.";
+        }
 
         if (errMsg) {
             if (!errMsg->empty()) {
@@ -225,7 +231,7 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
     if (!index ||
         !isCompatibleWithShardKey(
 
-            opCtx, collection, index, shardKey, false /* requireSingleKey */)) {
+            opCtx, collection, index, shardKey, /*requireSingleKey=*/false)) {
         return false;
     }
 
@@ -239,7 +245,7 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
                                       collection->getIndexCatalog(),
                                       indexName,
                                       shardKey,
-                                      true /* requireSingleKey */)
+                                      /*requireSingleKey=*/true)
                 .has_value();
 }
 

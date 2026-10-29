@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -48,6 +23,8 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -77,7 +54,6 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/router_role/router_role.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -153,19 +129,15 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         return shape_helpers::tryMakeShape<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
     }};
     auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss); });
+        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
-    // Perform the query settings lookup and attach it to 'expCtx'.
+    // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
-        expCtx, queryShapeHash, nss, distinctCommandRequest.getQuerySettings());
-    expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
+    querySettingsService.initializeSettingsForQuery(
+        expCtx, queryShapeHash, distinctCommandRequest.getQuerySettings());
 
     // We do not collect queryStats on explain for distinct.
-    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !verbosity.has_value()) {
+    if (!verbosity.has_value()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
             uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::DistinctKey>(
@@ -186,12 +158,29 @@ BSONObj prepareDistinctForPassthrough(
     const bool requestQueryStats,
     const boost::optional<query_shape::QueryShapeHash>& queryShapeHash) {
     const auto qsBson = qs.toBSON();
-    if (requestQueryStats || !qsBson.isEmpty() || queryShapeHash) {
-        BSONObjBuilder bob(cmd);
-        // Append distinct command with the query settings and includeQueryStatsMetrics if needed.
-        if (requestQueryStats) {
-            bob.append(DistinctCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
+    // Replace the client-supplied 'maxTimeMS' with the one resolved from the query settings, so
+    // that the shard's deadline reflects the override rather than the stale, client-supplied value.
+    // 'addField' replaces in place, preserving field order, so the forwarded command carries
+    // exactly one 'maxTimeMS'. This function is only reached on the non-explain path, hence
+    // 'isExplain' is false.
+    const auto cmdWithResolvedMaxTimeMS = [&] {
+        if (auto qsMaxTimeMS =
+                query_settings::resolveMaxTimeMSForShardForwarding(qs, /*isExplain=*/false)) {
+            return cmd.addField(
+                BSON(GenericArguments::kMaxTimeMSFieldName << *qsMaxTimeMS).firstElement());
         }
+        return cmd;
+    }();
+    // addField replaces in place so a client-supplied includeQueryStatsMetrics is overwritten
+    // instead of duplicated in the shard OP_MSG.
+    auto cmdForPassthrough = cmdWithResolvedMaxTimeMS;
+    if (requestQueryStats) {
+        cmdForPassthrough = cmdForPassthrough.addField(
+            BSON(DistinctCommandRequest::kIncludeQueryStatsMetricsFieldName << true)
+                .firstElement());
+    }
+    if (!qsBson.isEmpty() || queryShapeHash) {
+        BSONObjBuilder bob(cmdForPassthrough);
         if (!qsBson.isEmpty() && !cmd.hasField(DistinctCommandRequest::kQuerySettingsFieldName)) {
             bob.append(DistinctCommandRequest::kQuerySettingsFieldName, qsBson);
         }
@@ -214,7 +203,7 @@ BSONObj prepareDistinctForPassthrough(
         return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
     }
 
-    return CommandHelpers::filterCommandRequestForPassthrough(cmd);
+    return CommandHelpers::filterCommandRequestForPassthrough(cmdForPassthrough);
 }
 
 void runDistinctAsAgg(OperationContext* opCtx,
@@ -275,7 +264,7 @@ void runDistinctAsAgg(OperationContext* opCtx,
                                         AuthorizationSession::get(opCtx->getClient()),
                                         distinctAggRequest.getNamespace(),
                                         distinctAggRequest,
-                                        true /* isMongos */));
+                                        /*isMongos=*/true));
     if (resolvedView.has_value()) {
         // Query against a view.
         uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
@@ -344,6 +333,10 @@ public:
         return true;
     }
 
+    bool supportsQuerySettings() const override {
+        return true;
+    }
+
     class Invocation final : public MinimalInvocationBase {
         using MinimalInvocationBase::MinimalInvocationBase;
 
@@ -394,8 +387,9 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+            markOperationQueryMemorySheddingEligible(opCtx);
             try {
-                executeDistinct(opCtx, boost::none /* verbosity */, reply);
+                executeDistinct(opCtx, /*verbosity=*/boost::none, reply);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto result = reply->getBodyBuilder();
                 result.resetToEmpty();
@@ -404,8 +398,8 @@ public:
                                  _ns,
                                  request(),
                                  ExtensionsCallbackNoop(),
-                                 nullptr /* defaultCollator */,
-                                 boost::none /* verbosity */);
+                                 /*defaultCollator=*/nullptr,
+                                 /*verbosity=*/boost::none);
                 // If the database doesn't exist, we successfully return an empty result set.
                 result.appendArray("values", BSONObj());
                 CurOp::get(opCtx)->setEndOfOpMetrics(0);
@@ -418,9 +412,10 @@ public:
         void executeDistinct(OperationContext* opCtx,
                              boost::optional<ExplainOptions::Verbosity> verbosity,
                              rpc::ReplyBuilderInterface* reply) {
+            setReadWriteConcern(opCtx, request(), this);
             sharding::router::CollectionRouter router(opCtx, _ns);
             router.routeWithRoutingContext(
-                verbosity ? "explain distinct"_sd : definition()->getName(),
+                verbosity ? "explain distinct"sv : definition()->getName(),
                 [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                     auto outputBuilder = reply->getBodyBuilder();
                     outputBuilder.resetToEmpty();
@@ -467,8 +462,9 @@ public:
                 cmdForShards = ClusterExplain::wrapAsExplain(
                     cmdObj, *verbosity, canonicalQuery->getExpCtx()->getQuerySettings().toBSON());
             } else {
-                // Users cannot set 'includeQueryStatsMetrics' for distinct commands on mongos. We
-                // will decide if remote query stats metrics should be collected.
+                // includeQueryStatsMetrics is not returned in the mongos distinct reply. When this
+                // op is sampled, prepareDistinctForPassthrough overwrites the field to true so
+                // shards return metrics for the query stats store.
                 requestQueryStats =
                     query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
                 boost::optional<query_shape::QueryShapeHash> queryShapeHash =
@@ -496,7 +492,7 @@ public:
                 runDistinctAsAgg(opCtx,
                                  routingCtx,
                                  std::move(canonicalQuery),
-                                 boost::none /* resolvedView */,
+                                 /*resolvedView=*/boost::none,
                                  verbosity,
                                  outputBuilder);
                 return;
@@ -516,9 +512,9 @@ public:
                     Shard::RetryPolicy::kIdempotent,
                     query,
                     collation,
-                    boost::none /*letParameters*/,
-                    boost::none /*runtimeConstants*/,
-                    !verbosity.has_value() /* eligibleForSampling */);
+                    /*letParameters=*/boost::none,
+                    /*runtimeConstants=*/boost::none,
+                    /*eligibleForSampling=*/!verbosity.has_value());
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 const auto resolvedView = *ex.extraInfo<ResolvedNamespace>();
                 runDistinctAsAgg(opCtx,
@@ -607,7 +603,7 @@ public:
             if (!opCtx->inMultiDocumentTransaction() &&
                 repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
                 outputBuilder.append(
-                    "atClusterTime"_sd,
+                    "atClusterTime"sv,
                     repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
             }
 

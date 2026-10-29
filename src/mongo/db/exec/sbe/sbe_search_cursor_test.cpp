@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::SearchCursorStage.
@@ -34,6 +8,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -115,9 +90,9 @@ std::unique_ptr<executor::TaskExecutorCursor> mockTaskExecutorCursor(OperationCo
         batchVec.push_back(ele.Obj());
     }
 
-    executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load(),
-                                             /*batchSize*/ boost::none,
-                                             /*preFetchNextBatch*/ false);
+    executor::TaskExecutorCursorOptions opts(/*pinConnection=*/gPinTaskExecCursorConns.load(),
+                                             /*batchSize=*/boost::none,
+                                             /*preFetchNextBatch=*/false);
     // When pinning is enabled, TaskExecutorCursor requires both executor and underlying executor;
     // tests use the same executor for both since there is no real connection to pin.
     return std::make_unique<executor::TaskExecutorCursor>(
@@ -144,24 +119,24 @@ std::unique_ptr<PlanStage> makeSearchCursorStage(value::SlotId idSlot,
                                                    metadataSlots,
                                                    fieldNames,
                                                    fieldSlots,
-                                                   0 /* remoteCursorId */,
-                                                   boost::none /* sortSpecSlot */,
+                                                   /*remoteCursorId=*/0,
+                                                   /*sortSpecSlot=*/boost::none,
                                                    limitSlot,
-                                                   boost::none /* sortKeySlot */,
-                                                   boost::none /* collatorSlot */,
-                                                   nullptr /* yieldPolicy */,
+                                                   /*sortKeySlot=*/boost::none,
+                                                   /*collatorSlot=*/boost::none,
+                                                   /*yieldPolicy=*/nullptr,
                                                    kEmptyPlanNodeId)
         : SearchCursorStage::createForNonStoredSource(NamespaceString::kEmpty,
                                                       UUID::gen(),
                                                       idSlot,
                                                       metadataNames,
                                                       metadataSlots,
-                                                      0 /* remoteCursorId */,
-                                                      boost::none /* sortSpecSlot */,
+                                                      /*remoteCursorId=*/0,
+                                                      /*sortSpecSlot=*/boost::none,
                                                       limitSlot,
-                                                      boost::none /* sortKeySlot */,
-                                                      boost::none /* collatorSlot */,
-                                                      nullptr /* yieldPolicy */,
+                                                      /*sortKeySlot=*/boost::none,
+                                                      /*collatorSlot=*/boost::none,
+                                                      /*yieldPolicy=*/nullptr,
                                                       kEmptyPlanNodeId);
 }
 
@@ -171,8 +146,8 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     // Register and fill input slots in the runtime environment.
     auto limitSlot = env->registerSlot("limit"sv,
                                        sbe::value::TypeTags::NumberInt64,
-                                       10 /* val */,
-                                       true /* owned */,
+                                       /*val=*/10,
+                                       /*owned=*/true,
                                        getSlotIdGenerator());
 
     // Generate slots for the outputs.
@@ -185,12 +160,12 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
 
     // Build and prepare for execution of the search cursor stage.
     auto searchCursor = makeSearchCursorStage(idSlot,
-                                              0 /* resultSlot */,
+                                              /*resultSlot=*/0,
                                               metadataNames,
                                               metadataSlots,
-                                              {} /* fieldNames */,
-                                              {} /* fieldSlots */,
-                                              false /* isStoredSource */,
+                                              /*fieldNames=*/{},
+                                              /*fieldSlots=*/{},
+                                              /*isStoredSource=*/false,
                                               limitSlot);
 
     auto ctx = makeCompileCtx(std::move(env));
@@ -227,8 +202,8 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
     // Register and fill input slots in the runtime environment.
     auto limitSlot = env->registerSlot("limit"sv,
                                        sbe::value::TypeTags::NumberInt64,
-                                       1 /* val */,
-                                       true /* owned */,
+                                       /*val=*/1,
+                                       /*owned=*/true,
                                        getSlotIdGenerator());
 
     // Generate slots for the outputs.
@@ -243,13 +218,13 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
 
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeSearchCursorStage(0 /* idSlot */,
+    auto searchCursor = makeSearchCursorStage(/*idSlot=*/0,
                                               resultSlot,
                                               metadataNames,
                                               metadataSlots,
                                               fieldNames,
                                               fieldSlots,
-                                              true /* isStoredSource */,
+                                              /*isStoredSource=*/true,
                                               limitSlot);
 
     auto ctx = makeCompileCtx(std::move(env));
@@ -274,8 +249,8 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     // Register and fill input slots in the runtime environment.
     auto limitSlot = env->registerSlot("limit"sv,
                                        sbe::value::TypeTags::NumberInt64,
-                                       10 /* val */,
-                                       true /* owned */,
+                                       /*val=*/10,
+                                       /*owned=*/true,
                                        getSlotIdGenerator());
 
     // Generate slots for the outputs.
@@ -289,13 +264,13 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     expCtx->setUUID(UUID::gen());
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeSearchCursorStage(0 /* idSlot */,
+    auto searchCursor = makeSearchCursorStage(/*idSlot=*/0,
                                               resultSlot,
                                               metadataNames,
                                               metadataSlots,
                                               fieldNames,
                                               fieldSlots,
-                                              true /* isStoredSource */,
+                                              /*isStoredSource=*/true,
                                               limitSlot);
 
     auto ctx = makeCompileCtx(std::move(env));
@@ -313,9 +288,9 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
         auto curElem = resultStoredSource[i].Obj();
 
         auto [actualTag, actualVal] = searchCursor->getAccessor(*ctx, resultSlot)->getViewOfValue();
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(curElem["storedSource"].Obj());
-        value::ValueGuard guard(expectedTag, expectedVal);
-        assertValuesEqual(actualTag, actualVal, expectedTag, expectedVal);
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(curElem["storedSource"].Obj()));
+        ASSERT_SBE_VALUE_EQ(actualTag, actualVal, expected.tag(), expected.value());
 
         for (size_t p = 0; p < metadataNames.size(); ++p) {
             ASSERT(curElem.hasField(metadataNames[p]));

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_op_observer.h"
@@ -135,9 +109,12 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     // collection is held in exclusive mode to prevent this. However an exception to this is oplog
     // application, which already serializes these writes.
 
-    invariant(!opCtx->isEnforcingConstraints() ||
-              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
-                  NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
+    tassert(13413201,
+            "ReshardingOpObserver observed a write to the donor namespace without holding the "
+            "expected MODE_X lock",
+            !opCtx->isEnforcingConstraints() ||
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                    NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon
     // the snapshot when exitting the function.
@@ -228,7 +205,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator begin,
                                      std::vector<InsertStatement>::const_iterator end,
                                      const std::vector<RecordId>& recordIds,
-                                     std::vector<bool> fromMigrate,
+                                     const std::vector<bool>& fromMigrate,
                                      bool defaultFromMigrate,
                                      OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
@@ -349,16 +326,32 @@ void ReshardingOpObserver::onDelete(OperationContext* opCtx,
                                     const OplogDeleteEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
+    // Run pinning before unregistering from the LocalReshardingOperationsRegistry: the registry
+    // mutation is in-memory and immediate, whereas the pin's tassert can still abort this write
+    // before it commits. Doing the registry mutation second would leave it out of sync with the
+    // (rolled-back) on-disk state if the pin logic threw.
+    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
+        _doPin(opCtx);
+    }
     if (shouldUseRegistry() && _nssToRoleMap.contains(nss)) {
         auto commonMetadata = CommonReshardingMetadata::parse(
             doc, IDLParserContext("ReshardingOpObserver::onDelete"));
         LocalReshardingOperationsRegistry::get().unregisterOperation(_nssToRoleMap.at(nss),
                                                                      commonMetadata);
     }
-    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
-        _doPin(opCtx);
-    }
 }
 
+repl::OpTime ReshardingOpObserver::onDropCollection(OperationContext* opCtx,
+                                                    const NamespaceString& collectionName,
+                                                    const UUID& uuid,
+                                                    std::uint64_t numRecords,
+                                                    bool markFromMigrate,
+                                                    bool isTimeseries) {
+    if (shouldUseRegistry() && _nssToRoleMap.contains(collectionName)) {
+        LocalReshardingOperationsRegistry::get().clearOperationsForRole(
+            _nssToRoleMap.at(collectionName));
+    }
+    return {};
+}
 
 }  // namespace mongo

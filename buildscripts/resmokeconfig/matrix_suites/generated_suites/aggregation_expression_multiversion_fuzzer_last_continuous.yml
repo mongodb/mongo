@@ -19,6 +19,7 @@ executor:
           mongosBinVersion: last-continuous
           traceExceptions: false
           useRandomBinVersionsWithinReplicaSet: last-continuous
+      jsAbortOnOutOfMemory: ""
       nodb: ""
 matrix_suite: true
 selector:

@@ -55,12 +55,6 @@ class test_backup29(backup_base):
     few = 100
     nentries = 5000
 
-    def get_stat(self, stat_name):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        value = stat_cursor[stat_name][2]
-        stat_cursor.close()
-        return value
-
     def parse_blkmods(self, uri):
         meta_cursor = self.session.open_cursor('metadata:')
         config = meta_cursor[uri]

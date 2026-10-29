@@ -6,3 +6,6 @@ filters:
   - "multi_router_basic.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "validate_on_shutdown_retries_repl_state_change_interrupt.js":
+    approvers:
+      - 10gen/server-validate

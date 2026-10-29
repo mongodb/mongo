@@ -758,7 +758,7 @@ __wti_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     TAILQ_INSERT_HEAD(&session->cursor_cache[bucket], cursor, q);
 
     (void)__wt_atomic_sub_uint32_relaxed(&S2C(session)->open_cursor_count, 1);
-    WT_STAT_CONN_INCR_ATOMIC(session, cursor_cached_count);
+    WT_STAT_CONN_INCR(session, cursor_cached_count);
     WT_STAT_DSRC_DECR(session, cursor_open_count);
     F_SET(cursor, WT_CURSTD_CACHED);
 
@@ -788,7 +788,7 @@ __wti_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_DHANDLE_RELEASE(dhandle);
 
     (void)__wt_atomic_add_uint32_relaxed(&S2C(session)->open_cursor_count, 1);
-    WT_STAT_CONN_DECR_ATOMIC(session, cursor_cached_count);
+    WT_STAT_CONN_DECR(session, cursor_cached_count);
     WT_STAT_DSRC_INCR(session, cursor_open_count);
 
     bucket = cursor->uri_hash & (S2C(session)->hash_size - 1);
@@ -931,6 +931,11 @@ __wti_cursors_can_be_cached(WT_SESSION_IMPL *session, const char *cfg[], bool *c
 
     WT_RET(__wt_config_gets_def(session, cfg, "readonly", 0, &cval));
     if (cval.val)
+        goto return_false;
+
+    /* Statistics cursors are never cached, don't search the cache for a match. */
+    WT_RET(__wt_config_gets_def(session, cfg, "statistics", 0, &cval));
+    if (cval.len != 0)
         goto return_false;
 
     /* Checkpoints are readonly, we won't cache them. */
@@ -1104,13 +1109,13 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
             }
 
             cdump = NULL;
-            WT_RET(__cursor_reuse_or_init(session, cursor, cfg, &readonly, NULL, &cdump));
+            WT_ERR(__cursor_reuse_or_init(session, cursor, cfg, &readonly, NULL, &cdump));
             /* Since owner == NULL */
             WT_ASSERT(session, cdump == NULL);
 
             if (cbt) {
                 if (have_config) {
-                    WT_RET(__wt_config_gets_def(session, cfg, "read_once", 0, &cval));
+                    WT_ERR(__wt_config_gets_def(session, cfg, "read_once", 0, &cval));
                     if (cval.val != 0)
                         F_SET(cbt, WT_CBT_READ_ONCE);
                 }
@@ -1127,6 +1132,11 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
         }
     }
     return (WT_NOTFOUND);
+
+err:
+    /* Close the reopened cursor, returning it to the cache. */
+    WT_TRET(cursor->close(cursor));
+    return (ret);
 }
 
 /*
@@ -1483,6 +1493,26 @@ __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_lookup_str --
+ *     Search a cursor with string keys and values for a key, and return the value, or NULL if the
+ *     cursor has no such key. The value is valid until the cursor moves.
+ */
+int
+__wt_cursor_lookup_str(WT_CURSOR *cursor, const char *key, const char **valuep)
+{
+    WT_DECL_RET;
+
+    *valuep = NULL;
+
+    cursor->set_key(cursor, key);
+    WT_RET_NOTFOUND_OK(ret = cursor->search(cursor));
+    if (ret == WT_NOTFOUND)
+        return (0);
+
+    return (cursor->get_value(cursor, valuep));
+}
+
+/*
  * __wt_cursor_init --
  *     Default cursor initialization.
  */
@@ -1498,10 +1528,12 @@ __wt_cursor_init(
 
     session = CUR2S(cursor);
 
+    bool owns_internal_uri = false;
     if (cursor->internal_uri == NULL) {
         /* Various cursor code assumes there is an internal URI, so there better be one to set. */
         WT_ASSERT(session, uri != NULL);
         WT_RET(__wt_strdup(session, uri, &cursor->internal_uri));
+        owns_internal_uri = true;
     }
 
     /* WT_CURSTD_OVERWRITE */
@@ -1529,10 +1561,6 @@ __wt_cursor_init(
       cursor->modify == __wti_cursor_modify_value_format_notsup)
         cursor->modify = __cursor_modify;
 
-    /* Tiered cursors are not yet candidates for caching. */
-    if (uri != NULL && WT_PREFIX_MATCH(uri, "tiered:"))
-        F_CLR(cursor, WT_CURSTD_CACHEABLE);
-
     /*
      * Cursors that are internal to some other cursor (such as file cursors inside a table cursor)
      * should be closed after the containing cursor. Arrange for that to happen by putting internal
@@ -1553,10 +1581,8 @@ __wt_cursor_init(
     return (0);
 
 err:
-    if (ret != 0) {
+    if (owns_internal_uri)
         __wt_free(session, cursor->internal_uri);
-        cursor->internal_uri = NULL;
-    }
     return (ret);
 }
 

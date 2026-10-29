@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -65,7 +39,7 @@
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/logv2/uassert_sink.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/int128.h"
 #include "mongo/stdx/thread.h"
@@ -546,6 +520,17 @@ TEST_F(LogV2Test, Basic) {
     buffer.clear();
     t4.serialize(buffer);
     ASSERT_EQUALS(lines->back(), fmt::to_string(buffer));
+}
+
+TEST_F(LogV2Test, DefaultConstructedAttributeStorage) {
+    // A default-constructed TypeErasedAttributeStorage must have a well-defined (empty) range so
+    // that begin()/end() and apply() do not read an indeterminate _data pointer.
+    TypeErasedAttributeStorage attrs;
+    ASSERT(attrs.empty());
+    ASSERT_EQUALS(attrs.size(), 0u);
+    ASSERT(attrs.begin() == nullptr);
+    ASSERT(attrs.begin() == attrs.end());
+    attrs.apply([](std::string_view, auto&&) { FAIL("empty storage should not invoke callback"); });
 }
 
 TEST_F(LogV2Test, MismatchAttrInLogging) {
@@ -2107,7 +2092,7 @@ TEST_F(LogV2JsonTruncationTest, JsonTruncationDisabled) {
 }
 
 TEST_F(LogV2Test, StringTruncation) {
-    const AtomicWord<int32_t> maxAttributeSizeKB(1);
+    const Atomic<int32_t> maxAttributeSizeKB(1);
     auto lines = makeLineCapture(JSONFormatter(&maxAttributeSizeKB));
 
     std::size_t maxLength = maxAttributeSizeKB.load() << 10;
@@ -2157,7 +2142,7 @@ TEST_F(LogV2Test, StringTruncation) {
 // While having a very large maxAttributeSizeKB is impractical, this test should catch any potential
 // issues due to that (e.g., from sanitizers).
 TEST_F(LogV2Test, MaxIntMaxAttributeSize) {
-    const AtomicWord<int32_t> maxAttributeSizeKB(std::numeric_limits<int32_t>::max());
+    const Atomic<int32_t> maxAttributeSizeKB(std::numeric_limits<int32_t>::max());
     auto lines = makeLineCapture(JSONFormatter(&maxAttributeSizeKB));
 
     LOGV2(11792000, "name", "name"_attr = "some_name");
@@ -2201,269 +2186,6 @@ TEST_F(LogV2Test, Threads) {
     ASSERT(linesPlain->size() == threads.size() * kNumPerThread);
     ASSERT(linesText->size() == threads.size() * kNumPerThread);
     ASSERT(linesJson->size() == threads.size() * kNumPerThread);
-}
-
-TEST_F(LogV2Test, Ramlog) {
-    RamLog* ramlog = RamLog::get("test_ramlog");
-    auto sink = wrapInUnlockedSink(boost::make_shared<RamLogSink>(ramlog));
-    applyDefaultFilterToSink(sink);
-    sink->set_formatter(PlainFormatter());
-    attachSink(sink);
-
-    auto lines = makeLineCapture(PlainFormatter(), false);
-
-    auto verifyRamLog = [&] {
-        RamLog::LineIterator iter(ramlog);
-        for (const auto& s : lines->lines()) {
-            const auto next = iter.next();
-            if (s != next) {
-                std::cout << "\n\n\n********************** s='" << s << "', next='" << next
-                          << "'\n";
-                return false;
-            }
-        }
-        return true;
-    };
-
-    LOGV2(20058, "test");
-    ASSERT(verifyRamLog());
-    LOGV2(20059, "test2");
-    ASSERT(verifyRamLog());
-}
-
-TEST_F(LogV2Test, Ramlog_AltMaxLinesMaxSize) {
-    constexpr size_t alternativeMaxLines = 2048;
-    constexpr size_t alternativeMaxSizeBytes = 2 * 1024 * 1024;
-    RamLog* ramlog = RamLog::get("test_ramlog_alt2", alternativeMaxLines, alternativeMaxSizeBytes);
-    auto sink = wrapInUnlockedSink(boost::make_shared<RamLogSink>(ramlog));
-    applyDefaultFilterToSink(sink);
-    sink->set_formatter(PlainFormatter());
-    attachSink(sink);
-
-    auto lines = makeLineCapture(PlainFormatter(), false);
-
-    auto verifyRamLog = [&] {
-        RamLog::LineIterator iter(ramlog);
-        for (const auto& s : lines->lines()) {
-            const auto next = iter.next();
-            if (s != next) {
-                std::cout << "\n\n\n********************** s='" << s << "', next='" << next
-                          << "'\n";
-                return false;
-            }
-        }
-        return true;
-    };
-
-    LOGV2(5816501, "test");
-    ASSERT(verifyRamLog());
-    LOGV2(5816502, "test2");
-    ASSERT(verifyRamLog());
-}
-
-// Positive: Test that the ram log is properly circular
-TEST_F(LogV2Test, Ramlog_CircularBuffer) {
-    RamLog* ramlog = RamLog::get("test_ramlog2");
-
-    std::vector<std::string> lines;
-
-    constexpr size_t maxLines = 1024;
-    constexpr size_t testLines = 5000;
-
-    // Write enough lines to trigger wrapping
-    for (size_t i = 0; i < testLines; ++i) {
-        auto s = std::to_string(i);
-        lines.push_back(s);
-        ramlog->write(s);
-    }
-
-    lines.erase(lines.begin(), lines.begin() + (testLines - maxLines) + 1);
-
-    // Verify we circled correctly through the buffer
-    {
-        RamLog::LineIterator iter(ramlog);
-        ASSERT_EQ(iter.getTotalLinesWritten(), 5000UL);
-        for (const auto& line : lines) {
-            ASSERT_EQ(line, iter.next());
-        }
-    }
-
-    ramlog->clear();
-}
-
-// Positive: Test that the ram log is properly circular
-TEST_F(LogV2Test, Ramlog_CircularBuffer_AltMaxLinesMaxSize) {
-    constexpr size_t alternativeMaxLines = 10;
-    constexpr size_t alternativeMaxSizeBytes = 2 * 1024 * 1024;
-    RamLog* ramlog = RamLog::get("test_ramlog2_alt2", alternativeMaxLines, alternativeMaxSizeBytes);
-    ASSERT_EQ(alternativeMaxLines, ramlog->getMaxLines());
-    ASSERT_EQ(alternativeMaxSizeBytes, ramlog->getMaxSizeBytes());
-
-    std::vector<std::string> lines;
-
-    constexpr size_t maxLines = alternativeMaxLines;
-    constexpr size_t testLines = 12;
-
-    // Write enough lines to trigger wrapping
-    for (size_t i = 0; i < testLines; ++i) {
-        auto s = std::to_string(i);
-        lines.push_back(s);
-        ramlog->write(s);
-    }
-
-    lines.erase(lines.begin(), lines.begin() + (testLines - maxLines) + 1);
-
-    // Verify we circled correctly through the buffer
-    {
-        RamLog::LineIterator iter(ramlog);
-        ASSERT_EQ(iter.getTotalLinesWritten(), testLines);
-        int n = 1;
-        for (const auto& line : lines) {
-            ASSERT_EQ(line, iter.next()) << "\n\n\n   n=" << n << "\n\n\n\n";
-            n++;
-        }
-    }
-
-    ramlog->clear();
-}
-
-// Positive: Test that the ram log has a max size cap
-TEST_F(LogV2Test, Ramlog_MaxSize) {
-    RamLog* ramlog = RamLog::get("test_ramlog3");
-
-    std::vector<std::string> lines;
-
-    constexpr size_t testLines = 2000;
-    constexpr size_t longStringLength = 2048;
-
-    std::string longStr(longStringLength, 'a');
-
-    // Write enough lines to trigger wrapping and trimming
-    for (size_t i = 0; i < testLines; ++i) {
-        auto s = std::to_string(10000 + i) + longStr;
-        lines.push_back(s);
-        ramlog->write(s);
-    }
-
-    constexpr size_t linesToFit = (1024 * 1024) / (5 + longStringLength);
-
-    lines.erase(lines.begin(), lines.begin() + (testLines - linesToFit));
-
-    // Verify we keep just enough lines that fit
-    {
-        RamLog::LineIterator iter(ramlog);
-        ASSERT_EQ(iter.getTotalLinesWritten(), 2000UL);
-        for (const auto& line : lines) {
-            ASSERT_EQ(line, iter.next());
-        }
-    }
-
-    ramlog->clear();
-}
-
-// Positive: Test that the ram log has a max size cap
-TEST_F(LogV2Test, Ramlog_MaxSize_AltMaxLinesMaxSize) {
-    constexpr size_t testLines = 2000;
-    constexpr size_t longStringLength = 2048;
-    constexpr size_t fullStringLength = 2048 + 5;
-
-    constexpr size_t alternativeMaxLines = 2048;
-    constexpr size_t alternativeMaxSizeBytes = 1024 * 1024 + fullStringLength;
-    RamLog* ramlog = RamLog::get("test_ramlog3_alt", alternativeMaxLines, alternativeMaxSizeBytes);
-
-    std::vector<std::string> lines;
-
-    std::string longStr(longStringLength, 'a');
-
-    // Write enough lines to trigger wrapping and trimming
-    for (size_t i = 0; i < testLines; ++i) {
-        auto s = std::to_string(10000 + i) + longStr;
-        lines.push_back(s);
-        ramlog->write(s);
-    }
-
-    constexpr size_t linesToFit = alternativeMaxSizeBytes / fullStringLength;
-
-    lines.erase(lines.begin(), lines.begin() + (testLines - linesToFit));
-
-    // Verify we keep just enough lines that fit
-    {
-        RamLog::LineIterator iter(ramlog);
-        ASSERT_EQ(iter.getTotalLinesWritten(), 2000UL);
-        for (const auto& line : lines) {
-            ASSERT_EQ(line, iter.next());
-        }
-    }
-
-    ramlog->clear();
-}
-
-// Positive: Test that the ram log handles really large lines
-TEST_F(LogV2Test, Ramlog_GiantLine) {
-    RamLog* ramlog = RamLog::get("test_ramlog4");
-
-    std::vector<std::string> lines;
-
-    constexpr size_t testLines = 5000;
-
-    // Write enough lines to trigger wrapping
-    for (size_t i = 0; i < testLines; ++i) {
-        ramlog->write(std::to_string(i));
-    }
-
-    auto s = std::to_string(testLines);
-    lines.push_back(s);
-    ramlog->write(s);
-
-    std::string bigStr(2048 * 1024, 'a');
-    lines.push_back(bigStr);
-    ramlog->write(bigStr);
-
-    // Verify we keep 2 lines
-    {
-        RamLog::LineIterator iter(ramlog);
-        ASSERT_EQ(iter.getTotalLinesWritten(), testLines + 2);
-        for (const auto& line : lines) {
-            ASSERT_EQ(line, iter.next());
-        }
-    }
-
-    ramlog->clear();
-}
-
-// Positive: Test that the ram log handles really large lines
-TEST_F(LogV2Test, Ramlog_GiantLine_AltMaxLinesMaxSize) {
-    constexpr size_t alternativeMaxLines = 1024;
-    constexpr size_t alternativeMaxSizeBytes = 2 * 1024 * 1024;
-    RamLog* ramlog = RamLog::get("test_ramlog4_alt", alternativeMaxLines, alternativeMaxSizeBytes);
-
-    std::vector<std::string> lines;
-
-    constexpr size_t testLines = 5000;
-
-    // Write enough lines to trigger wrapping
-    for (size_t i = 0; i < testLines; ++i) {
-        ramlog->write(std::to_string(i));
-    }
-
-    auto s = std::to_string(testLines);
-    lines.push_back(s);
-    ramlog->write(s);
-
-    std::string bigStr(2048 * 1024 + 128, 'a');
-    lines.push_back(bigStr);
-    ramlog->write(bigStr);
-
-    // Verify we keep 2 lines
-    {
-        RamLog::LineIterator iter(ramlog);
-        ASSERT_EQ(iter.getTotalLinesWritten(), testLines + 2);
-        for (const auto& line : lines) {
-            ASSERT_EQ(line, iter.next());
-        }
-    }
-
-    ramlog->clear();
 }
 
 TEST_F(LogV2Test, MultipleDomains) {

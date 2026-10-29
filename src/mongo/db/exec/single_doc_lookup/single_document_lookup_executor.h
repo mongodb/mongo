@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,6 +15,10 @@
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
+struct PlanSummaryStats;
+}  // namespace mongo
 
 namespace mongo::exec::agg {
 
@@ -79,12 +57,18 @@ public:
         boost::optional<Timestamp> afterClusterTime) = 0;
 
     /**
-     * Lifecycle hooks invoked by the parent stage at batch boundaries. A strategy that caches
-     * opCtx-bound resources must drop them in detachFromOperationContext(), since they do not
-     * outlive the current opCtx.
+     * Opt-in: when set, each lookup's PlanSummaryStats (docs/keysExamined, indexesUsed, ...) are
+     * accumulated into 'sink'. Strategies that surface execution stats override this; the default
+     * is a no-op for those that don't (e.g. change-stream updateLookup).
      */
-    virtual void detachFromOperationContext() {}
-    virtual void reattachToOperationContext(OperationContext* opCtx) {}
+    virtual void setPlanSummaryStatsSink(PlanSummaryStats* sink) {}
+
+    /**
+     * Releases attached catalog state (collection acquisition handle, open storage cursors). Any
+     * cached plan survives. Non-throwing.
+     * Must be idempotent: it may be called more than once on the same executor.
+     */
+    virtual void releaseResources() noexcept {}
 };
 
 /**
@@ -111,17 +95,20 @@ public:
         if (result.status != LookupResult::HandledStatus::kNotHandled) {
             return result;
         }
+
+        // Release any resources before running the fallback executor.
+        _primary->releaseResources();
         return _fallback->performLookup(expCtx, nss, collectionUUID, documentKey, afterClusterTime);
     }
 
-    void detachFromOperationContext() override {
-        _primary->detachFromOperationContext();
-        _fallback->detachFromOperationContext();
+    void setPlanSummaryStatsSink(PlanSummaryStats* sink) override {
+        _primary->setPlanSummaryStatsSink(sink);
+        _fallback->setPlanSummaryStatsSink(sink);
     }
 
-    void reattachToOperationContext(OperationContext* opCtx) override {
-        _primary->reattachToOperationContext(opCtx);
-        _fallback->reattachToOperationContext(opCtx);
+    void releaseResources() noexcept override {
+        _primary->releaseResources();
+        _fallback->releaseResources();
     }
 
     /**

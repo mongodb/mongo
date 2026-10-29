@@ -42,7 +42,7 @@ for (let i = 0; i < numDocs; i++) {
 // Make sure the documents make it to the secondaries.
 replTest.awaitLastOpCommitted();
 
-const secondaries = replTest.getSecondaries();
+let secondaries = replTest.getSecondaries();
 assert.eq(
     nodes.length - 1,
     secondaries.length,
@@ -72,7 +72,12 @@ IndexBuildTest.buildIndexOnNodeAsStandalone(
     "x_1",
 );
 
-replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, replTest.getNodeId(primary));
+// buildIndexOnNodeAsStandalone() restarts each node, and restarting replaces that node's entry in
+// replTest.nodes with a new connection. Re-fetch so the rest of the test is not holding
+// connections to the processes that have since been shut down.
+secondaries = replTest.getSecondaries();
+
+replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, primary);
 
 jsTestLog("Build index on the primary as part of the replica set: " + primary.host);
 let createIdx = IndexBuildTest.startIndexBuild(

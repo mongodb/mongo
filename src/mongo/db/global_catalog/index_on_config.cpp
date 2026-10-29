@@ -1,36 +1,10 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/index_on_config.h"
 
-#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_namespace_placement_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -49,27 +23,20 @@ std::vector<IndexSpec_ForCatalog> getChunkCollectionIndexSpecs() {
     };
 }
 
-Status ensureCollectionIndexes(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const std::vector<IndexSpec_ForCatalog>& specs) {
-    for (const auto& spec : specs) {
-        Status result = sharding_util::createIndexOnCollection(opCtx, nss, spec.keys, spec.unique);
-        if (!result.isOK()) {
-            return result.withContext(str::stream()
-                                      << "couldn't create index " << spec.keys.toString() << " on "
-                                      << nss.toStringForErrorMsg());
-        }
-    }
-    return Status::OK();
-}
-
-Status createIndexOnConfigCollection(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     const BSONObj& keys,
-                                     bool unique) {
-    invariant(ns.isConfigDB() || ns.isAdminDB());
-
-    return sharding_util::createIndexOnCollection(opCtx, ns, keys, unique);
+std::vector<IndexSpec_ForCatalog> getPlacementHistoryCollectionIndexSpecs() {
+    return {
+        // Create a combined index on 'nss' (sorted ascending) and 'timestamp' (sorted descending).
+        {BSON(NamespacePlacementType::kNssFieldName
+              << 1 << NamespacePlacementType::kTimestampFieldName << -1),
+         true /* unique */},
+        // Create another index with 'timestamp' first (sorted descending), then 'nss' (sorted
+        // ascending). This is necessary to cover queries to the placement history that are querying
+        // by time range. Note that this index does not need to be unique, as the uniqueness of
+        // every {timestamp, nss} combination is already ensured by the first index.
+        {BSON(NamespacePlacementType::kTimestampFieldName
+              << -1 << NamespacePlacementType::kNssFieldName << 1),
+         false /* unique */},
+    };
 }
 
 }  // namespace mongo

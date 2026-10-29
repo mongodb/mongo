@@ -1,6 +1,7 @@
 // Test "impossible match" queries, or queries that will always have
 // an empty result set.
 // @tags: [
+//   uses_explain,
 //   assumes_read_concern_local,
 // ]
 

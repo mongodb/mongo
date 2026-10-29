@@ -5,10 +5,20 @@
 //   requires_replication,
 //   uses_parallel_shell,
 //   does_not_support_stepdowns,
+//   # This test verifies that a replica set write block replicates to a secondary, which can
+//   # cause the test to timeout while waiting for the secondary to apply the write block.
+//   no_kill_secondary,
+//   # This test reads replica set configuration from secondaries, for which
+//   # linearizable read concern is not supported.
+//   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
+//   # TODO(SERVER-123007): once 9.0 is lastLTS, remove this tag.
+//   multiversion_incompatible,
 //   does_not_support_config_fuzzer,
+//   cannot_run_during_upgrade_downgrade,
+//   wildcard_indexes_incompatible,
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -16,9 +26,167 @@ import {
     disableReplicaSetWriteBlock,
     enableReplicaSetWriteBlock,
 } from "jstests/libs/block_replica_set_writes_utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {afterEach, before, describe, it} from "jstests/libs/mochalite.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {isEnterpriseShell, runEncryptedTest} from "jstests/fle2/libs/encrypted_client_util.js";
+import {checkLog} from "src/mongo/shell/check_log.js";
+
+// Confirms background auto-compact is running by probing with a different configuration. A
+// transient ObjectIsBusy (the previous command's signal not yet consumed) is retried.
+function assertAutoCompactRunning(adminDB, probeMB) {
+    assert.soon(() => {
+        const res = adminDB.runCommand({autoCompact: true, freeSpaceTargetMB: probeMB});
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.eq(
+            res.code,
+            ErrorCodes.AlreadyInitialized,
+            "auto-compact reconfigure should be rejected because it is already running",
+            {res},
+        );
+        return true;
+    }, "Timed out confirming auto-compact is running");
+}
+
+function assertReplicaSetWriteBlockApplied(adminDB, allowDeletions, blockOperationTime) {
+    assert.soon(() => {
+        const replSetStatus = assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
+        // A lagged secondary may temporarily replay an older write-block transition with the same
+        // state. Wait for this command's oplog entry before accepting the observed state.
+        if (bsonWoCompare(replSetStatus.optimes.appliedOpTime.ts, blockOperationTime) < 0) {
+            return false;
+        }
+        const replStatus = assert.commandWorked(adminDB.serverStatus()).repl;
+        return (
+            replStatus.replicaSetWritesBlock === 2 &&
+            replStatus.replicaSetWritesBlockAllowDeletions === allowDeletions
+        );
+    }, "Timed out waiting for replica set write block to be applied");
+}
+
+function assertReplicaSetWriteBlockDisabled(adminDB, blockOperationTime) {
+    assert.soon(() => {
+        const replSetStatus = assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
+        if (bsonWoCompare(replSetStatus.optimes.appliedOpTime.ts, blockOperationTime) < 0) {
+            return false;
+        }
+        const replStatus = assert.commandWorked(adminDB.serverStatus()).repl;
+        return replStatus.replicaSetWritesBlock === 1;
+    }, "Timed out waiting for replica set write block disable to be applied");
+}
+
+function runAutoCompactPauseOnSecondaryTest(
+    replicaSetPrimary,
+    primaryAdminDB,
+    {startWithDeletionsAllowed, freeSpaceTargetMB},
+) {
+    const secondary = FixtureHelpers.getSecondaries(primaryAdminDB)[0];
+    if (
+        !secondary ||
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            replicaSetPrimary,
+            "supportsLocalCollections",
+            false,
+        )
+    ) {
+        jsTest.log.info(
+            "Skipping secondary auto-compact write block pause test: secondary or local collections unavailable",
+        );
+        return;
+    }
+
+    const secondaryAdminDB = secondary.getDB("admin");
+
+    // Make sure prior test cleanup has been applied before enabling auto-compaction. The release
+    // command runs on the primary, but its oplog entry may still be queued on this secondary.
+    const primaryReplSetStatus = assert.commandWorked(
+        primaryAdminDB.runCommand({replSetGetStatus: 1}),
+    );
+    assertReplicaSetWriteBlockDisabled(
+        secondaryAdminDB,
+        primaryReplSetStatus.optimes.appliedOpTime.ts,
+    );
+
+    // Optionally begin with deletions allowed, then transition the active block to disallow them.
+    if (startWithDeletionsAllowed) {
+        const allowDeletionsRes = enableReplicaSetWriteBlock(
+            primaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace",
+        );
+        assertReplicaSetWriteBlockApplied(
+            secondaryAdminDB,
+            true /* allowDeletions */,
+            allowDeletionsRes.operationTime,
+        );
+    }
+
+    // Enable auto-compact on the secondary.
+    assert.soon(() => {
+        const res = secondaryAdminDB.runCommand({autoCompact: true, freeSpaceTargetMB});
+        // A prior write block's release may not have replicated to this secondary yet.
+        if (
+            res.code === ErrorCodes.ObjectIsBusy ||
+            res.code === ErrorCodes.ReplicaSetWritesBlocked
+        ) {
+            return false;
+        }
+        if (res.code === ErrorCodes.AlreadyInitialized) return true;
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out enabling autoCompact on secondary");
+    assertAutoCompactRunning(secondaryAdminDB, freeSpaceTargetMB + 1);
+    assert.commandWorked(secondaryAdminDB.runCommand({clearLog: "global"}));
+
+    // Enabling the block (or changing its policy) must pause auto-compact on the secondary.
+    const blockRes = enableReplicaSetWriteBlock(
+        primaryAdminDB,
+        false /* allowDeletions */,
+        "InsufficientDiskSpace",
+    );
+    assertReplicaSetWriteBlockApplied(
+        secondaryAdminDB,
+        false /* allowDeletions */,
+        blockRes.operationTime,
+    );
+    assert.commandFailedWithCode(
+        secondaryAdminDB.runCommand({autoCompact: true}),
+        ErrorCodes.ReplicaSetWritesBlocked,
+    );
+
+    // Verify that the secondary paused auto-compaction.
+    assert(
+        checkLog.checkContainsOnceJson(secondary, 13374200, {}),
+        "Expected secondary to log paused auto-compaction",
+    );
+
+    const unblockRes = disableReplicaSetWriteBlock(
+        primaryAdminDB,
+        "InsufficientDiskSpace" /* reason */,
+    );
+    assertReplicaSetWriteBlockDisabled(secondaryAdminDB, unblockRes.operationTime);
+
+    // Re-enabling with a different target succeeds, proving auto-compaction remained stopped
+    // (did not return AlreadyInitialized).
+    assert.soon(() => {
+        const res = secondaryAdminDB.runCommand({
+            autoCompact: true,
+            freeSpaceTargetMB: freeSpaceTargetMB + 1,
+        });
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out confirming auto-compact remained stopped after write block release");
+
+    // Leave background compaction off.
+    assert.soon(() => {
+        const res = secondaryAdminDB.runCommand({autoCompact: false});
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out disabling autoCompact on secondary");
+}
 
 describe("Test blockReplicaSetWrites command on replica set level", function () {
     before(function () {
@@ -54,44 +222,85 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandWorked(this.replicaSetPrimary.getDB(this.testDbName).dropDatabase());
     });
 
-    it("Test that concurrent blockReplicaSetWrites commands serialize", function () {
-        const hangFailPoint = configureFailPoint(
-            this.replicaSetPrimary,
-            "hangInBlockReplicaSetWritesCommand",
-        );
+    it("Test that concurrent blockReplicaSetWrites invocations are serialized", function () {
+        const primary = this.replicaSetPrimary;
+        const failPointName = "hangInBlockReplicaSetWritesCommand";
 
-        jsTest.log.info("Starting parallel shell to run parallel blockReplicaSetWrites command");
-        const awaitShell = startParallelShell(() => {
-            assert.commandWorked(
-                db.getSiblingDB("admin").runCommand({
-                    blockReplicaSetWrites: 1,
-                    enabled: true,
-                    allowDeletions: false,
-                    reason: "InsufficientDiskSpace",
-                }),
+        // Pause the first invocation inside the critical section, while it holds the global
+        // serialization mutex.
+        const fp = configureFailPoint(primary, failPointName);
+
+        let enableShell;
+        let disableShell;
+        try {
+            // First invocation: enable the block. It acquires the global mutex and hangs at the
+            // failpoint.
+            enableShell = startParallelShell(
+                funWithArgs(function (reason) {
+                    assert.commandWorked(
+                        db.getSiblingDB("admin").runCommand({
+                            blockReplicaSetWrites: 1,
+                            enabled: true,
+                            allowDeletions: false,
+                            reason: reason,
+                        }),
+                    );
+                }, "InsufficientDiskSpace"),
+                this.replicaSetPrimaryPort,
             );
-        }, this.replicaSetPrimaryPort);
 
-        jsTest.log.info("Wait for fail point to be hit");
-        hangFailPoint.wait();
+            // Wait until the first invocation is parked at the failpoint. The command evaluates
+            // the failpoint via shouldFail() and then parks in pauseWhileSet(), which enters it a
+            // second time, so the parked invocation accounts for exactly two hits.
+            const hitsPerInvocation = 2;
+            const parkedHits = fp.timesEntered + hitsPerInvocation;
+            fp.wait({timesEntered: hitsPerInvocation});
 
-        jsTest.log.info(
-            "Try to run a second blockReplicaSetWrites command, which should timeout since the first command is still running",
+            // Second invocation: disable the block. Because the mutex is process-wide, this
+            // invocation must block on mutex acquisition and therefore cannot reach the
+            // failpoint-guarded critical section while the first invocation holds the lock.
+            disableShell = startParallelShell(
+                funWithArgs(function (reason) {
+                    assert.commandWorked(
+                        db.getSiblingDB("admin").runCommand({
+                            blockReplicaSetWrites: 1,
+                            enabled: false,
+                            reason: reason,
+                        }),
+                    );
+                }, "InsufficientDiskSpace"),
+                this.replicaSetPrimaryPort,
+            );
+
+            // The second invocation must not enter the failpoint while the first holds the mutex,
+            // so the hit count must not advance past the parked snapshot.
+            assert.commandFailedWithCode(
+                primary.adminCommand({
+                    waitForFailPoint: failPointName,
+                    timesEntered: parkedHits + 1,
+                    maxTimeMS: 5 * 1000,
+                }),
+                ErrorCodes.MaxTimeMSExpired,
+                "Second blockReplicaSetWrites invocation should be serialized behind the first and not enter the critical section",
+            );
+        } finally {
+            // Always release the first invocation so it drops the mutex, even if an assertion above
+            // threw. Otherwise the parked invocation would hold the mutex and deadlock cleanup.
+            fp.off();
+        }
+
+        // Release the parallel shells. The first finishes enabling the block and drops the mutex,
+        // after which the second acquires it and disables the block.
+        enableShell();
+        disableShell();
+
+        // After both invocations complete, the block should be disabled (the second invocation ran last).
+        const replStatus = assert.commandWorked(this.replicaSetPrimaryAdminDB.serverStatus()).repl;
+        assert.eq(
+            replStatus.replicaSetWritesBlock,
+            1,
+            "replicaSetWritesBlock metric should be 1 (Disabled) after the serialized disable completes",
         );
-        assert.commandFailedWithCode(
-            this.replicaSetPrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-                maxTimeMS: 5000,
-            }),
-            ErrorCodes.MaxTimeMSExpired,
-        );
-
-        jsTest.log.info("Turn off fail point to allow first command to complete");
-        hangFailPoint.off();
-        awaitShell();
     });
 
     it("Test that allowDeletions is required when enabling the block", function () {
@@ -137,6 +346,83 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
     });
 
+    it("Test that allowDeletions can be updated while replica set write blocking is active", function () {
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        const docBeforeUpdate =
+            this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne();
+        const blockCounterBeforeUpdate =
+            this.replicaSetPrimaryAdminDB.serverStatus().repl.replicaSetWritesBlockCounters
+                .InsufficientDiskSpace;
+
+        // Update the active block to allow deletions without releasing it.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        const docAfterUpdateToTrue =
+            this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne();
+        assert.eq(
+            docBeforeUpdate._id,
+            docAfterUpdateToTrue._id,
+            "Expected the existing critical section to update",
+        );
+        assert.eq(true, docAfterUpdateToTrue.enabled, "Expected write blocking to remain enabled");
+        assert.eq(true, docAfterUpdateToTrue.allowDeletions, "Expected allowDeletions to update");
+        assert.eq(
+            docBeforeUpdate.replicaSetWritesBlockReason,
+            docAfterUpdateToTrue.replicaSetWritesBlockReason,
+            "Expected the write-block reason to remain unchanged",
+        );
+        assert.eq(
+            blockCounterBeforeUpdate + 1,
+            this.replicaSetPrimaryAdminDB.serverStatus().repl.replicaSetWritesBlockCounters
+                .InsufficientDiskSpace,
+            "Updating allowDeletions must increment the block counter",
+        );
+
+        // Update the active block back to disallow deletions, then repeat the same value as a no-op.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        const docAfterUpdateBackToFalse =
+            this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne();
+        assert.eq(
+            docBeforeUpdate._id,
+            docAfterUpdateBackToFalse._id,
+            "Expected the existing critical section to update",
+        );
+        assert.eq(
+            true,
+            docAfterUpdateBackToFalse.enabled,
+            "Expected write blocking to remain enabled",
+        );
+        assert.eq(
+            false,
+            docAfterUpdateBackToFalse.allowDeletions,
+            "Expected allowDeletions to update back to false",
+        );
+        assert.eq(
+            blockCounterBeforeUpdate + 2,
+            this.replicaSetPrimaryAdminDB.serverStatus().repl.replicaSetWritesBlockCounters
+                .InsufficientDiskSpace,
+            "Each allowDeletions change must increment the enable counter; identical repeats must not",
+        );
+    });
+
     it("Test CUD operations are blocked/allowed when replica set write block is enabled/disabled", function () {
         const testColl = this.replicaSetPrimary.getDB(this.testDbName).getCollection("testColl");
 
@@ -147,6 +433,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             this.replicaSetPrimaryAdminDB,
             false /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
+        );
+        let replStatus = this.replicaSetPrimaryAdminDB.serverStatus().repl;
+        assert.eq(
+            false,
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            "replicaSetWritesBlockAllowDeletions should be false when deletions are blocked",
         );
 
         assert.commandFailedWithCode(
@@ -165,6 +457,12 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         disableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             "InsufficientDiskSpace" /* reason */,
+        );
+        replStatus = this.replicaSetPrimaryAdminDB.serverStatus().repl;
+        assert.eq(
+            true,
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            "replicaSetWritesBlockAllowDeletions should be true when replica set write blocking is disabled",
         );
 
         assert.commandWorked(testColl.insert({_id: 2, x: 2}));
@@ -273,15 +571,17 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
         assert.eq(2, testColl.count(), "Both documents should remain while deletions are blocked");
 
-        // Disable write block and and re-enable with allowDeletions: true to check that user deletes are allowed.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
+        // Update the active block with allowDeletions: true to check that user deletes are allowed.
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
             "InsufficientDiskSpace" /* reason */,
+        );
+        const replStatus = this.replicaSetPrimaryAdminDB.serverStatus().repl;
+        assert.eq(
+            true,
+            replStatus.replicaSetWritesBlockAllowDeletions,
+            "replicaSetWritesBlockAllowDeletions should be true when deletions are allowed",
         );
         assert.commandWorked(testColl.remove({_id: 1}));
         assert.eq(
@@ -316,45 +616,55 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
 
         const testColl = this.replicaSetPrimary.getDB(this.testDbName).getCollection("testColl");
 
+        // Reduce wait time between passes to speed up test.
+        const originalTtlMonitorSleepSecs = assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({setParameter: 1, ttlMonitorSleepSecs: 1}),
+        ).was;
+
         // Pause the TTL monitor so it doesn't run during setup.
         const pauseTtl = configureFailPoint(this.replicaSetPrimary, "hangTTLMonitorBetweenPasses");
-        pauseTtl.wait();
+        try {
+            pauseTtl.wait();
 
-        // Insert an already-expired document and create a TTL index with expireAfterSeconds: 0.
-        assert.commandWorked(testColl.insert({_id: 1, createdAt: new Date(0)}));
-        assert.commandWorked(testColl.createIndex({createdAt: 1}, {expireAfterSeconds: 0}));
+            // Insert an already-expired document and create a TTL index with expireAfterSeconds: 0.
+            assert.commandWorked(testColl.insert({_id: 1, createdAt: new Date(0)}));
+            assert.commandWorked(testColl.createIndex({createdAt: 1}, {expireAfterSeconds: 0}));
 
-        // Enable write block with allowDeletions: false and let TTL run — document should not be reaped.
-        enableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            false /* allowDeletions */,
-            "InsufficientDiskSpace" /* reason */,
-        );
-        runTTLMonitor();
-        assert.eq(
-            1,
-            testColl.count(),
-            "TTL should not have reaped the document while deletions are blocked",
-        );
+            // Enable write block with allowDeletions: false and let TTL run — document should not be reaped.
+            enableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            runTTLMonitor();
+            assert.eq(
+                1,
+                testColl.count(),
+                "TTL should not have reaped the document while deletions are blocked",
+            );
 
-        // Disable write block and re-enable with allowDeletions: true — TTL should now reap the document.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
-        enableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            true /* allowDeletions */,
-            "InsufficientDiskSpace" /* reason */,
-        );
-        runTTLMonitor();
-        assert.eq(
-            0,
-            testColl.count(),
-            "TTL should have reaped the document when allowDeletions is true",
-        );
-
-        pauseTtl.off();
+            // Update the active block with allowDeletions: true — TTL should now reap the document.
+            enableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                true /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            runTTLMonitor();
+            assert.eq(
+                0,
+                testColl.count(),
+                "TTL should have reaped the document when allowDeletions is true",
+            );
+        } finally {
+            // Ensure the TTL monitor isn't left hung if an assertion above throws.
+            pauseTtl.off();
+            assert.commandWorked(
+                this.replicaSetPrimaryAdminDB.runCommand({
+                    setParameter: 1,
+                    ttlMonitorSleepSecs: originalTtlMonitorSleepSecs,
+                }),
+            );
+        }
     });
 
     it("Test that DDLs are not blocked by replica set write block", function () {
@@ -511,13 +821,7 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             ErrorCodes.ReplicaSetWritesBlocked,
         );
 
-        // Disable write block.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
-
-        // Check that with allowDeletions:true, compact is permitted.
+        // Update the active block with allowDeletions:true; compact is then permitted.
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
@@ -560,15 +864,14 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
 
         // Leave background compaction off.
-        assert.commandWorked(this.replicaSetPrimaryAdminDB.runCommand({autoCompact: false}));
+        assert.soon(() => {
+            const res = this.replicaSetPrimaryAdminDB.runCommand({autoCompact: false});
+            if (res.code === ErrorCodes.ObjectIsBusy) return false;
+            assert.commandWorked(res);
+            return true;
+        }, "Timed out waiting to disable autoCompact");
 
-        // Disable write block.
-        disableReplicaSetWriteBlock(
-            this.replicaSetPrimaryAdminDB,
-            "InsufficientDiskSpace" /* reason */,
-        );
-
-        // Check that with allowDeletions:true, auto-compact is permitted.
+        // Update the active block with allowDeletions:true; auto-compact is then permitted.
         enableReplicaSetWriteBlock(
             this.replicaSetPrimaryAdminDB,
             true /* allowDeletions */,
@@ -588,6 +891,20 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             assert.commandWorked(res);
             return true;
         }, "Timed out waiting to disable autoCompact");
+    });
+
+    it("Test that a replica set write block pauses auto-compact on secondaries (best effort)", function () {
+        runAutoCompactPauseOnSecondaryTest(this.replicaSetPrimary, this.replicaSetPrimaryAdminDB, {
+            startWithDeletionsAllowed: false,
+            freeSpaceTargetMB: 700,
+        });
+    });
+
+    it("Test that blocking deletions after the write block is enabled pauses auto-compact on secondaries (best effort)", function () {
+        runAutoCompactPauseOnSecondaryTest(this.replicaSetPrimary, this.replicaSetPrimaryAdminDB, {
+            startWithDeletionsAllowed: true,
+            freeSpaceTargetMB: 750,
+        });
     });
 
     it("Test interaction between global write block and replica set write block (disable replica set write block first)", function () {
@@ -699,6 +1016,179 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             null,
             testColl.getIndexes().find((idx) => idx.name === "a_1"),
             "Expected index to exist after write block is disabled",
+        );
+    });
+
+    it("Test that in-progress index builds before the commit phase are aborted when blockReplicaSetWrites is enabled", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const testColl = testDB.getCollection("inProgressIndexBuildColl");
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        // Verify that index builds succeed normally before write blocking is enabled.
+        assert.commandWorked(testColl.createIndex({a: 1}));
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist before write blocking is enabled",
+        );
+        assert.commandWorked(testColl.dropIndex("a_1"));
+
+        // Pause the index build after initialization so we can enable the write block while it is in progress.
+        const hangFp = configureFailPoint(
+            this.replicaSetPrimary,
+            "hangAfterInitializingIndexBuild",
+        );
+
+        // Start the index build in a parallel shell.
+        const awaitIndexBuild = startParallelShell(() => {
+            const res = assert.commandFailedWithCode(
+                db
+                    .getSiblingDB("testDB")
+                    .getCollection("inProgressIndexBuildColl")
+                    .createIndex({a: 1}),
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.ReplicaSetWritesBlocked],
+            );
+            // The build must fail because of write blocking. This surfaces in one of two ways: the
+            // in-progress build is aborted with a "Write blocking" reason (IndexBuildAborted), or the
+            // build's setup write is rejected outright with "Replica set writes blocked"
+            // (ReplicaSetWritesBlocked) when the build restarts after the block is already enabled
+            // (e.g. when a concurrent FCV change interrupts the paused build).
+            assert(
+                res.errmsg.includes("Write blocking") ||
+                    res.errmsg.includes("Replica set writes blocked"),
+                "Unexpected index build failure reason",
+                {res},
+            );
+        }, this.replicaSetPrimaryPort);
+
+        hangFp.wait();
+
+        // Enable replica set write blocking while the index build is paused.
+        enableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, false, "InsufficientDiskSpace");
+
+        hangFp.off();
+        awaitIndexBuild();
+
+        // Verify the index was not created.
+        assert.eq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to not exist after in-progress build was aborted",
+        );
+
+        // Disable write blocking and verify that index builds succeed again.
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace");
+        assert.commandWorked(testColl.createIndex({a: 1}));
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist after write blocking is disabled",
+        );
+    });
+
+    it("Test changing allowDeletions does not abort an in-progress index build", function () {
+        const testColl = this.replicaSetPrimaryAdminDB.getCollection(this.adminTestCollName);
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        // A non-empty admin collection bypasses write blocking but uses the normal index-build path.
+        enableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, true, "InsufficientDiskSpace");
+        assert.commandWorked(this.replicaSetPrimary.adminCommand({clearLog: "global"}));
+
+        const hangFp = configureFailPoint(
+            this.replicaSetPrimary,
+            "hangAfterInitializingIndexBuild",
+        );
+        const awaitIndexBuild = startParallelShell(() => {
+            assert.commandWorked(
+                db.getSiblingDB("admin").getCollection("testDB_adminTestColl").createIndex({a: 1}),
+            );
+        }, this.replicaSetPrimaryPort);
+
+        try {
+            hangFp.wait();
+
+            // Retuning the deletion policy must not run the initial-enable index-build abort path.
+            enableReplicaSetWriteBlock(
+                this.replicaSetPrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+
+            assert(
+                !checkLog.checkContainsOnceJson(this.replicaSetPrimary, 6511600, {}),
+                "Retuning allowDeletions must not invoke abortIndexBuildsForWriteBlocking",
+            );
+        } finally {
+            hangFp.off();
+            awaitIndexBuild();
+        }
+
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected the in-progress index build to complete after the policy update",
+        );
+    });
+
+    it("Test that an index build already in the commit phase is not aborted but waited on when blockReplicaSetWrites is enabled", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const testColl = testDB.getCollection("commitPhaseIndexBuildColl");
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        // Pause the index build once it has reached the commit phase. At this point the build is
+        // past the point where it can be aborted, so enabling write blocking must wait for it to
+        // finish rather than abort it.
+        const hangFp = configureFailPoint(this.replicaSetPrimary, "hangIndexBuildBeforeCommit");
+
+        // Start the index build; it should succeed (not be aborted).
+        const awaitIndexBuild = startParallelShell(() => {
+            assert.commandWorked(
+                db
+                    .getSiblingDB("testDB")
+                    .getCollection("commitPhaseIndexBuildColl")
+                    .createIndex({a: 1}),
+            );
+        }, this.replicaSetPrimaryPort);
+
+        hangFp.wait();
+
+        // Enable replica set write blocking in a parallel shell. Because the index build is already
+        // committing and cannot be aborted, the command must wait for the build to finish before
+        // it completes.
+        const awaitWriteBlock = startParallelShell(() => {
+            assert.commandWorked(
+                db.getSiblingDB("admin").runCommand({
+                    blockReplicaSetWrites: 1,
+                    enabled: true,
+                    allowDeletions: false,
+                    reason: "InsufficientDiskSpace",
+                }),
+            );
+        }, this.replicaSetPrimaryPort);
+
+        // While the index build is still paused in commit, the write-blocking command must not have
+        // finished: it is blocked waiting on the build that it could not abort.
+        assert.soon(
+            () =>
+                this.replicaSetPrimaryAdminDB
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {"command.blockReplicaSetWrites": {$exists: true}}},
+                    ])
+                    .toArray().length > 0,
+            "Expected blockReplicaSetWrites to still be waiting on the committing index build",
+        );
+
+        // Let the index build commit; both the build and the write-blocking command should finish.
+        hangFp.off();
+        awaitIndexBuild();
+        awaitWriteBlock();
+
+        // Verify the index was created: a commit-phase build must not be aborted.
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist.",
         );
     });
 

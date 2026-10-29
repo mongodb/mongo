@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
@@ -38,7 +12,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -66,7 +39,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -157,7 +130,7 @@ std::unique_ptr<Pipeline> ReshardingTxnCloner::_targetAggregationRequest(Operati
         pipeline.getContext(),
         std::move(request),
         _sourceId.getShardId(),
-        IncludeMetrics{} /* remoteMetricsToInclude */);
+        /*remoteMetricsToInclude=*/IncludeMetrics{});
 }
 
 std::unique_ptr<Pipeline> ReshardingTxnCloner::_restartPipeline(
@@ -169,13 +142,9 @@ std::unique_ptr<Pipeline> ReshardingTxnCloner::_restartPipeline(
 }
 
 boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
-    OperationContext* opCtx, Pipeline& pipeline, exec::agg::Pipeline& execPipeline) {
-    execPipeline.reattachToOperationContext(opCtx);
-    pipeline.reattachToOperationContext(opCtx);
-    ON_BLOCK_EXIT([&pipeline, &execPipeline] {
-        execPipeline.detachFromOperationContext();
-        pipeline.detachFromOperationContext();
-    });
+    OperationContext* opCtx, resharding::ReshardingExecutablePipeline& pipeline) {
+    pipeline.reattachToOpCtx(opCtx);
+    ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOpCtx(); });
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
     // recipient spent waiting for documents from the donor shard. It doing so requires the CurOp to
@@ -184,7 +153,7 @@ boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
     curOp->ensureStarted();
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
-    auto doc = execPipeline.getNext();
+    auto doc = pipeline.get().getNext();
     return doc ? SessionTxnRecord::parse(doc->toBson(),
                                          IDLParserContext{"resharding config.transactions cloning"})
                : boost::optional<SessionTxnRecord>{};
@@ -211,7 +180,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
     }
 
     return session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
-        opCtx, sessionId, txnNumber, boost::none /* stmtId */, [&] {
+        opCtx, sessionId, txnNumber, /*stmtId=*/boost::none, [&] {
             // If the TransactionParticipant is flagged as having an incomplete history, then the
             // dead end sentinel is already present in the oplog.
             if (TransactionParticipant::get(opCtx).hasIncompleteHistory()) {
@@ -221,8 +190,8 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
             resharding::data_copy::updateSessionRecord(opCtx,
                                                        TransactionParticipant::kDeadEndSentinel,
                                                        {kIncompleteHistoryStmtId},
-                                                       boost::none /* preImageOpTime */,
-                                                       boost::none /* postImageOpTime */,
+                                                       /*preImageOpTime=*/boost::none,
+                                                       /*postImageOpTime=*/boost::none,
                                                        {});
         });
 }
@@ -246,8 +215,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest) {
     struct ChainContext {
-        std::unique_ptr<Pipeline> pipeline;
-        std::unique_ptr<exec::agg::Pipeline> execPipeline;
+        resharding::ReshardingExecutablePipeline pipeline;
         boost::optional<SessionTxnRecord> donorRecord;
         bool moreToCome = true;
         int progressCounter = 0;
@@ -257,17 +225,14 @@ SemiFuture<void> ReshardingTxnCloner::run(
 
     return resharding::WithAutomaticRetry(
                [this, chainCtx, cancelToken, factory, mongoProcessInterface_forTest] {
-                   if (!chainCtx->pipeline) {
+                   if (!chainCtx->pipeline.isInitialized()) {
                        auto opCtx = factory->makeOperationContext(&cc());
-                       chainCtx->pipeline =
+                       chainCtx->pipeline.reinitialize(
                            _restartPipeline(opCtx.get(),
                                             MONGO_unlikely(mongoProcessInterface_forTest)
                                                 ? mongoProcessInterface_forTest
-                                                : MongoProcessInterface::create(opCtx.get()));
-                       chainCtx->execPipeline =
-                           exec::agg::buildPipeline(chainCtx->pipeline->freeze());
-                       chainCtx->execPipeline->detachFromOperationContext();
-                       chainCtx->pipeline->detachFromOperationContext();
+                                                : MongoProcessInterface::create(opCtx.get())));
+                       chainCtx->pipeline.detachFromOpCtx();
                        chainCtx->donorRecord = boost::none;
                    }
 
@@ -275,14 +240,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    // due to a prepared transaction having been in progress.
                    if (!chainCtx->donorRecord) {
                        auto opCtx = factory->makeOperationContext(&cc());
-                       ScopeGuard guard([&] {
-                           chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                           chainCtx->execPipeline->dispose();
-                           chainCtx->pipeline.reset();
-                           chainCtx->execPipeline.reset();
-                       });
-                       chainCtx->donorRecord = _getNextRecord(
-                           opCtx.get(), *chainCtx->pipeline, *chainCtx->execPipeline);
+                       ScopeGuard guard([&] { chainCtx->pipeline.dispose(opCtx.get()); });
+                       chainCtx->donorRecord = _getNextRecord(opCtx.get(), chainCtx->pipeline);
                        guard.dismiss();
                    }
 
@@ -310,19 +269,34 @@ SemiFuture<void> ReshardingTxnCloner::run(
 
                    chainCtx->donorRecord = boost::none;
                    return makeReadyFutureWith([] {}).semi();
-               })
+               },
+               // Treat ReplicaSetWritesBlocked as transient so config.transactions cloning holds
+               // and resumes until the replica set write block is lifted, rather than failing the
+               // operation, matching ReshardingCollectionCloner's handling. LockTimeout is left out
+               // (retried by the recipient state machine that drives the cloner) so this only
+               // extends the default retryability with the write block.
+               resharding::kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern)
         .onTransientError([this, chainCtx, factory](const Status& status) {
-            LOGV2(5461600,
-                  "Transient error while cloning config.transactions collection",
-                  "sourceId"_attr = _sourceId,
-                  "readTimestamp"_attr = _fetchTimestamp,
-                  "error"_attr = redact(status));
-            if (chainCtx->pipeline) {
+            if (status == ErrorCodes::ReplicaSetWritesBlocked) {
+                if (resharding::shouldLogWriteBlockWarning(_lastWriteBlockWarningAt)) {
+                    LOGV2_WARNING(10627300,
+                                  "Resharding recipient is paused because writes to this replica "
+                                  "set are currently blocked; config.transactions cloning will "
+                                  "keep retrying until the write block is disabled or the "
+                                  "operation is aborted",
+                                  "sourceId"_attr = _sourceId,
+                                  "error"_attr = redact(status));
+                }
+            } else {
+                LOGV2(5461600,
+                      "Transient error while cloning config.transactions collection",
+                      "sourceId"_attr = _sourceId,
+                      "readTimestamp"_attr = _fetchTimestamp,
+                      "error"_attr = redact(status));
+            }
+            if (chainCtx->pipeline.isInitialized()) {
                 auto opCtx = factory->makeOperationContext(&cc());
-                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                chainCtx->execPipeline->dispose();
-                chainCtx->pipeline.reset();
-                chainCtx->execPipeline.reset();
+                chainCtx->pipeline.dispose(opCtx.get());
             }
         })
         .onUnrecoverableError([this](const Status& status) {
@@ -340,7 +314,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
         // RecipientStateMachine, along with its ReshardingTxnCloner member, may have already been
         // destructed.
         .onCompletion([chainCtx](Status status) {
-            if (chainCtx->pipeline) {
+            if (chainCtx->pipeline.isInitialized()) {
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
                 auto client = cc().getServiceContext()->getService()->makeClient(
                     "ReshardingTxnClonerCleanupClient", Client::noSession());
@@ -348,10 +322,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                 AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();
 
-                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                chainCtx->execPipeline->dispose();
-                chainCtx->pipeline.reset();
-                chainCtx->execPipeline.reset();
+                chainCtx->pipeline.dispose(opCtx.get());
             }
 
             // Propagate the result of the AsyncTry.

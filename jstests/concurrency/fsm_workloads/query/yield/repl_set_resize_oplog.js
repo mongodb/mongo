@@ -2,7 +2,10 @@
  * Concurrently runs 'replSetResizeOplog' with inserts and oplog scans and verifies that our oplog
  * scans wait for oplog visibility correctly.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *  assumes_against_mongod_not_mongos,
+ *  requires_replication
+ * ]
  */
 
 export const $config = (function () {

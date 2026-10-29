@@ -3,10 +3,9 @@
  */
 import {flattenQueryPlanTree, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {
-    checkSbeFullFeatureFlagEnabled,
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
-    checkSbeEqLookupUnwindEnabled,
+    isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -17,10 +16,14 @@ const frameworkControl = assert.commandWorked(
 const forceClassicEngineSet =
     frameworkControl.internalQueryFrameworkControl === "forceClassicEngine";
 
-const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
+const isFeatureFlagSbeFullEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeUnwind") && checkSbeFullyEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
-const isSbeEqLookupUnwind = checkSbeEqLookupUnwindEnabled(db) && !forceClassicEngineSet;
+const isLookupUnwindPushdownEnabled =
+    isDeferredGetExecutorEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") &&
+    !forceClassicEngineSet;
 const isSbeTransformStagesEnabled =
     FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") && !forceClassicEngineSet;
 
@@ -142,7 +145,7 @@ if (isFeatureFlagSbeFullEnabled) {
 } else if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"]);
-} else if (isSbeEqLookupUnwind) {
+} else if (isLookupUnwindPushdownEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
@@ -215,7 +218,7 @@ if (isFeatureFlagSbeFullEnabled) {
 } else if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"]);
-} else if (isSbeEqLookupUnwind) {
+} else if (isLookupUnwindPushdownEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "$sort"]);
 } else if (isSbeGroupLookupOnly) {

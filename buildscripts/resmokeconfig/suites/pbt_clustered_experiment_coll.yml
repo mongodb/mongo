@@ -1,0 +1,42 @@
+#
+# This passthrough runs all eligible PBT tests in a manner that causes
+# the experiment collections to be clustered. This is achieved by
+# passing TestData.pbtClusteredExperimentColl=true to PBT's setupCollection() function.
+#
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/**/*_pbt.js
+  exclude_files:
+    # Timeseries collections can not be clustered
+    - jstests/write_path/timeseries/**/*.js
+    - jstests/core/timeseries/**/*.js
+    # Query settings are not supported on standalone.
+    - jstests/core/query/query_settings/**/*.js
+    # Tests require sharding
+    - jstests/core_sharding/**/*.js
+    # Tests that do not use setupCollection() or otherwise bypass creating an experiment collection.
+    - jstests/core/index/express_pbt.js
+    - jstests/aggregation/sources/documents/collectionless_options_pbt.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+      global_vars:
+        TestData:
+          pbtClusteredExperimentColl: true
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

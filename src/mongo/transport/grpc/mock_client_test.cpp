@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/grpc/mock_client.h"
 
@@ -53,6 +27,7 @@ public:
     }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         _reactor = std::make_shared<GRPCReactor>();
         _ioThread = stdx::thread([&]() {
             _reactor->run();
@@ -63,6 +38,7 @@ public:
     void tearDown() override {
         _reactor->stop();
         _ioThread.join();
+        ServiceContextTest::tearDown();
     }
 
     const std::shared_ptr<GRPCReactor>& getReactor() {
@@ -131,7 +107,7 @@ TEST_F(MockClientTest, ConnectTimeout) {
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto status =
             client.connect(defaultServerAddress(), getReactor(), Milliseconds(5), {}).getNoThrow();
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.waitForOneNewEntry();
         ASSERT_NOT_OK(status);
         ASSERT_EQ(status.getStatus().code(), ErrorCodes::ExceededTimeLimit);
     };
@@ -150,7 +126,7 @@ TEST_F(MockClientTest, ConnectCancelled) {
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto connectFut = client.connect(
             defaultServerAddress(), getReactor(), Minutes(30), {}, cancelSource.token());
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.waitForOneNewEntry();
         cancelSource.cancel();
         auto status = connectFut.getNoThrow();
         ASSERT_NOT_OK(status);
@@ -169,7 +145,7 @@ TEST_F(MockClientTest, ConnectCancelledByShutdown) {
         client.start();
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto connectFut = client.connect(defaultServerAddress(), getReactor(), Minutes(30), {});
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        fp.waitForOneNewEntry();
         client.shutdown();
         auto status = connectFut.getNoThrow();
         ASSERT_NOT_OK(status);
@@ -226,7 +202,7 @@ TEST_F(MockClientTest, MockNoAuthToken) {
 
 TEST_F(MockClientTest, MockClientShutdown) {
     const int kNumRpcs = 10;
-    AtomicWord<int> numRpcsRemaining(kNumRpcs);
+    Atomic<int> numRpcsRemaining(kNumRpcs);
     Notification<void> rpcsFinished;
 
     auto serverHandler = [&](HostAndPort local, std::shared_ptr<IngressSession> session) {

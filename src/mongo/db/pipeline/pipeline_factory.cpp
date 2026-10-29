@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/pipeline_factory.h"
 
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
@@ -55,9 +30,7 @@ LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionC
         // TODO SERVER-129127 These options should be passed via a ParseContext struct rather than
         // through LiteParserOptions.
         LiteParserOptions{.allowGenericForeignDbLookup = expCtx->getAllowGenericForeignDbLookup(),
-                          .ifrContext = expCtx->getIfrContext(),
-                          .usingMongos = expCtx->getInRouter() || expCtx->getFromRouter(),
-                          .isParsingViewDefinition = expCtx->getIsParsingViewDefinition()});
+                          .ifrContext = expCtx->getIfrContext()});
 }
 
 void addViewInvolvedNamespaces(const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
@@ -89,7 +62,9 @@ std::unique_ptr<Pipeline> parseAndDesugarPipeline(
         // pipelines will use resolveInvolvedNamespacesFn and this legacy branch can be deleted.
         // Handle legacy mongot pipelines separately.
         liteParsedPipeline.bindResolvedNamespaceToStages(*expCtx->getView(),
-                                                         expCtx->getResolvedNamespaces());
+                                                         expCtx->getResolvedNamespaces(),
+                                                         0,
+                                                         liteParsedPipeline.getStages().size());
     } else if (opts.resolveInvolvedNamespacesFn) {
         opts.resolveInvolvedNamespacesFn(liteParsedPipeline);
     }
@@ -197,33 +172,6 @@ std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
         std::move(pipeline), expCtx, copiedOpts, aggRequest, shardCursorsSortSpec, readConcern);
 }
 
-namespace {
-std::unique_ptr<Pipeline> viewPipelineHelperForSearch(
-    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
-    ResolvedNamespace resolvedNs,
-    std::vector<BSONObj> currentPipeline,
-    const MakePipelineOptions& opts,
-    const NamespaceString& originalNs) {
-    // Search queries on mongot-indexed views behave differently than non-search aggregations on
-    // views. When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
-    // view transforms as part of its subpipeline. In this way, the view stages will always
-    // be applied directly after $_internalSearchMongotRemote and before the remaining
-    // stages of the user pipeline. This is to ensure the stages following
-    // $search/$vectorSearch in the user pipeline will receive the modified documents: when
-    // storedSource is disabled, idLookup will retrieve full/unmodified documents during
-    // (from the _id values returned by mongot), apply the view's data transforms, and pass
-    // said transformed documents through the rest of the user pipeline.
-    subPipelineExpCtx->setView(ResolvedNamespace::makeForView(
-        originalNs,
-        resolvedNs.ns,
-        std::move(resolvedNs.pipeline),
-        LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()}));
-
-    // return the user pipeline without appending the view stages.
-    return makePipeline(currentPipeline, subPipelineExpCtx, opts);
-}
-}  // namespace
-
 std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ResolvedNamespace resolvedNs,
@@ -232,39 +180,47 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     const NamespaceString& originalNs) {
 
     // Update subpipeline's ExpressionContext with the resolved namespace.
-    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
+    subPipelineExpCtx->setNamespaceString(resolvedNs.getResolvedNamespace());
 
     // When the sub-pipeline targets a view, stages inside the view's definition must run under the
     // view's default collation, not the outer collection's.
     applyViewDefaultCollation(subPipelineExpCtx, resolvedNs);
 
-    if (resolvedNs.pipeline.empty()) {
+    if (resolvedNs.getBsonPipeline().empty()) {
         return makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
 
-    if (search_helper_bson_obj::isMongotPipeline(subPipelineExpCtx->getIfrContext(),
-                                                 currentPipeline)) {
-        return viewPipelineHelperForSearch(
-            subPipelineExpCtx, std::move(resolvedNs), std::move(currentPipeline), opts, originalNs);
+    const bool pipelineIsMongot = search_helper_bson_obj::isMongotPipeline(
+        subPipelineExpCtx->getIfrContext(), currentPipeline);
+    const bool viewDefinitionIsMongot = search_helper_bson_obj::isMongotPipeline(
+        subPipelineExpCtx->getIfrContext(), resolvedNs.getBsonPipeline());
+
+    if (pipelineIsMongot) {
+        subPipelineExpCtx->setView(ResolvedNamespace::makeForView(
+            originalNs,
+            resolvedNs.getResolvedNamespace(),
+            resolvedNs.getBsonPipeline(),
+            LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()}));
     }
 
-    // Register the view's own involved namespaces before the std::move(resolvedNs.pipeline) below;
+    // Register the view's own involved namespaces before the std::move(resolvedNs) below;
     // the helper keeps its transient LiteParsedPipeline local so it cannot outlive that move.
-    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
+    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.getBsonPipeline());
 
-    // Create a LiteParsedPipeline for the user pipeline and apply view handling via
-    // bindResolvedNamespace().
+    const bool isHybrid = hybrid_scoring_util::isHybridSearchPipeline(currentPipeline);
+    const NamespaceString liteParseNss = ((pipelineIsMongot && !viewDefinitionIsMongot) || isHybrid)
+        ? originalNs
+        : subPipelineExpCtx->getNamespaceString();
     LiteParsedPipeline userLiteParsedPipeline(
-        makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
+        liteParseNss,
+        currentPipeline,
+        false,
+        LiteParserOptions{.allowGenericForeignDbLookup =
+                              subPipelineExpCtx->getAllowGenericForeignDbLookup(),
+                          .ifrContext = subPipelineExpCtx->getIfrContext()});
     desugarIfNecessary(userLiteParsedPipeline, opts, subPipelineExpCtx);
 
-    // Apply the view to the user pipeline by registering it in the namespace map and running the
-    // recursive resolver. This is equivalent to the old applyViewToLiteParsed call.
-    //
-    // Thread the sub-pipeline's IFR context into the inserted view entry so that re-parsing the
-    // view's pipeline (e.g. on an IFR-flag retry) sees the same feature-flag view as the rest of
-    // the request — otherwise extension stages inside the view would lite-parse against the
-    // global flag value and the retry would never converge.
+    // Register the view in the namespace map and run the recursive resolver.
     {
         auto resolvedNamespaces = subPipelineExpCtx->getResolvedNamespaces();
         PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
@@ -273,6 +229,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
                                                   subPipelineExpCtx->getIfrContext());
         PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
             &userLiteParsedPipeline, originalNs, resolvedNamespaces);
+        subPipelineExpCtx->setResolvedNamespaces(std::move(resolvedNamespaces));
     }
 
     // Parse from the modified LiteParsedPipeline. Skip desugar since we already did it above.
@@ -307,15 +264,15 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinitionStageParams(
     const NamespaceString& userNss,
     const MakePipelineOptions& opts) {
 
-    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+    if (resolvedNs.getResolvedNamespace().isTimeseriesBucketsCollection() &&
         isRawDataOperation(subPipelineExpCtx->getOperationContext())) {
         return Pipeline::parseFromStageParams(
             std::move(stageParams), subPipelineExpCtx, opts.validator);
     }
 
-    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
+    subPipelineExpCtx->setNamespaceString(resolvedNs.getResolvedNamespace());
 
-    if (resolvedNs.pipeline.empty()) {
+    if (resolvedNs.getBsonPipeline().empty()) {
         return Pipeline::parseFromStageParams(
             std::move(stageParams), subPipelineExpCtx, opts.validator);
     }
@@ -330,7 +287,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinitionStageParams(
     // Stage params already have the view pipeline stitched in (resolved during the LiteParsed
     // phase), so there is no need to re-apply the view. Add involved namespaces so inner stage
     // constructors can resolve them via getResolvedNamespace().
-    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
+    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.getBsonPipeline());
 
     return Pipeline::parseFromStageParams(
         std::move(stageParams), subPipelineExpCtx, opts.validator);
@@ -341,6 +298,6 @@ std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipel
                                             PipelineValidatorCallback validator) {
     LiteParsedPipeline liteParsedPipeline(makeLiteParsedPipeline(expCtx, rawPipeline));
     return Pipeline::parseFromLiteParsed(
-        liteParsedPipeline, expCtx, validator, true /*isFacetPipeline*/);
+        liteParsedPipeline, expCtx, validator, /*isFacetPipeline=*/true);
 }
 }  // namespace mongo::pipeline_factory

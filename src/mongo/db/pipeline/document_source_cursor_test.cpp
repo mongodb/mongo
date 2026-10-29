@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -33,9 +7,11 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
+#include "mongo/db/pipeline/document_source_cursor_test_util.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
@@ -59,206 +35,17 @@ namespace mongo {
 namespace {
 
 /**
- * Mock of the CatalogResourceHandle used by DocumentSourceCursor. This implementation does not
- * actually acquire any resources, and instead keeps track of whether the associated PlanExecutor
- * holds any storage engine state. If the PlanExecutor holds storage engine state while the catalog
- * resources are released, this class will trigger a test failure.
- */
-class MockDSCursorCatalogResourceHandle : public CatalogResourceHandle {
-public:
-    MockDSCursorCatalogResourceHandle(std::shared_ptr<bool> executorHoldsStorageEngineState)
-        : _executorHoldsStorageEngineState(executorHoldsStorageEngineState) {}
-    ~MockDSCursorCatalogResourceHandle() override {
-        ASSERT_EQ(*_executorHoldsStorageEngineState, false);
-    }
-
-    void acquire(OperationContext* opCtx) override {
-        // No-op.
-    }
-
-    void release() override {
-        ASSERT_EQ(*_executorHoldsStorageEngineState, false);
-    }
-
-    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher()
-        const override {
-        MONGO_UNREACHABLE;
-    }
-
-private:
-    // Tracks whether or not the associated plan executor holds storage engine state. This class
-    // does not modify the contents of this variable, it just asserts that the executor is not
-    // holding storage engine state when the catalog resources are released.
-    std::shared_ptr<bool> _executorHoldsStorageEngineState;
-};
-
-/**
- * Mock implementation of PlanExplainer needed to satisfy DocumentSourceCursor's requirements.
- */
-class MockPlanExplainer : public PlanExplainer {
-public:
-    const ExplainVersion& getVersion() const override {
-        static const ExplainVersion version = "mock";  // or any default value you prefer
-        return version;
-    }
-
-    bool areThereRejectedPlansToExplain() const override {
-        return false;  // Assuming no multi-planning by default
-    }
-
-    std::string getPlanSummary() const override {
-        return "Mock plan explainer";
-    }
-
-    void getSummaryStats(PlanSummaryStats* statsOut) const override {}
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const override {
-        return PlanStatsDetails(BSONObj(), boost::none);
-    }
-    PlanStatsDetails getWinningPlanTrialStats() const override {
-        return PlanStatsDetails(BSONObj(), boost::none);
-    }
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const override {
-        return {};
-    }
-};
-
-
-/**
- * Base class for a MockPlanExecutor that returns BSON objects from a pre-canned vector.
- */
-class MockPlanExecutorBase : public PlanExecutor {
-public:
-    MockPlanExecutorBase(OperationContext* opCtx, std::vector<BSONObj> data)
-        : _opCtx(opCtx), _data(std::move(data)) {}
-
-    CanonicalQuery* getCanonicalQuery() const override {
-        return nullptr;
-    }
-
-    const NamespaceString& nss() const override {
-        static auto kNss = NamespaceString::createNamespaceString_forTest("foo.bar");
-        return kNss;
-    }
-
-    const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const override {
-        static std::vector<NamespaceStringOrUUID> kEmpty;
-        return kEmpty;
-    }
-
-    OperationContext* getOpCtx() const override {
-        return _opCtx;
-    }
-
-    ExecState getNext(BSONObj* out, RecordId* dlOut) override {
-        if (_idx >= _data.size()) {
-            return ExecState::IS_EOF;
-        }
-        *out = _data[_idx++];
-        return ExecState::ADVANCED;
-    }
-
-    ExecState getNextDocument(Document& objOut) override {
-        BSONObj bson;
-        auto ret = getNext(&bson, nullptr);
-        objOut = Document(bson).getOwned();
-
-        return ret;
-    }
-
-    bool isEOF() const override {
-        return _idx == _data.size();
-    }
-
-    long long executeCount() override {
-        MONGO_UNREACHABLE;
-    }
-
-    UpdateResult getUpdateResult() const override {
-        MONGO_UNREACHABLE;
-    }
-
-    long long getDeleteResult() const override {
-        MONGO_UNREACHABLE;
-    }
-
-    BatchedDeleteStats getBatchedDeleteStats() override {
-        MONGO_UNREACHABLE;
-    }
-
-    void markAsKilled(Status killStatus) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void dispose(OperationContext* opCtx) override {
-        _isDisposed = true;
-    }
-
-    void forceSpill(PlanYieldPolicy* yieldPolicy) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void stashResult(const BSONObj& obj) override {
-        MONGO_UNREACHABLE;
-    }
-
-    bool isMarkedAsKilled() const override {
-        MONGO_UNREACHABLE;
-    }
-    Status getKillStatus() const override {
-        MONGO_UNREACHABLE;
-    }
-
-    bool isDisposed() const override {
-        return _isDisposed;
-    }
-
-    Timestamp getLatestOplogTimestamp() const override {
-        MONGO_UNREACHABLE;
-    }
-
-    BSONObj getPostBatchResumeToken() const override {
-        MONGO_UNREACHABLE;
-    }
-
-    LockPolicy lockPolicy() const override {
-        return PlanExecutor::LockPolicy::kLockExternally;
-    }
-
-    const PlanExplainer& getPlanExplainer() const override {
-        return _mockExplainer;
-    }
-
-    boost::optional<std::string_view> getExecutorType() const override {
-        return boost::none;
-    }
-
-    QueryFramework getQueryFramework() const override {
-        return QueryFramework::kUnknown;
-    }
-
-private:
-    OperationContext* _opCtx;
-
-    std::vector<BSONObj> _data;
-    size_t _idx = 0;
-
-    MockPlanExplainer _mockExplainer;
-    bool _isDisposed = false;
-};
-
-/**
  * Mock implementation of a PlanExecutor which randomly throws on calls to saveState() and
  * restoreState() based on given probabilities.
  */
-class ThrowyPlanExecutor : public MockPlanExecutorBase {
+class ThrowyPlanExecutor : public test::MockPlanExecutorBase {
 public:
     ThrowyPlanExecutor(OperationContext* opCtx,
                        std::vector<BSONObj> data,
                        double saveProbability,
                        double restoreProbability,
                        std::shared_ptr<bool> holdsStorageEngineState)
-        : MockPlanExecutorBase(opCtx, data),
+        : test::MockPlanExecutorBase(opCtx, data),
           _seed(Date_t::now().asInt64()),
           _prng(_seed),
           _probabilityThrowInSave(saveProbability),
@@ -369,7 +156,8 @@ TEST_F(DSCursorTest, TestSaveAndRestoreThrowing) {
                 cursor->bindCatalogInfo(collections, stasher);
                 // Overwrite the exisitng catalogResourceHandle with our test version.
                 cursor->setCatalogResourceHandle_forTest(
-                    make_intrusive<MockDSCursorCatalogResourceHandle>(holdsStorageEngineStateBool));
+                    make_intrusive<test::MockDSCursorCatalogResourceHandle>(
+                        holdsStorageEngineStateBool));
                 auto cursorStage = exec::agg::buildStage(cursor);
 
                 for (const auto& expectedBson : bsons) {
@@ -399,5 +187,142 @@ TEST_F(DSCursorTest, TestSaveAndRestoreThrowing) {
               "testsThatDidNotThrow"_attr = testsThatDidNotThrow);
     }
 }
+
+/**
+ * MockPlanExecutor instance used for count-only queries.
+ */
+class MockPlanExecutorForCount : public test::MockPlanExecutorBase {
+public:
+    MockPlanExecutorForCount(OperationContext* opCtx,
+                             std::vector<BSONObj> data,
+                             std::shared_ptr<bool> calledGetNextWithoutOutput)
+        : test::MockPlanExecutorBase(opCtx, std::move(data)),
+          _calledGetNextWithoutOutput(std::move(calledGetNextWithoutOutput)) {}
+
+    ExecState getNext(BSONObj* out, RecordId* dlOut) override {
+        invariant(out == nullptr);
+        *_calledGetNextWithoutOutput = true;
+        return nextDocument() ? ExecState::ADVANCED : ExecState::IS_EOF;
+    }
+
+    void saveState() override {}
+
+    void restoreState(const RestoreContext& context) override {}
+
+    void detachFromOperationContext() override {}
+
+    void reattachToOperationContext(OperationContext* opCtx) override {}
+
+private:
+    std::shared_ptr<bool> _calledGetNextWithoutOutput;
+};
+
+TEST_F(DSCursorTest, EmptyDocumentsUsesCountOnlyPlanExecutorInterface) {
+    std::vector<BSONObj> bsons = {BSON("foo" << 1), BSON("foo" << 2), BSON("foo" << 3)};
+    auto calledGetNextWithoutOutput = std::make_shared<bool>(false);
+    auto exec =
+        std::make_unique<MockPlanExecutorForCount>(getOpCtx(), bsons, calledGetNextWithoutOutput);
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> execWithDeleter(
+        std::move(exec).release(), PlanExecutor::Deleter{getOpCtx()});
+
+    MultipleCollectionAccessor collections;
+    auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    auto cursor = DocumentSourceCursor::create(
+        std::move(execWithDeleter), getExpCtx(), DocumentSourceCursor::CursorType::kEmptyDocuments);
+    cursor->bindCatalogInfo(collections, stasher);
+    cursor->setCatalogResourceHandle_forTest(
+        make_intrusive<test::MockDSCursorCatalogResourceHandle>(std::make_shared<bool>(false)));
+
+    auto cursorStage = exec::agg::buildStage(cursor);
+    for (size_t i = 0; i < bsons.size(); ++i) {
+        auto next = cursorStage->getNext();
+        ASSERT(next.isAdvanced());
+        ASSERT(next.getDocument().toBson().isEmpty());
+    }
+    ASSERT(cursorStage->getNext().isEOF());
+    ASSERT(*calledGetNextWithoutOutput);
+    cursorStage->dispose();
+}
+
+/**
+ * Builds a $cursor stage over 'bsons' with the given resume tracking behaviour, reporting
+ * 'latestOplogTimestamp' as the position of the underlying scan.
+ */
+boost::intrusive_ptr<exec::agg::CursorStage> makeOplogScanCursorStage(
+    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::vector<BSONObj> bsons,
+    Timestamp latestOplogTimestamp,
+    DocumentSourceCursor::ResumeTrackingType resumeTrackingType) {
+    auto exec = std::make_unique<test::MockPlanExecutorForOplogScan>(
+        opCtx, std::move(bsons), latestOplogTimestamp);
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> execWithDeleter(
+        std::move(exec).release(), PlanExecutor::Deleter{opCtx});
+
+    MultipleCollectionAccessor collections;
+    auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    auto cursor = DocumentSourceCursor::create(std::move(execWithDeleter),
+                                               expCtx,
+                                               DocumentSourceCursor::CursorType::kRegular,
+                                               resumeTrackingType);
+    cursor->bindCatalogInfo(collections, stasher);
+    cursor->setCatalogResourceHandle_forTest(
+        make_intrusive<test::MockDSCursorCatalogResourceHandle>(std::make_shared<bool>(false)));
+    auto stage = exec::agg::buildStage(cursor);
+    auto* cursorStage = dynamic_cast<exec::agg::CursorStage*>(stage.get());
+    ASSERT_TRUE(cursorStage);
+    return boost::intrusive_ptr<exec::agg::CursorStage>(cursorStage);
+}
+
+TEST_F(DSCursorTest, ReportsNoHighWaterMarkClusterTimeBeforeTheFirstBatchIsLoaded) {
+    auto cursorStage = makeOplogScanCursorStage(getOpCtx(),
+                                                getExpCtx(),
+                                                {BSON("ts" << Timestamp(100, 1))},
+                                                Timestamp(200, 1),
+                                                DocumentSourceCursor::ResumeTrackingType::kOplog);
+
+    // Nothing has been read yet, so we know nothing about where the scan is.
+    ASSERT_FALSE(cursorStage->getHighWaterMarkClusterTime());
+
+    cursorStage->dispose();
+}
+
+TEST_F(DSCursorTest, ReportsHighWaterMarkClusterTimeForAResumableOplogScan) {
+    auto cursorStage = makeOplogScanCursorStage(getOpCtx(),
+                                                getExpCtx(),
+                                                {BSON("ts" << Timestamp(100, 1))},
+                                                Timestamp(200, 1),
+                                                DocumentSourceCursor::ResumeTrackingType::kOplog);
+
+    // While there is a document to return, the reported position is that document's timestamp: the
+    // scan may have read further ahead, but the documents it read have not been returned yet.
+    ASSERT_TRUE(cursorStage->getNext().isAdvanced());
+    ASSERT_EQ(*cursorStage->getHighWaterMarkClusterTime(), Timestamp(100, 1));
+
+    // Once the batch is drained we can report the position the scan itself reached, which is what
+    // makes the high water mark advance over oplog entries which produce no result.
+    ASSERT_TRUE(cursorStage->getNext().isEOF());
+    ASSERT_EQ(*cursorStage->getHighWaterMarkClusterTime(), Timestamp(200, 1));
+
+    cursorStage->dispose();
+}
+
+TEST_F(DSCursorTest, ReportsNoHighWaterMarkClusterTimeForANonResumableScan) {
+    auto cursorStage = makeOplogScanCursorStage(getOpCtx(),
+                                                getExpCtx(),
+                                                {BSON("ts" << Timestamp(100, 1))},
+                                                Timestamp(200, 1),
+                                                DocumentSourceCursor::ResumeTrackingType::kNone);
+
+    // This scan is not resumable, so its position says nothing about which events have been
+    // produced and must not be reported as a high water mark.
+    ASSERT_TRUE(cursorStage->getNext().isAdvanced());
+    ASSERT_FALSE(cursorStage->getHighWaterMarkClusterTime());
+    ASSERT_TRUE(cursorStage->getNext().isEOF());
+    ASSERT_FALSE(cursorStage->getHighWaterMarkClusterTime());
+
+    cursorStage->dispose();
+}
+
 }  // namespace
 }  // namespace mongo

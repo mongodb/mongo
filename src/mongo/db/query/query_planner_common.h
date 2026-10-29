@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,6 +11,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -48,7 +23,7 @@ namespace mongo {
 /**
  * Methods used by several parts of the planning process.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerCommon {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerCommon {
 public:
     /**
      * Does the tree rooted at 'root' have a node with matchType 'type'?
@@ -117,6 +92,22 @@ public:
     static bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
         return query.getFindCommandRequest().getSort().isPrefixOf(
             kp, SimpleBSONElementComparator::kInstance);
+    }
+
+    /**
+     * Returns true if 'query' has a limit that is positive, i.e. one that can exempt the query
+     * from an unbounded-scan restriction such as maxEstimatedScanBytes or notablescan.
+     */
+    static bool hasEffectiveLimit(const CanonicalQuery& query) {
+        return query.getFindCommandRequest().getLimit().value_or(0) > 0;
+    }
+
+    /**
+     * Returns true if 'collInfo' has the maxEstimatedScanBytesDryRun bit set, i.e. a would-be
+     * rejection for that collection should be logged and counted rather than enforced.
+     */
+    static bool isMaxEstimatedScanBytesDryRun(const CollectionInfo& collInfo) {
+        return (collInfo.options & QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN);
     }
 
     static bool providesSortRequirementForDistinct(

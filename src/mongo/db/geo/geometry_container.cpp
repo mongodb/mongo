@@ -1,36 +1,24 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/geo/geometry_container.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/geo/big_polygon.h"
+#include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+
 #include <cstddef>
+#include <set>
+#include <utility>
 
 #include <s1angle.h>
 #include <s2.h>
@@ -47,20 +35,6 @@
 #include <util/math/vector3-inl.h>
 #include <util/math/vector3.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement_comparator_interface.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/geo/big_polygon.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geoparser.h"
-#include "mongo/db/query/bson/multikey_dotted_path_support.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
-
-#include <set>
-#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -90,7 +64,10 @@ bool GeometryContainer::hasS2Region() const {
     return (nullptr != _point && _point->crs == SPHERE) || nullptr != _line ||
         (nullptr != _polygon && (_polygon->crs == SPHERE || _polygon->crs == STRICT_SPHERE)) ||
         (nullptr != _cap && _cap->crs == SPHERE) || nullptr != _multiPoint ||
-        nullptr != _multiLine || nullptr != _multiPolygon || nullptr != _geometryCollection;
+        nullptr != _multiLine || nullptr != _multiPolygon ||
+        // A GeometryCollection with a strict-winding polygon member has no usable S2 region: that
+        // member's region lives in bigPolygon, not s2Polygon, and is excluded from _s2Region.
+        (nullptr != _geometryCollection && !_geometryCollectionHasStrictWindingPolygon());
 }
 
 const S2Region& GeometryContainer::getS2Region() const {
@@ -112,6 +89,13 @@ const S2Region& GeometryContainer::getS2Region() const {
         return *_s2Region;
     } else {
         tassert(9911928, "", nullptr != _geometryCollection);
+        // A strict-winding polygon member is excluded from _s2Region (its region lives in
+        // bigPolygon), so such a GeometryCollection has no usable S2 region. Reaching here for one
+        // means an upstream getNativeCRS()/hasS2Region() guard was missed; fail loudly rather than
+        // dereference a null _s2Region.
+        tassert(12748600,
+                "GeometryCollection with a strict-winding polygon has no S2 region",
+                !_geometryCollectionHasStrictWindingPolygon());
         return *_s2Region;
     }
 }
@@ -435,6 +419,21 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     return false;
 }
 
+// GeometryCollection polygon members with STRICT_SPHERE crs store their region in bigPolygon
+// instead of s2Polygon, which containment/intersection checks below don't support. Assert on the
+// crs first so a genuine strict-winding polygon fails with an accurate, on-message diagnostic, then
+// assert on the pointer itself so a future bug that decouples crs from s2Polygon (e.g. a bad
+// clone()) still fails loudly here instead of dereferencing a null pointer.
+static const S2Polygon& getGeometryCollectionPolygonRegion(const PolygonWithCRS& polygon) {
+    tassert(12748601,
+            "unsupported strict-winding polygon in GeometryCollection",
+            polygon.crs != STRICT_SPHERE);
+    tassert(12748602,
+            "GeometryCollection polygon s2Polygon is unexpectedly null",
+            nullptr != polygon.s2Polygon);
+    return *polygon.s2Polygon;
+}
+
 bool containsPoint(const S2Polygon& poly, const S2Cell& otherCell, const S2Point& otherPoint) {
     // This is much faster for actual containment checking.
     if (poly.Contains(otherPoint)) {
@@ -469,7 +468,8 @@ bool GeometryContainer::contains(const S2Cell& otherCell, const S2Point& otherPo
 
     if (nullptr != _geometryCollection) {
         for (const auto& polygon : _geometryCollection->polygons) {
-            if (containsPoint(*polygon->s2Polygon, otherCell, otherPoint)) {
+            if (containsPoint(
+                    getGeometryCollectionPolygonRegion(*polygon), otherCell, otherPoint)) {
                 return true;
             }
         }
@@ -538,7 +538,7 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
 
     if (nullptr != _geometryCollection) {
         for (const auto& polygon : _geometryCollection->polygons) {
-            if (containsLine(*polygon->s2Polygon, otherLine)) {
+            if (containsLine(getGeometryCollectionPolygonRegion(*polygon), otherLine)) {
                 return true;
             }
         }
@@ -590,7 +590,7 @@ bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
 
     if (nullptr != _geometryCollection) {
         for (const auto& polygon : _geometryCollection->polygons) {
-            if (containsPolygon(*polygon->s2Polygon, otherPolygon)) {
+            if (containsPolygon(getGeometryCollectionPolygonRegion(*polygon), otherPolygon)) {
                 return true;
             }
         }
@@ -633,7 +633,7 @@ bool GeometryContainer::intersects(const GeometryContainer& otherContainer) cons
         }
 
         for (size_t i = 0; i < c.polygons.size(); ++i) {
-            if (intersects(*c.polygons[i]->s2Polygon)) {
+            if (intersects(getGeometryCollectionPolygonRegion(*c.polygons[i]))) {
                 return true;
             }
         }
@@ -732,7 +732,7 @@ bool GeometryContainer::intersects(const S2Cell& otherPoint) const {
         }
 
         for (size_t i = 0; i < c.polygons.size(); ++i) {
-            if (c.polygons[i]->s2Polygon->MayIntersect(otherPoint)) {
+            if (getGeometryCollectionPolygonRegion(*c.polygons[i]).MayIntersect(otherPoint)) {
                 return true;
             }
         }
@@ -822,7 +822,8 @@ bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
         }
 
         for (size_t i = 0; i < c.polygons.size(); ++i) {
-            if (polygonLineIntersection(otherLine, *c.polygons[i]->s2Polygon)) {
+            if (polygonLineIntersection(otherLine,
+                                        getGeometryCollectionPolygonRegion(*c.polygons[i]))) {
                 return true;
             }
         }
@@ -902,7 +903,7 @@ bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
         }
 
         for (size_t i = 0; i < c.polygons.size(); ++i) {
-            if (otherPolygon.Intersects(c.polygons[i]->s2Polygon.get())) {
+            if (otherPolygon.Intersects(&getGeometryCollectionPolygonRegion(*c.polygons[i]))) {
                 return true;
             }
         }
@@ -962,36 +963,59 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
     Status status = Status::OK();
     vector<S2Region*> regions;
 
+    // Resets `member` if `status` is not OK. Returns true when the caller should propagate
+    // the error, ensuring no partially-initialized member escapes on parse failure.
+    auto resetOnError = [&status](auto& member) {
+        if (status.isOK())
+            return false;
+        member.reset();
+        return true;
+    };
+
     if (GeoParser::GEOJSON_POINT == type) {
         _point.reset(new PointWithCRS());
         status = GeoParser::parseGeoJSONPoint(obj, _point.get());
+        if (resetOnError(_point))
+            return status;
     } else if (GeoParser::GEOJSON_LINESTRING == type) {
         _line.reset(new LineWithCRS());
         status = GeoParser::parseGeoJSONLine(obj, skipValidation, _line.get());
+        if (resetOnError(_line))
+            return status;
     } else if (GeoParser::GEOJSON_POLYGON == type) {
         _polygon.reset(new PolygonWithCRS());
         status = GeoParser::parseGeoJSONPolygon(obj, skipValidation, _polygon.get());
+        if (resetOnError(_polygon))
+            return status;
     } else if (GeoParser::GEOJSON_MULTI_POINT == type) {
         _multiPoint.reset(new MultiPointWithCRS());
         status = GeoParser::parseMultiPoint(obj, _multiPoint.get());
+        if (resetOnError(_multiPoint))
+            return status;
         for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
             regions.push_back(&_multiPoint->cells[i]);
         }
     } else if (GeoParser::GEOJSON_MULTI_LINESTRING == type) {
         _multiLine.reset(new MultiLineWithCRS());
         status = GeoParser::parseMultiLine(obj, skipValidation, _multiLine.get());
+        if (resetOnError(_multiLine))
+            return status;
         for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
             regions.push_back(_multiLine->lines[i].get());
         }
     } else if (GeoParser::GEOJSON_MULTI_POLYGON == type) {
         _multiPolygon.reset(new MultiPolygonWithCRS());
         status = GeoParser::parseMultiPolygon(obj, skipValidation, _multiPolygon.get());
+        if (resetOnError(_multiPolygon))
+            return status;
         for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
             regions.push_back(_multiPolygon->polygons[i].get());
         }
     } else if (GeoParser::GEOJSON_GEOMETRY_COLLECTION == type) {
         _geometryCollection.reset(new GeometryCollection());
         status = GeoParser::parseGeometryCollection(obj, skipValidation, _geometryCollection.get());
+        if (resetOnError(_geometryCollection))
+            return status;
 
         // Add regions
         for (size_t i = 0; i < _geometryCollection->points.size(); ++i) {
@@ -1001,6 +1025,15 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
             regions.push_back(&_geometryCollection->lines[i]->line);
         }
         for (size_t i = 0; i < _geometryCollection->polygons.size(); ++i) {
+            // A strict-winding polygon has a null s2Polygon (its region lives in bigPolygon).
+            // Skip it rather than pushing a null region into the S2RegionUnion. Unlike the
+            // contains()/intersects() call sites, this runs unconditionally during parsing itself
+            // (before getNativeCRS() can be queried), so it must tolerate this case rather than
+            // assert on it; hasS2Region() reports false for such a collection, and getS2Region()
+            // is separately guarded above.
+            if (nullptr == _geometryCollection->polygons[i]->s2Polygon) {
+                continue;
+            }
             regions.push_back(_geometryCollection->polygons[i]->s2Polygon.get());
         }
         for (size_t i = 0; i < _geometryCollection->multiPoints.size(); ++i) {
@@ -1024,10 +1057,6 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
     } else {
         MONGO_UNREACHABLE_TASSERT(9911954);
     }
-
-    // Check parsing result.
-    if (!status.isOK())
-        return status;
 
     if (regions.size() > 0) {
         // S2RegionUnion doesn't take ownership of pointers.
@@ -1190,6 +1219,18 @@ string GeometryContainer::getDebugType() const {
     }
 }
 
+bool GeometryContainer::_geometryCollectionHasStrictWindingPolygon() const {
+    if (nullptr == _geometryCollection) {
+        return false;
+    }
+    for (const auto& polygon : _geometryCollection->polygons) {
+        if (polygon->crs == STRICT_SPHERE) {
+            return true;
+        }
+    }
+    return false;
+}
+
 CRS GeometryContainer::getNativeCRS() const {
     // TODO: Fix geometry collection reporting when/if we support multiple CRSes
 
@@ -1210,12 +1251,7 @@ CRS GeometryContainer::getNativeCRS() const {
     } else if (nullptr != _multiPolygon) {
         return _multiPolygon->crs;
     } else if (nullptr != _geometryCollection) {
-        for (const auto& polygon : _geometryCollection->polygons) {
-            if (polygon->crs == STRICT_SPHERE) {
-                return STRICT_SPHERE;
-            }
-        }
-        return SPHERE;
+        return _geometryCollectionHasStrictWindingPolygon() ? STRICT_SPHERE : SPHERE;
     } else {
         MONGO_UNREACHABLE_TASSERT(9911956);
         return FLAT;
@@ -1243,10 +1279,8 @@ bool GeometryContainer::supportsProject(CRS otherCRS) const {
         return _multiPolygon->crs == otherCRS;
     } else {
         tassert(9911929, "", nullptr != _geometryCollection);
-        for (const auto& polygon : _geometryCollection->polygons) {
-            if (polygon->crs == STRICT_SPHERE) {
-                return false;
-            }
+        if (_geometryCollectionHasStrictWindingPolygon()) {
+            return false;
         }
         return SPHERE == otherCRS;
     }

@@ -3,31 +3,8 @@ import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_op
 
 let baseName = "jstests_core_network_options";
 
-// Object Check
-jsTest.log('Testing "objcheck" command line option');
-let expectedResult = {"parsed": {"net": {"wireObjectCheck": true}}};
-testGetCmdLineOptsMongod({objcheck: ""}, expectedResult);
-
-jsTest.log('Testing "noobjcheck" command line option');
-expectedResult = {
-    "parsed": {"net": {"wireObjectCheck": false}},
-};
-testGetCmdLineOptsMongod({noobjcheck: ""}, expectedResult);
-
-jsTest.log('Testing "net.wireObjectCheck" config file option');
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/enable_objcheck.json",
-        "net": {"wireObjectCheck": true},
-    },
-};
-testGetCmdLineOptsMongod(
-    {config: "jstests/libs/config_files/enable_objcheck.json"},
-    expectedResult,
-);
-
 jsTest.log("Testing with no explicit network option setting");
-expectedResult = {
+let expectedResult = {
     "parsed": {"net": {}},
 };
 testGetCmdLineOptsMongod({}, expectedResult);
@@ -44,7 +21,7 @@ if (!_isWindows()) {
     expectedResult = {"parsed": {"net": {"unixDomainSocket": {"enabled": false}}}};
     testGetCmdLineOptsMongod({nounixsocket: ""}, expectedResult);
 
-    jsTest.log('Testing "net.wireObjectCheck" config file option');
+    jsTest.log('Testing "net.unixDomainSocket" config file option');
     expectedResult = {
         "parsed": {
             "config": "jstests/libs/config_files/enable_unixsocket.json",
@@ -60,30 +37,6 @@ if (!_isWindows()) {
     expectedResult = {"parsed": {"net": {}}};
     testGetCmdLineOptsMongod({}, expectedResult);
 }
-
-jsTest.log('Testing explicitly disabled "objcheck" config file option');
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/disable_objcheck.ini",
-        "net": {"wireObjectCheck": false},
-    },
-};
-testGetCmdLineOptsMongod(
-    {config: "jstests/libs/config_files/disable_objcheck.ini"},
-    expectedResult,
-);
-
-jsTest.log('Testing explicitly disabled "noobjcheck" config file option');
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/disable_noobjcheck.ini",
-        "net": {"wireObjectCheck": true},
-    },
-};
-testGetCmdLineOptsMongod(
-    {config: "jstests/libs/config_files/disable_noobjcheck.ini"},
-    expectedResult,
-);
 
 jsTest.log('Testing explicitly disabled "ipv6" config file option');
 expectedResult = {

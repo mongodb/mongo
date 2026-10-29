@@ -1,0 +1,10 @@
+test_kind: py_test
+
+selector:
+  roots: []
+
+executor:
+  hooks:
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CheckReplOplogs

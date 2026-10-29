@@ -6,6 +6,7 @@
  *   requires_fcv_60,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
@@ -63,6 +64,27 @@ assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid(unshardedColl));
 assert.eq(res.expectedCollection, shardedColl.getName());
 assert.eq(res.actualCollection, unshardedColl.getName());
+
+// Run a find which targets both shards, but make the database primary return an error other than
+// CollectionUUIDMismatch. The CollectionUUIDMismatch returned by shard1 should still be populated
+// with the actual collection from the database primary.
+const failPrimaryFind = configureFailPoint(st.rs0.getPrimary(), "failCommand", {
+    errorCode: ErrorCodes.InternalError,
+    failCommands: ["find"],
+    failInternalCommands: true,
+});
+res = assert.commandFailedWithCode(
+    db.runCommand({
+        find: shardedColl.getName(),
+        collectionUUID: uuid(unshardedColl),
+    }),
+    ErrorCodes.CollectionUUIDMismatch,
+);
+assert.eq(res.db, db.getName());
+assert.eq(res.collectionUUID, uuid(unshardedColl));
+assert.eq(res.expectedCollection, shardedColl.getName());
+assert.eq(res.actualCollection, unshardedColl.getName());
+failPrimaryFind.off();
 
 // Run a find on the unsharded collection, which only exists on shard0.
 res = assert.commandFailedWithCode(

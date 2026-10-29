@@ -1,6 +1,7 @@
 /**
  * Basic tests for the $_internalEqHash match expression.
  * @tags: [
+ *   uses_explain,
  *   # explain doesn't support read concern
  *   assumes_read_concern_unchanged,
  *   requires_fcv_70,

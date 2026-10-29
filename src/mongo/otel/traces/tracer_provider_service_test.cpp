@@ -1,177 +1,172 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/traces/tracer_provider_service.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/otel/traces/trace_settings.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/otel/traces/tracer_provider_service_factory.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
-#include <gmock/gmock.h>
-#include <opentelemetry/nostd/variant.h>
-#include <opentelemetry/sdk/resource/resource.h>
-#include <opentelemetry/sdk/trace/tracer_provider.h>
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <vector>
+
+#include <opentelemetry/sdk/trace/batch_span_processor_factory.h>
+#include <opentelemetry/sdk/trace/batch_span_processor_options.h>
+#include <opentelemetry/sdk/trace/exporter.h>
+#include <opentelemetry/sdk/trace/span_data.h>
+#include <opentelemetry/sdk/trace/tracer_provider_factory.h>
 
 namespace mongo::otel::traces {
 namespace {
 
-using mongo::unittest::TempDir;
-
 constexpr auto kServiceName = "mongod";
-constexpr auto kHttpEndpoint = "http://localhost:4318/v1/traces";
 
 /**
- * Returns the OTel SDK-level TracerProvider, or nullptr if the service holds a
- * non-SDK provider (e.g. noop).
+ * Exercises the concurrency contract between operation threads and shutdown. Operation threads read
+ * the provider (as span.cpp's Span::_start does) while another thread shuts the service down. Under
+ * TSAN this deterministically flags the data race on the non-atomic _tracerProvider member; without
+ * a sanitizer it can crash (SIGBUS/SIGSEGV) when the provider is destroyed out from under a reader.
  */
-opentelemetry::sdk::trace::TracerProvider* getSdkProvider(TracerProviderService& svc) {
-    return dynamic_cast<opentelemetry::sdk::trace::TracerProvider*>(svc.getTracerProvider().get());
-}
+TEST(TracerProviderServiceTest, ConcurrentGetTracerAndShutdownIsRaceFree) {
+    unittest::TempDir dir("tracer_provider_service_test");
+    auto swService = createFileTracerProviderService(kServiceName, dir.path());
+    ASSERT_OK(swService);
+    auto service = std::move(swService.getValue());
 
-/**
- * Extracts a string resource attribute by key. Returns "" if absent or the wrong type.
- * Note: "" is also a valid attribute value, so absence and empty-string are not distinguished.
- */
-std::string getStringAttr(const opentelemetry::sdk::resource::Resource& resource,
-                          const std::string& key) {
-    const auto& attrs = resource.GetAttributes();
-    auto it = attrs.find(key);
-    if (it == attrs.end()) {
-        return {};
+    constexpr int kReaders = 8;
+    std::vector<stdx::thread> readers;
+    readers.reserve(kReaders);
+
+    for (int i = 0; i < kReaders; ++i) {
+        readers.emplace_back([&] {
+            // Mirror Span::_start: snapshot the provider and obtain a tracer from it. Refreshing
+            // the snapshot and GetTracer's mutation of the provider's tracer list must be safe
+            // against a concurrent shutdown().
+            for (int iter = 0; iter < 10000; ++iter) {
+                if (auto* provider = service->getTracerProvider()) {
+                    auto tracer = provider->GetTracer("mongodb");
+                    tracer->StartSpan(std::string{std::to_string(iter)}, {});
+                }
+            }
+        });
     }
-    const auto* s = opentelemetry::nostd::get_if<std::string>(&it->second);
-    return s ? *s : std::string{};
+
+    // Tear the provider down while readers are still hitting it.
+    service->shutdown();
+
+    for (auto& reader : readers) {
+        reader.join();
+    }
 }
 
-TEST(HttpInitTest, ResourceHasServiceName) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+/**
+ * A SpanExporter whose Export() (invoked on the BatchSpanProcessor's background thread) increments
+ * an atomic counter. A post-shutdown canary of zero proves Export() was never called.
+ */
+class CanaryExporter final : public opentelemetry::sdk::trace::SpanExporter {
+public:
+    explicit CanaryExporter(std::atomic<int>* exportCanary) : _canary(exportCanary) {}
 
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.name"), kServiceName);
-}
+    std::unique_ptr<opentelemetry::sdk::trace::Recordable> MakeRecordable() noexcept override {
+        return std::make_unique<opentelemetry::sdk::trace::SpanData>();
+    }
 
-TEST(HttpInitTest, ResourceHasServiceInstanceId) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+    opentelemetry::sdk::common::ExportResult Export(
+        const opentelemetry::nostd::span<std::unique_ptr<opentelemetry::sdk::trace::Recordable>>&
+            spans) noexcept override {
+        // Reading through _canary after the test has freed it is a heap-use-after-free that ASAN
+        // will flag. It is only reachable if the export thread is still alive post-shutdown.
+        _canary->fetch_add(static_cast<int>(spans.size()));
+        return opentelemetry::sdk::common::ExportResult::kSuccess;
+    }
 
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.instance.id"),
-              ProcessId::getCurrent().toString());
-}
+    bool ForceFlush(std::chrono::microseconds) noexcept override {
+        return true;
+    }
 
-TEST(HttpInitTest, UserResourceAttributesAppearInProvider) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    unittest::ServerParameterGuard attrsParam{
-        "openTelemetryTracingResourceAttributes",
-        BSON("deployment.environment" << "staging" << "custom.key" << "custom-val")};
+    bool Shutdown(std::chrono::microseconds) noexcept override {
+        return true;
+    }
 
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+private:
+    std::atomic<int>* _canary;
+};
 
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
+TEST(TracerProviderServiceTest, ShutdownEndsExportThread) {
+    std::atomic<int> canary{0};
 
-    const auto& resource = sdkProvider->GetResource();
-    EXPECT_EQ(getStringAttr(resource, "deployment.environment"), "staging");
-    EXPECT_EQ(getStringAttr(resource, "custom.key"), "custom-val");
-}
+    // Build a provider whose processor never auto-flushes (huge delay), so the only export is the
+    // one we drive explicitly below.
+    opentelemetry::sdk::trace::BatchSpanProcessorOptions opts;
+    opts.max_queue_size = 4096;
+    opts.max_export_batch_size = 512;
+    opts.schedule_delay_millis = std::chrono::minutes{1};
+    auto processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
+        std::make_unique<CanaryExporter>(&canary), opts);
+    auto provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor));
 
-TEST(HttpInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    unittest::ServerParameterGuard attrsParam{
-        "openTelemetryTracingResourceAttributes",
-        BSON("service.name" << "user-supplied-name" << "service.instance.id" << "user-pid"
-                            << "custom.key" << "custom-val")};
+    TracerProviderService service{nullptr};
+    service.setTracerProvider_ForTest(std::move(provider));
 
-    ASSERT_OK(service->initializeHttp(kServiceName, kHttpEndpoint));
+    // Coordinate an "operation" thread (which reads the provider and later ends spans) with this
+    // "shutdown" thread. Keeping the two on separate threads mirrors production and helps catch
+    // potential threading bugs.
+    unittest::Barrier providerPinned(2);
+    unittest::Barrier shutdownComplete(2);
 
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.name"), "user-supplied-name");
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.instance.id"), "user-pid");
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "custom.key"), "custom-val");
-}
+    unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
+        auto opThread = monitor.spawn([&] {
+            // Read the provider as if starting a span. These objects will not be freed until after
+            // shutdown().
+            auto* provider = service.getTracerProvider();
+            ASSERT(provider);
+            auto tracer = provider->GetTracer("mongodb");
 
-TEST(FileInitTest, ResourceHasServiceName) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
+            // These spans complete *after* shutdown(), on this thread. Some are started before
+            // shutdown(), some after.
+            std::vector<std::shared_ptr<opentelemetry::trace::Span>> spans;
+            constexpr int kSpans = 256;
+            spans.reserve(kSpans);
+            for (int i = 0; i < kSpans / 2; ++i) {
+                spans.push_back(tracer->StartSpan("egressCommand", {}));
+            }
 
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.name"), kServiceName);
-}
+            providerPinned.countDownAndWait();
+            shutdownComplete.countDownAndWait();
 
-TEST(FileInitTest, ResourceHasServiceInstanceId) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
+            for (int i = 0; i < kSpans / 2; ++i) {
+                spans.push_back(tracer->StartSpan("egressCommand", {}));
+            }
+            for (auto& span : spans) {
+                span->End();
+            }
 
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.instance.id"),
-              ProcessId::getCurrent().toString());
-}
+            // Drive the export. A correct shutdown() makes this a no-op (processor already shut
+            // down).
+            tracer->ForceFlush(std::chrono::seconds{5});
+        });
 
-TEST(FileInitTest, UserResourceAttributesAppearInProvider) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    unittest::ServerParameterGuard attrsParam{"openTelemetryTracingResourceAttributes",
-                                              BSON("deployment.environment" << "production")};
+        // Shutdown after the thread has pinned the provider and started some spans.
+        providerPinned.countDownAndWait();
+        Timer shutdownTimer;
+        service.shutdown();
+        // shutdown() joins the processor's export thread. If there is a synchronization issue
+        // there, this will fail.
+        EXPECT_LE(duration_cast<Milliseconds>(shutdownTimer.elapsed()), Seconds{50})
+            << "Shutdown thread hung instead of shutting down immediately.";
+        shutdownComplete.countDownAndWait();
 
-    TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
-
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "deployment.environment"), "production");
-}
-
-TEST(FileInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
-    std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    unittest::ServerParameterGuard attrsParam{
-        "openTelemetryTracingResourceAttributes",
-        BSON("service.name" << "user-supplied-name" << "service.instance.id" << "user-pid"
-                            << "custom.key" << "custom-val")};
-
-    TempDir dir("tmp");
-    ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
-
-    auto* sdkProvider = getSdkProvider(*service);
-    ASSERT_NE(sdkProvider, nullptr);
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.name"), "user-supplied-name");
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "service.instance.id"), "user-pid");
-    EXPECT_EQ(getStringAttr(sdkProvider->GetResource(), "custom.key"), "custom-val");
+        opThread.join();
+    });
+    EXPECT_EQ(canary.load(), 0);
 }
 
 }  // namespace

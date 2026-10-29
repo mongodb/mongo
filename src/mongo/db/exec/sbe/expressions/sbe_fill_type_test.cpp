@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -52,8 +26,8 @@ TEST_F(SBEFillTypeTest, FillType) {
                                                                makeE<EVariable>(fillSlot)));
     auto compiledExpr = compileExpression(*fillTypeExpr);
 
-    auto [fillTag, fillVal] = value::makeNewString("hello world!"sv);
-    value::ValueGuard fillGuard{fillTag, fillVal};
+    value::TagValueOwned fill =
+        value::TagValueOwned::fromRaw(value::makeNewString("hello world!"sv));
 
     {
         // Test invalid type mask.
@@ -63,7 +37,7 @@ TEST_F(SBEFillTypeTest, FillType) {
 
         typeMaskAccessor.reset(typeMaskTag, typeMaskVal);
         inputAccessor.reset(inputTag, inputVal);
-        fillAccessor.reset(fillTag, fillVal);
+        fillAccessor.reset(fill.tag(), fill.value());
 
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
         ASSERT_EQ(runTag, value::TypeTags::Nothing);
@@ -80,9 +54,10 @@ TEST_F(SBEFillTypeTest, FillType) {
             auto [inputTag, inputVal] = makeNull();
             inputAccessor.reset(inputTag, inputVal);
 
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard runGuard{runTag, runVal};
-            ASSERT_THAT((std::pair{runTag, runVal}), ValueEq(std::pair{fillTag, fillVal}));
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            ASSERT_THAT((std::pair{result.tag(), result.value()}),
+                        ValueEq(std::pair{fill.tag(), fill.value()}));
         }
 
         {
@@ -91,9 +66,10 @@ TEST_F(SBEFillTypeTest, FillType) {
             value::Value inputVal = value::Value{0u};
             inputAccessor.reset(inputTag, inputVal);
 
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard runGuard{runTag, runVal};
-            ASSERT_THAT((std::pair{runTag, runVal}), ValueEq(std::pair{fillTag, fillVal}));
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            ASSERT_THAT((std::pair{result.tag(), result.value()}),
+                        ValueEq(std::pair{fill.tag(), fill.value()}));
         }
 
         {
@@ -107,13 +83,14 @@ TEST_F(SBEFillTypeTest, FillType) {
 
         {
             // Test with non-Nothing input that won't match the type mask.
-            auto [inputTag, inputVal] = makeArray(BSON_ARRAY(1 << 2 << 3));
-            value::ValueGuard inputGuard{inputTag, inputVal};
-            inputAccessor.reset(inputTag, inputVal);
+            value::TagValueOwned input =
+                value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(1 << 2 << 3)));
+            inputAccessor.reset(input.tag(), input.value());
 
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-            value::ValueGuard runGuard{runTag, runVal};
-            ASSERT_THAT((std::pair{runTag, runVal}), ValueEq(std::pair{inputTag, inputVal}));
+            value::TagValueOwned result =
+                value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+            ASSERT_THAT((std::pair{result.tag(), result.value()}),
+                        ValueEq(std::pair{input.tag(), input.value()}));
         }
     }
 }

@@ -1,42 +1,10 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/collection_crud/container_write.h"
-#include "mongo/db/record_id_helpers.h"
-#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/db/update/update_oplog_entry_serialization.h"
 
 #include <string_view>
 
@@ -46,8 +14,14 @@ namespace mongo::replicated_fast_count {
 namespace {
 
 BSONObj entryToContainerValue(const SizeCountStore::Entry& entry) {
-    return BSON(kValidAsOfKey << entry.timestamp << kMetadataKey
-                              << BSON(kCountKey << entry.count << kSizeKey << entry.size));
+    BSONObjBuilder builder;
+    builder.append(kCountKey, entry.count);
+    builder.append(kSizeKey, entry.size);
+    if (entry.hash) {
+        builder.append(kHashKey, *entry.hash);
+    }
+    const BSONObj metadata = builder.obj();
+    return BSON(kValidAsOfKey << entry.timestamp << kMetadataKey << metadata);
 }
 
 std::span<const char> bsonToSpan(const BSONObj& obj) {
@@ -63,193 +37,44 @@ void assertInWriteUnitOfWorkAndLocked(OperationContext* opCtx, std::string_view 
                 "Must hold the GlobalLock in a write mode when calling SizeCountStore::{}()", op),
             shard_role_details::getLocker(opCtx)->isWriteLocked());
 }
+
+// Extracts the 64-bit collection hash from a persisted `meta` subdocument. Returns boost::none if
+// the subdocument does not carry the field.
+boost::optional<int64_t> parseHash(const BSONObj& meta) {
+    const BSONElement hashElem = meta.getField(kHashKey);
+    if (hashElem.eoo()) {
+        return boost::none;
+    }
+    tassert(13197400,
+            "hash must be stored as a 64-bit integer",
+            hashElem.type() == BSONType::numberLong);
+    return hashElem.Long();
+}
+
+// Decodes a persisted metadata document into an Entry, extracting the `meta` subdocument once.
+SizeCountStore::Entry parseEntry(const BSONObj& data) {
+    const BSONObj meta = data.getField(kMetadataKey).Obj();
+    return SizeCountStore::Entry{.timestamp = data.getField(kValidAsOfKey).timestamp(),
+                                 .size = meta.getField(kSizeKey).Long(),
+                                 .count = meta.getField(kCountKey).Long(),
+                                 .hash = parseHash(meta)};
+}
 }  // namespace
 
-boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
-    OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition = acquireCollectionOrViewMaybeLockFree(
-        opCtx,
-        CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx,
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-            AcquisitionPrerequisites::OperationType::kRead));
-
-    if (acquisition.getCollectionPtr()) {
-        return acquisition;
-    }
-
-    return boost::none;
-}
-
-boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
-    OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
-        opCtx,
-        CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx,
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-            AcquisitionPrerequisites::OperationType::kWrite),
-        LockMode::MODE_IX);
-
-    if (acquisition.getCollectionPtr()) {
-        return acquisition;
-    }
-
-    return boost::none;
-}
-
 SizeCountStore::Entry SizeCountStore::parseContainerValue(std::span<const char> value) {
-    BSONObj data(value.data());
-    return Entry{.timestamp = data.getField(kValidAsOfKey).timestamp(),
-                 .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
-                 .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
+    return parseEntry(BSONObj(value.data()));
 }
 
-boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationContext* opCtx,
-                                                                      UUID uuid) const {
-    massert(12915208,
-            "Must hold the GlobalLock in a read mode when calling SizeCountStore::read()",
-            shard_role_details::getLocker(opCtx)->isReadLocked());
-
-    const auto acquisition = acquireFastCountCollectionForRead(opCtx);
-    if (!acquisition.has_value()) {
-        // TODO(SERVER-123051): Revisit this.
-        return boost::none;
-    }
-
-    const CollectionPtr& coll = acquisition->getCollectionPtr();
-    const RecordId rid =
-        record_id_helpers::keyForDoc(BSON("_id" << uuid),
-                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                     /*collator=*/nullptr)
-            .getValue();
-    Snapshotted<BSONObj> document;
-    if (!coll->findDoc(opCtx, rid, &document)) {
-        return boost::none;
-    }
-
-    const BSONObj& data = document.value();
-    return SizeCountStore::Entry{
-        .timestamp = data.getField(kValidAsOfKey).timestamp(),
-        .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
-        .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
-}
-
-void CollectionSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "write");
-
-    const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
-    const CollectionPtr& coll = acquisition.getCollectionPtr();
-    const RecordId rid =
-        record_id_helpers::keyForDoc(BSON("_id" << uuid),
-                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                     /*collator=*/nullptr)
-            .getValue();
-
-    const BSONObj newDoc = BSON("_id" << uuid << kValidAsOfKey << entry.timestamp << kMetadataKey
-                                      << BSON(kCountKey << entry.count << kSizeKey << entry.size));
-
-    Snapshotted<BSONObj> existingDoc;
-    if (coll->findDoc(opCtx, rid, &existingDoc)) {
-        const auto diff = doc_diff::computeOplogDiff(existingDoc.value(), newDoc, /*padding=*/0);
-        invariant(diff.has_value(),
-                  fmt::format("Expected computed diff to be smaller than the post-image: "
-                              "pre={}, post={}",
-                              existingDoc.value().toString(),
-                              newDoc.toString()));
-        if (!diff->isEmpty()) {
-            CollectionUpdateArgs args(existingDoc.value());
-            args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
-            args.criteria = BSON("_id" << uuid);
-            collection_internal::updateDocument(
-                opCtx, coll, rid, existingDoc, newDoc, &args.update, nullptr, nullptr, &args);
-        }
-    } else {
-        massertStatusOK(collection_internal::insertDocument(
-            opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
-    }
-}
-
-void CollectionSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
-
-    const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
-    const CollectionPtr& coll = acquisition.getCollectionPtr();
-
-    const BSONObj newDoc = BSON("_id" << uuid << kValidAsOfKey << entry.timestamp << kMetadataKey
-                                      << BSON(kCountKey << entry.count << kSizeKey << entry.size));
-
-    massertStatusOK(collection_internal::insertDocument(
-        opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
-}
-
-size_t CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "remove");
-
-    const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
-    const RecordId rid =
-        record_id_helpers::keyForDoc(BSON("_id" << uuid),
-                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                     /*collator=*/nullptr)
-            .getValue();
-
-    Snapshotted<BSONObj> docToDelete;
-
-    if (!acquisition.getCollectionPtr()->findDoc(opCtx, rid, &docToDelete)) {
-        LOGV2_WARNING(12054101,
-                      "Attempted to delete an entry for uuid {uuid} from the fast count store, but "
-                      "no such entry exists.",
-                      "uuid"_attr = uuid.toString());
-        return 0;
-    }
-
-    collection_internal::deleteDocument(opCtx,
-                                        acquisition.getCollectionPtr(),
-                                        docToDelete,
-                                        kUninitializedStmtId,
-                                        rid,
-                                        /*opDebug=*/nullptr);
-    return 1;
-}
-
-void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
-                                                          SizeCountDeltas& deltas) const {
-    massert(12915207,
-            "Must hold the GlobalLock in a read mode when calling "
-            "SizeCountStore::readAndIncrementSizeCounts()",
-            shard_role_details::getLocker(opCtx)->isReadLocked());
-
-    const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
-    const CollectionPtr& coll = acquisition.getCollectionPtr();
-
-    for (auto& [uuid, delta] : deltas) {
-        if (delta.state != DDLState::kNone) {
-            continue;
-        }
-        const RecordId rid = record_id_helpers::keyForDoc(
-                                 BSON("_id" << uuid),
-                                 clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                 /*collator=*/nullptr)
-                                 .getValue();
-        Snapshotted<BSONObj> doc;
-        if (coll->findDoc(opCtx, rid, &doc)) {
-            const BSONObj& data = doc.value();
-            delta.sizeCount.count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-            delta.sizeCount.size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
-        }
-    }
-}
-
-std::span<const char> ContainerSizeCountStore::uuidToContainerKey(const UUID& uuid) {
+std::span<const char> SizeCountStore::uuidToContainerKey(const UUID& uuid) {
     auto cdr = uuid.toCDR();
     return {reinterpret_cast<const char*>(cdr.data()), cdr.length()};
 }
 
-RecordStore* ContainerSizeCountStore::rs_ForTest() const {
+RecordStore* SizeCountStore::rs_ForTest() const {
     return _recordStore.get();
 }
 
-StringKeyedContainer& ContainerSizeCountStore::_getStringKeyedContainer() const {
+StringKeyedContainer& SizeCountStore::_getStringKeyedContainer() const {
     auto container = _recordStore->getContainer();
     massert(12566002,
             "Expected replicated fast count metadata record store to hold a StringKeyedContainer",
@@ -257,8 +82,8 @@ StringKeyedContainer& ContainerSizeCountStore::_getStringKeyedContainer() const 
     return std::get<std::reference_wrapper<StringKeyedContainer>>(container);
 }
 
-boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationContext* opCtx,
-                                                                     UUID uuid) const {
+boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* opCtx,
+                                                            UUID uuid) const {
     massert(12915203,
             "Must hold the GlobalLock in a read mode when calling SizeCountStore::read()",
             shard_role_details::getLocker(opCtx)->isReadLocked());
@@ -273,35 +98,67 @@ boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationCo
     return SizeCountStore::parseContainerValue(*result);
 }
 
-void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "write");
+boost::optional<SizeCountStore::Entry> SizeCountStore::insert(OperationContext* opCtx,
+                                                              UUID uuid,
+                                                              const SizeCountStore::Entry& entry,
+                                                              HashUpdateMode hashUpdateMode) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
 
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto& container = _getStringKeyedContainer();
+    auto keySpan = uuidToContainerKey(uuid);
+
+    auto cursor = container.getCursor(ru);
+    const auto previousValue = cursor->find(keySpan);
+    const boost::optional<SizeCountStore::Entry> previousEntry = previousValue.has_value()
+        ? boost::make_optional<SizeCountStore::Entry>(
+              SizeCountStore::parseContainerValue(*previousValue))
+        : boost::none;
+    const auto hashToWrite = [&]() -> boost::optional<int64_t> {
+        // Check if a previous entry exists and contains a hash. A set hash replaces an absent
+        // one.
+        if (previousEntry.has_value() && !previousEntry->hash.has_value() &&
+            hashUpdateMode == HashUpdateMode::kFold) {
+            // The pre-existing entry does not already contain a hash. Do not write a hash,
+            // regardless of the hash in `entry`. This accounts for collections with size/count
+            // metadata created before hash validation was enabled.
+            return boost::none;
+        }
+        return entry.hash;
+    }();
+
+    const BSONObj value = entryToContainerValue(SizeCountStore::Entry{.timestamp = entry.timestamp,
+                                                                      .size = entry.size,
+                                                                      .count = entry.count,
+                                                                      .hash = hashToWrite});
+    const std::span<const char> valueSpan = bsonToSpan(value);
+
+    // Check if the key exists. Containers currently only support strict inserts or strict updates.
+    if (previousValue.has_value()) {
+        massertStatusOK(container_write::update(opCtx, ru, container, keySpan, valueSpan));
+    } else {
+        massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valueSpan));
+    }
+
+    return previousEntry;
+}
+
+void SizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto val = entryToContainerValue(entry);
     auto keySpan = uuidToContainerKey(uuid);
     auto valSpan = bsonToSpan(val);
 
-    // Check if the key exists. Containers currently only support strict inserts or strict updates.
-    auto cursor = container.getCursor(ru);
-    if (cursor->find(keySpan)) {
-        massertStatusOK(container_write::update(opCtx, ru, container, keySpan, valSpan));
-    } else {
-        massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valSpan));
-    }
-}
-
-void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
-
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-    auto& container = _getStringKeyedContainer();
-    auto val = entryToContainerValue(entry);
+    // Bypass container_write::insert/update — those check canAcceptWritesFor which fails on a
+    // secondary in INITIAL_SYNC state. Write directly to the container and skip op observers
+    // since these writes are not user-visible operations. This write is unreplicated so we can
+    // safely use container::ExistingKeyPolicy::Overwrite.
     massertStatusOK(
-        container_write::insert(opCtx, ru, container, uuidToContainerKey(uuid), bsonToSpan(val)));
+        container.insert(ru, keySpan, valSpan, container::ExistingKeyPolicy::overwrite));
 }
 
-size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+size_t SizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     assertInWriteUnitOfWorkAndLocked(opCtx, "remove");
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -318,11 +175,11 @@ size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     return 1;
 }
 
-void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
-                                                         SizeCountDeltas& deltas) const {
+void SizeCountStore::readAndIncrementReplicatedMetadata(OperationContext* opCtx,
+                                                        ReplicatedMetadataDeltas& deltas) const {
     massert(12915202,
             "Must hold the GlobalLock in a read mode when calling "
-            "SizeCountStore::readAndIncrementSizeCounts()",
+            "SizeCountStore::readAndIncrementReplicatedMetadata()",
             shard_role_details::getLocker(opCtx)->isReadLocked());
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -337,8 +194,14 @@ void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx
             continue;
         }
         auto entry = parseContainerValue(*result);
-        delta.sizeCount.count += entry.count;
-        delta.sizeCount.size += entry.size;
+        delta.metadata.sizeCount.count += entry.count;
+        delta.metadata.sizeCount.size += entry.size;
+        if (delta.hashUpdateMode == HashUpdateMode::kSet) {
+            // A set hash replaces the persisted one rather than combining with it.
+            continue;
+        }
+        // If either hash is boost::none, delta.metadata.hash is set to boost::none.
+        delta.metadata.hash = combineValidationHashes(delta.metadata.hash, entry.hash);
     }
 }
 

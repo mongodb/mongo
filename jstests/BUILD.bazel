@@ -1,0 +1,7 @@
+load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files")
+
+package(default_visibility = ["//visibility:public"])
+
+# The suites/ directory holds resmoke_suite_test targets rather than test sources,
+# so it does not declare an all_subpackage_javascript_files target to aggregate.
+all_subpackage_javascript_files(exclude_subpackages = ["suites"])

@@ -4,6 +4,7 @@ modules:
     repo: dsi
     prefix: ${workdir}/src
     branch: master
+    clone_depth: 100
 
 include:
   ### lint_yaml trim start ###
@@ -14,6 +15,8 @@ include:
   - filename: evergreen/system_perf/master/base.yml
     module: dsi
   - filename: evergreen/system_perf/master/compiles.yml
+    module: dsi
+  - filename: evergreen/system_perf/master/compiles_pgo.yml
     module: dsi
   - filename: evergreen/system_perf/master/variants.yml
     module: dsi

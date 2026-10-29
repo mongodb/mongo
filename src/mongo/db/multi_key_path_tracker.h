@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -45,7 +19,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC MultikeyPathInfo {
+struct [[MONGO_MOD_PUBLIC]] MultikeyPathInfo {
     NamespaceString nss;
     UUID collectionUUID;
     std::string indexName;
@@ -53,6 +27,8 @@ struct MONGO_MOD_PUBLIC MultikeyPathInfo {
     MultikeyPaths multikeyPaths;
     // The oplog entry timestamp of the first write that made the index multikey.
     Timestamp earliestTimestamp;
+
+    bool operator==(const MultikeyPathInfo&) const = default;
 
     /**
      * True when 'info' targets the same collection and index at the same write timestamp as this
@@ -67,7 +43,7 @@ struct MONGO_MOD_PUBLIC MultikeyPathInfo {
     void mergePathsAndKeys(MultikeyPathInfo&& info);
 };
 
-using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
+using WorkerMultikeyPathInfo [[MONGO_MOD_PUBLIC]] = std::vector<MultikeyPathInfo>;
 
 /**
  * An OperationContext decoration that tracks which indexes should be made multikey. This is used
@@ -80,7 +56,7 @@ using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
  * timestamp are merged immediately, and entries with different timestamps are sorted later so
  * deferred multikey writes are applied in timestamp order.
  */
-class MONGO_MOD_PUBLIC MultikeyPathTracker {
+class [[MONGO_MOD_PUBLIC]] MultikeyPathTracker {
 public:
     static const OperationContext::Decoration<MultikeyPathTracker> get;
 

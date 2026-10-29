@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator.h"
 
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
-#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
@@ -112,7 +85,7 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
         nss(),
         _critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        !isAuthoritative /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/!isAuthoritative);
     service->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         nss(),
@@ -131,11 +104,6 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     // Copy by value: the causality barrier / getNewSession() calls below reassign _doc, which
     // would leave a reference into _doc dangling.
     const auto coll = _doc.getOptCollType().get();
-
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
 
     {
         const auto session = getNewSession(opCtx);
@@ -160,7 +128,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             opCtx,
             nss(),
             coll.getUuid(),
-            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
             session,
             executor,
             token);
@@ -173,7 +141,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
 
     // We need to send the drop to all the shards because movePrimary leaves garbage behind for
     // unsplittable collections.
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
@@ -190,11 +158,11 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             **executor,
             token,
             session,
-            true /* fromMigrate */,
-            false /* dropSystemCollections */,
-            !isAuthoritative /* forceLegacyRefresh */,
+            /*fromMigrate=*/true,
+            /*dropSystemCollections=*/false,
+            /*forceLegacyRefresh=*/!isAuthoritative,
             coll.getUuid(),
-            true /* requireCollectionEmpty */);
+            /*requireCollectionEmpty=*/true);
     }
 }
 

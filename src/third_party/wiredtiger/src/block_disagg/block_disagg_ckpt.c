@@ -182,8 +182,8 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
         /* Get the config we want to print to the metadata file */
         WT_ERR(__wt_config_getones(session, md_value, "checkpoint", &cval));
         checkpoint_timestamp = conn->disaggregated_storage.cur_checkpoint_timestamp;
-        WT_ERR(__wt_disagg_put_checkpoint_meta(
-          session, cval.str, cval.len, checkpoint_timestamp, schema_epoch));
+        WT_ERR(__wt_disagg_put_checkpoint_meta(session, cval.str, cval.len, checkpoint_timestamp,
+          conn->disaggregated_storage.cur_write_schema_epoch));
     } else {
         /* Extract the table/layered component name, if applicable. */
         if (WT_SUFFIX_MATCH(block_disagg->name, ".wt")) {
@@ -203,8 +203,8 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
          * they capture the checkpoint state of the stable table that was just checkpointed.
          */
         WT_SAVE_DHANDLE(session,
-          ret = __wt_disagg_enqueue_metadata_operation(
-            session, stable_uri, table_name, WT_SHARED_METADATA_UPDATE, schema_epoch, false));
+          ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, table_name,
+            WT_SHARED_METADATA_UPDATE, schema_epoch, false, NULL, NULL));
         WT_ERR(ret);
     }
 

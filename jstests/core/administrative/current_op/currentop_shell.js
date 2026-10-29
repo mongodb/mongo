@@ -170,9 +170,7 @@ const filter = {
     ns: coll.getFullName(),
     "command.comment": comment,
 
-    // On the replica set endpoint, currentOp reports both router and shard operations. So filter
-    // out one of them.
-    role: TestData.testingReplicaSetEndpoint ? "ClusterRole{router}" : {$exists: false},
+    role: {$exists: false},
 };
 
 // 1. The $currentOp aggregation stage should _not_ truncate the command.

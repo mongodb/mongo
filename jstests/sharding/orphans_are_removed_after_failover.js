@@ -11,8 +11,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

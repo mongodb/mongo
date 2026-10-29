@@ -71,6 +71,88 @@ at which that "borrow" would have been a valid token acquisition. (e.g. if the b
 capacity with a refill rate of 1 token/s, the thread would borrow 1 token, making the capacity -1,
 and then sleep for 1s, at which point the bucket has returned to 0 tokens).
 
+# Write Throttler
+
+The `WriteThrottler` is a generic write-admission gate that slows writes to a configurable target
+rate. Like the ingress request rate limiter, it is a thin wrapper around a
+[`RateLimiter`](rate_limiter.h) token bucket, and is stored as a decoration on the `ServiceContext`.
+It is installed at `ServiceContext` construction time for standalone mongod and shard-service
+contexts; mongos does not install it.
+
+## Purpose
+
+The throttler meters the rate at which writes are admitted so the rate can be tuned (via
+`setParameter`) to shed write-path pressure before it overwhelms downstream write-execution and
+storage resources on the shard/mongod.
+
+## Hook Point
+
+The throttler is invoked at service entry on mongod/shard
+([`service_entry_point_shard_role.cpp`](../service_entry_point_shard_role.cpp)). After the service
+entry point parses the command and applies ingress admission, it calls write-throttler admission for
+top-level write commands. Admission charges **one token per write operation** — not per global lock
+acquisition and not per yield/reacquire.
+
+The gate only acts when all of the following hold:
+
+- `writeThrottlerEnabled` is true.
+- The command `supportsWriteConcern()`.
+- The command is not a read (`isReadOperation()` is false).
+
+The gate reuses ingress admission's exemption decision, so internal commands, commands outside
+ingress admission control, and nested operations that already hold an ingress ticket also skip
+write-throttler admission.
+
+## Rate Source
+
+The target rate is configured entirely through the `writeThrottlerTargetRatePerSec` server parameter
+(set via `setParameter`). The `on_update` handlers push the new rate into the token bucket. Until
+the rate is lowered below `kMaxRate`, the throttler is idle (admits immediately). There is no
+internal rate-selection policy in this mechanism.
+
+## Configuration
+
+- `writeThrottlerEnabled` (bool, default false): master on/off switch. When off, the gate is a
+  no-op.
+- `writeThrottlerTargetRatePerSec` (int32, default `kMaxRate`): target write-work units per second
+  (see batch-aware charging below). Must be >= 1. Rate selection is external to this mechanism
+  (operators/`setParameter` only); there is no built-in controller or engage/release policy here.
+- `writeThrottlerBurstCapacitySecs` (double, default 0.5): seconds of unused rate that can
+  accumulate as burst capacity.
+- `writeThrottlerMaxQueueDepth` (long long, default 1000000): max threads that may block waiting for
+  a token; requests exceeding it are rejected with `RateLimitExceeded`.
+- `writeThrottlerMaxCostPerOp` (int, default 0 = no limit): upper bound on the token cost charged
+  for a single operation, capping the borrowed-balance spike from one large batch (applies to both
+  pre-charge and command-end true-up).
+
+## Batch-Aware Charging
+
+The throttler is always batch-aware. Service entry takes one admission token to arm the operation
+and to give the first known child write a one-token credit. Child write paths then admit known write
+statements before execution via `WriteThrottler::admitKnownWrites`: update/delete children pass `1`,
+and insert flushes pass their `batch.size()`. This preserves mid-command pacing without keeping a
+separate estimated-cost accumulator.
+
+Successful WiredTiger key writes (document records and index keys) increment
+`WriteThrottlerAdmissionContext` at the cursor-helper chokepoints. At command completion,
+`WriteThrottler::finalizeAdmission` reconciles the bucket by comparing storage-write count with the
+known-write admissions already charged, capped by `writeThrottlerMaxCostPerOp`. Storage
+amplification debits remaining cost; known writes that did not materialize return surplus tokens.
+Rejected WT writes are not counted; write-conflict retries accumulate. Recording is skipped when the
+operation had no write-throttler admission. Timeseries charge-unit semantics remain deferred to
+`SERVER-130859`.
+
+## Metrics
+
+- The wait, if any, is attributed to the `WriteThrottlerAdmissionContext` (a decoration on the
+  `OperationContext`), which registers a `writeThrottle` queue in the shared
+  `TicketHolderQueueStats` registry so curOp/serverStatus report write-throttle waits like other
+  admission queues.
+- The underlying `RateLimiter`'s token-bucket stats (attempted/successful/rejected admissions, queue
+  depth, available tokens, and the effective refresh rate via `RateLimiter::refreshRate()`) are
+  surfaced through `serverStatus.queues.writeThrottler` / FTDC. `targetRateLimit` is the bucket's
+  current refresh rate (from `writeThrottlerTargetRatePerSec` when enabled).
+
 # Session Establishment Rate Limiter
 
 The `SessionEstablishmentRateLimiter` places a limit on the number of connections the server (either
@@ -127,6 +209,7 @@ The following metrics were introduced to `serverStatus`:
     "successfulAdmissions": 1000,
     "attemptedAdmissions": 1100,
     "averageTimeQueuedMicros": 10,
+    "totalTimeQueuedMicros": 10000,
     "totalAvailableTokens": 0,
 }
 
@@ -213,38 +296,25 @@ circumstances:
 
 - The remote IP address is included in one of the ranges specified in
   `ingressRequestRateLimiterExemptions`.
+- The client-provided appName or driverName associated with that connection prefix-matches one of
+  the names specified in `ingressRequestRateLimiterApplicationExemptions`.
 - Auth is enabled and the ingress session has not been authenticated yet.
   - This exemption is to prevent unauthenticated clients from consuming all of the rate limiter
     tokens, causing unavailability.
 
-Because token acquisition currently only takes place in the `SessionWorkflow`, all internal requests
-are not subject to rate limiting.
+Because token acquisition currently only takes place in the `SessionWorkflow`, all process-internal
+requests are not subject to rate limiting.
 
 If the thread is not considered exempt, it attempts to acquire a token from the rate limiter. If a
 token is immediately available, the request proceeds as normal. If not, behavior depends on
 `ingressRequestAdmissionMaxQueueDepth`:
 
 - If queueing is disabled (`0`) or the queue is full, the request is rejected with an error labeled
-  `SystemOverloaded`. Clients will observe this label and interpret the server as being overloaded,
-  modifying their routing and retry logic accordingly.
+  `SystemOverloaded` and `RetryableError` (depending on the value of the
+  `ingressRequestRateLimiterAllowRetries` server parameter). Clients will observe this label and
+  interpret the server as being overloaded, modifying their routing and retry logic accordingly.
 - If queueing is enabled and capacity exists, the request reserves a queue position and later blocks
   in service entry point until that reserved position becomes valid (or until interruption).
-
-### Admission Token Exemption
-
-Token acquisition happens in two stages. `SessionWorkflow` calls `admitRequest` immediately after
-reading the message, before an `OperationContext` exists. The service entry point later calls
-`waitForAdmission` once the command has been parsed and the exemption signal is known
-(`isExemptFromAdmissionControl`). Because that signal is unavailable at the first stage, the
-rate-limiter-level exemption can only rescue requests that successfully reserved a queue slot:
-
-- Rate exceeded, queueing disabled: rejected at `admitRequest`.
-- Rate exceeded, queue full: rejected at `admitRequest`.
-- Rate exceeded, queue has room: queued at `admitRequest`, then exempted at `waitForAdmission`.
-
-This asymmetry is intentional. Determining exemption status from `admitRequest` would require
-constructing or partially evaluating the command before deciding to reject, which would make
-rejections more expensive.
 
 ## Metrics
 
@@ -264,7 +334,63 @@ The following `serverStatus` metrics are emitted by the `IngressRequestRateLimit
 - `interruptedInQueue`: the number of queued requests interrupted before admission.
 - `averageTimeQueuedMicros`: moving average queue wait time for successfully admitted queued
   requests.
+- `totalTimeQueuedMicros`: cumulative wait measured by the callers themselves, which for gates with
+  an admission context is exactly the per-operation queueing time reported in curOp, the slow query
+  log and the profiler. The average above is derived instead from the nap the token bucket planned,
+  so the two do not have to agree.
 - `totalAvailableTokens`: the current capacity of the underlying token bucket.
+
+# Egress Response Rate Limiting
+
+The `EgressResponseRateLimiter` paces the egress (response-send) path. It is a thin wrapper around
+[`admission::RateLimiter`](rate_limiter.h), stored as a `ServiceContext` decoration, mirroring the
+[`IngressRequestRateLimiter`](ingress_request_rate_limiter.h) pattern.
+
+When enabled, it engages for every `SystemOverloaded` rejection reply produced by the
+`IngressRequestRateLimiter` (the engagement gate lives in the `SessionWorkflow` egress hook). IRRL
+is the single authority on which ops get rejected. It already exempts unauthenticated,
+priority-port, and IP/app-list traffic, so anything that reaches the egress limiter has been deemed
+rejectable by IRRL and is throttled uniformly. A caller is never denied, when the queue is at
+capacity the call bypasses the queue and returns immediately (fail-open), so `throttle()` always
+returns and the returned `Status` is purely informational. This preserves the invariant that a
+rejection reply is never dropped; dropping it would corrupt the connection and hang the client.
+
+The wait is driven by a lightweight, per-session `Interruptible`
+(`DisconnectShutdownAwareInterruptible`, declared in `src/mongo/transport/session_workflow_p.h`)
+rather than a full `OperationContext`, so the rejection path does not pay for constructing an opCtx
+per response. The interruptible composes two cancellation conditions in a single sliced wait loop:
+
+- **Shutdown**: it polls a `CancellationToken` obtained from
+  `session()->getTransportLayer()->getSessionManager()->getShutdownToken()`, which is canceled from
+  the `SessionManager`'s `shutdown()` path. The token is a lock-free atomic poll, not a kernel wait,
+  so it is checked at each slice boundary. A parked egress waiter is released within one slice of
+  shutdown, so the egress path never blocks shutdown for longer than that slice.
+- **Client disconnect**: each slice is a blocking `Session::waitForPeerDisconnectUntil()`. Since the
+  rejection path has no `OperationContext`, it cannot rely on
+  `OperationContext::markKillOnClientDisconnect()` to be woken when the client gives up. Without
+  this wait a tarpitted reply would retain its worker thread and the session's transport resources
+  for the full nap time even after the client went away. On Asio sessions the slice is a single
+  kernel `poll(2)` for `POLLRDHUP|POLLHUP` on the session's socket, so the worker becomes runnable
+  as soon as the client's FIN/RST arrives rather than only noticing at the next slice boundary.
+  Sessions without an optimized override (gRPC, handoff) use `Session`'s default, which samples
+  `isConnected()` once per slice.
+
+On shutdown the wait returns `ErrorCodes::InterruptedAtShutdown`; on peer disconnect it returns
+`ErrorCodes::ClientDisconnect`, which the rate limiter surfaces as `InterruptedInQueue` and uses to
+return the borrowed token.
+
+Policy is driven externally via `setParameter` (e.g. mongotune):
+
+- `egressResponseRateLimiterEnabled` (bool, default: false): determines whether the limiter is
+  consulted at all. While it is false the egress hook returns before touching the limiter, so a
+  rejection reply is sent with no pacing and no admission is recorded. This is independent of
+  `ingressRequestRateLimiterEnabled`, so IRRL may reject requests without its replies being paced.
+- `egressResponseRateLimiterRatePerSec`: defaults to the maximum int32 value, so enabling the
+  limiter without also lowering this rate leaves it an effective no-op.
+- `egressResponseRateLimiterBurstCapacitySecs`: defaults to the maximum double value.
+- `egressResponseRateLimiterMaxQueueDepth`: defaults to the maximum int64 value until a lower value
+  is set. A value of 0 disables queueing, so responses that exceed rate+burst are sent immediately
+  without throttling.
 
 # Data-Node Ingress Admission Control
 

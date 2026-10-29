@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
@@ -47,7 +21,7 @@ void WriteOpAnalyzerImpl::recordTargetingStats(OperationContext* opCtx,
     }
 
     int aproxNShardsOwningChunks =
-        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks(opCtx) : 0;
+        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
 
     _stats.recordTargetingStats(tr.endpoints,
                                 op.getNsInfoIdx(),
@@ -71,7 +45,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
     const NamespaceString& bucketsNss = it->second;
 
-    if (routingCtx.hasNss(bucketsNss)) {
+    // Mirror CollectionRoutingInfoTargeter::_init()'s viewful-timeseries shape; bare map membership
+    // is client-forgeable.
+    if (!nss.isTimeseriesBucketsCollection() &&
+        !routingCtx.getCollectionRoutingInfo(nss).hasRoutingTable() &&
+        routingCtx.hasNss(bucketsNss) &&
+        routingCtx.getCollectionRoutingInfo(bucketsNss).hasRoutingTable()) {
         nss = bucketsNss;
         isViewfulTimeseries = true;
     }

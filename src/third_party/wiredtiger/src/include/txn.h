@@ -12,7 +12,9 @@
 #define WT_TXN_FIRST 1               /* First transaction to run */
 #define WT_TXN_MAX (UINT64_MAX - 10) /* End of time */
 #define WT_TXN_ABORTED UINT64_MAX    /* Update rolled back */
-#define WT_PREPARED_ID_NONE 0        /* Empty prepared id */
+
+#define WT_CKPT_SNAP_GEN_NONE 0 /* No published checkpoint snapshot was used for reconciliation */
+#define WT_PREPARED_ID_NONE 0   /* Empty prepared id */
 
 #define WT_TS_NONE 0         /* Beginning of time */
 #define WT_TS_MAX UINT64_MAX /* End of time */
@@ -27,8 +29,16 @@
  */
 #define WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW "Cache capacity has overflown"
 #define WT_TXN_ROLLBACK_REASON_CONFLICT "Write conflict between concurrent operations"
+#define WT_TXN_ROLLBACK_REASON_DISAGG_PICKUP \
+    "A newer checkpoint was adopted after the transaction snapshot was established"
 #define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
     "Transaction has the oldest pinned transaction ID"
+#define WT_TXN_ROLLBACK_REASON_STEP_DOWN \
+    "Write transaction straddled the step-down timestamp setting boundary"
+#define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
+    "Transaction dirty content alone exceeds the eviction updates or dirty trigger"
+#define WT_TXN_ROLLBACK_REASON_TRUNCATE_DIRTY \
+    "Truncate pinned too much dirty cache in the transaction"
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TXN_LOG_CKPT_CLEANUP 0x01u
@@ -184,7 +194,16 @@ struct __wt_txn_global {
     wt_shared volatile uint64_t oldest_id;
 
     wt_shared wt_timestamp_t durable_timestamp;
+    /*
+     * All accesses are relaxed: the value never orders other memory. Writers and the in-engine
+     * readers hold the checkpoint lock, and query_timestamp only returns it.
+     */
     wt_shared wt_timestamp_t last_ckpt_disaggregated_schema_epoch;
+    /*
+     * Release-stored by checkpoint once its durable state is established, acquire-loaded by sweep
+     * so that observing the timestamp guarantees the checkpoint's state is visible before an ingest
+     * table is dropped.
+     */
     wt_shared wt_timestamp_t last_ckpt_timestamp;
     wt_timestamp_t meta_ckpt_timestamp;
     wt_shared wt_timestamp_t oldest_timestamp;
@@ -192,6 +211,8 @@ struct __wt_txn_global {
     wt_timestamp_t recovery_timestamp;
     wt_shared wt_timestamp_t stable_disaggregated_schema_epoch;
     wt_shared wt_timestamp_t stable_timestamp;
+    wt_shared wt_timestamp_t step_down_disaggregated_schema_epoch;
+    wt_shared wt_timestamp_t step_down_timestamp;
     wt_shared wt_timestamp_t newest_seen_timestamp; /* Used by eviction to make guesses */
     wt_shared wt_timestamp_t version_cursor_pinned_timestamp;
     wt_shared bool has_durable_timestamp;
@@ -207,6 +228,15 @@ struct __wt_txn_global {
 
     /* Protects logging, checkpoints and transaction visibility. */
     WT_RWLOCK visibility_rwlock;
+
+    /*
+     * Protects the step-down timestamp and the step-down disaggregated schema epoch: writers set or
+     * clear them together, readers sample the timestamp at transaction begin and check it when a
+     * write transaction commits. A committing write transaction either observes the timestamp and
+     * rolls back, or its writes happen before the timestamp store and are visible to every
+     * transaction that begins with the timestamp set.
+     */
+    WT_RWLOCK step_down_lock;
 
     /*
      * Track information about the running checkpoint. The transaction snapshot used when
@@ -403,6 +433,13 @@ struct __wt_txn {
     /* Snapshot data. */
     WT_TXN_SNAPSHOT snapshot_data;
 
+    /*
+     * When eviction reconciles a page using the published checkpoint snapshot, the page can be
+     * stamped and checkpoint can skip re-reconciling it. WT_CKPT_SNAP_GEN_NONE when no such
+     * snapshot is in use.
+     */
+    uint64_t ckpt_snap_gen;
+
     /* Backup snapshot data. */
     WT_TXN_SNAPSHOT *backup_snapshot_data;
 
@@ -411,6 +448,22 @@ struct __wt_txn {
      * on the public list of committed timestamps.
      */
     wt_timestamp_t first_commit_timestamp;
+
+    /*
+     * True if the step-down timestamp was set when this transaction began. Used to redirect the
+     * transaction's writes to the ingest constituent (or mirrored to both stable and ingest when
+     * write mirroring is enabled), to include ingest in its reads, and to detect straddlers.
+     */
+    bool stepdown_ts_set;
+    /*
+     * The disaggregated role observed when the snapshot was established; the role-change generation
+     * it was established under is published in the session's generation slot. A snapshot
+     * established under one role must not bind a layered table's stable content under another. A
+     * bind compares both: the role catches a transition racing the bind without needing a lock (the
+     * dispatch and the comparison use one read of one variable), and the generation catches a role
+     * that changed away and back.
+     */
+    bool disagg_role_leader;
 
     /*
      * Timestamps used for reading via a checkpoint cursor instead of txn_shared->read_timestamp and
@@ -427,6 +480,16 @@ struct __wt_txn {
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
+
+    /*
+     * Cache bytes this transaction's updates have dirtied and not yet resolved. Eviction cannot
+     * reclaim these bytes, so it is maintained unconditionally rather than tracked only through the
+     * equivalent session statistic.
+     */
+    uint64_t update_dirty_bytes;
+
+    /* Dirty internal-page cache pinned by this transaction's fast-truncate, used to bound it. */
+    uint64_t truncate_dirty_bytes;
 
     /* Checkpoint status. */
     WT_LSN ckpt_lsn;
@@ -448,20 +511,21 @@ struct __wt_txn {
 #define WT_TXN_AUTOCOMMIT 0x00001u
 #define WT_TXN_ERROR 0x00002u
 #define WT_TXN_HAS_SNAPSHOT 0x00004u
-#define WT_TXN_IGNORE_PREPARE 0x00008u
-#define WT_TXN_IS_CHECKPOINT 0x00010u
-#define WT_TXN_PREPARE 0x00020u
-#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00040u
-#define WT_TXN_READONLY 0x00080u
-#define WT_TXN_REFRESH_SNAPSHOT 0x00100u
-#define WT_TXN_RUNNING 0x00200u
-#define WT_TXN_SHARED_TS_DURABLE 0x00400u
-#define WT_TXN_SHARED_TS_READ 0x00800u
-#define WT_TXN_SYNC_SET 0x01000u
-#define WT_TXN_TS_NOT_SET 0x02000u
-#define WT_TXN_TS_ROUND_PREPARED 0x04000u
-#define WT_TXN_TS_ROUND_READ 0x08000u
-#define WT_TXN_UPDATE 0x10000u
+#define WT_TXN_IGNORE_CACHE_SIZE 0x00008u
+#define WT_TXN_IGNORE_PREPARE 0x00010u
+#define WT_TXN_IS_CHECKPOINT 0x00020u
+#define WT_TXN_PREPARE 0x00040u
+#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x00080u
+#define WT_TXN_READONLY 0x00100u
+#define WT_TXN_REFRESH_SNAPSHOT 0x00200u
+#define WT_TXN_RUNNING 0x00400u
+#define WT_TXN_SHARED_TS_DURABLE 0x00800u
+#define WT_TXN_SHARED_TS_READ 0x01000u
+#define WT_TXN_SYNC_SET 0x02000u
+#define WT_TXN_TS_NOT_SET 0x04000u
+#define WT_TXN_TS_ROUND_PREPARED 0x08000u
+#define WT_TXN_TS_ROUND_READ 0x10000u
+#define WT_TXN_UPDATE 0x20000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 

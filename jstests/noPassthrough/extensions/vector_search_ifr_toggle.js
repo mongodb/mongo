@@ -21,6 +21,20 @@ checkPlatformCompatibleWithExtensions();
 const pipeline = [{$vectorSearch: {}}];
 
 /*
+ * Reads the current value of the featureFlagVectorSearchExtension IFR flag and asserts it matches
+ * 'expected'.
+ */
+function assertFlagValue(adminDb, expected) {
+    assert.eq(
+        assert.commandWorked(
+            adminDb.runCommand({getParameter: 1, featureFlagVectorSearchExtension: 1}),
+        ).featureFlagVectorSearchExtension.value,
+        expected,
+        `featureFlagVectorSearchExtension should be ${expected}`,
+    );
+}
+
+/*
  * Test with no extensions loaded. Legacy (fallback) should always be used, regardless of feature
  * flag state.
  */
@@ -29,6 +43,12 @@ withExtensions({}, (conn) => {
     const coll = conn.getDB("test")[jsTestName()];
     coll.drop();
     assert.commandWorked(coll.insertOne({_id: 0}));
+
+    assertFlagValue(adminDb, true);
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
+    assertFlagValue(adminDb, false);
 
     assert.commandWorked(
         adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
@@ -56,6 +76,14 @@ withExtensions({"libvector_search_extension.so": {}}, (conn) => {
         {_id: 2, text: "cherry"},
     ];
     assert.commandWorked(coll.insertMany(testData));
+
+    // The flag now ships enabled by default; verify that, then reset to the disabled state and
+    // confirm it took effect so the cases below run from a known starting point.
+    assertFlagValue(adminDb, true);
+    assert.commandWorked(
+        adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}),
+    );
+    assertFlagValue(adminDb, false);
 
     // Flag enabled; extension is used (no-op).
     assert.commandWorked(

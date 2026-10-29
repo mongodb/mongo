@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 
@@ -62,6 +36,7 @@
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -1018,12 +993,9 @@ private:
 class CollectionCatalogTimestampTest : public ServiceContextMongoDTest {
 public:
     // Disable table logging. When table logging is enabled, timestamps are discarded by WiredTiger.
-    CollectionCatalogTimestampTest()
-        : ServiceContextMongoDTest(Options{}.forceDisableTableLogging()) {}
-
-    // Special constructor to _disable_ timestamping. Not to be used directly.
-    struct DisableTimestampingTag {};
-    CollectionCatalogTimestampTest(DisableTimestampingTag) : ServiceContextMongoDTest() {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().forceDisableTableLogging();
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -1091,6 +1063,44 @@ public:
         _setupDDLOperation(opCtx, timestamp);
         wuow.emplace(opCtx);
         _dropCollection(opCtx, nss, timestamp);
+    }
+
+    void writableCollectionAndLeaveUncommitted(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               Timestamp timestamp,
+                                               boost::optional<WriteUnitOfWork>& wuow) {
+        _setupDDLOperation(opCtx, timestamp);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        wuow.emplace(opCtx);
+        CollectionWriter collection(opCtx, &acq);
+        ASSERT(collection.getWritableCollection(opCtx));
+    }
+
+    void renameCollectionAndLeaveUncommitted(OperationContext* opCtx,
+                                             const NamespaceString& from,
+                                             const NamespaceString& to,
+                                             Timestamp timestamp,
+                                             boost::optional<WriteUnitOfWork>& wuow) {
+        _setupDDLOperation(opCtx, timestamp);
+        wuow.emplace(opCtx);
+        _renameCollection(opCtx, from, to, timestamp);
+    }
+
+    void recreateCollectionWithUUIDInCurrentWUOW(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 UUID uuid) {
+        _createCollection(opCtx, nss, uuid, false);
+    }
+
+    void rollbackAfterCatalogPrecommit(boost::optional<WriteUnitOfWork>& wuow) {
+        shard_role_details::getRecoveryUnit(opCtx.get())
+            ->registerPreCommitHook([](OperationContext*, boost::optional<Timestamp>) {
+                throwWriteConflictException("Force rollback after catalog precommit");
+            });
+        ASSERT_THROWS(wuow->commit(), WriteConflictException);
     }
 
     void renameCollection(OperationContext* opCtx,
@@ -1178,7 +1188,7 @@ public:
         uassertStatusOK(indexBuildBlock->init(opCtx,
                                               writableColl,
                                               indexBuildInfo,
-                                              /*forRecover=*/false));
+                                              /*forRecovery=*/false));
         uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty());
@@ -1804,13 +1814,6 @@ private:
     }
 };
 
-class CollectionCatalogNoTimestampTest : public CollectionCatalogTimestampTest {
-public:
-    CollectionCatalogNoTimestampTest()
-        : CollectionCatalogTimestampTest(CollectionCatalogTimestampTest::DisableTimestampingTag{}) {
-    }
-};
-
 TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2381,6 +2384,8 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
     }
 }
 
+// TODO(SERVER-136424): Re-enable tests after fixing replicated fast count issue.
+#if 0
 TEST_F(CollectionCatalogTimestampTest, OpenCollectionAlwaysForDebugBuilds) {
     if constexpr (!kDebugBuild) {
         return;
@@ -2435,6 +2440,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionAlwaysForSanitizerBuilds) {
     ASSERT_FALSE(openedColls.lookupByNamespace(nss));
 }
 #endif
+#endif
 
 TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrites) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
@@ -2447,7 +2453,7 @@ TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrit
 
     auto coll =
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), nss, boost::none /* readTimestamp */);
+            ->establishConsistentCollection(opCtx.get(), nss, /*readTimestamp=*/boost::none);
     ASSERT(coll);
     ASSERT_EQ(expectedUUID, coll->uuid());
 
@@ -2465,7 +2471,7 @@ TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrit
 
     auto coll =
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), nss, boost::none /* readTimestamp */);
+            ->establishConsistentCollection(opCtx.get(), nss, /*readTimestamp=*/boost::none);
     ASSERT(coll);
     ASSERT_EQ(expectedUUID, coll->uuid());
 
@@ -2498,7 +2504,7 @@ TEST_F(CollectionCatalogTimestampTest,
             // Establish the collection and assert we get the one we just created in the child
             // WriteUnitOfWork (not the one which is being concurrently committed)
             auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-                opCtx, nss, boost::none /* readTimestamp */);
+                opCtx, nss, /*readTimestamp=*/boost::none);
             ASSERT(coll);
             ASSERT_EQ(expectedUUID, coll->uuid());
 
@@ -2538,11 +2544,10 @@ TEST_F(CollectionCatalogTimestampTest, DropCollectionAndCreateViewOnSameNSS) {
                                 opCtx.get(),
                                 nss,
                                 viewOnNs,
-                                BSONArray() /* pipeline */,
-                                [](auto&&...) {
-                                    return stdx::unordered_set<NamespaceString>{};
-                                } /* validatePipeline */,
-                                BSONObj() /* collation */));
+                                /*pipeline=*/BSONArray(),
+                                /*validatePipeline=*/
+                                [](auto&&...) { return stdx::unordered_set<NamespaceString>{}; },
+                                /*collation=*/BSONObj()));
 
         // Signal that we're ready to commit and wait until we are signaled to actually commit
         updatedCatalogInWuowAndReadyToCommit.emplaceValue();
@@ -2638,16 +2643,16 @@ public:
                 ASSERT(catalog->lookupCollectionByNamespace(newOpCtx.get(), mainNs));
                 ASSERT(!catalog->lookupView(newOpCtx.get(), mainNs));
                 ASSERT(catalog->establishConsistentCollection(
-                    newOpCtx.get(), mainNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), mainNs, /*readTimestamp=*/boost::none));
                 ASSERT(!catalog->establishConsistentCollection(
-                    newOpCtx.get(), bucketsNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), bucketsNs, /*readTimestamp=*/boost::none));
             } else {
                 ASSERT(!catalog->lookupCollectionByNamespace(newOpCtx.get(), mainNs));
                 ASSERT(catalog->lookupView(newOpCtx.get(), mainNs));
                 ASSERT(!catalog->establishConsistentCollection(
-                    newOpCtx.get(), mainNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), mainNs, /*readTimestamp=*/boost::none));
                 ASSERT(catalog->establishConsistentCollection(
-                    newOpCtx.get(), bucketsNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), bucketsNs, /*readTimestamp=*/boost::none));
             }
         };
 
@@ -2665,28 +2670,28 @@ public:
 
             // Before durable commit: no changes visible.
             ddl.hangAfterPreCommit();
-            assertCatalogState(!isUpgrade /* expectViewless */);
+            assertCatalogState(/*expectViewless=*/!isUpgrade);
 
             // After durable commit, before catalog update: no changes visible, neither in the
             // collection nor the view (this is special behavior for timeseries upgrade/downgrade:
             // normally the collection would become visible after durable commit).
             ddl.hangAfterCommit();
-            assertCatalogState(!isUpgrade /* expectViewless */);
+            assertCatalogState(/*expectViewless=*/!isUpgrade);
         }
 
         // After in-memory state updated: all changes visible.
-        assertCatalogState(isUpgrade /* expectViewless */);
+        assertCatalogState(/*expectViewless=*/isUpgrade);
     }
 };
 
 TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
        ConcurrentTimeseriesDowngradeAndOpenCollection) {
-    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(false /* isUpgrade */);
+    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(/*isUpgrade=*/false);
 }
 
 TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
        ConcurrentTimeseriesUpgradeAndOpenCollection) {
-    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(true /* isUpgrade */);
+    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(/*isUpgrade=*/true);
 }
 
 // Tests that lookupView hides a timeseries view for PIT reads at a timestamp before the
@@ -2868,6 +2873,10 @@ TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingCreate) {
             auto catalog = CollectionCatalog::get(opCtx);
             ASSERT_THROWS(catalog->resolveNamespaceStringOrUUID(opCtx, {nss.dbName(), uuid}),
                           ExceptionFor<ErrorCodes::NamespaceNotFound>);
+            ASSERT_THROWS_CODE(catalog->resolveNamespaceStringFromDBNameAndUUIDThrowIfCommitPending(
+                                   opCtx, nss.dbName(), uuid),
+                               DBException,
+                               ErrorCodes::CommitPendingNamespaceOrUUID);
             ASSERT_EQ(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
                           opCtx, {nss.dbName(), uuid}),
                       nss);
@@ -2950,6 +2959,116 @@ TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingDrop) {
                           opCtx, {nss.dbName(), uuid}),
                       nss);
         });
+}
+
+TEST_F(CollectionCatalogTimestampTest, NamespaceAndUUIDPendingEntriesRemovedAfterDropRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID uuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), nss, Timestamp(20, 20), wuow);
+
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss.dbName(), uuid)));
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), uuid), original);
+}
+
+TEST_F(CollectionCatalogTimestampTest, CreatedCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID uuid = UUID::gen();
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        createCollectionWithUUIDAndLeaveUncommitted(
+            opCtx.get(), nss, Timestamp(10, 10), uuid, wuow);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss.dbName(), uuid)));
+    ASSERT_FALSE(catalog->lookupCollectionByNamespace(opCtx.get(), nss));
+    ASSERT_FALSE(catalog->lookupCollectionByUUID(opCtx.get(), uuid));
+}
+
+TEST_F(CollectionCatalogTimestampTest, WritableCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID uuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        writableCollectionAndLeaveUncommitted(opCtx.get(), nss, Timestamp(20, 20), wuow);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss.dbName(), uuid)));
+    ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx.get(), nss), original);
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), uuid), original);
+}
+
+TEST_F(CollectionCatalogTimestampTest, RenamedCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const UUID uuid = createCollection(opCtx.get(), originalNss, Timestamp(10, 10));
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        renameCollectionAndLeaveUncommitted(
+            opCtx.get(), originalNss, renamedNss, Timestamp(20, 20), wuow);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(originalNss)));
+    ASSERT_FALSE(
+        catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(renamedNss)));
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(
+        NamespaceStringOrUUID(originalNss.dbName(), uuid)));
+    ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx.get(), originalNss), original);
+    ASSERT_FALSE(catalog->lookupCollectionByNamespace(opCtx.get(), renamedNss));
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), uuid), original);
+}
+
+TEST_F(CollectionCatalogTimestampTest, RecreatedCollectionPendingEntriesRemovedAfterRollback) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const UUID oldUuid = createCollection(opCtx.get(), nss, Timestamp(10, 10));
+    const UUID newUuid = UUID::gen();
+    const auto* original =
+        CollectionCatalog::latest(opCtx.get())->lookupCollectionByUUID(opCtx.get(), oldUuid);
+
+    {
+        boost::optional<WriteUnitOfWork> wuow;
+        dropCollectionAndLeaveUncommitted(opCtx.get(), nss, Timestamp(20, 20), wuow);
+        recreateCollectionWithUUIDInCurrentWUOW(opCtx.get(), nss, newUuid);
+        rollbackAfterCatalogPrecommit(wuow);
+    }
+
+    auto catalog = CollectionCatalog::latest(opCtx.get());
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(NamespaceStringOrUUID(nss)));
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(
+        NamespaceStringOrUUID(nss.dbName(), oldUuid)));
+    ASSERT_FALSE(catalog->isNamespaceOrUUIDCommitPending_forTest(
+        NamespaceStringOrUUID(nss.dbName(), newUuid)));
+    ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx.get(), nss), original);
+    ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx.get(), oldUuid), original);
+    ASSERT_FALSE(catalog->lookupCollectionByUUID(opCtx.get(), newUuid));
 }
 
 TEST_F(CollectionCatalogTimestampTest,
@@ -3900,11 +4019,11 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
         });
     }
     // Create and drop the collection. We have a time window where the namespace exists.
-    createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
+    createCollection(opCtx.get(), nss, Timestamp::min(), /*allowMixedModeWrites=*/true);
     dropCollection(opCtx.get(), nss, Timestamp(10, 10));
 
     // Before performing cleanup, re-create the collection.
-    createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
+    createCollection(opCtx.get(), nss, Timestamp::min(), /*allowMixedModeWrites=*/true);
 
     // Perform collection catalog cleanup.
     {

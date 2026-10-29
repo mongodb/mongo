@@ -3,7 +3,10 @@
  * and secondary read preference which write over 16 MB work as expected (especially with respect to
  * producing correctly sized write batches).
  *
- * @tags: [uses_$out, assumes_read_preference_unchanged]
+ * @tags: [
+ *   uses_$out,
+ *   assumes_read_preference_unchanged,
+ * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

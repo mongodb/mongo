@@ -1,0 +1,37 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: private
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
+
+enums:
+    MigrationBlockingOperationCoordinatorV2Phase:
+        description: "The phase of a MigrationBlockingOperationCoordinatorV2"
+        type: string
+        values:
+            kUnset: "unset"
+            kStartBlockingMigrations: "startBlockingMigrations"
+            kCurrentlyBlockingMigrations: "currentlyBlockingMigrations"
+            kStopBlockingMigrations: "stopBlockingMigrations"
+
+structs:
+    MigrationBlockingOperationCoordinatorV2Document:
+        description: State document for a MigrationBlockingOperationCoordinatorV2.
+        strict: false
+        chained_structs:
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
+        fields:
+            phase:
+                type: MigrationBlockingOperationCoordinatorV2Phase
+                description: The phase of the migration blocking operation coordinator.
+                default: kUnset
+            operations:
+                type: array<uuid>
+                description: The list of ongoing operation UUIDs.
+                optional: true
+                non_const_getter: true

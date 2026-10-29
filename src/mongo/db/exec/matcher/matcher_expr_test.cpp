@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
@@ -36,6 +10,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string_view>
@@ -585,6 +560,42 @@ TEST_F(ExprMatchTest, ExpressionEvaluationReturnsResultsCorrectly) {
     auto expressionResult = exec::matcher::evaluateExpression(getExprMatchExpression(), &document);
     ASSERT_TRUE(expressionResult.integral());
     ASSERT_EQUALS(-2, expressionResult.coerceToInt());
+}
+
+// When the ExpressionContext is bound to an OperationContext (the single-threaded query path),
+// evaluating $expr enforces the per-expression memory cap via the ExpressionContext's shared
+// fallback tracker.
+TEST_F(ExprMatchTest, ExpressionEvaluationEnforcesPerExpressionMemoryCap) {
+    // Disable expression tracking so the fallback tracker is standalone and enforces the
+    // per-expression cap (rather than rolling up into the larger per-operation limit).
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard capGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes", 8};
+
+    createMatcher(fromjson("{$expr: {$eq: [{$concat: ['$a', '$b']}, 'x']}}"));
+    ASSERT_THROWS_CODE(matches(BSON("a" << std::string(100, 'x') << "b" << std::string(100, 'y'))),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+// When the ExpressionContext has no OperationContext (a collection validator's shared
+// ExpressionContext), $expr evaluation must use a per-call tracker: it still enforces the
+// per-expression cap, but leaves the shared fallback tracker untouched (which would otherwise race
+// under concurrent validator evaluation).
+TEST_F(ExprMatchTest, ExpressionEvaluationWithoutOperationContextUsesPerCallTracker) {
+    unittest::ServerParameterGuard capGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes", 8};
+
+    createMatcher(fromjson("{$expr: {$eq: [{$concat: ['$a', '$b']}, 'x']}}"));
+    // Simulate a validator's shared ExpressionContext, which has no OperationContext.
+    getExprMatchExpression()->getExpressionContext()->setOperationContext(nullptr);
+
+    ASSERT_THROWS_CODE(matches(BSON("a" << std::string(100, 'x') << "b" << std::string(100, 'y'))),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+
+    // The per-call tracker enforced the cap; the shared fallback tracker was left untouched.
+    auto& sharedFallback =
+        getExprMatchExpression()->getExpressionContext()->getExpressionFallbackTracker();
+    ASSERT_EQ(sharedFallback.peakTrackedMemoryBytes(), 0);
 }
 
 }  // namespace mongo::evaluate_expr_matcher_test

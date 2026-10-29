@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,6 +11,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_metadata_accessor.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_recoverer_tracker.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
@@ -53,7 +28,7 @@ namespace mongo {
  * See the comments for DatabaseShardingState for more information on how this class fits in the
  * sharding architecture.
  */
-class MONGO_MOD_PARENT_PRIVATE DatabaseShardingRuntime : public DatabaseShardingState {
+class [[MONGO_MOD_PARENT_PRIVATE]] DatabaseShardingRuntime : public DatabaseShardingState {
     DatabaseShardingRuntime(const DatabaseShardingRuntime&) = delete;
     DatabaseShardingRuntime& operator=(const DatabaseShardingRuntime&) = delete;
 
@@ -225,8 +200,9 @@ public:
     /**
      * Sets the database metadata refresh future for other threads to wait on it.
      */
-    void setDbMetadataRefreshFuture_DEPRECATED(SharedSemiFuture<void> future,
-                                               CancellationSource cancellationSource);
+    void setDbMetadataRefreshFuture_DEPRECATED(
+        SharedSemiFuture<void> future,
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition);
 
     /**
      * If there is an ongoing database metadata refresh, returns the future to wait on it,
@@ -252,14 +228,16 @@ private:
     // DEPRECATED methods and attributes
 
     struct DbMetadataRefresh {
-        DbMetadataRefresh(SharedSemiFuture<void> future, CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
+        DbMetadataRefresh(SharedSemiFuture<void> future,
+                          ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition)
+            : future(std::move(future)),
+              recovererTrackerAcquisition(std::move(recovererTrackerAcquisition)) {}
 
         // Tracks the ongoing database metadata refresh.
         SharedSemiFuture<void> future;
 
-        // Cancellation source to cancel the ongoing database metadata refresh.
-        CancellationSource cancellationSource;
+        // Keeps the recovery registered with ShardCatalogRecovererTracker until completion.
+        ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition;
     };
 
     /**
@@ -268,7 +246,7 @@ private:
     void _cancelDbMetadataRefresh_DEPRECATED();
 
     // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads
-    // to wait on it, and a cancellation source to cancel the ongoing database metadata refresh.
+    // to wait on it, and a tracker acquisition used to cancel the refresh.
     boost::optional<DbMetadataRefresh> _dbMetadataRefresh;
 };
 
@@ -281,7 +259,7 @@ private:
  * metadata, or not hold the critical section to read it. Usages of this class should be minimal and
  * properly justified.
  */
-class MONGO_MOD_PARENT_PRIVATE [[nodiscard]] BypassDatabaseMetadataAccess {
+class [[MONGO_MOD_PARENT_PRIVATE]] [[nodiscard]] BypassDatabaseMetadataAccess {
 public:
     enum class Type { kReadOnly, kWriteOnly, kReadAndWrite };
 

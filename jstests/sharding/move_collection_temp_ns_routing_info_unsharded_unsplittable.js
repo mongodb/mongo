@@ -8,6 +8,7 @@
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
@@ -32,7 +33,11 @@ const reshardingPauseDonorBeforeCatalogCacheRefreshFailpoint = configureFailPoin
 
 // We trigger a refresh to make the catalog cache track the routing info for the temporary
 // resharding namespace as unsharded because the collection won't exist yet.
-assert.commandWorked(donor.adminCommand({_flushRoutingTableCacheUpdates: reshardingTest.tempNs}));
+if (!FeatureFlagUtil.isPresentAndEnabled(donor, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(
+        donor.adminCommand({_flushRoutingTableCacheUpdates: reshardingTest.tempNs}),
+    );
+}
 
 reshardingTest.withMoveCollectionInBackground({toShard: recipientShardNames[0]}, () => {
     reshardingPauseDonorBeforeCatalogCacheRefreshFailpoint.wait();

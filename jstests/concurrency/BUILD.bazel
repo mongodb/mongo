@@ -15,18 +15,18 @@ all_subpackage_javascript_files()
 
 resmoke_suite_test(
     name = "concurrency_simultaneous",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/concurrency_simultaneous.yml",
     data = CONCURRENCY_DATA,
-    shard_count = 15,
+    shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "random_name",
-        "resources:cpu:2",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],

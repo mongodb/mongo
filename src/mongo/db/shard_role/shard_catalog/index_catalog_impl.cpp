@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/index_catalog_impl.h"
 
@@ -66,6 +40,7 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -94,7 +69,7 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -866,7 +841,8 @@ Status _checkValidFilterExpressions(const MatchExpression* expression, int level
  * GEO_2DSPHERE provide additional validation on the index spec, and tweak the index spec
  * object to conform to their expected format.
  */
-StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
+StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj,
+                                          const VersionContext& versionContext) {
     std::string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
 
     if (IndexNames::TEXT == pluginName) {
@@ -874,11 +850,11 @@ StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
     }
 
     if (IndexNames::GEO_2DSPHERE == pluginName) {
-        return S2AccessMethod::fixSpec(obj);
+        return S2AccessMethod::fixSpec(obj, versionContext);
     }
 
     if (IndexNames::GEO_2DSPHERE_BUCKET == pluginName) {
-        return S2BucketAccessMethod::fixSpec(obj);
+        return S2BucketAccessMethod::fixSpec(obj, versionContext);
     }
 
     return obj;
@@ -969,12 +945,10 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     if (nameElem.type() != BSONType::string)
         return Status(ErrorCodes::CannotCreateIndex, "index name must be specified as a string");
 
-    const std::string_view name = nameElem.valueStringData();
-    if (name.find('\0') != std::string::npos)
-        return Status(ErrorCodes::CannotCreateIndex, "index name cannot contain NUL bytes");
-
-    if (name.empty())
-        return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
+    if (auto status = index_key_validate::validateIndexName(nameElem.valueStringData());
+        !status.isOK()) {
+        return status;
+    }
 
     const BSONObj key = spec.getObjectField("key");
     const Status keyStatus = index_key_validate::validateKeyPattern(key, indexVersion);
@@ -1509,6 +1483,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }
+    join_ordering::bumpCollectionVersionForDDL(collection);
     CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, collection, indexName, std::move(ownedEntry));
 
@@ -1776,6 +1751,7 @@ const IndexCatalogEntry* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }
+    join_ordering::bumpCollectionVersionForDDL(collection);
 
     // Return the new entry.
     return newEntry;
@@ -1783,20 +1759,6 @@ const IndexCatalogEntry* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
 // ---------------------------
 
-
-Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
-                                               const CollectionPtr& coll,
-                                               const IndexCatalogEntry* index,
-                                               const std::vector<BsonRecord>& bsonRecords,
-                                               int64_t* keysInsertedOut) const {
-    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
-
-    InsertDeleteOptions options;
-    prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
-
-    return index->accessMethod()->insert(
-        opCtx, pooledBuilder, coll, index, bsonRecords, options, keysInsertedOut);
-}
 
 Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
                                        const CollectionPtr& coll,
@@ -1815,17 +1777,13 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
     if (skip)
         return Status::OK();
 
-    const MatchExpression* filter = index->getFilterExpression();
-    if (!filter)
-        return _indexFilteredRecords(opCtx, coll, index, bsonRecords, keysInsertedOut);
 
-    std::vector<BsonRecord> filteredBsonRecords;
-    for (const auto& bsonRecord : bsonRecords) {
-        if (exec::matcher::matchesBSON(filter, *(bsonRecord.docPtr)))
-            filteredBsonRecords.push_back(bsonRecord);
-    }
+    InsertDeleteOptions options;
+    prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
 
-    return _indexFilteredRecords(opCtx, coll, index, filteredBsonRecords, keysInsertedOut);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+    return index->accessMethod()->insert(
+        opCtx, pooledBuilder, coll, index, bsonRecords, options, keysInsertedOut);
 }
 
 Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
@@ -2194,7 +2152,7 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
 StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
                                                     const CollectionPtr& collection,
                                                     const BSONObj& spec) const {
-    auto statusWithSpec = adjustIndexSpecObject(spec);
+    auto statusWithSpec = adjustIndexSpecObject(spec, VersionContext::getDecoration(opCtx));
     if (!statusWithSpec.isOK()) {
         return statusWithSpec;
     }

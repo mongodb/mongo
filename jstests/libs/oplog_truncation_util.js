@@ -13,17 +13,31 @@ export function verifyOplogCapMaintainerThreadNotStarted(log) {
 }
 
 /**
- * Quits the test if running in disaggregated storage mode without
- * featureFlagSizeBasedOplogTruncationForDisagg enabled. Calls teardown() first if provided.
+ * Returns true if running in disaggregated storage mode
+ *
+ * Keep in sync with `isDisaggregatedStorage` in `src/libfuzz/fuzzer_process_manager.ts`
+ * from jstestfuzz repo.
  */
-export function skipTestIfSizeBasedOplogTruncationDisabled(primary, teardown) {
+export function isDisagg(primary) {
     const disaggRes = assert.commandWorkedOrFailedWithCode(
         primary.adminCommand({getParameter: 1, disaggregatedStorageEnabled: 1}),
         ErrorCodes.InvalidOptions, // returned if an older version doesn't have the param
     );
-    const isDisagg = disaggRes.ok && disaggRes.disaggregatedStorageEnabled;
+    return disaggRes.ok && disaggRes.disaggregatedStorageEnabled;
+}
+
+/**
+ * Quits the test if running in disaggregated storage mode without
+ * featureFlagSizeBasedOplogTruncationForDisagg enabled. Calls teardown() first if provided.
+ *
+ * Returns true if running in disaggregated storage mode
+ *
+ * TODO(SERVER-125068) delete this function once the feature flag is removed
+ */
+export function skipTestIfSizeBasedOplogTruncationDisabled(primary, teardown) {
+    const isDsc = isDisagg(primary);
     if (
-        isDisagg &&
+        isDsc &&
         !FeatureFlagUtil.isPresentAndEnabled(
             primary.getDB("admin"),
             "SizeBasedOplogTruncationForDisagg",
@@ -37,4 +51,5 @@ export function skipTestIfSizeBasedOplogTruncationDisabled(primary, teardown) {
         }
         quit();
     }
+    return isDsc;
 }

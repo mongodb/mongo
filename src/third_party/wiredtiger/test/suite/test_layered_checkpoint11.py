@@ -53,6 +53,9 @@ class test_layered_checkpoint11(wttest.WiredTigerTestCase):
 
     uri = f'layered:{test_name}'
 
+    # Keep track of the timestamps this test uses.
+    timestamp = 0
+
     def follower_conn_config(self):
         cfg = self.extensionsConfig() + ',create,' + self.conn_base_config
         cfg += 'disaggregated=(role="follower")'
@@ -61,10 +64,14 @@ class test_layered_checkpoint11(wttest.WiredTigerTestCase):
         return cfg
 
     def insert_data(self, session, value_prefix):
+        self.timestamp += 1
         cursor = session.open_cursor(self.uri)
+        session.begin_transaction()
         for i in range(self.nitems):
             cursor[str(i)] = value_prefix + str(i)
+        session.commit_transaction("commit_timestamp=" + self.timestamp_str(self.timestamp))
         cursor.close()
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(self.timestamp))
 
     def check_data(self, session, value_prefix):
         cursor = session.open_cursor(self.uri)

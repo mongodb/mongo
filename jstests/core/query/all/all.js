@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   requires_fcv_91,
+ * ]
+ */
 let t = db.jstests_all;
 t.drop();
 

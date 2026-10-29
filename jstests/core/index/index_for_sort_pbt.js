@@ -4,6 +4,7 @@
  * produces the same results as a COLLSCAN + SORT baseline.
  *
  * @tags: [
+ *  uses_explain,
  *  requires_fcv_90,
  *  # Retrieving results using toArray may require a getMore command.
  *  requires_getmore,

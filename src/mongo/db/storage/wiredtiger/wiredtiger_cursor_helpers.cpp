@@ -1,37 +1,13 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/compiler.h"
@@ -60,12 +36,24 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, WT_CURSOR* curso
         ru.storeWriteContextForDebugging(builder.obj());
     }
 }
+
+// Records a single key write (one document record or one index key) that WiredTiger actually
+// applied, on the operation's WriteThrottlerAdmissionContext. A write that WiredTiger rejects
+// (WT_ROLLBACK conflict, duplicate key, cache-pressure rejection) is not counted because it never
+// happened. Write-conflict retries still accumulate rather than reset, because each retry
+// physically re-applies its successful writes.
+void maybeRecordStorageWrite(WiredTigerRecoveryUnit& ru) {
+    if (auto* opCtx = ru.getOperationContext()) {
+        WriteThrottlerAdmissionContext::get(opCtx).recordStorageWrite();
+    }
+}
 }  // namespace
 
 int wiredTigerCursorInsert(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->insert(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);
@@ -80,6 +68,7 @@ int wiredTigerCursorModify(WiredTigerRecoveryUnit& ru,
     int ret = cursor->modify(cursor, entries, nentries);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);
@@ -91,6 +80,7 @@ int wiredTigerCursorUpdate(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->update(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);
@@ -102,6 +92,7 @@ int wiredTigerCursorRemove(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     int ret = cursor->remove(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
+        maybeRecordStorageWrite(ru);
     }
     if (TestingProctor::instance().isEnabled()) {
         handleWriteContextForDebugging(ru, cursor);

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,6 +13,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 // Helper that's used to make tests easier to write (and read). Not all tests have been changed
 // to use this, but see the block hashagg unit test for an example.
 struct CopyableValueBlock {
@@ -185,19 +160,19 @@ static TypedValues makeInterestingValues() {
     vals.push_back(makeBsonObject(BSON("b" << 7)));
     vals.push_back(makeObject(BSON("b" << 8)));
 
-    auto int32s = makeNumbers<int32_t>(10 /* magnitude */);
+    auto int32s = makeNumbers<int32_t>(/*magnitude=*/10);
     for (auto int32 : int32s) {
         vals.push_back(makeInt32(int32));
     }
-    auto int64s = makeNumbers<int64_t>(100 /* magnitude */);
+    auto int64s = makeNumbers<int64_t>(/*magnitude=*/100);
     for (auto int64 : int64s) {
         vals.push_back(makeInt64(int64));
     }
-    auto dates = makeNumbers<int64_t>(500 /* magnitude */);
+    auto dates = makeNumbers<int64_t>(/*magnitude=*/500);
     for (auto dt : dates) {
         vals.push_back(std::pair{value::TypeTags::Date, value::bitcastFrom<int64_t>(dt)});
     }
-    auto doubles = makeNumbers<double>(1000 /* magnitude */);
+    auto doubles = makeNumbers<double>(/*magnitude=*/1000);
     for (auto dbl : doubles) {
         vals.push_back(makeDouble(dbl));
     }
@@ -205,8 +180,8 @@ static TypedValues makeInterestingValues() {
     vals.push_back(makeBool(false));
     vals.push_back(makeBool(true));
 
-    vals.push_back(value::makeNewString("regular string"_sd));  // StringBig
-    vals.push_back(value::makeNewString("tinystr"_sd));         // StringSmall
+    vals.push_back(value::makeNewString("regular string"sv));  // StringBig
+    vals.push_back(value::makeNewString("tinystr"sv));         // StringSmall
 
     vals.push_back(makeDecimal("-1234.5678"));
     vals.push_back(makeDecimal("1234.5678"));

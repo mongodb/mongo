@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file includes integration testing between the MockDBClientBase and MockRemoteDB.
@@ -319,7 +293,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(nss, BSONObj{} /*filter*/);
+        conn.remove(nss, /*filter=*/BSONObj{});
     }
 
     {
@@ -358,7 +332,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(nss2, BSONObj{} /*filter*/);
+        conn.remove(nss2, /*filter=*/BSONObj{});
 
         std::unique_ptr<mongo::DBClientCursor> cursor = conn.find(FindCommandRequest(nss2));
         ASSERT(!cursor->more());
@@ -404,7 +378,7 @@ TEST(MockDBClientConnTest, InsertAfterRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(nss, BSONObj{} /*filter*/);
+        conn.remove(nss, /*filter=*/BSONObj{});
     }
 
     {
@@ -707,7 +681,7 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
     MockDBClientConnection conn(&server);
 
     FindCommandRequest findCmd{nss};
-    mongo::DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    mongo::DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(2);
 
     // Two batches from the initial find and getMore command.
@@ -820,7 +794,7 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     runUntilExhaustRecv(&conn, &cursor);
 
@@ -865,7 +839,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(1);
 
     mongo::stdx::thread cursorThread([&] {
@@ -918,7 +892,7 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
     MockDBClientConnection conn(&server);
     conn.connect(mongo::HostAndPort("localhost", 12345), std::string_view(), boost::none);
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     // Shut down server before call.
     server.shutdown();
@@ -937,7 +911,7 @@ TEST(MockDBClientConnTest, ShutdownServerAfterCall) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     mongo::stdx::thread cursorThread([&] {
         ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::HostUnreachable);
@@ -961,7 +935,7 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
 
     conn.connect(mongo::HostAndPort("localhost", 12345), std::string_view(), boost::none);
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     server.shutdown();
 
@@ -987,7 +961,7 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeRecv) {
     MockDBClientConnection conn(&server, autoReconnect);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     runUntilExhaustRecv(&conn, &cursor);
 
@@ -1006,7 +980,7 @@ TEST(MockDBClientConnTest, ShutdownServerAfterRecv) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     runUntilExhaustRecv(&conn, &cursor);
 

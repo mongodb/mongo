@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,13 +12,13 @@
 #include <memory>
 #include <mutex>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Abstract interface governing when the Checkpointer thread wakes up to take a checkpoint.
  * The Checkpointer calls waitUntilReady() each loop iteration and then takes a checkpoint.
  */
-class MONGO_MOD_OPEN CheckpointSchedulePolicy {
+class [[MONGO_MOD_OPEN]] CheckpointSchedulePolicy {
 public:
     virtual ~CheckpointSchedulePolicy() = default;
 
@@ -55,6 +29,17 @@ public:
     virtual void waitUntilReady(std::unique_lock<std::mutex>& lock,
                                 stdx::condition_variable& cv,
                                 std::function<bool()> shouldWake) = 0;
+
+    /**
+     * Called by Checkpointer::notifyOplogWrite() on every oplog write. Returns true the first time
+     * accumulated bytes cross the volume threshold in a given checkpoint cycle, signalling that the
+     * Checkpointer should wake the checkpoint thread via notify_one(). Returns false on all
+     * subsequent calls in the same cycle.
+     *
+     * Threading: may be called concurrently from multiple oplog writer threads. Implementations
+     * must be lock-free or otherwise thread-safe. No Checkpointer locks are held at call time.
+     */
+    virtual bool accumulateOplogBytes(int64_t bytes) = 0;
 };
 
 /**
@@ -64,4 +49,4 @@ public:
 std::unique_ptr<CheckpointSchedulePolicy> createFixedIntervalPolicy(
     ClockSource* clock = SystemClockSource::get());
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

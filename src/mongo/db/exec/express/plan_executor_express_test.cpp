@@ -1,38 +1,23 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/express/plan_executor_express.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -41,14 +26,14 @@ IndexEntry createIndexEntry(BSONObj keyPattern, bool unique, bool sparse = false
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                       IndexConfig::kLatestIndexVersion,
-                      false /*multikey*/,
-                      {} /*mutikeyPaths*/,
-                      {} /*multikeyPathSet*/,
+                      /*mk=*/false,
+                      /*mkp=*/{},
+                      /*multikeyPathSet=*/{},
                       sparse,
                       unique,
                       IndexEntry::Identifier{"ident"},
-                      BSONObj() /*infoObj*/,
-                      nullptr /*wildcardProjection*/);
+                      /*io=*/BSONObj(),
+                      /*wildcardProjection=*/nullptr);
 }
 
 class ExpressTest : public ServiceContextTest {
@@ -80,6 +65,137 @@ public:
 
     ServiceContext::UniqueOperationContext _opCtxOwned;
 };
+
+/**
+ * Drives a real 'PlanExecutorExpress' over a real collection, which the eligibility tests above
+ * cannot do. This is what pins termination end to end: 'PlanExecutorExpress::getNext()' loops while
+ * it has no output and breaks only on 'ExpressPlan::exhausted()', so an iterator that reports a
+ * non-terminal result on a fetch miss spins in the executor, not in the iterator.
+ */
+class ExpressExecutorTest : public CatalogTestFixture {
+protected:
+    static inline const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("ExpressExecutorTest.TestCollection");
+    static constexpr auto kIndexName = "a_1";
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
+
+        auto collection = acquire();
+        {
+            WriteUnitOfWork wuow(operationContext());
+            CollectionWriter writer{operationContext(), &collection};
+            auto* writable = writer.getWritableCollection(operationContext());
+            ASSERT_OK(writable->getIndexCatalog()->createIndexOnEmptyCollection(
+                operationContext(),
+                writable,
+                BSON("v" << 2 << "name" << kIndexName << "key" << BSON("a" << 1))));
+            wuow.commit();
+        }
+        {
+            WriteUnitOfWork wuow(operationContext());
+            std::vector<BSONObj> docs{fromjson("{_id: 0, a: 2}"), fromjson("{_id: 1, a: 5}")};
+            ASSERT_OK(Helpers::insert(operationContext(), collection.getCollectionPtr(), docs));
+            wuow.commit();
+        }
+    }
+
+    CollectionAcquisition acquire() {
+        return acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(kNss,
+                                         PlacementConcern(boost::none, boost::none),
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_X);
+    }
+
+    /**
+     * Deletes the record behind the 'a: 5' index key without touching the index, leaving an entry
+     * that references a record which no longer exists.
+     */
+    void orphanIndexKeyForValueFive(const CollectionPtr& collectionPtr) {
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+        auto* recordStore = collectionPtr->getRecordStore();
+
+        boost::optional<RecordId> orphanedRid;
+        {
+            auto cursor = recordStore->getCursor(operationContext(), ru);
+            while (auto record = cursor->next()) {
+                if (record->data.toBson().getIntField("a") == 5) {
+                    orphanedRid = record->id;
+                    break;
+                }
+            }
+        }
+        ASSERT(bool(orphanedRid));
+
+        WriteUnitOfWork wuow(operationContext());
+        recordStore->deleteRecord(operationContext(), ru, *orphanedRid);
+        wuow.commit();
+    }
+
+    std::unique_ptr<CanonicalQuery> canonicalizeFindByA() {
+        auto findCommand = std::make_unique<FindCommandRequest>(kNss);
+        findCommand->setFilter(fromjson("{a: 5}"));
+        findCommand->setLimit(1);
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx =
+                ExpressionContextBuilder{}.fromRequest(operationContext(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    }
+
+    IndexForExpressEquality indexForA(const CollectionPtr& collectionPtr,
+                                      const CanonicalQuery& cq) {
+        boost::optional<IndexEntry> entry;
+        for (auto&& ice : collectionPtr->getIndexCatalog()->getEntriesShared(
+                 IndexCatalog::InclusionPolicy::kReady)) {
+            if (ice->descriptor()->indexName() == kIndexName) {
+                entry = indexEntryFromIndexCatalogEntry(operationContext(), collectionPtr, ice, cq);
+            }
+        }
+        ASSERT(bool(entry));
+        return IndexForExpressEquality(std::move(*entry), /*coversProjection=*/false);
+    }
+};
+
+// A fetch miss must drain to EOF within a short deadline, having examined the orphaned key exactly
+// once. The two assertions are complementary: the key count rules out an executor that loops a
+// bounded number of times, and the deadline rules out one that never terminates at all.
+TEST_F(ExpressExecutorTest, orphanIndexKeyReturnsEofOnPlainRead) {
+    auto collection = acquire();
+    orphanIndexKeyForValueFive(collection.getCollectionPtr());
+
+    // Matches what the command layer gives an ordinary find, which is the configuration that spun.
+    shard_role_details::getRecoveryUnit(operationContext())
+        ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
+    auto cq = canonicalizeFindByA();
+    auto index = indexForA(collection.getCollectionPtr(), *cq);
+    auto exec = makeExpressExecutorForFindByUserIndex(operationContext(),
+                                                      std::move(cq),
+                                                      collection,
+                                                      index,
+                                                      /*collectionFilter=*/boost::none,
+                                                      /*returnOwnedBson=*/false);
+
+    // Bounds only the drain loop, so setup cost cannot eat into it. One seek and one failed fetch
+    // is microseconds of work; seconds of headroom covers a loaded sanitizer host.
+    operationContext()->setDeadlineByDate(Date_t::now() + Seconds(5), ErrorCodes::MaxTimeMSExpired);
+
+    BSONObj out;
+    ASSERT_EQ(exec->getNext(&out, nullptr), PlanExecutor::IS_EOF);
+
+    // EOF alone would also be reported by an executor that looped a hundred times before giving
+    // up. Pinning the key count is what proves the orphaned entry was seeked once.
+    PlanSummaryStats summaryStats;
+    exec->getPlanExplainer().getSummaryStats(&summaryStats);
+    ASSERT_EQ(summaryStats.totalKeysExamined, 1);
+    ASSERT_EQ(summaryStats.totalDocsExamined, 0);
+    ASSERT_EQ(summaryStats.nReturned, 0);
+}
 
 }  // namespace
 
@@ -221,8 +337,8 @@ TEST_F(ExpressTest, sparseIndexIneligibility) {
     auto cq = canonicalize("{a: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    IndexForExpressEquality want{
-        createIndexEntry(BSON("a" << 1), true /* unique */, true /* sparse */), false};
+    IndexForExpressEquality want{createIndexEntry(BSON("a" << 1), /*unique=*/true, /*sparse=*/true),
+                                 false};
     params.mainCollectionInfo.indexes = {
         createIndexEntry(BSON("_id" << 1), true),
         want.index,
@@ -252,7 +368,7 @@ TEST_F(ExpressTest, nonBtreeEligibility) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.mainCollectionInfo.indexes = {
         createIndexEntry(BSON("$**" << 1), true),  // wildcard index is not a btree index type
-        createIndexEntry(BSON("a" << 1), false /* unique */),
+        createIndexEntry(BSON("a" << 1), /*unique=*/false),
     };
     auto ent = getIndexForExpressEquality(*cq, params);
     ASSERT_EQUALS(ent, boost::none);
@@ -263,11 +379,11 @@ TEST_F(ExpressTest, collationMismatchEligibility) {
     auto cq = canonicalize("{a: \"foo\"}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    auto revCollatorIdxEnt = createIndexEntry(BSON("a" << 1), true /* unique */);
+    auto revCollatorIdxEnt = createIndexEntry(BSON("a" << 1), /*unique=*/true);
     revCollatorIdxEnt.collator = &revCollator;
 
     params.mainCollectionInfo.indexes = {
-        createIndexEntry(BSON("a" << 1), false /* unique */),
+        createIndexEntry(BSON("a" << 1), /*unique=*/false),
         revCollatorIdxEnt,
     };
     auto ent = getIndexForExpressEquality(*cq, params);
@@ -278,12 +394,12 @@ TEST_F(ExpressTest, partialIndexEligibility) {
     auto cq = canonicalize("{a: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    auto partialIdxEnt = createIndexEntry(BSON("a" << 1), true /* unique */);
+    auto partialIdxEnt = createIndexEntry(BSON("a" << 1), /*unique=*/true);
     auto idxExpr = canonicalize("{a: {$exists: true}}");
     partialIdxEnt.filterExpr = idxExpr->getPrimaryMatchExpression();
 
     params.mainCollectionInfo.indexes = {
-        createIndexEntry(BSON("a" << 1), false /* unique */),
+        createIndexEntry(BSON("a" << 1), /*unique=*/false),
         partialIdxEnt,
     };
     auto ent = getIndexForExpressEquality(*cq, params);
@@ -297,7 +413,7 @@ TEST_F(ExpressTest, partialIndexEligibility) {
 }
 
 TEST_F(ExpressTest, coveringIndexEligibilityWithUniqueIndex) {
-    auto cq = canonicalize("{a: 2}", false /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    auto cq = canonicalize("{a: 2}", /*setLimit1=*/false, "{_id: 0, a: 1, c: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     IndexForExpressEquality want{createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false),
                                  true};
@@ -314,7 +430,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithUniqueIndex) {
 }
 
 TEST_F(ExpressTest, coveringIndexEligibilityWithoutUniqueIndex) {
-    auto cqNoLimit = canonicalize("{a: 2}", false /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    auto cqNoLimit = canonicalize("{a: 2}", /*setLimit1=*/false, "{_id: 0, a: 1, c: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
     IndexForExpressEquality want{createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false),
@@ -330,7 +446,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithoutUniqueIndex) {
     auto ent = getIndexForExpressEquality(*cqNoLimit, params);
     ASSERT_EQUALS(ent, boost::none);
 
-    auto cqLimit = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    auto cqLimit = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, c: 1}");
     ent = getIndexForExpressEquality(*cqLimit, params);
     ASSERT_EQUALS(ent, want);
 
@@ -361,7 +477,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+        auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, c: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -371,7 +487,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, c: 1}");
+        auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, c: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -381,7 +497,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1}");
+        auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -391,7 +507,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: \"abacaba\"}", true /*setLimit1*/, "{_id: 0, a: 1}");
+        auto cq = canonicalize("{a: \"abacaba\"}", /*setLimit1=*/true, "{_id: 0, a: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -415,7 +531,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithDuplicateKeys) {
         want.index,
     };
 
-    auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, b: 1}");
+    auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, b: 1}");
     auto ent = getIndexForExpressEquality(*cq, params);
     ASSERT_EQUALS(ent, want);
 }
@@ -431,7 +547,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithWrongKeyOrder) {
         want.index,
     };
 
-    auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, b: 1}");
+    auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, b: 1}");
     auto ent = getIndexForExpressEquality(*cq, params);
     ASSERT_EQUALS(ent, want);
 }
@@ -440,7 +556,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithMultiKey) {
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
-    const auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    const auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, c: 1}");
 
     {  // Can cover by a default index.
         auto indexEntry = createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false);
@@ -473,7 +589,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithMultiKey) {
         ASSERT_EQUALS(ent, want);
     }
     {  // Can cover if filter field is multi-key and is not included into the projection.
-        const auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, c: 1}");
+        const auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, c: 1}");
         auto indexEntry = createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false);
         indexEntry.multikey = true;
         indexEntry.multikeyPaths = MultikeyPaths{{0U}, {}, {}};
@@ -500,7 +616,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithSubFields) {
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
-    const auto cq = canonicalize("{'a.b': 2}", true /*setLimit1*/, "{_id: 0, c: 1}");
+    const auto cq = canonicalize("{'a.b': 2}", /*setLimit1=*/true, "{_id: 0, c: 1}");
 
     auto indexEntry = createIndexEntry(BSON("a.b" << 1 << "c" << 1), false);
     params.mainCollectionInfo.indexes = {indexEntry};

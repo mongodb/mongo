@@ -181,12 +181,23 @@
         WT_RET_TEST(__ret == (e), e); \
     } while (0)
 /*
+ * __WT_TRET_DOMINANT --
+ *     True when an error code can override another because it is stronger.
+ */
+#define __WT_TRET_DOMINANT(__ret) ((__ret) == WT_PANIC)
+
+/*
+ * __WT_TRET_SOFT --
+ *     True when an error code is weak enough that another can override it.
+ */
+#define __WT_TRET_SOFT(__ret) \
+    ((__ret) == 0 || (__ret) == WT_DUPLICATE_KEY || (__ret) == WT_NOTFOUND || (__ret) == WT_RESTART)
+
+/*
  * __WT_TRET_WINS --
  *     True when __ret should override the current value of ret. Requires ret to be in scope.
  */
-#define __WT_TRET_WINS(__ret)                                                          \
-    (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
-      ret == WT_RESTART)
+#define __WT_TRET_WINS(__ret) (__WT_TRET_DOMINANT(__ret) || __WT_TRET_SOFT(ret))
 
 #ifdef INLINE_FUNCTIONS_INSTEAD_OF_MACROS
 /* Set "ret" if not already set. */
@@ -362,6 +373,21 @@ __wt_tret_error_ok(int *pret, int a, int e)
         if (WT_UNLIKELY(!(exp)))                      \
             TRIGGER_ABORT(session, exp, __VA_ARGS__); \
     } while (0)
+
+/*
+ * WT_ASSERT_NO_SCHEMA_OP_DURING_STEP_UP --
+ *	Application threads must not run schema operations during a step-up, because step-up code
+ *	concurrently modifies layered-table state. Step-down holds the schema lock, so schema
+ *	operations serialize with it instead. Internal sessions perform the transition and are
+ *	exempt.
+ *
+ * FIXME-WT-18240: Remove the assertion once we have asynchronous step-up.
+ */
+#define WT_ASSERT_NO_SCHEMA_OP_DURING_STEP_UP(session)                   \
+    WT_ASSERT_ALWAYS(session,                                            \
+      !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECONFIGURING_STEP_UP) || \
+        F_ISSET(session, WT_SESSION_INTERNAL),                           \
+      "schema operation performed during step-up")
 
 /*
  * WT_ERR_ASSERT --

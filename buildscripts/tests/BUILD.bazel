@@ -1,6 +1,18 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel:mongo_script_rules.bzl", "mongo_toolchain_py_cxx_test")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
+
+py_test(
+    name = "test_task_artifacts",
+    srcs = ["test_task_artifacts.py"],
+    deps = [
+        "//buildscripts:task_artifacts",
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+    ],
+)
 
 mongo_toolchain_py_cxx_test(
     name = "test_clang_tidy",
@@ -35,6 +47,93 @@ py_test(
 )
 
 py_test(
+    name = "test_multiversion_downloads_filter",
+    srcs = ["test_multiversion_downloads_filter.py"],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:multiversion_downloads_filter",
+    ],
+)
+
+py_test(
+    name = "test_clang_format_vscode",
+    srcs = ["test_clang_format_vscode.py"],
+    data = ["//buildscripts:clang_format_vscode.sh"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "test_clang_format_version",
+    srcs = ["test_clang_format_version.py"],
+    visibility = ["//visibility:public"],
+    deps = ["//buildscripts:clang_format_version_lib"],
+)
+
+py_test(
+    name = "test_mongo_toolchain",
+    srcs = ["test_mongo_toolchain.py"],
+    data = ["//bazel:bazelisk"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:mongo_toolchain",
+    ],
+)
+
+py_test(
+    name = "test_code_coverage_data_process",
+    srcs = ["test_code_coverage_data_process.py"],
+    data = ["//evergreen/functions:all_python_files"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        "//evergreen/functions:all_python_files",
+    ],
+)
+
+py_test(
+    name = "test_gdb_utils",
+    srcs = ["test_gdb_utils.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/gdb:all_python_files",
+    ],
+)
+
+py_test(
+    name = "test_optimizer_printers",
+    srcs = ["test_optimizer_printers.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/gdb:all_python_files",
+    ],
+)
+
+py_test(
+    name = "test_idl_lib",
+    srcs = ["test_idl_lib.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/idl",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "pymongo",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_activate_task",
     srcs = ["test_activate_task.py"],
     visibility = ["//visibility:public"],
@@ -44,11 +143,65 @@ py_test(
 )
 
 py_test(
+    name = "test_generate_result_tasks",
+    srcs = ["test_generate_result_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:generate_result_tasks",
+    ],
+)
+
+py_test(
+    name = "test_stream_result_task_activation",
+    srcs = ["test_stream_result_task_activation.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:stream_result_task_activation",
+    ],
+)
+
+py_test(
     name = "test_bazel_plus_test_interface",
     srcs = ["test_bazel_plus_test_interface.py"],
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "test_gdb_rbe_sysroot",
+    srcs = ["test_gdb_rbe_sysroot.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:gdb_rbe_sysroot",
+    ],
+)
+
+py_test(
+    name = "test_local_rbe_container_url",
+    srcs = ["test_local_rbe_container_url.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:local_rbe_container_url",
+    ],
+)
+
+py_test(
+    name = "test_podman_recovery",
+    srcs = ["test_podman_recovery.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:podman_recovery",
+    ],
+)
+
+py_test(
+    name = "test_prepare_podman_for_bazel",
+    srcs = ["test_prepare_podman_for_bazel.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:prepare_podman_for_bazel",
     ],
 )
 
@@ -66,11 +219,29 @@ py_test(
 )
 
 py_test(
+    name = "test_benchmark_profiler",
+    srcs = ["test_benchmark_profiler.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:benchmark_profiler",
+    ],
+)
+
+py_test(
     name = "test_check_for_noexcept",
     srcs = ["test_check_for_noexcept.py"],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:check_for_noexcept",
+    ],
+)
+
+py_test(
+    name = "test_mongolint",
+    srcs = ["test_mongolint.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
     ],
 )
 
@@ -98,6 +269,15 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "test_cs_suggest_variants",
+    srcs = ["test_cs_suggest_variants.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:cs_suggest_variants_lib",
     ],
 )
 
@@ -134,15 +314,29 @@ py_test(
 )
 
 py_test(
-    name = "test_evergreen_activate_result_tasks",
-    srcs = ["test_evergreen_activate_result_tasks.py"],
+    name = "test_generate_version_expansions",
+    srcs = ["test_generate_version_expansions.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:evergreen_activate_result_tasks",
-        dependency(
-            "evergreen-py",
-            group = "testing",
-        ),
+        "//buildscripts:generate_version_expansions",
+    ],
+)
+
+py_test(
+    name = "test_gather_failed_tests",
+    srcs = ["test_gather_failed_tests.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:gather_failed_tests",
+    ],
+)
+
+py_test(
+    name = "test_create_bazel_test_report",
+    srcs = ["test_create_bazel_test_report.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:create_bazel_test_report",
     ],
 )
 
@@ -196,6 +390,19 @@ py_test(
 )
 
 py_test(
+    name = "test_fully_disabled_feature_flag_tags_check",
+    srcs = ["test_fully_disabled_feature_flag_tags_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:fully_disabled_feature_flag_tags_check",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_feature_flags",
     srcs = ["test_feature_flags.py"],
     data = ["//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml"],
@@ -211,16 +418,26 @@ py_test(
 )
 
 py_test(
+    name = "test_sbom_files_pr",
+    srcs = ["test_sbom_files_pr.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/sbom:sbom_files_pr",
+    ],
+)
+
+py_test(
     name = "test_generate_sbom",
     srcs = ["test_generate_sbom.py"],
     data = [
-        "//buildscripts/sbom:metadata.cdx.json",
+        "//buildscripts/sbom:metadata.cdx.yaml",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/sbom:config",
         "//buildscripts/sbom:endorctl_utils",
         "//buildscripts/sbom:sbom_utils",
+        "//buildscripts/tests/sbom_linter:sbom_linter_lib",
     ],
 )
 
@@ -266,11 +483,31 @@ py_test(
 )
 
 py_test(
+    name = "test_package_test_provenance",
+    srcs = ["test_package_test_provenance.py"],
+    data = ["//:.bazelversion"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:generate_bazel_spawn_pb2",
+        "//buildscripts/package_test:package_test_provenance",
+    ],
+)
+
+py_test(
+    name = "test_package_test_commands",
+    srcs = ["test_package_test_commands.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/package_test:package_test_commands",
+    ],
+)
+
+py_test(
     name = "test_package_test_internal",
     srcs = ["test_package_test_internal.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:package_test_internal",
+        "//buildscripts/package_test:package_test_internal",
     ],
 )
 
@@ -311,6 +548,15 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:sort_backport_multiversion",
+    ],
+)
+
+py_test(
+    name = "test_create_todo_tickets",
+    srcs = ["test_create_todo_tickets.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:create_todo_tickets",
     ],
 )
 

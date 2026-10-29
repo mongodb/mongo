@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -52,11 +26,10 @@ class PlanStageSlots;
  * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
  * we are generating a filter over an index scan.
  *
- * The 'canUsePathArrayness' parameter indicates that the filter runs over raw documents from the
- * ExpressionContext's main namespace, so PathArrayness info for that namespace may be used to
- * elide traverseF. Only the fetch residual filter sets this to true; filters that run on
- * computed/intermediate documents (e.g. non-leading $match after $group/$addFields) must leave
- * it false.
+ * The 'pathArraynessNss' parameter opt-in enables consulting PathArrayness metadata to elide
+ * traverseF; it must name the collection whose raw documents the filter runs over, which is not
+ * necessarily the ExpressionContext's main namespace (e.g. a foreign scan under join
+ * optimization). Filters over computed/intermediate documents must pass boost::none.
  *
  * This function returns an SbExpr. If 'root' is an AND with no children, this function will
  * return a null SbExpr to indicate that there is no filter condition.
@@ -66,7 +39,7 @@ SbExpr generateFilter(StageBuilderState& state,
                       boost::optional<SbSlot> inputSlot,
                       const PlanStageSlots& slots,
                       bool isFilterOverIxscan = false,
-                      bool canUsePathArrayness = false);
+                      const boost::optional<NamespaceString>& pathArraynessNss = boost::none);
 
 /**
  * Converts the list of bit positions inside of any of the bit-test match expressions

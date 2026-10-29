@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/get_executor_deferred_engine_choice_lowering.h"
 
@@ -48,6 +22,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -62,7 +38,7 @@ const BSONObj kGroupStage = fromjson(R"({$group: {_id: null, foo: {$count: {}}}}
 std::unique_ptr<QuerySolution> makeVirtualScan(std::vector<BSONArray> docs) {
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::make_unique<VirtualScanNode>(
-        std::move(docs), VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/));
+        std::move(docs), VirtualScanNode::ScanType::kCollScan, /*hasRecordId=*/false));
     return solution;
 }
 
@@ -197,9 +173,6 @@ protected:
     }
 
 private:
-    unittest::ServerParameterGuard sbeFullController{"featureFlagGetExecutorDeferredEngineChoice",
-                                                     true};
-
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::optional<MultipleCollectionAccessor> _collections;
 };
@@ -233,7 +206,7 @@ TEST_F(DeferredEngineChoiceLoweringTest, IdhackUsesClassic) {
                                operationContext(),
                                collections(),
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                               nullptr /*pipeline*/);
+                               /*pipeline=*/nullptr);
     ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()));
 }
 
@@ -253,7 +226,7 @@ TEST_F(DeferredEngineChoiceLoweringTest, BasicScanUsesClassic) {
                                operationContext(),
                                collections(),
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                               nullptr /*pipeline*/);
+                               /*pipeline=*/nullptr);
     ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()));
 }
 
@@ -295,13 +268,17 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
     auto testExpectedEngine = [&](size_t numDocs, bool hasGroupPipeline, bool shouldUseSbe) {
         auto [cq, plannerData] = createPlannerData(kFindFilter);
         auto solutions = createVirtualScanQuerySolutionsForDefaultFilter(
-            numDocs /*resultDocCount*/, cq->getPrimaryMatchExpression());
+            /*resultDocCount=*/numDocs, cq->getPrimaryMatchExpression());
         // Include the SBE-eligible pipeline, so that if multiplanning hits EOF we see classic used,
         // and if EOF is not reached we see SBE used.
         auto pipeline = makeSbeEligiblePipeline();
         auto pipelinePtr = hasGroupPipeline ? pipeline.get() : nullptr;
         auto multiplanner = std::make_unique<exec_deferred_engine_choice::MultiPlanner>(
-            std::move(plannerData), std::move(solutions));
+            std::move(plannerData),
+            std::move(solutions),
+            /*addingCBRChosenPlanToPlanCache=*/false,
+            /*maybeExplainData=*/boost::none,
+            PlanSelectionStrategy::kMultiPlanner);
         EngineSelectionPlanner planner(
             std::move(multiplanner), operationContext(), cq.get(), pipelinePtr, collections());
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
@@ -326,9 +303,9 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
     std::vector<int> numDocsCases = {1, 50, 150, 200};
     for (int numDocs : numDocsCases) {
         // With default flags, if there is a $group stage, SBE should always be used.
-        testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/true, /*shouldUseSbe=*/true);
         // If there is no pipeline, classic will always be used.
-        testExpectedEngine(numDocs, false /*hasGroupPipeline*/, false /*shouldUseSbe*/);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/false, /*shouldUseSbe=*/false);
     }
 
     unittest::ServerParameterGuard sbeFullController{"featureFlagSbeFull", true};
@@ -336,10 +313,75 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         bool hitEof = numDocs < 100;
         // With SBE full enabled, we can use SBE even when there is no pipeline. We should use the
         // EOF optimization (classic) if it's not a debug build and we hit EOF.
-        testExpectedEngine(numDocs, false /*hasGroupPipeline*/, kDebugBuild || !hitEof);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/false, kDebugBuild || !hitEof);
         // If there is a pipeline, SBE is always used.
-        testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/true, /*shouldUseSbe=*/true);
     }
 }
+
+using DeferredEngineChoiceLoweringDeathTest = DeferredEngineChoiceLoweringTest;
+
+DEATH_TEST_REGEX_F(DeferredEngineChoiceLoweringDeathTest,
+                   GetNextDocumentOnDisposedExecutor,
+                   "Tripwire assertion.*11321408") {
+    auto [cq, plannerData] = createPlannerData();
+
+    PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
+                                    .plannerParams = plannerData.plannerParams};
+
+    auto pipeline = makeSbeEligiblePipeline();
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{
+        std::move(preComputed), operationContext(), cq.get(), pipeline.get(), collections()};
+
+    auto exec = lowerPlanRankingResult(std::move(cq),
+                                       planner.extractPlanRankingResult(),
+                                       operationContext(),
+                                       collections(),
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       pipeline.get());
+
+    ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+
+    exec->dispose(operationContext());
+
+    Document doc;
+    ASSERT_THROWS_CODE(exec->getNextDocument(doc), AssertionException, 11321408);
+}
+
+DEATH_TEST_REGEX_F(DeferredEngineChoiceLoweringDeathTest,
+                   GetNextOnDisposedExecutor,
+                   "Tripwire assertion.*11321408") {
+    auto [cq, plannerData] = createPlannerData();
+
+    PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
+                                    .plannerParams = plannerData.plannerParams};
+
+    auto pipeline = makeSbeEligiblePipeline();
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{
+        std::move(preComputed), operationContext(), cq.get(), pipeline.get(), collections()};
+
+    auto exec = lowerPlanRankingResult(std::move(cq),
+                                       planner.extractPlanRankingResult(),
+                                       operationContext(),
+                                       collections(),
+                                       PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                       pipeline.get());
+
+    ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+
+    exec->dispose(operationContext());
+
+    BSONObj out;
+    ASSERT_THROWS_CODE(exec->getNext(&out, nullptr), AssertionException, 11321408);
+}
+
 }  // namespace
 }  // namespace mongo::exec_deferred_engine_choice

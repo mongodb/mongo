@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -46,6 +20,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -62,6 +37,13 @@ class NamespaceString;
 class ShardId;
 
 namespace migrationutil {
+
+/**
+ * Returns the BSON reason document used to acquire a migration critical section for a moveRange
+ * (chunk migration) request. The migrationId makes the reason unique per migration attempt.
+ */
+BSONObj makeCriticalSectionReasonForMoveRange(const ShardsvrMoveRangeRequest& request,
+                                              const UUID& migrationId);
 
 /**
  * Creates a report document with the provided parameters:
@@ -146,16 +128,33 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
-MONGO_MOD_PUBLIC void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long term);
+[[MONGO_MOD_PUBLIC]] void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx,
+                                                               long long term);
 
 /**
  * Instructs the recipient shard to release its critical section.
+ *
+ * TODO (completeMigration): Remove clearShardCatalogCache field when v9.0 branches out.
  */
 ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     OperationContext* opCtx,
     const ShardId& recipientShardId,
     const NamespaceString& nss,
-    const MigrationSessionId& sessionId);
+    const MigrationSessionId& sessionId,
+    bool clearShardCatalogCache);
+
+/**
+ * Emits the change-stream "chunk migrated" event for a committed migration. Reads the post-commit
+ * placement from the catalog cache to decide whether the donor retains any chunk of the collection,
+ * then notifies change streams. Used by both the same-term commit path and the recovery re-emit
+ * path, so the migration-specific fields are passed explicitly.
+ */
+void notifyChangeStreamsOnChunkMigrationCommitted(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const UUID& collectionUuid,
+                                                  const ShardId& fromShard,
+                                                  const ShardId& toShard,
+                                                  bool transfersFirstChunkToRecipient);
 
 /**
  * Writes the migration recipient recovery document to config.migrationRecipients and waits for
@@ -174,13 +173,20 @@ void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUI
  * If there was any ongoing receiveChunk that requires recovery (i.e that has reached the
  * critical section stage), restores the MigrationDestinationManager state.
  */
-MONGO_MOD_PUBLIC void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
 
 /**
  * Recovers all unfinished migrations pending recovery.
  * Note: This method assumes its caller is preventing new migrations from starting.
  */
-void drainMigrationsPendingRecovery(OperationContext* opCtx);
+// TODO (SERVER-98118): remove [[MONGO_MOD_NEEDS_REPLACEMENT]] once 9.0 becomes last LTS.
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void drainMigrationsPendingRecovery(OperationContext* opCtx);
+
+/**
+ * Asserts no migration is in progress or pending recovery.
+ */
+// TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void assertNoMigrationsRemaining(OperationContext* opCtx);
 
 /**
  * Refreshes the filtering metadata for the given namespace from the config server, retrying until
@@ -189,16 +195,19 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx);
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Registers RangeDeleterService recovery jobs for all migration coordinator recovery work that
- * will run in onStepUpComplete. Must be called during onStepUpBegin so that all jobs are
- * registered before the RangeDeleterService scan can complete and unblock range deletions.
+ * Registers two RangeDeleterService recovery jobs. Must be called during onStepUpBegin so both
+ * jobs are registered before the RangeDeleterService scan can complete and unblock range
+ * deletions.
  *
- * Registers one job for the legacy standalone migration recovery path
+ * The first is for the legacy standalone migration recovery path
  * (resumeMigrationCoordinationsOnStepUp), which recovers all standalone coordinators as a single
- * batch. Registers one additional job per unfinished MoveRangeCoordinator, each of which notifies
- * completion individually at the end of its _recoveryFlow.
+ * batch and resolves the job once the batch finishes.
+ *
+ * The second is for the MoveRangeCoordinator recovered from disk. The coordinator resolves the
+ * job when it completes, or ShardingCoordinatorService resolves it during rebuild when there is no
+ * MoveRangeCoordinator to recover.
  */
-MONGO_MOD_PUBLIC void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
+[[MONGO_MOD_PUBLIC]] void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
 
 /**
  * Submits an asynchronous task to recover the migration until it succeeds or the node steps down.
@@ -211,7 +220,7 @@ SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* o
  * within the context of a FCV downgrade.
  * TODO SERVER-103838 Remove this method and its invocations once 9.0 becomes LTS.
  */
-MONGO_MOD_PUBLIC void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
+[[MONGO_MOD_PUBLIC]] void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
 
 }  // namespace migrationutil
 }  // namespace mongo

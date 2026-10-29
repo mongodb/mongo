@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -149,6 +123,7 @@ public:
     WRAPPED_WT_SESSION_METHOD(log_flush)
     WRAPPED_WT_SESSION_METHOD(open_cursor)
     WRAPPED_WT_SESSION_METHOD(prepare_transaction)
+    WRAPPED_WT_SESSION_METHOD(publish)
     WRAPPED_WT_SESSION_METHOD(query_timestamp)
     WRAPPED_WT_SESSION_METHOD(reset)
     WRAPPED_WT_SESSION_METHOD(reconfigure)
@@ -157,8 +132,19 @@ public:
     WRAPPED_WT_SESSION_METHOD(timestamp_transaction_uint)
     WRAPPED_WT_SESSION_METHOD(transaction_pinned_range)
     WRAPPED_WT_SESSION_METHOD(truncate)
-    WRAPPED_WT_SESSION_METHOD(verify)
 #undef WRAPPED_WT_SESSION_METHOD
+
+    /**
+     * Perform a WiredTiger-level verification of a table.
+     *
+     * The config string specifies optional extra arguments made to the verify call, nullptr and
+     * empty strings are both permitted. These extra arguments will override any arguments that
+     * this wrapper adds internally.
+     *
+     * TODO SERVER-131939: Once we stop unconditionally skipping the extra HS key verification,
+     * remove this custom wrapper and go back to using the macro.
+     */
+    int verify(const char* uri, const char* config);
 
     /**
      * Gets a cursor on the table id 'id' with optional configuration, 'config'.
@@ -178,12 +164,12 @@ public:
      * This will never return a cursor from the cursor cache, and these cursors should *never* be
      * released into the cache by calling releaseCursor(). Use closeCursor() instead.
      */
-    WT_CURSOR* getNewCursor(std::string_view uri, const char* config);
+    WT_CURSOR* getNewCursor(const std::string& uri, const char* config);
 
     /**
      * Wrapper for getNewCursor() without a config string.
      */
-    WT_CURSOR* getNewCursor(std::string_view uri) {
+    WT_CURSOR* getNewCursor(const std::string& uri) {
         return getNewCursor(uri, nullptr);
     }
 
@@ -278,7 +264,7 @@ public:
     /**
      * Setter used for testing to allow tick source to be mocked.
      */
-    MONGO_MOD_PRIVATE void setTickSource_forTest(TickSource* tickSource) {
+    [[MONGO_MOD_PRIVATE]] void setTickSource_forTest(TickSource* tickSource) {
         _tickSource = tickSource;
     }
 
@@ -305,7 +291,7 @@ private:
     typedef std::list<CachedCursor> CursorCache;
 
     void _openCursor(WT_SESSION* session,
-                     std::string_view uri,
+                     const std::string& uri,
                      const char* config,
                      WT_CURSOR** cursorOut);
 

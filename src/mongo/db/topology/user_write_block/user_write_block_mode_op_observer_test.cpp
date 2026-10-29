@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/topology/user_write_block/user_write_block_mode_op_observer.h"
 
@@ -52,6 +26,7 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -137,7 +112,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
-                                     /*recordIds*/ {},
+                                     /*recordIds=*/{},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
@@ -153,7 +128,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
-                                     /*recordIds*/ {},
+                                     /*recordIds=*/{},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);
@@ -192,13 +167,13 @@ protected:
                                               false,
                                               /*recordIdsReplicated=*/false);
                 opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false);
-                opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/);
+                opObserver.onDropDatabase(opCtx, nss.dbName(), /*markFromMigrate=*/false);
                 opObserver.onDropCollection(opCtx,
                                             nss,
                                             uuid,
                                             0,
                                             /*markFromMigrate=*/false,
-                                            /*isTimeseries*/ false);
+                                            /*isTimeseries=*/false);
                 opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false);
                 // For renames, make sure we check both from and to for the given namespace
                 opObserver.preRenameCollection(opCtx,
@@ -209,7 +184,7 @@ protected:
                                                0,
                                                /*stayTemp=*/false,
                                                /*markFromMigrate=*/false,
-                                               /*isTimeseries*/ false);
+                                               /*isTimeseries=*/false);
                 opObserver.preRenameCollection(opCtx,
                                                adminNss,
                                                nss,
@@ -218,7 +193,7 @@ protected:
                                                0,
                                                /*stayTemp=*/false,
                                                /*markFromMigrate=*/false,
-                                               /*isTimeseries*/ false);
+                                               /*isTimeseries=*/false);
                 opObserver.onRenameCollection(opCtx,
                                               nss,
                                               adminNss,
@@ -227,7 +202,7 @@ protected:
                                               0,
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
-                                              /*isTimeseries*/ false);
+                                              /*isTimeseries=*/false);
                 opObserver.onRenameCollection(opCtx,
                                               adminNss,
                                               nss,
@@ -236,7 +211,7 @@ protected:
                                               0,
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
-                                              /*isTimeseries*/ false);
+                                              /*isTimeseries=*/false);
                 opObserver.onImportCollection(
                     opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false);
             } catch (...) {
@@ -263,14 +238,14 @@ protected:
                           AssertionException);
             ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/),
+            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName(), /*markFromMigrate=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropCollection(opCtx,
                                                       nss,
                                                       uuid,
                                                       0,
                                                       /*markFromMigrate=*/false,
-                                                      /*isTimeseries*/ false),
+                                                      /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false),
                           AssertionException);
@@ -282,7 +257,7 @@ protected:
                                                          0,
                                                          /*stayTemp=*/false,
                                                          /*markFromMigrate=*/false,
-                                                         /*isTimeseries*/ false),
+                                                         /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.preRenameCollection(opCtx,
                                                          adminNss,
@@ -292,7 +267,7 @@ protected:
                                                          0,
                                                          /*stayTemp=*/false,
                                                          /*markFromMigrate=*/false,
-                                                         /*isTimeseries*/ false),
+                                                         /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         nss,
@@ -302,7 +277,7 @@ protected:
                                                         0,
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
-                                                        /*isTimeseries*/ false),
+                                                        /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         adminNss,
@@ -312,7 +287,7 @@ protected:
                                                         0,
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
-                                                        /*isTimeseries*/ false),
+                                                        /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onImportCollection(
                               opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false),
@@ -385,13 +360,13 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     runCUD(opCtx.get(),
            NamespaceString::createNamespaceString_forTest("userDB.coll"),
            true,
-           true /* fromMigrate */);
+           /*fromMigrate=*/true);
 
     // Ensure that writes to the <db>.system.profile collections are always allowed
     runCUD(opCtx.get(),
            NamespaceString::createNamespaceString_forTest("userDB.system.profile"),
-           true /* shouldSucceed */,
-           false /* fromMigrate */);
+           /*shouldSucceed=*/true,
+           /*fromMigrate=*/false);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
@@ -414,6 +389,53 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll"), true);
     runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll"), true);
     runCheckedOps(opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll"), true);
+}
+
+TEST_F(UserWriteBlockModeOpObserverTest, RollbackDoesNotRecoverReplicaSetWriteBlocking) {
+    auto opCtx = cc().makeOperationContext();
+
+    auto* userWriteBlockState = GlobalUserWriteBlockState::get(opCtx.get());
+    auto* rsBlock = ReplicaSetWriteBlockState::get(opCtx.get());
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        userWriteBlockState->enableUserWriteBlocking(opCtx.get(),
+                                                     UserWritesBlockReasonEnum::kUnspecified);
+        rsBlock->enableReplicaSetWriteBlocking(
+            ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+        rsBlock->enableReplicaSetDeletionsBlocking();
+    }
+
+    BSONObjBuilder beforeBuilder;
+    rsBlock->appendReplicaSetWritesBlockCounters(beforeBuilder);
+    const auto before =
+        beforeBuilder.obj()
+            .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+            .safeNumberLong();
+
+    OpObserver::RollbackObserverInfo rbInfo{
+        .numberOfEntriesObserved = 1,
+        .rollbackNamespaces =
+            {
+                NamespaceString::kUserWritesCriticalSectionsNamespace,
+            },
+    };
+    UserWriteBlockModeOpObserver opObserver;
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+
+    BSONObjBuilder afterBuilder;
+    rsBlock->appendReplicaSetWritesBlockCounters(afterBuilder);
+    const auto after = afterBuilder.obj()
+                           .getObjectField("replicaSetWritesBlockCounters")["InsufficientDiskSpace"]
+                           .safeNumberLong();
+    ASSERT_EQ(after, before);
+
+    {
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+        ASSERT_TRUE(rsBlock->isReplicaSetWriteBlockingEnabled());
+        ASSERT_TRUE(rsBlock->isReplicaSetDeletionsBlockingEnabled());
+        // No user-writes critical section document exists, so rollback clears that mechanism only.
+        ASSERT_FALSE(userWriteBlockState->isUserWriteBlockingEnabled(opCtx.get()));
+    }
 }
 
 }  // namespace

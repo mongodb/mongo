@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/executor/async_multicaster.h"
 
@@ -49,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace {
@@ -63,7 +39,8 @@ public:
     // Common response factories
     RemoteCommandResponse makeSuccessResponse(const std::string& result = "success");
     RemoteCommandResponse makeRetryableErrorResponse();
-    RemoteCommandResponse makeSystemOverloadedErrorResponse();
+    RemoteCommandResponse makeSystemOverloadedErrorResponse(
+        boost::optional<Milliseconds> baseBackoffMS = boost::none);
 
     std::vector<AsyncMulticaster::Reply> runMulticast(OperationContext* opCtx,
                                                       const std::vector<HostAndPort>& hosts,
@@ -198,11 +175,18 @@ RemoteCommandResponse AsyncMulticasterTest::makeRetryableErrorResponse() {
         BSON("errorLabels" << BSON_ARRAY(ErrorLabel::kRetryableError)), Milliseconds(0));
 }
 
-RemoteCommandResponse AsyncMulticasterTest::makeSystemOverloadedErrorResponse() {
-    return RemoteCommandResponse::make_forTest(
-        BSON("errorLabels" << BSON_ARRAY(ErrorLabel::kRetryableError
-                                         << ErrorLabel::kSystemOverloadedError)),
-        Milliseconds(0));
+RemoteCommandResponse AsyncMulticasterTest::makeSystemOverloadedErrorResponse(
+    boost::optional<Milliseconds> baseBackoffMS) {
+    BSONObjBuilder bob;
+    {
+        BSONArrayBuilder arrayBuilder = bob.subarrayStart("errorLabels");
+        arrayBuilder.append(ErrorLabel::kRetryableError);
+        arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
+    }
+    if (baseBackoffMS) {
+        bob.append("baseBackoffMS", static_cast<long long>(baseBackoffMS->count()));
+    }
+    return RemoteCommandResponse::make_forTest(bob.obj(), Milliseconds(0));
 }
 
 std::vector<AsyncMulticaster::Reply> AsyncMulticasterTest::runMulticast(
@@ -438,6 +422,31 @@ TEST_F(AsyncMulticasterTest, MulticastToSingleHostSuccessfulResponseWithDelay) {
     // Retry after delay succeeds
     processAllNetworkRequests(successResponses);
     assertCountAndAllSuccessful(future.get(), hosts, successResponses);
+}
+
+TEST_F(AsyncMulticasterTest, MulticastRetryBackoffUsesBaseBackoffMSHintWhenSystemOverloaded) {
+    auto opCtx = makeOperationContext();
+    auto hosts = makeHostList(1);
+
+    constexpr Milliseconds baseBackoffMS{500};
+    FailPointEnableBlock fp{"returnMaxBackoffDelay"};
+
+    auto future =
+        std::async(std::launch::async, [&]() { return runMulticast(opCtx.get(), hosts); });
+
+    // The default max retry attempts is 3, so we expect 3 backoffs, each honoring the
+    // 'baseBackoffMS' hint carried on the system-overloaded response, before giving up.
+    const int maxRetryAttempts = 3;
+    for (int i = 1; i <= maxRetryAttempts; ++i) {
+        processAllNetworkRequests({makeSystemOverloadedErrorResponse(baseBackoffMS)});
+        const auto expectedBackoff = Milliseconds{baseBackoffMS.count() << i};
+        checkRequestReadyAfterDelay(expectedBackoff.count());
+    }
+
+    // After exhausting retries, the final (still-failing) response is returned to the caller.
+    auto errorResponse = {makeSystemOverloadedErrorResponse(baseBackoffMS)};
+    processAllNetworkRequests(errorResponse);
+    assertCountAndAllSuccessful(future.get(), hosts, errorResponse);
 }
 
 TEST_F(AsyncMulticasterTest, MulticastToMultipleHostSuccessfulResponseWithDelay) {

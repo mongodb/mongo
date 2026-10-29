@@ -1,49 +1,19 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_solution_analyzer.h"
 
 namespace mongo::query_solution_analyzer {
 
-StateMachineRule::StateMachineRule(bool ignoreNonEssentialNodes)
-    : _ignoreNonEssentialNodes(ignoreNonEssentialNodes) {
+StateMachine::StateMachine() {
     // Create the special states. User-defined states come after them.
     _states.resize(kMaxReservedState);
-
-    // Set start state.
-    _stack.push(kStart);
 }
 
-int StateMachineRule::addState(int state,
-                               StageType stage,
-                               Range allowedChildren,
-                               PredicateType predicate) {
+int StateMachine::addState(int state,
+                           StageType stage,
+                           Range allowedChildren,
+                           PredicateType predicate) {
     validateState(state);
     int nextState = allocState();
     validateState(nextState);
@@ -58,25 +28,32 @@ int StateMachineRule::addState(int state,
     return nextState;
 }
 
-int StateMachineRule::addState(int state,
-                               std::initializer_list<StageType> stages,
-                               Range allowedChildren,
-                               PredicateType predicate) {
+int StateMachine::addOrGetState(int state,
+                                StageType stage,
+                                Range allowedChildren,
+                                PredicateType predicate) {
     validateState(state);
-    int nextState = allocState();
-    validateState(nextState);
-
-    StateSpec& spec = _states[state];
-    for (const StageType stage : stages) {
-        auto res = spec.edges.emplace(stage, Edge{predicate, allowedChildren, nextState});
-        tassert(
-            11907600, "Engine selection state machine doesn't have unique transitions", res.second);
+    const auto& edges = _states[state].edges;
+    if (auto it = edges.find(stage); it != edges.end()) {
+        const Edge& existingEdge = it->second;
+        tassert(11907605,
+                "addOrGetState found an existing transition with conflicting constraints",
+                existingEdge.allowedChildren == allowedChildren &&
+                    existingEdge.predicate == predicate);
+        return existingEdge.nextState;
     }
-
-    return nextState;
+    return addState(state, stage, allowedChildren, predicate);
 }
 
-void StateMachineRule::preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index) {
+StateMachineMatcher::StateMachineMatcher(const StateMachine& machine, bool ignoreNonEssentialNodes)
+    : _machine(machine), _ignoreNonEssentialNodes(ignoreNonEssentialNodes) {
+    // Set start state.
+    _stack.push(_machine.getStartState());
+}
+
+void StateMachineMatcher::preVisit(RuleEngine& engine,
+                                   const QuerySolutionNode& node,
+                                   size_t index) {
     if (isStageIgnoredForCounters(node)) {
         // Don't consume a state transition or push a stack frame, so this node's child is
         // matched exactly as if the node weren't present.
@@ -104,7 +81,7 @@ void StateMachineRule::preVisit(RuleEngine& engine, const QuerySolutionNode& nod
     }
 }
 
-void StateMachineRule::postVisit(RuleEngine& engine, const QuerySolutionNode& node) {
+void StateMachineMatcher::postVisit(RuleEngine& engine, const QuerySolutionNode& node) {
     if (isStageIgnoredForCounters(node)) {
         // preVisit() pushed no frame for this node, so there is nothing to unwind.
         return;
@@ -119,9 +96,9 @@ void StateMachineRule::postVisit(RuleEngine& engine, const QuerySolutionNode& no
     }
 }
 
-bool StateMachineRule::matchesPredicate(const Edge& edge,
-                                        const QuerySolutionNode& node,
-                                        size_t index) const {
+bool StateMachineMatcher::matchesPredicate(const StateMachine::Edge& edge,
+                                           const QuerySolutionNode& node,
+                                           size_t index) const {
     if (!edge.allowedChildren.contains(index)) {
         return false;
     }
@@ -139,8 +116,8 @@ bool StateMachineRule::matchesPredicate(const Edge& edge,
     MONGO_UNREACHABLE;
 }
 
-void StateMachineRule::step(const QuerySolutionNode& node, size_t index) {
-    const StateSpec& state = currentState();
+void StateMachineMatcher::step(const QuerySolutionNode& node, size_t index) {
+    const StateMachine::StateSpec& state = currentState();
 
     auto it = state.edges.find(node.getType());
     if (it != state.edges.end() && matchesPredicate(it->second, node, index)) {
@@ -150,11 +127,11 @@ void StateMachineRule::step(const QuerySolutionNode& node, size_t index) {
         // There's no match in this node or its children, so we transition to the not match
         // state. Once we reach the leaf nodes of this subtree, they will set
         // _allBranchesMatch=false.
-        _stack.push(kNotMatch);
+        _stack.push(StateMachine::kNotMatch);
     }
 }
 
-bool StateMachineRule::isStageIgnoredForCounters(const QuerySolutionNode& node) const {
+bool StateMachineMatcher::isStageIgnoredForCounters(const QuerySolutionNode& node) const {
     if (!_ignoreNonEssentialNodes) {
         return false;
     }
@@ -170,18 +147,18 @@ bool StateMachineRule::isStageIgnoredForCounters(const QuerySolutionNode& node) 
     }
 }
 
-void StateMachineRule::dumpStates() {
-    for (size_t i = 0; i < _states.size(); ++i) {
+void StateMachineMatcher::dumpStates() {
+    for (size_t i = 0; i < _machine._states.size(); ++i) {
         std::cout << "State " << i << ":";
-        if (i == kStart)
+        if (i == StateMachine::kStart)
             std::cout << " [START]";
-        if (i == kNotMatch)
+        if (i == StateMachine::kNotMatch)
             std::cout << " [NOT_MATCH]";
-        if (_states[i].isMatch)
+        if (_machine._states[i].isMatch)
             std::cout << " [MATCH]";
         std::cout << std::endl;
 
-        for (const auto& [stage, edge] : _states[i].edges) {
+        for (const auto& [stage, edge] : _machine._states[i].edges) {
             const auto& range = edge.allowedChildren;
             const auto& nextState = edge.nextState;
 

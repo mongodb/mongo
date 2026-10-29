@@ -1,35 +1,11 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_stats/query_stats.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
@@ -37,18 +13,16 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_integration.h"
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/query/util/memory_util.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/buildinfo.h"
 #include "mongo/util/decorable.h"
@@ -57,8 +31,12 @@
 
 #include <climits>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include <absl/container/node_hash_map.h>
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <absl/hash/hash.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -96,21 +74,11 @@ auto& queryStatsStoreWriteErrorsMetric =
     *MetricBuilder<Counter64>{"queryStats.numQueryStatsStoreWriteErrors"};
 
 /**
- * Indicates whether or not query stats is enabled via the feature flag.
- */
-bool isQueryStatsFeatureEnabled() {
-    // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
-    // this could run during startup while the FCV is still uninitialized.
-    return feature_flags::gFeatureFlagQueryStats.isEnabledUseLastLTSFCVWhenUninitialized(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-}
-
-/**
  * Cap the queryStats store size.
  */
 size_t capQueryStatsStoreSize(size_t requestedSize) {
     size_t cappedStoreSize = memory_util::capMemorySize(
-        requestedSize /*requestedSizeBytes*/, 1 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
+        /*requestedSizeBytes=*/requestedSize, /*maximumSizeGB=*/1, /*percentTotalSystemMemory=*/25);
     // If capped size is less than requested size, the queryStats store has been capped at its
     // upper limit.
     if (cappedStoreSize < requestedSize) {
@@ -132,14 +100,6 @@ size_t getQueryStatsStoreSize() {
     return capQueryStatsStoreSize(requestedSize);
 }
 
-void assertConfigurationAllowed() {
-    uassert(7373500,
-            "Cannot configure queryStats store. The feature flag is not enabled. Please restart "
-            "and specify the feature flag, or upgrade the feature compatibility version to one "
-            "where it is enabled by default.",
-            isQueryStatsFeatureEnabled());
-}
-
 /**
  * Configure the rate limiter. This reads the configured values from the server parameters. To
  * ensure idempotency when both parameters are set to non-zero values, the sample-based policy takes
@@ -147,6 +107,9 @@ void assertConfigurationAllowed() {
  */
 void configureRateLimiter(ServiceContext* serviceCtx) {
     auto& limiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
+
+    // This limiter's rate can be overridden per operation via query settings.
+    limiter.setSamplingRateKnob(&query_knobs::kQueryStatsSampleRate);
 
     const auto configuredRateLimit = internalQueryStatsRateLimit.load();
     const auto configuredSamplingRate =
@@ -166,6 +129,10 @@ void configureRateLimiter(ServiceContext* serviceCtx) {
 void configureWriteCmdRateLimiter(ServiceContext* serviceCtx) {
     auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
 
+    // TODO(SERVER-134995): set the write limiter's sampling-rate knob via setSamplingRateKnob
+    // once write commands are query-settings-eligible. Until then its handle(opCtx) consults
+    // only the cluster-wide policy.
+
     const auto configuredSamplingRate =
         RateLimiter::roundSampleRateToPerThousand(internalQueryStatsWriteCmdSampleRate.load());
     limiter.configureSampleBased(configuredSamplingRate, SecureRandom().nextInt32());
@@ -174,7 +141,6 @@ void configureWriteCmdRateLimiter(ServiceContext* serviceCtx) {
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
-        assertConfigurationAllowed();
         auto requestedSize = memory_util::convertToSizeInBytes(memSize);
         auto cappedSize = capQueryStatsStoreSize(requestedSize);
         auto& queryStatsStoreManager = QueryStatsStoreManager::get(serviceCtx);
@@ -186,26 +152,16 @@ public:
     }
 
     void updateRateLimiter(ServiceContext* serviceCtx) override {
-        assertConfigurationAllowed();
         configureRateLimiter(serviceCtx);
     }
 
     void updateWriteCmdRateLimiter(ServiceContext* serviceCtx) override {
-        assertConfigurationAllowed();
         configureWriteCmdRateLimiter(serviceCtx);
     }
 };
 
 ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
     "QueryStatsStoreManagerRegisterer", [](ServiceContext* serviceCtx) {
-        // Note: it is possible that this is called before FCV is properly set up. The feature flags
-        // can only be specified at startup, but the feature compatibility version may change at
-        // runtime. If the feature compatibility version upgrades at runtime, the feature may now be
-        // enabled by default, even if the flag was not specified. To allow for this possibility, we
-        // will always configure a query stats store of the size currently specified by
-        // 'internalQueryStatsCacheSize', but we will prevent changing its shape or rate limit at
-        // runtime unless the feature flag is enabled (at whatever current FCV when the
-        // configuration setParameter command is run).
         query_stats_util::queryStatsStoreOnParamChangeUpdater(serviceCtx) =
             std::make_unique<QueryStatsOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
@@ -232,44 +188,11 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
     }};
 
 /**
- * Top-level checks for whether queryStats collection is enabled. If this returns false, we must go
+ * Top-level checks for whether the query stats store is enabled. If this returns false, we must go
  * no further.
  */
-bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
-    // During initialization, FCV may not yet be setup but queries could be run. We can't
-    // check whether queryStats should be enabled without FCV, so default to not recording
-    // those queries.
-    return isQueryStatsFeatureEnabled() &&
-        QueryStatsStoreManager::get(serviceCtx)->getMaxSize() > 0;
-}
-
-/**
- * Internal check for whether we should collect metrics. This checks the rate limiting
- * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
- */
-bool shouldCollect(RateLimiter& limiter) {
-    // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
-    // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    const auto samplingRate = limiter.getSamplingRate();
-    if (samplingRate <= 0) {
-        LOGV2_DEBUG(8473001,
-                    5,
-                    "sampling rate is <= 0, skipping this request",
-                    "samplingRate"_attr = samplingRate);
-        return false;
-    }
-
-    // Check if rate limiting allows us to collect queryStats for this request.
-    if (samplingRate < INT_MAX && !limiter.handle()) {
-        queryStatsRateLimitedRequestsMetric.increment();
-        LOGV2_DEBUG(8473002,
-                    5,
-                    "rate limited this request",
-                    "samplingRate"_attr = samplingRate,
-                    "totalLimited"_attr = queryStatsRateLimitedRequestsMetric.get());
-        return false;
-    }
-    return true;
+bool isQueryStatsStoreEnabled(const ServiceContext* serviceCtx) {
+    return QueryStatsStoreManager::get(serviceCtx)->getMaxSize() > 0;
 }
 
 void updateCursorStatistics(CursorEntry& cursorEntryToUpdate, const QueryStatsSnapshot& snapshot) {
@@ -323,6 +246,7 @@ void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
     queryPlannerEntryToUpdate.costBasedRankerStats.cardinalityEstimationMethods.aggregate(
         snapshot.cardinalityEstimationMethods);
     queryPlannerEntryToUpdate.costBasedRankerStats.nDocsSampled.aggregate(snapshot.nDocsSampled);
+    queryPlannerEntryToUpdate.planShapeCounters.add(snapshot.planShapeCounts);
 }
 
 void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnapshot& snapshot) {
@@ -342,6 +266,16 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
                       const QueryStatsSnapshot& snapshot,
                       std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalStats) {
     toUpdate.latestSeenTimestamp = Date_t::now();
+
+    // 'featureFlagQueryStatsErrors' allows for errored snapshots arrive here. Errored snapshots
+    // carry partial metrics, so they are dropped.
+    if (snapshot.isErrored()) {
+        if (feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
+            toUpdate.recordErrorCode(snapshot.errorCode);
+        }
+        return;
+    }
+
     toUpdate.lastExecutionMicros = snapshot.queryExecMicros;
     toUpdate.execCount++;
     toUpdate.workingTimeMillis.aggregate(snapshot.workingTimeMillis);
@@ -358,21 +292,23 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     }
 }
 
-void insertQueryStatsEntry(
+void doInsertQueryStatsEntry(
     QueryStatsStore::Partition& proofOfLock,
     QueryStatsStore& queryStatsStore,
-    boost::optional<size_t> queryStatsKeyHash,
+    boost::optional<size_t> storeKey,
     std::unique_ptr<Key> key,
     const QueryStatsSnapshot& snapshot,
-    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics) {
+    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
+    std::string userVisibleHash) {
     tassert(7315200,
             "key cannot be null when writing a new entry to the queryStats store",
             key != nullptr);
-    size_t numEvicted =
-        queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), proofOfLock);
+
+    size_t numEvicted = queryStatsStore.put(
+        *storeKey, QueryStatsEntry(std::move(key), std::move(userVisibleHash)), proofOfLock);
     queryStatsEvictedMetric.increment(numEvicted);
-    auto newMetrics = proofOfLock->get(*queryStatsKeyHash);
-    if (!newMetrics.isOK()) {
+    auto newEntry = proofOfLock->get(*storeKey);
+    if (!newEntry.isOK()) {
         // This can happen if the budget is immediately exceeded. Specifically
         // if the there is not enough room for a single new entry if the number
         // of partitions is too high relative to the size.
@@ -380,25 +316,44 @@ void insertQueryStatsEntry(
         LOGV2_DEBUG(7560900,
                     0,
                     "Failed to store queryStats entry.",
-                    "status"_attr = newMetrics.getStatus(),
-                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+                    "status"_attr = newEntry.getStatus(),
+                    "storeKeyHash"_attr = storeKey);
         return;
     }
 
     return updateStatistics(
-        proofOfLock, newMetrics.getValue()->second, snapshot, std::move(supplementalMetrics));
+        proofOfLock, newEntry.getValue()->second, snapshot, std::move(supplementalMetrics));
 }
 
-void registerRequestImpl(const OperationContext* opCtx,
+/**
+ * Inserts a new entry. The user-visible hash is computed and cached only when a secondary index is
+ * maintained; otherwise it is left empty and the read path computes it lazily.
+ */
+void insertQueryStatsEntry(QueryStatsStore::Partition& proofOfLock,
+                           QueryStatsStore& queryStatsStore,
+                           bool hasSecondaryIndex,
+                           boost::optional<size_t> storeKey,
+                           std::unique_ptr<Key> key,
+                           const QueryStatsSnapshot& snapshot,
+                           std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
+                           const BSONObj& representativeShapeKey) {
+    doInsertQueryStatsEntry(proofOfLock,
+                            queryStatsStore,
+                            storeKey,
+                            std::move(key),
+                            snapshot,
+                            std::move(supplementalMetrics),
+                            hasSecondaryIndex ? computeUserVisibleHash(representativeShapeKey)
+                                              : std::string{});
+}
+
+void registerRequestImpl(OperationContext* opCtx,
                          RateLimiter& rateLimiter,
                          const NamespaceString& collection,
                          const std::function<std::unique_ptr<Key>(void)>& makeKey,
                          OpDebug::QueryStatsInfo& queryStatsInfo) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
-        LOGV2_DEBUG(8473000,
-                    5,
-                    "not collecting query stats for this request since it is disabled",
-                    "featureEnabled"_attr = isQueryStatsFeatureEnabled());
+    if (!isQueryStatsStoreEnabled(opCtx->getServiceContext())) {
+        LOGV2_DEBUG(8473000, 5, "not collecting query stats for this request since it is disabled");
         return;
     }
 
@@ -425,7 +380,23 @@ void registerRequestImpl(const OperationContext* opCtx,
         return;
     }
 
-    if (!shouldCollect(rateLimiter)) {
+    // The rate limiter makes the sampling decision, honoring a per-query sampling-rate override
+    // (via query settings) over the cluster-wide rate limiter when one applies.
+    if (const CollectDecision decision = rateLimiter.handle(opCtx);
+        decision != CollectDecision::kCollected) {
+        if (decision == CollectDecision::kRateLimited) {
+            queryStatsRateLimitedRequestsMetric.increment();
+            LOGV2_DEBUG(8473002,
+                        5,
+                        "rate limited this request",
+                        "samplingRate"_attr = rateLimiter.getSamplingRate(),
+                        "totalLimited"_attr = queryStatsRateLimitedRequestsMetric.get());
+        } else if (decision == CollectDecision::kDisabled) {
+            LOGV2_DEBUG(8473001,
+                        5,
+                        "sampling rate is <= 0, skipping this request",
+                        "samplingRate"_attr = rateLimiter.getSamplingRate());
+        }
         queryStatsInfo.disableForSubqueryExecution = true;
         return;
     }
@@ -448,6 +419,15 @@ void registerRequestImpl(const OperationContext* opCtx,
     // original query from queryStats metrics collection and let it execute normally.
     try {
         queryStatsInfo.key = makeKey();
+        if (queryStatsInfo.key->size() > static_cast<size_t>(BSONObjMaxUserSize)) {
+            queryStatsStoreWriteErrorsMetric.increment();
+            LOGV2_DEBUG(13146600,
+                        2,
+                        "Query Stats shapification has exceeded the memory limit. Metrics will not "
+                        "be collected");
+            queryStatsInfo.key = nullptr;
+            return;
+        }
         queryStatsInfo.keyHash = absl::HashOf(*queryStatsInfo.key);
         if (MONGO_unlikely(queryStatsFailToSerializeKey.shouldFail())) {
             uasserted(ErrorCodes::FailPointEnabled,
@@ -460,8 +440,8 @@ void registerRequestImpl(const OperationContext* opCtx,
         if (status.code() == ErrorCodes::BSONObjectTooLarge) {
             LOGV2_DEBUG(7979400,
                         2,
-                        "Query Stats shapification has exceeded the 16 MB memory limit. Metrics "
-                        "will not be collected");
+                        "Query Stats shapification has exceeded the MB memory limit. Metrics will "
+                        "not be collected");
             return;
         }
 
@@ -492,6 +472,88 @@ void registerRequestImpl(const OperationContext* opCtx,
 
 }  // namespace
 
+Status validateQueryStatsKeyBson(const BSONObj& keyBson) {
+    // The 'keyBson' is expected to have structurally well-formed BSON by this point. Only its size
+    // and nesting depth remain to be checked.
+    dassert(validateBSON(keyBson));
+
+    if (auto status = keyBson.validateBSONObjSize(BSONObjMaxUserSize)
+                          .addContext("Query stats key exceeds maximum BSON size");
+        !status.isOK()) {
+        return status;
+    }
+
+    // validateBSONDepthForUserStorage enforces the user-storage depth limit, leaving enough buffer
+    // for server-added nesting when embedding 'keyBson' in a command reply.
+    return validateBSONDepthForUserStorage(keyBson).addContext(
+        "Query stats key is too deeply nested");
+}
+
+void QueryStatsStoreInsertionEvictionListener::onInsert(const std::size_t& storeKey,
+                                                        const QueryStatsEntry& entry,
+                                                        size_t estimatedSize) {
+    queryStatsStoreSizeEstimateBytesMetric.increment(estimatedSize);
+    queryStatsStoreSizeMetric.increment();
+    if (_index) {
+        _index->_insert(entry.userVisibleHash, storeKey);
+    }
+}
+
+void QueryStatsStoreInsertionEvictionListener::onEvict(const std::size_t& storeKey,
+                                                       const QueryStatsEntry& entry,
+                                                       size_t estimatedSize) {
+    queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
+    queryStatsStoreSizeMetric.decrement();
+    if (_index) {
+        _index->_erase(entry.userVisibleHash, storeKey);
+    }
+}
+
+void QueryStatsStoreInsertionEvictionListener::onClear(size_t estimatedSize) {
+    // onClear clears one store partition, which has no matching index partition (because both store
+    // and index partition on different values), so index erasure is left to onEvict.
+    queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
+    queryStatsStoreSizeMetric.setToZero();
+}
+
+std::deque<KeyHashLocation> QueryStatsStoreManager::findStoreKeysByUserHash(
+    const std::vector<std::string>& userVisibleHashes) {
+    std::deque<KeyHashLocation> locations;
+    absl::flat_hash_set<std::size_t> seenStoreKeys;
+    for (const auto& userVisibleHash : userVisibleHashes) {
+        auto storeKeys = _keyHashIndex._lookup(userVisibleHash);
+        if (!storeKeys) {
+            // The store holds no entry with this user-visible hash (every live entry is indexed).
+            continue;
+        }
+        // A store key is reported once even if several requested hashes resolve to it.
+        for (auto storeKey : *storeKeys) {
+            if (seenStoreKeys.insert(storeKey).second) {
+                locations.emplace_back(_queryStatsStore->partitionOf(storeKey), storeKey);
+            }
+        }
+    }
+    return locations;
+}
+
+BSONObj computeRepresentativeShapeKey(OperationContext* opCtx, const Key& key) {
+    return key.toBson(opCtx,
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault());
+}
+
+// SHA256 is more stable across platforms and versions than the quicker 'absl::HashOf', so the
+// user-visible hash is the SHA256 of the representative shape.
+std::string computeUserVisibleHash(const BSONObj& representativeShapeKey) {
+    return SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
+                                    representativeShapeKey.objsize())
+        .toString();
+}
+
+std::string computeUserVisibleHash(OperationContext* opCtx, const Key& key) {
+    return computeUserVisibleHash(computeRepresentativeShapeKey(opCtx, key));
+}
+
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      const std::function<std::unique_ptr<Key>(void)>& makeKey) {
@@ -506,6 +568,9 @@ void registerWriteRequest(OperationContext* opCtx,
     RateLimiter& rateLimiter =
         QueryStatsStoreManager::getWriteCmdRateLimiter(opCtx->getServiceContext());
     auto& opDebug = CurOp::get(opCtx)->debug();
+    // TODO(SERVER-134995): wire the write limiter's sampling-rate knob (via
+    // 'setSamplingRateKnob') once write commands are query-settings-eligible; its
+    // handle(opCtx) will then honor per-query overrides with no further changes here.
     registerRequestImpl(opCtx, rateLimiter, collection, makeKey, opDebug.getQueryStatsInfo());
 }
 
@@ -544,9 +609,8 @@ bool shouldRequestRemoteMetrics(const OpDebug& opDebug, size_t opIndex) {
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
-            "Query stats is not enabled without the feature flag on and a cache size greater than "
-            "0 bytes",
-            isQueryStatsEnabled(opCtx->getServiceContext()));
+            "The query stats cache size is not greater than 0 bytes",
+            isQueryStatsStoreEnabled(opCtx->getServiceContext()));
     return QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
@@ -578,6 +642,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         .planningTimeMicros = metrics.planningTime.value_or(Microseconds(0)).count(),
         .cardinalityEstimationMethods = metrics.cardinalityEstimationMethods,
         .nDocsSampled = static_cast<uint64_t>(metrics.nDocsSampled.value_or(0)),
+        .planShapeCounts = metrics.planShapeCounts,
         .nMatched = static_cast<uint64_t>(metrics.nMatched.value_or(0)),
         .nUpserted = static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
         .nModified = static_cast<uint64_t>(metrics.nModified.value_or(0)),
@@ -598,44 +663,86 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
     return snapshot;
 }
 
+namespace {
+
+/**
+ * Looks up the entry for 'storeKey' and, if present, updates its metrics. When no entry exists,
+ * returns the locked partition so the caller can insert into it.
+ */
+boost::optional<QueryStatsStore::Partition> updateExistingEntryOrLock(
+    QueryStatsStore& queryStatsStore,
+    std::size_t storeKey,
+    const QueryStatsSnapshot& snapshot,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>>& supplementalMetrics) {
+    auto&& [statusWithMetrics, partitionLock] = queryStatsStore.getWithPartitionLock(storeKey);
+    if (!statusWithMetrics.isOK()) {
+        return std::move(partitionLock);
+    }
+    updateStatistics(
+        partitionLock, *statusWithMetrics.getValue(), snapshot, std::move(supplementalMetrics));
+    return boost::none;
+}
+
+/**
+ * Serializes 'key's representative shape, or returns boost::none when it cannot be serialized. Such
+ * a key can be neither indexed nor emitted by $queryStats, so the caller should not store it.
+ */
+boost::optional<BSONObj> tryComputeRepresentativeShapeKey(OperationContext* opCtx,
+                                                          const Key& key,
+                                                          boost::optional<size_t> storeKey) {
+    try {
+        return computeRepresentativeShapeKey(opCtx, key);
+    } catch (const DBException& ex) {
+        queryStatsStoreWriteErrorsMetric.increment();
+        LOGV2_DEBUG(13519100,
+                    2,
+                    "Failed to serialize the query stats key. Skipping it.",
+                    "error"_attr = ex,
+                    "storeKeyHash"_attr = storeKey);
+        return boost::none;
+    }
+}
+
+}  // namespace
+
 void writeQueryStats(OperationContext* opCtx,
-                     boost::optional<size_t> queryStatsKeyHash,
+                     boost::optional<size_t> storeKey,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
                      bool isChangeStreamQuery) {
     // Generally we expect a 'key' to write query stats. However, for a change stream query, we
-    // expect it has no 'key' after its first writeQueryStats(), but it must have a
-    // 'queryStatsKeyHash' for its entry to be updated.
-    if (!key && !(isChangeStreamQuery && queryStatsKeyHash)) {
+    // expect it has no 'key' after its first writeQueryStats(), but it must have a 'storeKey' for
+    // its entry to be updated.
+    if (!key && !(isChangeStreamQuery && storeKey)) {
         return;
     }
 
     // It's possible that query stats was enabled in registerRequest but has been disabled since
-    // (e.g., by FCV downgrade or setting the store size to 0). Rather than calling
-    // getQueryStatsStore (which would trigger a uassert if query stats is disabled), we return and
-    // log a message if query stats is disabled, and otherwise grab the query stats store directly.
-    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
+    // (e.g., by setting the store size to 0). Rather than calling getQueryStatsStore (which would
+    // trigger a uassert if query stats is disabled), we return and log a message if query stats is
+    // disabled, and otherwise grab the query stats store directly.
+    if (!isQueryStatsStoreEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8456700,
                     2,
                     "Query stats was enabled when the command started but is now disabled. "
                     "Metrics will not be collected.",
-                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+                    "storeKeyHash"_attr = storeKey);
         return;
     }
-    auto&& queryStatsStore =
-        QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
+    auto& manager = *QueryStatsStoreManager::get(opCtx->getServiceContext());
+    auto&& queryStatsStore = manager.getQueryStatsStore();
     if (key) {
-        dassert(absl::HashOf(*key) == queryStatsKeyHash,
+        dassert(absl::HashOf(*key) == storeKey,
                 "Expecting query stats key to hash to the given hash. Is the OpCtx state being "
                 "incorrectly re-used?");
     }
-    auto&& [statusWithMetrics, partitionLock] =
-        queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
-    if (statusWithMetrics.isOK()) {
-        // Found an existing entry! Just update the metrics and we're done.
-        return updateStatistics(
-            partitionLock, *statusWithMetrics.getValue(), snapshot, std::move(supplementalMetrics));
+    {
+        // Look up the existing entry while holding its partition lock, but release the lock before
+        // the userVisibleHash computation below. Return early if entry was found and updated.
+        if (!updateExistingEntryOrLock(queryStatsStore, *storeKey, snapshot, supplementalMetrics)) {
+            return;
+        }
     }
 
     // It is possible a cursor that lives forever has no key associated with it and its entry may
@@ -644,21 +751,40 @@ void writeQueryStats(OperationContext* opCtx,
         return;
     }
 
-    // Otherwise we didn't find an existing entry. Try to create one.
-    return insertQueryStatsEntry(partitionLock,
+    // Serialize the key's representative shape.
+    auto representativeShapeKey = tryComputeRepresentativeShapeKey(opCtx, *key, storeKey);
+    if (!representativeShapeKey) {
+        return;
+    }
+
+    // Re-acquire the partition lock and re-check whether an entry exists. Another writer may have
+    // inserted an entry while the partition lock was briefly released.
+    auto result =
+        updateExistingEntryOrLock(queryStatsStore, *storeKey, snapshot, supplementalMetrics);
+    if (!result) {
+        // Another writer created the entry after our first miss.
+        return;
+    }
+
+    // Otherwise we still didn't find an existing entry. Try to create one.
+    return insertQueryStatsEntry(*result,
                                  queryStatsStore,
-                                 queryStatsKeyHash,
+                                 manager.hasSecondaryIndex(),
+                                 storeKey,
                                  std::move(key),
                                  snapshot,
-                                 std::move(supplementalMetrics));
+                                 std::move(supplementalMetrics),
+                                 *representativeShapeKey);
 }
 
-void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
-                                          boost::optional<size_t> queryStatsKeyHash,
-                                          std::unique_ptr<Key> key,
-                                          bool isChangeStreamQuery,
-                                          boost::optional<Microseconds> firstResponseExecutionTime,
-                                          OpDebug::AdditiveMetrics metrics) {
+void writeQueryStatsOnCursorDisposeOrKill(
+    OperationContext* opCtx,
+    boost::optional<size_t> storeKey,
+    std::unique_ptr<Key> key,
+    bool isChangeStreamQuery,
+    boost::optional<Microseconds> firstResponseExecutionTime,
+    OpDebug::AdditiveMetrics metrics,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics) {
     // It is discouraged but technically possible for a user to enable queryStats on the mongods of
     // a replica set. In this case, a cursor will be created for each mongod. However, the
     // queryStatsKey is behind a unique_ptr on CurOp. The ClientCursor constructor std::moves the
@@ -675,7 +801,8 @@ void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
         auto snapshot = query_stats::captureMetrics(
             opCtx, query_stats::microsecondsToUint64(firstResponseExecutionTime), metrics);
 
-        query_stats::writeQueryStats(opCtx, queryStatsKeyHash, std::move(key), snapshot);
+        query_stats::writeQueryStats(
+            opCtx, storeKey, std::move(key), snapshot, std::move(supplementalMetrics));
     } else if (isChangeStreamQuery && opCtx) {
         // Since we already recorded information about the possible getMores associated with a
         // cursor that never ends, the only information left to record is about the kill/dispose
@@ -684,8 +811,7 @@ void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
         auto snapshot = query_stats::captureMetrics(
             opCtx, query_stats::microsecondsToUint64(boost::none), OpDebug::AdditiveMetrics());
 
-        query_stats::writeQueryStats(
-            opCtx, queryStatsKeyHash, nullptr, snapshot, {}, isChangeStreamQuery);
+        query_stats::writeQueryStats(opCtx, storeKey, nullptr, snapshot, {}, isChangeStreamQuery);
     }
 }
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/mirror_maestro.h"
@@ -57,7 +31,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -381,7 +355,7 @@ private:
     // Even if _isInitialized is true, any member function of the variables below must still be
     // inately thread safe. If _isInitialized is false, there may not even be correct pointers to
     // call member functions upon.
-    AtomicWord<bool> _isInitialized;
+    Atomic<bool> _isInitialized;
 
     // The mirrorReads server parameter options. _paramsMutex serializes updates to the stored
     // params and _cachedHostsForTargetedMirroring, which stores the list of hosts to mirror reads
@@ -484,50 +458,50 @@ public:
 
     // Counts the total number of mirrorable operations (either general or targeted), regardless of
     // whether they are mirrored.
-    AtomicWord<CounterT> seen;
+    Atomic<CounterT> seen;
     // Counts the number of remote requests (for general mirroring as primary) that have ever been
     // scheduled to be sent over the network.
-    AtomicWord<CounterT> sent;
+    Atomic<CounterT> sent;
     // Counts the number of remote requests (for targeted mirroring) that have ever been
     // scheduled to be sent over the network.
-    AtomicWord<CounterT> targetedSent;
+    Atomic<CounterT> targetedSent;
     // Counts the number of remote requests (as primary) for general mirroring that failed with some
     // error when sending.
-    AtomicWord<CounterT> erroredDuringSend;
+    Atomic<CounterT> erroredDuringSend;
     // Counts the number of remote requests for targeted mirroring that failed with some error when
     // sending.
-    AtomicWord<CounterT> targetedErroredDuringSend;
+    Atomic<CounterT> targetedErroredDuringSend;
     // Counts the number of general mirroring response from secondaries after mirrored operations.
     // Only reported if mirrorMaestroExpectsResponse failpoint is enabled.
-    AtomicWord<CounterT> resolved;
+    Atomic<CounterT> resolved;
     // Counts the number of responses for targeted mirroring from secondaries after
     // mirrored operations. Only reported if mirrorMaestroExpectsResponse failpoint is enabled.
-    AtomicWord<CounterT> targetedResolved;
+    Atomic<CounterT> targetedResolved;
     // Counts the number of responses (as primary) for general mirroring of successful mirrored
     // operations. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
-    AtomicWord<CounterT> succeeded;
+    Atomic<CounterT> succeeded;
     // Counts the number of responses for targeted mirroring of successful mirrored
     // operations. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
-    AtomicWord<CounterT> targetedSucceeded;
+    Atomic<CounterT> targetedSucceeded;
     // Counts the number of operations (as primary) for general mirroring that will be mirrored but
     // are not yet scheduled. Disabled by default, hidden behind the mirrorMaestroTracksPending fail
     // point.
-    AtomicWord<CounterT> pending;
+    Atomic<CounterT> pending;
     // Counts the number of operations for targeted mirroring that will be mirrored but
     // are not yet scheduled. Disabled by default, hidden behind the mirrorMaestroTracksPending fail
     // point.
-    AtomicWord<CounterT> targetedPending;
+    Atomic<CounterT> targetedPending;
     // Counts the number of operations (as primary) for general mirroring that are currently
     // scheduled to be mirrored, but have not yet received any response. Disabled by default, hidden
     // behind the mirrorMaestroTracksPending fail point.
-    AtomicWord<CounterT> scheduled;
+    Atomic<CounterT> scheduled;
     // Counts the number of operations for targeted mirroring that are currently
     // scheduled to be mirrored, but have not yet received any response. Disabled by default, hidden
     // behind the mirrorMaestroTracksPending fail point.
-    AtomicWord<CounterT> targetedScheduled;
+    Atomic<CounterT> targetedScheduled;
     // Counts the number of mirrored operations processed successfully by this node as a
     // secondary.
-    AtomicWord<CounterT> processedAsSecondary;
+    Atomic<CounterT> processedAsSecondary;
 };
 auto& gMirroredReadsSection = *ServerStatusSectionBuilder<MirroredReadsSection>(
                                    std::string{MirrorMaestro::kServerStatusSectionName})
@@ -877,7 +851,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hostsForGeneralM
         };
 
         auto newRequest = executor::RemoteCommandRequest(
-            host, invocation.getDBForReadMirroring(), payload, nullptr /* opCtx */);
+            host, invocation.getDBForReadMirroring(), payload, /*opCtx=*/nullptr);
 
         newRequest.fireAndForget = true;
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail()))
@@ -916,7 +890,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hostsForGeneralM
         for (auto i = 0; i < mirrorCount; i++) {
             auto& host =
                 hostsForGeneralMirroring[(startIndex + i) % hostsForGeneralMirroring.size()];
-            executeMirrors(host, generalMirroringPayload, true /* generalMirror */);
+            executeMirrors(host, generalMirroringPayload, /*generalMirror=*/true);
         }
     }
 
@@ -924,7 +898,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hostsForGeneralM
     auto targetedMirroringPayload = payload(params.getTargetedMirroring().getMaxTimeMS());
     for (size_t i = 0; i < hostsForTargetedMirroring.size(); i++) {
         auto& host = hostsForTargetedMirroring[i];
-        executeMirrors(host, targetedMirroringPayload, false /* generalMirror */);
+        executeMirrors(host, targetedMirroringPayload, /*generalMirror=*/false);
     }
 } catch (const DBException& e) {
     LOGV2_DEBUG(31456, 2, "Mirroring failed", "reason"_attr = e);
@@ -958,8 +932,8 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
                 [] { return gMirrorMaestroConnPoolMaxSize.load(); },
                 "MirrorMaestroDynamicLimitController");
         };
-        return executor::makeNetworkInterface(
-            std::string{kMirrorMaestroName}, {}, {}, std::move(options));
+        return executor::makeNetworkInterface(std::string{kMirrorMaestroName},
+                                              {.connectionPoolOptions = std::move(options)});
     };
 
     _executor = executor::ThreadPoolTaskExecutor::create(

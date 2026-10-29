@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 
@@ -66,7 +40,7 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
     : HashAggBaseStage("group"sv,
                        yieldPolicy,
                        planNodeId,
-                       nullptr /* _collatorAccessor */,
+                       /*_collatorAccessor=*/nullptr,
                        participateInTrialRunTracking,
                        allowDiskUse,
                        forceIncreasedSpilling),
@@ -97,6 +71,7 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
 }
 
 void HashAggStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     if (_collatorSlot) {
@@ -265,35 +240,35 @@ void HashAggStage::open(bool reOpen) {
             // Copy keys in order to do the lookup.
             size_t idx = 0;
             for (auto& p : _inKeyAccessors) {
-                auto [tag, val] = p->getViewOfValue();
-                key.reset(idx++, false, tag, val);
+                key.reset(idx++, p->getViewOfValue());
             }
-            _htIt = _ht->find(key);
+
+            // Look up the key in the hash table and, only if it is not present, construct and
+            // insert an owned copy of the key together with a fresh accumulator row. Using
+            // lazy_emplace avoids hashing/probing the key twice (once in find() and again in
+            // emplace()) and avoids copying the key when the key is already present.
+            _htIt = _ht->lazy_emplace(key, [&](const TableType::constructor& ctor) {
+                newKey = true;
+                value::MaterializedRow keyCopy(key);
+                keyCopy.makeOwned();
+                ctor(std::move(keyCopy), value::MaterializedRow{_outAggAccessors.size()});
+            });
+
+            dassert(_htIt == _ht->find(key));
             firstDoc = false;
         }
-        dassert(_htIt == _ht->find(key));
-        if (_htIt == _ht->end()) {
-            // The key is not present in the hash table yet, so we insert it and initialize the
-            // corresponding accumulator. Note that as a future optimization, we could avoid
-            // doing a lookup both in the 'find()' call and in 'emplace()'.
-            newKey = true;
-            value::MaterializedRow keyCopy(key);
-            keyCopy.makeOwned();
-            auto [it, _] =
-                _ht->emplace(std::move(keyCopy), value::MaterializedRow{_outAggAccessors.size()});
 
-            _htIt = it;
-
+        if (newKey) {
             // Run all acc initializers for this key.
             for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-                _accumulatorList[idx]->initialize(_bytecode, *_outHashAggAccessors[idx]);
+                _accumulatorList[idx]->initialize(*_bytecode, *_outHashAggAccessors[idx]);
             }
         }
 
         // Accumulate state in '_ht' value, which is a materialized row of '_outAggAccessors'
         // each of which contains the current accumulator state for one accumulator.
         for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-            _accumulatorList[idx]->accumulate(_bytecode, *_outHashAggAccessors[idx]);
+            _accumulatorList[idx]->accumulate(*_bytecode, *_outHashAggAccessors[idx]);
         }
 
         // If the group-by key is empty we will only ever aggregate into a single row so no
@@ -346,6 +321,19 @@ HashAggBaseStage<HashAggStage>::SpilledRow HashAggStage::deserializeSpilledRecor
     auto key = value::MaterializedRow::deserializeForSorter(valReader, {&collator});
     auto val = value::MaterializedRow::deserializeForSorter(valReader, {&collator});
     return {std::move(key), std::move(val)};
+}
+
+std::pair<int64_t, int64_t> HashAggStage::spillImpl(SpillingStore* recordStore) {
+    int64_t spilledBytes = 0;
+    int64_t spilledRecords = 0;
+
+    // Spill only the records that have not been already consumed.
+    for (; _htIt != _ht->end(); ++_htIt) {
+        spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
+        spilledRecords++;
+    }
+
+    return {spilledBytes, spilledRecords};
 }
 
 PlanState HashAggStage::getNextSpilled() {
@@ -401,7 +389,7 @@ PlanState HashAggStage::getNextSpilled() {
         // state to be merged into it is in _spilledAggRow.getViewOfValue(idx).
         _spilledAggRow = std::move(recoveredRow.second);
         for (size_t idx = 0; idx < _accumulatorList.size(); ++idx) {
-            _accumulatorList[idx]->merge(_bytecode, *_outRecordStoreAggAccessors[idx]);
+            _accumulatorList[idx]->merge(*_bytecode, *_outRecordStoreAggAccessors[idx]);
         }
     }
 
@@ -418,7 +406,8 @@ PlanState HashAggStage::getNext() {
         PlanState planState = getNextSpilled();
         if (planState == PlanState::ADVANCED) {
             for (size_t accIdx = 0; accIdx < _accumulatorList.size(); ++accIdx) {
-                _accumulatorList[accIdx]->finalize(_bytecode, *_outRecordStoreAggAccessors[accIdx]);
+                _accumulatorList[accIdx]->finalize(*_bytecode,
+                                                   *_outRecordStoreAggAccessors[accIdx]);
             }
         }
         return planState;
@@ -433,7 +422,7 @@ PlanState HashAggStage::getNext() {
     }
 
     for (size_t accIdx = 0; accIdx < _accumulatorList.size(); ++accIdx) {
-        _accumulatorList[accIdx]->finalize(_bytecode, *_outHashAggAccessors[accIdx]);
+        _accumulatorList[accIdx]->finalize(*_bytecode, *_outHashAggAccessors[accIdx]);
     }
     return trackPlanState(PlanState::ADVANCED);
 }

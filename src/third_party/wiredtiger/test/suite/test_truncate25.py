@@ -74,7 +74,7 @@ class test_truncate25(wttest.WiredTigerTestCase):
 
         # Ensure that fast-truncate did not happen since the data is not globally visible.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[wiredtiger.stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[wiredtiger.stat.conn.cursor_truncate_fast_delete_pages][2]
         self.assertEqual(fastdelete_pages, 0)
 
         # Re-insert some data at a later timestamp.

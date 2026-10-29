@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_bucket.h"
 
@@ -219,6 +193,27 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenDefaultIsConstantExpression)
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 
+TEST_F(BucketReturnsGroupAndSort, LiteralDefaultIsSerializedAsConst) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [0, 2], default : {$literal : '$color'}}}");
+    auto expectedGroupExplain = Value(fromjson(
+        "{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : 0}]}, {$lt : "
+        "['$x', {$const : 2}]}]}, then : {$const : 0}}], default : {$const : '$color'}}}, count : "
+        "{$sum : {$const : 1}}, $willBeMerged: false}"));
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+}
+
+TEST_F(BucketReturnsGroupAndSort, LiteralBoundariesAreSerializedAsConst) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [{$literal : '$l'}, {$literal : '$n'}], default "
+        ": "
+        "'other'}}");
+    auto expectedGroupExplain = Value(fromjson(R"boundary(
+        {_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : '$l'}]}, {$lt : ['$x', {$const : '$n'}]}]}, then : {$const : '$l'}}], default : {$const : 'other'}}}, count : {$sum : {$const : 1}}, $willBeMerged : false}
+    )boundary"));
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+}
+
 TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
     auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 1, 2]}}");
     auto expectedGroupExplain =
@@ -376,5 +371,101 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     exec::agg::MockStage::setSource_forTest(groupStage, stage.get());
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }
+
+class BucketLiteralInjection : public AggregationContextFixture {};
+
+TEST_F(BucketLiteralInjection, DefaultLiteralDollarStringIsNotAFieldPath) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [0, 1], default : {$literal : '$color'}}}");
+
+    list<intrusive_ptr<DocumentSource>> bucketStages =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(bucketStages.size(), 2UL);
+
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
+    ASSERT(groupStage);
+
+    auto mock = exec::agg::MockStage::createForTest(
+        std::vector{BSON("x" << 5 << "color" << "red"), BSON("x" << 10 << "color" << "blue")},
+        getExpCtx());
+    exec::agg::MockStage::setSource_forTest(groupStage, mock.get());
+
+    auto result = groupStage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_VALUE_EQ(result.getDocument()["count"], Value(2));
+    ASSERT_VALUE_EQ(result.getDocument()["_id"], Value(std::string("$color")));
+    ASSERT_TRUE(groupStage->getNext().isEOF());
+}
+
+TEST_F(BucketLiteralInjection, DefaultLiteralRootVariableIsNotAVariableReference) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [0, 1], default : {$literal : '$$ROOT'}}}");
+
+    list<intrusive_ptr<DocumentSource>> bucketStages =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(bucketStages.size(), 2UL);
+
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
+    ASSERT(groupStage);
+
+    auto mock = exec::agg::MockStage::createForTest(
+        std::vector{BSON("x" << 5 << "color" << "red"), BSON("x" << 10 << "color" << "blue")},
+        getExpCtx());
+    exec::agg::MockStage::setSource_forTest(groupStage, mock.get());
+
+    auto result = groupStage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_VALUE_EQ(result.getDocument()["count"], Value(2));
+    ASSERT_VALUE_EQ(result.getDocument()["_id"], Value(std::string("$$ROOT")));
+    ASSERT_TRUE(groupStage->getNext().isEOF());
+}
+
+TEST_F(BucketLiteralInjection, BoundaryLiteralDollarStringIsNotAFieldPath) {
+    const auto spec = fromjson(
+        "{$bucket : {groupBy : '$x', boundaries : [{$literal : '$l'}, {$literal : '$n'}], default "
+        ": "
+        "'other'}}");
+
+    list<intrusive_ptr<DocumentSource>> bucketStages =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(bucketStages.size(), 2UL);
+
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
+    ASSERT(groupStage);
+
+    auto mock = exec::agg::MockStage::createForTest(
+        std::vector{BSON("x" << "$m" << "l" << "$j" << "n" << "$o"),
+                    BSON("x" << "$m" << "l" << "$i" << "n" << "$p")},
+        getExpCtx());
+    exec::agg::MockStage::setSource_forTest(groupStage, mock.get());
+
+    auto result = groupStage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_VALUE_EQ(result.getDocument()["count"], Value(2));
+    ASSERT_VALUE_EQ(result.getDocument()["_id"], Value(std::string("$l")));
+    ASSERT_TRUE(groupStage->getNext().isEOF());
+}
+
+TEST_F(BucketReturnsGroupAndSort, NoDefaultOmitsDefaultFromSwitchSerialization) {
+    const auto spec =
+        fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 2], default : '$$REMOVE'}}");
+    list<intrusive_ptr<DocumentSource>> result =
+        DocumentSourceBucket::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQUALS(result.size(), 2UL);
+
+    const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result.front().get());
+    ASSERT(groupStage);
+
+    auto explain = query_shape::SerializationOptions{
+        .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+    vector<Value> explainedStages;
+    groupStage->serializeToArray(explainedStages, explain);
+    ASSERT_EQUALS(explainedStages.size(), 1UL);
+
+    auto switchDoc =
+        explainedStages[0].getDocument()["$group"].getDocument()["_id"].getDocument()["$switch"];
+    ASSERT_TRUE(switchDoc.getDocument()["default"].missing());
+}
+
 }  // namespace
 }  // namespace mongo

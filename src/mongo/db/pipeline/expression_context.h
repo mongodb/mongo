@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,6 +11,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -58,6 +33,8 @@
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_settings.h"
+#include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/query/util/deferred.h"
@@ -71,6 +48,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string_view>
@@ -117,9 +95,9 @@ enum class MergeType {
 
 std::ostream& operator<<(std::ostream& os, SbeCompatibility sbeCompat);
 
-enum class MONGO_MOD_PUBLIC ExpressionContextCollationMatchesDefault { kYes, kNo };
+enum class [[MONGO_MOD_PUBLIC]] ExpressionContextCollationMatchesDefault { kYes, kNo };
 
-class MONGO_MOD_PUBLIC ExpressionContext : public RefCountable {
+class [[MONGO_MOD_PUBLIC]] ExpressionContext : public RefCountable {
 public:
     /**
      * An RAII type that will temporarily change the ExpressionContext's collator. Resets the
@@ -339,13 +317,14 @@ public:
         // Assert that the resolved namespace we are adding either doesn't exist in the map or we
         // are reassigning the same value (no modification allowed). Only perform the uuid check if
         // both uuids exist.
-        uassert(9825500,
-                "Cannot overwrite an existing namespace with a different value",
-                it == _params.resolvedNamespaces.end() ||
-                    (it->second.involvedNamespaceIsAView == resolvedNs.involvedNamespaceIsAView &&
-                     it->second.ns == resolvedNs.ns &&
-                     (!it->second.uuid.has_value() || !resolvedNs.uuid.has_value() ||
-                      it->second.uuid.value() == resolvedNs.uuid.value())));
+        uassert(
+            9825500,
+            "Cannot overwrite an existing namespace with a different value",
+            it == _params.resolvedNamespaces.end() ||
+                (it->second.isInvolvedNamespaceAView() == resolvedNs.isInvolvedNamespaceAView() &&
+                 it->second.getResolvedNamespace() == resolvedNs.getResolvedNamespace() &&
+                 (!it->second.getCollUUID().has_value() || !resolvedNs.getCollUUID().has_value() ||
+                  it->second.getCollUUID().value() == resolvedNs.getCollUUID().value())));
 
         _params.resolvedNamespaces[nss] = resolvedNs;
     }
@@ -445,6 +424,12 @@ public:
      */
     void stopExpressionCounters();
 
+    /**
+     * Increments the memory-intensive expression counter and throws ExceededMemoryLimit if it
+     * exceeds internalQueryMaxMemoryIntensiveExpressions.
+     */
+    void checkAndIncrementMemoryIntensiveExprCount(std::string_view exprName);
+
     bool expressionCountersAreActive() const {
         return static_cast<bool>(_expressionCounters);
     }
@@ -508,12 +493,38 @@ public:
     void ignoreFeatureInParserOrRejectAndThrow(std::string_view name, FeatureFlag& flag);
 
     void setOperationContext(OperationContext* opCtx) {
+        if (_params.opCtx != opCtx) {
+            // The expression fallback tracker can be a child of the current operation's memory
+            // tracker (see getExpressionFallbackTracker()), i.e. it caches a base pointer into that
+            // operation. Drop it whenever the OperationContext changes so we never keep a base
+            // pointer into a previous operation's (possibly destroyed) tracker; it is rebuilt
+            // lazily against the current OperationContext on next use.
+            _expressionFallbackTracker.reset();
+        }
         _params.opCtx = opCtx;
     }
 
     OperationContext* getOperationContext() const {
         return _params.opCtx;
     }
+
+    /**
+     * Returns a query-scoped fallback tracker used to account expression-evaluation memory when no
+     * stage-level tracker was wired to the EvaluationContext. Created lazily on first use and
+     * reused for the lifetime of this ExpressionContext, so evaluators do not allocate a tracker
+     * per document. When an OperationContext is available and both query/expression memory-tracking
+     * feature flags are enabled, the fallback is a child of the operation-wide tracker, so its
+     * usage rolls up into the query's total memory and is bounded by the per-query limit. Otherwise
+     * it is a standalone tracker bounded by the per-expression safety cap
+     * internalQueryMaxSingleExpressionMemoryUsageBytes.
+     *
+     * Not safe for concurrent use: this tracker is shared, mutable state on the ExpressionContext.
+     * Callers that may evaluate expressions against a shared ExpressionContext from multiple
+     * threads (e.g. collection validators evaluating $expr from concurrent writers) must not use
+     * it; they should supply a per-call tracker on the EvaluationContext instead (see
+     * exec::matcher::evaluateExpression()).
+     */
+    SimpleMemoryUsageTracker& getExpressionFallbackTracker();
 
     VersionContext& getVersionContext() {
         return _params.vCtx;
@@ -572,6 +583,14 @@ public:
 
     MergeType mergeType() const {
         return _params.mergeType;
+    }
+
+    bool forceShardFilter() const {
+        return _params.forceShardFilter;
+    }
+
+    void setForceShardFilter(bool forceShardFilter) {
+        _params.forceShardFilter = forceShardFilter;
     }
 
     bool getInRouter() const {
@@ -687,6 +706,14 @@ public:
         _params.allowDiskUse = allowDiskUse;
     }
 
+    bool getAllowPartialResults() const {
+        return _params.allowPartialResults;
+    }
+
+    void setAllowPartialResults(bool allowPartialResults) {
+        _params.allowPartialResults = allowPartialResults;
+    }
+
     bool getInLookup() const {
         return _params.inLookup;
     }
@@ -719,12 +746,42 @@ public:
         _params.isParsingCollectionValidator = isParsingCollectionValidator;
     }
 
+    bool getIsReparsingRepresentativeQueryShape() const {
+        return _params.isReparsingRepresentativeQueryShape;
+    }
+
+    void setIsReparsingRepresentativeQueryShape(bool isReparsingRepresentativeQueryShape) {
+        _params.isReparsingRepresentativeQueryShape = isReparsingRepresentativeQueryShape;
+    }
+
     bool getIsProfileFilter() const {
         return _params.isProfileFilter;
     }
 
     void setIsProfileFilter(bool isProfileFilter) {
         _params.isProfileFilter = isProfileFilter;
+    }
+
+    bool getExcludeOperationMemoryTracking() const {
+        return _params.excludeOperationMemoryTracking;
+    }
+
+    void setExcludeOperationMemoryTracking(bool excludeOperationMemoryTracking) {
+        if (_params.excludeOperationMemoryTracking != excludeOperationMemoryTracking) {
+            _expressionFallbackTracker.reset();
+        }
+        _params.excludeOperationMemoryTracking = excludeOperationMemoryTracking;
+    }
+
+    bool getExcludeExpressionFallbackFromOperationMemoryTracking() const {
+        return _params.excludeExpressionFallbackFromOperationMemoryTracking;
+    }
+
+    void setExcludeExpressionFallbackFromOperationMemoryTracking(bool exclude) {
+        if (_params.excludeExpressionFallbackFromOperationMemoryTracking != exclude) {
+            _expressionFallbackTracker.reset();
+        }
+        _params.excludeExpressionFallbackFromOperationMemoryTracking = exclude;
     }
 
     bool getExprUnstableForApiV1() const {
@@ -773,7 +830,7 @@ public:
 
     // Should only be used to test parsing with the flag. Otherwise, this flag should only be set
     // when creating a new ExpressionContext.
-    MONGO_MOD_NEEDS_REPLACEMENT bool setAllowGenericForeignDbLookup_forTest(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] bool setAllowGenericForeignDbLookup_forTest(
         bool allowGenericForeignDbLookup) {
         return _params.allowGenericForeignDbLookup = allowGenericForeignDbLookup;
     }
@@ -852,14 +909,6 @@ public:
         _params.sbeGroupCompatibility = sbeGroupCompatibility;
     }
 
-    SbeCompatibility getSbeWindowCompatibility() const {
-        return _params.sbeWindowCompatibility;
-    }
-
-    void setSbeWindowCompatibility(SbeCompatibility sbeWindowCompatibility) {
-        _params.sbeWindowCompatibility = sbeWindowCompatibility;
-    }
-
     SbeCompatibility getSbePipelineCompatibility() const {
         return _params.sbePipelineCompatibility;
     }
@@ -904,10 +953,6 @@ public:
         return _params.view;
     }
 
-    bool isFeatureFlagMongotIndexedViewsEnabled() const {
-        return _featureFlagMongotIndexedViews.get(versionContextForFeatureFlagCheck());
-    }
-
     void setView(boost::optional<ResolvedNamespace> view) {
         _params.view = std::move(view);
     }
@@ -922,15 +967,17 @@ public:
         _gotTemporarilyUnavailableException = v;
     }
 
-    // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-    const query_settings::QuerySettings& getQuerySettings() const {
-        static const auto kEmptySettings = query_settings::QuerySettings();
-        return _querySettings.get_value_or(kEmptySettings);
+    /**
+     * Returns true on the first call and false on subsequent calls. Intended to let the caller
+     * update the 'maxEstimatedScanBytes' metric exactly once per query.
+     */
+    bool tryClaimMaxEstimatedScanBytesMetric() {
+        return !std::exchange(_maxEstimatedScanBytesMetricCounted, true);
     }
 
     // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-    const boost::optional<query_settings::QuerySettings>& getOptionalQuerySettings() const {
-        return _querySettings;
+    const query_settings::QuerySettings& getQuerySettings() const {
+        return query_settings::forOp(getOperationContext());
     }
 
     // Resolves the VersionContext for a feature-flag check on this ExpressionContext.
@@ -945,34 +992,9 @@ public:
         return kNoVersionContext;
     }
 
-    /**
-     * Attaches 'querySettings' to context if they were not previously set.
-     *
-     * TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-     */
-    void setQuerySettingsIfNotPresent(query_settings::QuerySettings querySettings) {
-        if (_querySettings.has_value()) {
-            return;
-        }
-
-        tassert(8827100,
-                "Query knobs shouldn't be initialized before query settings are set",
-                !_queryKnobConfiguration.isInitialized());
-
-        _querySettings = std::move(querySettings);
-    }
-
-    // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
-    void setQuerySettings(const boost::optional<query_settings::QuerySettings>& querySettings) {
-        _querySettings = querySettings;
-    }
-
+    // TODO SERVER-108400: clean this up; the knob configuration now lives on the operation.
     const QueryKnobConfiguration& getQueryKnobConfiguration() const {
-        return _queryKnobConfiguration.get(getQuerySettings());
-    }
-
-    bool queryKnobIsInitialized() const {
-        return _queryKnobConfiguration.isInitialized();
+        return QueryKnobConfiguration::get(getOperationContext());
     }
 
     void setIgnoreCollator() {
@@ -995,34 +1017,10 @@ public:
     }
 
     /**
-     * Sets the IDHACK eligibility flag. Used when an aggregation pipeline is converted to a
-     * find-style canonical query, since the flag cannot be computed at aggregation ExpCtx build
-     * time (the collection is not yet available).
-     *
-     * The flag may not be cleared once set. Downstream code (express path, SBE selection,
-     * index-catalog skip) may have already branched on it.
-     */
-    inline void setIsIdHackQuery(bool v) {
-        tassert(12310000, "isIdHackQuery may not be cleared once set", !_params.isIdHackQuery || v);
-        _params.isIdHackQuery = v;
-    }
-
-    /**
      * Returns if query contains encryption information as part of the request.
      */
     inline bool isFleQuery() const {
         return _params.isFleQuery;
-    }
-
-    /**
-     * Returns if query can be rejected via query settings.
-     */
-    inline bool canBeRejected() const {
-        return _params.canBeRejected;
-    }
-
-    bool isBasicRankFusionFeatureFlagEnabled() const {
-        return _featureFlagRankFusionBasic.get(versionContextForFeatureFlagCheck());
     }
 
     bool shouldParserAllowStreams() const {
@@ -1039,6 +1037,14 @@ public:
 
     bool isHybridSearch() const {
         return _params.isHybridSearch;
+    }
+
+    void setRemainingQuota(int64_t remainingQuota) {
+        _params.remainingQuota = remainingQuota;
+    }
+
+    int64_t getRemainingQuota() const {
+        return _params.remainingQuota;
     }
 
     // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
@@ -1058,6 +1064,14 @@ public:
         return _params.wasRateLimited;
     }
 
+    void setUpdateChangeStreamFeatureCounters(bool v) {
+        _params.updateChangeStreamFeatureCounters = v;
+    }
+
+    bool updateChangeStreamFeatureCounters() const {
+        return _params.updateChangeStreamFeatureCounters;
+    }
+
     bool isFeatureFlagMqlJsEngineGapEnabled() const {
         return _featureFlagMqlJsEngineGap.get(versionContextForFeatureFlagCheck());
     }
@@ -1066,10 +1080,6 @@ public:
                                 std::shared_ptr<const PathArrayness> pathArrayness) {
         tassert(12502302, "PathArrayness must not be null", pathArrayness);
         _params.pathArraynessForNss.emplace(nss, std::move(pathArrayness));
-    }
-
-    bool hasPathArraynessForNss(const NamespaceString& nss) const {
-        return _params.pathArraynessForNss.contains(nss);
     }
 
     /**
@@ -1107,6 +1117,29 @@ public:
 
     const NonArrayPathsForNss& getNonArrayPathsForNss() const {
         return _params.nonArrayPathsForNss;
+    }
+
+    /**
+     * Merges path arrayness knowledge from 'other' into this context. For each nss in 'other',
+     * any path confirmed non-array there is also recorded as non-array here.
+     */
+    void mergeNonArrayPathsForNss(const NonArrayPathsForNss& other) {
+        for (const auto& [nss, paths] : other) {
+            auto& dest = _params.nonArrayPathsForNss[nss];
+            for (const auto& path : paths) {
+                dest.insert(path);
+            }
+        }
+    }
+
+    // Call when validator-derived type information affects planning for this query.
+    void markSchemaTypeInfoUsed() {
+        getOrCreateSchemaTypeInfoUsed()->store(true);
+    }
+
+    bool hasUsedSchemaTypeInfo() const {
+        const auto& flag = _params.schemaTypeInfoUsed;
+        return flag && flag->load();
     }
 
 protected:
@@ -1169,11 +1202,6 @@ protected:
         // being parsed using this expression context. This value is transient and gets
         // reset for every $group stage we parse. Each $group stage has its own per-stage flag.
         SbeCompatibility sbeGroupCompatibility = SbeCompatibility::noRequirements;
-        // The lowest SBE compatibility level of all window functions in the
-        // $_internalSetWindowFields stage currently being parsed using this expression context.
-        // This value is transient and gets reset for every $_internalSetWindowFields stage we
-        // parse. Each $_internalSetWindowFields stage has its own per-stage flag.
-        SbeCompatibility sbeWindowCompatibility = SbeCompatibility::noRequirements;
         // In some situations we could lower the collection access and, maybe, a prefix of a
         // pipeline to SBE but doing so would prevent a specific optimization that exists in the
         // classic engine from being applied. Until we implement the same optimization in SBE, we
@@ -1201,8 +1229,12 @@ protected:
         // if this value is 'unsortedMerge', then group accumulators need to output partial results,
         // so they can be combined by the merging pipeline.
         MergeType mergeType = MergeType::noMerge;
+        // When true, a shard-filter stage must always be included when building a query executor
+        // against this context (see forceShardFilter() above).
+        bool forceShardFilter = false;
         bool forPerShardCursor = false;
         bool allowDiskUse = false;
+        bool allowPartialResults = false;
         bool bypassDocumentValidation = false;
         bool isMapReduceCommand = false;
         bool hasWhereClause = false;
@@ -1217,9 +1249,21 @@ protected:
         bool isParsingViewDefinition = false;
         // True if this ExpressionContext is used to parse a collection validator expression.
         bool isParsingCollectionValidator = false;
+        // True if this ExpressionContext is used to re-parse an already-validated, server-stored
+        // query rather than a pipeline supplied directly by a client.
+        bool isReparsingRepresentativeQueryShape = false;
         // True if this ExpressionContext belongs to a profile filter. Like a collection validator,
         // a profile filter outlives the OperationContext it was parsed under.
         bool isProfileFilter = false;
+        // True if memory-tracked stages and expressions built against this ExpressionContext must
+        // not report to (or be bounded by) the operation-wide OperationMemoryUsageTracker.
+        // Standalone per-stage and per-expression limits still apply.
+        bool excludeOperationMemoryTracking = false;
+        // When true, the expression fallback tracker (see getExpressionFallbackTracker()) is not
+        // rolled up into the operation-wide OperationMemoryUsageTracker; it becomes a standalone
+        // tracker bounded only by the per-expression safety cap. Stage-level memory trackers are
+        // unaffected.
+        bool excludeExpressionFallbackFromOperationMemoryTracking = false;
         // These fields can be used in a context when API version validations were not enforced
         // during parse time (Example creating a view or validator), but needs to be enforce while
         // querying later.
@@ -1239,9 +1283,6 @@ protected:
         // Indicates if query contains encryption information as part of the request.
         bool isFleQuery = false;
 
-        // Indicates if query can be rejected via query settings.
-        bool canBeRejected = true;
-
         // Allows the foreign collection of a lookup to be in a different database than the local
         // collection using "from: {db: ..., coll: ...}" syntax. Currently, this should only be used
         // for streams since this isn't allowed in MQL beyond some exemptions for internal
@@ -1252,10 +1293,18 @@ protected:
         // $scoreFusion pipeline.
         bool isHybridSearch = false;
 
+        // A quota (in bytes) on the data that may be written by a $out stage.
+        int64_t remainingQuota = -1;
+
         bool requiresTimeseriesExtendedRangeSupport = false;
 
         // Indicates that the query is replanned after being rate-limited.
         bool wasRateLimited = false;
+
+        // If true, updates feature counter metrics for change stream queries on mongos/mongod.
+        // Can be set to false so that the same command does not update the feature counter
+        // metrics multiple times when opening additional cursors for the change stream.
+        bool updateChangeStreamFeatureCounters = true;
 
         // PathArrayness information keyed by namespace, covering the main collection and any
         // secondary collections involved in the query. An entry is absent if a collection
@@ -1263,7 +1312,20 @@ protected:
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss;
         NonArrayPathsForNss nonArrayPathsForNss;
+
+        // Tracks whether validator-derived type information affected planning for this query.
+        // Allocated lazily (see 'getOrCreateSchemaTypeInfoUsed') so that queries which never use
+        // schema type info do not pay for a heap allocation.
+        std::shared_ptr<std::atomic<bool>> schemaTypeInfoUsed;
     };
+
+    // Returns the shared schema-type-info-usage flag, allocating it on first use.
+    const std::shared_ptr<std::atomic<bool>>& getOrCreateSchemaTypeInfoUsed() {
+        if (!_params.schemaTypeInfoUsed) {
+            _params.schemaTypeInfoUsed = std::make_shared<std::atomic<bool>>(false);
+        }
+        return _params.schemaTypeInfoUsed;
+    }
 
     ExpressionContextParams _params;
 
@@ -1306,6 +1368,7 @@ protected:
             invariant(opCtx);
 
             opCtx->checkForInterrupt();
+            checkForQueryMemoryLoadShedding(opCtx);
             if (--_verySlowTick == 0) {
                 checkForInterruptVerySlow();
             }
@@ -1313,6 +1376,9 @@ protected:
 
         // Performs the work around checking for interrupt that can't be inlined.
         void checkForInterruptVerySlow();
+
+        // Evaluates the query-memory load-shed decision.
+        void checkForQueryMemoryLoadShedding(OperationContext* opCtx);
 
         static constexpr int32_t kInterruptCheckPeriod = 128;
         static constexpr int32_t kVerySlowInterruptCheckPeriod = 8;  // Runs every 1024 ticks
@@ -1373,12 +1439,18 @@ protected:
     DocumentComparator _documentComparator;
     ValueComparator _valueComparator;
 
-    // A map from namespace to the resolved namespace, in case any views are involved.
-    ResolvedNamespaceMap _resolvedNamespaces;
-
 private:
     std::unique_ptr<ExpressionCounters> _expressionCounters;
+    uint32_t _memoryIntensiveExprCount = 0;
+
+    // Query-scoped fallback tracker for expression evaluation; see getExpressionFallbackTracker().
+    // Created lazily and reused across all documents/expressions in this query.
+    boost::optional<SimpleMemoryUsageTracker> _expressionFallbackTracker;
+
     bool _gotTemporarilyUnavailableException = false;
+
+    // See tryClaimMaxEstimatedScanBytesMetric().
+    bool _maxEstimatedScanBytesMetricCounted = false;
 
     bool _isCappedDelete = false;
 
@@ -1388,31 +1460,10 @@ private:
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
 
-    boost::optional<query_settings::QuerySettings> _querySettings = boost::none;
-
-    DeferredFn<QueryKnobConfiguration, const query_settings::QuerySettings&>
-        _queryKnobConfiguration{[](const auto& querySettings) {
-            return QueryKnobConfiguration(querySettings);
-        }};
-
     Deferred<bool (*)(const VersionContext&)> _featureFlagShardFilteringDistinctScan{
         [](const VersionContext& vCtx) {
             return feature_flags::gFeatureFlagShardFilteringDistinctScan
                 .isEnabledUseLastLTSFCVWhenUninitialized(
-                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-        }};
-
-    Deferred<bool (*)(const VersionContext&)> _featureFlagRankFusionBasic{
-        [](const VersionContext& vCtx) {
-            return feature_flags::gFeatureFlagRankFusionBasic
-                .isEnabledUseLastLTSFCVWhenUninitialized(
-                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-        }};
-
-    Deferred<bool (*)(const VersionContext&)> _featureFlagMongotIndexedViews{
-        [](const VersionContext& vCtx) {
-            return feature_flags::gFeatureFlagMongotIndexedViews
-                .isEnabledUseLatestFCVWhenUninitialized(
                     vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};
 

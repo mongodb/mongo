@@ -68,12 +68,6 @@ class test_hs11(wttest.WiredTigerTestCase):
             return str(i)
         return i
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def evict_cursor(self, uri, nrows):
         s = self.conn.open_session()
         s.begin_transaction()

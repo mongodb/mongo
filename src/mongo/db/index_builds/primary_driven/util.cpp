@@ -1,52 +1,32 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_builds/primary_driven/util.h"
 
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache/join_plan_cache.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -235,6 +215,7 @@ Status commit(OperationContext* opCtx,
         if (mongo::feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
             collectionQueryInfo.rebuildPathArrayness(opCtx, writableColl);
         }
+        join_ordering::bumpCollectionVersionForDDL(writableColl);
 
         audit::logCreateIndex(opCtx->getClient(),
                               &index.spec,
@@ -291,9 +272,25 @@ Status abort(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
+    if (!_registry(opCtx->getServiceContext()).contains(buildUUID)) {
+        LOGV2(13344300,
+              "Index build: already deregistered, nothing to abort",
+              "buildUUID"_attr = buildUUID,
+              "collectionUUID"_attr = collectionUUID);
+        return Status::OK();
+    }
+
     for (auto&& index : indexes) {
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
+        if (!entry) {
+            LOGV2(13343400,
+                  "Index build: index entry not found during abort, skipping",
+                  "index"_attr = index.getIndexName(),
+                  "buildUUID"_attr = buildUUID,
+                  "collectionUUID"_attr = collectionUUID);
+            continue;
+        }
 
         auto status = writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry);
         if (!status.isOK()) {
@@ -335,9 +332,9 @@ ResumeIndexInfo resumeInfo(OperationContext* opCtx,
         auto& engine = *opCtx->getServiceContext()->getStorageEngine()->getEngine();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
-        if (!engine.hasIdent(ru, ident)) {
-            return false;
-        }
+        uassert(ErrorCodes::FailedToParse,
+                "Index build ident for resume not present",
+                engine.hasIdent(ru, ident));
 
         return engine
             .getRecordStore(
@@ -453,6 +450,45 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
               "numDeleted"_attr = numDeleted,
               "firstRangeStart"_attr = firstStart,
               "lastRangeEnd"_attr = lastEnd);
+    }
+}
+
+void deleteAllIndexEntries(OperationContext* opCtx,
+                           DatabaseName dbName,
+                           const UUID& collectionUUID,
+                           const std::vector<IndexBuildInfo>& indexes) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                {std::move(dbName), collectionUUID},
+                                                AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    for (auto&& index : indexes) {
+        auto* entry = collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
+            opCtx, index.indexIdent, IndexCatalog::InclusionPolicy::kUnfinished);
+        invariant(entry);
+        auto& indexContainer =
+            entry->accessMethod()->asSortedData()->getSortedDataInterface()->getContainer();
+
+        writeConflictRetry(opCtx, ru, "deleteAllIndexEntries", collection.nss(), [&] {
+            boost::optional<WriteUnitOfWork> wuow{opCtx};
+            auto cursor = indexContainer.getCursor(ru);
+            int64_t bytesDeleted = 0;
+
+            while (auto record = cursor->next()) {
+                bytesDeleted += record->first.size_bytes() + record->second.size_bytes();
+                uassertStatusOK(container_write::remove(opCtx, ru, indexContainer, record->first));
+                if (bytesDeleted >= indexTableCleanupBatchBytes.load()) {
+                    wuow->commit();
+                    wuow.emplace(opCtx);
+                    bytesDeleted = 0;
+                }
+            }
+
+            wuow->commit();
+        });
     }
 }
 

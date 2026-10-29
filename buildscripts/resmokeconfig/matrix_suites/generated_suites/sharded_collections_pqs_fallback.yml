@@ -21,7 +21,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
-        await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
+        await import("jstests/libs/override_methods/query/implicit_query_settings_fallback.js");
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
@@ -29,13 +29,13 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
     num_shards: 2
@@ -104,6 +104,7 @@ selector:
     - jstests/core/index/wildcard/wildcard_index_filter.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/query/index_key_expression.js
     - jstests/core/query/find_with_resume_after_param.js
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js

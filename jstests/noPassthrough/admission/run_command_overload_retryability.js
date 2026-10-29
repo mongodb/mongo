@@ -205,12 +205,7 @@ function runTestZeroRetries(commandName, command, mongos, shard) {
         const result = mongos.getDB(kDbName).runCommand(command);
         assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
 
-        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
-        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
-            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
-                result,
-            });
-        }
+        assert.eq(result.errorLabels, ["SystemOverloadedError"]);
     } finally {
         disableFailCommand(shardPrimary);
         assert.commandWorked(
@@ -227,10 +222,7 @@ function runTestZeroRetries(commandName, command, mongos, shard) {
     assert.eq(shardStatsDiff.numOperationsAttempted, 1);
     assert.eq(shardStatsDiff.numOverloadErrorsReceived, 1);
     assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, 0);
-    // The counter is incremented on the first overload error for an operation, even when no
-    // retry is performed (budget = 0).
-    // TODO SERVER-129657 Investigate numOperationsRetriedAtLeastOnceDueToOverload logic
-    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 0);
     assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 0);
     assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
 }
@@ -270,12 +262,7 @@ function runTestRetryCapExhausted(commandName, command, mongos, shard) {
         const result = mongos.getDB(kDbName).runCommand(command);
         assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
 
-        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
-        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
-            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
-                result,
-            });
-        }
+        assert.eq(result.errorLabels, ["SystemOverloadedError"]);
     } finally {
         disableFailCommand(shardPrimary);
         assert.commandWorked(
@@ -352,13 +339,7 @@ function runTestRetryCapExhaustedWithRetargeting(commandName, command, readPref,
     try {
         const result = mongos.getDB(kDbName).runCommand(cmd);
         assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
-
-        // TODO SERVER-128710 Revisit if RetryableError should be reapplied by mongos
-        for (const label of ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"]) {
-            assert(result.errorLabels?.includes(label), `Expected error label '${label}'`, {
-                result,
-            });
-        }
+        assert.eq(result.errorLabels, ["SystemOverloadedError"]);
     } finally {
         for (let node of shard.nodes) {
             disableFailCommand(node);

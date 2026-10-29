@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/baton.h"
@@ -66,19 +39,37 @@ namespace mongo {
 
 class OperationContext;
 
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
+using namespace std::literals::string_view_literals;
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 enum class TransportProtocol { MongoRPC, GRPC };
 
+struct SessionStats {
+    bool isIngress{false};
+    boost::optional<int64_t> peerId{};
+    int64_t congestionWindowSizeBytes{0};
+    // size of the receive/send network buffers, in bytes.
+    int64_t receiveBufferSizeBytes{0};
+    int64_t sendBufferSizeBytes{0};
+    // number of bytes currently in the receive/send network buffers.
+    int64_t receiveBufferBytes{0};
+    int64_t sendBufferBytes{0};
+};
+
+struct SessionStatsResult {
+    std::vector<SessionStats> stats;
+    int64_t errorCount{0};
+};
+
 inline std::string_view connectSSLModeToString(ConnectSSLMode mode) {
     switch (mode) {
         case kGlobalSSLMode:
-            return "global"_sd;
+            return "global"sv;
         case kEnableSSL:
-            return "enabled"_sd;
+            return "enabled"sv;
         case kDisableSSL:
-            return "disabled"_sd;
+            return "disabled"sv;
     }
     MONGO_UNREACHABLE;
 }
@@ -197,7 +188,15 @@ public:
      * Please convert to `std::weak_ptr` if a long term, non-owning reference is needed.
      */
     virtual std::shared_ptr<SessionManager> getSharedSessionManager() const = 0;
-
+    /**
+     * Returns the collected stats of current replication sessions.
+     */
+    virtual SessionStatsResult collectReplicationSessionStats() = 0;
+    /**
+     * Should be called whenever a new replication session gets created. This ensures
+     * that replication metrics are accurate.
+     */
+    virtual void registerReplicationSession(std::shared_ptr<Session>) = 0;
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
@@ -363,5 +362,5 @@ protected:
 };
 
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

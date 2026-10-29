@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -62,6 +36,12 @@ public:
      * Determines if we will yield locks while draining the side tables.
      */
     enum class DrainYieldPolicy { kNoYield, kYield };
+
+    /**
+     * Invoked once per drained batch, inside the transaction that applies that batch's keys and
+     * deletes its records.
+     */
+    using OnBatchAppliedFn = std::function<Status(OperationContext*)>;
 
     SideWritesTracker(OperationContext* opCtx,
                       std::string_view ident,
@@ -100,6 +80,7 @@ public:
                                 const IndexCatalogEntry* indexCatalogEntry,
                                 const InsertDeleteOptions& options,
                                 const IndexAccessMethod::KeyHandlerFn& onDuplicateKeyFn,
+                                const OnBatchAppliedFn& onBatchApplied,
                                 DrainYieldPolicy drainYieldPolicy);
 
     /**
@@ -110,6 +91,20 @@ public:
 
     uint64_t numApplied() const {
         return _numApplied;
+    }
+
+    /**
+     * Cumulative count of index keys written to the index table by this tracker's drains, and
+     * their total key string size in bytes. Both insertions and deletions are counted, since
+     * both write to the index table.
+     */
+    struct DrainWriteStats {
+        int64_t keysWritten = 0;
+        int64_t bytesWritten = 0;
+    };
+
+    DrainWriteStats getNumKeysAndBytesWritten() const {
+        return {_drainKeysWritten, _drainBytesWritten};
     }
 
     /**
@@ -141,9 +136,11 @@ private:
     // are additional fields that have to be referenced in commit/rollback handlers, this
     // counter should be moved to a new IndexBuildsInterceptor::InternalState structure that
     // will be managed as a shared resource.
-    std::shared_ptr<AtomicWord<uint64_t>> _counter = std::make_shared<AtomicWord<uint64_t>>(0);
+    std::shared_ptr<Atomic<uint64_t>> _counter = std::make_shared<Atomic<uint64_t>>(0);
 
     uint64_t _numApplied{0};
+    int64_t _drainKeysWritten{0};
+    int64_t _drainBytesWritten{0};
 };
 
 }  // namespace mongo

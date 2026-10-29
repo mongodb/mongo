@@ -2,6 +2,7 @@
  * This test ensures that hint on the distinct command works.
  *
  * @tags: [
+ *  uses_explain,
  *  assumes_unsharded_collection,
  *  requires_fcv_71,
  *  # Time series collections do not support sparse indexes on measurement fields.

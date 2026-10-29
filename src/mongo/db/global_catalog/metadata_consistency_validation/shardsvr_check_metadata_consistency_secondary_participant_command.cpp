@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -35,12 +9,15 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/metadata_consistency_validation/check_metadata_consistency_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
@@ -73,11 +50,15 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command. Do not call directly.";
+        return "Test-only internal command. Do not call directly.";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
+    }
+
+    bool maintenanceOk() const override {
+        return false;
     }
 
     class Invocation final : public InvocationBase {
@@ -85,12 +66,12 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             tassert(12922000,
-                    fmt::format("{} is a test-only command", Request::kCommandName),
-                    TestingProctor::instance().isEnabled());
+                    fmt::format("Cannot run {} on a node started without --shardsvr",
+                                Request::kCommandName),
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             const auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getMyHostAndPort();
             uassert(ErrorCodes::NotYetInitialized,
@@ -101,20 +82,41 @@ public:
             const auto& primaryShardId = request().getPrimaryShardId();
             const auto checkRangeDeletionIndexes =
                 request().getCommonFields().getCheckRangeDeletionIndexes();
+            const auto checkSecondariesMode =
+                request().getCommonFields().get_checkSecondariesMode();
             const auto checkIndexes = request().getCommonFields().getCheckIndexes();
 
-            auto inconsistencies =
+            tassert(12922306,
+                    "_shardsvrCheckMetadataConsistencySecondaryParticipantCommand must be invoked "
+                    "with _checkSecondariesMode != kNoSecondaryCheck",
+                    checkSecondariesMode.has_value() &&
+                        checkSecondariesMode !=
+                            CheckMetadataConsistencySecondaryModeEnum::kNoSecondaryCheck);
+            tassert(12922307,
+                    "ReadConcern must have afterClusterTime with _checkSecondariesMode == "
+                    "kCheckAtPrimaryTimestamp",
+                    checkSecondariesMode !=
+                            CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp ||
+                        repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime().has_value());
+
+            auto [inconsistencies, timestamp] =
                 metadata_consistency_util::runCheckMetadataConsistencyOnParticipant(
                     opCtx,
                     nss,
                     primaryShardId,
                     checkRangeDeletionIndexes,
                     checkIndexes,
-                    false /* asPrimaryNode */);
+                    request().getPerformStrictChunkChecksIfBelowThreshold(),
+                    checkSecondariesMode ==
+                            CheckMetadataConsistencySecondaryModeEnum::kCheckAtPrimaryTimestamp
+                        ? metadata_consistency_util::RSNodeMode::kSecondary
+                        : metadata_consistency_util::RSNodeMode::kDelayedSecondary);
 
             const auto& shardId = ShardingState::get(opCtx)->shardId();
             for (auto& inconsistency : inconsistencies) {
-                inconsistency.getProvenance().emplace(shardId, hostAndPort);
+                auto& provenance = inconsistency.getProvenance();
+                provenance.emplace(shardId, hostAndPort);
+                provenance->setTimestamp(timestamp);
             }
 
             return metadata_consistency_util::createInitialCursorReplyMongod(
@@ -131,12 +133,9 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const final {
-            if (level == repl::ReadConcernLevel::kSnapshotReadConcern) {
-                return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-            } else {
-                return CommandInvocation::supportsReadConcern(level, isImplicitDefault);
-            }
+                                                     bool isImplicitDefault) const override {
+            return {Status::OK(),
+                    Status{ErrorCodes::InvalidOptions, "default read concern not permitted"}};
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -149,7 +148,9 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencySecondaryParticipantCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencySecondaryParticipantCommand)
+    .testOnly()
+    .forShard();
 
 }  // namespace
 }  // namespace mongo

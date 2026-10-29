@@ -138,7 +138,7 @@ export function rollOver1MBOplog(replSet) {
     );
 }
 
-export function oplogRolloverTest(storageEngine, initialSyncMethod) {
+export function oplogRolloverTest(storageEngine, initialSyncMethod, extraSetParameters = {}) {
     jsTestLog("Testing with storageEngine: " + storageEngine);
     if (initialSyncMethod) {
         jsTestLog("  and initial sync method: " + initialSyncMethod);
@@ -149,10 +149,13 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod) {
     // truncate markers from being created during an insertion if the mutex cannot be obtained
     // immediately. Instead, the next insertion will attempt to create a new oplog truncate marker,
     // which this test does not do.
-    let parameters = {
-        logComponentVerbosity: tojson({storage: 2}),
-        "failpoint.hangOplogCapMaintainerThread": tojson({mode: "alwaysOn"}),
-    };
+    let parameters = Object.merge(
+        {
+            logComponentVerbosity: tojson({storage: 2}),
+            "failpoint.hangOplogCapMaintainerThread": tojson({mode: "alwaysOn"}),
+        },
+        extraSetParameters,
+    );
     if (initialSyncMethod) {
         parameters = Object.merge(parameters, {initialSyncMethod: initialSyncMethod});
     }

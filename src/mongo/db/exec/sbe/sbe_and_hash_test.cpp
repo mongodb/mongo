@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::AndHashStage.
@@ -63,13 +37,13 @@ using AndHashStageTest = PlanStageTestFixture;
 TEST_F(AndHashStageTest, AndHashCollationTest) {
     using namespace std::literals;
     for (auto useCollator : {false, true}) {
-        auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY("a" << "b"
-                                                                            << "c"));
-        value::ValueGuard innerGuard{innerTag, innerVal};
+        value::TagValueOwned innerArr =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY("a" << "b"
+                                                                                  << "c")));
 
-        auto [outerTag, outerVal] = stage_builder::makeValue(BSON_ARRAY("a" << "b"
-                                                                            << "A"));
-        value::ValueGuard outerGuard{outerTag, outerVal};
+        value::TagValueOwned outerArr =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY("a" << "b"
+                                                                                  << "A")));
 
         // After running the join we expect to get back pairs of the keys that were
         // matched up.
@@ -95,7 +69,7 @@ TEST_F(AndHashStageTest, AndHashCollationTest) {
                                     makeSV(innerCondSlot),
                                     makeSV(),
                                     boost::optional<value::SlotId>{useCollator, collatorSlot},
-                                    nullptr /* yieldPolicy */,
+                                    /*yieldPolicy=*/nullptr,
                                     kEmptyPlanNodeId);
 
             return std::make_pair(makeSV(innerCondSlot, outerCondSlot), std::move(andHashStage));
@@ -112,11 +86,9 @@ TEST_F(AndHashStageTest, AndHashCollationTest) {
                                value::bitcastFrom<CollatorInterface*>(collator.release()));
 
         // Two separate virtual scans are needed since AndHashStage needs two child stages.
-        outerGuard.reset();
-        auto [outerCondSlot, outerStage] = generateVirtualScan(outerTag, outerVal);
+        auto [outerCondSlot, outerStage] = generateVirtualScan(std::move(outerArr));
 
-        innerGuard.reset();
-        auto [innerCondSlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+        auto [innerCondSlot, innerStage] = generateVirtualScan(std::move(innerArr));
 
         // Call the `makeStage` callback to create the AndHashStage, passing in the mock scan
         // subtrees and the subtree's output slots.
@@ -127,10 +99,10 @@ TEST_F(AndHashStageTest, AndHashCollationTest) {
         auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
 
         // Get all the results produced by AndHash.
-        auto [resultsTag, resultsVal] = getAllResultsMulti(stage.get(), resultAccessors);
-        value::ValueGuard resultsGuard{resultsTag, resultsVal};
-        ASSERT_EQ(resultsTag, value::TypeTags::Array);
-        auto resultsView = value::getArrayView(resultsVal);
+        value::TagValueOwned resultsArr =
+            value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), resultAccessors));
+        ASSERT_EQ(resultsArr.tag(), value::TypeTags::Array);
+        auto resultsView = value::getArrayView(resultsArr.value());
 
         // make sure all the expected pairs occur in the result
         ASSERT_EQ(resultsView->size(), expectedVec.size());
@@ -158,24 +130,21 @@ TEST_F(AndHashStageTest, TestHashValueIsCopied) {
     // Outer side: one row with key="a" and projected value "projectedValue".
     // The string is >7 bytes to ensure heap allocation (StringBig), exercising
     // the ownership transfer in copyOrMoveValue().
-    auto [outerTag, outerVal] =
-        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY("a" << "projectedValue")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY("a" << "projectedValue"))));
 
     // Inner side: two rows both with key="a". Both match the single outer row,
     // so AndHash produces two results from the same hash table entry.
-    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY("a" << "a"));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY("a" << "a")));
 
     auto ctx = makeCompileCtx();
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, std::move(outerArr));
     auto outerKeySlot = outerSlots[0];
     auto outerProjectSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerKeySlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+    auto [innerKeySlot, innerStage] = generateVirtualScan(std::move(innerArr));
 
     auto andHashStage = makeS<AndHashStage>(std::move(outerStage),
                                             std::move(innerStage),
@@ -184,7 +153,7 @@ TEST_F(AndHashStageTest, TestHashValueIsCopied) {
                                             makeSV(innerKeySlot),
                                             makeSV(),
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     auto resultAccessors = prepareTree(ctx.get(), andHashStage.get(), makeSV(outerProjectSlot));
@@ -205,9 +174,9 @@ TEST_F(AndHashStageTest, TestHashValueIsCopied) {
 
     auto [tag2, val2] = projectAccessor->getViewOfValue();
 
-    auto [expectedTag, expectedVal] = value::makeNewString("projectedValue");
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
-    ASSERT_TRUE(valueEquals(tag2, val2, expectedTag, expectedVal));
+    value::TagValueOwned expectedStr =
+        value::TagValueOwned::fromRaw(value::makeNewString("projectedValue"));
+    ASSERT_TRUE(valueEquals(tag2, val2, expectedStr.tag(), expectedStr.value()));
 
     ASSERT_EQ(andHashStage->getNext(), PlanState::IS_EOF);
 
@@ -220,20 +189,18 @@ TEST_F(AndHashStageTest, AndHashMemoryLimitExceeded) {
         "internalSlotBasedExecutionAndHashStageMaxMemoryBytes", 1);
 
     // Outer side: one row with key=1 and projected value 1.
-    auto [outerTag, outerVal] =
-        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1))));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY(1 << BSON_ARRAY(1)))));
 
     // Inner side: one row with key=1.
-    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY(1));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1)));
 
     auto ctx = makeCompileCtx();
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
-    innerGuard.reset();
-    auto [innerKeySlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, std::move(outerArr));
+
+    auto [innerKeySlot, innerStage] = generateVirtualScan(std::move(innerArr));
 
     auto andHashStage = makeS<AndHashStage>(std::move(outerStage),
                                             std::move(innerStage),
@@ -242,7 +209,7 @@ TEST_F(AndHashStageTest, AndHashMemoryLimitExceeded) {
                                             makeSV(innerKeySlot),
                                             makeSV(),
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     // prepareTree() calls open() internally; with a 1-byte limit the first row inserted into
@@ -253,22 +220,19 @@ TEST_F(AndHashStageTest, AndHashMemoryLimitExceeded) {
 
 TEST_F(AndHashStageTest, AndHashMemoryTracking) {
     // Outer side: three rows, all with key=1 but different scalar projected values 10, 20, 30.
-    auto [outerTag, outerVal] = stage_builder::makeValue(
-        BSON_ARRAY(BSON_ARRAY(1 << 10) << BSON_ARRAY(1 << 20) << BSON_ARRAY(1 << 30)));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 10) << BSON_ARRAY(1 << 20) << BSON_ARRAY(1 << 30))));
 
     // Inner side: two rows, both with key=1. Each inner probe matches all 3 outer rows,
     // so the join produces 3 outer rows x 2 inner probes = 6 output rows total.
-    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY(1 << 1));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1 << 1)));
 
     auto ctx = makeCompileCtx();
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, std::move(outerArr));
 
-    innerGuard.reset();
-    auto [innerKeySlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+    auto [innerKeySlot, innerStage] = generateVirtualScan(std::move(innerArr));
 
     auto andHashStage = makeS<AndHashStage>(std::move(outerStage),
                                             std::move(innerStage),
@@ -277,7 +241,7 @@ TEST_F(AndHashStageTest, AndHashMemoryTracking) {
                                             makeSV(innerKeySlot),
                                             makeSV(),
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     auto resultAccessors =

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 
@@ -38,6 +12,8 @@
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/namespace_string_util.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -45,8 +21,9 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_shard.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -111,21 +88,21 @@ public:
         StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
 
         repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                              repl::ReadConcernLevel readConcern,
+                                                              repl::ReadConcernArgs readConcern,
                                                               BSONObj filter) override {
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
 
         std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
                                                           const DatabaseName& dbName,
-                                                          repl::ReadConcernLevel readConcernLevel,
+                                                          repl::ReadConcernArgs readConcern,
                                                           const BSONObj& sort) override {
             return {};
         }
 
         std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
-                                                   repl::ReadConcernLevel readConcernLevel,
+                                                   repl::ReadConcernArgs readConcern,
                                                    const BSONObj& sort) override {
             return _colls;
         }
@@ -144,9 +121,31 @@ public:
     }
 
     DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
-        return DatabaseType(kDbName,
-                            ShardRef{std::string{kShardList[0].getName()}},
-                            DatabaseVersion(uuid, timestamp));
+        return DatabaseType(kDbName, kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
+    }
+
+    repl::OplogEntry makeCreateDatabaseMetadataOplogEntry(const DatabaseType& dbMetadata) {
+        const auto dbNameStr =
+            DatabaseNameUtil::serialize(kDbName, SerializationContext::stateDefault());
+        return repl::makeCommandOplogEntry(
+            repl::OpTime(Timestamp(1, 1), 1),
+            NamespaceString::makeCommandNamespace(kDbName),
+            CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata, true /* fromClone */}.toBSON());
+    }
+
+    repl::OplogEntry makeDropDatabaseMetadataOplogEntry() {
+        const auto dbNameStr =
+            DatabaseNameUtil::serialize(kDbName, SerializationContext::stateDefault());
+        return repl::makeCommandOplogEntry(
+            repl::OpTime(Timestamp(1, 2), 1),
+            NamespaceString::makeCommandNamespace(kDbName),
+            DropDatabaseMetadataOplogEntry{dbNameStr, kDbName}.toBSON());
+    }
+
+    BSONObj getDatabaseVersionUpdateCounters() {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(operationContext()).report(&builder);
+        return builder.obj().getObjectField("databaseShardingMetadataStatistics").getOwned();
     }
 
     class RecoveryUnitMock : public RecoveryUnitNoop {
@@ -201,7 +200,7 @@ public:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart,
                                        transactionRuntimeContext);
 
@@ -214,7 +213,34 @@ public:
     }
 };
 
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, DatabaseMetadataOplogEntriesTrackApplication) {
+    auto opCtx = operationContext();
+    const auto dbMetadata = createDatabase(UUID::gen(), Timestamp(10, 0));
+    ShardServerOpObserver observer;
+
+    observer.onCreateDatabaseMetadata(opCtx, makeCreateDatabaseMetadataOplogEntry(dbMetadata));
+    auto counters = getDatabaseVersionUpdateCounters();
+    ASSERT_EQ(counters.getIntField("countCreateDatabaseMetadataOplogEntriesApplied"), 1);
+    ASSERT_EQ(counters.getIntField("countDropDatabaseMetadataOplogEntriesApplied"), 0);
+
+    observer.onDropDatabaseMetadata(opCtx, makeDropDatabaseMetadataOplogEntry());
+    counters = getDatabaseVersionUpdateCounters();
+    ASSERT_EQ(counters.getIntField("countCreateDatabaseMetadataOplogEntriesApplied"), 1);
+    ASSERT_EQ(counters.getIntField("countDropDatabaseMetadataOplogEntriesApplied"), 1);
+
+    ShardingStatistics::get(opCtx).databaseShardingMetadataStatistics.registerDbVersionMismatchWait(
+        12);
+    counters = getDatabaseVersionUpdateCounters();
+    ASSERT_EQ(counters.getIntField("countDbVersionMismatchWaits"), 1);
+    ASSERT_EQ(counters.getIntField("totalDbVersionMismatchWaitMillis"), 12);
+}
+
 TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
+    unittest::ServerParameterGuard authoritativeCrudGuard("featureFlagAuthoritativeShardsCRUD",
+                                                          false);
+    unittest::ServerParameterGuard authoritativeDdlGuard("featureFlagAuthoritativeShardsDDL",
+                                                         false);
+
     const auto uuid = UUID::gen();
 
     const auto oldDb = createDatabase(uuid, Timestamp(1));
@@ -249,8 +275,8 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckReceivedDatabaseVersion
 
     // Install DSR
     {
-        const auto dbInfoToInstall = DatabaseType(
-            kDbName, ShardRef{std::string{kShardList[0].getName()}}, installedDbVersion);
+        const auto dbInfoToInstall =
+            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
 
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dsr =
@@ -354,8 +380,8 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
 
     // Install DSR
     {
-        const auto dbInfoToInstall = DatabaseType(
-            kDbName, ShardRef{std::string{kShardList[0].getName()}}, installedDbVersion);
+        const auto dbInfoToInstall =
+            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
 
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dsr =
@@ -444,8 +470,8 @@ DEATH_TEST_REGEX_F(DatabaseShardingRuntimeTestWithMockedLoaderDeathTest,
 
     // Install DSR
     {
-        const auto dbInfoToInstall = DatabaseType(
-            kDbName, ShardRef{std::string{kShardList[0].getName()}}, installedDbVersion);
+        const auto dbInfoToInstall =
+            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dsr =
             DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);

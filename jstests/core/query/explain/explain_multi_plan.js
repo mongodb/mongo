@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   # This test asserts on query plans expected from unsharded collections.
 //   assumes_unsharded_collection,
 //   # TODO SERVER-30466

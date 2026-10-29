@@ -18,7 +18,7 @@ import {
     verifyDocuments,
 } from "jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
-import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunk_operation_errors.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;

@@ -3,11 +3,6 @@
  * and collection metadata, and does not block setFCV.
  *
  * TODO (SERVER-98118): Remove this test.
- *
- * @tags: [
- *   featureFlagAuthoritativeShardsCRUD,
- *   featureFlagAuthoritativeShardsDDL,
- * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -65,7 +60,7 @@ function assertAuthoritativeShardCatalog(shard, {authoritativeCollections, haveD
 describeOrSkip("FCV lifecycle for authoritative metadata", function () {
     const kDbName = "testDb";
 
-    let st, mongos, shard0, shard1;
+    let st, mongos, shard0, shard1, configPrimary;
 
     function assertFeatureFlags({enabled}) {
         const db = mongos.getDB(kDbName);
@@ -99,6 +94,11 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         mongos = st.s;
         shard0 = st.shard0;
         shard1 = st.shard1;
+        configPrimary = st.configRS.getPrimary();
+        // Add a shardName="config" so configPrimary can be passed to assertShardCatalogMatchesGlobal.
+        configPrimary.shardName = configPrimary
+            .getDB("admin")
+            .system.version.findOne({_id: "shardIdentity"}).shardName;
 
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
@@ -117,14 +117,12 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
     it("should correctly create and remove metadata on FCV upgrade and downgrade", function () {
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeShardCatalog(shard0, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
+        for (const node of [shard0, shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: false,
+                haveDatabases: false,
+            });
+        }
 
         // The upgrade creates the databases metadata on the primary shard, and the catalog on every shard.
         assert.commandWorked(
@@ -136,24 +134,24 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
             authoritativeCollections: true,
             haveDatabases: true,
         });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: true,
-            haveDatabases: false,
-        });
+        for (const node of [shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: true,
+                haveDatabases: false,
+            });
+        }
 
         // The downgrade drops everything from every shard.
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
 
-        assertAuthoritativeShardCatalog(shard0, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
+        for (const node of [shard0, shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: false,
+                haveDatabases: false,
+            });
+        }
     });
 
     it("should drop pre-existing metadata collection on FCV upgrade", function () {
@@ -233,37 +231,41 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
             authoritativeCollections: true,
             haveDatabases: true,
         });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: true,
-            haveDatabases: false,
-        });
+        for (const node of [shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: true,
+                haveDatabases: false,
+            });
+        }
 
-        // Manually create the databases collection on shard1 to simulate a dirty state.
-        assert.commandWorked(
-            shard1.getDB(kAuthoritativeDb).getCollection(kAuthoritativeDbsColl).insertOne({
-                _id: kDbName,
-            }),
-        );
-        st.rs1.awaitLastOpCommitted();
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: true,
-            haveDatabases: true,
-        });
+        // Manually create the databases collection on shard1 and the config server to simulate a
+        // dirty state.
+        for (const rs of [st.rs1, st.configRS]) {
+            const node = rs.getPrimary();
+            assert.commandWorked(
+                node.getDB(kAuthoritativeDb).getCollection(kAuthoritativeDbsColl).insertOne({
+                    _id: kDbName,
+                }),
+            );
+            rs.awaitLastOpCommitted();
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: true,
+                haveDatabases: true,
+            });
+        }
 
         assert.commandWorked(
             mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
 
-        // Assert everything is gone from both shards.
+        // Assert everything is gone from all shards.
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeShardCatalog(shard0, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
-        assertAuthoritativeShardCatalog(shard1, {
-            authoritativeCollections: false,
-            haveDatabases: false,
-        });
+        for (const node of [shard0, shard1, configPrimary]) {
+            assertAuthoritativeShardCatalog(node, {
+                authoritativeCollections: false,
+                haveDatabases: false,
+            });
+        }
     });
 
     function getGlobalCollectionMetadata(ns) {
@@ -426,6 +428,7 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         // primary; each data shard must carry the authoritative metadata exactly when it owns chunks.
         assertShardCatalogMatchesGlobal(shard1, sessionsNs, {isDbPrimary: false});
         assertShardCatalogMatchesGlobal(shard0, sessionsNs, {isDbPrimary: false});
+        assertShardCatalogMatchesGlobal(configPrimary, sessionsNs, {isDbPrimary: true});
 
         // A correct upgrade must leave no shard catalog inconsistencies for the collection.
         const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
@@ -438,93 +441,121 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
             () => `Unexpected shard catalog inconsistencies: ${tojson(inconsistencies)}`,
         );
     });
+});
 
-    // Pauses the donor's cloning DDL mid-upgrade, moves the database to the destination while paused,
-    // then resumes it. In this case the movePrimary, rather than the cloning DDL, becomes responsible
-    // for making the collection metadata authoritative.
-    function runMovePrimaryRaceDuringUpgrade(donorShard, destShard) {
-        const dbName = "movePrimaryRaceDb";
-        const db = mongos.getDB(dbName);
+describeOrSkip("dropDatabase during an FCV upgrade", function () {
+    const dbName = "dropDatabaseDuringFcvUpgrade";
+    let st;
+
+    beforeEach(function () {
+        st = new ShardingTest({shards: 1, config: 1, rs: {nodes: 2}});
         assert.commandWorked(
-            db.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}),
+            st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
         );
-
-        // A collection whose only chunk stays on the donor.
-        const onDonorNs = `${dbName}.onDonor`;
-        assert.commandWorked(db.adminCommand({shardCollection: onDonorNs, key: {x: 1}}));
-
-        // A collection whose only chunk is moved onto the destination.
-        const movedNs = `${dbName}.movedToNewPrimary`;
-        assert.commandWorked(db.adminCommand({shardCollection: movedNs, key: {x: 1}}));
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: movedNs,
-                find: {x: 0},
-                to: destShard.shardName,
-                _waitForDelete: true,
-            }),
-        );
-
-        // A collection with a chunk on both shards.
-        const onBothNs = `${dbName}.onBoth`;
-        assert.commandWorked(db.adminCommand({shardCollection: onBothNs, key: {x: 1}}));
-        assert.commandWorked(db.adminCommand({split: onBothNs, middle: {x: 0}}));
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: onBothNs,
-                find: {x: 0},
-                to: destShard.shardName,
-                _waitForDelete: true,
-            }),
-        );
-
-        // An unsplittable collection on the donor.
-        const trackedNs = `${dbName}.tracked`;
-        assert.commandWorked(
-            db.runCommand({
-                createUnsplittableCollection: "tracked",
-                dataShard: donorShard.shardName,
-            }),
-        );
-
-        const fp = configureFailPoint(
-            donorShard,
-            "hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL",
-            {
-                dbName: dbName,
-            },
-        );
-        const awaitUpgrade = startParallelShell(() => {
-            assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-            );
-        }, mongos.port);
-
-        fp.wait();
-        assert.commandWorked(db.adminCommand({movePrimary: dbName, to: destShard.shardName}));
-        fp.off();
-        awaitUpgrade();
-
-        st.awaitReplicationOnShards();
-
-        for (const ns of [onDonorNs, movedNs, onBothNs, trackedNs]) {
-            assertShardCatalogMatchesGlobal(destShard, ns, {isDbPrimary: true});
-            assertShardCatalogMatchesGlobal(donorShard, ns, {isDbPrimary: false});
-        }
-    }
-
-    // Test both shard0 -> shard1 and shard1 -> shard0 interleavings to ensure that we test the case
-    // where movePrimary has to clone the collection metadata and no later cloning fixes it up.
-    // I.e. the test may spuriously pass if the only interleaving we tested were:
-    // * cloneAuthoritativeMetadata(db, shard0)
-    // * movePrimary(db, from: shard0, to: shard1)
-    // * cloneAuthoritativeMetadata(db, shard1)
-    it("makes collection metadata authoritative when movePrimary races the cloning DDL (shard0 -> shard1)", function () {
-        runMovePrimaryRaceDuringUpgrade(shard0, shard1);
     });
 
-    it("makes collection metadata authoritative when movePrimary races the cloning DDL (shard1 -> shard0)", function () {
-        runMovePrimaryRaceDuringUpgrade(shard1, shard0);
+    afterEach(function () {
+        st.stop();
+    });
+
+    it("removes the dropped database's shard-local metadata", function () {
+        const configPrimary = st.configRS.getPrimary();
+        const shardPrimary = st.rs0.getPrimary();
+
+        function getFCV(conn) {
+            return assert.commandWorked(
+                conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+            ).featureCompatibilityVersion;
+        }
+
+        function getGlobalDatabaseMetadata() {
+            return st.s.getDB("config").databases.findOne({_id: dbName});
+        }
+
+        function getShardDatabaseMetadata(node) {
+            return node.getDB("config").shard.catalog.databases.findOne({_id: dbName});
+        }
+
+        function countDropDatabaseMetadataEntries() {
+            return shardPrimary
+                .getDB("local")
+                .getCollection("oplog.rs")
+                .countDocuments({op: "c", "o.dropDatabaseMetadata": {$exists: true}});
+        }
+
+        // Stop the upgrade after the config server enters upgrading FCV but before it transitions
+        // the shards. The config server can create authoritative database metadata while the shard
+        // still uses the non-authoritative metadata path.
+        const failPoint = configureFailPoint(
+            configPrimary,
+            "failAfterReachingTransitioningState",
+            {},
+            {times: 1},
+        );
+        assert.commandFailed(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        failPoint.wait();
+
+        const configFCV = getFCV(configPrimary);
+        assert.eq(lastLTSFCV, configFCV.version);
+        assert.eq(latestFCV, configFCV.targetVersion);
+        assert.eq(lastLTSFCV, getFCV(shardPrimary).version);
+
+        // Create a database. Since the configsvr is in kUpgrading state, we expect it to write
+        // authoritative database metadata on the shard.
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
+        const globalMetadata = getGlobalDatabaseMetadata();
+        const shardMetadata = getShardDatabaseMetadata(shardPrimary);
+        assert.neq(null, globalMetadata);
+        assert.neq(null, shardMetadata);
+        assert.eq(globalMetadata.version, shardMetadata.version);
+        const dropDatabaseMetadataEntriesBefore = countDropDatabaseMetadataEntries();
+
+        // Drop the database. dropDatabase runs on the shard, which still has not initiated the FCV
+        // upgrade. However, we expect it to still remove the authoritative database metadata.
+        assert.commandWorked(st.s.getDB(dbName).dropDatabase());
+        st.rs0.awaitReplication();
+        assert.eq(null, getGlobalDatabaseMetadata());
+        st.rs0.nodes.forEach((node) => assert.eq(null, getShardDatabaseMetadata(node)));
+        // The `dropDatabaseMetadata` oplog entry must not be written, since the shard has not yet
+        // transitioned to kUpgrading or kUpgraded FCV.
+        assert.eq(dropDatabaseMetadataEntriesBefore, countDropDatabaseMetadataEntries());
+
+        // Recreate the database.
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}),
+        );
+        const recreatedGlobalMetadata = getGlobalDatabaseMetadata();
+        const recreatedShardMetadata = getShardDatabaseMetadata(shardPrimary);
+        assert.neq(null, recreatedGlobalMetadata);
+        assert.neq(null, recreatedShardMetadata);
+        assert.eq(recreatedGlobalMetadata.version, recreatedShardMetadata.version);
+
+        // Complete FCV upgrade.
+        assert.commandWorked(
+            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+        );
+        st.rs0.awaitReplication();
+        assert.eq(recreatedGlobalMetadata.version, getGlobalDatabaseMetadata().version);
+        st.rs0.nodes.forEach((node) => {
+            const metadata = getShardDatabaseMetadata(node);
+            assert.neq(null, metadata);
+            assert.eq(recreatedGlobalMetadata.version, metadata.version);
+        });
+
+        // Drop the database again. The shard is now in kUpgraded FCV, so it must write a `dropDatabaseMetadata` oplog entry.
+        const dropDatabaseMetadataEntriesBeforeAuthoritative = countDropDatabaseMetadataEntries();
+        assert.commandWorked(st.s.getDB(dbName).dropDatabase());
+        st.rs0.awaitReplication();
+        assert.eq(null, getGlobalDatabaseMetadata());
+        st.rs0.nodes.forEach((node) => assert.eq(null, getShardDatabaseMetadata(node)));
+        assert.eq(
+            dropDatabaseMetadataEntriesBeforeAuthoritative + 1,
+            countDropDatabaseMetadataEntries(),
+        );
     });
 });
 

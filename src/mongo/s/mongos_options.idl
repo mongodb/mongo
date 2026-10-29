@@ -1,35 +1,11 @@
-# Copyright (C) 2019-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/s/mongos_options.h"
+        - "mongo/util/landlock/landlock.h"
     configs:
         section: "Sharding options"
         source: [yaml, cli, ini]
@@ -67,3 +43,31 @@ configs:
         description: "Enable javascript execution"
         arg_vartype: Bool
         source: [yaml]
+    "security.landlock.mode":
+        description: >-
+            Landlock self-sandboxing mode, restricting the server's filesystem access at
+            startup to a least-privilege set of paths. Alternatives are 'enforce' (refuse to
+            start when the running kernel cannot enforce the sandbox), 'bestEffort' (start
+            unsandboxed when it cannot) and 'disabled' (skip Landlock entirely). Linux only.
+        short_name: landlockMode
+        arg_vartype: String
+        default: "disabled"
+        source: [cli, yaml]
+        condition:
+            preprocessor: "defined(__linux__)"
+    "security.landlock.additionalPathRules":
+        description: >-
+            Additional filesystem hierarchies to permit under the Landlock sandbox, for paths
+            the server cannot derive from its own configuration. Each entry is
+            '<access>:<path>', where <access> is 'r' for read or 'rw' for read and write, and
+            <path> is absolute; the grant covers everything beneath it. Give one entry per
+            YAML list element, or repeat this option once per rule on the command line;
+            entries from both sources accumulate. Linux only.
+        short_name: landlockAdditionalPathRules
+        arg_vartype: StringVector
+        duplicate_behavior: append
+        source: [cli, yaml]
+        validator:
+            callback: validateLandlockAdditionalPathRules
+        condition:
+            preprocessor: "defined(__linux__)"

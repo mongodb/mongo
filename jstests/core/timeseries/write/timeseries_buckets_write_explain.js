@@ -2,6 +2,7 @@
  * Tests explaining write operations on the raw buckets of a timeseries collection.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  * ]
  */

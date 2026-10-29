@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -56,7 +30,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/service_entry_point_shard_role.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/password_digest.h"
 
@@ -68,44 +42,39 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {
 
-class SaslConversation : public ServiceContextTest {
+class SaslConversation : public ServiceContextTest,
+                         public testing::WithParamInterface<std::string> {
 public:
-    explicit SaslConversation(std::string mech);
+    void setUp() override;
 
-    void testSuccessfulAuthentication();
-    void testNoSuchUser();
-    void testBadPassword();
-    void testWrongClientMechanism();
-    void testWrongServerMechanism();
-    void testSCRAMSkipEmptyExchange();
+    void assertConversationFailure();
+
+    virtual bool skipServerSetup() const {
+        return false;
+    }
 
     ServiceContext::UniqueOperationContext opCtx;
-    auth::AuthorizationBackendMock* authzBackend;
-    SASLServerMechanismRegistry registry;
-    std::string mechanism;
+    auth::AuthorizationBackendMock* authzBackend = nullptr;
+    // Needs the Service, so it cannot be built before setUp() has run.
+    boost::optional<SASLServerMechanismRegistry> registry;
+    std::string mechanism = GetParam();
     std::unique_ptr<SaslClientSession> client;
     std::unique_ptr<ServerMechanismBase> server;
-
-private:
-    void assertConversationFailure();
-};
-
-class SaslIllegalConversation : public SaslConversation {
-public:
-    SaslIllegalConversation() : SaslConversation("ILLEGAL") {}
 };
 
 const std::string mockServiceName = "mocksvc";
 const std::string mockHostName = "host.mockery.com";
 
-SaslConversation::SaslConversation(std::string mech)
-    : opCtx(makeOperationContext()),
-      registry(getService(), {"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
-      mechanism(mech) {
+void SaslConversation::setUp() {
+    ServiceContextTest::setUp();
+    opCtx = makeOperationContext();
+    registry.emplace(getService(),
+                     std::vector<std::string>{"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"});
 
     // Initialize the serviceEntryPoint so that DBDirectClient can function.
     getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
@@ -126,18 +95,18 @@ SaslConversation::SaslConversation(std::string mech)
 
     client.reset(SaslClientSession::create(mechanism));
 
-    registry.registerFactory<PLAINServerFactory>(
+    registry->registerFactory<PLAINServerFactory>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
-    registry.registerFactory<SCRAMSHA1ServerFactory>(
+    registry->registerFactory<SCRAMSHA1ServerFactory>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
-    registry.registerFactory<SCRAMSHA256ServerFactory>(
+    registry->registerFactory<SCRAMSHA256ServerFactory>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
     // PLAIN mechanism uses the same hashed password as SCRAM-SHA-1,
     // but SCRAM-SHA-1's implementation makes the assumption the hashing has already
     // happened at both ends.
     // SCRAM-SHA-256 doesn't have this problem and always uses a pure password as input.
-    const auto pwHash = (mech == "PLAIN") ? createPasswordDigest("andy", "frim") : "frim";
+    const auto pwHash = (mechanism == "PLAIN") ? createPasswordDigest("andy", "frim") : "frim";
     const auto creds =
         BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
                                   pwHash, saslGlobalParams.scramSHA1IterationCount.load())
@@ -155,6 +124,12 @@ SaslConversation::SaslConversation(std::string mech)
                                         << "test"
                                         << "credentials" << creds << "roles" << BSONArray()),
                              BSONObj()));
+
+    if (!skipServerSetup()) {
+        auto swServer = registry->getServerMechanism(mechanism, "test");
+        ASSERT_OK(swServer.getStatus());
+        server = std::move(swServer.getValue());
+    }
 }
 
 void SaslConversation::assertConversationFailure() {
@@ -173,7 +148,7 @@ void SaslConversation::assertConversationFailure() {
                  server->isSuccess());
 }
 
-void SaslConversation::testSuccessfulAuthentication() {
+TEST_P(SaslConversation, SuccessfulAuthentication) {
     client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
     client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
     client->setParameter(SaslClientSession::parameterMechanism, mechanism);
@@ -191,7 +166,7 @@ void SaslConversation::testSuccessfulAuthentication() {
     ASSERT_TRUE(server->isSuccess());
 }
 
-void SaslConversation::testNoSuchUser() {
+TEST_P(SaslConversation, NoSuchUser) {
     client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
     client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
     client->setParameter(SaslClientSession::parameterMechanism, mechanism);
@@ -202,7 +177,7 @@ void SaslConversation::testNoSuchUser() {
     assertConversationFailure();
 }
 
-void SaslConversation::testBadPassword() {
+TEST_P(SaslConversation, BadPassword) {
     client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
     client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
     client->setParameter(SaslClientSession::parameterMechanism, mechanism);
@@ -214,7 +189,7 @@ void SaslConversation::testBadPassword() {
     assertConversationFailure();
 }
 
-void SaslConversation::testWrongClientMechanism() {
+TEST_P(SaslConversation, WrongClientMechanism) {
     client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
     client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
     client->setParameter(SaslClientSession::parameterMechanism,
@@ -226,7 +201,7 @@ void SaslConversation::testWrongClientMechanism() {
     assertConversationFailure();
 }
 
-void SaslConversation::testWrongServerMechanism() {
+TEST_P(SaslConversation, WrongServerMechanism) {
     client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
     client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
     client->setParameter(SaslClientSession::parameterMechanism, mechanism);
@@ -235,14 +210,14 @@ void SaslConversation::testWrongServerMechanism() {
     ASSERT_OK(client->initialize());
 
     auto swServer =
-        registry.getServerMechanism(mechanism != "SCRAM-SHA-1" ? "SCRAM-SHA-1" : "PLAIN", "test");
+        registry->getServerMechanism(mechanism != "SCRAM-SHA-1" ? "SCRAM-SHA-1" : "PLAIN", "test");
     ASSERT_OK(swServer.getStatus());
     server = std::move(swServer.getValue());
 
     assertConversationFailure();
 }
 
-void SaslConversation::testSCRAMSkipEmptyExchange() {
+TEST_P(SaslConversation, SCRAMSkipEmptyExchange) {
     if ((mechanism != "SCRAM-SHA-1") && (mechanism != "SCRAM-SHA-256")) {
         return;
     }
@@ -256,7 +231,7 @@ void SaslConversation::testSCRAMSkipEmptyExchange() {
         client->setParameter(SaslClientSession::parameterPassword, "frim");
         ASSERT_OK(client->initialize());
 
-        auto swServer = registry.getServerMechanism(mechanism, "test");
+        auto swServer = registry->getServerMechanism(mechanism, "test");
         ASSERT_OK(swServer.getStatus());
         server = std::move(swServer.getValue());
         ASSERT_OK(server->setOptions(BSON(saslCommandOptionSkipEmptyExchange << enabled)));
@@ -290,38 +265,14 @@ void SaslConversation::testSCRAMSkipEmptyExchange() {
     }
 }
 
-#define DEFINE_MECHANISM_FIXTURE(CLASS_SUFFIX, MECH_NAME)                   \
-    class SaslConversation##CLASS_SUFFIX : public SaslConversation {        \
-    public:                                                                 \
-        SaslConversation##CLASS_SUFFIX() : SaslConversation(MECH_NAME) {    \
-            auto swServer = registry.getServerMechanism(MECH_NAME, "test"); \
-            ASSERT_OK(swServer.getStatus());                                \
-            server = std::move(swServer.getValue());                        \
-        }                                                                   \
+class IllegalSaslConversation : public SaslConversation {
+public:
+    bool skipServerSetup() const override {
+        return true;
     }
+};
 
-#define DEFINE_MECHANISM_TEST(FIXTURE_NAME, TEST_NAME) \
-    TEST_F(FIXTURE_NAME, TEST_NAME) {                  \
-        test##TEST_NAME();                             \
-    }
-
-#define DEFINE_ALL_MECHANISM_TESTS(FIXTURE_NAME)                  \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, SuccessfulAuthentication) \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, NoSuchUser)               \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, BadPassword)              \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, WrongClientMechanism)     \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, WrongServerMechanism)     \
-    DEFINE_MECHANISM_TEST(FIXTURE_NAME, SCRAMSkipEmptyExchange)
-
-#define TEST_MECHANISM(CLASS_SUFFIX, MECH_NAME)        \
-    DEFINE_MECHANISM_FIXTURE(CLASS_SUFFIX, MECH_NAME); \
-    DEFINE_ALL_MECHANISM_TESTS(SaslConversation##CLASS_SUFFIX)
-
-TEST_MECHANISM(SCRAMSHA1, "SCRAM-SHA-1")
-TEST_MECHANISM(SCRAMSHA256, "SCRAM-SHA-256")
-TEST_MECHANISM(PLAIN, "PLAIN")
-
-TEST_F(SaslIllegalConversation, IllegalClientMechanism) {
+TEST_P(IllegalSaslConversation, IllegalClientMechanism) {
     client->setParameter(SaslClientSession::parameterServiceName, mockServiceName);
     client->setParameter(SaslClientSession::parameterServiceHostname, mockHostName);
     client->setParameter(SaslClientSession::parameterMechanism, "FAKE");
@@ -332,6 +283,11 @@ TEST_F(SaslIllegalConversation, IllegalClientMechanism) {
     std::string serverMessage;
     ASSERT(!client->initialize().isOK() || !client->step(serverMessage, &clientMessage).isOK());
 }
+
+INSTANTIATE_TEST_SUITE_P(,
+                         SaslConversation,
+                         testing::Values("SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"));
+INSTANTIATE_TEST_SUITE_P(, IllegalSaslConversation, testing::Values("ILLEGAL"));
 
 }  // namespace
 

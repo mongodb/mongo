@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,13 +15,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
@@ -71,21 +43,7 @@ namespace mongo {
 
 class CurrentChunkManager;
 
-using ShardHandleMap MONGO_MOD_NEEDS_REPLACEMENT =
-    stdx::unordered_map<ShardRef, ShardHandle, ShardRef::Hasher>;
-
-/**
- * Provides a mapping of shard references to shard handles for every shard in the shard registry.
- * Can trigger a shard registry lookup in the case that the topology time has been bumped and the
- * registry has not yet been refreshed.
- *
- * TODO (SERVER-126212): Remove this function once the chunk manager cannot contain a mix of shardId
- * and shard UUIDs.
- */
-MONGO_MOD_NEEDS_REPLACEMENT ShardHandleMap
-resolveShardHandlesForChunkManager(OperationContext* opCtx);
-
-struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] PlacementVersionTargetingInfo {
     /**
      * Constructs a placement information for a collection with the specified generation, starting
      * at placementVersion {0, 0} and maxValidAfter of Timestamp{0, 0}. The expectation is that the
@@ -105,15 +63,15 @@ struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
-using ShardPlacementVersionMap MONGO_MOD_NEEDS_REPLACEMENT =
-    stdx::unordered_map<ShardRef, PlacementVersionTargetingInfo, ShardRef::Hasher>;
+using ShardPlacementVersionMap [[MONGO_MOD_NEEDS_REPLACEMENT]] =
+    stdx::unordered_map<ShardId, PlacementVersionTargetingInfo, ShardId::Hasher>;
 
 /**
  * This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
  * provides a simpler, high-level interface for domain specific operations without exposing the
  * underlying implementation.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkMap {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkMap {
 public:
     // Vector of chunks ordered by max key in ascending order.
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
@@ -191,10 +149,6 @@ public:
         return _maxChunkVectorSize;
     }
 
-    /**
-     * The placement version map may contain both ShardId and ShardUUIDs for the same shard.
-     * Callers are responsible for resolving this information into a consistent view.
-     */
     const ShardPlacementVersionMap& getShardPlacementVersionMap() const {
         return _placementVersions;
     }
@@ -234,7 +188,7 @@ public:
             auto it = mapIt == mapItBegin ? _findIntersectingChunkIterator(shardKeyString,
                                                                            chunkVector.begin(),
                                                                            chunkVector.end(),
-                                                                           true /*isMaxInclusive*/)
+                                                                           /*isMaxInclusive=*/true)
                                           : chunkVector.begin();
             for (; it != chunkVector.end(); ++it) {
                 if (!handler(*it))
@@ -271,7 +225,7 @@ public:
                     return _findIntersectingChunkIterator(minShardKeyStr,
                                                           chunkVector.begin(),
                                                           chunkVector.end(),
-                                                          true /* isMaxInclusive */);
+                                                          /*isMaxInclusive=*/true);
                 }
                 return chunkVector.begin();
             }();
@@ -305,6 +259,12 @@ public:
                     : boost::make_optional(_chunkVectorMap.cbegin()->second->cbegin())};
     }
     ChunkMapIterator find(const BSONObj& shardKey) const;
+    /**
+     * Returns the closest chunk to 'shardKey' in 'direction', without requiring 'shardKey' to be
+     * contained in the returned chunk. Intended for gap-allowing maps where 'shardKey' may fall
+     * between chunks. Returns end() if no chunk exists in the given direction from 'shardKey'.
+     */
+    ChunkMapIterator findClosestInDirection(const BSONObj& shardKey, Direction direction) const;
     ChunkMapIterator end() const {
         auto chunkVectorMapEnd = _chunkVectorMap.cend();
         return {_chunkVectorMap,
@@ -314,13 +274,17 @@ public:
                     : boost::make_optional(std::prev(chunkVectorMapEnd)->second->cend())};
     }
 
-    ChunkMap createMerged(ChunkVector changedChunks) const;
+    ChunkMap createMerged(ChunkVector changedChunks, bool forceAllowGaps = false) const;
 
     BSONObj toBSON() const;
 
     std::string toString() const;
 
     static bool allElementsAreOfType(BSONType type, const BSONObj& obj);
+
+    bool allowGaps() const {
+        return _allowGaps;
+    }
 
 private:
     ChunkVector::const_iterator _findIntersectingChunkIterator(const std::string& shardKeyString,
@@ -332,7 +296,7 @@ private:
     _overlappingVectorSlotBounds(const std::string& minShardKeyStr,
                                  const std::string& maxShardKeyStr,
                                  bool isMaxInclusive) const;
-    ChunkMap _makeUpdated(ChunkVector&& changedChunks) const;
+    ChunkMap _makeUpdated(ChunkVector&& changedChunks, bool forceAllowGaps) const;
 
     void _updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk);
     void _updateShardVersionFromUpdateChunk(const ChunkInfo& chunk,
@@ -368,7 +332,7 @@ private:
  * In-memory representation of the routing table for a single sharded collection at various points
  * in time.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT RoutingTableHistory {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RoutingTableHistory {
     RoutingTableHistory(const RoutingTableHistory&) = delete;
     RoutingTableHistory& operator=(const RoutingTableHistory&) = delete;
 
@@ -433,13 +397,16 @@ public:
      * timeseriesFields/reshardingFields parameter implies that the field was not present, and will
      * clear any currently held timeseries/resharding fields inside the resulting
      * RoutingTableHistory.
+     *
+     * TODO (SERVER-130830) Remove forceAllowGaps once v9.0 branches out
      */
     RoutingTableHistory makeUpdated(
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         bool allowMigrations,
         bool unsplittable,
-        const std::vector<ChunkType>& changedChunks) const;
+        const std::vector<ChunkType>& changedChunks,
+        bool forceAllowGaps = false) const;
 
     const NamespaceString& nss() const {
         return _nss;
@@ -490,6 +457,14 @@ public:
 
     size_t numChunks() const {
         return _chunkMap.size();
+    }
+
+    /**
+     * Returns true if this routing table may have gaps in the key range (it holds only a subset of
+     * the collection's chunks). See ChunkManagerBase::allowGaps().
+     */
+    bool allowGaps() const {
+        return _chunkMap.allowGaps();
     }
 
     template <typename Callable>
@@ -620,7 +595,7 @@ private:
  *
  * This class should go away once a cluster-wide comparable ChunkVersion is implemented.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ComparableChunkVersion {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ComparableChunkVersion {
 public:
     /**
      * Creates a ComparableChunkVersion that wraps the given ChunkVersion.
@@ -677,8 +652,8 @@ public:
 private:
     friend class CatalogCache;
 
-    static AtomicWord<uint64_t> _epochDisambiguatingSequenceNumSource;
-    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
+    static Atomic<uint64_t> _epochDisambiguatingSequenceNumSource;
+    static Atomic<uint64_t> _forcedRefreshSequenceNumSource;
 
     ComparableChunkVersion(uint64_t forcedRefreshSequenceNum,
                            boost::optional<ChunkVersion> version,
@@ -687,7 +662,7 @@ private:
           _chunkVersion(std::move(version)),
           _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
 
-    MONGO_MOD_NEEDS_REPLACEMENT void setChunkVersion(const ChunkVersion& version);
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] void setChunkVersion(const ChunkVersion& version);
 
     uint64_t _forcedRefreshSequenceNum{0};
 
@@ -705,7 +680,7 @@ private:
  * supports tracked collections (i.e., collections which have entries in config.collections and
  * config.chunks).
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT OptionalRoutingTableHistory {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] OptionalRoutingTableHistory {
     // UNTRACKED collection constructor
     OptionalRoutingTableHistory() = default;
 
@@ -716,18 +691,18 @@ struct MONGO_MOD_NEEDS_REPLACEMENT OptionalRoutingTableHistory {
     std::shared_ptr<RoutingTableHistory> optRt;
 };
 
-using RoutingTableHistoryCache MONGO_MOD_UNFORTUNATELY_OPEN =
+using RoutingTableHistoryCache [[MONGO_MOD_UNFORTUNATELY_OPEN]] =
     ReadThroughCache<NamespaceString,
                      OptionalRoutingTableHistory,
                      ComparableChunkVersion,
                      ObservableMutex<std::mutex>>;
-using RoutingTableHistoryValueHandle MONGO_MOD_NEEDS_REPLACEMENT =
+using RoutingTableHistoryValueHandle [[MONGO_MOD_NEEDS_REPLACEMENT]] =
     RoutingTableHistoryCache::ValueHandle;
 
 /**
  * Combines a shard, the shard version, and database version that the shard should be using
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT ShardEndpoint {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
                   boost::optional<ShardVersion> shardVersionParam,
                   boost::optional<DatabaseVersion> dbVersionParam);
@@ -738,13 +713,6 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardEndpoint {
 
     boost::optional<ShardVersion> shardVersion;
     boost::optional<DatabaseVersion> databaseVersion;
-};
-
-/**
- * Compares shard endpoints in a map.
- */
-struct MONGO_MOD_NEEDS_REPLACEMENT EndpointComp {
-    bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
 };
 
 /**
@@ -798,7 +766,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT EndpointComp {
  *    - Respects atClusterTime for all chunk operations
  *    - Used for snapshot reads and multi-document transactions
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ChunkManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ChunkManager {
     friend class PointInTimeChunkManager;
 
 public:
@@ -846,6 +814,16 @@ public:
         return _rt->optRt ? _rt->optRt->numChunks() : 1;
     }
 
+    /**
+     * Returns true if the routing table only holds a subset of the collection's chunks and may
+     * therefore have gaps in the key range. Shard filtering tables built from the authoritative
+     * shard catalog contain only this shard's owned chunks and allow gaps; a full routing table
+     * (every chunk of the collection) does not. Returns false when there is no routing table.
+     */
+    bool allowGaps() const {
+        return _rt->optRt ? _rt->optRt->allowGaps() : false;
+    }
+
     std::string toString() const;
 
     // Methods only supported on collections registered in the sharding catalog (caller must check
@@ -872,31 +850,17 @@ public:
     }
 
     /**
-     * Retrieves the placement version for the given shard. May be blocking if the shard registry
-     * is not up to date.
-     *
-     * Methods in the CollectionMetadata using the ShardingState's shardId may pass nullptr to avoid
-     * shard registry lookups. TODO (SERVER-128349): Remove this caveat.
-     *
-     * TODO (SERVER-126212): Remove the operation context argument once shard ref resolution is no
-     * longer needed.
+     * Retrieves the placement version for the given shard.
      */
-    ChunkVersion getVersion(OperationContext*, const ShardId& shardId) const {
+    ChunkVersion getVersion(const ShardId& shardId) const {
         tassert(7626404, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersion(shardId);
     }
 
     /**
-     * Retrieves the maximum validAfter timestamp for the given shard. May be blocking if the shard
-     * registry is not up to date.
-     *
-     * Methods in the CollectionMetadata using the ShardingState's shardId may pass nullptr to avoid
-     * shard registry lookups. TODO (SERVER-128349): Remove this caveat.
-     *
-     * TODO (SERVER-126212): Remove the operation context argument once shard ref resolution is no
-     * longer needed.
+     * Retrieves the maximum validAfter timestamp for the given shard.
      */
-    Timestamp getMaxValidAfter(OperationContext*, const ShardId& shardId) const {
+    Timestamp getMaxValidAfter(const ShardId& shardId) const {
         tassert(7626405, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getMaxValidAfter(shardId);
     }
@@ -905,16 +869,8 @@ public:
      * Retrieves the placement version for the given shard.
      * Only use when logging the given chunk version -- if the caller must execute logic
      * based on the returned version, use getVersion() instead.
-     *
-     * May be blocking if the shard registry is not up to date.
-     *
-     * Methods in the CollectionMetadata using the ShardingState's shardId may pass nullptr to avoid
-     * shard registry lookups. TODO (SERVER-128349): Remove this caveat.
-     *
-     * TODO (SERVER-126212): Remove the operation context argument once shard ref resolution is no
-     * longer needed.
      */
-    ChunkVersion getVersionForLogging(OperationContext*, const ShardId& shardId) const {
+    ChunkVersion getVersionForLogging(const ShardId& shardId) const {
         tassert(7626406, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersionForLogging(shardId);
     }
@@ -954,9 +910,7 @@ public:
      * "shardId" in this routing table. If "shardKey" is empty returns false. If "shardKey" is not a
      * valid shard key, the behaviour is undefined.
      */
-    bool keyBelongsToShard(OperationContext*,
-                           const BSONObj& shardKey,
-                           const ShardId& shardId) const;
+    bool keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const;
 
     struct ChunkOwnership {
         bool containsShardKey;
@@ -969,17 +923,14 @@ public:
      * 'nearestOwnedChunk' = boost::none); it is also possible that the nearest chunk is the one
      * which includes 'shardKey'(in which case 'containsShardKey' = true).
      */
-    ChunkOwnership nearestOwnedChunk(OperationContext*,
-                                     const BSONObj& shardKey,
+    ChunkOwnership nearestOwnedChunk(const BSONObj& shardKey,
                                      const ShardId& shardId,
                                      ChunkMap::Direction direction) const;
 
     /**
      * Returns true if any chunk owned by the shard with the given "shardId" overlaps "range".
      */
-    bool rangeOverlapsShard(OperationContext*,
-                            const ChunkRange& range,
-                            const ShardId& shardId) const;
+    bool rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const;
 
     /**
      * Given a shard key (or a prefix) that has been extracted from a document, returns the chunk
@@ -1009,7 +960,7 @@ public:
      * Finds the shard id of the shard that owns the chunk minKey belongs to, assuming the simple
      * collation because shard keys do not support non-simple collations.
      */
-    ShardId getMinKeyShardIdWithSimpleCollation(OperationContext*) const;
+    ShardId getMinKeyShardIdWithSimpleCollation() const;
 
     /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
@@ -1017,8 +968,7 @@ public:
      * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
      * query.
      */
-    void getShardIdsForRange(OperationContext*,
-                             const BSONObj& min,
+    void getShardIdsForRange(const BSONObj& min,
                              const BSONObj& max,
                              std::set<ShardId>* shardIds,
                              std::set<ChunkRange>* chunkRanges = nullptr,
@@ -1031,7 +981,7 @@ public:
      *
      * TODO SERVER-114823: Remove all usages getAllShardIds_UNSAFE_NotPointInTime
      */
-    void getAllShardIds_UNSAFE_NotPointInTime(OperationContext*, std::set<ShardId>* all) const {
+    void getAllShardIds_UNSAFE_NotPointInTime(std::set<ShardId>* all) const {
         tassert(8719701, "Expected routing table to be initialized", _rt->optRt);
         _rt->optRt->getAllShardIds(all);
     }
@@ -1053,7 +1003,7 @@ public:
      *
      * TODO SERVER-114823: Remove all usages getAproxNShardsOwningChunks
      */
-    size_t getAproxNShardsOwningChunks(OperationContext*) const {
+    size_t getAproxNShardsOwningChunks() const {
         tassert(7626411, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getNShardsOwningChunks();
     }
@@ -1106,7 +1056,7 @@ protected:
     boost::optional<Timestamp> _clusterTime;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT CurrentChunkManager : public ChunkManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] CurrentChunkManager : public ChunkManager {
 public:
     explicit CurrentChunkManager(RoutingTableHistoryValueHandle rt)
         : ChunkManager(std::move(rt), boost::none) {}
@@ -1117,15 +1067,15 @@ public:
      *
      * Can only be used when this ChunkManager is not at point-in-time.
      */
-    boost::optional<Chunk> getNextChunkOnShard(OperationContext*,
-                                               const BSONObj& shardKey,
+    boost::optional<Chunk> getNextChunkOnShard(const BSONObj& shardKey,
                                                const ShardId& shardId) const;
 
     /**
      * Returns a new CurrentChunkManager with the given chunk changes applied to this manager's
      * routing table.
      */
-    CurrentChunkManager makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+    CurrentChunkManager makeUpdated(const std::vector<ChunkType>& changedChunks,
+                                    bool forceAllowGaps = false) const;
 
     /**
      * Returns the ids of all shards on which the collection has any chunks.
@@ -1152,7 +1102,7 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT PointInTimeChunkManager : public ChunkManager {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] PointInTimeChunkManager : public ChunkManager {
 public:
     PointInTimeChunkManager(RoutingTableHistoryValueHandle rt, Timestamp clusterTime)
         : ChunkManager(std::move(rt), clusterTime) {}
@@ -1166,6 +1116,7 @@ public:
  * If `max` is the max bound of some chunk, returns that chunk.
  * Otherwise, returns the chunk that contains the key `max`.
  */
-MONGO_MOD_NEEDS_REPLACEMENT Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] Chunk getChunkForMaxBound(const ChunkManager& cm,
+                                                          const BSONObj& max);
 
 }  // namespace mongo

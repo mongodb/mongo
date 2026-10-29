@@ -1,30 +1,5 @@
-# Copyright (C) 2019-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     mod_visibility: private
@@ -54,7 +29,7 @@ server_parameters:
 
     wiredTigerSessionCloseIdleTimeSecs:
         description: "Close idle wiredtiger sessions in the session cache after this many seconds"
-        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_vartype: "Atomic<std::int32_t>"
         cpp_varname: gWiredTigerSessionCloseIdleTimeSecs
         set_at: [startup, runtime]
         default:
@@ -98,7 +73,7 @@ server_parameters:
     wiredTigerCursorCacheSize:
         description: "Wired tiger cursor cache size"
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_vartype: "Atomic<std::int32_t>"
         cpp_varname: gWiredTigerCursorCacheSize
         default: -100
         validator:
@@ -363,7 +338,7 @@ server_parameters:
         description: >-
             The minimum number of threads that the WiredTiger instance will use for cache eviction.
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_vartype: "Atomic<std::int32_t>"
         cpp_varname: gWiredTigerEvictionThreadsMin
         on_update: "WiredTigerKVEngine::updateEvictionThreadsMin"
         default: 4
@@ -376,7 +351,7 @@ server_parameters:
         description: >-
             The maximum number of threads that the WiredTiger instance will use for cache eviction.
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<std::int32_t>"
+        cpp_vartype: "Atomic<std::int32_t>"
         cpp_varname: gWiredTigerEvictionThreadsMax
         on_update: "WiredTigerKVEngine::updateEvictionThreadsMax"
         default: 4
@@ -487,7 +462,7 @@ server_parameters:
             will not be thrown."
         set_at: [startup, runtime]
         cpp_varname: "gTransactionTooLargeForCacheThreshold"
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         default: 0.75
         validator:
             gte: 0.0
@@ -503,7 +478,7 @@ server_parameters:
             writes. Blind writes avoid a redundant read-before-write, eliminating standby cache
             misses during oplog application.
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<double>"
+        cpp_vartype: "Atomic<double>"
         cpp_varname: gWiredTigerBlindWriteRatio
         # 99.9% blind -- 1-in-1000 writes remain non-blind as a sanity check without materially
         # regressing standby write throughput.
@@ -590,6 +565,8 @@ configs:
         cpp_varname: "wiredTigerGlobalOptions.engineConfig"
         short_name: wiredTigerEngineConfigString
         hidden: true
+        validator:
+            callback: WiredTigerGlobalOptions::validateWiredTigerConfigString
     "storage.wiredTiger.engineConfig.liveRestoreSource":
         description: "Path to the source for live restore."
         arg_vartype: String
@@ -638,6 +615,8 @@ configs:
         cpp_varname: "wiredTigerGlobalOptions.collectionConfig"
         short_name: wiredTigerCollectionConfigString
         hidden: true
+        validator:
+            callback: WiredTigerGlobalOptions::validateWiredTigerConfigString
 
     # WiredTiger index options
     "storage.wiredTiger.indexConfig.prefixCompression":
@@ -652,3 +631,5 @@ configs:
         cpp_varname: "wiredTigerGlobalOptions.indexConfig"
         short_name: wiredTigerIndexConfigString
         hidden: true
+        validator:
+            callback: WiredTigerGlobalOptions::validateWiredTigerConfigString

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
@@ -56,8 +30,9 @@ struct c_api_to_cpp_api<::MongoExtensionLogicalAggStage> {
  */
 class LogicalAggStageAPI : public VTableAPI<::MongoExtensionLogicalAggStage> {
 public:
-    LogicalAggStageAPI(::MongoExtensionLogicalAggStage* ptr)
-        : VTableAPI<::MongoExtensionLogicalAggStage>(ptr) {}
+    LogicalAggStageAPI(::MongoExtensionLogicalAggStage* ptr,
+                       const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+        : VTableAPI<::MongoExtensionLogicalAggStage>(ptr, capability) {}
 
     std::string_view getName() const;
 
@@ -139,33 +114,47 @@ public:
      */
     boost::optional<MongoExtensionDocsNeededBoundsInfo> getDocsNeededBounds() const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11420603, "LogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
-        tassert(11173703, "LogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
-        tassert(11239401, "LogicalAggStage 'explain' is null", vtable.explain != nullptr);
-        tassert(10957200, "LogicalAggStage 'compile' is null", vtable.compile != nullptr);
-        tassert(10917600,
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'serialize' is null",
+                vtable.serialize != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'explain' is null",
+                vtable.explain != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'compile' is null",
+                vtable.compile != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_distributed_plan_logic' is null",
                 vtable.get_distributed_plan_logic != nullptr);
-        tassert(11713400, "LogicalAggStage 'clone' is null", vtable.clone != nullptr);
-        tassert(11553300,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'clone' is null",
+                vtable.clone != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'set_vector_search_limit_for_optimization' is null",
                 vtable.set_vector_search_limit_for_optimization_deprecated != nullptr);
-        tassert(12201402,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'evaluate_pipeline_rewrite_rule_precondition' is null",
                 vtable.evaluate_pipeline_rewrite_rule_precondition != nullptr);
-        tassert(12201403,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'evaluate_pipeline_rewrite_rule_transform' is null",
                 vtable.evaluate_pipeline_rewrite_rule_transform != nullptr);
-        tassert(12200400, "LogicalAggStage 'get_filter' is null", vtable.get_filter != nullptr);
-        tassert(12200100,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'get_filter' is null",
+                vtable.get_filter != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'apply_pipeline_suffix_dependencies' is null",
                 vtable.apply_pipeline_suffix_dependencies != nullptr);
-        tassert(12327100,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_sort_pattern' is null",
                 vtable.get_sort_pattern != nullptr);
-        tassert(12601400, "LogicalAggStage 'skip_stream' is null", vtable.skip_stream != nullptr);
-        tassert(11842300,
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "LogicalAggStage 'skip_stream' is null",
+                vtable.skip_stream != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_docs_needed_bounds' is null",
                 vtable.get_docs_needed_bounds != nullptr);
     }

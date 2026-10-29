@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -274,9 +248,13 @@ public:
     repl::ReplicationCoordinatorMock* _coordinatorMock;
     repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
-    StorageTimestampTest()
-        : ServiceContextMongoDTest(Options{}.useReplSettings(true).useMockClock(true)) {
-        // Set up mongod.
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useReplSettings(true)
+            .useMockClock(true);
+    }
+
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         _opCtxRaii = cc().makeOperationContext();
@@ -493,12 +471,12 @@ public:
     }
 
     BSONObj queryOplog(const BSONObj& query) {
-        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
+        OneOffRead oor(_opCtx, Timestamp::min(), /*waitForOplog=*/true);
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
     }
 
     Timestamp getTopOfOplog() {
-        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
+        OneOffRead oor(_opCtx, Timestamp::min(), /*waitForOplog=*/true);
         BSONObj ret;
         ASSERT_TRUE(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, ret));
         return ret["ts"].timestamp();
@@ -832,7 +810,7 @@ public:
         stdx::unordered_set<std::string> fieldNames;
         auto cursor = collectionPtr->getCursor(_opCtx);
         for (auto record = cursor->next(); record; record = cursor->next()) {
-            _extractDottedFieldNames(record->data.toBson(), "" /*prefix*/, fieldNames);
+            _extractDottedFieldNames(record->data.toBson(), /*prefix=*/"", fieldNames);
         }
         return fieldNames;
     }
@@ -1940,7 +1918,7 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -1975,14 +1953,13 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     // but it is incorrect to assign a timestamp that is too late. In this specific case, we
     // expect the write to be timestamped at the logical clock tick directly preceding the
     // commit time.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, false /* shouldBeMultikey */, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, /*shouldBeMultikey=*/false, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {{}});
     assertMultikeyPaths(
-        _opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+        _opCtx, collPtr, indexName, multikeyNoopTs, /*shouldBeMultikey=*/true, {{0}});
     assertMultikeyPaths(
-        _opCtx, collPtr, indexName, multikeyNoopTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(
-        _opCtx, collPtr, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {{0}});
+        _opCtx, collPtr, indexName, commitEntryTs, /*shouldBeMultikey=*/true, {{0}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {{0}});
 }
 
 TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTransaction) {
@@ -2023,7 +2000,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2045,8 +2022,8 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
     // Verify the catalog multikey flag is set at the latest timestamp.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, false /* shouldBeMultikey */, {});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, /*shouldBeMultikey=*/false, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {});
 
     // Verify the wildcard metadata keys are present at the latest timestamp.
     // The field "a" is an array, so it should be recorded as a multikey path.
@@ -2068,7 +2045,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     }
 
     // Before the transaction, the catalog multikey flag should not be set.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 }
 
 TEST_F(StorageTimestampTest,
@@ -2109,7 +2086,7 @@ TEST_F(StorageTimestampTest,
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2195,7 +2172,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2228,9 +2205,9 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
     // Verify the catalog multikey flag is set at the latest timestamp.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {});
     // Before the transaction, multikey should not be set.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     // Verify the wildcard metadata keys are present at the latest timestamp.
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
@@ -2290,7 +2267,7 @@ TEST_F(StorageTimestampTest, PrimarySetsCompoundWildcardMultikeyInsideMultiDocum
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2307,10 +2284,10 @@ TEST_F(StorageTimestampTest, PrimarySetsCompoundWildcardMultikeyInsideMultiDocum
     const auto collAcq = acquireCollForRead(_opCtx, nss);
     const auto& collPtr = collAcq.getCollectionPtr();
 
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {});
 
     // Before the transaction, the catalog multikey flag should not be set.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     ASSERT(entry);
@@ -2389,8 +2366,8 @@ TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransac
     const auto& collPtr = collAcq.getCollectionPtr();
 
     // Catalog flag set after apply, not before.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, /*shouldBeMultikey=*/true, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     ASSERT(entry);
@@ -2524,8 +2501,8 @@ TEST_F(StorageTimestampTest, SecondaryAppliesCompoundWildcardMultikeyMetadataFro
     const auto collAcq = acquireCollForRead(_opCtx, nss);
     const auto& collPtr = collAcq.getCollectionPtr();
 
-    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, /*shouldBeMultikey=*/true, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     ASSERT(entry);
@@ -2586,9 +2563,8 @@ TEST_F(StorageTimestampTest, SecondaryAppliesRegularMultikeyMetadataFromTransact
     const auto& collPtr = collAcq.getCollectionPtr();
 
     // Regular index: catalog flag set + multikey path component is recorded.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(
-        _opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, /*shouldBeMultikey=*/true, {{0}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {{}});
 }
 
 TEST_F(StorageTimestampTest, InitializeMinValid) {
@@ -2664,119 +2640,105 @@ TEST_F(StorageTimestampTest, SetMinValidAppliedThrough) {
  * timestamping `dropDatabase` side-effects no longer applies. The purpose of this test is to
  * exercise the `StorageEngine::dropDatabase` method.
  */
-class KVDropDatabase : public StorageTimestampTest {
-private:
-    void TestBody() override {
-        // Not actually called.
-    }
+class KVDropDatabaseTest : public StorageTimestampTest, public testing::WithParamInterface<bool> {};
 
-public:
-    void run(bool simulatePrimary) {
-        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-        auto mdbCatalog = storageEngine->getMDBCatalog();
 
-        // Declare the database to be in a "synced" state, i.e: in steady-state replication.
-        Timestamp syncTime = _clock->tickClusterTime(1).asTimestamp();
-        invariant(!syncTime.isNull());
-        storageEngine->setInitialDataTimestamp(syncTime);
+TEST_P(KVDropDatabaseTest, Primary) {
+    bool simulatePrimary = GetParam();
+    auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto mdbCatalog = storageEngine->getMDBCatalog();
 
-        // This test drops collections piece-wise instead of having the "drop database" algorithm
-        // perform this walk. Defensively operate on a separate DB from the other tests to ensure
-        // no leftover collections carry-over.
-        const NamespaceString nss =
-            NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
-        const NamespaceString sysProfile =
-            NamespaceString::createNamespaceString_forTest("unittestsDropDB.system.profile");
+    // Declare the database to be in a "synced" state, i.e: in steady-state replication.
+    Timestamp syncTime = _clock->tickClusterTime(1).asTimestamp();
+    invariant(!syncTime.isNull());
+    storageEngine->setInitialDataTimestamp(syncTime);
 
-        std::string collIdent;
-        std::string indexIdent;
-        std::string sysProfileIdent;
-        // `*.system.profile` does not have an `_id` index. Just create it to abide by the API. This
-        // value will be the empty string. Helper methods accommodate this.
-        std::string sysProfileIndexIdent;
-        for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
-                            std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
-            auto collAcq = acquireCollection(_opCtx,
-                                             CollectionAcquisitionRequest::fromOpCtx(
-                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                             MODE_X);
-            ;
+    // This test drops collections piece-wise instead of having the "drop database" algorithm
+    // perform this walk. Defensively operate on a separate DB from the other tests to ensure
+    // no leftover collections carry-over.
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
+    const NamespaceString sysProfile =
+        NamespaceString::createNamespaceString_forTest("unittestsDropDB.system.profile");
 
-            // Save the pre-state idents so we can capture the specific idents related to collection
-            // creation.
-            std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
-            const auto& nss = std::get<0>(tuple);
+    std::string collIdent;
+    std::string indexIdent;
+    std::string sysProfileIdent;
+    // `*.system.profile` does not have an `_id` index. Just create it to abide by the API. This
+    // value will be the empty string. Helper methods accommodate this.
+    std::string sysProfileIndexIdent;
+    for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
+                        std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ;
 
-            // Non-replicated namespaces are wrapped in an unreplicated writes block. This has the
-            // side-effect of not timestamping the collection creation.
-            repl::UnreplicatedWritesBlock notReplicated(_opCtx);
-            if (nss.isReplicated()) {
-                TimestampBlock tsBlock(_opCtx, _clock->tickClusterTime(1).asTimestamp());
-                create(nss);
-            } else {
-                create(nss);
-            }
+        // Save the pre-state idents so we can capture the specific idents related to collection
+        // creation.
+        std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
+        const auto& nss = std::get<0>(tuple);
 
-            // Bind the local values to the variables in the parent scope.
-            auto& collIdent = std::get<1>(tuple);
-            auto& indexIdent = std::get<2>(tuple);
-            std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(mdbCatalog, origIdents);
-        }
-
-        {
-            // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
-            auto coll = acquireCollection(_opCtx,
-                                          CollectionAcquisitionRequest::fromOpCtx(
-                                              _opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                          LockMode::MODE_X);
-            WriteUnitOfWork wuow(_opCtx);
-            Database* db = DatabaseHolder::get(_opCtx)->getDb(_opCtx, nss.dbName());
-            ASSERT_OK(db->dropCollection(_opCtx, nss));
-            wuow.commit();
-        }
-
-        // Reserve a tick, this represents a time after the rename in which the `kvDropDatabase`
-        // ident for `kvDropDatabase` still exists.
-        const Timestamp postRenameTime = _clock->tickClusterTime(1).asTimestamp();
-
-        // Because the storage engine is managing drops internally, the ident should not be visible
-        // after a drop.
-        assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, postRenameTime);
-
-        const Timestamp dropTime = _clock->tickClusterTime(1).asTimestamp();
-        if (simulatePrimary) {
-            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
+        // Non-replicated namespaces are wrapped in an unreplicated writes block. This has the
+        // side-effect of not timestamping the collection creation.
+        repl::UnreplicatedWritesBlock notReplicated(_opCtx);
+        if (nss.isReplicated()) {
+            TimestampBlock tsBlock(_opCtx, _clock->tickClusterTime(1).asTimestamp());
+            create(nss);
         } else {
-            repl::UnreplicatedWritesBlock uwb(_opCtx);
-            TimestampBlock ts(_opCtx, dropTime);
-            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
+            create(nss);
         }
 
-        // Assert that the idents do not exist.
-        assertIdentsMissingAtTimestamp(
-            mdbCatalog, sysProfileIdent, sysProfileIndexIdent, Timestamp::max());
-        assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, Timestamp::max());
-
-        // dropDatabase must not timestamp the final write. The collection and index should seem
-        // to have never existed.
-        assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, syncTime);
-
-        // Reset initial data timestamp to avoid unintended storage engine timestamp side effects.
-        storageEngine->setInitialDataTimestamp(Timestamp(0, 0));
+        // Bind the local values to the variables in the parent scope.
+        auto& collIdent = std::get<1>(tuple);
+        auto& indexIdent = std::get<2>(tuple);
+        std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(mdbCatalog, origIdents);
     }
-};
 
-TEST(SimpleStorageTimestampTest, KVDropDatabasePrimary) {
     {
-        KVDropDatabase test;
-        test.run(true);
+        // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
+        auto coll = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            LockMode::MODE_X);
+        WriteUnitOfWork wuow(_opCtx);
+        Database* db = DatabaseHolder::get(_opCtx)->getDb(_opCtx, nss.dbName());
+        ASSERT_OK(db->dropCollection(_opCtx, nss));
+        wuow.commit();
     }
-    // Reconstruct the datafiles from scratch across tests.
-    {
-        KVDropDatabase test;
-        test.run(false);
+
+    // Reserve a tick, this represents a time after the rename in which the `kvDropDatabase`
+    // ident for `kvDropDatabase` still exists.
+    const Timestamp postRenameTime = _clock->tickClusterTime(1).asTimestamp();
+
+    // Because the storage engine is managing drops internally, the ident should not be visible
+    // after a drop.
+    assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, postRenameTime);
+
+    const Timestamp dropTime = _clock->tickClusterTime(1).asTimestamp();
+    if (simulatePrimary) {
+        ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
+    } else {
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+        TimestampBlock ts(_opCtx, dropTime);
+        ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
     }
+
+    // Assert that the idents do not exist.
+    assertIdentsMissingAtTimestamp(
+        mdbCatalog, sysProfileIdent, sysProfileIndexIdent, Timestamp::max());
+    assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, Timestamp::max());
+
+    // dropDatabase must not timestamp the final write. The collection and index should seem
+    // to have never existed.
+    assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, syncTime);
+
+    // Reset initial data timestamp to avoid unintended storage engine timestamp side effects.
+    storageEngine->setInitialDataTimestamp(Timestamp(0, 0));
 }
+
+INSTANTIATE_TEST_SUITE_P(, KVDropDatabaseTest, testing::Bool());
 
 /**
  * This test asserts that the catalog updates that represent the beginning and end of an index
@@ -3124,6 +3086,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Save the pre-state idents so we can capture the specific ident related to index
     // creation.
     std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
+    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
 
     // Rename collection.
     BSONObj renameResult;
@@ -3153,13 +3116,13 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // We expect one new collection ident and one new index ident (the _id index) during this
     // rename.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexCreateInitTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/1, indexCreateInitTs);
 
     // We expect one new collection ident and three new index idents (including the _id index)
     // after this rename. The a_1 and b_1 index idents are created and persisted with the
     // "ready: true" write.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexCommitTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/3, indexCommitTs);
 
     // Assert the 'a_1' and `b_1` indexes becomes ready at the last oplog entry time.
     RecordId renamedCatalogId = CollectionCatalog::get(_opCtx)
@@ -3271,13 +3234,13 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
     // We expect one new one new index ident during this index build.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexStartTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/1, indexStartTs);
     ASSERT_FALSE(
         getIndexMetaData(getMetaDataAtTime(mdbCatalog, catalogId, indexStartTs), "a_1").ready);
 
     // We expect all new idents to be removed after the index build has aborted.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 0, indexAbortTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/0, indexAbortTs);
     assertIndexMetaDataMissing(getMetaDataAtTime(mdbCatalog, catalogId, indexAbortTs), "a_1");
 
     // Assert that the index build is removed from config.system.indexBuilds collection after
@@ -3711,8 +3674,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
 
             // We cannot use the OperationContext to wait for the thread to reach the fail point
             // because it also uses the ClockSourceMock.
-            fpb->waitForTimesEntered(Interruptible::notInterruptible(),
-                                     fpb.initialTimesEntered() + 1);
+            fpb.waitForOneNewEntry(Interruptible::notInterruptible());
         }
 
         auto mdbCatalog = _opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
@@ -3980,7 +3942,11 @@ public:
 
     RetryableFindAndModifyTest()
         : nss(NamespaceString::createNamespaceString_forTest(dbName,
-                                                             "retryableFindAndModifyTest")) {
+                                                             "retryableFindAndModifyTest")) {}
+
+    void setUp() override {
+        StorageTimestampTest::setUp();
+
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
@@ -4037,7 +4003,7 @@ public:
         // Start a retryable write.
         txnParticipant.beginOrContinue(_opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
     }
 
@@ -4081,8 +4047,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
                                  oldObj),
             newObj,
             collection_internal::kUpdateNoIndexes,
-            nullptr /* indexesAffected */,
-            nullptr /* opDebug */,
+            /*indexesAffected=*/nullptr,
+            /*opDebug=*/nullptr,
             &args);
         wuow.commit();
     }
@@ -4144,10 +4110,10 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
                                                            source,
                                                            damages,
                                                            collection_internal::kUpdateNoIndexes,
-                                                           nullptr /* indexesAffected */,
-                                                           nullptr /* opDebug */,
+                                                           /*indexesAffected=*/nullptr,
+                                                           /*opDebug=*/nullptr,
                                                            &args,
-                                                           nullptr /*cursor*/);
+                                                           /*cursor=*/nullptr);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());
     }
@@ -4216,7 +4182,11 @@ public:
 
     MultiDocumentTransactionTest()
         : nss(NamespaceString::createNamespaceString_forTest(dbName,
-                                                             "multiDocumentTransactionTest")) {
+                                                             "multiDocumentTransactionTest")) {}
+
+    void setUp() override {
+        StorageTimestampTest::setUp();
+
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
@@ -4256,7 +4226,7 @@ public:
 
         txnParticipant.beginOrContinue(_opCtx,
                                        {*_opCtx->getTxnNumber()},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
@@ -4989,7 +4959,11 @@ public:
 class GetOldestActiveTimestampTest : public StorageTimestampTest {
 public:
     GetOldestActiveTimestampTest()
-        : configTxnsNss(NamespaceString::kSessionTransactionsTableNamespace) {
+        : configTxnsNss(NamespaceString::kSessionTransactionsTableNamespace) {}
+
+    void setUp() override {
+        StorageTimestampTest::setUp();
+
         // Create config.transactions collection
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, configTxnsNss));
         ASSERT_OK(createCollection(

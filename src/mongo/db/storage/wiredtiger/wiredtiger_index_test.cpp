@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/json.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/move/utility_core.hpp>
@@ -79,6 +54,40 @@ TEST(WiredTigerIndexTest, GenerateCreateStringInvalidConfigStringOption) {
 TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigStringOption) {
     BSONObj spec = fromjson("{configString: 'prefix_compression=true'}");
     ASSERT_EQ(WiredTigerIndex::parseIndexOptions(spec), std::string("prefix_compression=true,"));
+}
+
+std::string_view getConfigString(const WiredTigerConfigParser& parser, const char* key) {
+    WT_CONFIG_ITEM item;
+    ASSERT_EQ(0, parser.get(key, &item));
+    return std::string_view(item.str, item.len);
+}
+
+TEST(WiredTigerIndexTest, GenerateCreateStringProviderConfigOverridesConfigStringType) {
+    if (!hasGlobalServiceContext()) {
+        setGlobalServiceContext(ServiceContext::make());
+    }
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj spec = fromjson("{key: {a: 1}, name: 'a_1', v: 1}");
+    IndexConfig config{false /* isIdIndex */,
+                       false /* unique */,
+                       IndexConfig::kLatestIndexVersion,
+                       spec,
+                       "a_1",
+                       Ordering::allAscending()};
+
+    auto result =
+        WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
+                                              /*sysIndexConfig=*/"",
+                                              /*collIndexConfig=*/"type=file",
+                                              /*providerConfig=*/"type=layered",
+                                              NamespaceStringUtil::serializeForCatalog(nss),
+                                              config,
+                                              /*isLogged=*/false);
+    ASSERT_OK(result.getStatus());
+
+    WiredTigerConfigParser parser(result.getValue());
+    ASSERT_EQ("layered", getConfigString(parser, "type"));
 }
 
 }  // namespace

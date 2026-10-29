@@ -83,6 +83,48 @@
               # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
               enableOTELTracing: false
 
+- name: replica_fixture_last_patch_new_new_old
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_patch
+        mixed_bin_versions: new_new_old
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
+- name: replica_fixture_last_patch_new_old_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_patch
+        mixed_bin_versions: new_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
+- name: replica_fixture_last_patch_old_new_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_patch
+        mixed_bin_versions: old_new_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
 - name: sharded_fixture_last_lts_new_old_old_new
   value:
     executor:
@@ -105,6 +147,30 @@
         num_shards: 2
         num_rs_nodes_per_shard: 2
         old_bin_version: last_continuous
+        mixed_bin_versions: new_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
+              enableOTELTracing: false
+
+- name: concurrency_sharded_replication_backport_required_multiversion_exclude
+  value:
+    # TODO BACKPORT-29703: remove backport_required_multiversion when the IFRContext
+    # egress-metadata caching backport lands on v9.0 (last-lts/last-continuous).
+    exclude_with_any_tags:
+      - backport_required_multiversion
+
+# last-patch fixture, mirroring its last-lts/last-continuous siblings. Add a new
+# shape here when enabling last-patch for another suite.
+- name: sharded_fixture_last_patch_new_old_old_new
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 2
+        old_bin_version: last_patch
         mixed_bin_versions: new_old_old_new
       config:
         shell_options:
@@ -208,6 +274,7 @@
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
         - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+        - disables_test_commands
       exclude_files:
         - jstests/replsets/initial_sync_rename_collection.js
         - jstests/replsets/initial_sync_drop_collection.js
@@ -218,9 +285,7 @@
 - name: replica_sets_multiversion_last_continuous_selector
   value:
     exclude_files:
-      - jstests/replsets/test_only_repl_commands.js
       - jstests/replsets/transactions_only_allowed_on_primaries.js
-      - jstests/replsets/prepare_conflict_read_concern_behavior.js
 
 - name: replica_sets_multiversion_testdata_last_lts
   value:
@@ -245,6 +310,40 @@
               # Since a test in replica_sets could start up a sharded cluster, we
               # need to set this variable so that the right version of mongos is chosen.
               mongosBinVersion: "last-continuous"
+
+- name: replica_sets_multiversion_testdata_last_patch
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: "last-patch"
+              # Since a test in replica_sets could start up a sharded cluster, we
+              # need to set this variable so that the right version of mongos is chosen.
+              mongosBinVersion: "last-patch"
+
+- name: update_fuzzer_multiversion_testdata_last_lts
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              # The update fuzzer creates its own clusters, so it takes the old version from
+              # TestData rather than from a fixture. Unlike useRandomBinVersionsWithinReplicaSet,
+              # oldBin is not read by ReplSetTest, so it selects the binary without also
+              # changing FCV handling or fixture seeding.
+              oldBin: "last-lts"
+
+- name: update_fuzzer_multiversion_testdata_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              oldBin: "last-continuous"
 
 - name: rollback_multiversion_fuzzer_testdata_last_lts
   value:
@@ -299,6 +398,29 @@
         - jstests/sharding/drop_indexes_with_stale_config_error.js
         - jstests/sharding/query/out_merge/merge_write_concern.js
 
+        # This test explicitly runs on a standalone mongod.
+        - jstests/sharding/drop_config_db.js
+
+        # Exclude change streams v2 tests from multiversion testing until v2 is rolled out everywhere.
+        # TODO SERVER-134853 Reenable these tests.
+        - jstests/sharding/query/change_streams/change_stream_all_databases_v2_smoke.js
+        - jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
+        - jstests/sharding/query/change_streams/change_stream_cluster_v2_ignore_removed_shards_smoke.js
+        - jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
+        - jstests/sharding/query/change_streams/change_stream_collection_v2_smoke.js
+        - jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
+        - jstests/sharding/query/change_streams/change_stream_database_v2_ignore_removed_shards_smoke.js
+        - jstests/sharding/query/change_streams/change_stream_database_v2_strict_whitebox.js
+        - jstests/sharding/query/change_streams/change_stream_resumes_on_v2_disable.js
+        - jstests/sharding/query/change_streams/change_stream_resume_after_rename.js
+        - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
+        - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
+        - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+        - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_cluster.js
+        - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_collection.js
+        - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
+        - jstests/sharding/query/change_streams/test_change_stream_sharding_move_chunk_events.js
+
 - name: sharding_multiversion_testdata_last_lts
   value:
     executor:
@@ -308,6 +430,9 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-lts"
               mongosBinVersion: "last-lts"
+              # Disable replicated fast count in this mixed-bin-version suite.
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
 
 - name: sharding_multiversion_testdata_last_continuous
   value:
@@ -318,6 +443,22 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-continuous"
               mongosBinVersion: "last-continuous"
+              # Disable replicated fast count in this mixed-bin-version suite.
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
+
+- name: sharding_multiversion_testdata_last_patch
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: "last-patch"
+              mongosBinVersion: "last-patch"
+              # Disable replicated fast count in this mixed-bin-version suite.
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
 
 - name: sharding_multiversion_mongos_testdata_last_lts
   value:
@@ -336,6 +477,15 @@
           global_vars:
             TestData:
               mongosBinVersion: "last-continuous"
+
+- name: sharding_multiversion_mongos_testdata_last_patch
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              mongosBinVersion: "last-patch"
 
 - name: jstestfuzz_replication_multiversion_hooks
   value:
@@ -393,18 +543,46 @@
     exclude_files:
       # TODO (SERVER-122386) Re-enable the following tests
       - jstests/sharding/flush_resharding_state_change_errors.js
-
-- name: sharding_jscore_passthrough_last_continuous_new_old_old_new_excluded_files
-  value:
-    exclude_files:
-      # TODO (SERVER-122384) Re-enable the following tests
-      - jstests/core/ddl/create_collection.js
-      - jstests/core/timeseries/ddl/timeseries_index.js
+      # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
+      # enabled at 9.0, so the v2 reader bypasses the v1 failpoint used by this test.
+      - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
 
 - name: sharding_last_continuous_excluded_files
   value:
     exclude_files:
-      # TODO (SERVER-122384) Re-enable the following tests
-      - jstests/core/timeseries/ddl/timeseries_index.js
       # TODO (SERVER-122387) Re-enable the following tests
       - jstests/sharding/timeseries/timeseries_indexes.js
+
+- name: sharding_last_lts_excluded_files
+  value:
+    exclude_files:
+      # TODO SERVER-133011: featureFlagChangeStreamPreciseShardTargeting is
+      # enabled at 9.0 last-LTS, so the v2 reader bypasses the v1 failpoint used by this test.
+      - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
+      # TODO SERVER-132935: re-enable once the test handles the 9.0 last-LTS mongos
+      # rejecting duplicate stmtIds with InvalidOptions instead of the transaction-level error expected here.
+      - jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
+      # TODO SERVER-132935: re-enable once the 9.0 binary can parse latestFCV 9.1.
+      - jstests/sharding/migration_blocking_operation/migration_blocking_operation_fcv_transition.js
+
+# The new-binary half of a mixed-bin-versions node can take the replicated fast count
+# initial-sync path even when its sync source is an old binary that never used it, because the
+# FCV-uninitialized-during-initial-sync gate can't see the sync source's real FCV. Setting this
+# failpoint disables replicated fast count entirely on the new-binary nodes only.
+- name: disable_replicated_fast_count_on_new_binary
+  value:
+    executor:
+      fixture:
+        new_binary_set_parameters:
+          failpoint.disableReplicatedFastCount:
+            mode: alwaysOn
+
+- name: disable_replicated_fast_count_on_test_spawned_new_binary
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"

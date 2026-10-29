@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "engine.h"
 
@@ -54,12 +28,14 @@
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
 
 #include <cstring>
 #include <ctime>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 #include "error.h"
 #include "jsapi.h"
@@ -74,6 +50,7 @@
 #include "js/Initialization.h"
 #include "js/Interrupt.h"
 #include "js/PropertyAndElement.h"
+#include "js/PropertyDescriptor.h"
 #include "js/Realm.h"
 #include "js/RealmOptions.h"
 #include "js/SourceText.h"
@@ -101,55 +78,6 @@ const char* const kInvokeResult = "__returnValue";
 constexpr int64_t kDefaultEmitByteLimitBytes = 16 * 1024 * 1024;
 
 static const JSClass kGlobalClass = {"global", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps};
-
-// Freeze script shared between parent realm and child realms. Freezing standard
-// constructors and prototypes prevents user JS from mutating them across resets.
-static const char* const kFreezeBuiltinsScript =
-    "(function() {"
-    "  var TypedArrayProto = Object.getPrototypeOf(Uint8Array.prototype);"
-    "  var targets = ["
-    "    Object, Array, Function,"
-    "    String, Number, Boolean,"
-    "    RegExp, Date, Error,"
-    "    TypeError, RangeError, SyntaxError, ReferenceError, URIError, EvalError,"
-    "    Object.prototype, Array.prototype, Function.prototype,"
-    "    String.prototype, Number.prototype, Boolean.prototype,"
-    "    RegExp.prototype, Date.prototype, Error.prototype,"
-    "    TypeError.prototype, RangeError.prototype, SyntaxError.prototype,"
-    "    ReferenceError.prototype, URIError.prototype, EvalError.prototype,"
-    "    Math, JSON,"
-    "    Map, Set, WeakMap, WeakSet,"
-    "    Map.prototype, Set.prototype,"
-    "    WeakMap.prototype, WeakSet.prototype,"
-    "    Promise, Promise.prototype,"
-    "    Symbol, Symbol.prototype,"
-    "    Proxy, Reflect,"
-    "    Int8Array, Uint8Array, Uint8ClampedArray,"
-    "    Int16Array, Uint16Array,"
-    "    Int32Array, Uint32Array,"
-    "    Float32Array, Float64Array,"
-    "    BigInt64Array, BigUint64Array,"
-    "    Int8Array.prototype, Uint8Array.prototype, Uint8ClampedArray.prototype,"
-    "    Int16Array.prototype, Uint16Array.prototype,"
-    "    Int32Array.prototype, Uint32Array.prototype,"
-    "    Float32Array.prototype, Float64Array.prototype,"
-    "    BigInt64Array.prototype, BigUint64Array.prototype,"
-    "    TypedArrayProto,"
-    "    ArrayBuffer, ArrayBuffer.prototype,"
-    "    DataView, DataView.prototype"
-    "  ];"
-    // Guard ES2020+ globals: the embedded SM build may not expose all of them.
-    // Using typeof avoids a ReferenceError on absent globals.
-    "  if (typeof BigInt !== 'undefined') { targets.push(BigInt, BigInt.prototype); }"
-    "  if (typeof WeakRef !== 'undefined') { targets.push(WeakRef, WeakRef.prototype); }"
-    "  if (typeof FinalizationRegistry !== 'undefined') {"
-    "    targets.push(FinalizationRegistry, FinalizationRegistry.prototype);"
-    "  }"
-    "  if (typeof Atomics !== 'undefined') { targets.push(Atomics); }"
-    "  for (var i = 0; i < targets.length; i++) {"
-    "    Object.freeze(targets[i]);"
-    "  }"
-    "})();";
 
 FunctionSlot* MozJSScriptEngine::resolveHandle(uint64_t handle, wasm_mozjs_error_t* err) {
     if (handle == 0 || handle > _slots.size()) {
@@ -180,6 +108,106 @@ MozJSScriptEngine::~MozJSScriptEngine() {
     }
 }
 
+err_code_t MozJSScriptEngine::_freezeBuiltins(ExecutionCheck& chk, wasm_mozjs_error_t* err) {
+    // Freezing standard constructors and prototypes prevents user JS from mutating them
+    // across resets. This also covers MongoDB custom-type prototypes (Timestamp.prototype,
+    // ObjectId.prototype, ...): reset()'s scrubbing pass only tracks own properties of the
+    // engine-installed *constructors* (_initFnProps), not their prototypes, so e.g.
+    // Timestamp.prototype.custom = 'leak' would otherwise survive reset() indefinitely.
+    //
+    // Rather than naming built-ins in a JS string (fragile — every new type installed by
+    // installTypes() would need a matching edit, invisible to the type system), enumerate
+    // every own property of _global, freeze each object, and walk its full .prototype chain.
+    // A visited set drives termination and prevents re-processing shared objects
+    // (Object.prototype, the shared TypedArray prototype, ...). This automatically covers all
+    // types installed by installTypes(), all standard built-ins, and any future additions.
+    //
+    // Must run after types.js has attached its prototype extensions (tojson, toString, ...)
+    // and after the Array helpers are installed; freezing any earlier would silently drop the
+    // members those install passes still need to attach.
+    std::unordered_set<JSObject*> visited;
+    visited.insert(_global.get());
+
+    // Freeze `obj` plus its own object/function *values* one level deep. Freezing `obj` only
+    // locks its own property slots (no add/remove/reconfigure); it does NOT freeze the objects
+    // those slots hold. Extension methods types.js attaches (Array.tojson, ...) and mirrors by
+    // reference into every realm would otherwise stay mutable: one realm could add an own
+    // property to e.g. Array.tojson and every realm sharing that same function object would see
+    // it. Descriptors (not direct gets) are used so accessor properties are skipped without
+    // invoking them (some standard accessors are poison pills that throw on get).
+    auto freezeWithValues = [&](JS::HandleObject obj) -> bool {
+        if (!visited.insert(obj.get()).second)
+            return true;
+        JS::RootedVector<JS::PropertyKey> ownIds(_cx);
+        if (!js::GetPropertyKeys(
+                _cx, obj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &ownIds))
+            return false;
+        JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>> maybeDesc(_cx);
+        JS::RootedId ownId(_cx);
+        for (size_t i = 0; i < ownIds.length(); ++i) {
+            ownId.set(ownIds[i]);
+            if (!JS_GetOwnPropertyDescriptorById(_cx, obj, ownId, &maybeDesc) ||
+                maybeDesc.isNothing())
+                continue;
+            if (!maybeDesc->hasValue())
+                continue;
+            JS::Value v = maybeDesc->value();
+            if (!v.isObject())
+                continue;
+            JS::RootedObject vObj(_cx, &v.toObject());
+            if (!JS_FreezeObject(_cx, vObj))
+                return false;
+        }
+        return JS_FreezeObject(_cx, obj);
+    };
+
+    auto freezeProtoChain = [&](JS::HandleObject start) -> bool {
+        JS::RootedObject cur(_cx, start);
+        while (cur) {
+            if (!freezeWithValues(cur))
+                return false;
+            JS::RootedObject next(_cx);
+            if (!JS_GetPrototype(_cx, cur, &next))
+                return false;
+            cur = next;
+        }
+        return true;
+    };
+
+    JS::RootedVector<JS::PropertyKey> globalIds(_cx);
+    if (!chk.ok(js::GetPropertyKeys(_cx, _global, JSITER_OWNONLY | JSITER_HIDDEN, &globalIds),
+                SM_E_JSAPI_FAIL))
+        return err ? err->code : SM_E_JSAPI_FAIL;
+
+    JS::RootedId gid(_cx);
+    JS::RootedValue gval(_cx);
+    JS::RootedValue proto(_cx);
+    for (size_t i = 0; i < globalIds.length(); ++i) {
+        gid.set(globalIds[i]);
+        if (!gid.isString())
+            continue;
+        if (!chk.ok(JS_GetPropertyById(_cx, _global, gid, &gval), SM_E_JSAPI_FAIL))
+            return err ? err->code : SM_E_JSAPI_FAIL;
+        if (!gval.isObject())
+            continue;
+        // MaxKey/MinKey are singletons: postInstall() replaces the installed constructor with
+        // the shared instance itself, so globalThis.MaxKey has no .prototype to freeze. The
+        // freezeWithValues() call below freezes the singleton object directly.
+        JS::RootedObject obj(_cx, &gval.toObject());
+        if (!chk.ok(freezeWithValues(obj), SM_E_JSAPI_FAIL))
+            return err ? err->code : SM_E_JSAPI_FAIL;
+        // Walk the .prototype chain of every constructor so instance-shared prototypes
+        // (Foo.prototype, Foo.prototype.__proto__, ...) are frozen too.
+        if (JS_GetProperty(_cx, obj, "prototype", &proto) && proto.isObject()) {
+            JS::RootedObject protoObj(_cx, &proto.toObject());
+            if (!chk.ok(freezeProtoChain(protoObj), SM_E_JSAPI_FAIL))
+                return err ? err->code : SM_E_JSAPI_FAIL;
+        }
+    }
+
+    return SM_OK;
+}
+
 err_code_t MozJSScriptEngine::_setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_error_t* err) {
     JS::RealmOptions ro;
     {
@@ -207,9 +235,8 @@ err_code_t MozJSScriptEngine::_setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_er
         JSAutoRealm ar(_cx, _global);
         _internedStrings = std::make_unique<InternedStringTable>(_cx);
         _prototypeInstaller->installTypes(_global);
-        // TODO (SERVER-129747): Freeze MongoDB custom-type prototypes (Timestamp.prototype,
-        // ObjectId.prototype, etc.) here after installTypes() so user JS cannot add properties
-        // that survive reset(). Same freeze needed in _setupChildRealm() after its installTypes().
+        // MongoDB custom-type prototypes (Timestamp.prototype, ObjectId.prototype, etc.) are
+        // frozen below by _freezeBuiltins(), after types.js has attached its extensions.
 
         if (!chk.ok(installParseJSFunctionHelper(_cx, _global), SM_E_INTERNAL))
             return err ? err->code : SM_E_INTERNAL;
@@ -392,18 +419,8 @@ err_code_t MozJSScriptEngine::_setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_er
         }
 
         // Freeze after Array helpers so Array.sum etc. become permanently immutable.
-        // kFreezeBuiltinsScript is shared with _setupChildRealm.
-        JS::CompileOptions freezeOpts(_cx);
-        freezeOpts.setFileAndLine("wasm:init-freeze", 1);
-        JS::SourceText<mozilla::Utf8Unit> freezeSrc;
-        JS::RootedValue freezeRval(_cx);
-        if (!chk.ok(freezeSrc.init(_cx,
-                                   kFreezeBuiltinsScript,
-                                   strlen(kFreezeBuiltinsScript),
-                                   JS::SourceOwnership::Borrowed),
-                    SM_E_INTERNAL) ||
-            !chk.ok(JS::Evaluate(_cx, freezeOpts, freezeSrc, &freezeRval), SM_E_INTERNAL))
-            return err ? err->code : SM_E_INTERNAL;
+        if (err_code_t rc = _freezeBuiltins(chk, err); rc != SM_OK)
+            return rc;
     }
 
     return SM_OK;
@@ -451,145 +468,133 @@ err_code_t MozJSScriptEngine::_setupChildRealm(ExecutionCheck& chk, wasm_mozjs_e
         if (!chk.ok(installParseJSFunctionHelper(_cx, _global), SM_E_INTERNAL))
             return err ? err->code : SM_E_INTERNAL;
 
-        // Copy Array helpers from parent's frozen Array to child's Array.
+        // Mirror the parent realm's globals into the freshly-created child realm. The parent is
+        // the single source of truth: it has run the hex_md5 inline script, types.js and
+        // assert_wasm.js, and had installTypes() applied, so it holds every helper, Mongo type
+        // and built-in extension the child must expose. InitRealmStandardClasses() and the
+        // child's own installTypes() already gave it standard built-ins and Mongo type
+        // constructors, so we copy only what the child is *missing*:
+        //   - top-level globals it lacks (hex_md5, ISODate, tojson, assert, ...),
+        //   - own properties types.js added to shared constructors/prototypes that the child's
+        //     fresh copies lack (Array.tojson, RegExp.escape, Date.prototype.tojson, ...).
+        // The parent is populated only by trusted init scripts, so "copy what the child lacks"
+        // introduces nothing dangerous (eval/Function/Proxy/Reflect and the per-realm parse
+        // helper already exist in the child and are skipped). Anything that must NOT be mirrored
+        // goes in kChildRealmMirrorExclusions; the BuiltinExtensions/GlobalHelpers scope tests
+        // fail loudly if a future parent global silently stops reaching the child.
         {
-            JS::RootedValue parentArrayVal(_cx);
-            JS::RootedValue childArrayVal(_cx);
-            if (JS_GetProperty(_cx, _parentGlobal, "Array", &parentArrayVal) &&
-                JS_GetProperty(_cx, _global, "Array", &childArrayVal) &&
-                parentArrayVal.isObject() && childArrayVal.isObject()) {
-                JS::RootedObject parentArr(_cx, &parentArrayVal.toObject());
-                JS::RootedObject childArr(_cx, &childArrayVal.toObject());
-                static const char* kHelpers[] = {"sum", "avg", "contains", "unique"};
-                for (const auto* h : kHelpers) {
-                    JS::RootedValue hval(_cx);
-                    if (JS_GetProperty(_cx, parentArr, h, &hval) && !hval.isUndefined())
-                        JS_SetProperty(_cx, childArr, h, hval);
-                }
-            }
-        }
-
-        // TODO (SERVER-129745): The copyProps() calls below are incomplete — Array.tojson,
-        // Array.shuffle, Set/Map/RegExp.prototype.tojson and others added by types.js are missing.
-        // Copy static methods and prototype extensions that types.js added to standard built-ins.
-        // types.js runs once in the parent realm; the child realm has fresh
-        // InitRealmStandardClasses objects that don't inherit these additions, so we copy them
-        // explicitly before freeze.
-        {
-            auto copyProps = [&](JS::HandleObject from,
-                                 JS::HandleObject to,
-                                 std::initializer_list<const char*> props) {
-                JS::RootedValue v(_cx);
-                for (const char* p : props) {
-                    if (JS_GetProperty(_cx, from, p, &v) && !v.isUndefined())
-                        JS_SetProperty(_cx, to, p, v);
-                }
+            static constexpr std::string_view kChildRealmMirrorExclusions[] = {
+                // BSONAwareMap is the internal implementation of Map used by types.js. It must
+                // not appear in user-visible scope; the user-facing name is "Map". The parent
+                // realm keeps it as "BSONAwareMap" (unlike the native MozJS shell which renames
+                // it to "Map") so that the parent's standard Map slot is unchanged, but the
+                // child realm must not expose the implementation name.
+                "BSONAwareMap",
             };
-            auto getObj =
-                [&](JS::HandleObject scope, const char* name, JS::MutableHandleObject out) -> bool {
-                JS::RootedValue v(_cx);
-                if (!JS_GetProperty(_cx, scope, name, &v) || !v.isObject())
+            auto isExcluded = [&](const char* name) {
+                for (std::string_view e : kChildRealmMirrorExclusions)
+                    if (e == name)
+                        return true;
+                return false;
+            };
+
+            // Copy own properties present on `from` but missing on `to`, by *descriptor*. Using
+            // descriptors (not get/set) is essential: a value-based copy would invoke getters, and
+            // some standard accessors are poison pills that throw on get (Function.prototype.caller
+            // / .arguments). Existence is checked with HasOwnProperty so we never read a value
+            // either. Members the child already has are left untouched; only the additions land.
+            auto copyMissingProps = [&](JS::HandleObject from, JS::HandleObject to) -> bool {
+                JS::RootedVector<JS::PropertyKey> ids(_cx);
+                if (!js::GetPropertyKeys(_cx, from, JSITER_OWNONLY | JSITER_HIDDEN, &ids))
                     return false;
-                out.set(&v.toObject());
+                JS::RootedId id(_cx);
+                JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>> maybeDesc(_cx);
+                for (size_t i = 0; i < ids.length(); ++i) {
+                    id.set(ids[i]);
+                    bool hasOwn = false;
+                    if (!JS_HasOwnPropertyById(_cx, to, id, &hasOwn))
+                        return false;
+                    if (hasOwn)
+                        continue;  // child already has its own — don't clobber standard members
+                    if (!JS_GetOwnPropertyDescriptorById(_cx, from, id, &maybeDesc))
+                        return false;
+                    if (maybeDesc.isNothing())
+                        continue;
+                    JS::Rooted<JS::PropertyDescriptor> desc(_cx, *maybeDesc);
+                    if (!JS_DefinePropertyById(_cx, to, id, desc))
+                        return false;
+                }
                 return true;
             };
-            auto getProto = [&](JS::HandleObject ctor, JS::MutableHandleObject out) -> bool {
-                JS::RootedValue v(_cx);
-                if (!JS_GetProperty(_cx, ctor, "prototype", &v) || !v.isObject())
-                    return false;
-                out.set(&v.toObject());
-                return true;
-            };
 
-            // Object.extend / merge / deepMerge / keySet
-            {
-                JS::RootedObject pO(_cx), cO(_cx);
-                if (getObj(_parentGlobal, "Object", &pO) && getObj(_global, "Object", &cO))
-                    copyProps(pO, cO, {"extend", "merge", "deepMerge", "keySet"});
-            }
-            // Date.timeFunc (static) and Date.prototype.tojson
-            {
-                JS::RootedObject pD(_cx), cD(_cx);
-                if (getObj(_parentGlobal, "Date", &pD) && getObj(_global, "Date", &cD)) {
-                    copyProps(pD, cD, {"timeFunc"});
-                    JS::RootedObject pDP(_cx), cDP(_cx);
-                    if (getProto(pD, &pDP) && getProto(cD, &cDP))
-                        copyProps(pDP, cDP, {"tojson"});
-                }
-            }
-            // String.prototype.ltrim / rtrim / pad
-            {
-                JS::RootedObject pS(_cx), cS(_cx);
-                if (getObj(_parentGlobal, "String", &pS) && getObj(_global, "String", &cS)) {
-                    JS::RootedObject pSP(_cx), cSP(_cx);
-                    if (getProto(pS, &pSP) && getProto(cS, &cSP))
-                        copyProps(pSP, cSP, {"ltrim", "rtrim", "pad"});
-                }
-            }
-            // Number.prototype.toPercentStr / zeroPad
-            {
-                JS::RootedObject pN(_cx), cN(_cx);
-                if (getObj(_parentGlobal, "Number", &pN) && getObj(_global, "Number", &cN)) {
-                    JS::RootedObject pNP(_cx), cNP(_cx);
-                    if (getProto(pN, &pNP) && getProto(cN, &cNP))
-                        copyProps(pNP, cNP, {"toPercentStr", "zeroPad"});
-                }
-            }
-        }
+            JS::RootedVector<JS::PropertyKey> parentIds(_cx);
+            if (!chk.ok(js::GetPropertyKeys(
+                            _cx, _parentGlobal, JSITER_OWNONLY | JSITER_HIDDEN, &parentIds),
+                        SM_E_JSAPI_FAIL))
+                return err ? err->code : SM_E_JSAPI_FAIL;
 
-        // Copy MongoDB global helpers from the parent realm to child globalThis.
-        // These are exec'd once in _setupNewGlobal() (parent realm), so they appear in
-        // _initGlobalNames and survive reset() in the child without re-execution.
-        {
-            // From hex_md5 inline script, types.js, and assert_wasm.js respectively.
-            static const char* kGlobalHelpers[] = {
-                "hex_md5",
-                // types.js globals:
-                "ISODate",
-                "isNumber",
-                "isObject",
-                "isString",
-                "printjson",
-                "toJsonForLog",
-                "tojson",
-                "tojsonObject",
-                "tojsononeline",
-                // assert_wasm.js globals:
-                "_buildAssertionMessage",
-                "_doassert",
-                "_isEq",
-                "_processMsg",
-                "assert",
-                "assertThrowsHelper",
-                "doassert",
-                "formatErrorMsg",
-                "friendlyEqual",
-            };
-            for (const auto* h : kGlobalHelpers) {
-                JS::RootedValue hval(_cx);
-                if (JS_GetProperty(_cx, _parentGlobal, h, &hval) && !hval.isUndefined())
-                    JS_SetProperty(_cx, _global, h, hval);
+            JS::RootedId id(_cx);
+            JS::Rooted<mozilla::Maybe<JS::PropertyDescriptor>> maybeDesc(_cx);
+            JS::RootedValue parentVal(_cx), childVal(_cx);
+            for (size_t i = 0; i < parentIds.length(); ++i) {
+                id.set(parentIds[i]);
+                if (!id.isString())
+                    continue;
+                JS::RootedString rstr(_cx, id.toString());
+                JS::UniqueChars name = JS_EncodeStringToUTF8(_cx, rstr);
+                if (!name || isExcluded(name.get()))
+                    continue;
+
+                bool childHas = false;
+                if (!chk.ok(JS_HasOwnPropertyById(_cx, _global, id, &childHas), SM_E_JSAPI_FAIL))
+                    return err ? err->code : SM_E_JSAPI_FAIL;
+
+                if (!childHas) {
+                    // A top-level global the child lacks (helper, Mongo type, ...):
+                    // copy it by descriptor.
+                    if (!chk.ok(JS_GetOwnPropertyDescriptorById(_cx, _parentGlobal, id, &maybeDesc),
+                                SM_E_JSAPI_FAIL))
+                        return err ? err->code : SM_E_JSAPI_FAIL;
+                    if (maybeDesc.isNothing())
+                        continue;
+                    JS::Rooted<JS::PropertyDescriptor> desc(_cx, *maybeDesc);
+                    if (!chk.ok(JS_DefinePropertyById(_cx, _global, id, desc), SM_E_JSAPI_FAIL))
+                        return err ? err->code : SM_E_JSAPI_FAIL;
+                    continue;
+                }
+
+                // Present in both realms. If it's a shared constructor/object, copy the own props
+                // types.js added that the child's fresh copy lacks, plus its prototype's. Reading
+                // the constructor value is safe — globals are data properties, not accessors.
+                if (!JS_GetPropertyById(_cx, _parentGlobal, id, &parentVal) ||
+                    !parentVal.isObject())
+                    continue;
+                if (!JS_GetPropertyById(_cx, _global, id, &childVal) || !childVal.isObject())
+                    continue;
+                JS::RootedObject pObj(_cx, &parentVal.toObject()), cObj(_cx, &childVal.toObject());
+                if (pObj == cObj || pObj == _parentGlobal)
+                    continue;  // genuinely shared object, or the globalThis self-reference
+                if (!chk.ok(copyMissingProps(pObj, cObj), SM_E_JSAPI_FAIL))
+                    return err ? err->code : SM_E_JSAPI_FAIL;
+
+                JS::RootedValue pProto(_cx), cProto(_cx);
+                if (JS_GetProperty(_cx, pObj, "prototype", &pProto) && pProto.isObject() &&
+                    JS_GetProperty(_cx, cObj, "prototype", &cProto) && cProto.isObject()) {
+                    JS::RootedObject pP(_cx, &pProto.toObject()), cP(_cx, &cProto.toObject());
+                    if (pP != cP && !chk.ok(copyMissingProps(pP, cP), SM_E_JSAPI_FAIL))
+                        return err ? err->code : SM_E_JSAPI_FAIL;
+                }
             }
         }
 
         // Freeze standard constructors and prototypes so mutations don't survive reset().
         // The child realm is dropped on resetRealm(); within a realm's lifetime, reset()
         // is the fast path so freezing is the only protection against cross-request leakage.
-        JS::CompileOptions freezeOpts(_cx);
-        freezeOpts.setFileAndLine("wasm:child-freeze", 1);
-        JS::SourceText<mozilla::Utf8Unit> freezeSrc;
-        JS::RootedValue freezeRval(_cx);
-        if (!chk.ok(freezeSrc.init(_cx,
-                                   kFreezeBuiltinsScript,
-                                   strlen(kFreezeBuiltinsScript),
-                                   JS::SourceOwnership::Borrowed),
-                    SM_E_INTERNAL) ||
-            !chk.ok(JS::Evaluate(_cx, freezeOpts, freezeSrc, &freezeRval), SM_E_INTERNAL))
-            return err ? err->code : SM_E_INTERNAL;
+        if (err_code_t rc = _freezeBuiltins(chk, err); rc != SM_OK)
+            return rc;
 
-        // Remove internal helpers from the child's user-visible scope. This runs after
-        // the freeze script so that kFreezeBuiltinsScript can reference Reflect by name without
-        // getting a ReferenceError.
+        // Remove internal helpers from the child's user-visible scope. Freezing above locks
+        // each object's own slots but not _global itself, so these deletions still succeed.
         {
             JS::ObjectOpResult ignored;
             JS_DeleteProperty(_cx, _global, "__parseJSFunctionOrExpression", ignored);
@@ -733,6 +738,7 @@ err_code_t MozJSScriptEngine::resetRealm(wasm_mozjs_error_t* err) {
     _emitBytesUsed = 0;
     _emitByteLimit = kDefaultEmitByteLimitBytes;
     _status = Status::OK();
+    _printBudget.reset();
 
     // Release all child-realm GC roots BEFORE allocating the new realm. Without this,
     // the live-set is nearly doubled during JS_NewGlobalObject, risking OOM under
@@ -919,6 +925,10 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
 
     ExecutionCheck chk(_cx, err);
 
+    // Advance the generation before wrapping args so any stale BSON-backed JS objects retained
+    // from a prior invocation are detected when accessed during this one.
+    ++_generation;
+
     const int nargs = argsObject.nFields();
 
     JS::RootedValueVector args(_cx);
@@ -936,7 +946,7 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
             BSONElement next = it.next();
 
             JS::RootedValue value(_cx);
-            ValueReader(_cx, &value).fromBSONElement(next, argsObject, false /*readOnlyArgs*/);
+            ValueReader(_cx, &value).fromBSONElementUnowned(next, /*readOnlyArgs=*/false);
 
             if (!args.append(value)) {
                 if (err) {
@@ -1065,6 +1075,10 @@ err_code_t MozJSScriptEngine::invokePredicate(uint64_t handle,
     JSAutoRealm ar(_cx, _global);
     ExecutionCheck chk(_cx, err);
 
+    // Advance generation so any unowned BSONHolder retained from a prior invokeFunction call
+    // is detected as stale if accessed during this predicate.
+    ++_generation;
+
     JS::RootedValue smrecv(_cx);
     if (!document.isEmpty())
         ValueReader(_cx, &smrecv).fromBSON(document, nullptr, false);
@@ -1076,10 +1090,13 @@ err_code_t MozJSScriptEngine::invokePredicate(uint64_t handle,
     // These are cheap JS property sets using the already-deserialized smrecv — no extra
     // BSON serialization needed.
     if (smrecv.isObject()) {
-        JS_SetProperty(_cx, _global, "obj", smrecv);
         JS::RootedValue trueVal(_cx);
         trueVal.setBoolean(true);
-        JS_SetProperty(_cx, _global, "fullObject", trueVal);
+        // Fails if user code made these non-configurable (e.g. froze globalThis).
+        if (!chk.ok(JS_DefineProperty(_cx, _global, "obj", smrecv, JSPROP_ENUMERATE)) ||
+            !chk.ok(JS_DefineProperty(_cx, _global, "fullObject", trueVal, JSPROP_ENUMERATE))) {
+            return err ? err->code : SM_E_JSAPI_FAIL;
+        }
     }
 
     JS::RootedValueVector args(_cx);
@@ -1113,6 +1130,10 @@ err_code_t MozJSScriptEngine::invokeMap(uint64_t handle,
 
     JSAutoRealm ar(_cx, _global);
     ExecutionCheck chk(_cx, err);
+
+    // Advance generation so any unowned BSONHolder retained from a prior invokeFunction call
+    // is detected as stale if accessed during this map invocation.
+    ++_generation;
 
     JS::RootedValue smrecv(_cx);
     if (!document.isEmpty())
@@ -1170,16 +1191,18 @@ err_code_t MozJSScriptEngine::setGlobal(const char* name,
     for (BSONObjIterator it(value); it.more();) {
         BSONElement elem = it.next();
         JS::RootedValue val(_cx);
-        ValueReader(_cx, &val).fromBSONElement(elem, value, false /* readOnlyArgs */);
+        ValueReader(_cx, &val).fromBSONElement(elem, value, /*readOnlyArgs=*/false);
 
-        if (!chk.ok(JS_SetProperty(_cx, jsObj, elem.fieldName(), val), SM_E_INTERNAL)) {
+        if (!chk.ok(JS_DefineProperty(_cx, jsObj, elem.fieldName(), val, JSPROP_ENUMERATE),
+                    SM_E_INTERNAL)) {
             return err ? err->code : SM_E_INTERNAL;
         }
     }
 
     JS::RootedValue objVal(_cx, JS::ObjectValue(*jsObj));
     std::string nameStr(name, name_len);
-    if (!chk.ok(JS_SetProperty(_cx, _global, nameStr.c_str(), objVal), SM_E_INTERNAL)) {
+    if (!chk.ok(JS_DefineProperty(_cx, _global, nameStr.c_str(), objVal, JSPROP_ENUMERATE),
+                SM_E_INTERNAL)) {
         return err ? err->code : SM_E_INTERNAL;
     }
 
@@ -1276,10 +1299,32 @@ err_code_t MozJSScriptEngine::setGlobalValue(const char* name,
     ValueReader(_cx, &val).fromBSONElement(elem, singleElementDoc, false);
 
     std::string nameStr(name, name_len);
-    if (!chk.ok(JS_SetProperty(_cx, _global, nameStr.c_str(), val), SM_E_INTERNAL)) {
+    if (!chk.ok(JS_DefineProperty(_cx, _global, nameStr.c_str(), val, JSPROP_ENUMERATE),
+                SM_E_INTERNAL)) {
         return err ? err->code : SM_E_INTERNAL;
     }
 
+    return SM_OK;
+}
+
+err_code_t MozJSScriptEngine::deleteGlobal(const char* name,
+                                           size_t name_len,
+                                           wasm_mozjs_error_t* err) {
+    clear_error(err);
+    if (!_initialized || !_cx || !_global)
+        return SM_E_BAD_STATE;
+    if (!name || name_len == 0)
+        return SM_E_INVALID_ARG;
+
+    JSAutoRealm ar(_cx, _global);
+    ExecutionCheck chk(_cx, err);
+
+    std::string nameStr(name, name_len);
+    // Performs a best effort delete. A non-configurable global delete is a silent no-op rather than
+    // an error.
+    if (!chk.ok(JS_DeleteProperty(_cx, _global, nameStr.c_str()), SM_E_INTERNAL)) {
+        return err ? err->code : SM_E_INTERNAL;
+    }
     return SM_OK;
 }
 
@@ -1288,105 +1333,131 @@ err_code_t MozJSScriptEngine::reset(wasm_mozjs_error_t* err) {
     if (!_initialized || !_cx || !_global)
         return SM_E_BAD_STATE;
 
-    JSAutoRealm ar(_cx, _global);
-    ExecutionCheck chk(_cx, err);
-
-    // TODO (SERVER-129746): JS_DeleteProperty result is never inspected in these deletion passes.
-    // A non-configurable property (Object.defineProperty with configurable:false) silently
-    // survives reset. On deletion failure, fall back to resetRealm().
-    // Delete all own properties of globalThis (including non-enumerable and symbols) not
-    // present after init(). _initGlobalNames holds the post-init snapshot.
+    bool needsRealmReset = false;
     {
-        JS::RootedVector<JS::PropertyKey> ids(_cx);
-        if (!chk.ok(js::GetPropertyKeys(
-                _cx, _global, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &ids)))
-            return err ? err->code : SM_E_JSAPI_FAIL;
-        JS::RootedId id(_cx);
-        for (size_t i = 0; i < ids.length(); ++i) {
-            id.set(ids[i]);
-            if (id.isString()) {
-                JS::RootedString rstr(_cx, id.toString());
-                JS::UniqueChars name = JS_EncodeStringToUTF8(_cx, rstr);
-                if (name) {
-                    if (_initGlobalNames.find(name.get()) == _initGlobalNames.end()) {
+        JSAutoRealm ar(_cx, _global);
+        ExecutionCheck chk(_cx, err);
+
+        // Delete all own properties of globalThis (including non-enumerable and symbols) not
+        // present after init(). _initGlobalNames holds the post-init snapshot. If any property
+        // is non-configurable (Object.defineProperty with configurable:false), JS_DeleteProperty
+        // silently fails; we detect that via ObjectOpResult and fall back to resetRealm().
+        {
+            JS::RootedVector<JS::PropertyKey> ids(_cx);
+            if (!chk.ok(js::GetPropertyKeys(
+                    _cx, _global, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &ids)))
+                return err ? err->code : SM_E_JSAPI_FAIL;
+            JS::RootedId id(_cx);
+            for (size_t i = 0; i < ids.length(); ++i) {
+                id.set(ids[i]);
+                if (id.isString()) {
+                    JS::RootedString rstr(_cx, id.toString());
+                    JS::UniqueChars name = JS_EncodeStringToUTF8(_cx, rstr);
+                    if (name) {
+                        if (_initGlobalNames.find(name.get()) == _initGlobalNames.end()) {
+                            JS::ObjectOpResult result;
+                            if (!JS_DeleteProperty(_cx, _global, name.get(), result) ||
+                                !result.ok()) {
+                                JS_ClearPendingException(_cx);
+                                needsRealmReset = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        // Encoding failed (OOM) — fall back to by-id deletion.
                         JS::ObjectOpResult result;
-                        JS_DeleteProperty(_cx, _global, name.get(), result);
+                        if (!JS_DeletePropertyById(_cx, _global, id, result) || !result.ok()) {
+                            JS_ClearPendingException(_cx);
+                            needsRealmReset = true;
+                            break;
+                        }
                     }
                 } else {
-                    // Encoding failed (OOM) — fall back to by-id deletion.
+                    // Symbol-keyed property — not in _initGlobalNames, always delete.
                     JS::ObjectOpResult result;
-                    JS_DeletePropertyById(_cx, _global, id, result);
+                    if (!JS_DeletePropertyById(_cx, _global, id, result) || !result.ok()) {
+                        JS_ClearPendingException(_cx);
+                        needsRealmReset = true;
+                        break;
+                    }
                 }
-            } else {
-                // Symbol-keyed property — not in _initGlobalNames, always delete.
-                JS::ObjectOpResult result;
-                JS_DeletePropertyById(_cx, _global, id, result);
             }
         }
-    }
 
-    // Scrub own properties attached to cached function objects in _slots.
-    // User code can write properties onto JS functions (e.g. fn.__stash__ = 'secret')
-    // which would otherwise survive reset().
-    {
-        JS::RootedValue fnVal(_cx);
-        JS::RootedObject fnObj(_cx);
-        for (auto& slot : _slots) {
-            fnVal.set(slot.fn.get());
-            if (!fnVal.isObject())
-                continue;
-            fnObj.set(&fnVal.toObject());
-            JS::RootedVector<JS::PropertyKey> fnIds(_cx);
-            if (!js::GetPropertyKeys(
-                    _cx, fnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &fnIds)) {
-                JS_ClearPendingException(_cx);
-                continue;
-            }
-            JS::RootedId fid(_cx);
-            for (size_t i = 0; i < fnIds.length(); ++i) {
-                fid.set(fnIds[i]);
-                JS::ObjectOpResult result;
-                JS_DeletePropertyById(_cx, fnObj, fid, result);
-            }
-        }
-    }
-
-    // Scrub user-added own properties from engine-installed function objects on globalThis.
-    // Their names survive the deletion pass above (present in _initGlobalNames), but the
-    // functions themselves can carry user-set properties. _initFnProps maps each such
-    // function name to its init-time properties; only user-added ones are deleted.
-    {
-        JS::RootedValue gval(_cx);
-        JS::RootedObject gfnObj(_cx);
-        for (const auto& [initName, initProps] : _initFnProps) {
-            if (!JS_GetProperty(_cx, _global, initName.c_str(), &gval))
-                continue;
-            if (!gval.isObject())
-                continue;
-            gfnObj.set(&gval.toObject());
-            if (!js::IsFunctionObject(gfnObj))
-                continue;
-            JS::RootedVector<JS::PropertyKey> gfnIds(_cx);
-            if (!js::GetPropertyKeys(
-                    _cx, gfnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &gfnIds)) {
-                JS_ClearPendingException(_cx);
-                continue;
-            }
-            JS::RootedId gfid(_cx);
-            for (size_t i = 0; i < gfnIds.length(); ++i) {
-                gfid.set(gfnIds[i]);
-                if (gfid.isString()) {
-                    JS::RootedString rstr(_cx, gfid.toString());
-                    JS::UniqueChars pname = JS_EncodeStringToUTF8(_cx, rstr);
-                    if (pname && initProps.find(pname.get()) != initProps.end())
-                        continue;  // present at init time — keep it
+        // Scrub own properties attached to cached function objects in _slots.
+        // User code can write properties onto JS functions (e.g. fn.__stash__ = 'secret')
+        // which would otherwise survive reset(). Non-configurable properties (prototype,
+        // length, name, arguments, caller) are intrinsic engine properties — skip them;
+        // never trigger a realm reset from here since _slots must survive reset().
+        if (!needsRealmReset) {
+            JS::RootedValue fnVal(_cx);
+            JS::RootedObject fnObj(_cx);
+            for (auto& slot : _slots) {
+                fnVal.set(slot.fn.get());
+                if (!fnVal.isObject())
+                    continue;
+                fnObj.set(&fnVal.toObject());
+                JS::RootedVector<JS::PropertyKey> fnIds(_cx);
+                if (!js::GetPropertyKeys(
+                        _cx, fnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &fnIds)) {
+                    JS_ClearPendingException(_cx);
+                    continue;
                 }
-                // Symbol-keyed or string-keyed property not present at init — user added it.
-                JS::ObjectOpResult result;
-                JS_DeletePropertyById(_cx, gfnObj, gfid, result);
+                JS::RootedId fid(_cx);
+                for (size_t i = 0; i < fnIds.length(); ++i) {
+                    fid.set(fnIds[i]);
+                    JS::ObjectOpResult result;
+                    if (!JS_DeletePropertyById(_cx, fnObj, fid, result) || !result.ok()) {
+                        JS_ClearPendingException(_cx);
+                        continue;
+                    }
+                }
             }
         }
-    }
+
+        // Scrub user-added own properties from engine-installed function objects on globalThis.
+        // Their names survive the deletion pass above (present in _initGlobalNames), but the
+        // functions themselves can carry user-set properties. _initFnProps maps each such
+        // function name to its init-time properties; only user-added ones are deleted.
+        if (!needsRealmReset) {
+            JS::RootedValue gval(_cx);
+            JS::RootedObject gfnObj(_cx);
+            for (const auto& [initName, initProps] : _initFnProps) {
+                if (!JS_GetProperty(_cx, _global, initName.c_str(), &gval))
+                    continue;
+                if (!gval.isObject())
+                    continue;
+                gfnObj.set(&gval.toObject());
+                if (!js::IsFunctionObject(gfnObj))
+                    continue;
+                JS::RootedVector<JS::PropertyKey> gfnIds(_cx);
+                if (!js::GetPropertyKeys(
+                        _cx, gfnObj, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, &gfnIds)) {
+                    JS_ClearPendingException(_cx);
+                    continue;
+                }
+                JS::RootedId gfid(_cx);
+                for (size_t i = 0; i < gfnIds.length(); ++i) {
+                    gfid.set(gfnIds[i]);
+                    if (gfid.isString()) {
+                        JS::RootedString rstr(_cx, gfid.toString());
+                        JS::UniqueChars pname = JS_EncodeStringToUTF8(_cx, rstr);
+                        if (pname && initProps.find(pname.get()) != initProps.end())
+                            continue;  // present at init time — keep it
+                    }
+                    // Symbol-keyed or string-keyed property not present at init — user added it.
+                    JS::ObjectOpResult result;
+                    if (!JS_DeletePropertyById(_cx, gfnObj, gfid, result) || !result.ok()) {
+                        JS_ClearPendingException(_cx);
+                        continue;
+                    }
+                }
+            }
+        }
+    }  // JSAutoRealm ar destroyed here — old child realm exited before resetRealm().
+
+    if (needsRealmReset)
+        return resetRealm(err);
 
     // Compiled JS functions are preserved across resets — bytecodes are independent of
     // user globals, keeping _cachedFunctions valid and avoiding per-document recompilation.
@@ -1395,6 +1466,7 @@ err_code_t MozJSScriptEngine::reset(wasm_mozjs_error_t* err) {
     _emitBytesUsed = 0;
     _emitByteLimit = kDefaultEmitByteLimitBytes;
     _status = Status::OK();
+    _printBudget.reset();
 
     // Skip the ~1 ms GC for cheap scopes, but collect when meaningful host-BSON garbage
     // may be pinned by dead proxies (see _notePinnedHostBytes) so a parked, reused bridge
@@ -1404,6 +1476,7 @@ err_code_t MozJSScriptEngine::reset(wasm_mozjs_error_t* err) {
         _pinnedHostBytesSinceGc = 0;
     }
 
+    ++_generation;
     return SM_OK;
 }
 
@@ -1518,20 +1591,28 @@ void MozJSScriptEngine::sleep(Milliseconds ms) {
     // slices. nanosleep is a blocking host call — the WASM epoch check only
     // triggers when control returns to WASM code. Slicing keeps sleep
     // interruptible by the DeadlineMonitor on the host side.
-    auto remaining = ms;
-    constexpr Milliseconds kSlice{1};
-    while (remaining > Milliseconds{0}) {
-        auto slice = std::min(remaining, kSlice);
+    //
+    // Note that due to clock granularity and scheduling, the number of slices in a given duration
+    // is not guaranteed to be 'duration / slice'. Practically, there will be fewer slices than
+    // expected due to scheduling jitter causing the sleep to be longer than the slice time.
+    // While it is possible for nanosleep to return early due to signal interruption, it is less
+    // likely.
+    constexpr Microseconds kSlice{Milliseconds{1}};
+    Timer timer;
+    Microseconds elapsed{0};
+    while (elapsed < ms) {
+        const Microseconds remaining = ms - elapsed;
+        const auto slice = std::min(remaining, kSlice);
         struct timespec ts;
         ts.tv_sec = 0;
-        ts.tv_nsec = static_cast<long>(slice.count() * 1'000'000L);
+        ts.tv_nsec = static_cast<long>(slice.count() * 1'000L);
         nanosleep(&ts, nullptr);
-        remaining -= slice;
+        elapsed = timer.elapsed();
     }
 }
 
 std::size_t MozJSScriptEngine::getGeneration() const {
-    return 1;
+    return _generation;
 }
 
 JS::HandleId MozJSScriptEngine::getInternedStringId(InternedString name) {
@@ -1653,6 +1734,10 @@ bool MozJSScriptEngine::isJavaScriptProtectionEnabled() const {
 
 bool MozJSScriptEngine::requiresOwnedObjects() const {
     return false;
+}
+
+JSPrintBudget* MozJSScriptEngine::printBudget() {
+    return &_printBudget;
 }
 
 void MozJSScriptEngine::newFunction(std::string_view raw, JS::MutableHandleValue out) {

@@ -2,13 +2,18 @@
 // executionStats output.
 //
 // @tags: [
+//   uses_explain,
 //   assumes_against_mongod_not_mongos,
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
 //   featureFlagSbeFull,
 // ]
 
-import {getPlanStages, getQueryPlanner, isIxscan} from "jstests/libs/query/analyze_plan.js";
+import {
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isIxscan,
+} from "jstests/libs/query/analyze_plan.js";
 
 function assertStageContainsIndexName(stage) {
     assert(stage.hasOwnProperty("indexName"));
@@ -29,10 +34,14 @@ assert.commandWorked(
 );
 
 let explain = coll.find({a: 3}).hint({a: 1}).explain("executionStats");
-let queryPlanner = getQueryPlanner(explain);
-assert(isIxscan(db, queryPlanner.winningPlan));
+let winningPlan = getWinningPlanFromExplain(explain);
+assert(isIxscan(db, winningPlan));
 // Ensure the query is run on sbe engine.
-assert("slotBasedPlan" in queryPlanner.winningPlan);
+assert(
+    getWinningPlanFromExplain(explain, true /* isSBEPlan */),
+    "Expected the query to run in SBE",
+    {explain},
+);
 
 let ixscanStages = getPlanStages(explain.executionStats.executionStages, "ixseek");
 assert(ixscanStages.length !== 0);

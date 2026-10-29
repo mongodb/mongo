@@ -6,6 +6,8 @@ def _zstd(ctx):
         ctx.file(
             "BUILD.bazel",
             """
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -38,6 +40,8 @@ sh_binary(
             "BUILD.bazel",
             """
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
 package(default_visibility = ["//visibility:public"])
 
 constraint_value(

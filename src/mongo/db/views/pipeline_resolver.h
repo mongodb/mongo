@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,6 +14,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -48,7 +23,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC PipelineResolver {
+class [[MONGO_MOD_PUBLIC]] PipelineResolver {
 public:
     /**
      * Constructs a new aggregation request which targets the base collection of 'resolvedView'
@@ -87,11 +62,19 @@ public:
      * Walks 'lpp' and binds any view found at 'mainNss' in 'resolvedNamespaces', then recurses
      * into each stage's subpipelines using the subpipeline's original parse NSS as the recursive
      * 'mainNss'. Returns whether any view was bound.
+     *
+     * When 'bindOnly' is true, every level calls bindResolvedNamespaceToStages() instead of
+     * handleView(), i.e. it binds view/namespace info onto stages WITHOUT prepending the view
+     * pipeline. Callers (e.g. the $lookup execution-time binder) use this when the view pipeline
+     * is already materialized in the resolved pipeline and only namespace binding is needed —
+     * prepending again would double-apply the view.
      */
     static bool resolveInvolvedNamespacesOnLiteParsedPipeline(
         LiteParsedPipeline* lpp,
         const NamespaceString& mainNss,
-        const ResolvedNamespaceMap& resolvedNamespaces);
+        const ResolvedNamespaceMap& resolvedNamespaces,
+        bool bindOnly = false,
+        size_t bindOnlyStart = 0);
 
     /**
      * Inserts a ResolvedView into a ResolvedNamespaceMap.

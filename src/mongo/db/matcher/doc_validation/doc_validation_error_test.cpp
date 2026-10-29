@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/doc_validation/doc_validation_error_test.h"
 
@@ -44,7 +18,7 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -115,7 +89,7 @@ TEST(GenerateValidationError, FailingDocumentId) {
                                                         << "comparison failed"
                                                         << "consideredValue" << 1));
     ASSERT_BSONOBJ_EQ(
-        doc_validation_error::generateValidationError(query, document, false /* shouldThrow */),
+        doc_validation_error::generateValidationError(query, document, /*shouldThrow=*/false),
         expectedError);
 }
 
@@ -154,7 +128,7 @@ void verifyTruncatedError(const BSONObj& query,
                           const int maxConsideredValuesSize) {
     auto generatedError = generateValidationError(query,
                                                   document,
-                                                  false /* shouldThrow */,
+                                                  /*shouldThrow=*/false,
                                                   maxDocValidationErrorSize,
                                                   maxConsideredValuesSize);
     ASSERT_TRUE(generatedError.hasField("truncated"));
@@ -928,7 +902,7 @@ TEST(MiscellaneousMatchExpression, ExprWhichThrowsGeneratesError) {
         "   {code: 2, "
         "   codeName: 'BadValue', "
         "   errmsg: \"can't $divide by zero\"}}");
-    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, /*shouldThrow=*/true);
 }
 
 TEST(MiscellaneousMatchExpression, MultipleExprsWhichThrow) {
@@ -953,7 +927,7 @@ TEST(MiscellaneousMatchExpression, MultipleExprsWhichThrow) {
         "       {code: 2, "
         "      codeName: 'BadValue', "
         "       errmsg: \"can't $divide by zero\"}}}]}");
-    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, /*shouldThrow=*/true);
 }
 
 TEST(MiscellaneousMatchExpression, OneExprThrowsAmongMultiple) {
@@ -970,7 +944,7 @@ TEST(MiscellaneousMatchExpression, OneExprThrowsAmongMultiple) {
         "       {code: 2, "
         "      codeName: 'BadValue', "
         "       errmsg: \"can't $divide by zero\"}}}]}");
-    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, /*shouldThrow=*/true);
 }
 
 TEST(MiscellaneousMatchExpression, ExprsWhichThrowUnderInversion) {
@@ -995,7 +969,7 @@ TEST(MiscellaneousMatchExpression, ExprsWhichThrowUnderInversion) {
         "       {code: 2, "
         "      codeName: 'BadValue', "
         "       errmsg: \"can't $divide by zero\"}}}]}");
-    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, /*shouldThrow=*/true);
 }
 
 // $sampleRate
@@ -1853,7 +1827,7 @@ TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
     // Verify that a query that is too deep will not return any error detail.
     auto verifyFailingQuery = [](const BSONObj& query, BSONObj& failingDoc) -> void {
         // 'failingQuery' will generate a truncated error with no detail.
-        BSONObj error = generateValidationError(query, failingDoc, false /* shouldThrow */);
+        BSONObj error = generateValidationError(query, failingDoc, /*shouldThrow=*/false);
         auto reason = error.getField("reason");
         auto truncated = error.getField("truncated");
         ASSERT(reason);
@@ -1874,7 +1848,7 @@ TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
     // Should no longer fail when below the maximum allowed depth.
     --depth;
     BSONObj error =
-        generateValidationError(generateDeeplyNestedOr(depth), doc, false /* shouldThrow */);
+        generateValidationError(generateDeeplyNestedOr(depth), doc, /*shouldThrow=*/false);
     ASSERT_FALSE(error.hasField("reason"));
     ASSERT_FALSE(error.hasField("truncated"));
     ASSERT_EQ(error.getField("details").type(), BSONType::object);
@@ -1910,7 +1884,7 @@ TEST(DocValidationTruncationTest, ConsideredValuesArrayNotTruncatedWhenConfigure
         valuesArray.append(i);
     }
     BSONObj document = BSON("a" << valuesArray.arr());
-    BSONObj generatedError = generateValidationError(query, document, false /* shouldThrow */);
+    BSONObj generatedError = generateValidationError(query, document, /*shouldThrow=*/false);
     // Should not report 'consideredValuesTruncated: true'
     ASSERT_FALSE(generatedError.hasField("consideredValuesTruncated"));
 }
@@ -1980,7 +1954,7 @@ TEST(DocValidationTruncationTest, BasicSizeTruncation) {
         auto error =
             generateValidationError(query,
                                     doc,
-                                    false /* shouldThrow */,
+                                    /*shouldThrow=*/false,
                                     maxSize,
                                     internalQueryMaxDocValidationErrorConsideredValues.load());
         // Generated error should have a note field and a failingDocumentId field, but no details
@@ -2001,7 +1975,7 @@ TEST(DocValidationTruncationTest, DocValidationReportsProgrammingError) {
     BSONObj doc = BSON("b" << 4);
     auto error = generateValidationError(query,
                                          doc,
-                                         false /* shouldThrow */,
+                                         /*shouldThrow=*/false,
                                          kDefaultMaxDocValidationErrorSize,
                                          internalQueryMaxDocValidationErrorConsideredValues.load());
     // There should be an error with 'note' and 'details' fields.

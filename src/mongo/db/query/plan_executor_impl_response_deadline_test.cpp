@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/mock_stage.h"
@@ -100,8 +74,10 @@ class PlanExecutorImplOplogScanNoCollectionTest : public ServiceContextMongoDTes
 // always reports a time well past the configured 1ms timeout by the time the yield callback runs.
 class PlanExecutorImplOplogScanWithCollectionTest : public CatalogTestFixture {
 public:
-    PlanExecutorImplOplogScanWithCollectionTest()
-        : CatalogTestFixture(Options{}.useMockClock(true, Milliseconds{5000})) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().useMockClock(true,
+                                                                            Milliseconds{5000});
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -137,7 +113,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest, NonChangeStreamQuery_ReturnsAl
     auto exec = plan_executor_factory::make(expCtx,
                                             std::move(ws),
                                             std::move(mockStage),
-                                            boost::none /* collection */,
+                                            /*collection=*/boost::none,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             QueryPlannerParams::DEFAULT,
                                             kNss);
@@ -179,7 +155,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest, ChangeStreamQuery_KnobZero_Ret
     auto exec = plan_executor_factory::make(expCtx,
                                             std::move(ws),
                                             std::move(mockStage),
-                                            boost::none /* collection */,
+                                            /*collection=*/boost::none,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             QueryPlannerParams::DEFAULT,
                                             kNss);
@@ -217,7 +193,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest,
     auto exec = plan_executor_factory::make(expCtx,
                                             std::move(ws),
                                             std::move(mockStage),
-                                            boost::none /* collection */,
+                                            /*collection=*/boost::none,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             QueryPlannerParams::DEFAULT,
                                             kNss);
@@ -261,7 +237,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     // very first getNext() call. The auto-advancing clock ensures that by the time the yield
     // callback fires, the precise clock source has advanced well past the 1 ms deadline.
     auto [ws, mockStage] = makeMockStageWithDocuments(
-        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, true /* enqueueNeedYieldFirst */);
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/true);
 
     auto coll = acquireTestCollection();
     auto exec = plan_executor_factory::make(expCtx,
@@ -301,7 +277,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     expCtx->setChangeStreamSpec(spec);
 
     auto [ws, mockStage] = makeMockStageWithDocuments(
-        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, false /* enqueueNeedYieldFirst */);
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/false);
 
     auto coll = acquireTestCollection();
     auto exec = plan_executor_factory::make(expCtx,
@@ -340,8 +316,10 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
 // response deadline type checks.
 class PlanExecutorImplOplogScanLogInfoTest : public CatalogTestFixture {
 public:
-    PlanExecutorImplOplogScanLogInfoTest()
-        : CatalogTestFixture(Options{}.useMockClock(true, Milliseconds{100000})) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().useMockClock(true,
+                                                                            Milliseconds{100000});
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -376,7 +354,7 @@ TEST_F(PlanExecutorImplOplogScanLogInfoTest,
     // auto-advancing precise clock (100 000 ms per now() call) guarantees the callback sees a
     // time well past kLongOplogScanLogInfoDeadline (90 s).
     auto [ws, mockStage] = makeMockStageWithDocuments(
-        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, true /* enqueueNeedYieldFirst */);
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/true);
 
     auto coll = acquireTestCollection();
     auto exec = plan_executor_factory::make(expCtx,

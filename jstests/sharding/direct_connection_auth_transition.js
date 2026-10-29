@@ -6,6 +6,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -58,9 +59,11 @@ function runInsertViaDirectConnection(hostName, dbName, collName) {
 assert.commandWorked(mongosAdminUser.getSiblingDB(dbName).runCommand({create: collName}));
 
 // Trigger a refresh to ensure the filtering information is known
-assert.commandWorked(
-    shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + "." + collName}),
-);
+if (!FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(
+        shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + "." + collName}),
+    );
+}
 
 // Begin the insertion thread via a direct connection.
 const insertThread = new Thread(runInsertViaDirectConnection, st.shard0.host, dbName, collName);

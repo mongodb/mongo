@@ -1,0 +1,651 @@
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
+
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
+#include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/unittest.h"
+
+namespace mongo::join_ordering {
+namespace {
+unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/join/agg_join_model"};
+using RenamesTest = AggJoinModelFixture;
+}  // namespace
+
+TEST_F(RenamesTest, RenamePrefixLocalForeign) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$project: {renamedField: "$a"}},
+            {$lookup: {from: "A", localField: "renamedField", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is renamed to "renamedField".
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT(resolvedPaths[0].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[0].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    // Path "b" is simple, no rename.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT_FALSE(resolvedPaths[1].fieldPathAfterRenames);
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenamePrefixMultiLocalForeignProjectDups) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$project: {renamedField: "$a", alsoRenamedField: "$a"}},
+            {$lookup: {from: "A", localField: "alsoRenamedField", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is renamed to "alsoRenamedField".
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT(resolvedPaths[0].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[0].fieldPathAfterRenames->fullPath(), "alsoRenamedField");
+
+    // Path "b" is simple, no rename.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT_FALSE(resolvedPaths[1].fieldPathAfterRenames);
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenamePrefixMatchExpr) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$project: {renamedField: "$a"}},
+            {$lookup: {from: "A", let: {rf: "$renamedField"}, as: "fromA", pipeline: [
+                {$match: {$expr: {$eq: ["$$rf", "$b"]}}}
+            ]}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is renamed to "renamedField".
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT(resolvedPaths[0].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[0].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    // Path "b" is simple, no rename.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT_FALSE(resolvedPaths[1].fieldPathAfterRenames);
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameSubpipelineLocalForeign) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA", pipeline: [
+                {$project: {renamedField: "$b"}}
+            ]}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    const auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is straightforward. Same before/after CQ.
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT_FALSE(resolvedPaths[0].fieldPathAfterRenames.has_value());
+
+    // Path "b" is renamed to renamedField, and we track that.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT(resolvedPaths[1].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[1].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameSubpipelineMatchExpr) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "A", let: {lf: "$a"}, as: "fromA", pipeline: [
+                {$match: {$expr: {$eq: ["$$lf", "$b"]}}},
+                {$project: {renamedField: "$b"}}
+            ]}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    const auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is straightforward. Same before/after CQ.
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT_FALSE(resolvedPaths[0].fieldPathAfterRenames.has_value());
+
+    // Path "b" is renamed to renamedField, and we track that.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT(resolvedPaths[1].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[1].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameSubpipelineMatchExprProjectDups) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "A", let: {lf: "$a"}, as: "fromA", pipeline: [
+                {$match: {$expr: {$eq: ["$$lf", "$b"]}}},
+                {$project: {renamedField: "$b", renamedAlso: "$b", renameRename: "$b"}}
+            ]}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    const auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is straightforward. Same before/after CQ.
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT_FALSE(resolvedPaths[0].fieldPathAfterRenames.has_value());
+
+    // Path "b" is renamed twice, but we pick 'renameRename', and we track that.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT(resolvedPaths[1].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[1].fieldPathAfterRenames->fullPath(), "renameRename");
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameSubpipelineMatchExprSwapped) {
+    // TODO SERVER-130580: we should be able to produce a join graph for this pipeline also- it
+    // should produce an equivalent plan to the above.
+    const auto query = R"([
+            {$lookup: {from: "A", let: {lf: "$a"}, as: "fromA", pipeline: [
+                {$project: {renamedField: "$b"}},
+                {$match: {$expr: {$eq: ["$$lf", "$b"]}}}
+            ]}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kUnsupportedStage));
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 1);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 1);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+}
+
+TEST_F(RenamesTest, TrailingMatchAfterRename) {
+    // TODO SERVER-130580: we should be able to produce a join graph for this pipeline also- it
+    // should produce an equivalent plan to the above.
+    const auto query = R"([
+            {$lookup: {from: "A", as: "fromA", pipeline: []}},
+            {$unwind: "$fromA"},
+            {$project: {renamedField: "$fromA.b"}},
+            {$match: {$expr: {$eq: ["$a", "$renamedField"]}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_FALSE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kGraphDisconnected));
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+}
+
+TEST_F(RenamesTest, RenamePrefixTrailingMatch) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$project: {renamedField: "$a"}},
+            {$lookup: {from: "A", as: "fromA", pipeline: []}},
+            {$unwind: "$fromA"},
+            {$match: {$expr: {$eq: ["$renamedField", "$fromA.b"]}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is renamed to "renamedField".
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT(resolvedPaths[0].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[0].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    // Path "b" is simple, no rename.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT_FALSE(resolvedPaths[1].fieldPathAfterRenames);
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameSubpipelineTrailingMatch) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "A", as: "fromA", pipeline: [
+                {$project: {renamedField: "$b"}}
+            ]}},
+            {$unwind: "$fromA"},
+            {$match: {$expr: {$eq: ["$a", "$fromA.renamedField"]}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    const auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is straightforward. Same before/after CQ.
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT_FALSE(resolvedPaths[0].fieldPathAfterRenames.has_value());
+
+    // Path "b" is renamed to renamedField, and we track that.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT(resolvedPaths[1].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[1].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameSubpipelineTrailingMatchProjectDups) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+            {$lookup: {from: "A", as: "fromA", pipeline: [
+                {$project: {renamedField: "$b", renamedAlso: "$b", "xRename": "$b", "yRename": "$b"}}
+            ]}},
+            {$unwind: "$fromA"},
+            {$match: {$expr: {$eq: ["$a", "$fromA.renamedField"]}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_FALSE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    const auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 2);
+
+    // Path "a" is straightforward. Same before/after CQ.
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT_FALSE(resolvedPaths[0].fieldPathAfterRenames.has_value());
+
+    // Path "b" is renamed to renamedField, and we track that.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT(resolvedPaths[1].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[1].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameAllTypesCycle) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    // Cycle is formed due to predicates BASE.a --- A.b --- B.c --- C.d
+    // Fields BASE.a, B.c, and C.d are renamed. Suffix $project has no effect.
+    const auto query = R"([
+            {$project: {renamedField: "$a"}},
+            {$lookup: {from: "A", localField: "renamedField", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "fromA.b", foreignField: "c", as: "fromB", pipeline: [
+                {$project: {cRenamed: "$c"}}
+            ]}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", as: "fromC", pipeline: [
+                {$project: {dRenamed: "$d"}}
+            ]}},
+            {$unwind: "$fromC"},
+            {$match: {$expr: {$eq: ["$fromC.dRenamed", "$fromB.cRenamed"]}}},
+            {$project: {renameAgain: "$fromC.dRenamed"}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b"}}, {"B", {"c"}}, {"C", {"d"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    // The query is fully optimized, but the trailing $project ends the prefix, so a reason is
+    // still recorded.
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kUnsupportedStage));
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 4);
+
+    // Path BASE.a is renamed to "renamedField".
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT(resolvedPaths[0].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[0].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    // Path A.b is simple, no rename.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT_FALSE(resolvedPaths[1].fieldPathAfterRenames);
+
+    // Path B.c is renamed to "cRenamed".
+    ASSERT_EQ(resolvedPaths[2].nodeId, 2);
+    ASSERT_EQ(resolvedPaths[2].underlyingFieldPath.fullPath(), "c");
+    ASSERT(resolvedPaths[2].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[2].fieldPathAfterRenames->fullPath(), "cRenamed");
+
+    // Path C.d is renamed to "dRenamed".
+    ASSERT_EQ(resolvedPaths[3].nodeId, 3);
+    ASSERT_EQ(resolvedPaths[3].underlyingFieldPath.fullPath(), "d");
+    ASSERT(resolvedPaths[3].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[3].fieldPathAfterRenames->fullPath(), "dRenamed");
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(RenamesTest, RenameMultipleCycle) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    // Cycle is formed due to predicates BASE.a --- A.b --- B.c --- C.d
+    // Fields BASE.a, B.c, and C.d are renamed. Suffix $project has no effect.
+    // It shouldn't matter which rename we use, as long as all renames resolve to same base coll
+    // path, i.e. optimizer should treat dRenamed/dRenamed2 as the same path.
+    const auto query = R"([
+            {$project: {renamedField: "$a"}},
+            {$lookup: {from: "A", localField: "renamedField", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", as: "fromB", pipeline: [
+                {$project: {cRenamed: "$c", cRenamed2: "$c"}}
+            ]}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", as: "fromC", pipeline: [
+                {$project: {dRenamed: "$d", dRenamed2: "$d"}}
+            ]}},
+            {$unwind: "$fromC"},
+            {$match: {$expr: {$eq: ["$fromC.dRenamed2", "$fromB.cRenamed"]}}},
+            {$match: {$expr: {$eq: ["$fromC.dRenamed", "$renamedField"]}}},
+            {$match: {$expr: {$eq: ["$fromA.x", "$fromC.dRenamed2"]}}},
+            {$project: {renameAgain: "$fromC.dRenamed"}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline, {"a"}, {{"A", {"b", "x"}}, {"B", {"c"}}, {"C", {"d"}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel =
+        AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams, getFreshJoinOptMetrics());
+    ASSERT_OK(swJoinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    // The query is fully optimized, but the trailing $project ends the prefix, so a reason is
+    // still recorded.
+    ASSERT_TRUE(getJoinOptMetrics().fallbackReason.has_value());
+    ASSERT_EQ(toStringData(*getJoinOptMetrics().fallbackReason),
+              toStringData(JoinFallbackReason::kUnsupportedStage));
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+
+    auto& joinModel = swJoinModel.getValue();
+    const auto& resolvedPaths = joinModel.getResolvedPaths();
+    ASSERT_EQ(resolvedPaths.size(), 5);
+
+    // Path BASE.a is renamed to "renamedField".
+    ASSERT_EQ(resolvedPaths[0].nodeId, 0);
+    ASSERT_EQ(resolvedPaths[0].underlyingFieldPath.fullPath(), "a");
+    ASSERT(resolvedPaths[0].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[0].fieldPathAfterRenames->fullPath(), "renamedField");
+
+    // Path A.b is simple, no rename.
+    ASSERT_EQ(resolvedPaths[1].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[1].underlyingFieldPath.fullPath(), "b");
+    ASSERT_FALSE(resolvedPaths[1].fieldPathAfterRenames);
+
+    // Path C.d is renamed to "dRenamed" & "dRenamed2". Note: we track the last one referenced.
+    ASSERT_EQ(resolvedPaths[2].nodeId, 3);
+    ASSERT_EQ(resolvedPaths[2].underlyingFieldPath.fullPath(), "d");
+    ASSERT(resolvedPaths[2].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[2].fieldPathAfterRenames->fullPath(), "dRenamed2");
+
+    // Path B.c is similar.
+    ASSERT_EQ(resolvedPaths[3].nodeId, 2);
+    ASSERT_EQ(resolvedPaths[3].underlyingFieldPath.fullPath(), "c");
+    ASSERT(resolvedPaths[3].fieldPathAfterRenames.has_value());
+    ASSERT_EQ(resolvedPaths[3].fieldPathAfterRenames->fullPath(), "cRenamed");
+
+    // Path A.x has no renames.
+    ASSERT_EQ(resolvedPaths[4].nodeId, 1);
+    ASSERT_EQ(resolvedPaths[4].underlyingFieldPath.fullPath(), "x");
+    ASSERT_FALSE(resolvedPaths[4].fieldPathAfterRenames.has_value());
+
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+}  // namespace mongo::join_ordering

@@ -53,12 +53,6 @@ class test_bulk_load(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(types, keyfmt, valfmt)
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     # Test a simple bulk-load
     def test_bulk_load(self):
         uri = self.type + self.name

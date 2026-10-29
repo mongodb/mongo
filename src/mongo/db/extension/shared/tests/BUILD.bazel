@@ -11,10 +11,13 @@ exports_files(
 mongo_cc_unit_test(
     name = "extension_shared_test",
     srcs = [
+        "api_contract_test.cpp",
         "byte_buf_utils_test.cpp",
+        "capability_version_test.cpp",
         "extension_status_test.cpp",
         "handle_test.cpp",
         "vec_byte_buf_test.cpp",
+        "version_bump_test.cpp",
     ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [

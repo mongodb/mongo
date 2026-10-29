@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/keypattern.h"
 
@@ -48,10 +22,15 @@ bool KeyPattern::isHashedKeyPattern(const BSONObj& pattern) {
 }
 
 StringBuilder& operator<<(StringBuilder& sb, const KeyPattern& keyPattern) {
-    return KeyPattern::addToStringBuilder(sb, keyPattern._pattern);
+    return KeyPattern::_addToStringBuilder(sb, keyPattern._pattern);
 }
 
-StringBuilder& KeyPattern::addToStringBuilder(StringBuilder& sb, const BSONObj& pattern) {
+StackStringBuilder& operator<<(StackStringBuilder& sb, const KeyPattern& keyPattern) {
+    return KeyPattern::_addToStringBuilder(sb, keyPattern._pattern);
+}
+
+template <typename SB>
+SB& KeyPattern::_addToStringBuilder(SB& sb, const BSONObj& pattern) {
     // Rather than return BSONObj::toString() we construct a keyPattern string manually. This allows
     // us to avoid the cost of writing numeric direction to the str::stream which will then undergo
     // expensive number to string conversion.
@@ -66,7 +45,7 @@ StringBuilder& KeyPattern::addToStringBuilder(StringBuilder& sb, const BSONObj& 
         }
 
         if (BSONType::string == elem.type()) {
-            sb << elem;
+            sb << elem.fieldNameStringData() << ": \"" << elem.valueStringData() << "\"";
         } else if (elem.number() >= 0) {
             // The canonical check as to whether a key pattern element is "ascending" or
             // "descending" is (elem.number() >= 0). This is defined by the Ordering class.

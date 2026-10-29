@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
@@ -48,11 +22,13 @@ namespace mongo {
 namespace unified_write_executor {
 namespace {
 struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
-    WriteOpAnalyzerTestImpl()
-        : ShardingTestFixture(
-              false /* withMockCatalogCache */,
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+    WriteOpAnalyzerTestImpl() : ShardingTestFixture(/*withMockCatalogCache=*/false) {}
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()),
+            shouldSetupTransportLayer());
+    }
 
     const ShardId shardId1 = ShardId("shard1");
     const ShardId shardId2 = ShardId("shard2");
@@ -70,8 +46,7 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
         std::vector<ShardType> shards;
         for (size_t i = 0; i < remoteShards.size(); i++) {
             ShardType shardType;
-            shardType.setHandle(
-                ShardHandle{ShardId(get<0>(remoteShards[i]).toString()), boost::none});
+            shardType.setName(get<0>(remoteShards[i]).toString());
             shardType.setHost(get<1>(remoteShards[i]).toString());
             shards.push_back(shardType);
 
@@ -132,7 +107,7 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                                                epoch,
                                                Timestamp(1, 1),
                                                timeseriesFields,
-                                               boost::none /* reshardingFields */,
+                                               /*reshardingFields=*/boost::none,
                                                false,
                                                chunks);
 
@@ -170,6 +145,32 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                     DatabaseTypeValueHandle(DatabaseType{
                         nss.dbName(), kShard1Name, DatabaseVersion(uuid, Timestamp{1, 1})})));
         }
+        return RoutingContext::createSynthetic(criMap);
+    }
+
+    /**
+     * Set up a routing context that mirrors a real viewful timeseries collection: the logical view
+     * namespace 'nss' is untracked (has no routing table), while its buckets namespace is a
+     * tracked, sharded timeseries collection. This is the only shape under which the analyzer
+     * should translate a write on 'nss' to its buckets namespace.
+     */
+    std::unique_ptr<RoutingContext> createRoutingContextViewfulTimeseries(
+        const NamespaceString& nss, const UUID& bucketsUuid) {
+        const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
+        TypeCollectionTimeseriesFields tsFields;
+        tsFields.setTimeField(std::string("ts"));
+        tsFields.setMetaField(std::string("x"));
+
+        auto dbVersion = DatabaseVersion(bucketsUuid, Timestamp{1, 1});
+        stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
+        criMap.emplace(
+            nss, CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, kShard1Name, dbVersion));
+        criMap.emplace(nssBuckets,
+                       CollectionRoutingInfo(
+                           createChunkManager(
+                               bucketsUuid, nssBuckets, tsFields, true /* isViewfulTimeseries */),
+                           DatabaseTypeValueHandle(
+                               DatabaseType{nssBuckets.dbName(), kShard1Name, dbVersion})));
         return RoutingContext::createSynthetic(criMap);
     }
 
@@ -888,10 +889,8 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
     unittest::ServerParameterGuard enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
-    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+    auto rtx = createRoutingContextViewfulTimeseries(nss, uuid);
 
     BulkWriteCommandRequest request(
         {
@@ -922,10 +921,8 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesNonTargeted) {
     unittest::ServerParameterGuard enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
-    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+    auto rtx = createRoutingContextViewfulTimeseries(nss, uuid);
 
     BulkWriteCommandRequest request(
         {
@@ -949,10 +946,8 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesRetryableWrite) {
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(TxnNumber(1));
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
-    auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+    auto rtx = createRoutingContextViewfulTimeseries(nss, uuid);
 
     BulkWriteCommandRequest request(
         {
@@ -970,6 +965,38 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesRetryableWrite) {
 
     rtx->onRequestSentForNss(nss);
 }
+
+// A client must not be able to redirect a write on a normal (tracked) collection 'db.X' to its
+// 'db.system.buckets.X' namespace merely by also listing the buckets namespace in the request. When
+// 'nss' is itself tracked, the analyzer must not perform the viewful-timeseries namespace
+// translation even though the buckets namespace is present in the routing context.
+TEST_F(WriteOpAnalyzerTestImpl, DeclaredBucketsNssDoesNotRedirectTrackedCollection) {
+    unittest::ServerParameterGuard enableTimeseriesUpdatesSupport(
+        "featureFlagTimeseriesUpdatesSupport", true);
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
+    UUID uuid = UUID::gen();
+    UUID bucketsUuid = UUID::gen();
+    // 'nss' is a normal sharded (tracked) collection, and the client has additionally declared the
+    // buckets namespace, which is also registered in the routing context.
+    auto rtx = createRoutingContextSharded({{uuid, nss}, {bucketsUuid, nssBuckets}});
+
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteUpdateOp(0,
+                              BSON("x" << -1),
+                              write_ops::UpdateModification(BSON("$set" << BSON("x" << -10)))),
+        },
+        {NamespaceInfoEntry(nss), NamespaceInfoEntry(nssBuckets)});
+
+    WriteOp op1(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    // The write must stay on 'nss' and must not be flagged as a viewful timeseries translation.
+    ASSERT_FALSE(analysis.isViewfulTimeseries);
+
+    rtx->onRequestSentForNss(nss);
+}
+
 }  // namespace
 }  // namespace unified_write_executor
 }  // namespace mongo

@@ -2,7 +2,7 @@
  * Tests hybrid search $score score details. This test focuses on ensuring that the structure
  * and contents of the produced scoreDetails field is correct.
  *
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
+ * @tags: [requires_fcv_82]
  */
 import {
     // fieldPresent,

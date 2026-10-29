@@ -25,7 +25,7 @@ import {CursorList} from "jstests/libs/query/change_stream_util.js";
 import {
     ServerStatusMetrics,
     TestDataModifyGuard,
-} from "jstests/change_streams/change_stream_metrics_util.js";
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const testColl = testDB.getCollection("test");

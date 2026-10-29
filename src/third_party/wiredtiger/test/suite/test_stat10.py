@@ -104,6 +104,9 @@ class test_stat10(wttest.WiredTigerTestCase):
         evict_cursor.close()
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook(
+        "disagg", "new tables cannot be evicted until their publication takes effect",
+        param="schema_epochs")
     def test_tree_stats(self):
         if self.runningHook('disagg') and self.key_format == 'r':
             self.skipTest("disagg does not support column-store")

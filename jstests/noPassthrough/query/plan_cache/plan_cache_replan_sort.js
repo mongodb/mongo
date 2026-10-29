@@ -7,7 +7,6 @@
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {getCachedPlan} from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: false}});
 const db = conn.getDB("test");
@@ -44,14 +43,8 @@ assert.eq(1, cachedPlans.length, cachedPlans);
 assert.eq(true, cachedPlans[0].isActive, cachedPlans);
 const cachedPlan = getCachedPlan(cachedPlans[0].cachedPlan);
 const cachedPlanVersion = cachedPlans[0].version;
-if (sbePlanCacheEnabled(db)) {
-    // If the SBE plan cache is on, then the cached plan has a different format.
-    assert.eq(cachedPlanVersion, "2", cachedPlans);
-    assert(cachedPlan.stages.includes("sort"), cachedPlans);
-} else {
-    assert.eq(cachedPlanVersion, "1", cachedPlans);
-    assert.eq(cachedPlan.stage, "SORT", cachedPlans);
-}
+assert.eq(cachedPlanVersion, "1", cachedPlans);
+assert.eq(cachedPlan.stage, "SORT", cachedPlans);
 
 // Assert we "replan", by running the same query with different parameters. This time the filter is
 // not selective at all and will result in more documents attempted to be sorted.

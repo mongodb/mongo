@@ -5,10 +5,14 @@
  * cursor assertions are used as additional cross-checks.
  *
  * @tags: [
+ *   # Asserts on state-transition internals for one specific watch-mode scope's targeter.
+ *   do_not_run_in_whole_db_passthrough,
+ *   do_not_run_in_whole_cluster_passthrough,
  *   assumes_balancer_off,
  *   config_shard_incompatible,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   featureFlagChangeStreamReaderV2,
  *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
@@ -35,6 +39,10 @@ import {
     CreateUntrackedCollectionCommand,
     ShardCollectionCommand,
 } from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {
+    readShardTargetingDelta,
+    ServerStatusMetrics,
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 const {kCollOrDbPlacementRefresh} = V2TargeterLogCodes;
 
@@ -146,15 +154,24 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.Uninitialized, to: S.FetchingInitialization},
-                    {from: S.FetchingInitialization, to: S.FetchingGettingChangeEvent},
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.Uninitialized, to: S.FetchingInitialization},
+                        {from: S.FetchingInitialization, to: S.FetchingGettingChangeEvent},
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
 
             assertOpenCursors(
                 st,
@@ -209,19 +226,34 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.Uninitialized, to: S.FetchingInitialization},
-                    {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.Uninitialized, to: S.FetchingInitialization},
+                        {
+                            from: S.FetchingInitialization,
+                            to: S.FetchingStartingChangeStreamSegment,
+                        },
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingStartingChangeStreamSegment, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
 
             assertOpenCursors(
                 st,
@@ -249,37 +281,50 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             assert.commandWorked(st.s.adminCommand({clearLog: "global"}));
 
             const logOffset = checkLog.getGlobalLog(st.s).length;
-            const csCursor = csTest.startWatchingChanges({
-                pipeline: [{$changeStream: {version: "v2", startAtOperationTime: currentTime}}],
-                collection: 1,
-                aggregateOptions: {comment, cursor: {batchSize: 0}},
+
+            // Wrap the whole scenario: the fetchingGettingChangeEvent entry-counter must stay at
+            // 1 across the movePrimary, confirming the metric does not spuriously increment when
+            // the stage stays in the same state.
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                const csCursor = csTest.startWatchingChanges({
+                    pipeline: [{$changeStream: {version: "v2", startAtOperationTime: currentTime}}],
+                    collection: 1,
+                    aggregateOptions: {comment, cursor: {batchSize: 0}},
+                });
+
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.Uninitialized, to: S.FetchingInitialization},
+                        {from: S.FetchingInitialization, to: S.FetchingGettingChangeEvent},
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+
+                const logOffsetAfterInit = checkLog.getGlobalLog(st.s).length;
+
+                assert.commandWorked(
+                    st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}),
+                );
+                awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () =>
+                    csTest.assertNoChange(csCursor),
+                );
+
+                // The stage must not have left FetchingGettingChangeEvent.
+                assertNoV2StageStateTransitionFrom(
+                    st.s,
+                    logOffsetAfterInit,
+                    S.FetchingGettingChangeEvent,
+                );
             });
-
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.Uninitialized, to: S.FetchingInitialization},
-                    {from: S.FetchingInitialization, to: S.FetchingGettingChangeEvent},
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
-
-            const logOffsetAfterInit = checkLog.getGlobalLog(st.s).length;
-
-            assert.commandWorked(
-                st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}),
-            );
-            awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () =>
-                csTest.assertNoChange(csCursor),
-            );
-
-            // The stage must not have left FetchingGettingChangeEvent.
-            assertNoV2StageStateTransitionFrom(
-                st.s,
-                logOffsetAfterInit,
-                S.FetchingGettingChangeEvent,
-            );
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
             assertOpenCursors(
                 st,
                 [st.shard1.shardName],
@@ -306,47 +351,63 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
             const logOffset = checkLog.getGlobalLog(st.s).length;
             const comment = "state_trans_db_irs_moveprimary";
             csTest = new ChangeStreamTest(db);
-            const csCursor = csTest.startWatchingChanges({
-                pipeline: [
-                    {
-                        $changeStream: {
-                            version: "v2",
-                            startAtOperationTime: currentTime,
-                            ignoreRemovedShards: true,
+
+            // Wrap the whole scenario: the fetchingNormalGettingChangeEvent entry-counter must
+            // stay at 1 across the movePrimary, confirming the metric does not spuriously
+            // increment when the stage stays in the same state.
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                const csCursor = csTest.startWatchingChanges({
+                    pipeline: [
+                        {
+                            $changeStream: {
+                                version: "v2",
+                                startAtOperationTime: currentTime,
+                                ignoreRemovedShards: true,
+                            },
                         },
-                    },
-                ],
-                collection: 1,
-                aggregateOptions: {comment, cursor: {batchSize: 0}},
+                    ],
+                    collection: 1,
+                    aggregateOptions: {comment, cursor: {batchSize: 0}},
+                });
+
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+
+                const logOffsetAfterInit = checkLog.getGlobalLog(st.s).length;
+
+                assert.commandWorked(
+                    st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}),
+                );
+                awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () =>
+                    csTest.assertNoChange(csCursor),
+                );
+
+                // The stage must not have left FetchingNormalGettingChangeEvent.
+                assertNoV2StageStateTransitionFrom(
+                    st.s,
+                    logOffsetAfterInit,
+                    S.FetchingNormalGettingChangeEvent,
+                );
             });
-
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
-
-            const logOffsetAfterInit = checkLog.getGlobalLog(st.s).length;
-
-            assert.commandWorked(
-                st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}),
-            );
-            awaitLogMessageCodes(st.s, [kCollOrDbPlacementRefresh], () =>
-                csTest.assertNoChange(csCursor),
-            );
-
-            // The stage must not have left FetchingNormalGettingChangeEvent.
-            assertNoV2StageStateTransitionFrom(
-                st.s,
-                logOffsetAfterInit,
-                S.FetchingNormalGettingChangeEvent,
-            );
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingStartingChangeStreamSegment, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
             assertOpenCursors(
                 st,
                 [st.shard1.shardName],

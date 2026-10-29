@@ -1,10 +1,6 @@
 // Wrapper around the validate command that can be used to validate index key counts.
 import {Thread} from "jstests/libs/parallelTester.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
-import {
-    filterGetAllCollectionsExcludingViews,
-    filterGetAllCollectionsExcludingViewsAndTimeseries,
-} from "src/mongo/shell/data_consistency_checker.js";
 
 export class CollectionValidator {
     validateCollections(db, obj) {
@@ -134,7 +130,7 @@ function validateCollectionsImpl(db, obj) {
     let full_res = {ok: 1, failed_res: [], hashes: {}};
 
     // Don't run validate on view namespaces.
-    let filter = filterGetAllCollectionsExcludingViews();
+    let filter = {type: {$ne: "view"}};
 
     // Optionally skip collections.
     if (
@@ -174,9 +170,11 @@ function validateCollectionsImpl(db, obj) {
                 return false;
             }
             // If the new filter {type: {$ne: "view"}} fails with InvalidViewDefinition in
-            // multiversion environments, fall back to the old filter
+            // multiversion environments, fall back to the legacy "exclude views and
+            // timeseries" filter that matches only collections (or entries with no 'type'
+            // field on older servers).
             if (ex.code === ErrorCodes.InvalidViewDefinition) {
-                filter = filterGetAllCollectionsExcludingViewsAndTimeseries();
+                filter = {$or: [{type: "collection"}, {type: {$exists: false}}]};
                 return false; // Retry with the fallback filter
             }
             throw ex;

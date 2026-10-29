@@ -6,7 +6,7 @@
  * LookupRequirement::kNotAllowed for ALL extensions regardless of the SDK-level allowedInLookup
  * property, so even stages that would be allowed with the flag on (e.g. $testBar) are rejected.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, requires_fcv_90]
  */
 import {
     checkPlatformCompatibleWithExtensions,

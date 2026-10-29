@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_donor_oplog_pipeline.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -83,29 +56,22 @@ ReshardingDonorOplogPipeline::ScopedPipeline ReshardingDonorOplogPipeline::initW
     OperationContext* opCtx, ReshardingDonorOplogId resumeToken) {
     ScopedPipeline scopedPipeline(opCtx, this);
 
-    if (_pipeline) {
-        tassert(10703100,
-                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
-                _execPipeline);
-        _execPipeline->reattachToOperationContext(opCtx);
-        _pipeline->reattachToOperationContext(opCtx);
+    if (_pipeline.isInitialized()) {
+        _pipeline.reattachToOpCtx(opCtx);
     } else {
         auto pipeline =
             _makePipeline(opCtx, _mongoProcessInterfaceFactory->create(opCtx), resumeToken);
-        _pipeline = pipeline->getContext()
-                        ->getMongoProcessInterface()
-                        ->attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
-        _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
+        pipeline = pipeline->getContext()
+                       ->getMongoProcessInterface()
+                       ->attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
+        _pipeline.reinitialize(std::move(pipeline));
     }
 
     return scopedPipeline;
 }
 
 void ReshardingDonorOplogPipeline::_detachFromOperationContext() {
-    invariant(_execPipeline);
-    invariant(_pipeline);
-    _execPipeline->detachFromOperationContext();
-    _pipeline->detachFromOperationContext();
+    _pipeline.detachFromOpCtx();
 }
 
 std::unique_ptr<Pipeline> ReshardingDonorOplogPipeline::_makePipeline(
@@ -136,16 +102,16 @@ std::unique_ptr<Pipeline> ReshardingDonorOplogPipeline::_makePipeline(
 }
 
 std::vector<repl::OplogEntry> ReshardingDonorOplogPipeline::_getNextBatch(size_t batchLimit) {
-    invariant(_execPipeline);
-    invariant(_pipeline);
+    invariant(_pipeline.isInitialized());
+    auto& execPipeline = _pipeline.get();
     // Must be initialized with operation context first before calling getNextBatch()
-    invariant(_pipeline->getContext()->getOperationContext());
+    invariant(execPipeline.getContext()->getOperationContext());
 
     std::vector<repl::OplogEntry> batch;
 
     int numBytes = 0;
     do {
-        auto doc = _execPipeline->getNext();
+        auto doc = execPipeline.getNext();
         if (!doc) {
             break;
         }
@@ -159,7 +125,7 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogPipeline::_getNextBatch(size_t
             // The ReshardingOplogFetcher should never insert documents after the reshardFinalOp
             // entry. We defensively check each oplog entry for being the reshardFinalOp and confirm
             // the pipeline has been exhausted.
-            if (auto nextDoc = _execPipeline->getNext()) {
+            if (auto nextDoc = execPipeline.getNext()) {
                 tasserted(6077499,
                           fmt::format("Unexpectedly found entry after reshardFinalOp: {}",
                                       redact(nextDoc->toString())));
@@ -172,12 +138,7 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogPipeline::_getNextBatch(size_t
 }
 
 void ReshardingDonorOplogPipeline::dispose(OperationContext* opCtx) {
-    if (_pipeline) {
-        _execPipeline->reattachToOperationContext(opCtx);
-        _execPipeline->dispose();
-        _pipeline.reset();
-        _execPipeline.reset();
-    }
+    _pipeline.dispose(opCtx);
 }
 
 }  // namespace mongo

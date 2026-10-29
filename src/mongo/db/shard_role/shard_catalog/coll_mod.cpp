@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 
@@ -47,7 +21,9 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -87,7 +63,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -498,7 +474,17 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             cmd.kCommandName, parsed.collValidator->validatorDoc, parsed.collValidator->isOK());
 
         if (!parsed.collValidator->isOK()) {
-            return parsed.collValidator->getStatus();
+            // Do not enforce an OK result during oplog application: as at startup, the
+            // validator may have been well formed on the version that wrote it. Keeping it
+            // rejects writes to the collection (fail closed) rather than allowing them
+            // unvalidated (SERVER-134863).
+            if (opCtx->isEnforcingConstraints()) {
+                return parsed.collValidator->getStatus();
+            }
+            LOGV2_WARNING(13486301,
+                          "Applying collMod with a malformed collection validator",
+                          logAttrs(nss),
+                          "validatorStatus"_attr = parsed.collValidator->getStatus());
         }
         oplogEntryBuilder.append(CollMod::kValidatorFieldName, validatorObj);
     }
@@ -1039,6 +1025,12 @@ Status _collModInternal(OperationContext* opCtx,
                                                    cmrNew.collValidator,
                                                    cmrNew.prepareConstraintValidationLevel),
                 "Failed to set validation options");
+            auto& collectionQueryInfo = CollectionQueryInfo::get(writableColl);
+            if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+                collectionQueryInfo.rebuildSchemaTypeInfo(opCtx, writableColl);
+            } else {
+                collectionQueryInfo.invalidateSchemaTypeInfo();
+            }
         }
 
         if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&

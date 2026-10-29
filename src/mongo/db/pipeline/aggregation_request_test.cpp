@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -41,7 +15,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -87,7 +60,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     // Using oplog namespace so that validation of $_requestReshardingResumeToken succeeds.
     BSONObj inputBson = fromjson(
         "{aggregate: 'oplog.rs', pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: "
-        "true, fromRouter: true, "
+        "true, allowPartialResults: true, fromRouter: true, "
         "needsMerge: true, bypassDocumentValidation: true, $_requestReshardingResumeToken: true, "
         "collation: {locale: 'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, "
         "readConcern: {level: 'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, "
@@ -102,6 +75,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.getAllowDiskUse());
+    ASSERT_TRUE(request.getAllowPartialResults().value_or(false));
     ASSERT_TRUE(aggregation_request_helper::getFromRouter(request));
     ASSERT_TRUE(request.getNeedsMerge());
     ASSERT_TRUE(request.getBypassDocumentValidation().value_or(false));
@@ -558,6 +532,19 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
         validRequest, nonBoolAllowDiskUse, ErrorCodes::TypeMismatch);
 }
 
+TEST(AggregationRequestTest, ShouldRejectNonBoolAllowPartialResults) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    const BSONObj validRequest = fromjson(
+        "{aggregate: 'collection',"
+        "pipeline: [{$match: {a: 'abc'}}],"
+        "cursor: {},"
+        "allowPartialResults: true, "
+        "$db: 'a'}");
+    const BSONObj nonBoolAllowPartialResults = fromjson("{allowPartialResults: 1}");
+    aggregationRequestParseFailureHelper(
+        validRequest, nonBoolAllowPartialResults, ErrorCodes::TypeMismatch);
+}
+
 TEST(AggregationRequestTest, ShouldRejectNonBoolIsMapReduceCommand) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
     const BSONObj validRequest = fromjson(
@@ -849,65 +836,6 @@ TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfOplogNss) {
         "cursor: {}}");
     const BSONObj oplogNss = fromjson("{aggregate: 'oplog.rs', $db: 'local'}");
     aggregationRequestParseFailureHelper(validRequest, oplogNss, ErrorCodes::FailedToParse);
-}
-
-class ScopedFCV {
-public:
-    explicit ScopedFCV(multiversion::FeatureCompatibilityVersion version)
-        : _prev(serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()) {
-        serverGlobalParams.mutableFCV.setVersion(version);
-    }
-    ~ScopedFCV() {
-        serverGlobalParams.mutableFCV.setVersion(_prev);
-    }
-
-private:
-    multiversion::FeatureCompatibilityVersion _prev;
-};
-
-TEST(AggregationRequestTest, AddIfrFlagsSerializesOutgoingIfrFlagsAtLatestFCV) {
-    // (Generic FCV reference): test usage
-    ScopedFCV fcv(multiversion::GenericFCV::kLatest);
-    unittest::ServerParameterGuard hybridFlag("featureFlagExtensionsInsideHybridSearch", true);
-    unittest::ServerParameterGuard vectorFlag("featureFlagVectorSearchExtension", true);
-
-    const auto flagsForWire = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
-    ASSERT_FALSE(flagsForWire.empty());
-
-    auto ifr = std::make_shared<IncrementalFeatureRolloutContext>();
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
-        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, $db: 'test'}")));
-
-    aggregation_request_helper::addIfrFlagsToRequest(request, ifr);
-
-    const auto ifrFlags = request.getIfrFlags();
-    ASSERT_TRUE(ifrFlags.has_value());
-    ASSERT_EQ(ifrFlags->size(), flagsForWire.size());
-    std::map<std::string, bool> observed;
-    for (const auto& doc : *ifrFlags) {
-        observed[doc["name"].String()] = doc["value"].Bool();
-    }
-    for (auto* flag : flagsForWire) {
-        ASSERT_EQ(observed[flag->getName()], ifr->getSavedFlagValue(*flag))
-            << "IFR flag " << flag->getName();
-    }
-}
-
-TEST(AggregationRequestTest, AddIfrFlagsOmitsIfrFlagsAtLastLTSFCV) {
-    // (Generic FCV reference): test usage
-    ScopedFCV fcv(multiversion::GenericFCV::kLastLTS);
-    unittest::ServerParameterGuard hybridFlag("featureFlagExtensionsInsideHybridSearch", true);
-    unittest::ServerParameterGuard vectorFlag("featureFlagVectorSearchExtension", true);
-
-    ASSERT_TRUE(IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests().empty());
-
-    auto ifr = std::make_shared<IncrementalFeatureRolloutContext>();
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
-        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, $db: 'test'}")));
-
-    aggregation_request_helper::addIfrFlagsToRequest(request, ifr);
-
-    ASSERT_FALSE(request.getIfrFlags().has_value());
 }
 
 }  // namespace

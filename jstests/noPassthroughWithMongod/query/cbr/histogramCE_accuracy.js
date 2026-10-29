@@ -1,12 +1,17 @@
-/* Check the cardinality estimation of very simple predicates using histograms by running
-   the predicate itself and comparing the number of documents matched to the estimate.
-
-   In this test, we use distributions that allow for "perfect" histograms, that is,
-   histograms where, even with the information loss, perfect estimates can be made.
-
-   Simularily, the predicates used are those that can be estimated perfectly
-   (except for the occasional off-by-one errors)
-*/
+/**
+ * Check the cardinality estimation of very simple predicates using histograms by running
+ * the predicate itself and comparing the number of documents matched to the estimate.
+ *
+ * In this test, we use distributions that allow for "perfect" histograms, that is,
+ * histograms where, even with the information loss, perfect estimates can be made.
+ *
+ * Simularily, the predicates used are those that can be estimated perfectly
+ * (except for the occasional off-by-one errors)
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
+ */
 
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -31,9 +36,10 @@ import {TwoFieldDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/dat
 import {NumberDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/number.js";
 import {StringDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/string.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -46,6 +52,7 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "histogramCE",
             }),
         );
@@ -58,7 +65,12 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
         }
 
         for (const analyze_key of analyze ? analyze : ["a"]) {
-            let analyze_cmd = {analyze: collName, key: analyze_key, numberBuckets: numberBuckets};
+            let analyze_cmd = {
+                analyze: collName,
+                mode: "histograms",
+                key: analyze_key,
+                numberBuckets: numberBuckets,
+            };
 
             assert.commandWorked(coll.runCommand(analyze_cmd));
         }
@@ -70,7 +82,18 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
             const explain = cursor.explain();
             const plans = getAllPlans(explain);
             for (const plan of plans) {
-                assert(plan.hasOwnProperty("cardinalityEstimate"));
+                if (!plan.hasOwnProperty("cardinalityEstimate")) {
+                    // CBR abandons estimation for the whole query when a scan node estimates to
+                    // zero, handing all candidates to the multi-planner and reporting no estimates
+                    // in explain. That may only happen when the predicate truly matches nothing.
+                    assert.eq(
+                        0,
+                        actualDocuments,
+                        "plan has no cardinality estimate but the predicate matches documents",
+                        {predicate, plan},
+                    );
+                    continue;
+                }
                 const cardinalityEstimate = plan.cardinalityEstimate;
 
                 // 'Histogram', 'Code' and 'Metadata' all imply a confident estimate,

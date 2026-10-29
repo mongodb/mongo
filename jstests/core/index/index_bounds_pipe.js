@@ -2,6 +2,7 @@
  * Tests the tightness of index bounds when attempting to match a regex that contains escaped and
  * non-escaped pipe '|' characters.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   requires_fcv_80,
  *   requires_getmore,

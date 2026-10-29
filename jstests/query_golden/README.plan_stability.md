@@ -11,7 +11,7 @@ The plan_stability test is a standard golden test:
 ```bash
 $ buildscripts/resmoke.py run \
   --suites=query_golden_classic \
-  '--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine, featureFlagCostBasedRanker: ..., internalQueryCBRCEMode: ...}' \
+  '--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine, featureFlagCostBasedRanker: ..., internalQueryPlanRanker: ..., internalQueryCBRCEMode: ...}' \
   jstests/query_golden/plan_stability.js
 ```
 
@@ -95,7 +95,7 @@ actual pipeline of interest, **above** the counters.
 ```bash
 buildscripts/resmoke.py run \
   --suites=query_golden_classic \
-  --mongodSetParameters='{internalQueryFrameworkControl: forceClassicEngine, featureFlagCostBasedRanker: True, internalQueryCBRCEMode: samplingCE, internalQuerySamplingBySequentialScan: True}' \
+  --mongodSetParameters='{internalQueryFrameworkControl: forceClassicEngine, featureFlagCostBasedRanker: True, internalQueryPlanRanker: costBased, internalQueryCBRCEMode: samplingCE, internalQuerySamplingBySequentialScan: True}' \
    jstests/query_golden/plan_stability.js \
    --pauseAfterPopulate
 ```
@@ -169,7 +169,7 @@ multiple times to compare their wallclock execution times:
 pipeline = [...];
 db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false});
 db.plan_stability.aggregate(pipeline).explain('executionStats').executionStats.executionTimeMillis;
-db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"});
+db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryPlanRanker: "costBased", internalQueryCBRCEMode: "samplingCE"});
 db.plan_stability.aggregate(pipeline).explain('executionStats').executionStats.executionTimeMillis;
 ```
 

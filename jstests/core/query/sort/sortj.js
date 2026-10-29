@@ -4,6 +4,9 @@
 //   # in memory variants won't treat this workload the same and may not fail.
 //   requires_persistence,
 //   requires_getmore,
+//   # The number of documents needed to exceed the sort memory limit on every shard is derived
+//   # from the number of shards owning chunks, which must not change during the test.
+//   assumes_stable_shard_list,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

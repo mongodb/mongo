@@ -4,7 +4,7 @@
  *
  * This test exists to verify the pipeline splitting behavior for a source stage followed by idLookup in sharded contexts.
  *
- * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
+ * @tags: [ featureFlagExtensionsAPI, requires_fcv_90 ]
  */
 
 const collName = jsTestName();

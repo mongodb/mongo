@@ -11,8 +11,8 @@ include:
   - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
   - filename: etc/evergreen_yml_components/tasks/compile_tasks_nightly.yml
-  - filename: etc/evergreen_yml_components/tasks/devcontainer_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/security_tasks.yml
 
   - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
   ### Uncomment when using this file for a release branch. ###
@@ -51,10 +51,15 @@ include:
   - filename: etc/evergreen_yml_components/tasks/coverity_tasks.yml
   - filename: etc/evergreen_yml_components/variants/coverity.yml
   - filename: etc/evergreen_yml_components/tasks/release_tasks.yml
+  - filename: etc/evergreen_yml_components/custom_builds/tasks.yml
+  - filename: etc/evergreen_yml_components/custom_builds/variants.yml
   ### Uncomment when using this file for a release branch. ###
   # - filename: etc/evergreen_yml_components/variants/release/release.yml
 
   - filename: src/mongo/db/modules/atlas/atlas_release.yml
+  ### TODO(SERVER-136019): Revert SERVER-136018 (reenable DSC release fuzzers)
+  - filename: src/mongo/db/modules/atlas/atlas_release_fuzzers.yml
+  ### Comment out when using this file for a release branch. ###
   - filename: etc/evergreen_yml_components/variants/amazon/streams/streams_release.yml
 
 parameters:
@@ -78,3 +83,7 @@ patch_aliases:
     description: "Runs release smoke tests"
     variant: ".*"
     task: "^(crypt_create_lib|package|test_packages|jscore)$"
+  - alias: blocking-emergency-atlas-release-tasks
+    description: "Run variants that would potentially block an emergency release"
+    variant_tags: ["emergency_release"]
+    task: ".*"

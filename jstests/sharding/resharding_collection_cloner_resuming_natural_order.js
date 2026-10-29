@@ -8,6 +8,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -57,12 +58,14 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
 // on the primary shard for the database. We manually run the _flushRoutingTableCacheUpdates command
 // to guarantee they have been written and are visible with the atClusterTime used by the
 // testReshardCloneCollection command.
-for (const shard of [st.shard0, st.shard1]) {
-    assert.commandWorked(
-        shard.rs.getPrimary().adminCommand({
-            _flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName(),
-        }),
-    );
+if (!FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsCRUD")) {
+    for (const shard of [st.shard0, st.shard1]) {
+        assert.commandWorked(
+            shard.rs.getPrimary().adminCommand({
+                _flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName(),
+            }),
+        );
+    }
 }
 
 // Shard 3 intentionally starts with no data.

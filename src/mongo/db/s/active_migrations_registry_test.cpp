@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/s/active_migrations_registry.h"
@@ -182,7 +156,7 @@ TEST_F(MoveChunkRegistration, TestReceiveChunkIsRejectedWhenRegistryIsLocked) {
                   NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfMigrationOps */));
+                  /*waitForCompletionOfMigrationOps=*/false));
     _registry.unlock("dummy");
 }
 
@@ -216,7 +190,7 @@ TEST_F(MoveChunkRegistration, SplitOrMergeBlocksWhileReceiveInProgressOnSameNss)
                                                      nss,
                                                      chunkRange,
                                                      ShardId("shard0001"),
-                                                     false /* waitForCompletionOfMigrationOps */));
+                                                     /*waitForCompletionOfMigrationOps=*/false));
 
         // 3. Signal the split/merge thread that the receive is registered.
         readyToSplitMerge.set_value();
@@ -274,7 +248,7 @@ TEST_F(MoveChunkRegistration, SplitOrMergeAllowedWhileReceivingDifferentNss) {
                                                  receiveNss,
                                                  chunkRange,
                                                  ShardId("shard0001"),
-                                                 false /* waitForCompletionOfMigrationOps */));
+                                                 /*waitForCompletionOfMigrationOps=*/false));
 
     ASSERT_OK(_registry.registerSplitOrMergeChunk(_opCtx, splitNss, chunkRange).getStatus());
 }
@@ -329,7 +303,7 @@ TEST_F(MoveChunkRegistration, ReceiveBlocksWhileSplitOrMergeInProgressOnSameNss)
                                            nss,
                                            chunkRange,
                                            ShardId("shard0001"),
-                                           false /* waitForCompletionOfMigrationOps */);
+                                           /*waitForCompletionOfMigrationOps=*/false);
 
         // 10. The receive proceeds once the split/merge has completed.
         ASSERT_OK(scopedReceiveChunk.getStatus());
@@ -360,7 +334,7 @@ TEST_F(MoveChunkRegistration, ReceiveAllowedWhileSplitOrMergeOnDifferentNss) {
                                         receiveNss,
                                         chunkRange,
                                         ShardId("shard0001"),
-                                        false /* waitForCompletionOfMigrationOps */)
+                                        /*waitForCompletionOfMigrationOps=*/false)
                   .getStatus());
 }
 
@@ -412,7 +386,7 @@ TEST_F(MoveChunkRegistration,
             NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
             ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
             ShardId("shard0001"),
-            true /* waitForCompletionOfMigrationOps */);
+            /*waitForCompletionOfMigrationOps=*/true);
 
         ASSERT_OK(scopedReceiveChunk.getStatus());
 
@@ -593,8 +567,8 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileSplitOrMergeInProgress) {
 }
 
 TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWithoutOperationFCV) {
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
+
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -615,7 +589,7 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWi
                   NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfConflictingOps */));
+                  /*waitForCompletionOfMigrationOps=*/false));
 
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
               _registry.registerSplitOrMergeChunk(
@@ -634,8 +608,8 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWi
 }
 
 TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejectDuringTransition) {
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
+
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -659,7 +633,7 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejec
                   NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfConflictingOps */));
+                  /*waitForCompletionOfMigrationOps=*/false));
 
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
               _registry.registerSplitOrMergeChunk(
@@ -669,8 +643,6 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejec
 }
 
 TEST_F(MoveChunkRegistration, RecoveryBypassWithStableOperationFCVAllowsRegistration) {
-    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
     const auto originalFCV =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
@@ -697,7 +669,7 @@ TEST_F(MoveChunkRegistration, RecoveryBypassWithStableOperationFCVAllowsRegistra
             NamespaceString::createNamespaceString_forTest("TestDB", "RecoveryReceiveColl"),
             ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
             ShardId("shard0001"),
-            false /* waitForCompletionOfConflictingOps */,
+            /*waitForCompletionOfMigrationOps=*/false,
             ActiveMigrationsRegistryTestAccessor::makeRecoveryBypass()));
     }
 

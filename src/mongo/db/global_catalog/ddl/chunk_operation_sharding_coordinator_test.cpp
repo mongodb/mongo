@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
 
@@ -35,11 +9,14 @@
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/ddl/test_chunk_operation_sharding_coordinator_document_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/move_range_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/util/time_support.h"
 
 #include <memory>
 
@@ -61,13 +38,13 @@ public:
 class ChunkOperationShardingCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     static inline const auto kTestNs = NamespaceString::createNamespaceString_forTest("test.test");
-    static inline const ShardHandle kTestShardHandle{ShardId("test-shard"), UUID::gen()};
+    static inline const ShardId kTestShardId{"test-shard"};
     static inline const KeyPattern kTestKeyPattern{BSON("x" << 1)};
 
-    ChunkOperationShardingCoordinatorTest()
-        : repl::PrimaryOnlyServiceMongoDTest(
-              Options{}.addClientObserver(std::make_unique<ClientObserver>())),
-          _externalState(std::make_shared<ShardingCoordinatorExternalStateForTest>()) {}
+    Options makeServiceContextOptions() override {
+        return repl::PrimaryOnlyServiceMongoDTest::makeServiceContextOptions().addClientObserver(
+            std::make_unique<ClientObserver>());
+    }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         auto externalStateFactory =
@@ -83,8 +60,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(HostAndPort("localhost", 27017)),
-                                    kTestShardHandle.name()},
-                                   kTestShardHandle.uuid().value());
+                                    kTestShardId});
 
         _opCtx = cc().getOperationContext();
         if (!_opCtx) {
@@ -120,7 +96,8 @@ protected:
     executor::NetworkInterfaceMock* _network;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
-    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
+    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState =
+        std::make_shared<ShardingCoordinatorExternalStateForTest>();
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
 
@@ -129,7 +106,7 @@ protected:
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUuid);
         chunk.setVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
-        chunk.setShard(kTestShardHandle.name());
+        chunk.setShard(kTestShardId);
         chunk.setRange({kTestKeyPattern.globalMin(), kTestKeyPattern.globalMax()});
         chunk.setOnCurrentShardSince(Timestamp(1, 0));
         chunk.setHistory({});
@@ -156,11 +133,10 @@ protected:
             std::make_shared<RoutingTableHistory>(std::move(rt)),
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata =
-            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardHandle.name());
+            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(_opCtx, kTestNs);
         scopedCSR->setCollectionMetadata(
             _opCtx, collectionMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        scopedCSR->setAuthoritative();
     }
 
     MergeChunksCoordinatorDocument makeMergeChunksCoordinatorDoc(std::vector<BSONObj> bounds,
@@ -269,6 +245,10 @@ protected:
         bool isInCriticalSection(Phase phase) const override {
             return false;
         }
+
+        ChunkOperationsStatistics::ChunkOperationType chunkOperationMetricType() const override {
+            return ChunkOperationsStatistics::ChunkOperationType::kSplitChunk;
+        }
     };
 };
 
@@ -280,6 +260,8 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SmokeTest) {
 
     ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
+    coorMetadata.setAuthoritativeMetadataAccessLevel(
+        AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
 
     doc.setShardingCoordinatorMetadata(std::move(coorMetadata));
 
@@ -288,6 +270,67 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SmokeTest) {
     auto future = (static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get()))
                       ->run(_scopedExecutor, cancellationSource.token());
     future.get();
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, SuccessfulRunRecordsCommittedStatistic) {
+    const auto committedBefore = [&] {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(getServiceContext()).report(&builder);
+        return builder.obj()
+            .getObjectField("chunkOperationsStatistics")
+            .getIntField("countSplitChunkCommitted");
+    }();
+
+    CancellationSource cancellationSource;
+
+    TestChunkOperationShardingCoordinatorDocument doc;
+    ShardingCoordinatorMetadata coorMetadata{{kTestNs, CoordinatorTypeEnum::kTestCoordinator}};
+    ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
+    coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
+    coorMetadata.setAuthoritativeMetadataAccessLevel(
+        AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+    doc.setShardingCoordinatorMetadata(std::move(coorMetadata));
+
+    auto coordinator = std::make_shared<TestChunkOperationShardingCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), std::move(doc));
+    (static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get()))
+        ->run(_scopedExecutor, cancellationSource.token())
+        .get();
+
+    // A clean run completes without an abort reason, so the shared _onCleanup hook counts it as a
+    // committed operation of the type reported by the coordinator (kSplitChunk here).
+    BSONObjBuilder builder;
+    ShardingStatistics::get(getServiceContext()).report(&builder);
+    ASSERT_EQ(builder.obj()
+                  .getObjectField("chunkOperationsStatistics")
+                  .getIntField("countSplitChunkCommitted"),
+              committedBefore + 1);
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, StepdownReleasesActiveMigrationsRegistry) {
+    auto hangBeforeRunningCoordinator =
+        globalFailPointRegistry().find("hangBeforeRunningCoordinatorInstance");
+    const auto timesEntered = hangBeforeRunningCoordinator->setMode(FailPoint::alwaysOn);
+
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), kTestShardId, ShardId{"recipient-shard"});
+    auto coordinator = checked_pointer_cast<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service)->getOrCreateInstance(
+            _opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{_opCtx}));
+
+    hangBeforeRunningCoordinator->waitForTimesEntered(timesEntered + 1);
+    ASSERT_EQ(ActiveMigrationsRegistry::get(_opCtx).getActiveDonateChunkNss(),
+              coordinatorDoc.getShardingCoordinatorMetadata().getId().getNss());
+
+    stepDown();
+    hangBeforeRunningCoordinator->setMode(FailPoint::off);
+
+    Timer timer;
+    while (ActiveMigrationsRegistry::get(_opCtx).getActiveDonateChunkNss() &&
+           timer.elapsed() < Seconds(2)) {
+        sleepFor(Milliseconds(10));
+    }
+    ASSERT_FALSE(ActiveMigrationsRegistry::get(_opCtx).getActiveDonateChunkNss());
 }
 
 TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictSameParams) {

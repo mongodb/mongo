@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -57,7 +31,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
@@ -297,12 +270,12 @@ TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
     resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, InvalidStartAtWrongRecordIdType) {
@@ -315,11 +288,11 @@ TEST(QueryRequestTest, InvalidStartAtWrongRecordIdType) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false /* isClusteredCollection */));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), /*isClusteredCollection=*/false));
     findCommand.setStartAt(fromjson("{$recordId: NumberLong(1)}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false /* isClusteredCollection */));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
@@ -333,7 +306,7 @@ TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, InvalidStartAtExtraField) {
@@ -346,7 +319,7 @@ TEST(QueryRequestTest, InvalidStartAtExtraField) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false /* isClusteredCollection */));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithHint) {
@@ -384,7 +357,7 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -401,7 +374,7 @@ TEST(QueryRequestTest, StartAtWithSort) {
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -421,7 +394,7 @@ TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, StartAtNoSpecifiedRequestResumeToken) {
@@ -435,7 +408,7 @@ TEST(QueryRequestTest, StartAtNoSpecifiedRequestResumeToken) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
@@ -451,7 +424,7 @@ TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyStartAt) {
@@ -465,7 +438,7 @@ TEST(QueryRequestTest, ExplicitEmptyStartAt) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
 }
 
 TEST(QueryRequestTest, ResumeAfterMismatchInitialSyncId) {
@@ -487,7 +460,7 @@ TEST(QueryRequestTest, ResumeAfterMismatchInitialSyncId) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, StartAtMismatchInitialSyncId) {
@@ -508,7 +481,7 @@ TEST(QueryRequestTest, StartAtMismatchInitialSyncId) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
 }
 
 //
@@ -603,7 +576,6 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "allowPartialResults: true,"
         "readOnce: true,"
         "includeQueryStatsMetrics: true,"
-        "includeMetrics : {queryStats : true},"
         "'$db': 'test'}");
 
     unique_ptr<FindCommandRequest> findCommand(
@@ -616,8 +588,6 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(findCommand->getAllowPartialResults());
     ASSERT(findCommand->getReadOnce());
     ASSERT(findCommand->getIncludeQueryStatsMetrics());
-    ASSERT(findCommand->getIncludeMetrics().has_value());
-    ASSERT(findCommand->getIncludeMetrics()->getQueryStats());
 }
 
 TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
@@ -648,7 +618,6 @@ TEST(QueryRequestTest, ParseFromCommandIncludeQueryStatsMetricsDefaultsToFalse) 
     unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT_FALSE(findCommand->getIncludeQueryStatsMetrics());
-    ASSERT_FALSE(findCommand->getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats());
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
@@ -1494,12 +1463,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
                        ErrorCodes::InvalidPipelineOperator);
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
+TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowPartialResults(true);
-    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
-                       DBException,
-                       ErrorCodes::InvalidPipelineOperator);
+
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
+
+    ASSERT_TRUE(ar.getAllowPartialResults().value_or(false));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
@@ -1619,40 +1589,11 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsTrueSucceeds) {
-    // Test that the legacy option is set correctly when the feature flag is disabled.
-    // TODO (SERVER-123320): Remove this test completely when the feature flag is removed.
-    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", false);
     FindCommandRequest findCommand(testns);
     findCommand.setIncludeQueryStatsMetrics(true);
     auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
     ASSERT_TRUE(ar.getIncludeQueryStatsMetrics());
-    ASSERT_FALSE(ar.getIncludeMetrics().has_value());
-
-    IncludeMetrics im;
-    im.setQueryStats(true);
-    findCommand.setIncludeMetrics(im);
-    auto ar2 = query_request_conversion::asAggregateCommandRequest(findCommand);
-    ASSERT_TRUE(ar2.getIncludeMetrics()->getQueryStats());
-}
-
-TEST(QueryRequestTest, ConvertToAggregationWithIncludeMetricsQueryStatsTrueSucceeds) {
-    // Test that the new option is set correctly when the feature flag is enabled.
-    unittest::ServerParameterGuard controller("featureFlagIncludeMetricsObjectOption", true);
-    FindCommandRequest findCommand(testns);
-    findCommand.setIncludeQueryStatsMetrics(true);
-    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
-
-    // The legacy field is merged into includeMetrics during conversion rather than forwarded.
-    ASSERT_FALSE(ar.getIncludeQueryStatsMetrics());
-    ASSERT_TRUE(ar.getIncludeMetrics().has_value());
-    ASSERT_TRUE(ar.getIncludeMetrics()->getQueryStats());
-
-    IncludeMetrics im;
-    im.setQueryStats(true);
-    findCommand.setIncludeMetrics(im);
-    auto ar2 = query_request_conversion::asAggregateCommandRequest(findCommand);
-    ASSERT_TRUE(ar2.getIncludeMetrics()->getQueryStats());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsFalseSucceeds) {
@@ -1661,13 +1602,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsFalseSucc
     auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
     ASSERT_FALSE(ar.getIncludeQueryStatsMetrics());
-    ASSERT_FALSE(ar.getIncludeMetrics().has_value());
-
-    IncludeMetrics im;
-    im.setQueryStats(false);
-    findCommand.setIncludeMetrics(im);
-    auto ar2 = query_request_conversion::asAggregateCommandRequest(findCommand);
-    ASSERT_FALSE(ar2.getIncludeMetrics()->getQueryStats());
 }
 
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {

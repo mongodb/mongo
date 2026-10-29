@@ -1,50 +1,28 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
+#include <array>
 #include <string_view>
 
 #include <boost/filesystem/directory.hpp>
@@ -309,6 +287,24 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
 }
 
 // static
+Status WiredTigerUtil::checkConfigStringBannedKeys(std::string_view config) {
+    WiredTigerConfigParser parser(config);
+    WT_CONFIG_ITEM importEnabled;
+    if (parser.get("import.enabled", &importEnabled) == 0 && importEnabled.val != 0) {
+        return {ErrorCodes::BadValue,
+                "Enabling the WiredTiger 'import' option is not allowed in a configString"};
+    }
+
+    WT_CONFIG_ITEM source;
+    if (parser.get("source", &source) == 0 && source.len != 0) {
+        return {ErrorCodes::BadValue,
+                "The WiredTiger 'source' option is not allowed in a configString"};
+    }
+
+    return Status::OK();
+}
+
+// static
 Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
     invariant(configElem.fieldNameStringData() == WiredTigerUtil::kConfigStringField);
 
@@ -323,10 +319,6 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     // Do NOT allow embedded null characters
     if (config.find('\0') != std::string::npos) {
         return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
-    }
-
-    if (config.find("type=lsm") != std::string::npos) {
-        return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
     }
 
     if (gFeatureFlagBanEncryptionOptionsInCollectionCreation
@@ -351,6 +343,21 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         errorMsg << ".";
         return status.withReason(errorMsg.stringData());
     }
+
+    // Only allow type=file (the default), which must also be unquoted.
+    WiredTigerConfigParser parser(config);
+    WT_CONFIG_ITEM typeItem;
+    if (parser.get("type", &typeItem) == 0 &&
+        !(typeItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID &&
+          std::string_view(typeItem.str, typeItem.len) == "file")) {
+        return {ErrorCodes::IllegalOperation,
+                "Configuration of the WiredTiger 'type' option is not supported."};
+    }
+
+    if (auto bannedKeyStatus = checkConfigStringBannedKeys(config); !bannedKeyStatus.isOK()) {
+        return bannedKeyStatus;
+    }
+
     return Status::OK();
 }
 
@@ -375,10 +382,10 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* sess
     if (ret != 0) {
         // The numerical 'statisticsKey' can be located in the WT_STATS_* preprocessor macros in
         // wiredtiger.h.
-        return StatusWith<int64_t>(ErrorCodes::CursorNotFound,
-                                   str::stream() << "unable to open cursor at URI " << uri
-                                                 << " for statistic: " << statisticsKey
-                                                 << ". reason: " << wiredtiger_strerror(ret));
+        return StatusWith<int64_t>(wtRCToStatus(ret, session, [&]() {
+            return fmt::format(
+                "unable to open cursor at URI {} for statistic: {}", uri, statisticsKey);
+        }));
     }
     invariant(cursor);
     ON_BLOCK_EXIT([&] { cursor->close(cursor); });
@@ -404,13 +411,129 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* sess
     return StatusWith<int64_t>(value);
 }
 
+void WiredTigerUtil::logStorageSizeStats(WiredTigerSession& session, const std::string& tableUri) {
+    // The URI reported in the log line is the on-disk file backing the b-tree, not the table URI.
+    std::string type;
+    std::string fileUri;
+    fetchTypeAndSourceURI(session, tableUri, &type, &fileUri);
+
+    // Read the accumulated summary directly from the on-disk file b-tree the scan traversed.
+    // Reading "statistics:<table>" instead would aggregate the table's column groups and drop these
+    // per-b-tree counters, so the file URI is required here.
+    const std::string statsUri = "statistics:" + fileUri;
+    auto stat = [&](int key) -> int64_t {
+        auto sw = getStatisticsValue(session, statsUri, "statistics=(fast)", key);
+        return sw.isOK() ? sw.getValue() : 0;
+    };
+
+    const int64_t leafPages = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_PAGES);
+    const int64_t internalPages = stat(WT_STAT_DSRC_BTREE_SIZE_INTERNAL_PAGES);
+    const int64_t overflowPages = stat(WT_STAT_DSRC_BTREE_SIZE_OVERFLOW_PAGES);
+    // Pages the scan visited but could not measure because they had no on-disk image (built in
+    // memory and not yet read back from disk). A non-zero value quantifies how much of the tree the
+    // summary above is missing.
+    const int64_t noImagePages = stat(WT_STAT_DSRC_BTREE_SIZE_NO_IMAGE_PAGES);
+    const int64_t leafBytes = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_BYTES);
+    const int64_t internalBytes = stat(WT_STAT_DSRC_BTREE_SIZE_INTERNAL_BYTES);
+    const int64_t overflowBytes = stat(WT_STAT_DSRC_BTREE_SIZE_OVERFLOW_BYTES);
+    const int64_t keyBytes = stat(WT_STAT_DSRC_BTREE_SIZE_KEY_BYTES);
+    const int64_t valueBytes = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_BYTES);
+    const int64_t keyCount = stat(WT_STAT_DSRC_BTREE_SIZE_KEY_COUNT);
+    const int64_t valueCount = stat(WT_STAT_DSRC_BTREE_SIZE_VALUE_COUNT);
+    // A visible stop on a value cell is a tombstone still occupying the leaf. Those cells are
+    // excluded from key/value and reported here. schemaVersion 1 (the field absent) counted them
+    // as live; 2 is this split. Bump the version if a field is dropped or a count changes meaning.
+    constexpr int64_t kSizeMetricsSchemaVersion = 2;
+    const int64_t deletedKeyBytes = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_KEY_BYTES);
+    const int64_t deletedKeyCount = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_KEY_COUNT);
+    const int64_t deletedValueBytes = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_VALUE_BYTES);
+    const int64_t deletedValueCount = stat(WT_STAT_DSRC_BTREE_SIZE_DELETED_VALUE_COUNT);
+    const int64_t maxLeafPage = stat(WT_STAT_DSRC_BTREE_MAXLEAFPAGE);
+#if defined(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_BUCKETS) && \
+    defined(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_CEILING)
+    const int64_t histBuckets = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_BUCKETS);
+    const int64_t histCeiling = stat(WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_CEILING);
+#else
+    const int64_t histBuckets = 0;
+    const int64_t histCeiling = 0;
+#endif
+
+    const int histStatKeys[WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets] = {
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_0,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_1,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_2,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_3,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_4,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_5,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_6,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_7,
+        WT_STAT_DSRC_BTREE_SIZE_LEAF_HIST_8};
+    std::array<int64_t, WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets> bucketCounts{};
+    for (int i = 0; i < WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets; ++i) {
+        bucketCounts[i] = stat(histStatKeys[i]);
+    }
+    const BSONArray histogram =
+        buildLeafPageSizeHistogram(histBuckets, histCeiling, maxLeafPage, bucketCounts);
+
+    LOGV2(12951900,
+          "WiredTiger size metrics",
+          "schemaVersion"_attr = kSizeMetricsSchemaVersion,
+          "uri"_attr = fileUri,
+          "leafPages"_attr = leafPages,
+          "internalPages"_attr = internalPages,
+          "overflowPages"_attr = overflowPages,
+          "pagesWithoutImage"_attr = noImagePages,
+          "leafBytes"_attr = leafBytes,
+          "internalBytes"_attr = internalBytes,
+          "overflowBytes"_attr = overflowBytes,
+          "keyBytes"_attr = keyBytes,
+          "valueBytes"_attr = valueBytes,
+          "keyCount"_attr = keyCount,
+          "valueCount"_attr = valueCount,
+          "deletedKeyBytes"_attr = deletedKeyBytes,
+          "deletedKeyCount"_attr = deletedKeyCount,
+          "deletedValueBytes"_attr = deletedValueBytes,
+          "deletedValueCount"_attr = deletedValueCount,
+          "leafPageSizeHistogram"_attr = histogram);
+}
+
+BSONArray WiredTigerUtil::buildLeafPageSizeHistogram(int64_t publishedBuckets,
+                                                     int64_t publishedCeiling,
+                                                     int64_t maxLeafPage,
+                                                     std::span<const int64_t> bucketCounts) {
+    const int nBuckets =
+        (publishedBuckets > 0 && publishedBuckets <= kLeafPageSizeHistogramMaxBuckets)
+        ? static_cast<int>(publishedBuckets)
+        : kLeafPageSizeHistogramMaxBuckets;
+    const int64_t ceiling = publishedCeiling > 0 ? publishedCeiling : maxLeafPage;
+    const int64_t bucketWidth = nBuckets > 1 ? ceiling / (nBuckets - 1) : 0;
+
+    BSONArrayBuilder histogram;
+    for (int i = 0; i < nBuckets; ++i) {
+        BSONObjBuilder bucket(histogram.subobjStart());
+        if (i + 1 < nBuckets) {
+            bucket.append("maxBytes", static_cast<long long>(bucketWidth * (i + 1)));
+        } else {
+            bucket.append("gteBytes", static_cast<long long>(ceiling));
+        }
+        const int64_t count = i < static_cast<int64_t>(bucketCounts.size()) ? bucketCounts[i] : 0;
+        bucket.append("count", static_cast<long long>(count));
+    }
+    return histogram.arr();
+}
+
 int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& uri) {
     StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     const Status& status = result.getStatus();
     if (!status.isOK()) {
-        if (status.code() == ErrorCodes::CursorNotFound) {
-            // ident gone, so its 0
+        // A missing file (NoSuchKey) means the ident is gone, so it contributes 0.
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            return 0;
+        }
+        // ObjectIsBusy means the data handle is transiently held by a concurrent operation. We
+        // treat the ident as gone.
+        if (status.code() == ErrorCodes::ObjectIsBusy) {
             return 0;
         }
         uassertStatusOK(status);
@@ -426,8 +549,15 @@ int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& session, const 
     auto getStats = [&](int key) -> int64_t {
         auto result = getStatisticsValue(session, statsUri, "statistics=(fast)", key);
         if (!result.isOK()) {
-            if (result.getStatus().code() == ErrorCodes::CursorNotFound)
-                return 0;  // ident gone, so return 0
+            // A missing file (NoSuchKey) means the ident is gone, so it contributes 0.
+            if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
+                return 0;
+            }
+            // ObjectIsBusy means the data handle is transiently held by a concurrent operation. We
+            // treat the ident as gone.
+            if (result.getStatus().code() == ErrorCodes::ObjectIsBusy) {
+                return 0;
+            }
 
             uassertStatusOK(result.getStatus());
         }
@@ -584,8 +714,6 @@ logv2::LogComponent getWTLogComponent(const BSONObj& obj) {
             return logv2::LogComponent::kWiredTigerRTS;
         case WT_VERB_SALVAGE:
             return logv2::LogComponent::kWiredTigerSalvage;
-        case WT_VERB_TIERED:
-            return logv2::LogComponent::kWiredTigerTiered;
         case WT_VERB_TIMESTAMP:
             return logv2::LogComponent::kWiredTigerTimestamp;
         case WT_VERB_TRANSACTION:
@@ -1011,7 +1139,7 @@ std::unique_ptr<WiredTigerSession> WiredTigerUtil::getStatisticsSession(
     auto session = std::make_unique<WiredTigerSession>(&engine.getConnection(), handler, permit);
     // Configure the session to avoid being coopted into cache eviction. We never want to block stat
     // fetching on workload issues.
-    session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
+    session->modifyConfiguration("ignore_cache_size=true", "ignore_cache_size=false");
     return session;
 }
 
@@ -1318,7 +1446,6 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         {logv2::LogComponent::kWiredTigerRecovery, "recovery"},
         {logv2::LogComponent::kWiredTigerRTS, "rts"},
         {logv2::LogComponent::kWiredTigerSalvage, "salvage"},
-        {logv2::LogComponent::kWiredTigerTiered, "tiered"},
         {logv2::LogComponent::kWiredTigerTimestamp, "timestamp"},
         {logv2::LogComponent::kWiredTigerTransaction, "transaction"},
         {logv2::LogComponent::kWiredTigerVerify, "verify"},
@@ -1427,12 +1554,8 @@ Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
 
 // static
 uint64_t WiredTigerUtil::genTableId() {
-    static AtomicWord<unsigned long long> nextTableId(WiredTigerUtil::kLastTableId);
+    static Atomic<unsigned long long> nextTableId(WiredTigerUtil::kLastTableId);
     return nextTableId.fetchAndAdd(1);
-}
-
-std::string WiredTigerUtil::concatConfigs(const std::string& configA, const std::string& configB) {
-    return str::stream() << configA << "," << configB;
 }
 
 boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {
@@ -1510,8 +1633,8 @@ void WiredTigerUtil::logMetadata(WiredTigerSession& session, std::string_view ur
     }
 }
 
-void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, std::string_view uri) {
-    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.data(), nullptr, nullptr, nullptr)),
+void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, const std::string& uri) {
+    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.c_str(), nullptr, nullptr, nullptr)),
                   *ru.getSession());
 }
 
@@ -1523,12 +1646,26 @@ Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
             !ru.readOnly());
 
     invariant(ru.inUnitOfWork());
+    auto* kvEngine = ru.getConnection()->getKVEngine();
     auto& session = *ru.getSessionNoTxn();
     LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
+
+    const bool publishCreate =
+        kvEngine && kvEngine->usesSchemaEpochs() && gFeatureFlagEnableSchemaEpochs.isEnabled();
+    std::unique_lock<std::mutex> lock;
+    bool inStepdown = false;
+    if (publishCreate) {
+        lock = kvEngine->lockStepDown();
+        inStepdown = !kvEngine->getStepDownTimestamp().isNull();
+    }
+
     const auto status = wtRCToStatus(session.create(uri, config), session);
     if (status.isOK()) {
-        ru.onCreateTable(uri);
+        using StepdownState = WiredTigerRecoveryUnit::StepdownState;
+        auto state = inStepdown ? StepdownState::after : StepdownState::before;
+        ru.onCreateTable(uri, state);
     }
+
     return status;
 }
 

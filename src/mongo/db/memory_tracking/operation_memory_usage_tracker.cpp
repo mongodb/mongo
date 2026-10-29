@@ -1,50 +1,33 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
+#include <limits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
 
-const OperationContext::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> _getFromOpCtx =
-    OperationContext::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
+const OperationContext::Decoration<std::shared_ptr<OperationMemoryUsageTracker>> _getFromOpCtx =
+    OperationContext::declareDecoration<std::shared_ptr<OperationMemoryUsageTracker>>();
 
-}
+}  // namespace
 
 OperationMemoryUsageTracker::OperationMemoryUsageTracker(OperationContext* opCtx)
-    : SimpleMemoryUsageTracker(internalQueryMaxMemoryUsageBytesPerOperation.loadRelaxed()),
+    // Root of every tracker base chain: the only tracker that writes to CurOp, so this is where
+    // the CurOp chunk size is latched from the knob.
+    : SimpleMemoryUsageTracker(nullptr,
+                               MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation},
+                               internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed()),
       _opCtx(opCtx) {}
 
 /**
@@ -55,110 +38,130 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
     OperationContext* opCtx) {
     OperationMemoryUsageTracker* opTracker = _getFromOpCtx(opCtx).get();
     if (!opTracker) {
-        auto uniqueTracker = std::make_unique<OperationMemoryUsageTracker>(opCtx);
-        opTracker = uniqueTracker.get();
+        auto sharedTracker = std::make_shared<OperationMemoryUsageTracker>(opCtx);
+        opTracker = sharedTracker.get();
         opTracker->setWriteToCurOp(
             [opTracker](int64_t inUseTrackedMemoryBytes, int64_t peakTrackedMemBytes) {
                 if (opTracker->_opCtx) {
                     CurOp::get(opTracker->_opCtx)
                         ->setMemoryTrackingStats(inUseTrackedMemoryBytes, peakTrackedMemBytes);
                 } else {
-                    LOGV2_DEBUG(10430900, 3, "No OperationContext on OperationMemoryUsageTracker");
+                    // Being detached from an opCtx is an expected potential state - stashed
+                    // tracker, or ReportToCurOp::kNo.
+                    LOGV2_DEBUG(10430900,
+                                5,
+                                "Operation memory tracker is detached from CurOp; skipping stats "
+                                "propagation");
                 }
             });
-        _getFromOpCtx(opCtx) = std::move(uniqueTracker);
+        _getFromOpCtx(opCtx) = std::move(sharedTracker);
     }
 
     return opTracker;
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-    const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(), maxMemoryUsageBytes);
+    const ExpressionContext& expCtx, MemoryUsageLimit maxMemoryUsageBytes) {
+    return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(),
+                                              maxMemoryUsageBytes,
+                                              expCtx.getExcludeOperationMemoryTracking());
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
-    OperationContext* opCtx, int64_t maxMemoryUsageBytes) {
+    OperationContext* opCtx, MemoryUsageLimit maxMemoryUsageBytes) {
     return createSimpleMemoryUsageTrackerImpl(opCtx, maxMemoryUsageBytes);
 }
 
 DeduplicatorReporter OperationMemoryUsageTracker::createDeduplicatorReporter(
-    std::function<void(int64_t, int64_t)> callback, int64_t chunkSize) {
+    std::function<void(int64_t, int64_t)> callback, int64_t serverStatusChunkSize) {
     if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-        return DeduplicatorReporter{nullptr, chunkSize};
+        return DeduplicatorReporter{nullptr, serverStatusChunkSize};
     }
-    return DeduplicatorReporter{std::move(callback), chunkSize};
-}
-
-SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
-    const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(
-        expCtx.getOperationContext(),
-        maxMemoryUsageBytes,
-        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
-}
-
-SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
-    OperationContext* opCtx, int64_t maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(
-        opCtx, maxMemoryUsageBytes, internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+    return DeduplicatorReporter{std::move(callback), serverStatusChunkSize};
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerImpl(
-    OperationContext* opCtx, int64_t maxMemoryUsageBytes, int64_t chunkSize) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-        return SimpleMemoryUsageTracker{maxMemoryUsageBytes, chunkSize};
+    OperationContext* opCtx,
+    MemoryUsageLimit maxMemoryUsageBytes,
+    bool excludeOperationMemoryTracking) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        excludeOperationMemoryTracking) {
+        return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
     }
 
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes, chunkSize};
+    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
 }
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
-    const ExpressionContext& expCtx, bool allowDiskUse, int64_t maxMemoryUsageBytes) {
+    const ExpressionContext& expCtx, bool allowDiskUse, MemoryUsageLimit maxMemoryUsageBytes) {
     return createMemoryUsageTrackerImpl(expCtx, allowDiskUse, maxMemoryUsageBytes);
 }
 
-MemoryUsageTracker OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(
-    const ExpressionContext& expCtx, bool allowDiskUse, int64_t maxMemoryUsageBytes) {
-    return createMemoryUsageTrackerImpl(expCtx,
-                                        allowDiskUse,
-                                        maxMemoryUsageBytes,
-                                        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
-}
-
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
-    const ExpressionContext& expCtx,
-    bool allowDiskUse,
-    int64_t maxMemoryUsageBytes,
-    int64_t chunkSize) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    const ExpressionContext& expCtx, bool allowDiskUse, MemoryUsageLimit maxMemoryUsageBytes) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        expCtx.getExcludeOperationMemoryTracking()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
     }
 
     OperationContext* opCtx = expCtx.getOperationContext();
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes, chunkSize};
+    return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes};
 }
 
-std::unique_ptr<OperationMemoryUsageTracker> OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(
-    OperationContext* opCtx) {
-    std::unique_ptr<OperationMemoryUsageTracker> tracker = std::move(_getFromOpCtx(opCtx));
+std::shared_ptr<OperationMemoryUsageTracker>
+OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(OperationContext* opCtx) {
+    invariant(opCtx);
+    std::shared_ptr<OperationMemoryUsageTracker> tracker = std::move(_getFromOpCtx(opCtx));
     if (tracker) {
+        // The tracker outlives its opCtx while stashed on the cursor between getMores.
         tracker->_opCtx = nullptr;
     }
     return tracker;
 }
 
-void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
-    OperationContext* opCtx, std::unique_ptr<OperationMemoryUsageTracker> tracker) {
+void OperationMemoryUsageTracker::attachToOpCtxIfAvailable(
+    OperationContext* opCtx,
+    std::shared_ptr<OperationMemoryUsageTracker> tracker,
+    ReportToCurOp reportToCurOp) {
     invariant(opCtx);
-    if (tracker) {
+    if (!tracker) {
+        // Nothing to publish. Leave any tracker already on the opCtx in place.
+        return;
+    }
+    if (reportToCurOp == ReportToCurOp::kYes) {
         tracker->_opCtx = opCtx;
-        CurOp::get(opCtx)->setMemoryTrackingStats(tracker->inUseTrackedMemoryBytes(),
-                                                  tracker->peakTrackedMemoryBytes());
+        tracker->flushToCurOp();
+    } else {
+        // Reset tracker _opCtx to not report to curOp.
+        tracker->_opCtx = nullptr;
     }
     _getFromOpCtx(opCtx) = std::move(tracker);
+}
+
+std::shared_ptr<OperationMemoryUsageTracker> OperationMemoryUsageTracker::getOwningIfExists(
+    OperationContext* opCtx) {
+    invariant(opCtx);
+    return _getFromOpCtx(opCtx);
+}
+
+bool OperationMemoryUsageTracker::hasTrackerOnOpCtx(OperationContext* opCtx) {
+    return _getFromOpCtx(opCtx) != nullptr;
+}
+
+OperationMemoryUsageTracker* OperationMemoryUsageTracker::getIfExists(OperationContext* opCtx) {
+    return _getFromOpCtx(opCtx).get();
+}
+
+void OperationMemoryUsageTracker::rebindToOperation(SimpleMemoryUsageTracker& tracker,
+                                                    const ExpressionContext& expCtx,
+                                                    OperationContext* opCtx) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
+        expCtx.getExcludeOperationMemoryTracking()) {
+        return;
+    }
+    tracker.resetBase(getOperationMemoryUsageTracker(opCtx));
 }
 
 }  // namespace mongo

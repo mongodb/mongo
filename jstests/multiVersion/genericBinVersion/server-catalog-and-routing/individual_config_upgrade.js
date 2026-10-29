@@ -53,6 +53,7 @@ function testIndividualConfigUpgrade() {
             config.version++;
             config.settings = config.settings || {};
             config.settings = {electionTimeoutMillis: 1000};
+            config.settings = {heartbeatIntervalMillis: 500};
             assert.commandWorked(
                 st.configRS.getPrimary().adminCommand({
                     replSetReconfig: config,

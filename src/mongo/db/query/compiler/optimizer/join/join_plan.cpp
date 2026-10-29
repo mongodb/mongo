@@ -1,42 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/util/disjoint_set.h"
 #include "mongo/util/str.h"
 
 namespace mongo::join_ordering {
 namespace {
+
 std::string joinNodeStringPrefix(const JoinPlanNode& node,
                                  size_t numNodesToPrint,
                                  std::string indentStr) {
@@ -82,6 +56,17 @@ JoinPlanNodeId JoinPlanNodeRegistry::registerJoinNode(const JoinSubset& subset,
                                                       JoinPlanNodeId right,
                                                       JoinCostEstimate cost) {
     JoinPlanNodeId id = _allJoinPlans.size();
+    switch (method) {
+        case JoinMethod::HJ:
+            _numHashJoins++;
+            break;
+        case JoinMethod::NLJ:
+            _numNestedLoopJoins++;
+            break;
+        case JoinMethod::INLJ:
+            _numIndexedNestedLoopJoins++;
+            break;
+    }
     _allJoinPlans.emplace_back(JoiningNode{method, left, right, subset.subset, std::move(cost)});
     return id;
 }
@@ -97,9 +82,12 @@ JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(NodeId node,
 }
 
 JoinPlanNodeId JoinPlanNodeRegistry::registerINLJRHSNode(
-    NodeId node, std::shared_ptr<const IndexCatalogEntry> entry, const NamespaceString& nss) {
+    NodeId node,
+    EdgeId probeEdge,
+    std::shared_ptr<const IndexCatalogEntry> entry,
+    const NamespaceString& nss) {
     JoinPlanNodeId id = _allJoinPlans.size();
-    _allJoinPlans.emplace_back(INLJRHSNode{std::move(entry), nss, node});
+    _allJoinPlans.emplace_back(INLJRHSNode{std::move(entry), nss, node, probeEdge});
     return id;
 }
 
@@ -150,49 +138,61 @@ JoinCostEstimate JoinPlanNodeRegistry::getCost(JoinPlanNodeId nodeId) const {
 }
 
 BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
-                                                 size_t numNodesToPrint) const {
+                                                 const JoinGraph& graph,
+                                                 bool printSubset) const {
     BSONObjBuilder bob;
-    bob << "subset" << nodeSetToString(getBitset(nodeId), numNodesToPrint);
+    joinPlanNodeToBSON(bob, nodeId, graph, printSubset);
+    return bob.obj();
+}
+
+void JoinPlanNodeRegistry::joinPlanNodeToBSON(BSONObjBuilder& bob,
+                                              JoinPlanNodeId nodeId,
+                                              const JoinGraph& graph,
+                                              bool brief) const {
+    const NodeSet bitset = getBitset(nodeId);
+    bob << "planNodeId" << (int)nodeId;
+    if (!brief) {
+        bob << "subset" << nodeSetToString(bitset, graph.numNodes());
+        BSONArrayBuilder namesBob(bob.subarrayStart("subsetCollectionNames"));
+        for (const auto& name : subsetCollectionNames(bitset, graph)) {
+            namesBob << name;
+        }
+    }
     if (!isOfType<INLJRHSNode>(nodeId)) {
         // INLJRHSNodes don't have their own associated cost.
         bob << "cost" << getCost(nodeId).toBSON();
     }
     std::visit(
-        OverloadedVisitor{[this, numNodesToPrint, &bob](const JoiningNode& join) {
-                              bob << "method" << joinMethodToString(join.method);
-                              bob << "left" << joinPlanNodeToBSON(join.left, numNodesToPrint);
-                              bob << "right" << joinPlanNodeToBSON(join.right, numNodesToPrint);
-                          },
-                          [&bob](const INLJRHSNode& ip) {
-                              bob << "accessPath"
-                                  << (str::stream()
-                                      << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern());
-                          },
-                          [&bob](const BaseNode& base) {
-                              bob << "accessPath" << base.soln->summaryString();
-                          }},
+        OverloadedVisitor{
+            [this, &graph, &bob, &brief](const JoiningNode& join) {
+                bob << "method" << joinMethodToString(join.method);
+                if (!brief) {
+                    bob << "left" << joinPlanNodeToBSON(join.left, graph, brief);
+                    bob << "right" << joinPlanNodeToBSON(join.right, graph, brief);
+                } else {
+                    bob << "leftSubset" << nodeSetToString(getBitset(join.left), graph.numNodes());
+                    bob << "leftNodeId" << (int)join.left;
+                    bob << "rightSubset"
+                        << nodeSetToString(getBitset(join.right), graph.numNodes());
+                    if (isOfType<INLJRHSNode>(join.right)) {
+                        // INLJ is a special case- we use an IXPROBE instead of the "best" single
+                        // table access plan for that subset, but this is not a plan linked to the
+                        // subset. Just print out the whole node.
+                        bob << "rightNode" << joinPlanNodeToBSON(join.right, graph, brief);
+                    } else {
+                        bob << "rightNodeId" << (int)join.right;
+                    }
+                }
+            },
+            [&bob](const INLJRHSNode& ip) {
+                bob << "accessPath"
+                    << (str::stream() << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern())
+                    << "probeEdge" << ip.probeEdge;
+            },
+            [&bob](const BaseNode& base) {
+                bob << "accessPath" << base.soln->summaryString();
+            }},
         get(nodeId));
-    return bob.obj();
-}
-
-bool JoinGraph::isConnected() const {
-    if (_edges.size() < _nodes.size() - 1) {
-        return false;
-    }
-
-    // We could implement the following with DFS. However, getting the neighbors of a node requires
-    // iterating over all edges, which is inefficient. Instead, we use union-find.
-    DisjointSet ds{_nodes.size()};
-    for (const auto& edge : _edges) {
-        ds.unite(edge.left, edge.right);
-    }
-    auto root = ds.find(0);
-    for (size_t i = 1; i < _nodes.size(); ++i) {
-        if (ds.find(i) != root) {
-            return false;
-        }
-    }
-    return true;
 }
 
 }  // namespace mongo::join_ordering

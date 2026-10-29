@@ -1,32 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/curop_metrics.h"
+
+#include "mongo/db/admission/ticketing/ticketholder_parameters_gen.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
@@ -36,13 +13,36 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_service.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 #include <memory>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+// Per-opCtx decoration tracking non-ticketed execution intervals for aggregation pipelines.
+static const OperationContext::Decoration<AggNonTicketedIntervalTracker> aggNonTicketedIntervalDec =
+    OperationContext::declareDecoration<AggNonTicketedIntervalTracker>();
+
+AggNonTicketedIntervalTracker& getAggNonTicketedIntervalTracker(OperationContext* opCtx) {
+    return aggNonTicketedIntervalDec(opCtx);
+}
+
+int64_t aggNonTicketedIntervalThresholdMillis() {
+    return gDelinquentAcquisitionIntervalMillis.load();
+}
+
+void closeAggNonTicketedIntervalIfOpen(AggNonTicketedIntervalTracker& tracker,
+                                       OperationContext* opCtx) {
+    if (!tracker.hasIntervalStart)
+        return;
+    auto& ts = opCtx->tickSource();
+    tracker.closeInterval(
+        ts.ticksTo<Milliseconds>(ts.getTicks() - tracker.intervalStartTick).count(),
+        aggNonTicketedIntervalThresholdMillis());
+}
+
 namespace {
 
 /** Build a `Counter64` metric with the given `name` and `role`. */
@@ -59,7 +59,7 @@ void incrCounter(Counter64* stat, const T& in) {
 
 /** If `in` is an atomic, load it and increment by that value. */
 template <typename T>
-void incrCounter(Counter64* stat, const AtomicWord<T>& in) {
+void incrCounter(Counter64* stat, const Atomic<T>& in) {
     incrCounter(stat, in.load());
 }
 
@@ -160,9 +160,23 @@ struct InShard : InBoth {
         }
 
         _updateExternalStats(opCtx);
+        _flushAggNonTicketedStats(opCtx);
     }
 
 private:
+    /** Close any in-progress non-ticketed interval and flush to global counters. */
+    void _flushAggNonTicketedStats(OperationContext* opCtx) {
+        auto& tracker = aggNonTicketedIntervalDec(opCtx);
+        closeAggNonTicketedIntervalIfOpen(tracker, opCtx);
+        if (tracker.hadLongInterval) {
+            aggNonTicketedIntervals->incrementRelaxed(tracker.longIntervalCount);
+            aggNonTicketedTotalMillis->incrementRelaxed(tracker.longIntervalTotalMs);
+            aggNonTicketedMaxMillis->setToMax(tracker.longIntervalMaxMs);
+            aggNonTicketedQueries->increment();
+            tracker.hadLongInterval = false;  // prevent double-counting if flushed again
+        }
+    }
+
     /** A few nonmember variables also need to be updated. */
     static void _updateExternalStats(const OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
@@ -181,6 +195,10 @@ private:
             debug.luLocalComplex);
         sortCounters.incrementSortCountersPerQuery(debug.sortTotalDataSizeBytes, debug.keysSorted);
         queryFrameworkCounters.incrementQueryEngineCounters(curOp);
+        nonLeadingPushdownCounters.incrementCounters(
+            debug.nlpMatch, debug.nlpProject, debug.nlpAddFields, debug.nlpReplaceRoot);
+        pathArraynessCounters.incrementPerQuery(debug.pathArraynessLeadingFilter,
+                                                debug.pathArraynessSimplified);
     }
 
 public:
@@ -194,6 +212,21 @@ public:
     Counter64* writeConflicts{makeCounter("operation.writeConflicts", role)};
     Counter64* oplogReturned{makeCounter("oplogStats.document.returned", role)};
     Counter64* oplogScannedObjects{makeCounter("oplogStats.queryExecutor.scannedObjects", role)};
+    // Aggregation pipeline non-ticketed execution interval metrics.
+    // These track periods when an aggregate command releases its execution ticket to perform
+    // in-memory work (e.g. $sort, $group) after the $cursor stage finishes reading. Intervals
+    // longer than delinquentAcquisitionIntervalMillis are counted.
+    //   nonTicketed.intervals  - total long intervals across all aggregations
+    //   nonTicketed.totalMillis - cumulative ms in those intervals
+    //   nonTicketed.maxMillis  - longest single interval ever seen
+    //   nonTicketed.queries    - distinct aggregate commands with at least one long interval
+    Counter64* aggNonTicketedIntervals{
+        makeCounter("query.aggregation.nonTicketed.intervals", role)};
+    Counter64* aggNonTicketedTotalMillis{
+        makeCounter("query.aggregation.nonTicketed.totalMillis", role)};
+    Atomic64Metric* aggNonTicketedMaxMillis{
+        &*MetricBuilder<Atomic64Metric>("query.aggregation.nonTicketed.maxMillis").setRole(role)};
+    Counter64* aggNonTicketedQueries{makeCounter("query.aggregation.nonTicketed.queries", role)};
 
 private:
     struct OtelCounters {

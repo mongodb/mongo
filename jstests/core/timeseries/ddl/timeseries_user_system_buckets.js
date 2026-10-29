@@ -14,6 +14,8 @@
  *   # Running shardCollection instead of createCollection returns different error types which are
  *   # not expected by the test
  *   assumes_unsharded_collection,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  *  ]
  */
 

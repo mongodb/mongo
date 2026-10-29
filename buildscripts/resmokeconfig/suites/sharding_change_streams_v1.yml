@@ -13,4 +13,4 @@ executor:
       nodb: ""
       # Ensure we always start change streams with v1 version.
       eval: >-
-        await import('jstests/libs/override_methods/implicit_change_stream_v1.js');
+        await import('jstests/libs/override_methods/query/implicit_change_stream_v1.js');

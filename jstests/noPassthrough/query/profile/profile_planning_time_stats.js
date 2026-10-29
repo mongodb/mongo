@@ -1,6 +1,9 @@
 /**
  * Tests for validating that planning time stats are included in slow query logs.
  * @tags: [
+ *   # Imports explain_and_profile_optimization_stats_util.js, which runs mapReduce, requiring
+ *   # server-side scripting.
+ *   requires_scripting,
  *   # Slow Windows machines cause this test to be flaky. Increasing maxPlanningTimeMicros would
  *   # make the test less useful on Linux variants so we don't run on Windows.
  *   incompatible_with_windows_tls,

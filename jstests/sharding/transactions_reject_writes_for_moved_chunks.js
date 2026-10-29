@@ -7,6 +7,7 @@
 //   uses_transactions,
 // ]
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -59,9 +60,11 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed,
 
         // Flush metadata on the destination shard so the next request doesn't encounter
         // StaleConfig. The router refreshes after moving a chunk, so it will already be fresh.
-        assert.commandWorked(
-            st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}),
-        );
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.rs1.getPrimary(), "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(
+                st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}),
+            );
+        }
     }
 
     st.refreshCatalogCacheForNs(st.s, ns);
@@ -178,9 +181,11 @@ fixtures.forEach(function (fixture) {
 
     // Force a routing table refresh on Shard2, to avoid picking a global read timestamp before the
     // sharding metadata cache collections are created.
-    assert.commandWorked(
-        st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}),
-    );
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs2.getPrimary(), "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(
+            st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}),
+        );
+    }
 
     assert.commandWorked(
         st.s.adminCommand({

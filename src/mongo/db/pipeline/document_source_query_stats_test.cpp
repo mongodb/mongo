@@ -1,50 +1,43 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_query_stats.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/find_key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
+#include <algorithm>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include <absl/hash/hash.h>
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -82,10 +75,63 @@ public:
                                                       query_shape::CollectionType::kCollection);
     }
 
+    QueryStatsEntry makeEntry(std::unique_ptr<const Key> key) {
+        const auto userVisibleHash = computeUserVisibleHash(getOpCtx(), *key);
+        return QueryStatsEntry{std::move(key), userVisibleHash};
+    }
+
+    std::unique_ptr<const Key> makeAggKeyWithAllowPartialResults(
+        boost::optional<bool> allowPartialResults) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+        auto rawPipeline = {fromjson(R"({ $match: { x: 1 } })")};
+        AggregateCommandRequest acr(kDefaultTestNss.nss());
+        acr.setPipeline(rawPipeline);
+        if (allowPartialResults) {
+            acr.setAllowPartialResults(*allowPartialResults);
+        }
+        auto pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+        auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+            acr, kDefaultTestNss.nss(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+        return std::make_unique<query_stats::AggKey>(expCtx,
+                                                     acr,
+                                                     std::move(aggShape),
+                                                     pipeline->getInvolvedCollections(),
+                                                     query_shape::CollectionType::kCollection);
+    }
+
     QueryStatsStore& setUpQueryStatsStore(unsigned numPartitions = 1) {
         QueryStatsStoreManager::get(getServiceContext()) = std::make_unique<QueryStatsStoreManager>(
-            16 * 1024 * 1024 /* cacheSize */, numPartitions);
+            /*cacheSize=*/16 * 1024 * 1024, numPartitions);
         return getQueryStatsStore(getOpCtx());
+    }
+
+    QueryStatsStoreManager& getManager() {
+        return *QueryStatsStoreManager::get(getServiceContext());
+    }
+
+    /**
+     * Stores an entry for the find shape that 'filter' produces under 'storeKey', so the
+     * store and the keyHash index are populated together.
+     */
+    std::string putIndexedEntry(QueryStatsStore& queryStatsStore, size_t storeKey, BSONObj filter) {
+        auto key = makeFindKeyFromQuery(std::move(filter));
+        auto userVisibleHash =
+            computeUserVisibleHash(computeRepresentativeShapeKey(getOpCtx(), *key));
+        queryStatsStore.put(storeKey, makeEntry(std::move(key)));
+        return userVisibleHash;
+    }
+
+    /**
+     * Builds a $queryStats stage that takes the keyHash lookup execution path for 'locations'.
+     */
+    boost::intrusive_ptr<exec::agg::Stage> buildKeyHashLookupStage(
+        std::vector<std::string> locations) {
+        const auto source =
+            DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+        checked_cast<DocumentSourceQueryStats*>(source.get())
+            ->setKeyHashLookupLocations(std::move(locations));
+        return exec::agg::buildStage(source);
     }
 
     // Calls getNext() on the document source and validates the result. Returns the field name of
@@ -117,8 +163,44 @@ public:
         return std::string(filterObj.fieldName());
     }
 
+    void populateStoreWithExecCounts(QueryStatsStore& queryStatsStore, int numEntries) {
+        for (int i = 0; i < numEntries; ++i) {
+            BSONObjBuilder filter;
+            filter.append("field" + std::to_string(i), i);
+            queryStatsStore.put(i, makeEntry(makeFindKeyFromQuery(filter.obj())));
+            queryStatsStore.lookup(i).getValue()->execCount = i;
+        }
+    }
+
+    boost::intrusive_ptr<exec::agg::Stage> buildTopKExecCountStage(long long limit) {
+        const auto source =
+            DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+        static_cast<DocumentSourceQueryStats*>(source.get())
+            ->setTopKSortSpec(
+                query_stats::TopKSortSpec{"metrics.execCount", false /* isAscending */, limit});
+        return exec::agg::buildStage(source);
+    }
+
+    static std::vector<long long> drainExecCounts(boost::intrusive_ptr<exec::agg::Stage> stage) {
+        std::vector<long long> execCounts;
+        for (auto result = stage->getNext(); !result.isEOF(); result = stage->getNext()) {
+            ASSERT_TRUE(result.isAdvanced());
+            execCounts.push_back(
+                result.getDocument().getNestedField({"metrics.execCount"}).coerceToLong());
+        }
+        std::sort(execCounts.begin(), execCounts.end(), std::greater<>());
+        return execCounts;
+    }
+
     static const BSONObj kQueryStatsStage;
     static const BSONObj kQueryStatsStageWithTransformIdentifiers;
+
+private:
+    // Entries are only indexed, and the keyHash lookup path only taken, while the match pushdown
+    // optimization is enabled.
+    // TODO (SERVER-135371): Remove once knob enabled by default.
+    unittest::ServerParameterGuard _enableMatchPushdown{
+        "internalQueryStatsMatchPushdownOptimizationEnabled", true};
 };
 
 const BSONObj DocumentSourceQueryStatsTest::kQueryStatsStage = fromjson(R"({
@@ -246,10 +328,10 @@ TEST_F(DocumentSourceQueryStatsTest,
 TEST_F(DocumentSourceQueryStatsTest, GetNextOverMultiplePartitions) {
     // First, populate the query stats store. One partition will have 2 entries, one will have
     // 1, and one will have none.
-    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
-    queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("a" << 5))});
-    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("b" << 10))});
-    queryStatsStore.put(3, QueryStatsEntry{makeFindKeyFromQuery(BSON("c" << 15))});
+    auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
+    queryStatsStore.put(0, makeEntry(makeFindKeyFromQuery(BSON("a" << 5))));
+    queryStatsStore.put(1, makeEntry(makeFindKeyFromQuery(BSON("b" << 10))));
+    queryStatsStore.put(3, makeEntry(makeFindKeyFromQuery(BSON("c" << 15))));
 
     ASSERT_TRUE(queryStatsStore.getPartition(0)->hasKey(0));
     ASSERT_TRUE(queryStatsStore.getPartition(0)->hasKey(3));
@@ -280,11 +362,185 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextOverMultiplePartitions) {
     ASSERT_EQ(filters.size(), 3);
 }
 
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupResolvesAcrossPartitions) {
+    // Store keys 0 and 3 land in partition 0, store key 1 lands in partition 1.
+    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+    const auto keyHashB = putIndexedEntry(queryStatsStore, 1, BSON("b" << 10));
+    const auto keyHashC = putIndexedEntry(queryStatsStore, 3, BSON("c" << 15));
+    ASSERT_EQ(queryStatsStore.partitionOf(0), queryStatsStore.partitionOf(3));
+    ASSERT_NE(queryStatsStore.partitionOf(0), queryStatsStore.partitionOf(1));
+
+    auto stage = buildKeyHashLookupStage({keyHashA, keyHashB, keyHashC});
+
+    std::vector<std::pair<std::string, Date_t>> results;
+    for (int i = 0; i < 3; ++i) {
+        auto result = stage->getNext();
+        ASSERT_TRUE(result.isAdvanced());
+        const auto& doc = result.getDocument();
+        results.emplace_back(doc["keyHash"].getString(), doc["asOf"].getDate());
+    }
+    ASSERT_TRUE(stage->getNext().isEOF());
+
+    // Every location is resolved, whatever partition it lives in.
+    ASSERT_EQ(StringSet({results[0].first, results[1].first, results[2].first}),
+              StringSet({keyHashA, keyHashB, keyHashC}));
+
+    // The read time is captured once for the whole optimized scan, so every entry it materializes
+    // reports the same 'asOf' timestamp.
+    ASSERT_EQ(results[0].second, results[1].second);
+    ASSERT_EQ(results[1].second, results[2].second);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupReportsEachEntryOnce) {
+    auto& queryStatsStore = setUpQueryStatsStore();
+    const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+
+    // A duplicated target should be reported once.
+    auto stage = buildKeyHashLookupStage({keyHashA, keyHashA});
+
+    auto result = stage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_EQ(result.getDocument()["keyHash"].getString(), keyHashA);
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupIgnoresUnindexedTarget) {
+    auto& queryStatsStore = setUpQueryStatsStore();
+    const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+    // Not a target, so a full scan would return it but the lookup must not.
+    putIndexedEntry(queryStatsStore, 1, BSON("b" << 10));
+    // A keyHash the store holds no entry for.
+    const auto unknownKeyHash = computeUserVisibleHash(
+        computeRepresentativeShapeKey(getOpCtx(), *makeFindKeyFromQuery(BSON("unknown" << 1))));
+
+    // The index drops the unknown hash, so the stage returns only the resolved target rather than
+    // scanning the store.
+    auto stage = buildKeyHashLookupStage({keyHashA, unknownKeyHash});
+
+    StringSet seen;
+    for (auto result = stage->getNext(); !result.isEOF(); result = stage->getNext()) {
+        ASSERT_TRUE(result.isAdvanced());
+        seen.insert(result.getDocument()["keyHash"].getString());
+    }
+    ASSERT_EQ(seen, StringSet({keyHashA}));
+}
+
+/**
+ * A store entry can leave the store while its index mapping lingers, e.g. when the lookup resolves
+ * a store key and the entry is evicted before the partition lock is taken. clear() reproduces that
+ * reader-visible state: it fires onClear, which does not prune the keyHash index.
+ *
+ * The stale mapping is skipped, so the lookup still returns the live locations and does not scan.
+ */
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupSkipsEvictedTarget) {
+    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    auto& manager = getManager();
+
+    // This entry's mapping outlives the entry itself.
+    const auto evictedKeyHash = putIndexedEntry(queryStatsStore, /*storeKey*/ 0, BSON("gone" << 1));
+    queryStatsStore.clear();
+
+    const auto keyHashA = putIndexedEntry(queryStatsStore, /*storeKey*/ 1, BSON("a" << 5));
+    // Not a target, so a full scan would return it but the lookup must not.
+    putIndexedEntry(queryStatsStore, /*storeKey*/ 2, BSON("b" << 10));
+    ASSERT_NE(queryStatsStore.partitionOf(0), queryStatsStore.partitionOf(1));
+    // All three mappings are still indexed.
+    ASSERT_EQ(manager.numMappings_forTest(), 3);
+
+    auto stage = buildKeyHashLookupStage({evictedKeyHash, keyHashA});
+
+    // The lookup finds store key 0 empty, skips it, and returns only the live target.
+    auto result = stage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_EQ(result.getDocument()["keyHash"].getString(), keyHashA);
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupReturnsNothingWhenIndexUnmaintained) {
+    // The knob is startup-only, so the manager has to be built while it is off for the index to be
+    // left unmaintained.
+    std::string keyHashA;
+    {
+        unittest::ServerParameterGuard disable("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                               false);
+        auto& queryStatsStore = setUpQueryStatsStore();
+        keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+    }
+
+    // Nothing was indexed, so the lookup resolves to no locations. In production this cannot arise:
+    // the pushdown rule doesn't capture while the knob is off, so the stage scans instead.
+    auto stage = buildKeyHashLookupStage({keyHashA});
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupWithNoKeyHashesIsEOF) {
+    auto& queryStatsStore = setUpQueryStatsStore();
+    putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+
+    // An empty $in pushes down an empty keyHash list, which shouldn't fall back to a full scan.
+    auto stage = buildKeyHashLookupStage({});
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextForAllowPartialResultsTriState) {
+    // Populate the query stats store with 3 agg entries differing only in allowPartialResults:
+    // omitted, true, and false.
+    auto& queryStatsStore = setUpQueryStatsStore();
+    auto keyOmitted = makeAggKeyWithAllowPartialResults(boost::none);
+    const auto hashOmitted = absl::HashOf(*keyOmitted);
+    queryStatsStore.put(hashOmitted, makeEntry(std::move(keyOmitted)));
+    auto keyTrue = makeAggKeyWithAllowPartialResults(true);
+    const auto hashTrue = absl::HashOf(*keyTrue);
+    queryStatsStore.put(hashTrue, makeEntry(std::move(keyTrue)));
+    auto keyFalse = makeAggKeyWithAllowPartialResults(false);
+    const auto hashFalse = absl::HashOf(*keyFalse);
+    queryStatsStore.put(hashFalse, makeEntry(std::move(keyFalse)));
+
+    const auto source =
+        DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(source);
+
+    // allowPartialResults is a command-level key field, not part of the query shape, so all three
+    // entries must produce the same queryShapeHash despite having distinct keyHash values. Each
+    // entry is identified by its own 'key.allowPartialResults' field (missing/true/false),
+    // independent of iteration order.
+    StringMap<std::string> keyHashesByLabel;
+    boost::optional<std::string> sharedQueryShapeHash;
+    for (int i = 0; i < 3; ++i) {
+        auto result = stage->getNext();
+        ASSERT_TRUE(result.isAdvanced());
+        const auto& doc = result.getDocument();
+
+        const auto& allowPartialResultsField = doc.getNestedField({"key.allowPartialResults"});
+        std::string label = allowPartialResultsField.missing()
+            ? "omitted"
+            : (allowPartialResultsField.getBool() ? "true" : "false");
+        ASSERT_FALSE(keyHashesByLabel.contains(label)) << "Saw duplicate entry for: " << label;
+        keyHashesByLabel.emplace(label, std::string(doc["keyHash"].getString()));
+
+        auto queryShapeHash = std::string(doc["queryShapeHash"].getString());
+        if (sharedQueryShapeHash) {
+            ASSERT_EQ(*sharedQueryShapeHash, queryShapeHash);
+        } else {
+            sharedQueryShapeHash = queryShapeHash;
+        }
+    }
+
+    ASSERT_TRUE(stage->getNext().isEOF());
+
+    // We should see all three distinct entries exactly once, with distinct keyHash values.
+    ASSERT_EQ(keyHashesByLabel.size(), 3);
+    ASSERT_NE(keyHashesByLabel["omitted"], keyHashesByLabel["true"]);
+    ASSERT_NE(keyHashesByLabel["omitted"], keyHashesByLabel["false"]);
+    ASSERT_NE(keyHashesByLabel["true"], keyHashesByLabel["false"]);
+}
+
 TEST_F(DocumentSourceQueryStatsTest, GetNextTransformIdentifiers) {
     // First, populate the query stats store. Both entries will be in the single store partition.
     auto& queryStatsStore = setUpQueryStatsStore();
-    queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("a" << 5))});
-    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("b" << 10))});
+    queryStatsStore.put(0, makeEntry(makeFindKeyFromQuery(BSON("a" << 5))));
+    queryStatsStore.put(1, makeEntry(makeFindKeyFromQuery(BSON("b" << 10))));
 
     const auto source = DocumentSourceQueryStats::createFromBson(
         kQueryStatsStageWithTransformIdentifiers.firstElement(), getExpCtx());
@@ -329,7 +585,7 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
 
     // Populate the query stats store with an entry that fails to re-parse.
     auto& queryStatsStore = setUpQueryStatsStore();
-    queryStatsStore.put(0, QueryStatsEntry{std::move(findKey)});
+    queryStatsStore.put(0, makeEntry(std::move(findKey)));
 
     // First case - don't treat errors as fatal.
     internalQueryStatsErrorsAreCommandFatal.store(false);
@@ -353,39 +609,105 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
     ASSERT_THROWS_CODE(stage->getNext(), DBException, ErrorCodes::QueryStatsFailedToRecord);
 }
 
+TEST_F(DocumentSourceQueryStatsTest, TopKReturnsOnlyCandidatesWhenAllMaterialize) {
+    auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
+    populateStoreWithExecCounts(queryStatsStore, 10);
+
+    // With no materialization failures the stage emits only the top-K candidates and never falls
+    // back to scanning the rest of the store.
+    const std::vector<long long> expected{9, 8, 7};
+    ASSERT(drainExecCounts(buildTopKExecCountStage(3)) == expected);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, TopKFallsBackToFullScanWhenCandidateFailsToMaterialize) {
+    auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
+    populateStoreWithExecCounts(queryStatsStore, 10);
+
+    // The candidates are execCounts {7, 8, 9}. Fail the first materialization, which hits one of
+    // them, so the top-K pass alone would emit only 2 documents for a limit of 3.
+    FailPointEnableBlock fp("queryStatsGenerateQueryFeatureNotAllowedError",
+                            FailPoint::ModeOptions{FailPoint::nTimes, 1, {}});
+    const auto execCounts = drainExecCounts(buildTopKExecCountStage(3));
+
+    // The stage falls back to the full scan, which emits every entry that wasn't already a
+    // candidate: the 2 surviving candidates plus the 7 non-candidates, with no duplicates.
+    ASSERT_EQ(execCounts.size(), 9);
+    ASSERT(std::adjacent_find(execCounts.begin(), execCounts.end()) == execCounts.end());
+    const auto numCandidatesEmitted =
+        std::count_if(execCounts.begin(), execCounts.end(), [](long long c) { return c >= 7; });
+    ASSERT_EQ(numCandidatesEmitted, 2);
+    for (long long nonCandidate = 0; nonCandidate <= 6; ++nonCandidate) {
+        ASSERT(std::find(execCounts.begin(), execCounts.end(), nonCandidate) != execCounts.end())
+            << "missing non-candidate execCount " << nonCandidate;
+    }
+}
+
+TEST_F(DocumentSourceQueryStatsTest, ClonePreservesTopKSortSpec) {
+    auto source =
+        DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+    static_cast<DocumentSourceQueryStats*>(source.get())
+        ->setTopKSortSpec(
+            query_stats::TopKSortSpec{"metrics.execCount", false /* isAscending */, 3});
+
+    auto clone = source->clone(getExpCtx());
+    query_shape::SerializationOptions explainOpts;
+    explainOpts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    Value topKSort =
+        clone->serialize(explainOpts).getDocument()["$queryStats"]["topKSortOptimization"];
+    ASSERT_FALSE(topKSort.missing()) << "clone dropped the top-K sort spec";
+    ASSERT_BSONOBJ_EQ(
+        BSON("path" << "metrics.execCount" << "limit" << 3LL << "isAscending" << false),
+        topKSort.getDocument().toBson());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, ClonePreservesKeyHashLookupSet) {
+    auto source =
+        DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+    const std::vector<std::string> locations{"apple", "banana", "carrot"};
+    static_cast<DocumentSourceQueryStats*>(source.get())->setKeyHashLookupLocations(locations);
+
+    auto clone = source->clone(getExpCtx());
+    query_shape::SerializationOptions explainOpts;
+    explainOpts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    Value lookupLocations =
+        clone->serialize(explainOpts).getDocument()["$queryStats"]["keyHashLookupLocations"];
+    ASSERT_FALSE(lookupLocations.missing()) << "clone dropped the keyHashLookupLocations";
+
+    // Built as a named value so the ASSERT_VALUE_EQ argument has no top-level commas.
+    Value expected{std::vector<Value>(locations.begin(), locations.end())};
+    ASSERT_VALUE_EQ(expected, lookupLocations);
+}
+
 TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {
     // First, populate the query stats store. Include a constant of each representative data type so
     // that we have comprehensive coverage of hash consistency. (We don't have to cover every
     // distinct type or interesting values because they will get converted to representative values
     // at this first parse-and-serialize step.)
     auto& queryStatsStore = setUpQueryStatsStore();
-    queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("number" << 5))});
-    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("string" << "hello"))});
+    queryStatsStore.put(0, makeEntry(makeFindKeyFromQuery(BSON("number" << 5))));
+    queryStatsStore.put(1, makeEntry(makeFindKeyFromQuery(BSON("string" << "hello"))));
+    queryStatsStore.put(2, makeEntry(makeFindKeyFromQuery(BSON("obj" << BSON("c" << BSONObj())))));
     queryStatsStore.put(
-        2, QueryStatsEntry{makeFindKeyFromQuery(BSON("obj" << BSON("c" << BSONObj())))});
-    queryStatsStore.put(
-        3,
-        QueryStatsEntry{makeFindKeyFromQuery(BSON("array" << BSON_ARRAY(1 << "hello" << true)))});
+        3, makeEntry(makeFindKeyFromQuery(BSON("array" << BSON_ARRAY(1 << "hello" << true)))));
     queryStatsStore.put(4,
-                        QueryStatsEntry{makeFindKeyFromQuery(BSON(
-                            "binData" << BSONBinData("hello", 5, BinDataType::BinDataGeneral)))});
+                        makeEntry(makeFindKeyFromQuery(BSON(
+                            "binData" << BSONBinData("hello", 5, BinDataType::BinDataGeneral)))));
     queryStatsStore.put(
-        5, QueryStatsEntry{makeFindKeyFromQuery(BSON("oid" << OID("aaaaaaaaaaaaaaaaaaaaaaaa")))});
-    queryStatsStore.put(6, QueryStatsEntry{makeFindKeyFromQuery(BSON("bool" << true))});
-    queryStatsStore.put(7, QueryStatsEntry{makeFindKeyFromQuery(BSON("date" << Date_t::min()))});
-    queryStatsStore.put(8, QueryStatsEntry{makeFindKeyFromQuery(BSON("null" << BSONNULL))});
-    queryStatsStore.put(9, QueryStatsEntry{makeFindKeyFromQuery(BSON("regex" << BSONRegEx(".*")))});
+        5, makeEntry(makeFindKeyFromQuery(BSON("oid" << OID("aaaaaaaaaaaaaaaaaaaaaaaa")))));
+    queryStatsStore.put(6, makeEntry(makeFindKeyFromQuery(BSON("bool" << true))));
+    queryStatsStore.put(7, makeEntry(makeFindKeyFromQuery(BSON("date" << Date_t::min()))));
+    queryStatsStore.put(8, makeEntry(makeFindKeyFromQuery(BSON("null" << BSONNULL))));
+    queryStatsStore.put(9, makeEntry(makeFindKeyFromQuery(BSON("regex" << BSONRegEx(".*")))));
     queryStatsStore.put(10,
-                        QueryStatsEntry{makeFindKeyFromQuery(
-                            BSON("dbRef" << BSONDBRef("ns", OID("aaaaaaaaaaaaaaaaaaaaaaaa"))))});
-    queryStatsStore.put(11, QueryStatsEntry{makeFindKeyFromQuery(BSON("js" << BSONCode("code")))});
+                        makeEntry(makeFindKeyFromQuery(
+                            BSON("dbRef" << BSONDBRef("ns", OID("aaaaaaaaaaaaaaaaaaaaaaaa"))))));
+    queryStatsStore.put(11, makeEntry(makeFindKeyFromQuery(BSON("js" << BSONCode("code")))));
     queryStatsStore.put(12,
-                        QueryStatsEntry{makeFindKeyFromQuery(BSON(
-                            "jsScope" << BSONCodeWScope("code", BSON("c" << 1))))});  // CodeWScope
-    queryStatsStore.put(
-        13, QueryStatsEntry{makeFindKeyFromQuery(BSON("timestamp" << Timestamp::max()))});
-    queryStatsStore.put(14, QueryStatsEntry{makeFindKeyFromQuery(BSON("minKey" << MINKEY))});
-    queryStatsStore.put(15, QueryStatsEntry{makeFindKeyFromQuery(BSON("maxKey" << MAXKEY))});
+                        makeEntry(makeFindKeyFromQuery(BSON(
+                            "jsScope" << BSONCodeWScope("code", BSON("c" << 1))))));  // CodeWScope
+    queryStatsStore.put(13, makeEntry(makeFindKeyFromQuery(BSON("timestamp" << Timestamp::max()))));
+    queryStatsStore.put(14, makeEntry(makeFindKeyFromQuery(BSON("minKey" << MINKEY))));
+    queryStatsStore.put(15, makeEntry(makeFindKeyFromQuery(BSON("maxKey" << MAXKEY))));
 
     const auto source =
         DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
@@ -433,7 +755,7 @@ TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {
     StringSet filters;
     for (size_t i = 0; i < keyHashes.size(); ++i) {
         filters.emplace(getNextAndValidateResult(
-            stage, keyHashes, shapeHashes, false /* shouldValidateFilterDataType */));
+            stage, keyHashes, shapeHashes, /*shouldValidateFilterDataType=*/false));
     }
 
     ASSERT_TRUE(stage->getNext().isEOF());

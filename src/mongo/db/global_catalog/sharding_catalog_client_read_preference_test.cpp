@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -117,8 +91,7 @@ protected:
                          DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
         auto future = launchAsync([&] {
-            return assertGet(
-                catalogClient()->getDatabasesForShard(operationContext(), ShardRef{kShardId1}));
+            return assertGet(catalogClient()->getDatabasesForShard(operationContext(), kShardId1));
         });
 
         onFindCommand([this, dbt, expectedReadPreference](const RemoteCommandRequest& request) {
@@ -150,7 +123,7 @@ protected:
 
         auto future = launchAsync([&] {
             return catalogClient()->getAllDBs(
-                operationContext(), repl::ReadConcernLevel::kSnapshotReadConcern, readPrefOverride);
+                operationContext(), repl::ReadConcernArgs::kSnapshot, readPrefOverride);
         });
 
         onFindCommand([this, dbt, expectedReadPreference](const RemoteCommandRequest& request) {
@@ -234,28 +207,28 @@ public:
 
 TEST_F(ShardingCatalogClientReadPreferenceWithNoCachedDataInShardRegistry,
        CatalogQueriesUsePrimaryPreferredReadPreferenceNoCached) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::PrimaryPreferred);
 }
 
 TEST_F(ShardingCatalogClientReadPreferenceWithoutConfigShardTest,
        CatalogQueriesUseNearestReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::Nearest);
 }
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        CatalogQueriesUsePrimaryPreferredReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::PrimaryPreferred);
 }
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        ClusterServerParameterForcesNearestReadPreference) {
-    setClusterParameter(true /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/true);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::Nearest);
 }
@@ -276,7 +249,7 @@ TEST_F(ShardingCatalogClientReadPreferenceWithNoCachedDataInShardRegistry,
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        GetAllDBsOverridesPrimaryOnlyReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     // With a config shard the default would be PrimaryPreferred, but the explicit override
     // should force PrimaryOnly.
@@ -286,7 +259,7 @@ TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        GetAllDBsUsesDefaultReadPreferenceWhenNoOverride) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     // Without an override, getAllDBs should use the default PrimaryPreferred for config shard.
     assertReadPreferenceForGetAllDBs(ReadPreference::PrimaryPreferred);
@@ -294,7 +267,7 @@ TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
 
 TEST_F(ShardingCatalogClientReadPreferenceWithoutConfigShardTest,
        GetAllDBsOverridesPrimaryOnlyReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     // Without a config shard the default would be Nearest, but the explicit override
     // should force PrimaryOnly.

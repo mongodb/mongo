@@ -3,6 +3,7 @@
  * the catalog cache refresh succeeds and after it finishes all persisted cache entries are intact.
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 const st = new ShardingTest({
     shards: 1,
@@ -10,6 +11,9 @@ const st = new ShardingTest({
     initiateWithDefaultElectionTimeout: true,
     other: {configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}},
 });
+// config.cache.collections is not written when the authoritative shard catalog is used.
+// TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}),

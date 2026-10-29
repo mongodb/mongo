@@ -1,10 +1,17 @@
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
 load(":cc_toolchain_config_wasip2.bzl", "wasi_cc_toolchain_config_wasip2")
+load(":wasi_repo_test.bzl", "wasi_repo_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
 # --- WASI Preview2 (wasm32-wasip2) toolchain/platform ---
 
-wasi_cc_toolchain_config_wasip2(name = "wasi_cc_toolchain_config_wasip2")
+wasi_cc_toolchain_config_wasip2(
+    name = "wasi_cc_toolchain_config_wasip2",
+    ar = "@wasi_sdk//:llvm-ar",
+    clang = "@wasi_sdk//:wasm32-wasip2-clang",
+    clangpp = "@wasi_sdk//:wasm32-wasip2-clang++",
+)
 
 cc_toolchain(
     name = "wasi_cc_toolchain_wasip2_impl",
@@ -33,6 +40,8 @@ toolchain(
 
 # Empty group to satisfy cc_toolchain’s file sets we don’t use.
 filegroup(name = "empty")
+
+wasi_repo_test_suite(name = "wasi_repo_test")
 
 # Files the toolchain “has”; pointing at the repo we fetched.
 filegroup(

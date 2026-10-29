@@ -15,8 +15,9 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {describe, it, before, after, afterEach} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
-    ChangeStreamTest,
+    assertGetMoreFailsWithExpectedError,
     isResumableChangeStreamError,
+    ChangeStreamTest,
 } from "jstests/libs/query/change_stream_util.js";
 
 /**
@@ -28,22 +29,6 @@ function assertGetMoreSucceedsAfterElection(db, cursor, collName, predicate, msg
     assert.soon(() => {
         const r = assert.commandWorked(db.runCommand({getMore: cursor.id, collection: collName}));
         return r.cursor.nextBatch.some(predicate);
-    }, msg);
-}
-
-/**
- * Polls getMore until it fails with one of the expected retryable error codes that indicate a
- * readPreference mismatch after an election. Through mongos the ARM may wrap the shard error as
- * HostUnreachable before the cursor is fully torn down.
- */
-function assertGetMoreFailsAfterElectionWithRetryableError(db, cursorId, collName, msg) {
-    assert.soon(function () {
-        const r = db.runCommand({getMore: cursorId, collection: collName});
-        if (r.ok === 0) {
-            assert(isResumableChangeStreamError(r), "Unexpected error: " + tojson(r));
-            return true;
-        }
-        return false;
     }, msg);
 }
 
@@ -131,12 +116,13 @@ describe("change stream readPreference enforcement on sharded cluster elections"
             const shard0Secondary = st.rs0.getSecondary();
             st.rs0.stepUp(shard0Secondary, {awaitReplicationBeforeStepUp: false});
 
-            assertGetMoreFailsAfterElectionWithRetryableError(
-                mongosDb,
+            assertGetMoreFailsWithExpectedError({
+                db: mongosDb,
                 cursorId,
                 collName,
-                "Expected change stream getMore to fail after shard election",
-            );
+                expectedError: isResumableChangeStreamError,
+                msg: "Expected change stream getMore to fail after shard election",
+            });
         });
 
         it("fails with retryable error when shard primary steps down (readPref: primary)", function () {
@@ -153,12 +139,13 @@ describe("change stream readPreference enforcement on sharded cluster elections"
             // Step up a secondary so the current shard0 primary steps down.
             st.rs0.stepUp(st.rs0.getSecondary(), {awaitReplicationBeforeStepUp: false});
 
-            assertGetMoreFailsAfterElectionWithRetryableError(
-                mongosDb,
+            assertGetMoreFailsWithExpectedError({
+                db: mongosDb,
                 cursorId,
                 collName,
-                "Expected change stream getMore to fail after shard primary stepdown",
-            );
+                expectedError: isResumableChangeStreamError,
+                msg: "Expected change stream getMore to fail after shard primary stepdown",
+            });
         });
 
         it("resumes correctly after readPreference enforcement error", function () {

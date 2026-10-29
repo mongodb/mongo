@@ -10,10 +10,6 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// The UUID consistency check can hit NotPrimaryNoSecondaryOk when it attempts to obtain a list of
-// collections from the shard Primaries through mongoS at the end of this test.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // Start a new sharded cluster with 2 nodes and obtain references to the test DB and collection.
 const st = new ShardingTest({
     shards: 2,

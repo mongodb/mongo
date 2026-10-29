@@ -1,11 +1,13 @@
 /*
  * Tests hybrid search with $rankFusion inside of a $lookup subpipeline.
- * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getMovieData,
+    getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
     getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
@@ -28,23 +30,35 @@ createSearchIndex(collA, getMovieSearchIndexSpec());
 createSearchIndex(collA, getMovieVectorSearchIndexSpec());
 
 const limit = 20;
+// Multiplication factor of limit for numCandidates in $vectorSearch.
+const vectorSearchOverrequestFactor = 10;
+
+const extensionsInHybridSearchEnabled = FeatureFlagUtil.isEnabled(
+    db.getMongo(),
+    "ExtensionsInsideHybridSearch",
+);
 
 /*
  * Identity $lookup.
  */
 
-// Note: There is no $vectorSearch input pipeline here because a $rankFusion with more than one
-// input pipeline desugars to a $unionWith, and $unionWith is not allowed inside a $lookup
-// subpipeline (error 51047). This is independent of featureFlagExtensionsInsideHybridSearch,
-// which only lifts the restriction on $vectorSearch itself appearing in a $lookup subpipeline.
-// TODO SERVER-128801: Add a $vectorSearch pipeline to the $rankFusion below (copying the
-// equivalent portion of ranked_fusion_union_with.js) once multi-pipeline hybrid search is
-// supported inside $lookup.
 let collATestQuery = [
     {
         $rankFusion: {
             input: {
                 pipelines: {
+                    vector: [
+                        {
+                            $vectorSearch: {
+                                // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
+                                queryVector: getMoviePlotEmbeddingById(6),
+                                path: "plot_embedding",
+                                numCandidates: limit * vectorSearchOverrequestFactor,
+                                index: getMovieVectorSearchIndexSpec().name,
+                                limit: limit,
+                            },
+                        },
+                    ],
                     search: [
                         {
                             $search: {
@@ -62,25 +76,31 @@ let collATestQuery = [
 ];
 
 // Perform an identity $lookup query.
-let results = collA
-    .aggregate([
-        {$limit: 1},
-        {$lookup: {from: collA.getName(), pipeline: collATestQuery, as: "out"}},
-        {$unwind: "$out"},
-        {$replaceRoot: {newRoot: "$out"}},
-    ])
-    .toArray();
+const identityLookupPipeline = [
+    {$limit: 1},
+    {$lookup: {from: collA.getName(), pipeline: collATestQuery, as: "out"}},
+    {$unwind: "$out"},
+    {$replaceRoot: {newRoot: "$out"}},
+];
 
-let expectedResultIds = [6, 1, 2, 3, 4, 5];
-assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);
+// TODO SERVER-121094 Remove this check when the feature flag is removed.
+// $unionWith is only allowed inside of $lookup when featureFlagExtensionsInsideHybridSearch is enabled.
+if (extensionsInHybridSearchEnabled) {
+    let results = collA.aggregate(identityLookupPipeline).toArray();
+    let expectedResultIds = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15];
+    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);
+} else {
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: collA.getName(), pipeline: identityLookupPipeline, cursor: {}}),
+        51047,
+    );
+}
 
 /*
  * Two $rankFusion queries on the same dataset connected by a $lookup.
  */
 assert.commandWorked(collB.insertMany(getMovieData()));
 
-// TODO SERVER-128801: Add a $vectorSearch pipeline to the $rankFusion below once multi-pipeline
-// hybrid search ($unionWith desugaring) is supported inside $lookup; see the note above.
 let collBTestQuery = [
     {
         $rankFusion: {
@@ -107,65 +127,79 @@ let collBTestQuery = [
 createSearchIndex(collB, getMovieSearchIndexSpec());
 createSearchIndex(collB, getMovieVectorSearchIndexSpec());
 
-results = collB.aggregate(collBTestQuery).toArray();
+// TODO SERVER-121094 Remove this check when the feature flag is removed.
+// $unionWith is only allowed inside of $lookup when featureFlagExtensionsInsideHybridSearch is enabled.
+if (extensionsInHybridSearchEnabled) {
+    let results = collB.aggregate(collBTestQuery).toArray();
 
-/*
- * Because of how $lookup works, the initial output of the above query will be:
- *
- * [
- *     {
- *         id: 0,
- *         ...
- *         out: [{_id: 10, ...}, {_id: 11, ...}, ...] // Nested documents from $lookup
- *     },
- *     {
- *         id: 1,
- *         ...
- *         out: [{_id: 10, ...}, {_id: 11, ...}, ...] // Identical nested documents from $lookup
- *     },
- *     .
- *     .
- *     .
- * ]
- *
- * This means that in order to run assertDocArrExpectedFuzzy() as recommended for $rankedFusion
- * tests, it's necessary to do some post-parsing of the results to ensure that:
- *      1. The "top-level" documents (from $rankFusion being executed on collB) are separated from
- * the "nested" documents (from $lookup being executed on collA).
- *      2. The "nested" documents are appended after the "top-level" documents, without repeats.
- */
-let collBResults = [];
+    /*
+     * Because of how $lookup works, the initial output of the above query will be:
+     *
+     * [
+     *     {
+     *         id: 0,
+     *         ...
+     *         out: [{_id: 10, ...}, {_id: 11, ...}, ...] // Nested documents from $lookup
+     *     },
+     *     {
+     *         id: 1,
+     *         ...
+     *         out: [{_id: 10, ...}, {_id: 11, ...}, ...] // Identical nested documents from $lookup
+     *     },
+     *     .
+     *     .
+     *     .
+     * ]
+     *
+     * This means that in order to run assertDocArrExpectedFuzzy() as recommended for $rankedFusion
+     * tests, it's necessary to do some post-parsing of the results to ensure that:
+     *      1. The "top-level" documents (from $rankFusion being executed on collB) are separated
+     * from the "nested" documents (from $lookup being executed on collA).
+     *      2. The "nested" documents are appended after the "top-level" documents, without repeats.
+     */
+    let collBResults = [];
 
-// Keep track of seen ids to prevent repeated results.
-let collAIds = new Set();
-let collAResults = [];
+    // Keep track of seen ids to prevent repeated results across both collB and collA results.
+    let seenIds = new Set();
+    let collAResults = [];
 
-results.forEach((doc) => {
-    // Get every part of the document except for the "out" array created by collA's lookup.
-    let topLevelDoc = Object.fromEntries(Object.entries(doc).filter(([key]) => key !== "out"));
+    // First pass: collect all top-level collB documents and register their IDs before processing
+    // any nested lookups. This prevents a later collB document's ID from appearing in the nested
+    // results of an earlier collB document.
+    results.forEach((doc) => {
+        let topLevelDoc = Object.fromEntries(Object.entries(doc).filter(([key]) => key !== "out"));
+        collBResults.push(topLevelDoc);
+        seenIds.add(topLevelDoc._id);
+    });
 
-    collBResults.push(topLevelDoc);
+    // Second pass: collect nested collA documents, deduplicating against all collB IDs.
+    results.forEach((doc) => {
+        if (doc.out && Array.isArray(doc.out)) {
+            doc.out.forEach((nestedDoc) => {
+                // Add nested document if not already seen in either collB or collA results.
+                if (!seenIds.has(nestedDoc._id)) {
+                    seenIds.add(nestedDoc._id);
+                    collAResults.push(nestedDoc);
+                }
+            });
+        }
+    });
 
-    // Process nested documents from collA's lookup.
-    if (doc.out && Array.isArray(doc.out)) {
-        doc.out.forEach((nestedDoc) => {
-            // Add nested document if not already seen.
-            if (!collAIds.has(nestedDoc._id)) {
-                collAIds.add(nestedDoc._id);
-                collAResults.push(nestedDoc);
-            }
-        });
-    }
-});
+    // Combine results.
+    let combinedResults = [...collBResults, ...collAResults];
 
-// Combine results.
-let combinedResults = [...collBResults, ...collAResults];
-
-expectedResultIds = [14, 15, 6, 1, 2, 3, 4, 5];
-assertDocArrExpectedFuzzy(
-    buildExpectedResults(expectedResultIds, datasets.MOVIES),
-    combinedResults,
-);
+    // collBResults = [14, 15], collAResults = remaining 13 movies from collA (14 and 15 excluded
+    // because they are already in collBResults). Combined has 15 unique entries.
+    assertDocArrExpectedFuzzy(
+        buildExpectedResults([14, 15, 6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 11, 7], datasets.MOVIES),
+        combinedResults,
+    );
+} else {
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: collB.getName(), pipeline: collBTestQuery, cursor: {}}),
+        51047,
+    );
+}
 
 dropSearchIndex(collA, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(collA, {name: getMovieVectorSearchIndexSpec().name});

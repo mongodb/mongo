@@ -6,6 +6,9 @@ filters:
   - "auto_split_vector_basic.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "balancer_*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "conn_pool*":
     approvers:
       - 10gen/server-networking-and-observability
@@ -46,6 +49,9 @@ filters:
   - "*range*deletion*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "max_key_orphan*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "*retryable_write*":
     approvers:
       - 10gen/server-transactions
@@ -71,6 +77,9 @@ filters:
   - "add_shard_*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "run_command_on_all_shards_shard_removed.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "custom_write_concern.js":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -78,6 +87,9 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-ddl
   - "create_unsplittable_collection.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "create_system_session.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
   - "list_cluster_catalog*":
@@ -125,6 +137,9 @@ filters:
   - "incompatible_shard_key_indexes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "secondary_shard_versioning.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "all_commands_direct_shard_connection_auth.js":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -158,6 +173,21 @@ filters:
   - "index_commands_shard_targeting.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "configsvr_retries_createindex_on_stale_config.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "drop_indexes_with_stale_config_error.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "list_indexes_shard_targeting.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "sharded_index_consistency_metrics_stale_version_retries.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "shard_collection_error_handling.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "shard_identity_rollback.js":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -182,12 +212,30 @@ filters:
   - "replicate_record_ids_collection_migration.js":
     approvers:
       - 10gen/server-collection-write-path
-  - "heal_config_shards_on_fcv_upgrade.js":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "printShardingStatus.js":
     approvers:
       - 10gen/server-catalog-and-routing
   - "shard_requests_mongos_metrics.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "prepare_transaction_then_migrate.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "sharding_statistics_server_status.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "invalid_shard_identity_doc.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "mongos_waits_for_signing_keys_before_serving.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "retryable_find_and_modify_remove_by_id_chunk_migration.js":
+    approvers:
+      - 10gen/query-execution-router
+  - "mongos_unsharded_commands_interface_parity_with_replica_set.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "fcv_suite_selftest.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

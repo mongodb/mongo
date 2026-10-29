@@ -17,6 +17,12 @@ function checkOplogEntry(actualOplogEntry) {
 
 // We need to disable the periodic no-op writer so we can verify that the 'appendOplogNote'
 // no-op is the latest operation on the oplog.
+//
+// Replicated fast count's background metadata checkpoint flush can append to the oplog after the
+// 'appendOplogNote' no-op, so disable the feature for this test.
+TestData.setParameters = TestData.setParameters || {};
+TestData.setParameters["failpoint.disableReplicatedFastCount"] = tojson({mode: "alwaysOn"});
+
 const st = new ShardingTest({
     mongos: 1,
     shards: 2,

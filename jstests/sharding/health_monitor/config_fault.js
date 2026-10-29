@@ -14,6 +14,10 @@ const params = {
     healthMonitoringIntensities: tojson({
         values: [{type: "test", intensity: "critical"}],
     }),
+    // On Windows builds, a crash will result in writing a minidump, which can deadlock on loader
+    // lock, see src/mongo/util/exception_filter_win32.cpp. Since we crash on purpose, disable
+    // minidumps to prevent the potential deadlock.
+    ...(_isWindows() ? {win32MinidumpEnabled: false} : {}),
 };
 const setFailPoint = {
     "failpoint.badConfigTestHealthObserver": "{'mode':'alwaysOn'}",

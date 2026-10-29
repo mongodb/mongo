@@ -9,6 +9,7 @@ selector:
     - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 
   exclude_files:
     # The following tests fail because a certain command or functionality is not supported on
@@ -191,10 +192,6 @@ selector:
     # compatible with them (they can't be sharded), but does not exclude the `requires_capped` tag.
     - jstests/core/catalog/list_catalog_stage_consistency.js
 
-    # This test assumes query settings representative queries are stored in the cluster parameter,
-    # which is not the case if featureFlagPQSBackfill is on.
-    - jstests/core/query/query_settings/query_settings_size_limits.js
-
     # These tests run resharding, which can fail due to FCV change.
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js
 
@@ -216,10 +213,6 @@ selector:
     - featureFlagTimeseriesUpdatesSupport
     # TODO: SERVER-78068 Remove Feature Flag for PM-2983
     - featureFlagRecordIdsReplicated
-    # TODO: SERVER-85426 Remove Feature Flag for SPM-3541
-    - featureFlagRankFusionBasic
-    - featureFlagRankFusionFull
-    - featureFlagSearchHybridScoringFull
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
     # Exclude tests that require a specific fcv.
@@ -228,6 +221,7 @@ selector:
     - requires_fcv_82
     - requires_fcv_83
     - requires_fcv_90
+    - requires_fcv_91
     # Exclude tests that are not compatible with upgrade/downgrade.
     - cannot_run_during_upgrade_downgrade
 
@@ -272,5 +266,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
     num_rs_nodes_per_shard: 2

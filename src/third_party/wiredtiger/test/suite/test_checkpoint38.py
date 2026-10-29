@@ -43,8 +43,7 @@ class test_checkpoint38(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(thread_values)
 
-    # Use a large cache to ensure all dirty pages remain in cache during checkpoint, even when
-    # running with the tiered hook (which adds flush_tier overhead before the checkpoint walk).
+    # Use a large cache to ensure all dirty pages remain in cache during checkpoint.
     # Without a large enough cache, eviction pressure during insertion can remove dirty leaf pages
     # from cache before the checkpoint walk, leaving nothing for the parallel workers to reconcile.
     # Set eviction_checkpoint_target=0 to disable pre-checkpoint scrubbing as well.
@@ -53,12 +52,6 @@ class test_checkpoint38(wttest.WiredTigerTestCase):
                 'eviction_dirty_target=95,eviction_dirty_trigger=99,eviction_checkpoint_target=0'
                 ',statistics=(all),statistics_log=(json,on_close,wait=1)'
                 f',checkpoint_threads={self.checkpoint_threads}')
-
-    def get_stat(self, stat_key):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat_key][2]
-        stat_cursor.close()
-        return val
 
     def test_parallel_checkpoint(self):
         uri = 'table:checkpoint38'

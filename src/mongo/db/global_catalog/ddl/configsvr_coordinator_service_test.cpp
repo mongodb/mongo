@@ -1,52 +1,34 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/topology/cluster_parameters/set_cluster_parameter_coordinator_document_gen.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_coordinator_document_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 
+#include <memory>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo {
@@ -68,7 +50,8 @@ public:
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
 
         auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
-        registry->registerService(std::make_unique<ShardingCoordinatorService>(serviceContext));
+        registry->registerService(std::make_unique<ShardingCoordinatorService>(
+            serviceContext, std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>()));
     }
 
     void tearDown() override {
@@ -157,7 +140,7 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
             opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
 
         // Ensure all instances start before we disable the failpoint.
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 5);
+        fp.waitForNNewEntries(5);
         instances = {coord1, coord2, coord3};
     }
 
@@ -170,6 +153,180 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
         opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
     ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
         opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
+}
+
+// CausalityBarrier mock so tests can assert whether the barrier is performed, without contacting
+// participants.
+class MockCausalityBarrier : public CausalityBarrier {
+public:
+    MOCK_METHOD(void, perform, (OperationContext*, const OperationSessionInfo&), (override));
+};
+
+// Test-only coordinator that injects a caller-provided CausalityBarrier and can force a number of
+// retriable failures to trigger re-executions. It reuses the SetClusterParameter state document and
+// phase enum so no test-only IDL type is needed; the parameter contents are irrelevant.
+class BarrierTestCoordinator
+    : public ConfigsvrCoordinatorImpl<SetClusterParameterCoordinatorDocument,
+                                      SetClusterParameterCoordinatorPhaseEnum> {
+public:
+    using StateDoc = SetClusterParameterCoordinatorDocument;
+    using Phase = SetClusterParameterCoordinatorPhaseEnum;
+
+    BarrierTestCoordinator(const BSONObj& stateDoc,
+                           std::unique_ptr<CausalityBarrier> barrier,
+                           int forcedRetries)
+        : ConfigsvrCoordinatorImpl(stateDoc),
+          _barrier(std::move(barrier)),
+          _remainingRetries(forcedRetries) {}
+
+    bool hasSameOptions(const BSONObj&) const override {
+        return true;
+    }
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode,
+        MongoProcessInterface::CurrentOpSessionsMode) noexcept override {
+        return boost::none;
+    }
+
+private:
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken&) noexcept override {
+        return ExecutorFuture<void>(**executor)
+            .then(_buildPhaseHandler(
+                Phase::kSetClusterParameter, [this, anchor = shared_from_this()](auto* opCtx) {
+                    // Acquire and durably persist a session, simulating a coordinator that has
+                    // issued retryable writes to participants. This is what makes a subsequent
+                    // execution's causality barrier do work.
+                    _getNewSession(opCtx);
+
+                    // Force a retriable error on the first `_remainingRetries` attempts so that the
+                    // coordinator re-executes.
+                    if (_remainingRetries-- > 0) {
+                        uasserted(ErrorCodes::HostUnreachable,
+                                  "forced retriable error to trigger re-execution");
+                    }
+                }));
+    }
+
+    const ConfigsvrCoordinatorMetadata& metadata() const override {
+        return _doc.getConfigsvrCoordinatorMetadata();
+    }
+
+    std::string_view serializePhase(const Phase& phase) const override {
+        return idl::serialize(phase);
+    }
+
+    std::unique_ptr<CausalityBarrier> _makeCausalityBarrier(
+        const std::shared_ptr<executor::ScopedTaskExecutor>&, const CancellationToken&) override {
+        invariant(_barrier, "BarrierTestCoordinator barrier already consumed");
+        return std::move(_barrier);
+    }
+
+    std::unique_ptr<CausalityBarrier> _barrier;
+    // Only mutated from the (single) coordinator executor thread across re-executions.
+    int _remainingRetries;
+};
+
+// Minimal PrimaryOnlyService that builds BarrierTestCoordinator instances, injecting the barrier
+// and forced-retry count staged on the fixture.
+class BarrierTestService : public repl::PrimaryOnlyService {
+public:
+    BarrierTestService(ServiceContext* serviceContext,
+                       std::unique_ptr<CausalityBarrier>* nextBarrier,
+                       const int* forcedRetries)
+        : PrimaryOnlyService(serviceContext),
+          _nextBarrier(nextBarrier),
+          _forcedRetries(forcedRetries) {}
+
+    std::string_view getServiceName() const override {
+        return "BarrierTestConfigsvrCoordinatorService"sv;
+    }
+
+    NamespaceString getStateDocumentsNS() const override {
+        return NamespaceString::kConfigsvrCoordinatorsNamespace;
+    }
+
+    void checkIfConflictsWithOtherInstances(
+        OperationContext*,
+        BSONObj,
+        const std::vector<const PrimaryOnlyService::Instance*>&) override {}
+
+    std::shared_ptr<Instance> constructInstance(BSONObj initialState) override {
+        return std::make_shared<BarrierTestCoordinator>(
+            std::move(initialState), std::move(*_nextBarrier), *_forcedRetries);
+    }
+
+    std::shared_ptr<ConfigsvrCoordinator> getOrCreate(OperationContext* opCtx, BSONObj coorDoc) {
+        auto [instance, _] = PrimaryOnlyService::getOrCreateInstance(opCtx, std::move(coorDoc));
+        return checked_pointer_cast<ConfigsvrCoordinator>(std::move(instance));
+    }
+
+private:
+    std::unique_ptr<CausalityBarrier>* _nextBarrier;
+    const int* _forcedRetries;
+};
+
+class ConfigsvrCoordinatorBarrierTest : public repl::PrimaryOnlyServiceMongoDTest {
+public:
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
+        return std::make_unique<BarrierTestService>(serviceContext, &_nextBarrier, &_forcedRetries);
+    }
+
+    void setUp() override {
+        repl::PrimaryOnlyServiceMongoDTest::setUp();
+
+        auto serviceContext = getServiceContext();
+        repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceMock>());
+    }
+
+    void tearDown() override {
+        _service->shutdown();
+        repl::PrimaryOnlyServiceMongoDTest::tearDown();
+    }
+
+protected:
+    // Runs a coordinator through its real run() loop to completion, injecting `barrier` and forcing
+    // `forcedRetries` retriable failures so that the coordinator re-executes that many times.
+    void runCoordinatorToCompletion(std::unique_ptr<CausalityBarrier> barrier, int forcedRetries) {
+        _nextBarrier = std::move(barrier);
+        _forcedRetries = forcedRetries;
+
+        auto opCtx = cc().makeOperationContext();
+        auto* service = checked_cast<BarrierTestService*>(_service);
+
+        SetClusterParameterCoordinatorDocument doc;
+        ConfigsvrCoordinatorId cid(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
+        cid.setSubId("barrier-test"sv);
+        doc.setConfigsvrCoordinatorMetadata({cid});
+        doc.setParameter(BSON("a" << 1));
+        doc.setCompatibleWithTopologyChange(true);
+
+        auto instance = service->getOrCreate(opCtx.get(), doc.toBSON());
+        instance->getCompletionFuture().get();
+    }
+
+    // Staged for the next coordinator that the service constructs.
+    std::unique_ptr<CausalityBarrier> _nextBarrier;
+    int _forcedRetries = 0;
+};
+
+TEST_F(ConfigsvrCoordinatorBarrierTest, NoBarrierOnFirstRun) {
+    // A coordinator that completes on its first execution never persisted a session before the
+    // barrier ran, so the barrier is never performed.
+    auto barrier = std::make_unique<MockCausalityBarrier>();
+    EXPECT_CALL(*barrier, perform(::testing::_, ::testing::_)).Times(0);
+
+    runCoordinatorToCompletion(std::move(barrier), /*forcedRetries=*/0);
+}
+
+TEST_F(ConfigsvrCoordinatorBarrierTest, BarrierOnReExecution) {
+    // The first execution persists a session and then fails, forcing a re-execution. The
+    // re-execution performs the causality barrier exactly once before doing any work.
+    auto barrier = std::make_unique<MockCausalityBarrier>();
+    EXPECT_CALL(*barrier, perform(::testing::_, ::testing::_)).Times(1);
+
+    runCoordinatorToCompletion(std::move(barrier), /*forcedRetries=*/1);
 }
 
 }  // namespace

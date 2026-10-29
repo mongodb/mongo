@@ -18,7 +18,6 @@
 // ]
 import {isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     aggPlanHasStage,
     getAggPlanStage,
@@ -30,12 +29,12 @@ import {
 import {
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
+    checkSbeTransformStagesEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
-const sbeNonLeadingMatchEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
-const sbeTransformStagesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
+const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(db);
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -309,7 +308,9 @@ assertPipelineIfSbeEnabled(
             expectedResult: [{count: 2}],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    // $count is desugared into $group and $project. The SBE transform stages flag is required
+    // to push the $project to SBE.
+    sbeRestricted && sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 
 assertPipelineIfSbeEnabled(
@@ -706,7 +707,6 @@ assertPipelineIfSbeEnabled(
     true /* hasEligibleRestrictedStage */,
 );
 
-// Similar as above, but with $addFields stage at the front of the pipeline.
 pipeline = [{$addFields: {z: "abc"}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
 assertPipelineIfSbeEnabled(
     function () {
@@ -721,7 +721,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted && sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -784,8 +784,9 @@ assertProjectionCanBeRemovedBeforeGroup([
 // fails to include a dependency of the $group and so will have an impact on the query results.
 assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$a", s: {$sum: "$b"}}}]);
 
-// TODO SERVER-67323 This one could be removed, but is left for future work.
-assertProjectionIsNotRemoved([
+// {a:1,b:1} retains a.b and b.c exactly, so the projection is
+// safely optimized away.
+assertProjectionCanBeRemovedBeforeGroup([
     {$project: {a: 1, b: 1}},
     {$group: {_id: "$a.b", s: {$sum: "$b.c"}}},
 ]);
@@ -793,15 +794,9 @@ assertProjectionIsNotRemoved([
 // Test that an inclusion projection is NOT optimized away if group depends on the entire document.
 assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$$ROOT"}}]);
 
-// If the $group depends on both "path" and "path.subpath" then it will generate a $project on only
-// "path" to express its dependency set. We then fail to optimize that out. As a future improvement,
-// we could improve the optimizer to ensure that a projection stage is not present in the resulting
-// plan.
-pipeline = [{$group: {_id: "$a.b", s: {$first: "$a"}}}];
-// TODO SERVER-XYZ Assert this can be optimized out.
-// assertProjectionCanBeRemovedBeforeGroup(pipeline, "PROJECTION_DEFAULT");
-// assertProjectionCanBeRemovedBeforeGroup(pipeline, "PROJECTION_SIMPLE");
-assertProjectionIsNotRemoved(pipeline);
+// Dependency analysis generates a {a:1} projection but it is optimized away since all group deps
+// (a.b, a) are retained by {a:1}.
+assertProjectionCanBeRemovedBeforeGroup([{$group: {_id: "$a.b", s: {$first: "$a"}}}]);
 
 assertProjectionCanBeRemovedBeforeGroup(
     [{$project: {"a.b": 1, "b.c": 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}],
@@ -823,6 +818,27 @@ assertProjectionIsNotRemoved(
 );
 assertProjectionIsNotRemoved(
     [{$project: {"a.b": 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}],
+    "PROJECTION_DEFAULT",
+);
+
+// SERVER-129990: Mixed projection (computed + passthrough) before a group that only reads the
+// passthrough field. isFieldRetainedExactly returns true for 'b', so the projection is eliminated.
+assertProjectionCanBeRemovedBeforeGroup(
+    [{$project: {k0: {$add: ["$a", "$b"]}, b: 1}}, {$group: {_id: "$b"}}],
+    "PROJECTION_DEFAULT",
+);
+
+// SERVER-129990: Mixed projection where the group reads the computed field 'k0'. The projection
+// cannot be eliminated because removing it would leave '$k0' undefined.
+assertProjectionIsNotRemoved(
+    [{$project: {k0: {$add: ["$a", "$b"]}, b: 1}}, {$group: {_id: "$k0"}}],
+    "PROJECTION_DEFAULT",
+);
+
+// SERVER-129990: Projection that renames a field ('x' → 'k1') used by the group. 'k1' only
+// exists because of the projection; eliminating it would make '$k1' undefined in the group.
+assertProjectionIsNotRemoved(
+    [{$project: {k1: "$x"}}, {$group: {_id: "$k1"}}],
     "PROJECTION_DEFAULT",
 );
 
@@ -850,14 +866,16 @@ assertPipelineIfSbeEnabled(
     true /* hasEligibleRestrictedStage */,
 );
 
-// We generate a projection stage from dependency analysis, even if the pipeline begins with an
-// exclusion projection.
+// The query starts with a PROJECTION_DEFAULT and dependency analysis add a PROJECTION_SIMPLE below it because the pipeline begins with an
+// exclusion projection. But GROUP reads only 'a' and 'b',
+// both of which are retained exactly by the PROJECTION_SIMPLE({a,b,!_id}), so the intermediate
+// PROJECTION_DEFAULT is redundant.
 pipeline = [{$project: {c: 0}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
 assertPipelineIfSbeEnabled(
     function () {
         assertPipelineDoesNotUseAggregation({
             pipeline: pipeline,
-            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "PROJECTION_DEFAULT", "GROUP"],
+            expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "GROUP"],
         });
     },
     function () {
@@ -866,7 +884,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted && sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -889,7 +907,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    sbeRestricted && sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");

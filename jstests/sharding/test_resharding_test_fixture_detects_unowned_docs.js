@@ -46,8 +46,12 @@ const reshardingOptions = {
         {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
     ],
 };
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-if (!isMultiversion) {
+// 'performVerification' was introduced in 8.1 and 'reshardCollection' is a strict command, so a
+// mongos older than that rejects the field. Those suites run with an FCV where
+// featureFlagReshardingVerification is disabled, so verification does not run there anyway.
+const performVerificationSupported =
+    MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "8.1") >= 0;
+if (performVerificationSupported) {
     // This test explicitly inserts a document into the resharding temporary collection so
     // resharding verification is expected to fail.
     reshardingOptions.performVerification = false;

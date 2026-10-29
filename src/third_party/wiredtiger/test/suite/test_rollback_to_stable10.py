@@ -275,9 +275,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Wait for checkpoint to start before committing.
             ckpt_started = 0
             while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
                 time.sleep(1)
 
             # Perform several updates in parallel with checkpoint.
@@ -305,10 +303,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
 
         # Check that the history store file has been used and has non-zero size before the simulated
         # crash.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        cache_hs_ondisk = stat_cursor[stat.conn.cache_hs_ondisk][2]
-        stat_cursor.close()
-        self.assertGreater(cache_hs_ondisk, 0)
+        self.assertStatGreaterSoon(stat.conn.cache_hs_ondisk, 0)
 
         # Simulate a crash by copying to a new directory(RESTART).
         copy_wiredtiger_home(self, ".", "RESTART")
@@ -326,10 +321,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.pr("restart complete")
 
         # The history store file size should be greater than zero after the restart.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        cache_hs_ondisk = stat_cursor[stat.conn.cache_hs_ondisk][2]
-        stat_cursor.close()
-        self.assertGreater(cache_hs_ondisk, 0)
+        self.assertStatGreaterSoon(stat.conn.cache_hs_ondisk, 0)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri_1, nrows, 50)

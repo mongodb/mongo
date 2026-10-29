@@ -1,9 +1,9 @@
 /**
- * Tests the serverStatus metrics for AutomaticCE plan selection under the
- * CBRCostBasedRankerChoice strategy.
+ * Tests the serverStatus metrics for plan selection under the mixed plan ranker and the
+ * EstimateRankingEffort strategy.
  *
- * Verifies all query.cbr.* and query.multiPlanner.* metrics under automaticCE mode with the
- * CBRCostBasedRankerChoice strategy. This strategy always
+ * Verifies all query.cbr.* and query.multiPlanner.* metrics under mixed plan ranking mode with the
+ * EstimateRankingEffort strategy. This strategy always
  * runs a brief multiplanner estimation trial, then uses a cost model to decide between MP and CBR:
  *
  *   MP wins  – estimation trial exits early (EOF/full batch) or CBR offers no clear improvement.
@@ -34,14 +34,15 @@ const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);
 coll.drop();
 
-// Make sure CBR is enabled in automaticCE mode with the CBRCostBasedRankerChoice strategy.
+// Make sure CBR is enabled in mixed plan ranking mode with the EstimateRankingEffort strategy.
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
         featureFlagCostBasedRanker: true,
-        internalQueryCBRCEMode: "automaticCE",
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
         internalQuerySamplingBySequentialScan: true,
-        automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+        internalQueryMixedPlanRankingStrategy: "EstimateRankingEffort",
     }),
 );
 

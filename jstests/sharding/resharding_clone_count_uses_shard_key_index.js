@@ -8,6 +8,7 @@
  * @tags: [
  *   uses_atclustertime,
  *   featureFlagReshardingVerification,
+ *   requires_fcv_90,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

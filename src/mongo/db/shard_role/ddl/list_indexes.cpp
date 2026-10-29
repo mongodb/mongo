@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/shard_role/shard_catalog/list_indexes.h"
@@ -60,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_indexes_allowed_fields.h"
 #include "mongo/db/shard_role/ddl/list_indexes_gen.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -125,11 +100,13 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
             .getDatabaseProfileLevel(origNssOrUUID.dbName())};
 
     // TODO SERVER-104759: switch to normal acquireCollection once 9.0 becomes last LTS
-    auto [collAcq, _] = timeseries::acquireCollectionWithBucketsLookup(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, origNssOrUUID, AcquisitionPrerequisites::OperationType::kRead),
-        LockMode::MODE_IS);
+    auto [collAcq, _] = writeConflictRetry(opCtx, "listIndexes", origNssOrUUID, [&]() {
+        return timeseries::acquireCollectionWithBucketsLookup(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, origNssOrUUID, AcquisitionPrerequisites::OperationType::kRead),
+            LockMode::MODE_IS);
+    });
 
     uassert(ErrorCodes::NamespaceNotFound,
             fmt::format("ns does not exist: {}", origNssOrUUID.toStringForErrorMsg()),
@@ -279,7 +256,7 @@ public:
                 if (nssOrUuid.isNamespaceString()) {
                     return nssOrUuid.nss();
                 }
-                return shard_role_nocheck::resolveNssWithoutAcquisition(
+                return shard_role_nocheck::resolveNssWithoutAcquisitionAtLatest(
                     opCtx, nssOrUuid.dbName(), nssOrUuid.uuid());
             }();
 
@@ -397,7 +374,7 @@ public:
 
             if (exec->isEOF()) {
                 return ListIndexesReplyCursor(
-                    0 /* cursorId */,
+                    /*id=*/0,
                     nss,
                     std::move(firstBatch),
                     SerializationContext::stateCommandReply(serializationContext));

@@ -6,6 +6,7 @@
 import {
     deleteExtensionConfigs,
     generateExtensionConfigs,
+    getExtensionConfDir,
     isPlatformCompatibleWithExtensions,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
@@ -26,6 +27,7 @@ try {
                 // Use a real extension name to ensure that the feature flag is causing the failure,
                 // not a missing extension.
                 loadExtensions: extensions[0],
+                extensionsConfigPath: getExtensionConfDir(),
             });
             // If we've reached this point, startup did not fail as expected.
             MongoRunner.stopMongod(conn);

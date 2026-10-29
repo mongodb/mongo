@@ -1,13 +1,18 @@
 /**
  * Regression test for AF-16798 and other occurrences of the same bug.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-117707: Remove this check once CBR is enabled for SBE
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -42,6 +47,7 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "samplingCE",
                 // Force sequential scan so the sample is the first 384 docs (a=0..383), making
                 // the matchCount for {a: {$gte: 341}} deterministically 43.
@@ -124,6 +130,7 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "heuristicCE",
             }),
         );
@@ -183,6 +190,7 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: "samplingCE",
                 internalQuerySamplingBySequentialScan: true,
             }),

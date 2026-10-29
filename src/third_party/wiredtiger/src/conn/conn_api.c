@@ -148,7 +148,7 @@ err:
         __wt_free(session, ncoll);
     }
 
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -249,7 +249,7 @@ err:
         __wt_free(session, ncomp);
     }
 
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -314,7 +314,7 @@ err:
         __wt_free(session, ndsrc);
     }
 
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -495,7 +495,7 @@ err:
         __wt_free(session, nenc);
     }
 
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -570,7 +570,7 @@ err:
         __wt_free(session, npl);
     }
 
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -655,124 +655,6 @@ __wti_conn_remove_key_provider(WT_SESSION_IMPL *session)
 }
 
 /*
- * __conn_add_storage_source --
- *     WT_CONNECTION->add_storage_source method.
- */
-static int
-__conn_add_storage_source(
-  WT_CONNECTION *wt_conn, const char *name, WT_STORAGE_SOURCE *storage_source, const char *config)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_NAMED_STORAGE_SOURCE *nstorage;
-    WT_SESSION_IMPL *session;
-    uint64_t i;
-
-    nstorage = NULL;
-
-    conn = (WT_CONNECTION_IMPL *)wt_conn;
-    CONNECTION_API_CALL(conn, session, add_storage_source, config, cfg);
-    WT_UNUSED(cfg);
-
-    WT_ERR(__wt_calloc_one(session, &nstorage));
-    WT_ERR(__wt_strdup(session, name, &nstorage->name));
-    nstorage->storage_source = storage_source;
-    TAILQ_INIT(&nstorage->bucketqh);
-    WT_ERR(__wt_calloc_def(session, conn->hash_size, &nstorage->buckethashqh));
-    for (i = 0; i < conn->hash_size; i++)
-        TAILQ_INIT(&nstorage->buckethashqh[i]);
-
-    __wt_spin_lock(session, &conn->api_lock);
-    TAILQ_INSERT_TAIL(&conn->ext.storagesrcqh, nstorage, q);
-    nstorage = NULL;
-    __wt_spin_unlock(session, &conn->api_lock);
-
-err:
-    if (nstorage != NULL) {
-        __wt_free(session, nstorage->name);
-        __wt_free(session, nstorage);
-    }
-
-    API_END_RET_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __conn_get_storage_source --
- *     WT_CONNECTION->get_storage_source method.
- */
-static int
-__conn_get_storage_source(
-  WT_CONNECTION *wt_conn, const char *name, WT_STORAGE_SOURCE **storage_sourcep)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_NAMED_STORAGE_SOURCE *nstorage_source;
-    WT_STORAGE_SOURCE *storage_source;
-
-    conn = (WT_CONNECTION_IMPL *)wt_conn;
-    *storage_sourcep = NULL;
-
-    ret = EINVAL;
-    TAILQ_FOREACH (nstorage_source, &conn->ext.storagesrcqh, q)
-        if (WT_STREQ(nstorage_source->name, name)) {
-            storage_source = nstorage_source->storage_source;
-            WT_RET(storage_source->ss_add_reference(storage_source));
-            *storage_sourcep = storage_source;
-            ret = 0;
-            break;
-        }
-    if (ret != 0)
-        WT_RET_MSG(conn->default_session, ret, "unknown storage_source '%s'", name);
-
-    return (ret);
-}
-
-/*
- * __wti_conn_remove_storage_source --
- *     Remove storage_source added by WT_CONNECTION->add_storage_source, only used internally.
- */
-int
-__wti_conn_remove_storage_source(WT_SESSION_IMPL *session)
-{
-    WT_BUCKET_STORAGE *bstorage;
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    WT_NAMED_STORAGE_SOURCE *nstorage;
-    WT_STORAGE_SOURCE *storage;
-
-    conn = S2C(session);
-
-    while ((nstorage = TAILQ_FIRST(&conn->ext.storagesrcqh)) != NULL) {
-        /* Remove from the connection's list, free memory. */
-        TAILQ_REMOVE(&conn->ext.storagesrcqh, nstorage, q);
-        while ((bstorage = TAILQ_FIRST(&nstorage->bucketqh)) != NULL) {
-            /* Remove from the connection's list, free memory. */
-            TAILQ_REMOVE(&nstorage->bucketqh, bstorage, q);
-            __wt_free(session, bstorage->auth_token);
-            __wt_free(session, bstorage->bucket);
-            __wt_free(session, bstorage->bucket_prefix);
-            __wt_free(session, bstorage->cache_directory);
-            if (bstorage->file_system != NULL && bstorage->file_system->terminate != NULL)
-                WT_TRET(
-                  bstorage->file_system->terminate(bstorage->file_system, (WT_SESSION *)session));
-            __wt_free(session, bstorage);
-        }
-
-        /* Call any termination method. */
-        storage = nstorage->storage_source;
-        WT_ASSERT(session, storage != NULL);
-        if (storage->terminate != NULL)
-            WT_TRET(storage->terminate(storage, (WT_SESSION *)session));
-
-        __wt_free(session, nstorage->buckethashqh);
-        __wt_free(session, nstorage->name);
-        __wt_free(session, nstorage);
-    }
-
-    return (ret);
-}
-
-/*
  * __wti_conn_backup_init --
  *     Initialize the WT_CONN_BACKUP structure.
  */
@@ -803,14 +685,12 @@ __wti_conn_ext_init(WT_SESSION_IMPL *session)
     WT_CONNECTION_IMPL *conn;
 
     conn = S2C(session);
-    TAILQ_INIT(&conn->ext.collqh);       /* Collator list */
-    TAILQ_INIT(&conn->ext.compqh);       /* Compressor list */
-    TAILQ_INIT(&conn->ext.encryptqh);    /* Encryptor list */
-    TAILQ_INIT(&conn->ext.pagelogqh);    /* Page log list */
-    TAILQ_INIT(&conn->ext.storagesrcqh); /* Storage source list */
+    TAILQ_INIT(&conn->ext.collqh);    /* Collator list */
+    TAILQ_INIT(&conn->ext.compqh);    /* Compressor list */
+    TAILQ_INIT(&conn->ext.encryptqh); /* Encryptor list */
+    TAILQ_INIT(&conn->ext.pagelogqh); /* Page log list */
     WT_RET(__wt_spin_init(session, &conn->ext.encryptor_lock, "encryptor"));
     WT_RET(__wt_spin_init(session, &conn->ext.page_log_lock, "page log"));
-    WT_RET(__wt_spin_init(session, &conn->ext.storage_lock, "tiered storage"));
     return (0);
 }
 
@@ -826,7 +706,6 @@ __wti_conn_ext_destroy(WT_SESSION_IMPL *session)
     conn = S2C(session);
     __wt_spin_destroy(session, &conn->ext.encryptor_lock);
     __wt_spin_destroy(session, &conn->ext.page_log_lock);
-    __wt_spin_destroy(session, &conn->ext.storage_lock);
 }
 
 /*
@@ -1062,7 +941,7 @@ __conn_load_extension(WT_CONNECTION *wt_conn, const char *path, const char *conf
     ret = __conn_load_extension_int(session, path, cfg, false);
 
 err:
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1185,7 +1064,7 @@ __conn_configure_method(WT_CONNECTION *wt_conn, const char *method, const char *
     ret = __wt_configure_method(session, method, uri, config, type, check);
 
 err:
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1264,7 +1143,7 @@ __conn_compile_configuration(
 
     ret = __wt_conf_compile(session, method, str, compiled);
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -1305,6 +1184,14 @@ err:
      */
     WT_TRET(__wt_session_array_walk(
       conn->default_session, __conn_rollback_transaction_callback, true, NULL));
+
+    /*
+     * Stop the deferred checkpoint pickup server before transactional activity shuts down: an
+     * adoption runs metadata transactions, so any in-flight adoption must complete while snapshot
+     * visibility checks still operate. Stop it before the session-closing walk below as well: it
+     * opens a session per adoption, which must not race a walk that closes sessions.
+     */
+    WT_TRET(__wti_disagg_deferred_pickup_server_destroy(session));
 
     __wt_verbose_info(session, WT_VERB_RECOVERY_PROGRESS, "%s", "closing all running sessions.");
     /* Close open, external sessions. */
@@ -1374,13 +1261,6 @@ err:
           conn->default_session->event_handler, wt_conn, NULL, WT_EVENT_CONN_CLOSE, NULL));
     F_CLR_ATOMIC_32(conn, WT_CONN_MINIMAL);
 
-    /*
-     * See if close should wait for tiered storage to finish any flushing after the final
-     * checkpoint.
-     */
-    WT_TRET(__wt_config_gets(session, cfg, "final_flush", &cval));
-    WT_TRET(__wti_tiered_storage_destroy(session, cval.val));
-
     if (ret != 0) {
         __wt_err(session, ret, "failure during close, disabling further writes");
         F_SET_ATOMIC_32(conn, WT_CONN_PANIC);
@@ -1409,7 +1289,7 @@ err:
     /* We no longer have a session, don't try to update it. */
     session = NULL;
 
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1436,6 +1316,10 @@ __conn_debug_info(WT_CONNECTION *wt_conn, const char *config)
     if (cval.val != 0)
         WT_ERR(__wt_verbose_dump_cache(session));
 
+    WT_ERR(__wt_config_gets(session, cfg, "cache_top", &cval));
+    if (cval.val != 0)
+        WT_ERR(__wt_cache_top_report(session));
+
     WT_ERR(__wt_config_gets(session, cfg, "cursors", &cval));
     if (cval.val != 0)
         WT_ERR(__wt_verbose_dump_sessions(session, true));
@@ -1460,7 +1344,7 @@ __conn_debug_info(WT_CONNECTION *wt_conn, const char *config)
     if (cval.val != 0)
         WT_ERR(__wt_verbose_dump_txn(session));
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -1479,7 +1363,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
     CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
     ret = __wti_conn_reconfig(session, cfg);
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -1511,7 +1395,7 @@ err:
     if (session_ret != NULL)
         WT_TRET(__wt_call_log_open_session(session_ret, ret));
 #endif
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    CONNECTION_API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1533,7 +1417,7 @@ err:
 #ifdef HAVE_CALL_LOG
     WT_TRET(__wt_call_log_query_timestamp(session, config, hex_timestamp, ret, true));
 #endif
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -1555,7 +1439,7 @@ err:
 #ifdef HAVE_CALL_LOG
     WT_TRET(__wt_call_log_set_timestamp(session, config, ret));
 #endif
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -1586,7 +1470,7 @@ __conn_rollback_to_stable(WT_CONNECTION *wt_conn, const char *config)
     WT_STAT_CONN_INCR(session, txn_rts);
     ret = conn->rts->rollback_to_stable(session, cfg, false);
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -1677,6 +1561,7 @@ __conn_cleanup_chunk_cache(WT_SESSION_IMPL *session)
 
     WT_WITH_SCHEMA_LOCK(
       session, ret = __wt_schema_drop(session, WT_CC_METAFILE_URI, drop_cfg, false));
+    __wt_drop_pending_apply(session);
 
     return (ret);
 }
@@ -1698,11 +1583,21 @@ __conn_startup_cleanup_and_verify(WT_CONNECTION_IMPL *conn, bool verify_meta)
         /* Database verification must happen as the first step before any potential changes. */
         WT_ERR(__wt_verify_disagg_database_size(session));
 
+        if (__wt_conn_is_disagg(session)) {
+            WT_SESSION *wt_session = &session->iface;
+            WT_ERR(wt_session->verify(wt_session, WT_DISAGG_METADATA_URI, NULL));
+        }
+
         /*
          * If the user wants to verify WiredTiger metadata, verify the history store now that the
          * metadata table may have been salvaged and eviction has been started and recovery run.
+         *
+         * Hold the checkpoint lock, as WT_SESSION::verify does: a disaggregated follower judges a
+         * record against the oldest timestamp of the checkpoint it picked up, and that only
+         * describes the data store being walked while no other checkpoint can be picked up.
          */
-        WT_ERR(__wt_hs_verify(session));
+        WT_WITH_CHECKPOINT_LOCK(session, ret = __wt_hs_verify(session));
+        WT_ERR(ret);
     }
 
     /* The chunk cache metadata table may exist on upgrade. Discard it. */
@@ -2471,11 +2366,25 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
 
+    /* Internal testing only: lets the test suite bypass the disaggregated commit-ts rule. */
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.disagg_commit_ts_optional", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_DISAGG_COMMIT_TS_OPTIONAL);
+    else
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_DISAGG_COMMIT_TS_OPTIONAL);
+
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.disagg_slow_truncate_follower", &cval));
     if (cval.val)
         FLD_SET(conn->debug.flags, WT_CONN_DEBUG_DISAGG_SLOW_TRUNCATE_FOLLOWER);
     else
         FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_DISAGG_SLOW_TRUNCATE_FOLLOWER);
+
+    /* Internal testing only: lets the test suite bypass the step-down/prepare bans. */
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.disagg_stepdown_prepare", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_DISAGG_STEPDOWN_PREPARE);
+    else
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_DISAGG_STEPDOWN_PREPARE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction", &cval));
     if (cval.val)
@@ -2522,11 +2431,11 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING);
 
-    WT_RET(__wt_config_gets(session, cfg, "debug_mode.tiered_flush_error_continue", &cval));
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.timing_stress_force", &cval));
     if (cval.val)
-        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_TIMING_STRESS_FORCE);
     else
-        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TIMING_STRESS_FORCE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.update_restore_evict", &cval));
     if (cval.val)
@@ -2616,7 +2525,8 @@ __wt_get_verbose_categories(const WT_NAME_FLAG **catp, size_t *countp)
 {
     static const WT_NAME_FLAG verbtypes[] = {{"all", WT_VERB_ALL}, {"api", WT_VERB_API},
       {"backup", WT_VERB_BACKUP}, {"block", WT_VERB_BLOCK}, {"block_cache", WT_VERB_BLKCACHE},
-      {"checkpoint", WT_VERB_CHECKPOINT}, {"checkpoint_cleanup", WT_VERB_CHECKPOINT_CLEANUP},
+      {"cache_top", WT_VERB_CACHE_TOP}, {"checkpoint", WT_VERB_CHECKPOINT},
+      {"checkpoint_cleanup", WT_VERB_CHECKPOINT_CLEANUP},
       {"checkpoint_progress", WT_VERB_CHECKPOINT_PROGRESS}, {"compact", WT_VERB_COMPACT},
       {"compact_progress", WT_VERB_COMPACT_PROGRESS}, {"configuration", WT_VERB_CONFIGURATION},
       {"cross_checkpoint_cache", WT_VERB_CROSS_CHECKPOINT_CACHE},
@@ -2631,11 +2541,12 @@ __wt_get_verbose_categories(const WT_NAME_FLAG **catp, size_t *countp)
       {"out_of_order", WT_VERB_OUT_OF_ORDER}, {"overflow", WT_VERB_OVERFLOW},
       {"page_delta", WT_VERB_PAGE_DELTA}, {"read", WT_VERB_READ}, {"reconcile", WT_VERB_RECONCILE},
       {"recovery", WT_VERB_RECOVERY}, {"recovery_progress", WT_VERB_RECOVERY_PROGRESS},
-      {"rts", WT_VERB_RTS}, {"salvage", WT_VERB_SALVAGE}, {"shared_cache", WT_VERB_SHARED_CACHE},
-      {"split", WT_VERB_SPLIT}, {"sweep", WT_VERB_SWEEP}, {"temporary", WT_VERB_TEMPORARY},
-      {"thread_group", WT_VERB_THREAD_GROUP}, {"timestamp", WT_VERB_TIMESTAMP},
-      {"tiered", WT_VERB_TIERED}, {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
-      {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE}, {NULL, 0}};
+      {"rts", WT_VERB_RTS}, {"salvage", WT_VERB_SALVAGE}, {"schema_epoch", WT_VERB_SCHEMA_EPOCH},
+      {"shared_cache", WT_VERB_SHARED_CACHE}, {"split", WT_VERB_SPLIT}, {"sweep", WT_VERB_SWEEP},
+      {"temporary", WT_VERB_TEMPORARY}, {"thread_group", WT_VERB_THREAD_GROUP},
+      {"timestamp", WT_VERB_TIMESTAMP}, {"transaction", WT_VERB_TRANSACTION},
+      {"verify", WT_VERB_VERIFY}, {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE},
+      {NULL, 0}};
 
     WT_ASSERT(NULL, catp != NULL);
     *catp = verbtypes;
@@ -2831,6 +2742,9 @@ __wti_disagg_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_CONN_DEBUG_DISAGG_ADDRESS_COOKIE_UPGRADE address_cookie_upgrade;
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE block_header_upgrade;
+#endif
 
     conn = S2C(session);
 
@@ -2851,6 +2765,31 @@ __wti_disagg_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(
       __wt_config_gets(session, cfg, "debug_mode.disagg_address_cookie_optional_field", &cval));
     conn->debug.disagg_address_cookie_optional_field = cval.val != 0;
+
+    /* Parse the block header upgrade mode, which is an enumeration. */
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.disagg_block_header_upgrade", &cval));
+#ifdef HAVE_DIAGNOSTIC
+    if (cval.len == 0 || WT_CONFIG_LIT_MATCH("none", cval))
+        block_header_upgrade = WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_NONE;
+    else if (WT_CONFIG_LIT_MATCH("compatible", cval))
+        block_header_upgrade = WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_COMPATIBLE;
+    else if (WT_CONFIG_LIT_MATCH("incompatible", cval))
+        block_header_upgrade = WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_INCOMPATIBLE;
+    else if (WT_CONFIG_LIT_MATCH("v1_oversized", cval))
+        block_header_upgrade = WT_CONN_DEBUG_DISAGG_BLOCK_HEADER_UPGRADE_V1_OVERSIZED;
+    else
+        WT_RET_MSG(session, EINVAL, "Invalid value for debug.disagg_block_header_upgrade: '%.*s'",
+          (int)cval.len, cval.str);
+    conn->debug.disagg_block_header_upgrade = block_header_upgrade;
+#else
+    if (cval.len != 0 && !WT_CONFIG_LIT_MATCH("none", cval))
+        WT_RET_MSG(session, ENOTSUP,
+          "debug.disagg_block_header_upgrade=%.*s requires a diagnostic build", (int)cval.len,
+          cval.str);
+#endif
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.disagg_block_header_v1_ignore_size", &cval));
+    conn->debug.disagg_block_header_v1_ignore_size = cval.val != 0;
 
     return (0);
 }
@@ -2933,6 +2872,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
       "compatibility=(release=),"
       "config_base=,"
       "create=,"
+      "disaggregated=(stepdown_write_mirroring=),"
       "encryption=(secretkey=),"
       "error_prefix=,"
       "exclusive=,"
@@ -3004,7 +2944,7 @@ __conn_set_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER *key_provider, c
     conn->key_provider = key_provider;
 
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -3051,7 +2991,7 @@ __conn_set_file_system(WT_CONNECTION *wt_conn, WT_FILE_SYSTEM *file_system, cons
     conn->file_system = file_system;
 
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -3290,7 +3230,7 @@ __conn_set_context_uint(WT_CONNECTION *wt_conn, WT_CONTEXT_TYPE which, uint64_t 
     }
 
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -3307,12 +3247,12 @@ __conn_dump_error_log(WT_CONNECTION *wt_conn)
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
 
-    CONNECTION_API_CALL_NOCONF_NOERRCLEAR(conn, session, dump_error_log);
+    CONNECTION_API_CALL_NOCONF(conn, session, dump_error_log);
 
     __wt_error_log_to_handler(session);
 
 err:
-    API_END_RET(session, ret);
+    CONNECTION_API_END_RET(session, ret);
 }
 
 /*
@@ -3327,10 +3267,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
       __conn_get_home, __conn_compile_configuration, __conn_configure_method, __conn_is_new,
       __conn_open_session, __conn_query_timestamp, __conn_set_timestamp, __conn_rollback_to_stable,
       __conn_load_extension, __conn_add_data_source, __conn_add_collator, __conn_add_compressor,
-      __conn_add_encryptor, __conn_set_file_system, __conn_add_page_log, __conn_add_storage_source,
-      __conn_get_page_log, __conn_get_storage_source, __conn_set_context_uint,
-      __conn_dump_error_log, __conn_set_key_provider, __conn_get_key_provider,
-      __conn_get_extension_api};
+      __conn_add_encryptor, __conn_set_file_system, __conn_add_page_log, __conn_get_page_log,
+      __conn_set_context_uint, __conn_dump_error_log, __conn_set_key_provider,
+      __conn_get_key_provider, __conn_get_extension_api};
     static const WT_NAME_FLAG file_types[] = {
       {"data", WT_FILE_TYPE_DATA}, {"log", WT_FILE_TYPE_LOG}, {NULL, 0}};
 
@@ -3709,17 +3648,20 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wti_heuristic_controls_config(session, cfg));
 
     /*
+     * On upgrade, WiredTiger.basecfg can still list the dir_store extension. Loading it would crash
+     * the library. The leftover extension and leftover tiered_storage configuration are dependent,
+     * so looking for the tiered storage config catches that case before the load.
+     */
+    WT_ERR(__wt_config_gets_none(session, cfg, "tiered_storage.name", &cval));
+    if (cval.len != 0)
+        WT_ERR_MSG(session, ENOTSUP, "tiered storage is not supported");
+
+    /*
      * Load the extensions after initialization completes; extensions expect everything else to be
      * in place, and the extensions call back into the library.
      */
     WT_ERR(__conn_builtin_extensions(conn, cfg));
     WT_ERR(__conn_load_extensions(session, cfg, false));
-
-    /*
-     * Do some early initialization for tiered storage, as this may affect our choice of file system
-     * for some operations.
-     */
-    WT_ERR(__wt_tiered_conn_config(session, cfg, false));
 
     /*
      * The metadata/log encryptor is configured after extensions, since extensions may load
@@ -3770,8 +3712,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     if (verify_meta) {
         __wt_verbose_info(session, WT_VERB_RECOVERY, "%s", "performing metadata verify");
         wt_session = &session->iface;
-        ret = wt_session->verify(wt_session, WT_METAFILE_URI, NULL);
-        WT_ERR(ret);
+        WT_ERR(wt_session->verify(wt_session, WT_METAFILE_URI, NULL));
     }
 
     /*

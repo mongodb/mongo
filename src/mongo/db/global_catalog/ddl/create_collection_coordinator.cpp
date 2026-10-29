@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/create_collection_coordinator.h"
@@ -150,6 +124,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCommitOnShardingCatalog);
+MONGO_FAIL_POINT_DEFINE(hangAfterCommitOnGlobalCatalog);
+MONGO_FAIL_POINT_DEFINE(createCollectionHangBeforeExitCriticalSection);
 
 namespace mongo {
 
@@ -162,8 +138,8 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
     size_t numShards,
     bool collectionIsEmpty,
     bool isUnsplittable,
-    boost::optional<ShardRef> dataShard,
-    boost::optional<std::vector<ShardRef>> availableShardRefs) {
+    boost::optional<ShardId> dataShard,
+    boost::optional<std::vector<ShardId>> availableShardIds) {
 
     if (isUnsplittable) {
         // Unsharded collections
@@ -197,7 +173,7 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
                                                                 shardKeyPattern,
                                                                 std::move(tags),
                                                                 collectionIsEmpty,
-                                                                std::move(availableShardRefs));
+                                                                std::move(availableShardIds));
     }
 
     //  If the collection is empty, some optimizations for the chunk distribution may be available.
@@ -205,12 +181,12 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
         if (tags.empty() && shardKeyPattern.hasHashedPrefix()) {
             // Evenly distribute chunks across shards (in combination with hashed shard keys, this
             // should increase the probability of establishing an already balanced collection).
-            return std::make_unique<SplitPointsBasedSplitPolicy>(std::move(availableShardRefs));
+            return std::make_unique<SplitPointsBasedSplitPolicy>(std::move(availableShardIds));
         }
         if (!tags.empty()) {
             // Enforce zone constraints.
             return std::make_unique<SingleChunkPerTagSplitPolicy>(
-                opCtx, std::move(tags), std::move(availableShardRefs));
+                opCtx, std::move(tags), std::move(availableShardIds));
         }
     }
 
@@ -545,18 +521,18 @@ int getNumShards(OperationContext* opCtx) {
 // specified) the dataShard.
 void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<ShardRef>& excludedDataShard,
+                             const boost::optional<ShardId>& excludedDataShard,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
                              const CancellationToken& token,
                              const OperationSessionInfo& osi,
                              const boost::optional<UUID>& expectedUUID,
                              bool fromMigrate,
                              bool isAuthoritative) {
-    const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
-    std::erase(participants, primaryShardRef);
+    std::erase(participants, primaryShardId);
     if (excludedDataShard) {
         // Remove data shard from participants. If the collection existed prior to this operation,
         // we do not want to drop the user's collection.
@@ -571,8 +547,8 @@ void broadcastDropCollection(OperationContext* opCtx,
         token,
         osi,
         fromMigrate,
-        false /* dropSystemCollections */,
-        !isAuthoritative /* forceLegacyRefresh */,
+        /*dropSystemCollections=*/false,
+        /*forceLegacyRefresh=*/!isAuthoritative,
         expectedUUID);
 }
 
@@ -1110,7 +1086,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss,
         critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
-        !isAuthoritative /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/!isAuthoritative);
 
     // Preventively acquire the critical section protecting the buckets namespace that the
     // creation of a timeseries collection would require.
@@ -1119,7 +1095,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
-        !isAuthoritative /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/!isAuthoritative);
 }
 
 void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
@@ -1191,14 +1167,15 @@ void logEndCreateCollection(
 void createCollectionOnShards(OperationContext* opCtx,
                               const OperationSessionInfo& osi,
                               const boost::optional<UUID>& collectionUUID,
-                              const std::vector<ShardRef>& shardRefs,
+                              const std::vector<ShardId>& shardIds,
                               const NamespaceString& nss,
                               const OptionsAndIndexes& optionsAndIndexes) {
     std::vector<AsyncRequestsSender::Request> requests;
+    auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
 
     const auto& [collOptions, indexes, idIndex] = optionsAndIndexes;
 
-    for (const auto& shard : shardRefs) {
+    for (const auto& shard : shardIds) {
         ShardsvrCreateCollectionParticipant createCollectionParticipantRequest(nss);
         createCollectionParticipantRequest.setCollectionUUID(*collectionUUID);
 
@@ -1374,6 +1351,24 @@ boost::optional<UUID> createCollectionAndIndexes(
     return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
 }
 
+// TODO (SERVER-133881): without the feature flag check, this function reduces to just checking
+// `isUnsplittable`, so just remove the function as it doesn't make much sense anymore.
+bool shouldDisallowChunkOperations(OperationContext* opCtx,
+                                   AuthoritativeMetadataAccessLevelEnum authMetadataAccessLevel,
+                                   bool isUnsplittable) {
+    if (!feature_flags::gCreateRenameNewSetAllowChunkOperationsBehavior.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return false;
+    }
+
+    // Chunk operations are disallowed on unsplittable collections, there is no need to explicitly
+    // block them with `allowChunkOperations: false`. Not doing it saves an `allowChunkOperations:
+    // true` command later.
+    return authMetadataAccessLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed &&
+        !isUnsplittable;
+}
+
 /**
  * Does the following writes:
  * 1. Replaces the config.chunks entries for the new collection;
@@ -1390,7 +1385,8 @@ void commit(OperationContext* opCtx,
             const NamespaceString& nss,
             const std::set<ShardId>& shardsHoldingData,
             const TranslatedRequestParams& translatedRequestParams,
-            std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
+            std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder,
+            AuthoritativeMetadataAccessLevelEnum authMetadataAccessLevel) {
     LOGV2_DEBUG(5277906, 2, "Create collection commit", logAttrs(nss));
 
     if (MONGO_unlikely(nss == NamespaceString::kLogicalSessionsNamespace)) {
@@ -1412,8 +1408,12 @@ void commit(OperationContext* opCtx,
                                Date_t::now(),
                                *collectionUUID,
                                translatedRequestParams.getKeyPattern());
-    if (isUnsplittable(request))
-        coll.setUnsplittable(isUnsplittable(request));
+
+    auto const unsplittable = isUnsplittable(request);
+
+    if (unsplittable) {
+        coll.setUnsplittable(unsplittable);
+    }
 
     const auto& placementVersion = initialChunks->chunks.back().getVersion();
 
@@ -1427,6 +1427,10 @@ void commit(OperationContext* opCtx,
 
     if (request.getUnique()) {
         coll.setUnique(*request.getUnique());
+    }
+
+    if (shouldDisallowChunkOperations(opCtx, authMetadataAccessLevel, unsplittable)) {
+        coll.setAllowChunkOperations(false);
     }
 
     auto ops = sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
@@ -1496,12 +1500,12 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     bool throwIfReasonDiffers,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
-    const std::vector<ShardRef>& shardRefs) {
+    const std::vector<ShardId>& shardIds) {
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
         nss(),
-        shardRefs,
+        shardIds,
         CriticalSectionBlockTypeEnum::kUnblock,
         _critSecReason,
         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -1601,6 +1605,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             Phase::kCommitOnShardingCatalog,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _commitOnGlobalCatalog(opCtx, executor, token);
+                if (MONGO_unlikely(hangAfterCommitOnGlobalCatalog.shouldFail())) {
+                    LOGV2(13612900, "Hanging due to hangAfterCommitOnGlobalCatalog fail point");
+                    hangAfterCommitOnGlobalCatalog.pauseWhileSet();
+                }
                 _commitOnShardCatalog(opCtx, executor, token);
             }))
         .then(_buildPhaseHandler(
@@ -1616,19 +1624,24 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
-            auto involvedShards = *_doc.getShardIds();
-            auto addIfNotPresent = [&](const ShardId& shard) {
-                if (std::find(involvedShards.begin(), involvedShards.end(), shard) ==
-                    involvedShards.end())
-                    involvedShards.push_back(shard);
-            };
+            const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+            if (!isAuthoritative) {
+                auto involvedShards = *_doc.getShardIds();
+                auto addIfNotPresent = [&](const ShardId& shard) {
+                    if (std::find(involvedShards.begin(), involvedShards.end(), shard) ==
+                        involvedShards.end())
+                        involvedShards.push_back(shard);
+                };
 
-            // The filtering information has been cleared on all participant shards. Here we issue a
-            // best effort refresh on all shards involved in the operation to install the correct
-            // filtering information.
-            addIfNotPresent(ShardingState::get(opCtx)->shardId());
-            addIfNotPresent(*_doc.getOriginalDataShard());
-            sharding_util::triggerFireAndForgetShardRefreshes(opCtx, involvedShards, nss());
+                // The filtering information has been cleared on all participant shards. Here we
+                // issue a best effort refresh on all shards involved in the operation to install
+                // the correct filtering information. In authoritative mode, the commit phase
+                // already updates the shard catalog and installs the in-memory metadata.
+                addIfNotPresent(ShardingState::get(opCtx)->shardId());
+                addIfNotPresent(*_doc.getOriginalDataShard());
+                sharding_util::triggerFireAndForgetShardRefreshes(opCtx, involvedShards, nss());
+            }
 
             if (_firstExecution) {
                 const auto& placementVersion = _initialChunks->chunks.back().getVersion();
@@ -1840,7 +1853,7 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
     translatedRequestParams.setTimeseries(optExtendedTimeseriesFields);
     _doc.setTranslatedRequestParams(std::move(translatedRequestParams));
 
-    const auto originalDataShard = [&]() -> ShardRef {
+    const auto originalDataShard = [&]() -> ShardId {
         auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
         if (!cm.hasRoutingTable()) {
@@ -1849,8 +1862,7 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
         }
         std::set<ShardId> allShards;
         cm.getAllShardIds(&allShards);
-        // TODO SERVER-128349: Remove conversion to ShardRef
-        return ShardRef{*(allShards.begin())};
+        return *(allShards.begin());
     }();
     _doc.setOriginalDataShard(originalDataShard);
 }
@@ -1867,12 +1879,6 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
         return;
     }
 
-    // TODO (SERVER-87265) Remove this call if possible.
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
-
     _enterCriticalSectionOnShards(opCtx,
                                   executor,
                                   token,
@@ -1885,8 +1891,7 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
         if (targetIsConfigDb) {
             return checkIfCollectionIsEmpty(opCtx, nss(), ShardId::kConfigServerId);
         }
-        // TODO SERVER-128911: getShardId() will fail once UUIDs are in play
-        return checkIfCollectionIsEmpty(opCtx, nss(), _doc.getOriginalDataShard()->getShardId());
+        return checkIfCollectionIsEmpty(opCtx, nss(), {*_doc.getOriginalDataShard()});
     });
 
     if (targetIsConfigDb) {
@@ -1908,12 +1913,6 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
     bool collectionExists = sharding_ddl_util::getCollectionUUID(opCtx, nss()).is_initialized();
     if (!collectionExists || *_doc.getOriginalDataShard() == ShardingState::get(opCtx)->shardId()) {
         return;
-    }
-
-    // TODO (SERVER-87265) Remove this call if possible.
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
     }
 
     auto optUuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -1960,9 +1959,8 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
                                   _request.getUnique().value_or(false));
     }
 
-    const auto dataShardForPolicy = _request.getDataShard()
-        ? boost::optional<ShardRef>(*_request.getDataShard())
-        : _doc.getOriginalDataShard();
+    const auto dataShardForPolicy =
+        _request.getDataShard() ? _request.getDataShard() : _doc.getOriginalDataShard();
     const auto splitPolicy = create_collection_util::createPolicy(
         opCtx,
         shardKeyPattern,
@@ -1984,12 +1982,12 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
 
     // Save on doc the set of shards involved in the chunk distribution
     auto participantShards = [&]() {
-        std::set<ShardRef> involvedShards;
+        std::set<ShardId> involvedShards;
         for (const auto& chunk : _initialChunks->chunks) {
             involvedShards.emplace(chunk.getShard());
         }
-        return std::vector<ShardRef>(std::make_move_iterator(involvedShards.begin()),
-                                     std::make_move_iterator(involvedShards.end()));
+        return std::vector<ShardId>(std::make_move_iterator(involvedShards.begin()),
+                                    std::make_move_iterator(involvedShards.end()));
     }();
     _doc.setShardIds(std::move(participantShards));
 }
@@ -1999,13 +1997,13 @@ void CreateCollectionCoordinator::_enterCriticalSectionOnShards(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token,
     const NamespaceString& nss,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     mongo::CriticalSectionBlockTypeEnum blockType) {
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
         nss,
-        shardRefs,
+        shardIds,
         blockType,
         _critSecReason,
         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -2018,11 +2016,6 @@ void CreateCollectionCoordinator::_enterCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-    }
-
     // Block reads and writes on all shards other than the dbPrimary.
     auto participants = *_doc.getShardIds();
     // Ensure the critical section is promoted to block reads on the data shard if the data shard is
@@ -2109,9 +2102,6 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
     }
 
@@ -2149,13 +2139,13 @@ void CreateCollectionCoordinator::_notifyChangeStreamReadersOnUpcomingCommit(
     tassert(10649101, "Uuid is expected to be already initialized", _uuid.has_value());
     CollectionSharded notification(nss(), *_uuid, patchedRequest.toBSON());
 
-    const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     const auto supportsPreciseTargeting =
         feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    if (primaryShardRef == _doc.getOriginalDataShard() || !supportsPreciseTargeting) {
+    if (primaryShardId == _doc.getOriginalDataShard() || !supportsPreciseTargeting) {
         // Perform a local call to dispatch the notification through the coordinator.
         notifyChangeStreamsOnShardCollection(opCtx, notification);
         return;
@@ -2209,9 +2199,6 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
     }
 
     if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-
         // Check if a previous request already created and committed the collection.
         const auto shardKeyPattern =
             ShardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
@@ -2242,9 +2229,8 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
 
         // Re-calculate initial chunk distribution given the set of shards with the critical section
         // taken.
-        const auto& dataShardForPolicy = _request.getDataShard()
-            ? boost::optional<ShardRef>(*_request.getDataShard())
-            : _doc.getOriginalDataShard();
+        const auto& dataShardForPolicy =
+            _request.getDataShard() ? _request.getDataShard() : _doc.getOriginalDataShard();
         try {
             const auto splitPolicy = create_collection_util::createPolicy(
                 opCtx,
@@ -2289,15 +2275,17 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
         involvedShards.emplace(chunk.getShard());
     }
 
-    commit(opCtx,
-           **executor,
-           _request,
-           _initialChunks,
-           _uuid,
-           nss(),
-           involvedShards,
-           *_doc.getTranslatedRequestParams(),
-           [this](OperationContext* opCtx) { return getNewSession(opCtx); });
+    commit(
+        opCtx,
+        **executor,
+        _request,
+        _initialChunks,
+        _uuid,
+        nss(),
+        involvedShards,
+        *_doc.getTranslatedRequestParams(),
+        [this](OperationContext* opCtx) { return getNewSession(opCtx); },
+        _doc.getAuthoritativeMetadataAccessLevel());
     const auto& commitTime = _initialChunks->chunks.back().getVersion().getTimestamp();
     _notifyChangeStreamReadersOnPlacementChanged(opCtx, commitTime, executor, token);
 
@@ -2323,8 +2311,16 @@ void CreateCollectionCoordinator::_commitOnShardCatalog(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
     cm.getAllShardIds(&involvedShards);
     // The DB primary shard must always know that a collection is tracked, even when it does not
-    // own any chunks.
-    involvedShards.emplace(ShardingState::get(opCtx)->shardId());
+    // own any chunks. For config.system.sessions, the DB primary is the config server, but the
+    // coordinator runs on the first shard instead, so add it explicitly.
+    involvedShards.emplace(nss().isConfigDB() ? ShardId::kConfigServerId
+                                              : ShardingState::get(opCtx)->shardId());
+    // The original data shard may no longer own chunks after applying the final placement (for
+    // example, due to zones), but it still needs the shard catalog commit to clear the previous
+    // unsplittable collection metadata.
+    if (_doc.getOriginalDataShard()) {
+        involvedShards.emplace(*_doc.getOriginalDataShard());
+    }
 
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
@@ -2339,9 +2335,6 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
     if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
-
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
         // Get the shards committed to the sharding catalog.
@@ -2349,38 +2342,35 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         const auto& cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
         cm.getAllShardIds(&involvedShardIds);
-        // TODO SERVER-128349: Following conversion will be redundant once Chunk manager returns
-        // ShardRef
-        std::set<ShardRef> involvedShardRefs{involvedShardIds.cbegin(), involvedShardIds.cend()};
 
         // If there are less shards involved in the operation than the ones persisted in the
         // document, implies that the collection has been created in some shards that are not owning
         // chunks.
-        auto allShardRefs = *_doc.getShardIds();
-        std::vector<ShardRef> nonInvolvedShardRefs;
-        std::set_difference(allShardRefs.cbegin(),
-                            allShardRefs.cend(),
-                            involvedShardRefs.cbegin(),
-                            involvedShardRefs.cend(),
-                            std::back_inserter(nonInvolvedShardRefs));
+        auto allShardIds = *_doc.getShardIds();
+        std::vector<ShardId> nonInvolvedShardIds;
+        std::set_difference(allShardIds.cbegin(),
+                            allShardIds.cend(),
+                            involvedShardIds.cbegin(),
+                            involvedShardIds.cend(),
+                            std::back_inserter(nonInvolvedShardIds));
 
         // Remove the primary shard from the list. It must always have the collection regardless if
         // it owns chunks.
-        const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
-        std::erase(nonInvolvedShardRefs, primaryShardRef);
+        const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+        std::erase(nonInvolvedShardIds, primaryShardId);
 
         const auto session = getNewSession(opCtx);
-        if (!nonInvolvedShardRefs.empty()) {
+        if (!nonInvolvedShardIds.empty()) {
             sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
                 opCtx,
                 nss(),
-                nonInvolvedShardRefs,
+                nonInvolvedShardIds,
                 **executor,
                 token,
                 session,
-                true /* fromMigrate */,
-                false /* dropSystemCollections */,
-                !isAuthoritative /* forceLegacyRefresh */,
+                /*fromMigrate=*/true,
+                /*dropSystemCollections=*/false,
+                /*forceLegacyRefresh=*/!isAuthoritative,
                 _uuid);
         }
     }
@@ -2405,7 +2395,7 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
             session,
             true,
             false,
-            !isAuthoritative /* forceLegacyRefresh */,
+            /*forceLegacyRefresh=*/!isAuthoritative,
             _uuid);
     }
 }
@@ -2414,35 +2404,46 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    if (!_firstExecution) {
-        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
-        performCausalityBarrier(opCtx, barrier);
+
+    if (MONGO_unlikely(createCollectionHangBeforeExitCriticalSection.shouldFail())) {
+        createCollectionHangBeforeExitCriticalSection.pauseWhileSet();
     }
 
     // Exit critical section on all shards other than the coordinator.
     auto participants = *_doc.getShardIds();
     // Ensure the critical section is released on the data shard if the data shard is not the
     // coordinator and is not a participant.
-    if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->asShardRef(opCtx) &&
+    if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->shardId() &&
         std::find(participants.begin(), participants.end(), *_doc.getOriginalDataShard()) ==
             participants.end()) {
         participants.push_back(*_doc.getOriginalDataShard());
     }
     // The critical section on the coordinator will be released below since both the original and
     // bucket namespace critical sections need released.
-    std::erase(participants, ShardingState::get(opCtx)->asShardRef(opCtx));
+    std::erase(participants, ShardingState::get(opCtx)->shardId());
 
     _exitCriticalSectionOnShards(
-        opCtx, false /* throwIfReasonDiffers */, executor, token, participants);
+        opCtx, /*throwIfReasonDiffers=*/false, executor, token, participants);
 
     // If the coordinator successfully committed the collection during a previous execution, the
     // critical section may have already been released. In such case, it is safe to skip the release
     // if the reason does not match because a migration may have already re-acquired it.
     exitCriticalSectionsOnCoordinator(opCtx,
                                       _doc.getAuthoritativeMetadataAccessLevel(),
-                                      _firstExecution /* throwIfReasonDiffers */,
+                                      /*throwIfReasonDiffers=*/_firstExecution,
                                       _critSecReason,
                                       originalNss());
+
+    if (const auto authMetadataAccessLevel = _doc.getAuthoritativeMetadataAccessLevel();
+        shouldDisallowChunkOperations(opCtx, authMetadataAccessLevel, isUnsplittable(_request))) {
+        // The commit creates the collection with allowChunkOperations set to false. After the
+        // critical section is released, we need to enable chunk operations.
+        if (!_firstExecution && !_uuid) {
+            _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+        }
+        sharding_ddl_util::resumeMigrations(
+            opCtx, nss(), _uuid, [&] { return getNewSession(opCtx); }, authMetadataAccessLevel);
+    }
 }
 
 ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
@@ -2467,23 +2468,23 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                 const auto session = getNewSession(opCtx);
                 broadcastDropCollection(opCtx,
                                         nss(),
-                                        *_doc.getOriginalDataShard() /* excludedDataShard */,
+                                        /*excludedDataShard=*/*_doc.getOriginalDataShard(),
                                         **executor,
                                         token,
                                         session,
                                         _uuid,
-                                        false /*fromMigrate*/,
-                                        isAuthoritative /*isAuthoritative*/);
+                                        /*fromMigrate=*/false,
+                                        /*isAuthoritative=*/isAuthoritative);
             }
 
 
-            std::vector<ShardRef> participants;
+            std::vector<ShardId> participants;
             if (_doc.getPhase() >= Phase::kEnterCriticalSection) {
                 participants = *_doc.getShardIds();
-                std::erase(participants, ShardingState::get(opCtx)->asShardRef(opCtx));
+                std::erase(participants, ShardingState::get(opCtx)->shardId());
             }
             if (_doc.getPhase() >= Phase::kEnterWriteCSOnDataShardAndCheckEmpty) {
-                if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->asShardRef(opCtx) &&
+                if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->shardId() &&
                     std::find(participants.begin(),
                               participants.end(),
                               *_doc.getOriginalDataShard()) == participants.end()) {
@@ -2494,14 +2495,14 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             // Exit critical section on any participant shards, including the data shard.
             if (!participants.empty()) {
                 _exitCriticalSectionOnShards(
-                    opCtx, true /* throwIfReasonDiffers */, executor, token, participants);
+                    opCtx, /*throwIfReasonDiffers=*/true, executor, token, participants);
             }
 
 
             // Exit both critical sections on the coordinator
             exitCriticalSectionsOnCoordinator(opCtx,
                                               _doc.getAuthoritativeMetadataAccessLevel(),
-                                              true /* throwIfReasonDiffers */,
+                                              /*throwIfReasonDiffers=*/true,
                                               _critSecReason,
                                               originalNss());
         })

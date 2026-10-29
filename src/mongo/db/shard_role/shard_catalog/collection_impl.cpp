@@ -1,50 +1,7 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/collection_impl.h"
-
-#include <mutex>
-#include <string_view>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -117,15 +74,34 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/string_map.h"
 
+#include <mutex>
+#include <string_view>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
+// This fail point allows collections to be given malformed validators. With parseValidator: true,
+// the collection stores the parse error and rejects writes instead of bypassing the parser.
+MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
+
 namespace {
 
-// This fail point allows collections to be given malformed validator. A malformed validator
-// will not (and cannot) be enforced but it will be persisted.
-MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // Simulate the behavior of mixed-schema flag of MongoDB versions without SERVER-91195:
 // Only set the legacy time-series mixed-schema flag at the top level of the catalog,
@@ -628,19 +604,21 @@ std::pair<Collection::DocumentValidationResult, Status> CollectionImpl::checkVal
     }
 
     // Strict validation for bucket documents in timeseries collections
-    try {
-        timeseries::validateBucketConsistency(this, document);
-        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
-    } catch (DBException& ex) {
+    {
+        using BCV = DVR::BucketConsistencyViolation;
+        const BCV violation = timeseries::validateBucketConsistency(this, document);
+        if (violation == BCV::kNone) {
+            return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
+        }
         // For strict timeseries validation we ensure that we only return kError or kErrorAndLog.
         const SVR svr = validationActionOrDefault(_metadata->options.validationAction) ==
                 ValidationActionEnum::errorAndLog
             ? SVR::kErrorAndLog
             : SVR::kError;
-        return {DVR{svr, NCR::kTimeseriesSchemaViolation},
+        return {DVR{svr, NCR::kTimeseriesSchemaViolation, violation},
                 Status(doc_validation_error::DocumentValidationFailureInfo(document),
-                       ex.toStatus().toString())};
-    };
+                       "Time-series bucket document failed consistency check")};
+    }
 }
 
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
@@ -655,9 +633,9 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                 "Document would fail validation",
                 logAttrs(ns()),
                 "document"_attr = redact(document),
-                "errInfo"_attr =
+                "errInfo"_attr = redact(
                     result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                        ->getDetails());
+                        ->getDetails()));
             return Status::OK();
         case SchemaValidationResult::kErrorAndLog:
             LOGV2_WARNING(
@@ -665,9 +643,9 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                 "Document failed validation",
                 logAttrs(ns()),
                 "document"_attr = redact(document),
-                "errInfo"_attr =
+                "errInfo"_attr = redact(
                     result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                        ->getDetails());
+                        ->getDetails()));
             return result.second;
         case SchemaValidationResult::kError:
             return result.second;
@@ -679,7 +657,8 @@ Collection::Validator CollectionImpl::parseValidator(
     OperationContext* opCtx,
     const BSONObj& validator,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
-    if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail())) {
+    if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail(
+            [](const BSONObj& data) { return !data.getBoolField("parseValidator"); }))) {
         return {validator, nullptr, nullptr};
     }
 
@@ -972,7 +951,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
             return status;
         }
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
-            truncateMarkers->adjust(*newCappedSize);
+            truncateMarkers->adjust(*_shared->_recordStore);
         }
     }
 
@@ -1057,14 +1036,14 @@ long long CollectionImpl::getCappedMaxSize() const {
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
     return (shouldReadFromReplicatedFastCount(opCtx, _ns))
         ? _shared->_recordStore->accurateNumRecords() +
-            UncommittedFastCountChange::getForRead(opCtx).find(uuid()).count
+            UncommittedFastCountChanges::find(opCtx, uuid()).count
         : _shared->_recordStore->numRecords();
 }
 
 long long CollectionImpl::dataSize(OperationContext* opCtx) const {
     return (shouldReadFromReplicatedFastCount(opCtx, _ns))
         ? _shared->_recordStore->accurateDataSize() +
-            UncommittedFastCountChange::getForRead(opCtx).find(uuid()).size
+            UncommittedFastCountChanges::find(opCtx, uuid()).size
         : _shared->_recordStore->dataSize();
 }
 
@@ -1085,7 +1064,7 @@ CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) 
             fmt::format("Expected the size/count store to contain an entry for UUID={}",
                         uuid().toString()),
             persisted.has_value());
-    return persisted->first;
+    return persisted->first.sizeCount;
 }
 
 int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,
@@ -1197,7 +1176,18 @@ Status CollectionImpl::setValidationOptions(
         mustReparse) {
         _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
         if (!_validator.isOK()) {
-            return _validator.getStatus();
+            // Do not enforce an OK result during oplog application: as at startup, the
+            // validator may have been well formed on the version that wrote it. Keeping it
+            // rejects writes to the collection (fail closed) rather than allowing them
+            // unvalidated (SERVER-134863).
+            if (opCtx->isEnforcingConstraints()) {
+                return _validator.getStatus();
+            }
+            LOGV2_WARNING(13486300,
+                          "Re-parsing of a malformed collection validator failed during oplog "
+                          "application, keeping it",
+                          logAttrs(ns()),
+                          "validatorStatus"_attr = _validator.getStatus());
         }
     }
 

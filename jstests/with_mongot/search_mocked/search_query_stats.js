@@ -1,5 +1,6 @@
 /**
  * Verify the query shape that is outputted by $queryStats for $search and $searchMeta queries.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite.
  */
 import {
     assertAggregatedMetricsSingleExec,
@@ -14,7 +15,10 @@ mongotmock.start();
 const mongotConn = mongotmock.getConnection();
 
 const conn = MongoRunner.runMongod({
-    setParameter: {mongotHost: mongotConn.host, internalQueryStatsRateLimit: -1},
+    setParameter: {
+        mongotHost: mongotConn.host,
+        internalQueryStatsSampleRate: 1,
+    },
 });
 
 const dbName = jsTestName();

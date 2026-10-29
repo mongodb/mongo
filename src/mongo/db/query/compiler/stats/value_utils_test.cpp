@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/stats/value_utils.h"
 
@@ -70,12 +44,10 @@ public:
 };
 
 void assertSameTypeBracketedInterval(const Interval& interval) {
-    auto [startTag, startVal] = sbe::bson::convertToOwned(interval.start).releaseToRaw();
-    auto [endTag, endVal] = sbe::bson::convertToOwned(interval.end).releaseToRaw();
-    sbe::value::ValueGuard startGuard{startTag, startVal};
-    sbe::value::ValueGuard endGuard{endTag, endVal};
+    auto start = sbe::bson::convertToOwned(interval.start);
+    auto end = sbe::bson::convertToOwned(interval.end);
 
-    ASSERT(sameTypeBracketInterval(startTag, interval.endInclusive, endTag, endVal));
+    ASSERT(sameTypeBracketInterval(start.tag(), interval.endInclusive, end.tag(), end.value()));
 }
 
 TEST_F(ValueUtilsTest, SameTypeBracketedIntervalEqual) {
@@ -256,13 +228,12 @@ TEST_F(ValueUtilsTest, GetMinBoundAlignsWithAppendMinForType) {
         builder.appendMinForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
-        auto expected = sbe::bson::convertToOwned(elem).releaseToRaw();
-        sbe::value::ValueGuard guard{expected};
+        auto expected = sbe::bson::convertToOwned(elem);
 
         auto res = stats::compareValues(
-            actual.getTag(), actual.getValue(), expected.first, expected.second);
+            actual.getTag(), actual.getValue(), expected.tag(), expected.value());
         ASSERT_EQ(res, 0) << "tag: " << tag << ", getMinBound() returns: " << actual.get()
-                          << ", expected returning: " << expected;
+                          << ", expected returning: " << expected.raw();
         ASSERT_TRUE(inclusive);
     }
 }
@@ -284,13 +255,12 @@ TEST_F(ValueUtilsTest, GetMaxBoundAlignsWithAppendMaxForType) {
         builder.appendMaxForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
-        auto expected = sbe::bson::convertToOwned(elem).releaseToRaw();
-        sbe::value::ValueGuard guard{expected};
+        auto expected = sbe::bson::convertToOwned(elem);
 
         auto res = stats::compareValues(
-            actual.getTag(), actual.getValue(), expected.first, expected.second);
+            actual.getTag(), actual.getValue(), expected.tag(), expected.value());
         ASSERT_EQ(res, 0) << "tag: " << tag << ", getMaxBound() returns: " << actual.get()
-                          << ", expected returning: " << expected;
+                          << ", expected returning: " << expected.raw();
         ASSERT_EQ(inclusive, !isVariableWidthType(tag));
     }
 }
@@ -331,13 +301,11 @@ TEST_F(ValueUtilsTest, ReturnsTrueForFullBracketIntervals) {
         // Converts to SBE values.
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertToOwned(interval.start).releaseToRaw();
-        auto [endTag, endVal] = sbe::bson::convertToOwned(interval.end).releaseToRaw();
-        sbe::value::ValueGuard startGuard{startTag, startVal};
-        sbe::value::ValueGuard endGuard{endTag, endVal};
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
-        ASSERT_TRUE(
-            isFullBracketInterval(startTag, startVal, startInclusive, endTag, endVal, endInclusive))
+        ASSERT_TRUE(isFullBracketInterval(
+            start.tag(), start.value(), startInclusive, end.tag(), end.value(), endInclusive))
             << "type: " << typeName(BSONType(t));
     }
 }
@@ -358,24 +326,24 @@ TEST_F(ValueUtilsTest, ReturnsFalseForNonFullBracketIntervalsWithStaticWidthType
     // Asserts that the function returns false if either bound is exclusive.
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       false /*startInclusive*/,
+                                       /*startInclusive=*/false,
                                        end.getTag(),
                                        end.getValue(),
-                                       false /*endInclusive*/));
+                                       /*endInclusive=*/false));
 
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       true /*startInclusive*/,
+                                       /*startInclusive=*/true,
                                        end.getTag(),
                                        end.getValue(),
-                                       false /*endInclusive*/));
+                                       /*endInclusive=*/false));
 
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       false /*startInclusive*/,
+                                       /*startInclusive=*/false,
                                        end.getTag(),
                                        end.getValue(),
-                                       true /*endInclusive*/));
+                                       /*endInclusive=*/true));
 }
 
 TEST_F(ValueUtilsTest, ReturnsFalseForNonFullBracketIntervalsWithVariableWidthType) {
@@ -394,18 +362,18 @@ TEST_F(ValueUtilsTest, ReturnsFalseForNonFullBracketIntervalsWithVariableWidthTy
     // Asserts that the function returns false if 'endInclusive' is true.
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       startInclusive /*startInclusive*/,
+                                       /*startInclusive=*/startInclusive,
                                        end.getTag(),
                                        end.getValue(),
-                                       true /*endInclusive*/));
+                                       /*endInclusive=*/true));
 
     // Asserts that the function returns false the end bound is incorrect.
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       true /*startInclusive*/,
+                                       /*startInclusive=*/true,
                                        start.getTag(),
                                        start.getValue(),
-                                       endInclusive /*endInclusive*/));
+                                       /*endInclusive=*/endInclusive));
 
     // Asserts that the short-circuit returns false when the function detects the end tag is not the
     // next type of the start tag.
@@ -422,7 +390,7 @@ TEST_F(ValueUtilsTest, BracketizeSingleTypeInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = makeInt64Value(200);
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, false /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/false);
 
     std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>> expected{
         {SBEValue{makeInt64Value(100)}, false}, {SBEValue{makeInt64Value(200)}, false}};
@@ -441,7 +409,7 @@ TEST_F(ValueUtilsTest, BracketizeSameTypeBracketInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = sbe::value::makeNewString("");
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, false /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/false);
 
     std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>> expected{
         {SBEValue{makeInt64Value(100)}, false}, {sbe::value::makeNewString(""), false}};
@@ -457,7 +425,7 @@ TEST_F(ValueUtilsTest, BracketizeMixedTypeInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = makeBooleanValue(1);
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, false /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/false);
 
     std::vector<std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>>> expected = {
         {{SBEValue{makeInt64Value(100)}, false}, getMaxBound(TypeTags::NumberInt64)},
@@ -478,7 +446,7 @@ TEST_F(ValueUtilsTest, BracketizeEmptyInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = makeInt64Value(100);
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, true /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/true);
 
     // (100, 100] is an empty interval as no number is included. We expect the returned
     // sub-intervals to be an empty vector.

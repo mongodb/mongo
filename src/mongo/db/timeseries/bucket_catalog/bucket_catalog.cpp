@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 
@@ -33,6 +7,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
@@ -44,6 +19,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/tracking/context.h"
 
+#include <algorithm>
+#include <tuple>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -1147,25 +1124,22 @@ std::vector<BatchedInsertContext> buildBatchedInsertContexts(
                                                                    errorsAndIndices);
 }
 
-TimeseriesWriteBatches stageInsertBatch(
-    OperationContext* opCtx,
-    BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const OperationId& opId,
-    const StringDataComparator* comparator,
-    uint64_t storageCacheSizeBytes,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    const AllowQueryBasedReopening allowQueryBasedReopening,
-    BatchedInsertContext& batch) {
+void stageInsertBatch(OperationContext* opCtx,
+                      BucketCatalog& bucketCatalog,
+                      const Collection* bucketsColl,
+                      const OperationId& opId,
+                      const StringDataComparator* comparator,
+                      uint64_t storageCacheSizeBytes,
+                      const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                      const AllowQueryBasedReopening allowQueryBasedReopening,
+                      BatchedInsertContext& batch,
+                      TimeseriesWriteBatches& writeBatches) {
     auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
     std::unique_lock<std::mutex> stripeLock{stripe.mutex};
-    TimeseriesWriteBatches writeBatches;
     size_t currentPosition = 0;
-    bool needsAnotherBucket = true;
-
-    while (needsAnotherBucket) {
+    while (currentPosition < batch.measurementsTimesAndIndices.size()) {
         bool bucketOpenedDueToMetadata = true;
-        auto [measurement, measurementTimestamp, _] =
+        const auto& [measurement, measurementTimestamp, _] =
             batch.measurementsTimesAndIndices[currentPosition];
         auto& eligibleBucket = getEligibleBucket(opCtx,
                                                  bucketCatalog,
@@ -1183,59 +1157,67 @@ TimeseriesWriteBatches stageInsertBatch(
                                                  batch.stats,
                                                  bucketOpenedDueToMetadata);
 
-        // getEligibleBucket guarantees that we will successfully insert at least one measurement
-        // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without
-        // rolling it over, which allows us to unconditionally initialize the writeBatch.
-        std::shared_ptr<WriteBatch> writeBatch = activeBatch(
-            bucketCatalog.trackingContexts, eligibleBucket, opId, batch.stripeNumber, batch.stats);
-        writeBatch->openedDueToMetadata = bucketOpenedDueToMetadata;
-        internal::StageInsertBatchResult result =
-            internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
-                                                         opId,
-                                                         comparator,
-                                                         batch,
-                                                         stripe,
-                                                         stripeLock,
-                                                         storageCacheSizeBytes,
-                                                         eligibleBucket,
-                                                         currentPosition,
-                                                         writeBatch);
+        auto writeBatch = internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
+                                                                       opId,
+                                                                       comparator,
+                                                                       batch,
+                                                                       stripeLock,
+                                                                       storageCacheSizeBytes,
+                                                                       eligibleBucket,
+                                                                       currentPosition);
 
-        /**
-         * Though rare, it is possible that the bucket provided by getEligibleBucket
-         * is not considered to be eligible when re-checking for rollover inside
-         * stageInsertBatchIntoEligibleBucket. For example, there is a global
-         * statistic, numActiveBuckets, that is not protected by the stripe lock
-         * and can be independently updated between the two checks. To avoid a
-         * crash, the write path will ignore an ineligible bucket and try again.
-         */
-        if (result != internal::StageInsertBatchResult::NoMeasurementsStaged) {
-            writeBatches.emplace_back(writeBatch);
+        if (writeBatch) {
+            writeBatch->openedDueToMetadata = bucketOpenedDueToMetadata;
+            writeBatches.push_back(std::move(writeBatch));
+        } else {
+            /**
+             * Though rare, it is possible that the bucket provided by getEligibleBucket is not
+             * considered to be eligible when re-checking for rollover inside
+             * stageInsertBatchIntoEligibleBucket. For example, there is a global statistic,
+             * numActiveBuckets, that is not protected by the stripe lock and can be independently
+             * updated between the two checks. To avoid a crash, the write path will ignore an
+             * ineligible bucket and try again. If this happened, the previous bucket must have a
+             * rollover reason set or we'd just loop forever trying to insert into it.
+             */
+            invariant(eligibleBucket.rolloverReason != RolloverReason::kNone);
         }
-
-        needsAnotherBucket = (result != internal::StageInsertBatchResult::Success);
     }
 
     invariant(currentPosition == batch.measurementsTimesAndIndices.size());
-    return writeBatches;
 }
 
-StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
-    OperationContext* opCtx,
-    BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    const TimeseriesOptions& timeseriesOptions,
-    OperationId opId,
-    const StringDataComparator* comparator,
-    uint64_t storageCacheSizeBytes,
-    bool earlyReturnOnError,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    const std::vector<BSONObj>& userMeasurementsBatch,
-    size_t startIndex,
-    size_t numDocsToStage,
-    const std::vector<size_t>& indices,
-    const AllowQueryBasedReopening allowQueryBasedReopening,
-    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+void abortWriteBatches(BucketCatalog& bucketCatalog,
+                       const TimeseriesWriteBatches& writeBatches,
+                       const Status& status) {
+    for (const auto& writeBatch : writeBatches) {
+        if (writeBatch) {
+            abort(bucketCatalog, writeBatch, status);
+        }
+    }
+}
+
+void sortBatchesForCommit(TimeseriesWriteBatches& writeBatches) {
+    std::sort(writeBatches.begin(), writeBatches.end(), [](const auto& left, const auto& right) {
+        return left->bucketId.oid < right->bucketId.oid;
+    });
+}
+
+Status prepareInsertsToBuckets(OperationContext* opCtx,
+                               BucketCatalog& bucketCatalog,
+                               const Collection* bucketsColl,
+                               const TimeseriesOptions& timeseriesOptions,
+                               OperationId opId,
+                               const StringDataComparator* comparator,
+                               uint64_t storageCacheSizeBytes,
+                               bool earlyReturnOnError,
+                               const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                               const std::vector<BSONObj>& userMeasurementsBatch,
+                               size_t startIndex,
+                               size_t numDocsToStage,
+                               const std::vector<size_t>& indices,
+                               const AllowQueryBasedReopening allowQueryBasedReopening,
+                               std::vector<WriteStageErrorAndIndex>& errorsAndIndices,
+                               TimeseriesWriteBatches& writeBatches) {
     auto batchedInsertContexts = buildBatchedInsertContexts(bucketCatalog,
                                                             bucketsColl->uuid(),
                                                             timeseriesOptions,
@@ -1250,25 +1232,20 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
         return errorsAndIndices.front().error;
     }
 
-    TimeseriesWriteBatches results;
-
     for (auto& batchedInsertContext : batchedInsertContexts) {
-        auto writeBatches = stageInsertBatch(opCtx,
-                                             bucketCatalog,
-                                             bucketsColl,
-                                             opId,
-                                             comparator,
-                                             storageCacheSizeBytes,
-                                             compressAndWriteBucketFunc,
-                                             allowQueryBasedReopening,
-                                             batchedInsertContext);
-
-        // Append all returned write batches to results, since multiple buckets may have been
-        // targeted.
-        results.insert(results.end(), writeBatches.begin(), writeBatches.end());
+        stageInsertBatch(opCtx,
+                         bucketCatalog,
+                         bucketsColl,
+                         opId,
+                         comparator,
+                         storageCacheSizeBytes,
+                         compressAndWriteBucketFunc,
+                         allowQueryBasedReopening,
+                         batchedInsertContext,
+                         writeBatches);
     }
 
-    return results;
+    return Status::OK();
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(

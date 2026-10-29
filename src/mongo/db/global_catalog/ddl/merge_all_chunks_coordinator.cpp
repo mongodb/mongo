@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/merge_all_chunks_coordinator.h"
 
@@ -38,14 +12,12 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
@@ -70,27 +42,6 @@ BSONObj makeCriticalSectionReason(const NamespaceString& nss) {
                   << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 }
 
-void checkPreconditions(OperationContext* opCtx, const NamespaceString& nss) {
-    const bool allowChunkOps =
-        CollectionShardingRuntime::acquireShared(opCtx, nss)->allowChunkOperations();
-
-    auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
-            metadata.isSharded());
-
-    uassert(
-        ErrorCodes::ConflictingOperationInProgress,
-        str::stream() << "Can't execute mergeAllChunksOnShard because chunk operations for this "
-                         "collection are disallowed. 'allowChunkOperations' flag is "
-                      << allowChunkOps << "; 'allowMigrations' flag is "
-                      << metadata.allowMigrations(),
-        allowChunkOps && metadata.allowMigrations());
-}
-
 void acquireCriticalSection(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const BSONObj& critSecReason) {
@@ -100,7 +51,7 @@ void acquireCriticalSection(OperationContext* opCtx,
         nss,
         critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/false);
     svc->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
@@ -148,40 +99,7 @@ ConfigsvrMergeAllPrecomputedChunksOnShardResponse commitToGlobalCatalog(
                                                                     kIdlParserCtx);
 }
 
-MergeAllChunksOnShardResponse commitToGlobalCatalogFallback(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const ShardId& shard,
-                                                            std::int32_t maxNumberOfChunksToMerge,
-                                                            std::int32_t maxTimeProcessingChunksMS,
-                                                            OperationSessionInfo session) {
-    ConfigSvrCommitMergeAllChunksOnShard configRequest(nss);
-    configRequest.setDbName(DatabaseName::kAdmin);
-    configRequest.setShard(shard);
-    configRequest.setMaxNumberOfChunksToMerge(maxNumberOfChunksToMerge);
-    configRequest.setMaxTimeProcessingChunksMS(maxTimeProcessingChunksMS);
-    generic_argument_util::setMajorityWriteConcern(configRequest);
-    generic_argument_util::setOperationSessionInfo(configRequest, session);
-
-    auto cmdResponse =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin,
-            configRequest.toBSON(),
-            Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-    return MergeAllChunksOnShardResponse::parse(cmdResponse.response, kIdlParserCtx);
-}
-
-// TODO (SERVER-127444): return `CollectionType` (non-optional).
 boost::optional<CollectionType> getCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-    if (csr->getAuthoritativeState() !=
-        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-        return boost::none;
-    }
-
     PersistentTaskStore<CollectionType> collStore{
         NamespaceString::kConfigShardCatalogCollectionsNamespace};
     boost::optional<CollectionType> coll;
@@ -191,10 +109,6 @@ boost::optional<CollectionType> getCollection(OperationContext* opCtx, const Nam
                           coll = parsedColl;
                           return false;
                       });
-    uassert(ErrorCodes::NamespaceNotFound,
-            fmt::format("Collection '{}' not found in local cluster catalog",
-                        nss.toStringForErrorMsg()),
-            coll);
     return coll;
 }
 
@@ -209,8 +123,8 @@ bool isSafeToAbortOnGlobalCatalogCommitError(const Status& status) {
 // while this coordinator was running. This should be impossible: all DDL operations that modify
 // a collection's sharding state or UUID call setAllowChunkOperations(false) and drain in-flight
 // chunk coordinators before making any change, so this coordinator cannot be running at the same
-// time. If either error is seen at kGlobalCatalogCommit the DDL serialization invariant has been
-// violated.
+// time. If either error is seen during the global-catalog commit the DDL serialization invariant
+// has been violated.
 bool isNotExpectedOnGlobalCatalogCommitError(const Status& status) {
     return status == ErrorCodes::NamespaceNotSharded || status == ErrorCodes::StaleEpoch;
 }
@@ -252,12 +166,6 @@ bool MergeAllChunksCoordinator::_mustAlwaysMakeProgress() {
     // loop to keep running so transient failures in either path cannot leave the critical section
     // held.
     return _doc.getPhase() >= Phase::kAcquireCriticalSection;
-}
-
-bool MergeAllChunksCoordinator::_allowedToInvalidateOSI() const noexcept {
-    // TODO (SERVER-127444): remove !_doc.getNewChunks().has_value() from the condition.
-    return _cleaningUp || !_doc.getNewChunks().has_value() ||
-        _doc.getPhase() != Phase::kGlobalCatalogCommit;
 }
 
 void MergeAllChunksCoordinator::_onCleanup(OperationContext* opCtx) {
@@ -313,6 +221,46 @@ void MergeAllChunksCoordinator::_releaseLocks(OperationContext* opCtx) {
     _scopedSplitMergeChunk.reset();
 }
 
+// Checks for preconditions (the collection exists, is sharded and chunk operations are allowed),
+// throwing if they are not met. Returns true if the collection is sharded but the shard owns no
+// data, false otherwise.
+bool MergeAllChunksCoordinator::_checkPreconditions(OperationContext* opCtx) {
+    auto [metadata, allowChunkOps] = _getCollectionMetadata(opCtx);
+
+    uassert(
+        ErrorCodes::ConflictingOperationInProgress,
+        str::stream() << "Can't execute mergeAllChunksOnShard because chunk operations for this "
+                         "collection are disallowed. 'allowChunkOperations' flag is "
+                      << allowChunkOps << "; 'allowMigrations' flag is "
+                      << metadata.allowMigrations(),
+        allowChunkOps && metadata.allowMigrations());
+
+    // isSharded() from the CSR could return false if this shard does not own chunks for the given
+    // collection, even if it is actually sharded. The semantics of mergeAllChunksOnShard on a shard
+    // that does not own chunks (but the collection exists in the cluster and is sharded) is no-op
+    // without error. For that reason, we need to confirm from the global catalog before throwing
+    // NamespaceNotSharded.
+    if (!metadata.isSharded()) {
+        auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
+        const CollectionMetadata csrsMetadata(std::move(cm), ShardingState::get(opCtx)->shardId());
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Collection " << nss().toStringForErrorMsg() << " is not sharded",
+                csrsMetadata.isSharded());
+        return true;
+    }
+
+    return false;
+}
+
+void MergeAllChunksCoordinator::_skipToFinalPhase() {
+    _doc.setNumMergedChunks(0);
+    // The chunkVersion is unused in this case, it's ok to return an empty version.
+    _doc.setShardVersion(ChunkVersion{});
+    _doc.setSkipCSRelease(true);
+    _enterPhase(Phase::kReleaseCriticalSection);
+}
+
 ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -320,6 +268,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
     static constexpr auto kMaxChunkVectorSize = BSONObjMaxUserSize / 2;
 
     return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] { _checkCriticalSection(); })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
             [this, anchor = shared_from_this()](auto* opCtx) {
@@ -334,7 +283,19 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                checkPreconditions(opCtx, nss());
+                _registerChunkOperationStarted(opCtx);
+
+                // A collection could be sharded while not having local metadata if the current
+                // shard does not own any chunks for the collection. If the shard does not own data,
+                // we can skip to the end of the coordinator and return. This is not only an
+                // optimization but also a correctness requirement: we decided that the collection
+                // is sharded after asking the global catalog, which introduces a race condition
+                // with create and rename. In this situation, we must end the coordinator without
+                // attempting to acquire or release the critical section.
+                const bool isUnownedShardedCollection = _checkPreconditions(opCtx);
+                if (isUnownedShardedCollection) {
+                    _skipToFinalPhase();
+                }
             }))
         .then(_buildPhaseHandler(
             Phase::kPrecomputeChunkList,
@@ -344,16 +305,13 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                auto const coll = getCollection(opCtx, nss());
-
-                if (!coll.has_value()) {
-                    // boost::none means that the catalog is non-authoritative. In that case, return
-                    // early (without updating the coordinator document) and fallback later to the
-                    // legacy global catalog commit.
-                    LOGV2(12834401,
-                          "The catalog is non-authoritative, falling back to legacy commit",
+                const auto coll = getCollection(opCtx, nss());
+                if (!coll) {
+                    LOGV2(12744401,
+                          "Collection not found in local shard catalog, nothing to merge",
                           logAttrs(nss()),
                           "shard"_attr = _request.getShard());
+                    _skipToFinalPhase();
                     return;
                 }
 
@@ -366,7 +324,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                         Grid::get(opCtx)->shardRegistry()->getConfigShard(),
                         NamespaceString::kConfigShardCatalogChunksNamespace,
                         *coll,
-                        boost::none /*originalVersion*/,
+                        /*originalVersion=*/boost::none,
                         _request.getMaxNumberOfChunksToMerge(),
                         _request.getMaxTimeProcessingChunksMS());
 
@@ -377,16 +335,13 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                           "shard"_attr = _request.getShard());
                     // There are no chunks to merge, so we can short-circuit and avoid taking the
                     // critical section.
-                    _doc.setNumMergedChunks(numMergedChunks);
-                    // The chunkVersion is unused in this case, it's ok to return an empty version.
-                    _doc.setShardVersion(ChunkVersion{});
-                    _enterPhase(Phase::kReleaseCriticalSection);
+                    _skipToFinalPhase();
                     return;
                 }
 
                 BSONArrayBuilder bab;
                 for (const auto& chunk : newChunks) {
-                    BSONObj chunkBson = chunk.toConfigBSON(true /*omitVersion*/);
+                    BSONObj chunkBson = chunk.toConfigBSON(/*omitVersion=*/true);
                     if (bab.len() + chunkBson.objsize() > kMaxChunkVectorSize) {
                         // If we truncate the list, numMergedChunks is no longer correct. This is
                         // not a huge deal: that number never reaches the user, and internally is
@@ -419,50 +374,35 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                       "shard"_attr = _request.getShard());
 
                 acquireCriticalSection(opCtx, nss(), _critSecReason);
-
-                // Generate a new OSI to be used during next phase
-                getNewSession(opCtx);
             }))
         .then(_buildPhaseHandler(
-            Phase::kGlobalCatalogCommit,
-            [this, anchor = shared_from_this()](auto* opCtx) {
+            Phase::kCommit,
+            [this, executor, token, anchor = shared_from_this()](auto* opCtx) {
+                tassert(12744402,
+                        "Expected precomputed chunk list to be set before committing",
+                        _doc.getNewChunks().has_value());
+
                 LOGV2(12578605,
                       "Committing merge all chunks on shard operation to the global catalog",
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                // TODO (SERVER-127444): remove the "else" branch and add tassert on
-                // _doc.getNewChunks().has_value()
-                if (_doc.getNewChunks().has_value()) {
-                    // _configSvrCommitMergeAllPrecomputedChunksOnShard is idempotent throught
-                    // retryable writes, so we need to use the same session (i.e. same
-                    // lsid/txnNumber) on every retry. For this reason, we don't generate a new
-                    // OSI but rather resuse the current one. This OSI was generated at the end of
-                    // the previous phase.
-                    const auto session = getCurrentSession(opCtx);
-                    tassert(12834402, "There must be a persisted session", session.has_value());
+                // Commit to the global catalog to obtain the changed chunks. The config command is
+                // idempotent by range, so re-running it on a retry or after a failover returns the
+                // same chunks without re-merging. This lets the changed chunks live only in this
+                // local response rather than being persisted in the state document (which already
+                // holds the precomputed chunk list and could otherwise approach the BSON limit).
+                auto response = commitToGlobalCatalog(
+                    opCtx, nss(), _request.getShard(), *_doc.getNewChunks(), getNewSession(opCtx));
 
-                    auto response = commitToGlobalCatalog(
-                        opCtx, nss(), _request.getShard(), *_doc.getNewChunks(), *session);
-
+                // Persist the shard version the first time the commit applies: it survives to
+                // kReleaseCriticalSection (where the response is built) and marks the
+                // global-catalog commit as applied for the onError handler. Guarded so retries do
+                // not rewrite the (potentially large) precomputed chunk list held in the state
+                // document.
+                if (!_doc.getShardVersion()) {
                     auto newDoc = _doc;
                     newDoc.setShardVersion(response.getShardVersion());
-                    _updateStateDocument(opCtx, std::move(newDoc));
-                } else {
-                    // This is the legacy commit, which calls
-                    // `_configSvrCommitMergeAllChunksOnShardCommand` instead of
-                    // `_configSvrCommitMergeAllPrecomputedChunksOnShard`. This branch is reached
-                    // only when the catalog is non-authoritative when this command runs.
-                    auto response =
-                        commitToGlobalCatalogFallback(opCtx,
-                                                      nss(),
-                                                      _request.getShard(),
-                                                      _request.getMaxNumberOfChunksToMerge(),
-                                                      _request.getMaxTimeProcessingChunksMS(),
-                                                      getNewSession(opCtx));
-                    auto newDoc = _doc;
-                    newDoc.setShardVersion(response.getShardVersion());
-                    newDoc.setNumMergedChunks(response.getNumMergedChunks());
                     _updateStateDocument(opCtx, std::move(newDoc));
                 }
 
@@ -470,19 +410,19 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                 // primary will start-up from a configTime that is inclusive of the metadata update
                 // that has been committed.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-            }))
-        .then(_buildPhaseHandler(
-            Phase::kShardCatalogCommit,
-            [this, executor, token, anchor = shared_from_this()](auto* opCtx) {
+
                 LOGV2(12578607,
-                      "Installing new chunk layout into the shard catalog after merge all chunks",
+                      "Installing changed chunks into the shard catalog after merge all chunks",
                       logAttrs(nss()),
                       "shard"_attr = _request.getShard());
 
-                // Install the new chunk layout into the local shard catalog.
-                sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                // Install only the changed chunks into the local shard catalog. The shard commit
+                // uses its own session (distinct from the global-catalog commit): on a config
+                // shard both commits target the same node, so they must use different txnNumbers.
+                sharding_ddl_util::commitChunkOperationsMetadataToShardCatalog(
                     opCtx,
                     nss(),
+                    response.getChangedChunks(),
                     {ShardingState::get(opCtx)->shardId()},
                     getNewSession(opCtx),
                     executor,
@@ -491,13 +431,14 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSection,
             [this, anchor = shared_from_this()](auto* opCtx) {
-                LOGV2(12578608,
-                      "Releasing critical section for merge all chunks on shard "
-                      "operation",
-                      logAttrs(nss()),
-                      "shard"_attr = _request.getShard());
+                if (!_doc.getSkipCSRelease()) {
+                    LOGV2(12578608,
+                          "Releasing critical section for merge all chunks on shard operation",
+                          logAttrs(nss()),
+                          "shard"_attr = _request.getShard());
 
-                releaseCriticalSection(opCtx, nss(), _critSecReason);
+                    releaseCriticalSection(opCtx, nss(), _critSecReason);
+                }
 
                 tassert(12834403,
                         fmt::format("Expected response fields to be set: {} {}",
@@ -506,6 +447,10 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                         _doc.getShardVersion().has_value() &&
                             _doc.getNumMergedChunks().has_value());
                 _response.emplace(*_doc.getShardVersion(), *_doc.getNumMergedChunks());
+
+                ShardingStatistics::get(opCtx)
+                    .chunkOperationsStatistics.registerMergeAllChunksMerged(
+                        *_doc.getNumMergedChunks());
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             // Retry in case of getting a retryable error.
@@ -515,16 +460,24 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
 
             const auto phase = _doc.getPhase();
 
-            // Before the kGlobalCatalogCommit phase the merge has not been committed anywhere, so
-            // a non-retryable error is safe to abort on. Persist an abort reason so the critical
+            // If the phase is unset, there's no persisted document, so there is nothing to cleanup.
+            if (phase == Phase::kUnset) {
+                uassertStatusOK(status);
+                MONGO_UNREACHABLE_TASSERT(13380602);
+            }
+
+            // Before the kCommit phase the merge has not been committed anywhere, so a
+            // non-retryable error is safe to abort on. Persist an abort reason so the critical
             // section (if already held) is released via _cleanupOnAbort.
-            if (phase < Phase::kGlobalCatalogCommit) {
+            if (phase < Phase::kCommit) {
                 auto opCtxHolder = makeOperationContext();
                 triggerCleanup(opCtxHolder.get(), status);
                 MONGO_UNREACHABLE_TASSERT(12578610);
             }
 
-            if (phase == Phase::kGlobalCatalogCommit) {
+            // Allow aborting only if the global catalog commit fails. Within kCommit the persisted
+            // shard version marks whether the global catalog commit has applied.
+            if (phase == Phase::kCommit && !_doc.getShardVersion()) {
                 // These errors indicate the DDL serialization invariant was violated: all DDL
                 // operations drain in-flight chunk coordinators before modifying the collection,
                 // so they cannot be observed here under correct operation.
@@ -543,7 +496,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                 }
             }
 
-            // Retry the operation when kGlobalCatalogCommit or a greater phase fails.
+            // Retry the operation when kCommit or a greater phase fails.
             return status;
         });
 }

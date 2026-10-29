@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
 
@@ -50,20 +24,23 @@ namespace mongo {
 namespace resharding {
 namespace {
 
-class ReshardingCoordinatorServiceExternalStateTest : service_context_test::WithSetupTransportLayer,
-                                                      public ConfigServerTestFixture {
+class ReshardingCoordinatorServiceExternalStateTest : public ConfigServerTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
         ShardType shard0;
-        shard0.setHandle(ShardHandle{ShardId(shardId0.toString()), boost::none});
+        shard0.setName(shardId0.toString());
         shard0.setHost(shardId0.toString() + ":1234");
         ShardType shard1;
-        shard1.setHandle(ShardHandle{ShardId(shardId1.toString()), boost::none});
+        shard1.setName(shardId1.toString());
         shard1.setHost(shardId1.toString() + ":1234");
         ShardType shard2;
-        shard2.setHandle(ShardHandle{ShardId(shardId2.toString()), boost::none});
+        shard2.setName(shardId2.toString());
         shard2.setHost(shardId2.toString() + ":1234");
         std::vector<ShardType> shards{shard0, shard1, shard2};
 
@@ -250,7 +227,7 @@ public:
             std::vector<BSONObj> docs =
                 makeRecipientCloningMetricsAggregateDocuments(reshardingUUID, recipientDocsCopied);
             CursorResponse cursorResponse(
-                NamespaceString::kRecipientReshardingResumeDataNamespace, 0 /* cursorId */, docs);
+                NamespaceString::kRecipientReshardingResumeDataNamespace, /*cursorId=*/0, docs);
             auto response = cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 
             expectations.push_back(

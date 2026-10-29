@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/storage_engine.h"
 
@@ -45,6 +19,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/control/storage_control.h"
@@ -54,8 +29,7 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_direct_crud.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
@@ -63,11 +37,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
@@ -78,7 +52,6 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <string>
 #include <string_view>
@@ -100,6 +73,19 @@ using namespace std::literals::string_view_literals;
 
 void callbackMock() {}
 
+std::span<const char> toSpan(const StatusWith<UniqueBuffer>& buffer) {
+    ASSERT_OK(buffer);
+    return {buffer.getValue().get(), buffer.getValue().capacity()};
+}
+
+void assertBufferEqualsSpan(std::span<const char> expected,
+                            const StatusWith<UniqueBuffer>& actual) {
+    ASSERT_OK(actual);
+    auto& buffer = actual.getValue();
+    ASSERT_TRUE(std::equal(
+        expected.begin(), expected.end(), buffer.get(), buffer.get() + buffer.capacity()));
+}
+
 TEST_F(StorageEngineTest, DirectWritesInsertTest) {
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
@@ -116,26 +102,18 @@ TEST_F(StorageEngineTest, DirectWritesInsertTest) {
     const auto intIdent = intRs->getIdent();
     const auto strIdent = strRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     // Perform direct writes.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value));
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value));
         txn.commit();
     }
 
-    // Verify results.
-    auto intOut = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
-    auto strOut = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
-
-    ASSERT_OK(intOut);
-    ASSERT_OK(strOut);
-    EXPECT_EQ(value.size(), intOut.getValue().capacity());
-    EXPECT_EQ(value.size(), strOut.getValue().capacity());
-    EXPECT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
-    EXPECT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, intIdent)->get(intKey));
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, strIdent)->get(strKey));
 }
 
 TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
@@ -154,45 +132,65 @@ TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
     const auto intIdent = intRs->getIdent();
     const auto strIdent = strRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     // Initial insertions.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value));
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value));
         txn.commit();
     }
 
-    // Verify initial insertions.
-    auto intOut = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
-    auto strOut = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
-
-    ASSERT_OK(intOut);
-    ASSERT_OK(strOut);
-    EXPECT_EQ(value.size(), intOut.getValue().capacity());
-    EXPECT_EQ(value.size(), strOut.getValue().capacity());
-    EXPECT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
-    EXPECT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
-
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, intIdent)->get(intKey));
+    assertBufferEqualsSpan(value, engine->getDirectCursor(*ru, strIdent)->get(strKey));
 
     // Perform deletes.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, intKey));
-        ASSERT_OK(storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, strKey));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->remove(*ru, intKey));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->remove(*ru, strKey));
         txn.commit();
     }
 
     // Check for successful deletes.
-    auto s1 = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
-    ASSERT_NOT_OK(s1);
-    EXPECT_EQ(ErrorCodes::NoSuchKey, s1.getStatus().code());
-    auto s2 = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
-    ASSERT_NOT_OK(s2);
-    EXPECT_EQ(ErrorCodes::NoSuchKey, s2.getStatus().code());
+    EXPECT_EQ(ErrorCodes::NoSuchKey, engine->getDirectCursor(*ru, intIdent)->get(intKey));
+    EXPECT_EQ(ErrorCodes::NoSuchKey, engine->getDirectCursor(*ru, strIdent)->get(strKey));
 }
 
+TEST_F(StorageEngineTest, DirectWritesUpdateTest) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const int64_t intKey{1};
+    const std::span<const char> strKey{"key"sv};
+    const std::span<const char> value{"test"sv};
+
+    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
+    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    ASSERT(intRs.get());
+    ASSERT(strRs.get());
+
+    auto* engine = _storageEngine->getEngine();
+
+    auto intCursor = engine->getDirectCursor(*ru, intRs->getIdent());
+    auto strCursor = engine->getDirectCursor(*ru, strRs->getIdent());
+
+    StorageWriteTransaction txn(*ru);
+    ASSERT_OK(intCursor->insert(*ru, intKey, value));
+    ASSERT_OK(strCursor->insert(*ru, strKey, value));
+
+    assertBufferEqualsSpan(value, intCursor->get(intKey));
+    assertBufferEqualsSpan(value, strCursor->get(strKey));
+
+    auto value2 = "test2"sv;
+
+    ASSERT_OK(intCursor->update(*ru, intKey, value2));
+    ASSERT_OK(strCursor->update(*ru, strKey, value2));
+
+    assertBufferEqualsSpan(value2, intCursor->get(intKey));
+    assertBufferEqualsSpan(value2, strCursor->get(strKey));
+}
 
 TEST_F(StorageEngineTest, DirectWritesFailures) {
     auto opCtx = cc().makeOperationContext();
@@ -213,13 +211,13 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     const auto intIdent = intRs->getIdent();
     const auto strIdent = strRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     // Initial insertions.
     {
         StorageWriteTransaction txn(*ru);
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1));
-        ASSERT_OK(
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1));
+        ASSERT_OK(engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value1));
+        ASSERT_OK(engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value1));
         txn.commit();
     }
 
@@ -227,12 +225,10 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     // Duplicate key insertion will return DuplicateKey.
     {
         StorageWriteTransaction txn(*ru);
-        auto s1 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1);
+        auto s1 = engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value1);
         ASSERT_NOT_OK(s1);
         EXPECT_EQ(ErrorCodes::KeyExists, s1.code());
-        auto s2 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1);
+        auto s2 = engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value1);
         ASSERT_NOT_OK(s2);
         EXPECT_EQ(ErrorCodes::KeyExists, s2.code());
     }
@@ -241,12 +237,10 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     // Duplicate keys with different values will also return DuplicateKey.
     {
         StorageWriteTransaction txn(*ru);
-        auto s1 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value2);
+        auto s1 = engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value2);
         ASSERT_NOT_OK(s1);
         EXPECT_EQ(ErrorCodes::KeyExists, s1.code());
-        auto s2 =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value2);
+        auto s2 = engine->getDirectCursor(*ru, strIdent)->insert(*ru, strKey, value2);
         ASSERT_NOT_OK(s2);
         EXPECT_EQ(ErrorCodes::KeyExists, s2.code());
     }
@@ -254,16 +248,55 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     // Deleting non-existent keys will return NoSuchKey.
     {
         StorageWriteTransaction txn(*ru);
-        auto s1 =
-            storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, nonExistentIntKey);
+        auto s1 = engine->getDirectCursor(*ru, intIdent)->remove(*ru, nonExistentIntKey);
         ASSERT_NOT_OK(s1);
         EXPECT_EQ(ErrorCodes::NoSuchKey, s1.code());
 
-        auto s2 =
-            storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, nonExistentStrKey);
+        auto s2 = engine->getDirectCursor(*ru, strIdent)->remove(*ru, nonExistentStrKey);
         ASSERT_NOT_OK(s2);
         EXPECT_EQ(ErrorCodes::NoSuchKey, s2.code());
     }
+}
+
+TEST_F(StorageEngineTest, DirectWritesNullAndEmpty) {
+    auto opCtx = cc().makeOperationContext();
+    auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+
+    auto rs = makeTemporary(opCtx.get());
+    ASSERT(rs.get());
+    const auto ident = rs->getIdent();
+
+    auto* engine = _storageEngine->getEngine();
+
+    const int64_t emptyKey = 1;
+    const int64_t nullKey = 2;
+    const int64_t nonexistentKey = 3;
+
+    {
+        StorageWriteTransaction txn(*ru);
+        auto cursor = engine->getDirectCursor(*ru, ident);
+        ASSERT_OK(cursor->insert(*ru, 1, std::span("", 0)));
+        ASSERT_OK(cursor->insert(*ru, 2, std::span<const char>()));
+        txn.commit();
+    }
+
+    auto cursor = engine->getDirectCursor(*ru, ident);
+
+    auto empty = cursor->get(emptyKey);
+    ASSERT_OK(empty);
+    EXPECT_EQ(0, empty.getValue().capacity());
+    // UniqueBuffer(0) allocates kHolderSize bytes and thus is non-null even if malloc(0) would
+    // return null
+    EXPECT_NE(nullptr, empty.getValue().get());
+
+    auto null = cursor->get(nullKey);
+    ASSERT_OK(null);
+    EXPECT_EQ(0, null.getValue().capacity());
+    // WiredTiger does not support storing null as a distinct thing from an empty buffer
+    EXPECT_NE(nullptr, null.getValue().get());
+
+    auto nonexistent = cursor->get(nonexistentKey);
+    EXPECT_EQ(ErrorCodes::NoSuchKey, nonexistent);
 }
 
 using StorageEngineTestDeathTest = StorageEngineTest;
@@ -273,23 +306,18 @@ DEATH_TEST_F(StorageEngineTestDeathTest,
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
-    const char* key = "key";
-    const char* valueToStore = "test";
     const int64_t intKey{1};
-    const std::span<const char> value{valueToStore, std::strlen(valueToStore)};
-    const std::span<const char> strKey{key, std::strlen(key)};
+    const std::span<const char> value = "test"sv;
 
-    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
-    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    auto intRs = makeTemporary(opCtx.get());  // KeyFormat::Long
     ASSERT(intRs.get());
-    ASSERT(strRs.get());
 
     const auto intIdent = intRs->getIdent();
 
     // This should fail an invariant from missing a storage transaction.
     {
         auto status =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value);
+            _storageEngine->getEngine()->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value);
     }
 }
 
@@ -299,30 +327,26 @@ DEATH_TEST_F(StorageEngineTestDeathTest,
     auto opCtx = cc().makeOperationContext();
     auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
 
-    const char* key = "key";
-    const char* valueToStore = "test";
     const int64_t intKey{1};
-    const std::span<const char> value{valueToStore, std::strlen(valueToStore)};
-    const std::span<const char> strKey{key, std::strlen(key)};
+    const std::span<const char> value = "test"sv;
 
-    auto intRs = makeTemporary(opCtx.get());           // KeyFormat::Long
-    auto strRs = makeTemporaryClustered(opCtx.get());  // KeyFormat::String
+    auto intRs = makeTemporary(opCtx.get());  // KeyFormat::Long
     ASSERT(intRs.get());
-    ASSERT(strRs.get());
 
     const auto intIdent = intRs->getIdent();
 
+    auto* engine = _storageEngine->getEngine();
+
     {
         StorageWriteTransaction txn(*ru);
-        auto status =
-            storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value);
+        auto status = engine->getDirectCursor(*ru, intIdent)->insert(*ru, intKey, value);
         ASSERT_OK(status);
         txn.commit();
     }
 
     // This should fail an invariant from missing a storage transaction.
     {
-        auto status = storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, intKey);
+        auto status = engine->getDirectCursor(*ru, intIdent)->remove(*ru, intKey);
     }
 }
 
@@ -379,7 +403,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         catalog::closeCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     }
 
     ASSERT(!identExists(opCtx.get(), collInfo.ident));
@@ -938,6 +963,45 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
+TEST_F(StorageEngineTest, ReconcileUnfinishedIndexRetriesWriteConflicts) {
+    auto opCtx = cc().makeOperationContext();
+
+    Lock::GlobalLock lk(&*opCtx, MODE_X);
+
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+
+    // Start a single-phase (i.e. no build UUID) index.
+    const boost::optional<UUID> buildUUID = boost::none;
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, buildUUID));
+        wuow.commit();
+    }
+
+    const auto indexIdent =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), collInfo.catalogId, indexName);
+
+    // Dropping the unfinished index writes to the catalog. Reconcile must retry that write on
+    // consecutive write conflicts rather than let the exception escape and take down startup.
+    auto fp = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 2});
+
+    auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
+
+    ASSERT(!identExists(opCtx.get(), indexIdent));
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
+
+    // The retried catalog write must have persisted the metadata without the dropped index.
+    auto md = durable_catalog::getParsedCatalogEntry(
+                  opCtx.get(), collInfo.catalogId, _storageEngine->getMDBCatalog())
+                  ->metadata;
+    ASSERT_EQ(-1, md->findIndexOffset(indexName));
+}
+
 TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     auto opCtx = cc().makeOperationContext();
 
@@ -1017,7 +1081,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         catalog::closeCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     }
 
     ASSERT(identExists(opCtx.get(), collInfo.ident));
@@ -1074,7 +1139,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 
     // When in a repair context, loadMDBCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-    catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+    catalog::initializeCollectionCatalog(
+        opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     auto identNs = collInfo.ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs =
@@ -1111,7 +1177,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         _storageEngine->closeMDBCatalog(opCtx.get());
         _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, boost::none);
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -1123,6 +1190,89 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     NamespaceString orphanNs =
         NamespaceString::createNamespaceString_forTest("local.orphan." + identNs);
     ASSERT(!collectionExists(opCtx.get(), orphanNs));
+}
+
+TEST_F(StorageEngineTest, InitializeCatalogSeedsCatalogIdTrackerOldestTimestamp) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const NamespaceString missingNs = NamespaceString::createNamespaceString_forTest("db.missing");
+    createCollection(opCtx.get(), collNs);
+
+    const Timestamp stableTs(10, 10);
+    {
+        Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
+        catalog::closeCatalog(opCtx.get());
+        _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStartup, stableTs);
+    }
+
+    auto lookupResult = [&](const NamespaceString& nss, boost::optional<Timestamp> ts) {
+        return CollectionCatalog::get(opCtx.get())->catalogIdTracker().lookup(nss, ts).result;
+    };
+    using Existence = HistoricalCatalogIdTracker::LookupResult::Existence;
+
+    // The tracker maintains mappings from the stable timestamp onwards: a namespace with no
+    // mapping is known to not exist without scanning the durable catalog.
+    ASSERT_EQ(Existence::kNotExists, lookupResult(missingNs, stableTs));
+    ASSERT_EQ(Existence::kNotExists, lookupResult(missingNs, Timestamp(11, 11)));
+    // Before the stable timestamp the tracker maintains nothing, so existence is unknown.
+    ASSERT_EQ(Existence::kUnknown, lookupResult(missingNs, Timestamp(9, 9)));
+    // Existing collections are registered at the stable timestamp.
+    ASSERT_EQ(Existence::kExists, lookupResult(collNs, stableTs));
+    ASSERT_EQ(Existence::kUnknown, lookupResult(collNs, Timestamp(9, 9)));
+}
+
+TEST_F(StorageEngineTest, InitializeCatalogOnStorageChangeSeedsCatalogIdTracker) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString missingNs = NamespaceString::createNamespaceString_forTest("db.missing");
+
+    const Timestamp stableTs(10, 10);
+    {
+        Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
+        catalog::closeCatalog(opCtx.get());
+        _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStorageChange, stableTs);
+    }
+
+    using Existence = HistoricalCatalogIdTracker::LookupResult::Existence;
+    const auto& tracker = CollectionCatalog::get(opCtx.get())->catalogIdTracker();
+
+    // Missing namespaces are known not to exist at or after stableTs.
+    ASSERT_EQ(Existence::kNotExists, tracker.lookup(missingNs, stableTs).result);
+    ASSERT_EQ(Existence::kUnknown, tracker.lookup(missingNs, Timestamp(9, 9)).result);
+}
+
+TEST_F(StorageEngineTest, InitializeCatalogOnStorageChangeResetsCatalogIdTracker) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const UUID uuid = UUID::gen();
+    const RecordId catalogId{1};
+    const Timestamp pitTs(10, 10);
+
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().recordExistingAtTime(collNs, uuid, catalogId, pitTs);
+    });
+    const auto& trackerBeforeStorageChange =
+        CollectionCatalog::get(opCtx.get())->catalogIdTracker();
+    ASSERT_EQ(HistoricalCatalogIdTracker::LookupResult::Existence::kExists,
+              trackerBeforeStorageChange.lookup(collNs, pitTs).result);
+
+    {
+        Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
+        catalog::closeCatalog(opCtx.get());
+        _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        catalog::initializeCollectionCatalog(
+            opCtx.get(), _storageEngine, catalog::InitMode::kStorageChange, pitTs);
+    }
+
+    const auto& trackerAfterStorageChange = CollectionCatalog::get(opCtx.get())->catalogIdTracker();
+    ASSERT_EQ(HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists,
+              trackerAfterStorageChange.lookup(collNs, pitTs).result);
 }
 
 TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
@@ -1152,7 +1302,9 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         });
     {
         Lock::GlobalWrite globalLk(opCtx.get());
-        catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+        catalog::initializeCollectionCatalog(opCtx.get(),
+                                             getServiceContext()->getStorageEngine(),
+                                             catalog::InitMode::kStorageChange);
     }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     LOGV2(5781103, "Started up storage engine in alternate location");
@@ -1181,7 +1333,9 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         });
     {
         Lock::GlobalWrite globalLk(opCtx.get());
-        catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+        catalog::initializeCollectionCatalog(opCtx.get(),
+                                             getServiceContext()->getStorageEngine(),
+                                             catalog::InitMode::kStorageChange);
     }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
@@ -1266,7 +1420,8 @@ TEST_F(StorageEngineTest, IdentMissingForReadyIndex) {
     CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
         catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
     });
-    catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+    catalog::initializeCollectionCatalog(
+        opCtx.get(), getServiceContext()->getStorageEngine(), catalog::InitMode::kStartup);
 
     // Startup recovery currently does not handle this invalid state, but throws an appropriate
     // exception rather than segfaulting or otherwise crashing uncleanly

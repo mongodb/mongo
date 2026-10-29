@@ -4,6 +4,7 @@
 // @tags: [
 //   requires_fcv_81,
 //   requires_persistence,
+//   requires_profiling,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

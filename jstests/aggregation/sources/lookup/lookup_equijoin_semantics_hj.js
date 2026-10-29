@@ -1,7 +1,10 @@
 /**
  * Tests for $lookup with localField/foreignField syntax using hash join algorithm.
  *
- * @tags: [featureFlagSbeFull]
+ * @tags: [
+ *   featureFlagSbeFull,
+ *   requires_fcv_91,
+ * ]
  */
 import {
     JoinAlgorithm,

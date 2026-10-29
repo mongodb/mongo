@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,6 +14,7 @@
 #include "mongo/util/waitable.h"
 
 #include <mutex>
+#include <thread>
 #include <vector>
 
 namespace mongo {
@@ -49,7 +24,7 @@ class OperationContext;
 /**
  * The most basic Baton implementation.
  */
-class MONGO_MOD_PUBLIC DefaultBaton : public Baton {
+class [[MONGO_MOD_PUBLIC]] DefaultBaton : public Baton {
 public:
     explicit DefaultBaton(OperationContext* opCtx);
 
@@ -70,6 +45,41 @@ private:
         size_t id;
         Promise<void> promise;
     };
+
+    /**
+     * Detects and fails if two threads run the tracked resource concurrently. Re-entrancy from the
+     * same thread is allowed.
+     */
+    class SingleThreadEnforcer {
+    public:
+        struct Guard {
+            ~Guard() {
+                enforcer->end();
+            }
+
+            SingleThreadEnforcer* enforcer;
+        };
+
+        [[nodiscard]] Guard start() {
+            const auto id = std::this_thread::get_id();
+            invariant(!_runDepth || _id == id, "Detected concurrent runners");
+            _id = id;
+            ++_runDepth;
+            return Guard{.enforcer = this};
+        }
+
+        void end() {
+            if (--_runDepth != 0) {
+                return;
+            }
+            _id = std::thread::id{};
+        }
+
+    private:
+        std::thread::id _id;
+        int _runDepth = 0;
+    };
+
     void detachImpl() override;
 
     using Job = unique_function<void(std::unique_lock<std::mutex>)>;
@@ -96,9 +106,11 @@ private:
     bool _notified = false;
     bool _sleeping = false;
 
+    SingleThreadEnforcer _ste;
+
     OperationContext* _opCtx;
 
-    AtomicWord<size_t> _nextTimerId;
+    Atomic<size_t> _nextTimerId;
     // Sorted in order of nearest -> furthest in future.
     std::multimap<Date_t, Timer> _timers;
     stdx::unordered_map<size_t, std::multimap<Date_t, Timer>::iterator> _timersById;

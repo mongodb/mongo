@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/blocking_results_merger.h"
 
@@ -33,20 +7,25 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 #include <mutex>
+#include <string_view>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -54,9 +33,77 @@ namespace mongo {
 
 namespace {
 
-using BlockingResultsMergerTest = ResultsMergerTestFixture;
+class BlockingResultsMergerTestFixture : public ResultsMergerTestFixture {
+protected:
+    /**
+     * Sends an interrupt signal to start to tear down test fixture state.
+     *
+     * This offers a race-free way to interrupt another thread parked in
+     * BlockingResultsMerger::next(). In contrast, BlockingResultsMerger::kill() is not safe to call
+     * from another thread. TSan builds identified that its
+     * 'runWithoutInterruptionExceptAtGlobalShutdown()' step writes the opCtx's deadline state
+     * ('_deadline'/'_maxTime'/'_timeoutError') under the Client lock which must only run on the
+     * opCtx's own thread.
+     */
+    void interruptOperationContext() {
+        std::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->markKilled(ErrorCodes::Interrupted);
+    }
 
-TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilKilled) {
+    /**
+     * Waits for 'future' within 60s, then kills 'merger'. On error, the opCtx is interrupted
+     * instead (kill() is not thread-safe -- see 'interruptOperationContext()'). This careful
+     * cleanup is done so that a thread parked in 'next()' still unwinds before this local
+     * FutureHandle is destroyed (its dtor's executor join deadlocks on that thread otherwise).
+     */
+    void waitForFutureThenKill(executor::NetworkTestEnv::FutureHandle<void> future,
+                               BlockingResultsMerger& merger) {
+        try {
+            future.timed_get(Seconds{60});
+        } catch (...) {
+            // Interrupt before the FutureHandle destructor joins the executor thread.
+            interruptOperationContext();
+            throw;
+        }
+        merger.kill(operationContext());
+    }
+
+    void waitForGetMoreScheduled(std::string what) {
+        waitForCondition([this] { return networkHasReadyRequests(); },
+                         [] {},
+                         std::move(what),
+                         [this] { interruptOperationContext(); });
+    }
+};
+
+// Throughout this file: ARM = AsyncResultsMerger, BRM = BlockingResultsMerger.
+
+// Builds a getMore response object carrying a command error with the given error labels. Mirrors
+// the helper of the same name in 'async_results_merger_test.cpp'. When 'baseBackoffMS' is supplied,
+// it is attached as a 'baseBackoffMS' field so that the retry strategy uses it as the backoff base.
+BSONObj makeResponseObjWithErrorLabels(int errorCode,
+                                       std::string_view reason,
+                                       std::vector<std::string_view> errorLabels,
+                                       boost::optional<Milliseconds> baseBackoffMS = boost::none) {
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append("ok", 0);
+    responseBuilder.append("code", errorCode);
+    responseBuilder.append("errmsg", reason);
+
+    BSONArrayBuilder arr(responseBuilder.subarrayStart("errorLabels"));
+    for (const auto& label : errorLabels) {
+        arr.append(label);
+    }
+    arr.done();
+
+    if (baseBackoffMS) {
+        responseBuilder.append("baseBackoffMS", static_cast<long long>(baseBackoffMS->count()));
+    }
+
+    return responseBuilder.obj();
+}
+
+TEST_F(BlockingResultsMergerTestFixture, ShouldBeAbleToBlockUntilKilled) {
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
@@ -306,10 +353,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
     // killing a BlockingResultsMerger involves running a killCursors, and this main thread is in
     // charge of scheduling the response to that request.
     future = launchAsync([&]() { blockingMerger.kill(operationContext()); });
-    while (!networkHasReadyRequests() || !getNthPendingRequest(0u).cmdObj["killCursors"]) {
-        // Wait for the kill to schedule it's killCursors. It may schedule a getMore first before
-        // cancelling it, so wait until the pending request is actually a killCursors.
-    }
+    waitForKillCursorsIssued();
     assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
     // Run the callback for the killCursors. We don't actually inspect the value so we don't have to
@@ -387,12 +431,10 @@ TEST_F(ResultsMergerTestFixture, KillShouldCompleteWithInterruptedOpCtx) {
     auto killFuture = launchAsync([&]() { blockingMerger.kill(operationContext()); });
 
     // In the mock-network environment, cancellation callbacks are delivered when the network
-    // processes its queue.  Wait until the ARM has scheduled the killCursors command (which
-    // proves it has progressed past the cancel step), then flush all pending callbacks so the
-    // kill future gets signalled and kill() can return.
-    while (!networkHasReadyRequests() || !getNthPendingRequest(0u).cmdObj["killCursors"]) {
-        // Spin until the ARM has issued the killCursors for the open cursor.
-    }
+    // processes its queue. Wait until the ARM has scheduled the killCursors command (which proves
+    // it has progressed past the cancel step), then flush all pending callbacks so the kill future
+    // gets signalled and kill() can return.
+    waitForKillCursorsIssued();
     assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
     runReadyCallbacks();
@@ -437,9 +479,7 @@ TEST_F(ResultsMergerTestFixture, KillDoesNotLeakExceptions) {
     // processes its queue. Wait until the ARM has scheduled the killCursors command (which proves
     // it has progressed past the cancel step), then flush all pending callbacks so the kill future
     // gets signalled and kill() can return.
-    while (!networkHasReadyRequests() || !getNthPendingRequest(0u).cmdObj["killCursors"]) {
-        // Spin until the ARM has issued the killCursors for the open cursor.
-    }
+    waitForKillCursorsIssued();
 
     assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
@@ -534,6 +574,337 @@ TEST_F(ResultsMergerTestFixture, CanAccessAsyncResultsMergerParams) {
 
     // Kill merger because otherwise it will run into an assertion in its dtor.
     blockingMerger.kill(operationContext());
+}
+
+//
+// The following tests exercise the BlockingResultsMerger's automatic retry-with-backoff behavior on
+// retryable getMore errors. The BlockingResultsMerger drives the retry loop internally: its
+// 'blockUntilNext()' helper repeatedly calls 'nextEvent()' / 'waitForEvent()' until the underlying
+// AsyncResultsMerger becomes ready, so a retryable error is retried transparently before 'next()'
+// returns. The 'RetryableError' label alone implies a zero-delay backoff, so the ARM re-dispatches
+// the retry as soon as the deferral callback fires.
+//
+
+// Tests that a single retryable error is retried automatically and the BlockingResultsMerger
+// ultimately returns the results from the successful retry.
+TEST_F(BlockingResultsMergerTestFixture, BlockingResultsMergerRetriesSingleErrorAndSucceeds) {
+    unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "transient error", {ErrorLabel::kRetryableError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    BlockingResultsMerger blockingMerger(operationContext(),
+                                         makeARMParamsFromExistingCursors(std::move(cursors)),
+                                         executor(),
+                                         nullptr);
+
+    auto future = launchAsync([&] {
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
+
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // The initial getMore fails with a retryable error.
+    waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
+    scheduleNetworkResponseObjs({retryableError});
+
+    // The BRM's blocking loop drives the zero-delay backoff and re-dispatches the retry getMore.
+    waitForGetMoreScheduled("Waiting for retry getMore to be scheduled");
+    std::vector<CursorResponse> success;
+    success.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{BSON("x" << 1)});
+    scheduleNetworkResponses(std::move(success));
+
+    waitForFutureThenKill(std::move(future), blockingMerger);
+}
+
+// Tests that a persistent error that resolves within the backoff strategy's attempt budget is
+// retried repeatedly and ultimately succeeds.
+TEST_F(BlockingResultsMergerTestFixture,
+       BlockingResultsMergerRetriesPersistentErrorUntilItResolves) {
+    unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "persistent transient error", {ErrorLabel::kRetryableError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    BlockingResultsMerger blockingMerger(operationContext(),
+                                         makeARMParamsFromExistingCursors(std::move(cursors)),
+                                         executor(),
+                                         nullptr);
+
+    // Two failures, then a success: still within the three-attempt budget.
+    const int kNumFailuresBeforeSuccess = 2;
+    auto future = launchAsync([&] {
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
+
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    for (int i = 0; i < kNumFailuresBeforeSuccess; ++i) {
+        waitForGetMoreScheduled(str::stream()
+                                << "Waiting for getMore attempt " << i << " to be scheduled");
+        scheduleNetworkResponseObjs({retryableError});
+    }
+
+    // The next retry succeeds, still within the backoff strategy's attempt budget.
+    waitForGetMoreScheduled("Waiting for final getMore to be scheduled");
+    std::vector<CursorResponse> success;
+    success.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{BSON("x" << 1)});
+    scheduleNetworkResponses(std::move(success));
+
+    waitForFutureThenKill(std::move(future), blockingMerger);
+}
+
+// Tests that a persistent error that outlasts the backoff strategy's attempt budget is surfaced
+// to the caller of 'next()' rather than being retried forever.
+TEST_F(BlockingResultsMergerTestFixture,
+       BlockingResultsMergerSurfacesErrorWhenBackoffBudgetExhausted) {
+    const int maxAttempts = 3;
+    unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", maxAttempts);
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable, "persistent error", {ErrorLabel::kRetryableError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    BlockingResultsMerger blockingMerger(operationContext(),
+                                         makeARMParamsFromExistingCursors(std::move(cursors)),
+                                         executor(),
+                                         nullptr);
+
+    auto future = launchAsync([&] {
+        auto nextStatus = blockingMerger.next(operationContext());
+        ASSERT(!nextStatus.isOK());
+        ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::HostUnreachable);
+        ASSERT_STRING_CONTAINS(nextStatus.getStatus().reason(), "persistent error");
+    });
+
+    // The initial getMore plus 'maxAttempts' retries all fail. Once the budget is exhausted the
+    // final error is surfaced to the caller rather than retried again.
+    for (int i = 0; i < maxAttempts + 1; ++i) {
+        waitForGetMoreScheduled(str::stream()
+                                << "Waiting for getMore attempt " << i << " to be scheduled");
+        scheduleNetworkResponseObjs({retryableError});
+    }
+
+    // The cursor was not exhausted by a successful response, so it must be killed before the BRM is
+    // destroyed.
+    waitForFutureThenKill(std::move(future), blockingMerger);
+}
+
+// Tests that an OperationContext can be detached and reattached while a delayed backoff retry
+// is pending. This mirrors the production scenario where a mongos cursor is stashed (detached)
+// between client getMores in the middle of the ARM's backoff retry loop. 'SystemOverloadedError'
+// alongside 'RetryableError' triggers a non-zero backoff, giving the test a window to swap the
+// OperationContext before the retry fires.
+TEST_F(BlockingResultsMergerTestFixture,
+       BlockingResultsMergerRetriesAfterDetachingAndReattachingMidBackoff) {
+    unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
+    constexpr auto kBackoffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << kBackoffDelayMs)};
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable,
+        "transient error",
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    BlockingResultsMerger blockingMerger(operationContext(),
+                                         makeARMParamsFromExistingCursors(std::move(cursors)),
+                                         executor(),
+                                         nullptr);
+
+    auto future = launchAsync([&] {
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
+
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // Wait for the initial getMore to be dispatched, then detach the OperationContext (simulating
+    // the cursor being stashed between client getMores) before delivering the error response.
+    waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
+    blockingMerger.detachFromOperationContext();
+
+    // Deliver the retryable error while detached. Because the ARM has no OperationContext, the
+    // retry is scheduled via the executor's 'sleepFor' (a timer on the mock network) rather than
+    // the SubBaton, so it will not fire until the network clock is advanced below.
+    scheduleNetworkResponseObjs({retryableError});
+
+    // Reattach with a fresh OperationContext. The pending retry must not be lost.
+    blockingMerger.reattachToOperationContext(operationContext());
+
+    // Fire the backoff timer and pump the network so the retry callback defers and signals the
+    // event the BRM is blocked on. The BRM's loop then re-dispatches the retry getMore using the
+    // reattached OperationContext.
+    advanceTime(Milliseconds(kBackoffDelayMs + 1));
+    runReadyCallbacks();
+
+    // The retry getMore is now dispatched; answer it with a successful, exhausting batch.
+    waitForGetMoreScheduled("Waiting for retry getMore to be scheduled");
+    std::vector<CursorResponse> success;
+    success.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{BSON("x" << 1)});
+    scheduleNetworkResponses(std::move(success));
+
+    waitForFutureThenKill(std::move(future), blockingMerger);
+}
+
+// The ARM schedules a backoff retry through one of two mechanisms depending on whether it is
+// attached to an OperationContext:
+//
+//   * While attached, the retry is scheduled via
+//     '_subBaton->waitUntil(preciseNow + delay, token).thenRunOn(_executor).getAsync(cb)'.
+//     'SubBaton::waitUntil' forwards to the opCtx's parent DefaultBaton, which stores the timer in
+//     its '_timers' map keyed on the *precise* clock source.
+//   * While detached, the retry is scheduled via '_executor->sleepFor(delay, token).getAsync(cb)',
+//     whose timer is driven by the mock *network* clock.
+//
+// This difference makes the testing harness strategy differ between the two, as you can see below.
+//
+// The next two tests pin the "not too soon" half of that contract for the BRM: the retry getMore
+// must NOT be dispatched until the mock clock advances past the backoff deadline.
+
+TEST_F(BlockingResultsMergerTestFixture,
+       BlockingResultsMergerDoesNotRetryBeforeBackoffDeadlineWhileAttached) {
+    unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
+    constexpr auto kBackoffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << kBackoffDelayMs)};
+    // Observation-only: lets us deterministically wait for the retry alarm to be armed before
+    // advancing the mock clock, replacing a racy fixed 'sleepmillis'.
+    FailPointEnableBlock retryScheduledFp{"armRetryScheduledForTesting"};
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable,
+        "transient error",
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    BlockingResultsMerger blockingMerger(operationContext(),
+                                         makeARMParamsFromExistingCursors(std::move(cursors)),
+                                         executor(),
+                                         nullptr);
+
+    auto future = launchAsync([&] {
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // The initial getMore fails with a retryable error that carries a non-zero backoff.
+    waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
+    scheduleNetworkResponseObjs({retryableError});
+
+    // This fail point is entered at the end of the ARM's '_scheduleRetryCallback', once the retry
+    // timer is armed with a fixed deadline of (now + delay). Wait until the fail point has been
+    // entered before touching the clock.
+    //
+    // NOTE: don't call 'runScheduledTasks()' here - see warning in that function's comment for
+    // details. The BRM self-drives the baton; advanceTime() + runReadyCallbacks() below are all it
+    // needs.
+    retryScheduledFp.waitForOneNewEntry();
+    runReadyCallbacks();
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Advance partway: still before the deadline, so no timer fires yet. 'outstandingRequest' stays
+    // true and no getMore is dispatched.
+    advanceTime(Milliseconds(kBackoffDelayMs / 2));
+    runReadyCallbacks();
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Only once the mock clock passes the deadline does the SubBaton timer fire: the retry
+    // continuation signals the event the BRM is blocked on, so it re-dispatches the retry getMore.
+    // The ClockSourceMocks all share one global mock (see clock_source_mock.cpp), so advancing the
+    // network clock here also moves the precise-clock SubBaton timer past its deadline;
+    // 'runReadyCallbacks()' then pumps the executor to run the continuation.
+    advanceTime(Milliseconds(kBackoffDelayMs / 2 + 1));
+    runReadyCallbacks();
+    waitForGetMoreScheduled("Waiting for retry getMore to be scheduled");
+    std::vector<CursorResponse> success;
+    success.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{BSON("x" << 1)});
+    scheduleNetworkResponses(std::move(success));
+
+    waitForFutureThenKill(std::move(future), blockingMerger);
+}
+
+// While detached, the retry getMore is not dispatched until the *network* clock advances past the
+// backoff deadline (via 'advanceTime()'). This clarifies that the 'advanceTime' trick, not
+// 'getMockClockSource()->advance', is what drives a retry scheduled while detached, because the
+// detached path uses '_executor->sleepFor' rather than the SubBaton.
+TEST_F(BlockingResultsMergerTestFixture,
+       BlockingResultsMergerDoesNotRetryBeforeBackoffDeadlineWhileDetached) {
+    unittest::ServerParameterGuard maxAttemptsGuard("defaultClientMaxRetryAttempts", 3);
+    constexpr auto kBackoffDelayMs = 1000;
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << kBackoffDelayMs)};
+    // Observation-only: lets us deterministically wait for the 'sleepFor' timer to be armed before
+    // advancing the mock clock, replacing a racy fixed 'sleepmillis'.
+    FailPointEnableBlock retryScheduledFp{"armRetryScheduledForTesting"};
+
+    const BSONObj retryableError = makeResponseObjWithErrorLabels(
+        ErrorCodes::HostUnreachable,
+        "transient error",
+        {ErrorLabel::kRetryableError, ErrorLabel::kSystemOverloadedError});
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    BlockingResultsMerger blockingMerger(operationContext(),
+                                         makeARMParamsFromExistingCursors(std::move(cursors)),
+                                         executor(),
+                                         nullptr);
+
+    auto future = launchAsync([&] {
+        auto next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
+        next = unittest::assertGet(blockingMerger.next(operationContext()));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // Detach before delivering the error so the ARM schedules the retry via 'sleepFor' (network
+    // clock) rather than the SubBaton (precise clock), then reattach.
+    waitForGetMoreScheduled("Waiting for initial getMore to be scheduled");
+    blockingMerger.detachFromOperationContext();
+    scheduleNetworkResponseObjs({retryableError});
+    blockingMerger.reattachToOperationContext(operationContext());
+
+    // Deterministically wait for the detached retry (scheduled via 'sleepFor' on the *network*
+    // clock) to be armed. The deadline is fixed at networkClock(0) + kBackoffDelayMs before we
+    // touch the clock below, so the negative assertion is meaningful. Wait relative to when the
+    // block enabled the fail point, since the fail point's absolute counter accumulates across
+    // tests in this binary.
+    retryScheduledFp.waitForOneNewEntry();
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Advancing the network clock partway is still before the deadline: no retry yet.
+    advanceTime(Milliseconds(kBackoffDelayMs / 2));
+    runReadyCallbacks();
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Only once the network clock passes the backoff deadline does the 'sleepFor' timer fire, the
+    // retry callback defer, and the BRM's loop re-dispatch the retry getMore.
+    advanceTime(Milliseconds(kBackoffDelayMs / 2 + 1));
+    runReadyCallbacks();
+    waitForGetMoreScheduled("Waiting for retry getMore to be scheduled");
+    std::vector<CursorResponse> success;
+    success.emplace_back(kTestNss, CursorId(0), std::vector<BSONObj>{BSON("x" << 1)});
+    scheduleNetworkResponses(std::move(success));
+
+    waitForFutureThenKill(std::move(future), blockingMerger);
 }
 
 }  // namespace

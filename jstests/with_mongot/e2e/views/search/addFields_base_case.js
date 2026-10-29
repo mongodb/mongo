@@ -4,7 +4,7 @@
  * 2. An aggregation pipeline containing a $search and non-$search stage.
  * 3. A non-search aggregation pipeline.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {

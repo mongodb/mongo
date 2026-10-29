@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -45,8 +19,10 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/throttle_cursor.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
@@ -54,12 +30,13 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 /**
  * Builds one or more indexes.
  *
@@ -309,13 +286,6 @@ public:
     void persistResumeState(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
-     * Writes the "tearable side write" abort sentinel.
-     *
-     * TODO (SERVER-126257): Remove once index build side writes cannot be torn.
-     */
-    void writeTearableSideWriteAbortRecord(OperationContext* opCtx) const;
-
-    /**
      * May be called at any time after construction but before a successful commit(). Suppresses
      * the default behavior on destruction of removing all traces of uncommitted index builds. May
      * delete internal tables, but this is not transactional. Writes the resumable index build
@@ -351,6 +321,36 @@ public:
      */
     void appendBuildInfo(BSONObjBuilder* builder) const;
 
+    /**
+     * Returns the phase the index build is currently in.
+     */
+    IndexBuildPhaseEnum getPhase() const {
+        std::lock_guard lk(_stateMutex);
+        return _phase;
+    }
+
+    /**
+     * Running total number of keys and bytes written to the index tables by this index build,
+     * including deletions. The number of bytes is calculated as the total size of the key strings
+     * being written.
+     *
+     * More specifically, this tracks the number of keys and bytes written during
+     * the bulk load and side writes drain phases, since the collection scan phase does not itself
+     * write to an index table.
+     *
+     */
+    struct IndexBuildWriteStats {
+        int64_t numKeysWrittenBulkLoad = 0;
+        int64_t numBytesWrittenBulkLoad = 0;
+        int64_t numKeysWrittenSideWritesDrain = 0;
+        int64_t numBytesWrittenSideWritesDrain = 0;
+    };
+
+    IndexBuildWriteStats getIndexTableWrites() const {
+        std::lock_guard lk(_stateMutex);
+        return _indexWriteStats;
+    }
+
 private:
     struct IndexToBuild {
         std::unique_ptr<IndexBuildBlock> block;
@@ -365,12 +365,22 @@ private:
         // writes.
         boost::optional<RecordId> lastSpilledRecordId;
 
+        // Multikey state this build recovered from the side writes it drained.
+        bool drainedMultikey = false;
+        MultikeyPaths drainedMultikeyPaths;
+
         // We cache index catalog entry pointer for the collection scan phase. This is necessary for
         // index build performance in the insert path.
         const IndexCatalogEntry* entryForScan = nullptr;
     };
 
     void _writeStateToDisk(OperationContext* opCtx);
+
+    /**
+     * If replicating container writes, releases the builder's sorters and any resources held by
+     * them.
+     */
+    void _releaseReplicatedSorters();
 
     /**
      * Performs an update-or-insert of a single record into the index build container. Caller must
@@ -384,6 +394,9 @@ private:
      */
     void _writeIndexBuildMetadataToContainer(OperationContext* opCtx) const;
 
+    // Sets the phase and returns the previous one.
+    IndexBuildPhaseEnum _setPhase(IndexBuildPhaseEnum phase);
+
     /**
      * Writes a single IndexStateInfo to the index build container for the given index. No-op when
      * not replicating container writes or not resumable.
@@ -391,10 +404,25 @@ private:
     void _writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index) const;
 
     /**
+     * Writes the IndexStateInfo for the given index within the caller's transaction. Callers that
+     * are not already in one should use `_writeIndexStateInfoToContainer`.
+     */
+    void _upsertIndexStateInfo(OperationContext* opCtx, size_t index) const;
+
+    /**
      * Writes the IndexBuildMetadata and the IndexStateInfo for all indexes to the index build
      * container. No-op when not replicating container writes or not resumable.
      */
     void _writeAllStateToContainer(OperationContext* opCtx) const;
+
+    /**
+     * Folds multikey paths recovered while draining side writes or retrying skipped records into
+     * this build's state and persists them with the rest of the resume state, within the caller's
+     * transaction.
+     */
+    Status _recordRecoveredMultikeyPaths(OperationContext* opCtx,
+                                         size_t index,
+                                         const MultikeyPaths& paths);
 
     BSONObj _constructStateObject() const;
 
@@ -408,7 +436,13 @@ private:
                                      const BSONObj& doc,
                                      unsigned long long iteration) const;
 
-    Status _insert(
+    /**
+     * Inserts documents to be indexed from the collection scan into the bulk builder, to insert the
+     * relevant index keys into the external sorter.
+     * Returns the insert status along with the number of times the document was inserted into index
+     * bulk builders.
+     */
+    StatusWith<int64_t> _insert(
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const BSONObj& wholeDocument,
@@ -463,8 +497,15 @@ private:
     // or boost::none if nothing has been inserted.
     boost::optional<RecordId> _lastRecordIdInserted;
 
+    // Protects the state that other threads observe while the build thread runs: _method, _phase
+    // and _indexWriteStats.
+    mutable std::mutex _stateMutex;
+
     // The current phase of the index build.
     IndexBuildPhaseEnum _phase = IndexBuildPhaseEnum::kInitialized;
+
+    // The number of keys and bytes written to the index tables so far by this index build.
+    IndexBuildWriteStats _indexWriteStats;
 
     // We cache the collection pointer for the collection scan phase. The collection pointer is
     // compared after yielding, which is used to indicate whether we need to refetch the index
@@ -478,7 +519,13 @@ private:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
     BSONObj _objToIndex;
 
+    // Paces the container writes of the spills issued by the collection scan phase. Installed by
+    // _doCollectionScan for the duration of the scan and reset on the way out, so that the
+    // SpillCallbacks captured in init() only pace the scan phase's spills. Disengaged when the
+    // scan is not running or when container writes are not replicated.
+    boost::optional<DataThrottle> _scanContainerWriteThrottle;
+
     // The temporary record store used for persisting the resume state of a resumable index build.
     boost::optional<LazyRecordStore> _resumeStateTempRecordStore;
 };
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

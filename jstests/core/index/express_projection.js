@@ -1,6 +1,7 @@
 /**
  * Tests how express code path works with projections.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_83,
  *   # "Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results"

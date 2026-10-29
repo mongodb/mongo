@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/unittest/golden_test.h"
 
@@ -34,6 +8,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <cstdlib>
 #include <exception>
 #include <ostream>
 #include <string>
@@ -45,6 +20,54 @@ namespace mongo::unittest {
 namespace {
 
 namespace fs = boost::filesystem;
+
+void setEnvVar(const char* name, const char* value) {
+#ifdef _WIN32
+    ASSERT_EQUALS(0, _putenv_s(name, value));
+#else
+    ASSERT_EQUALS(0, setenv(name, value, 1));
+#endif
+}
+
+void unsetEnvVar(const char* name) {
+#ifdef _WIN32
+    // Per the CRT contract, setting an environment variable to the empty string deletes it.
+    ASSERT_EQUALS(0, _putenv_s(name, ""));
+#else
+    ASSERT_EQUALS(0, unsetenv(name));
+#endif
+}
+
+// Sets or clears an environment variable for the duration of its scope and restores its previous
+// value afterwards.
+class ScopedEnvVar {
+public:
+    explicit ScopedEnvVar(const char* name, const char* value = nullptr) : _name(name) {
+        if (const char* oldValue = std::getenv(name)) {
+            _oldValue = oldValue;
+        }
+        if (value) {
+            setEnvVar(name, value);
+        } else {
+            unsetEnvVar(name);
+        }
+    }
+
+    ~ScopedEnvVar() {
+        if (_oldValue) {
+            setEnvVar(_name.c_str(), _oldValue->c_str());
+        } else {
+            unsetEnvVar(_name.c_str());
+        }
+    }
+
+    ScopedEnvVar(const ScopedEnvVar&) = delete;
+    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
+
+private:
+    std::string _name;
+    boost::optional<std::string> _oldValue;
+};
 
 GoldenTestConfig goldenTestConfig{"src/mongo/unittest/expected_output"};
 
@@ -75,6 +98,50 @@ TEST(GoldenSelfTest, GoldenTestContextGetPath) {
     GoldenTestContext ctx(&goldenTestConfig);
     ASSERT_EQ(ctx.getTestPath(),
               fs::path("golden_self_test") / fs::path("golden_test_context_get_path.txt"));
+}
+
+TEST(GoldenSelfTest, ResolveGoldenDataRootFromConfiguredEnvironmentWins) {
+    ScopedEnvVar configPathGuard("GOLDEN_TEST_CONFIG_PATH");
+    ScopedEnvVar dataRootGuard("GOLDEN_TEST_DATA_ROOT", "/some/configured/root");
+    ScopedEnvVar srcdirGuard("TEST_SRCDIR", "/some/runfiles/root");
+    ScopedEnvVar workspaceGuard("TEST_WORKSPACE", "test_workspace");
+
+    auto opts = GoldenTestOptions::parseEnvironment();
+    ASSERT(opts.goldenDataRoot);
+    ASSERT_EQ(*opts.goldenDataRoot, "/some/configured/root");
+    ASSERT_EQ(resolveGoldenDataRoot(opts.goldenDataRoot), fs::path("/some/configured/root"));
+}
+
+TEST(GoldenSelfTest, ResolveGoldenDataRootFromBazelTestEnvironment) {
+    ScopedEnvVar srcdirGuard("TEST_SRCDIR", "/some/runfiles/root");
+    ScopedEnvVar workspaceGuard("TEST_WORKSPACE", "test_workspace");
+
+    ASSERT_EQ(resolveGoldenDataRoot(boost::none),
+              fs::path("/some/runfiles/root") / "test_workspace");
+}
+
+TEST(GoldenSelfTest, ResolveGoldenDataRootFallsBackToWorkingDirectory) {
+    // Temporarily clear the bazel test environment variables to exercise the fallback.
+    ScopedEnvVar srcdirGuard("TEST_SRCDIR");
+    ScopedEnvVar workspaceGuard("TEST_WORKSPACE");
+
+    ASSERT_EQ(resolveGoldenDataRoot(boost::none), fs::path("."));
+}
+
+TEST(GoldenSelfTest, ResolveGoldenDataRootRequiresBothBazelEnvironmentVariables) {
+    ScopedEnvVar srcdirGuard("TEST_SRCDIR", "/some/runfiles/root");
+    ScopedEnvVar workspaceGuard("TEST_WORKSPACE");
+    ASSERT_EQ(resolveGoldenDataRoot(boost::none), fs::path("."));
+
+    unsetEnvVar("TEST_SRCDIR");
+    setEnvVar("TEST_WORKSPACE", "test_workspace");
+    ASSERT_EQ(resolveGoldenDataRoot(boost::none), fs::path("."));
+}
+
+TEST(GoldenSelfTest, ResolveGoldenDataRootIgnoresEmptyConfig) {
+    // An empty GOLDEN_TEST_DATA_ROOT (e.g. --test_env inheriting an unset variable) must
+    // not resolve to an empty path.
+    ASSERT_EQ(resolveGoldenDataRoot(std::string("")), resolveGoldenDataRoot(boost::none));
 }
 
 // Verify the basic output comparison works, when config is reused.

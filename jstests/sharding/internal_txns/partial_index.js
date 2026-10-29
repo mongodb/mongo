@@ -9,12 +9,6 @@ import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// TODO (SERVER-88675): DDL commands against config and admin database are not allowed via a router
-// but are allowed via a direct connection to the config server or shard.
-// This test involves dropping an index in the 'config' database which is not allowed through a
-// router.
-TestData.replicaSetEndpointIncompatible = true;
-
 const kDbName = "testDb";
 const kCollName = "testColl";
 const kConfigTxnNs = "config.transactions";

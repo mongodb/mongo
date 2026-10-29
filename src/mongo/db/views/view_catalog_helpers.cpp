@@ -1,45 +1,14 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/views/view_catalog_helpers.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -50,13 +19,14 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/util/retry.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view_graph.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -70,20 +40,56 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 namespace mongo {
 namespace view_catalog_helpers {
 
+namespace {
+LiteParsedPipeline liteParseAndValidateWithIfrRetry(const OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<BSONObj>& pipeline,
+                                                    bool performApiVersionChecks) {
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+
+    return retryOn<ErrorCodes::IFRFlagRetry>(
+        "validateViewPipeline",
+        [&] {
+            LiteParsedPipeline liteParsedPipeline(
+                nss, pipeline, false, LiteParserOptions{.ifrContext = ifrContext});
+            liteParsedPipeline.validate(opCtx, performApiVersionChecks);
+            return liteParsedPipeline;
+        },
+        kDefaultMaxRetries,
+        [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
+            auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
+            tassert(13322500, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
+            std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
+            auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+            tassert(13322501,
+                    str::stream() << "IFR retry referenced an unknown feature flag: "
+                                  << disabledFlagName,
+                    flag);
+            ifrContext->disableFlag(*flag);
+        });
+}
+}  // namespace
+
 StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationContext* opCtx,
                                                                   const ViewDefinition& viewDef) {
-    const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
-
     // The API version pipeline validation should be skipped for time-series view because of
     // following reasons:
     //     - the view pipeline is not created by (or visible to) the end-user and should be skipped.
     //     - the view pipeline can have stages that are not allowed in stable API version '1' eg.
     //       '$_internalUnpackBucket'.
-    bool performApiVersionChecks = !viewDef.timeseries();
-    liteParsedPipeline.validate(opCtx, performApiVersionChecks);
+    const LiteParsedPipeline liteParsedPipeline = liteParseAndValidateWithIfrRetry(
+        opCtx, viewDef.viewOn(), viewDef.pipeline(), !viewDef.timeseries());
     liteParsedPipeline.checkStagesAllowedInViewDefinition();
 
     // Verify that this is a legitimate pipeline specification by making sure it parses

@@ -36,6 +36,7 @@ from wtscenario import make_scenarios
 # Utilities: wt dump, as well as the dump cursor
 # Test that dump and load retain table configuration information.
 #
+@wttest.skip_for_hook("disagg", "wt load is not supported in disaggregated storage mode")
 class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt dump.  We check for specific output and preservation of

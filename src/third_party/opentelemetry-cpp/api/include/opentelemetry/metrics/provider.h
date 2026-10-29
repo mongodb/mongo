@@ -45,14 +45,16 @@ public:
 private:
   OPENTELEMETRY_API_SINGLETON static nostd::shared_ptr<MeterProvider> &GetProvider() noexcept
   {
-    static nostd::shared_ptr<MeterProvider> provider(new NoopMeterProvider);
-    return provider;
+    // intentionally leak
+    static auto provider = new nostd::shared_ptr<MeterProvider>(new NoopMeterProvider);
+    return *provider;
   }
 
   OPENTELEMETRY_API_SINGLETON static common::SpinLockMutex &GetLock() noexcept
   {
-    static common::SpinLockMutex lock;
-    return lock;
+    // intentionally leak
+    static auto lock = new common::SpinLockMutex();
+    return *lock;
   }
 };
 

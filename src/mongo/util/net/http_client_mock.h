@@ -1,44 +1,37 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/http_client.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC MockHttpClient : public HttpClient {
+namespace mock_http_client_detail {
+
+// Different libcurl builds percent-encode with either upper- or lower-case hex
+// digits; the two encodings are equivalent, so canonicalize to one case for
+// URL comparison.
+inline std::string canonicalizeUrl(std::string url) {
+    for (size_t i = 0; i + 2 < url.size(); ++i) {
+        if (url[i] == '%') {
+            url[i + 1] = ctype::toUpper(url[i + 1]);
+            url[i + 2] = ctype::toUpper(url[i + 2]);
+        }
+    }
+    return url;
+}
+
+}  // namespace mock_http_client_detail
+
+class [[MONGO_MOD_PUBLIC]] MockHttpClient : public HttpClient {
 public:
     MockHttpClient() = default;
 
@@ -58,10 +51,14 @@ public:
 
         template <typename H>
         friend H AbslHashValue(H h, const Request& request) {
-            return H::combine(std::move(h), request.method, request.url);
+            return H::combine(std::move(h),
+                              request.method,
+                              mock_http_client_detail::canonicalizeUrl(request.url));
         }
         friend bool operator==(const Request& my, const Request& other) {
-            return my.method == other.method && my.url == other.url;
+            return my.method == other.method &&
+                mock_http_client_detail::canonicalizeUrl(my.url) ==
+                mock_http_client_detail::canonicalizeUrl(other.url);
         }
     };
     struct Response {

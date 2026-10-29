@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/router_role/router_role.h"
 
@@ -35,6 +9,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -43,6 +18,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -57,7 +33,70 @@ namespace {
 constexpr size_t kMaxDatabaseCreationAttempts = 3;
 
 MONGO_FAIL_POINT_DEFINE(waitForDatabaseToBeDropped);
+
+bool isNamespaceInvolvedInRouting(const NamespaceString& nss,
+                                  const std::vector<NamespaceString>& namespaces) {
+    return std::find(namespaces.begin(), namespaces.end(), nss) != namespaces.end();
+}
 }  // namespace
+
+bool onStaleError(CatalogCache* catalogCache,
+                  const Status& status,
+                  const std::vector<NamespaceString>& namespaces,
+                  bool filterUnrelatedNamespaces,
+                  boost::optional<const NamespaceString&> nss) {
+    if (status == ErrorCodes::StaleDbVersion) {
+        auto si = status.extraInfo<StaleDbRoutingVersion>();
+        tassert(6375910, "StaleDbVersion must have extraInfo", si);
+        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+        return true;
+    }
+
+    if (status == ErrorCodes::StaleConfig) {
+        auto si = status.extraInfo<StaleConfigInfo>();
+        tassert(6375911, "StaleConfig must have extraInfo", si);
+        const auto staleNs = si->getNss();
+
+        if (filterUnrelatedNamespaces && !isNamespaceInvolvedInRouting(staleNs, namespaces)) {
+            return false;
+        }
+
+        catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
+        return true;
+    }
+
+    if (status == ErrorCodes::StaleEpoch) {
+        if (auto si = status.extraInfo<StaleEpochInfo>()) {
+            if (filterUnrelatedNamespaces &&
+                !isNamespaceInvolvedInRouting(si->getNss(), namespaces)) {
+                return false;
+            }
+
+            const auto& versionWanted = si->getVersionWanted();
+            if (!versionWanted.has_value() || versionWanted == ShardVersion{}) {
+                catalogCache->onStaleCollectionVersion(si->getNss(), boost::none);
+            } else {
+                catalogCache->onStaleCollectionVersion(si->getNss(), versionWanted);
+            }
+        } else {
+            // TODO SERVER-109793: Once StaleEpochInfo is non-optional, this branch is unreachable.
+            // Remove the optional nss parameter and replace this else (including the for-loop)
+            // with a tassert.
+            if (nss) {
+                catalogCache->onStaleCollectionVersion(*nss, boost::none);
+            } else {
+                // Refresh every targeted nss when the error does not name a collection.
+                for (const auto& targetedNss : namespaces) {
+                    catalogCache->onStaleCollectionVersion(targetedNss, boost::none);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
 
 RouterBase::RouterBase(OperationContext* opCtx, CatalogCache* catalogCache)
     : _opCtx(opCtx), _catalogCache(catalogCache) {}
@@ -72,6 +111,15 @@ void RouterBase::_initTxnRouterIfNeeded() {
         invariant(opCtxTxnNum);
         txnRouter.beginOrContinueTxn(
             _opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+    }
+}
+
+void RouterBase::_armStaleConfigRetryAttemptTracking() {
+    // Only arm if not already armed: a nested router must not reset a counter that an enclosing
+    // router has already incremented while retrying a StaleConfig error.
+    auto& attempt = staleConfigRetryAttempt(_opCtx);
+    if (!attempt) {
+        attempt = 0;
     }
 }
 
@@ -168,63 +216,13 @@ CollectionRouterCommon::CollectionRouterCommon(
     : RouterBase(opCtx, catalogCache), _targetedNamespaces(targetedNamespaces) {}
 
 void CollectionRouterCommon::_onException(RoutingRetryInfo* retryInfo, Status s) {
-    const auto isNssInvolvedInRouting = [&](const NamespaceString& nss) {
-        if (nss.isTimeseriesBucketsCollection() &&
-            std::find(_targetedNamespaces.begin(),
-                      _targetedNamespaces.end(),
-                      nss.getTimeseriesViewNamespace()) != _targetedNamespaces.end()) {
-            return true;
-        }
-
-        return std::find(_targetedNamespaces.begin(), _targetedNamespaces.end(), nss) !=
-            _targetedNamespaces.end();
-    };
-
-    if (s == ErrorCodes::StaleDbVersion) {
-        auto si = s.extraInfo<StaleDbRoutingVersion>();
-        tassert(6375903, "StaleDbVersion must have extraInfo", si);
-        _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-    } else if (s == ErrorCodes::StaleConfig) {
-        auto si = s.extraInfo<StaleConfigInfo>();
-        tassert(6375904, "StaleConfig must have extraInfo", si);
-        const auto staleNs = si->getNss();
-
-        if (!isNssInvolvedInRouting(staleNs)) {
-            uassertStatusOK(s);
-        }
-
-        // TODO(SERVER-118822): Remove this once 9.0 becomes last LTS
-        // Refresh the view namespace if the stale namespace is a buckets timeseries collection.
-        if (staleNs.isTimeseriesBucketsCollection()) {
-            // A timeseries might've been created, so we need to invalidate the original namespace
-            // version.
-            _catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
-                                                    boost::none);
-        }
-
-        // Refresh the timeseries buckets nss when the command targets the buckets collection but
-        // the stale namespace is it's view.
-        std::for_each(
-            _targetedNamespaces.begin(), _targetedNamespaces.end(), [&](const auto& targetedNss) {
-                if (targetedNss.isTimeseriesBucketsCollection() &&
-                    targetedNss.getTimeseriesViewNamespace() == staleNs) {
-                    _catalogCache->onStaleCollectionVersion(targetedNss, boost::none);
-                }
-            });
-
-        _catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
-    } else if (s == ErrorCodes::StaleEpoch) {
-        if (auto si = s.extraInfo<StaleEpochInfo>()) {
-            if (!isNssInvolvedInRouting(si->getNss())) {
-                uassertStatusOK(s);
-            }
-
-            _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
-        } else {
-            for (const auto& nss : _targetedNamespaces) {
-                _catalogCache->onStaleCollectionVersion(nss, boost::none);
+    if (onStaleError(_catalogCache, s, _targetedNamespaces, true /* filterUnrelatedNamespaces */)) {
+        if (s == ErrorCodes::StaleConfig) {
+            if (auto& attempt = staleConfigRetryAttempt(_opCtx)) {
+                attempt = *attempt + 1;
             }
         }
+        // Fall through to the retry logic below.
     } else if (s == ErrorCodes::TransactionParticipantFailedUnyield) {
         auto extraInfo = s.extraInfo<TransactionParticipantFailedUnyieldInfo>();
         tassert(9690300, "TransactionParticipantFailedUnyield must have extraInfo", extraInfo);
@@ -235,16 +233,10 @@ void CollectionRouterCommon::_onException(RoutingRetryInfo* retryInfo, Status s)
             uassertStatusOK(s);
         }
 
-        if (*originalStatus == ErrorCodes::StaleConfig) {
-            auto si = originalStatus->extraInfo<StaleConfigInfo>();
-            tassert(9690301, "StaleConfig must have extraInfo", si);
-            _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
-        } else if (*originalStatus == ErrorCodes::StaleDbVersion) {
-            auto si = originalStatus->extraInfo<StaleDbRoutingVersion>();
-            tassert(9690302, "StaleDbVersion must have extraInfo", si);
-            _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-        }
-
+        onStaleError(_catalogCache,
+                     *originalStatus,
+                     _targetedNamespaces,
+                     true /* filterUnrelatedNamespaces */);
         uassertStatusOK(s);
     } else if (s == ErrorCodes::ShardNotFound) {
         // Shard has been removed. Attempting to route again.
@@ -366,11 +358,10 @@ CollectionRoutingInfo CollectionRouter::_createDbIfRequestedAndGetRoutingInfo() 
     return _getRoutingInfo(nss);
 }
 
-void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(OperationContext* opCtx,
-                                                             const ShardId& shardId,
+void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                              const CollectionRoutingInfo& cri,
                                                              BSONObjBuilder* builder) {
-    if (cri.getShardVersion(opCtx, shardId) == ShardVersion::UNTRACKED()) {
+    if (cri.getShardVersion(shardId) == ShardVersion::UNTRACKED()) {
         // Need to add the database version as well.
         const auto& dbVersion = cri.getDbVersion();
         if (!dbVersion.isFixed()) {
@@ -378,7 +369,7 @@ void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(OperationContext* o
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    appendShardVersion(*builder, cri.getShardVersion(opCtx, shardId));
+    appendShardVersion(*builder, cri.getShardVersion(shardId));
 }
 
 CollectionRouter::CollectionRouter(OperationContext* opCtx, NamespaceString nss)
@@ -419,7 +410,7 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
             if (cm.isSharded()) {
                 return false;
             } else if (cm.isUnsplittable()) {
-                return cm.getMinKeyShardIdWithSimpleCollation(_opCtx) == myShardId;
+                return cm.getMinKeyShardIdWithSimpleCollation() == myShardId;
             } else {
                 // If collection is untracked, it is only local if this shard is the dbPrimary
                 // shard.
@@ -480,7 +471,7 @@ std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
             if (refresh) {
                 for (const auto& nss : nssList) {
                     Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
-                        nss, boost::none /* wantedVersion */);
+                        nss, /*wantedVersion=*/boost::none);
                 }
             }
 

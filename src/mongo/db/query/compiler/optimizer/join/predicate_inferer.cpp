@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 
@@ -39,6 +13,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/disjoint_set.h"
 
@@ -152,7 +127,7 @@ SingleTablePredicate pipelineExpression, matchExpression;
  * Expressions or all MatchExpressions.
  */
 template <typename ExprCombinator, typename MatchCombinator>
-std::optional<SingleTablePredicate> combineChildren(
+boost::optional<SingleTablePredicate> combineChildren(
     std::vector<SingleTablePredicate> children,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
@@ -180,7 +155,7 @@ std::optional<SingleTablePredicate> combineChildren(
         return SingleTablePredicate{std::move(combined)};
     }
 
-    return std::nullopt;
+    return {};
 }
 
 /*
@@ -196,13 +171,13 @@ std::optional<SingleTablePredicate> combineChildren(
  * MatchExpression or PipelineExpression. Later on, finalizeSTPForTargetNode() will take care of
  * converting PipelineExpressions to MatchExpressions.
  */
-std::optional<SingleTablePredicate> getSingleTablePredicateForField(
+boost::optional<SingleTablePredicate> getSingleTablePredicateForField(
     const MatchExpression* expr,
     const FieldPath& fieldPath,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     if (!expr) {
-        return std::nullopt;
+        return {};
     }
 
     if (ComparisonMatchExpressionBase::isEquality(expr->matchType())) {
@@ -211,7 +186,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
         // class).
         const auto* cmp = dynamic_cast<const ComparisonMatchExpressionBase*>(expr);
         if (cmp->path() != fieldPath.fullPath()) {
-            return std::nullopt;
+            return {};
         }
 
         // Preserve $eq vs $expr semantics.
@@ -230,20 +205,20 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
             auto constExpr = ExpressionConstant::create(expCtx.get(), Value(value));
             auto eqExpr = ExpressionCompare::create(
                 expCtx.get(), ExpressionCompare::CmpOp::EQ, fieldExpr, constExpr);
-            return eqExpr;
+            return SingleTablePredicate{eqExpr};
         }
         // This is an $eq MatchExpression. To preserve $eq semantics, we just return a copy
         // untouched.
-        return expr->clone();
+        return SingleTablePredicate{expr->clone()};
     }
 
     if (expr->matchType() == MatchExpression::MATCH_IN) {
         const auto* inExpr = checked_cast<const InMatchExpression*>(expr);
         if (inExpr->path() != fieldPath.fullPath()) {
-            return std::nullopt;
+            return {};
         }
 
-        return inExpr->clone();
+        return SingleTablePredicate{inExpr->clone()};
     }
 
     if (expr->matchType() == MatchExpression::AND) {
@@ -256,7 +231,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
         }
 
         if (children.empty()) {
-            return std::nullopt;
+            return {};
         }
 
         if (children.size() == 1) {
@@ -270,7 +245,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
     }
 
     // Do not support $or, $nor, $not
-    return std::nullopt;
+    return {};
 }
 
 /*
@@ -291,7 +266,7 @@ StatusWith<std::unique_ptr<MatchExpression>> finalizeSTPForTargetNode(
 
     auto& targetNode = graph.getNode(resolvedPaths[pathId].nodeId);
     auto targetNodeExpCtx = targetNode.accessPath->getExpCtx().get();
-    const auto& targetFieldName = resolvedPaths[pathId].fieldName;
+    const auto& targetFieldName = resolvedPaths[pathId].underlyingFieldPath;
     // Step 1: Get a MatchExpression, regardless of which alternative pred holds.
     std::unique_ptr<MatchExpression> matchExpr = std::visit(
         [&](const auto& singletablepreciate) -> std::unique_ptr<MatchExpression> {
@@ -319,20 +294,35 @@ StatusWith<std::unique_ptr<MatchExpression>> finalizeSTPForTargetNode(
     return matchExpr;
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchExpression(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    NamespaceString nss,
-    std::unique_ptr<MatchExpression> expr) {
-    ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
+StatusWith<std::unique_ptr<CanonicalQuery>> cloneCQWithUpdatedFilter(
+    const CanonicalQuery& cqOld, std::unique_ptr<MatchExpression> expr, bool enableSimplification) {
+    const auto& oldExpCtx = cqOld.getExpCtx();
+    auto expCtx = makeCopyFromExpressionContext(oldExpCtx, cqOld.nss(), oldExpCtx->getUUID());
+    // Share the collator instance so it is the same object as on the source ExpressionContext,
+    // which the $expr nodes in 'expr' still point at.
+    if (!expCtx->getIgnoreCollator()) {
+        expCtx->setCollator(oldExpCtx->getCollatorShared());
+    }
+    if (enableSimplification) {
+        expCtx->setInLookup(false);
+    }
     expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
+
+    expr->setCollator(expCtx->getCollator());
+
+    auto fcr = query_request_helper::makeFromFindCommand(cqOld.getFindCommandRequest());
+    // Replace the old filter with the new one.
+    fcr->setFilter(expr->serialize());
     auto pfc = ParsedFindCommand::withExistingFilter(expCtx,
                                                      nullptr,
                                                      std::move(expr),
-                                                     std::make_unique<FindCommandRequest>(nss),
+                                                     std::move(fcr),
                                                      ProjectionPolicies::findProjectionPolicies());
+    if (!pfc.isOK()) {
+        return pfc.getStatus();
+    }
     CanonicalQueryParams params{.expCtx = expCtx, .parsedFind = std::move(pfc.getValue())};
     auto cq = CanonicalQuery::make(std::move(params));
-    expCtx->setPlanCache(oldPlanCache);
     if (cq.isOK() && SubPlanningUtils::canUseSubplanning(*cq.getValue())) {
         return Status(ErrorCodes::QueryFeatureNotAllowed,
                       "Encountered rooted $or, can't use subplanning together with join opt");
@@ -349,7 +339,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
                                      const std::vector<ResolvedPath>& resolvedPaths,
                                      MutableJoinGraph& graph,
                                      const FieldPath& sourceFieldName,
-                                     std::vector<BSONObj>& accessPathsBackingBson) {
+                                     std::vector<BSONObj>& accessPathsBackingBson,
+                                     OpDebug::JoinOptimizationMetrics& metrics) {
     for (PathId pathId : equivalenceClass) {
         if (pathId == sourcePathId) {
             // This node produced the STP we're propagating - no work to do, skip.
@@ -377,16 +368,11 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
 
         // After construction, CanonicalQuery's MatchExpression is read-only. Since the propogation
         // logic above requires updating the root of the MatchExpression, updating the join node's
-        // access path will require constructing an entirely new CQ with the newFilter.
-        auto nss = targetNode.collectionName;
-        auto expCtx = ExpressionContextBuilder{}
-                          .opCtx(targetNode.accessPath->getExpCtx()->getOperationContext())
-                          .ns(nss)
-                          .build();
-        // This will normalize and optimize the Match Expression (eg flattening an unnecessary AND
-        // wrapper) before creating the new CQ.
-        auto swCq =
-            createCanonicalQueryFromSingleMatchExpression(expCtx, nss, std::move(newFilter));
+        // access path will require constructing an entirely new CQ with the newFilter. This will
+        // normalize and optimize the MatchExpression (eg flattening an unnecessary AND wrapper)
+        // before creating the new CQ.
+        auto swCq = cloneCQWithUpdatedFilter(
+            *targetNode.accessPath, std::move(newFilter), /*enableSimplification=*/true);
         if (!swCq.isOK()) {
             uassertStatusOK(swCq.getStatus());
         }
@@ -399,6 +385,8 @@ Status propagateSingleTablePredicate(absl::InlinedVector<PathId, 8> equivalenceC
         // hold onto the original BSONObj.
         accessPathsBackingBson.emplace_back(targetNode.accessPath->getQueryObj());
         targetNode.accessPath = std::move(swCq.getValue());
+
+        metrics.numInferredSingleTablePredicates++;
     }
     return Status::OK();
 }
@@ -427,7 +415,7 @@ boost::optional<SingleTablePredResult> extractSingleTablePredicateFromEquivclass
 
         if (!cq->getPrimaryMatchExpression()->isTriviallyTrue()) {
             // There is a single table predicate (STP) on this node.
-            auto& fieldName = resolvedPaths[pathId].fieldName;
+            auto& fieldName = resolvedPaths[pathId].underlyingFieldPath;
             // Confirm that the STP is indeed on the field that is associated with this
             // equivalence class.
             if (auto pred = getSingleTablePredicateForField(
@@ -453,7 +441,8 @@ StatusWith<std::vector<BSONObj>> inferSingleTablePredicate(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OpDebug::JoinOptimizationMetrics& metrics) {
     std::vector<BSONObj> accessPathsBackingBson;
 
     for (const auto& [setId, equivalenceClass] : pathSets) {
@@ -467,7 +456,8 @@ StatusWith<std::vector<BSONObj>> inferSingleTablePredicate(
                                                     resolvedPaths,
                                                     graph,
                                                     fieldName,
-                                                    accessPathsBackingBson);
+                                                    accessPathsBackingBson,
+                                                    metrics);
             if (!sw.isOK()) {
                 return sw;
             }
@@ -492,7 +482,8 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
     MutableJoinGraph& graph,
     const std::vector<ResolvedPath>& resolvedPaths,
     size_t maxNodes,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OpDebug::JoinOptimizationMetrics& metrics) {
     DisjointSet ds{resolvedPaths.size()};
     for (const auto& edge : graph.edges()) {
         for (const auto& pred : edge.predicates) {
@@ -532,16 +523,13 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
                     // unoptimized.
                     break;
                 }
+                metrics.numInferredEqJoinPredicates++;
             }
             pathSet.push_back(currentPathId);
         }
     }
-    // TODO SERVER-117385 remove this flag and this check once we can handle inferred predicates in
-    // our CE.
-    if (!expCtx->getQueryKnobConfiguration().getInferSingleTablePredicates()) {
-        return std::vector<BSONObj>{};
-    }
-    return inferSingleTablePredicate(graph, resolvedPaths, pathSets, expCtx);
+
+    return inferSingleTablePredicate(graph, resolvedPaths, pathSets, expCtx, metrics);
 }
 
 }  // namespace mongo::join_ordering

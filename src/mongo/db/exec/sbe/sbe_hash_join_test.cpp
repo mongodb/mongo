@@ -1,53 +1,33 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::HashJoinStage.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
+#include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
+#include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -183,7 +163,8 @@ std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStage(
     value::SlotVector outerProjectSlots,
     value::SlotVector innerCondSlots,
     value::SlotVector innerProjectSlots,
-    boost::optional<value::SlotId> collatorSlot = boost::none) {
+    boost::optional<value::SlotId> collatorSlot = boost::none,
+    bool allowDiskUse = true) {
 
     // Output slots are the condition and project slots from both sides
     value::SlotVector outputSlots;
@@ -199,7 +180,8 @@ std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStage(
                                               innerCondSlots,
                                               innerProjectSlots,
                                               collatorSlot,
-                                              nullptr /* yieldPolicy */,
+                                              allowDiskUse,
+                                              /*yieldPolicy=*/nullptr,
                                               kEmptyPlanNodeId,
                                               boost::none);
 
@@ -211,25 +193,23 @@ TEST_F(HashJoinStageTest, BasicHashJoin) {
 
     // Outer side (probes hash table): [[key, proj], ...] = [[1, "big_string_1"], [2,
     // "big_string_1"], [3, "big_string3"]]
-    auto [outerTag, outerVal] =
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY(1 << "big_string_1") << BSON_ARRAY(2 << "big_string_2")
-                                                             << BSON_ARRAY(3 << "big_string_3")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+                                                             << BSON_ARRAY(3 << "big_string_3"))));
 
     // Inner side (builds hash table): [[key, proj], ...] = [[2, "big_string_x"], [3,
     // "big_string_y"], [4, "big_string_z"]]
-    auto [innerTag, innerVal] =
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY(2 << "big_string_x") << BSON_ARRAY(3 << "big_string_y")
-                                                             << BSON_ARRAY(4 << "big_string_z")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+                                                             << BSON_ARRAY(4 << "big_string_z"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -244,39 +224,81 @@ TEST_F(HashJoinStageTest, BasicHashJoin) {
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
     // Get all results
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // Key 2 matches: [2, 2, "big_string_x", "big_string_2"]
     // Key 3 matches: [3, 3, "big_string_y", "big_string_3"]
-    auto [expectedTag, expectedVal] =
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY(2 << 2 << "big_string_x" << "big_string_2")
-                             << BSON_ARRAY(3 << 3 << "big_string_y" << "big_string_3")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                             << BSON_ARRAY(3 << 3 << "big_string_y" << "big_string_3"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
+}
+
+TEST_F(HashJoinStageTest, SpillThrowsWhenDiskUseNotAllowed) {
+    // Force the hash table to spill by setting a tiny memory limit.
+    unittest::ServerParameterGuard maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",
+        static_cast<long long>(16));
+
+    auto ctx = makeCompileCtx();
+
+    // Build enough inner rows that the hash table exceeds the tiny memory limit.
+    BSONArrayBuilder innerBuilder;
+    for (int i = 0; i < 50; ++i) {
+        innerBuilder.append(BSON_ARRAY(i << ("big_string_" + std::to_string(i))));
+    }
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(innerBuilder.arr()));
+    value::TagValueOwned outerArr =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(BSON_ARRAY(1 << "x"))));
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
+
+    // Construct the join with allowDiskUse = false.
+    auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                          std::move(outerStage),
+                                                          std::move(innerStage),
+                                                          makeSV(outerSlots[0]),
+                                                          makeSV(outerSlots[1]),
+                                                          makeSV(innerSlots[0]),
+                                                          makeSV(innerSlots[1]),
+                                                          /*collatorSlot=*/boost::none,
+                                                          /*allowDiskUse=*/false);
+
+    // The stage must throw QueryExceededMemoryLimitNoDiskUseAllowed when it tries to spill during
+    // the build phase, instead of spilling.
+    ASSERT_THROWS_CODE(
+        [&] {
+            auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+            getAllResultsMulti(hashJoinStage.get(), resultAccessors);
+        }(),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(HashJoinStageTest, HashJoinEmptyOuter) {
     auto ctx = makeCompileCtx();
 
     // Empty outer side
-    auto [outerTag, outerVal] = makeArray(BSONArray());
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(BSONArray()));
 
     // Inner side with values: [[key, proj], ...]
-    auto [innerTag, innerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b") << BSON_ARRAY(3 << "c")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b") << BSON_ARRAY(3 << "c"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -290,35 +312,33 @@ TEST_F(HashJoinStageTest, HashJoinEmptyOuter) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // No matches when outer is empty - expect empty array
-    auto [expectedTag, expectedVal] = makeArray(BSONArray());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(BSONArray()));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinEmptyInner) {
     auto ctx = makeCompileCtx();
 
     // Outer side with values: [[key, proj], ...]
-    auto [outerTag, outerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << 100) << BSON_ARRAY(2 << 200) << BSON_ARRAY(3 << 300)));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << 100) << BSON_ARRAY(2 << 200) << BSON_ARRAY(3 << 300))));
 
     // Empty inner side
-    auto [innerTag, innerVal] = makeArray(BSONArray());
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(BSONArray()));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -332,36 +352,34 @@ TEST_F(HashJoinStageTest, HashJoinEmptyInner) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // No matches when inner is empty - expect empty array
-    auto [expectedTag, expectedVal] = makeArray(BSONArray());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(BSONArray()));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinDuplicateKeys) {
     auto ctx = makeCompileCtx();
 
     // Outer side with duplicate keys: [[key, proj], ...] = [[1, "a"], [1, "b"], [2, "c"]]
-    auto [outerTag, outerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(2 << "c")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(2 << "c"))));
 
     // Inner side with duplicate keys: [[key, proj], ...] = [[1, 10], [2, 20], [2, 30]]
-    auto [innerTag, innerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << 10) << BSON_ARRAY(2 << 20) << BSON_ARRAY(2 << 30)));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY(1 << 10) << BSON_ARRAY(2 << 20) << BSON_ARRAY(2 << 30))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -375,39 +393,37 @@ TEST_F(HashJoinStageTest, HashJoinDuplicateKeys) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
-    auto [expectedTag, expectedVal] =
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY(1 << 1 << 10 << "a")
                              << BSON_ARRAY(1 << 1 << 10 << "b") << BSON_ARRAY(2 << 2 << 20 << "c")
-                             << BSON_ARRAY(2 << 2 << 30 << "c")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                             << BSON_ARRAY(2 << 2 << 30 << "c"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinNoMatches) {
     auto ctx = makeCompileCtx();
 
     // Outer side: [[key, proj], ...] = [[1, "a"], [2, "b"], [3, "c"]]
-    auto [outerTag, outerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b") << BSON_ARRAY(3 << "c")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b") << BSON_ARRAY(3 << "c"))));
 
     // Inner side: keys 4, 5, 6 (no overlap) [[key, proj], ...]
-    auto [innerTag, innerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(4 << "x") << BSON_ARRAY(5 << "y") << BSON_ARRAY(6 << "z")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(4 << "x") << BSON_ARRAY(5 << "y") << BSON_ARRAY(6 << "z"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -421,36 +437,34 @@ TEST_F(HashJoinStageTest, HashJoinNoMatches) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // No matches since keys don't overlap - expect empty array
-    auto [expectedTag, expectedVal] = makeArray(BSONArray());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(BSONArray()));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinStringKeys) {
     auto ctx = makeCompileCtx();
 
     // Outer side: string keys with projections [[key, proj], ...]
-    auto [outerTag, outerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY("apple" << 1) << BSON_ARRAY("banana" << 2) << BSON_ARRAY("cherry" << 3)));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY("apple" << 1) << BSON_ARRAY("banana" << 2) << BSON_ARRAY("cherry" << 3))));
 
     // Inner side: string keys with projections [[key, proj], ...]
-    auto [innerTag, innerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY("banana" << "b") << BSON_ARRAY("cherry" << "c") << BSON_ARRAY("date" << "d")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY("banana" << "b") << BSON_ARRAY("cherry" << "c") << BSON_ARRAY("date" << "d"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -464,40 +478,38 @@ TEST_F(HashJoinStageTest, HashJoinStringKeys) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // "banana" matches: ["banana", "banana", "b", 2]
     // "cherry" matches: ["cherry", "cherry", "c", 3]
-    auto [expectedTag, expectedVal] =
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY("banana" << "banana" << "b" << 2)
-                             << BSON_ARRAY("cherry" << "cherry" << "c" << 3)));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                             << BSON_ARRAY("cherry" << "cherry" << "c" << 3))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinMixedTypes) {
     auto ctx = makeCompileCtx();
 
     // Outer side: mixed integer and double values that are equal [[key, proj], ...]
-    auto [outerTag, outerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY(1 << "int1") << BSON_ARRAY(2.0 << "dbl2") << BSON_ARRAY(3 << "int3")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(1 << "int1") << BSON_ARRAY(2.0 << "dbl2") << BSON_ARRAY(3 << "int3"))));
 
     // Inner side: values that should match [[key, proj], ...]
-    auto [innerTag, innerVal] = makeArray(
-        BSON_ARRAY(BSON_ARRAY(1.0 << 100) << BSON_ARRAY(2 << 200) << BSON_ARRAY(4 << 400)));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1.0 << 100) << BSON_ARRAY(2 << 200) << BSON_ARRAY(4 << 400))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -511,36 +523,36 @@ TEST_F(HashJoinStageTest, HashJoinMixedTypes) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // 1.0 (inner) matches 1 (outer): [1.0, 1, 100, "int1"]
     // 2 (inner) matches 2.0 (outer): [2, 2.0, 200, "dbl2"]
-    auto [expectedTag, expectedVal] = makeArray(
-        BSON_ARRAY(BSON_ARRAY(1.0 << 1 << 100 << "int1") << BSON_ARRAY(2 << 2.0 << 200 << "dbl2")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(1.0 << 1 << 100 << "int1") << BSON_ARRAY(2 << 2.0 << 200 << "dbl2"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinSingleMatch) {
     auto ctx = makeCompileCtx();
 
     // Single element on each side that matches [[key, proj]]
-    auto [outerTag, outerVal] = makeArray(BSON_ARRAY(BSON_ARRAY(42 << "outer")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(BSON_ARRAY(42 << "outer"))));
 
-    auto [innerTag, innerVal] = makeArray(BSON_ARRAY(BSON_ARRAY(42 << "inner")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(BSON_ARRAY(42 << "inner"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -554,38 +566,37 @@ TEST_F(HashJoinStageTest, HashJoinSingleMatch) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // Single match: [42, 42, "inner", "outer"]
-    auto [expectedTag, expectedVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(42 << 42 << "inner" << "outer")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY(42 << 42 << "inner" << "outer"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinManyDuplicatesOnOuter) {
     auto ctx = makeCompileCtx();
 
     // Many duplicates on outer side with different projections [[key, proj], ...]
-    auto [outerTag, outerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(1 << "c")
-                                                  << BSON_ARRAY(1 << "d") << BSON_ARRAY(1 << "e")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(1 << "c")
+                                        << BSON_ARRAY(1 << "d") << BSON_ARRAY(1 << "e"))));
 
     // Single match on inner side [[key, proj]]
-    auto [innerTag, innerVal] = makeArray(BSON_ARRAY(BSON_ARRAY(1 << 100)));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(BSON_ARRAY(1 << 100))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -599,41 +610,40 @@ TEST_F(HashJoinStageTest, HashJoinManyDuplicatesOnOuter) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // Inner (key=1, proj=100) matches all 5 outer rows with different projections
-    auto [expectedTag, expectedVal] = makeArray(
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(
         BSON_ARRAY(BSON_ARRAY(1 << 1 << 100 << "a")
                    << BSON_ARRAY(1 << 1 << 100 << "b") << BSON_ARRAY(1 << 1 << 100 << "c")
-                   << BSON_ARRAY(1 << 1 << 100 << "d") << BSON_ARRAY(1 << 1 << 100 << "e")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                   << BSON_ARRAY(1 << 1 << 100 << "d") << BSON_ARRAY(1 << 1 << 100 << "e"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinManyDuplicatesOnInner) {
     auto ctx = makeCompileCtx();
 
     // Single probe on outer [[key, proj]]
-    auto [outerTag, outerVal] = makeArray(BSON_ARRAY(BSON_ARRAY(1 << "big_outer_string")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr =
+        value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(BSON_ARRAY(1 << "big_outer_string"))));
 
     // Many matches from inner with same key but different projections [[key, proj], ...]
-    auto [innerTag, innerVal] = makeArray(BSON_ARRAY(
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
         BSON_ARRAY(1 << "big_inner_string_10")
         << BSON_ARRAY(1 << "big_inner_string_20") << BSON_ARRAY(1 << "big_inner_string_30")
-        << BSON_ARRAY(1 << "big_inner_string_40") << BSON_ARRAY(1 << "big_inner_string_50")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+        << BSON_ARRAY(1 << "big_inner_string_40") << BSON_ARRAY(1 << "big_inner_string_50"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -647,42 +657,40 @@ TEST_F(HashJoinStageTest, HashJoinManyDuplicatesOnInner) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // All 5 inner rows (each with different proj) match the single outer row
-    auto [expectedTag, expectedVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << 1 << "big_inner_string_10" << "big_outer_string")
-                             << BSON_ARRAY(1 << 1 << "big_inner_string_20" << "big_outer_string")
-                             << BSON_ARRAY(1 << 1 << "big_inner_string_30" << "big_outer_string")
-                             << BSON_ARRAY(1 << 1 << "big_inner_string_40" << "big_outer_string")
-                             << BSON_ARRAY(1 << 1 << "big_inner_string_50" << "big_outer_string")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << 1 << "big_inner_string_10" << "big_outer_string")
+                   << BSON_ARRAY(1 << 1 << "big_inner_string_20" << "big_outer_string")
+                   << BSON_ARRAY(1 << 1 << "big_inner_string_30" << "big_outer_string")
+                   << BSON_ARRAY(1 << 1 << "big_inner_string_40" << "big_outer_string")
+                   << BSON_ARRAY(1 << 1 << "big_inner_string_50" << "big_outer_string"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinCartesianProduct) {
     auto ctx = makeCompileCtx();
 
     // 3 duplicates on outer with different projections [[key, proj], ...]
-    auto [outerTag, outerVal] =
-        makeArray(BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(1 << "c")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(1 << "b") << BSON_ARRAY(1 << "c"))));
 
     // 4 probes on inner with same key but different projections [[key, proj], ...]
-    auto [innerTag, innerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY(1 << 1) << BSON_ARRAY(1 << 2) << BSON_ARRAY(1 << 3) << BSON_ARRAY(1 << 4)));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(1 << 1) << BSON_ARRAY(1 << 2) << BSON_ARRAY(1 << 3) << BSON_ARRAY(1 << 4))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -696,44 +704,42 @@ TEST_F(HashJoinStageTest, HashJoinCartesianProduct) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // Cartesian product: 4 inner rows x 3 outer rows = 12 results
-    auto [expectedTag, expectedVal] =
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY(1 << 1 << 1 << "a")
                              << BSON_ARRAY(1 << 1 << 1 << "b") << BSON_ARRAY(1 << 1 << 1 << "c")
                              << BSON_ARRAY(1 << 1 << 2 << "a") << BSON_ARRAY(1 << 1 << 2 << "b")
                              << BSON_ARRAY(1 << 1 << 2 << "c") << BSON_ARRAY(1 << 1 << 3 << "a")
                              << BSON_ARRAY(1 << 1 << 3 << "b") << BSON_ARRAY(1 << 1 << 3 << "c")
                              << BSON_ARRAY(1 << 1 << 4 << "a") << BSON_ARRAY(1 << 1 << 4 << "b")
-                             << BSON_ARRAY(1 << 1 << 4 << "c")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                             << BSON_ARRAY(1 << 1 << 4 << "c"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinNullKeys) {
     auto ctx = makeCompileCtx();
 
     // Outer with null key [[key, proj], ...]
-    auto [outerTag, outerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY(BSONNULL << "null") << BSON_ARRAY(1 << "one") << BSON_ARRAY(2 << "two")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(BSONNULL << "null") << BSON_ARRAY(1 << "one") << BSON_ARRAY(2 << "two"))));
 
     // Inner with null key [[key, proj], ...]
-    auto [innerTag, innerVal] = makeArray(
-        BSON_ARRAY(BSON_ARRAY(BSONNULL << 0) << BSON_ARRAY(2 << 200) << BSON_ARRAY(3 << 300)));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY(BSONNULL << 0) << BSON_ARRAY(2 << 200) << BSON_ARRAY(3 << 300))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
     auto outerCondSlot = outerSlots[0];
     auto outerProjSlot = outerSlots[1];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
     auto innerCondSlot = innerSlots[0];
     auto innerProjSlot = innerSlots[1];
 
@@ -747,31 +753,29 @@ TEST_F(HashJoinStageTest, HashJoinNullKeys) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Expected results: [innerKey, outerKey, innerProj, outerProj]
     // null-null match: [null, null, 0, "null"]
     // 2-2 match: [2, 2, 200, "two"]
-    auto [expectedTag, expectedVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY(BSONNULL << BSONNULL << 0 << "null") << BSON_ARRAY(2 << 2 << 200 << "two")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(BSONNULL << BSONNULL << 0 << "null") << BSON_ARRAY(2 << 2 << 200 << "two"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
 }
 
 TEST_F(HashJoinStageTest, HashJoinCollationTest) {
     using namespace std::literals;
     for (auto useCollator : {false, true}) {
         // Inner side: [[key, proj], ...]
-        auto [innerTag, innerVal] = makeArray(
-            BSON_ARRAY(BSON_ARRAY("a" << 1) << BSON_ARRAY("b" << 2) << BSON_ARRAY("c" << 3)));
-        value::ValueGuard innerGuard{innerTag, innerVal};
+        value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(
+            BSON_ARRAY(BSON_ARRAY("a" << 1) << BSON_ARRAY("b" << 2) << BSON_ARRAY("c" << 3))));
 
         // Outer side: [[key, proj], ...]
-        auto [outerTag, outerVal] = makeArray(
-            BSON_ARRAY(BSON_ARRAY("a" << "x") << BSON_ARRAY("b" << "y") << BSON_ARRAY("A" << "z")));
-        value::ValueGuard outerGuard{outerTag, outerVal};
+        value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+            BSON_ARRAY("a" << "x") << BSON_ARRAY("b" << "y") << BSON_ARRAY("A" << "z"))));
 
         auto collatorSlot = generateSlotId();
 
@@ -790,7 +794,8 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
                                          makeSV(innerCondSlot),
                                          makeSV(innerProjSlot),
                                          boost::optional<value::SlotId>{useCollator, collatorSlot},
-                                         nullptr /* yieldPolicy */,
+                                         /*allowDiskUse=*/true,
+                                         /*yieldPolicy=*/nullptr,
                                          kEmptyPlanNodeId,
                                          boost::none);
 
@@ -810,13 +815,13 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
                                value::bitcastFrom<CollatorInterface*>(collator.release()));
 
         // Two separate virtual scans are needed since HashJoinStage needs two child stages.
-        outerGuard.reset();
-        auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+        auto [outerT, outerV] = outerArr.releaseToRaw();
+        auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
         auto outerCondSlot = outerSlots[0];
         auto outerProjSlot = outerSlots[1];
 
-        innerGuard.reset();
-        auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerTag, innerVal);
+        auto [innerT, innerV] = innerArr.releaseToRaw();
+        auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
         auto innerCondSlot = innerSlots[0];
         auto innerProjSlot = innerSlots[1];
 
@@ -833,8 +838,8 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
         auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
 
         // Get all the results produced by HashJoin.
-        auto [resultsTag, resultsVal] = getAllResultsMulti(stage.get(), resultAccessors);
-        value::ValueGuard resultsGuard{resultsTag, resultsVal};
+        value::TagValueOwned resultsArr =
+            value::TagValueOwned::fromRaw(getAllResultsMulti(stage.get(), resultAccessors));
 
         // Expected results: [innerKey, outerKey, innerProj, outerProj]
         // With collator: "a" matches "a" and "A" (case-insensitive), "b" matches "b"
@@ -849,9 +854,10 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
             std::tie(expectedTag, expectedVal) = makeArray(BSON_ARRAY(
                 BSON_ARRAY("a" << "a" << 1 << "x") << BSON_ARRAY("b" << "b" << 2 << "y")));
         }
-        value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(expectedTag, expectedVal);
 
-        assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+        assertResultsMatch(
+            resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
     }
 }
 
@@ -860,23 +866,21 @@ TEST_F(HashJoinStageTest, HashJoinMultipleJoinKeys) {
 
     // Outer side: rows are [key1, key2, proj]. Join on (key1, key2).
     // (1,10), (1,20), (2,10)
-    auto [outerTag, outerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY(1 << 10 << "a") << BSON_ARRAY(1 << 20 << "b") << BSON_ARRAY(2 << 10 << "c")));
-    value::ValueGuard outerGuard{outerTag, outerVal};
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(1 << 10 << "a") << BSON_ARRAY(1 << 20 << "b") << BSON_ARRAY(2 << 10 << "c"))));
 
     // Inner side: rows are [key1, key2, proj]. (1,10), (2,10), (2,20)
-    auto [innerTag, innerVal] = makeArray(BSON_ARRAY(
-        BSON_ARRAY(1 << 10 << "x") << BSON_ARRAY(2 << 10 << "y") << BSON_ARRAY(2 << 20 << "z")));
-    value::ValueGuard innerGuard{innerTag, innerVal};
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(makeArray(BSON_ARRAY(
+        BSON_ARRAY(1 << 10 << "x") << BSON_ARRAY(2 << 10 << "y") << BSON_ARRAY(2 << 20 << "z"))));
 
-    outerGuard.reset();
-    auto [outerSlots, outerStage] = generateVirtualScanMulti(3, outerTag, outerVal);
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(3, outerT, outerV);
     auto outerCondSlot0 = outerSlots[0];
     auto outerCondSlot1 = outerSlots[1];
     auto outerProjSlot = outerSlots[2];
 
-    innerGuard.reset();
-    auto [innerSlots, innerStage] = generateVirtualScanMulti(3, innerTag, innerVal);
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(3, innerT, innerV);
     auto innerCondSlot0 = innerSlots[0];
     auto innerCondSlot1 = innerSlots[1];
     auto innerProjSlot = innerSlots[2];
@@ -892,19 +896,273 @@ TEST_F(HashJoinStageTest, HashJoinMultipleJoinKeys) {
 
     auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
 
-    auto [resultsTag, resultsVal] = getAllResultsMulti(hashJoinStage.get(), resultAccessors);
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
 
     // Output order: innerCond (key1, key2), outerCond (key1, key2), innerProj, outerProj.
     // (1,10) matches: [1, 10, 1, 10, "x", "a"]
     // (2,10) matches: [2, 10, 2, 10, "y", "c"]
     // (1,20) and (2,20) have no match on the other side.
-    auto [expectedTag, expectedVal] =
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY(1 << 10 << 1 << 10 << "x" << "a")
-                             << BSON_ARRAY(2 << 10 << 2 << 10 << "y" << "c")));
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+                             << BSON_ARRAY(2 << 10 << 2 << 10 << "y" << "c"))));
 
-    assertResultsMatch(resultsTag, resultsVal, expectedTag, expectedVal);
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
+}
+
+// Wraps the outer (probe) child of a HashJoinStage and hands out each row's values in freshly
+// allocated buffers, freeing the previous row's buffers as it advances. It also injects a
+// saveState()/restoreState() on the root plan on the Nth call to getNext(), after the previous
+// row's buffers have been freed. This simulates a yield firing inside the probe child's getNext()
+// while the hash join's probe rows still hold views into the freed buffers.
+class BufferRecyclingYieldStage final : public PlanStage {
+public:
+    BufferRecyclingYieldStage(std::unique_ptr<PlanStage> child,
+                              value::SlotVector slots,
+                              int yieldOnCallN,
+                              PlanNodeId nodeId)
+        : PlanStage("buffer_recycle"sv, nullptr, nodeId, false),
+          _slots(std::move(slots)),
+          _outAccessors(_slots.size()),
+          _yieldOnCallN(yieldOnCallN) {
+        _children.emplace_back(std::move(child));
+    }
+
+    void setRoot(PlanStage* root) {
+        _root = root;
+    }
+
+    // Frees the buffers backing the values handed out for the current row, simulating the
+    // underlying storage having been released.
+    void releaseCurrentRowBuffersForTest() {
+        for (auto& accessor : _outAccessors) {
+            accessor.reset();
+        }
+    }
+
+    std::unique_ptr<PlanStage> clone() const final {
+        auto c = std::make_unique<BufferRecyclingYieldStage>(
+            _children[0]->clone(), _slots, _yieldOnCallN, _commonStats.nodeId);
+        c->_root = _root;
+        return c;
+    }
+
+    void prepare(CompileCtx& ctx) final {
+        _children[0]->prepare(ctx);
+        for (auto slot : _slots) {
+            _inAccessors.push_back(_children[0]->getAccessor(ctx, slot));
+        }
+    }
+
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final {
+        for (size_t i = 0; i < _slots.size(); ++i) {
+            if (_slots[i] == slot) {
+                return &_outAccessors[i];
+            }
+        }
+        return ctx.getAccessor(slot);
+    }
+
+    void open(bool reOpen) final {
+        _commonStats.opens++;
+        _children[0]->open(reOpen);
+    }
+
+    PlanState getNext() final {
+        auto state = _children[0]->getNext();
+        if (state == PlanState::ADVANCED) {
+            // Copy the child's values into freshly allocated buffers; resetting the accessor
+            // frees the buffers handed out for the previous row, as a storage cursor would on
+            // advancing.
+            for (size_t i = 0; i < _inAccessors.size(); ++i) {
+                _outAccessors[i].reset(_inAccessors[i]->getViewOfValue().copy());
+            }
+        }
+        if (++_callCount == _yieldOnCallN && _root) {
+            _root->saveState();
+            _root->restoreState();
+        }
+        return trackPlanState(state);
+    }
+
+    void close() final {
+        trackClose();
+        _children[0]->close();
+    }
+
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final {
+        auto ret = std::make_unique<PlanStageStats>(_commonStats);
+        ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+        return ret;
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return nullptr;
+    }
+
+    void doDebugPrint(std::vector<DebugPrinter::Block>&, DebugPrintInfo&) const final {}
+
+    size_t estimateCompileTimeSize() const final {
+        return sizeof(*this);
+    }
+
+protected:
+    // The values handed out are owned by _outAccessors, so they are stable across yields.
+    void doSaveState() final {}
+    void doRestoreState() final {}
+
+private:
+    value::SlotVector _slots;
+    std::vector<value::SlotAccessor*> _inAccessors;
+    std::vector<value::OwnedValueAccessor> _outAccessors;
+    int _yieldOnCallN;
+    int _callCount = 0;
+    PlanStage* _root = nullptr;
+};
+
+// While HashJoinStage advances its outer (probe) child, its _probeKey/_probeProject rows still
+// hold views into the previous outer row's buffers, which the child may have already freed.
+// If a yield fires at that point, the join must not try to deep-copy those stale views into its
+// join cursor's saved state.
+TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresWhileAdvancingOuterChild) {
+    auto ctx = makeCompileCtx();
+
+    // Use strings > 7 bytes so values are heap-allocated (StringBig). Both outer rows
+    // match the single build row, so the row produced after the mid-advance yield is
+    // also verified.
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "outer_proj_1_long")
+                             << BSON_ARRAY("k1_long_key_string" << "outer_proj_2_long"))));
+
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "inner_proj_long"))));
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outerT, outerV);
+
+    // The yield fires on call 2 of the wrapper's getNext(): row 1's buffers have just been freed
+    // (row 2 was copied into fresh ones), while the join's probe rows still view row 1's buffers.
+    auto recyclingStage = std::make_unique<BufferRecyclingYieldStage>(
+        std::move(outerScanStage), outerScanSlots, /*yieldOnCallN=*/2, kEmptyPlanNodeId);
+    auto* recyclingStagePtr = recyclingStage.get();
+
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, innerT, innerV);
+
+    auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                          std::move(recyclingStage),
+                                                          std::move(innerScanStage),
+                                                          makeSV(outerScanSlots[0]),
+                                                          makeSV(outerScanSlots[1]),
+                                                          makeSV(innerScanSlots[0]),
+                                                          makeSV(innerScanSlots[1]));
+
+    // Output slot order: innerCond, outerCond, innerProj, outerProj.
+    auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+    recyclingStagePtr->setRoot(hashJoinStage.get());
+
+    auto assertStrSlot = [](value::SlotAccessor* acc, std::string_view expected) {
+        auto [tag, val] = acc->getViewOfValue();
+        ASSERT_TRUE(value::isString(tag));
+        ASSERT_EQ(value::getStringView(tag, val), expected);
+    };
+
+    // Match 1: outer row 1.
+    ASSERT_EQ(hashJoinStage->getNext(), PlanState::ADVANCED);
+    assertStrSlot(resultAccessors[3], "outer_proj_1_long");
+
+    // Match 2: fetching outer row 2 frees row 1's buffers and then fires the yield.
+    ASSERT_EQ(hashJoinStage->getNext(), PlanState::ADVANCED);
+    assertStrSlot(resultAccessors[3], "outer_proj_2_long");
+
+    ASSERT_EQ(hashJoinStage->getNext(), PlanState::IS_EOF);
+    hashJoinStage->close();
+}
+
+// When HashJoinStage is re-opened, a cursor left over from the previous execution must be
+// dropped before the build phase runs: the cursor references _probeKey/_probeProject, which may
+// still view buffers that no longer exist, so a yield fired by the build child during the
+// re-opened build phase must not save them.
+TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresDuringReopenedBuildPhase) {
+    auto ctx = makeCompileCtx();
+
+    // Strings longer than 7 bytes are heap-allocated (StringBig). Outer row 1 has two build-side
+    // matches, so the join cursor is still streaming the row's matches (i.e. is still alive) when
+    // the stage is re-opened below.
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "outer_proj_1_long")
+                             << BSON_ARRAY("k2_long_key_string" << "outer_proj_2_long"))));
+
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "inner_proj_a_long")
+                             << BSON_ARRAY("k1_long_key_string" << "inner_proj_b_long")
+                             << BSON_ARRAY("k2_long_key_string" << "inner_proj_c_long"))));
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outerT, outerV);
+
+    constexpr int kNeverYield = -1;
+    auto recyclingStage = std::make_unique<BufferRecyclingYieldStage>(
+        std::move(outerScanStage), outerScanSlots, kNeverYield, kEmptyPlanNodeId);
+    auto* recyclingStagePtr = recyclingStage.get();
+
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, innerT, innerV);
+
+    // The first build phase consumes four inner getNext() calls (three rows plus EOF), so the
+    // injected yield fires on the first getNext() of the re-opened build phase.
+    auto yieldStage = std::make_unique<YieldInjectingStage>(
+        std::move(innerScanStage), /*yieldOnCallN=*/5, kEmptyPlanNodeId);
+    auto* yieldStagePtr = yieldStage.get();
+
+    auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                          std::move(recyclingStage),
+                                                          std::move(yieldStage),
+                                                          makeSV(outerScanSlots[0]),
+                                                          makeSV(outerScanSlots[1]),
+                                                          makeSV(innerScanSlots[0]),
+                                                          makeSV(innerScanSlots[1]));
+
+    // Output slot order: innerCond, outerCond, innerProj, outerProj.
+    auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+    recyclingStagePtr->setRoot(hashJoinStage.get());
+    yieldStagePtr->setRoot(hashJoinStage.get());
+
+    // First execution: produce the first match of outer row 1. The cursor retains a pending
+    // match ("inner_proj_b_long") and the probe rows view the outer wrapper's row-1 buffers.
+    ASSERT_EQ(hashJoinStage->getNext(), PlanState::ADVANCED);
+    auto assertStrSlot = [](value::SlotAccessor* acc, std::string_view expected) {
+        auto [tag, val] = acc->getViewOfValue();
+        ASSERT_TRUE(value::isString(tag));
+        ASSERT_EQ(value::getStringView(tag, val), expected);
+    };
+    assertStrSlot(resultAccessors[3], "outer_proj_1_long");
+
+    // Simulate the outer side's storage having been released while the stage was idle: the
+    // buffers backing the probe-row views are freed.
+    recyclingStagePtr->releaseCurrentRowBuffersForTest();
+
+    // Re-open the stage: The stage must drop the leftover cursor and disable slot access up
+    // front, so that the yield fired by the build child's first getNext() does not save the
+    // dangling probe rows.
+    hashJoinStage->open(/*reOpen=*/true);
+
+    // The re-opened join produces the full result set from scratch.
+    value::TagValueOwned resultsArr =
+        value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
+    value::TagValueOwned expectedArr = value::TagValueOwned::fromRaw(makeArray(
+        BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "k1_long_key_string" << "inner_proj_a_long"
+                                                   << "outer_proj_1_long")
+                   << BSON_ARRAY("k1_long_key_string" << "k1_long_key_string"
+                                                      << "inner_proj_b_long"
+                                                      << "outer_proj_1_long")
+                   << BSON_ARRAY("k2_long_key_string" << "k2_long_key_string"
+                                                      << "inner_proj_c_long"
+                                                      << "outer_proj_2_long"))));
+    assertResultsMatch(
+        resultsArr.tag(), resultsArr.value(), expectedArr.tag(), expectedArr.value());
+    hashJoinStage->close();
 }
 
 // Test for nested HashJoinStage use-after-free on yield.
@@ -923,23 +1181,21 @@ TEST_F(HashJoinStageTest, NestedHashJoinNoUseAfterFreeOnYield) {
     // scan1: outer (probe) side of ParentHashJoin.
     //   Row 1: "k1_long_key" — 2 matches in scan2 (keeps cursor alive across the safe yield).
     //   Row 2: "k_no_match_long" — no match; this row causes ParentHashJoin to free HJ_1.
-    auto [scan1Tag, scan1Val] =
+    value::TagValueOwned scan1Arr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "proj_A_long")
-                             << BSON_ARRAY("k_no_match_long" << "proj_B_long")));
-    value::ValueGuard scan1Guard{scan1Tag, scan1Val};
+                             << BSON_ARRAY("k_no_match_long" << "proj_B_long"))));
 
     // scan2: inner (build) side of ParentHashJoin.
-    auto [scan2Tag, scan2Val] =
+    value::TagValueOwned scan2Arr = value::TagValueOwned::fromRaw(
         makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "inner_1_long")
-                             << BSON_ARRAY("k1_long_key" << "inner_2_long")));
-    value::ValueGuard scan2Guard{scan2Tag, scan2Val};
+                             << BSON_ARRAY("k1_long_key" << "inner_2_long"))));
 
     // scan3: inner (build) side of ChildHashJoin.
-    auto [scan3Tag, scan3Val] = makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "child_1_long")));
-    value::ValueGuard scan3Guard{scan3Tag, scan3Val};
+    value::TagValueOwned scan3Arr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key" << "child_1_long"))));
 
-    scan1Guard.reset();
-    auto [scan1Slots, scan1Stage] = generateVirtualScanMulti(2, scan1Tag, scan1Val);
+    auto [scan1T, scan1V] = scan1Arr.releaseToRaw();
+    auto [scan1Slots, scan1Stage] = generateVirtualScanMulti(2, scan1T, scan1V);
 
     // YieldInjectingStage fires on call 3 of scan1.getNext():
     //   Call 1 → "k1_long_key"      (Match 1 and Match 2 setup)
@@ -947,11 +1203,11 @@ TEST_F(HashJoinStageTest, NestedHashJoinNoUseAfterFreeOnYield) {
     //                                dangles)
     //   Call 3 → IS_EOF             (yield fires: saveState() → makeOwned() on dangling ptr)
     auto yieldStage = std::make_unique<YieldInjectingStage>(
-        std::move(scan1Stage), 3 /* yieldOnCallN */, kEmptyPlanNodeId);
+        std::move(scan1Stage), /*yieldOnCallN=*/3, kEmptyPlanNodeId);
     auto* yieldStagePtr = yieldStage.get();
 
-    scan2Guard.reset();
-    auto [scan2Slots, scan2Stage] = generateVirtualScanMulti(2, scan2Tag, scan2Val);
+    auto [scan2T, scan2V] = scan2Arr.releaseToRaw();
+    auto [scan2Slots, scan2Stage] = generateVirtualScanMulti(2, scan2T, scan2V);
 
     auto [parentOutputSlots, parentStage] = makeHashJoinStage(this,
                                                               std::move(yieldStage),
@@ -965,8 +1221,8 @@ TEST_F(HashJoinStageTest, NestedHashJoinNoUseAfterFreeOnYield) {
     value::SlotVector childOuterProjSlots = {
         parentOutputSlots[0], parentOutputSlots[2], parentOutputSlots[3]};
 
-    scan3Guard.reset();
-    auto [scan3Slots, scan3Stage] = generateVirtualScanMulti(2, scan3Tag, scan3Val);
+    auto [scan3T, scan3V] = scan3Arr.releaseToRaw();
+    auto [scan3Slots, scan3Stage] = generateVirtualScanMulti(2, scan3T, scan3V);
 
     auto [childOutputSlots, childStage] = makeHashJoinStage(this,
                                                             std::move(parentStage),
@@ -1003,5 +1259,331 @@ TEST_F(HashJoinStageTest, NestedHashJoinNoUseAfterFreeOnYield) {
     ASSERT_EQ(childStage->getNext(), PlanState::IS_EOF);
     childStage->close();
 }
+
+// Variant of BufferRecyclingYieldStage that yields (root saveState()/restoreState()) on every
+// k-th getNext() call.
+class RecyclingYieldEveryStage final : public PlanStage {
+public:
+    RecyclingYieldEveryStage(std::unique_ptr<PlanStage> child,
+                             value::SlotVector slots,
+                             int yieldEveryN,
+                             PlanNodeId nodeId)
+        : PlanStage("buffer_recycle_every"sv, nullptr, nodeId, false),
+          _slots(std::move(slots)),
+          _outAccessors(_slots.size()),
+          _yieldEveryN(yieldEveryN) {
+        _children.emplace_back(std::move(child));
+    }
+
+    void setRoot(PlanStage* root) {
+        _root = root;
+    }
+
+    void releaseCurrentRowBuffersForTest() {
+        for (auto& accessor : _outAccessors) {
+            accessor.reset();
+        }
+    }
+
+    // Arms the next restoreState() to fail with a WriteConflictException, simulating a storage
+    // restore failure that triggers PlanYieldPolicy's save/yield/restore retry.
+    void setThrowOnNextRestoreForTest() {
+        _throwOnNextRestore = true;
+    }
+
+    std::unique_ptr<PlanStage> clone() const final {
+        auto c = std::make_unique<RecyclingYieldEveryStage>(
+            _children[0]->clone(), _slots, _yieldEveryN, _commonStats.nodeId);
+        c->_root = _root;
+        return c;
+    }
+
+    void prepare(CompileCtx& ctx) final {
+        _children[0]->prepare(ctx);
+        for (auto slot : _slots) {
+            _inAccessors.push_back(_children[0]->getAccessor(ctx, slot));
+        }
+    }
+
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final {
+        for (size_t i = 0; i < _slots.size(); ++i) {
+            if (_slots[i] == slot) {
+                return &_outAccessors[i];
+            }
+        }
+        return ctx.getAccessor(slot);
+    }
+
+    void open(bool reOpen) final {
+        _commonStats.opens++;
+        _children[0]->open(reOpen);
+    }
+
+    PlanState getNext() final {
+        auto state = _children[0]->getNext();
+        if (state == PlanState::ADVANCED) {
+            // Copy the child's values into freshly allocated buffers; resetting the accessor
+            // frees the buffers handed out for the previous row, as a storage cursor would on
+            // advancing.
+            for (size_t i = 0; i < _inAccessors.size(); ++i) {
+                _outAccessors[i].reset(_inAccessors[i]->getViewOfValue().copy());
+            }
+        }
+        if (++_callCount % _yieldEveryN == 0 && _root) {
+            _root->saveState();
+            _root->restoreState();
+        }
+        return trackPlanState(state);
+    }
+
+    void close() final {
+        trackClose();
+        _children[0]->close();
+    }
+
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final {
+        auto ret = std::make_unique<PlanStageStats>(_commonStats);
+        ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+        return ret;
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return nullptr;
+    }
+
+    void doDebugPrint(std::vector<DebugPrinter::Block>&, DebugPrintInfo&) const final {}
+
+    size_t estimateCompileTimeSize() const final {
+        return sizeof(*this);
+    }
+
+protected:
+    // The values handed out are owned by _outAccessors, so they are stable across yields.
+    void doSaveState() final {}
+    void doRestoreState() final {
+        if (std::exchange(_throwOnNextRestore, false)) {
+            uasserted(ErrorCodes::WriteConflict, "simulated write conflict on restore");
+        }
+    }
+
+private:
+    value::SlotVector _slots;
+    std::vector<value::SlotAccessor*> _inAccessors;
+    std::vector<value::OwnedValueAccessor> _outAccessors;
+    int _yieldEveryN;
+    int _callCount = 0;
+    PlanStage* _root = nullptr;
+    bool _throwOnNextRestore = false;
+};
+
+// When a yield's restoreState() fails (e.g. a storage-layer WriteConflict), the yield policy
+// retries the whole yield starting with a fresh saveState().
+TEST_F(HashJoinStageTest, NoUseAfterFreeOnYieldRetryAfterFailedRestore) {
+    auto ctx = makeCompileCtx();
+
+    // Outer row 1 has two build-side matches, so the join cursor still has a pending match when
+    // the simulated yield begins. Long strings are heap-allocated (StringBig).
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "outer_proj_1_long")
+                             << BSON_ARRAY("k2_long_key_string" << "outer_proj_2_long"))));
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("k1_long_key_string" << "inner_proj_a_long")
+                             << BSON_ARRAY("k1_long_key_string" << "inner_proj_b_long")
+                             << BSON_ARRAY("k2_long_key_string" << "inner_proj_c_long"))));
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outerT, outerV);
+
+    auto recyclingStage = std::make_unique<RecyclingYieldEveryStage>(
+        std::move(outerScanStage), outerScanSlots, 1000000 /* never yields */, kEmptyPlanNodeId);
+    auto* recyclingStagePtr = recyclingStage.get();
+
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, innerT, innerV);
+
+    auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                          std::move(recyclingStage),
+                                                          std::move(innerScanStage),
+                                                          makeSV(outerScanSlots[0]),
+                                                          makeSV(outerScanSlots[1]),
+                                                          makeSV(innerScanSlots[0]),
+                                                          makeSV(innerScanSlots[1]));
+
+    auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+
+    // Produce the first match of outer row 1; the cursor retains a pending match and the probe
+    // rows view the outer wrapper's row-1 buffers.
+    ASSERT_EQ(hashJoinStage->getNext(), PlanState::ADVANCED);
+
+    // Yield attempt 1: save, then the storage release frees the row-1 buffers, then the restore
+    // fails in the outer child.
+    hashJoinStage->saveState();
+    recyclingStagePtr->releaseCurrentRowBuffersForTest();
+    recyclingStagePtr->setThrowOnNextRestoreForTest();
+    ASSERT_THROWS_CODE(hashJoinStage->restoreState(), DBException, ErrorCodes::WriteConflict);
+
+    // The yield policy retries with a fresh save; the already-owned probe rows must be untouched
+    // by it.
+    hashJoinStage->saveState();
+    hashJoinStage->restoreState();
+
+    // Drain the rest of the results to keep the stage in a consistent state for close().
+    while (hashJoinStage->getNext() == PlanState::ADVANCED) {
+    }
+    hashJoinStage->close();
+}
+
+TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresAfterMidStreamReopenBeforeFirstProbe) {
+    auto ctx = makeCompileCtx();
+
+    // Use long (heap-allocated) strings so views into freed buffers are detectable.
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("key_string_1_long" << "outer_proj_1_long")
+                             << BSON_ARRAY("key_string_2_long" << "outer_proj_2_long"))));
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("key_string_1_long" << "inner_proj_1_long")
+                             << BSON_ARRAY("key_string_2_long" << "inner_proj_2_long"))));
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerT, outerV);
+
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerSlots, innerStage] = generateVirtualScanMulti(2, innerT, innerV);
+
+    auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                          std::move(outerStage),
+                                                          std::move(innerStage),
+                                                          makeSV(outerSlots[0]),
+                                                          makeSV(outerSlots[1]),
+                                                          makeSV(innerSlots[0]),
+                                                          makeSV(innerSlots[1]));
+
+    auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+
+    // Produce one row; the outer subtree now holds views into its current row's buffer.
+    ASSERT_EQ(hashJoinStage->getNext(), PlanState::ADVANCED);
+
+    // Mid-stream re-open, as a nested loop join does for its inner side.
+    hashJoinStage->open(/*reOpen=*/true);
+
+    // Simulate the yield check at the top of the re-opened getNext(), before the outer child has
+    // produced a fresh row.
+    hashJoinStage->saveState();
+    hashJoinStage->restoreState();
+
+    // The re-opened join must produce the full result set again.
+    std::multiset<std::string> actual;
+    while (hashJoinStage->getNext() == PlanState::ADVANCED) {
+        auto str = [&](int idx) {
+            auto [tag, val] = resultAccessors[idx]->getViewOfValue();
+            return std::string(value::getStringView(tag, val));
+        };
+        actual.insert(str(0) + "|" + str(2) + "|" + str(3));
+    }
+    std::multiset<std::string> expected{"key_string_1_long|inner_proj_1_long|outer_proj_1_long",
+                                        "key_string_2_long|inner_proj_2_long|outer_proj_2_long"};
+    ASSERT_TRUE(actual == expected);
+    hashJoinStage->close();
+}
+
+TEST_F(HashJoinStageTest, NoUseAfterFreeWhenProbeRowIsRecopiedOnSecondYield) {
+    auto ctx = makeCompileCtx();
+
+    // One outer row with two build-side matches, so the join publishes the same probe row from two
+    // consecutive getNext() calls, with a yield during each.
+    value::TagValueOwned outerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("key_string_1_long" << "outer_proj_1_long"))));
+
+    value::TagValueOwned innerArr = value::TagValueOwned::fromRaw(
+        makeArray(BSON_ARRAY(BSON_ARRAY("key_string_1_long" << "inner_proj_1_long")
+                             << BSON_ARRAY("key_string_1_long" << "inner_proj_2_long"))));
+
+    // Turn both sides' strings into heap values (StringBig) with concat(): the kind that a stage
+    // holding only a view of them must not copy at yield time.
+    auto makeHeapStrings = [&](std::unique_ptr<PlanStage> input, const value::SlotVector& inSlots) {
+        SlotExprPairVector projects;
+        value::SlotVector outSlots;
+        for (auto slot : inSlots) {
+            auto [sfxTag, sfxVal] = value::makeNewString("_heap");
+            outSlots.push_back(generateSlotId());
+            projects.emplace_back(
+                outSlots.back(),
+                makeE<EFunction>(EFn::kConcat,
+                                 makeEs(makeE<EVariable>(slot), makeE<EConstant>(sfxTag, sfxVal))));
+        }
+        return std::make_pair(
+            std::move(outSlots),
+            makeS<ProjectStage>(std::move(input), std::move(projects), kEmptyPlanNodeId));
+    };
+
+    auto [outerT, outerV] = outerArr.releaseToRaw();
+    auto [outerScanSlots, outerScan] = generateVirtualScanMulti(2, outerT, outerV);
+    auto [outerSlots, outerStage] = makeHeapStrings(std::move(outerScan), outerScanSlots);
+
+    auto [innerT, innerV] = innerArr.releaseToRaw();
+    auto [innerScanSlots, innerScan] = generateVirtualScanMulti(2, innerT, innerV);
+    auto [innerSlots, innerStage] = makeHeapStrings(std::move(innerScan), innerScanSlots);
+
+    auto [hjOutputSlots, hashJoinStage] = makeHashJoinStage(this,
+                                                            std::move(outerStage),
+                                                            std::move(innerStage),
+                                                            makeSV(outerSlots[0]),
+                                                            makeSV(outerSlots[1]),
+                                                            makeSV(innerSlots[0]),
+                                                            makeSV(innerSlots[1]));
+
+    // Pass-through projection above the join: its accessor caches a view of the join's output
+    // value rather than re-reading the join's accessor on every access.
+    auto passThroughSlot = generateSlotId();
+    SlotExprPairVector passThrough;
+    passThrough.emplace_back(passThroughSlot, makeE<EVariable>(outerSlots[1]));
+    auto projectStage =
+        makeS<ProjectStage>(std::move(hashJoinStage), std::move(passThrough), kEmptyPlanNodeId);
+
+    // Nested loop inner side: a one-row scan that yields on every getNext(), under a filter that
+    // reads the pass-through slot (correlated) after that yield.
+    auto [innerXSlot, innerXScan] = generateVirtualScan(BSON_ARRAY(1));
+    auto yieldStage = std::make_unique<RecyclingYieldEveryStage>(
+        std::move(innerXScan), makeSV(innerXSlot), /*yieldEveryN=*/1, kEmptyPlanNodeId);
+    auto* yieldStagePtr = yieldStage.get();
+    auto [expectedTag, expectedVal] = value::makeNewString("outer_proj_1_long_heap");
+    auto filterStage =
+        makeS<FilterStage<false>>(std::move(yieldStage),
+                                  makeE<EPrimBinary>(EPrimBinary::eq,
+                                                     makeE<EVariable>(passThroughSlot),
+                                                     makeE<EConstant>(expectedTag, expectedVal)),
+                                  kEmptyPlanNodeId);
+
+    auto loopJoin = makeS<LoopJoinStage>(std::move(projectStage),
+                                         std::move(filterStage),
+                                         /*outerProjects=*/makeSV(passThroughSlot),
+                                         /*outerCorrelated=*/makeSV(passThroughSlot),
+                                         /*predicate=*/nullptr,
+                                         kEmptyPlanNodeId);
+
+    prepareTree(ctx.get(), loopJoin.get());
+    yieldStagePtr->setRoot(loopJoin.get());
+    auto* resultAccessor = loopJoin->getAccessor(*ctx, passThroughSlot);
+
+    auto assertResult = [&] {
+        auto [tag, val] = resultAccessor->getViewOfValue();
+        ASSERT_TRUE(value::isString(tag));
+        ASSERT_EQ(std::string(value::getStringView(tag, val)), "outer_proj_1_long_heap");
+    };
+
+    // Match 1. The inner side yields: the join owns the probe row's values in place; the
+    // pass-through slot views them.
+    ASSERT_EQ(loopJoin->getNext(), PlanState::ADVANCED);
+    assertResult();
+
+    // Match 2. The inner side yields again: the re-save must not move or free the owned values,
+    // because the filter reads them right after.
+    ASSERT_EQ(loopJoin->getNext(), PlanState::ADVANCED);
+    assertResult();
+
+    ASSERT_EQ(loopJoin->getNext(), PlanState::IS_EOF);
+    loopJoin->close();
+}
+
 
 }  // namespace mongo::sbe

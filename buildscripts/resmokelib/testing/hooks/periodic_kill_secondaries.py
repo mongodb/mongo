@@ -5,6 +5,7 @@ import time
 import bson
 import pymongo
 import pymongo.errors
+from pymongo.common import DatetimeConversion
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture
@@ -345,7 +346,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             self.logger.info(fixture.create_fixture_table(self.fixture))
             secondary.await_ready()
 
-            client = secondary.mongo_client()
+            # The oplog may contain dates written by jstests that are outside the range
+            # representable by Python datetime, so decode those as raw milliseconds
+            # instead of raising InvalidBSON.
+            client = secondary.mongo_client(datetime_conversion=DatetimeConversion.DATETIME_AUTO)
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
             recovery_timestamp_res = client.admin.command(
                 "replSetTest", getLastStableRecoveryTimestamp=True

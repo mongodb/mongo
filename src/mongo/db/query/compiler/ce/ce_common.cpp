@@ -1,42 +1,20 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/ce/ce_common.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/matcher/path.h"
 
 #include <algorithm>
 #include <concepts>
+#include <string>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -50,7 +28,7 @@ public:
         tassert(11214702, "Vectors must be the same size", l.size() == r.size());
 
         for (size_t i = 0; i < l.size(); i++) {
-            auto cmp = l[i].woCompare(r[i], false, nullptr /* stringComparator */);
+            auto cmp = l[i].woCompare(r[i], false, /*comparator=*/nullptr);
             if (cmp != 0) {
                 return cmp < 0;
             }
@@ -58,6 +36,13 @@ public:
         return false;
     }
 };
+
+// Comparator that ignores field names, matching the semantics of BSONElementSet
+// (BSONElementCmpWithoutField) that countUniqueDocuments() relied on. The comparator must
+// outlive any set it backs. It has no dependencies on other objects with static storage
+// duration, so it cannot be caught in a static-initialization-order fiasco.
+const BSONElementComparator kIgnoreFieldNameComparator{
+    BSONElementComparator::FieldNamesMode::kIgnore, nullptr /* stringComparator */};
 }  // namespace
 
 BSONObj FieldPathAndEqSemantics::toBSON() const {
@@ -101,9 +86,19 @@ public:
                 11158501, "Should always find at least one element at path in document", it.more());
 
             const auto elt = it.next();
-            tassert(11158502,
-                    "Encountered unexpected array in NDV computation",
-                    elt.element().type() != BSONType::array);
+            // This function is used for index scan nodes with non-multikey indices.
+            // If we see a document with an array-valued field, it must have been inserted
+            // after planning.
+            if (elt.element().type() == BSONType::array) {
+                // TODO(SERVER-132305): This can be removed after we switch to using the
+                // PathArrayness api.
+                uasserted(
+                    ErrorCodes::QueryPlanKilled,
+                    str::stream()
+                        << "query plan killed :: non-array path became multikey while the query "
+                           "was suspended: path="
+                        << field.path.fullPath());
+            }
             if (elt.element().eoo() && !field.isExprEq) {
                 // Use $eq equality semantics, which consider null & missing to be equal.
                 projectedFieldValues.push_back(kNullElt);
@@ -136,92 +131,122 @@ public:
  * This is used to approximate the transformation a multikey index would apply.
  *
  * As multikey indexes only permit a single array-valued index key component for a given document,
- * it is asserted that any provided document meets this expectation.
+ * it is asserted that any provided document meets this expectation. For instance, for input fields
+ * of {a, b}:
  *
  * {a:1, b:[1, 2]} -> (1, 1), (1, 2) // Ok
  * {a:[1, 2], b:1} -> (1, 1), (2, 1) // Ok
  * {a:[1, 2], b:[1, 2]} -> XXX // Assertion failure
+ *
+ * For dotted paths that share an array-valued prefix (e.g. 'a' and 'a.b' when 'a' is an array),
+ * the behavior matches BtreeKeyGenerator: each outer array element is visited once, and all field
+ * paths are resolved relative to that element. Under regular $eq semantics, scalar elements produce
+ * null for any remaining sub-path (e.g. element '1' yields null for 'a.b'); under $expr $eq the
+ * remaining sub-path stays missing (EOO). For example, for input fields {a, a.b}:
+ *
+ * {a:[{b:0}, {b:0}, 1]} -> ({b:0}, 0), ({b:0}, 0), (1, null)
+ *
+ * Here 'a' and 'a.b' both resolve against the same outer array. The scalar element '1' has no
+ * embedded 'b', so 'a.b' yields null for it. This is *not* a parallel-array case; the assertion
+ * only fires when two fields resolve to two genuinely distinct arrays.
  */
 class ArrayUnwindProjector {
 public:
-    ArrayUnwindProjector(const std::vector<FieldPathAndEqSemantics>& fields) : fields(fields) {
-        fieldsInDoc.reserve(fields.size());
-        iterators.reserve(fields.size());
-        for (const auto& field : fields) {
-            iterators.emplace_back(ElementPath{field.path.fullPath(),
-                                               ElementPath::LeafArrayBehavior::kTraverseOmitArray,
-                                               ElementPath::NonLeafArrayBehavior::kTraverse},
-                                   BSONElementIterator());
-        }
-    }
+    ArrayUnwindProjector(const std::vector<FieldPathAndEqSemantics>& fields) : _fields(fields) {}
 
     void operator()(const BSONObj& doc, std::invocable<std::vector<BSONElement>> auto&& callback) {
-        fieldsInDoc.clear();
-
-        for (auto& [path, iter] : iterators) {
-            iter.reset(&path, doc);
+        // Seed the recursion with the full, still-unresolved paths and an all-null value tuple.
+        std::vector<std::string_view> paths(_fields.size());
+        for (size_t i = 0; i < _fields.size(); ++i) {
+            paths[i] = _fields[i].path.fullPath();
         }
+        _processObj(
+            doc, std::move(paths), std::vector<BSONElement>(_fields.size(), kNullElt), callback);
+    }
 
-        // Exactly zero or one path may include an array if there is a multikey index over the
-        // provided fields.
-        // If an array is encountered, retain the index of the field/iterator required to "flatten"
-        // the array into multiple keys.
-        boost::optional<size_t> multiKeyFieldIndex;
+private:
+    // Recursively projects 'obj' down to one key tuple per array-element combination, mirroring
+    // BtreeKeyGenerator::_getKeysWithArray + _getKeysArrEltFixed.
+    //
+    // Invariant: for each field 'i', 'paths[i]' is the portion of the path still to be resolved
+    // (empty once fully resolved) and 'values[i]' is its value resolved so far. The recursion
+    // resolves fields against 'obj' until the first array is hit, then unwinds that array,
+    // resolving any remaining path suffixes against each element in a recursive call.
+    void _processObj(const BSONObj& obj,
+                     std::vector<std::string_view> paths,
+                     std::vector<BSONElement> values,
+                     std::invocable<std::vector<BSONElement>> auto&& callback) const {
+        // Phase 1: resolve each unresolved field against 'obj', stopping at the first array. Fields
+        // that hit the same array are correlated and unwound together below.
+        BSONElement arrElt;
+        std::vector<size_t> arrIdxs;
 
-        for (size_t idx = 0; idx < fields.size(); ++idx) {
-            const auto& field = fields[idx];
-
-            auto& it = iterators[idx].second;
-
-            if (!it.more()) {
-                // This document has an empty array at this path, so this iteration mode
-                // (traversing arrays) reports no values. A multikey index represents this as an
-                // undefined key.
-                fieldsInDoc.push_back(kUndefinedElt);
+        for (size_t i = 0; i < _fields.size(); ++i) {
+            // An empty path indicates it's fully resolved.
+            if (paths[i].empty()) {
                 continue;
             }
-            const auto elt = it.next();
-            if (elt.element().eoo() && !field.isExprEq) {
-                // Use $eq equality semantics, which consider null & missing to be equal.
-                fieldsInDoc.push_back(kNullElt);
-            } else {
-                // Use $expr equality semantics.
-                fieldsInDoc.push_back(elt.element());
-            }
 
-            if (it.more()) {
-                // This element of the index is multikey. There can be only one for a given doc
-                // in a given index.
-                tassert(10061113,
-                        "Parallel arrays are not supported; at most one index field may be "
-                        "array-valued per document",
-                        !multiKeyFieldIndex);
-                multiKeyFieldIndex = idx;
+            // extractElementAtOrArrayAlongDottedPath advances 'p' past the consumed prefix and
+            // stops at the first array along the path (if any).
+            const char* p = paths[i].data();
+            BSONElement elt = bson::extractElementAtOrArrayAlongDottedPath(obj, p);
+
+            if (elt.eoo()) {
+                // Path is missing. Under $eq semantics null == missing; under $expr keep the EOO.
+                values[i] = _fields[i].isExprEq ? elt : kNullElt;
+                paths[i] = {};
+            } else if (elt.type() == BSONType::array) {
+                // The unwind point. Only one distinct array may be indexed per document, so any
+                // other field reaching a *different* array is a genuine parallel-array case.
+                uassert(10061118,
+                        "Parallel arrays are not supported",
+                        arrElt.eoo() || elt.rawdata() == arrElt.rawdata());
+                arrElt = elt;
+                paths[i] = std::string_view{p};  // remaining suffix after the array
+                arrIdxs.push_back(i);
+            } else {
+                // Scalar (or subobject) leaf value; the field is fully resolved.
+                values[i] = elt;
+                paths[i] = {};
             }
         }
 
-        tassert(
-            10061112, "Unexpected number of fields in tuple", fieldsInDoc.size() == fields.size());
+        // Phase 2 (base case): no array was found, so every field is resolved -- emit one tuple.
+        if (arrElt.eoo()) {
+            callback(values);
+            return;
+        }
 
-        callback(fieldsInDoc);
+        // Phase 3: unwind the shared array. For each element, pin terminal fields (those whose
+        // remaining path ended at the array) to the element value, then recurse into the element's
+        // embedded object to resolve any deeper suffixes. Non-object elements recurse into an empty
+        // object, so their remaining suffixes resolve to null.
+        auto processElement = [&](const BSONElement& elem) {
+            auto pathsCopy = paths;
+            auto valuesCopy = values;
+            for (size_t i : arrIdxs) {
+                if (pathsCopy[i].empty()) {
+                    valuesCopy[i] = elem;
+                }
+            }
+            BSONObj sub = elem.type() == BSONType::object ? elem.embeddedObject() : BSONObj{};
+            _processObj(sub, std::move(pathsCopy), std::move(valuesCopy), callback);
+        };
 
-        if (multiKeyFieldIndex) {
-            auto idx = *multiKeyFieldIndex;
-            auto& iter = iterators[idx].second;
-            while (iter.more()) {
-                fieldsInDoc[idx] = iter.next().element();
-                callback(fieldsInDoc);
+        BSONObj arrObj = arrElt.embeddedObject();
+        if (arrObj.isEmpty()) {
+            // Empty array: emit one key with undefined for terminal fields (matching btree
+            // behavior).
+            processElement(kUndefinedElt);
+        } else {
+            for (const auto& elem : arrObj) {
+                processElement(elem);
             }
         }
     }
 
-    const std::vector<FieldPathAndEqSemantics>& fields;
-
-    // Scratch space for accumulating projected fields, avoids reallocating this vector for each
-    // document.
-    std::vector<BSONElement> fieldsInDoc;
-    // Pre-constructed iterators (and referenced paths) to avoid constructing for every document.
-    std::vector<std::pair<ElementPath, BSONElementIterator>> iterators;
+    const std::vector<FieldPathAndEqSemantics>& _fields;
 };
 
 namespace filter {
@@ -311,49 +336,12 @@ KeyCountResult countNDVMultiKey(const std::vector<FieldPathAndEqSemantics>& fiel
 }
 
 size_t countUniqueDocuments(const std::vector<BSONObj>& docs) {
-    BSONElementSet uniqueIds;
+    auto uniqueIds = kIgnoreFieldNameComparator.makeBSONEltUnorderedSet();
+    uniqueIds.reserve(docs.size());
     for (const auto& doc : docs) {
         uniqueIds.insert(doc["_id"]);
     }
     return uniqueIds.size();
-}
-
-bool matchesInterval(const Interval& interval, BSONElement val) {
-    int startCmp = val.woCompare(interval.start, 0 /*ignoreFieldNames*/);
-    int endCmp = val.woCompare(interval.end, 0 /*ignoreFieldNames*/);
-
-    if (startCmp == 0) {
-        /**
-         * The document value is equal to the starting point of the interval; the document is inside
-         * the bounds of this index interval if the starting point is included in the interval.
-         */
-        return interval.startInclusive;
-    } else if (startCmp < 0 && endCmp < 0) {
-        /**
-         * The document value is less than both the starting point and the end point and is thus
-         * not inside the bounds of this index interval. Depending on the index spec and the
-         * direction the index is traversed, endCmp can be < startCmp which is why it's necesary to
-         * check both interval end points.
-         */
-        return false;
-    }
-
-    if (endCmp == 0) {
-        /**
-         * The document value is equal to the end point of the interval; the document is inside the
-         * bounds of this index interval if the end point is included in the interval.
-         */
-        return interval.endInclusive;
-    } else if (endCmp > 0 && startCmp > 0) {
-        /**
-         * The document value is greater than both the starting point and the end point and is thus
-         * not inside the bounds of this index interval. Depending on the index spec and the
-         * direction the index is traversed, startCmp can be < endCmp which is why it's necesary to
-         * check both interval end points.
-         */
-        return false;
-    }
-    return true;
 }
 
 bool matchesInterval(const OrderedIntervalList& oil, BSONElement val) {
@@ -372,13 +360,13 @@ bool matchesInterval(const OrderedIntervalList& oil, BSONElement val) {
                             const std::pair<BSONElement, Interval::Direction>& valAndDirection) {
                              return IndexBoundsChecker::intervalCmp(
                                         interval, valAndDirection.first, valAndDirection.second) ==
-                                 IndexBoundsChecker::AHEAD;
+                                 IntervalPosition::AHEAD;
                          });
 
     if (it == oil.intervals.end()) {
         return false;
     }
-    return IndexBoundsChecker::intervalCmp(*it, val, direction) == IndexBoundsChecker::WITHIN;
+    return IndexBoundsChecker::intervalCmp(*it, val, direction) == IntervalPosition::WITHIN;
 }
 
 }  // namespace mongo::ce

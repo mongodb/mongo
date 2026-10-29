@@ -6,6 +6,7 @@
  *   requires_profiling,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -50,12 +51,14 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
 // on the primary shard for the database. We manually run the _flushRoutingTableCacheUpdates command
 // to guarantee they have been written and are visible with the atClusterTime used by the
 // testReshardCloneCollection command.
-for (const shard of [st.shard0, st.shard1]) {
-    assert.commandWorked(
-        shard.rs.getPrimary().adminCommand({
-            _flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName(),
-        }),
-    );
+if (!FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsCRUD")) {
+    for (const shard of [st.shard0, st.shard1]) {
+        assert.commandWorked(
+            shard.rs.getPrimary().adminCommand({
+                _flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName(),
+            }),
+        );
+    }
 }
 
 assert.commandWorked(

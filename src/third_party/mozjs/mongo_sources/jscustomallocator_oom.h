@@ -11,7 +11,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
+#include <jstypes.h>
+#include <mozilla/Assertions.h>
 #include <mozilla/Atomics.h>
 
 namespace js {

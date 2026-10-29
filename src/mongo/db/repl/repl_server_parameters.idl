@@ -1,36 +1,11 @@
-# Copyright (C) 2018-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 # server setParameters for replication
 
 global:
     cpp_namespace: "mongo::repl"
-    mod_visibility: pub
+    mod_visibility: public
     cpp_includes:
         - "mongo/client/read_preference.h"
         - "mongo/client/read_preference_validators.h"
@@ -64,7 +39,7 @@ server_parameters:
     numInitialSyncConnectAttempts:
         description: The number of attempts to connect to a sync source
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: numInitialSyncConnectAttempts
         default: 10
         redact: false
@@ -72,7 +47,7 @@ server_parameters:
     numInitialSyncOplogFindAttempts:
         description: The number of attempts to call find on the remote oplog
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: numInitialSyncOplogFindAttempts
         default: 3
         redact: false
@@ -82,7 +57,7 @@ server_parameters:
             The batchSize to use for the find/getMore queries called by the OplogFetcher. If set
             at runtime, this value will be used for the next initial sync attempt.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: initialSyncOplogFetcherBatchSize
         # 16MB max batch size / 12 byte min doc size * 10 (for good measure) =
         #     defaultBatchSize to use.
@@ -96,7 +71,7 @@ server_parameters:
             during initial sync. Bounded by initialSyncIndexBuildMemoryMinMB and
             initialSyncIndexBuildMemoryMaxMB.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: initialSyncIndexBuildMemoryPercentage
         default: 10
         validator:
@@ -109,7 +84,7 @@ server_parameters:
             The minimum memory usage for index builds during initial sync. Bounds
             initialSyncIndexBuildMemoryPercentage.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: initialSyncIndexBuildMemoryMinMB
         default: 200
         validator:
@@ -122,7 +97,7 @@ server_parameters:
             The maximum memory usage allowed for index builds during initial sync.
             Bounds initialSyncIndexBuildMemoryPercentage.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: initialSyncIndexBuildMemoryMaxMB
         default: 16384
         validator:
@@ -138,7 +113,7 @@ server_parameters:
             the potentially slow process of a sync source finding the lastApplied optime
             provided in a node's query in its oplog.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: oplogInitialFindMaxSeconds
         default: 60
         redact: false
@@ -146,7 +121,7 @@ server_parameters:
     oplogRetriedFindMaxSeconds:
         description: Number of seconds for the `maxTimeMS` on any retried `find` commands
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: oplogRetriedFindMaxSeconds
         default: 2
         redact: false
@@ -156,7 +131,7 @@ server_parameters:
             Whether to use the "exhaust cursor" feature when fetching oplog entries from the sync
             source.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: oplogFetcherUsesExhaust
         default: true
         redact: false
@@ -166,7 +141,7 @@ server_parameters:
             How long, in milliseconds, to wait for more data when an oplog application batch is
             not full.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: oplogBatchDelayMillis
         default: 0
         validator:
@@ -177,7 +152,7 @@ server_parameters:
     bgSyncOplogFetcherBatchSize:
         description: The batchSize to use for the find/getMore queries called by the OplogFetcher
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: bgSyncOplogFetcherBatchSize
         # 16MB max batch size / 12 byte min doc size * 10 (for good measure) =
         #     defaultBatchSize to use.
@@ -193,7 +168,7 @@ server_parameters:
             the sync source from having to read too much data at once, and reduce the
             chance of a socket timeout.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: rollbackRemoteOplogQueryBatchSize
         # We choose 2000 for (10 minute timeout) * (60 sec / min) * (50 MB / second) /
         #     (16 MB / document).
@@ -204,7 +179,7 @@ server_parameters:
     writePeriodicNoops:
         description: Sets whether to write periodic noops or not
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: writePeriodicNoops
         default: true
         redact: false
@@ -213,7 +188,7 @@ server_parameters:
         description: <-
             Number of seconds between noop writer writes.
         set_at: [startup]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: periodicNoopIntervalSecs
         default: 10
         validator:
@@ -224,7 +199,7 @@ server_parameters:
     collectionClonerUsesExhaust:
         description: Whether to use the "exhaust cursor" feature when retrieving collection data.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: collectionClonerUsesExhaust
         default: true
         redact: false
@@ -235,7 +210,7 @@ server_parameters:
             Limit for the number of bytes of data inserted per storage transaction
             (WriteUnitOfWork) by collectionBulkLoader during initial sync collection cloning
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: collectionBulkLoaderBatchSizeInBytes
         default:
             expr: 256 * 1024
@@ -248,7 +223,7 @@ server_parameters:
             CollectionCloner. Default of '0' means the limit is the number of documents
             that will fit in a single BSON object.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: collectionClonerBatchSize
         default: 0
         validator:
@@ -264,7 +239,7 @@ server_parameters:
             each restart, starting by waiting 5ms on the first restart and doubling 
             the wait on each subsequent restart, with an upper limit of 500ms.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: oplogFetcherSteadyStateMaxFetcherRestarts
         default: 1
         validator:
@@ -282,7 +257,7 @@ server_parameters:
             subsequent restart, with an upper limit of 500ms. As a result, the default 
             of 10 total restarts will take approximately ~2 seconds total.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: oplogFetcherInitialSyncMaxFetcherRestarts
         default: 10
         validator:
@@ -292,7 +267,7 @@ server_parameters:
     replBatchLimitOperations:
         description: The maximum number of operations to apply in a single batch
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: replBatchLimitOperations
         default:
             expr: 5 * 1000
@@ -305,7 +280,7 @@ server_parameters:
     replBatchLimitBytes:
         description: The maximum oplog application batch size in bytes
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: replBatchLimitBytes
         default:
             expr: 100 * 1024 * 1024
@@ -345,7 +320,7 @@ server_parameters:
     replElectionTimeoutOffsetLimitFraction:
         description: ""
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<double>
+        cpp_vartype: Atomic<double>
         cpp_varname: replElectionTimeoutOffsetLimitFraction
         default: 0.15
         validator:
@@ -358,7 +333,7 @@ server_parameters:
             The amount of time to continue retrying transient errors during initial sync before
             declaring the attempt failed.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: initialSyncTransientErrorRetryPeriodSeconds
         default:
             expr: 24 * 60 * 60
@@ -366,12 +341,26 @@ server_parameters:
             gte: 0
         redact: false
 
+    enableInitialSyncCleanShutdownCheck:
+        description: >-
+            Whether an initial syncing node checks its sync source for clean shutdowns that could
+            have rolled back writes the node has already cloned. Settable at runtime so that a sync
+            source can be deliberately restarted during an initial sync without having to restart
+            the syncing node, which would discard the attempt's progress. This value is read at
+            the start of each initial sync attempt, so any changes to this parameter will not be in
+            effect until the next initial sync attempt.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: enableInitialSyncCleanShutdownCheck
+        default: true
+        redact: false
+
     oplogNetworkTimeoutBufferSeconds:
         description: >-
             Number of seconds to add to the `find` and `getMore` timeouts for oplog fetching to
             calculate the network timeout for the requests.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: oplogNetworkTimeoutBufferSeconds
         default: 5
         validator:
@@ -383,7 +372,7 @@ server_parameters:
             Whether or not secondary oplog application enforces (by fassert) consistency
             constraints that apply if an oplog entry is to be applied exactly once and in order.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: oplogApplicationEnforcesSteadyStateConstraints
         default: false
         on_update: onOplogApplicationEnforcesSteadyStateConstraintsUpdate
@@ -411,7 +400,7 @@ server_parameters:
             if the node should attempt to change sync sources because another node is significantly
             closer than its current sync source.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: changeSyncSourceThresholdMillis
         default: 5
         validator:
@@ -424,7 +413,7 @@ server_parameters:
             turns off reevaluating its sync source. This will only affect sync source changes while
             a node has a valid sync source.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: maxNumSyncSourceChangesPerHour
         default: 3
         validator:
@@ -437,7 +426,7 @@ server_parameters:
             If chaining is disabled in the replica set, enabling this parameter allows the node
             to chain regardless.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableOverrideClusterChainingSetting
         default: false
         redact: false
@@ -447,7 +436,7 @@ server_parameters:
             If true, disable check for IP addresses in split horizon configurations. As per the
             definition of SNI laid out in RFC6066, literal IP addresses are not allowed as server names.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: disableSplitHorizonIPCheck
         default: false
         redact: false
@@ -458,7 +447,7 @@ server_parameters:
             initiate process. This parameter should only ever be enabled in our testing
             infrastructure, as using it in production may lead to undefined behavior.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
         default: false
         redact: false
@@ -482,7 +471,7 @@ server_parameters:
             sets with arbiters. Enabled by default. Test-only.
         test_only: true
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: enableReconfigRollbackCommittedWritesCheck
         default: true
         redact: false
@@ -502,7 +491,7 @@ server_parameters:
             Specifies the max lag in seconds between the syncing node and the sync source to mark
             the file copy based initial sync done successfully.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: fileBasedInitialSyncMaxLagSec
         default:
             expr: 5 * 60
@@ -516,7 +505,7 @@ server_parameters:
             clone updates while the lag between the syncing node and the sync source is higher than 
             fileBasedInitialSyncMaxLagSec.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: fileBasedInitialSyncMaxCyclesWithoutProgress
         default: 3
         validator:
@@ -528,7 +517,7 @@ server_parameters:
             Period of time, in milliseconds, syncing node may wait for the sync source to have the
             full oplog history up to the backup point in time.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: fileBasedInitialSyncExtendCursorTimeoutMS
         default:
             expr: 180 * 1000
@@ -541,7 +530,7 @@ server_parameters:
             Time limit threshold to fassert if getting RSTL times out when executing a stepdown or stepup command.
             Set to 0 to disable.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: fassertOnLockTimeoutForStepUpDown
         default: 60
         validator:
@@ -569,7 +558,7 @@ server_parameters:
             The maximum amount of time, in milliseconds, that a single replica set aware
             service's onStepUpBegin method can take without a warning being logged.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: slowServiceOnStepUpBeginThresholdMS
         default: 200
         validator:
@@ -581,7 +570,7 @@ server_parameters:
             The maximum amount of time, in milliseconds, that a single replica set aware
             service's onStepDown method can take without a warning being logged.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: slowServiceOnStepDownThresholdMS
         default: 200
         validator:
@@ -593,7 +582,7 @@ server_parameters:
             The maximum amount of time, in milliseconds, that the total of all replica set
             aware services' onStepUpBegin methods can take without a warning being logged.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: slowTotalOnStepUpBeginThresholdMS
         default: 500
         validator:
@@ -606,7 +595,7 @@ server_parameters:
             service or primary-only service's onStepUpComplete method can take without a warning
             being logged.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: slowServiceOnStepUpCompleteThresholdMS
         default: 200
         validator:
@@ -619,7 +608,7 @@ server_parameters:
             aware services' and primary-only services' onStepUpComplete methods can take
             without a warning being logged.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: slowTotalOnStepUpCompleteThresholdMS
         default: 500
         validator:
@@ -643,7 +632,7 @@ server_parameters:
             The maximum number of total index keys to be checked in reverse lookup in one storage catalog
             snapshot during dbcheck's extraIndexKeys mode.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: dbCheckMaxTotalIndexKeysPerSnapshot
         default: 1000
         validator:
@@ -655,7 +644,7 @@ server_parameters:
             The maximum number of consecutive identical index keys to be checked in reverse lookup in one storage catalog
             snapshot during dbcheck's extraIndexKeys mode.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot
         default: 1000
         validator:
@@ -666,7 +655,7 @@ server_parameters:
         description: >-
             Parameter for whether dbcheck batches should be applied on secondaries.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: skipApplyingDbCheckBatchOnSecondary
         default: false
         redact: false
@@ -676,7 +665,7 @@ server_parameters:
             The maximum amount of time for a dbcheck batch to run on a secondary.
             Once the time limit is hit the secondary will stop running the batch.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: dbCheckSecondaryBatchMaxTimeMs
         default: 5000
         validator:
@@ -688,7 +677,7 @@ server_parameters:
         description: >-
             The maximum number of internal retries that dbCheck will run on a batch.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: dbCheckMaxInternalRetries
         default: 5
         validator:
@@ -700,7 +689,7 @@ server_parameters:
             The number of retries that be made by writeConflictRetry(). It is used in secondary
             oplog application to catch unexpected behavior.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: writeConflictRetryLimit
         default: 10000
         validator:
@@ -713,7 +702,7 @@ server_parameters:
             to assist with diagnostics during secondary oplog application unexpected behavior. If this parameter is less than
             gMinimalWriteConflictRetryCountForStateDump, then the latter will be used to determine dump rate.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: writeConflictRetryCountForDumpState
         default: 1000
         validator:
@@ -737,7 +726,7 @@ server_parameters:
             Usually, the priority ports should be removed via ReplSetReconfig not via this
             parameter, and this parameter is only intended as an emergency backdoor.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
+        cpp_vartype: Atomic<bool>
         cpp_varname: disableReplicationUsageOfPriorityPort
         default: false
         redact: false
@@ -748,53 +737,68 @@ server_parameters:
             for the find to return. This value is adjustable to allow users to minimize
             the amount of time the resolver will spend waiting for a sync source candidate to respond.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: syncSourceResolverFindFetcherTimeoutMillis
         default: 30000
         redact: false
 
-    initialSyncWaitForSyncSourceLastStableRecoveryTs:
+    minWaitForStreamingHelloMillis:
         description: >-
-            If true, during initial sync, we will wait for the sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp before starting collection cloning. This is to prevent a bug where we may miss
-            documents during collection clone if our sync source restarts. Please see SERVER-113184 for more details.
-            IMPORTANT: Turning this server parameter off will introduce risk for inconsistent data after initial sync.
-            Only turn this off if initial sync is unable to wait for sync source propagation, and run data consistency
-            validation after initial sync completes.
+            Minimum timeout in milliseconds for pre-auth streamable hello commands.
+            If a client supplies a maxAwaitTimeMS below this value, the server will
+            either abort the operation or clamp the timeout to this floor, depending
+            on the value of abortStreamingHelloWithSmallTimeout.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: minWaitForStreamingHelloMillis
+        default: 500
+        validator:
+            gte: 0
+        redact: false
+
+    abortStreamingHelloWithSmallTimeout:
+        description: >-
+            When true, pre-auth streamable hello commands with a maxAwaitTimeMS below
+            minWaitForStreamingHelloMillis will fail. When false, the server will
+            clamp the effective timeout to minWaitForStreamingHelloMillis instead.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTs
+        cpp_varname: abortStreamingHelloWithSmallTimeout
+        default: false
+        redact: false
+
+    continuousInternodeValidationFatalOnMismatch:
+        description: >-
+            When true, a hash mismatch detected by continuous internode validation crashes the
+            node, unless the node is still in STARTUP or STARTUP2, where the mismatch is only
+            logged so that a mismatch reproducing from the last checkpoint cannot turn into a
+            startup crash loop. When false, the mismatch is only logged in every state.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: continuousInternodeValidationFatalOnMismatch
         default: true
         redact: false
 
-    initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs:
+    disableContinuousInternodeValidation:
         description: >-
-            The amount of time in seconds that the node will wait for the node's sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp. No effect if 'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false. Default
-            wait period of 10 minutes.
+            Emergency override that skips verification of per-document hashes during oplog
+            application, even when the persistence provider mandates it. Hashes are still written
+            to the oplog and folded into the per-collection hash. A divergence introduced while verification is skipped is not caught by setting this
+            back to false.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs
-        default:
-            expr: 60 * 10
-        validator:
-            gte: 0
+        cpp_vartype: Atomic<bool>
+        cpp_varname: disableContinuousInternodeValidation
+        default: false
         redact: false
 
-    initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs:
+    enableContinuousInternodePerCollectionValidation:
         description: >-
-            If the earliest oplog entry on the sync source is the "initiating set" entry and the
-            sync source's lastStableRecoveryTimestamp is within this many seconds of that entry,
-            initial sync skips waiting for the stable recovery timestamp to advance. This covers the
-            case where the replica set was just created and the sync source has not yet had time to
-            advance its stable recovery timestamp far from the initiating set timestamp. Default is
-            1 hour. No effect if 'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false.
+            When true, a replicated metadata mismatch detected during per-collection continuous
+            internode validation crashes the node. When false, no validation is run.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs
-        default: 3600
-        validator:
-            gte: 0
+        cpp_vartype: Atomic<bool>
+        cpp_varname: enableContinuousInternodePerCollectionValidation
+        default: false
         redact: false
 
 feature_flags:

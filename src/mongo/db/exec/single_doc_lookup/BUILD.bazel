@@ -9,11 +9,12 @@ exports_files(
     ]),
 )
 
-# Header-only strategy interface for single-document lookups, plus the PrimaryWithFallback
-# combinator.
+# Header-only strategy interface for single-document lookups, the PrimaryWithFallback combinator,
+# and the ScopedBatchedLookup RAII batch scope over an executor chain.
 mongo_cc_library(
     name = "single_document_lookup_executor",
     hdrs = [
+        "scoped_batched_lookup.h",
         "single_document_lookup_executor.h",
     ],
     deps = [
@@ -41,6 +42,8 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:shard_role_api",
+        # checkCollectionUUIDMismatch.
+        "//src/mongo/db/shard_role",
     ],
 )
 
@@ -53,6 +56,21 @@ mongo_cc_unit_test(
     deps = [
         ":collection_acquirer",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
+# Header-only shared helper (makeIdEqualityFilter) used by every local single-document lookup
+# strategy to reduce a documentKey to its {_id: <value>} equality filter.
+mongo_cc_library(
+    name = "local_lookup_util",
+    hdrs = [
+        "local_lookup_util.h",
+    ],
+    deps = [
+        ":single_document_lookup_executor",
+        "//src/mongo/db/exec/document_value",
+        # CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage for $indexStats.
+        "//src/mongo/db/query:collection_query_info",
     ],
 )
 
@@ -75,6 +93,49 @@ mongo_cc_library(
     ],
 )
 
+# Sharded-cluster eligibility. Split into its own target because it pulls the router / catalog-cache
+# / shard-targeting libraries; only the change-stream updateLookup wiring point links it, so the base
+# eligibility (interface + AlwaysLocal/AlwaysUnknown) stays sharding-router-free.
+mongo_cc_library(
+    name = "sharded_cluster_local_lookup_eligibility",
+    srcs = [
+        "sharded_cluster_local_lookup_eligibility.cpp",
+    ],
+    hdrs = [
+        "sharded_cluster_local_lookup_eligibility.h",
+    ],
+    deps = [
+        ":local_lookup_eligibility",
+        ":single_document_lookup_executor",
+        # CollationSpec::kSimpleSpec for shard-key targeting.
+        "//src/mongo/db/query/collation:collator_interface",
+        # resolveShardRoleVersions: shared tracked/untracked version derivation.
+        "//src/mongo/db/shard_role",
+        # CollectionRouter, CollectionRoutingInfo, CatalogCache::getCollectionRoutingInfo.
+        "//src/mongo/s:grid",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sharded_cluster_local_lookup_eligibility_test",
+    srcs = [
+        "sharded_cluster_local_lookup_eligibility_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":sharded_cluster_local_lookup_eligibility",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        # CatalogCacheMock + the static CRI builders.
+        "//src/mongo/db/sharding_environment:sharding_test_fixture_common",
+        # ShardServerTestFixtureWithCatalogCacheMock: a shard-server fixture with CatalogCacheMock in
+        # Grid, so run()'s CollectionRouter::route() resolves against it AND its withStaleShardRetry
+        # (CollectionShardingState access) runs against real shard-role infrastructure.
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+    ],
+)
+
 # Production factory producing LocalLookupEligibility instances based on ShardingState.
 mongo_cc_library(
     name = "local_lookup_eligibility_factory",
@@ -87,7 +148,25 @@ mongo_cc_library(
     ],
     deps = [
         ":local_lookup_eligibility",
+        # The sharded branch constructs ShardedClusterLocalLookupEligibility; this transitively pulls
+        # the router/grid libraries into the factory's link graph (only linked at the change-stream
+        # stage factory + test util).
+        ":sharded_cluster_local_lookup_eligibility",
+        # ShardingState::get / shardId() ship in shard_role_api (topology/sharding_state.cpp).
         "//src/mongo/db:shard_role_api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "local_lookup_eligibility_factory_impl_test",
+    srcs = [
+        "local_lookup_eligibility_factory_impl_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":local_lookup_eligibility_factory",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+        "//src/mongo/transport:transport_layer_mock",
     ],
 )
 
@@ -131,7 +210,9 @@ mongo_cc_library(
     deps = [
         ":collection_acquirer",
         ":local_lookup_eligibility",
+        ":local_lookup_util",
         ":single_document_lookup_executor",
+        ":single_document_lookup_stats",
         "//src/mongo/db/exec/express:express_executor",
         # CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage for $indexStats.
         "//src/mongo/db/query:collection_query_info",
@@ -148,9 +229,73 @@ mongo_cc_unit_test(
     deps = [
         ":express_single_document_lookup_executor",
         ":local_lookup_eligibility_test_util",
+        ":single_document_lookup_stats_test_util",
+        "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+# SBE-based strategy: a parameterized _id plan compiled once and reused across lookups by rebinding
+# the _id slot, with the acquisition cached across the batch window.
+mongo_cc_library(
+    name = "sbe_single_document_lookup_executor",
+    srcs = [
+        "sbe_single_document_lookup_executor.cpp",
+    ],
+    deps = [
+        ":collection_acquirer",
+        ":local_lookup_eligibility",
+        ":local_lookup_util",
+        ":single_document_lookup_executor",
+        ":single_document_lookup_stats",
+        # sbe::RuntimeEnvironment, PlanStage, value helpers.
+        "//src/mongo/db/exec/sbe:query_sbe",
+        # record_id_helpers::keyForElem.
+        "//src/mongo/db:record_id_helpers",
+        # CanonicalQuery, FindCommandRequest, ExpressionContextBuilder.
+        "//src/mongo/db/query:canonical_query_base",
+        # CollectionQueryInfo::getPlanCacheInvalidatorVersion for plan invalidation.
+        "//src/mongo/db/query:collection_query_info",
+        # PlanYieldPolicySBE.
+        "//src/mongo/db/query:plan_yield_policy_sbe",
+        # QueryPlanner::plan + QueryPlannerParams.
+        "//src/mongo/db/query:query_planner",
+        # QueryPlannerParams::fillOutMainCollectionPlannerParams / requiresShardFiltering.
+        "//src/mongo/db/query:query_planner_params",
+        # validIdField.
+        "//src/mongo/db/query/util:validate_id",
+        # isEligibleForComparisonAutoParameterization.
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
+        # buildSlotBasedExecutableTree, prepareSlotBasedExecutableTree, makeKeyStringPair,
+        # PlanStageData, ParameterizedIndexScanSlots.
+        "//src/mongo/db/query/stage_builder/sbe:stage_builder",
+        # checkCollectionUUIDMismatch.
+        "//src/mongo/db/shard_role",
+        # clustered_util::isClusteredOnId.
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sbe_single_document_lookup_executor_test",
+    srcs = [
+        "sbe_single_document_lookup_executor_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":local_lookup_eligibility_test_util",
+        ":sbe_single_document_lookup_executor",
+        ":single_document_lookup_stats_test_util",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
@@ -162,7 +307,9 @@ mongo_cc_library(
     ],
     deps = [
         ":single_document_lookup_executor",
+        ":single_document_lookup_stats",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/s/commands:document_shard_key_query_conversion",
     ],
 )
 
@@ -174,7 +321,49 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":aggregation_single_document_lookup_executor",
+        ":single_document_lookup_stats_test_util",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline/process_interface:stub_mongo_process_interface",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+# Per-(consumer x engine) OTEL metrics cells + recorder for change stream single-document lookups.
+# Registers the updateLookup express/aggregation/sbe cells at load time.
+mongo_cc_library(
+    name = "single_document_lookup_stats",
+    srcs = [
+        "single_document_lookup_stats.cpp",
+    ],
+    deps = [
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+# Shared test helper: snapshots an updateLookup cell's counters + latency totals via
+# OtelMetricsCapturer, so tests assert deltas against a before-snapshot. Linked only into test
+# binaries.
+mongo_cc_library(
+    name = "single_document_lookup_stats_test_util",
+    testonly = True,
+    hdrs = [
+        "single_document_lookup_stats_test_util.h",
+    ],
+    deps = [
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "single_document_lookup_stats_test",
+    srcs = [
+        "single_document_lookup_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":single_document_lookup_stats",
+        ":single_document_lookup_stats_test_util",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )

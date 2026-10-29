@@ -1,65 +1,48 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/handoff/handoff_session.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/handoff_s2n_init.h"
+#include "mongo/transport/handoff/handoff_test_util.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
+#include "mongo/transport/session_manager_common_mock.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_peer_info.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 
 #include <algorithm>
 #include <chrono>
 #include <concepts>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <future>
 #include <memory>
 #include <span>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
 
 #include <fcntl.h>
+#include <poll.h>
 #include <s2n.h>
 #include <unistd.h>
 
@@ -94,7 +77,10 @@ Message makeMessage(NetworkOp op, const BSONObj& body) {
 void writeAll(int fd, const char* buf, size_t len) {
     size_t written = 0;
     while (written < len) {
-        ssize_t n = ::send(fd, buf + written, len - written, 0);
+        ssize_t n;
+        do {
+            n = ::send(fd, buf + written, len - written, 0);
+        } while (n == -1 && errno == EINTR);
         ASSERT_GT(n, 0) << "send failed: " << errorMessage(lastSocketError());
         written += n;
     }
@@ -148,6 +134,131 @@ void sendMessageWithFds(int udsFd, const Message& msg, std::initializer_list<int
     ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
 }
 
+/**
+ * Waits until the specified file descriptor is _not_ ready for reading.
+ * Checks for readability at most once per specified retry interval.
+ * This function triggers a test failure if any of the following occurs:
+ * - system error
+ * - the specified timeout elapses
+ * - the write end of the file descriptor shuts down
+ */
+void waitUntilDataConsumed(
+    int fd,
+    std::chrono::steady_clock::duration timeout,
+    std::chrono::steady_clock::duration checkInterval = std::chrono::milliseconds(1)) {
+    ::pollfd interests;
+    interests.fd = fd;
+    interests.events = POLLIN;
+    const int timeoutMs = 0;
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    for (;;) {
+        const int rc = ::poll(&interests, 1, timeoutMs);
+        if (rc == -1) {
+            const int error = errno;
+            ASSERT_EQ(error, EINTR);
+            continue;
+        }
+        if (rc == 0) {
+            // `fd` is not readable
+            break;
+        }
+        invariant(rc == 1);
+        ASSERT_FALSE(interests.revents & POLLHUP);
+        ASSERT_FALSE(interests.revents & POLLERR);
+        ASSERT_TRUE(interests.revents & POLLIN);
+        ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "timed out";
+        std::this_thread::sleep_for(checkInterval);
+    }
+};
+
+std::tuple<char, std::error_code> readTaskStateFromProcfsStat(
+    const std::filesystem::path& taskProcfsStatPath) {
+    int rc;
+    do {
+        rc = ::open(taskProcfsStatPath.c_str(), O_RDONLY);
+    } while (rc == -1 && errno == EINTR);
+    if (rc == -1) {
+        return {'\0', std::error_code(errno, std::system_category())};
+    }
+    const int fd = rc;
+    ScopeGuard closer{[&]() {
+        (void)::close(fd);
+    }};
+
+    char buffer[256];
+    ssize_t size;
+    do {
+        size = ::read(fd, buffer, sizeof buffer);
+    } while (size == -1 && errno == EINTR);
+    if (size == -1) {
+        return {'\0', std::error_code(errno, std::system_category())};
+    }
+    if (size == 0) {
+        return {'\0', std::make_error_code(std::errc::no_such_process)};
+    }
+    const std::string_view prefix{buffer, size_t(size)};
+    // We're looking for the one-char <state> in "<pid> (<command_name>) <state> <other_fields...>"
+    const char state = prefix[prefix.rfind(')') + 2];
+    return {state, std::error_code()};
+}
+
+std::filesystem::path thisTaskProcfsStatPath() {
+    return std::filesystem::canonical("/proc/thread-self/stat");
+}
+
+void waitUntilTaskIsAsleep(const std::filesystem::path& taskProcfsStatPath,
+                           std::chrono::steady_clock::duration timeout,
+                           std::chrono::steady_clock::duration checkInterval) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    for (;;) {
+        const auto [state, error] = readTaskStateFromProcfsStat(taskProcfsStatPath);
+        ASSERT_FALSE(error) << error;
+        if (state == 'S') {
+            break;  // sleeping
+        }
+        ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "Most recent state: " << state;
+        std::this_thread::sleep_for(checkInterval);
+    }
+}
+
+/**
+ * ThreadSleepOneTimeNotification is a synchronization mechanism that allows one thread to wait
+ * until another thread has indicated that it is about to go to sleep and then goes to sleep.
+ *
+ * ThreadSleepOneTimeNotification is used to test behavior like "when the session thread is blocked
+ * in waitForData(), a call to end() from another thread wakes up the session thread."
+ *
+ * The thread that is about to go to sleep calls notifyAboutToSleep to indicate that it is about to
+ * go to sleep. Subsequent calls to notifyAboutToSleep have no effect.
+ *
+ * The thread that is interested in waiting for the other thread to go to sleep calls
+ * waitForEnterSleep. If the specified timeout elapses, then a test failure is triggered.
+ * Otherwise, waitForEnterSleep returns when the other thread has both indicated that it is going to
+ * sleep and then is actually asleep.
+ * waitForEnterSleep checks the state of the other thread at an optionally specified interval.
+ */
+class ThreadSleepOneTimeNotification {
+public:
+    void notifyAboutToSleep();
+    void waitForEnterSleep(std::chrono::milliseconds timeout,
+                           std::chrono::milliseconds checkInterval = std::chrono::milliseconds(1));
+
+private:
+    PromiseAndFuture<std::filesystem::path> taskStat = makePromiseFuture<std::filesystem::path>();
+    bool taskStatPublished = false;
+};
+
+void ThreadSleepOneTimeNotification::notifyAboutToSleep() {
+    if (!std::exchange(taskStatPublished, true)) {
+        taskStat.promise.emplaceValue(thisTaskProcfsStatPath());
+    }
+}
+
+void ThreadSleepOneTimeNotification::waitForEnterSleep(std::chrono::milliseconds timeout,
+                                                       std::chrono::milliseconds checkInterval) {
+    waitUntilTaskIsAsleep(std::move(taskStat.future).get(), timeout, checkInterval);
+}
+
 struct SessionHandoffMessageOptions {
     bool omitEmptyExtraCleartext = true;
 };
@@ -191,7 +302,7 @@ Message buildSessionHandoffMessage(const std::vector<uint8_t>& serializedState,
  * deserialization is needed.
  */
 class HandoffSessionCleartextFixture : public unittest::Test {
-public:
+protected:
     void setUp() override {
         int fds[2];
         ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0)
@@ -221,6 +332,10 @@ public:
             .posix = _posix});
     }
 
+    int mongodFd() const {
+        return _mongodFd;
+    }
+
     int proxyFd() const {
         return _proxyFd;
     }
@@ -232,10 +347,14 @@ public:
         }
     }
 
+    MockPOSIXInterface& posix() {
+        return _posix;
+    }
+
 private:
     int _mongodFd = -1;
     int _proxyFd = -1;
-    POSIXInterface _posix;
+    MockPOSIXInterface _posix;
 };
 
 //
@@ -245,7 +364,7 @@ private:
 class HandoffSessionPropertiesTest : public HandoffSessionCleartextFixture {};
 
 /** A freshly constructed session begins in Cleartext mode. */
-TEST_F(HandoffSessionPropertiesTest, InitialStateIsProxyHeader) {
+TEST_F(HandoffSessionPropertiesTest, InitialStateIsCleartext) {
     auto session = makeSession();
     ASSERT_EQ(session->getState_forTest(), HandoffSession::State::Cleartext);
 }
@@ -346,22 +465,98 @@ DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
     makeSession()->setTimeout(Milliseconds{100});
 }
 
+class HandoffSessionLoadBalancerTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        int fds[2];
+        ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0)
+            << "socketpair failed: " << errorMessage(lastSocketError());
+        _mongodFd = fds[0];
+        _proxyFd = fds[1];
+
+        auto sm = std::make_unique<MockSessionManagerCommon>(getServiceContext());
+        _sessionManager = sm.get();
+        _tl = std::make_unique<TransportLayerMock>(std::move(sm));
+    }
+
+    void tearDown() override {
+        if (_proxyFd >= 0) {
+            ::close(_proxyFd);
+            _proxyFd = -1;
+        }
+        ServiceContextTest::tearDown();
+    }
+
+    std::shared_ptr<HandoffSession> makeLoadBalancedSession() {
+        return std::make_shared<HandoffSession>(
+            HandoffSession::Params{.fd = _mongodFd,
+                                   .localAddress = std::filesystem::path("/dummy/mongod"),
+                                   .transportLayer = _tl.get(),
+                                   .acceptedOnLoadBalancedSocket = true,
+                                   .acceptedOnPrioritySocket = false,
+                                   .s2nConfig = nullptr,
+                                   .posix = _posix});
+    }
+
+    MockSessionManagerCommon& sessionManager() {
+        return *_sessionManager;
+    }
+
+    MockPOSIXInterface& posix() {
+        return _posix;
+    }
+
+private:
+    int _mongodFd = -1;
+    int _proxyFd = -1;
+    MockPOSIXInterface _posix;
+    MockSessionManagerCommon* _sessionManager = nullptr;
+    std::unique_ptr<TransportLayerMock> _tl;
+};
+
 /**
- * setIsLoadBalancerPeer is called by `load_balancer_support.cpp`, but only if the session was
- * accepted on the load balancer socket. Rather than enforce a redundant check in the session
- * implementation, trust any value specified in setIsLoadBalancerPeer, and verify that the same
- * value is returned by bindsToOperationState.
+ * setIsLoadBalancerPeer tracks whether the session is a load balancer peer, and increments and
+ * decrements the number of load balancer sessions in the session manager accordingly.
  */
-TEST_F(HandoffSessionPropertiesTest, SetIsLoadBalancerPeerDeterminesBindsToOperationState) {
-    auto session = makeSession();
-    // initially false
+TEST_F(HandoffSessionLoadBalancerTest, SetIsLoadBalancerPeerBasic) {
+    auto session = makeLoadBalancedSession();
+
+    ASSERT_FALSE(session->isLoadBalancerPeer());
     ASSERT_FALSE(session->bindsToOperationState());
-    // true means true
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+
     session->setIsLoadBalancerPeer(true);
+    ASSERT_TRUE(session->isLoadBalancerPeer());
     ASSERT_TRUE(session->bindsToOperationState());
-    // false means false
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
     session->setIsLoadBalancerPeer(false);
+    ASSERT_FALSE(session->isLoadBalancerPeer());
     ASSERT_FALSE(session->bindsToOperationState());
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+TEST_F(HandoffSessionLoadBalancerTest, SetIsLoadBalancerPeerIsIdempotent) {
+    auto session = makeLoadBalancedSession();
+
+    session->setIsLoadBalancerPeer(true);
+    session->setIsLoadBalancerPeer(true);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 1);
+
+    session->setIsLoadBalancerPeer(false);
+    session->setIsLoadBalancerPeer(false);
+    ASSERT_EQ(sessionManager().getSessionStats().numLoadBalancedSessions, 0);
+}
+
+/**
+ * setIsLoadBalancerPeer rejects a connection claiming to be from a load balancer when the session
+ * was not accepted on the load balancer port.
+ */
+DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
+             SetIsLoadBalancerPeerRejectsNonLoadBalancerPortConnections,
+             "Client claimed to be from a loadBalancer, but is not on load balancer port") {
+    makeSession()->setIsLoadBalancerPeer(true);
 }
 
 //
@@ -453,9 +648,15 @@ TEST_F(HandoffSessionPreHandoffMessageTest, SourceMessageReassemblesFragmentedMe
         constexpr size_t kChunk = 7;
         while (off < static_cast<size_t>(totalSize)) {
             size_t n = std::min(kChunk, static_cast<size_t>(totalSize) - off);
-            writeAll(proxyFd(), p + off, n);
-            off += n;
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            const int flags = 0;
+            ssize_t sent;
+            do {
+                sent = ::send(proxyFd(), p + off, n, flags);
+            } while (sent == -1 && errno == EINTR);
+            ASSERT_GT(sent, 0) << "send failed: " << errorMessage(lastSocketError());
+            off += sent;
+            // Wait for the session thread (the test driver thread) to consume the data.
+            waitUntilDataConsumed(mongodFd(), std::chrono::seconds(1));
         }
     });
 
@@ -675,13 +876,18 @@ TEST_F(HandoffSessionPreHandoffEndSessionTest, WaitForDataSucceedsAfterPeerClose
  * concurrent poll() on close() alone.
  */
 TEST_F(HandoffSessionPreHandoffEndSessionTest, EndUnblocksBlockedWaitForData) {
-    auto session = makeSession();
+    ThreadSleepOneTimeNotification sync;
 
+    posix().onPoll = [&](::pollfd fds[], nfds_t nfds, int timeoutMillis) {
+        sync.notifyAboutToSleep();
+        return ::poll(fds, nfds, timeoutMillis);
+    };
+
+    auto session = makeSession();
     auto fut = std::async(std::launch::async, [&] { return session->waitForData(); });
 
-    // The sleep gives waitForData() time to enter poll() before end() closes _fd. On a slow
-    // machine, end() may win the race first and the poll() wakeup path goes untested.
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // Wait until waitForData() enters poll(), then verify that end() wakes it up.
+    sync.waitForEnterSleep(std::chrono::seconds(1));
     session->end();
     ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
         << "end() failed to unblock waitForData()";
@@ -924,8 +1130,8 @@ public:
         // Create a UDS socketpair for the HandoffSession.
         int udsFds[2];
         ASSERT_EQ(::socketpair(AF_UNIX, SOCK_STREAM, 0, udsFds), 0);
-        int mongodUdsFd = udsFds[0];  // mongod's HandoffSession end.
-        proxyUdsFd = udsFds[1];       // proxy's end.
+        mongodUdsFd = udsFds[0];  // mongod's HandoffSession end.
+        proxyUdsFd = udsFds[1];   // proxy's end.
 
         session = std::make_shared<HandoffSession>(
             HandoffSession::Params{.fd = mongodUdsFd,
@@ -1047,11 +1253,16 @@ protected:
     std::shared_ptr<HandoffSession> session;
     int proxyTlsFd = -1;
     int proxyUdsFd = -1;
+    int mongodUdsFd = -1;  // HandoffSession is responsible for closing this file.
     int clientTlsFd = -1;
     struct s2n_connection* clientConn = nullptr;
     struct s2n_connection* serverConn = nullptr;
     std::vector<uint8_t> serializedState;
     std::vector<uint8_t> extraCleartext;
+
+    MockPOSIXInterface& posix() {
+        return _posix;
+    }
 
 private:
     static constexpr auto kServerCertKeyFile = "jstests/libs/server.pem";
@@ -1137,7 +1348,7 @@ private:
     struct s2n_config* _clientConfig = nullptr;
     struct s2n_config* _deserConfig = nullptr;
     struct s2n_cert_chain_and_key* _certChainAndKey = nullptr;
-    POSIXInterface _posix;
+    MockPOSIXInterface _posix;
 };
 
 //
@@ -1403,6 +1614,149 @@ INSTANTIATE_TEST_SUITE_P(JustPartialMessages,
                                                           PartialMessageExtent::SizeMinusOneByte)));
 
 /**
+ * waitForData() returns OK immediately if there is unconsumed data available from a previous
+ * OP_HANDOFF's extraCleartext field.
+ */
+TEST_F(HandoffSessionHandoffTransitionTest, WaitForDataConsidersExtraCleartext) {
+    std::vector<Message> messages;
+    std::vector<iovec> chunks;
+
+    messages.push_back(makeMessage(dbMsg, BSON("ping" << 1)));
+    chunks.push_back(fromMessage(messages.back()));
+
+    messages.push_back(makeMessage(dbMsg, BSON("ping" << 2)));
+    chunks.push_back(fromMessage(messages.back()));
+
+    messages.push_back(makeMessage(dbMsg, BSON("ping" << 3)));
+    chunks.push_back(fromMessage(messages.back()));
+
+    clientSend(chunks);
+
+    // Tell the proxy (the "server" end of the TLS connection) to receive one message's worth of
+    // data. The remaining two messages, which were sent by the client along with the first message,
+    // will fit in the same TLS record and so will be received and decoded by s2n-tls together with
+    // the first. Those messages will be sent to the mongod session as "extraCleartext", below.
+    const Message firstReceived = serverReceive(messages[0].size());
+    ASSERT_EQ(firstReceived.size(), messages[0].size());
+    ASSERT_EQ(memcmp(firstReceived.buf(), messages[0].buf(), messages[0].size()), 0);
+
+    serializeConnection();
+    ASSERT_EQ(extraCleartext.size(), messages[1].size() + messages[2].size());
+
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
+    sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
+    // The session receives a dup of proxyTlsFd via SCM_RIGHTS and uses it for TLS I/O.
+    // Our copy is no longer needed.
+    ::close(proxyTlsFd);
+    proxyTlsFd = -1;
+
+    // Source one message at mongod. This will trigger handoff, the second message will be retrieved
+    // from extraCleartext, and the third message will remain in the session's unconsumed buffer.
+    boost::optional<StatusWith<Message>> result;
+    std::thread t([&] { result = session->sourceMessage(); });
+
+    waitForSessionHandoff();
+    t.join();
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_OK(result->getStatus());
+    ASSERT_EQ(result->getValue().size(), messages[1].size());
+    ASSERT_EQ(memcmp(result->getValue().buf(), messages[1].buf(), messages[1].size()), 0);
+
+    // `session->waitForData()` should return OK immediately, because there's data in the
+    // unconsumed buffer.
+    // To detect whether `session->waitForData()` is hanging, have a thread call
+    // `session->waitForData()` and submit the result to a promise/future. Then the test driver
+    // thread can await the value with a timeout. Ending the session will unblock waitForData if
+    // it's hanging, so in any case end the session and join the thread at the end of the current
+    // scope.
+    std::promise<Status> promise;
+    std::future<Status> future = promise.get_future();
+    std::thread waiter{[&]() {
+        promise.set_value(session->waitForData());
+    }};
+    ScopeGuard guard{[&]() {
+        session->end();  // wake up the waiter if it hasn't finished
+        waiter.join();
+    }};
+    ASSERT_NE(future.wait_for(std::chrono::seconds(1)), std::future_status::timeout);
+    ASSERT_OK(future.get());
+
+    const StatusWith<Message> lastMessage = session->sourceMessage();
+    ASSERT_OK(lastMessage.getStatus());
+    ASSERT_EQ(lastMessage.getValue().size(), messages[2].size());
+    ASSERT_EQ(memcmp(lastMessage.getValue().buf(), messages[2].buf(), messages[2].size()), 0);
+}
+
+/**
+ * waitForData() returns OK immediately if there is decrypted but unconsumed data available in the
+ * s2n-tls connection's s2n_peek().
+ */
+TEST_F(HandoffSessionHandoffTransitionTest, WaitForDataConsidersS2nPeek) {
+    serializeConnection();
+    ASSERT_EQ(extraCleartext.size(), 0);
+    Message handoffMsg = buildSessionHandoffMessage(serializedState, extraCleartext);
+    sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
+    // The session receives a dup of proxyTlsFd via SCM_RIGHTS and uses it for TLS I/O.
+    // Our copy is no longer needed. Now the client and the session are talking directly.
+    ::close(proxyTlsFd);
+    proxyTlsFd = -1;
+
+    // Source one message at mongod. This will trigger handoff, and the session will block waiting
+    // for the next message in TLS mode.
+    // We'll then have the client send two messages at once such that they both fit in one TLS
+    // record. The session will return the first message, and the second message will be in the
+    // session's s2n_peek().
+    boost::optional<StatusWith<Message>> result;
+    std::thread t([&] { result = session->sourceMessage(); });
+
+    waitForSessionHandoff();
+
+    std::vector<Message> messages;
+    std::vector<iovec> chunks;
+
+    messages.push_back(makeMessage(dbMsg, BSON("ping" << 1)));
+    chunks.push_back(fromMessage(messages.back()));
+
+    messages.push_back(makeMessage(dbMsg, BSON("ping" << 2)));
+    chunks.push_back(fromMessage(messages.back()));
+
+    clientSend(chunks);
+    t.join();
+    ASSERT_EQ(session->getState_forTest(), HandoffSession::State::TLS);
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_OK(result->getStatus());
+    ASSERT_EQ(result->getValue().size(), messages[0].size());
+    ASSERT_EQ(memcmp(result->getValue().buf(), messages[0].buf(), messages[0].size()), 0);
+
+    // `session->waitForData()` should return OK immediately, because there's data in the
+    // s2n_peek().
+    // To detect whether `session->waitForData()` is hanging, have a thread call
+    // `session->waitForData()` and submit the result to a promise/future. Then the test driver
+    // thread can await the value with a timeout. Ending the session will unblock waitForData if
+    // it's hanging, so in any case end the session and join the thread at the end of the current
+    // scope.
+    std::promise<Status> promise;
+    std::future<Status> future = promise.get_future();
+    std::thread waiter{[&]() {
+        promise.set_value(session->waitForData());
+    }};
+    ScopeGuard guard{[&]() {
+        session->end();  // wake up the waiter if it hasn't finished
+        waiter.join();
+    }};
+    ASSERT_NE(future.wait_for(std::chrono::seconds(1)), std::future_status::timeout);
+    ASSERT_OK(future.get());
+
+    const StatusWith<Message> lastMessage = session->sourceMessage();
+    ASSERT_OK(lastMessage.getStatus());
+    ASSERT_EQ(lastMessage.getValue().size(), messages[1].size());
+    ASSERT_EQ(memcmp(lastMessage.getValue().buf(), messages[1].buf(), messages[1].size()), 0);
+}
+
+/**
  * If there is no decrypted data remaining in the proxy's s2n connection, then the OP_HANDOFF
  * "extraCleartext" can be omitted.
  * However, if it is included in the OP_HANDOFF body and is empty, the server will behave the same
@@ -1486,12 +1840,11 @@ TEST_F(HandoffSessionHandoffTransitionTest, SuccessfulHandoffWithFragmentedHeade
         } while (n < 0 && errno == EINTR);
         ASSERT_GT(n, 0) << "sendmsg failed: " << errorMessage(lastSocketError());
         ASSERT_EQ(n, static_cast<ssize_t>(kFirstChunk)) << "sendmsg sent less than expected";
+        // Wait for the session thread to consume the first chunk.
+        waitUntilDataConsumed(mongodUdsFd, std::chrono::seconds(1));
     }
     ::close(proxyTlsFd);
     proxyTlsFd = -1;
-
-    // Pause so the first fragment is consumed before the rest arrives.
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
     // Send the remaining header bytes and full body.
     writeAll(proxyUdsFd,
@@ -1633,7 +1986,9 @@ TEST_F(HandoffSessionPostHandoffMessageTest, SourceMessageReassemblesFragmentedM
             size_t n = std::min(kChunk, static_cast<size_t>(totalSize) - off);
             clientSend(msg.buf() + off, n);
             off += n;
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            // Wait for `sourceMessage()` to consume the data we just sent.
+            const auto timeout = std::chrono::seconds(1);
+            waitUntilDataConsumed(proxyTlsFd, timeout);
         }
     });
 
@@ -1809,11 +2164,18 @@ TEST_F(HandoffSessionPostHandoffEndSessionTest, WaitForDataSucceedsAfterPeerClos
  * concurrent poll() on close() alone.
  */
 TEST_F(HandoffSessionPostHandoffEndSessionTest, EndUnblocksBlockedWaitForData) {
+    ThreadSleepOneTimeNotification sync;
+
+    posix().onPoll = [&](::pollfd fds[], nfds_t nfds, int timeoutMillis) {
+        sync.notifyAboutToSleep();
+        return ::poll(fds, nfds, timeoutMillis);
+    };
+
     auto fut = std::async(std::launch::async, [&] { return session->waitForData(); });
 
-    // The sleep gives waitForData() time to enter poll() before end() closes _fd. On a slow
-    // machine, end() may win the race first and the poll() wakeup path goes untested.
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // Wait until waitForData() enters poll(), then verify that end() wakes it up.
+    sync.waitForEnterSleep(std::chrono::seconds(1));
+
     session->end();
     ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
         << "end() failed to unblock waitForData()";
@@ -2078,6 +2440,7 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNIAndCert) {
  * SSLPeerInfo is set as expected after the handoff.
  */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderArrivesFragmented) {
+    auto preludeFuture = std::async(std::launch::async, [&] { session->prelude(); });
     auto header = buildProxyHeader(/*sniName=*/kTestSniName,
                                    /*subjectDN=*/nullptr,
                                    /*rolesBytes=*/nullptr,
@@ -2087,7 +2450,10 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderArrivesFragmented) {
     // Send the first quarter, pause, then send the rest.
     size_t firstChunk = header.size() / 4;
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), firstChunk);
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    // Wait for `Session::prelude()` to consume the first chunk.
+    waitUntilDataConsumed(mongodUdsFd, std::chrono::seconds(1));
+
     writeAll(proxyUdsFd,
              reinterpret_cast<const char*>(header.data() + firstChunk),
              header.size() - firstChunk);
@@ -2098,7 +2464,7 @@ TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderArrivesFragmented) {
         ASSERT_EQ(peerInfo->sniName().value(), kTestSniName);
     };
 
-    ASSERT_NO_THROW(session->prelude());
+    ASSERT_NO_THROW(preludeFuture.get());
     validatePeerInfo();
 
     driveHandoff();
@@ -2140,16 +2506,24 @@ TEST_F(HandoffSessionProxyHeaderTest, FailsOnPeerClose) {
 }
 
 /**
- * end() called while blocked waiting for the proxy header unblocks the read promptly.
+ * end() called while blocked waiting for the proxy header unblocks the session thread promptly.
  * Mirrors EndUnblocksBlockedWaitForData but for the proxy-header read path.
  */
 TEST_F(HandoffSessionProxyHeaderTest, EndUnblocksProxyHeaderRead) {
+    ThreadSleepOneTimeNotification sync;
+
+    posix().onPoll = [&](::pollfd fds[], nfds_t nfds, int timeoutMillis) {
+        sync.notifyAboutToSleep();
+        return ::poll(fds, nfds, timeoutMillis);
+    };
+
     auto fut = std::async(std::launch::async, [&] {
         ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::SocketException);
     });
 
-    // Give prelude() time to enter the blocking recv() before end() closes the fd.
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // Wait for prelude() to enter the blocking poll(). Then verify that end() unblocks it.
+    sync.waitForEnterSleep(std::chrono::seconds(1));
+
     session->end();
     ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
         << "end() failed to unblock proxy header read";
@@ -2260,28 +2634,42 @@ TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfSocketIsEmp
 }
 
 /**
- * The proxy protocol read timeout must not outlive prelude(). A short proxyProtocolTimeoutSecs
- * must not cause sourceMessage() to return NetworkTimeout after prelude() succeeds.
+ * The proxy protocol read timeout must not outlive prelude().
  */
 TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutNotLeftOnSocketAfterPrelude) {
-    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 1};
+
+    const ::timeval noTimeout = {};
+    ::timeval firstTimeout;
+    ::timeval lastTimeout;
+    int timeoutCount = 0;
+    posix().onSetsockopt = [&](int socket,
+                               int level,
+                               int option_name,
+                               const void* option_value,
+                               socklen_t option_len) {
+        if (level == SOL_SOCKET && option_name == SO_RCVTIMEO) {
+            ASSERT_EQ(option_len, sizeof(::timeval));
+            std::memcpy(&lastTimeout, option_value, option_len);
+            if (++timeoutCount == 1) {
+                firstTimeout = lastTimeout;
+            }
+        }
+        return ::setsockopt(socket, level, option_name, option_value, option_len);
+    };
 
     auto header = buildProxyHeader(
         /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
     ASSERT_NO_THROW(session->prelude());
 
-    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
-    auto fut = std::async(std::launch::async, [&] { return session->sourceMessage(); });
+    const auto toDuration = [](const ::timeval& timeout) {
+        return std::chrono::seconds(timeout.tv_sec) + std::chrono::microseconds(timeout.tv_usec);
+    };
 
-    // Give sourceMessage() time to block waiting for the message. If the proxy protocol timeout
-    // was not cleared, it would return early instead.
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    ASSERT_EQ(fut.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout)
-        << "sourceMessage() returned early after prelude()";
-
-    writeAll(proxyUdsFd, msg.buf(), msg.size());
-    ASSERT_OK(fut.get().getStatus());
+    ASSERT_EQ(timeoutCount, 2);
+    ASSERT_NE(toDuration(firstTimeout), toDuration(noTimeout));
+    ASSERT_EQ(toDuration(lastTimeout), toDuration(noTimeout));
 }
 
 /**

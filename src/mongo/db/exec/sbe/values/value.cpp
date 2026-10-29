@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/values/value.h"
 
@@ -314,7 +288,7 @@ std::string print(const std::pair<TypeTags, Value>& value) {
     return stream;
 }
 
-std::string printTagAndVal(const TypeTags tag, const Value value) {
+MONGO_COMPILER_USED std::string printTagAndVal(const TypeTags tag, const Value value) {
     return printTagAndVal(std::pair<TypeTags, Value>{tag, value});
 }
 
@@ -395,14 +369,12 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             return getKeyString(val)->hash();
         case TypeTags::Array:
         case TypeTags::bsonArray: {
-            auto arr = ArrayEnumerator{tag, val};
             auto res = hashInit();
 
-            // There should be enough entropy in the first 4 elements.
-            for (int i = 0; i < 4 && !arr.atEnd(); ++i) {
+            // Hash all of the elements
+            for (ArrayEnumerator arr{tag, val}; !arr.atEnd(); arr.advance()) {
                 auto [elemTag, elemVal] = arr.getViewOfValue();
                 res = hashCombine(res, hashValue(elemTag, elemVal, collator));
-                arr.advance();
             }
 
             return res;
@@ -424,14 +396,12 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
         }
         case TypeTags::Object:
         case TypeTags::bsonObject: {
-            auto obj = ObjectEnumerator{tag, val};
             auto res = hashInit();
 
-            // There should be enough entropy in the first 4 elements.
-            for (int i = 0; i < 4 && !obj.atEnd(); ++i) {
+            // Hash all of the fields
+            for (ObjectEnumerator obj{tag, val}; !obj.atEnd(); obj.advance()) {
                 auto [elemTag, elemVal] = obj.getViewOfValue();
                 res = hashCombine(res, hashValue(elemTag, elemVal, collator));
-                obj.advance();
             }
 
             return res;
@@ -757,11 +727,11 @@ bool isInfinity(TypeTags tag, Value val) noexcept {
 
 bool ArraySet::push_back_raw(TypeTags tag, Value val) {
     if (tag != TypeTags::Nothing) {
-        ValueGuard guard{tag, val};
+        TagValueOwned owned = TagValueOwned::fromRaw(tag, val);
         auto [it, inserted] = _values.insert({tag, val});
 
         if (inserted) {
-            guard.reset();
+            owned.reset();
         }
 
         return inserted;
@@ -778,17 +748,23 @@ bool ArraySet::push_back_clone(TypeTags tag, Value val) {
     return false;
 }
 
+bool ArraySet::push_back(TagValueOwned value) {
+    if (value.tag() != TypeTags::Nothing) {
+        return _values.insert_lazy(value.raw(), [&]() { return value.releaseToRaw(); }).second;
+    }
+    return false;
+}
+
 std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
                                            Value value,
                                            const CollatorInterface* collator) {
-    auto [resTag, resVal] = makeNewArraySet(collator);
-    ValueGuard guard(resTag, resVal);
-    ArraySet* setValues = getArraySetView(resVal);
+    TagValueOwned res = TagValueOwned::fromRaw(makeNewArraySet(collator));
+    ArraySet* setValues = getArraySetView(res.value());
     setValues->reserve(getArraySize(tag, value));
     arrayForEach(tag, value, [&](TypeTags elemTag, Value elemVal) {
         setValues->push_back_clone(elemTag, elemVal);
     });
-    guard.reset();
+    auto [resTag, resVal] = res.releaseToRaw();
     return {resTag, reinterpret_cast<Value>(setValues)};
 }
 
@@ -827,7 +803,8 @@ bool ArrayEnumerator::advance() {
         if (_arrayCurrent != _arrayEnd - 1) {
             _arrayCurrent = bson::advance(_arrayCurrent, _fieldNameSize);
             if (_arrayCurrent != _arrayEnd - 1) {
-                _fieldNameSize = TinyStrHelpers::strlen(bson::fieldNameRaw(_arrayCurrent));
+                _fieldNameSize =
+                    bson::fieldNameLength(bson::fieldNameRaw(_arrayCurrent), _arrayEnd);
             }
         }
 
@@ -839,7 +816,7 @@ TagValueView ObjectEnumerator::getViewOfValue() const {
     if (_object) {
         return _object->getAt(_index);
     } else {
-        auto sv = bson::fieldNameAndLength(_objectCurrent);
+        auto sv = bson::fieldNameAndLength(_objectCurrent, _objectEnd);
         return bson::convertToView(_objectCurrent, _objectEnd, sv.size());
     }
 }
@@ -853,7 +830,7 @@ bool ObjectEnumerator::advance() {
         return _index < _object->size();
     } else {
         if (*_objectCurrent != 0) {
-            auto sv = bson::fieldNameAndLength(_objectCurrent);
+            auto sv = bson::fieldNameAndLength(_objectCurrent, _objectEnd);
             _objectCurrent = bson::advance(_objectCurrent, sv.size());
         }
 
@@ -871,7 +848,7 @@ std::string_view ObjectEnumerator::getFieldName() const {
         }
     } else {
         if (*_objectCurrent != 0) {
-            return bson::fieldNameAndLength(_objectCurrent);
+            return bson::fieldNameAndLength(_objectCurrent, _objectEnd);
         } else {
             return ""sv;
         }
@@ -941,9 +918,8 @@ std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface
         }
     }
 
-    auto [setTag, setVal] = makeNewArraySet(collator);
-    ValueGuard guard{setTag, setVal};
-    auto setView = getArraySetView(setVal);
+    TagValueOwned set = TagValueOwned::fromRaw(makeNewArraySet(collator));
+    auto setView = getArraySetView(set.value());
 
     auto arrIter = ArrayEnumerator{tag, val};
     while (!arrIter.atEnd()) {
@@ -952,8 +928,7 @@ std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface
         setView->push_back_raw(copyTag, copyVal);
         arrIter.advance();
     }
-    guard.reset();
-    return {setTag, setVal};
+    return set.releaseToRaw();
 }
 
 bool operator==(const ArraySet& lhs, const ArraySet& rhs) {

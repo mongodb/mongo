@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 
@@ -61,7 +35,6 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
@@ -123,8 +96,8 @@ public:
                                          false,
                                          epoch,
                                          timestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
 
                                          true,
                                          {std::move(chunk)})));
@@ -146,8 +119,8 @@ public:
                                          false,
                                          newVersion.epoch(),
                                          newVersion.getTimestamp(),
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
                                          true,
                                          {std::move(chunk)})));
         return CollectionMetadata{cm, metadata.shardId()};
@@ -189,8 +162,8 @@ public:
                                                      false,
                                                      epoch,
                                                      timestamp,
-                                                     boost::none /* timeseriesFields */,
-                                                     boost::none /* reshardingFields */,
+                                                     /*timeseriesFields=*/boost::none,
+                                                     /*reshardingFields=*/boost::none,
                                                      true,
                                                      chunks)));
         return CollectionMetadata(std::move(cm), std::move(collectionShardId));
@@ -231,18 +204,21 @@ public:
         return csr._metadataType == CollectionShardingRuntime::MetadataType::kTracked;
     }
 
-    static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(const NamespaceString& nss,
-                                                                       const UUID& uuid) {
+    static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(
+        const NamespaceString& nss, const UUID& uuid, bool forDroppedCollection = false) {
         // Fixed OpTime used for synthetic oplog entries. These tests should never read it because
-        // CollectionCacheRecoverer is not installed, so reusing the same value everywhere is fine.
+        // CollectionMetadataSynchronizer is not installed, so reusing the same value everywhere is
+        // fine.
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
                                            nss.getCommandNS(),
-                                           BSON("invalidateCollectionMetadata" << nss.coll()),
+                                           BSON("invalidateCollectionMetadata"
+                                                << nss.coll() << "forDroppedCollection"
+                                                << forDroppedCollection),
                                            boost::none,
                                            uuid);
     }
 
-    static repl::OplogEntry makeCollectionShardingStateDeltaOplogEntry(
+    static repl::OplogEntry makeUpdateCollectionMetadataOplogEntry(
         const NamespaceString& nss, const UUID& uuid, const std::vector<ChunkType>& changedChunks) {
         BSONArrayBuilder changedChunksBuilder;
         for (const auto& chunk : changedChunks) {
@@ -250,14 +226,33 @@ public:
         }
 
         // Fixed OpTime used for synthetic oplog entries. These tests should never read it because
-        // CollectionCacheRecoverer is not installed, so reusing the same value everywhere is fine.
+        // CollectionMetadataSynchronizer is not installed, so reusing the same value everywhere is
+        // fine.
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
                                            nss,
-                                           BSON("applyCollectionShardingStateDelta"
+                                           BSON("updateCollectionMetadata"
                                                 << nss.coll() << "changedChunks"
                                                 << changedChunksBuilder.arr()),
                                            boost::none,
                                            uuid);
+    }
+
+    static repl::OplogEntry makeSetAllowChunkOperationsOplogEntry(const NamespaceString& nss,
+                                                                  const UUID& uuid,
+                                                                  bool allowChunkOperations) {
+        return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
+                                           nss,
+                                           BSON("setAllowChunkOperations" << nss.coll()
+                                                                          << "allowChunkOperations"
+                                                                          << allowChunkOperations),
+                                           boost::none,
+                                           uuid);
+    }
+
+    BSONObj getCollectionRecoveryStatistics() {
+        BSONObjBuilder builder;
+        ShardingStatistics::get(operationContext()).report(&builder);
+        return builder.obj().getObjectField("collectionShardingMetadataStatistics").getOwned();
     }
 };
 
@@ -283,7 +278,7 @@ void runWithinTxn(OperationContext* opCtx,
 
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNumber},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart,
                                    transactionRuntimeContext);
 
@@ -348,7 +343,6 @@ TEST_F(CollectionShardingRuntimeTest, CheckShardVersionThrowsStaleConfigAfterDon
         {ChunkHistory(*changedChunk.getOnCurrentShardSince(), changedChunk.getShard())});
     auto updatedMetadata = metadata.makeUpdated({changedChunk});
 
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updatedMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -414,6 +408,25 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 
+TEST_F(CollectionShardingRuntimeTest, SetAndClearCollectionMetadataUpdatesStatistics) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    const auto statsBefore = getCollectionRecoveryStatistics();
+    const auto setsBefore = statsBefore.getIntField("countCollectionMetadataCacheSets");
+    const auto clearsBefore = statsBefore.getIntField("countCollectionMetadataCacheClears");
+
+    csr.setCollectionMetadata(opCtx, makeShardedMetadata(opCtx));
+    auto statsAfterSet = getCollectionRecoveryStatistics();
+    ASSERT_EQ(statsAfterSet.getIntField("countCollectionMetadataCacheSets"), setsBefore + 1);
+    ASSERT_EQ(statsAfterSet.getIntField("countCollectionMetadataCacheClears"), clearsBefore);
+
+    csr.clearCollectionMetadata(opCtx);
+    auto statsAfterClear = getCollectionRecoveryStatistics();
+    ASSERT_EQ(statsAfterClear.getIntField("countCollectionMetadataCacheSets"), setsBefore + 1);
+    ASSERT_EQ(statsAfterClear.getIntField("countCollectionMetadataCacheClears"), clearsBefore + 1);
+}
+
 TEST_F(CollectionShardingRuntimeTest,
        ClearFilteringMetadataAuthoritativeClearsMetadataWhenTrackedAndUUIDMatches) {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);
@@ -423,11 +436,8 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
 
     csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
 
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -438,11 +448,8 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
 
     csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
 
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -452,81 +459,7 @@ TEST_F(CollectionShardingRuntimeTest,
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 
     csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
 
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, SetCollectionMetadataKeepsNonAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    auto metadata = makeShardedMetadata(opCtx);
-
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-
-    csr.setCollectionMetadata(opCtx, metadata);
-
-    ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, SetCollectionMetadataKeepsAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    auto metadata = makeShardedMetadata(opCtx);
-
-    csr.clearCollectionMetadata(opCtx);
-    csr.setAuthoritative();
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-
-    csr.setCollectionMetadata(opCtx, metadata);
-
-    ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, ClearCollectionMetadataKeepsNonAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    csr.setCollectionMetadata(opCtx, makeShardedMetadata(opCtx));
-
-    csr.clearCollectionMetadata(opCtx);
-
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, ClearCollectionMetadataKeepsAuthoritativeState) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    csr.setCollectionMetadata(
-        opCtx, makeShardedMetadata(opCtx), CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-    csr.setAuthoritative();
-
-    csr.clearCollectionMetadata(opCtx);
-
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
-}
-
-TEST_F(CollectionShardingRuntimeTest, SetAuthoritativeUpdatesAuthoritativeStateOnly) {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
-    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
-
-    csr.setAuthoritative();
-
-    ASSERT_EQ(csr.getAuthoritativeState(),
-              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 
@@ -863,23 +796,22 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVer
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated with version ChunkVersion::IGNORED()
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, ChunkVersion::IGNORED(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(ChunkVersion::IGNORED(), collectionUUID);
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated with version which is older
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadataInThePast.getShardPlacementVersion(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(metadataInThePast.getShardPlacementVersion(),
+                                                       collectionUUID);
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will not be invalidated when collection UUID does not match
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadata.getShardPlacementVersion(), UUID::gen());
+    csr.invalidateRangePreserversOlderThanShardVersion(metadata.getShardPlacementVersion(),
+                                                       UUID::gen());
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
     // Test that the trackers will be invalidated with current version
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadata.getShardPlacementVersion(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(metadata.getShardPlacementVersion(),
+                                                       collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
@@ -900,8 +832,7 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanUnsharde
     // case ownershipFilter::shardPlacementVersion = UNTRACKED. Currently it's not possible to test
     // as in this case metadataManager is not created for unsharded collection. When it will be
     // changed it will be possible to test against a current version.
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, ChunkVersion::UNTRACKED(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(ChunkVersion::UNTRACKED(), collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
@@ -923,8 +854,8 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUntrackedCollecti
 
     ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
 
-    csr.invalidateRangePreserversOlderThanShardVersion(
-        opCtx, metadata.getShardPlacementVersion(), collectionUUID);
+    csr.invalidateRangePreserversOlderThanShardVersion(metadata.getShardPlacementVersion(),
+                                                       collectionUUID);
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
@@ -1026,7 +957,7 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingUntrackedAuthorita
     OperationContext* opCtx = operationContext();
 
     ASSERT_EQ(ChunkVersion::UNTRACKED() <=> ChunkVersion::UNTRACKED(),
-              std::partial_ordering::unordered);
+              std::partial_ordering::equivalent);
 
     auto future = csr.registerWaiterForChunkVersion(
         opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
@@ -1036,8 +967,6 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingUntrackedAuthorita
     csr.setCollectionMetadata(opCtx,
                               CollectionMetadata::UNTRACKED(),
                               CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-    csr.setAuthoritative();
-
     ASSERT_TRUE(future.isReady());
     future.get();
 }
@@ -1052,7 +981,7 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksA
     ASSERT_EQ(trackedZeroChunks.minorVersion(), 0u);
     ASSERT_NE(trackedZeroChunks, ChunkVersion::UNTRACKED());
 
-    ASSERT_EQ(trackedZeroChunks <=> trackedZeroChunks, std::partial_ordering::unordered);
+    ASSERT_EQ(trackedZeroChunks <=> trackedZeroChunks, std::partial_ordering::equivalent);
 
     auto future =
         csr.registerWaiterForChunkVersion(opCtx, ShardVersionFactory::make(trackedZeroChunks));
@@ -1061,8 +990,6 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksA
 
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-    csr.setAuthoritative();
-
     ASSERT_TRUE(future.isReady());
     future.get();
 }
@@ -1077,7 +1004,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) 
 
     // Start authoritative with zero owned chunks: every key is a gap.
     auto metadata = makeGappedShardedMetadata(uuid, {}, thisShard);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1090,7 +1016,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) 
     // Receive the first chunks, both assigned to this shard.
     auto updated = metadata.makeUpdated(
         makeChangedChunks(metadata, {{0, 10, thisShard}, {20, 30, thisShard}}));
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1113,12 +1038,10 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForAnotherSh
     const auto uuid = UUID::gen();
 
     auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{20, 30, otherShard}}));
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1139,12 +1062,10 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForCurrentSh
     const auto uuid = UUID::gen();
 
     auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{20, 30, thisShard}}));
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1166,7 +1087,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyC
     const auto uuid = UUID::gen();
 
     auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1178,7 +1098,6 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyC
 
     // The same range is re-tagged to another shard, so this shard owns nothing afterwards.
     auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{0, 10, otherShard}}));
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1199,13 +1118,11 @@ TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesMixedChunkDelta) {
     const auto uuid = UUID::gen();
 
     auto metadata = makeGappedShardedMetadata(uuid, {}, thisShard);
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto updated = metadata.makeUpdated(
         makeChangedChunks(metadata, {{0, 10, thisShard}, {20, 30, otherShard}}));
-    csr.setAuthoritative();
     csr.setCollectionMetadata(
         opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
@@ -1250,21 +1167,21 @@ public:
         StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
 
         repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                              repl::ReadConcernLevel readConcern,
+                                                              repl::ReadConcernArgs readConcern,
                                                               BSONObj filter) override {
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
 
         std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
                                                           const DatabaseName& dbName,
-                                                          repl::ReadConcernLevel readConcernLevel,
+                                                          repl::ReadConcernArgs readConcern,
                                                           const BSONObj& sort) override {
             return {};
         }
 
         std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
-                                                   repl::ReadConcernLevel readConcernLevel,
+                                                   repl::ReadConcernArgs readConcern,
                                                    const BSONObj& sort) override {
             return _colls;
         }
@@ -1292,16 +1209,12 @@ public:
                                         const UUID& uuid,
                                         const Timestamp& timestamp) {
         auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
-        ChunkType chunk1(uuid,
-                         range1,
-                         ChunkVersion({epoch, timestamp}, {1, 0}),
-                         ShardRef{kShardList[0].getName()});
+        ChunkType chunk1(
+            uuid, range1, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(kShardKey << 5), BSON(kShardKey << MAXKEY));
-        ChunkType chunk2(uuid,
-                         range2,
-                         ChunkVersion({epoch, timestamp}, {1, 1}),
-                         ShardRef{kShardList[0].getName()});
+        ChunkType chunk2(
+            uuid, range2, ChunkVersion({epoch, timestamp}, {1, 1}), kShardList[0].getName());
 
         return {chunk1, chunk2};
     }
@@ -1354,34 +1267,7 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CheckCriticalSectionMetric
     ASSERT_EQ(metrics["totalTimeWaiting"].safeNumberLong(), 0);
 }
 
-class CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader
-    : public CollectionShardingRuntimeTestWithMockedLoader,
-      public testing::WithParamInterface<bool> {
-protected:
-    void setUp() override {
-        _featureFlagScope.emplace("featureFlagUniqueShardIdentifiers", GetParam());
-        CollectionShardingRuntimeTestWithMockedLoader::setUp();
-    }
-
-    void tearDown() override {
-        CollectionShardingRuntimeTestWithMockedLoader::tearDown();
-        _featureFlagScope.reset();
-    }
-
-private:
-    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
-};
-
-INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,
-                         CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
-                         testing::Bool(),
-                         [](const testing::TestParamInfo<bool>& info) {
-                             return info.param ? "WithUniqueShardIdentifiers"
-                                               : "WithoutUniqueShardIdentifiers";
-                         });
-
-TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
-       CriticalSectionMetricsReportWaiters) {
+TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsReportWaiters) {
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter the critical section.
@@ -1412,7 +1298,7 @@ TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
             ASSERT_EQ(kNss, exInfo->getNss());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
             ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
+            ASSERT_EQ(kMyShardName, exInfo->getShardId());
             const auto& signal = exInfo->getCriticalSectionSignal();
             sleepmillis(10);
             auto metrics = getStatistics();
@@ -1467,9 +1353,12 @@ TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
 /**
  * Fixture for when range deletion functionality is required in CollectionShardingRuntime tests.
  */
-class CollectionShardingRuntimeWithRangeDeleterTest : service_context_test::WithSetupTransportLayer,
-                                                      public CollectionShardingRuntimeTest {
+class CollectionShardingRuntimeWithRangeDeleterTest : public CollectionShardingRuntimeTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         CollectionShardingRuntimeTest::setUp();
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
@@ -1536,6 +1425,9 @@ RangeDeletionTask createRangeDeletionTask(OperationContext* opCtx,
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     t.setTimestamp(currentTime.clusterTime().asTimestamp());
     t.setPending(true);
+    // Persist the shard key pattern as production does, so the MaxKey orphan guard classifies the
+    // task from the task doc instead of fetching the collection from the config server.
+    t.setKeyPattern(KeyPattern(kShardKeyPattern));
     return t;
 }
 
@@ -1546,7 +1438,8 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         kTestNss,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
-        Date_t::max());
+        Date_t::max(),
+        /*refreshMetadataIfUnknown=*/false);
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -1567,10 +1460,48 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 }
 
 TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
+       WaitForCleanAuthoritativeReturnsErrorIfCollectionUUIDDoesNotMatchFilteringMetadata) {
+    // Even on the authoritative path, known metadata whose UUID does not match is a genuine reset
+    // (not a transiently-cleared metadata), so it must fail rather than attempt recovery.
+    OperationContext* opCtx = operationContext();
+    auto metadata = makeShardedMetadata(opCtx, uuid());
+    csr()->setCollectionMetadata(opCtx, metadata);
+    auto randomUuid = UUID::gen();
+
+    auto status = CollectionShardingRuntime::waitForClean(
+        opCtx,
+        kTestNss,
+        randomUuid,
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Date_t::max(),
+        /*refreshMetadataIfUnknown=*/true);
+    ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
        WaitForCleanReturnsOKIfNoDeletionsAreScheduled) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx, uuid());
     csr()->setCollectionMetadata(opCtx, metadata);
+
+    auto status = CollectionShardingRuntime::waitForClean(
+        opCtx,
+        kTestNss,
+        uuid(),
+        ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+        Date_t::max());
+
+    ASSERT_OK(status);
+}
+
+TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
+       WaitForCleanReturnsOKWhenCollectionIsUnowned) {
+    // When the CSR has no routing table but is marked kUnowned, waitForClean must still succeed
+    // (using the caller-provided UUID) rather than reporting a metadata reset.
+    OperationContext* opCtx = operationContext();
+    csr()->setCollectionMetadata(opCtx,
+                                 CollectionMetadata::UNTRACKED(),
+                                 CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 
     auto status = CollectionShardingRuntime::waitForClean(
         opCtx,
@@ -1597,7 +1528,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 
     const auto task = createRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
     auto taskCompletionFuture = registerAndCreatePersistentTask(
-        opCtx, task, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     opCtx->setDeadlineAfterNowBy(Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
     auto status =
@@ -1622,10 +1553,10 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const auto task2 = createRangeDeletionTask(opCtx, kTestNss, uuid(), range2, 0);
 
     auto cleanupCompleteFirst = registerAndCreatePersistentTask(
-        opCtx, task1, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task1, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     auto cleanupCompleteSecond = registerAndCreatePersistentTask(
-        opCtx, task2, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task2, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     auto status = CollectionShardingRuntime::waitForClean(
         opCtx,
@@ -1652,7 +1583,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const auto task = createRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
 
     auto cleanupComplete = registerAndCreatePersistentTask(
-        opCtx, task, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     auto status =
         CollectionShardingRuntime::waitForClean(opCtx, kTestNss, uuid(), range, Date_t::max());
@@ -1664,10 +1595,6 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 class CollectionShardingRuntimeWithCatalogTest
     : public CollectionShardingRuntimeWithRangeDeleterTest {
 public:
-    void setUp() override {
-        CollectionShardingRuntimeWithRangeDeleterTest::setUp();
-    }
-
     void tearDown() override {
         OpObserver::Times::get(operationContext()).reservedOpTimes.clear();
         CollectionShardingRuntimeWithRangeDeleterTest::tearDown();
@@ -1694,7 +1621,7 @@ TEST_F(ShardingMongoDTestFixture, ShardingStateDisabledReturnsUntrackedVersion) 
     ShardingState::RecoveredClusterRole rcr;
     rcr.role = ClusterRole::None;
     auto shardingState = ShardingState::get(opCtx);
-    shardingState->setRecoveryCompleted(rcr, UUID::gen());
+    shardingState->setRecoveryCompleted(rcr);
     ASSERT_DOES_NOT_THROW(csr.getCollectionDescription(opCtx));
     ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
 }
@@ -1718,7 +1645,7 @@ TEST_F(ShardingMongoDTestFixture, ShardingStateEnabledReturnsTrackedVersion) {
     ShardingState::RecoveredClusterRole rcr;
     rcr.role = ClusterRole::ShardServer;
     rcr.shardId = ShardId("0");
-    ShardingState::get(opCtx)->setRecoveryCompleted(rcr, UUID::gen());
+    ShardingState::get(opCtx)->setRecoveryCompleted(rcr);
     ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
     ASSERT_THROWS_CODE(csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::StaleConfig);
 }
@@ -1732,7 +1659,6 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
         scopedCsr->setCollectionMetadata(opCtx,
                                          makeShardedMetadata(opCtx, collUuid),
                                          CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
-        scopedCsr->setAuthoritative();
     }
 
     {
@@ -1743,16 +1669,44 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     auto oplogEntry = makeInvalidateCollectionMetadataOplogEntry(kTestNss, collUuid);
     ShardServerOpObserver observer;
     observer.onInvalidateCollectionMetadata(opCtx, oplogEntry);
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countInvalidateCollectionMetadataOplogEntriesApplied"),
+              1);
+    // A refresh-driven invalidation must not be accounted as a drop.
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countInvalidateCollectionMetadataOplogEntriesForDroppedCollections"),
+              0);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
-        ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 
-TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWithMatchingUUID) {
+TEST_F(CollectionShardingRuntimeTest,
+       OnInvalidateCollectionMetadataForDroppedCollectionTracksDrop) {
+    auto opCtx = operationContext();
+    createTestCollection(opCtx, kTestNss);
+    auto collUuid = UUID::gen();
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        scopedCsr->setCollectionMetadata(opCtx,
+                                         makeShardedMetadata(opCtx, collUuid),
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+    }
+
+    auto oplogEntry = makeInvalidateCollectionMetadataOplogEntry(
+        kTestNss, collUuid, /*forDroppedCollection=*/true);
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(opCtx, oplogEntry);
+
+    auto stats = getCollectionRecoveryStatistics();
+    ASSERT_EQ(stats.getIntField("countInvalidateCollectionMetadataOplogEntriesApplied"), 1);
+    ASSERT_EQ(
+        stats.getIntField("countInvalidateCollectionMetadataOplogEntriesForDroppedCollections"), 1);
+}
+
+TEST_F(CollectionShardingRuntimeTest, OnUpdateCollectionMetadataCSRWithMatchingUUID) {
     auto opCtx = operationContext();
     createTestCollection(opCtx, kTestNss);
     auto collUuid = UUID::gen();
@@ -1769,22 +1723,43 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaCSRWith
                            ShardId("other"));
     changedChunk.setName(OID::gen());
 
-    auto oplogEntry =
-        makeCollectionShardingStateDeltaOplogEntry(kTestNss, collUuid, {changedChunk});
+    auto oplogEntry = makeUpdateCollectionMetadataOplogEntry(kTestNss, collUuid, {changedChunk});
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    observer.onUpdateCollectionMetadata(opCtx, oplogEntry);
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countUpdateCollectionMetadataOplogEntriesApplied"),
+              1);
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countUpdateCollectionMetadataChangedChunksApplied"),
+              1);
 
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         auto metadata = csr->getCurrentMetadataIfKnown();
         ASSERT_TRUE(metadata);
         ASSERT_EQ(metadata->getCollPlacementVersion(), newVersion);
-        ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 
-TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithoutKnownMetadata) {
+TEST_F(CollectionShardingRuntimeTest, OnSetAllowChunkOperationsTracksOplogEntryApplication) {
+    auto opCtx = operationContext();
+    createTestCollection(opCtx, kTestNss);
+    const auto collUuid = UUID::gen();
+
+    auto oplogEntry =
+        makeSetAllowChunkOperationsOplogEntry(kTestNss, collUuid, /*allowChunkOperations=*/false);
+    ShardServerOpObserver observer;
+    observer.onSetAllowChunkOperations(opCtx, oplogEntry);
+
+    ASSERT_EQ(getCollectionRecoveryStatistics().getIntField(
+                  "countSetAllowChunkOperationsOplogEntriesApplied"),
+              1);
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_FALSE(csr->allowChunkOperations());
+}
+
+TEST_F(CollectionShardingRuntimeTest, OnUpdateCollectionMetadataWithoutKnownMetadata) {
     auto opCtx = operationContext();
     createTestCollection(opCtx, kTestNss);
     auto collUuid = UUID::gen();
@@ -1803,23 +1778,20 @@ TEST_F(CollectionShardingRuntimeTest, OnApplyCollectionShardingStateDeltaWithout
                            ShardId("other"));
     changedChunk.setName(OID::gen());
 
-    auto oplogEntry =
-        makeCollectionShardingStateDeltaOplogEntry(kTestNss, collUuid, {changedChunk});
+    auto oplogEntry = makeUpdateCollectionMetadataOplogEntry(kTestNss, collUuid, {changedChunk});
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    observer.onUpdateCollectionMetadata(opCtx, oplogEntry);
 
-    // The delta is dropped and the collection stays in an authoritative-but-unknown state, forcing
-    // the next user to perform a full recovery from disk.
+    // The delta is dropped and the collection stays unknown, forcing the next user to perform a
+    // full recovery from disk.
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
-        ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
     }
 }
 
 DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
-                   OnApplyCollectionShardingStateDeltaWithMismatchedUUID,
+                   OnUpdateCollectionMetadataWithMismatchedUUID,
                    "Tripwire assertion.*12698707") {
     auto opCtx = operationContext();
     createTestCollection(opCtx, kTestNss);
@@ -1839,10 +1811,9 @@ DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
                            ShardId("other"));
     changedChunk.setName(OID::gen());
 
-    auto oplogEntry =
-        makeCollectionShardingStateDeltaOplogEntry(kTestNss, otherUuid, {changedChunk});
+    auto oplogEntry = makeUpdateCollectionMetadataOplogEntry(kTestNss, otherUuid, {changedChunk});
     ShardServerOpObserver observer;
-    observer.onApplyCollectionShardingStateDelta(opCtx, oplogEntry);
+    observer.onUpdateCollectionMetadata(opCtx, oplogEntry);
 }
 
 }  // namespace mongo

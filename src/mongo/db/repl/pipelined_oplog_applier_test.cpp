@@ -1,0 +1,2407 @@
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
+
+#include "mongo/db/repl/pipelined_oplog_applier.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/client.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/pipelined_applier_otel_metrics.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
+#include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <atomic>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <boost/optional.hpp>
+
+namespace mongo::repl {
+namespace {
+
+std::unique_ptr<PipelinedOplogApplier> makeApplier() {
+    return std::make_unique<PipelinedOplogApplier>(
+        /*executor=*/nullptr,
+        /*oplogBuffer=*/nullptr,
+        &noopOplogApplierObserver,
+        /*replCoord=*/nullptr,
+        /*storageInterface=*/nullptr,
+        OplogApplier::Options(OplogApplication::Mode::kSecondary),
+        /*numWorkers=*/16);
+}
+
+using PipelinedOplogApplierTest = ServiceContextTest;
+using PipelinedOplogApplierDeathTest = ServiceContextTest;
+
+// Creates a collection and index with untimestamped catalog writes.
+UUID createCollectionWithIndex(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& key) {
+    UnreplicatedWritesBlock noRep(opCtx);
+    auto uuid = createCollectionWithUuid(opCtx, nss);
+    createIndex(opCtx, nss, uuid, BSON("v" << 2 << "name" << "idx" << "key" << key));
+    return uuid;
+}
+
+// Checks the index's catalog multikey state after application.
+void assertIndexMultikey(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const std::string& indexName,
+                         bool expected,
+                         const MultikeyPaths& paths) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    ASSERT_TRUE(coll.exists());
+    const auto& collPtr = coll.getCollectionPtr();
+    const auto* entry = collPtr->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    ASSERT_TRUE(entry);
+    ASSERT_EQ(entry->isMultikey(opCtx, collPtr), expected);
+    ASSERT_EQ(entry->getMultikeyPaths(opCtx, collPtr), paths);
+}
+
+TEST_F(PipelinedOplogApplierTest, ConstructsWithSecondaryMode) {
+    auto applier = makeApplier();
+    ASSERT_EQ(applier->getOptions().mode, OplogApplication::Mode::kSecondary);
+}
+
+DEATH_TEST_REGEX_F(PipelinedOplogApplierDeathTest,
+                   ApplyOplogBatchIsUnimplemented,
+                   "Hit a MONGO_UNIMPLEMENTED") {
+    auto applier = makeApplier();
+    applier->applyOplogBatch(/*opCtx=*/nullptr, {}).getStatus().ignore();
+}
+
+// Exercises applyWorkItem() and consumeWorkItem() against real oplog entries.
+class PipelinedWorkItemTest : public OplogApplierImplTest {
+protected:
+    using WorkItem = PipelinedApplierWorkerPool::WorkItem;
+
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        PipelinedApplyOtelMetrics::initialize();
+    }
+
+    // A work item bundled with the backing memory for its ops. WorkItem.ops holds
+    // ApplierOperations whose pointers alias `backing`; the caller must keep `backing` alive for
+    // as long as the item is being applied (i.e. until the worker pool has consumed it).
+    struct OwnedWorkItem {
+        std::vector<OplogEntry> backing;
+        WorkItem item;
+    };
+
+    static OplogApplier::Options secondaryOptions() {
+        return OplogApplier::Options(OplogApplication::Mode::kSecondary);
+    }
+
+    static OwnedWorkItem makeItem(std::vector<OplogEntry> ops) {
+        OwnedWorkItem owned;
+        owned.backing = std::move(ops);
+        owned.item.ops.reserve(owned.backing.size());
+        for (const auto& op : owned.backing) {
+            owned.item.ops.emplace_back(&op);
+        }
+        return owned;
+    }
+
+    OplogEntry insertOp(const NamespaceString& nss, const BSONObj& doc) {
+        return makeInsertDocumentOplogEntry(nextOpTime(), nss, doc);
+    }
+
+    OplogEntry updateOp(const NamespaceString& nss, const BSONObj& query, const BSONObj& setDoc) {
+        return makeUpdateDocumentOplogEntry(nextOpTime(),
+                                            nss,
+                                            query,
+                                            update_oplog_entry::makeDeltaOplogEntry(
+                                                BSON(doc_diff::kUpdateSectionFieldName << setDoc)));
+    }
+
+    OplogEntry deleteOp(const NamespaceString& nss, const BSONObj& query) {
+        return makeDeleteDocumentOplogEntry(nextOpTime(), nss, query);
+    }
+
+    long long countDocs(const NamespaceString& nss) {
+        DBDirectClient client(_opCtx.get());
+        return client.count(nss);
+    }
+
+    // Consumes items on one worker and reads each slice's results from its completed batch.
+    std::vector<WorkerMultikeyPathInfo> consumeOnWorker(const OplogApplier::Options& options,
+                                                        std::vector<OwnedWorkItem> items,
+                                                        bool deferMultikeyWrites = false) {
+        PipelinedApplierBatchTracker tracker;
+        PipelinedApplierWorkerPool pool(
+            /*numWorkers=*/1, [&](size_t workerIdx, const WorkItem& item) {
+                consumeWorkItem(workerIdx, options, item, tracker, deferMultikeyWrites);
+            });
+        for (auto& owned : items) {
+            auto& item = owned.item;
+            auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
+            item.multikeyPathInfo = &(*multikeyMetadata)[0];
+            item.batchRemainingWorkers = tracker.addBatch(
+                item.ops.empty() ? OpTimeAndWallTime{}
+                                 : OpTimeAndWallTime{item.ops.back()->getOpTime(),
+                                                     item.ops.back()->getWallClockTime()},
+                1,
+                {},
+                {},
+                multikeyMetadata);
+            pool.enqueue(0, std::move(item));
+        }
+        pool.shutdownAndJoin();
+        std::vector<WorkerMultikeyPathInfo> multikey;
+        // Every successfully consumed item completes its batch exactly once.
+        for (size_t i = 0; i < items.size(); ++i) {
+            auto batch = tracker.popCompletedBatch(Milliseconds(0));
+            ASSERT_TRUE(batch);
+            ASSERT_TRUE(batch->multikeyMetadata);
+            ASSERT_EQ(batch->multikeyMetadata->size(), 1U);
+            multikey.push_back((*batch->multikeyMetadata)[0]);
+            tracker.onBatchPublished();
+        }
+        ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+        return multikey;
+    }
+
+    // Creates an empty indexed collection for multikey tracking tests.
+    UUID createIndexedCollection(const BSONObj& key = BSON("a" << 1)) {
+        return createCollectionWithIndex(_opCtx.get(), kNss, key);
+    }
+
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.poa_apply");
+};
+
+TEST_F(PipelinedWorkItemTest, AppliesOpsInWorkItemOrder) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    // The final state is only correct if the ops are applied in the order given.
+    auto owned = makeItem({insertOp(kNss, BSON("_id" << 0)),
+                           updateOp(kNss, BSON("_id" << 0), BSON("a" << 1)),
+                           updateOp(kNss, BSON("_id" << 0), BSON("a" << 2)),
+                           insertOp(kNss, BSON("_id" << 1)),
+                           deleteOp(kNss, BSON("_id" << 1))});
+    ASSERT_OK(applyWorkItem(_opCtx.get(), options, owned.item));
+
+    ASSERT_EQ(countDocs(kNss), 1);
+    ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0 << "a" << 2)));
+}
+
+TEST_F(PipelinedWorkItemTest, GroupsConsecutiveInsertsOnTheSameCollection) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    std::vector<size_t> insertBatchSizes;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            insertBatchSizes.push_back(docs.size());
+        };
+
+    auto item = makeItem({insertOp(kNss, BSON("_id" << 0)),
+                          insertOp(kNss, BSON("_id" << 1)),
+                          insertOp(kNss, BSON("_id" << 2))});
+    ASSERT_OK(applyWorkItem(_opCtx.get(), options, item.item));
+
+    // Exactly one insert call, carrying all three documents: the shared apply path groups
+    // consecutive inserts to one collection.
+    ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{3}));
+    ASSERT_EQ(countDocs(kNss), 3);
+}
+
+TEST_F(PipelinedWorkItemTest, WriteConflictRetryCompletesBatchOnce) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    int insertAttempts = 0;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>&) {
+            if (++insertAttempts == 1) {
+                throwWriteConflictException("injected write conflict");
+            }
+        };
+
+    consumeOnWorker(options, {makeItem({insertOp(kNss, BSON("_id" << 0))})});
+
+    ASSERT_EQ(insertAttempts, 2);
+    ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0)));
+}
+
+TEST_F(PipelinedWorkItemTest, WriteConflictRetryRecordsMultikeyAndCompletesBatchOnce) {
+    auto uuid = createIndexedCollection();
+    const auto options = secondaryOptions();
+    auto doc = BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2));
+    auto op = insertOp(kNss, doc);
+
+    int insertAttempts = 0;
+    bool failedAttemptTrackedMultikey = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            if (++insertAttempts == 1) {
+                failedAttemptTrackedMultikey = !MultikeyPathTracker::get(opCtx).isEmpty();
+                throwWriteConflictException("injected write conflict");
+            }
+        };
+
+    auto multikey = consumeOnWorker(options, {makeItem({op})}, /*deferMultikeyWrites=*/true);
+
+    // Retry after multikey discovery must retain one timestamped result and complete the batch
+    // once.
+    ASSERT_EQ(insertAttempts, 2);
+    ASSERT_TRUE(failedAttemptTrackedMultikey);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {{kNss, uuid, "idx", {}, {{0U}}, op.getTimestamp()}},
+    };
+    ASSERT_EQ(multikey, expected);
+    ASSERT_TRUE(docExists(_opCtx.get(), kNss, doc));
+    ASSERT_EQ(countDocs(kNss), 1);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
+}
+
+TEST_F(PipelinedWorkItemTest, ReturnsErrorWhenCollectionIsMissingInSteadyState) {
+    createDatabase(_opCtx.get(), kNss.db_forTest());
+    const auto options = secondaryOptions();
+
+    auto status =
+        applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item);
+
+    ASSERT_EQ(status, ErrorCodes::NamespaceNotFound);
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
+}
+
+TEST_F(PipelinedWorkItemTest, IgnoresMissingCollectionWhenOptionsAllowIt) {
+    createDatabase(_opCtx.get(), kNss.db_forTest());
+    // kInitialSync is the mode whose Options set allowNamespaceNotFoundErrorsOnCrudOps.
+    const OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
+
+    ASSERT_OK(
+        applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item));
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesCommands) {
+    const auto options = secondaryOptions();
+    auto createOp = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
+
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(), options, makeItem({createOp, insertOp(kNss, BSON("_id" << 0))}).item));
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kNss));
+    ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0)));
+}
+
+TEST_F(PipelinedWorkItemTest, FallsBackToSingleInsertsWhenAnInjectedGroupedInsertFails) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    // Fail any insert carrying more than one document. This stands in for a grouped insert
+    // hitting an error such as a duplicate key, after which the shared apply path applies the
+    // ops one at a time so the failing op is isolated.
+    std::vector<size_t> insertBatchSizes;
+    _opObserver->onInsertsFn = [&](OperationContext*,
+                                   const NamespaceString&,
+                                   const std::vector<BSONObj>& docs) {
+        insertBatchSizes.push_back(docs.size());
+        uassert(ErrorCodes::OperationFailed, "injected grouped insert failure", docs.size() == 1);
+    };
+
+    ASSERT_OK(applyWorkItem(_opCtx.get(),
+                            options,
+                            makeItem({insertOp(kNss, BSON("_id" << 0)),
+                                      insertOp(kNss, BSON("_id" << 1)),
+                                      insertOp(kNss, BSON("_id" << 2))})
+                                .item));
+
+    // The grouped attempt, then each op individually.
+    ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{3, 1, 1, 1}));
+    ASSERT_EQ(countDocs(kNss), 3);
+}
+
+TEST_F(PipelinedWorkItemTest, GroupedInsertFallbackPreservesMultikeyPathsAndTimestamps) {
+    auto uuid = createIndexedCollection(BSON("a" << 1 << "b" << 1));
+    const auto options = secondaryOptions();
+    auto scalar = insertOp(kNss, BSON("_id" << 0 << "a" << 0 << "b" << 0));
+    auto first = insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second = insertOp(kNss, BSON("_id" << 2 << "a" << 2 << "b" << BSON_ARRAY(3 << 4)));
+
+    std::vector<size_t> insertBatchSizes;
+    bool failedGroupTrackedMultikey = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            insertBatchSizes.push_back(docs.size());
+            if (docs.size() > 1) {
+                failedGroupTrackedMultikey =
+                    MultikeyPathTracker::get(opCtx).getMultikeyPathInfo().size() == 2;
+                uasserted(ErrorCodes::OperationFailed, "injected grouped insert failure");
+            }
+        };
+
+    auto multikey =
+        consumeOnWorker(options, {makeItem({scalar, first, second})}, /*deferMultikeyWrites=*/true);
+
+    // Individual retries must not duplicate paths or use the scalar insert's timestamp.
+    ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{3, 1, 1, 1}));
+    ASSERT_TRUE(failedGroupTrackedMultikey);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {
+            {kNss, uuid, "idx", {}, {{0U}, {}}, first.getTimestamp()},
+            {kNss, uuid, "idx", {}, {{}, {0U}}, second.getTimestamp()},
+        },
+    };
+    ASSERT_EQ(multikey, expected);
+    ASSERT_EQ(countDocs(kNss), 3);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}, {}}));
+}
+
+TEST_F(PipelinedWorkItemTest, SetsWorkerOpCtxStates) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    // Recorded rather than asserted inside the hook: applyOplogBatchCommon is noexcept, so a
+    // throwing ASSERT would terminate the test instead of failing it.
+    bool observed = false;
+    bool writesReplicated = true;
+    bool enforcingConstraints = true;
+    auto prepareConflictBehavior = PrepareConflictBehavior::kEnforce;
+    auto admissionPriority = AdmissionContext::Priority::kNormal;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            observed = true;
+            writesReplicated = opCtx->writesAreReplicated();
+            enforcingConstraints = opCtx->isEnforcingConstraints();
+            prepareConflictBehavior =
+                shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
+            admissionPriority = ExecutionAdmissionContext::get(opCtx).getPriority();
+        };
+
+    ASSERT_OK(
+        applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item));
+
+    ASSERT_TRUE(observed);
+    ASSERT_FALSE(writesReplicated);
+    ASSERT_FALSE(enforcingConstraints);
+    ASSERT_EQ(prepareConflictBehavior, PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    ASSERT_EQ(admissionPriority, AdmissionContext::Priority::kExempt);
+}
+
+TEST_F(PipelinedWorkItemTest, WorkerAppliesItemsInFifoOrder) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Each item depends on the one before it, so the final state is only correct in FIFO order.
+    std::vector<OwnedWorkItem> items;
+    items.push_back(makeItem({insertOp(kNss, BSON("_id" << 0))}));
+    items.push_back(makeItem({updateOp(kNss, BSON("_id" << 0), BSON("a" << 1))}));
+    items.push_back(makeItem({insertOp(kNss, BSON("_id" << 1))}));
+    items.push_back(makeItem({deleteOp(kNss, BSON("_id" << 1))}));
+    consumeOnWorker(secondaryOptions(), std::move(items));
+
+    ASSERT_EQ(countDocs(kNss), 1);
+    ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0 << "a" << 1)));
+}
+
+TEST_F(PipelinedWorkItemTest, TracksMultikeyWritesPerItemAtTheirOwnTimestamps) {
+    auto uuid = createIndexedCollection();
+    auto scalar = insertOp(kNss, BSON("_id" << 0 << "a" << 1));
+    auto array = insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3)));
+    auto update = updateOp(kNss, BSON("_id" << 0), BSON("a" << BSON_ARRAY(4 << 5)));
+    auto later = insertOp(kNss, BSON("_id" << 2 << "a" << 6));
+    auto laterArray = insertOp(kNss, BSON("_id" << 3 << "a" << BSON_ARRAY(7 << 8)));
+    std::vector<size_t> insertBatchSizes;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            insertBatchSizes.push_back(docs.size());
+        };
+
+    // The grouped insert and update retain their timestamps; the next item inherits no paths.
+    auto multikey = consumeOnWorker(
+        secondaryOptions(),
+        {makeItem({scalar, array, update}), makeItem({later}), makeItem({laterArray})},
+        /*deferMultikeyWrites=*/true);
+    ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{2, 1, 1}));
+    ASSERT_EQ(countDocs(kNss), 4);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {
+            {kNss, uuid, "idx", {}, {{0U}}, array.getTimestamp()},
+            {kNss, uuid, "idx", {}, {{0U}}, update.getTimestamp()},
+        },
+        {},
+        {{kNss, uuid, "idx", {}, {{0U}}, laterArray.getTimestamp()}},
+    };
+    ASSERT_EQ(multikey, expected);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
+}
+
+TEST_F(PipelinedWorkItemTest, KeepsMultikeyResultsWithTheirBatchWhenALaterBatchFinishesFirst) {
+    auto uuid = createIndexedCollection(BSON("a" << 1 << "b" << 1));
+    auto first = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second = insertOp(kNss, BSON("_id" << 1 << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    auto later = insertOp(kNss, BSON("_id" << 2 << "a" << BSON_ARRAY(5 << 6) << "b" << 2));
+    PipelinedApplierBatchTracker tracker;
+    auto metadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
+    std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakMetadata = metadata;
+    auto counter =
+        tracker.addBatch({second.getOpTime(), second.getWallClockTime()}, 2, {}, {}, metadata);
+    auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
+    std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakLaterMetadata = laterMetadata;
+    auto laterCounter =
+        tracker.addBatch({later.getOpTime(), later.getWallClockTime()}, 1, {}, {}, laterMetadata);
+    auto firstOwned = makeItem({first});
+    firstOwned.item.batchRemainingWorkers = counter;
+    firstOwned.item.multikeyPathInfo = &(*metadata)[0];
+    auto secondOwned = makeItem({second});
+    secondOwned.item.batchRemainingWorkers = counter;
+    secondOwned.item.multikeyPathInfo = &(*metadata)[3];
+    auto laterOwned = makeItem({later});
+    laterOwned.item.batchRemainingWorkers = laterCounter;
+    laterOwned.item.multikeyPathInfo = &(*laterMetadata)[3];
+    Notification<void> firstReached;
+    Notification<void> releaseFirst;
+    Notification<void> laterCompleted;
+    Notification<void> firstConsumed;
+    Notification<void> releaseFirstWorker;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                if (!firstReached) {
+                    firstReached.set();
+                }
+                releaseFirst.get();
+            }
+        };
+    PipelinedApplierWorkerPool pool(4, [&](size_t workerIdx, const WorkItem& item) {
+        consumeWorkItem(workerIdx, secondaryOptions(), item, tracker, /*deferMultikeyWrites=*/true);
+        if (workerIdx == 0) {
+            firstConsumed.set();
+            releaseFirstWorker.get();
+        }
+        if (item.batchRemainingWorkers == laterCounter) {
+            laterCompleted.set();
+        }
+    });
+    ON_BLOCK_EXIT([&] {
+        if (!releaseFirst) {
+            releaseFirst.set();
+        }
+        if (!releaseFirstWorker) {
+            releaseFirstWorker.set();
+        }
+        pool.shutdownAndJoin();
+    });
+    pool.enqueue(0, std::move(firstOwned.item));
+    pool.enqueue(3, std::move(secondOwned.item));
+    pool.enqueue(3, std::move(laterOwned.item));
+    metadata.reset();
+    laterMetadata.reset();
+
+    // Worker 3 finishes both of its slices while worker 0 still holds the first batch open.
+    ASSERT_TRUE(firstReached.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_TRUE(laterCompleted.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_EQ(counter->load(), 1U);
+    ASSERT_EQ(laterCounter->load(), 0U);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+    releaseFirst.set();
+
+    // Reading after batch completion must see both slices without relying on joining the workers.
+    auto completed = tracker.popCompletedBatch(Seconds(60));
+    ASSERT_TRUE(completed);
+    ASSERT_EQ(completed->lastOpTime.opTime, second.getOpTime());
+    ASSERT_TRUE(completed->multikeyMetadata);
+    ASSERT_EQ(counter->load(), 0U);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {{kNss, uuid, "idx", {}, {{0U}, {}}, first.getTimestamp()}},
+        {},
+        {},
+        {{kNss, uuid, "idx", {}, {{}, {0U}}, second.getTimestamp()}},
+    };
+    ASSERT_EQ(*completed->multikeyMetadata, expected);
+    tracker.onBatchPublished();
+
+    auto completedLater = tracker.popCompletedBatch(Milliseconds(0));
+    ASSERT_TRUE(completedLater);
+    ASSERT_EQ(completedLater->lastOpTime.opTime, later.getOpTime());
+    ASSERT_TRUE(completedLater->multikeyMetadata);
+    ASSERT_NE(completedLater->multikeyMetadata, completed->multikeyMetadata);
+    const std::vector<WorkerMultikeyPathInfo> expectedLater{
+        {},
+        {},
+        {},
+        {{kNss, uuid, "idx", {}, {{0U}, {}}, later.getTimestamp()}},
+    };
+    ASSERT_EQ(*completedLater->multikeyMetadata, expectedLater);
+    tracker.onBatchPublished();
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+
+    // A completed work item can remain alive after its batch releases the borrowed metadata.
+    ASSERT_TRUE(firstConsumed.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_FALSE(weakMetadata.expired());
+    ASSERT_FALSE(weakLaterMetadata.expired());
+    completed.reset();
+    ASSERT_TRUE(weakMetadata.expired());
+    ASSERT_FALSE(weakLaterMetadata.expired());
+    completedLater.reset();
+    ASSERT_TRUE(weakLaterMetadata.expired());
+    releaseFirstWorker.set();
+    pool.shutdownAndJoin();
+}
+
+TEST_F(PipelinedWorkItemTest, ClearsMultikeyTrackingWhenReusingAnOperationContext) {
+    auto uuid = createIndexedCollection();
+    auto op = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(_opCtx.get(), secondaryOptions(), makeItem({op}).item, &multikey));
+    const WorkerMultikeyPathInfo expected{
+        {kNss, uuid, "idx", {}, {{0U}}, op.getTimestamp()},
+    };
+    ASSERT_EQ(multikey, expected);
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    ASSERT_FALSE(tracker.isTrackingMultikeyPathInfo());
+    ASSERT_TRUE(tracker.isEmpty());
+
+    // Reusing the opCtx for a scalar write must not recapture the previous item's paths.
+    multikey.clear();
+    ASSERT_OK(applyWorkItem(_opCtx.get(),
+                            secondaryOptions(),
+                            makeItem({insertOp(kNss, BSON("_id" << 1 << "a" << 3))}).item,
+                            &multikey));
+    ASSERT_TRUE(multikey.empty());
+    ASSERT_FALSE(tracker.isTrackingMultikeyPathInfo());
+    ASSERT_TRUE(tracker.isEmpty());
+}
+
+TEST_F(PipelinedWorkItemTest, ClearsMultikeyTrackingOnApplicationFailure) {
+    createIndexedCollection();
+    bool hadTrackedPaths = false;
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        hadTrackedPaths = !MultikeyPathTracker::get(opCtx).isEmpty();
+        uasserted(ErrorCodes::OperationFailed, "injected failure after multikey insert");
+    };
+    WorkerMultikeyPathInfo multikey;
+    auto status =
+        applyWorkItem(_opCtx.get(),
+                      secondaryOptions(),
+                      makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2))),
+                                deleteOp(kNss, BSON("_id" << 0))})
+                          .item,
+                      &multikey);
+
+    // A partially applied item exports no result and leaves no tracker state behind.
+    ASSERT_EQ(status, ErrorCodes::OperationFailed);
+    ASSERT_TRUE(hadTrackedPaths);
+    ASSERT_TRUE(multikey.empty());
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    ASSERT_FALSE(tracker.isTrackingMultikeyPathInfo());
+    ASSERT_TRUE(tracker.isEmpty());
+}
+
+TEST_F(PipelinedWorkItemTest, PreservesExactWildcardMetadataPathsAtEachTimestamp) {
+    const auto keyPattern = BSON("$**" << 1);
+    const auto ordering = WildcardAccessMethod::makeOrdering(keyPattern);
+    auto uuid = createIndexedCollection(keyPattern);
+    auto first = insertOp(
+        kNss,
+        BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << BSON("c" << BSON_ARRAY(3 << 4))));
+    auto second =
+        insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(5 << 6) << "d" << BSON_ARRAY(7 << 8)));
+    auto multikey = consumeOnWorker(
+        secondaryOptions(), {makeItem({first, second})}, /*deferMultikeyWrites=*/true);
+
+    // Repeated and nested paths must survive the handoff without leaking between write timestamps.
+    ASSERT_EQ(multikey.size(), 1U);
+    ASSERT_EQ(multikey[0].size(), 2U);
+    ASSERT_EQ(multikey[0][0].earliestTimestamp, first.getTimestamp());
+    ASSERT_EQ(multikey[0][1].earliestTimestamp, second.getTimestamp());
+    std::vector<std::vector<std::string>> paths;
+    for (const auto& info : multikey[0]) {
+        ASSERT_EQ(info.collectionUUID, uuid);
+        ASSERT_EQ(info.indexName, "idx");
+        ASSERT_TRUE(info.multikeyPaths.empty());
+        auto fieldPaths = set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(
+            info.multikeyMetadataKeys, ordering);
+        std::sort(fieldPaths.begin(), fieldPaths.end());
+        paths.push_back(std::move(fieldPaths));
+    }
+    ASSERT_EQ(paths[0], (std::vector<std::string>{"a", "b.c"}));
+    ASSERT_EQ(paths[1], (std::vector<std::string>{"a", "d"}));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesSetMultikeyMetadataWithoutAccumulatingIt) {
+    createIndexedCollection();
+    auto op = makeCommandOplogEntry(nextOpTime(),
+                                    kNss.getCommandNS(),
+                                    BSON("setMultikeyMetadata"
+                                         << kNss.ns_forTest() << "idxName" << "idx" << "paths"
+                                         << multikey_paths::serialize(BSON("a" << 1), {{0U}})));
+    auto multikey =
+        consumeOnWorker(secondaryOptions(), {makeItem({op})}, /*deferMultikeyWrites=*/true);
+
+    // Replicated multikey metadata is applied directly, even when the worker is tracking.
+    ASSERT_EQ(multikey, std::vector<WorkerMultikeyPathInfo>(1));
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesMultikeyWithoutDeferredOutput) {
+    createIndexedCollection();
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(),
+        secondaryOptions(),
+        makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))}).item));
+
+    // Without a deferred output, application must finish the catalog write itself.
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesMultikeyOnWorkerImmediatelyByDefault) {
+    auto uuid = createIndexedCollection();
+    createIndex(_opCtx.get(),
+                kNss,
+                uuid,
+                BSON("v" << 2 << "name" << "wildcard" << "key" << BSON("$**" << 1)));
+    auto multikey = consumeOnWorker(
+        secondaryOptions(),
+        {makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))})});
+
+    // Immediate mode records an empty slice result and finishes the catalog writes on the worker.
+    ASSERT_EQ(multikey, std::vector<WorkerMultikeyPathInfo>(1));
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+    assertIndexMultikey(_opCtx.get(), kNss, "wildcard", true, {});
+}
+
+TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto owned = makeItem({insertOp(kNss, BSON("_id" << 0)), deleteOp(kNss, BSON("_id" << 0))});
+    PipelinedApplierBatchTracker tracker;
+    const OpTimeAndWallTime lastOpTime{owned.item.ops.back()->getOpTime(),
+                                       owned.item.ops.back()->getWallClockTime()};
+    auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
+    owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
+    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata);
+    owned.item.batchRemainingWorkers = counter;
+    Notification<void> reached;
+    Notification<void> release;
+    _opObserver->onDeleteFn = [&](OperationContext*,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        if (!reached) {
+            reached.set();
+        }
+        release.get();
+    };
+    PipelinedApplierWorkerPool pool(1, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker);
+    });
+    ON_BLOCK_EXIT([&] {
+        if (!release) {
+            release.set();
+        }
+        pool.shutdownAndJoin();
+    });
+    pool.enqueue(0, std::move(owned.item));
+
+    // If reached is set, the applier has processed the delete operation, but is waiting on release
+    // to be set.
+    ASSERT_TRUE(reached.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+    release.set();
+    // The pool will wait on the worker completing its work item.
+    pool.shutdownAndJoin();
+
+    auto completed = tracker.popCompletedBatch(Milliseconds(0));
+    ASSERT_TRUE(completed);
+    ASSERT_EQ(completed->lastOpTime, lastOpTime);
+    tracker.onBatchPublished();
+    ASSERT_EQ(counter->load(), 0);
+    ASSERT_EQ(countDocs(kNss), 0);
+}
+
+TEST_F(PipelinedWorkItemTest, RecordsMultikeyAfterTheWholeSliceIsApplied) {
+    auto uuid = createIndexedCollection();
+    auto insert = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    auto owned = makeItem({insert, deleteOp(kNss, BSON("_id" << 0))});
+    PipelinedApplierBatchTracker tracker;
+    const OpTimeAndWallTime lastOpTime{owned.item.ops.back()->getOpTime(),
+                                       owned.item.ops.back()->getWallClockTime()};
+    auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
+    owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
+    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata);
+    owned.item.batchRemainingWorkers = counter;
+    Notification<void> reached;
+    Notification<void> release;
+    _opObserver->onDeleteFn = [&](OperationContext*,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        if (!reached) {
+            reached.set();
+        }
+        release.get();
+    };
+    PipelinedApplierWorkerPool pool(1, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker, /*deferMultikeyWrites=*/true);
+    });
+    ON_BLOCK_EXIT([&] {
+        if (!release) {
+            release.set();
+        }
+        pool.shutdownAndJoin();
+    });
+    pool.enqueue(0, std::move(owned.item));
+
+    // If reached is set, the applier has processed the delete operation, but is waiting on release
+    // to be set.
+    ASSERT_TRUE(reached.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+    release.set();
+    // The pool will wait on the worker completing its work item.
+    pool.shutdownAndJoin();
+
+    auto completed = tracker.popCompletedBatch(Milliseconds(0));
+    ASSERT_TRUE(completed);
+    ASSERT_EQ(completed->lastOpTime, lastOpTime);
+    ASSERT_TRUE(completed->multikeyMetadata);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {{kNss, uuid, "idx", {}, {{0U}}, insert.getTimestamp()}},
+    };
+    ASSERT_EQ(*completed->multikeyMetadata, expected);
+    tracker.onBatchPublished();
+    ASSERT_EQ(counter->load(), 0);
+    ASSERT_EQ(countDocs(kNss), 0);
+}
+
+TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto owned = makeItem({insertOp(kNss, BSON("_id" << 0))});
+    auto peer = makeItem({insertOp(kNss, BSON("_id" << 1))});
+    auto later = makeItem({insertOp(kNss, BSON("_id" << 2))});
+    PipelinedApplierBatchTracker tracker;
+    // owned and peer are slices of the first batch, so they share a counter initialized to two
+    // workers.
+    auto firstMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
+    auto counter = tracker.addBatch(
+        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()},
+        2,
+        {},
+        {},
+        firstMetadata);
+    owned.item.batchRemainingWorkers = counter;
+    owned.item.multikeyPathInfo = &(*firstMetadata)[0];
+    peer.item.batchRemainingWorkers = counter;
+    peer.item.multikeyPathInfo = &(*firstMetadata)[1];
+    // later belongs to a second batch that only needs one worker to finish.
+    auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
+    auto laterCounter = tracker.addBatch(
+        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()},
+        1,
+        {},
+        {},
+        laterMetadata);
+    later.item.batchRemainingWorkers = laterCounter;
+    later.item.multikeyPathInfo = &(*laterMetadata)[1];
+    // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
+    // finish.
+    _opObserver->onInsertsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
+            }
+        };
+    PipelinedApplierWorkerPool pool(2, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker);
+    });
+    // Worker 0 abandons owned, while worker 1 applies peer and then later.
+    pool.enqueue(0, std::move(owned.item));
+    pool.enqueue(1, std::move(peer.item));
+    pool.enqueue(1, std::move(later.item));
+    // Wait until both workers have finished handling their queued items.
+    pool.shutdownAndJoin();
+
+    // Only peer decremented the first batch's counter; the abandoned item must leave it at one.
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_EQ(laterCounter->load(), 0);
+    // The completed second batch cannot be popped ahead of the incomplete first batch.
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+}
+
+TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotRecordMultikeyWrites) {
+    createIndexedCollection();
+    auto owned = makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))});
+    auto peer = makeItem({insertOp(kNss, BSON("_id" << 1))});
+    auto later = makeItem({insertOp(kNss, BSON("_id" << 2))});
+    PipelinedApplierBatchTracker tracker;
+    // owned and peer are slices of the first batch, so they share a counter initialized to two
+    // workers.
+    auto firstMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
+    auto counter = tracker.addBatch(
+        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()},
+        2,
+        {},
+        {},
+        firstMetadata);
+    owned.item.batchRemainingWorkers = counter;
+    owned.item.multikeyPathInfo = &(*firstMetadata)[0];
+    peer.item.batchRemainingWorkers = counter;
+    peer.item.multikeyPathInfo = &(*firstMetadata)[1];
+    // later belongs to a second batch that only needs one worker to finish.
+    auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
+    auto laterCounter = tracker.addBatch(
+        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()},
+        1,
+        {},
+        {},
+        laterMetadata);
+    later.item.batchRemainingWorkers = laterCounter;
+    later.item.multikeyPathInfo = &(*laterMetadata)[1];
+    // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
+    // finish.
+    _opObserver->onInsertsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
+            }
+        };
+    PipelinedApplierWorkerPool pool(2, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker, /*deferMultikeyWrites=*/true);
+    });
+    // Worker 0 abandons owned, while worker 1 applies peer and then later.
+    pool.enqueue(0, std::move(owned.item));
+    pool.enqueue(1, std::move(peer.item));
+    pool.enqueue(1, std::move(later.item));
+    // Wait until both workers have finished handling their queued items.
+    pool.shutdownAndJoin();
+
+    // Only peer decremented the first batch's counter; the abandoned item must leave it at one.
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_EQ(laterCounter->load(), 0);
+    // An abandoned slice must not export its deferred writes.
+    ASSERT_TRUE((*firstMetadata)[0].empty());
+    ASSERT_TRUE((*firstMetadata)[1].empty());
+    ASSERT_TRUE((*laterMetadata)[0].empty());
+    ASSERT_TRUE((*laterMetadata)[1].empty());
+    // The completed second batch cannot be popped ahead of the incomplete first batch.
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+}
+
+using PipelinedWorkItemDeathTest = PipelinedWorkItemTest;
+
+DEATH_TEST_REGEX_F(PipelinedWorkItemDeathTest, ConsumeRejectsEmptyWorkItem, "item.ops.empty") {
+    std::vector<OwnedWorkItem> items(1);
+    consumeOnWorker(secondaryOptions(), std::move(items));
+}
+
+DEATH_TEST_REGEX_F(PipelinedWorkItemDeathTest,
+                   ConsumeFassertsOnUnrecoverableError,
+                   "13322100.*Pipelined oplog applier worker failed to apply a work item") {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>&) {
+            uasserted(ErrorCodes::OperationFailed, "injected unrecoverable failure");
+        };
+
+    std::vector<OwnedWorkItem> items;
+    items.push_back(makeItem({insertOp(kNss, BSON("_id" << 0))}));
+    consumeOnWorker(options, std::move(items));
+}
+
+// Tests the dispatch decision made for a batch re: pipelined or serialized.
+class PipelinedBatchSerializationTest : public OplogApplierImplTest {
+protected:
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.poa_serial");
+    const NamespaceString kOtherNss =
+        NamespaceString::createNamespaceString_forTest("test.poa_serial_other");
+    const UUID kUuid = UUID::gen();
+
+    OplogEntry insertOp(const NamespaceString& nss, const BSONObj& doc) {
+        return makeInsertDocumentOplogEntry(nextOpTime(), nss, doc);
+    }
+
+    OplogEntry noopOp(const NamespaceString& nss, const BSONObj& object) {
+        return makeOplogEntry(nextOpTime(), OpTypeEnum::kNoop, nss, boost::none /* uuid */, object);
+    }
+
+    OplogEntry commandOp(const NamespaceString& nss, const BSONObj& command) {
+        return makeCommandOplogEntry(nextOpTime(), nss, command);
+    }
+
+    // A non-transactional applyOps entry.
+    OplogEntry standaloneApplyOpsOp(std::vector<ReplOperation> ops) {
+        return makeApplyOpsOplogEntry(nextOpTime(),
+                                      std::move(ops),
+                                      OperationSessionInfo(),
+                                      Date_t::now(),
+                                      {} /* stmtIds */,
+                                      boost::none /* prevWriteOpTimeInTransaction */);
+    }
+
+    // A transaction applyOps entry. A null 'prevOpTime' marks the transaction's first entry.
+    OplogEntry transactionApplyOpsOp(std::vector<ReplOperation> ops,
+                                     const OperationSessionInfo& sessionInfo,
+                                     OpTime prevOpTime,
+                                     ApplyOpsType applyOpsType) {
+        return makeApplyOpsOplogEntry(nextOpTime(),
+                                      std::move(ops),
+                                      sessionInfo,
+                                      Date_t::now(),
+                                      {} /* stmtIds */,
+                                      prevOpTime,
+                                      boost::none /* multiOpType */,
+                                      applyOpsType);
+    }
+
+    ReplOperation innerInsert(const NamespaceString& nss, const BSONObj& doc) {
+        return MutableOplogEntry::makeInsertOperation(nss, kUuid, doc, doc);
+    }
+
+    static OperationSessionInfo makeSessionInfo() {
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+        sessionInfo.setTxnNumber(1);
+        return sessionInfo;
+    }
+
+    // Whether a batch of 'ops' must be applied serialized.
+    bool serialized(std::vector<OplogEntry> ops) {
+        return batchMustBeAppliedSerialized(OplogApplication::Mode::kSecondary, ops);
+    }
+};
+
+TEST_F(PipelinedBatchSerializationTest, PipelinesCrudContainerAndNoopOps) {
+    auto ident = serviceContext->getStorageEngine()->generateNewInternalIdent();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+    ASSERT_FALSE(serialized({insertOp(kNss, BSON("_id" << 0))}));
+    ASSERT_FALSE(
+        serialized({makeContainerInsertOplogEntry(nextOpTime(), ident, 1 /* key */, value)}));
+    ASSERT_FALSE(serialized({noopOp(kNss, BSON("msg" << "periodic noop"))}));
+    ASSERT_FALSE(
+        serialized({insertOp(kNss, BSON("_id" << 0)), insertOp(kOtherNss, BSON("_id" << 1))}));
+}
+
+TEST_F(PipelinedBatchSerializationTest, SerializesTheBatchOfANewPrimaryNoop) {
+    auto op = noopOp(kNss, BSON(kNewPrimaryMsgField << kNewPrimaryMsg));
+    ASSERT_TRUE(op.isNewPrimaryNoop());
+    ASSERT_TRUE(serialized({op, insertOp(kNss, BSON("_id" << 0))}));
+}
+
+TEST_F(PipelinedBatchSerializationTest, SerializesOpsOnOwnBatchNamespaces) {
+    // These namespaces get their own batch in the classic applier, for any non-command op type.
+    const auto systemViews = NamespaceString::makeSystemDotViewsNamespace(kNss.dbName());
+    ASSERT_TRUE(serialized({insertOp(systemViews, BSON("_id" << "test.v"))}));
+    ASSERT_TRUE(serialized({insertOp(NamespaceString::kServerConfigurationNamespace,
+                                     BSON("_id" << "featureCompatibility"))}));
+}
+
+TEST_F(PipelinedBatchSerializationTest, SerializesCommands) {
+    ASSERT_TRUE(serialized({commandOp(kNss, BSON("create" << kNss.coll()))}));
+    ASSERT_TRUE(serialized({commandOp(kNss, BSON("dropDatabase" << 1))}));
+    ASSERT_TRUE(
+        serialized({makeCreateIndexOplogEntry(nextOpTime(), kNss, "a_1", BSON("a" << 1), kUuid)}));
+}
+
+// Runs the applier over a mock oplog buffer: the batcher pulls from the buffer, _run dispatches
+// each batch, and the workers apply it to real collections. Each write is attributed to the worker
+// thread that made it via the thread name the pool assigns,
+// "PipelinedApplierWorker-<workerIdx>-<n>". A test may also gate on the write of a given document
+// to hold that worker mid-batch or to learn when the document was written.
+class PipelinedOplogApplierRunTest : public OplogApplierImplTest {
+protected:
+    static constexpr size_t kNumWorkers = 4;
+
+    // Checks that lastApplied matches the batch's final op time and wall time.
+    void assertPublished(const OplogEntry& batchEnd) {
+        auto* replCoord = ReplicationCoordinator::get(serviceContext);
+        const OpTimeAndWallTime expected{batchEnd.getOpTime(), batchEnd.getWallClockTime()};
+        ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), expected);
+    }
+
+    enum class WriteKind { kInsert, kDelete };
+
+    // Tracks metadata about writes in tests, used to make correctness assertions.
+    struct ObservedWrite {
+        size_t workerIdx;
+        WriteKind kind;
+        NamespaceString nss;
+        BSONObj doc;
+        // Non-zero for inserts only: a unique ID shared by every document inserted in the same
+        // onInserts call, so a test can determine whether or not an insert was batched.
+        uint64_t insertCallId = 0;
+    };
+
+    // Set when the watched document is written by a worker; if 'hold' is set, that worker then
+    // blocks until 'release' is set. Used to pause workers mid-batch to make correctness assertions
+    // about concurrency.
+    struct Gate {
+        bool hold = false;
+        Notification<void> reached;
+        Notification<void> release;
+    };
+
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        PipelinedApplyOtelMetrics::initialize();
+        // Synthetic optimes bypass the oplog writer, so allDurable can move backwards during apply.
+        // Disable the mock's automatic committed-snapshot updates while still recording
+        // lastApplied.
+        static_cast<ReplicationCoordinatorMock*>(ReplicationCoordinator::get(serviceContext))
+            ->setUpdateCommittedSnapshot(false);
+        ThreadPool::Options options;
+        options.poolName = "PipelinedOplogApplierRunTest";
+        options.maxThreads = 1;
+        options.onCreateThread = [](const std::string& threadName) {
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
+        };
+        _executor = executor::ThreadPoolTaskExecutor::create(
+            std::make_unique<ThreadPool>(options),
+            std::make_unique<executor::NetworkInterfaceMock>());
+        _executor->startup();
+        _buffer.startup(_opCtx.get());
+
+        _opObserver->onInsertsFn = [&](OperationContext*,
+                                       const NamespaceString& nss,
+                                       const std::vector<BSONObj>& docs) {
+            auto workerIdx = currentWorkerIdx();
+            auto callId = _nextInsertCallId++;
+            {
+                std::lock_guard lk(_mutex);
+                for (const auto& doc : docs) {
+                    _writes.push_back({workerIdx, WriteKind::kInsert, nss, doc.getOwned(), callId});
+                }
+            }
+            for (const auto& doc : docs) {
+                passGate(doc);
+            }
+        };
+        _opObserver->onDeleteFn = [&](OperationContext*,
+                                      const CollectionPtr& coll,
+                                      StmtId,
+                                      const BSONObj& doc,
+                                      const OplogDeleteEntryArgs&) {
+            {
+                std::lock_guard lk(_mutex);
+                _writes.push_back(
+                    {currentWorkerIdx(), WriteKind::kDelete, coll->ns(), doc.getOwned()});
+            }
+            passGate(doc);
+        };
+    }
+
+    void tearDown() override {
+        // Never leave a worker held or the applier running past the test.
+        for (auto& [id, gate] : _gates) {
+            if (!gate.release) {
+                gate.release.set();
+            }
+        }
+        if (_finished) {
+            shutdownApplier();
+            _finished->get();
+        }
+        _applier.reset();
+        _buffer.shutdown(_opCtx.get());
+        _executor->shutdown();
+        _executor->join();
+        OplogApplierImplTest::tearDown();
+    }
+
+    static size_t currentWorkerIdx() {
+        constexpr std::string_view kPrefix = "PipelinedApplierWorker-";
+        auto name = getThreadName();
+        invariant(name.starts_with(kPrefix), name);
+        auto rest = name.substr(kPrefix.size());
+        return static_cast<size_t>(std::stoul(std::string(rest.substr(0, rest.find('-')))));
+    }
+
+    // Registers a gate on the document with the given integer _id. Must be called before the
+    // applier is started.
+    Gate& watchWriteOf(int id, bool hold) {
+        auto [it, inserted] = _gates.try_emplace(id);
+        invariant(inserted);
+        it->second.hold = hold;
+        return it->second;
+    }
+
+    // Called on the worker thread for every write; marks and, if held, blocks on the doc's gate.
+    void passGate(const BSONObj& doc) {
+        auto idElem = doc["_id"];
+        if (!idElem.isNumber()) {
+            return;
+        }
+        auto it = _gates.find(idElem.numberInt());
+        if (it == _gates.end()) {
+            return;
+        }
+        auto& gate = it->second;
+        if (!gate.reached) {
+            gate.reached.set();
+        }
+        if (gate.hold) {
+            gate.release.get();
+        }
+    }
+
+    void waitForGate(Gate& gate) {
+        ASSERT_TRUE(gate.reached.waitFor(_opCtx.get(), Seconds(60)));
+    }
+
+    void startApplier() {
+        _applier = std::make_unique<PipelinedOplogApplier>(
+            _executor.get(),
+            &_buffer,
+            &noopOplogApplierObserver,
+            ReplicationCoordinator::get(serviceContext),
+            getStorageInterface(),
+            OplogApplier::Options(OplogApplication::Mode::kSecondary),
+            kNumWorkers);
+        _finished.emplace(_applier->startup());
+    }
+
+    // Requests shutdown. The batcher otherwise sleeps a full second on the drained buffer before
+    // it notices the request, so that wait is skipped from here on.
+    void shutdownApplier() {
+        _skipBatcherWait.emplace("skipOplogBatcherWaitForData");
+        _applier->shutdown();
+    }
+
+    // Shuts the applier down and waits for it to exit, which happens once it has dispatched
+    // everything in the buffer and the workers have applied it.
+    void finishApplier() {
+        shutdownApplier();
+        _finished->get();
+        _finished.reset();
+        ASSERT_TRUE(_buffer.isEmpty());
+    }
+
+    void pushToBuffer(const std::vector<OplogEntry>& ops) {
+        std::vector<BSONObj> docs;
+        for (const auto& op : ops) {
+            docs.push_back(op.getEntry().toBSON());
+        }
+        _buffer.push(_opCtx.get(), docs.begin(), docs.end());
+    }
+
+    // Runs a fresh applier over 'ops' until the workers have applied all of them.
+    void applyThroughBuffer(const std::vector<OplogEntry>& ops) {
+        pushToBuffer(ops);
+        startApplier();
+        finishApplier();
+    }
+
+    // The worker that should receive 'op'.
+    size_t expectedWorker(OplogEntry op) {
+        CachedCollectionProperties collPropertiesCache;
+        std::vector<std::vector<ApplierOperation>> writerVectors(kNumWorkers);
+        return OplogApplierUtils::addToWriterVector(
+            _opCtx.get(), &op, &writerVectors, &collPropertiesCache);
+    }
+
+    // Given ops are hash-routed, a test cannot simply
+    // pick _ids and know which worker are assigned. This searches upward from 'startFrom' for the
+    // first _id whose document in kNss routes to 'workerIdx', giving tests a deterministic way to
+    // build ops for a chosen worker: to spread a batch across every worker, to hold one worker
+    // while another stays free, or to keep a payload on held workers.
+    int idRoutedTo(size_t workerIdx, int startFrom = 0) {
+        for (int id = startFrom;; ++id) {
+            if (expectedWorker(makeInsertDocumentOplogEntry(
+                    OpTime(Timestamp(1, 1), 1), kNss, BSON("_id" << id))) == workerIdx) {
+                return id;
+            }
+        }
+    }
+
+    // The observed writes to 'nss', in observation order.
+    std::vector<ObservedWrite> writesTo(const NamespaceString& nss) {
+        std::lock_guard lk(_mutex);
+        std::vector<ObservedWrite> writes;
+        for (const auto& write : _writes) {
+            if (write.nss == nss) {
+                writes.push_back(write);
+            }
+        }
+        return writes;
+    }
+
+    // Reconstructs the grouped insert calls to 'nss' from the flat _writes list. Every document
+    // inserted in one onInserts call shares an insertCallId; this buckets those together, returning
+    // one (workerIdx, docs) pair per call. A test uses the number of calls to verify that each
+    // participating worker received exactly one work item per batch.
+    std::vector<std::pair<size_t, std::vector<BSONObj>>> insertCallsTo(const NamespaceString& nss) {
+        std::lock_guard lk(_mutex);
+        std::map<uint64_t, std::pair<size_t, std::vector<BSONObj>>> byCallId;
+        for (const auto& write : _writes) {
+            if (write.kind != WriteKind::kInsert || write.nss != nss) {
+                continue;
+            }
+            auto& [workerIdx, docs] = byCallId[write.insertCallId];
+            workerIdx = write.workerIdx;
+            docs.push_back(write.doc);
+        }
+        std::vector<std::pair<size_t, std::vector<BSONObj>>> calls;
+        for (auto& [_, call] : byCallId) {
+            calls.push_back(std::move(call));
+        }
+        return calls;
+    }
+
+    OplogEntry insertOp(const NamespaceString& nss, const BSONObj& doc) {
+        return makeInsertDocumentOplogEntry(nextOpTime(), nss, doc);
+    }
+
+    static BSONObj setUpdate(const BSONObj& setDoc) {
+        return update_oplog_entry::makeDeltaOplogEntry(
+            BSON(doc_diff::kUpdateSectionFieldName << setDoc));
+    }
+
+    OplogEntry updateOp(const NamespaceString& nss, const BSONObj& query, const BSONObj& setDoc) {
+        return makeUpdateDocumentOplogEntry(nextOpTime(), nss, query, setUpdate(setDoc));
+    }
+
+    OplogEntry deleteOp(const NamespaceString& nss, const BSONObj& query) {
+        return makeDeleteDocumentOplogEntry(nextOpTime(), nss, query);
+    }
+
+    // A non-transactional applyOps entry holding 'innerOps'.
+    OplogEntry applyOpsOp(std::vector<ReplOperation> innerOps) {
+        return makeApplyOpsOplogEntry(nextOpTime(),
+                                      std::move(innerOps),
+                                      OperationSessionInfo(),
+                                      Date_t::now(),
+                                      /*stmtIds=*/{},
+                                      /*prevWriteOpTimeInTransaction=*/boost::none);
+    }
+
+    // A non-transactional applyOps entry holding inserts of 'docs' into 'nss'.
+    OplogEntry applyOpsInsertingOp(const NamespaceString& nss,
+                                   const UUID& uuid,
+                                   const std::vector<BSONObj>& docs) {
+        std::vector<ReplOperation> innerOps;
+        for (const auto& doc : docs) {
+            innerOps.push_back(MutableOplogEntry::makeInsertOperation(nss, uuid, doc, doc));
+        }
+        return applyOpsOp(std::move(innerOps));
+    }
+
+    // Creates a container keyed by bytes and returns its ident.
+    std::string createBytesContainer() {
+        auto* storageEngine = serviceContext->getStorageEngine();
+        auto ident = storageEngine->generateNewInternalIdent();
+        auto ru = storageEngine->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        _container =
+            storageEngine->getEngine()->makeInternalRecordStore(*ru, ident, KeyFormat::String);
+        swt.commit();
+        return ident;
+    }
+
+    OplogEntry containerOp(std::string_view ident, OpTypeEnum opType, const BSONObj& o) {
+        return OplogEntry(DurableOplogEntry(DurableOplogEntryParams{
+            .opTime = nextOpTime(),
+            .opType = opType,
+            .nss = NamespaceString::kContainerNamespace,
+            .container = ident,
+            .oField = o,
+            .wallClockTime = Date_t::now(),
+        }));
+    }
+
+    // A container op suitable for nesting in an applyOps entry.
+    static ReplOperation containerReplOp(std::string_view ident,
+                                         OpTypeEnum opType,
+                                         const BSONObj& o) {
+        ReplOperation op;
+        op.setOpType(opType);
+        op.setNss(NamespaceString::kContainerNamespace);
+        op.setContainer(ident);
+        op.setObject(o);
+        return op;
+    }
+
+    static BSONBinData bytesKey(std::string_view key) {
+        return BSONBinData(key.data(), key.size(), BinDataGeneral);
+    }
+
+    BSONObj packedInsertOf(const std::vector<std::string_view>& keys, BSONBinData value) {
+        BSONArrayBuilder keyArray;
+        for (auto key : keys) {
+            keyArray.append(bytesKey(key));
+        }
+        return BSON("k" << keyArray.arr() << "v" << value);
+    }
+
+    // The container-op counterpart of idRoutedTo: the first keystring with n at or above
+    // 'startFrom' whose single-key insert into 'ident' routes to 'workerIdx'.
+    std::string containerKeyRoutedTo(std::string_view ident, size_t workerIdx, int startFrom = 0) {
+        auto value = BSONBinData("V", 1, BinDataGeneral);
+        for (int n = startFrom;; ++n) {
+            auto key = "K" + std::to_string(n);
+            if (expectedWorker(containerOp(ident,
+                                           OpTypeEnum::kContainerInsert,
+                                           BSON("k" << bytesKey(key) << "v" << value))) ==
+                workerIdx) {
+                return key;
+            }
+        }
+    }
+
+    bool containerHasKey(std::string_view ident, std::string_view key) {
+        auto* kvEngine = serviceContext->getStorageEngine()->getEngine();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        return kvEngine->getDirectCursor(ru, ident)
+            ->get(std::span<const char>(key.data(), key.size()))
+            .isOK();
+    }
+
+    long long numRecords(const NamespaceString& nss) {
+        auto coll = acquireCollection(
+            _opCtx.get(),
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                         ReadConcernArgs::get(_opCtx.get()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        return coll.getCollectionPtr()->numRecords(_opCtx.get());
+    }
+
+    std::vector<BSONObj> readAllDocs(const NamespaceString& nss) {
+        std::vector<BSONObj> docs;
+        CollectionReader reader(_opCtx.get(), nss);
+        while (true) {
+            auto swDoc = reader.next();
+            if (swDoc.getStatus() == ErrorCodes::CollectionIsEmpty) {
+                return docs;
+            }
+            docs.push_back(unittest::assertGet(swDoc).getOwned());
+        }
+    }
+
+    // Checks that a scan of 'nss' returns exactly 'expected' (compared by _id) and that the
+    // collection's record count agrees with what the scan returned.
+    void assertCollectionContainsExactly(const NamespaceString& nss,
+                                         std::vector<BSONObj> expected) {
+        auto actual = readAllDocs(nss);
+        auto byId = [](const BSONObj& a, const BSONObj& b) {
+            return a["_id"].woCompare(b["_id"]) < 0;
+        };
+        std::sort(actual.begin(), actual.end(), byId);
+        std::sort(expected.begin(), expected.end(), byId);
+        ASSERT_EQ(actual.size(), expected.size());
+        for (size_t i = 0; i < actual.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(actual[i], expected[i]);
+        }
+        ASSERT_EQ(numRecords(nss), static_cast<long long>(actual.size()));
+    }
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
+    OplogBufferMock _buffer;
+    std::unique_ptr<PipelinedOplogApplier> _applier;
+    boost::optional<Future<void>> _finished;
+    boost::optional<FailPointEnableBlock> _skipBatcherWait;
+    std::mutex _mutex;
+    std::atomic<uint64_t> _nextInsertCallId{1};
+    std::vector<ObservedWrite> _writes;
+    std::map<int, Gate> _gates;
+    std::unique_ptr<RecordStore> _container;
+
+    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.poa_run");
+    const NamespaceString kOtherNss =
+        NamespaceString::createNamespaceString_forTest("test.poa_run_other");
+};
+
+TEST_F(PipelinedOplogApplierRunTest, AppliesEveryBatchInTheBufferOnTheWorkers) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    // Small batches so the loop pulls and dispatches several of them.
+    setServerParameter("replBatchLimitOperations", 8);
+
+    std::vector<OplogEntry> ops;
+    std::vector<BSONObj> expected;
+    for (int i = 0; i < 50; ++i) {
+        ops.push_back(insertOp(kNss, BSON("_id" << i)));
+        expected.push_back(BSON("_id" << i));
+    }
+    ops.push_back(updateOp(kNss, BSON("_id" << 1), BSON("a" << 1)));
+    expected[1] = BSON("_id" << 1 << "a" << 1);
+    ops.push_back(deleteOp(kNss, BSON("_id" << 2)));
+    expected.erase(expected.begin() + 2);
+
+    applyThroughBuffer(ops);
+
+    assertCollectionContainsExactly(kNss, expected);
+    assertPublished(ops.back());
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesLastBatchWithItsOriginalWallTime) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    std::vector<OplogEntry> ops;
+    for (int i = 0; i < 8; ++i) {
+        // Decreasing wall times must not be used to order batches or replace the original wall
+        // time.
+        ops.emplace_back(DurableOplogEntry{DurableOplogEntryParams{
+            .opTime = nextOpTime(),
+            .opType = OpTypeEnum::kInsert,
+            .nss = kNss,
+            .oField = BSON("_id" << i),
+            .wallClockTime = Date_t::fromMillisSinceEpoch(1000 - i),
+        }});
+    }
+    applyThroughBuffer(ops);
+    assertPublished(ops.back());
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesWhileDispatcherIsWaitingForMoreData) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto op = insertOp(kNss, BSON("_id" << 0));
+    pushToBuffer({op});
+    startApplier();
+
+    const auto deadline = Date_t::now() + Seconds(60);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    while (replCoord->getMyLastAppliedOpTime() < op.getOpTime()) {
+        ASSERT_LT(Date_t::now(), deadline);
+        sleepmillis(1);
+    }
+    ASSERT_FALSE(_finished->isReady());
+    assertPublished(op);
+    finishApplier();
+}
+
+// A popped batch keeps drain blocked until the advancer finishes all publication side effects.
+TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationAfterTheLastBatchIsPopped) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    auto op = insertOp(kNss, BSON("_id" << 0));
+    {
+        // Hold the advancer after it pops the last batch, before it updates lastApplied.
+        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
+        pushToBuffer({op});
+        startApplier();
+        publishing.waitForOneNewEntry();
+        unittest::LogCaptureGuard logs;
+        {
+            // Pause drain after it sees the advancer is still busy, despite the empty FIFO queue.
+            FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+            shutdownApplier();
+            beforeWait.waitForOneNewEntry();
+            ASSERT_FALSE(_finished->isReady());
+            ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
+                      0);
+            ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+            // The kNoTimestamp read sees the committed document without waiting for lastApplied.
+            assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+        }
+        // The idle-wait failpoint is now disabled; leaving this scope also releases publication.
+    }
+    _finished->get();
+    _finished.reset();
+    assertPublished(op);
+}
+
+// A zero-worker batch still needs publication even though every worker is already idle.
+TEST_F(PipelinedOplogApplierRunTest, DrainWaitsForPublicationOfAZeroWorkerBatch) {
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    auto op = containerOp(createBytesContainer(),
+                          OpTypeEnum::kContainerInsert,
+                          packedInsertOf({}, BSONBinData("V", 1, BinDataGeneral)));
+    {
+        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
+        pushToBuffer({op});
+        startApplier();
+        publishing.waitForOneNewEntry();
+        unittest::LogCaptureGuard logs;
+        {
+            FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
+            shutdownApplier();
+            beforeWait.waitForOneNewEntry();
+            ASSERT_FALSE(_finished->isReady());
+            ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"),
+                      0);
+            ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+        }
+    }
+    _finished->get();
+    _finished.reset();
+    assertPublished(op);
+}
+
+// Draining without dispatched batches must finish without changing replication progress.
+TEST_F(PipelinedOplogApplierRunTest, DrainsAnEmptyPipeline) {
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    applyThroughBuffer({});
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, ShutdownDoesNotPublishAnAbandonedBatchOrItsSuccessor) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    _opObserver->onInsertsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
+            }
+        };
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    const auto writtenBefore = replCoord->getMyLastWrittenOpTimeAndWallTime();
+    applyThroughBuffer({insertOp(kNss, BSON("_id" << 0)), insertOp(kNss, BSON("_id" << 1))});
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+    ASSERT_EQ(replCoord->getMyLastWrittenOpTimeAndWallTime(), writtenBefore);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 1)});
+}
+
+// Every op is applied by the worker the router selects for it, and the batch reaches more than one
+// worker.
+TEST_F(PipelinedOplogApplierRunTest, AppliesEachOpOnTheWorkerTheRouterSelects) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    createCollectionWithUuid(_opCtx.get(), kOtherNss);
+    // One document per worker in kNss, plus a few in another collection.
+    std::vector<OplogEntry> ops;
+    int nextId = 0;
+    for (size_t workerIdx = 0; workerIdx < kNumWorkers; ++workerIdx) {
+        nextId = idRoutedTo(workerIdx, nextId);
+        ops.push_back(insertOp(kNss, BSON("_id" << nextId++)));
+    }
+    for (int i = 0; i < 4; ++i) {
+        ops.push_back(insertOp(kOtherNss, BSON("_id" << i)));
+    }
+    // {nss, _id} -> workerIdx
+    std::map<std::pair<NamespaceString, int>, size_t> expectedWorkerByDoc;
+    for (const auto& op : ops) {
+        expectedWorkerByDoc[{op.getNss(), op.getObject()["_id"].Int()}] = expectedWorker(op);
+    }
+
+    applyThroughBuffer(ops);
+
+    std::lock_guard lk(_mutex);
+    std::set<std::pair<NamespaceString, int>> observedDocs;
+    std::set<size_t> observedWorkers;
+    // Check that each write was an insert, that it was only written once, and it was applied by the
+    // correct worker thread.
+    for (const auto& write : _writes) {
+        ASSERT_EQ(write.kind, WriteKind::kInsert);
+        auto key = std::make_pair(write.nss, write.doc["_id"].Int());
+        ASSERT_TRUE(observedDocs.insert(key).second) << "written twice: " << write.doc;
+        ASSERT_EQ(write.workerIdx, expectedWorkerByDoc.at(key)) << write.doc;
+        observedWorkers.insert(write.workerIdx);
+    }
+    ASSERT_EQ(observedDocs.size(), expectedWorkerByDoc.size());
+    ASSERT_EQ(observedWorkers.size(), kNumWorkers);
+}
+
+// Ops on one document all reach the same worker and are applied in oplog order.
+TEST_F(PipelinedOplogApplierRunTest, AppliesOpsOnOneDocumentOnOneWorkerInOplogOrder) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    applyThroughBuffer({insertOp(kNss, BSON("_id" << 0)),
+                        deleteOp(kNss, BSON("_id" << 0)),
+                        insertOp(kNss, BSON("_id" << 0 << "a" << 1)),
+                        deleteOp(kNss, BSON("_id" << 0)),
+                        insertOp(kNss, BSON("_id" << 0 << "a" << 2))});
+
+    auto writes = writesTo(kNss);
+    ASSERT_EQ(writes.size(), 5);
+    const std::vector<WriteKind> expectedKinds{WriteKind::kInsert,
+                                               WriteKind::kDelete,
+                                               WriteKind::kInsert,
+                                               WriteKind::kDelete,
+                                               WriteKind::kInsert};
+    for (size_t i = 0; i < writes.size(); ++i) {
+        ASSERT_EQ(writes[i].workerIdx, writes.front().workerIdx);
+        ASSERT_EQ(writes[i].kind, expectedKinds[i]) << "write " << i;
+    }
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0 << "a" << 2)});
+}
+
+// A worker receives its whole slice of a batch as one work item: consecutive inserts on one
+// collection in a single item are applied as one grouped insert, so each participating worker
+// makes exactly one insert call holding all of its documents, in oplog order.
+TEST_F(PipelinedOplogApplierRunTest, EnqueuesOneWorkItemPerParticipatingWorkerPerBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    std::vector<OplogEntry> ops;
+    std::map<size_t, std::vector<BSONObj>> expectedDocsByWorker;
+    for (int i = 0; i < 12; ++i) {
+        ops.push_back(insertOp(kNss, BSON("_id" << i)));
+        expectedDocsByWorker[expectedWorker(ops.back())].push_back(BSON("_id" << i));
+    }
+    // Ensure at least two workers were assigned ops.
+    ASSERT_GT(expectedDocsByWorker.size(), 1);
+
+    applyThroughBuffer(ops);
+
+    auto calls = insertCallsTo(kNss);
+    // Each worker should have one grouped insert call.
+    ASSERT_EQ(calls.size(), expectedDocsByWorker.size());
+    std::set<size_t> workersSeen;
+    for (const auto& [workerIdx, docs] : calls) {
+        ASSERT_TRUE(workersSeen.insert(workerIdx).second)
+            << "worker " << workerIdx << " made more than one insert call";
+        const auto& expectedDocs = expectedDocsByWorker.at(workerIdx);
+        ASSERT_EQ(docs.size(), expectedDocs.size()) << "worker " << workerIdx;
+        for (size_t i = 0; i < docs.size(); ++i) {
+            ASSERT_BSONOBJ_EQ(docs[i], expectedDocs[i]);
+        }
+    }
+}
+
+// A non-transactional applyOps entry is never applied as a unit: each inner op is routed as if it
+// had been its own oplog entry.
+TEST_F(PipelinedOplogApplierRunTest, RoutesTheInnerOpsOfANonTransactionalApplyOps) {
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    auto applyOps =
+        applyOpsInsertingOp(kNss, uuid, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
+    auto plainInsert = insertOp(kNss, BSON("_id" << 3));
+    std::map<int, size_t> expectedWorkerById;
+    for (auto& innerOp : ApplyOps::extractOperations(applyOps)) {
+        expectedWorkerById[innerOp.getObject()["_id"].Int()] = expectedWorker(innerOp);
+    }
+    expectedWorkerById[3] = expectedWorker(plainInsert);
+
+    applyThroughBuffer({applyOps, plainInsert});
+
+    auto writes = writesTo(kNss);
+    std::set<int> observedIds;
+    for (const auto& write : writes) {
+        ASSERT_EQ(write.kind, WriteKind::kInsert);
+        auto id = write.doc["_id"].Int();
+        ASSERT_TRUE(observedIds.insert(id).second) << "written twice: " << write.doc;
+        ASSERT_EQ(write.workerIdx, expectedWorkerById.at(id)) << write.doc;
+    }
+    ASSERT_EQ(observedIds, (std::set<int>{0, 1, 2, 3}));
+    assertCollectionContainsExactly(
+        kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)});
+}
+
+// Ops on one document keep their oplog order whether they arrive as plain entries, inside one
+// applyOps entry, across applyOps entries, or across batch boundaries.
+TEST_F(PipelinedOplogApplierRunTest, AppliesDependentOpsInsideAndOutsideApplyOpsInOplogOrder) {
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    // Every outer oplog entry in its own batch.
+    setServerParameter("replBatchLimitOperations", 1);
+
+    applyThroughBuffer({
+        insertOp(kNss, BSON("_id" << 0 << "a" << 0)),
+        // Two dependent updates of the same document inside one applyOps: only the second may win.
+        applyOpsOp({MutableOplogEntry::makeUpdateOperation(
+                        kNss, uuid, setUpdate(BSON("a" << 1)), BSON("_id" << 0)),
+                    MutableOplogEntry::makeUpdateOperation(
+                        kNss, uuid, setUpdate(BSON("a" << 2)), BSON("_id" << 0)),
+                    MutableOplogEntry::makeInsertOperation(
+                        kNss, uuid, BSON("_id" << 1 << "b" << 0), BSON("_id" << 1))}),
+        deleteOp(kNss, BSON("_id" << 1)),
+        applyOpsOp({MutableOplogEntry::makeInsertOperation(
+            kNss, uuid, BSON("_id" << 1 << "b" << 1), BSON("_id" << 1))}),
+        updateOp(kNss, BSON("_id" << 1), BSON("c" << 1)),
+    });
+
+    assertCollectionContainsExactly(
+        kNss, {BSON("_id" << 0 << "a" << 2), BSON("_id" << 1 << "b" << 1 << "c" << 1)});
+}
+
+// A packed container op is split into single-key ops before routing, so a later op on one of its
+// keys is applied after it by the same worker.
+TEST_F(PipelinedOplogApplierRunTest, ExpandsPackedContainerOpsBeforeRouting) {
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    applyThroughBuffer(
+        {containerOp(
+             ident, OpTypeEnum::kContainerInsert, packedInsertOf({"K1", "K2", "K3"}, value)),
+         containerOp(ident, OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2")))});
+
+    ASSERT_TRUE(containerHasKey(ident, "K1"));
+    ASSERT_FALSE(containerHasKey(ident, "K2"));
+    ASSERT_TRUE(containerHasKey(ident, "K3"));
+}
+
+// A packed container op nested in an applyOps entry is expanded too, so a later delete of one of
+// its keys is applied after the insert of that key.
+TEST_F(PipelinedOplogApplierRunTest, ExpandsPackedContainerOpsInsideApplyOps) {
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    applyThroughBuffer(
+        {applyOpsOp({MutableOplogEntry::makeInsertOperation(
+                         kNss, uuid, BSON("_id" << 0), BSON("_id" << 0)),
+                     containerReplOp(ident,
+                                     OpTypeEnum::kContainerInsert,
+                                     packedInsertOf({"K1", "K2", "K3"}, value))}),
+         containerOp(ident, OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2")))});
+
+    ASSERT_TRUE(containerHasKey(ident, "K1"));
+    ASSERT_FALSE(containerHasKey(ident, "K2"));
+    ASSERT_TRUE(containerHasKey(ident, "K3"));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesAPackedContainerBatchWithNoWorkerSlices) {
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+    auto empty = containerOp(ident, OpTypeEnum::kContainerInsert, packedInsertOf({}, value));
+    applyThroughBuffer({empty});
+    assertPublished(empty);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesOriginalBatchBoundaryWhenExpansionRemovesTheLastOp) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto ident = createBytesContainer();
+    auto insert = insertOp(kNss, BSON("_id" << 0));
+    auto empty = containerOp(ident,
+                             OpTypeEnum::kContainerInsert,
+                             packedInsertOf({}, BSONBinData("V", 1, BinDataGeneral)));
+    applyThroughBuffer({insert, empty});
+    assertPublished(empty);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0)});
+}
+
+// The collection's in-memory record count follows the writes the workers make.
+TEST_F(PipelinedOplogApplierRunTest, FastCountFollowsTheWorkersWrites) {
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    std::vector<OplogEntry> ops;
+    std::vector<BSONObj> expected;
+    for (int i = 0; i < 10; ++i) {
+        ops.push_back(insertOp(kNss, BSON("_id" << i)));
+        expected.push_back(BSON("_id" << i));
+    }
+    ops.push_back(updateOp(kNss, BSON("_id" << 3), BSON("a" << 1)));
+    expected[3] = BSON("_id" << 3 << "a" << 1);
+    ops.push_back(deleteOp(kNss, BSON("_id" << 7)));
+    expected.erase(expected.begin() + 7);
+    ops.push_back(applyOpsInsertingOp(kNss, uuid, {BSON("_id" << 10), BSON("_id" << 11)}));
+    expected.push_back(BSON("_id" << 10));
+    expected.push_back(BSON("_id" << 11));
+
+    applyThroughBuffer(ops);
+
+    // assertCollectionContainsExactly compares the record count against a scan of the documents.
+    assertCollectionContainsExactly(kNss, expected);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesImmediateMultikeyWrites) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    auto insert = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+
+    // The production dispatcher must not defer catalog writes without an advancer flush.
+    applyThroughBuffer({insert});
+    assertPublished(insert);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+#if 0  // TODO(SERVER-135372): Enable once the advancer combines and flushes worker multikey writes.
+TEST_F(PipelinedOplogApplierRunTest, PublishesMultikeyWritesFromEveryWorker) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    auto first = insertOp(
+        kNss, BSON("_id" << idRoutedTo(0) << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second = insertOp(
+        kNss, BSON("_id" << idRoutedTo(1) << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+
+    applyThroughBuffer({first, second});
+
+    // A published batch must include the catalog changes discovered by both workers.
+    assertPublished(second);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesMultikeyWritesFromSuccessiveBatches) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    auto first = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    applyThroughBuffer({first});
+    assertPublished(first);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {}}));
+
+    // An update in a later batch contributes a new path to an already multikey index.
+    auto second = updateOp(kNss, BSON("_id" << 0), BSON("a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    applyThroughBuffer({second});
+    assertPublished(second);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+}
+#endif
+
+// The dispatcher does not wait for a batch to finish: a batch pushed while a worker is still busy
+// with the previous batch is dispatched and applied by the other workers.
+TEST_F(PipelinedOplogApplierRunTest, DispatchesTheNextBatchWhileAnEarlierBatchIsStillApplying) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const int heldId = idRoutedTo(0);
+    const int laterId = idRoutedTo(1);
+    auto& held = watchWriteOf(heldId, /*hold=*/true);
+    auto& later = watchWriteOf(laterId, /*hold=*/false);
+
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    auto firstOp = insertOp(kNss, BSON("_id" << heldId));
+    pushToBuffer({firstOp});
+    startApplier();
+    waitForGate(held);
+
+    // Pushed after the applier started, while worker 0 is held mid-batch.
+    auto laterOp = insertOp(kNss, BSON("_id" << laterId));
+    pushToBuffer({laterOp});
+    waitForGate(later);
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+
+    // Draining must wait for the held worker to finish and its batch to be published. Both ops
+    // are pipelined, so the first drain the fail point sees is the teardown drain, meaning the
+    // dispatcher finished its run loop.
+    {
+        FailPointEnableBlock drainHang("hangBeforePipelinedApplierDrain");
+        shutdownApplier();
+        drainHang.waitForOneNewEntry();
+    }
+    // The drain is blocked waiting for the held worker's batch to be applied and published, so
+    // shutdown cannot complete yet.
+    ASSERT_FALSE(_finished->isReady());
+    held.release.set();
+    _finished->get();
+    _finished.reset();
+
+    assertPublished(laterOp);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << heldId), BSON("_id" << laterId)});
+}
+
+// Derived ops (from applyOps) live in the in-flight batch's backing memory (kept alive by
+// PipelinedApplierBatchTracker until the batch is published). This holds a worker mid-batch, lets
+// the dispatcher move past it, and verifies the derived ops are still applied correctly — their
+// storage must outlive the dispatcher's move-on.
+TEST_F(PipelinedOplogApplierRunTest, DerivedOpsRemainValidAfterTheDispatcherMovesOn) {
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    // One entry per batch so the marker is dispatched strictly after the applyOps.
+    setServerParameter("replBatchLimitOperations", 1);
+
+    const int heldId = idRoutedTo(0);
+    auto& held = watchWriteOf(heldId, /*hold=*/true);
+    const int derivedId = idRoutedTo(0, heldId + 1);
+    const int markerId = idRoutedTo(1, derivedId + 1);
+    auto& marker = watchWriteOf(markerId, /*hold=*/false);
+
+    pushToBuffer({insertOp(kNss, BSON("_id" << heldId))});
+    startApplier();
+    // Worker 0 is blocked after completing this write.
+    waitForGate(held);
+
+    // The derived op from the apply ops is also routed to worker 0, where it sits waiting in the
+    // queue. The marker insert oplog entry is routed to worker 1.
+    pushToBuffer({applyOpsInsertingOp(kNss, uuid, {BSON("_id" << derivedId)}),
+                  insertOp(kNss, BSON("_id" << markerId))});
+    // The marker oplog entry is completed by worker 1, while the derived op from the apply ops is
+    // still blocked.
+    waitForGate(marker);
+
+    // Worker 0 is able to apply the derived insert.
+    held.release.set();
+    finishApplier();
+
+    assertCollectionContainsExactly(
+        kNss, {BSON("_id" << heldId), BSON("_id" << derivedId), BSON("_id" << markerId)});
+}
+
+
+using PipelinedOplogApplierRunDeathTest = PipelinedOplogApplierRunTest;
+
+DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
+                   FassertsOnABatchThatIsNotAfterLastApplied,
+                   "13322700.*does not follow the last dispatched op") {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto op = insertOp(kNss, BSON("_id" << 0));
+    ReplicationCoordinator::get(serviceContext)
+        ->setMyLastAppliedOpTimeAndWallTimeForward({op.getOpTime(), Date_t::now()});
+    applyThroughBuffer({op});
+}
+
+// The bound is the last dispatched op, not lastApplied, which lags behind dispatch.
+DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
+                   FassertsOnABatchThatPrecedesTheLastDispatchedOp,
+                   "13322700.*does not follow the last dispatched op") {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    applyThroughBuffer(
+        {makeInsertDocumentOplogEntry(OpTime(Timestamp(100, 0), 1), kNss, BSON("_id" << 0)),
+         makeInsertDocumentOplogEntry(OpTime(Timestamp(50, 0), 1), kNss, BSON("_id" << 1))});
+}
+
+DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
+                   FassertsOnABatchThatRepeatsTheLastDispatchedOpTime,
+                   "13322700.*does not follow the last dispatched op") {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    setServerParameter("replBatchLimitOperations", 1);
+    applyThroughBuffer(
+        {makeInsertDocumentOplogEntry(OpTime(Timestamp(100, 0), 1), kNss, BSON("_id" << 0)),
+         makeInsertDocumentOplogEntry(OpTime(Timestamp(100, 0), 1), kNss, BSON("_id" << 1))});
+}
+
+DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
+                   FassertsWhenABatchCannotBeDispatched,
+                   "13322701.*failed to dispatch a batch") {
+    // A non-transactional applyOps whose inner op cannot be extracted.
+    applyThroughBuffer(
+        {makeCommandOplogEntry(nextOpTime(),
+                               NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                               BSON("applyOps" << BSON_ARRAY(BSONObj())))});
+}
+
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesASingleSerializedBatch) {
+    auto createOp = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
+
+    applyThroughBuffer({createOp});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kNss));
+    assertPublished(createOp);
+}
+
+// Each create arrives from the batcher as its own serialized batch.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesSeveralSerializedBatches) {
+    const auto nssA = NamespaceString::createNamespaceString_forTest("test.poa_serialized_a");
+    const auto nssB = NamespaceString::createNamespaceString_forTest("test.poa_serialized_b");
+    const auto nssC = NamespaceString::createNamespaceString_forTest("test.poa_serialized_c");
+    auto createA = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssA);
+    auto createB = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssB);
+    auto createC = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssC);
+
+    applyThroughBuffer({createA, createB, createC});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), nssA));
+    ASSERT_TRUE(collectionExists(_opCtx.get(), nssB));
+    ASSERT_TRUE(collectionExists(_opCtx.get(), nssC));
+    assertPublished(createC);
+}
+
+// Serialized batches share the buffer with pipelined batches without losing or reordering
+// anything: the batcher splits this push into a pipelined batch, the serialized createCollection
+// batch, and another pipelined batch. The serialized batch drains everything in flight, is
+// dispatched, and drains again (including publication) before the following pipelined batch is
+// dispatched, so the following ops (which target the newly-created collection) apply after it.
+// The final lastApplied is the last op in the buffer.
+TEST_F(PipelinedOplogApplierRunTest, AppliesPipelinedBatchesBeforeAndAfterASerializedBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Two inserts into a pre-existing collection, a createCollection serialized batch, then two
+    // inserts into the newly-created collection.
+    auto ins0 = insertOp(kNss, BSON("_id" << 0));
+    auto ins1 = insertOp(kNss, BSON("_id" << 1));
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+    auto ins2 = insertOp(kOtherNss, BSON("_id" << 100));
+    auto ins3 = insertOp(kOtherNss, BSON("_id" << 101));
+
+    applyThroughBuffer({ins0, ins1, createOther, ins2, ins3});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertCollectionContainsExactly(kOtherNss, {BSON("_id" << 100), BSON("_id" << 101)});
+    assertPublished(ins3);
+}
+
+// Push a serialized op to the buffer while an applier worker is paused on a pipelined batch.
+// The dispatcher must finish the drain before the serialized batch — everything in flight
+// applied and published — before dispatching the serialized batch, so the serialized op is not
+// applied and lastApplied does not advance until the worker is unpaused.
+TEST_F(PipelinedOplogApplierRunTest, WaitsForInflightPipelinedBatchToDrainBeforeASerializedBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Force one op per batch so the serialized op arrives strictly after the held insert.
+    setServerParameter("replBatchLimitOperations", 1);
+
+    // `true` when a worker has started applying the serialized op.
+    WaitableAtomic<bool> createCalled{false};
+    _opObserver->onCreateCollectionFn =
+        [&](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            createCalled.store(true);
+            createCalled.notifyAll();
+        };
+
+    // Get _id to pause worker on.
+    const int heldId = idRoutedTo(0);
+    auto& held = watchWriteOf(heldId, true /* hold */);
+
+    // Push operation that worker will get stuck on.
+    pushToBuffer({insertOp(kNss, BSON("_id" << heldId))});
+    startApplier();
+    waitForGate(held);
+
+    // Push a serialized op while the worker is paused.
+    // The dispatcher must drain first, so the observer must not fire yet.
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+    pushToBuffer({createOther});
+
+    // Give the dispatcher a chance to move; we should still be stuck waiting for the drain, and
+    // draining is stuck waiting for the worker to apply.
+    ASSERT_EQ(createCalled.waitFor(false, Milliseconds(500)), boost::none);
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kOtherNss));
+
+    // Release the held worker; the pipelined batch drains, and only then is the serialized op
+    // dispatched and applied.
+    held.release.set();
+    ASSERT_TRUE(createCalled.waitFor(false, Seconds(60)));
+    finishApplier();
+
+    // Ensure that the serialized op was successfully applied.
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << heldId)});
+    assertPublished(createOther);
+}
+
+// The drain after a serialized batch: the next pipelined batch must not be dispatched until the
+// serialized batch has been applied and published. Hold the worker applying a serialized
+// createCollection, then push a pipelined batch targeting the collection it creates: its ops
+// must not be applied until the create finishes.
+TEST_F(PipelinedOplogApplierRunTest, WaitsForASerializedBatchToDrainBeforeDispatchingTheNextBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // The worker applying the serialized create marks this gate and blocks on it until released.
+    // The gate's _id never matches a written document, so only the observer reaches it; holding
+    // here keeps teardown's gate release as the safety net if the test fails early.
+    const int kCreateGateId = -1;
+    auto& createGate = watchWriteOf(kCreateGateId, true /* hold */);
+    _opObserver->onCreateCollectionFn =
+        [&](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            createGate.reached.set();
+            createGate.release.get();
+        };
+
+    // Gate (no hold) to learn when the insert following the create is applied.
+    auto& insGate = watchWriteOf(100, false /* hold */);
+
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+    auto ins100 = insertOp(kOtherNss, BSON("_id" << 100));
+    auto ins101 = insertOp(kOtherNss, BSON("_id" << 101));
+
+    pushToBuffer({createOther});
+    startApplier();
+
+    // The serialized create batch is dispatched and a worker is stuck in the observer.
+    waitForGate(createGate);
+
+    // A pipelined batch targeting the collection the create is still building. The dispatcher
+    // must stay in the drain that follows the serialized batch, so these must not be applied yet.
+    pushToBuffer({ins100, ins101});
+    ASSERT_FALSE(insGate.reached.waitFor(_opCtx.get(), Milliseconds(500)));
+    ASSERT_TRUE(writesTo(kOtherNss).empty());
+
+    // Release the create; the drain completes and only then is the pipelined batch applied.
+    createGate.release.set();
+    waitForGate(insGate);
+    finishApplier();
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kOtherNss, {BSON("_id" << 100), BSON("_id" << 101)});
+    assertPublished(ins101);
+}
+
+// The drain after a serialized batch waits for publication, not just worker application: the
+// serialized batch may be applied and popped from the batch tracker while lastApplied has not
+// advanced, and the next pipelined batch must still wait for publication to complete.
+TEST_F(PipelinedOplogApplierRunTest,
+       WaitsForASerializedBatchPublicationBeforeDispatchingTheNextBatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+
+    // `true` once a worker has applied the serialized create.
+    WaitableAtomic<bool> createCalled{false};
+    _opObserver->onCreateCollectionFn =
+        [&](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            createCalled.store(true);
+            createCalled.notifyAll();
+        };
+
+    // Gate (no hold) to learn when the insert following the create is applied.
+    auto& insGate = watchWriteOf(100, false /* hold */);
+
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+    auto ins100 = insertOp(kOtherNss, BSON("_id" << 100));
+    auto ins101 = insertOp(kOtherNss, BSON("_id" << 101));
+
+    {
+        // Hold the advancer after it pops the serialized batch, before it updates lastApplied.
+        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
+        pushToBuffer({createOther});
+        startApplier();
+        publishing.waitForOneNewEntry();
+
+        // The create is applied and the workers are idle, but lastApplied has not reached it.
+        ASSERT_TRUE(createCalled.waitFor(false, Seconds(60)));
+        ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+        ASSERT_LT(replCoord->getMyLastAppliedOpTime(), createOther.getOpTime());
+
+        // The following pipelined batch must not be dispatched until publication completes.
+        pushToBuffer({ins100, ins101});
+        ASSERT_FALSE(insGate.reached.waitFor(_opCtx.get(), Milliseconds(500)));
+        ASSERT_TRUE(writesTo(kOtherNss).empty());
+
+        // Leaving this scope releases publication; the drain completes and the batch applies.
+    }
+    waitForGate(insGate);
+    finishApplier();
+
+    assertCollectionContainsExactly(kOtherNss, {BSON("_id" << 100), BSON("_id" << 101)});
+    assertPublished(ins101);
+}
+
+// If a serialized op is interrupted by a global-shutdown-class error, the applier abandons that
+// op and bails: the failing op is not applied, no later op in the buffer is applied, and
+// lastApplied stays where it was so restart recovery re-applies from here.
+TEST_F(PipelinedOplogApplierRunTest, ShutdownDuringSerializedOpDoesNotPublish) {
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+
+    // Fail the very first serialized op with a shutdown-class error.
+    _opObserver->onCreateCollectionFn =
+        [](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            uasserted(ErrorCodes::InterruptedAtShutdown,
+                      "injected global shutdown during serialized op");
+        };
+
+    // The first create is the one that will be interrupted; the second must not be applied
+    // because the applier bailed before reaching it.
+    auto createFirst = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
+    auto createSecond = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+
+    applyThroughBuffer({createFirst, createSecond});
+
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kOtherNss));
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+}
+
+// Any non-shutdown error from a serialized op is unrecoverable: the serialized op is dispatched
+// to a worker like any other op, so the worker fasserts with the worker-application fatal
+// code (13322100) rather than silently skipping the op.
+DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
+                   FassertsWhenSerializedOpFailsFatally,
+                   "13322100.*failed to apply a work item") {
+    _opObserver->onCreateCollectionFn =
+        [](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            uasserted(ErrorCodes::OperationFailed,
+                      "injected unrecoverable failure during serialized op");
+        };
+    applyThroughBuffer({makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss)});
+}
+
+// A batch led by the new-primary noop — the batcher starts a new batch at the noop, so it shares
+// a batch only with the ops that follow it.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesABatchLedByANewPrimaryNoop) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto noop = makeOplogEntry(nextOpTime(),
+                               OpTypeEnum::kNoop,
+                               kNss,
+                               boost::none /* uuid */,
+                               BSON(kNewPrimaryMsgField << kNewPrimaryMsg));
+    auto ins0 = insertOp(kNss, BSON("_id" << 0));
+    auto ins1 = insertOp(kNss, BSON("_id" << 1));
+
+    applyThroughBuffer({noop, ins0, ins1});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertPublished(ins1);
+}
+
+TEST_F(PipelinedWorkItemTest, OpsAppliedByWorkersCounterIncrementsPerAppliedOp) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsAppliedByWorkers);
+
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    // Two work items totaling 5 ops. The counter should grow by exactly 5 on the happy path.
+    ASSERT_OK(applyWorkItem(_opCtx.get(),
+                            options,
+                            makeItem({insertOp(kNss, BSON("_id" << 0)),
+                                      insertOp(kNss, BSON("_id" << 1)),
+                                      updateOp(kNss, BSON("_id" << 0), BSON("a" << 1))})
+                                .item));
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(),
+        options,
+        makeItem({insertOp(kNss, BSON("_id" << 2)), deleteOp(kNss, BSON("_id" << 1))}).item));
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsAppliedByWorkers);
+    ASSERT_EQ(after - before, 5);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsEveryOpInEveryBatch) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    // Small batches so the loop pulls and dispatches several of them.
+    setServerParameter("replBatchLimitOperations", 8);
+
+    constexpr int kNumOps = 25;
+    std::vector<OplogEntry> ops;
+    ops.reserve(kNumOps);
+    for (int i = 0; i < kNumOps; ++i) {
+        ops.push_back(insertOp(kNss, BSON("_id" << i)));
+    }
+    applyThroughBuffer(ops);
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, kNumOps);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsInnerOpsOfApplyOps) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Two applyOps entries (one holding 3 inner ops, another holding 4), plus one plain insert:
+    // 3 + 4 + 1 = 8
+    applyThroughBuffer({
+        applyOpsInsertingOp(kNss, uuid, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}),
+        applyOpsInsertingOp(
+            kNss, uuid, {BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 5), BSON("_id" << 6)}),
+        insertOp(kNss, BSON("_id" << 7)),
+    });
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 8);
+}
+
+// The opsDispatched counter counts the single-key ops that a packed container op expands to,
+// not the packed op itself.
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsExpandedContainerOps) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    // A packed insert of 3 keys and a single-key delete:
+    // 3 + 1 = 4 single-key ops enqueued.
+    applyThroughBuffer(
+        {containerOp(
+             ident, OpTypeEnum::kContainerInsert, packedInsertOf({"K1", "K2", "K3"}, value)),
+         containerOp(ident, OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2")))});
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 4);
+}
+
+// A packed container op nested inside an applyOps entry is expanded to its single-key ops before
+// routing; the opsDispatched counter must count the fully-expanded ops, not the applyOps entry or
+// the packed container op that lives inside it.
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsExpandedContainerOpsInsideApplyOps) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    // The applyOps holds one plain insert plus a packed container insert of 3 keys, which expands
+    // to 4 dispatched ops.
+    applyThroughBuffer({applyOpsOp(
+        {MutableOplogEntry::makeInsertOperation(kNss, uuid, BSON("_id" << 0), BSON("_id" << 0)),
+         containerReplOp(
+             ident, OpTypeEnum::kContainerInsert, packedInsertOf({"K1", "K2", "K3"}, value))})});
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 4);
+}
+
+// A packed container op that expands to zero single-key ops (an empty key list) does not contribute
+// to the opsDispatched counter.
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterIgnoresEmptyPackedContainerOp) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    applyThroughBuffer(
+        {containerOp(ident, OpTypeEnum::kContainerInsert, packedInsertOf({}, value))});
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 0);
+}
+
+}  // namespace
+}  // namespace mongo::repl

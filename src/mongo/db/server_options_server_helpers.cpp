@@ -1,47 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/server_options_server_helpers.h"
 
-#include <boost/algorithm/string/constants.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/core/addressof.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/function/function_base.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-#include <boost/type_index/type_index_facade.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -68,6 +30,19 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/core/addressof.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -237,13 +212,9 @@ Status canonicalizeServerOptions(moe::Environment* params) {
     if (!ret.isOK())
         return ret;
 
-    // "net.wireObjectCheck" comes from the config file, so override it if either "objcheck" or
-    // "noobjcheck" are set, since those come from the command line.
+    // objcheck and noobjcheck are deprecated now, so if either are set, log a warning.
     if (params->count("objcheck")) {
-        ret = params->set("net.wireObjectCheck", moe::Value((*params)["objcheck"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        LOGV2_WARNING(13047401, "Deprecated option \"objcheck\" was set");
         ret = params->remove("objcheck");
         if (!ret.isOK()) {
             return ret;
@@ -251,10 +222,7 @@ Status canonicalizeServerOptions(moe::Environment* params) {
     }
 
     if (params->count("noobjcheck")) {
-        ret = params->set("net.wireObjectCheck", moe::Value(!(*params)["noobjcheck"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        LOGV2_WARNING(13047402, "Deprecated option \"noobjcheck\" was set");
         ret = params->remove("noobjcheck");
         if (!ret.isOK()) {
             return ret;
@@ -374,7 +342,7 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.wireObjectCheck")) {
-        serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
+        LOGV2_WARNING(13047403, "Deprecated option \"net.wireObjectCheck\" was set");
     }
 
     if (params.count("net.bindIp")) {

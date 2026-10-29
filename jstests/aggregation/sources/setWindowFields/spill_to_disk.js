@@ -69,14 +69,6 @@ function changeSpillLimit({mode, maxDocs}) {
             "data": {maxDocsBeforeSpill: maxDocs},
         },
     });
-    FixtureHelpers.runCommandOnEachPrimary({
-        db: admin,
-        cmdObj: {
-            configureFailPoint: "overrideMemoryLimitForSpillForSBEWindowStage",
-            mode: mode,
-            "data": {spillCounter: maxDocs},
-        },
-    });
 }
 
 function testSingleAccumulator(accumulator, nullValue, spec) {
@@ -240,11 +232,7 @@ function testUsedDiskAppearsInExplain() {
         .explain("allPlansExecution")
         .aggregate(explainPipeline, {allowDiskUse: true});
 
-    // If setWindowFields is pushed down to SBE, the stage name in explain will be 'window',
-    // otherwise it will be '$_internalSetWindowFields'.
-    let stages = getAggPlanStages(explainAllPlansExecution, "window").concat(
-        getAggPlanStages(explainAllPlansExecution, "$_internalSetWindowFields"),
-    );
+    let stages = getAggPlanStages(explainAllPlansExecution, "$_internalSetWindowFields");
     assert.gt(stages.length, 0, stages);
     assert(stages[0]["usedDisk"], stages);
 
@@ -253,9 +241,7 @@ function testUsedDiskAppearsInExplain() {
     explainAllPlansExecution = coll
         .explain("allPlansExecution")
         .aggregate(explainPipeline, {allowDiskUse: true});
-    stages = getAggPlanStages(explainAllPlansExecution, "window").concat(
-        getAggPlanStages(explainAllPlansExecution, "$_internalSetWindowFields"),
-    );
+    stages = getAggPlanStages(explainAllPlansExecution, "$_internalSetWindowFields");
     assert.gt(stages.length, 0, stages);
     assert(!stages[0]["usedDisk"], stages);
 }

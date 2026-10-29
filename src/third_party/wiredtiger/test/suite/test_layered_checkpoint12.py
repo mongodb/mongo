@@ -52,10 +52,13 @@ class test_layered_checkpoint12(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.create_session_config)
 
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(100):
             cursor[i] = 'value' + str(i)
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
         checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
 
@@ -67,13 +70,13 @@ class test_layered_checkpoint12(wttest.WiredTigerTestCase):
         self.close_conn()
         with self.customStdoutPattern(
             lambda output: self.assertNotRegex(
-                output, r'disagg database size verify: .*checkpoint size')):
+                output, r'disagg database size: .*checkpoint size')):
             self.open_conn(config=self._follower_config())
 
         # Reopen again with checkpoint metadata so startup picks up the latest
         # checkpoint and runs the database-size verification branch.
         with self.expectedStdoutPattern(
-            r'disagg database size verify: .*checkpoint size', maxchars=30000):
+            r'disagg database size: .*checkpoint size', maxchars=30000):
             self.reopen_conn(config=self._follower_config(checkpoint_meta))
 
         # test_layered*.py modules run layered verify during teardown. Ignore the

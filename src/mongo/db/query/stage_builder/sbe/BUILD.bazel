@@ -116,7 +116,8 @@ mongo_cc_library(
         "gen_lookup.cpp",
         "gen_projection.cpp",
         "gen_ts.cpp",
-        "gen_window_function.cpp",
+        "sbe_stage_blueprint_slot_usage.cpp",
+        "sbe_stage_lowering.cpp",
         "sbexpr.cpp",
         "sbexpr_helpers.cpp",
         "type_checker.cpp",
@@ -186,5 +187,20 @@ mongo_cc_library(
         "//src/mongo/s/query:sharding_helpers",
         "//src/mongo/stdx",
         "//src/mongo/util:string_listset",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "gen_coll_scan_test",
+    srcs = [
+        "gen_coll_scan_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":stage_builder",
+        "//src/mongo/db/exec/sbe:clustered_scan_stage_test_fixtures",
+        "//src/mongo/db/exec/sbe:sbe_plan_stage_test",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:collection_mock",
     ],
 )

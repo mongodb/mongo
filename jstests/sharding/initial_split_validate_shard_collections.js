@@ -3,6 +3,7 @@
  * which spreads the collection across all available shards.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -55,21 +56,43 @@ const shard1UUID = getUUIDFromListCollections(st.shard1.getDB("test"), "user");
 assert.eq(collEntry.uuid, shard0UUID);
 assert.eq(collEntry.uuid, shard1UUID);
 
-// Check that the shards' on-disk caches have the correct number of chunks
-assert.commandWorked(
-    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: "test.user", syncFromConfig: false}),
-);
-assert.commandWorked(
-    st.shard1.adminCommand({_flushRoutingTableCacheUpdates: "test.user", syncFromConfig: false}),
-);
-
+// Check that the config server has the correct number of chunks
 const chunksOnConfigCount = findChunksUtil.countChunksForNs(st.config, "test.user");
 assert.eq(expectedChunksOnConfigCount, chunksOnConfigCount);
 
-const chunksCollName = "cache.chunks.test.user";
-const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).find().toArray();
-const chunksOnShard1 = st.shard1.getDB("config").getCollection(chunksCollName).find().toArray();
-assert.eq(chunksOnConfigCount, chunksOnShard0.length);
-assert.eq(chunksOnConfigCount, chunksOnShard1.length);
+// Check that the shards' metadata has the correct number of chunks
+if (FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    const chunksOnShard0 = st.shard0
+        .getDB("config")
+        .getCollection("shard.catalog.chunks")
+        .find({uuid: collEntry.uuid})
+        .toArray();
+    const chunksOnShard1 = st.shard1
+        .getDB("config")
+        .getCollection("shard.catalog.chunks")
+        .find({uuid: collEntry.uuid})
+        .toArray();
+    assert.eq(expectedChunksPerShardCount, chunksOnShard0.length, chunksOnShard0);
+    assert.eq(expectedChunksPerShardCount, chunksOnShard1.length, chunksOnShard1);
+} else {
+    assert.commandWorked(
+        st.shard0.adminCommand({
+            _flushRoutingTableCacheUpdates: "test.user",
+            syncFromConfig: false,
+        }),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({
+            _flushRoutingTableCacheUpdates: "test.user",
+            syncFromConfig: false,
+        }),
+    );
+
+    const chunksCollName = "cache.chunks.test.user";
+    const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).find().toArray();
+    const chunksOnShard1 = st.shard1.getDB("config").getCollection(chunksCollName).find().toArray();
+    assert.eq(chunksOnConfigCount, chunksOnShard0.length, chunksOnShard0);
+    assert.eq(chunksOnConfigCount, chunksOnShard1.length, chunksOnShard1);
+}
 
 st.stop();

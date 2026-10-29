@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
@@ -104,7 +78,8 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     bool roundUpPreparedTimestamps,
     RoundUpReadTimestamp roundUpReadTimestamp,
     RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite,
-    boost::optional<uint64_t> claimPreparedId)
+    boost::optional<uint64_t> claimPreparedId,
+    boost::optional<int64_t> operationTimeoutMs)
     : _session(session) {
     invariant(!_rollback);
 
@@ -124,16 +99,27 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
         compiled_config = compiledBeginTransactions[config - 1].getConfig(_session);
     }
 
-    if (claimPreparedId) {
-        // Slow path used on startup recovery to take ownership of a prepared transaction as part of
-        // the transaction.
+    if (claimPreparedId || operationTimeoutMs) {
+        // Slow path used when we need to append options that are not part of the precompiled
+        // begin_transaction configurations (e.g. claim_prepared_id or operation_timeout_ms).
         std::stringstream rawConfig;
         if (config > 0) {
             // We need to get the raw config because the compiled config is not a human readable
             // string that allows us to concatenate the claim_prepared_id.
             rawConfig << compiledBeginTransactions[config - 1].getRawConfig() << ",";
         }
-        rawConfig << fmt::format("claim_prepared_id={}", unsignedHex(*claimPreparedId));
+        if (claimPreparedId) {
+            rawConfig << fmt::format("claim_prepared_id={}", unsignedHex(*claimPreparedId));
+        }
+        if (operationTimeoutMs) {
+            if (claimPreparedId) {
+                rawConfig << ",";
+            }
+            // Bounds every operation in this transaction: once exceeded, WiredTiger fails the
+            // operation with WT_ROLLBACK instead of waiting indefinitely (e.g. in optional
+            // application eviction).
+            rawConfig << fmt::format("operation_timeout_ms={}", *operationTimeoutMs);
+        }
         std::string rawConfigStr = rawConfig.str();
         invariantWTOK(_session->begin_transaction(rawConfigStr.c_str()), *_session);
     } else {

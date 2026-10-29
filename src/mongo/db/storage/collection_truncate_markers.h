@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/system_tick_source.h"
@@ -63,7 +37,7 @@ namespace mongo {
 // If these requirements hold then this class can be used to compute and maintain up-to-date markers
 // for ranges of deletions. These markers will be expired and returned to the deleter whenever the
 // implementation defined '_hasExcessMarkers' returns true.
-class MONGO_MOD_OPEN CollectionTruncateMarkers
+class [[MONGO_MOD_OPEN]] CollectionTruncateMarkers
     : public std::enable_shared_from_this<CollectionTruncateMarkers> {
 public:
     /** Markers represent "waypoints" of the collection that contain information between the current
@@ -102,6 +76,10 @@ public:
 
     // The method used for creating the initial set of markers.
     enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling, InProgress };
+
+    // Constrains which creation methods may be selected for the initial set of markers.
+    // 'kAuto' lets the heuristics pick between scanning and sampling.
+    enum class MarkersCreationPolicy { kAuto, kScanOnly, kSampleOnly };
 
     CollectionTruncateMarkers(std::deque<Marker> markers,
                               int64_t leftoverRecordsCount,
@@ -184,16 +162,15 @@ public:
 
     /**
      * Given the estimated collection 'dataSize' and 'numRecords', along with a target
-     * 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
-     * creation method), computes the initial creation method to try for the initialization.
+     * 'minBytesPerMarker', computes the initial creation method to try for the initialization.
      *
      * It's possible the initial creation method is not the actual creation method. However, it will
      * be the first creation method tried. For example, if estimates of 'dataSize' and 'numRecords'
      * are really far off, sampling may default back to scanning later on.
      *
-     * 'forceScanning' picks 'Scanning' unconditionally, bypassing the size-based heuristic. This
-     * should be used in cases where random sampling is unsupported. The server parameter
-     * 'gUseSlowCollectionTruncateMarkerScanning' has the same effect for every call site.
+     * 'policy' constrains which creation methods may be selected. The server parameter
+     * 'gUseSlowCollectionTruncateMarkerScanning' forces scanning for every callsite, overriding
+     * 'policy'.
      *
      * 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
      * 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
@@ -203,7 +180,7 @@ public:
         int64_t numRecords,
         int64_t dataSize,
         int64_t minBytesPerMarker,
-        bool forceScanning,
+        MarkersCreationPolicy policy = MarkersCreationPolicy::kAuto,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     /**
@@ -216,7 +193,7 @@ public:
      * If we were to use query framework scans here we would incur on a layering violation as the
      * storage layer shouldn't have to interact with the query (higher) layer in here.
      */
-    class MONGO_MOD_OPEN CollectionIterator {
+    class [[MONGO_MOD_OPEN]] CollectionIterator {
     public:
         virtual ~CollectionIterator() = default;
 
@@ -262,8 +239,8 @@ public:
         OperationContext* opCtx,
         CollectionIterator& collIterator,
         int64_t minBytesPerMarker,
-        bool forceScanning,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        MarkersCreationPolicy policy = MarkersCreationPolicy::kAuto,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     // Creates the initial set of markers by fully scanning the collection. The set of markers
@@ -273,6 +250,7 @@ public:
         CollectionIterator& collIterator,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        int64_t startTime,
         TickSource* tickSource = globalSystemTickSource());
 
     // Creates the initial set of markers by sampling the collection. The set of markers
@@ -281,9 +259,10 @@ public:
     static InitialSetOfMarkers createMarkersBySampling(
         OperationContext* opCtx,
         CollectionIterator& collIterator,
-        int64_t estimatedRecordsPerMarker,
-        int64_t estimatedBytesPerMarker,
+        int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        bool allowFallbackScanning,
+        int64_t startTime,
         TickSource* tickSource = globalSystemTickSource());
 
     void setMinBytesPerMarker(int64_t size);
@@ -307,21 +286,25 @@ public:
         return _markers.size();
     }
 
+    int64_t minBytesPerMarker() const {
+        return _minBytesPerMarker.load();
+    }
+
     //
     // The following methods are public only for use in tests.
     //
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     int64_t currentBytes_forTest() const {
         return _currentBytes.load();
     }
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     int64_t currentRecords_forTest() const {
         return _currentRecords.load();
     }
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     std::deque<Marker> getMarkers_forTest() const {
         // Return a copy of the vector.
         return _markers;
@@ -341,10 +324,10 @@ private:
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
-    AtomicWord<int64_t> _minBytesPerMarker;
+    Atomic<int64_t> _minBytesPerMarker;
 
-    AtomicWord<int64_t> _currentRecords;  // Number of records in the marker being filled.
-    AtomicWord<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
+    Atomic<int64_t> _currentRecords;  // Number of records in the marker being filled.
+    Atomic<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
 
     // Protects against concurrent access to the deque of collection markers and the
     // _initialSamplingFinished variable.
@@ -356,8 +339,8 @@ private:
 
 protected:
     struct PartialMarkerMetrics {
-        AtomicWord<int64_t>* currentRecords;
-        AtomicWord<int64_t>* currentBytes;
+        Atomic<int64_t>* currentRecords;
+        Atomic<int64_t>* currentBytes;
     };
 
     template <typename F>
@@ -412,7 +395,7 @@ protected:
  * This is useful in time-based expiration systems as there could be low activity collections
  * containing expired data that can't be removed until covered by a full marker.
  */
-class MONGO_MOD_OPEN CollectionTruncateMarkersWithPartialExpiration
+class [[MONGO_MOD_OPEN]] CollectionTruncateMarkersWithPartialExpiration
     : public CollectionTruncateMarkers {
 public:
     /**
@@ -444,7 +427,7 @@ public:
                                     minBytesPerMarker,
                                     totalTimeSpentBuilding,
                                     creationMethod,
-                                    false /* initialSamplingFinished */),
+                                    /*initialSamplingFinished=*/false),
           _highestRecordId(std::move(highestRecordId)),
           _highestWallTime(highestWallTime) {}
 
@@ -459,7 +442,7 @@ public:
                                                 int64_t countInserted,
                                                 bool oplogSamplingAsyncEnabled) final;
 
-    MONGO_MOD_PUBLIC
+    [[MONGO_MOD_PUBLIC]]
     std::pair<const RecordId&, const Date_t&> getHighestRecordMetrics_forTest() const {
         return {_highestRecordId, _highestWallTime};
     }

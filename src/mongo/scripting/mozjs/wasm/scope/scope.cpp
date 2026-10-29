@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
 
@@ -36,12 +10,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/config_engine_wasm_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
@@ -62,7 +36,7 @@ WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wa
 WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
                                      boost::optional<int> jsHeapLimitMB,
                                      std::unique_ptr<wasm::MozJSWasmBridge> idleBridge,
-                                     FunctionCacheMap /*cachedFunctions*/)
+                                     /*cachedFunctions=*/FunctionCacheMap)
     : _wasmEngineCtx(std::move(wasmEngineCtx)),
       _jsHeapLimitMB(jsHeapLimitMB),
       _bridge(std::move(idleBridge)) {
@@ -116,6 +90,11 @@ WasmtimeImplScope::~WasmtimeImplScope() {
 }
 
 void WasmtimeImplScope::reset() {
+    // A live scope always holds its shared engine context: getWasmEngineContext() memoizes and
+    // returns the process-wide context, and it is only cleared when the scope is parked/destroyed.
+    // reset() must never rebuild it (a no-op now that the context is shared).
+    invariant(_wasmEngineCtx);
+
     // Clear the decoration under the Client lock before tearing down _bridge, so a racing
     // interrupt() cannot call kill() on a dangling bridge.
     unregisterOperation();
@@ -142,18 +121,6 @@ void WasmtimeImplScope::reset() {
         }
         _bridge = nullptr;
         _emitSetupBytes = 0;
-
-        // Only recreate WasmEngineContext when a kill was pending. kill() calls
-        // Engine::increment_epoch(), which is engine-wide state — a fresh Engine+Component avoids
-        // epoch contamination on the next Store instantiation. For non-kill resets the existing
-        // Engine is clean and a new Store can be safely created from it.
-        if (wasKillPending || !_wasmEngineCtx) {
-            _wasmEngineCtx.reset();
-            if (auto* engine = getGlobalScriptEngine()) {
-                _wasmEngineCtx =
-                    static_cast<WasmtimeScriptEngine*>(engine)->createWasmEngineContext();
-            }
-        }
         // Handles from the old bridge are invalid after recreation — must recompile.
         _cachedFunctions.clear();
     }
@@ -231,9 +198,8 @@ bool WasmtimeImplScope::execPredicate(ScriptingFunction func, const BSONObj& doc
     // Single WASM crossing instead of 3 (setObject + setBoolean + invoke).
     // obj/fullObject are set on the WASM side inside invokePredicate() — no extra host calls.
     auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(doc);
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    ScopeGuard guard([&] { _deadlineMonitor.stopDeadline(this); });
-    return _bridge->invokePredicate(func, std::move(bsonVal));
+    return _invokeWithDeadlineMonitoring(
+        timeoutMs, [&] { return _bridge->invokePredicate(func, std::move(bsonVal)); });
 }
 
 ScriptingFunction WasmtimeImplScope::_createFunction(const char* raw) {
@@ -283,11 +249,8 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                         "func"_attr = static_cast<uint64_t>(func),
                         "emitSetupBytes"_attr = _emitSetupBytes,
                         "argSize"_attr = bsonArg.objsize());
-            _deadlineMonitor.startDeadline(this, timeoutMs);
-            {
-                ScopeGuard mapGuard([&] { _deadlineMonitor.stopDeadline(this); });
-                _bridge->invokeMap(func, std::move(bsonVal));
-            }
+            _invokeWithDeadlineMonitoring(timeoutMs,
+                                          [&] { _bridge->invokeMap(func, std::move(bsonVal)); });
             _drainEmitToCallback();
             return 0;
         }
@@ -300,11 +263,8 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                     "func"_attr = static_cast<uint64_t>(func),
                     "argSize"_attr = bsonArg.objsize());
         bool predicateResult;
-        _deadlineMonitor.startDeadline(this, timeoutMs);
-        {
-            ScopeGuard predGuard([&] { _deadlineMonitor.stopDeadline(this); });
-            predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
-        }
+        predicateResult = _invokeWithDeadlineMonitoring(
+            timeoutMs, [&] { return _bridge->invokePredicate(func, std::move(bsonVal)); });
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
@@ -319,12 +279,13 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                 "argSize"_attr = bsonArg.objsize(),
                 "ignoreReturn"_attr = ignoreReturn);
     StatusWith<BSONObj> result{BSONObj{}};
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    {
-        ScopeGuard funcGuard([&] { _deadlineMonitor.stopDeadline(this); });
-        result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
-    }
+    result = _invokeWithDeadlineMonitoring(
+        timeoutMs, [&] { return _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn); });
     uassertStatusOK(result.getStatus());
+    // Detect any stale emit() calls made during this invocation. In the invokeMap path,
+    // _drainEmitToCallback() is called explicitly. For regular invocations the buffer
+    // should be empty; draining here will throw (via the callback) if emit() was misused.
+    _drainEmitToCallback();
     if (!ignoreReturn) {
         BSONObj wrapped = result.getValue();
         BSONElement retVal = wrapped["__returnValue"];
@@ -347,17 +308,17 @@ void WasmtimeImplScope::injectNative(const char* field, NativeFunction func, voi
             "Only 'emit' function can be injected",
             std::string_view(field) == "emit");
 
+    // injectNative is called exactly once per $_internalJsEmit evaluation. The old pattern
+    // of calling it twice (once to set up, once with data=nullptr to invalidate a stack
+    // pointer) no longer applies: emitFromJS reads state via EmitStateGuard::get() instead.
+    // Re-injection with the same function is allowed (scope reuse across evaluations);
+    // injecting a different function is always a bug.
+    tassert(9712402,
+            "injectNative(emit) must not replace an active emit callback with a different function",
+            !_emitCallback || _emitCallback == func);
+
     _emitCallback = func;
     _emitCallbackData = data;
-
-    // evaluate_javascript.cpp calls injectNative a second time with data=nullptr to
-    // invalidate the emitState pointer after the map function returns. That call must NOT
-    // trigger a fresh setupEmit: the buffer is already drained, and setupEmit allocates
-    // ~117 MB of WASM linear memory — repeated calls accumulate heap pressure and can
-    // exhaust the store limit (CannotLeaveComponent trap).
-    if (!data) {
-        return;
-    }
 
     // Margin lets WASM buffer one over-limit doc so the host's EmitState sees
     // it during drain and can throw, instead of WASM silently dropping it.
@@ -508,6 +469,10 @@ void WasmtimeImplScope::setFunction(const char* field, const char* code) {
     _bridge->setGlobalValue(field, BSON("" << BSONCode(code)));
 }
 
+void WasmtimeImplScope::deleteGlobal(std::string_view name) {
+    _bridge->deleteGlobal(name);
+}
+
 int WasmtimeImplScope::type(const char* field) {
     BSONObj result = _resolveGlobal(field);
     BSONElement val = result[kReturnValueField];
@@ -533,12 +498,11 @@ bool WasmtimeImplScope::exec(std::string_view code,
                              bool assertOnError,
                              int timeoutMs) {
     std::string wrapped = "function() { " + std::string(code) + " }";
-    ScriptingFunction func = _bridge->createFunction(wrapped);
     auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(BSONObj());
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    StatusWith<BSONObj> result =
-        _bridge->invokeFunction(func, std::move(bsonVal), /*ignoreReturn=*/true);
-    _deadlineMonitor.stopDeadline(this);
+    ScriptingFunction func = _bridge->createFunction(wrapped);
+    StatusWith<BSONObj> result = _invokeWithDeadlineMonitoring(timeoutMs, [&] {
+        return _bridge->invokeFunction(func, std::move(bsonVal), /*ignoreReturn=*/true);
+    });
     if (!result.isOK()) {
         if (reportError) {
             LOGV2_ERROR(11605401,
@@ -561,28 +525,79 @@ std::string WasmtimeImplScope::getError() {
 }
 
 void WasmtimeImplScope::registerOperation(OperationContext* opCtx) {
-    _opCtx.store(opCtx, std::memory_order_release);
-    if (auto* engine = getGlobalScriptEngine()) {
-        static_cast<WasmtimeScriptEngine*>(engine)->registerOperation(
-            opCtx, this, [this] { _opCtx.store(nullptr, std::memory_order_release); });
+    tassert(13286901, "must have an operation context", opCtx);
+    auto* engine = dynamic_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
+    if (!engine) {
+        // Store no pointer when there is no WASM engine to register with. This avoids dangling
+        // '_opCtx', since the cleanup for each scope's operation context happens inside the
+        // destructor of 'WasmtimeScopeRegistry' which exists inside the engine.
+        return;
     }
+
+    _opCtx.store(opCtx, std::memory_order_release);
+    engine->registerOperation(
+        opCtx, this, [this] { _opCtx.store(nullptr, std::memory_order_release); });
 }
+
 void WasmtimeImplScope::unregisterOperation() {
     // Atomically take ownership of _opCtx so we call engine->unregisterOperation() exactly once,
     // even if the onTeardown callback races with us from the OperationContext's destructor.
     auto* opCtx = _opCtx.exchange(nullptr, std::memory_order_acq_rel);
     if (opCtx) {
-        if (auto* engine = getGlobalScriptEngine()) {
-            static_cast<WasmtimeScriptEngine*>(engine)->unregisterOperation(opCtx);
+        if (auto* engine = dynamic_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine())) {
+            engine->unregisterOperation(opCtx, this);
         }
     }
 }
 void WasmtimeImplScope::kill() {
+    // Reason-less kill: derive the real reason from the registered opCtx when there is one.
+    // The DeadlineMonitor lands here both for its periodic isKillPending() pass (SERVER-130767:
+    // that pass is what delivers opCtx kills -- killOp, maxTimeMS expiry, client disconnect --
+    // to a thread stuck inside JS, since such a thread never polls checkForInterrupt()) and for
+    // the JS-fn timeout, where no opCtx state is set and Interrupted is the correct reason.
+    auto reason = ErrorCodes::Interrupted;
+    if (auto* opCtx = _opCtx.load(std::memory_order_acquire)) {
+        // Lock the Client, per getKillStatus()'s concurrency contract for non-operation
+        // threads (this runs on the DeadlineMonitor thread). The opCtx cannot be destroyed
+        // underneath us: _opCtx is only non-null between registerOperation() and
+        // unregisterOperation(), i.e. while the operation's own thread is inside the
+        // invocation, and the DeadlineMonitor only polls tasks whose deadline is still
+        // registered (stopDeadline() serialises against the poll via the monitor mutex).
+        ClientLock clientLock(opCtx->getClient());
+        if (auto opReason = scriptKillReasonFor(opCtx); opReason != ErrorCodes::OK) {
+            reason = opReason;
+            // The direct kill-op listener path (WasmtimeScriptEngine::interrupt()) logs its own
+            // delivery; log here too so the poll-driven path -- the only one that delivers a
+            // silent deadline expiry or unrecorded client disconnect (SERVER-130767) -- is
+            // equally observable.
+            LOGV2_DEBUG(11542381,
+                        2,
+                        "Delivering opCtx kill to Wasmtime op via DeadlineMonitor poll",
+                        "opId"_attr = opCtx->getOpID(),
+                        "reason"_attr = reason);
+        }
+    }
     if (_bridge)
-        _bridge->kill();
+        _bridge->kill(reason);
+}
+void WasmtimeImplScope::killWithReason(ErrorCodes::Error reason) {
+    if (_bridge)
+        _bridge->kill(reason);
 }
 bool WasmtimeImplScope::isKillPending() const {
-    return _bridge && _bridge->isKillPending();
+    if (_bridge && _bridge->isKillPending()) {
+        return true;
+    }
+    // Also report a pending kill when the registered opCtx is interrupted but nobody has told
+    // this scope yet (plain markKilled() does not notify kill-op listeners, and a client
+    // disconnect or deadline expiry may not be recorded anywhere at all). The DeadlineMonitor
+    // polls this every scriptingEngineInterruptIntervalMS and calls kill() when it turns true.
+    // Client lock and opCtx lifetime: see kill() above.
+    if (auto* opCtx = _opCtx.load(std::memory_order_acquire)) {
+        ClientLock clientLock(opCtx->getClient());
+        return scriptKillReasonFor(opCtx) != ErrorCodes::OK;
+    }
+    return false;
 }
 
 bool WasmtimeImplScope::hasOutOfMemoryException() {

@@ -3,6 +3,7 @@
  * Also asserts on which stages are pushed down to SBE, and which remain as document sources.
  *
  * @tags: [
+ *   uses_explain,
  *   # Different versions may have different SBE components enabled.
  *   multiversion_incompatible,
  *   # Topology doesn't affect engine selection.
@@ -36,11 +37,11 @@ const trySbeEngineSet = frameworkControl.internalQueryFrameworkControl === "tryS
 const ffSbeFull = FeatureFlagUtil.isPresentAndEnabled(db, "SbeFull");
 const ffSbeTransformStages = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 const ffSbeNonLeadingMatch = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
-const ffSbeEqLookupUnwind = FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwind");
-const ffGetExecutorDeferredEngineChoice = FeatureFlagUtil.isPresentAndEnabled(
+const ffSbeEqLookupUnwindHashJoin = FeatureFlagUtil.isPresentAndEnabled(
     db,
-    "GetExecutorDeferredEngineChoice",
+    "SbeEqLookupUnwindHashJoin",
 );
+const lookupUnwindPushesDown = ffSbeEqLookupUnwindHashJoin;
 const sbeFullyEnabled = ffSbeFull || trySbeEngineSet;
 
 const coll = db.coll;
@@ -117,7 +118,7 @@ const lookup = {
 const lookupUnwind = [lookup, {$unwind: "$array"}];
 
 // The deferred exec path only enables certain LU plan shapes.
-const shapesThatTriggerLookupUnwind = ffGetExecutorDeferredEngineChoice
+const shapesThatTriggerLookupUnwind = lookupUnwindPushesDown
     ? allShapes.filter(
           (p) =>
               p !== collScanSortShape &&
@@ -127,7 +128,7 @@ const shapesThatTriggerLookupUnwind = ffGetExecutorDeferredEngineChoice
               p !== ixScanSortLimitFetchShape &&
               p !== ixScanSkipFetchShape,
       )
-    : allShapes;
+    : [];
 
 // Our test cases. Each object contains an aggregation pipeline, and a field listing which plan
 // shapes would trigger SBE usage. The aggregation will be run with different plan shapes and use
@@ -204,34 +205,34 @@ const aggregationTests = [
         // together.
         agg: [lookupUnwind],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [ffSbeEqLookupUnwind],
+        pushDownPattern: [lookupUnwindPushesDown],
     },
     {
         agg: [lookupUnwind, match],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [ffSbeEqLookupUnwind, ffSbeNonLeadingMatch],
+        pushDownPattern: [lookupUnwindPushesDown, ffSbeNonLeadingMatch],
     },
     {
         agg: [lookupUnwind, neutralProject],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [ffSbeEqLookupUnwind, ffSbeTransformStages],
+        pushDownPattern: [lookupUnwindPushesDown, ffSbeTransformStages],
     },
     {
         agg: [lookupUnwind, lookup],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [ffSbeEqLookupUnwind, true],
+        pushDownPattern: [lookupUnwindPushesDown, true],
     },
     {
         agg: [lookupUnwind, group],
         planShapesThatTriggerSbe: shapesThatTriggerLookupUnwind,
-        pushDownPattern: [ffSbeEqLookupUnwind, true],
+        pushDownPattern: [lookupUnwindPushesDown, true],
     },
     {
         agg: [lookup, lookupUnwind],
         planShapesThatTriggerSbe: allShapes,
         pushDownPattern: [
             true,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
         ],
     },
     {
@@ -239,7 +240,7 @@ const aggregationTests = [
         planShapesThatTriggerSbe: allShapes,
         pushDownPattern: [
             true,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
         ],
     },
     {
@@ -248,7 +249,7 @@ const aggregationTests = [
         pushDownPattern: [
             true,
             ffSbeNonLeadingMatch,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
         ],
     },
     // This test case covers the scenario where the QSN cut has to remove 3 stages from the QSN instead of just one.
@@ -258,7 +259,7 @@ const aggregationTests = [
         pushDownPattern: [
             true,
             ffSbeNonLeadingMatch,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
             ffSbeTransformStages,
             true,
         ],
@@ -269,7 +270,7 @@ const aggregationTests = [
         pushDownPattern: [
             true,
             ffSbeTransformStages,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
         ],
     },
     {
@@ -278,7 +279,7 @@ const aggregationTests = [
         pushDownPattern: [
             true,
             ffSbeNonLeadingMatch,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
         ],
     },
     {
@@ -287,7 +288,7 @@ const aggregationTests = [
         pushDownPattern: [
             true,
             ffSbeTransformStages,
-            (shape) => ffSbeEqLookupUnwind && shapesThatTriggerLookupUnwind.includes(shape),
+            (shape) => lookupUnwindPushesDown && shapesThatTriggerLookupUnwind.includes(shape),
         ],
     },
 ];

@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   uses_explain,
+ * ]
+ */
 // Tests that an aggregation command works with explain explicitly set to false.
 
 const testDB = db.getSiblingDB("testDB");

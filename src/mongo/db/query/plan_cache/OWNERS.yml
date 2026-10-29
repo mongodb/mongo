@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query-optimization
+  - "join_plan_cache*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "OWNERS.yml":
     approvers:
       - 10gen/query-optimization-staff-leads

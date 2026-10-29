@@ -3,6 +3,7 @@
  * we cannot reliably enforce its internal status when authorization is disabled, it is necessary to
  * ensure that the accumulator functions behave correctly, even when used within a $group stage with
  * $doingMerge: true.
+ * @tags: [requires_fcv_81]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
@@ -11,12 +12,12 @@ const coll = db[jsTestName()];
 coll.drop();
 
 const docs = [
-    {groupKey: 1, scalar: 1},
-    {groupKey: 1, scalar: 2},
-    {groupKey: 1, scalar: 3},
-    {groupKey: 2, scalar: 11},
-    {groupKey: 2, scalar: 12},
-    {groupKey: 2, scalar: 13},
+    {groupKey: 1, scalar: 1, array: [1, 2, 3]},
+    {groupKey: 1, scalar: 2, array: [11, 12, 13]},
+    {groupKey: 1, scalar: 3, array: [21, 22, 23]},
+    {groupKey: 2, scalar: 11, array: [31, 32, 33]},
+    {groupKey: 2, scalar: 12, array: [41, 42, 43]},
+    {groupKey: 2, scalar: 13, array: [51, 52, 53]},
 ];
 
 assert.commandWorked(coll.insertMany(docs));
@@ -72,6 +73,12 @@ assertNoError("$first", "$scalar");
 assertNoError("$last", "$scalar");
 assertNoError("$min", "$scalar");
 assertNoError("$max", "$scalar");
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Array accumulator functions do not display errors since they already take their inputs as arrays.
+
+assertNoError("$concatArrays", "$array");
+assertNoError("$setUnion", "$array");
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Window function accumulators do not support merging in the first place:

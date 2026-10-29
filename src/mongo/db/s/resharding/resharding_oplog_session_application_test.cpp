@@ -1,39 +1,9 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,7 +29,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -91,6 +60,13 @@
 #include <utility>
 #include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
@@ -99,6 +75,10 @@ namespace {
 
 class ReshardingOplogSessionApplicationTest : public ServiceContextMongoDTest {
 public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
@@ -134,7 +114,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
 
         auto opTime = [opCtx] {
@@ -167,15 +147,15 @@ public:
                                LogicalSessionId lsid,
                                TxnNumber txnNumber) {
         session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
-            opCtx, std::move(lsid), txnNumber, boost::none /* stmtId */, [opCtx] {
+            opCtx, std::move(lsid), txnNumber, /*stmtId=*/boost::none, [opCtx] {
                 if (!TransactionParticipant::get(opCtx).hasIncompleteHistory()) {
                     resharding::data_copy::updateSessionRecord(
                         opCtx,
                         TransactionParticipant::kDeadEndSentinel,
                         {kIncompleteHistoryStmtId},
-                        boost::none /* preImageOpTime */,
-                        boost::none /* postImageOpTime */,
-                        {} /* sourceNss */);
+                        /*preImageOpTime=*/boost::none,
+                        /*postImageOpTime=*/boost::none,
+                        /*sourceNss=*/{});
                 }
             });
     }
@@ -190,7 +170,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "insert");
@@ -209,7 +189,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -246,7 +226,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -413,7 +393,7 @@ public:
         // SessionTxnRecord update from the oplog entry.
         repl::SessionUpdateTracker sessionUpdateTracker;
         auto flushImmediate = sessionUpdateTracker.updateSession(
-            {foundOp.toBSON()}, boost::none /*preparedDerivedFields*/);
+            {foundOp.toBSON()}, /*preparedDerivedFields=*/boost::none);
         auto flushLater = sessionUpdateTracker.flushAll();
 
         // The oplog entries generated by ReshardingTxnCloner are always op='n' and are therefore
@@ -441,7 +421,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
         ASSERT_TRUE(bool(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)));
     }
@@ -455,8 +435,6 @@ private:
     const ShardId _donorShardId{"donor-0"};
     const NamespaceString _oplogBufferNss = NamespaceString::createNamespaceString_forTest(
         std::string(NamespaceString::kReshardingLocalOplogBufferPrefix) + _donorShardId.toString());
-
-    service_context_test::ShardRoleOverride _shardRole;
 };
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSession) {
@@ -923,8 +901,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
                                    lsid,
                                    incomingTxnNumber,
                                    {incomingStmtId},
-                                   boost::none /* needsRetryImage */,
-                                   preImageOplogEntry.getOpTime() /* preImageOpTime */);
+                                   /*needsRetryImage=*/boost::none,
+                                   /*preImageOpTime=*/preImageOplogEntry.getOpTime());
 
     {
         auto opCtx = makeOperationContext();
@@ -972,7 +950,7 @@ DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
                                    lsid,
                                    incomingTxnNumber,
                                    {incomingStmtId},
-                                   boost::none /* needsRetryImage */,
+                                   /*needsRetryImage=*/boost::none,
                                    preImageOpTime);
 
     {
@@ -1022,9 +1000,9 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
                                    lsid,
                                    incomingTxnNumber,
                                    {incomingStmtId},
-                                   boost::none /* needsRetryImage */,
-                                   boost::none /* preImageOpTime */,
-                                   postImageOplogEntry.getOpTime() /* postImageOpTime */);
+                                   /*needsRetryImage=*/boost::none,
+                                   /*preImageOpTime=*/boost::none,
+                                   /*postImageOpTime=*/postImageOplogEntry.getOpTime());
 
     {
         auto opCtx = makeOperationContext();
@@ -1071,8 +1049,8 @@ DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
                                    lsid,
                                    incomingTxnNumber,
                                    {incomingStmtId},
-                                   boost::none /* needsRetryImage */,
-                                   boost::none /* preImageOpTime */,
+                                   /*needsRetryImage=*/boost::none,
+                                   /*preImageOpTime=*/boost::none,
                                    postImageOpTime);
 
     {

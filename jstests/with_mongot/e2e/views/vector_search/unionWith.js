@@ -6,7 +6,7 @@
  * 2. Outer view and inner collection.
  * 3. Outer collection and inner view.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {
     actionMoviesViewPipeline,

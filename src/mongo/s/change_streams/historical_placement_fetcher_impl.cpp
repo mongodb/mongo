@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/change_streams/historical_placement_fetcher_impl.h"
 
@@ -33,6 +7,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -42,6 +17,14 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     Timestamp atClusterTime,
     bool checkIfPointInTimeIsInFuture,
     bool ignoreRemovedShards) {
+    // config.placementHistory never contains a marker earlier than the 'Dawn of Time' entry at
+    // Timestamp(0, 1), so a query for the zero timestamp could never be satisfied. Normalize it to
+    // the earliest queryable point in time so that change stream callers may legitimately use
+    // Timestamp(0, 0) as a placeholder for "the beginning of time".
+    if (atClusterTime == Timestamp(0, 0)) {
+        atClusterTime = Timestamp(0, 1);
+    }
+
     // The config server request must always have a namespace string, even if it is the empty
     // string.
     const auto targetWholeCluster = !nss.has_value() || nss->isEmpty();
@@ -51,6 +34,9 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
                                             ignoreRemovedShards);
     request.setTargetWholeCluster(targetWholeCluster);
     request.setCheckIfPointInTimeIsInFuture(checkIfPointInTimeIsInFuture);
+
+    // Time the config-server round trip plus response parsing.
+    Timer timer;
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto remoteResponse = uassertStatusOK(
@@ -62,9 +48,12 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
                                 Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
     uassertStatusOK(remoteResponse.commandStatus);
 
-    return ConfigsvrGetHistoricalPlacementResponse::parse(
-               remoteResponse.response, IDLParserContext("HistoricalPlacementFetcherImpl"))
-        .getHistoricalPlacement();
+    auto placement =
+        ConfigsvrGetHistoricalPlacementResponse::parse(
+            remoteResponse.response, IDLParserContext("HistoricalPlacementFetcherImpl"))
+            .getHistoricalPlacement();
+    _metrics.recordLookup(placement.getStatus(), duration_cast<Milliseconds>(timer.elapsed()));
+    return placement;
 }
 
 }  // namespace mongo

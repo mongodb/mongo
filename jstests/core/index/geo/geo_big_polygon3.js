@@ -28,7 +28,7 @@ import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_h
 
 // On a sharded cluster a count command with an invalid query issued against a non-existent db will
 // return an empty result but it will error on a replica set.
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     // Create database
     assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }

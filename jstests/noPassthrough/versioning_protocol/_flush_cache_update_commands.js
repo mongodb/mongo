@@ -18,12 +18,13 @@ function checkTimestampConsistencyInPersistentMetadata(
     dbTimestampInConfig,
     collTimestampInConfig,
 ) {
+    const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        st.s.getDB("admin"),
+        "AuthoritativeShardsDDL",
+    );
+
     // Checking consistency on shard catalog.
     function getDbMetadata() {
-        const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
-            st.s.getDB("admin"),
-            "AuthoritativeShardsDDL",
-        );
         if (!isAuthoritativeShardEnabled) {
             st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: true});
             return st.shard0.getDB("config").cache.databases.findOne({_id: dbName});
@@ -35,11 +36,16 @@ function checkTimestampConsistencyInPersistentMetadata(
     assert.neq(null, dbTimestampInShard);
     assert.eq(timestampCmp(dbTimestampInConfig, dbTimestampInShard), 0);
 
-    // Checking consistency on local shard collection: config.cache.collections
-    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nss, syncFromConfig: true});
-    let collTimestampInShard = st.shard0
-        .getDB("config")
-        .cache.collections.findOne({_id: nss}).timestamp;
+    // Checking consistency on local shard collection catalog.
+    function getCollMetadata() {
+        if (!isAuthoritativeShardEnabled) {
+            st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nss, syncFromConfig: true});
+            return st.shard0.getDB("config").cache.collections.findOne({_id: nss});
+        }
+        return st.shard0.getDB("config").shard.catalog.collections.findOne({_id: nss});
+    }
+
+    let collTimestampInShard = getCollMetadata().timestamp;
     assert.neq(null, collTimestampInShard);
     assert.eq(timestampCmp(collTimestampInConfig, collTimestampInShard), 0);
 }

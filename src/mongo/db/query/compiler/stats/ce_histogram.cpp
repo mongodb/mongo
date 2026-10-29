@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
 
@@ -165,7 +139,7 @@ private:
  */
 void validateHistogramTypeCounts(const TypeCounts& tc,
                                  const ScalarHistogram& s,
-                                 std::function<bool(int64_t /*tc*/, int64_t /*s*/)> isValid,
+                                 std::function<bool(/*tc=*/int64_t, /*s=*/int64_t)> isValid,
                                  int64_t nanCount = 0) {
 
     // Ensure that all histogrammable type brackets are accounted for in the histogram.
@@ -193,7 +167,7 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
     // Ensure that all histogrammable type counts are accounted for in the type counters.
     // While typeCount include types for nans but nans are in a separate counts the typeCounts needs
     // to subtract nan counts.
-    const double totalTC = getTotalCount(tc, true /* histogrammable*/) - nanCount;
+    const double totalTC = getTotalCount(tc, /*isHistogrammable=*/true) - nanCount;
     const double totalCard = s.getCardinality();
     if (!isValid(totalTC, totalCard)) {
         uasserted(7105701,
@@ -209,7 +183,7 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
  */
 void validateHistogramFrequencies(const ScalarHistogram& ls,
                                   const ScalarHistogram& rs,
-                                  std::function<bool(int64_t /*ls*/, int64_t /*rs*/)> isValid) {
+                                  std::function<bool(/*ls=*/int64_t, /*rs=*/int64_t)> isValid) {
     // Ensure that the total cardinality of the histograms is comparatively correct.
     const double cardL = ls.getCardinality();
     const double cardR = rs.getCardinality();

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_container.h"
 
@@ -95,6 +69,27 @@ Status WiredTigerIntegerKeyedContainer::insert(RecoveryUnit& ru,
     return wtRCToStatus(ret, cursor->session);
 }
 
+Status WiredTigerIntegerKeyedContainer::insert(RecoveryUnit& ru,
+                                               std::span<const int64_t> keys,
+                                               std::span<const std::span<const char>> values,
+                                               container::ExistingKeyPolicy policy) {
+    massert(13274504,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    WiredTigerCursor cursor{
+        getWiredTigerCursorParams(wtRu, tableId(), overwrite(policy)), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    int ret = 0;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        ret = insert(wtRu, *cursor.get(), keys[i], values[i]);
+        if (ret != 0) {
+            break;
+        }
+    }
+    return wtRCToStatus(ret, cursor->session);
+}
+
 int WiredTigerIntegerKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
                                             WT_CURSOR& cursor,
                                             int64_t key,
@@ -145,7 +140,7 @@ std::unique_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::
 
 WiredTigerIntegerKeyedContainer::Cursor::Cursor(RecoveryUnit& ru,
                                                 uint64_t tableId,
-                                                std::string_view uri)
+                                                const std::string& uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
               *WiredTigerRecoveryUnit::get(ru).getSession()) {}
@@ -187,6 +182,28 @@ Status WiredTigerStringKeyedContainer::insert(RecoveryUnit& ru,
         getWiredTigerCursorParams(wtRu, tableId(), overwrite(policy)), uri(), *wtRu.getSession()};
     wtRu.assertInActiveTxn();
     int ret = insert(wtRu, *cursor.get(), key, value);
+    return wtRCToStatus(ret, cursor->session);
+}
+
+
+Status WiredTigerStringKeyedContainer::insert(RecoveryUnit& ru,
+                                              std::span<const std::span<const char>> keys,
+                                              std::span<const std::span<const char>> values,
+                                              container::ExistingKeyPolicy policy) {
+    massert(13274505,
+            "Spans for keys and values must have the same size",
+            keys.size() == values.size());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    WiredTigerCursor cursor{
+        getWiredTigerCursorParams(wtRu, tableId(), overwrite(policy)), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    int ret = 0;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        ret = insert(wtRu, *cursor.get(), keys[i], values[i]);
+        if (ret != 0) {
+            break;
+        }
+    }
     return wtRCToStatus(ret, cursor->session);
 }
 
@@ -240,7 +257,7 @@ std::unique_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::ge
 
 WiredTigerStringKeyedContainer::Cursor::Cursor(RecoveryUnit& ru,
                                                uint64_t tableId,
-                                               std::string_view uri)
+                                               const std::string& uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
               *WiredTigerRecoveryUnit::get(ru).getSession()) {}

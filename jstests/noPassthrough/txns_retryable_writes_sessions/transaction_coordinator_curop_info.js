@@ -8,6 +8,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
@@ -125,8 +126,10 @@ assert.commandWorked(
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant.shardName}));
-assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(participant.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(coordinator, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(coordinator.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    assert.commandWorked(participant.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 st.refreshCatalogCacheForNs(st.s, ns);
 
 let failPoints = enableFailPoints(coordinator, failPointNames);

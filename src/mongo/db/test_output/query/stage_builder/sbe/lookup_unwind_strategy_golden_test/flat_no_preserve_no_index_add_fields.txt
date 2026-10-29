@@ -1,0 +1,217 @@
+# Golden test output of LookupUnwindStrategyGoldenTest/FlatNoPreserveNoIndexAddFields
+{ $lookup: { from: "<strategy>", localField: "lkey", foreignField: "fkey", as: "joined" } }
+{ $unwind: { path: "$joined" } }
+{ $addFields: { computed: { $add: [ "$n", "$joined.c" ] } } }
+
+## HashJoin
+[4] project [s15 = makeBsonObj(MakeObjSpec([joined = Set(0), computed = Set(1)], Open, NewObj, 0), s1, s12, s14)] 
+[4] project [s14 = 
+    if (isNullish(s4) || isNullish(s13)) 
+    then null 
+    elif ((
+        if isNumber(s4) 
+        then 0 
+        elif isDate(s4) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s13) 
+        then 0 
+        elif isDate(s13) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+   ) > 1) 
+    then fail(7157722, "only one date allowed in an $add expression") 
+    else (s4 + s13) 
+] 
+[4] extract_field_paths inputs[s4 = Get(n)/Id, s12 = Get(joined)/Id] outputs[s13 = Get(joined)/Traverse/Get(c)/Id] 
+[3] hash_lookup_unwind inner s12 
+    outer s10 
+        [3] project [s10 = arrayToSet(
+            if (isArray(s3) ?: false) 
+            then 
+                if isArrayEmpty(s3) 
+                then [null] 
+                else s3 
+            
+            else newArray((s3 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey, s4 = n] @"UUID" 
+    inner s11 s5 
+        [3] project [s11 = arrayToSet(
+            let [
+                l4.0 = (s7 ?: null) 
+            ] 
+            in 
+                if isArray(l4.0) 
+                then concatArrays(l4.0, newArray(l4.0)) 
+                else newArray(move(l4.0)) 
+       )] 
+        [2] scan generic [s5 = record, s6 = recordId] [s7 = fkey, s8 = joined, s9 = n] @"UUID" 
+
+## NestedLoopJoin
+[4] project [s17 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s12, s16)] 
+[4] project [s16 = 
+    if (isNullish(s14) || isNullish(s15)) 
+    then null 
+    elif ((
+        if isNumber(s14) 
+        then 0 
+        elif isDate(s14) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s15) 
+        then 0 
+        elif isDate(s15) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+   ) > 1) 
+    then fail(7157722, "only one date allowed in an $add expression") 
+    else (s14 + s15) 
+] 
+[4] extract_field_paths inputs[s13 = Get(joined)/Id, s14 = Get(n)/Id] outputs[s15 = Get(joined)/Traverse/Get(c)/Id] 
+[3] project [s13 = getField(s12, "joined"), s14 = getField(s12, "n")] 
+[3] project [s12 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s6)] 
+[3] nlj inner [s1] [s11] 
+    left 
+        [3] project [s11 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = joined, s4 = lkey, s5 = n] @"UUID" 
+    right 
+        [3] filter {traverseF((s8 ?: null), lambda(l6.0) { isMember(move(l6.0), s11) }, true)} 
+        [2] scan generic [s6 = record, s7 = recordId] [s8 = fkey, s9 = joined, s10 = n] @"UUID" 
+
+## IndexedLoopJoin
+[5] project [s27 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s22, s26)] 
+[5] project [s26 = 
+    if (isNullish(s24) || isNullish(s25)) 
+    then null 
+    elif ((
+        if isNumber(s24) 
+        then 0 
+        elif isDate(s24) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s25) 
+        then 0 
+        elif isDate(s25) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+   ) > 1) 
+    then fail(7157722, "only one date allowed in an $add expression") 
+    else (s24 + s25) 
+] 
+[5] extract_field_paths inputs[s23 = Get(joined)/Id, s24 = Get(n)/Id] outputs[s25 = Get(joined)/Traverse/Get(c)/Id] 
+[4] project [s23 = getField(s22, "joined"), s24 = getField(s22, "n")] 
+[4] project [s22 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s13)] 
+[4] nlj inner [s1] [s18] 
+    left 
+        [4] project [s18 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = joined, s4 = lkey, s5 = n] @"UUID" 
+    right 
+        [4] filter {traverseF((s15 ?: null), lambda(l10.0) { isMember(move(l10.0), s18) }, true)} 
+        [4] nlj inner [] [s6, s7] 
+            left 
+                [4] project [s6 = ks(1ll, 0, s20, 1ll), s7 = ks(1ll, 0, s20, 2ll)] 
+                [4] unwind s20 = outField, s21 = outIndex, s19 = inField _preserveNullAndEmptyArrays 
+                [4] project [s19 = 
+                    if traverseF(s18, lambda(l8.0) { isArray(move(l8.0)) }, false) 
+                    then arrayToSet(concatArrays(s18, traverseP(s18, lambda(l9.0) { 
+                        if isArray(l9.0) 
+                        then (getElement(move(l9.0), 0) ?: undefined) 
+                        else move(l9.0) 
+                    }, 1))) 
+                    else s18 
+               ] 
+                [4] limit 1ll 
+                [4] coscan 
+            right 
+                [3] fetch s8 = seek, s13 = result, s14 = recordId, s11 = inSnapshotId, s9 = inIndexIdent, s10 = inIndexKey, s12 = inIndexKeyPattern [s15 = fkey, s16 = joined, s17 = n] @"UUID" 
+                [2] ixseek seekKeyLow = s6 seekKeyHigh = s7 [s10 = indexKey, s8 = recordId, s11 = snapshotId, s9 = indexIdent] [] @"UUID" @"fkey_1" forward 
+
+## DynamicIndexedLoopJoin
+[6] project [s34 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s29, s33)] 
+[6] project [s33 = 
+    if (isNullish(s31) || isNullish(s32)) 
+    then null 
+    elif ((
+        if isNumber(s31) 
+        then 0 
+        elif isDate(s31) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+    + 
+        if isNumber(s32) 
+        then 0 
+        elif isDate(s32) 
+        then 1 
+        else fail(7157723, "only numbers and dates are allowed in an $add expression") 
+   ) > 1) 
+    then fail(7157722, "only one date allowed in an $add expression") 
+    else (s31 + s32) 
+] 
+[6] extract_field_paths inputs[s30 = Get(joined)/Id, s31 = Get(n)/Id] outputs[s32 = Get(joined)/Traverse/Get(c)/Id] 
+[5] project [s30 = getField(s29, "joined"), s31 = getField(s29, "n")] 
+[5] project [s29 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s27)] 
+[5] nlj inner [s1] [s23, s1] 
+    left 
+        [5] project [s23 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = joined, s4 = lkey, s5 = n] @"UUID" 
+    right 
+        [5] filter {traverseF((s28 ?: null), lambda(l12.0) { isMember(move(l12.0), s23) }, true)} 
+        [5] branch {!(traverseF(s23, lambda(l11.0) { typeMatch(move(l11.0), 1024) }, false))} [s27, s28] 
+        [s13, s15] [5] nlj inner [] [s6, s7] 
+            left 
+                [5] project [s6 = ks(1ll, 0, s25, 1ll), s7 = ks(1ll, 0, s25, 2ll)] 
+                [5] unwind s25 = outField, s26 = outIndex, s24 = inField _preserveNullAndEmptyArrays 
+                [5] project [s24 = 
+                    if traverseF(s23, lambda(l9.0) { isArray(move(l9.0)) }, false) 
+                    then arrayToSet(concatArrays(s23, traverseP(s23, lambda(l10.0) { 
+                        if isArray(l10.0) 
+                        then (getElement(move(l10.0), 0) ?: undefined) 
+                        else move(l10.0) 
+                    }, 1))) 
+                    else s23 
+               ] 
+                [5] limit 1ll 
+                [5] coscan 
+            right 
+                [3] fetch s8 = seek, s13 = result, s14 = recordId, s11 = inSnapshotId, s9 = inIndexIdent, s10 = inIndexKey, s12 = inIndexKeyPattern [s15 = fkey, s16 = joined, s17 = n] @"UUID" 
+                [2] ixseek seekKeyLow = s6 seekKeyHigh = s7 [s10 = indexKey, s8 = recordId, s11 = snapshotId, s9 = indexIdent] [] @"UUID" @"fkey_1" forward 
+        
+        [s18, s20] [4] scan generic [s18 = record, s19 = recordId] [s20 = fkey, s21 = joined, s22 = n] @"UUID" 
+
+## Results
+{ _id: 0, lkey: 1, n: 5, a: { x: 10 }, joined: { _id: 10, fkey: 1, c: 100 }, computed: 105 }
+{ _id: 0, lkey: 1, n: 5, a: { x: 10 }, joined: { _id: 11, fkey: 1, c: 200 }, computed: 205 }
+{ _id: 2, lkey: [ 3, 7 ], n: 9, a: 5, joined: { _id: 12, fkey: 3, c: 300 }, computed: 309 }
+{ _id: 3, lkey: 3, joined: { _id: 12, fkey: 3, c: 300 }, a: { x: 1, b: "preexisting" }, computed: null }
+{ _id: 4, n: 1, a: {}, joined: { _id: 13, fkey: null, c: 400 }, computed: 401 }
+{ _id: 5, lkey: null, joined: { _id: 13, fkey: null, c: 400 }, computed: null }
+{ _id: 7, idx: "preexisting", lkey: 1, n: 3, joined: { _id: 10, fkey: 1, c: 100 }, computed: 103 }
+{ _id: 7, idx: "preexisting", lkey: 1, n: 3, joined: { _id: 11, fkey: 1, c: 200 }, computed: 203 }

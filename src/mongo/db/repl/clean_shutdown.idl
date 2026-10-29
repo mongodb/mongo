@@ -1,0 +1,32 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+# Clean shutdown IDL File
+
+global:
+    cpp_namespace: "mongo::repl"
+    mod_visibility: public
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    CleanShutdownDocument:
+        description:
+            A document in which the server records metadata about a clean shutdown it has
+            undergone. One such document is appended to local.system.cleanShutdownLog each time the
+            node starts up after a clean shutdown.
+        fields:
+            _id:
+                type: long
+                cpp_name: id
+                description:
+                    "A monotonically increasing identifier for this clean shutdown. Each new
+                    document uses the previous most recent document's _id plus one. This is a long
+                    rather than an int because old documents are truncated away as the capped
+                    collection fills, so the identifier only ever grows."
+            cleanShutdownLastCheckpointTimestamp:
+                type: timestamp
+                description:
+                    "The timestamp of the last checkpoint the node took prior to shutting down,
+                    which is the stable timestamp the node rolled back to on restart."

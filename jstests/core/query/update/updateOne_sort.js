@@ -4,6 +4,7 @@
  *   - Sort will only have functionality in updateOne, not update or updateMany
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
@@ -22,7 +23,7 @@ const coll = db[jsTestName()];
 
 function verifyExplainContainsNoSort(explain, nWouldModify) {
     let stages = explain.executionStats.executionStages;
-    if (isMongos(db) || TestData.testingReplicaSetEndpoint) {
+    if (isMongos(db)) {
         stages = stages.shards[0].executionStages;
     }
     assert.eq("UPDATE", stages.stage);

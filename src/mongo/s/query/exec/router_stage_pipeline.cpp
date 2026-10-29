@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/router_stage_pipeline.h"
 
@@ -100,7 +74,7 @@ std::size_t RouterStagePipeline::getNumRemotes() const {
 }
 
 BSONObj RouterStagePipeline::getPostBatchResumeToken() {
-    return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
+    return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMarkForClient() : BSONObj();
 }
 
 BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
@@ -108,6 +82,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     if (!_mergePipeline->getContext()->isTailableAwaitData()) {
         return event.toBson();
     }
+
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();
@@ -123,6 +98,21 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
             (resumeToken.getType() == BSONType::object) &&
                 idField.binaryEqual(resumeToken.getDocument().toBson()));
+
+    // Confirm that the resume token has not regressed compared to the previously returned event.
+    // It is possible to receive the _same_ resume token again in case sharded DDL operations from
+    // different shards have the same cluster time.
+    const auto currentResumeTokenData =
+        resumeToken.getDocument()[ResumeToken::kDataFieldName].getString();
+    if (_previousResumeTokenData) {
+        tassert(13536500,
+                str::stream() << "Encountered an event whose resume token regressed to before the "
+                                 "previously returned resume token. Previous: "
+                              << *_previousResumeTokenData
+                              << " but found: " << currentResumeTokenData,
+                currentResumeTokenData >= *_previousResumeTokenData);
+    }
+    _previousResumeTokenData = std::move(currentResumeTokenData);
 
     // Return the event in BSONObj form, minus the $sortKey metadata.
     return eventBSON;

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -56,7 +30,7 @@ namespace mongo {
 /**
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
-class MONGO_MOD_OPEN ShardingTestFixtureCommon : public ServiceContextTest {
+class [[MONGO_MOD_OPEN]] ShardingTestFixtureCommon : public ServiceContextTest {
 public:
     /**
      * Constructs a standalone RoutingTableHistory object (i.e., not linked to any CatalogCache),
@@ -65,9 +39,15 @@ public:
      */
     static RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt);
 
+    /**
+     * How long shutdownExecutorPool() will keep running the mock networks, waiting for the executor
+     * pool to quiesce, before failing the test. Generous, because expiry means a real defect rather
+     * than a slow machine: the drain only spins while some thread is mid-schedule.
+     */
+    static constexpr Microseconds kExecutorPoolDrainTimeout = Seconds{30};
+
 protected:
-    explicit ShardingTestFixtureCommon(
-        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext);
+    ShardingTestFixtureCommon();
     ~ShardingTestFixtureCommon() override;
 
     void setUp() override;
@@ -136,6 +116,17 @@ protected:
 
     virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
         return nullptr;
+    }
+
+    /**
+     * Whether the ShardingCatalogClient returned by makeShardingCatalogClient() answers
+     * getAllShards() by issuing a (mocked) network request, as the real implementation does.
+     * Override to return false if makeShardingCatalogClient() returns a fake/static client that
+     * answers synchronously in-process instead, so addRemoteShards() knows not to wait for a
+     * network request that will never arrive.
+     */
+    virtual bool catalogClientUsesNetworkForGetAllShards() const {
+        return true;
     }
 
     /**

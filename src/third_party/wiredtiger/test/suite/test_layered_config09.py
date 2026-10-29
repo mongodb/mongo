@@ -46,25 +46,13 @@ class test_layered_config09(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
     disagg_storages = gen_disagg_storages(disagg_only = True)
     scenarios = make_scenarios(disagg_storages, role_scenarios, prefix_scenarios)
-    conn_base_config = 'statistics=(all),verbose=(tiered),'
+    conn_base_config = 'statistics=(all),'
 
     def conn_config(self):
         return self.conn_base_config + f'disaggregated=(role="{self.role}"),' \
             + 'disaggregated=(lose_all_my_data=true)'
 
-
-    def test_disagg_tiered_disabled(self):
-        # Test that we do not start the tiered storage worker thread in
-        # disaggregated storage mode.
-
-        self.captureout.checkAdditionalPattern(self,
-            'Tiered storage not started: disaggregated storage.')
-
     def test_disagg_tiered_create_disabled(self):
-        # Test that creating a tiered table fails in disaggregated storage mode.
-        self.captureout.checkAdditionalPattern(self,
-            'Tiered storage not started: disaggregated storage.')
-
         # Hit ENOTSUP with "tier", "tiered", and tiered "object" uri prefix
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
         lambda: self.session.create(self.prefix + self.test_name,

@@ -3,46 +3,10 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 package(default_visibility = ["//visibility:public"])
 
 py_library(
-    name = "calibrations",
-    srcs = ["calibrations.py"],
-)
-
-py_library(
-    name = "spm_2658_distribution_coverage",
-    srcs = ["spm_2658_distribution_coverage.py"],
-)
-
-py_library(
-    name = "spm_2658_employee",
-    srcs = ["spm_2658_employee.py"],
-)
-
-py_library(
-    name = "spm_2658_type_coverage",
-    srcs = ["spm_2658_type_coverage.py"],
-)
-
-py_library(
-    name = "test",
-    srcs = ["test.py"],
-)
-
-py_library(
-    name = "test_correlations",
-    srcs = ["test_correlations.py"],
-)
-
-py_library(
-    name = "test_seed",
-    srcs = ["test_seed.py"],
-)
-
-py_library(
-    name = "test_types",
-    srcs = ["test_types.py"],
-)
-
-py_library(
-    name = "plan_stability2",
-    srcs = ["plan_stability2.py"],
+    name = "specs",
+    srcs = glob(["*.py"]),
+    imports = [".."],
+    deps = [
+        "//src/mongo/db/query/benchmark/data_generator/datagen",
+    ],
 )

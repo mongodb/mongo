@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -44,7 +18,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::unittest {
 
@@ -97,6 +71,18 @@ struct GoldenTestConfig {
 };
 
 /**
+ * Resolves the directory that golden data paths are relative to.
+ * Precedence:
+ *  1. 'configuredDataRoot' (set via the GOLDEN_TEST_DATA_ROOT environment variable, e.g. with
+ *     bazel's --test_env flag) when set.
+ *  2. bazel's TEST_SRCDIR/TEST_WORKSPACE environment variables, when both are set, so that tests
+ *     running with a working directory other than the repository root still find their data.
+ *  3. the current working directory when neither of the above is configured.
+ */
+boost::filesystem::path resolveGoldenDataRoot(
+    const boost::optional<std::string>& configuredDataRoot);
+
+/**
  * Global environment shared across all golden test suites.
  * Specifically, output directory is shared across all suites to allow simple directory diffing,
  * even if multiple suites were executed.
@@ -142,7 +128,7 @@ private:
  * This reduces the size the side of diffs and reduces chances of conflicts. 3) Includes both input
  * and output. This helps with inspecting the changes, without need to pattern match across files.
  */
-class MONGO_MOD_OPEN GoldenTestContextBase {
+class [[MONGO_MOD_OPEN]] GoldenTestContextBase {
 public:
     explicit GoldenTestContextBase(
         const GoldenTestConfig* config,
@@ -267,6 +253,9 @@ struct GoldenTestOptions {
      *  - GOLDEN_TEST_OUTPUT_ROOT_PATTERN: (optional) overrides the `outputRootPattern` value
      *    loaded from the yaml config. Intended to let resmoke.py pre-resolve a single output
      *    root and share it across all golden tests in one invocation.
+     *  - GOLDEN_TEST_DATA_ROOT: (optional) overrides the directory that golden data paths
+     *    (GoldenTestConfig::relativePath) are resolved against. Useful when the test's working
+     *    directory is not the root of the repository.
      */
     static GoldenTestOptions parseEnvironment();
 
@@ -277,6 +266,13 @@ struct GoldenTestOptions {
      * random lowercase hexadecimal digits.
      */
     boost::optional<std::string> outputRootPattern;
+
+    /**
+     * Directory that golden data paths (GoldenTestConfig::relativePath) are resolved against. If
+     * not specified, the directory is derived from bazel's TEST_SRCDIR/TEST_WORKSPACE environment
+     * variables when available, or defaults to the current working directory.
+     */
+    boost::optional<std::string> goldenDataRoot;
 
     /**
      * Shell command to diff a single golden test run output.

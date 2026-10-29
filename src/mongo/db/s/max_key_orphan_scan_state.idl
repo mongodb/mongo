@@ -1,36 +1,11 @@
-# Copyright (C) 2026-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 # Defines the singleton document stored in config.maxKeyOrphanScanState. The document
-# tracks the result of the per-primary-stepup Category A (MaxKey orphan) inventory scan
-# run by the shard's RangeDeleterService. The collection is replicated within the shard
-# replica set so that alertEmitted is preserved across stepups and new primaries do not
-# re-alert for the same finding. See CA-551 / SERVER-121533.
+# tracks the result of the per-primary-stepup MaxKey orphan inventory scan run on each
+# shard primary. The collection is replicated within the shard replica set so that
+# unownedAlertEmitted is preserved across stepups and new primaries do not re-alert for the
+# same finding.
 
 global:
     cpp_namespace: "mongo"
@@ -42,9 +17,9 @@ imports:
 structs:
     maxKeyOrphanScanState:
         description:
-            "Singleton state document for the Category A (MaxKey orphan) detection scan.
-            Lives in config.maxKeyOrphanScanState on each shard, replicated within the
-            shard replica set."
+            "Singleton state document for the MaxKey orphan detection scan. Lives in
+            config.maxKeyOrphanScanState on each shard, replicated within the shard
+            replica set."
         strict: false
         fields:
             _id:
@@ -53,22 +28,39 @@ structs:
                 default: '"scanState"'
             scanStartedAt:
                 type: date
-                description: "Wallclock time when the scan started on the current primary."
+                description: "Wallclock time when the detection scan started on the current primary."
+                optional: true
             scanCompletedAt:
                 type: date
                 description:
                     "Wallclock time when the scan finished. Set only when the scan ran
                     to completion on the current primary; absent if the scan was abandoned."
                 optional: true
-            foundMaxKey:
+            foundUnownedMaxKey:
                 type: bool
                 description: "True if any unowned MaxKey doc is found on this shard."
-            alertEmitted:
+                optional: true
+            unownedAlertEmitted:
                 type: bool
                 description:
-                    "Gates the one-shot WARNING log emitted when foundMaxKey transitions
+                    "Gates the one-shot WARNING log emitted when foundUnownedMaxKey
+                    transitions to true. Replicated so new primaries do not re-alert for an
+                    already surfaced finding."
+                optional: true
+            foundOwnedMaxKey:
+                type: bool
+                description:
+                    "True if any accessible (owned) MaxKey doc is found on this shard. The
+                    shard legitimately owns the document, but its version could be stale if
+                    it was re-owned after some series of application operations."
+                optional: true
+            ownedAlertEmitted:
+                type: bool
+                description:
+                    "Gates the one-shot WARNING log emitted when foundOwnedMaxKey transitions
                     to true. Replicated so new primaries do not re-alert for an already
                     surfaced finding."
+                optional: true
             binaryVersionAtScan:
                 type: string
                 description: "Server binary version that performed the scan."
@@ -76,4 +68,13 @@ structs:
             fcvAtScan:
                 type: string
                 description: "Feature compatibility version at the time of the scan."
+                optional: true
+            blockedTasks:
+                type: array<uuid>
+                description:
+                    "The _id of every pre-upgrade range-deletion task classified as containing
+                    an unrecoverable MaxKey orphan by the range-deletion guard. While
+                    skipRangeDeletionForMaxKeyChunks is enabled the range deleter deletes the
+                    ordinary documents in these tasks' ranges but preserves those whose leading
+                    shard-key field is MaxKey (left on disk for out-of-band recovery)."
                 optional: true

@@ -406,10 +406,10 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // ============================================================================
 
     // Broadcast the command to all mongoses and returns error if any returns error.
-    this.broadcast = function (dbName, cmd, options, secToken) {
+    this.broadcast = function (dbName, cmd, options, secToken, traceparent) {
         let res;
         for (const mongo of this._mongoConnections) {
-            res = mongo._runCommandImpl(dbName, cmd, options, secToken);
+            res = mongo._runCommandImpl(dbName, cmd, options, secToken, traceparent);
             if (!res.ok) {
                 return res;
             }
@@ -474,14 +474,14 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return selectedMongo;
     };
 
-    this._runCommandImpl = function (dbname, cmd, options, secToken) {
+    this._runCommandImpl = function (dbname, cmd, options, secToken, traceparent) {
         // Ensure we call this overridden _runCommandImpl if pinToSingleMongos is undefined or disabled.
         assert.neq(TestData.pinToSingleMongos, true);
 
         assertIsSupportedCommand(cmd);
 
         if (requiresBroadcast(cmd)) {
-            return this.broadcast(dbname, cmd, options, secToken);
+            return this.broadcast(dbname, cmd, options, secToken, traceparent);
         }
 
         const mongo = this.selectMongo(cmd);
@@ -504,7 +504,7 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
             }
         }
 
-        let result = mongo._runCommandImpl(dbname, cmd, options, secToken);
+        let result = mongo._runCommandImpl(dbname, cmd, options, secToken, traceparent);
 
         // Ensure the multi-router carries the latest clusterTime for the next command.
         if (result?.$clusterTime) {
@@ -537,6 +537,8 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
 
         return result;
     };
+
+    this.withoutTelemetryContext = Mongo.prototype.withoutTelemetryContext;
 
     this.adminCommand = function (cmd) {
         return Mongo.prototype.adminCommand.call(this, cmd);

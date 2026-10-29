@@ -156,7 +156,7 @@ test_rts_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "rts";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -238,7 +238,7 @@ test_rts_crash_wt(void)
         WT_SESSION *session;
         WT_SESSION *session1;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(
@@ -265,7 +265,7 @@ test_rts_crash_wt(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
@@ -322,7 +322,7 @@ test_restart_wt1(void)
         WT_SESSION *session;
         WT_SESSION *session1;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(
@@ -350,7 +350,7 @@ test_restart_wt1(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
@@ -409,7 +409,7 @@ test_restart_wt2(void)
         WT_SESSION *session;
         WT_SESSION *session1;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(
@@ -438,7 +438,7 @@ test_restart_wt2(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
@@ -511,7 +511,7 @@ test_restart_wt3(void)
         WT_SESSION *session1;
         WT_SESSION *session2;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -552,7 +552,7 @@ test_restart_wt3(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
@@ -613,7 +613,7 @@ test_crash_wt1(void)
         WT_SESSION *session;
         WT_SESSION *session1;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(
@@ -632,7 +632,7 @@ test_crash_wt1(void)
     WT_SESSION *session;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     wt_model_assert(table, uri, key1);
@@ -684,7 +684,7 @@ test_crash_wt2(void)
         WT_SESSION *session;
         WT_SESSION *session1;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(
@@ -708,7 +708,7 @@ test_crash_wt2(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
@@ -781,7 +781,7 @@ test_crash_wt3(void)
         WT_SESSION *session1;
         WT_SESSION *session2;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -816,7 +816,7 @@ test_crash_wt3(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_assert(wt_get_stable_timestamp(conn) == database.stable_timestamp());
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
@@ -890,7 +890,7 @@ test_logged_wt(void)
         WT_SESSION *session1;
         WT_SESSION *session2;
 
-        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+        testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
         testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -920,7 +920,7 @@ test_logged_wt(void)
     WT_SESSION *session1;
 
     /* Reopen and verify. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     wt_model_assert(table, uri, key1);

@@ -1,4 +1,4 @@
-load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/uv:defs.bzl", "dependency")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
 
@@ -105,7 +105,6 @@ mongo_cc_unit_test(
         "data_range_test.cpp",
         "data_type_string_data_test.cpp",
         "data_type_terminated_test.cpp",
-        "data_type_validated_test.cpp",
         "data_view_test.cpp",
         "dependency_graph_test.cpp",
         "encoded_value_storage_test.cpp",

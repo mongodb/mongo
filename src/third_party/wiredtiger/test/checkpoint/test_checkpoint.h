@@ -88,11 +88,13 @@ typedef struct {
     int nworkers;                /* Number workers configured */
     int status;                  /* Exit status */
 
-    bool checkpoint_slow_timing_stress;  /* Checkpoint slow timing stress */
-    bool evict_reposition_timing_stress; /* Reposition the cursor for read operations */
-    bool hs_checkpoint_timing_stress;    /* History store checkpoint timing stress */
-    bool precise_checkpoint;             /* Use precise checkpoint */
-    bool sweep_stress;                   /* Sweep stress test */
+    bool checkpoint_slow_timing_stress;             /* Checkpoint slow timing stress */
+    bool disagg_stable_dhandle_delay_timing_stress; /* Disagg stable dhandle delay timing stress */
+    bool evict_reposition_timing_stress;            /* Reposition the cursor for read operations */
+    bool hs_checkpoint_timing_stress;               /* History store checkpoint timing stress */
+    bool precise_checkpoint;                        /* Use precise checkpoint */
+    bool prepare_checkpoint_delay_timing_stress;    /* Checkpoint prepare delay timing stress */
+    bool sweep_stress;                              /* Sweep stress test */
 
     uint64_t ts_oldest;                   /* Current oldest timestamp */
     uint64_t ts_stable;                   /* Current stable timestamp */
@@ -114,7 +116,6 @@ typedef struct {
     WT_RWLOCK clock_lock;          /* Clock synchronization */
     wt_thread_t checkpoint_thread; /* Checkpoint thread */
     wt_thread_t clock_thread;      /* Clock thread */
-    wt_thread_t flush_thread;      /* Flush thread */
 } GLOBAL;
 extern GLOBAL g;
 
@@ -124,7 +125,6 @@ extern GLOBAL g;
 
 void end_threads(void);
 int log_print_err_worker(const char *, int, const char *, int, int);
-void set_flush_tier_delay(WT_RAND_STATE *);
 void start_threads(void);
 int start_workers(void);
 const char *type_to_string(table_type);

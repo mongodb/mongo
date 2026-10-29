@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/session/logical_session_id.h"
 
@@ -67,7 +41,7 @@
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_collection_mock.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
@@ -101,7 +75,8 @@ public:
     ServiceContext::UniqueOperationContext _opCtx;
     AuthorizationSession* authzSession;
 
-    LogicalSessionIdTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         // Initialize the serviceEntryPoint so that DBDirectClient can function.
         getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
@@ -359,9 +334,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransac
     addSimpleUser(UserName("simple", "test"));
     initializeOpSessionInfoWithRequestBody(_opCtx.get(),
                                            BSON("TestCmd" << 1),
-                                           true /* requiresAuth */,
-                                           true /* attachToOpCtx */,
-                                           true /* isReplSetMemberOrMongos */);
+                                           /*requiresAuth=*/true,
+                                           /*attachToOpCtx=*/true,
+                                           /*isReplSetMemberOrMongos=*/true);
 
     ASSERT(!_opCtx->getLogicalSessionId());
     ASSERT(!_opCtx->getTxnNumber());
@@ -376,9 +351,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
                                            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON()
                                                           << "OtherField"
                                                           << "TestField"),
-                                           true /* requiresAuth */,
-                                           true /* attachToOpCtx */,
-                                           true /* isReplSetMemberOrMongos */);
+                                           /*requiresAuth=*/true,
+                                           /*attachToOpCtx=*/true,
+                                           /*isReplSetMemberOrMongos=*/true);
 
     ASSERT(_opCtx->getLogicalSessionId());
     ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
@@ -392,9 +367,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWith
                            _opCtx.get(),
                            BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
                                           << "TestField"),
-                           true /* requiresAuth */,
-                           true /* attachToOpCtx */,
-                           true /* isReplSetMemberOrMongos */),
+                           /*requiresAuth=*/true,
+                           /*attachToOpCtx=*/true,
+                           /*isReplSetMemberOrMongos=*/true),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
@@ -408,9 +383,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
                                            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON()
                                                           << "txnNumber" << 100LL << "OtherField"
                                                           << "TestField"),
-                                           true /* requiresAuth */,
-                                           true /* attachToOpCtx */,
-                                           true /* isReplSetMemberOrMongos */);
+                                           /*requiresAuth=*/true,
+                                           /*attachToOpCtx=*/true,
+                                           /*isReplSetMemberOrMongos=*/true);
 
     ASSERT(_opCtx->getLogicalSessionId());
     ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
@@ -429,9 +404,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMon
             _opCtx.get(),
             BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                            << "TestField"),
-            true /* requiresAuth */,
-            true /* attachToOpCtx */,
-            false /* isReplSetMemberOrMongos */),
+            /*requiresAuth=*/true,
+            /*attachToOpCtx=*/true,
+            /*isReplSetMemberOrMongos=*/false),
         AssertionException,
         ErrorCodes::IllegalOperation);
 }
@@ -447,9 +422,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfNoCache
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
-        true /* requiresAuth */,
-        true /* attachToOpCtx */,
-        true /* isReplSetMemberOrMongos */);
+        /*requiresAuth=*/true,
+        /*attachToOpCtx=*/true,
+        /*isReplSetMemberOrMongos=*/true);
     ASSERT(sessionInfo.getSessionId() == boost::none);
     ASSERT(sessionInfo.getTxnNumber() == boost::none);
     ASSERT(sessionInfo.getStartTransaction() == boost::none);
@@ -465,9 +440,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfDoNotAt
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
-        true /* requiresAuth */,
-        false /* attachToOpCtx */,
-        true /* isReplSetMemberOrMongos */);
+        /*requiresAuth=*/true,
+        /*attachToOpCtx=*/false,
+        /*isReplSetMemberOrMongos=*/true);
 
     ASSERT(sessionInfo.getSessionId() == boost::none);
     ASSERT(sessionInfo.getTxnNumber() == boost::none);
@@ -489,9 +464,9 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_VerifyUIDEvenIfDoNot
     ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
                            _opCtx.get(),
                            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL),
-                           true /* requiresAuth */,
-                           false /* attachToOpCtx */,
-                           true /* isReplSetMemberOrMongos */),
+                           /*requiresAuth=*/true,
+                           /*attachToOpCtx=*/false,
+                           /*isReplSetMemberOrMongos=*/true),
                        AssertionException,
                        ErrorCodes::Unauthorized);
 }
@@ -501,7 +476,8 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDi
         {BSON("lsid" << makeLogicalSessionIdForTest().toBSON())},
         {BSON("txnNumber" << 1LL)},
         {BSON("autocommit" << true)},
-        {BSON("startTransaction" << true)}};
+        {BSON("startTransaction" << true)},
+        {BSON("startOrContinueTransaction" << true)}};
 
 
     _opCtx->getClient()->setInDirectClient(true);
@@ -510,17 +486,178 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDi
         BSONObjBuilder commandBuilder = BSON("count" << "foo");
         commandBuilder.appendElements(param);
 
-        ASSERT_THROWS_CODE(
-            initializeOpSessionInfoWithRequestBody(_opCtx.get(),
-                                                   commandBuilder.obj(),
-                                                   true /* requiresAuth */,
-                                                   true /* attachToOpCtx */,
-                                                   true /* isReplSetMemberOrMongos */),
-            AssertionException,
-            50891);
+        ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(_opCtx.get(),
+                                                                  commandBuilder.obj(),
+                                                                  /*requiresAuth=*/true,
+                                                                  /*attachToOpCtx=*/true,
+                                                                  /*isReplSetMemberOrMongos=*/true),
+                           AssertionException,
+                           50891);
     }
 
     _opCtx->getClient()->setInDirectClient(false);
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_StartTransactionRequiresAutocommit) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL
+                                          << "startTransaction" << true),
+                           /*requiresAuth=*/true,
+                           /*attachToOpCtx=*/true,
+                           /*isReplSetMemberOrMongos=*/true),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_StartOrContinueTransactionRequiresAutocommit) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL
+                                          << "startOrContinueTransaction" << true),
+                           /*requiresAuth=*/true,
+                           /*attachToOpCtx=*/true,
+                           /*isReplSetMemberOrMongos=*/true),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_StartTransactionFalseNotAllowed) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL
+                                          << "autocommit" << false << "startTransaction" << false),
+                           /*requiresAuth=*/true,
+                           /*attachToOpCtx=*/true,
+                           /*isReplSetMemberOrMongos=*/true),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_StartOrContinueTransactionFalseNotAllowed) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(
+        initializeOpSessionInfoWithRequestBody(
+            _opCtx.get(),
+            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "autocommit"
+                           << false << "startOrContinueTransaction" << false),
+            /*requiresAuth=*/true,
+            /*attachToOpCtx=*/true,
+            /*isReplSetMemberOrMongos=*/true),
+        AssertionException,
+        ErrorCodes::InvalidOptions);
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_StartOrContinueTransactionRequiresInternalClient) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(
+        initializeOpSessionInfoWithRequestBody(
+            _opCtx.get(),
+            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "autocommit"
+                           << false << "startOrContinueTransaction" << true),
+            /*requiresAuth=*/true,
+            /*attachToOpCtx=*/true,
+            /*isReplSetMemberOrMongos=*/true),
+        AssertionException,
+        ErrorCodes::Unauthorized);
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_StartOrContinueTransactionAllowedForInternalClient) {
+    addClusterUser(UserName("cluster", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    auto sessionInfo = initializeOpSessionInfoWithRequestBody(
+        _opCtx.get(),
+        BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "autocommit"
+                       << false << "startOrContinueTransaction" << true),
+        /*requiresAuth=*/true,
+        /*attachToOpCtx=*/true,
+        /*isReplSetMemberOrMongos=*/true);
+    ASSERT(sessionInfo.getStartOrContinueTransaction());
+    ASSERT_TRUE(sessionInfo.getStartOrContinueTransaction().value());
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_IsServerInitiatedTransactionRequiresInternalClient) {
+    addSimpleUser(UserName("simple", "test"));
+
+    // Supplying any value for isServerInitiatedTransaction must be rejected, since either value
+    // would let a client choose its own metrics classification.
+    for (bool isServerInitiated : {true, false}) {
+        LogicalSessionFromClient lsid;
+        lsid.setId(UUID::gen());
+
+        ASSERT_THROWS_CODE(
+            initializeOpSessionInfoWithRequestBody(
+                _opCtx.get(),
+                BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL
+                               << "autocommit" << false << "startTransaction" << true
+                               << "isServerInitiatedTransaction" << isServerInitiated),
+                /*requiresAuth=*/true,
+                /*attachToOpCtx=*/true,
+                /*isReplSetMemberOrMongos=*/true),
+            AssertionException,
+            ErrorCodes::Unauthorized);
+    }
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_IsServerInitiatedTransactionAllowedForInternalClient) {
+    addClusterUser(UserName("cluster", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    auto sessionInfo = initializeOpSessionInfoWithRequestBody(
+        _opCtx.get(),
+        BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "autocommit"
+                       << false << "startTransaction" << true << "isServerInitiatedTransaction"
+                       << true),
+        /*requiresAuth=*/true,
+        /*attachToOpCtx=*/true,
+        /*isReplSetMemberOrMongos=*/true);
+    ASSERT(sessionInfo.getIsServerInitiatedTransaction());
+    ASSERT_TRUE(sessionInfo.getIsServerInitiatedTransaction().value());
+}
+
+TEST_F(LogicalSessionIdTest,
+       InitializeOperationSessionInfo_CannotSpecifyBothStartTransactionAndStartOrContinue) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL
+                                          << "autocommit" << false << "startTransaction" << true
+                                          << "startOrContinueTransaction" << true),
+                           /*requiresAuth=*/true,
+                           /*attachToOpCtx=*/true,
+                           /*isReplSetMemberOrMongos=*/true),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
 }
 
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {

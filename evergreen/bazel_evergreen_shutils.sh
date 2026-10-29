@@ -36,6 +36,17 @@ bazel_evergreen_shutils::is_macos() {
     [[ "${os}" == "darwin" ]] && return 0 || return 1
 }
 
+# Evergreen's Windows hosts run these scripts under a Cygwin/MSYS bash, but the Bazel server
+# they talk to is a native Win32 process. That mismatch matters for any PID handling: see
+# bazel_evergreen_shutils::pid_is_live.
+bazel_evergreen_shutils::is_windows() {
+    local -r os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    case "${os}" in
+    cygwin* | mingw* | msys*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
 bazel_evergreen_shutils::is_ppc64le() {
     local -r arch="$(uname -m)"
     [[ "${arch}" == "ppc64le" || "${arch}" == "ppc64" || "${arch}" == "ppc" ]] && return 0 || return 1
@@ -81,6 +92,35 @@ bazel_evergreen_shutils::bazel_rbe_supported() {
     fi
 }
 
+# All invocations of bazel_compile.sh are Evergreen CI builds. Keep this policy
+# in the wrapper so task, patch, and profile flags cannot re-enable the
+# expensive GDB index actions in CI.
+bazel_evergreen_shutils::should_disable_gdb_index() {
+    return 0
+}
+
+# Return the invocation file used to create release binary provenance for a task. The ordinary
+# invocation file is still written for every Bazel compile, but provenance must retain the command
+# from the task's primary build instead of whichever compile ran last.
+bazel_evergreen_shutils::get_provenance_build_invocation_file() {
+    local task_name_to_check="${1:-}"
+    local project_to_check="${2:-}"
+
+    case "${task_name_to_check}" in
+    archive_dist_test)
+        echo ".bazel_provenance_build_invocation"
+        ;;
+    package)
+        if [[ "${project_to_check}" == mongo-release* ]]; then
+            echo ".bazel_provenance_build_invocation"
+        fi
+        ;;
+    crypt_create_lib)
+        echo ".bazel_crypt_build_invocation"
+        ;;
+    esac
+}
+
 # Requires: evergreen_remote_exec, task_name (for tests), bazel_args vars optionally.
 bazel_evergreen_shutils::compute_local_arg() {
     local mode="${1:-build}" # build|test|run
@@ -98,17 +138,23 @@ bazel_evergreen_shutils::compute_local_arg() {
     fi
 
     if bazel_evergreen_shutils::is_ppc64le; then
-        local_arg+=" --jobs=48"
+        # Keep local links/tests bounded without overriding the common --jobs=300
+        # limit used to feed remote execution.
+        local_arg+=" --local_resources=cpu=48"
     fi
     if bazel_evergreen_shutils::is_s390x; then
-        local_arg+=" --jobs=16"
+        local_arg+=" --local_resources=cpu=16"
     fi
 
-    # For run-mode, if RBE isn't supported or is disabled explicitly, force local config.
+    # Run locally when remote execution is disabled or unsupported, while retaining
+    # the EngFlow asset downloader, remote cache, and credentials configured by CI.
+    # --config=local disables those too, exposing repository fetches to upstream outages.
     if [[ "$mode" == "run" ]]; then
-        if ! bazel_evergreen_shutils::bazel_rbe_supported || [[ "${evergreen_remote_exec:-}" != "on" ]]; then
-            # Keep compatibility with existing pattern:
-            local_arg+=" --config=local"
+        if [[ "${evergreen_remote_exec:-}" != "on" ]]; then
+            local_arg+=" --config=no-remote-exec"
+        elif ! bazel_evergreen_shutils::bazel_rbe_supported &&
+            ! bazel_evergreen_shutils::is_s390x_or_ppc64le; then
+            local_arg+=" --config=no-remote-exec"
         fi
     fi
 
@@ -123,14 +169,18 @@ bazel_evergreen_shutils::extract_config_flags() {
   }' <<<"$all"
 }
 
-# Adds --config=public-release-rbe or --config=public-release-local if this is a release-ish build.
+# Select release profiles for nightly/release builds and explicit release invocations.
 bazel_evergreen_shutils::maybe_release_flag() {
     local local_arg="$1"
     if [[ -n "${MONGO_VERSION_OVERRIDE:-}" ]]; then
         echo "$local_arg --config=public-release"
+    elif [[ "${compiling_for_test:-}" == "true" ]]; then
+        echo "$local_arg"
+    elif [[ "${project:-}" == "mongodb-mongo-master" && "${is_release:-false}" != "true" ]]; then
+        echo "$local_arg"
     elif [[ "${release_rbe:-}" == "true" ]]; then
         echo "$local_arg --config=public-release-rbe" # release with RBE (Remote Build Execution)
-    elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
+    elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" ]]; then
         echo "$local_arg" # non-release
     else
         echo "$local_arg --config=public-release-local" # release without RBE (Remote Build Execution)
@@ -139,21 +189,39 @@ bazel_evergreen_shutils::maybe_release_flag() {
 
 # --- Timeouts --------------------------------------------------------------
 
+# Use the wrapper's RC resolver so imported/default configurations and aliases
+# obey the same policy as explicit flags. prelude.sh loads expansions into shell
+# variables, so pass the executing distro explicitly to the Python helper.
+bazel_evergreen_shutils::check_release_distro() {
+    distro_id="${distro_id:-}" "${python}" -m bazel.wrapper_hook.release_distro --evergreen -- "$@"
+}
+
 # Timeout helper: returns a "timeout <secs>" prefix or empty string.
+#
+# Arguments:
+#   $1: "on" when remote execution is enabled
+#   $2: Bazel command name (only "build" receives the local fallback timeout)
 # Prints a one-time warning to stderr if a timeout was requested but no
 # timeout binary is available. Supports macOS 'gtimeout' if installed.
 # SIGQUIT triggers Bazel/Bazelisk diagnostics but does not reliably stop the
 # full process tree, so follow it with a short kill-after window.
 bazel_evergreen_shutils::timeout_prefix() {
-    local fallback_remote="${1:-}" # "on" = use 3600s default for remote builds
-    local need_timeout=""          # "explicit" | "fallback" | ""
+    local fallback_remote="${1:-}" # "on" = use the remote-build fallback
+    local bazel_command="${2:-}"
+    local need_timeout="" # "explicit" | "fallback"
     local timeout_bin=""
     local timeout_kill_after_seconds="${BAZEL_EVG_TIMEOUT_KILL_AFTER_SECONDS:-15}"
+    local fallback_timeout_seconds=7200 # Local builds get two hours per attempt.
+    local fallback_timeout_label="local-build"
 
     # Do we want a timeout?
     if [[ -n "${build_timeout_seconds:-}" ]]; then
         need_timeout="explicit"
     elif [[ "$fallback_remote" == "on" ]]; then
+        need_timeout="fallback"
+        fallback_timeout_seconds=3600
+        fallback_timeout_label="remote-build"
+    elif [[ "$bazel_command" == "build" ]]; then
         need_timeout="fallback"
     fi
 
@@ -170,7 +238,7 @@ bazel_evergreen_shutils::timeout_prefix() {
             if [[ "$need_timeout" == "explicit" ]]; then
                 echo "[warn] 'timeout' not found; requested ${build_timeout_seconds}s timeout will be ignored." >&2
             else
-                echo "[warn] 'timeout' not found; remote-build fallback timeout (3600s) will be ignored." >&2
+                echo "[warn] 'timeout' not found; ${fallback_timeout_label} fallback timeout (${fallback_timeout_seconds}s) will be ignored." >&2
             fi
             # Helpful hint for macOS users
             if bazel_evergreen_shutils::is_macos; then
@@ -187,13 +255,40 @@ bazel_evergreen_shutils::timeout_prefix() {
         if [[ "$need_timeout" == "explicit" ]]; then
             echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s ${build_timeout_seconds}"
         elif [[ "$need_timeout" == "fallback" ]]; then
-            echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s 3600"
+            echo "$timeout_bin -s QUIT -k ${timeout_kill_after_seconds}s ${fallback_timeout_seconds}"
         else
             echo ""
         fi
     else
         echo ""
     fi
+}
+
+# Release artifact commands on IBM waterfall variants use the host-native
+# ``public-release-local`` policy.  Those variants intentionally keep the
+# Evergreen remote-exec expansion enabled for test/compile tasks, but must not
+# inherit the one-hour remote-build fallback timeout while a native release
+# link or package is running.
+bazel_evergreen_shutils::command_uses_local_release() {
+    local arg
+    local next
+    while [[ "$#" -gt 0 ]]; do
+        arg="$1"
+        shift
+        case "$arg" in
+        --config=public-release-local | --remote_executor=)
+            return 0
+            ;;
+        --config | --remote_executor)
+            if [[ "$#" -gt 0 ]]; then
+                next="$1"
+                shift
+                [[ "$next" == "public-release-local" || -z "$next" ]] && return 0
+            fi
+            ;;
+        esac
+    done
+    return 1
 }
 
 bazel_evergreen_shutils::is_timeout_exit_code() {
@@ -248,6 +343,50 @@ bazel_evergreen_shutils::bazel_pidfile_path() {
     echo "${ob}/server/server.pid.txt"
 }
 
+# Answers "is this PID alive?" in a way that works on every platform we build on.
+#
+# server.pid.txt holds a *native* PID. On Windows that is a Win32 PID with no entry in the
+# Cygwin/MSYS PID table, so `kill -0` fails for a perfectly healthy server -- which used to make
+# the retry loop diagnose a phantom server death, shut the live server down mid-build, and corrupt
+# in-flight external repository fetches. Use tasklist there instead.
+#
+# Return codes are deliberately three-valued:
+#   0 - positively alive
+#   1 - positively dead
+#   2 - could not determine
+# Callers must not treat 2 as death; killing or restarting on an unknown is what caused the
+# original bug.
+bazel_evergreen_shutils::pid_is_live() {
+    local pid="$1"
+
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+
+    if bazel_evergreen_shutils::is_windows; then
+        if ! command -v tasklist >/dev/null 2>&1; then
+            return 2
+        fi
+        # Capture tasklist's own status rather than the pipeline's: piping straight into grep
+        # would report a *failed* tasklist as "no match", i.e. positively dead, which is exactly
+        # the false negative this helper exists to prevent.
+        local listing listing_status
+        listing="$(tasklist /FI "PID eq ${pid}" /NH 2>/dev/null)"
+        listing_status=$?
+        if [[ "$listing_status" -ne 0 ]]; then
+            return 2
+        fi
+        # /NH drops the column header; a missing PID yields "INFO: No tasks are running...".
+        if grep -q "\b${pid}\b" <<<"$listing"; then
+            return 0
+        fi
+        return 1
+    fi
+
+    if kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 bazel_evergreen_shutils::bazel_server_pid() {
     local BAZEL_BINARY="$1"
     local pf pid
@@ -263,11 +402,14 @@ bazel_evergreen_shutils::is_bazel_server_running() {
     local pid
     pid="$(bazel_evergreen_shutils::bazel_server_pid "$BAZEL_BINARY" 2>/dev/null || true)"
     [[ -n "$pid" ]] || return 1
-    if kill -0 "$pid" 2>/dev/null; then
-        return 0
-    else
-        return 1
-    fi
+    bazel_evergreen_shutils::pid_is_live "$pid"
+    case "$?" in
+    0) return 0 ;;
+    # Undetermined: assume the server is up. A false "dead" here triggers a shutdown of a
+    # healthy server, which is far more destructive than skipping a restart we did not need.
+    2) return 0 ;;
+    *) return 1 ;;
+    esac
 }
 
 bazel_evergreen_shutils::print_bazel_server_pid() {
@@ -285,6 +427,24 @@ bazel_evergreen_shutils::print_bazel_server_pid() {
     fi
 }
 
+# Emits candidate server PIDs by scanning the process table. `pgrep -f "java.*bazel"` only works
+# where the server is a child of this PID namespace; on Windows it never matches the native server,
+# so this yields nothing there and callers fall back to the pidfile.
+bazel_evergreen_shutils::scan_server_pids() {
+    if bazel_evergreen_shutils::is_windows; then
+        return 0
+    fi
+    pgrep -f "java.*bazel" 2>/dev/null || true
+}
+
+# Keeps a PID if it is alive or if liveness could not be determined; see pid_is_live for why
+# "unknown" must not be read as dead.
+bazel_evergreen_shutils::_keep_if_not_dead() {
+    local pid="$1"
+    bazel_evergreen_shutils::pid_is_live "$pid"
+    [[ "$?" -ne 1 ]]
+}
+
 bazel_evergreen_shutils::fast_bazel_server_pids() {
     local pid
     local -a live_pids=()
@@ -295,10 +455,10 @@ bazel_evergreen_shutils::fast_bazel_server_pids() {
             continue
         fi
         seen_pids["$pid"]=1
-        if kill -0 "$pid" 2>/dev/null; then
+        if bazel_evergreen_shutils::_keep_if_not_dead "$pid"; then
             live_pids+=("$pid")
         fi
-    done < <(pgrep -f "java.*bazel" 2>/dev/null || true)
+    done < <(bazel_evergreen_shutils::scan_server_pids)
 
     if [[ ${#live_pids[@]} -eq 0 ]]; then
         return 1
@@ -326,14 +486,14 @@ bazel_evergreen_shutils::bazel_server_pids() {
         if [[ "$pid" =~ ^[0-9]+$ ]]; then
             candidate_pids+=("$pid")
         fi
-    done < <(pgrep -f "java.*bazel" 2>/dev/null || true)
+    done < <(bazel_evergreen_shutils::scan_server_pids)
 
     for pid in "${candidate_pids[@]}"; do
         if [[ -n "${seen_pids[$pid]:-}" ]]; then
             continue
         fi
         seen_pids["$pid"]=1
-        if kill -0 "$pid" 2>/dev/null; then
+        if bazel_evergreen_shutils::_keep_if_not_dead "$pid"; then
             live_pids+=("$pid")
         fi
     done
@@ -608,7 +768,7 @@ bazel_evergreen_shutils::write_last_engflow_link() {
 #   $3: bazel binary
 #   $4..: full bazel subcommand + args (e.g. "build --verbose_failures ...")
 # Special handling:
-#   - exit 124/137 -> timeout
+#   - exit 124/137 -> timeout; only build commands retry after a timeout
 #   - server death (pid missing) -> restart, then retry
 # Returns with global RET set.
 bazel_evergreen_shutils::retry_bazel_cmd() {
@@ -617,7 +777,16 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     local BAZEL_BINARY="$1"
     shift
 
-    local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}")"
+    # Keep explicit build_timeout_seconds intact, but suppress the remote-mode
+    # fallback for host-native release commands. Their Evergreen execution
+    # timeout (6h PPC / 24h s390x) is the appropriate upper bound.
+    local bazel_command="${1:-}"
+    local timeout_remote_exec="${evergreen_remote_exec:-}"
+    local raw_rest=("$@")
+    if bazel_evergreen_shutils::command_uses_local_release "${raw_rest[@]}"; then
+        timeout_remote_exec=""
+    fi
+    local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "$timeout_remote_exec" "$bazel_command")"
     local timeout_duration=""
     if [[ -n "$timeout_str" ]]; then
         timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
@@ -634,8 +803,6 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
     # Everything else is the Bazel subcommand + flags (and possibly redirections/pipes).
     # We *intentionally* keep it as raw words and reassemble to a single string for eval.
-    local raw_rest=("$@")
-
     # Once we detect an OOM/server-death, we enable the guard for subsequent attempts.
     local use_oom_guard=false
     local -r OOM_GUARD_FLAG='--local_resources=cpu=HOST_CPUS*.5'
@@ -652,7 +819,7 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
         # Ensure/refresh server & pid before we run (helps produce a fresh pidfile too).
         if ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
-            echo "[retry ${i}] Bazel server not running (likely OOM/killed); restarting…" >&2
+            echo "[retry ${i}] Bazel server not running; starting…" >&2
             "$BAZEL_BINARY" info >/dev/null 2>&1 || true
             bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
         fi
@@ -719,6 +886,11 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             fi
         fi
 
+        local has_next_attempt=false
+        if [[ "$i" -lt "$attempts" ]]; then
+            has_next_attempt=true
+        fi
+
         if bazel_evergreen_shutils::is_timeout_exit_code "$RET" "$timeout_str" "$timeout_duration" "$attempt_elapsed_seconds"; then
             if [[ $RET -eq 137 ]]; then
                 echo "Bazel timed out and was force-killed after SIGQUIT." >&2
@@ -728,19 +900,28 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             fi
             bazel_evergreen_shutils::capture_bazel_jvm_out "$BAZEL_BINARY" "$attempt_bazel_server_pid" >/dev/null || true
             bazel_evergreen_shutils::terminate_bazel_servers || true
-        elif ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
-            echo "[retry ${i}] Bazel server down (OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
-            use_oom_guard=true
-            "$BAZEL_BINARY" shutdown || true
-            "$BAZEL_BINARY" info >/dev/null 2>&1 || true
-            bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
-        else
-            if [[ ${RETRY_ON_FAIL:-0} -eq 1 ]]; then
-                echo "Bazel failed (exit=$RET); restarting server before retry..." >&2
-                "$BAZEL_BINARY" shutdown || true
-            else
+            if [[ "$bazel_command" != "build" ]]; then
                 break
             fi
+        elif ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
+            if $has_next_attempt; then
+                echo "[retry ${i}] Bazel server exited unexpectedly (possibly OOM/killed). Enabling OOM guard for next attempt and restarting…" >&2
+                use_oom_guard=true
+                "$BAZEL_BINARY" shutdown || true
+                "$BAZEL_BINARY" info >/dev/null 2>&1 || true
+                bazel_evergreen_shutils::print_bazel_server_pid "$BAZEL_BINARY" >&2
+            else
+                echo "[retry ${i}] Bazel server exited unexpectedly (possibly OOM/killed)." >&2
+            fi
+        else
+            if [[ ${RETRY_ON_FAIL:-0} -ne 1 ]] || ! $has_next_attempt; then
+                break
+            fi
+            echo "Bazel failed (exit=$RET); retrying with existing server..." >&2
+        fi
+
+        if ! $has_next_attempt; then
+            break
         fi
 
         sleep 60
@@ -773,8 +954,11 @@ bazel_evergreen_shutils::query_resmoke_configs() {
     local FLAGS="$2"
     local OUTPUT_FILE="$3"
 
-    ${BAZEL_BINARY} cquery ${FLAGS} 'kind(resmoke_config, //...)' \
+    # Restrict cquery's target universe before analysis. Without this filter, cquery analyzes
+    # every target matched by //..., including manual analysis-test fixtures whose expected
+    # analysis failures are not caught by their wrapper tests.
+    ${BAZEL_BINARY} cquery ${FLAGS} --build_tag_filters=resmoke_config 'kind(resmoke_config, //...)' \
         --output=starlark \
-        --starlark:expr='": ".join([str(target.label).replace("@@","")] + [f.path for f in target.files.to_list()])' \
+        --starlark:expr='": ".join([str(target.label).replace("@@","")] + [f.path for f in target.files.to_list()]) if target.files.to_list() else ""' \
         >"${OUTPUT_FILE}"
 }

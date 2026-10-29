@@ -175,6 +175,12 @@ struct __wti_reconcile {
     /* Track the pinned stable timestamp at the time reconciliation started. */
     wt_timestamp_t rec_start_pinned_stable_ts;
 
+    /*
+     * When eviction is reconciling under the published checkpoint snapshot, the identity of that
+     * snapshot; otherwise WT_CKPT_SNAP_GEN_NONE.
+     */
+    uint64_t rec_ckpt_snap_gen;
+
     /* Track the prune timestamp at the time reconciliation started. */
     wt_timestamp_t rec_prune_timestamp;
 
@@ -439,22 +445,28 @@ struct __wti_update_select {
 
     WT_TIME_WINDOW tw;
 
-    bool upd_saved;                   /* An element on the row's update chain was saved */
-    bool no_ts_tombstone;             /* Tombstone without a timestamp */
-    bool skip_aborted_prepared_value; /* Skip a non-tombstone aborted prepared update on the
-                                          update chain */
-    bool was_modify;                  /* There was a MODIFY on the update chain */
+    bool upd_saved;       /* An element on the row's update chain was saved */
+    bool no_ts_tombstone; /* Tombstone without a timestamp */
+
+    /*
+     * A prepared update that was rolled back after the stable timestamp and skipped by this
+     * reconciliation, kept so the fallback append can anchor its walk on it rather than the
+     * concurrently-mutating update chain head.
+     */
+    WT_UPDATE *prepare_rollback_upd;
+
+    bool modify_needs_onpage_value; /* A retained MODIFY needs the on-page value */
 };
 
-#define WTI_UPDATE_SELECT_INIT(upd_select)                 \
-    do {                                                   \
-        (upd_select)->upd = NULL;                          \
-        (upd_select)->tombstone = NULL;                    \
-        (upd_select)->upd_saved = false;                   \
-        (upd_select)->no_ts_tombstone = false;             \
-        (upd_select)->skip_aborted_prepared_value = false; \
-        (upd_select)->was_modify = false;                  \
-        WT_TIME_WINDOW_INIT(&(upd_select)->tw);            \
+#define WTI_UPDATE_SELECT_INIT(upd_select)               \
+    do {                                                 \
+        (upd_select)->upd = NULL;                        \
+        (upd_select)->tombstone = NULL;                  \
+        (upd_select)->upd_saved = false;                 \
+        (upd_select)->no_ts_tombstone = false;           \
+        (upd_select)->prepare_rollback_upd = NULL;       \
+        (upd_select)->modify_needs_onpage_value = false; \
+        WT_TIME_WINDOW_INIT(&(upd_select)->tw);          \
     } while (0)
 
 #define WT_REC_RESULT_SINGLE_PAGE(session, r)                                    \

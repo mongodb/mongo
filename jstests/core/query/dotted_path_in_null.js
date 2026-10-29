@@ -1,6 +1,7 @@
 // @tags: [
 //   # Time series collections do not support indexing array values in measurement fields.
 //   exclude_from_timeseries_crud_passthrough,
+//   requires_fcv_91
 // ]
 
 const coll = db.dotted_path_in_null;

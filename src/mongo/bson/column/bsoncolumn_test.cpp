@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/column/bsoncolumn.h"
 
@@ -4259,7 +4233,7 @@ TEST_F(BSONColumnTest, BinDataColumnSubtypeInObjectRejectedByBuilder) {
     // Appending an object that contains a binData/Column field must be rejected.
     std::vector<uint8_t> payload{'\0'};
     BSONObjBuilder outer;
-    outer.appendBinData("col"_sd, payload.size(), BinDataType::Column, payload.data());
+    outer.appendBinData("col"sv, payload.size(), BinDataType::Column, payload.data());
     BSONObj obj = outer.obj();
 
     ASSERT_THROWS_CODE(cb.append(obj.firstElement()), DBException, 12506300);
@@ -8035,7 +8009,7 @@ TEST_F(BSONColumnTest, InterleavedArrayAppend) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
@@ -8338,7 +8312,7 @@ TEST_F(BSONColumnTest, ObjectEmpty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
@@ -8359,7 +8333,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmptyLegacyDecompression) {
@@ -8374,7 +8348,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmptyLegacyDecompression) {
     appendLiteral(expected, elems[1]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems, false /* testPathDecompression */);
+    verifyDecompression(expected, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
@@ -8393,7 +8367,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDetermine) {
@@ -8419,7 +8393,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDeterm
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest,
@@ -8441,7 +8415,7 @@ TEST_F(BSONColumnTest,
     appendLiteral(expected, elems[1]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems, false /* testPathDecompression */);
+    verifyDecompression(expected, elems, /*testPathDecompression=*/false);
 }
 
 
@@ -8480,7 +8454,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppend
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest,
@@ -8513,7 +8487,7 @@ TEST_F(BSONColumnTest,
     appendLiteral(expected, elems[6]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems, false /* testPathDecompression */);
+    verifyDecompression(expected, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, InterleavedFullSkipAfterObjectSkip) {
@@ -9759,7 +9733,7 @@ TEST_F(BSONColumnTest, EmptyObjectSkipAndInterleaved) {
 
     auto binData = cb.finalize();
 
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
     verifyDecompressPathFast(binData, elems, TestPath{{"a"}});
     verifyDecompressPathFast(binData, elems, TestPath{{"b"}});
     verifyDecompressPathFast(binData, elems, TestPath{{}});
@@ -10185,6 +10159,43 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         EXPECT_EQ(minResult.first.Int(), 3);
         EXPECT_EQ(minResult.second, 1u);
     }
+}
+
+// Regression test for a discrepancy between the materializing decompress path and the min/max
+// (CompareCollector / MinMaxCollector) path. After interleaved mode ends, the interleaved
+// decompressor calls setLast<BSONElement>(BSONElement()) to mark the last value missing, so that
+// the trailing simple8b blocks are handled by decompressAllMissing() instead of
+// decompressAllLiteral() (which asserts that post-literal delta blocks only contain skip or 0).
+// The min/max collectors previously hardcoded isLastMissing() to false and ignored setLast(), so
+// they took the decompressAllLiteral() branch and threw uassert 8609800 on inputs that the
+// iterator and block-based APIs accepted. This uncaught throw crashed the
+// bsoncolumn_decompress_fuzzer.
+//
+// The bytes below are a fuzzer-found reproducer. We only assert that the min/max expressions no
+// longer throw (the crash being regressed); we do not compare returned values, because these bytes
+// decode to elements the expectedMinMax() test helper cannot canonicalize.
+TEST_F(BSONColumnTest, MinMaxInterleavedTrailingBlocksDoNotThrow) {
+    const uint8_t bytes[] = {
+        0xf0, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x07, 0x00,
+        0xff, 0x27, 0x00, 0x12, 0x00, 0x00, 0x80, 0x81, 0x81, 0x81, 0xff, 0x00, 0x80, 0x67, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xfc, 0xff, 0x00, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff, 0x81, 0x25, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0x81, 0x81, 0x81, 0xff, 0xff, 0xff, 0xff, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0xff, 0xff, 0xff, 0xff, 0x0b, 0x00, 0x00, 0xff, 0x00, 0x00, 0xff, 0x00, 0x00};
+    const char* data = reinterpret_cast<const char*>(bytes);
+    const size_t size = sizeof(bytes);
+
+    // The reproducer is a valid BSONColumn that ends with an interleaved section followed by
+    // trailing simple8b blocks, which is the shape that exercises the isLastMissing() branch.
+    ASSERT_OK(validateBSONColumn(data, size));
+
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
+
+    // Prior to the fix these calls threw uassert 8609800 ("Post literal delta blocks should only
+    // contain skip or 0") and aborted the fuzzer. They must now succeed without throwing.
+    ASSERT_DOES_NOT_THROW(min<BSONElementMaterializer>(data, size, allocator));
+    ASSERT_DOES_NOT_THROW(max<BSONElementMaterializer>(data, size, allocator));
+    ASSERT_DOES_NOT_THROW(minmax<BSONElementMaterializer>(data, size, allocator));
 }
 
 TEST(DenseTest, EmptyColumn) {

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,6 +7,7 @@
 #include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -46,7 +21,7 @@ namespace mongo {
 /**
  * Identifies where a knob value in a QueryKnobSnapshot came from.
  */
-enum class KnobSource : uint8_t {
+enum class [[MONGO_MOD_PARENT_PRIVATE]] KnobSource : uint8_t {
     kDefault,       // Value read from global IDL default
     kSetParameter,  // Value overridden via setParameter command
     kQuerySettings  // Value overridden via Parameterized Query Settings (PQS)
@@ -66,7 +41,7 @@ static_assert(static_cast<uint8_t>(KnobSource::kDefault) == 0,
  *
  * Construct via QueryKnobSnapshotBuilder.
  */
-class QueryKnobSnapshot {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobSnapshot {
     friend class QueryKnobSnapshotBuilder;
 
 public:
@@ -116,7 +91,7 @@ private:
  * Supports fluent chaining from a temporary: QueryKnobSnapshotBuilder{n}.set(...).build().
  * For a named builder, move it before building: std::move(builder).build().
  */
-class QueryKnobSnapshotBuilder {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobSnapshotBuilder {
 public:
     explicit QueryKnobSnapshotBuilder(size_t size);
     explicit QueryKnobSnapshotBuilder(QueryKnobSnapshot snapshot);
@@ -140,7 +115,7 @@ private:
  * writes are serialized by _intentLock to prevent lost updates from concurrent callers.
  * The outgoing snapshot is swapped out under the write lock and destroyed after it is released.
  */
-class QueryKnobSnapshotCache {
+class [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobSnapshotCache {
 public:
     explicit QueryKnobSnapshotCache(QueryKnobSnapshot defaults);
 
@@ -150,6 +125,7 @@ public:
      * Returns a copy of the current snapshot. Safe to call concurrently from any thread.
      */
     [[nodiscard]] QueryKnobSnapshot getSnapshot() const;
+    [[nodiscard]] QueryKnobSnapshot getDefaults() const;
 
     /**
      * Returns a copy of the current snapshot, cached in thread-local storage. Safe to call
@@ -182,7 +158,8 @@ private:
     std::mutex _intentLock;
     QueryKnobSnapshot _defaults;  // immutable reference for kDefault vs kSetParameter detection
     QueryKnobSnapshot _snapshot;  // live snapshot used by queries
-    alignas(64) AtomicWord<uint8_t> _version{0};
+    // Must be wide enough to never wrap over a server's lifetime.
+    alignas(64) Atomic<uint64_t> _version{0};
 };
 
 }  // namespace mongo

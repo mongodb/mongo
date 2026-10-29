@@ -161,11 +161,6 @@ config_fuzzer_params = {
             "max": 100,
             "fuzz_at": ["startup"],
         },
-        "maxShardMetadataDiskRecoveryAttempts": {
-            "min": 10,
-            "max": 100,
-            "fuzz_at": ["startup"],
-        },
         "operationMemoryPoolBlockMaxSizeKB": {
             "min": 1024,
             "max": 2048,
@@ -459,6 +454,35 @@ config_fuzzer_params = {
         },
         # Choose whether to shuffle the list command results or not.
         "failpoint.shuffleListCommandResults": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        # Randomly cause the chunk operations to fail with a retryable error after durably persisting changes transactionally.
+        # The expectation is that these failures are retried by the coordinators and don't cause inconsistencies. Note that
+        # leaving them alwaysOn is deliberate as the code locations are such that they should only be hit at most once per
+        # operation.
+        "failpoint.mergeAllChunksFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitChunkSplitFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitChunksMergeFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitChunkMigrationFailAfterCommit": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        # Similar "fail after durable commit" failpoints for non-chunk DDL operations.
+        "failpoint.commitMovePrimaryFailsAfterDurableChange": {
+            "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
+            "fuzz_at": ["startup"],
+        },
+        "failpoint.commitRefineCollectionShardKeyFailsAfterDurableChange": {
             "choices": [{"mode": "off"}, {"mode": "alwaysOn"}],
             "fuzz_at": ["startup"],
         },

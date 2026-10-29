@@ -9,10 +9,10 @@ ciphertext="$(echo "$data" | xxd -r -p | openssl enc -aes-256-ctr -K "$key" -iv 
 
 cat <<EOF
     // clang-format off
-    vector.d = "$data"_sd;
-    vector.k = "$key"_sd;
-    vector.iv = "$iv"_sd;
-    vector.c = "$ciphertext"_sd;
-    vector.r = "$iv$ciphertext"_sd;
+    vector.d = "$data";
+    vector.k = "$key";
+    vector.iv = "$iv";
+    vector.c = "$ciphertext";
+    vector.r = "$iv$ciphertext";
     // clang-format on
 EOF

@@ -121,6 +121,7 @@ mongo_cc_library(
         "//src/mongo/executor:remote_command",
         "//src/mongo/rpc:command_status",
         "//src/mongo/rpc:metadata",
+        "//src/mongo/rpc:object_check",
         "//src/mongo/shell:program_runner",
         "//src/mongo/util:icu",
         "//src/mongo/util:md5",
@@ -166,6 +167,8 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/stats:counters",
         "//src/mongo/executor:egress_connection_closer_manager",
+        "//src/mongo/otel/traces:telemetry_context_serialization",
+        "//src/mongo/otel/traces/span",
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:message_compressor",
@@ -228,6 +231,10 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_request",
+        "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces:telemetry_context_serialization",
+        "//src/mongo/otel/traces:tracing_enablement",
+        "//src/mongo/otel/traces/span",
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",
         "//src/mongo/util/net:ssl_manager",
@@ -288,11 +295,13 @@ mongo_cc_library(
         "//src/mongo/executor:network_interface",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:rpc_local_timing",
         "//src/mongo/executor:thread_pool_task_executor",
         "//src/mongo/transport:message_compressor",
         "//src/mongo/transport:transport_layer_manager",
         "//src/mongo/util:background_job",
         "//src/mongo/util:md5",
+        "//src/mongo/util/net:connection_purpose",
         "//src/mongo/util/net:network",
         "//src/mongo/util/net:ssl_manager",
     ] + select({
@@ -370,6 +379,7 @@ mongo_cc_library(
         "sasl_aws_common",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/db:server_base",
+        "//src/mongo/rpc:object_check",
         "//src/third_party/libmongocrypt:mongocrypt",
     ],
 )
@@ -612,7 +622,47 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":clientdriver_network",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "dbclient_base_test",
+    srcs = [
+        "dbclient_base_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":clientdriver_minimal",
+        "//src/mongo/otel/traces:traces_test_util",
+        "//src/mongo/otel/traces:tracing",
+        "//src/mongo/otel/traces:tracing_initialization",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "async_client_test",
+    srcs = [
+        "async_client_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "tracing_test",
+    ],
+    deps = [
+        ":async_client",
+        "//src/mongo/executor:remote_command",
+        "//src/mongo/otel/traces:traces_test_util",
+        "//src/mongo/otel/traces:tracing",
+        "//src/mongo/otel/traces:tracing_initialization",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
@@ -641,6 +691,7 @@ mongo_cc_integration_test(
     ],
     deps = [
         ":clientdriver_network",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
     ],
@@ -698,5 +749,17 @@ mongo_cc_unit_test(
     deps = [
         ":native_sasl_client",
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rpc_local_timing_test",
+    srcs = [
+        "rpc_local_timing_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":async_client",
+        "//src/mongo/unittest",
     ],
 )

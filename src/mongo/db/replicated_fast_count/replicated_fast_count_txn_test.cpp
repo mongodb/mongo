@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -58,14 +32,16 @@ namespace mongo::replicated_fast_count {
 namespace {
 
 using test_helpers::checkCommittedSizeCount;
+using test_helpers::checkUncommittedSizeCount;
 
 /**
  * Tests replicated fast count across multidocument transactions.
  */
 class ReplicatedFastCountTxnFixture : public MockReplCoordServerFixture {
 public:
-    explicit ReplicatedFastCountTxnFixture(Options options = {})
-        : MockReplCoordServerFixture(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return MockReplCoordServerFixture::makeServiceContextOptions().useReplSettings(true);
+    }
 
 protected:
     void setUp() override {
@@ -138,7 +114,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "ReplicatedFastCountTxns");
@@ -174,7 +150,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
@@ -194,7 +170,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -221,9 +197,10 @@ protected:
 
 class ReplicatedFastCountTxnTest : public ReplicatedFastCountTxnFixture {
 public:
-    ReplicatedFastCountTxnTest()
-        : ReplicatedFastCountTxnFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return Options().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
 
 TEST_F(ReplicatedFastCountTxnTest,
@@ -256,13 +233,13 @@ TEST_F(ReplicatedFastCountTxnTest,
         // Since the transaction as a whole hasn't been committed, expect doc1 to only count toward
         // uncommitted changes.
         checkCommittedSizeCount(opCtx1, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx1, *uuid, 1, doc1.objsize());
+        checkUncommittedSizeCount(opCtx1, *uuid, {.size = doc1.objsize(), .count = 1});
     });
 
     // The insert shouldn't be visible outside the transaction.
     ASSERT(uuid.has_value());
     checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 
     // Continue and commit the transaction.
     continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext* opCtx2) {
@@ -281,11 +258,11 @@ TEST_F(ReplicatedFastCountTxnTest,
         // Uncommitted fast count changes should include both inserts, even though they were
         // executed on different OperationContexts.
         checkCommittedSizeCount(opCtx2, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx2, *uuid, expectedCount, expectedSize);
+        checkUncommittedSizeCount(opCtx2, *uuid, {.size = expectedSize, .count = expectedCount});
     });
 
     checkCommittedSizeCount(_opCtx, *uuid, {.size = expectedSize, .count = expectedCount});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 }
 
 TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocumentTxnAbort) {
@@ -314,23 +291,23 @@ TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocument
         // Since the transaction as a whole hasn't been committed, expect doc1 to only count toward
         // uncommitted changes.
         checkCommittedSizeCount(opCtx1, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx1, *uuid, 1, doc1.objsize());
+        checkUncommittedSizeCount(opCtx1, *uuid, {.size = doc1.objsize(), .count = 1});
     });
 
     // The insert shouldn't be visible outside the transaction.
     ASSERT(uuid.has_value());
     checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 
     abortTxn(sessionId, txnNumber);
 
     // Confirm the uncommitted changes were discarded.
     checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
-    test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
+    checkUncommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
 }
 
 TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) {
-    // Tests that the 'UncommittedFastCountChange' is reset when there is a new
+    // Tests that 'UncommittedFastCountChanges' is reset when there is a new
     // 'RecoveryUnit::Snapshot', even across a single OperationContext.
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
@@ -354,7 +331,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
         }
 
         checkCommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 1, doc1.objsize());
+        checkUncommittedSizeCount(opCtx, *uuid, {.size = doc1.objsize(), .count = 1});
     });
     abortTxn(_opCtx, sessionId, txnNumber);
 
@@ -362,7 +339,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
     beginTxn(_opCtx, sessionId, txnNumber, [&](OperationContext* opCtx) {
         // Nothing leaked over from the previous transaction on the session.
         checkCommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
-        test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 0, 0);
+        checkUncommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
     });
     abortTxn(_opCtx, sessionId, txnNumber);
 }
@@ -511,8 +488,10 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) 
  */
 class PreparedSizeMetadataTest : public ReplicatedFastCountTxnFixture {
 protected:
-    PreparedSizeMetadataTest(Options options = {})
-        : ReplicatedFastCountTxnFixture(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ReplicatedFastCountTxnFixture::makeServiceContextOptions().useReplSettings(true);
+    }
+
     void setUp() override {
         ReplicatedFastCountTxnFixture::setUp();
         setGlobalFailPoint("skipCommitTxnCheckPrepareMajorityCommitted",
@@ -550,8 +529,9 @@ protected:
         for (const auto& doc : docs) {
             auto operation = repl::DurableOplogEntry::makeInsertOperation(
                 nss, coll.uuid(), doc, doc["_id"].wrap());
-            operation.setSizeMetadata(repl::OplogEntrySizeMetadata{
-                SingleOpSizeMetadata(static_cast<int32_t>(doc.objsize()))});
+            SingleOpSizeMetadata sizeMetadata;
+            sizeMetadata.setSz(static_cast<int32_t>(doc.objsize()));
+            operation.setSizeMetadata(repl::OplogEntrySizeMetadata{sizeMetadata});
             txnParticipant.addTransactionOperation(opCtx, operation);
         }
     }
@@ -572,7 +552,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
         auto prepareTs = txnParticipant.prepareTransaction(opCtx, {}).first;
@@ -597,7 +577,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
         txnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
         const auto commitTs = Timestamp(prepareTs.getSecs(), prepareTs.getInc() + 1);
@@ -660,7 +640,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
         txnParticipant.prepareTransaction(opCtx, {});
@@ -821,9 +801,10 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
 
     // Before restoring, no uncommitted fast count changes have been seeded.
     {
-        const auto& uncommitted = UncommittedFastCountChange::getForRead(_opCtx);
-        EXPECT_EQ(uncommitted.find(_uuid1), (CollectionSizeCount{.size = 0, .count = 0}));
-        EXPECT_EQ(uncommitted.find(_uuid2), (CollectionSizeCount{.size = 0, .count = 0}));
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid1),
+                  (CollectionSizeCount{.size = 0, .count = 0}));
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid2),
+                  (CollectionSizeCount{.size = 0, .count = 0}));
     }
 
     // Restoring from the checkpoint record re-seeds the uncommitted fast count changes from the
@@ -833,10 +814,9 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
         restoreFromCheckpointAndGetSession(_opCtx, sessionId, txnNumber, std::move(recoveryRecord));
 
     {
-        const auto& uncommitted = UncommittedFastCountChange::getForRead(_opCtx);
-        EXPECT_EQ(uncommitted.find(_uuid1),
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid1),
                   (CollectionSizeCount{.size = docA.objsize() + docB.objsize(), .count = 2}));
-        EXPECT_EQ(uncommitted.find(_uuid2),
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid2),
                   (CollectionSizeCount{.size = docC.objsize(), .count = 1}));
     }
 }

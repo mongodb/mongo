@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
@@ -57,9 +30,10 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/type_traits/decay.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class IndexCatalogEntry;
 class OperationContext;
@@ -82,35 +56,35 @@ public:
         kIdentical    // Indicates that all applicable index options match.
     };
 
-    static constexpr std::string_view k2dIndexBitsFieldName = "bits"_sd;
-    static constexpr std::string_view k2dIndexMinFieldName = "min"_sd;
-    static constexpr std::string_view k2dIndexMaxFieldName = "max"_sd;
-    static constexpr std::string_view k2dsphereCoarsestIndexedLevel = "coarsestIndexedLevel"_sd;
-    static constexpr std::string_view k2dsphereFinestIndexedLevel = "finestIndexedLevel"_sd;
-    static constexpr std::string_view k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
-    static constexpr std::string_view kBackgroundFieldName = "background"_sd;
-    static constexpr std::string_view kBucketSizeFieldName = "bucketSize"_sd;
-    static constexpr std::string_view kCollationFieldName = "collation"_sd;
-    static constexpr std::string_view kDefaultLanguageFieldName = "default_language"_sd;
-    static constexpr std::string_view kDropDuplicatesFieldName = "dropDups"_sd;
-    static constexpr std::string_view kExpireAfterSecondsFieldName = "expireAfterSeconds"_sd;
-    static constexpr std::string_view kHiddenFieldName = "hidden"_sd;
-    static constexpr std::string_view kIndexNameFieldName = "name"_sd;
-    static constexpr std::string_view kIndexVersionFieldName = "v"_sd;
-    static constexpr std::string_view kKeyPatternFieldName = "key"_sd;
-    static constexpr std::string_view kLanguageOverrideFieldName = "language_override"_sd;
+    static constexpr std::string_view k2dIndexBitsFieldName = "bits"sv;
+    static constexpr std::string_view k2dIndexMinFieldName = "min"sv;
+    static constexpr std::string_view k2dIndexMaxFieldName = "max"sv;
+    static constexpr std::string_view k2dsphereCoarsestIndexedLevel = "coarsestIndexedLevel"sv;
+    static constexpr std::string_view k2dsphereFinestIndexedLevel = "finestIndexedLevel"sv;
+    static constexpr std::string_view k2dsphereVersionFieldName = "2dsphereIndexVersion"sv;
+    static constexpr std::string_view kBackgroundFieldName = "background"sv;
+    static constexpr std::string_view kBucketSizeFieldName = "bucketSize"sv;
+    static constexpr std::string_view kCollationFieldName = "collation"sv;
+    static constexpr std::string_view kDefaultLanguageFieldName = "default_language"sv;
+    static constexpr std::string_view kDropDuplicatesFieldName = "dropDups"sv;
+    static constexpr std::string_view kExpireAfterSecondsFieldName = "expireAfterSeconds"sv;
+    static constexpr std::string_view kHiddenFieldName = "hidden"sv;
+    static constexpr std::string_view kIndexNameFieldName = "name"sv;
+    static constexpr std::string_view kIndexVersionFieldName = "v"sv;
+    static constexpr std::string_view kKeyPatternFieldName = "key"sv;
+    static constexpr std::string_view kLanguageOverrideFieldName = "language_override"sv;
     // TODO(SERVER-100328): remove after 9.0 is branched.
-    static constexpr std::string_view kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
-    static constexpr std::string_view kPartialFilterExprFieldName = "partialFilterExpression"_sd;
-    static constexpr std::string_view kWildcardProjectionFieldName = "wildcardProjection"_sd;
-    static constexpr std::string_view kSparseFieldName = "sparse"_sd;
-    static constexpr std::string_view kStorageEngineFieldName = "storageEngine"_sd;
-    static constexpr std::string_view kTextVersionFieldName = "textIndexVersion"_sd;
-    static constexpr std::string_view kUniqueFieldName = "unique"_sd;
-    static constexpr std::string_view kWeightsFieldName = "weights"_sd;
-    static constexpr std::string_view kOriginalSpecFieldName = "originalSpec"_sd;
-    static constexpr std::string_view kPrepareUniqueFieldName = "prepareUnique"_sd;
-    static constexpr std::string_view kClusteredFieldName = "clustered"_sd;
+    static constexpr std::string_view kNamespaceFieldName = "ns"sv;  // Removed in 4.4
+    static constexpr std::string_view kPartialFilterExprFieldName = "partialFilterExpression"sv;
+    static constexpr std::string_view kWildcardProjectionFieldName = "wildcardProjection"sv;
+    static constexpr std::string_view kSparseFieldName = "sparse"sv;
+    static constexpr std::string_view kStorageEngineFieldName = "storageEngine"sv;
+    static constexpr std::string_view kTextVersionFieldName = "textIndexVersion"sv;
+    static constexpr std::string_view kUniqueFieldName = "unique"sv;
+    static constexpr std::string_view kWeightsFieldName = "weights"sv;
+    static constexpr std::string_view kOriginalSpecFieldName = "originalSpec"sv;
+    static constexpr std::string_view kPrepareUniqueFieldName = "prepareUnique"sv;
+    static constexpr std::string_view kClusteredFieldName = "clustered"sv;
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.
@@ -320,7 +294,7 @@ public:
         if (iter.next()) {
             return false;
         }
-        if (firstElement.fieldNameStringData() != "_id"_sd) {
+        if (firstElement.fieldNameStringData() != "_id"sv) {
             return false;
         }
         auto intVal = firstElement.safeNumberInt();
@@ -337,11 +311,11 @@ public:
         if (iter.next()) {
             return false;
         }
-        if (firstElement.fieldNameStringData() != "_id"_sd) {
+        if (firstElement.fieldNameStringData() != "_id"sv) {
             return false;
         }
         auto strVal = firstElement.valueStringDataSafe();
-        return strVal == "hashed"_sd;
+        return strVal == "hashed"sv;
     }
 
 private:

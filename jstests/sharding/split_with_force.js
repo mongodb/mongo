@@ -4,9 +4,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// TODO (SERVER-87574): Performing splitVector across dbs isn't supported via mongos.
-TestData.replicaSetEndpointIncompatible = true;
-
 let options = {
     chunkSize: 1, // MB
 };

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -48,17 +22,30 @@ namespace mongo::sbe {
 /**
  * Evaluates a set of expressions and stores the results into corresponding output slots. This is
  * unrelated to projections in MQL. The set of (slot, expression) pairs are passed in the 'projects'
- * slot map.
+ * vector.
+ *
+ * With 'Binding::kParallel' (the default) the bindings have let semantics: no expression may refer
+ * to the output slot of any expression in the same stage.
+ *
+ * With 'Binding::kSequential' the bindings have let* semantics instead: the expressions are
+ * evaluated in order, and each expression may refer to the output slots of the expressions that
+ * precede it. For example, 'project* [s2 = s1 + 1, s3 = s2 * 2]' computes 's3' from the value of
+ * 's2' produced for the same row. An expression still may not refer to its own output slot or to
+ * the output slot of an expression that follows it.
  *
  * Debug string representation:
  *
  *  project [slot_1 = expr_1, ..., slot_n = expr_n] childStage
+ *  project* [slot_1 = expr_1, ..., slot_n = expr_n] childStage    (Binding::kSequential)
  */
 class ProjectStage final : public PlanStage {
 public:
+    enum class Binding { kParallel, kSequential };
+
     ProjectStage(std::unique_ptr<PlanStage> input,
                  SlotExprPairVector projects,
                  PlanNodeId planNodeId,
+                 Binding binding = Binding::kParallel,
                  bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -83,17 +70,44 @@ protected:
 
 
 private:
+    struct CompiledProject {
+        std::unique_ptr<vm::CodeFragment> code;
+        value::OwnedValueAccessor accessor;
+    };
+
     const SlotExprPairVector _projects;
-    value::SlotMap<std::pair<std::unique_ptr<vm::CodeFragment>, value::OwnedValueAccessor>> _fields;
+    const Binding _binding;
 
-    vm::ByteCode _bytecode;
+    // Maps each output slot to the index of its expression in '_projects'.
+    value::SlotMap<size_t> _slotToIdx;
 
-    bool _compiled{false};
+    // The compiled expressions, in the same order as '_projects'. With sequential binding, an
+    // output slot becomes visible through getAccessor() as soon as its expression has been
+    // compiled, which is what allows each expression to refer to the output slots of the
+    // expressions before it. The vector's capacity is reserved up front because compiled code holds
+    // pointers to the accessors of earlier entries.
+    std::vector<CompiledProject> _compiled;
+
+    // Set once all of the expressions have been compiled. From then on, every output slot is
+    // visible through getAccessor() regardless of the binding mode.
+    bool _prepared{false};
+
+    std::shared_ptr<vm::ByteCode> _bytecode;
 };
 
 template <typename... Ts>
 inline auto makeProjectStage(std::unique_ptr<PlanStage> input, PlanNodeId nodeId, Ts&&... pack) {
     return makeS<ProjectStage>(
         std::move(input), makeSlotExprPairVec(std::forward<Ts>(pack)...), nodeId);
+}
+
+template <typename... Ts>
+inline auto makeSequentialProjectStage(std::unique_ptr<PlanStage> input,
+                                       PlanNodeId nodeId,
+                                       Ts&&... pack) {
+    return makeS<ProjectStage>(std::move(input),
+                               makeSlotExprPairVec(std::forward<Ts>(pack)...),
+                               nodeId,
+                               ProjectStage::Binding::kSequential);
 }
 }  // namespace mongo::sbe

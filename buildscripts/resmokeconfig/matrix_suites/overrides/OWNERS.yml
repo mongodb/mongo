@@ -73,7 +73,13 @@ filters:
   - "drop_config_cache_collections_hook.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "write_blocking.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "kill_primary.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "replica_sets_stepdown_selector.yml":
     approvers:
       - 10gen/server-replication-reviewers
   - "minimum_batch_size.yml":
@@ -82,3 +88,6 @@ filters:
   - "encryption.yml":
     approvers:
       - 10gen/server-security
+  - "with_mongot_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api

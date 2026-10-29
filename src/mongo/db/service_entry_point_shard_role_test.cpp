@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/service_entry_point_shard_role.h"
 
@@ -33,18 +7,29 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ingress_request_admission_context.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
+#include "mongo/db/admission/write_throttler.h"
+#include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
@@ -55,26 +40,53 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
 
+#include <memory>
+
+#include <gmock/gmock.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo::admission {
 namespace {
+
+using ::testing::_;
+using ::testing::Invoke;
 
 MONGO_REGISTER_COMMAND(TestCmdProcessInternalCommand).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdProcessInternalSucceedCommand).testOnly().forShard();
 
-class TestCmdShardIngressSubject final : public TestCmdBase {
+// Mocks the shard's response to a StaleConfig error found while recovering sharding metadata on
+// the write path, so tests can simulate e.g. the recovery being interrupted by a concurrent
+// shutdown or stepdown.
+class StaleShardVersionExceptionHandlerMock final : public StaleShardCollectionMetadataHandler {
 public:
-    static constexpr auto kCommandName = "testShardIngressSubject";
-    TestCmdShardIngressSubject() : TestCmdBase(kCommandName) {}
-
-    bool isSubjectToIngressAdmissionControl() const override {
-        return true;
-    }
-
-    bool runWithBuilderOnly(BSONObjBuilder&) override {
-        return true;
-    }
+    MOCK_METHOD(boost::optional<ChunkVersion>,
+                handleStaleShardVersionException,
+                (OperationContext*, const StaleConfigInfo&),
+                (const, override));
 };
-MONGO_REGISTER_COMMAND(TestCmdShardIngressSubject).testOnly().forShard();
+
+class CollectionShardingStateFactoryMock : public CollectionShardingStateFactory {
+public:
+    explicit CollectionShardingStateFactoryMock(
+        std::shared_ptr<StaleShardCollectionMetadataHandler> staleShardExceptionHandler)
+        : _staleShardExceptionHandler(std::move(staleShardExceptionHandler)) {}
+
+    std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
+        MONGO_UNREACHABLE;
+    }
+
+    const StaleShardCollectionMetadataHandler& getStaleShardExceptionHandler() const override {
+        return *_staleShardExceptionHandler;
+    }
+
+private:
+    std::shared_ptr<StaleShardCollectionMetadataHandler> _staleShardExceptionHandler;
+};
+
+void installWriteThrottler(ServiceContext* service) {
+    WriteThrottler::set(service, std::make_unique<WriteThrottler>(service->getTickSource()));
+}
 
 class ServiceEntryPointShardRoleTest : public ServiceEntryPointTestFixture {
 public:
@@ -207,8 +219,11 @@ void ServiceEntryPointShardRoleTest::testCommandMaxTimeMSOpOnly() {
     }
 }
 
-class ServiceEntryPointShardServerTest : public virtual service_context_test::ShardRoleOverride,
-                                         public ServiceEntryPointShardRoleTest {};
+class ServiceEntryPointShardServerTest : public ServiceEntryPointShardRoleTest {
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+};
 
 TEST_F(ServiceEntryPointShardServerTest, TestCommandSucceeds) {
     testCommandSucceeds();
@@ -320,219 +335,235 @@ TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDe
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-TEST_F(ServiceEntryPointShardServerTest, WaitForAdmissionResolvesDeferredTokenBeforeInvocation) {
-    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
+// A write command (supportsWriteConcern + kWrite) that succeeds and is subject to ingress
+// admission. Used as the nested DBDirectClient write to verify the write throttler does not admit a
+// re-entrant operation twice.
+class TestCmdWriteThrottlerNestedWrite : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerNestedWrite";
+    TestCmdWriteThrottlerNestedWrite() : TestCmdBase(kCommandName) {}
 
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "WaitForAdmissionResolvesDeferredTokenBeforeInvocation");
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        return true;
+    }
+};
+
+class TestCmdWriteThrottlerRead : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerRead";
+    TestCmdWriteThrottlerRead() : TestCmdBase(kCommandName) {}
+
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kRead;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        return true;
+    }
+};
+
+class TestCmdWriteThrottlerCommand : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerCommand";
+    TestCmdWriteThrottlerCommand() : TestCmdBase(kCommandName) {}
+
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kCommand;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        return true;
+    }
+};
+
+// A top-level write command that issues a nested write via DBDirectClient on the same opCtx.
+class TestCmdWriteThrottlerDirectClientParent : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerDirectClientParent";
+    TestCmdWriteThrottlerDirectClientParent() : TestCmdBase(kCommandName) {}
+
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        uassert(ErrorCodes::InternalError, "runWithBuilderOnly not implemented", false);
+    }
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj&,
+             BSONObjBuilder&) override {
+        BSONObj info;
+        DBDirectClient{opCtx}.runCommand(
+            DatabaseName::createDatabaseName_forTest(boost::none, "admin"),
+            BSON(TestCmdWriteThrottlerNestedWrite::kCommandName << 1),
+            info);
+        return true;
+    }
+};
+
+class TestCmdWriteThrottlerDisablesDuringRun : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testWriteThrottlerDisablesDuringRun";
+    TestCmdWriteThrottlerDisablesDuringRun() : TestCmdBase(kCommandName) {}
+
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        uassert(ErrorCodes::InternalError, "runWithBuilderOnly not implemented", false);
+    }
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj&,
+             BSONObjBuilder&) override {
+        WriteThrottlerAdmissionContext::get(opCtx).recordStorageWrites(10);
+        auto* enabledParameter =
+            ServerParameterSet::getNodeParameterSet()->get("writeThrottlerEnabled");
+        uassertStatusOK(enabledParameter->setFromString("false", boost::none));
+        return true;
+    }
+};
+
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerNestedWrite).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerRead).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerCommand).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerDirectClientParent).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdWriteThrottlerDisablesDuringRun).testOnly().forShard();
+
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerAdmitsWriteCommandOnceAtServiceEntry) {
+    installWriteThrottler(getGlobalServiceContext());
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec",
+                                              WriteThrottler::kMaxRate};
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
 
     auto opCtx = makeOperationContext();
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
-                                                                 std::move(*queuedTokenResult));
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerNestedWrite::kCommandName << 1),
+                               opCtx.get());
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
 
-    // Mark this client as a direct client so that waitForAdmission exempts it rather than sleeping
-    // on the mock clock. We are just testing that waitForAdmission resolves the deferred token and
-    // allows the command to proceed, not that it waits for the token to be available.
-    opCtx->getClient()->setInDirectClient(true);
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+}
 
-    runCommandTestWithResponse(BSON("ping" << 1), opCtx.get(), Status::OK());
-    ASSERT_EQ(limiterForDeferredToken.queued(), 0);
-    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsReadCommands) {
+    installWriteThrottler(getGlobalServiceContext());
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec",
+                                              WriteThrottler::kMaxRate};
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
+
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerRead::kCommandName << 1), opCtx.get());
+    ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 0);
+}
+
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsNonWriteCommands) {
+    installWriteThrottler(getGlobalServiceContext());
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec",
+                                              WriteThrottler::kMaxRate};
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
+
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerCommand::kCommandName << 1), opCtx.get());
+    ASSERT_EQ(WriteThrottlerAdmissionContext::get(opCtx.get()).getAdmissions(), 0);
+}
+
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerSkipsDirectClientReentryWrite) {
+    installWriteThrottler(getGlobalServiceContext());
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec",
+                                              WriteThrottler::kMaxRate};
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
+
+    auto opCtx = makeOperationContext();
+    // The parent is a top-level write command that issues a nested write via DBDirectClient on the
+    // same opCtx. The top-level write is admitted exactly once; the re-entrant direct-client write
+    // must not take a second write-throttler admission.
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerDirectClientParent::kCommandName << 1),
+                               opCtx.get());
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+}
+
+TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerFinalizesAdmissionWhenDisabledDuringRun) {
+    unittest::ServerParameterGuard enabled{"writeThrottlerEnabled", true};
+    unittest::ServerParameterGuard targetRate{"writeThrottlerTargetRatePerSec", 1};
+    unittest::ServerParameterGuard burstCapacity{"writeThrottlerBurstCapacitySecs", 100.0};
+    installWriteThrottler(getGlobalServiceContext());
+    auto* throttler = WriteThrottler::get(getGlobalServiceContext());
+
+    const auto before = throttler->tokenBalance_forTest();
+    auto opCtx = makeOperationContext();
+    runCommandTestWithResponse(BSON(TestCmdWriteThrottlerDisablesDuringRun::kCommandName << 1),
+                               opCtx.get());
+
+    auto& admCtx = WriteThrottlerAdmissionContext::get(opCtx.get());
+    ASSERT_EQ(admCtx.getAdmissions(), 1);
+    ASSERT_EQ(throttler->tokenBalance_forTest(), before - 10);
 }
 
 TEST_F(ServiceEntryPointShardServerTest,
        PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled) {
-    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/1,
-        "PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled");
-
-    auto opCtx = makeOperationContext();
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
-                                                                 std::move(*queuedTokenResult));
-
-    auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
-    ASSERT_OK(handleRequest(msg, opCtx.get()));
-
-    ASSERT_EQ(limiterForDeferredToken.stats().addedToQueue(), 1);
-    ASSERT_EQ(limiterForDeferredToken.stats().removedFromQueue(), 1);
-    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
-    ASSERT_EQ(limiterForDeferredToken.queued(), 0);
+    testPendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionInterrupted) {
-    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    auto opCtx = makeOperationContext();
-    auto* client = opCtx->getClient();
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "QueuedAdmissionInterrupted");
-
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
-                                                                 std::move(*queuedTokenResult));
-
-    // handleRequest blocks in waitForAdmission while the queued token's napTime elapses. A
-    // background thread waits until the opCtx is blocking there, then kills it to trigger
-    // Interrupted.
-    auto msg = constructMessage(BSON(TestCmdShardIngressSubject::kCommandName << 1), opCtx.get());
-    stdx::thread interrupter([&] {
-        while (!opCtx->isWaitingForConditionOrInterrupt()) {
-            sleepmillis(1);
-        }
-        opCtx->markKilled(ErrorCodes::Interrupted);
-    });
-    auto swDbResponse = handleRequest(msg, opCtx.get());
-    interrupter.join();
-    ASSERT_OK(swDbResponse);
-
-    const auto response = dbResponseToBSON(swDbResponse.getValue());
-    const auto status = getStatusFromCommandResult(response);
-    ASSERT_EQ(status.code(), ErrorCodes::Interrupted);
-    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    testQueuedAdmissionInterrupted();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionRespectsMaxTimeMS) {
-    gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    auto* clockSource =
-        static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
-    auto* tickSource =
-        static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
-
-    auto opCtx = makeOperationContext();
-    auto* client = opCtx->getClient();
-
-    // ServiceEntryPointShardRole has a contract guard ensuring presence of an AuthorizationSession.
-    AuthorizationSession::get(client);
-
-    // Create the limiter with the mock tick source so clock advancement controls token
-    // availability.
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "QueuedAdmissionRespectsMaxTimeMS",
-        tickSource);
-
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
-                                                                 std::move(*queuedTokenResult));
-
-    // handleRequest parses maxTimeMS from the message and sets the opCtx deadline. A background
-    // thread waits until the opCtx is blocking in waitForAdmission, then advances the mock clock
-    // past the 5ms deadline (well under the ~1000ms napTime) to trigger MaxTimeMSExpired.
-    stdx::thread clockAdvancer([&] {
-        while (!opCtx->isWaitingForConditionOrInterrupt()) {
-            sleepmillis(1);
-        }
-        clockSource->advance(Milliseconds(6));
-        tickSource->advance(Milliseconds(6));
-    });
-
-    auto msg = constructMessage(BSON(TestCmdShardIngressSubject::kCommandName
-                                     << 1 << GenericArguments::kMaxTimeMSFieldName << 5),
-                                opCtx.get());
-    auto swDbResponse = handleRequest(msg, opCtx.get());
-    clockAdvancer.join();
-    ASSERT_OK(swDbResponse);
-
-    const auto response = dbResponseToBSON(swDbResponse.getValue());
-    const auto status = getStatusFromCommandResult(response);
-    ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
-    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    testQueuedAdmissionRespectsMaxTimeMS();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSucceeds) {
-    gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    auto* clockSource =
-        static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
-    auto* tickSource =
-        static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
-
-    auto opCtx = makeOperationContext();
-    auto* client = opCtx->getClient();
-
-    // ServiceEntryPointShardRole has a contract guard ensuring presence of an AuthorizationSession.
-    AuthorizationSession::get(client);
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "QueuedAdmissionWithLargeMaxTimeMSSucceeds",
-        tickSource);
-
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
-                                                                 std::move(*queuedTokenResult));
-
-    // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
-    // 1 token/sec) elapses. A background thread waits until the opCtx is blocking, then advances
-    // the mock clock past the napTime to release the token and let the command succeed.
-    stdx::thread clockAdvancer([&] {
-        while (!opCtx->isWaitingForConditionOrInterrupt()) {
-            sleepmillis(1);
-        }
-        clockSource->advance(Milliseconds(1001));
-        tickSource->advance(Milliseconds(1001));
-    });
-
-    auto msg = constructMessage(BSON(TestCmdShardIngressSubject::kCommandName
-                                     << 1 << GenericArguments::kMaxTimeMSFieldName << (60 * 1000)),
-                                opCtx.get());
-    auto swDbResponse = handleRequest(msg, opCtx.get());
-    clockAdvancer.join();
-
-    ASSERT_OK(swDbResponse);
-    ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())), Status::OK());
-    ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
+    testQueuedAdmissionWithLargeMaxTimeMSSucceeds();
 }
 
-#ifdef MONGO_CONFIG_OTEL
-TEST_F(ServiceEntryPointShardServerTest, TelemetryContextDeserializedFromRequest) {
-    testTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointShardServerTest, TelemetryContextDeserializedFromSection) {
+    testTelemetryContextDeserializedFromSection();
 }
 
-TEST_F(ServiceEntryPointShardServerTest, TelemetryContextNotSetWhenNotInRequest) {
-    testTelemetryContextNotSetWhenNotInRequest();
+TEST_F(ServiceEntryPointShardServerTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
+    testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
-#endif
 
+TEST_F(ServiceEntryPointShardServerTest, IngressSpanHasServerKind) {
+    testIngressSpanHasServerKind();
+}
 
-class ServiceEntryPointReplicaSetTest : public virtual service_context_test::ReplicaSetRoleOverride,
-                                        public ServiceEntryPointShardRoleTest {};
+TEST_F(ServiceEntryPointShardServerTest, IngressSpanHasConsumerKindForMoreToCome) {
+    testIngressSpanHasConsumerKindForMoreToCome();
+}
+
+class ServiceEntryPointReplicaSetTest : public ServiceEntryPointShardRoleTest {
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::None};
+    }
+};
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestCommandSucceeds) {
     testCommandSucceeds();
@@ -644,15 +675,21 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDef
     testWriteConcernClientUnspecifiedWithDefault();
 }
 
-#ifdef MONGO_CONFIG_OTEL
-TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextDeserializedFromRequest) {
-    testTelemetryContextDeserializedFromRequest();
+TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextDeserializedFromSection) {
+    testTelemetryContextDeserializedFromSection();
 }
 
-TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextNotSetWhenNotInRequest) {
-    testTelemetryContextNotSetWhenNotInRequest();
+TEST_F(ServiceEntryPointReplicaSetTest, SpanNotCreatedWhenTelemetryContextNotSetInRequest) {
+    testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
 }
-#endif
+
+TEST_F(ServiceEntryPointReplicaSetTest, IngressSpanHasServerKind) {
+    testIngressSpanHasServerKind();
+}
+
+TEST_F(ServiceEntryPointReplicaSetTest, IngressSpanHasConsumerKindForMoreToCome) {
+    testIngressSpanHasConsumerKindForMoreToCome();
+}
 
 // Test command that returns the opCtx deadline in its response (used as the child command).
 class TestCmdReportDeadline : public TestCmdBase {
@@ -791,6 +828,37 @@ TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSWithNoParentDeadline) {
 }
 TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter) {
     testNestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter();
+}
+
+TEST_F(ServiceEntryPointShardServerTest,
+       WriteErrorSurvivesInterruptionDuringShardingMetadataRecovery) {
+    auto staleShardVersionHandlerMock = std::make_shared<StaleShardVersionExceptionHandlerMock>();
+    EXPECT_CALL(*staleShardVersionHandlerMock, handleStaleShardVersionException(_, _))
+        .WillOnce(
+            Invoke([](OperationContext*, const StaleConfigInfo&) -> boost::optional<ChunkVersion> {
+                uasserted(ErrorCodes::InterruptedDueToReplStateChange,
+                          "simulated interruption while recovering sharding metadata");
+            }));
+    CollectionShardingStateFactory::set(
+        getServiceContext(),
+        std::make_unique<CollectionShardingStateFactoryMock>(staleShardVersionHandlerMock));
+
+    auto opCtx = makeOperationContext();
+
+    // Simulate a write command that reported an individual write's StaleConfig error via the
+    // sharding operation state, to be handled once the command invocation returns.
+    const auto generation = CollectionGeneration(OID::gen(), Timestamp(1, 0));
+    OperationShardingState::get(opCtx.get())
+        .setShardingOperationFailedStatus(Status(
+            StaleConfigInfo(NamespaceString::createNamespaceString_forTest("testDb", "testColl"),
+                            ShardVersionFactory::make(ChunkVersion(generation, {1, 0})),
+                            boost::none,
+                            ShardId("shard0000")),
+            "simulated stale config write error"));
+
+    // Even though recovering the write's StaleConfig error is interrupted, the command's own
+    // (successful) response must not be overwritten with a top-level error.
+    runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, NestedMaxTimeMSChildTightensParentDeadline) {

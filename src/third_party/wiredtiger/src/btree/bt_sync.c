@@ -9,18 +9,139 @@
 #include "wt_internal.h"
 
 /*
+ * __sync_evict_reconciled_under_ckpt_snapshot --
+ *     Return true if eviction already reconciled the page using this checkpoint's snapshot, so the
+ *     on-disk image checkpoint would produce is identical and re-reconciliation can be skipped.
+ */
+static WT_INLINE bool
+__sync_evict_reconciled_under_ckpt_snapshot(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_PAGE_MODIFY *mod;
+
+    conn = S2C(session);
+    mod = ref->page->modify;
+
+    if (!F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT))
+        return (false);
+
+    /*
+     * The page must have been reconciled under the snapshot this checkpoint published. The
+     * connection's checkpoint generation identifies the running one.
+     */
+    if (mod->rec_ckpt_snap_gen == WT_CKPT_SNAP_GEN_NONE ||
+      mod->rec_ckpt_snap_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
+        return (false);
+
+    if (mod->rec_pinned_stable_timestamp !=
+      __wt_atomic_load_uint64_relaxed(&conn->txn_global.checkpoint_timestamp))
+        return (false);
+
+    return (true);
+}
+
+/*
+ * __sync_page_image_durable --
+ *     Return true if every reconciliation product of the page is backed by a written block address,
+ *     so checkpoint can leave the existing on-disk image in place instead of rewriting it.
+ */
+static WT_INLINE bool
+__sync_page_image_durable(WT_REF *ref)
+{
+    WT_MULTI *multi;
+    WT_PAGE_MODIFY *mod;
+    u_int i;
+
+    mod = ref->page->modify;
+
+    /* A re-instantiated page keeps its written address on the ref. */
+    if (mod->rec_result == 0)
+        return (__wt_atomic_load_ptr_relaxed(&ref->addr) != NULL);
+
+    switch (mod->rec_result) {
+    case WT_PM_REC_EMPTY:
+        /* The page is deleted, there is nothing to write. */
+        return (true);
+    case WT_PM_REC_REPLACE:
+        /* The block is written. */
+        return (mod->mod_replace.block_cookie != NULL);
+    case WT_PM_REC_MULTIBLOCK:
+        /*
+         * A page evicted with unresolved updates can have blocks without a disk address; checkpoint
+         * must write it with valid addresses.
+         */
+        for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
+            if (multi->addr.block_cookie == NULL)
+                return (false);
+        return (true);
+    default:
+        return (false);
+    }
+}
+
+/*
+ * __sync_scrub_checkpoint_enabled --
+ *     Return true if checkpoint reconciliation should retain clean disk images for scrub eviction.
+ */
+static bool
+__sync_scrub_checkpoint_enabled(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    /* Skip during recovery or checkpoint shutdown: the scrubbed image would never be consumed. */
+    if (F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT))
+        return (false);
+
+    /* Skip the metadata trees when generating images. */
+    if (WT_IS_ANY_METADATA(S2BT(session)->dhandle))
+        return (false);
+
+    switch (__wt_atomic_load_uint8_relaxed(
+      &conn->cache->cache_eviction_controls.checkpoint_scrub_eviction)) {
+    case WT_CACHE_CHECKPOINT_SCRUB_EVICT_OFF:
+        return (false);
+    case WT_CACHE_CHECKPOINT_SCRUB_EVICT_ON:
+        return (true);
+    default:
+        /* Only retain an image while eviction is in scrub mode. */
+        return (
+          F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && F_ISSET(conn->evict, WT_EVICT_CACHE_SCRUB));
+    }
+}
+
+/*
+ * __sync_page_rec_flags --
+ *     Add a scrub-image request to a page's reconciliation flags. Only a row-store leaf can be
+ *     swapped for its image, and the cache budget is re-read per page because pages queued for a
+ *     reconciliation worker have not consumed their image yet.
+ */
+static uint32_t
+__sync_page_rec_flags(
+  WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t rec_flags, bool checkpoint_scrub)
+{
+    if (checkpoint_scrub && page->type == WT_PAGE_ROW_LEAF &&
+      __wt_cache_scrub_image_budget_ok(session))
+        FLD_SET(rec_flags, WT_REC_SAVE_IMAGE_CLEAN);
+
+    return (rec_flags);
+}
+
+/*
  * __sync_checkpoint_can_skip --
  *     There are limited conditions under which we can skip writing a dirty page during checkpoint.
  */
 static WT_INLINE bool
 __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-    WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
     WT_TXN *txn;
-    u_int i;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &S2BT(session)->flush_lock);
+
+    txn = session->txn;
+    mod = ref->page->modify;
 
     /*
      * If we got to this point and we are dealing with an internal page, this means at least one of
@@ -39,27 +160,6 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     if (WT_IS_DISAGG_META(session->dhandle))
         return (false);
 
-    /* The checkpoint's snapshot includes the first dirty update on the page. */
-    txn = session->txn;
-    mod = ref->page->modify;
-    if (txn->snapshot_data.snap_max >= __wt_tsan_suppress_load_uint64(&mod->first_dirty_txn))
-        return (false);
-
-    /*
-     * The problematic case is when a page was evicted but when there were unresolved updates and
-     * not every block associated with the page has a disk address. We can't skip such pages because
-     * we need a checkpoint write with valid addresses.
-     *
-     * The page's modification information can change underfoot if the page is being reconciled, so
-     * we'd normally serialize with reconciliation before reviewing page-modification information.
-     * However, checkpoint is the only valid writer of dirty leaf pages at this point, we skip the
-     * lock.
-     */
-    if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
-        for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
-            if (multi->addr.block_cookie == NULL)
-                return (false);
-
     /* RTS, recovery or shutdown should not leave anything dirty behind. */
     if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
         return (false);
@@ -75,7 +175,37 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         return (false);
 
-    return (true);
+    /*
+     * We can only skip writing the page if its current content is already durable on disk. A page
+     * evicted with unresolved updates, or re-instantiated from an image that was never written, has
+     * content that only exists in memory; checkpoint must write it with valid addresses.
+     *
+     * The page's modification information can change underfoot if the page is being reconciled, so
+     * we'd normally serialize with reconciliation before reviewing page-modification information.
+     * However, checkpoint is the only valid writer of dirty leaf pages at this point, we skip the
+     * lock.
+     */
+    if (!__sync_page_image_durable(ref))
+        return (false);
+
+    /*
+     * If the checkpoint's snapshot does not include the first dirty update on the page, there is no
+     * content for this checkpoint to write and we can skip it.
+     */
+    if (txn->snapshot_data.snap_max < __wt_tsan_suppress_load_uint64(&mod->first_dirty_txn))
+        return (true);
+
+    /*
+     * Otherwise there is content to write, unless eviction already reconciled the page under this
+     * same checkpoint snapshot and pinned stable timestamp; in that case the on-disk image is
+     * identical to what checkpoint would produce and we can skip re-reconciliation.
+     */
+    if (__sync_evict_reconciled_under_ckpt_snapshot(session, ref)) {
+        WT_STAT_CONN_INCR(session, checkpoint_pages_reconciliation_skipped_evict_snapshot);
+        return (true);
+    }
+
+    return (false);
 }
 
 /*
@@ -166,7 +296,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     uint64_t reconcile_time_pct, reconcile_time, reconcile_start;
     uint64_t saved_pinned_id, t, time_start, time_stop;
     uint32_t flags, rec_flags;
-    bool dirty, is_hs, is_internal, tried_eviction;
+    bool checkpoint_scrub, dirty, is_hs, is_internal, tried_eviction;
 
     conn = S2C(session);
     btree = S2BT(session);
@@ -176,6 +306,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
     /* Don't bump page read generations. */
     flags = WT_READ_INTERNAL_OP;
+
+    /*
+     * The scrub-eviction configuration is fixed for the checkpoint, but whether a given page gets
+     * an image also depends on its type and on the cache budget, so that is decided per page.
+     */
+    checkpoint_scrub = __sync_scrub_checkpoint_enabled(session);
 
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;
@@ -211,6 +347,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
             LF_SET(WT_READ_VISIBLE_ALL);
 
+        rec_flags = WT_REC_CHECKPOINT;
+
         for (;;) {
             WT_ERR(__wt_tree_walk(session, &walk, flags));
             if (walk == NULL)
@@ -229,12 +367,16 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 leaf_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);
                 ++leaf_pages;
                 reconcile_start = __wt_clock(session);
-                WT_ERR(__wt_reconcile(session, walk, NULL, WT_REC_CHECKPOINT));
+                WT_ERR(__wt_reconcile(session, walk, NULL,
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub), NULL));
                 reconcile_time += __wt_clock(session) - reconcile_start;
             }
         }
         break;
     case WT_SYNC_CHECKPOINT:
+        if (WT_SESSION_IS_CHECKPOINT(session))
+            WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
         /*
          * If we are flushing a file at read-committed isolation, which is of particular interest
          * for flushing the metadata to make a schema-changing operation durable, get a
@@ -282,7 +424,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
         /* Add in history store reconciliation for standard files. */
         rec_flags = WT_REC_CHECKPOINT;
-        if (!is_hs && !WT_IS_METADATA(btree->dhandle) && !WT_IS_DISAGG_META(btree->dhandle))
+        if (!is_hs && !WT_IS_ANY_METADATA(btree->dhandle))
             rec_flags |= WT_REC_HS;
 
         /* Write all dirty in-cache pages. */
@@ -380,7 +522,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              */
             if (!is_internal &&
               FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE) &&
-              !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
+              !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT) &&
+              __wt_btree_eviction_enabled(btree)) {
                 ret = __wt_page_release_evict(session, walk, 0);
                 walk = NULL;
                 WT_ERR_ERROR_OK(ret, EBUSY, false);
@@ -408,10 +551,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                  */
                 WT_REF *walk_dup = NULL;
                 WT_ERR(__sync_dup_walk(session, walk, 0, &walk_dup));
-                WT_ERR(__wt_checkpoint_parallel_push_work(session, walk_dup, rec_flags, flags));
+                WT_ERR(__wt_checkpoint_parallel_push_work(session, walk_dup,
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub), flags));
             } else {
                 reconcile_start = __wt_clock(session);
-                WT_ERR(__wt_reconcile(session, walk, NULL, rec_flags));
+                WT_ERR(__wt_reconcile(session, walk, NULL,
+                  __sync_page_rec_flags(session, page, rec_flags, checkpoint_scrub), NULL));
                 reconcile_time += __wt_clock(session) - reconcile_start;
             }
 
@@ -446,11 +591,17 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          *
          * Do not mark the tree dirty if there is no change to stable timestamp compared to the last
          * checkpoint.
+         *
+         * The load is relaxed rather than acquire: this runs on the checkpoint thread, under the
+         * checkpoint lock, which is the same thread that publishes the timestamp, and the value is
+         * only compared to decide whether to mark the tree dirty. No state published alongside the
+         * timestamp is consumed here.
          */
         if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING) &&
           !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT) &&
           (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
-            (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
+            (conn->txn_global.checkpoint_timestamp !=
+                __wt_atomic_load_uint64_relaxed(&conn->txn_global.last_ckpt_timestamp) &&
               btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))
             __wt_tree_modify_set(session);
         break;

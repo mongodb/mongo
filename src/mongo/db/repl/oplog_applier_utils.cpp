@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/oplog_applier_utils.h"
 
@@ -42,13 +16,14 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/profile_settings.h"
-#include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
+#include "mongo/db/replicated_fast_count/repair_replicated_metadata_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -64,6 +39,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -146,12 +122,105 @@ void processCrudOp(OperationContext* opCtx,
     }
 }
 
+
+/**
+ * Returns the number of single-key ops that 'op' expands to, or boost::none if 'op' is not a packed
+ * container op.
+ *
+ * Note the count is not enough on its own to tell whether an op is packed: an array holding a
+ * single key is packed but expands to one op, and an empty array is packed but expands to none.
+ */
+boost::optional<size_t> packedContainerOpCount(const OplogEntry& op) {
+    if (!op.isContainerOpType()) {
+        return boost::none;
+    }
+    const BSONObj& o = op.getObject();
+    if (const auto key = o[ContainerInsertOplogEntryO::kKeyFieldName];
+        ContainerKey::isPacked(key)) {
+        return key.embeddedObject().nFields();
+    }
+    // An unpacked key paired with a packed value covers the consecutive keys starting at that key,
+    // so the number of values is the number of keys written.
+    if (const auto val = o[ContainerInsertOplogEntryO::kValueFieldName];
+        ContainerVal::isPacked(val)) {
+        return val.embeddedObject().nFields();
+    }
+    return boost::none;
+}
+
+/**
+ * Returns true if 'op' is a container op that packs more than one key into a single entry, either
+ * by making the key an array or by making the value an array (in which case the keys are the
+ * consecutive integers starting at the key).
+ */
+bool isBatchedContainerOp(const OplogEntry& op) {
+    if (!op.isContainerOpType()) {
+        return false;
+    }
+    const BSONObj& o = op.getObject();
+    return ContainerKey::isPacked(o[ContainerInsertOplogEntryO::kKeyFieldName]) ||
+        ContainerVal::isPacked(o[ContainerInsertOplogEntryO::kValueFieldName]);
+}
+
 void getContainerKeyHash(OperationContext* opCtx,
                          OplogEntry* op,
                          boost::optional<size_t>& hashKey) {
+    // Multi-key entries must have been expanded by expandBatchedContainerOps() before reaching
+    // here. Hashing one as a unit would send it to a different writer thread than the other entries
+    // touching its keys, letting inserts and deletes of the same key race.
+    invariant(!isBatchedContainerOp(*op),
+              str::stream() << "container op packing multiple keys reached writer thread "
+                               "assignment: "
+                            << redact(op->toBSONForLogging()));
+
     BSONElement key = op->getObject()["k"];
     BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
     hashKey.emplace(elementHasher.hash(key));
+}
+
+/**
+ * Returns a copy of baseObject with an OplogEntry::kObjectFieldName appended.
+ *
+ * The baseObject must not have an existing OplogEntry::kObjectFieldName.
+ *
+ * Note that the rebuilt 'o' is appended last rather than in its original position, so the field
+ * order of the result differs from that of a natural oplog entry.
+ */
+OplogEntry withObject(const BSONObj& baseObject, const BSONObj& oField) {
+    dassert(!baseObject.hasField(OplogEntry::kObjectFieldName), baseObject.toString());
+    // The fixed per-element overhead of an appended BSON field: one type byte ahead of the field
+    // name and one NUL byte terminating it. baseObject.objsize() already accounts for the object's
+    // 4-byte length header and trailing EOO byte, both of which carry over to the result.
+    static constexpr int kElementOverheadBytes = 2;
+    BSONObjBuilder builder(baseObject.objsize() + kElementOverheadBytes +
+                           static_cast<int>(OplogEntry::kObjectFieldName.size()) +
+                           oField.objsize());
+    builder.appendElements(baseObject);
+    builder.append(OplogEntry::kObjectFieldName, oField);
+    return OplogEntry(builder.obj());
+}
+
+/**
+ * Makes room in 'v' for 'additional' more elements.
+ *
+ * Note this grows geometrically rather than to exactly the size needed. expandBatchedContainerOps()
+ * accumulates many expansions into one buffer, and reserving the exact size each time would
+ * reallocate on every packed op instead of amortizing the growth.
+ */
+void reserveAdditional(std::vector<OplogEntry>& v, size_t additional) {
+    const size_t needed = v.size() + additional;
+    if (needed > v.capacity()) {
+        v.reserve(std::max(needed, v.capacity() * 2));
+    }
+}
+
+BSONObj makeSingleContainerInsertO(ContainerKey key, boost::optional<ContainerVal> value) {
+    ContainerInsertOplogEntryO insertO;
+    insertO.setKey(std::move(key));
+    if (value) {
+        insertO.setValue(std::move(*value));
+    }
+    return insertO.toBSON();
 }
 
 /**
@@ -243,6 +312,147 @@ uint32_t OplogApplierUtils::getOplogEntryHash(OperationContext* opCtx,
     }
 
     return opHash ? absl::HashOf(nss, *opHash) : absl::HashOf(nss);
+}
+
+namespace {
+/**
+ * Appends to 'expanded' the single-key container ops equivalent to 'op' and returns true. Returns
+ * false, leaving 'expanded' untouched, if 'op' is not a container op that packs multiple keys.
+ *
+ * This is the accumulating form used by expandBatchedContainerOps(), which collects many expansions
+ * into one buffer. expandBatchedContainerOp() wraps it for callers holding a single op.
+ */
+bool appendExpandedContainerOp(const OplogEntry& op, std::vector<OplogEntry>& expanded) {
+    if (!isBatchedContainerOp(op)) {
+        return false;
+    }
+
+    const BSONObj o = op.getObject();
+
+    // Create an owned copy and strip the object field, this will serve as a template to create
+    // "unrolled" batched oplog.
+    const BSONObj rawWithoutO = op.getRaw().removeField(OplogEntry::kObjectFieldName);
+
+    switch (op.getOpType()) {
+        case OpTypeEnum::kContainerInsert: {
+            const auto insertO = ContainerInsertOplogEntryO::parse(
+                o, IDLParserContext("ContainerInsertOplogEntryO"));
+            const auto& key = insertO.getKey();
+            const auto& maybeVal = insertO.getValue();
+
+            if (maybeVal && maybeVal->isArrayVal()) {
+                const auto& values = maybeVal->getArrayVal();
+                if (key.isIntKey()) {
+                    // A single int key with an array of values inserts at the consecutive keys
+                    // starting at that key, matching applyContainerOperations().
+                    const int64_t baseKey = key.getIntKey();
+                    reserveAdditional(expanded, values.size());
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        expanded.emplace_back(
+                            withObject(rawWithoutO,
+                                       makeSingleContainerInsertO(
+                                           ContainerKey(baseKey + static_cast<int64_t>(i)),
+                                           ContainerVal(values[i]))));
+                    }
+                    return true;
+                }
+                // Otherwise keys and values are paired off; DurableOplogEntry's constructor has
+                // already checked that the two arrays are the same length.
+                const auto& keys = key.getArrayKey();
+                invariant(keys.size() == values.size(), op.toStringForLogging());
+                reserveAdditional(expanded, keys.size());
+                for (size_t i = 0; i < keys.size(); ++i) {
+                    expanded.emplace_back(
+                        withObject(rawWithoutO,
+                                   makeSingleContainerInsertO(ContainerKey(keys[i]),
+                                                              ContainerVal(values[i]))));
+                }
+                return true;
+            }
+
+            // An array of keys sharing one (possibly absent) value.
+            invariant(key.isArrayKey(), op.toStringForLogging());
+            const auto& keys = key.getArrayKey();
+            reserveAdditional(expanded, keys.size());
+            for (auto&& singleKey : keys) {
+                expanded.emplace_back(withObject(
+                    rawWithoutO, makeSingleContainerInsertO(ContainerKey(singleKey), maybeVal)));
+            }
+            return true;
+        }
+        case OpTypeEnum::kContainerDelete: {
+            const auto deleteO = ContainerDeleteOplogEntryO::parse(
+                o, IDLParserContext("ContainerDeleteOplogEntryO"));
+            const auto& keys = deleteO.getKey().getArrayKey();
+            reserveAdditional(expanded, keys.size());
+            for (auto&& singleKey : keys) {
+                ContainerDeleteOplogEntryO singleO;
+                singleO.setKey(ContainerKey(singleKey));
+                expanded.emplace_back(withObject(rawWithoutO, singleO.toBSON()));
+            }
+            return true;
+        }
+        case OpTypeEnum::kContainerUpdate:
+            // Container updates are always a single key and a single value, enforced by
+            // DurableOplogEntry's constructor.
+            //
+            // TODO SERVER-131747 Support container updates with multiple kvs
+            MONGO_UNREACHABLE_TASSERT(13230702);
+        default:
+            MONGO_UNREACHABLE_TASSERT(13230703);
+    }
+}
+}  // namespace
+
+boost::optional<std::vector<OplogEntry>> OplogApplierUtils::expandBatchedContainerOp(
+    const OplogEntry& op) {
+    std::vector<OplogEntry> expanded;
+    if (!appendExpandedContainerOp(op, expanded)) {
+        return boost::none;
+    }
+    return expanded;
+}
+
+void OplogApplierUtils::expandBatchedContainerOps(std::vector<OplogEntry>& ops) {
+    // One pass to decide whether anything needs expanding and, if so, how large the result will be.
+    // Sizing the buffer exactly means building it never reallocates, which matters because
+    // OplogEntry is not nothrow move constructible, so every reallocation would copy rather than
+    // move. Walking the packed arrays to count them only reads BSON element headers, far cheaper
+    // than the entry copy each expanded op already costs.
+    //
+    // Note 'anyPacked' cannot be derived from 'expandedSize': a packed op holding a single key
+    // expands to one op, leaving the total equal to ops.size() even though expansion is required.
+    size_t expandedSize = 0;
+    bool anyPacked = false;
+    for (const auto& op : ops) {
+        if (const auto count = packedContainerOpCount(op)) {
+            anyPacked = true;
+            expandedSize += *count;
+        } else {
+            ++expandedSize;
+        }
+    }
+
+    // Container ops are rare next to CRUD ops, so don't rebuild the vector unless one of them
+    // actually needs expanding.
+    if (!anyPacked) {
+        return;
+    }
+
+    // Ops that are not expanded are copied rather than moved out of 'ops', so that a throw from
+    // appendExpandedContainerOp() leaves 'ops' as it was instead of leaving a prefix of it
+    // moved-from. Building the whole result before committing it below keeps this all-or-nothing.
+    std::vector<OplogEntry> expandedOps;
+    expandedOps.reserve(expandedSize);
+    for (const auto& op : ops) {
+        if (!appendExpandedContainerOp(op, expandedOps)) {
+            expandedOps.push_back(op);
+        }
+    }
+
+    // Commit. Swapping two vectors cannot throw, so 'ops' either keeps its original contents or
+    // gets the fully expanded ones.
+    ops.swap(expandedOps);
 }
 
 uint32_t OplogApplierUtils::addToWriterVector(
@@ -422,6 +632,52 @@ NamespaceStringOrUUID OplogApplierUtils::getNsOrUUID(const NamespaceString& nss,
     return nss;
 }
 
+namespace {
+
+// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
+bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
+    const auto typeElem = o2.getField("type");
+    return typeElem.type() == BSONType::string &&
+        typeElem.valueStringData() == "repairReplicatedMetadata";
+}
+
+void applyRepairReplicatedMetadataNoop(OperationContext* opCtx, const BSONObj& o2) {
+    // Replication does not otherwise validate a no-op's o2, so a malformed repair entry is
+    // ignored rather than surfaced as an error, mirroring the fast-count oplog scan.
+    boost::optional<RepairReplicatedMetadataO2> parsed;
+    try {
+        parsed = RepairReplicatedMetadataO2::parse(o2);
+    } catch (const DBException&) {
+        return;
+    }
+
+    boost::optional<NamespaceString> nss;
+    {
+        Lock::GlobalLock globalLock(opCtx, MODE_IS);
+        nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, parsed->getUuid());
+    }
+    if (!nss) {
+        return;
+    }
+
+    auto collection = acquireCollection(opCtx,
+                                        {*nss,
+                                         parsed->getUuid(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+                                        MODE_IX);
+    if (!collection.exists() || collection.uuid() != parsed->getUuid()) {
+        return;
+    }
+
+    const auto& metadata = parsed->getM();
+    collection.getCollectionPtr()->getRecordStore()->adjustAccurateSizeCount(
+        metadata.getSz().value_or(0), metadata.getCt().value_or(0));
+}
+
+}  // namespace
+
 Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     OperationContext* opCtx,
     const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
@@ -457,6 +713,10 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     }
 
     if (opType == OpTypeEnum::kNoop) {
+        const auto& o2 = op->getObject2();
+        if (o2 && isRepairReplicatedMetadataO2(*o2)) {
+            applyRepairReplicatedMetadataNoop(opCtx, *o2);
+        }
         incrementOpsAppliedStats(1);
         return Status::OK();
     } else if (opType == OpTypeEnum::kKeyMaterial || opType == OpTypeEnum::kCMKRotation) {
@@ -569,7 +829,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                             OplogConstraintViolationEnum::kDeleteOnMissingNs,
                             "delete",
                             opObj,
-                            boost::none /* status */);
+                            /*status=*/boost::none);
                     }
                     return Status::OK();
                 }

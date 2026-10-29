@@ -2,6 +2,7 @@
  * Verifies that findAndModify commands with an invalid command object fail as expected.
  *
  * @tags: [
+ *   uses_explain,
  *   cannot_run_during_upgrade_downgrade,
  *   does_not_support_stepdowns,
  *   # Avoid spurious 'ShardNotFound' errors in some overrides and multiversion tests.

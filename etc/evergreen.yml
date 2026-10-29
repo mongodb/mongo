@@ -62,12 +62,12 @@ include:
   - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
   - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
-  - filename: etc/evergreen_yml_components/tasks/release_tasks.yml
-  - filename: etc/evergreen_yml_components/tasks/devcontainer_tasks.yml
+  - filename: etc/evergreen_yml_components/tasks/security_tasks.yml
 
   - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
   - filename: etc/evergreen_yml_components/variants/misc/misc.yml
   - filename: etc/evergreen_yml_components/variants/misc/misc_master_branch_only.yml
+  - filename: etc/evergreen_yml_components/variants/misc/legacy_js_engine.yml
 
   - filename: etc/evergreen_yml_components/variants/amazon/test_dev.yml
   - filename: etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -96,6 +96,7 @@ include:
 
   - filename: src/mongo/db/modules/atlas/atlas_dev.yml
   - filename: src/mongo/db/modules/atlas/atlas_sls_pin_bump.yml
+  - filename: src/mongo/db/modules/atlas/atlas_commit_queue.yml
   - filename: etc/evergreen_yml_components/copybara/copybara.yml
   - filename: etc/evergreen_yml_components/copybara/copybara_gen.yml
 
@@ -108,8 +109,14 @@ parameters:
     description: "path to this file"
   - key: test_selection_strategies_array
     description: "Array of test selection strategies"
+  - key: use_tss_staging
+    description: "Set to true to ask the staging test selection deployment instead of production"
+  - key: runtime_params_json
+    description: 'JSON of runtime params (e.g. {"enable_linux_perf":true}) to enable on-CPU profiling on benchmark tasks.'
+  - key: antithesis_suites
+    description: "Comma-separated ds-antithesis suite tasks (e.g. mongod-sls-multi-cell-encryption) to run against this patch's mongod image. No antithesis run is triggered if this parameter is empty or not set."
   - key: message_filter_plugin_release_version
-    description: "Dev release version string of the message filter plugin artifact to promote to GA. Used by promote_message_filter_plugin to locate the existing dev tarball in origin-message-filter-plugin-dev and re-import it via URP at the GA artifact name. No rebuild is performed."
+    description: "Dev release version string of the message filter plugin artifact to promote to GA, in the form YYYYMMDD.hhmmss.<githash>. Used by promote_message_filter_plugin to locate the existing dev tarball in origin-message-filter-plugin-dev and re-import it via URP at the GA artifact name. No rebuild is performed."
   # Note: the `urp_input_bucket_override` parameter is already declared by the merged
   # monguard config (monguard/.evergreen/config_mongodb_master.yml) and is reused here.
 
@@ -167,10 +174,13 @@ patch_aliases:
     variant_tags: ["required"]
     task: ".*"
   - alias: query
-    variant: "^(.*query-patch-only|amazon-linux2023-arm64-static-compile)$"
+    variant: "^(.*query-patch-only|amazon-linux2023-arm64-static-compile|enterprise-amazon-linux2-arm64-all-feature-flags-sbe-full)$"
     task: ".*"
   - alias: query-quick
     variant: "^(.*query-quick-patch-only|linux-x86-dynamic-compile)$"
+    task: ".*"
+  - alias: query-joo
+    variant: "^(.*join-optimization-query-patch-only|amazon-linux2023-arm64-static-compile|run-all-affected-jstests)"
     task: ".*"
   - alias: security
     variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"
@@ -194,20 +204,31 @@ patch_aliases:
       to only select tests that use a real mongot.
     variant_tags: ["required", "mongot_e2e"]
     task: ".*"
+  - alias: mongot-extension
+    description: >
+      Runs only the with_mongot_extension_* and concurrency_with_mongot_extension_* tasks on the
+      variants that use a real mongot. Use this instead of `required-and-mongot-e2e-tests` when you
+      only want the extension suites and not the required variants.
+    variant_tags: ["mongot_e2e"]
+    task: "^(concurrency_)?with_mongot_extension_.*"
   - alias: codecoverage
-    description: "Run tests and report code coverage"
+    description: "Run the code coverage tasks"
     variant: ".*-coverage"
     task: ".*"
   - alias: unittestcoverage
-    description: "Run unit tests and report code coverage"
+    description: "Run the unittest code coverage task only (skips any integration tests)"
     variant: ".*-coverage"
     task: "^(unit_test_group.*|bazel_coverage)$"
   - alias: cluster_scalability
     variant_tags: ["cluster_scalability_only"]
     task_tags: ["cluster_scalability_only"]
-  - alias: blocking-emergency-atlas-release-tasks
-    description: "Run variants that would potentially block an emergency release"
-    variant_tags: ["emergency_release"]
+  - alias: disagg
+    description: >
+      An alternative to `required` for changes that only touch disagg (DSC) code. Runs every
+      required variant except those tagged `no_atlas_build`, which cannot load DSC code. A required
+      variant without the tag is included, so a missing tag runs an unneeded variant rather than
+      skipping DSC coverage.
+    variant_tags: ["required !no_atlas_build"]
     task: ".*"
   - alias: streams
     description: "Runs all streams variants"

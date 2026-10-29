@@ -14,7 +14,8 @@
 #include "connection_wrapper.h"
 #include "../utils.h"
 
-connection_wrapper::connection_wrapper(const std::string &db_home, const char *cfg_str)
+connection_wrapper::connection_wrapper(
+  const std::string &db_home, const char *cfg_str, WT_EVENT_HANDLER *event_handler)
     : _conn_impl(nullptr), _conn(nullptr), _db_home(db_home), _cfg_str(cfg_str), _do_cleanup(true)
 {
     struct stat sb;
@@ -31,7 +32,7 @@ connection_wrapper::connection_wrapper(const std::string &db_home, const char *c
     } else {
         utils::throw_if_non_zero(mkdir(_db_home.c_str(), 0700));
     }
-    utils::throw_if_non_zero(wiredtiger_open(_db_home.c_str(), nullptr, cfg_str, &_conn));
+    utils::throw_if_non_zero(wiredtiger_open(_db_home.c_str(), event_handler, cfg_str, &_conn));
     _conn_impl = (WT_CONNECTION_IMPL *)_conn;
 }
 

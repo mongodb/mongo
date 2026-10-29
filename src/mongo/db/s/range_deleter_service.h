@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/base/error_codes.h"
@@ -46,6 +20,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -60,6 +35,7 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
@@ -67,7 +43,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT RangeDeleterService
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] RangeDeleterService
     : public ReplicaSetAwareServiceShardSvr<RangeDeleterService> {
 public:
     RangeDeleterService() = default;
@@ -82,6 +58,10 @@ private:
 
     // Keeping track of per-collection registered range deletion tasks.
     RangeDeletionTaskTracker _rangeDeletionTasks;
+
+    // Range-deletion task ids classified by the MaxKey orphan guard. Populated at step-up before
+    // processing begins, cleared on step-down/shutdown.
+    stdx::unordered_set<UUID, UUID::Hash> _blockedMaxKeyTasks;
 
     // Mono-threaded executor processing range deletion tasks
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -115,8 +95,8 @@ private:
     std::mutex _mutex_DO_NOT_USE_DIRECTLY;
 
 public:
-    void registerRecoveryJob(long long term);
-    void notifyRecoveryJobComplete(long long term);
+    void registerRecoveryJob(long long term, RecoveryJob job);
+    void notifyRecoveryJobComplete(long long term, RecoveryJob job);
 
     enum class TaskPending { kNotPending, kPending };
 
@@ -153,13 +133,30 @@ public:
      * NB: in case an overlapping range deletion task is registered AFTER invoking this method,
      * it will not be taken into account. Handling this scenario is responsibility of the caller.
      * */
-    MONGO_MOD_NEEDS_REPLACEMENT SharedSemiFuture<void> getOverlappingRangeDeletionsFuture(
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] SharedSemiFuture<void> getOverlappingRangeDeletionsFuture(
         const UUID& collectionUUID, const ChunkRange& range);
 
     /**
      * Checks if the range deleter service is disabled.
      */
     bool isDisabled();
+
+    /*
+     * Returns true iff 'taskId' was classified as a blocked MaxKey orphan task at step-up.
+     */
+    bool isMaxKeyBlocked(const UUID& taskId);
+
+    /*
+     * Replaces the blocked MaxKey task set. Called once per term at step-up, before processing.
+     */
+    void setBlockedMaxKeyTasks(std::vector<UUID> blockedTaskIds);
+
+    /*
+     * Classifies pre-existing range-deletion tasks and stores the blocked set (no-op when the guard
+     * flag is off). Called by the range-deletion processor before it deletes any task, so a blocked
+     * task is never deleted before classification. May throw; the caller retries.
+     */
+    void classifyBlockedMaxKeyTasks(OperationContext* opCtx);
 
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStartup(OperationContext* opCtx) override;
@@ -182,7 +179,7 @@ public:
     /*
      * Returns the total number of range deletion tasks registered on the service.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT long long totalNumOfRegisteredTasks();
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] long long totalNumOfRegisteredTasks();
 
     /* Returns a future which is fulfilled when the service is initialized for the current term. */
     SemiFuture<void> getTermInitializationFuture();

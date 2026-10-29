@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,24 +12,21 @@
 
 #include <functional>
 #include <memory>
+#include <variant>
 #include <vector>
 
 namespace mongo {
 
 class ExpressionContext;
 
-/**
- * Sort pattern for merge-sorting the document results stream across shards, and the merge pipeline
- * for the metadata stream on the router. Provided by the extension source via a callback that
- * survives the LiteParsed -> StageParams -> DocumentSource handoff.
- */
-struct DocResultsShardedPlanSpec {
-    BSONObj resultsSortPattern;
-    std::vector<BSONObj> metaMergePipeline;
-};
+using DocResultsShardedPlanProvider = std::function<const ShardedPlanSpec&(ExpressionContext*)>;
 
-using DocResultsShardedPlanProvider =
-    std::function<const DocResultsShardedPlanSpec&(ExpressionContext*)>;
+// The sharded distributed-plan info comes from exactly one of two mutually exclusive sources:
+//   * DocResultsShardedPlanProvider — live callback from the extension AST node, attached during
+//     in-process construction.
+//   * ShardedPlanSpec — values the router cached into the IDL spec so a shard re-parsing this
+//     stage inside a subpipeline can reconstruct DPL without the callback.
+using ShardedPlanSource = std::variant<DocResultsShardedPlanProvider, ShardedPlanSpec>;
 
 /**
  * Stage params produced by InternalDocumentResultsAndMetadataLiteParsed and consumed by
@@ -66,11 +37,11 @@ public:
     InternalDocumentResultsAndMetadataStageParams(boost::optional<MetadataBindSpec> metadata,
                                                   bool returnCursor,
                                                   OwnedLiteParsedPipeline sourcePipeline,
-                                                  DocResultsShardedPlanProvider shardedPlanProvider)
+                                                  boost::optional<ShardedPlanSource> shardedPlan)
         : _metadata(std::move(metadata)),
           _returnCursor(returnCursor),
           _sourcePipeline(std::move(sourcePipeline)),
-          _shardedPlanProvider(std::move(shardedPlanProvider)) {}
+          _shardedPlan(std::move(shardedPlan)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -89,8 +60,8 @@ public:
         return _sourcePipeline;
     }
 
-    const DocResultsShardedPlanProvider& getShardedPlanProvider() const {
-        return _shardedPlanProvider;
+    const boost::optional<ShardedPlanSource>& getShardedPlan() const {
+        return _shardedPlan;
     }
 
 private:
@@ -99,7 +70,7 @@ private:
     OwnedLiteParsedPipeline _sourcePipeline;
     // Carries the extension's DPL callback through the LiteParsed -> StageParams handoff so the
     // resulting DocumentSource can wire up its sharded plan logic. Null on non-extension paths.
-    DocResultsShardedPlanProvider _shardedPlanProvider;
+    boost::optional<ShardedPlanSource> _shardedPlan;
 };
 
 /**
@@ -132,14 +103,27 @@ public:
         // Clone the inner sub-pipeline so any view info bound onto it via bindResolvedNamespace()
         // travels with the StageParams to DocumentSource construction.
         return std::make_unique<InternalDocumentResultsAndMetadataStageParams>(
-            _metadata,
-            _returnCursor,
-            OwnedLiteParsedPipeline(_pipelines.front()),
-            _shardedPlanProvider);
+            _metadata, _returnCursor, OwnedLiteParsedPipeline(_pipelines.front()), _shardedPlan);
     }
 
-    void setShardedPlanProvider(DocResultsShardedPlanProvider provider) {
-        _shardedPlanProvider = std::move(provider);
+    void setShardedPlan(ShardedPlanSource source) {
+        _shardedPlan = std::move(source);
+    }
+
+    bool isRankedStage() const final {
+        return _pipelines.front()->isRankedPipeline();
+    }
+
+    bool isScoredStage() const final {
+        return _pipelines.front()->isScoredPipeline();
+    }
+
+    bool isScoreDetailsStage() const final {
+        return _pipelines.front()->isScoreDetailsPipeline();
+    }
+
+    bool isSelectionStage() const final {
+        return _pipelines.front()->isSelectionPipeline();
     }
 
     FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
@@ -164,7 +148,8 @@ public:
                                  "source sub-pipeline, found "
                               << _pipelines.size(),
                 _pipelines.size() == 1);
-        _pipelines.front()->bindResolvedNamespaceToStages(view, resolvedNamespaces);
+        _pipelines.front()->bindResolvedNamespaceToStages(
+            view, resolvedNamespaces, 0, _pipelines.front()->getStages().size());
     }
 
 private:
@@ -174,7 +159,7 @@ private:
     // extension's distributed-plan callback. Threaded through getStageParams() to the resulting
     // DocumentSource so distributedPlanLogic() can produce a merge-sort pattern and metadata
     // merge pipeline. Null when constructed via the BSON parse path.
-    DocResultsShardedPlanProvider _shardedPlanProvider;
+    boost::optional<ShardedPlanSource> _shardedPlan;
 };
 
 }  // namespace mongo

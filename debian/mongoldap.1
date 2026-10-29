@@ -2,12 +2,11 @@
 .SH MONGOLDAP
 \fIMongoDB Enterprise\f1
 .PP
-Starting in MongoDB 8.0, LDAP authentication and authorization is
-deprecated. LDAP is available and will continue to operate without
-changes throughout the lifetime of MongoDB 8. LDAP will be removed in a
-future major release.
+Starting in MongoDB 8.0 and continued in 9.0, LDAP authentication and
+authorization is deprecated. LDAP will be removed in a future release.
 .PP
-For details, see \fBLDAP Deprecation\f1\&.
+To learn about alternative authentication methods, see
+\fBLDAP Authentication Alternatives\f1\&.
 .SH SYNOPSIS
 .PP
 MongoDB Enterprise provides
@@ -281,23 +280,23 @@ both \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the s
 \fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The password used to bind to an LDAP server when using
-\fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
-\fB\-\-ldapQueryUser\f1\f1\&.
+\fB\-\-ldapQueryUser\f1\&. You must use \fB\-\-ldapQueryPassword\f1 with
+\fB\-\-ldapQueryUser\f1\&.
 .PP
 If not set, \fBmongoldap\f1\f1 does not attempt to bind to the LDAP server.
 .PP
 You can configure this setting on a running \fBmongoldap\f1\f1 using
-\fBsetParameter\f1\f1\&.
+\fBsetParameter\f1\&.
 .PP
-The \fBldapQueryPassword\f1\fBsetParameter\f1\f1 command accepts either a
+The \fBldapQueryPassword\f1 \fBsetParameter\f1 command accepts either a
 string or an array of strings. If \fBldapQueryPassword\f1 is set to an array,
 MongoDB tries each password in order until one succeeds. Use a password array
 to roll over the LDAP account password without downtime.
 .PP
-Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
-instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&.
-You cannot specify both \fB\-\-ldapQueryPassword\f1\f1 and
-\fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
+Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1
+instead of \fB\-\-ldapQueryUser\f1 and \fB\-\-ldapQueryPassword\f1\&.
+You cannot specify both \fB\-\-ldapQueryPassword\f1 and
+\fB\-\-ldapBindWithOSDefaults\f1 at the same time.
 .PP
 \fBmongoldap \-\-ldapBindWithOSDefaults\f1
 .RS
@@ -382,6 +381,14 @@ SASL mechanism(s) on both the \fBmongoldap\f1\f1 host and the remote
 LDAP server host. Your operating system may include certain SASL
 libraries by default. Defer to the documentation associated with each
 SASL mechanism for guidance on installation and configuration.
+.PP
+On hosts with Cyrus SASL 2.1.28 or later, MongoDB does not support LDAP
+SASL binding with the \fBDIGEST\-MD5\f1 mechanism. If you set
+\fBsecurity.ldap.bind.method\f1\f1 to \fBsasl\f1 and specify
+\fBDIGEST\-MD5\f1 in \fBsecurity.ldap.bind.saslMechanisms\f1\f1,
+\fBmongod\f1 and \fBmongos\f1 fail to start.
+.PP
+For details and alternatives, see \fBDIGEST\-MD5 Not Supported with Cyrus SASL 2.1.28 and Later\f1\&.
 .PP
 If using the \fBGSSAPI\f1 SASL mechanism for use with
 \fBKerberos Authentication on Self\-Managed Deployments\f1, verify the following for the

@@ -1,7 +1,7 @@
 /**
  * Tests an extension source stage.
  *
- * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
+ * @tags: [ featureFlagExtensionsAPI, requires_fcv_90 ]
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

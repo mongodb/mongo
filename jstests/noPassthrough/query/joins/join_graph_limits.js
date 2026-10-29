@@ -9,6 +9,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
@@ -32,7 +33,7 @@ function assertNonOptimizedLookups(coll, pipeline, expectedLookupStages) {
         ...getPlanStages(winningPlan, "EQ_LOOKUP"),
         ...getPlanStages(winningPlan, "EQ_LOOKUP_UNWIND"),
     ];
-    assert.eq(nonOptimizedLookupStages.length, expectedLookupStages);
+    assert.eq(nonOptimizedLookupStages.length, expectedLookupStages, explain);
 }
 
 function assertJoinPlanResults(coll, pipeline, expectedResults) {
@@ -108,7 +109,14 @@ setServerParameters({
     assertJoinPlanResults(coll, pipeline, noJoinOptResults);
 
     // Due to the limit one $lookup stages is expected to be left unoptimized.
-    assertNonOptimizedLookups(coll, pipeline, 1);
+    assertNonOptimizedLookups(
+        coll,
+        pipeline,
+        // $lookup+$unwind suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage when either the
+        // deferred get executor is enabled or the full SBE engine is in use. Otherwise, the suffix
+        // is executed in document sources.
+        isDeferredGetExecutorEnabled(db) || checkSbeFullyEnabled(db) ? 1 : 0,
+    );
 }
 
 // 4. Join optimization enabled: number of edges limit hit.
@@ -122,7 +130,14 @@ setServerParameters({
     assertJoinPlanResults(coll, pipeline, noJoinOptResults);
 
     // Due to the limit one $lookup stages is expected to be left unoptimized.
-    assertNonOptimizedLookups(coll, pipeline, 1);
+    assertNonOptimizedLookups(
+        coll,
+        pipeline,
+        // $lookup+$unwind suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage when either the
+        // deferred get executor is enabled or the full SBE engine is in use. Otherwise, the suffix
+        // is executed in document sources.
+        isDeferredGetExecutorEnabled(db) || checkSbeFullyEnabled(db) ? 1 : 0,
+    );
 }
 
 MongoRunner.stopMongod(conn);

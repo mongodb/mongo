@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 
@@ -178,10 +152,10 @@ TEST_F(ReplicaSetWriteBlockStateTest, DisableDeletionsBlockingClearsIsEnabled) {
 
     auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
     state->enableReplicaSetDeletionsBlocking();
-    ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled_forTest());
+    ASSERT_TRUE(state->isReplicaSetDeletionsBlockingEnabled());
 
     state->disableReplicaSetDeletionsBlocking();
-    ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled_forTest());
+    ASSERT_FALSE(state->isReplicaSetDeletionsBlockingEnabled());
 
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
@@ -367,6 +341,24 @@ TEST_F(ReplicaSetWriteBlockStateTest, BlockReplicaSetWritesCommandCountersIncrem
     ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 2);
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest,
+       BlockReplicaSetWritesCommandCountersDoNotIncrementWhenAlreadyEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    BSONObjBuilder bob;
+    state->appendReplicaSetWritesBlockCounters(bob);
+    BSONObj doc = bob.obj();
+    const auto sub = doc.getObjectField("replicaSetWritesBlockCounters");
+    ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 1);
+}
+
 TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenDeletionsBlockingDisabled) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
@@ -534,6 +526,121 @@ TEST_F(ReplicaSetWriteBlockStateTest, IncomingMigrationAllowedWhenBypassEnabled)
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
     ASSERT_DOES_NOT_THROW(state->checkIfIncomingMigrationAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedWhenIndexBuildBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildBlockedWhenIndexBuildBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableUserIndexBuildBlocking();
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_EQ(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss),
+              ErrorCodes::ReplicaSetWritesBlocked);
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, DisableIndexBuildBlockingRestoresAllowedState) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableUserIndexBuildBlocking();
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_EQ(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    state->disableUserIndexBuildBlocking();
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedOnInternalDb) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableUserIndexBuildBlocking();
+
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll")));
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll")));
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(
+        opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll")));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IndexBuildAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableUserIndexBuildBlocking();
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_OK(state->checkIfIndexBuildAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingReshardingAllowedWhenWriteBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    ASSERT_OK(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingReshardingBlockedWhenWriteBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    ASSERT_EQ(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    state->disableReplicaSetWriteBlocking();
+    ASSERT_OK(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingReshardingAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    ASSERT_OK(state->checkIfIncomingReshardingAllowedToStart(opCtx.get()));
 }
 
 }  // namespace

@@ -52,38 +52,44 @@
         <<: *authOptions
         appName: Resmoke-Hook
 
-    # Internal-client appNames that bypass the ingress rate limiter once authenticated.
-    # Sourced from https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs#L77-L119
+    # AppName prefixes for MongoDB-internal connections exempt from the ingress request rate limiter (IRRL) once authenticated.
+    # Authoritative upstream source (production config):
+    #   https://github.com/10gen/mongotune/blob/3c9fab88663772d957b901cf7501aaae5a352057/crates/mongotune-core/src/exemptions.rs#L28
+    #
+    # This list includes ops-tooling names (Resmoke-Hook, MongoDB Automation Agent, mongotune,
+    # mongot, etc.) that are only relevant in suite-level passthrough tests. The noPassthrough
+    # test subset (direct shard/config connections only, without those names) lives in:
+    #   jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js
+    #   (kInternalConnectionAppNameExemptions)
+    #
+    # When adding a new internal executor, update both this anchor and the JS list above.
     appNameExemptions: &appNameExemptions >
-      {"appNames":["OplogFetcher",
+      {"appNames":["Cloner",
+                  "MongoDB Automation Agent",
+                  "MongoDB Backup Module",
+                  "MongoDB CPS Module",
+                  "MongoDB CPS PIT Module",
+                  "MongoDB DB Check Module",
                   "MongoDB Internal Client",
+                  "MongoDB Lifecycle Management Module",
+                  "MongoDB Monitoring Module",
+                  "MongoDB Online Archive Module",
+                  "MongoDB PIT Restore Module",
+                  "mongot",
+                  "mongotune",
                   "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
                   "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
                   "NetworkInterfaceTL-HelloMe-TaskExecutor",
                   "NetworkInterfaceTL-Repl",
                   "NetworkInterfaceTL-Reshard",
-                  "NetworkInterfaceTL-StandaloneNetwork",
-                  "NetworkInterfaceTL-ShardingCoordinatorNetwork",
                   "NetworkInterfaceTL-Sharding-Fixed",
-                  "MongoDB Automation Agent",
-                  "mongotune",
-                  "mongot",
-                  "ReplCoordExtern",
-                  "InitialSyncer",
+                  "NetworkInterfaceTL-ShardingCoordinatorNetwork",
+                  "NetworkInterfaceTL-StandaloneNetwork",
+                  "OplogFetcher",
                   "Reshard",
-                  "Rollback",
-                  "Cloner",
-                  "MongoDB Automation Agent",
-                  "MongoDB Monitoring Module",
-                  "MongoDB Backup Module",
-                  "MongoDB PIT Restore Module",
-                  "MongoDB CPS Module",
-                  "MongoDB CPS PIT Module",
-                  "MongoDB DB Check Module",
-                  "MongoDB Online Archive Module",
-                  "MongoDB Lifecycle Management Module",
                   "Resmoke-Admin",
-                  "Resmoke-Hook"]}
+                  "Resmoke-Hook",
+                  "Rollback"]}
 
     rateLimiterParamsCommon: &rateLimiterParamsCommon
       defaultClientMaxRetryAttempts: 16
@@ -283,6 +289,10 @@
       - jstests/core/timeseries/query/timeseries_raw_data_queries.js
       - jstests/core/timeseries/write/timeseries_raw_data_writes.js
       - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+      # This test closes cursors between test cases, expecting this to always kill open cursors, but
+      # killing cursors uses fireAndForget commands within mongos, so killing will not be retried
+      # after getting load shed, leaving cursors open and failing the test.
+      - jstests/core/administrative/current_op/currentop_find.js
 
 - name: auth_exclude_files_core_sharding
   value:
@@ -345,8 +355,6 @@
       - uses_map_reduce_internal_merge_pipeline
       # Parallel shell spawns unauthenticated connections.
       - uses_parallel_shell
-      # TODO SERVER-129844: Crash when getMore retry runs after original opCtx is destroyed.
-      - requires_getmore
       # These suites already authenticate as a user, so they can't run tests that expect to be able
       # to log in as a different user.
       - requires_auth

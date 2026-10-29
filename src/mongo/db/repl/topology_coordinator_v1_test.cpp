@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -59,7 +33,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
@@ -1582,6 +1556,157 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
         true);
 }
 
+// Tests for the logic in '_chooseNearbySyncSource' that prefers the primary over an equally close
+// node. The primary state tracked in '_memberData' is self-reported and can be stale, so it can
+// disagree with '_currentPrimaryIndex'. These tests make sure we only ever pick a node we vetted as
+// an eligible sync source, and in particular that we never pick ourselves.
+class ChooseNearbySyncSourcePreferPrimaryTest : public TopoCoordTest {
+public:
+    void setUp() override {
+        TopoCoordTest::setUp();
+        updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself:27017")
+                                              << BSON("_id" << 1 << "host" << "host2:27017")
+                                              << BSON("_id" << 2 << "host" << "host3:27017")
+                                              << BSON("_id" << 3 << "host" << "host4:27017")
+                                              << BSON("_id" << 4 << "host" << "host5:27017"
+                                                            << "hidden" << true << "priority" << 0
+                                                            << "votes" << 0))),
+                     0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        // Set 'changeSyncSourceThresholdMillis' to a non-zero value so that two candidates with
+        // similar ping times are considered to be in the same data center.
+        changeSyncSourceThresholdMillis.store(5LL);
+
+        // Receive up heartbeats from all other nodes so that they are eligible sync sources. We
+        // repeat this 5 times to satisfy that we have received at least 5N heartbeats.
+        for (auto i = 0; i < 5; i++) {
+            for (const auto& host : {host2, host3, host4, host5}) {
+                ASSERT_NO_ACTION(
+                    receiveUpHeartbeat(
+                        host, "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime)
+                        .getAction());
+            }
+        }
+
+        // 'host2' and 'host3' are in the same data center, while 'host4' is far away.
+        getTopoCoord().setPing_forTest(host2, closerPingTime);
+        getTopoCoord().setPing_forTest(host3, pingTime);
+        getTopoCoord().setPing_forTest(host4, farPingTime);
+        getTopoCoord().setPing_forTest(host5, pingTime);
+    }
+
+    // Makes the node at 'memberIndex' report itself as the primary, which also advances
+    // '_currentPrimaryIndex'.
+    void makeMemberPrimary(const HostAndPort& host, int memberIndex) {
+        ASSERT_NO_ACTION(
+            receiveUpHeartbeat(host, "rs0", MemberState::RS_PRIMARY, election, syncSourceOpTime)
+                .getAction());
+        ASSERT_EQUALS(memberIndex, getCurrentPrimaryIndex());
+    }
+
+    const HostAndPort hself = HostAndPort("hself", 27017);
+    const HostAndPort host2 = HostAndPort("host2", 27017);
+    const HostAndPort host3 = HostAndPort("host3", 27017);
+    const HostAndPort host4 = HostAndPort("host4", 27017);
+    // 'host5' is hidden, so it is never an eligible sync source on the first attempt.
+    const HostAndPort host5 = HostAndPort("host5", 27017);
+
+    const OpTime election = OpTime(Timestamp(1, 0), 0);
+    const OpTime syncSourceOpTime = OpTime(Timestamp(4, 0), 0);
+    // Set lastOpTimeFetched to be before the sync sources' OpTimes.
+    const OpTime lastOpTimeFetched = OpTime(Timestamp(3, 0), 0);
+
+    // 'closerPingTime' and 'pingTime' are within 'changeSyncSourceThresholdMillis' of each other,
+    // while 'farPingTime' is not within the threshold of either.
+    const Milliseconds closerPingTime = Milliseconds(4);
+    const Milliseconds pingTime = Milliseconds(7);
+    const Milliseconds farPingTime = Milliseconds(1000);
+};
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, PrefersPrimaryWhenPingsAreWithinThreshold) {
+    // 'host3' is the primary and is in the same data center as the slightly closer 'host2', so we
+    // should prefer the primary.
+    makeMemberPrimary(host3, 2);
+
+    unittest::LogCaptureGuard logs{};
+    ASSERT_EQUALS(
+        host3,
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest));
+    ASSERT_EQUALS(1, countLogLinesWithId(logs, 9649500));
+}
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, DoesNotSelectSelfWhenWeAreThePrimary) {
+    // 'host3' reports itself as the primary, and then we become the primary ourselves. 'host3' is
+    // still cached as a primary in '_memberData', but '_currentPrimaryIndex' now points at us.
+    makeMemberPrimary(host3, 2);
+    makeSelfPrimary(Timestamp(2, 0));
+    ASSERT_EQUALS(getSelfIndex(), getCurrentPrimaryIndex());
+    ASSERT_TRUE(getTopoCoord().getMemberData()[2].getState().primary());
+
+    // We must not choose ourselves. Since we cannot prefer a primary that is not a candidate, we
+    // fall back to choosing the closest node.
+    unittest::LogCaptureGuard logs{};
+    const auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest);
+    ASSERT_NOT_EQUALS(hself, syncSource);
+    ASSERT_EQUALS(host2, syncSource);
+    ASSERT_EQUALS(0, countLogLinesWithId(logs, 9649500));
+    ASSERT_LTE(1, countLogLinesWithId(logs, 9649501));
+
+    // Re-evaluating the sync source must not trip the invariant that our sync source is not
+    // ourselves.
+    ASSERT_FALSE(
+        getTopoCoord().shouldChangeSyncSource(syncSource,
+                                              makeReplSetMetadata(),
+                                              makeOplogQueryMetadata(syncSourceOpTime,
+                                                                     syncSourceOpTime,
+                                                                     /*primaryIndex=*/-1,
+                                                                     /*syncSourceIndex=*/1,
+                                                                     syncSource.toString()),
+                                              lastOpTimeFetched,
+                                              now()));
+}
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, IgnoresStalePrimaryWhenThereIsNoKnownPrimary) {
+    // 'host3' reports itself as the primary, and then the primary steps down. 'host3' is still
+    // cached as a primary in '_memberData', but '_currentPrimaryIndex' is now -1.
+    makeMemberPrimary(host3, 2);
+    getTopoCoord().setCurrentPrimary_forTest(-1);
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+    ASSERT_TRUE(getTopoCoord().getMemberData()[2].getState().primary());
+
+    // We should choose the closest node rather than poisoning our selection with -1, which would
+    // leave us with no sync source at all.
+    unittest::LogCaptureGuard logs{};
+    ASSERT_EQUALS(
+        host2,
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest));
+    ASSERT_EQUALS(0, countLogLinesWithId(logs, 9649500));
+}
+
+TEST_F(ChooseNearbySyncSourcePreferPrimaryTest, IgnoresPrimaryThatIsNotACandidate) {
+    // 'host5' is the primary, but it is hidden, so it is not an eligible sync source. 'host2' and
+    // 'host3' are the two eligible candidates, and 'host3' is stale-cached as a primary.
+    makeMemberPrimary(host3, 2);
+
+    // Point '_currentPrimaryIndex' at the hidden 'host5'. We set this directly because
+    // '_updatePrimaryFromHBDataV1' breaks ties between members reporting themselves as primary by
+    // term, and the test heartbeat helpers give every member the same term.
+    getTopoCoord().setPrimaryIndex(4);
+    ASSERT_EQUALS(4, getCurrentPrimaryIndex());
+    ASSERT_TRUE(getTopoCoord().getMemberData()[2].getState().primary());
+
+    // We should choose the closest of the two eligible candidates instead of the ineligible
+    // primary, which we never vetted as a sync source.
+    unittest::LogCaptureGuard logs{};
+    ASSERT_EQUALS(
+        host2,
+        getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeFetched, ReadPreference::Nearest));
+    ASSERT_EQUALS(0, countLogLinesWithId(logs, 9649500));
+}
+
 void TopoCoordTest::testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
     BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
@@ -2971,6 +3096,63 @@ TEST_F(PrepareHeartbeatResponseV1Test, NodeReturnsBadValueWhenAHeartbeatRequestI
     ASSERT_EQUALS("", response.getReplicaSetName());
 }
 
+TEST_F(PrepareHeartbeatResponseV1Test, LastHeartbeatRecvFromPrimaryIsUnsetWhenNoPrimaryIsKnown) {
+    ReplSetHeartbeatArgsV1 args;
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    args.setConfigVersion(initConfigVersion);
+    args.setConfigTerm(initConfigTerm);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+
+    ASSERT_FALSE(getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    // Self being primary is not a liveness signal about another node either.
+    getTopoCoord().setPrimaryIndex(0);
+    ASSERT_FALSE(getTopoCoord().getLastHeartbeatRecvFromPrimary());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test, LastHeartbeatRecvFromPrimaryAdvancesOnRequestFromPrimary) {
+    // h2 (member id 20, index 1) is the primary.
+    getTopoCoord().setPrimaryIndex(1);
+    // The primary is known, but it has never sent us a request, so the timestamp is unset rather
+    // than absent.
+    ASSERT_EQUALS(Date_t(), *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+    // A request from the other secondary does not count.
+    ReplSetHeartbeatArgsV1 fromSecondary;
+    fromSecondary.setSetName("rs0");
+    fromSecondary.setSenderId(30);
+    fromSecondary.setConfigVersion(initConfigVersion);
+    fromSecondary.setConfigTerm(initConfigTerm);
+    prepareHeartbeatResponseV1(fromSecondary, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_EQUALS(Date_t(), *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    // A request from the primary does.
+    ReplSetHeartbeatArgsV1 fromPrimary;
+    fromPrimary.setSetName("rs0");
+    fromPrimary.setSenderId(20);
+    fromPrimary.setConfigVersion(initConfigVersion);
+    fromPrimary.setConfigTerm(initConfigTerm);
+    const auto firstRecv = now();
+    prepareHeartbeatResponseV1(fromPrimary, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_EQUALS(firstRecv, *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+
+    // A later request from the primary advances the timestamp.
+    const auto secondRecv = now();
+    ASSERT_GREATER_THAN(secondRecv, firstRecv);
+    prepareHeartbeatResponseV1(fromPrimary, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_EQUALS(secondRecv, *getTopoCoord().getLastHeartbeatRecvFromPrimary());
+}
+
 TEST_F(TopoCoordTest, SetConfigVersionToNegativeTwoInHeartbeatResponseWhenNoConfigHasBeenReceived) {
     // set up args and acknowledge sender
     ReplSetHeartbeatArgsV1 args;
@@ -3311,9 +3493,9 @@ void TopoCoordTest::testMemberReplicationProgressAfterReconfig(BSONObj initialCo
                                                               OpTime(Timestamp(12, 2), term),
                                                               OpTime(Timestamp(13, 12), term)}};
 
-    topoCoordSetMyLastDurableOpTime(get<0>(times[0]), Date_t(), false /* isRollbackAllowed */);
-    topoCoordSetMyLastAppliedOpTime(get<1>(times[0]), Date_t(), false /* isRollbackAllowed */);
-    topoCoordSetMyLastWrittenOpTime(get<2>(times[0]), Date_t(), false /* isRollbackAllowed */);
+    topoCoordSetMyLastDurableOpTime(get<0>(times[0]), Date_t(), /*isRollbackAllowed=*/false);
+    topoCoordSetMyLastAppliedOpTime(get<1>(times[0]), Date_t(), /*isRollbackAllowed=*/false);
+    topoCoordSetMyLastWrittenOpTime(get<2>(times[0]), Date_t(), /*isRollbackAllowed=*/false);
 
     heartbeatFromMemberWithMultiOptime(hp1,
                                        setName,
@@ -4441,7 +4623,7 @@ TEST_F(HeartbeatResponseTestV1,
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            staleOpTime, staleOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
+            staleOpTime, staleOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/1),
         staleOpTime,
         now()));
     logs.stop();
@@ -4466,8 +4648,8 @@ TEST_F(HeartbeatResponseTestV1,
     // Show we like host2 while it is primary.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, true /* isPrimary */),
-        makeOplogQueryMetadata(syncSourceOpTime, syncSourceOpTime, 1 /* primaryIndex */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/true),
+        makeOplogQueryMetadata(syncSourceOpTime, syncSourceOpTime, /*primaryIndex=*/1),
         lastOpTimeFetched,
         now()));
 
@@ -4477,7 +4659,7 @@ TEST_F(HeartbeatResponseTestV1,
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/false),
         makeOplogQueryMetadata(syncSourceOpTime, syncSourceOpTime, 2, 2),
         lastOpTimeFetched,
         now()));
@@ -4520,12 +4702,12 @@ void HeartbeatResponseTestV1::testShouldChangeSyncSourceWhenSyncSourceFormsCycle
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         members[1],
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/false),
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
-                               -1 /* primaryIndex */,
-                               2 /* syncSourceIndex */,
-                               members[2].toString() /* syncSourceHost */),
+                               /*primaryIndex=*/-1,
+                               /*syncSourceIndex=*/2,
+                               /*syncSourceHost=*/members[2].toString()),
         lastOpTimeFetched,
         now()));
 
@@ -4537,13 +4719,13 @@ void HeartbeatResponseTestV1::testShouldChangeSyncSourceWhenSyncSourceFormsCycle
     getTopoCoord().setPrimaryIndex(2);
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         members[1],
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/false),
         // Sync source is also syncing from us.
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
-                               -1 /* primaryIndex */,
-                               0 /* syncSourceIndex */,
-                               members[0].toString() /* syncSourceHost */),
+                               /*primaryIndex=*/-1,
+                               /*syncSourceIndex=*/0,
+                               /*syncSourceHost=*/members[0].toString()),
         lastOpTimeFetched,
         now()));
 
@@ -4556,13 +4738,13 @@ void HeartbeatResponseTestV1::testShouldChangeSyncSourceWhenSyncSourceFormsCycle
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         members[1],
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/false),
         // Sync source is also syncing from us.
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
-                               -1 /* primaryIndex */,
-                               0 /* syncSourceIndex */,
-                               members[0].toString() /* syncSourceHost */),
+                               /*primaryIndex=*/-1,
+                               /*syncSourceIndex=*/0,
+                               /*syncSourceHost=*/members[0].toString()),
         olderThanSyncSourceOpTime,
         now()));
 
@@ -4573,13 +4755,13 @@ void HeartbeatResponseTestV1::testShouldChangeSyncSourceWhenSyncSourceFormsCycle
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         members[1],
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/false),
         // Sync source is also syncing from us.
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
-                               -1 /* primaryIndex */,
-                               0 /* syncSourceIndex */,
-                               members[0].toString() /* syncSourceHost */),
+                               /*primaryIndex=*/-1,
+                               /*syncSourceIndex=*/0,
+                               /*syncSourceHost=*/members[0].toString()),
         lastOpTimeFetched,
         now()));
 }
@@ -4697,7 +4879,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbea
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            staleOpTime, staleOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
+            staleOpTime, staleOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/1),
         staleOpTime,
         now()));
     logs.stop();
@@ -4754,7 +4936,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            staleOpTime, staleOpTime, -1 /* primaryIndex */, 1 /* syncSourceIndex */),
+            staleOpTime, staleOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/1),
         staleOpTime,
         now()));
     logs.stop();
@@ -4779,15 +4961,14 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceIsDown) {
 
     // set up complete, time for actual check
     unittest::LogCaptureGuard logs;
-    ASSERT_TRUE(
-        getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                              makeReplSetMetadata(),
-                                              makeOplogQueryMetadata(oldSyncSourceOpTime,
-                                                                     oldSyncSourceOpTime,
-                                                                     -1 /* primaryIndex */,
-                                                                     1 /* syncSourceIndex */),
-                                              oldSyncSourceOpTime,
-                                              now()));
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
+                                                      makeReplSetMetadata(),
+                                                      makeOplogQueryMetadata(oldSyncSourceOpTime,
+                                                                             oldSyncSourceOpTime,
+                                                                             /*primaryIndex=*/-1,
+                                                                             /*syncSourceIndex=*/1),
+                                                      oldSyncSourceOpTime,
+                                                      now()));
     logs.stop();
     ASSERT_EQUALS(1, countLogLinesContaining(logs, "Choosing new sync source"));
     ASSERT_EQUALS(1, countLogLinesWithId(logs, 5929000));
@@ -4835,8 +5016,8 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceFromStalePrimary) {
     // set up complete, time for actual check
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, true /* isPrimary */),
-        makeOplogQueryMetadata(staleOpTime, staleOpTime, 1 /* primaryIndex */),
+        makeReplSetMetadata(/*visibleOpTime=*/OpTime(), /*isPrimary=*/true),
+        makeOplogQueryMetadata(staleOpTime, staleOpTime, /*primaryIndex=*/1),
         staleOpTime,
         now()));
 }
@@ -4903,7 +5084,7 @@ TEST_F(HeartbeatResponseTestV1,
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            freshOpTime, freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+            freshOpTime, freshOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/2),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2
         now()));
 }
@@ -4944,7 +5125,7 @@ TEST_F(HeartbeatResponseTestV1,
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            freshOpTime, freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+            freshOpTime, freshOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/2),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3
         now()));
     logs.stop();
@@ -5050,9 +5231,9 @@ TEST_F(HeartbeatResponseTestV1,
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"),
         // Indicate host2 still thinks it is primary.
-        makeReplSetMetadata(freshOpTime, true /* isPrimary */),
+        makeReplSetMetadata(freshOpTime, /*isPrimary=*/true),
         makeOplogQueryMetadata(
-            freshOpTime, freshOpTime, 1 /* primaryIndex */, -1 /* syncSourceIndex */),
+            freshOpTime, freshOpTime, /*primaryIndex=*/1, /*syncSourceIndex=*/-1),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2 and host3
         now()));
 }
@@ -5076,7 +5257,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldntChangeSyncSourceWhenChainingDisabledAndW
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            freshOpTime, freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+            freshOpTime, freshOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/2),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2
         now()));
 }
@@ -5121,7 +5302,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenAddingPriorityPorts) {
         HostAndPort("host2"),
         makeReplSetMetadata(),
         makeOplogQueryMetadata(
-            freshOpTime, freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+            freshOpTime, freshOpTime, /*primaryIndex=*/-1, /*syncSourceIndex=*/2),
         staleOpTime,  // lastOpTimeFetched so that we are behind host2
         now()));
 }
@@ -5307,7 +5488,7 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryPrefAndCurrentlySyncingFromPrima
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
                                                             "rs0",
                                                             MemberState::RS_PRIMARY,
-                                                            OpTime() /* election */,
+                                                            /*electionTime=*/OpTime(),
                                                             syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
@@ -5332,7 +5513,7 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
                                                             "rs0",
                                                             MemberState::RS_PRIMARY,
-                                                            OpTime() /* election */,
+                                                            /*electionTime=*/OpTime(),
                                                             syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
@@ -7329,7 +7510,7 @@ TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
     heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_ARBITER, caughtUpOpTime);
 
     ASSERT_FALSE(getTopoCoord().haveNumNodesReachedOpTime(
-        caughtUpOpTime, 3 /* numNodes */, false /* durablyWritten */));
+        caughtUpOpTime, /*numNodes=*/3, /*durablyWritten=*/false));
 }
 
 TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
@@ -7365,7 +7546,7 @@ TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
     heartbeatFromMember(HostAndPort("host4"), "rs0", MemberState::RS_ARBITER, caughtUpOpTime);
 
     ASSERT_FALSE(getTopoCoord().haveNumNodesReachedOpTime(
-        caughtUpOpTime, 2 /* numNodes */, false /* durablyWritten */));
+        caughtUpOpTime, /*numNodes=*/2, /*durablyWritten=*/false));
 }
 
 TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
@@ -7407,8 +7588,212 @@ TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
     // Since host2's lastAppliedOpTime is lagging, and we check the
     // min(lastDurableOpTime, lastAppliedOpTime), it should not be counted.
     ASSERT_FALSE(getTopoCoord().haveNumNodesReachedOpTime(
-        caughtUpOpTime, 3 /* numNodes */, true /* durablyWritten */));
+        caughtUpOpTime, /*numNodes=*/3, /*durablyWritten=*/true));
 }
+
+/**
+ * Fixture for the getMaxReachedOpTimeFor*() tests.
+ *
+ * Those tests differ only in the shape of the replica set and in which opTime each node has
+ * reached, so setUpReplSet() takes exactly that as data and does everything else: build and install
+ * the config, make self primary, set self's opTime, and deliver the initial heartbeats.
+ *
+ * Every opTime here is one of two timestamps -- caughtUp() or lagged() -- which setUpReplSet()
+ * stamps with the term the set ends up in. Keeping the spec term-free is what lets a test name its
+ * opTimes before the set exists.
+ */
+class TopoCoordMaxReachedOpTimeTest : public TopoCoordTest {
+public:
+    static constexpr auto kSetName = "rs0";
+
+    /** A member to configure. Member 0 is self; the defaults describe a data-bearing voter. */
+    struct Member {
+        std::string host;
+        bool arbiter = false;
+        bool voter = true;
+    };
+
+    /**
+     * How to bring the replica set up: the members to configure, the timestamp self is at, and the
+     * timestamp each other member has reported. A member with no entry has not been heard from.
+     */
+    struct ReplSetSpec {
+        std::vector<Member> members;
+        Timestamp selfTimestamp;
+        std::vector<std::pair<std::string, Timestamp>> reached;
+    };
+
+    /** The two timestamps these tests distinguish between. */
+    static Timestamp caughtUp() {
+        return Timestamp(100, 0);
+    }
+    static Timestamp lagged() {
+        return Timestamp(50, 0);
+    }
+
+    void setUpReplSet(const ReplSetSpec& spec) {
+        _members = spec.members;
+
+        BSONArrayBuilder members;
+        for (size_t i = 0; i < _members.size(); ++i) {
+            const auto& member = _members[i];
+            BSONObjBuilder builder;
+            builder.append("_id", static_cast<int>(i));
+            builder.append("host", member.host + ":27017");
+            if (member.arbiter) {
+                builder.append("arbiterOnly", true);
+            }
+            if (!member.voter) {
+                builder.append("votes", 0);
+                builder.append("priority", 0);
+            }
+            members.append(builder.obj());
+        }
+        updateConfig(BSON("_id" << kSetName << "version" << 2 << "members" << members.arr()),
+                     /*selfIndex=*/0);
+
+        makeSelfPrimary();
+        _term = getTopoCoord().getTerm();
+
+        setMyOpTime(opTimeAt(spec.selfTimestamp));
+        for (const auto& [host, timestamp] : spec.reached) {
+            reportOpTime(host, timestamp);
+        }
+    }
+
+    /**
+     * Delivers a heartbeat reporting that `host` has reached `timestamp`. Members configured as
+     * arbiters report as arbiters, everyone else as a secondary.
+     */
+    void reportOpTime(const std::string& host, Timestamp timestamp) {
+        heartbeatFromMember(HostAndPort(host),
+                            kSetName,
+                            _isArbiter(host) ? MemberState::RS_ARBITER : MemberState::RS_SECONDARY,
+                            opTimeAt(timestamp));
+    }
+
+    OpTime opTimeAt(Timestamp timestamp) const {
+        return OpTime(timestamp, _term);
+    }
+    OpTime caughtUpOpTime() const {
+        return opTimeAt(caughtUp());
+    }
+    OpTime laggedOpTime() const {
+        return opTimeAt(lagged());
+    }
+
+    /** The tag pattern for w:"majority" in the current config. */
+    ReplSetTagPattern majorityPattern() {
+        return unittest::assertGet(
+            getCurrentConfig().findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName));
+    }
+
+    // The methods under test, and the predicates they are expected to agree with. These tests only
+    // ever ask about non-durable opTimes.
+    OpTime maxReachedForNumNodes(int numNodes) {
+        return getTopoCoord().getMaxReachedOpTimeForNumNodes(numNodes, kDurablyWritten);
+    }
+    OpTime maxReachedForMajority() {
+        return getTopoCoord().getMaxReachedOpTimeForTaggedNodes(majorityPattern(), kDurablyWritten);
+    }
+    bool haveNumNodesReached(const OpTime& opTime, int numNodes) {
+        return getTopoCoord().haveNumNodesReachedOpTime(opTime, numNodes, kDurablyWritten);
+    }
+    bool haveMajorityReached(const OpTime& opTime) {
+        return getTopoCoord().haveTaggedNodesReachedOpTime(
+            opTime, majorityPattern(), kDurablyWritten);
+    }
+
+private:
+    static constexpr bool kDurablyWritten = false;
+
+    bool _isArbiter(const std::string& host) const {
+        for (const auto& member : _members) {
+            if (member.host == host) {
+                return member.arbiter;
+            }
+        }
+        return false;
+    }
+
+    long long _term = 0;
+    std::vector<Member> _members;
+};
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, NumNodesReturnsNthLargestOpTime) {
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {"host2"}},
+                  .selfTimestamp = caughtUp(),
+                  .reached = {{"host1", caughtUp()}, {"host2", lagged()}}});
+
+    // Two nodes are at the caught-up opTime and all three are at the lagged one, so those are the
+    // highest opTimes satisfying w:2 and w:3 respectively.
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForNumNodes(1));
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForNumNodes(2));
+    ASSERT_EQ(laggedOpTime(), maxReachedForNumNodes(3));
+
+    // The returned opTimes agree with what haveNumNodesReachedOpTime() reports.
+    ASSERT_TRUE(haveNumNodesReached(caughtUpOpTime(), 2));
+    ASSERT_FALSE(haveNumNodesReached(caughtUpOpTime(), 3));
+    ASSERT_TRUE(haveNumNodesReached(laggedOpTime(), 3));
+
+    // More nodes are required than the set has, so nothing is satisfiable.
+    ASSERT_TRUE(maxReachedForNumNodes(4).isNull());
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, NumNodesExcludesArbiters) {
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {.host = "host2", .arbiter = true}},
+                  .selfTimestamp = caughtUp(),
+                  .reached = {{"host1", caughtUp()}, {"host2", caughtUp()}}});
+
+    // Only the two data-bearing nodes count, so w:3 is not satisfiable even though the arbiter has
+    // reported the same opTime.
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForNumNodes(2));
+    ASSERT_TRUE(maxReachedForNumNodes(3).isNull());
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, NumNodesIsCappedBySelf) {
+    // Self is behind both secondaries. Self is a required participant, so it caps the answer.
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {"host2"}},
+                  .selfTimestamp = lagged(),
+                  .reached = {{"host1", caughtUp()}, {"host2", caughtUp()}}});
+
+    ASSERT_EQ(laggedOpTime(), maxReachedForNumNodes(2));
+    ASSERT_FALSE(haveNumNodesReached(caughtUpOpTime(), 2));
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, TaggedNodesReturnsHighestSatisfyingOpTime) {
+    // The config has 3 voting members, so the majority number is 2. No secondary has reported yet.
+    setUpReplSet({.members = {{"host0"}, {"host1"}, {"host2"}}, .selfTimestamp = caughtUp()});
+
+    // Only self has reached the caught-up opTime, which is not yet a majority.
+    ASSERT_TRUE(maxReachedForMajority().isNull());
+
+    // With one lagging secondary, a majority has reached the lagged opTime but no higher.
+    reportOpTime("host1", lagged());
+    ASSERT_EQ(laggedOpTime(), maxReachedForMajority());
+    ASSERT_TRUE(haveMajorityReached(laggedOpTime()));
+    ASSERT_FALSE(haveMajorityReached(caughtUpOpTime()));
+
+    // Once that secondary catches up, the majority has reached the caught-up opTime.
+    reportOpTime("host1", caughtUp());
+    ASSERT_EQ(caughtUpOpTime(), maxReachedForMajority());
+    ASSERT_TRUE(haveMajorityReached(caughtUpOpTime()));
+}
+
+TEST_F(TopoCoordMaxReachedOpTimeTest, TaggedNodesExcludeNonVotersAndArbiters) {
+    // The config has 3 voting members including an arbiter, so the majority number is 2. Neither
+    // the non-voter nor the arbiter counts towards it, so the only other node that does is the
+    // lagging secondary.
+    setUpReplSet({.members = {{"host0"},
+                              {"host1"},
+                              {.host = "host2", .voter = false},
+                              {.host = "host3", .arbiter = true}},
+                  .selfTimestamp = caughtUp(),
+                  .reached = {{"host1", lagged()}, {"host2", caughtUp()}, {"host3", caughtUp()}}});
+
+    ASSERT_EQ(laggedOpTime(), maxReachedForMajority());
+}
+
 
 TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
     auto configA = ReplSetConfig::parse(
@@ -8232,8 +8617,8 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferen
     ASSERT_FALSE(
         getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
                                               makeReplSetMetadata(OpTime(),
-                                                                  false /* isPrimary */,
-                                                                  -1 /* syncSourceIndex */,
+                                                                  /*isPrimary=*/false,
+                                                                  /*syncSourceIndex=*/-1,
                                                                   8 /* different config version */),
                                               makeOplogQueryMetadata(syncSourceOpTime),
                                               lastOpTimeFetched,

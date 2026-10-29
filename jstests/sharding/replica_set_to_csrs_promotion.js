@@ -216,11 +216,6 @@ describe("transitions", function () {
                         remember: false,
                     });
                 });
-                // Wait for this secondary to complete initial sync before stopping
-                // the next. Stopping both simultaneously creates a circular deadlock:
-                // neither can pass waitingForSyncSourceStableTs because the primary
-                // has no majority votes and its stable timestamp cannot advance.
-                rs.awaitSecondaryNodes(rs.timeoutMS, [rs.nodes[id]]);
             }
             const primaryId = rs.getNodeId(rs.getPrimary());
             rs.stepUp(rs.getSecondary());
@@ -383,13 +378,14 @@ describe("operations during rolling restart", function () {
                     waitPid: true,
                 },
             );
+            let restartedSecondary;
             assert.doesNotThrow(() => {
-                rs.start(id, {
+                restartedSecondary = rs.start(id, {
                     ...startupFlags,
                     remember: false,
                 });
             });
-            rs.stepUp(secondary);
+            rs.stepUp(restartedSecondary);
         };
 
         this.restartAllSecondaries = (rs, startupFlags) => {

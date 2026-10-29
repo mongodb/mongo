@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -47,8 +21,6 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/check_metadata_consistency_gen.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
-#include "mongo/db/global_catalog/sharding_catalog_client.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -99,26 +71,16 @@ MONGO_FAIL_POINT_DEFINE(hangCheckMetadataBeforeEstablishCursors);
 MONGO_FAIL_POINT_DEFINE(tripwireCheckMetadataAfterEstablishCursors);
 
 /*
- * Return the set of shards that are primaries for at least one database
+ * Returns the set of shards to target as participants.
  */
-stdx::unordered_set<ShardId> getAllDbPrimaryShards(OperationContext* opCtx) {
-    static const std::vector<BSONObj> rawPipeline{fromjson(R"({
-        $group: {
-            _id: '$primary'
-        }
-    })")};
-    AggregateCommandRequest aggRequest{NamespaceString::kConfigDatabasesNamespace, rawPipeline};
-    auto aggResponse = Grid::get(opCtx)->catalogClient()->runCatalogAggregation(
-        opCtx, aggRequest, {repl::ReadConcernLevel::kMajorityReadConcern});
+stdx::unordered_set<ShardId> getTargetShards(OperationContext* opCtx) {
+    const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    stdx::unordered_set<ShardId> targetShards(allShardIds.begin(), allShardIds.end());
 
-    stdx::unordered_set<ShardId> shardIds;
-    shardIds.reserve(aggResponse.size() + 1);
-    for (auto&& responseEntry : aggResponse) {
-        shardIds.insert(responseEntry.firstElement().str());
-    }
     // The config server is authoritative for config database
-    shardIds.insert(ShardId::kConfigServerId);
-    return shardIds;
+    targetShards.insert(ShardId::kConfigServerId);
+
+    return targetShards;
 }
 
 MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
@@ -186,14 +148,14 @@ public:
             shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
 
-            // Send a request to all shards that are primaries for at least one database
+            // Send a request to all shards.
             const auto shardOpKey = UUID::gen();
             BSONObjBuilder shardRequestBob;
             shardsvrRequest.serialize(&shardRequestBob);
             appendOpKey(shardOpKey, &shardRequestBob);
             auto shardRequestWithOpKey = shardRequestBob.obj();
 
-            for (auto&& shardId : getAllDbPrimaryShards(opCtx)) {
+            for (auto&& shardId : getTargetShards(opCtx)) {
                 requests.emplace_back(std::move(shardId), shardRequestWithOpKey.getOwned());
             }
 
@@ -264,8 +226,8 @@ public:
                 nss,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
                 requests,
-                false /*allowPartialResults*/,
-                nullptr /* RoutingContext */,
+                /*allowPartialResults=*/false,
+                /*routingCtx=*/nullptr,
                 Shard::RetryPolicy::kIdempotent,
                 std::move(opKeys));
 

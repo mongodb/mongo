@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
@@ -39,30 +14,50 @@
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
+using mongo::extension::PipelineRewriteRule;
 
 using StreamType = sdk::ExecAggStageResultsAndMetadataSource::StreamType;
 
 namespace {
+using namespace std::literals::string_view_literals;
 
-constexpr std::string_view kByShardField = "byShard"_sd;
-constexpr std::string_view kMetaField = "meta"_sd;
-constexpr std::string_view kNumMetaField = "numMeta"_sd;
-constexpr std::string_view kNumDocsField = "numDocs"_sd;
-constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"_sd;
-constexpr std::string_view kSortPatternField = "sortPattern"_sd;
-constexpr std::string_view kMergePipelineField = "mergePipeline"_sd;
+constexpr std::string_view kByShardField = "byShard"sv;
+constexpr std::string_view kMetaField = "meta"sv;
+constexpr std::string_view kNumMetaField = "numMeta"sv;
+constexpr std::string_view kNumDocsField = "numDocs"sv;
+constexpr std::string_view kDocPadField = "docPad"sv;
+constexpr std::string_view kBatchSizeField = "batchSize"sv;
+constexpr std::string_view kAddStreamTypeField = "addStreamTypeField"sv;
+constexpr std::string_view kReportObservedBoundsField = "reportObservedBounds"sv;
+constexpr std::string_view kAdvertiseSortKeyField = "advertiseSortKey"sv;
+constexpr std::string_view kSuppressScoreField = "suppressScore"sv;
+constexpr std::string_view kAdvertiseScoreDetailsField = "advertiseScoreDetails"sv;
+constexpr std::string_view kIsSelectionStageField = "isSelectionStage"sv;
+constexpr std::string_view kSortPatternField = "sortPattern"sv;
+constexpr std::string_view kMergePipelineField = "mergePipeline"sv;
 
 // DRM wrapper / metadata field names.
-constexpr std::string_view kSourceField = "source"_sd;
-constexpr std::string_view kMetadataField = "metadata"_sd;
-constexpr std::string_view kAsField = "as"_sd;
-constexpr std::string_view kSearchMetaName = "SEARCH_META"_sd;
+constexpr std::string_view kSourceField = "source"sv;
+constexpr std::string_view kMetadataField = "metadata"sv;
+constexpr std::string_view kAsField = "as"sv;
+constexpr std::string_view kSearchMetaName = "SEARCH_META"sv;
 
 // Emitted document field names.
-constexpr std::string_view kScoreField = "score"_sd;
-constexpr std::string_view kSortKeyField = "$sortKey"_sd;
-constexpr std::string_view kSearchScoreField = "$searchScore"_sd;
-constexpr std::string_view kStreamTypeField = "_streamType"_sd;
+constexpr std::string_view kScoreField = "score"sv;
+constexpr std::string_view kSortKeyField = "$sortKey"sv;
+constexpr std::string_view kSearchScoreField = "$searchScore"sv;
+constexpr std::string_view kScoreDetailsMetaField = "$scoreDetails"sv;
+constexpr std::string_view kStreamTypeField = "_streamType"sv;
+
+// Marker embedded in the emitted $scoreDetails metadata. Hybrid fusion merges a scoreDetails-
+// generating input pipeline's per-doc scoreDetails into its output scoreDetails, so a test can
+// assert this marker survives the fusion to confirm the DRM source was recognized as
+// scoreDetails-generating.
+constexpr std::string_view kScoreDetailsMarker = "extensionMultiStreamScoreDetails"sv;
+
+// Pipeline bounds error values.
+constexpr long long kNoRuleFiredSentinel = -1;
+constexpr long long kNonDiscreteBoundValue = -2;
 
 // True if 'field' is present at the top level or inside any per-shard override.
 bool fieldPresentInAnyShard(const BSONObj& args, std::string_view field) {
@@ -96,13 +91,29 @@ BSONObj resolveEffectiveArgs(const BSONObj& args, const std::string& shardId) {
 
 struct DocEmitConfig {
     int numDocs = 0;
+    // Number of filler bytes appended to each document result via a "pad" string field. Lets a test
+    // inflate the document stream past the Exchange's per-consumer buffer with fewer documents.
+    int docPad = 0;
     bool addStreamTypeField = false;
+    bool scoreDetails = false;
+    int batchSize = 0;
+    bool reportObservedBounds = false;
+    // The distinct states that can be observed from the applyPipelineBounds rule:
+    //   boost::none            -> the rule never fired (kNoRuleFiredSentinel reported: -1)
+    //   kNonDiscreteBoundValue -> the rule fired but found a non-discrete (Unknown/NeedAll) bound
+    //   any other value        -> the rule fired and found this discrete bound
+    boost::optional<long long> observedMaxLimit;
 
     static DocEmitConfig parse(const BSONObj& args) {
-        return {
-            args[kNumDocsField].isNumber() ? args[kNumDocsField].safeNumberInt() : 0,
-            args[kAddStreamTypeField].booleanSafe(),
-        };
+        DocEmitConfig config;
+        config.numDocs = args[kNumDocsField].isNumber() ? args[kNumDocsField].safeNumberInt() : 0;
+        config.docPad = args[kDocPadField].isNumber() ? args[kDocPadField].safeNumberInt() : 0;
+        config.addStreamTypeField = args[kAddStreamTypeField].booleanSafe();
+        config.scoreDetails = args[kAdvertiseScoreDetailsField].booleanSafe();
+        config.batchSize =
+            args[kBatchSizeField].isNumber() ? args[kBatchSizeField].safeNumberInt() : 0;
+        config.reportObservedBounds = args[kReportObservedBoundsField].booleanSafe();
+        return config;
     }
 };
 
@@ -157,11 +168,8 @@ struct DplConfig {
 };
 
 /**
- * Emits numMeta metadata docs (kMetaResult) followed by numDocs document results (kDocResult).
- * numMeta drives three test scenarios:
- *   1 (default when "meta" present) — normal two-stream path
- *   0 — triggers $setVariableFromSubPipeline error 625296 (no metadata doc)
- *   2 — triggers $setVariableFromSubPipeline error 625297 (duplicate metadata)
+ * Emits numMeta metadata docs (kMetaResult) followed by numDocs document results (kDocResult). Each
+ * source _should_ emit exactly one metadata document; numMeta lets tests deviate from that.
  */
 class MultiStreamSourceExecStage : public sdk::ExecAggStageResultsAndMetadataSource {
 public:
@@ -173,14 +181,21 @@ public:
           _metaConfig(std::move(metaConfig)) {}
 
     extension::ExtensionGetNextResult getNext(
-        const sdk::QueryExecutionContextHandle& /*execCtx*/,
+        const sdk::QueryExecutionContextHandle& execCtx,
         ::MongoExtensionExecAggStage* /*execStage*/) override {
         if (!_metaConfig.skip && _metaConfig.isActive() && _metaEmitted < _metaConfig.numMeta) {
             ++_metaEmitted;
             return advanced(_metaConfig.meta, StreamType::kMetaResult);
         }
+        if (!_metaConfig.skip && _metaConfig.isActive() && !_metaEosSent) {
+            _metaEosSent = true;
+            return advancedMetaStreamEOS();
+        }
         if (_nextDoc >= _docConfig.numDocs) {
             return extension::ExtensionGetNextResult::eof();
+        }
+        if (_nextDoc == 0 && _docConfig.batchSize > 0) {
+            execCtx->setBatchSize(static_cast<uint64_t>(_docConfig.batchSize));
         }
         int i = _nextDoc++;
         int score = _docConfig.numDocs - i;
@@ -188,14 +203,28 @@ public:
         builder.append("_id", i);
         builder.append(kScoreField, score);
         builder.append("name", "doc_" + std::to_string(i));
+        if (_docConfig.docPad > 0) {
+            builder.append("pad", std::string(_docConfig.docPad, 'x'));
+        }
         if (_docConfig.addStreamTypeField) {
             builder.append(kStreamTypeField, -1);
         }
+        if (_docConfig.reportObservedBounds) {
+            builder.append("observedPipelineLimit",
+                           _docConfig.observedMaxLimit.value_or(kNoRuleFiredSentinel));
+        }
         // $sortKey drives merge-sort across shards. $searchScore is score * 0.125.
-        return advanced(
-            builder.obj(),
-            StreamType::kDocResult,
-            BSON(kSortKeyField << BSON_ARRAY(score) << kSearchScoreField << score * 0.125));
+        BSONObjBuilder metaBuilder;
+        metaBuilder.append(kSortKeyField, BSON_ARRAY(score));
+        metaBuilder.append(kSearchScoreField, score * 0.125);
+        if (_docConfig.scoreDetails) {
+            // Tagged with kScoreDetailsMarker so a hybrid fusion test can confirm the source's
+            // scoreDetails flowed through fusion (only happens when it is recognized as
+            // scoreDetails-generating).
+            metaBuilder.append(kScoreDetailsMetaField,
+                               BSON("marker" << kScoreDetailsMarker << "score" << score));
+        }
+        return advanced(builder.obj(), StreamType::kDocResult, metaBuilder.obj());
     }
 
     void open() override {}
@@ -213,6 +242,7 @@ private:
     MetaEmitConfig _metaConfig;
     int _nextDoc = 0;
     int _metaEmitted = 0;
+    bool _metaEosSent = false;
 };
 
 class MultiStreamSourceLogicalStage : public sdk::LogicalAggStage {
@@ -237,6 +267,24 @@ public:
 
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
         return std::make_unique<MultiStreamSourceExecStage>(_name, _docConfig, _metaConfig);
+    }
+
+    bool evaluatePipelineRewriteRulePrecondition(
+        std::string_view ruleName,
+        mongo::extension::ConstPipelineRewriteContextHandle) const override {
+        return ruleName == "applyPipelineBounds";
+    }
+
+    bool evaluatePipelineRewriteRuleTransform(
+        std::string_view ruleName, mongo::extension::PipelineRewriteContextHandle ctx) override {
+        if (ruleName == "applyPipelineBounds") {
+            // Always assign so a later re-run correctly overwrites a stale value.
+            auto bounds = ctx->getPipelineSuffixBounds();
+            _docConfig.observedMaxLimit = (bounds.maxBounds.type == kDocsNeededConstraintDiscrete)
+                ? static_cast<long long>(bounds.maxBounds.value)
+                : kNonDiscreteBoundValue;
+        }
+        return false;
     }
 
     boost::optional<extension::sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
@@ -267,8 +315,21 @@ public:
         extension::MongoExtensionStaticProperties properties;
         properties.setRequiresInputDocSource(false);
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
-        properties.setHostType(extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
-        properties.setProvidedMetadataFields(std::vector<std::string>{"searchScore"});
+        properties.setHostType(extension::MongoExtensionHostTypeRequirementEnum::kTargetedShards);
+
+        std::vector<std::string> provided;
+        if (!_arguments[kSuppressScoreField].booleanSafe()) {
+            provided.emplace_back("searchScore");
+        }
+        if (_arguments[kAdvertiseSortKeyField].booleanSafe()) {
+            provided.emplace_back("sortKey");
+        }
+        if (_arguments[kAdvertiseScoreDetailsField].booleanSafe()) {
+            provided.emplace_back("scoreDetails");
+        }
+        properties.setProvidedMetadataFields(std::move(provided));
+        properties.setIsSelectionStage(_arguments[kIsSelectionStageField].booleanSafe());
+
         BSONObjBuilder builder;
         properties.serialize(&builder);
         return builder.obj();
@@ -345,13 +406,18 @@ extension::AggStageAstNodeHandle expandToDrm(const BSONObj& args) {
  * mergePipeline) is supplied.
  *
  * Arguments (all optional, also accepted under byShard.<shardId> overrides):
- *   numDocs:            <int>   number of document results to emit
- *   numMeta:            <int>   number of metadata docs (0/1/2 exercise DRM edge cases)
- *   meta:               <obj>   metadata payload; presence activates the metadata stream
- *   addStreamTypeField: <bool>  append a debug _streamType field to each document
- *   sortPattern:        <obj>   merge-sort pattern for the DPL callback
- *   mergePipeline:      <array> metadata merge pipeline for the DPL callback
- *   byShard:            <obj>   { <shardId>: { ...per-shard overrides... } }
+ *   numDocs:               <int>   number of document results to emit
+ *   docPad:                <int>   filler bytes appended to each document (inflates stream size)
+ *   numMeta:               <int>   number of metadata docs (0/1/2 exercise DRM edge cases)
+ *   meta:                  <obj>   metadata payload; presence activates the metadata stream
+ *   addStreamTypeField:    <bool>  append a debug _streamType field to each document
+ *   advertiseSortKey:      <bool>  advertise sortKey metadata (marks the source as ranked)
+ *   suppressScore:         <bool>  drop searchScore from advertised metadata (marks it non-scored)
+ *   advertiseScoreDetails: <bool> advertise + emit $scoreDetails metadata (see kScoreDetailsMarker)
+ *   isSelectionStage:      <bool>  mark the source as a selection stage
+ *   sortPattern:           <obj>   merge-sort pattern for the DPL callback
+ *   mergePipeline:         <array> metadata merge pipeline for the DPL callback
+ *   byShard:               <obj>   { <shardId>: { ...per-shard overrides... } }
  */
 class ExtensionMultiStreamParseNode : public sdk::AggStageParseNode {
 public:
@@ -369,8 +435,16 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return BSONObj();
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
+        BSONObjBuilder args;
+        for (const auto& elem : _args) {
+            if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+                args.append(elem);
+            } else {
+                ctx->appendLiteral(args, elem.fieldName(), elem);
+            }
+        }
+        return BSON(_name << args.obj());
     }
 
     BSONObj toBsonForLog() const override {
@@ -383,6 +457,63 @@ public:
 
 private:
     BSONObj _args;
+};
+
+/**
+ * $expandToDrm desugars into a single $_internalDocumentResultsAndMetadata stage that wraps a
+ * caller-supplied source stage with no metadata stream or DPL. Unlike $extensionMultiStream (whose
+ * source is the fixed $_multiStreamSource), this lets tests exercise DRM over an arbitrary source
+ * through the legitimate desugaring path.
+ */
+class ExpandToDrmParseNode : public sdk::AggStageParseNode {
+public:
+    ExpandToDrmParseNode(std::string_view name, const BSONObj& args)
+        : sdk::AggStageParseNode(name), _args(args.getOwned()) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<extension::VariantNodeHandle> expand() const override {
+        // Wrap the caller-provided source stage in a $_internalDocumentResultsAndMetadata spec and
+        // desugar into it via the host service. No metadata field and no distributed plan logic
+        // callback are attached (document-only behavior).
+        BSONObj drmSpec = BSON("$_internalDocumentResultsAndMetadata"
+                               << BSON(kSourceField << _args[kSourceField].Obj()));
+        std::vector<extension::VariantNodeHandle> expanded;
+        expanded.reserve(1);
+        expanded.emplace_back(sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(
+            drmSpec, /*callback=*/nullptr, /*userData=*/nullptr, /*destroy=*/nullptr));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
+        return BSON(_name << _args);
+    }
+
+    BSONObj toBsonForLog() const override {
+        return BSON(_name << _args);
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToDrmParseNode>(getName(), _args);
+    }
+
+private:
+    BSONObj _args;
+};
+
+// $expandToDrm: user-facing stage that desugars into $_internalDocumentResultsAndMetadata wrapping
+// a caller-supplied 'source' stage.
+class ExpandToDrmStageDescriptor
+    : public sdk::TestStageDescriptor<"$expandToDrm", ExpandToDrmParseNode> {
+public:
+    void validate(const BSONObj& arguments) const override {
+        auto sourceElem = arguments[kSourceField];
+        sdk_uassert(13042900,
+                    "$expandToDrm requires a 'source' object specifying a single source stage",
+                    sourceElem.type() == BSONType::object && sourceElem.Obj().nFields() == 1);
+    }
 };
 
 // $_multiStreamSource: source stage that emits the two-stream (doc + metadata)
@@ -400,6 +531,12 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<ExtensionMultiStreamStageDescriptor>(portal);
         _registerStage<MultiStreamSourceStageDescriptor>(portal);
+        _registerStage<ExpandToDrmStageDescriptor>(portal);
+
+        std::vector<PipelineRewriteRule> rules{
+            {"applyPipelineBounds", kPipelineRewriteRuleTagInPlace},
+        };
+        _registerStageRules<MultiStreamSourceStageDescriptor>(portal, rules);
     }
 };
 

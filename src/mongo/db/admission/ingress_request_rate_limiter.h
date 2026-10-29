@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,14 +9,17 @@
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/optional.hpp>
 
 namespace mongo {
 namespace admission {
 
-class MONGO_MOD_PUBLIC IngressRequestRateLimiter {
+class [[MONGO_MOD_PUBLIC]] IngressRequestRateLimiter {
 public:
+    static constexpr std::string_view kRateLimiterName = "ingressRequestRateLimiter";
+
     IngressRequestRateLimiter();
     /**
      * Returns the reference to IngressRequestRateLimiter associated with the operation's service
@@ -69,18 +46,8 @@ public:
     /**
      * Waits for admission to be granted. If there is no deferred token then this is a no-op,
      * otherwise it resolves the deferred token.
-     *
-     * If isExemptFromAdmissionControl is true, the deferred token is marked exempt instead of
-     * waited on, returning the borrowed token to the bucket and releasing its queue slot.
-     *
-     * Exemption is determined here (rather than in admitRequest) because it
-     * depends on command-level state that is not available at the point of message read. As a
-     * consequence, the exemption can only take effect for requests that successfully reserved a
-     * queue slot in admitRequest. A rate-exceeded request that was rejected up front because
-     * queueing was disabled or the queue was full will not reach this function. See README.md for
-     * the rationale.
      */
-    static Status waitForAdmission(OperationContext* opCtx, bool isExemptFromAdmissionControl);
+    static Status waitForAdmission(OperationContext* opCtx);
 
     /**
      * Adjusts the refresh rate and burst capacity of the rate limiter.
@@ -96,19 +63,20 @@ public:
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionRatePerSec changes value.
      */
-    MONGO_MOD_PRIVATE static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
 
     /**
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionBurstCapacitySecs changes value.
      */
-    MONGO_MOD_PRIVATE static Status onUpdateAdmissionBurstCapacitySecs(double burstCapacitySecs);
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateAdmissionBurstCapacitySecs(
+        double burstCapacitySecs);
 
     /**
      * Called automatically when the value of the server parameter
      * ingressRequestAdmissionMaxQueueDepth changes value.
      */
-    MONGO_MOD_PRIVATE static Status onUpdateAdmissionMaxQueueDepth(std::int64_t maxQueueDepth);
+    [[MONGO_MOD_PRIVATE]] static Status onUpdateAdmissionMaxQueueDepth(std::int64_t maxQueueDepth);
 
     /**
      * Reports the ingress admission rate limiter metrics.
@@ -125,7 +93,8 @@ public:
     /** Clears any pending deferred admission token stored on the client. */
     static void clearDeferredAdmissionToken(Client* client);
     /** Test-only helper to seed a pending DeferredToken on a client. */
-    static void setDeferredAdmissionToken_forTest(Client* client, RateLimiter::DeferredToken token);
+    [[MONGO_MOD_PUBLIC]] static void setDeferredAdmissionToken_forTest(
+        Client* client, RateLimiter::DeferredToken token);
     /** Test-only helper to check if a client has a deferred admission token. */
     static bool hasDeferredAdmissionToken_forTest(Client* client);
 

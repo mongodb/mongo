@@ -103,7 +103,7 @@ class test_truncate20(test_cc_base):
 
             # Check stats to make sure we fast-deleted at least one page.
             stat_cursor = self.session.open_cursor('statistics:', None, None)
-            fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+            fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
 
             self.assertGreater(fastdelete_pages, 0)
 

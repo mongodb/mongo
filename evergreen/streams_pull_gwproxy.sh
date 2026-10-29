@@ -24,6 +24,8 @@ print(latest['imageDigest'])
 ")
 
 echo "Pulling gwproxy image: $REGISTRY/$REPO@$DIGEST"
-docker pull "$REGISTRY/$REPO@$DIGEST"
-docker tag "$REGISTRY/$REPO@$DIGEST" gwproxy-sre:latest
+# RHEL images ship podman instead of docker.
+if command -v docker >/dev/null 2>&1; then ENGINE=docker; else ENGINE=podman; fi
+$ENGINE pull "$REGISTRY/$REPO@$DIGEST"
+$ENGINE tag "$REGISTRY/$REPO@$DIGEST" gwproxy-sre:latest
 echo "gwproxy_image: gwproxy-sre:latest" >gwproxy_image_expansion.yml

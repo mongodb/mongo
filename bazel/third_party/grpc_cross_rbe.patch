@@ -1,0 +1,306 @@
+diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
+index ee44332d144..6e4d5fe8eee 100644
+--- a/bazel/generate_cc.bzl
++++ b/bazel/generate_cc.bzl
+@@ -156,14 +156,21 @@ def generate_cc_impl(ctx):
+                 for f in ctx.attr.well_known_protos.files.to_list()
+             ]
+ 
+-    ctx.actions.run(
+-        inputs = protos + includes + well_known_proto_files,
+-        tools = tools,
+-        outputs = out_files,
+-        executable = ctx.executable._protoc,
+-        arguments = arguments,
+-        use_default_shell_env = True,
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "inputs": protos + includes + well_known_proto_files,
++        "tools": tools,
++        "outputs": out_files,
++        "executable": ctx.executable._protoc,
++        "arguments": arguments,
++        "mnemonic": "GenProto",
++        "use_default_shell_env": True,
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+ 
+     # Create symlinks from _virtual_imports to _virtual_includes for headers.
+     virtual_includes_files = []
+@@ -192,7 +199,7 @@ _generate_cc = rule(
+         ),
+         "plugin": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+         ),
+         "flags": attr.string_list(
+             mandatory = False,
+@@ -210,7 +217,19 @@ _generate_cc = rule(
+         "_protoc": attr.label(
+             default = Label("@com_google_protobuf//:protoc"),
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
++        ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        # The compiler and plugin are host tools.  Requiring the C++ toolchain
++        # makes Bazel select the marked x86_64/aarch64 execution platform for
++        # IBM target builds instead of dispatching the target protoc binary.
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+         ),
+     },
+     # We generate .h files, so we need to output to genfiles.
+diff --git a/bazel/generate_objc.bzl b/bazel/generate_objc.bzl
+index 6fadabc4707..8eb4046ba1a 100644
+--- a/bazel/generate_objc.bzl
++++ b/bazel/generate_objc.bzl
+@@ -96,13 +96,20 @@ def _generate_objc_impl(ctx):
+         # go two levels up so that #import "google/protobuf/..." is correct
+         arguments.append("-I{0}".format(f + "/../.."))
+         well_known_proto_files = ctx.attr.well_known_protos.files.to_list()
+-    ctx.actions.run(
+-        inputs = protos + well_known_proto_files,
+-        tools = tools,
+-        outputs = out_files,
+-        executable = ctx.executable._protoc,
+-        arguments = arguments,
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "inputs": protos + well_known_proto_files,
++        "tools": tools,
++        "outputs": out_files,
++        "executable": ctx.executable._protoc,
++        "arguments": arguments,
++        "mnemonic": "GenProto",
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+ 
+     return struct(files = depset(out_files))  # buildifier: disable=rule-impl-return
+ 
+@@ -166,7 +173,7 @@ generate_objc = rule(
+             default = Label("//src/compiler:grpc_objective_c_plugin"),
+             executable = True,
+             providers = ["files_to_run"],
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+         ),
+         "srcs": attr.string_list(
+             mandatory = False,
+@@ -182,7 +189,16 @@ generate_objc = rule(
+         "_protoc": attr.label(
+             default = Label("@com_google_protobuf//:protoc"),
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
++        ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+         ),
+     },
+     output_to_genfiles = True,
+diff --git a/bazel/python_rules.bzl b/bazel/python_rules.bzl
+index e6cf84dca20..8aa3d2bdf21 100644
+--- a/bazel/python_rules.bzl
++++ b/bazel/python_rules.bzl
+@@ -83,14 +83,19 @@ def _gen_py_aspect_impl(target, context):
+ 
+     arguments += get_proto_arguments(protos, context.genfiles_dir.path)
+ 
+-    context.actions.run(
+-        inputs = protos + includes.to_list(),
+-        tools = tools,
+-        outputs = out_files,
+-        executable = context.executable._protoc,
+-        arguments = arguments,
+-        mnemonic = "ProtocInvocation",
+-    )
++    action_kwargs = {
++        "inputs": protos + includes.to_list(),
++        "tools": tools,
++        "outputs": out_files,
++        "executable": context.executable._protoc,
++        "arguments": arguments,
++        "mnemonic": "ProtocInvocation",
++        # This aspect always invokes a host-side protoc.  The group's execution
++        # platform is native on ordinary builds and the marked foreign-host
++        # platform for IBM cross builds.
++        "exec_group": "cross",
++    }
++    context.actions.run(**action_kwargs)
+ 
+     imports = []
+     if out_dir.import_path:
+@@ -115,13 +120,18 @@ _gen_py_aspect = aspect(
+         "_protoc": attr.label(
+             default = Label("@com_google_protobuf//:protoc"),
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+         ),
+         "_protobuf_library": attr.label(
+             default = Label("@com_google_protobuf//:protobuf_python"),
+             providers = [PyInfo],
+         ),
+     },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
++    },
+ )
+ 
+ def _generate_py_impl(context):
+@@ -170,7 +180,7 @@ _py_proto_library = rule(
+         "_protoc": attr.label(
+             default = Label("@com_google_protobuf//:protoc"),
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+         ),
+         "_protobuf_library": attr.label(
+             default = Label("@com_google_protobuf//:protobuf_python"),
+@@ -178,6 +188,11 @@ _py_proto_library = rule(
+         ),
+         "imports": attr.string_list(),
+     },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
++    },
+     implementation = _generate_py_impl,
+ )
+ 
+@@ -227,14 +242,16 @@ def _generate_pb2_grpc_src_impl(context):
+     ]
+     arguments.append("--proto_path={}".format(context.genfiles_dir.path))
+     arguments += get_proto_arguments(protos, context.genfiles_dir.path)
+-    context.actions.run(
+-        inputs = protos + includes,
+-        tools = tools,
+-        outputs = out_files,
+-        executable = context.executable._protoc,
+-        arguments = arguments,
+-        mnemonic = "ProtocInvocation",
+-    )
++    action_kwargs = {
++        "inputs": protos + includes,
++        "tools": tools,
++        "outputs": out_files,
++        "executable": context.executable._protoc,
++        "arguments": arguments,
++        "mnemonic": "ProtocInvocation",
++        "exec_group": "cross",
++    }
++    context.actions.run(**action_kwargs)
+ 
+     imports = []
+ 
+@@ -285,12 +302,12 @@ _generate_pb2_grpc_src = rule(
+         "strip_prefixes": attr.string_list(),
+         "_grpc_plugin": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             default = Label("//src/compiler:grpc_python_plugin"),
+         ),
+         "_protoc": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             default = Label("@com_google_protobuf//:protoc"),
+         ),
+         "grpc_library": attr.label(
+@@ -298,6 +315,11 @@ _generate_pb2_grpc_src = rule(
+             providers = [PyInfo],
+         ),
+     },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
++    },
+     implementation = _generate_pb2_grpc_src_impl,
+ )
+ 
+diff --git a/third_party/upb/upb/bazel/amalgamation.bzl b/third_party/upb/upb/bazel/amalgamation.bzl
+index 8f19516fc97..f63206c2f93 100644
+--- a/third_party/upb/upb/bazel/amalgamation.bzl
++++ b/third_party/upb/upb/bazel/amalgamation.bzl
+@@ -40,22 +40,33 @@ def _upb_amalgamation(ctx):
+     for lib in ctx.attr.libs:
+         inputs += lib[SrcList].srcs
+     srcs = [src for src in inputs if not src.path.endswith("hpp")]
+-    ctx.actions.run(
+-        inputs = inputs,
+-        outputs = ctx.outputs.outs,
+-        arguments = [f.path for f in ctx.outputs.outs] + [f.path for f in srcs],
+-        progress_message = "Making amalgamation",
+-        executable = ctx.executable._amalgamator,
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "inputs": inputs,
++        "outputs": ctx.outputs.outs,
++        "arguments": [f.path for f in ctx.outputs.outs] + [f.path for f in srcs],
++        "progress_message": "Making amalgamation",
++        "executable": ctx.executable._amalgamator,
++        "mnemonic": "UpbAmalgamation",
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+     return []
+ 
+ upb_amalgamation = rule(
+     attrs = {
+         "_amalgamator": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             default = "//upb/bazel:amalgamate",
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
+         "prefix": attr.string(
+             default = "",
+         ),
+@@ -63,5 +74,10 @@ upb_amalgamation = rule(
+         "outs": attr.output_list(),
+         "strip_import_prefix": attr.string_list(),
+     },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
++    },
+     implementation = _upb_amalgamation,
+ )
+

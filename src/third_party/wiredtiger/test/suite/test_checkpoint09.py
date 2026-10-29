@@ -54,12 +54,6 @@ class test_checkpoint09(wttest.WiredTigerTestCase):
         else:
             return config
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def large_updates(self, uri, value, ds, nrows, skip_count, commit_ts):
         # Update a large number of records.
         session = self.session

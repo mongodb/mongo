@@ -52,6 +52,18 @@ idl_generator(
 )
 
 idl_generator(
+    name = "commit_split_chunk_gen",
+    src = "commit_split_chunk.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog:chunk_range_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+        "//src/mongo/db/versioning_protocol:chunk_version_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "coordinator_session_gen",
     src = "coordinator_session.idl",
     deps = [
@@ -143,6 +155,15 @@ idl_generator(
 idl_generator(
     name = "migration_blocking_operation_coordinator_gen",
     src = "migration_blocking_operation_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "migration_blocking_operation_coordinator_v2_gen",
+    src = "migration_blocking_operation_coordinator_v2.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
@@ -260,15 +281,6 @@ idl_generator(
 idl_generator(
     name = "add_shard_to_zone_gen",
     src = "add_shard_to_zone.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
-    name = "convert_shard_refs_in_namespace_metadata_gen",
-    src = "convert_shard_refs_in_namespace_metadata.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
@@ -525,6 +537,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
         "//src/mongo/db/repl:change_stream_oplog_notification",
+        "//src/mongo/db/repl:intent_registry",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replica_set_aware_service",
@@ -540,6 +553,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/sharding_environment:sharding_feature_flags",
         "//src/mongo/db/sharding_environment:sharding_logging",
+        "//src/mongo/db/sharding_environment:sharding_runtime_d_params_idl",
         "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/topology:remove_shard_exception",

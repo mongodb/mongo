@@ -12,6 +12,8 @@
  *   # TODO SERVER-117062: remove gcov and macos tags once the change to configure ramLogLimits is backported.
  *   incompatible_with_gcov,
  *   incompatible_with_macos,
+ *   # TODO SERVER-130874: Re-enable this test on the windows variant.
+ *   incompatible_with_windows_tls,
  *   requires_mongobridge,
  * ]
  */

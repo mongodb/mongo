@@ -1,42 +1,9 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <cstdint>
+#include "mongo/db/commands/fle2_compact.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/data_builder.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -51,7 +18,6 @@
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_options_gen.h"
-#include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -72,6 +38,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -81,6 +48,14 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -527,8 +502,30 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     // Compact 4.f.i, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
     const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
     // Compact 4.f.ii, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
-    // This assumes that (pathLength * uniqueLeaves) >= uniqueTokens
-    dassert((pathLength * uniqueLeaves) >= uniqueTokens);
+    // This assumes that (pathLength * uniqueLeaves) >= uniqueTokens: if this doesn't hold, then
+    // it could mean that the parameters for calculating the path length have changed. In that case
+    // skip padding insertions for this field.
+    if (uniqueLeaves > 0 && pathLength > (std::numeric_limits<std::size_t>::max() / uniqueLeaves)) {
+        // Skip padding insertions if pathLength * uniqueLeaves would overflow.
+        LOGV2_DEBUG(13062801,
+                    2,
+                    "Skipping insertion of padding documents for range field",
+                    "field"_attr = fieldPath,
+                    "edgesLength"_attr = pathLength,
+                    "uniqueLeaves"_attr = uniqueLeaves,
+                    "uniqueTokens"_attr = uniqueTokens);
+        return;
+    }
+    if ((pathLength * uniqueLeaves) < uniqueTokens) {
+        LOGV2_WARNING(13062802,
+                      "Encountered invalid edges length when compacting a range field",
+                      "field"_attr = fieldPath,
+                      "edgesLength"_attr = pathLength,
+                      "uniqueLeaves"_attr = uniqueLeaves,
+                      "uniqueTokens"_attr = uniqueTokens);
+        uasserted(13062800, "Encountered invalid edges length when compacting a range field");
+    }
+
     const size_t numPads =
         std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
     if (numPads <= 0) {

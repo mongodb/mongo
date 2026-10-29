@@ -1,37 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/util/duration.h"
+#include "mongo/db/sharding_environment/client/shard_remote.h"
 
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -41,7 +12,6 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/sharding_environment/client/shard.h"
-#include "mongo/db/sharding_environment/client/shard_remote.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/network_test_env.h"
@@ -49,12 +19,18 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
+#include <cmath>
 #include <cstddef>
 #include <set>
 #include <string_view>
 #include <system_error>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {
@@ -91,7 +67,7 @@ protected:
         for (const auto& shard : kTestShards) {
             ShardType shardType;
             auto host = ConnectionString::forReplicaSet(shard.id.toString(), shard.hosts);
-            shardType.setHandle(ShardHandle{ShardId(shard.id.toString()), boost::none});
+            shardType.setName(shard.id.toString());
             shardType.setHost(host.toString());
             shards.push_back(shardType);
 
@@ -139,6 +115,17 @@ protected:
 
             if (i < kDefaultClientMaxRetryAttemptsDefault) {
                 ASSERT_GT(advanceUntilReadyRequest(), Milliseconds{0});
+            }
+        }
+    }
+
+    void runRetryBackoffTestExpectingExponentialDelay(auto networkCommand, Milliseconds baseDelay) {
+        for (int i = 0; i < kMaxCommandExecutions; ++i) {
+            onCommand(networkCommand);
+
+            if (i < kDefaultClientMaxRetryAttemptsDefault) {
+                ASSERT_GTE(advanceUntilReadyRequest(),
+                           baseDelay * static_cast<std::int64_t>(std::exp2(i + 1)));
             }
         }
     }
@@ -226,7 +213,7 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
         // We consume some tokens in order to be able to observe the return rate.
         for (int i = 0; i < 2; ++i) {
             ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
-                error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+                error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
         }
 
         // We test that the return rate was changed by observing how many tokens were returned by
@@ -254,24 +241,24 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     auto error = Status(ErrorCodes::PrimarySteppedDown, "Interrupted at shutdown");
 
     ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
     ASSERT_LT(retryBudget.getBalance_forTest(), initialBalance);
     ASSERT_NE(std::ranges::find(retryStrategy.getTargetingMetadata().deprioritizedServers,
                                 firstShardHostAndPort),
               retryStrategy.getTargetingMetadata().deprioritizedServers.end());
 
     ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
-    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
     ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
-    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
     ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), 0);
 
     ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
-        error, firstShardHostAndPort, errorLabelsSystemOverloaded));
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
 
     ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
-    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
 
     retryStrategy.recordBackoff(backoff);
     retryStrategy.recordSuccess(firstShardHostAndPort);
@@ -284,6 +271,180 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     ASSERT_EQ(stats.totalBackoffTimeMillis.loadRelaxed(), backoff.count());
 }
 
+TEST_F(ShardRemoteTest, ShardRetryStrategyZeroBudgetNoRetries) {
+    auto attemptsGuard = unittest::ServerParameterGuard{"defaultClientMaxRetryAttempts", 0};
+
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto error = Status(kSystemOverloadedErrorCode, "System overloaded");
+
+    ASSERT_FALSE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyCapExhaustedTwoRetries) {
+    constexpr int kRetryAttempts = 2;
+    auto attemptsGuard =
+        unittest::ServerParameterGuard{"defaultClientMaxRetryAttempts", kRetryAttempts};
+
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto error = Status(kSystemOverloadedErrorCode, "System overloaded");
+
+    // First kRetryAttempts (2) calls succeed
+    for (int i = 0; i < kRetryAttempts; ++i) {
+        ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+            error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
+    }
+    // Cap exhausted, no retry occurs
+    ASSERT_FALSE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        error, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), kRetryAttempts + 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), kRetryAttempts);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadError) {
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto overloadError = Status(kSystemOverloadedErrorCode, "System overloaded");
+    auto connectionError = Status(ErrorCodes::HostUnreachable, "Connection refused");
+
+    // First attempt: fails with SystemOverloadedError — no retry metrics yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Second attempt: fails with a non-overload connection error.
+    // numRetriesDueToOverloadAttempted incremented to 1 — this is the first retry after overload.
+    // AndSucceeded stays 0 because no command success has occurred yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        connectionError, firstShardHostAndPort, {}, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Third attempt: succeeds.
+    // numRetriesDueToOverloadAttempted stays at 1 because the previous attempt was not an overload.
+    // AndSucceeded increments to 1 now that the operation has succeeded.
+    retryStrategy.recordSuccess(firstShardHostAndPort);
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 1);
+}
+
+TEST_F(ShardRemoteTest, ShardRetryStrategyInterleavedNonOverloadErrorThenOverloadError) {
+    auto firstShard = kTestShards.front().id;
+    auto firstShardHostAndPort = kTestShards.front().hosts.front();
+
+    auto shardState = getShardState(firstShard);
+    auto& [retryBudget, stats] = *shardState;
+
+    auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
+
+    auto overloadError = Status(kSystemOverloadedErrorCode, "System overloaded");
+    auto connectionError = Status(ErrorCodes::HostUnreachable, "Connection refused");
+
+    // First attempt: fails with SystemOverloadedError — no retry metrics yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 0);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Second attempt: fails with a non-overload connection error.
+    // numRetriesDueToOverloadAttempted incremented to 1 — this is the first retry after overload.
+    // AndSucceeded stays 0 because no command success has occurred yet.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        connectionError, firstShardHostAndPort, {}, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Third attempt: fails with SystemOverloadedError again.
+    // numRetriesDueToOverloadAttempted stays at 1 because the previous attempt was not an overload.
+    // numOperationsRetriedAtLeastOnceDueToOverload stays at 1 — counted at most once per operation.
+    ASSERT_TRUE(retryStrategy.recordFailureAndEvaluateShouldRetry(
+        overloadError, firstShardHostAndPort, errorLabelsSystemOverloaded, boost::none));
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 0);
+
+    // Fourth attempt: succeeds.
+    // numRetriesDueToOverloadAttempted increments to 2 because the previous attempt was an
+    // overload. AndSucceeded increments to 1 now that the operation has succeeded — counted once.
+    retryStrategy.recordSuccess(firstShardHostAndPort);
+
+    ASSERT_EQ(stats.numOperationsAttempted.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOverloadErrorsReceived.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numRetriesDueToOverloadAttempted.loadRelaxed(), 2);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverload.loadRelaxed(), 1);
+    ASSERT_EQ(stats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed(), 1);
+}
+
 TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloaded) {
     auto future =
         launchAsync([&] { runDummyCommandOnShard(kConfigShard, Shard::RetryPolicy::kIdempotent); });
@@ -291,6 +452,21 @@ TEST_F(ShardRemoteTest, RunCommandResponseErrorOverloaded) {
     runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
         return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
     });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunCommandHonorsServerBaseBackoffMS) {
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    auto future =
+        launchAsync([&] { runDummyCommandOnShard(kConfigShard, Shard::RetryPolicy::kIdempotent); });
+
+    runRetryBackoffTestExpectingExponentialDelay(
+        [kBaseBackoffMS](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode, kBaseBackoffMS);
+        },
+        kBaseBackoffMS);
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
 }
@@ -331,6 +507,29 @@ TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandErrorOverloadedRetry) {
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
 }
 
+TEST_F(ShardRemoteTest, RunExhaustiveCursorCommandHonorsServerBaseBackoffMS) {
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    auto future = launchAsync([&] {
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runExhaustiveCursorCommand(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+            BSON("unused" << "cmd"),
+            Minutes{1}));
+    });
+
+    runRetryBackoffTestExpectingExponentialDelay(
+        [kBaseBackoffMS](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode, kBaseBackoffMS);
+        },
+        kBaseBackoffMS);
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
 TEST_F(ShardRemoteTest, RunAggregationWithResultErrorOverloadedRetry) {
     auto future = launchAsync([&] {
         auto shard =
@@ -345,6 +544,29 @@ TEST_F(ShardRemoteTest, RunAggregationWithResultErrorOverloadedRetry) {
     runExhaustiveRetryBackoffTest([](const executor::RemoteCommandRequest&) {
         return createErrorSystemOverloaded(kSystemOverloadedErrorCode);
     });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
+}
+
+TEST_F(ShardRemoteTest, RunAggregationHonorsServerBaseBackoffMS) {
+    constexpr auto kBaseBackoffMS = Milliseconds{500};
+
+    auto future = launchAsync([&] {
+        auto shard =
+            unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));
+        auto result = uassertStatusOK(shard->runAggregationWithResult(
+            operationContext(),
+            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(kNamespaceName),
+                                    std::vector<mongo::BSONObj>()),
+            Shard::RetryPolicy::kIdempotent));
+    });
+
+
+    runRetryBackoffTestExpectingExponentialDelay(
+        [kBaseBackoffMS](const executor::RemoteCommandRequest&) {
+            return createErrorSystemOverloaded(kSystemOverloadedErrorCode, kBaseBackoffMS);
+        },
+        kBaseBackoffMS);
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kSystemOverloadedErrorCode);
 }
@@ -426,7 +648,7 @@ TEST_F(ShardRemoteTest, FindOnConfigFromShardRespectsDefaultConfigCommandTimeout
         uassertStatusOK(shard->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReadConcernArgs::kMajority,
             NamespaceString::createNamespaceString_forTest("admin.bar"),
             {},
             {},

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/storage_engine_impl.h"
 
@@ -93,10 +67,10 @@ public:
         auto runner = makePeriodicRunner(getServiceContext());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
-        StorageEngineOptions options{/*directoryPerDB=*/false,
-                                     /*directoryForIndexes=*/false,
-                                     /*forRepair=*/false,
-                                     /*lockFileCreatedByUncleanShutdown=*/false};
+        StorageEngineOptions options{.directoryPerDB = false,
+                                     .directoryForIndexes = false,
+                                     .forRepair = false,
+                                     .lockFileCreatedByUncleanShutdown = false};
         _storageEngine =
             std::make_unique<StorageEngineImpl>(opCtx.get(),
                                                 std::make_unique<TimestampMockKVEngine>(),
@@ -201,7 +175,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
 
 TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     Timestamp previous = Timestamp();
-    AtomicWord<int> timesNotified{0};
+    Atomic<int> timesNotified{0};
 
     TimestampListener listener([&](OperationContext* opCtx, const Timestamps& timestamps) {
         ASSERT_TRUE(previous < timestamps.stable);
@@ -227,8 +201,8 @@ public:
                 (RecoveryUnit & ru,
                  std::string_view ident,
                  bool identHasSizeInfo,
-                 const StorageEngine::DropIdentCallback& onDrop,
-                 boost::optional<uint64_t> schemaEpoch),
+                 boost::optional<uint64_t> schemaEpoch,
+                 bool),
                 (override));
 };
 
@@ -252,10 +226,10 @@ public:
         auto runner = makePeriodicRunner(getServiceContext());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
-        StorageEngineOptions options{/*directoryPerDB=*/false,
-                                     /*directoryForIndexes=*/false,
-                                     /*forRepair=*/false,
-                                     /*lockFileCreatedByUncleanShutdown=*/false};
+        StorageEngineOptions options{.directoryPerDB = false,
+                                     .directoryForIndexes = false,
+                                     .forRepair = false,
+                                     .lockFileCreatedByUncleanShutdown = false};
         _storageEngine = std::make_unique<StorageEngineImpl>(
             opCtx.get(), std::make_unique<MockKVEngine>(), std::unique_ptr<KVEngine>(), options);
         _mockKVEngine = static_cast<MockKVEngine*>(_storageEngine->getEngine());
@@ -290,12 +264,12 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
         .WillOnce([&](RecoveryUnit& calledRu,
                       std::string_view calledIdent,
                       bool identHasSizeInfo,
-                      const StorageEngine::DropIdentCallback& onDrop,
-                      boost::optional<uint64_t> schemaEpoch) {
+                      boost::optional<uint64_t> schemaEpoch,
+                      bool waitForLocks) {
             ASSERT_EQ(calledIdent, std::string_view{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
-            ASSERT_FALSE(static_cast<bool>(onDrop));
             ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
+            ASSERT_TRUE(waitForLocks);
             return Status::OK();
         });
 
@@ -308,12 +282,12 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
         .WillOnce([&](RecoveryUnit& calledRu,
                       std::string_view calledIdent,
                       bool identHasSizeInfo,
-                      const StorageEngine::DropIdentCallback& onDrop,
-                      boost::optional<uint64_t> schemaEpoch) {
+                      boost::optional<uint64_t> schemaEpoch,
+                      bool waitForLocks) {
             ASSERT_EQ(calledIdent, std::string_view{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
-            ASSERT_FALSE(static_cast<bool>(onDrop));
             ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
+            ASSERT_TRUE(waitForLocks);
             return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIdent failed.");
         });
 

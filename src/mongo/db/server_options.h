@@ -1,41 +1,17 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
@@ -44,6 +20,8 @@
 
 #include <algorithm>
 #include <ctime>
+#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -61,10 +39,10 @@
 
 namespace mongo {
 
-MONGO_MOD_PUB constexpr inline int DEFAULT_UNIX_PERMS = 0700;
-MONGO_MOD_PUB constexpr inline size_t DEFAULT_MAX_CONN = 1000000;
+[[MONGO_MOD_PUBLIC]] constexpr inline int DEFAULT_UNIX_PERMS = 0700;
+[[MONGO_MOD_PUBLIC]] constexpr inline size_t DEFAULT_MAX_CONN = 1000000;
 
-struct MONGO_MOD_PUB ServerGlobalParams {
+struct [[MONGO_MOD_PUBLIC]] ServerGlobalParams {
     std::string binaryName;  // mongod or mongos
     std::string cwd;         // cwd of when process started
 
@@ -102,10 +80,7 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     boost::optional<int> priorityPort;    // --priorityPort
     bool doAutoBootstrapSharding{false};  // This is derived from other settings during startup.
 
-    bool objcheck = true;  // --objcheck
-
     // Shell parameter, used for testing only, to tell the shell to crash on InvalidBSON errors.
-    // Can be paired with --objcheck so that extra BSON validation occurs.
     bool crashOnInvalidBSONError = false;  // --crashOnInvalidBSONError
 
     // When specified, deterministically reproduces the execution order of mongo initializers.
@@ -303,16 +278,31 @@ struct MONGO_MOD_PUB ServerGlobalParams {
         }
 
         void reset() {
-            _version.store(FCV::kUnsetDefaultLastLTSBehavior);
+            setVersion(FCV::kUnsetDefaultLastLTSBehavior);
         }
 
+        // if you have an FeatureCompatibilityVersionDocument, you should use
+        // setVersionFromFCVDocument() instead of this function
         void setVersion(FCV version) {
-            return _version.store(version);
+            std::unique_lock lk(_fcvDocMutex);
+            _fcvDoc = boost::none;
+            _version.store(version);
+        }
+
+        void setVersionFromFCVDocument(const FeatureCompatibilityVersionDocument& fcvDoc);
+
+        // fcvDoc is null if setVersion(doc) was never called. callback must be fast.
+        template <typename Callback>
+        void withAcquiredFCVDocument(Callback&& callback) const {
+            std::shared_lock lk(_fcvDocMutex);
+            callback(_fcvDoc ? &*_fcvDoc : nullptr);
         }
 
     private:
+        // Protects both _fcvDoc and _version.
+        mutable RWMutex _fcvDocMutex;
+        boost::optional<FeatureCompatibilityVersionDocument> _fcvDoc;
         Atomic<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
-
     } mutableFCV;
 
     // Const reference for featureCompatibilityVersion checks.
@@ -334,8 +324,12 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     // If empty string (default), verification will by bypassed (which is fine in insecure mode).
     std::string extensionsSignaturePublicKeyPath;
 #endif
+
+    // Path to directory containing extension configuration files. If empty, it means the config was
+    // not provided, since the parser will reject empty strings provided by the user.
+    std::string extensionsConfigPath;
 };
 
-MONGO_MOD_PUB extern ServerGlobalParams serverGlobalParams;
+[[MONGO_MOD_PUBLIC]] extern ServerGlobalParams serverGlobalParams;
 
 }  // namespace mongo

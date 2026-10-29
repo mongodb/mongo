@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -80,7 +54,7 @@ namespace write_ops_exec {
 /**
  * The result of performing a single write, possibly within a batch.
  */
-struct MONGO_MOD_PUBLIC WriteResult {
+struct [[MONGO_MOD_PUBLIC]] WriteResult {
     /**
      * Maps 1-to-1 to single ops in request. May be shorter than input if there are errors.
      */
@@ -105,9 +79,7 @@ bool handleError(OperationContext* opCtx,
                  boost::optional<UUID> sampleId,
                  WriteResult* out);
 
-bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo,
-                         const boost::optional<TenantId>& tenantId);
+bool getFleCrudProcessed(const boost::optional<EncryptionInformation>& encryptionInfo);
 
 /**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
@@ -154,7 +126,7 @@ long long performDelete(OperationContext* opCtx,
  * Generates a WriteError for a given Status.
  * TODO SERVER-115819 remove external dependencies on this function.
  */
-MONGO_MOD_NEEDS_REPLACEMENT boost::optional<write_ops::WriteError> generateError(
+[[MONGO_MOD_NEEDS_REPLACEMENT]] boost::optional<write_ops::WriteError> generateError(
     OperationContext* opCtx, const Status& status, int index, size_t numErrors);
 
 /**
@@ -191,17 +163,17 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp);
  * object is not passed in, a CollectionPreCondition object will still be constructed, but it will
  * be assumed that we are not performing a logical time-series operation.
  */
-MONGO_MOD_PUBLIC WriteResult performInserts(
+[[MONGO_MOD_PUBLIC]] WriteResult performInserts(
     OperationContext* opCtx,
     const write_ops::InsertCommandRequest& op,
     boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
     OperationSource source = OperationSource::kStandard);
-MONGO_MOD_PUBLIC WriteResult performUpdates(
+[[MONGO_MOD_PUBLIC]] WriteResult performUpdates(
     OperationContext* opCtx,
     const write_ops::UpdateCommandRequest& op,
     boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,
     OperationSource source = OperationSource::kStandard);
-MONGO_MOD_PUBLIC WriteResult performDeletes(
+[[MONGO_MOD_PUBLIC]] WriteResult performDeletes(
     OperationContext* opCtx,
     const write_ops::DeleteCommandRequest& op,
     boost::optional<const timeseries::CollectionPreConditions&> preConditions = boost::none,

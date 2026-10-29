@@ -13,6 +13,7 @@ list(APPEND clang_flags "-Wconditional-uninitialized")
 list(APPEND clang_flags "-Wno-pre-c11-compat")
 list(APPEND clang_flags "-Wno-c++-compat")
 list(APPEND clang_flags "-Wno-switch-default")
+list(APPEND clang_flags "-Wno-overlength-strings")
 
 # In code coverage builds inline functions may not be inlined, which can result in additional
 # unused copies of those functions, so the unused-function warning much be turned off.

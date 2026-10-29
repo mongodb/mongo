@@ -15,6 +15,9 @@
  *     # TODO (SERVER-104171) the timeseries setup runs a migration. Remove the upgrade-downgrade
  *     # incompatible tag once migrations  work during downgrade.
  *     cannot_run_during_upgrade_downgrade,
+ *     # The balancer may issue moveCollection/resharding requests that conflict with the index
+ *     # builds this test starts.
+ *     assumes_balancer_off,
  *     requires_getmore,
  * ]
  */

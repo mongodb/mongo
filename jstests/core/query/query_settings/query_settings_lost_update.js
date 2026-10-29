@@ -12,10 +12,8 @@
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
  *   uses_parallel_shell,
- *   # This test assumes 'querySettings' cluster-wide parameter is not modified outside of the test.
- *   # This is not true when running in FCV upgrade/downgrade suite, which involves 'querySettings'
- *   # migration.
- *   # TODO: SERVER-94927 Remove Feature Flag for SPM-3684.
+ *   # Query settings commands hold the FCV region while paused on the fail-point, so a concurrent
+ *   # setFCV would block the second command behind it and hang the test.
  *   cannot_run_during_upgrade_downgrade,
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -80,6 +54,8 @@ public:
         boost::optional<int64_t> skip;
         mongo::OptionalBool tailable;
 
+        std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline;
+
         std::unique_ptr<FindCommandRequest> makeFindCmdReq(NamespaceString nss) {
             auto findCommand = std::make_unique<FindCommandRequest>(nss);
             findCommand->setLimit(limit);
@@ -132,6 +108,9 @@ public:
 protected:
     void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj>& docs);
 
+    MultipleCollectionAccessor acquireCollections(const NamespaceString& main,
+                                                  const std::vector<NamespaceString>& secondaries);
+
     /**
      * Returns an IndexEntry populated with the real IndexCatalogEntry shared_ptr so ident-based
      * catalog lookups work in the stage builder.
@@ -161,6 +140,19 @@ protected:
                  const mongo::BSONArray& expectedValue,
                  BuildPlanStageParam param = {});
 
+    struct PlanRun {
+        std::string explain;
+        sbe::value::TagValueOwned results;
+    };
+
+    PlanRun runPlan(std::unique_ptr<QuerySolution> querySolution, BuildPlanStageParam param = {});
+
+    static sbe::value::TagValueOwned sortArray(sbe::value::TagValueView array);
+
+    void createSecondaryCollection(const NamespaceString& nss,
+                                   const std::vector<BSONObj>& docs,
+                                   const std::vector<BSONObj>& indexSpecs = {});
+
     IndexEntry makeIndexEntry(BSONObj keyPattern) {
         ASSERT_TRUE(_collInitialized) << "collection must be initialized before looking up index";
         return SbeStageBuilderTestFixture::makeIndexEntry(_nss, keyPattern);
@@ -168,6 +160,7 @@ protected:
 
     std::unique_ptr<unittest::GoldenTestContext> _gctx;
     bool _collInitialized = false;
+    std::vector<NamespaceString> _secondaryNamespaces;
 };
 
 class GoldenSbeExprBuilderTestFixture : public GoldenSbeStageBuilderTestFixture {

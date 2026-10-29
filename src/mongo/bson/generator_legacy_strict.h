@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,13 +13,14 @@
 #include <fmt/format.h>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 class LegacyStrictGenerator : private ExtendedCanonicalV200Generator {
 public:
     using ExtendedCanonicalV200Generator::writeBool;
     using ExtendedCanonicalV200Generator::writeNull;
 
     void writeUndefined(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({ "$undefined" : true })"_sd);
+        appendTo(buffer, R"({ "$undefined" : true })"sv);
     }
 
     void writeString(fmt::memory_buffer& buffer, std::string_view str) const {
@@ -69,12 +44,12 @@ public:
             val <= std::numeric_limits<double>::max())
             fmt::format_to(std::back_inserter(buffer), R"({:.16g})", val);
         else if (std::isnan(val))
-            appendTo(buffer, "NaN"_sd);
+            appendTo(buffer, "NaN"sv);
         else if (std::isinf(val)) {
             if (val > 0)
-                appendTo(buffer, "Infinity"_sd);
+                appendTo(buffer, "Infinity"sv);
             else
-                appendTo(buffer, "-Infinity"_sd);
+                appendTo(buffer, "-Infinity"sv);
         } else {
             StringBuilder ss;
             ss << "Number " << val << " cannot be represented in JSON";
@@ -84,11 +59,11 @@ public:
 
     void writeDecimal128(fmt::memory_buffer& buffer, Decimal128 val) const {
         if (val.isNaN())
-            appendTo(buffer, R"({ "$numberDecimal" : "NaN" })"_sd);
+            appendTo(buffer, R"({ "$numberDecimal" : "NaN" })"sv);
         else if (val.isInfinite())
             fmt::format_to(std::back_inserter(buffer),
                            R"({{ "$numberDecimal" : "{}" }})",
-                           val.isNegative() ? "-Infinity"_sd : "Infinity"_sd);
+                           val.isNegative() ? "-Infinity"sv : "Infinity"sv);
         else {
             fmt::format_to(
                 std::back_inserter(buffer), R"({{ "$numberDecimal" : "{}" }})", val.toString());
@@ -157,11 +132,11 @@ public:
     }
 
     void writeMinKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({ "$minKey" : 1 })"_sd);
+        appendTo(buffer, R"({ "$minKey" : 1 })"sv);
     }
 
     void writeMaxKey(fmt::memory_buffer& buffer) const {
-        appendTo(buffer, R"({ "$maxKey" : 1 })"_sd);
+        appendTo(buffer, R"({ "$maxKey" : 1 })"sv);
     }
 
     void writePadding(fmt::memory_buffer& buffer) const {

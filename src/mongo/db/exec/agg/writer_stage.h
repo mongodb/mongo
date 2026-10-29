@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -66,7 +40,7 @@ namespace mongo::exec::agg {
  * TODO SERVER-112777: Remove 'atlas_streams' dependency on 'BatchObject'.
  */
 template <typename B>
-class MONGO_MOD_NEEDS_REPLACEMENT WriterStage : public Stage {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] WriterStage : public Stage {
 
 public:
     using BatchObject = B;
@@ -137,6 +111,18 @@ protected:
 
                 auto doc = nextInput.releaseDocument();
                 auto [obj, objSize] = makeBatchObject(std::move(doc));
+                if (_quotaInBytes > 0) {
+                    _usedQuota += objSize;
+                    if (_usedQuota > _quotaInBytes) {
+                        quotaExceeded();
+                        uasserted(13624400,
+                                  fmt::format("Quota exceeded for {} operation: {} bytes used, "
+                                              "effective quota is {} bytes",
+                                              getCommonStats().stageTypeStr,
+                                              _usedQuota,
+                                              _quotaInBytes));
+                    }
+                }
 
                 bufferedBytes += objSize;
                 if (!batch.empty() &&
@@ -228,6 +214,22 @@ protected:
      */
     virtual void waitWhileFailPointEnabled() {}
 
+    /**
+     * Sets the effective quota for the write operation. After this is set, each
+     * doGetNext() call will check if the quota has been exceeded and uassert if so.
+     * If the value is less than or equal to zero, the quota is considered to be unset
+     * and will not be checked.
+     */
+    void setEffectiveQuota(int64_t quotaInBytes) {
+        _quotaInBytes = quotaInBytes;
+    }
+
+    /**
+     * A subclass may override this method to perform additional actions when the quota
+     * is exceeded.
+     */
+    virtual void quotaExceeded() {}
+
     // An interface that is used to estimate the size of each write operation.
     const std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> _writeSizeEstimator;
 
@@ -236,6 +238,8 @@ protected:
 
     bool _initialized{false};
     bool _done{false};
+    int64_t _quotaInBytes{0};
+    int64_t _usedQuota{0};
 };
 
 }  // namespace mongo::exec::agg

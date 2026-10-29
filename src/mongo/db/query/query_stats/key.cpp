@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_stats/key.h"
 
@@ -97,7 +71,8 @@ UniversalKeyComponents::UniversalKeyComponents(
     std::unique_ptr<APIParameters> apiParams,
     query_shape::CollectionType collectionType,
     bool maxTimeMS,
-    boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash)
+    boost::optional<query_shape::QueryShapeHash> originalQueryShapeHash,
+    bool inTransaction)
     : _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
@@ -110,6 +85,7 @@ UniversalKeyComponents::UniversalKeyComponents(
       _clientMetaDataHash(clientMetadata ? clientMetadata->hashWithoutMongosInfo()
                                          : simpleHash(BSONObj())),
       _collectionType(collectionType),
+      _inTransaction(inTransaction),
       _tenantId{getTenantId(_queryShape.get()).value_or(kNotSetTenantId)},
       _originalQueryShapeHash(originalQueryShapeHash.value_or(query_shape::QueryShapeHash{})),
       _hasField{
@@ -206,6 +182,9 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob,
     if (_collectionType > query_shape::CollectionType::kUnknown) {
         bob.append("collectionType", toStringData(_collectionType));
     }
+    if (_inTransaction) {
+        bob.append("inTransaction", true);
+    }
     if (!_hintObj.isEmpty()) {
         bob.append("hint", shape_helpers::extractHintShape(_hintObj, opts));
     }
@@ -238,7 +217,8 @@ Key::Key(OperationContext* opCtx,
           std::make_unique<APIParameters>(APIParameters::get(opCtx)),
           collectionType,
           hasMaxTimeMS,
-          originalQueryShapeHash) {}
+          originalQueryShapeHash,
+          opCtx->inMultiDocumentTransaction()) {}
 
 BSONObj Key::toBson(OperationContext* opCtx,
                     const query_shape::SerializationOptions& opts,

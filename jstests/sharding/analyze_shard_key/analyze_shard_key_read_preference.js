@@ -55,8 +55,7 @@ function setUpCollection() {
     }
     // Waiting for the documents to get replicated to all nodes is necessary since the test later
     // runs the analyzeShardKey commands on secondaries.
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, 3);
-    assert.commandWorked(coll.insert(docs, {writeConcern}));
+    assert.commandWorked(coll.insert(docs, {writeConcern: {w: 3}}));
 
     return {dbName, collName};
 }

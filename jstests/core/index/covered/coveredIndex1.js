@@ -5,6 +5,7 @@
  * cannot be covered when they aren't on the shard key since the document needs to be fetched in
  * order to apply the SHARDING_FILTER stage.
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   # The test assumes it is in control of which indexes exist and makes some assertions on explain
  *   # plans.
@@ -13,7 +14,7 @@
  */
 // Include helpers for analyzing explain output.
 import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRanker} from "jstests/libs/query/cbr_utils.js";
 
 const coll = db["jstests_coveredIndex1"];
 coll.drop();
@@ -40,8 +41,6 @@ function assertIfQueryIsCovered(query, projection, isCovered, hint) {
     const explain = cursor.explain();
     assert.commandWorked(explain);
 
-    assert(explain.hasOwnProperty("queryPlanner"), tojson(explain));
-    assert(explain.queryPlanner.hasOwnProperty("winningPlan"), tojson(explain));
     const winningPlan = getWinningPlanFromExplain(explain);
     if (isCovered) {
         assert(
@@ -85,7 +84,7 @@ assertIfQueryIsCovered({fn: "john"}, {fn: 1, _id: 0}, false);
 // Repeat the above test, but with a compound index involving _id.
 assert.commandWorked(coll.dropIndex({ln: 1, fn: 1}));
 assert.commandWorked(coll.createIndex({_id: 1, ln: 1}));
-if (getPlanRankerMode(db) === "multiPlanning") {
+if (getPlanRanker(db) === "multiPlanning") {
     // TODO SERVER-97933: Enable these cases with CBR, where the CE is 0 for all stages and so the plans are tied in cost.
     assertIfQueryIsCovered({_id: 123, ln: "doe"}, {_id: 1}, true);
     assertIfQueryIsCovered({_id: 123, ln: "doe"}, {ln: 1}, true);

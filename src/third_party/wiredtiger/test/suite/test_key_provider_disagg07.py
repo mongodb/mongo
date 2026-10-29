@@ -49,7 +49,9 @@ class test_key_provider_disagg07(KeyProviderBase):
     def populate_table(self):
         # Give checkpoints real work to flush.
         self.ds = SimpleDataSet(self, self.uri, 10)
+        self.session.begin_transaction()
         self.ds.populate()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         self.row = 100
 
     def setup_follower(self):
@@ -65,10 +67,12 @@ class test_key_provider_disagg07(KeyProviderBase):
         if conn is None:
             conn = self.conn
         session = conn.open_session()
+        session.begin_transaction()
         cursor = session.open_cursor(self.uri)
         self.row += 1
         cursor[self.ds.key(self.row)] = self.ds.value(self.row)
         cursor.close()
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.next_commit_ts()))
         session.checkpoint()
         session.close()
 

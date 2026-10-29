@@ -162,13 +162,14 @@ describe("merge, split, and move chunks", function () {
 
         it("splits after merge then moves across shards", function () {
             assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 15}}));
-            assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 30}}));
             assert.commandWorked(
-                admin.runCommand({moveChunk: ns, find: {_id: 30}, to: shardNames[0]}),
+                admin.runCommand({
+                    moveRange: ns,
+                    min: {_id: 30},
+                    toShard: shardNames[0],
+                }),
             );
             assert.eq(numDocs, coll.find().itcount());
-            // S0: min->10, 10->15, 15->20, 30->90
-            // S1: 20->30, 90->max
         });
 
         it("rejects merge across a hole in chunk ranges", function () {

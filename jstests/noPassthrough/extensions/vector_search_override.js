@@ -12,6 +12,7 @@ import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
     checkPlatformCompatibleWithExtensions,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -20,6 +21,7 @@ const extensionNames = generateExtensionConfigs("libvector_search_extension.so")
 
 const options = {
     loadExtensions: extensionNames[0],
+    extensionsConfigPath: getExtensionConfDir(),
     setParameter: {featureFlagVectorSearchExtension: true},
 };
 

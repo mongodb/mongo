@@ -21,38 +21,6 @@ __wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename, bool dur
 }
 
 /*
- * __wt_block_manager_drop_object --
- *     Drop a shared object file from the bucket directory and the cache directory.
- */
-int
-__wt_block_manager_drop_object(
-  WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage, const char *filename, bool durable)
-{
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-
-    WT_UNUSED(durable);
-
-    WT_RET(__wt_scr_alloc(session, 0, &tmp));
-
-    /* Generate the name of the shared object file with the bucket prefix. */
-    WT_ERR(__wt_buf_fmt(session, tmp, "%s%s", bstorage->bucket_prefix, filename));
-    /*
-     * Call directly into the bucket file system rather than wt_fs_remove because wt_fs_remove will
-     * prepend the home directory and then send an incorrect path into the storage layer. The bucket
-     * and cache directory should just get the prefixed name and it will do its own path management.
-     */
-    WT_WITH_BUCKET_STORAGE(bstorage, session,
-      ret = bstorage->file_system->fs_remove(
-        bstorage->file_system, (WT_SESSION *)session, tmp->data, 0));
-    WT_ERR(ret);
-
-err:
-    __wt_scr_free(session, &tmp);
-    return (ret);
-}
-
-/*
  * __wt_block_manager_create --
  *     Create a file.
  */
@@ -238,8 +206,8 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     if (fixed)
         LF_SET(WT_FS_OPEN_FIXED);
     /*
-     * Tiered storage sets file permissions to readonly, but nobody else does. This flag means the
-     * underlying file is read-only, and NOT that the handle access pattern is read-only.
+     * This flag means the underlying file is read-only, and NOT that the handle access pattern is
+     * read-only.
      */
     if (readonly) {
         LF_SET(WT_FS_OPEN_READONLY);

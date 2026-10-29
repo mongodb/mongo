@@ -32,12 +32,6 @@ from wtscenario import make_scenarios
 import wiredtiger, wttest
 
 # Verify the use of the `all` field to set verbose categories.
-
-# Enabling tiered alters the logs produced by WiredTiger during this test,
-# breaking our assumptions about what log output to expect. This doesn't
-# impact the logic under test (the "all" configuration field) so we'll
-# disable this test under tiered."
-@wttest.skip_for_hook("tiered", "Enabling tiered alters the logs produced by WiredTiger")
 class test_verbose04(test_verbose_base):
 
     test_name = __qualname__

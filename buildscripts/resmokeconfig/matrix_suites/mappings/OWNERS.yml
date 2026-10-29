@@ -43,7 +43,7 @@ filters:
   - "core_minimum_batch_size.yml":
     approvers:
       - 10gen/query-execution
-  - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml":
+  - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml":
     approvers:
       - 10gen/query-optimization
   - "core_repeat_queries.yml":
@@ -106,7 +106,16 @@ filters:
   - "replica_sets_kill_secondaries_jscore_passthrough.yml":
     approvers:
       - 10gen/server-replication-reviewers
+  - "replica_sets_kill_primary_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "replica_sets_max_mirroring.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
   - "replica_sets_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-jstest-infra
+  - "replica_sets_last_patch.yml":
     approvers:
       - 10gen/server-jstest-infra
   - "*execution_control*":
@@ -136,3 +145,9 @@ filters:
   - "sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "with_mongot_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api
+  - "multiversion_sanity_check*":
+    approvers:
+      - 10gen/server-jstest-infra

@@ -1,36 +1,12 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/op_debug.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -62,25 +38,32 @@ public:
      * connected component to be used for implicit edge finding.
      */
     static StatusWith<AggJoinModel> constructJoinModel(const Pipeline& pipeline,
-                                                       AggModelBuildParams buildParams);
+                                                       AggModelBuildParams buildParams,
+                                                       OpDebug::JoinOptimizationMetrics& metrics);
 
     AggJoinModel(JoinGraph graph,
                  std::vector<ResolvedPath> resolvedPaths,
                  std::unique_ptr<Pipeline> prefix,
                  std::unique_ptr<Pipeline> suffix,
-                 std::vector<BSONObj> accessPathsBackingBson)
+                 std::vector<BSONObj> accessPathsBackingBson,
+                 boost::intrusive_ptr<ExpressionContext> joinExpCtx,
+                 absl::flat_hash_set<NamespaceString> distinctNamespaces)
         : graph{std::move(graph)},
           resolvedPaths{std::move(resolvedPaths)},
           prefix{std::move(prefix)},
           suffix{std::move(suffix)},
-          accessPathsBackingBson{std::move(accessPathsBackingBson)} {}
+          accessPathsBackingBson{std::move(accessPathsBackingBson)},
+          _joinExpCtx{std::move(joinExpCtx)},
+          _distinctNamespaces{std::move(distinctNamespaces)} {}
 
     AggJoinModel(AggJoinModel&& other)
         : graph{std::move(other.graph)},
           resolvedPaths{std::move(other.resolvedPaths)},
           prefix{std::move(other.prefix)},
           suffix{std::move(other.suffix)},
-          accessPathsBackingBson{std::move(other.accessPathsBackingBson)} {}
+          accessPathsBackingBson{std::move(other.accessPathsBackingBson)},
+          _joinExpCtx{std::move(other._joinExpCtx)},
+          _distinctNamespaces{std::move(other._distinctNamespaces)} {}
 
     AggJoinModel& operator=(AggJoinModel&& other) {
         graph = std::move(other.graph);
@@ -88,6 +71,8 @@ public:
         prefix = std::move(other.prefix);
         suffix = std::move(other.suffix);
         accessPathsBackingBson = std::move(other.accessPathsBackingBson);
+        _joinExpCtx = std::move(other._joinExpCtx);
+        _distinctNamespaces = std::move(other._distinctNamespaces);
         return *this;
     }
 
@@ -96,7 +81,7 @@ public:
 
     /** Converts the Aggregation Join Model to a JSON string. */
     std::string toString(bool pretty) const {
-        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
+        return toBSON().jsonString(/*format=*/ExtendedCanonicalV2_0_0, pretty);
     }
 
     const JoinGraph& getGraph() const {
@@ -111,11 +96,25 @@ public:
     Pipeline* getSuffix() const {
         return suffix.get();
     }
+    /**
+     * The ExpressionContext used throughout join optimization. It is a clone of the original
+     * pipeline's context, kept separate so that a fallback leaves the original untouched. All
+     * non-array path learnings from join-predicate eligibility checks accumulate here.
+     */
+    const boost::intrusive_ptr<ExpressionContext>& getJoinExpCtx() const {
+        return _joinExpCtx;
+    }
     std::unique_ptr<Pipeline> releaseSuffix() {
         return std::move(suffix);
     }
     const std::vector<BSONObj>& getAccessPathsBackingBson() const {
         return accessPathsBackingBson;
+    }
+    /**
+     * The distinct namespaces of the join graph's nodes, collected during model construction.
+     */
+    const absl::flat_hash_set<NamespaceString>& getDistinctNamespaces() const {
+        return _distinctNamespaces;
     }
 
 private:
@@ -130,6 +129,12 @@ private:
     std::unique_ptr<Pipeline> suffix;
 
     std::vector<BSONObj> accessPathsBackingBson;
+
+    // Clone of the original pipeline's ExpressionContext used throughout join optimization.
+    boost::intrusive_ptr<ExpressionContext> _joinExpCtx;
+
+    // Distinct namespaces of the join graph's nodes.
+    absl::flat_hash_set<NamespaceString> _distinctNamespaces;
 };
 
 }  // namespace mongo::join_ordering

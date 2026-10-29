@@ -1,0 +1,21 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+
+server_parameters:
+    geoRecoveryFromSinCosRoundingErrors:
+        mod_visibility: private
+        description: >-
+            When enabled, polygon rings rejected by validation are retried with tolerance for
+            sin/cos rounding differences across platforms. Node-local and runtime-settable: set
+            it on every replica set member, and rebuild the 2dsphere indexes on any member that
+            generated index keys with this parameter disabled. A member with it disabled
+            silently skips the index keys for rings other members accept, so its validate() and
+            index-backed queries miss those documents.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: "gGeoRecoveryFromSinCosRoundingErrors"
+        default: false
+        redact: false

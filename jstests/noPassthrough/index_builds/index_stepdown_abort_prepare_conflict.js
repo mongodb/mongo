@@ -112,9 +112,12 @@ assert.commandWorked(newSession.abortTransaction_forTesting());
 
 IndexBuildTest.waitForIndexBuildToStop(newPrimary.getDB(dbName), collName, indexName);
 IndexBuildTest.waitForIndexBuildToStop(primary.getDB(dbName), collName, indexName);
+
+// The new primary may resume the unfinished index build on step-up and only abort it once the
+// prepared transaction releases its locks. Wait for the abort to remove the index.
+IndexBuildTest.assertIndexesSoon(newPrimary.getDB(dbName).getCollection(collName), 1, ["_id_"], []);
 rst.awaitReplication();
 
-IndexBuildTest.assertIndexes(newPrimary.getDB(dbName).getCollection(collName), 1, ["_id_"], []);
 IndexBuildTest.assertIndexes(primaryColl, 1, ["_id_"], []);
 
 rst.stopSet();

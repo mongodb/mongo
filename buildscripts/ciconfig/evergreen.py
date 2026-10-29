@@ -24,6 +24,45 @@ ASAN_SIGNATURE = "detect_leaks=1"
 LOGGER = structlog.get_logger(__name__)
 
 
+def _is_same_or_under(path, directory):
+    """Return whether path is directory or lives under it."""
+    try:
+        return os.path.commonpath([path, directory]) == os.path.normpath(directory)
+    except ValueError:
+        # Paths on different drives or a mix of absolute and relative paths.
+        return False
+
+
+def _passwd_home_directory():
+    """Return the home directory from the passwd database, or None if unavailable."""
+    try:
+        import pwd
+    except ImportError:  # Windows has no passwd database.
+        return None
+
+    try:
+        return pwd.getpwuid(os.getuid()).pw_dir
+    except KeyError:
+        return None
+
+
+def _user_home_directory():
+    """Return the user's home directory, ignoring a Bazel test HOME override.
+
+    Bazel 9 sets HOME to TEST_TMPDIR for test actions, so os.path.expanduser() no longer
+    resolves to the real home the way it did under Bazel 7, where HOME was left unset and
+    expanduser() fell through to the passwd database. Do that fallback explicitly.
+    """
+    home = os.environ.get("HOME")
+    test_tmpdir = os.environ.get("TEST_TMPDIR")
+    if home and test_tmpdir and _is_same_or_under(home, test_tmpdir):
+        passwd_home = _passwd_home_directory()
+        if passwd_home:
+            return passwd_home
+
+    return os.path.expanduser("~")
+
+
 def find_evergreen_binary(evergreen_binary):
     """Find evergreen binary."""
     if not evergreen_binary:
@@ -49,7 +88,7 @@ def find_evergreen_binary(evergreen_binary):
                 " This will likely cause us to be unable to find evergreen binary."
             )
 
-    default_evergreen_location = os.path.expanduser(os.path.join("~", "evergreen"))
+    default_evergreen_location = os.path.join(_user_home_directory(), "evergreen")
 
     # Restore environment if it was modified above on windows
     os.environ.clear()
@@ -68,6 +107,22 @@ def find_evergreen_binary(evergreen_binary):
     return evergreen_binary
 
 
+# The evergreen CLI writes its own log lines to stdout ahead of the evaluated YAML,
+# e.g. "[evergreen] 2026/09/11 19:00:42 [p=warning]: ...". Those are not part of the
+# document and must be removed before parsing.
+_EVERGREEN_LOG_LINE_RE = re.compile(r"^\[evergreen\] \d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\b")
+
+
+def _strip_evergreen_log_prefix(output):
+    """Drop the leading block of evergreen CLI log lines from command output."""
+    lines = output.splitlines(keepends=True)
+    index = 0
+    while index < len(lines) and _EVERGREEN_LOG_LINE_RE.match(lines[index]):
+        index += 1
+
+    return "".join(lines[index:])
+
+
 def parse_evergreen_file(path, evergreen_binary="evergreen"):
     """Read an Evergreen file and return EvergreenProjectConfig instance."""
     evergreen_binary = find_evergreen_binary(evergreen_binary)
@@ -81,7 +136,7 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
                     path, result.stdout, result.stderr
                 )
             )
-        config: dict = yaml_load(result.stdout)
+        config: dict = yaml_load(_strip_evergreen_log_prefix(result.stdout))
     else:
         with open(path, "r", encoding="utf8") as fstream:
             data = fstream.read()

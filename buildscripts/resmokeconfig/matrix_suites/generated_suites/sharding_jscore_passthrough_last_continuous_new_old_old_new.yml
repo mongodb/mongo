@@ -25,14 +25,17 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
+    new_binary_set_parameters:
+      failpoint.disableReplicatedFastCount:
+        mode: alwaysOn
     num_mongos: 1
     num_rs_nodes_per_shard: 2
     num_shards: 2
@@ -66,8 +69,6 @@ selector:
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/ddl/create_collection.js
-    - jstests/core/timeseries/ddl/timeseries_index.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

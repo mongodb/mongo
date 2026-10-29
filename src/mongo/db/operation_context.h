@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -46,7 +20,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -72,7 +46,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -529,6 +503,22 @@ public:
      * To remove a deadline, pass in Date_t::max().
      */
     void setDeadlineByDate(Date_t when, ErrorCodes::Error timeoutError);
+
+    /**
+     * Sets the deadline and maxTime from a total time budget for the operation, anchored to the
+     * operation's start (via the elapsed timer) rather than to "now", so that repeated calls for a
+     * single operation are idempotent. A total of zero (or greater than the maximum representable
+     * duration) is treated as "no timeout".
+     *
+     * Unlike 'setDeadlineAndMaxTime', this does not check '_hasArtificialDeadline'/'hasDeadline()'
+     * and so is permitted to change an already-set deadline. Only call this when the caller is a
+     * legitimate secondary source of the operation's total time budget (e.g. restoring a
+     * previously stored maxTime, or a query-settings-derived override discovered during query
+     * planning) rather than an arbitrary external mutation. The recomputed deadline is written
+     * eagerly to the canonical deadline state so that the interrupt hot path (which reads the
+     * deadline field directly) observes it immediately.
+     */
+    void setMaxTimeFromTotalBudget(Microseconds total, ErrorCodes::Error timeoutError);
 
     /**
      * Sets the deadline for this operation to the maxTime plus the current time reported
@@ -1072,7 +1062,7 @@ private:
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
 
     // This is used directly by WriteUnitOfWork
-    MONGO_MOD_NEEDS_REPLACEMENT WriteUnitOfWork::RecoveryUnitState _ruState =
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] WriteUnitOfWork::RecoveryUnitState _ruState =
         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 
     // Operations run within a transaction will hold a WriteUnitOfWork for the duration in order
@@ -1082,10 +1072,10 @@ private:
     // Follows the values of ErrorCodes::Error. The default value is 0 (OK), which means the
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
-    AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+    Atomic<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
     // When the operation was marked as killed.
-    AtomicWord<TickSource::Tick> _killTime{0};
+    Atomic<TickSource::Tick> _killTime{0};
 
     // Tracks total number of interrupt checks.
     Atomic<int64_t> _numInterruptChecks{0};
@@ -1154,7 +1144,7 @@ private:
 
     // If true, this OpCtx will get interrupted during replica set stepUp and stepDown, regardless
     // of what locks it's taken.
-    AtomicWord<bool> _alwaysInterruptAtStepDownOrUp{false};
+    Atomic<bool> _alwaysInterruptAtStepDownOrUp{false};
 
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.

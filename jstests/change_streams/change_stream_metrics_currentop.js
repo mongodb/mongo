@@ -16,9 +16,14 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {CursorList, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    advanceClusterTimeIncludingConfigServer,
+    CursorList,
+    getClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 import {listIdleCursors} from "jstests/libs/query/change_stream_util.js";
-import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
+import {TestDataModifyGuard} from "jstests/libs/query/change_stream_metrics_util.js";
 
 describe("change stream cursor metrics in currentOp", function () {
     const testDB = db.getSiblingDB(jsTestName());
@@ -284,12 +289,44 @@ describe("change stream cursor metrics in currentOp", function () {
         );
     });
 
+    // On a mongoD, a getMore with a past 'startAtOperationTime' scans the oplog forward from that
+    // past time to the current tip. This produces an empty batch but advances the reported optime
+    // to the current oplog tip, so the optime no longer equals 'startAtOperationTime'. Only on
+    // mongoS does the optime remain pinned to 'startAtOperationTime' before the first getMore
+    // returns data. Restrict this case to mongoS suites.
+    for (const pastTimestamp of FixtureHelpers.isMongos(db) && !TestData.forceChangeStreamReaderV1
+        ? [Timestamp(0, 0), Timestamp(1, 0), Timestamp(1, 1)]
+        : []) {
+        it(`optime initialized from past (startAtOperationTime=${tojson(pastTimestamp)})`, function () {
+            const comment = "optime initialized from past startAtOperationTime";
+            let cursor = this.cursorList.push(
+                testColl.watch([], {
+                    comment,
+                    startAtOperationTime: pastTimestamp,
+                    cursor: {batchSize: 0},
+                }),
+            );
+            let idleCursor = getIdleCursor(comment, cursor);
+            assert.eq(
+                pastTimestamp,
+                idleCursor.cursor.changeStreams.optime,
+                "changeStreams.optime must equal startAtOperationTime before any getMore",
+            );
+            // Ensure the 'getMore' command succeeds. Do not assert on actual optime since result
+            // may vary depending on a passthrough suite.
+            runGetMore(cursor);
+        });
+    }
+
     it("optime initialized to cluster time with no start option", function () {
         const comment = "optime initialized to cluster time with no start option";
 
-        // TODO SERVER-128391: Investigate why using 'getClusterTime()' from change_stream_util.js
-        // does not work in disagg test suites.
         const currentClusterTime = getClusterTimeFromInsert(testDB);
+        // The cluster time gossiped above can outpace the oplog's visible timestamp (e.g. when the
+        // periodic no-op writer hasn't caught up yet), which is what a fresh change stream's
+        // initial optime is derived from. Force the oplog to catch up to currentClusterTime before
+        // opening the cursor so the assertion below isn't racy. See SERVER-128391/SERVER-131399.
+        advanceClusterTimeIncludingConfigServer(testDB);
         let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
 
         const idleCursor = getIdleCursor(comment, cursor);

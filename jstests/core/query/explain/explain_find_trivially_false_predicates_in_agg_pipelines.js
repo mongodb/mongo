@@ -1,6 +1,7 @@
 /**
  * Tests for optimizations applied to trivially false predicates in aggregate pipelines.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_83,
  *   # Tests run here require explaining plans on aggregate commands that could be incomplete
  *   # during stepdown
@@ -11,7 +12,8 @@
  *   assumes_read_concern_local,
  *   # Tests with balancer also enable 'random_migrations: true' which results in a different
  *   # sharded $lookup plan that cannot be verified whether it has an EOF.
- *   assumes_balancer_off
+ *   assumes_balancer_off,
+ *   multiversion_incompatible,
  * ]
  */
 
@@ -372,7 +374,9 @@ function getCollScanFilter(explain) {
     );
 
     const matchFilter = getMatchFilter(explainResult);
-    const expectedMatchCondition = {$and: [{t: {$elemMatch: {}}}, {t: {$eq: 42}}]};
+    // The value-form $elemMatch whose body is trivially true serializes as '$nin: []', which
+    // re-parses unambiguously into the value form.
+    const expectedMatchCondition = {$and: [{t: {$elemMatch: {$nin: []}}}, {t: {$eq: 42}}]};
     assert.docEq(
         matchFilter,
         expectedMatchCondition,
@@ -385,9 +389,11 @@ function getCollScanFilter(explain) {
     const q2 = [{$match: {t: {$elemMatch: {$not: {$in: []}}}}}];
     const explainResult = localColl.explain().aggregate(q2);
     const collScanFilter = getCollScanFilter(explainResult);
+    // The value-form $elemMatch whose body is trivially true serializes as '$nin: []', which
+    // re-parses unambiguously into the value form.
     assert.docEq(
         collScanFilter,
-        {t: {"$elemMatch": {}}},
+        {t: {"$elemMatch": {$nin: []}}},
         "Winning plan filter should match expected filter",
     );
 }

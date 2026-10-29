@@ -19,11 +19,6 @@ setParameterOnAllNonConfigNodes(
     "internalQueryFrameworkControl",
     "forceClassicEngine",
 );
-setParameterOnAllNonConfigNodes(
-    testDB.getMongo(),
-    "internalQueryMaxWriteToCurOpMemoryUsageBytes",
-    128,
-);
 
 const collName = jsTestName();
 const coll = testDB[collName];

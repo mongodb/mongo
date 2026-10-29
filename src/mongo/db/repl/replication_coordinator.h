@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -126,7 +100,7 @@ class UpdatePositionArgs;
  * with the rest of the system.  The public methods on ReplicationCoordinator are the public
  * API that the replication subsystem presents to the rest of the codebase.
  */
-class MONGO_MOD_PUB ReplicationCoordinator : public SyncSourceSelector {
+class [[MONGO_MOD_PUBLIC]] ReplicationCoordinator : public SyncSourceSelector {
     ReplicationCoordinator(const ReplicationCoordinator&) = delete;
     ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
 
@@ -172,8 +146,8 @@ public:
      * failing hello requests with ShutdownInProgress. Returns true if the server entered quiesce
      * mode.
      *
-     * We take in quiesceTime only for reporting purposes. The waiting during quiesce mode happens
-     * external to the ReplicationCoordinator.
+     * We take in quiesceTime for reporting and to bound any waiting this function does. The grace
+     * window wait happens external to the ReplicationCoordinator.
      */
     virtual bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) = 0;
 
@@ -232,7 +206,7 @@ public:
      * Version which does not check for the RSTL. Without the RSTL, the return value may be
      * inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::isInPrimaryOrSecondaryState)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::isInPrimaryOrSecondaryState)]]
     virtual bool isInPrimaryOrSecondaryState_UNSAFE() const = 0;
 
     /**
@@ -308,7 +282,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL, the
      * return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesForDatabase)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesForDatabase)]]
     virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                                    const DatabaseName& dbName) = 0;
 
@@ -325,7 +299,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesFor)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::canAcceptWritesFor)]]
     virtual bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& nsOrUUID) = 0;
 
@@ -370,7 +344,7 @@ public:
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
      * the return value may be inaccurate by the time the function returns.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::checkCanServeReadsFor)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::checkCanServeReadsFor)]]
     virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 bool secondaryOk) = 0;
@@ -553,7 +527,7 @@ public:
      * Retrieves and returns the current election id, which is a unique id that is local to
      * this node and changes every time we become primary.
      */
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::getTerm) virtual OID getElectionId() = 0;
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::getTerm)]] virtual OID getElectionId() = 0;
 
     /**
      * Returns the id for this node as specified in the current replica set configuration.
@@ -776,7 +750,7 @@ public:
      * internal structure that could change at any time, and getting member information is
      * inherently racy; member configuration can change at any time.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual boost::optional<MemberConfig>
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual boost::optional<MemberConfig>
     findConfigMemberByHostAndPort_deprecated(const HostAndPort& hap) const = 0;
 
     /**
@@ -854,7 +828,8 @@ public:
      * Handles an incoming heartbeat command with arguments 'args'. Populates 'response';
      * returns a Status with either OK or an error message.
      */
-    virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+    virtual Status processHeartbeatV1(OperationContext* opCtx,
+                                      const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) = 0;
 
 
@@ -1082,7 +1057,10 @@ public:
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) = 0;
 
-    virtual Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) = 0;
+    virtual Status stepUpIfEligible(
+        OperationContext* opCtx,
+        bool skipDryRun,
+        boost::optional<Date_t> priorPrimaryStopAcceptingWritesTime = boost::none) = 0;
 
     virtual ServiceContext* getServiceContext() = 0;
 
@@ -1238,7 +1216,7 @@ public:
     /**
      * A testing only function that cancels and reschedules replication heartbeats immediately.
      */
-    MONGO_MOD_NEEDS_REPLACEMENT virtual void restartScheduledHeartbeats_forTest() = 0;
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual void restartScheduledHeartbeats_forTest() = 0;
 
     /**
      * Records if the cluster-wide write concern is set during sharding initialization.
@@ -1256,7 +1234,7 @@ public:
      * Use [reserve|release]ConfigWriteConcernTagChanges when executing a reconfig that
      * could potentially change read/write concern tags.
      */
-    class MONGO_MOD_PUB WriteConcernTagChanges {
+    class [[MONGO_MOD_PUBLIC]] WriteConcernTagChanges {
     public:
         WriteConcernTagChanges() = default;
         virtual ~WriteConcernTagChanges() = default;
@@ -1317,11 +1295,12 @@ public:
     virtual void addAppliedOpTimeObserver(std::unique_ptr<OpTimeObserver> observer) = 0;
 
     /**
-     * Returns a future that becomes ready the next time lastApplied advances on this node.
-     * The default implementation returns an already-ready future; nodes that support push-based
-     * exhaust heartbeat notifications should override this to return a pending future.
+     * Returns a future that becomes ready the next time a value reported in this node's heartbeat
+     * response advances (lastApplied or the last installed checkpoint timestamp). The default
+     * implementation returns an already-ready future; nodes that support push-based exhaust
+     * heartbeat notifications should override this to return a pending future.
      */
-    virtual SharedSemiFuture<void> getNextAppliedOpTimeFuture() {
+    virtual SharedSemiFuture<void> getNextHeartbeatNotificationFuture() {
         return SemiFuture<void>::makeReady().share();
     }
 

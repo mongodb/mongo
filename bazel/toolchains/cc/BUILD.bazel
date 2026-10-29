@@ -1,0 +1,47 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "container_action.py",
+    "container_engine.py",
+    "container_mounts.py",
+])
+
+py_library(
+    name = "container_action",
+    srcs = ["container_action.py"],
+)
+
+py_library(
+    name = "container_runtime",
+    srcs = [
+        "container_engine.py",
+        "container_mounts.py",
+    ],
+    deps = [
+        ":container_action",
+        "//bazel:container_paths",
+    ],
+)
+
+py_test(
+    name = "container_engine_test",
+    srcs = ["container_engine_test.py"],
+    main = "container_engine_test.py",
+    deps = [":container_runtime"],
+)
+
+py_test(
+    name = "container_mounts_test",
+    srcs = ["container_mounts_test.py"],
+    main = "container_mounts_test.py",
+    deps = [":container_runtime"],
+)
+
+py_test(
+    name = "container_action_test",
+    srcs = ["container_action_test.py"],
+    main = "container_action_test.py",
+    deps = [":container_action"],
+)

@@ -1,6 +1,7 @@
 """Test resmoke's handling of test/task timeouts and archival."""
 
 import datetime
+import glob
 import io
 import json
 import logging
@@ -23,6 +24,11 @@ from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import (
 )
 from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import get_generated_task_name
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
+from buildscripts.tests.resmoke_end2end.nested_resmoke import stage_mongo_version_file
+
+
+def setUpModule():
+    stage_mongo_version_file()
 
 
 class _ResmokeSelftest(unittest.TestCase):
@@ -51,6 +57,19 @@ class _ResmokeSelftest(unittest.TestCase):
         self.logger.info("Cleaning temp directory %s", self.test_dir)
         rmtree(self.test_dir, ignore_errors=True)
         os.makedirs(self.test_dir, mode=0o755, exist_ok=True)
+
+    def tearDown(self):
+        # The timeout tests intentionally trigger the hang analyzer, which writes core
+        # dumps into the current working directory. Remove them on teardown.
+        self._cleanup_core_dumps()
+
+    def _cleanup_core_dumps(self):
+        for pattern in ("dump_*.core", "dump_*.mdmp"):
+            for path in glob.glob(pattern):
+                try:
+                    os.remove(path)
+                except OSError as err:
+                    self.logger.warning("Could not remove core dump %s: %s", path, err)
 
     def execute_resmoke(self, resmoke_args, **kwargs):
         resmoke_process = core.programs.make_process(
@@ -740,6 +759,15 @@ class TestExceptionExtraction(unittest.TestCase):
         expected = "The following tests had errors:\n    buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js\n        Traceback (most recent call last):\n"
         assert expected in output
 
+    def test_check_metadata_consistency_background_hook_fails_on_inconsistency(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_metadata_consistency_background_hook_failure.yml",
+        ]
+        result = execute_resmoke(resmoke_args)
+
+        self.assertIn("Found metadata inconsistencies", result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+
 
 class TestForceExcludedTest(unittest.TestCase):
     def test_no_force_exclude(self):
@@ -895,10 +923,12 @@ class TestEvergreenYML(unittest.TestCase):
         jstestfuzz_count = 0
         for task in self.evg_conf.tasks:
             generate_func = task.find_func_command("generate resmoke tasks")
-            if (
-                generate_func is None
-                or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) is not True
-            ):
+            if generate_func is None:
+                continue
+
+            # `evergreen evaluate` renders command vars as strings, so the flag arrives as
+            # "true" rather than a boolean when the evergreen binary is available.
+            if get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) not in (True, "true"):
                 continue
 
             jstestfuzz_count += 1

@@ -1,33 +1,7 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -42,7 +16,7 @@ namespace {
 class TestJob final : public BackgroundJob {
 public:
     TestJob(bool selfDelete,
-            AtomicWord<bool>* flag,
+            Atomic<bool>* flag,
             Notification<void>* canProceed = nullptr,
             Notification<void>* destructorInvoked = nullptr)
         : BackgroundJob(selfDelete),
@@ -66,13 +40,13 @@ public:
     }
 
 private:
-    AtomicWord<bool>* const _flag;
+    Atomic<bool>* const _flag;
     Notification<void>* const _canProceed;
     Notification<void>* const _destructorInvoked;
 };
 
 TEST(BackgroundJobBasic, NormalCase) {
-    AtomicWord<bool> flag(false);
+    Atomic<bool> flag(false);
     TestJob tj(false, &flag);
     tj.go();
     ASSERT(tj.wait());
@@ -80,7 +54,7 @@ TEST(BackgroundJobBasic, NormalCase) {
 }
 
 TEST(BackgroundJobBasic, TimeOutCase) {
-    AtomicWord<bool> flag(false);
+    Atomic<bool> flag(false);
     Notification<void> canProceed;
     TestJob tj(false, &flag, &canProceed);
     tj.go();
@@ -94,7 +68,7 @@ TEST(BackgroundJobBasic, TimeOutCase) {
 }
 
 TEST(BackgroundJobBasic, SelfDeletingCase) {
-    AtomicWord<bool> flag(false);
+    Atomic<bool> flag(false);
     Notification<void> destructorInvoked;
     // Though it looks like one, this is not a leak since the job is self deleting.
     (new TestJob(true, &flag, nullptr, &destructorInvoked))->go();

@@ -1,41 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/strings/string_view.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -81,7 +48,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
@@ -102,6 +69,14 @@
 #include <string_view>
 #include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/strings/string_view.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -115,6 +90,10 @@ const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
 MONGO_FAIL_POINT_DEFINE(hangAfterProcessingDeferredXferMods);
+
+std::shared_ptr<executor::TaskExecutor> getRecipientCommandExecutor() {
+    return Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
+}
 
 BSONObj createRequestWithSessionId(std::string_view commandName,
                                    const NamespaceString& nss,
@@ -323,7 +302,9 @@ MigrationChunkClonerSource::~MigrationChunkClonerSource() {
 Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
                                               const UUID& migrationId,
                                               const LogicalSessionId& lsid,
-                                              TxnNumber txnNumber) {
+                                              TxnNumber txnNumber,
+                                              const boost::optional<ChunkRange>& enclosingChunk,
+                                              bool isAuthoritative) {
     invariant(_state == kNew);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
@@ -378,7 +359,9 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
                                             getMin(),
                                             getMax(),
                                             _shardKeyPattern.toBSON(),
-                                            secondaryThrottleOptions);
+                                            secondaryThrottleOptions,
+                                            enclosingChunk,
+                                            isAuthoritative);
 
     // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
     // StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then we add the
@@ -393,12 +376,6 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
         return startChunkCloneResponseStatus.getStatus();
     }
 
-    // TODO SERVER-122998: Setting the state to kCloning below means that if cancelClone was called
-    // we will send a cancellation command to the recipient. The reason to limit the cases when we
-    // send cancellation is for backwards compatibility with 3.2 nodes, which cannot differentiate
-    // between cancellations for different migration sessions. It is thus possible that a second
-    // migration from different donor, but the same recipient would certainly abort an already
-    // running migration.
     std::lock_guard<std::mutex> sl(_mutex);
     _state = kCloning;
 
@@ -418,7 +395,8 @@ Status MigrationChunkClonerSource::awaitUntilCriticalSectionIsAppropriate(
     return _checkRecipientCloningStatus(opCtx, maxTimeToWait);
 }
 
-StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* opCtx) {
+StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* opCtx,
+                                                            bool clearShardCatalogCache) {
     invariant(_state == kCloning);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
@@ -447,6 +425,9 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
         BSONObjBuilder builder;
         builder.append(kRecvChunkCommit,
                        NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault()));
+        // Tell the recipient whether it must refresh its filtering metadata when releasing the
+        // migration critical section it is about to enter.
+        builder.append("clearShardCatalogCache", clearShardCatalogCache);
         _sessionId.append(&builder);
         return builder.obj();
     }());
@@ -477,23 +458,36 @@ void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) {
     switch (_state) {
         case kDone:
             break;
-        case kCloning: {
-            const auto status =
-                _callRecipient(opCtx,
-                               createRequestWithSessionId(kRecvChunkAbort, nss(), _sessionId))
-                    .getStatus();
-            if (!status.isOK()) {
-                LOGV2(21991,
-                      "Failed to cancel migration",
-                      "error"_attr = redact(status),
+        case kCloning:
+        case kNew: {
+            const auto scheduleStatus = _scheduleRecipientCommand(
+                createRequestWithSessionId(kRecvChunkAbort, nss(), _sessionId),
+                Milliseconds(gMigrationRecipientAbortTimeoutMS.load()),
+                [nss = nss(), migrationId = _migrationId](
+                    const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                    const auto status = args.response.isOK()
+                        ? getStatusFromCommandResult(args.response.data)
+                        : args.response.status;
+                    if (!status.isOK()) {
+                        LOGV2(21991,
+                              "Failed to cancel migration",
+                              "error"_attr = redact(status),
+                              logAttrs(nss),
+                              "migrationId"_attr = migrationId);
+                    }
+                });
+
+            if (!scheduleStatus.isOK()) {
+                LOGV2(13439800,
+                      "Unable to notify the recipient of the migration abort",
+                      "error"_attr = redact(scheduleStatus.getStatus()),
                       logAttrs(nss()),
                       "migrationId"_attr = _migrationId);
             }
-            [[fallthrough]];
-        }
-        case kNew:
+
             _cleanup(false);
             break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -911,7 +905,10 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
         if (!Helpers::findById(opCtx, this->nss(), BSON("_id" << idElement), newerVersionDoc)) {
             // If the document can no longer be found, this means that another later op must have
             // deleted it. That delete would have been captured by the xferMods so nothing else to
-            // do here.
+            // do here. This relies on the fact that the cloner reads on this document is blocked
+            // because it doesn't ignore prepare conflicts and waits for the transaction against
+            // this document to finish. Once the transaction finishes, the normal non-deferred
+            // xferMods will have captured any further modifications.
             continue;
         }
 
@@ -966,14 +963,17 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
         return true;
     };
     long long totalDocSize = xferMods(&arrDel, &deleteList, 0, noopFn);
+    const long long numDeletesTransferred = arrDel.arrSize();
     arrDel.done();
 
+    long long numUpsertsTransferred = 0;
     if (deleteList.empty()) {
         BSONArrayBuilder arrUpd(builder->subarrayStart("reload"));
         auto findByIdWrapper = [opCtx, this](BSONObj idDoc, BSONObj* fullDoc) {
             return Helpers::findById(opCtx, this->nss(), idDoc, *fullDoc);
         };
         totalDocSize = xferMods(&arrUpd, &updateList, totalDocSize, findByIdWrapper);
+        numUpsertsTransferred = arrUpd.arrSize();
         arrUpd.done();
     }
 
@@ -981,6 +981,8 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
 
     // Put back remaining ids we didn't consume
     std::unique_lock<std::mutex> lk(_mutex);
+    _numXferModsDeletesTransferred += numDeletesTransferred;
+    _numXferModsUpsertsTransferred += numUpsertsTransferred;
     _deleted.splice(_deleted.cbegin(), deleteList);
     _untransferredDeletesCounter = _deleted.size();
     _reload.splice(_reload.cbegin(), updateList);
@@ -1010,14 +1012,25 @@ void MigrationChunkClonerSource::_cleanup(bool wasSuccessful) {
     _deferredUntransferredOpsCounter = 0;
 }
 
+StatusWith<executor::TaskExecutor::CallbackHandle>
+MigrationChunkClonerSource::_scheduleRecipientCommand(
+    const BSONObj& cmdObj,
+    Milliseconds timeout,
+    executor::TaskExecutor::RemoteCommandCallbackFn callback) {
+    return getRecipientCommandExecutor()->scheduleRemoteCommand(
+        executor::RemoteCommandRequest(
+            _recipientHost, DatabaseName::kAdmin, cmdObj, nullptr, timeout),
+        std::move(callback));
+}
+
 StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext* opCtx,
                                                                const BSONObj& cmdObj) {
     executor::RemoteCommandResponse responseStatus(
         _recipientHost, Status{ErrorCodes::InternalError, "Uninitialized value"});
 
-    auto executor = Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
-    auto scheduleStatus = executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_recipientHost, DatabaseName::kAdmin, cmdObj, nullptr),
+    auto scheduleStatus = _scheduleRecipientCommand(
+        cmdObj,
+        executor::RemoteCommandRequest::kNoTimeout,
         [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
             responseStatus = args.response;
         });
@@ -1026,6 +1039,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext*
         return scheduleStatus.getStatus();
     }
 
+    auto executor = getRecipientCommandExecutor();
     auto cbHandle = scheduleStatus.getValue();
 
     try {
@@ -1447,6 +1461,22 @@ MigrationChunkClonerSource::getSessionOplogEntriesSkippedSoFarLowerBound() {
 
 boost::optional<long long> MigrationChunkClonerSource::getSessionOplogEntriesToBeMigratedSoFar() {
     return _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
+}
+
+MigrationChunkClonerSource::CloneStats MigrationChunkClonerSource::getCloneStats() const {
+    CloneStats stats;
+    {
+        std::lock_guard lk(_mutex);
+        stats.xferModsDeletes = _numXferModsDeletesTransferred;
+        stats.xferModsUpserts = _numXferModsUpsertsTransferred;
+    }
+    if (_sessionCatalogSource) {
+        stats.sessionOplogEntriesToBeMigrated =
+            _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
+        stats.sessionOplogEntriesSkippedLowerBound =
+            _sessionCatalogSource->getSessionOplogEntriesSkippedSoFarLowerBound();
+    }
+    return stats;
 }
 
 MigrationChunkClonerSource::CloneList::DocumentInFlightWithLock::DocumentInFlightWithLock(

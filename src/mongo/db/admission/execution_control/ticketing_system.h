@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -49,7 +23,8 @@
 
 namespace mongo {
 namespace admission {
-namespace MONGO_MOD_PUBLIC execution_control {
+namespace [[MONGO_MOD_PUBLIC]] execution_control {
+using namespace std::literals::string_view_literals;
 
 enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
 
@@ -66,15 +41,15 @@ enum class ExecutionControlConcurrencyAdjustmentAlgorithmEnum;
  * pool based on a heuristic.
  *   - Throughput probing: a single pool is dynamically adjusted based on observed throughput.
  */
-class MONGO_MOD_PUBLIC TicketingSystem {
+class [[MONGO_MOD_PUBLIC]] TicketingSystem {
 public:
     static constexpr auto kDefaultConcurrentTransactionsValue = 128;
     static constexpr auto kUnsetLowPriorityConcurrentTransactionsValue = -1;
-    static constexpr auto kExemptPriorityName = "exempt"_sd;
-    static constexpr auto kLowPriorityName = "lowPriority"_sd;
-    static constexpr auto kNormalPriorityName = "normalPriority"_sd;
-    static constexpr auto kNonDeprioritizableName = "nonDeprioritizable"_sd;
-    static constexpr auto kDeprioritizableName = "deprioritizable"_sd;
+    static constexpr auto kExemptPriorityName = "exempt"sv;
+    static constexpr auto kLowPriorityName = "lowPriority"sv;
+    static constexpr auto kNormalPriorityName = "normalPriority"sv;
+    static constexpr auto kNonDeprioritizableName = "nonDeprioritizable"sv;
+    static constexpr auto kDeprioritizableName = "deprioritizable"sv;
 
     struct RWTicketHolder {
         std::unique_ptr<TicketHolder> read;
@@ -96,9 +71,9 @@ public:
         static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
-        MONGO_MOD_PRIVATE static Status validateConcurrentWriteTransactions(
+        [[MONGO_MOD_PRIVATE]] static Status validateConcurrentWriteTransactions(
             const int32_t& newWriteTransactions, boost::optional<TenantId>);
-        MONGO_MOD_PRIVATE static Status validateConcurrentReadTransactions(
+        [[MONGO_MOD_PRIVATE]] static Status validateConcurrentReadTransactions(
             const int32_t& newReadTransactions, boost::optional<TenantId>);
     };
 
@@ -111,13 +86,13 @@ public:
         static Status updateReadMaxQueueDepth(std::int32_t newReadMaxQueueDepth);
         static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
         static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
-        MONGO_MOD_PRIVATE static Status validateConcurrentWriteTransactions(
+        [[MONGO_MOD_PRIVATE]] static Status validateConcurrentWriteTransactions(
             const int32_t& newWriteTransactions, boost::optional<TenantId>);
-        MONGO_MOD_PRIVATE static Status validateConcurrentReadTransactions(
+        [[MONGO_MOD_PRIVATE]] static Status validateConcurrentReadTransactions(
             const int32_t& newReadTransactions, boost::optional<TenantId>);
     };
 
-    MONGO_MOD_PRIVATE static Status validateConcurrencyAdjustmentAlgorithm(
+    [[MONGO_MOD_PRIVATE]] static Status validateConcurrencyAdjustmentAlgorithm(
         const std::string& name, const boost::optional<TenantId>&);
 
     static Status updateConcurrencyAdjustmentAlgorithm(std::string newAlgorithm);
@@ -134,7 +109,7 @@ public:
      * If the server parameter matches the default, this function returns the number of logical
      * cores. Otherwise, it returns the specific value loaded from the atomic.
      */
-    static int resolveLowPriorityTickets(const AtomicWord<int32_t>& serverParam);
+    static int resolveLowPriorityTickets(const Atomic<int32_t>& serverParam);
 
     static TicketingSystem* get(ServiceContext* svcCtx);
 
@@ -321,7 +296,7 @@ private:
      * Atomically holds the current state of the ticketing system. The TicketingState struct
      * contains both the raw algorithm enum and the logic to interpret it.
      */
-    AtomicWord<TicketingState> _state;
+    Atomic<TicketingState> _state;
 
     /**
      * Returns true if the operation should be downgraded to low priority.
@@ -352,14 +327,14 @@ private:
     /**
      * Counts the total number of operations deprioritized.
      */
-    AtomicWord<std::int64_t> _opsDeprioritized;
+    Atomic<std::int64_t> _opsDeprioritized;
 
     /**
      * Counts the total number of operations marked non-deprioritizable. This includes operations
      * that use ScopedTaskTypeNonDeprioritizable and operations which are affected by client based
      * exemptions.
      */
-    AtomicWord<std::int64_t> _opsMarkedNonDeprioritizable;
+    Atomic<std::int64_t> _opsMarkedNonDeprioritizable;
 
     /**
      * Accumulate deprioritizable/non-deprioritizable operation statistics for read and write
@@ -373,6 +348,6 @@ private:
     AdmissionsHistogram _admissionsHistogram;
 };
 
-}  // namespace MONGO_MOD_PUBLIC execution_control
+}  // namespace execution_control
 }  // namespace admission
 }  // namespace mongo

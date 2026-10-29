@@ -1,53 +1,43 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/type_collection.h"
-#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/time_support.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace metadata_consistency_util {
+namespace [[MONGO_MOD_PARENT_PRIVATE]] metadata_consistency_util {
+
+/**
+ * The replica set status of this node.
+ *  - kPrimary: this node is an RS primary.
+ *  - kSecondary: this node is an up to date RS secondary (meaning it is running at a timestamp
+ *                where the DB primary is holding the DDL lock).
+ *  - kDelayedSecondary: this node is an RS secondary running at an arbitrarily delayed timestamp.
+ */
+enum class RSNodeMode {
+    kPrimary,
+    kSecondary,
+    kDelayedSecondary,
+};
 
 /**
  * Creates a MetadataInconsistencyItem object from the given parameters.
@@ -63,6 +53,38 @@ MetadataInconsistencyItem makeInconsistency(
         details.toBSON()};
     item.setSeverity(severity);
     return item;
+}
+
+void logSnapshotUnavailableRetry(std::string_view checkName, size_t attempt, const Status& status);
+
+/**
+ * Retries `check` if it fails with SnapshotUnavailable, which may be transiently returned if the
+ * targeted node has not yet set a committed snapshot.
+ * TODO(SERVER-132541): consider removing this retry loop once repl. waits for a committed snapshot.
+ */
+template <typename Callable>
+auto snapshotUnavailableRetry(OperationContext* opCtx,
+                              std::string_view checkName,
+                              Callable&& check) {
+    if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime().has_value()) {
+        // If the caller already picked the snapshot (checkMetadataConsistency on secondaries),
+        // do not retry since all retries are expected to fail similarly. The caller must handle it.
+        return check();
+    }
+
+    static constexpr size_t kMaxAttempts = 30;
+    Backoff backoff{Milliseconds{250}, Milliseconds::max()};
+    for (size_t attempt = 1;; ++attempt) {
+        try {
+            return check();
+        } catch (const ExceptionFor<ErrorCodes::SnapshotUnavailable>& ex) {
+            if (attempt >= kMaxAttempts) {
+                throw;
+            }
+            logSnapshotUnavailableRetry(checkName, attempt, ex.toStatus());
+            opCtx->sleepFor(backoff.nextSleep());
+        }
+    }
 }
 
 /**
@@ -102,7 +124,10 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
     bool checkRangeDeletionIndexes,
-    bool optionalCheckIndexes);
+    bool optionalCheckIndexes,
+    int64_t strictChunkChecksThreshold,
+    RSNodeMode rsMode = RSNodeMode::kPrimary,
+    const stdx::unordered_set<NamespaceString>& collectionsUnderCs = {});
 
 /**
  * For every collection, check that all the shards currently owning chunks for that collection have
@@ -158,29 +183,37 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
     OperationContext* opCtx, const CollectionType& collection);
 
 /**
- * Checks for inconsistencies in the database's metadata between the global catalog and the
- * shard catalog.
- *
- * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
- * there is no inconsistency, it returns an empty vector.
+ * Checks that this shard's config database shard catalog collections match the current FCV
+ * (e.g. on FCV 9.0+, the legacy config.cache.* collections should not exist).
  */
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
-    OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog);
+std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWithAuthoritativeness(
+    OperationContext* opCtx);
 
 /**
  * Main check consistency metadata logic ran by the participant commands (i.e.
  * _shardsvrCheckMetadataConsistencyParticipant and
  * _shardsvrCheckMetadataConsistencySecondaryParticipant).
- * `asPrimaryNode` is set to true if this command is called by the shard *RS* primary (not the shard
- * DB primary). Setting it to false skips some cluster-wide checks.
+ * `rsMode` must be set to the correct RS status of this node. It can take three values:
+ *  - kPrimary: this node is an RS primary. It will perform all checks, including checks across
+ *              shards.
+ *  - kSecondary: this node is an up to date RS secondary (meaning it is running at a timestamp
+ *                where the DB primary is holding the DDL lock). The command must have been called
+ *                with `afterClusterTime` readConcern set at the timestamp of the primary to ensure
+ *                consistency. Almost all checks are performed, except inter-shard checks.
+ *  - kDelayedSecondary: this node is an RS secondary running at an arbitrarily delayed timestamp.
+ *                       It will establish a snapshot internally and perform checks at that
+ *                       timestamp. Checks of in-memory metadata aren't performed, since in-memory
+ *                       metadata is not versioned. The returned boost::optional<Timestamp> contains
+ *                       the timestamp of the snapshot it chose.
  */
-std::vector<MetadataInconsistencyItem> runCheckMetadataConsistencyOnParticipant(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardId& primaryShardId,
-    bool checkRangeDeletionIndexes,
-    bool checkIndexes,
-    bool asPrimaryNode);
+std::pair<std::vector<MetadataInconsistencyItem>, boost::optional<Timestamp>>
+runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const ShardId& primaryShardId,
+                                         bool checkRangeDeletionIndexes,
+                                         bool checkIndexes,
+                                         int64_t strictChunkChecksThreshold,
+                                         RSNodeMode rsMode);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo

@@ -1,6 +1,7 @@
 // Tests for $expr in the CRUD commands.
 //
 // @tags: [
+//   uses_explain,
 //   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_signed_security_token,
 //   does_not_support_stepdowns,

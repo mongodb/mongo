@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
@@ -54,6 +28,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
@@ -87,27 +63,46 @@ public:
                 // No need to acquire additional locks in a non-sharded environment
                 _internalRun(opCtx, fromNss, toNss, originalIndexes, collectionOptions);
             } else {
-                // Sharded environment. Run the _shardsvrRenameCollection command, which will use
-                // the RenameCollectionCoordinator.
-                RenameCollectionRequest renameCollectionRequest(toNss);
-                renameCollectionRequest.setDropTarget(true);
-                renameCollectionRequest.setExpectedIndexes(originalIndexes);
-                renameCollectionRequest.setExpectedCollectionOptions(collectionOptions);
-                // TODO: SERVER-81975 (PM-1931) remove this once we enable support for $out to
-                // sharded collections.
-                renameCollectionRequest.setTargetMustNotBeSharded(true);
+                auto runCommand = [&]() {
+                    // Sharded environment. Run the _shardsvrRenameCollection command, which will
+                    // use the RenameCollectionCoordinator.
+                    RenameCollectionRequest renameCollectionRequest(toNss);
+                    renameCollectionRequest.setDropTarget(true);
+                    renameCollectionRequest.setExpectedIndexes(originalIndexes);
+                    renameCollectionRequest.setExpectedCollectionOptions(collectionOptions);
+                    // TODO: SERVER-81975 (PM-1931) remove this once we enable support for $out to
+                    // sharded collections.
+                    renameCollectionRequest.setTargetMustNotBeSharded(true);
 
-                ShardsvrRenameCollection shardsvrRenameCollectionRequest(fromNss);
-                shardsvrRenameCollectionRequest.setRenameCollectionRequest(renameCollectionRequest);
+                    ShardsvrRenameCollection shardsvrRenameCollectionRequest(fromNss);
+                    shardsvrRenameCollectionRequest.setRenameCollectionRequest(
+                        renameCollectionRequest);
 
-                // _shardsvrRenameCollection requires majority write concern.
-                generic_argument_util::setMajorityWriteConcern(shardsvrRenameCollectionRequest);
+                    // _shardsvrRenameCollection requires majority write concern.
+                    generic_argument_util::setMajorityWriteConcern(shardsvrRenameCollectionRequest);
 
-                DBDirectClient client(opCtx);
-                BSONObj cmdResult;
-                client.runCommand(
-                    fromNss.dbName(), shardsvrRenameCollectionRequest.toBSON(), cmdResult);
-                uassertStatusOK(getStatusFromCommandResult(cmdResult));
+                    DBDirectClient client(opCtx);
+                    BSONObj cmdResult;
+                    client.runCommand(
+                        fromNss.dbName(), shardsvrRenameCollectionRequest.toBSON(), cmdResult);
+                    uassertStatusOK(getStatusFromCommandResult(cmdResult));
+                };
+
+                // We do one retry here on DDLCoordinatorMustRetryDueToFCVTransition to match the
+                // service entry point's behavior. This isn't handled in the service entry point
+                // for this command because it's run in a DBDirectClient.
+                // TODO (SERVER-98118): remove retry logic once 9.0 becomes last LTS.
+                try {
+                    runCommand();
+                } catch (
+                    const ExceptionFor<ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition>& e) {
+                    LOGV2_OPTIONS(13265501,
+                                  {logv2::LogComponent::kSharding},
+                                  "Retrying InternalRenameIfOptionsAndIndexesMatchCmd due to "
+                                  "FCV transition",
+                                  "error"_attr = redact(e));
+                    runCommand();
+                }
             }
         }
 
@@ -120,8 +115,8 @@ public:
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;
-            options.originalIndexes = indexList;
-            options.originalCollectionOptions = collectionOptions;
+            options.expectedIndexes = indexList;
+            options.expectedCollectionOptions = collectionOptions;
             doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx, fromNss, toNss, options);
         }
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,7 +10,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <map>
@@ -52,7 +26,7 @@ namespace mongo {
  * Use ServerStatusSectionBuilder below to build your ServerStatusSection and register it with the
  * command. Make sure to perform the registration before the server can run commands.
  */
-class MONGO_MOD_OPEN ServerStatusSection {
+class [[MONGO_MOD_OPEN]] ServerStatusSection {
 public:
     ServerStatusSection(std::string sectionName, ClusterRole role)
         : _sectionName(std::move(sectionName)), _role(role) {}
@@ -195,7 +169,7 @@ private:
  * all sections are registered before serverStatus can be run.
  */
 template <typename Section>
-class MONGO_MOD_PUBLIC ServerStatusSectionBuilder {
+class [[MONGO_MOD_PUBLIC]] ServerStatusSectionBuilder {
 public:
     explicit ServerStatusSectionBuilder(std::string name) : _name(std::move(name)) {}
 
@@ -248,7 +222,7 @@ private:
 };
 
 
-class MONGO_MOD_PUBLIC OpCounterServerStatusSection : public ServerStatusSection {
+class [[MONGO_MOD_PUBLIC]] OpCounterServerStatusSection : public ServerStatusSection {
 public:
     OpCounterServerStatusSection(const std::string& sectionName,
                                  ClusterRole role,
@@ -271,7 +245,7 @@ private:
 /**
  * Publishes an infrequently-changing BSON object as a server status section.
  */
-class MONGO_MOD_PUBLIC BSONObjectStatusSection : public ServerStatusSection {
+class [[MONGO_MOD_PUBLIC]] BSONObjectStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,7 +8,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/baton.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
@@ -78,8 +52,8 @@ struct SessionManagerOpCounters {
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).
  */
-class MONGO_MOD_PUBLIC Session : public std::enable_shared_from_this<Session>,
-                                 public Decorable<Session> {
+class [[MONGO_MOD_PUBLIC]] Session : public std::enable_shared_from_this<Session>,
+                                     public Decorable<Session> {
     Session(const Session&) = delete;
     Session& operator=(const Session&) = delete;
 
@@ -146,6 +120,7 @@ public:
 
     /**
      * Waits for the availability of incoming data.
+     * This function must be invoked from the session workflow thread only.
      */
     virtual Status waitForData() = 0;
     virtual Future<void> asyncWaitForData() = 0;
@@ -197,6 +172,19 @@ public:
     virtual bool isConnected() = 0;
 
     /**
+     * Blocks the calling thread until the remote peer has closed its end of the connection or until
+     * `deadline` is reached.
+     *
+     * Returns `true` if the peer has disconnected (or the underlying socket is in an error state),
+     * `false` if `deadline` expired without observing a disconnect.
+     *
+     * Implementations may perform a blocking `poll()` on the session's socket, so this must not be
+     * called concurrently with `sourceMessage()`/`sinkMessage()`/`waitForData()` on the same
+     * session.
+     */
+    virtual bool waitForPeerDisconnectUntil(Date_t deadline);
+
+    /**
      * Returns true if this session was connected through an L4 load balancer.
      */
     bool isLoadBalancerPeer() const {
@@ -212,9 +200,16 @@ public:
     }
 
     /**
-     * Signal the session that the client declared being from a load balancer.
+     * Marks this as a load balancer session or not based on whether the client sent
+     * {loadBalanced: true} in its hello command.
+     * - If the client sent {loadBalanced: true} but is not connecting through the load balancer
+     *   port, throws a tassert since that indicates a driver that does not have load balancing
+     *   enabled.
+     * - If the client did not send {loadBalanced: true} but is connecting through the load balancer
+     *   port, does not throw an error since it is treated as a client connecting directly to the
+     *   load balancer port.
      */
-    virtual void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
+    virtual void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption);
 
     /**
      * Returns true if the connection is on the priority port or corresponding unix socket.
@@ -264,6 +259,9 @@ public:
      *  2. If the connection was NOT accepted via the load balancer port:
      *      a. The source remote endpoint is always remote(). The proxy protocol
      *         header is only parsed if presented by a load balancer connection.
+     *
+     * NOTE: This value is trusted as-is with no authentication of the connecting peer. Access to
+     * the load balancer port MUST be restricted to trusted hosts (the load balancer/reverse proxy).
      */
     virtual const HostAndPort& getSourceRemoteEndpoint() const {
         return remote();

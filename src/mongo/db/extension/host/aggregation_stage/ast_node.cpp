@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 
@@ -67,7 +41,7 @@ DPLCallbackOwner::DPLCallbackOwner(CallbackInvoker invoker, std::function<void()
 bool DPLCallbackOwner::hasCallback() const {
     return _state && _state->invoker;
 }
-
+// TODO SERVER-136921: Figure out a way to provide CapabilityVersion to this method.
 const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec&
 DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     tassert(12728604, "getOrInvoke() called without a DPL callback", hasCallback());
@@ -102,16 +76,18 @@ DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     };
 
     if (rawSort) {
-        state.result.resultsSortPattern = ownedValidatedBson(sortHandle->getByteView());
+        state.result.setResultsSortPattern(ownedValidatedBson(sortHandle->getByteView()));
     }
     if (rawMerge) {
         BSONObj arr = ownedValidatedBson(mergeHandle->getByteView());
+        std::vector<BSONObj> pipeline;
         for (auto&& elem : arr) {
-            uassert(12728601,
+            tassert(ErrorCodes::ExtensionError,
                     "DPL metaMergePipeline elements must be objects",
                     elem.type() == BSONType::object);
-            state.result.metaMergePipeline.push_back(elem.Obj().getOwned());
+            pipeline.push_back(elem.Obj().getOwned());
         }
+        state.result.setMetaMergePipeline(std::move(pipeline));
     }
     return state.result;
 }
@@ -190,7 +166,7 @@ std::unique_ptr<LiteParsedDocumentSource> DocumentResultsAndMetadataAstNode::exp
     tassert(12878900,
             "Expected InternalDocumentResultsAndMetadataLiteParsed from AggStageAstNode expansion",
             drmLp != nullptr);
-    drmLp->setShardedPlanProvider(std::move(provider));
+    drmLp->setShardedPlan(std::move(provider));
     return lpds;
 }
 
@@ -205,15 +181,15 @@ DocumentResultsAndMetadataAstNode::expandToDocumentSource(
     if (!provider) {
         return stages;
     }
-    tassert(12728602,
+    tassert(ErrorCodes::ExtensionError,
             "$_internalDocumentResultsAndMetadata must expand to exactly one stage",
             stages.size() == 1);
     auto* drm =
         dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stages.front().get());
-    tassert(12728603,
+    tassert(ErrorCodes::ExtensionError,
             "expanded $_internalDocumentResultsAndMetadata stage has unexpected type",
             drm != nullptr);
-    drm->setShardedPlanProvider(std::move(provider));
+    drm->setShardedPlan(std::move(provider));
     return stages;
 }
 

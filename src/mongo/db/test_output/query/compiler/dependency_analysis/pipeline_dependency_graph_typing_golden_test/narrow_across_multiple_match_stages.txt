@@ -1,0 +1,29 @@
+VARIATION NarrowAcrossMultipleMatchStages
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: number|array(S)
+    x.y: any
+  end of pipeline
+    x: number
+    x.y: missing
+

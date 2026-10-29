@@ -1,45 +1,26 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder_mock.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_mock.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -84,8 +65,8 @@ public:
     const NamespaceString kSecondaryNssOtherDb2 =
         NamespaceString::createNamespaceString_forTest("test2", "secondaryColl2");
     const Milliseconds timeoutMs = Seconds(1);
-    const ClientAndCtx client1 = makeClientWithLocker("client1");
-    const ClientAndCtx client2 = makeClientWithLocker("client2");
+    ClientAndCtx client1;
+    ClientAndCtx client2;
 
 private:
     void setUp() override;
@@ -93,6 +74,9 @@ private:
 };
 
 void CatalogRAIITestFixture::setUp() {
+    ServiceContextTest::setUp();
+    client1 = makeClientWithLocker("client1");
+    client2 = makeClientWithLocker("client2");
     DatabaseShardingStateFactory::set(getServiceContext(),
                                       std::make_unique<DatabaseShardingStateFactoryMock>());
     DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
@@ -318,6 +302,7 @@ protected:
 };
 
 void ReadSourceScopeTest::setUp() {
+    ServiceContextTest::setUp();
     _opCtx = getClient()->makeOperationContext();
     shard_role_details::setRecoveryUnit(_opCtx.get(),
                                         std::make_unique<RecoveryUnitMock>(),
@@ -373,6 +358,73 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBWithTenantHitsDeadline) {
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), dbName, MODE_X, Date_t::now() + timeoutMs); },
         timeoutMs);
+}
+
+class AutoGetOplogFastPathTest : public ServiceContextMongoDTest {
+public:
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtxHolder = makeOperationContext();
+
+        repl::ReplicationCoordinator::set(
+            getServiceContext(),
+            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
+        repl::StorageInterface::set(getServiceContext(),
+                                    std::make_unique<repl::StorageInterfaceImpl>());
+        repl::createOplog(opCtx());
+    }
+
+    OperationContext* opCtx() const {
+        return _opCtxHolder.get();
+    }
+
+    repl::StorageInterface* storage() const {
+        return repl::StorageInterface::get(getServiceContext());
+    }
+
+    /**
+     * Returns a token that expires once nothing references the collection's ident.
+     */
+    std::weak_ptr<Ident> getIdentToken(const NamespaceString& nss) const {
+        // Scoped so this catalog reference is not itself a holder of the ident.
+        auto catalog = CollectionCatalog::get(opCtx());
+        auto collection = catalog->lookupCollectionByNamespace(opCtx(), nss);
+        ASSERT(collection);
+        return collection->getSharedIdent();
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+};
+
+// AutoGetOplogFastPath must not keep collections other than the oplog alive. Retaining a whole
+// catalog version here pins the idents of collections dropped afterwards, which makes a replicated
+// 'dropIdent' fatal on the applier.
+TEST_F(AutoGetOplogFastPathTest, DoesNotRetainUnrelatedDroppedCollectionIdent) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_OK(storage()->createCollection(opCtx(), nss, options));
+    auto identToken = getIdentToken(nss);
+    ASSERT_FALSE(identToken.expired());
+
+    AutoGetOplogFastPath oplogWrite(opCtx(), OplogAccessMode::kWrite);
+    ASSERT(oplogWrite.getCollection());
+
+    {
+        // Drop without replicating, so the drop does not need an opTime assigned to it.
+        repl::UnreplicatedWritesBlock uwb(opCtx());
+        ASSERT_OK(storage()->dropCollection(opCtx(), nss));
+    }
+    // The drop stashed a catalog on this opCtx's snapshot, so isolate the oplog acquisition as the
+    // only remaining candidate holder.
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
+
+    EXPECT_TRUE(identToken.expired());
 }
 
 }  // namespace

@@ -9,7 +9,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 
-const st = new ShardingTest({shards: 2});
+// Non-deterministic query stats collection can to non-deterministic execution stats for subpipeline aggregations.
+const queryStatsDisabled = {internalQueryStatsRateLimit: 0, internalQueryStatsSampleRate: 0};
+const st = new ShardingTest({
+    shards: 2,
+    other: {
+        mongosOptions: {setParameter: queryStatsDisabled},
+        rsOptions: {setParameter: queryStatsDisabled},
+    },
+});
 const db = st.s.getDB(dbName);
 
 const outerColl = db["outer"];

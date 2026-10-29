@@ -15,7 +15,9 @@
 import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {isServerSideJavaScriptEnabled} from "jstests/libs/js_engine_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const name = jsTestName();
@@ -53,7 +55,6 @@ function chunkOperationsBlockedByAuthShardTransition(shardConn) {
 
 const allCommands = {
     _addShard: {skip: isAnInternalCommand},
-    _internalClearCollectionShardingMetadata: {skip: isAnInternalCommand},
     _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
     _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isAnInternalCommand},
@@ -72,12 +73,14 @@ const allCommands = {
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
     _configsvrCommitMergeAllChunksOnShard: {skip: isAnInternalCommand},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: isAnInternalCommand},
+    _configsvrCommitMergeChunks: {skip: isAnInternalCommand},
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
+    _configsvrCommitMoveRange: {skip: isAnInternalCommand},
     _configsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _configsvrCommitShardRemoval: {skip: isAnInternalCommand},
+    _configsvrCommitSplitChunk: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
     _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},
@@ -181,6 +184,7 @@ const allCommands = {
     _shardsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrCommitCollModCollectionMetadata: {skip: isAnInternalCommand},
+    _shardsvrCommitChunkOperationsMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitDropCollectionMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitCreateCollectionMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitCreateCollectionChunklessMetadata: {skip: isAnInternalCommand},
@@ -215,6 +219,9 @@ const allCommands = {
     streams_writeCheckpoint: {skip: isAnInternalCommand},
     streams_sendEvent: {skip: isAnInternalCommand},
     streams_updateConnection: {skip: "internal command"},
+    streams_previewStream: {skip: "internal command"},
+    streams_getMorePreview: {skip: "internal command"},
+    streams_stopPreview: {skip: "internal command"},
     _transferMods: {skip: isAnInternalCommand},
     abortMoveCollection: {
         // Skipping command because it requires testing through a parallel shell.
@@ -306,7 +313,8 @@ const allCommands = {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
         },
-        command: {analyze: collName},
+        // TODO SERVER-124374: add testing for sample mode
+        command: {analyze: collName, mode: "histograms", key: "a"},
         teardown: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
@@ -431,16 +439,28 @@ const allCommands = {
         command: {checkMetadataConsistency: 1},
     },
     checkShardingIndex: {
-        setUp: function (conn, fixture) {
-            assert.commandWorked(fixture.shard0.getDB(dbName).runCommand({create: collName}));
-            const f = fixture.shard0.getCollection(fullNs);
-            f.createIndex({x: 1, y: 1});
-        },
-        command: {checkShardingIndex: fullNs, keyPattern: {x: 1, y: 1}},
         isShardedOnly: true,
-        isShardSvrOnly: true,
-        teardown: function (conn) {
-            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        fullScenario: function (conn, fixture) {
+            const testDb = "testDB";
+            // Manually specify the primary shard since the command can only run against the shard node.
+            assert.commandWorked(
+                conn.adminCommand({
+                    enableSharding: testDb,
+                    primaryShard: fixture.shard0.shardName,
+                }),
+            );
+            assert.commandWorked(conn.getDB(testDb).runCommand({create: collName}));
+            const fullNamespace = testDb + "." + collName;
+            conn.getCollection(fullNamespace).createIndex({x: 1, y: 1});
+
+            assert.commandWorked(
+                fixture.shard0
+                    .getDB(testDb)
+                    .runCommand({checkShardingIndex: fullNamespace, keyPattern: {x: 1, y: 1}}),
+            );
+
+            // Drop testDB to leave the status clean
+            assert.commandWorked(conn.getDB(testDb).dropDatabase());
         },
     },
     cleanupOrphaned: {
@@ -461,6 +481,14 @@ const allCommands = {
         },
     },
     cleanupStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
+    clearJoinPlanCache: {
+        command: {clearJoinPlanCache: 1},
+        isAdminCommand: true,
+        // The join plan cache knobs are off by default. Rather than toggling them on every node of
+        // the fixture, assert the command is reachable and reaches its feature gate.
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.QueryFeatureNotAllowed,
+    },
     clearJumboFlag: {
         isShardedOnly: true,
         fullScenario: function (conn, fixture) {
@@ -898,6 +926,14 @@ const allCommands = {
     getLog: {
         isAdminCommand: true,
         command: {getLog: "global"},
+    },
+    getMetricsFilteringAllowlist: {
+        isAdminCommand: true,
+        command: {getMetricsFilteringAllowlist: 1, category: "serverStatus"},
+        // The metrics filtering feature flags are not enabled in tests by default, so this
+        // command is expected to fail with IllegalOperation.
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.IllegalOperation,
     },
     getMore: {
         fullScenario: function (conn) {
@@ -1430,6 +1466,12 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName + "2"}));
         },
     },
+    repairReplicatedMetadata: {
+        command: {repairReplicatedMetadata: 1, uuid: UUID(), metadata: {}},
+        isAdminCommand: true,
+        doesNotRunOnStandalone: true,
+        doesNotRunOnMongos: true,
+    },
     replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {
         // This will be tested in FCV upgrade/downgrade passthroughs through the replsets directory.
@@ -1780,7 +1822,7 @@ const allCommands = {
         skip: "requires a sharded cluster with embedded config server",
     },
     sysprofile: {skip: isAnInternalCommand},
-    testCommandFeatureFlaggedOnLatestFCV83: {skip: isAnInternalCommand},
+    testCommandFeatureFlaggedOnLatestFCV91: {skip: isAnInternalCommand},
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},
@@ -1820,6 +1862,10 @@ const allCommands = {
         },
     },
     updateESECMKIdentifierList: {skip: "requires additional setup"},
+    updateMetricsFilteringAllowlist: {
+        command: {updateMetricsFilteringAllowlist: 1, category: "serverStatus", add: ["test.path"]},
+        isAdminCommand: true,
+    },
     updateRole: {
         setUp: function (conn) {
             assert.commandWorked(
@@ -1912,6 +1958,7 @@ const allCommands = {
         command: {whatsmyuri: 1},
         isAdminCommand: true,
     },
+    wiredTigerRepair: {skip: isAnInternalCommand},
 };
 
 /**
@@ -2058,6 +2105,10 @@ let runTest = function (conn, adminDB, fixture) {
         );
     }
 
+    // mapReduce with JS map/reduce functions needs a server-side JS engine, which is absent on some
+    // builds (e.g. ppc64le links scripting_none). Skip just that command there.
+    const skipScriptingCommands = !isServerSideJavaScriptEnabled(conn);
+
     for (const command of commandsList) {
         const test = allCommands[command];
 
@@ -2066,6 +2117,11 @@ let runTest = function (conn, adminDB, fixture) {
 
         if (test.skip !== undefined || test.skip === commandIsDisabledOnLastLTS) {
             jsTestLog("Skipping " + command + ": " + test.skip);
+            continue;
+        }
+
+        if (skipScriptingCommands && command === "mapReduce") {
+            jsTestLog("Skipping " + command + ": server-side JS is unavailable on this build");
             continue;
         }
 
@@ -2083,9 +2139,10 @@ let runTest = function (conn, adminDB, fixture) {
         runAllCommands(command, test, conn, fixture);
     }
 
-    assert.commandWorked(
-        conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-    );
+    // A two-phase index build run during the commands loop may still have its async coordinator
+    // thread alive with a stale operation FCV, causing setFCV's drain barrier to reject the
+    // transition with BackgroundOperationInProgressForNamespace. Retry until the thread exits.
+    setFCVWithRetryOnBackgroundOpInProgress(conn, latestFCV);
 
     jsTestLog("Running all commands after upgrading back to the latest FCV");
     commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);

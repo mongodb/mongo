@@ -6,6 +6,7 @@
  * covered.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   requires_non_retryable_commands,

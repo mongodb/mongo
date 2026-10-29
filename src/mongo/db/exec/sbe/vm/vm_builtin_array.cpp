@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
@@ -60,9 +34,22 @@ value::TagValueMaybeOwned ByteCode::builtinNewArray(ArityType arity) {
     auto arr = value::getArrayView(result.value());
 
     if (arity) {
+        size_t currentMemoryBytes = 0;
+        const size_t maxMemoryBytes =
+            internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
-            arr->push_back(moveOwnedFromStack(idx));
+            auto elem = moveOwnedFromStack(idx);
+            currentMemoryBytes += value::getApproximateSize(elem.tag(), elem.value());
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$array would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
+            arr->push_back(std::move(elem));
         }
     }
 
@@ -222,6 +209,9 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto resView = value::getArrayView(result.value());
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto elem = viewFromStack(idx);
         if (!value::isArray(elem.tag)) {
@@ -229,6 +219,14 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
         }
 
         value::arrayForEach(elem.tag, elem.value, [&](value::TypeTags elTag, value::Value elVal) {
+            currentMemoryBytes += value::getApproximateSize(elTag, elVal);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$concatArrays would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
             resView->push_back_raw(value::copyValue(elTag, elVal));
         });
     }
@@ -256,12 +254,35 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
             "Invalid parameter 'input size' for builtin ZipArrays",
             inputSize <= arity - localVariables);
 
-    const size_t defaultSize = arity - localVariables - inputSize;
-
-    // Assert whether defaults has the same size as the input (also checked by an upper layer).
+    // The defaults, if given, arrive as a single trailing argument holding the whole defaults
+    // array (SERVER-109615).
+    const size_t numDefaultsArgs = arity - localVariables - inputSize;
     tassert(5156503,
-            "Invalid default array count for builtin ZipArrays",
-            defaultSize == 0 || defaultSize == inputSize);
+            "Invalid default argument count for builtin ZipArrays",
+            numDefaultsArgs == 0 || numDefaultsArgs == 1);
+
+    // Views into the defaults array, one per input. Left empty when defaults are absent or
+    // nullish, in which case missing input elements fall back to null.
+    std::vector<value::TagValueView> defaults;
+    if (numDefaultsArgs == 1) {
+        const auto defaultsView = viewFromStack(localVariables + inputSize);
+        if (!value::isNullish(defaultsView.tag)) {
+            uassert(10961502,
+                    "$zip defaults must resolve to an array",
+                    value::isArray(defaultsView.tag));
+            uassert(10961503,
+                    "defaults and inputs must have the same length",
+                    value::getArraySize(defaultsView.tag, defaultsView.value) == inputSize);
+
+            // Prefill views for by-column access; bsonArray does not support random access.
+            defaults.reserve(inputSize);
+            value::arrayForEach(defaultsView.tag,
+                                defaultsView.value,
+                                [&](value::TypeTags elTag, value::Value elVal) {
+                                    defaults.emplace_back(elTag, elVal);
+                                });
+        }
+    }
 
     // Keeps enumerators to every input array.
     absl::InlinedVector<value::ArrayEnumerator, 8> inputs;
@@ -290,6 +311,9 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
     auto* resView = value::getArrayView(result.value());
     resView->reserve(outputLength);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxSingleExpressionMemoryUsageBytes.loadRelaxed();
+
     for (size_t row = 0; row < outputLength; row++) {
         // Used to construct each array in the output, e.g. [1, 2, 3].
         auto intermediateRes = value::TagValueOwned::fromRaw(value::makeNewArray());
@@ -304,15 +328,23 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
                 intermediateResView->push_back_raw(
                     value::copyValue(inputElem.tag, inputElem.value));
                 input.advance();
-            } else if (col < defaultSize) {
+            } else if (col < defaults.size()) {
                 // Add the specified default value.
-                auto defaultElem = viewFromStack(localVariables + inputSize + col);
+                const auto& defaultElem = defaults[col];
                 intermediateResView->push_back_raw(
                     value::copyValue(defaultElem.tag, defaultElem.value));
             } else {
                 // Add a null default value.
                 intermediateResView->push_back_raw(value::TypeTags::Null, 0);
             }
+        }
+        currentMemoryBytes +=
+            value::getApproximateSize(intermediateRes.tag(), intermediateRes.value());
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$zip would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
         }
         resView->push_back(std::move(intermediateRes));
     }

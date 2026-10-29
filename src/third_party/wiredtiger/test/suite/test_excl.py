@@ -26,23 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # Test session.create with the exclusive configuration.
-class test_create_excl(TieredConfigMixin, wttest.WiredTigerTestCase):
+@wttest.skip_for_hook("disagg", "Exclusive create is not supported with disagg layered tables")
+class test_create_excl(wttest.WiredTigerTestCase):
     types = [
         ('file', dict(type = 'file:')),
         ('table', dict(type = 'table:')),
     ]
-    tiered_storage_sources = gen_tiered_storage_sources()
-    scenarios = make_scenarios(tiered_storage_sources, types)
+    scenarios = make_scenarios(types)
 
     def test_create_excl(self):
-        if self.is_tiered_scenario() and self.type == 'file:':
-            self.skipTest('Tiered storage does not support file URIs.')
-
         uri = self.type + "create_excl"
 
         # Create the object with the exclusive setting.

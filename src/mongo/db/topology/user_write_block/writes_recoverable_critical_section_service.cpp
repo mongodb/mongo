@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
@@ -37,6 +11,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
@@ -47,6 +22,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
@@ -111,6 +87,20 @@ void setBlockUserWritesDocumentField(OperationContext* opCtx,
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << BSON(UserWriteBlockingCriticalSectionDocument::kBlockUserWritesFieldName
                             << blockUserWrites)),
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+}
+
+void setAllowDeletionsDocumentField(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    bool allowDeletions) {
+    PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> store(
+        NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
+    store.update(
+        opCtx,
+        BSON(ReplicaSetWriteBlockingCriticalSectionDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
+        BSON("$set" << BSON(ReplicaSetWriteBlockingCriticalSectionDocument::kAllowDeletionsFieldName
+                            << allowDeletions)),
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
@@ -184,6 +174,7 @@ void releaseCriticalSection(OperationContext* opCtx,
         uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
     }
 }
+
 }  // namespace
 
 const NamespaceString UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace =
@@ -386,7 +377,7 @@ void UserWritesRecoverableCriticalSectionService::
 
         // Promote the critical section to block also user writes by updating the critical section
         // document. The OpObserver will promote the in-memory CS when reacting to the update event.
-        setBlockUserWritesDocumentField(opCtx, nss, true /* blockUserWrites */);
+        setBlockUserWritesDocumentField(opCtx, nss, /*blockUserWrites=*/true);
     }
 
     LOGV2_DEBUG(6351904,
@@ -446,7 +437,7 @@ void UserWritesRecoverableCriticalSectionService::
 
         // Demote the critical section to block also user writes by updating the critical section
         // document. The OpObserver will demote the in-memory CS when reacting to the update event.
-        setBlockUserWritesDocumentField(opCtx, nss, false /* blockUserWrites */);
+        setBlockUserWritesDocumentField(opCtx, nss, /*blockUserWrites=*/false);
     }
 
     LOGV2_DEBUG(6351908,
@@ -488,7 +479,7 @@ void UserWritesRecoverableCriticalSectionService::
     LOGV2_DEBUG(6351911, 2, "Released user writes recoverable critical section", logAttrs(nss));
 }
 
-void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSections(
+void UserWritesRecoverableCriticalSectionService::recoverUserWritesCriticalSection(
     OperationContext* opCtx) {
     if (MONGO_unlikely(skipRecoverUserWriteCriticalSections.shouldFail())) {
         return;
@@ -517,23 +508,50 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
 
         return true;
     });
+}
 
+void UserWritesRecoverableCriticalSectionService::recoverReplicaSetWritesCriticalSection(
+    OperationContext* opCtx) {
     // Recover the persisted replica set writes critical section documents and restore the
     // state into memory.
     PersistentTaskStore<ReplicaSetWriteBlockingCriticalSectionDocument> replicaSetWritesStore(
         NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
+    auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
+    bool foundReplicaSetWritesCriticalSection = false;
     replicaSetWritesStore.forEach(
-        opCtx, BSONObj{}, [&opCtx](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
+        opCtx, BSONObj{}, [&](const ReplicaSetWriteBlockingCriticalSectionDocument& doc) {
             invariant(doc.getNss().isEmpty());
+            foundReplicaSetWritesCriticalSection = true;
+
             if (doc.getEnabled()) {
-                ReplicaSetWriteBlockState::get(opCtx)->enableReplicaSetWriteBlocking(
+                replicaSetWriteBlockState->enableReplicaSetWriteBlocking(
                     doc.getReplicaSetWritesBlockReason());
+            } else {
+                replicaSetWriteBlockState->disableReplicaSetWriteBlocking();
             }
-            if (!doc.getAllowDeletions()) {
-                ReplicaSetWriteBlockState::get(opCtx)->enableReplicaSetDeletionsBlocking();
+
+            if (doc.getAllowDeletions()) {
+                replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
+            } else {
+                replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
             }
+
             return true;
         });
+    if (!foundReplicaSetWritesCriticalSection) {
+        replicaSetWriteBlockState->disableReplicaSetWriteBlocking();
+        replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
+    }
+}
+
+void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSections(
+    OperationContext* opCtx) {
+    if (MONGO_unlikely(skipRecoverUserWriteCriticalSections.shouldFail())) {
+        return;
+    }
+
+    recoverUserWritesCriticalSection(opCtx);
+    recoverReplicaSetWritesCriticalSection(opCtx);
 
     LOGV2_DEBUG(6351913,
                 2,
@@ -601,6 +619,73 @@ void UserWritesRecoverableCriticalSectionService::
                 "enabled"_attr = "true",
                 "allowDeletions"_attr = allowDeletions,
                 "reason"_attr = reasonText(reason));
+
+    if (!allowDeletions) {
+        opCtx->getServiceContext()->getStorageEngine()->pauseAutoCompactForReplicaSetWritesBlock(
+            opCtx);
+    }
+}
+
+bool UserWritesRecoverableCriticalSectionService::updateAllowDeletionsForActiveReplicaSetWriteBlock(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool allowDeletions,
+    ReplicaSetWritesBlockReasonEnum reason) {
+    LOGV2_DEBUG(12096706,
+                3,
+                "Updating allowDeletions for replica set writes recoverable critical section",
+                logAttrs(nss),
+                "allowDeletions"_attr = allowDeletions,
+                "reason"_attr = reasonText(reason));
+
+    invariant(nss == kBlockReplicaSetWritesNamespace);
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+    {
+        // In-flight deletes that started under allowDeletions:true may still complete, while
+        // new deletes are rejected once the OpObserver commits the updated policy.
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+        const auto bsonObj = findRecoverableCriticalSectionDoc(
+            opCtx, NamespaceString::kReplicaSetWritesCriticalSectionsNamespace, nss);
+        if (bsonObj.isEmpty()) {
+            return false;
+        }
+
+        const auto collCSDoc = ReplicaSetWriteBlockingCriticalSectionDocument::parse(
+            bsonObj, IDLParserContext("UpdateReplicaSetWritesCS"));
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot update replica set writes critical section when it is "
+                                 "not enabled",
+                collCSDoc.getEnabled());
+        uassert(
+            ErrorCodes::IllegalOperation,
+            str::stream() << "Cannot update replica set writes critical section with a different "
+                             "reason. reason: "
+                          << reasonText(reason) << ", current: "
+                          << reasonText(collCSDoc.getReplicaSetWritesBlockReason()),
+            collCSDoc.getReplicaSetWritesBlockReason() == reason);
+
+        if (collCSDoc.getAllowDeletions() == allowDeletions) {
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            return true;
+        }
+
+        setAllowDeletionsDocumentField(opCtx, nss, allowDeletions);
+    }
+
+    if (!allowDeletions) {
+        opCtx->getServiceContext()->getStorageEngine()->pauseAutoCompactForReplicaSetWritesBlock(
+            opCtx);
+    }
+
+    LOGV2_DEBUG(13365900,
+                2,
+                "Updated allowDeletions for replica set writes recoverable critical section",
+                logAttrs(nss),
+                "allowDeletions"_attr = allowDeletions,
+                "reason"_attr = reasonText(reason));
+    return true;
 }
 
 void UserWritesRecoverableCriticalSectionService::

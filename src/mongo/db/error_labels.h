@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/optime.h"
@@ -43,22 +16,23 @@
 
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
-static constexpr std::string_view kErrorLabelsFieldName = "errorLabels"_sd;
-static constexpr std::string_view kRetryAfterMSFieldName = "retryAfterMS"_sd;
+using namespace std::literals::string_view_literals;
+static constexpr std::string_view kErrorLabelsFieldName = "errorLabels"sv;
+static constexpr std::string_view kBaseBackoffMSFieldName = "baseBackoffMS"sv;
 namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
-constexpr inline auto kTransientTransaction = "TransientTransactionError"_sd;
-constexpr inline auto kRetryableWrite = "RetryableWriteError"_sd;
-constexpr inline auto kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
-constexpr inline auto kResumableChangeStream = "ResumableChangeStreamError"_sd;
-constexpr inline auto kNoWritesPerformed = "NoWritesPerformed"_sd;
-constexpr inline auto kStreamProcessorRetryableError = "StreamProcessorRetryableError"_sd;
-constexpr inline auto kStreamProcessorUserError = "StreamProcessorUserError"_sd;
-constexpr inline auto kSystemOverloadedError = "SystemOverloadedError"_sd;
-constexpr inline auto kRetryableError = "RetryableError"_sd;
+constexpr inline auto kTransientTransaction = "TransientTransactionError"sv;
+constexpr inline auto kRetryableWrite = "RetryableWriteError"sv;
+constexpr inline auto kNonResumableChangeStream = "NonResumableChangeStreamError"sv;
+constexpr inline auto kResumableChangeStream = "ResumableChangeStreamError"sv;
+constexpr inline auto kNoWritesPerformed = "NoWritesPerformed"sv;
+constexpr inline auto kStreamProcessorRetryableError = "StreamProcessorRetryableError"sv;
+constexpr inline auto kStreamProcessorUserError = "StreamProcessorUserError"sv;
+constexpr inline auto kSystemOverloadedError = "SystemOverloadedError"sv;
+constexpr inline auto kRetryableError = "RetryableError"sv;
 
 }  // namespace ErrorLabel
 
@@ -113,6 +87,9 @@ private:
 
 /**
  * Returns the error labels for the given error.
+ *
+ * The returned document may also include other fields related to the error labels that should be
+ * appended to the final response returned to the client.
  */
 BSONObj getErrorLabels(OperationContext* opCtx,
                        const OperationSessionInfoFromClient& sessionOptions,
@@ -154,9 +131,9 @@ bool isStreamProcessorUserError(ErrorCodes::Error code);
 bool isSystemOverloadedError(ErrorCodes::Error code);
 
 /**
- * Returns the configured `overloadRetryAfterMS` server parameter value in milliseconds, or 0 when
- * disabled.
+ * Returns the configured `externalClientBaseBackoffMS` server parameter value in milliseconds, or 0
+ * when disabled.
  */
-long long getOverloadRetryAfterMS();
+long long getExternalClientBaseBackoffMS();
 
 }  // namespace mongo

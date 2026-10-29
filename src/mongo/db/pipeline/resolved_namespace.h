@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -46,7 +20,7 @@
 
 namespace mongo {
 
-struct MONGO_MOD_PUBLIC TimeseriesViewMetadata {
+struct [[MONGO_MOD_PUBLIC]] TimeseriesViewMetadata {
     boost::optional<TimeseriesOptions> options;
     boost::optional<bool> mayContainMixedData;
     boost::optional<bool> usesExtendedRange;
@@ -67,7 +41,7 @@ class LiteParsedPipeline;
 struct LiteParserOptions;
 class OwnedLiteParsedPipeline;
 
-struct MONGO_MOD_PUBLIC ResolvedNamespaceViewOptions {
+struct [[MONGO_MOD_PUBLIC]] ResolvedNamespaceViewOptions {
     boost::optional<UUID> collUUID = boost::none;
     bool involvedNamespaceIsAView = true;
     boost::optional<TimeseriesViewMetadata> timeseriesMetadata = boost::none;
@@ -84,7 +58,7 @@ extern const ResolvedNamespaceViewOptions kSimpleViewOptions;
  * the view pipeline (raw BSON and optionally parsed), collation, and timeseries
  * metadata. Supports BSON serialization for the ErrorExtraInfo API.
  */
-class MONGO_MOD_PUBLIC ResolvedNamespace final : public ErrorExtraInfo {
+class [[MONGO_MOD_PUBLIC]] ResolvedNamespace final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     // Callback type for desugaring a parsed view pipeline. This indirection exists because
@@ -155,6 +129,13 @@ public:
     const NamespaceString& getResolvedNamespace() const;
     // The view pipeline as raw BSON; empty for non-view namespaces.
     const std::vector<BSONObj>& getBsonPipeline() const;
+    // The resolved collection's UUID, when known.
+    const boost::optional<UUID>& getCollUUID() const;
+    void setCollUUID(boost::optional<UUID> collUUID) {
+        _uuid = std::move(collUUID);
+    }
+    // True if the involved namespace resolved from a view.
+    bool isInvolvedNamespaceAView() const;
     // Default collation for the namespace (empty BSONObj means simple collation).
     const BSONObj& getDefaultCollation() const;
     // True if this namespace is a timeseries view.
@@ -222,23 +203,18 @@ public:
     static ResolvedNamespace parseFromBSON(const BSONElement& elem);
     void serializeToBSON(std::string_view fieldName, BSONObjBuilder* bob) const;
 
-    // TODO SERVER-122119 Rename these variables to use the "_" prefix and make them private/add
-    // getters.
-
-    // The namespace of the underlying collection. If this namespace
-    // represents a view, this contains the namespace of the view's underlying
-    // collection, NOT the view namespace.
-    // TODO SERVER-122119 It would be helpful to name this _resolvedNss;
-    NamespaceString ns;
-    // The view's raw BSON object pipeline (empty for collections). The constructor enforces
-    // that every stage is owned, so this map can outlive the view-catalog entry it was built
-    // from.
-    std::vector<BSONObj> pipeline;
-    boost::optional<UUID> uuid = boost::none;
-    bool involvedNamespaceIsAView = false;
-
 private:
     // Core member variables - these are always set, no matter what.
+
+    // The namespace of the underlying collection. If this namespace represents a view, this is the
+    // view's underlying collection namespace, not the view namespace.
+    NamespaceString _resolvedNss;
+
+    // The view's raw BSON object pipeline (empty for collections). The constructor enforces that
+    // every stage is owned, so this map can outlive the view-catalog entry it was built from.
+    std::vector<BSONObj> _pipeline;
+    boost::optional<UUID> _uuid = boost::none;
+    bool _involvedNamespaceIsAView = false;
 
     // The namespace provided by the user - in the case of the view, this
     // is the view namespace, NOT the underlying collection.
@@ -264,7 +240,7 @@ private:
 /**
  * Map from view to resolved namespace.
  */
-using ResolvedNamespaceMap MONGO_MOD_PUBLIC =
+using ResolvedNamespaceMap [[MONGO_MOD_PUBLIC]] =
     absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
 
 }  // namespace mongo

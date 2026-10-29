@@ -1,14 +1,19 @@
 /**
  * Ensure that the analyze command produces histograms which cost-based ranking is able to use.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ceEqual} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -35,9 +40,11 @@ assert.commandWorked(coll.insertMany(docs));
 coll.createIndex({a: 1});
 
 // Generate histograms for field 'a' and 'b'
-assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "c"}));
+assert.commandWorked(
+    coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+);
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "b"}));
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "c"}));
 
 // Run a find command with the given filter and verify that every plan uses a histogram estimate.
 function assertQueryUsesHistograms({query, expectedCE}) {
@@ -60,6 +67,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -120,12 +128,17 @@ try {
             {a: null, b: 9},
         ]),
     );
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+    );
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "b", numberBuckets: 10}),
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -151,11 +164,14 @@ try {
     // Create index so the catalog has multikey metadata, but the queries we run hint a collection
     // scan so we can test CE of MatchExpressions using histogram.
     assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -198,12 +214,17 @@ try {
             {a: 1, b: 1, c: 1},
         ]),
     );
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+    );
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "b", numberBuckets: 10}),
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -241,8 +262,8 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
-            internalQueryCBRCEMode: "automaticCE",
-            automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "heuristicCE",
         }),
     );
 

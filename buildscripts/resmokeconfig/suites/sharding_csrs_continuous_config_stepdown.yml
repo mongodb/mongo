@@ -83,7 +83,6 @@ selector:
     - jstests/sharding/analyze_shard_key/persist_sampled_read_queries.js
     - jstests/sharding/analyze_shard_key/persist_sampled_write_queries.js
     - jstests/sharding/analyze_shard_key/refresh_sample_rates.js
-    - jstests/sharding/clear_jumbo.js
     - jstests/sharding/cluster_cardinality_parameter_interrupt.js
     - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
     - jstests/sharding/read_after_optime.js
@@ -115,7 +114,6 @@ selector:
     # Runs replSetGetStatus -- via awaitLastOpCommitted -- directly against the config server:
     # retries aren't supported.
     - jstests/sharding/coll_epoch_test1.js
-    - jstests/sharding/move_stale_mongos.js
     - jstests/sharding/shard4.js
     - jstests/sharding/shard5.js
     - jstests/sharding/split_stale_mongos.js
@@ -288,7 +286,6 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_no_shards.js
     - jstests/sharding/query/change_streams/change_stream_on_system_collection.js
     - jstests/sharding/query/change_streams/change_stream_transaction_sharded.js
-    - jstests/sharding/query/change_streams/change_stream_transaction_sharded_commit_timestamp.js
     - jstests/sharding/query/change_streams/change_stream_update_lookup_collation.js
     - jstests/sharding/query/change_streams/change_stream_update_lookup_read_concern.js
     - jstests/sharding/query/change_streams/change_streams.js
@@ -296,6 +293,16 @@ selector:
     - jstests/sharding/query/change_streams/change_streams_new_shard_new_database.js
     - jstests/sharding/query/change_streams/change_streams_unsharded_update_resume.js
     - jstests/sharding/query/change_streams/change_streams_update_lookup_shard_metadata_missing.js
+    - jstests/sharding/query/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_documentKey_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocumentBeforeChange_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocument_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_namespace_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_operation_type_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_to_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_updateDescription_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/change_stream_match_pushdown_wallTime_rewrite.js
+    - jstests/sharding/query/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
     - jstests/sharding/query/change_streams/lookup_change_stream_post_image_compound_shard_key.js
     - jstests/sharding/query/change_streams/lookup_change_stream_post_image_id_shard_key.js
     - jstests/sharding/query/agg/agg_write_stages_cannot_run_on_mongos.js
@@ -318,7 +325,6 @@ selector:
     - jstests/sharding/index_and_collection_option_propagation.js
     - jstests/sharding/mongos_rs_shard_failure_tolerance.js
     - jstests/sharding/mongos_shard_failure_tolerance.js
-    - jstests/sharding/read_pref.js
     - jstests/sharding/query/change_streams/config_server_data_shard_error_handling.js
     - jstests/sharding/query/count/count_secondaryok.js
     - jstests/sharding/query/allow_partial_results.js
@@ -326,16 +332,24 @@ selector:
   exclude_with_any_tags:
     - does_not_support_stepdowns
     - assumes_change_streams_v1
+    # FsyncLock prevents stepdown from acquiring the RSTL lock, blocking stepdown and preventing
+    # that node from being unlocked.
+    - requires_fsync
 
 executor:
   config:
     shell_options:
       global_vars:
         TestData:
-          # TODO: SERVER-45994 remove
-          skipCheckingCatalogCacheConsistencyWithShardingCatalog: true
           skipCheckOrphans: true
+          # Allow internal clients to retry more aggressively, since config server stepdowns make
+          # retriable errors common in this suite.
+          setParameters:
+            defaultClientMaxRetryAttempts: 10
+          setParametersMongos:
+            defaultClientMaxRetryAttempts: 10
       eval: >-
         await import("jstests/libs/override_methods/sharding_csrs_continuous_config_stepdown.js");
-        await import("jstests/libs/override_methods/require_change_stream_test_fixture.js");
+        await import("jstests/libs/override_methods/query/require_change_stream_test_fixture.js");
+        await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       nodb: ""

@@ -48,12 +48,6 @@ class test_txn24(wttest.WiredTigerTestCase):
     def conn_config(self):
         return 'cache_size=100MB,eviction=(threads_min=4,threads_max=4),verbose=[transaction]'
 
-    def get_stat(self, stat):
-        stat_cursor = self.session.open_cursor('statistics:')
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def test_snapshot_isolation_and_eviction(self):
         # Verbose transaction logging is enabled; suppress the "oldest id pinned" messages that
         # may appear from background eviction threads during the long-running transaction below.

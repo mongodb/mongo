@@ -15,6 +15,15 @@
  */
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
+// The size storer applies a write's size delta when the write executes rather than when its
+// transaction commits, so the fast count transiently includes rows from transactions that have not
+// committed. This test shuts the primary down repeatedly while a resharding operation is in
+// flight, so the shutdown validation hook can observe a fast count that disagrees with the number
+// of records. That hook enforces fast count by default; skip the enforcement here. This is normally
+// reported as a warning in validation, so an inaccurate fast count is acceptable in these test results.
+const originalSkipEnforceFastCountOnValidate = TestData.skipEnforceFastCountOnValidate;
+TestData.skipEnforceFastCountOnValidate = true;
+
 const reshardingTest = new ReshardingTest({enableElections: true});
 reshardingTest.setup();
 
@@ -53,3 +62,5 @@ reshardingTest.withReshardingInBackground(
 );
 
 reshardingTest.teardown();
+
+TestData.skipEnforceFastCountOnValidate = originalSkipEnforceFastCountOnValidate;

@@ -1,40 +1,21 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_chunk_range.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -52,23 +33,31 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_critical_section_document_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/tick_source_mock.h"
 
+#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -80,6 +69,35 @@
 
 namespace mongo {
 namespace {
+
+const std::string kShardKey = "_id";
+const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
+
+// Builds tracked (sharded) filtering metadata for the given namespace.
+CollectionMetadata makeShardedMetadata(const NamespaceString& nss,
+                                       UUID uuid = UUID::gen(),
+                                       ShardId chunkShardId = ShardId("other"),
+                                       ShardId collectionShardId = ShardId("0")) {
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(Date_t::now());
+    auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
+    auto chunk =
+        ChunkType(uuid, std::move(range), ChunkVersion({epoch, timestamp}, {1, 0}), chunkShardId);
+    CurrentChunkManager cm(ShardServerTestFixture::makeStandaloneRoutingTableHistory(
+        RoutingTableHistory::makeNew(nss,
+                                     uuid,
+                                     kShardKeyPattern,
+                                     /*unsplittable=*/false,
+                                     nullptr,
+                                     false,
+                                     epoch,
+                                     timestamp,
+                                     /*timeseriesFields=*/boost::none,
+                                     /*reshardingFields=*/boost::none,
+                                     true,
+                                     {std::move(chunk)})));
+    return CollectionMetadata(std::move(cm), collectionShardId);
+}
 
 class ShardingRecoveryServiceTest : public ShardServerTestFixture {
 public:
@@ -154,7 +172,7 @@ public:
         dbClient.remove(
             NamespaceString::kCollectionCriticalSectionsNamespace,
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
-            false /* removeMany */);
+            /*removeMany=*/false);
     }
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
@@ -391,7 +409,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
             dbName,
             dbOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -446,7 +464,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
             dbName,
             dbOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
@@ -454,7 +472,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
             dbName,
             dbOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -527,7 +545,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             dbName,
             dbOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
@@ -535,7 +553,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             dbName,
             differentOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
@@ -551,7 +569,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             dbName,
             dbOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -578,7 +596,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             dbName,
             dbOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -615,7 +633,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -670,7 +688,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
@@ -678,7 +696,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -750,7 +768,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
@@ -758,7 +776,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             collNss,
             differentOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
@@ -774,7 +792,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -801,7 +819,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -849,7 +867,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
                                criticalSectionColl(),
                                inserts.begin(),
                                inserts.end(),
-                               /*recordIds*/ {},
+                               /*recordIds=*/{},
                                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                                /*defaultFromMigrate=*/false);
         wuow.commit();
@@ -925,7 +943,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
                                criticalSectionColl(),
                                inserts.begin(),
                                inserts.end(),
-                               /*recordIds*/ {},
+                               /*recordIds=*/{},
                                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                                /*defaultFromMigrate=*/false);
         wuow.commit();
@@ -991,7 +1009,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // hypothetical availability of initial data.
     {
         AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
-        writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
+        writeReadCriticalSectionDocument(dbName, dbOpReason, /*blockReads=*/false);
     }
     ShardingRecoveryService::get(operationContext())
         ->onConsistentDataAvailable(operationContext(), false, false);
@@ -1008,7 +1026,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // hypothetical availability of initial data.
     {
         AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
-        writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
+        writeReadCriticalSectionDocument(dbName, dbOpReason, /*blockReads=*/true);
     }
     ShardingRecoveryService::get(operationContext())
         ->onConsistentDataAvailable(operationContext(), false, false);
@@ -1044,7 +1062,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // hypothetical  availability of initial data.
     {
         AutoGetCollection coll(operationContext(), collNss, MODE_IX);
-        writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
+        writeReadCriticalSectionDocument(collNss, collOpReason, /*blockReads=*/false);
     }
     ShardingRecoveryService::get(operationContext())
         ->onConsistentDataAvailable(operationContext(), false, false);
@@ -1061,7 +1079,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // hypothetical  availability of initial data.
     {
         AutoGetCollection coll(operationContext(), collNss, MODE_IX);
-        writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
+        writeReadCriticalSectionDocument(collNss, collOpReason, /*blockReads=*/true);
     }
     ShardingRecoveryService::get(operationContext())
         ->onConsistentDataAvailable(operationContext(), false, false);
@@ -1099,11 +1117,11 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // hypothetical replication rollback.
     {
         AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
-        writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
+        writeReadCriticalSectionDocument(dbName, dbOpReason, /*blockReads=*/false);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -1117,11 +1135,11 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // hypothetical replication rollback.
     {
         AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
-        writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
+        writeReadCriticalSectionDocument(dbName, dbOpReason, /*blockReads=*/true);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -1138,8 +1156,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -1155,11 +1173,11 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // hypothetical replication rollback.
     {
         AutoGetCollection coll(operationContext(), collNss, MODE_IX);
-        writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
+        writeReadCriticalSectionDocument(collNss, collOpReason, /*blockReads=*/false);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -1173,11 +1191,11 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // hypothetical replication rollback.
     {
         AutoGetCollection coll(operationContext(), collNss, MODE_IX);
-        writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
+        writeReadCriticalSectionDocument(collNss, collOpReason, /*blockReads=*/true);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -1194,11 +1212,236 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
     ShardingRecoveryService::get(operationContext())
-        ->onReplicationRollback(operationContext(),
-                                {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(
+            operationContext(), {NamespaceString::kCollectionCriticalSectionsNamespace}, {});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
+}
+
+// Installs filtering metadata and allowChunkOperations flag on a couple of collections. Both CSR
+// and DSR are backed by durable shard-catalog collections. Then simulates a replication rollback
+// carrying the given 'rollbackNamespaces' and 'rollbackCommandCounts' and asserts the resulting
+// in-memory state.
+//
+// The DDL protocol first writes to durable shard-catalog, then updates the in-memory state
+// through oplog c entries. We simulate the rollback between the shard-catalog write and the c
+// entry. The rollback reverses the oplog c entry.
+// Hence, in-memory DSR version and allowChunkOperations flag are seeded to differ from the disk
+// (with a stale version). Post-rollback this helps distinguish a genuine rebuild from an untouched
+// state.
+//
+// The post-rollback state is governed by two independent booleans:
+//   - 'resetCsr': whether the CSR filtering metadata was cleared. Recovery resets every CSR or
+//   none.
+//   - 'recoveryTriggered': whether recovery actually ran, which governs whether the DSR and the
+//     allowChunkOperations flag were rebuilt from disk.
+//
+// 'resetCsr' can only be true when 'recoveryTriggered' is true; the converse need not hold. (e.g.
+// when the CSR reset is disabled by a server parameter).
+void clearFilteringMetadataOnRecoveryTestHelper(OperationContext* opCtx,
+                                                const std::set<NamespaceString>& rollbackNamespaces,
+                                                const StringMap<long long>& rollbackCommandCounts,
+                                                bool resetCsr,
+                                                bool recoveryTriggered) {
+    // Two collections in a single database, each fully backed by durable shard-catalog collections.
+    // The installed collection namespace are arbitrary, but must be different to assert that every
+    // CSR is reset or none.
+    const auto nssX = NamespaceString::createNamespaceString_forTest("RecoverDB", "CollX");
+    const auto nssY = NamespaceString::createNamespaceString_forTest("RecoverDB", "CollY");
+    const auto dbName = nssX.dbName();
+    const auto shardId = ShardingState::get(opCtx)->shardId();
+
+    // Stale in-memory version vs newer on-disk version.
+    const DatabaseVersion staleVersion{UUID::gen(), Timestamp(10, 1)};
+    const DatabaseVersion diskVersion{UUID::gen(), Timestamp(20, 1)};
+
+    // Back both collections with durable shard-catalog.
+    {
+        DBDirectClient client(opCtx);
+
+        // config.shard.catalog.databases holds the newer version.
+        client.insert(NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                      DatabaseType{dbName, shardId, diskVersion}.toBSON());
+
+        for (const auto& nss : {nssX, nssY}) {
+            const auto collUuid = UUID::gen();
+            const OID epoch = OID::gen();
+            const Timestamp collTimestamp(Date_t::now());
+
+            // config.shard.catalog.collections: allowChunkOperations=false.
+            CollectionType diskColl{
+                nss, epoch, collTimestamp, Date_t::now(), collUuid, kShardKeyPattern};
+            diskColl.setAllowChunkOperations(false);
+            client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                          diskColl.toBSON());
+        }
+    }
+
+    // Install in-memory filtering metadata and allowChunkOperations=true on both collections so a
+    // rebuild from the disk value (false) is observable.
+    for (const auto& nss : {nssX, nssY}) {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->setCollectionMetadata(opCtx, makeShardedMetadata(nss));
+        scopedCsr->setAllowChunkOperations(true);
+    }
+
+    // Install a stale in-memory DSR version for the database.
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->setDbMetadata(opCtx, DatabaseType{dbName, shardId, staleVersion});
+    }
+
+    // Simulate a replication rollback carrying the given namespaces and command counts.
+    ShardingRecoveryService::get(opCtx)->onReplicationRollback(
+        opCtx, rollbackNamespaces, rollbackCommandCounts);
+
+    // Recovery resets every CSR or none; assert the same filtering-metadata outcome for both.
+    for (const auto& nss : {nssX, nssY}) {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+        const auto metadata = csr->getCurrentMetadataIfKnown();
+        ASSERT((resetCsr && !metadata) || (!resetCsr && metadata && metadata->isSharded()));
+    }
+
+    // The DSR is rebuilt from disk iff recovery ran: its version matches the newer on-disk version
+    // when recovery ran, and stays at the stale in-memory version otherwise.
+    {
+        BypassDatabaseMetadataAccess bypass(
+            opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
+        auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
+        const auto version = scopedDsr->getDbVersion(opCtx);
+        ASSERT_TRUE(version);
+        ASSERT_EQ(*version, recoveryTriggered ? diskVersion : staleVersion);
+        ASSERT_EQ(scopedDsr->getDbPrimaryShard(opCtx), boost::optional<ShardId>(shardId));
+    }
+
+    // The allowChunkOperations flag is rebuilt from disk (false) iff recovery ran; otherwise it
+    // keeps its in-memory value (true). Asserted for both collections.
+    for (const auto& nss : {nssX, nssY}) {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+        ASSERT_EQ(scopedCsr->allowChunkOperations(), !recoveryTriggered);
+    }
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForInvalidateCollectionMetadata) {
+    // A rolled-back invalidateCollectionMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"invalidateCollectionMetadata", 1}},
+                                               /*resetCsr=*/true,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForUpdateCollectionMetadata) {
+    // A rolled-back updateCollectionMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"updateCollectionMetadata", 1}},
+                                               /*resetCsr=*/true,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForCreateDatabaseMetadata) {
+    // A rolled-back createDatabaseMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"createDatabaseMetadata", 1}},
+                                               /*resetCsr=*/true,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForDropDatabaseMetadata) {
+    // A rolled-back dropDatabaseMetadata 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"dropDatabaseMetadata", 1}},
+                                               /*resetCsr=*/true,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryRollbackClearsShardingStateForSetAllowChunkOperations) {
+    // A rolled-back setAllowChunkOperations 'c' entry triggers recovery and resets all CSRs.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"setAllowChunkOperations", 1}},
+                                               /*resetCsr=*/true,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetCollectionShardingRuntimesWhenParameterDisabled) {
+    // Disable the CSR reset during recovery.
+    unittest::ServerParameterGuard guard("clearCollectionShardingRuntimesOnRecovery", false);
+
+    // Even though invalidateCollectionMetadata was rolled back, the server parameter overrides the
+    // behavior and the CSRs are not reset. Recovery still runs, so the DSR and allowChunkOperations
+    // flag are rebuilt from disk.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"invalidateCollectionMetadata", 1}},
+                                               /*resetCsr=*/false,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetShardingStateWhenCommandCountIsZero) {
+    // A command count of zero must not trigger recovery.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"invalidateCollectionMetadata", 0}},
+                                               /*resetCsr=*/false,
+                                               /*recoveryTriggered=*/false);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetShardingStateForUnrelatedCommands) {
+    // Synthetic CRUD keys are not CSR-maintenance commands and must not trigger recovery.
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               /*rollbackNamespaces=*/{},
+                                               {{"insert", 3}, {"update", 2}},
+                                               /*resetCsr=*/false,
+                                               /*recoveryTriggered=*/false);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryDoesNotResetShardingStateForUserCollectionNamespace) {
+    // A rolled-back user-collection namespace is not a trigger namespace, so on its own it resets
+    // nothing.
+    const auto nssA = NamespaceString::createNamespaceString_forTest("TestDB", "CollA");
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {nssA},
+                                               /*rollbackCommandCounts=*/{},
+                                               /*resetCsr=*/false,
+                                               /*recoveryTriggered=*/false);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback,
+       RecoveryResetsShardingStateForCommandDespiteUserCollectionNamespace) {
+    // The user-collection namespace is inert; the rolled-back invalidateCollectionMetadata 'c'
+    // entry is what triggers the (global) reset of all CSRs.
+    const auto nssA = NamespaceString::createNamespaceString_forTest("TestDB", "CollA");
+    clearFilteringMetadataOnRecoveryTestHelper(operationContext(),
+                                               {nssA},
+                                               {{"invalidateCollectionMetadata", 1}},
+                                               /*resetCsr=*/true,
+                                               /*recoveryTriggered=*/true);
+}
+
+TEST_F(ShardingRecoveryServiceTestAfterRollback, RecoveryResetsShardingStateForTriggerNamespace) {
+    // A rolled-back trigger namespace resets all CSRs even without any command counts.
+    clearFilteringMetadataOnRecoveryTestHelper(
+        operationContext(),
+        {NamespaceString::kConfigShardCatalogCollectionsNamespace},
+        /*rollbackCommandCounts=*/{},
+        /*resetCsr=*/true,
+        /*recoveryTriggered=*/true);
 }
 
 TEST_F(ShardingRecoveryServiceTestOnPrimary, CallbackInvokedWhenCollLockContended) {
@@ -1237,8 +1480,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, CallbackInvokedWhenCollLockContende
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */,
-            boost::none /* lockAcquisitionTimeout */,
+            /*clearShardCatalogCache=*/true,
+            /*lockAcquisitionTimeout=*/boost::none,
             [&](OperationContext*) {
                 std::lock_guard<std::mutex> lk(mu);
                 callbackInvoked = true;
@@ -1278,8 +1521,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, CallbackNotInvokedWhenCollLockNotCo
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */,
-            boost::none /* lockAcquisitionTimeout */,
+            /*clearShardCatalogCache=*/true,
+            /*lockAcquisitionTimeout=*/boost::none,
             [&](OperationContext*) { callbackInvoked = true; });
 
     // The callback is only invoked on the LOCK_WAITING path.
@@ -1322,8 +1565,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */,
-            boost::none /* lockAcquisitionTimeout */,
+            /*clearShardCatalogCache=*/true,
+            /*lockAcquisitionTimeout=*/boost::none,
             [&](OperationContext* opCtx) {
                 auto* cbLocker = shard_role_details::getLocker(opCtx);
                 auto conflictingLockerIds = cbLocker->getConflictingLockerIds(collResId, MODE_S);
@@ -1377,8 +1620,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
                                collNss,
                                collOpReason,
                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                               true /* clearShardCatalogCache */,
-                               Milliseconds(500) /* lockAcquisitionTimeout */,
+                               /*clearShardCatalogCache=*/true,
+                               /*lockAcquisitionTimeout=*/Milliseconds(500),
                                [&](OperationContext* opCtx) {
                                    auto* cbLocker = shard_role_details::getLocker(opCtx);
                                    auto conflictingLockerIds =
@@ -1426,8 +1669,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
                 collNss,
                 collOpReason,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                true /* clearShardCatalogCache */,
-                boost::none /* lockAcquisitionTimeout */,
+                /*clearShardCatalogCache=*/true,
+                /*lockAcquisitionTimeout=*/boost::none,
                 [&](OperationContext* opCtx) {
                     // Attempt to kill sessions for conflicting lockers.
                     auto* cbLocker = shard_role_details::getLocker(opCtx);
@@ -1446,7 +1689,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
     // Start a new transaction thread that tries to acquire MODE_IX on collNss.
     // Since Critical section's MODE_S is in the conflict queue, new MODE_IX requests will wait.
-    AtomicWord<bool> newTxnLockAcquired{false};
+    Atomic<bool> newTxnLockAcquired{false};
     std::mutex newTxnMu;
     stdx::condition_variable newTxnCv;
     bool newTxnEnqueued = false;

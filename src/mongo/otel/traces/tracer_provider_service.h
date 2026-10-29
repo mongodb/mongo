@@ -1,38 +1,13 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/versioned_value.h"
 
+#include <cstdint>
 #include <memory>
-#include <string>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/trace/provider.h>
@@ -43,23 +18,19 @@ namespace mongo::otel::traces {
 /**
  * Service class that manages the OpenTelemetry TracerProvider. This allows the tracer provider to
  * be isolated from other code that may interact with the OpenTelemetry library.
+ *
+ * Instances are constructed with an already-created tracer provider (or none, if tracing is
+ * disabled). The logic for building a tracer provider (e.g. from an HTTP or file OTLP exporter)
+ * and its dependencies (OTLP exporters, trace settings, etc.) lives in a separate library; see
+ * tracer_provider_service_factory.h.
+ *
+ * This class is thread-safe, with some caveats (see getTracerProvider() documentation).
  */
 class TracerProviderService {
 public:
-    /**
-     * Initialize the tracer provider with HTTP exporter.
-     */
-    Status initializeHttp(std::string name, std::string endpoint);
-
-    /**
-     * Initialize the tracer provider with file exporter.
-     */
-    Status initializeFile(std::string name, std::string directory);
-
-    /**
-     * Initialize with no-op tracer provider (when tracing is disabled).
-     */
-    void initializeNoOp();
+    /** A null tracerProvider is valid and represents tracing being disabled. */
+    explicit TracerProviderService(
+        std::unique_ptr<opentelemetry::trace::TracerProvider> tracerProvider);
 
     /**
      * Shutdown the tracer provider.
@@ -67,43 +38,39 @@ public:
     void shutdown();
 
     /**
-     * Get the tracer provider.
+     * Returns the current tracer provider, or nullptr when tracing is disabled. The returned
+     * pointer is valid until the next call to getTracerProvider() from the same thread. As such,
+     * be very careful about passing the returned pointer to a different thread.
      */
-    std::shared_ptr<opentelemetry::trace::TracerProvider> getTracerProvider() const {
-        return _tracerProvider;
-    }
-
-    /**
-     * Check if tracing is enabled.
-     */
-    bool isEnabled() const {
-        return _enabled;
-    }
-
-    /**
-     * Factory method for creating TracerProviderService instances.
-     * This is needed for testing and should be used instead of direct construction.
-     */
-    static std::unique_ptr<TracerProviderService> create() {
-        return std::unique_ptr<TracerProviderService>(new TracerProviderService());
-    }
+    opentelemetry::trace::TracerProvider* getTracerProvider() const;
 
     void setTracerProvider_ForTest(
-        std::shared_ptr<opentelemetry::trace::TracerProvider> tracerProvider) {
-        _tracerProvider = tracerProvider;
-        _enabled = (tracerProvider != nullptr);
-    }
+        std::unique_ptr<opentelemetry::trace::TracerProvider> tracerProvider);
 
 private:
-    TracerProviderService() = default;
+    /** Returns a process-unique id, never reused, used to invalidate thread-local snapshots. */
+    static uint64_t _nextId();
 
-    std::shared_ptr<opentelemetry::trace::TracerProvider> _tracerProvider;
-    bool _enabled = false;
+    // Id for the purposes of invalidating thread-local snapshots if the global service is changed.
+    const uint64_t _id = _nextId();
+    // The provider handle is stored in a VersionedValue so that operation threads (which read it on
+    // every span start) never race with provider change (e.g. during shutdown). Readers access it
+    // through a snapshot that keeps the provider alive for the duration of their use, so it can
+    // never be destroyed out from under an in-flight operation.
+    VersionedValue<std::unique_ptr<opentelemetry::trace::TracerProvider>> _tracerProvider;
 };
 
 /** May return nullptr if tracing is not initialized or supported in the current environment. */
 TracerProviderService* getGlobalTracerProviderService();
 
 void setGlobalTracerProviderService(std::unique_ptr<TracerProviderService> service);
+
+/**
+ * Replaces the current global TracerProviderService with a new one and returns the old one.
+ * Intended for use in tests.
+ */
+std::unique_ptr<TracerProviderService> swapGlobalTracerProviderServiceForTest(
+    std::unique_ptr<TracerProviderService> newService);
+
 
 }  // namespace mongo::otel::traces

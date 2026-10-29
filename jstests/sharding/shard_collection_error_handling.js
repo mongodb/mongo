@@ -3,13 +3,19 @@
  * needed to rollback or continue the operation.
  *
  * @tags: [
- *    requires_fcv_80
+ *    requires_fcv_80,
+ *    requires_persistence,
+ *    resource_intensive,
  * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+// Dropping an untracked collection leaves an UNTRACKED CSS entry.
+// TODO (SERVER-133353): Remove this once UNTRACKED is dropped from CSS in direct connections.
+TestData.skipCheckMetadataConsistency = true;
 
 // Configure initial sharding cluster
 const st = new ShardingTest({
@@ -303,7 +309,8 @@ testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(false /* cre
     );
     assert.eq(1, rs1Collections.cursor.firstBatch.length);
 
-    // Manually drop the collection to pass the metadata inconsistency hook.
+    // Manually drop the collection to pass the metadata inconsistency hook. Dropping an untracked
+    // collection leaves an UNTRACKED CSS entry.
     assert(st.shard1.getCollection(ns).drop());
 })();
 

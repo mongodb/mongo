@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/cursor_stage.h"
 
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -94,6 +67,11 @@ void CursorStage::Batch::enqueue(Document&& doc, boost::optional<BSONObj> resume
             break;
         }
     }
+}
+
+void CursorStage::Batch::enqueue() {
+    invariant(_type == CursorType::kEmptyDocuments);
+    ++_count;
 }
 
 Document CursorStage::Batch::dequeue() {
@@ -261,11 +239,11 @@ void CursorStage::_updateOplogTimestamp() {
         const auto& ts = _currentBatch.peekFront().getField(repl::OpTime::kTimestampFieldName);
         invariant(ts.getType() == BSONType::timestamp);
         _latestOplogTimestamp = ts.getTimestamp();
-        return;
+    } else {
+        // If we have no more results to return, advance to the latest oplog timestamp.
+        tassert(9047700, "expecting _sharedState to be present", _sharedState->exec);
+        _latestOplogTimestamp = _sharedState->exec->getLatestOplogTimestamp();
     }
-
-    // If we have no more results to return, advance to the latest oplog timestamp.
-    _latestOplogTimestamp = _sharedState->exec->getLatestOplogTimestamp();
 }
 
 void CursorStage::_updateNonOplogResumeToken() {
@@ -285,15 +263,7 @@ void CursorStage::recordPlanSummaryStats() {
 }
 
 bool CursorStage::pullDataFromExecutor(OperationContext* opCtx) {
-    PlanExecutor::ExecState state;
-    Document resultObj;
-
-    while ((state = _sharedState->exec->getNextDocument(resultObj)) == PlanExecutor::ADVANCED) {
-        boost::optional<BSONObj> resumeToken;
-        if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
-            resumeToken = _sharedState->exec->getPostBatchResumeToken();
-        _currentBatch.enqueue(transformDoc(std::move(resultObj)), std::move(resumeToken));
-
+    auto batchFull = [&]() -> bool {
         // As long as we're waiting for inserts, we shouldn't do any batching at this level we
         // need the whole pipeline to see each document to see if we should stop waiting.
         bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
@@ -303,8 +273,38 @@ bool CursorStage::pullDataFromExecutor(OperationContext* opCtx) {
             if (batchCountFull && overflow::mul(_batchSizeCount, 2, &_batchSizeCount)) {
                 _batchSizeCount = 0;  // Go unlimited if we overflow.
             }
-            // Return false indicating the executor should not be destroyed.
-            return false;
+            return true;
+        }
+        return false;
+    };
+
+    PlanExecutor::ExecState state;
+    auto* exec = _sharedState->exec.get();
+
+    if (_currentBatch.getType() == CursorType::kEmptyDocuments && !transformDocCanThrow()) {
+        // Specialized loop for count-only workloads. In this case, do not materialize the
+        // intermediate documents just for counting them. This is result-equivalent only if the
+        // stage cannot throw on invalid inputs.
+        while ((state = exec->getNext(nullptr, nullptr)) == PlanExecutor::ADVANCED) {
+            _currentBatch.enqueue();
+
+            if (batchFull()) {
+                // Return false indicating the executor should not be destroyed.
+                return false;
+            }
+        }
+    } else {
+        Document resultObj;
+        while ((state = exec->getNextDocument(resultObj)) == PlanExecutor::ADVANCED) {
+            boost::optional<BSONObj> resumeToken;
+            if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
+                resumeToken = exec->getPostBatchResumeToken();
+            _currentBatch.enqueue(transformDoc(std::move(resultObj)), std::move(resumeToken));
+
+            if (batchFull()) {
+                // Return false indicating the executor should not be destroyed.
+                return false;
+            }
         }
     }
 

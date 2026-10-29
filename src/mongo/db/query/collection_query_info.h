@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_invalidator.h"
@@ -44,6 +17,9 @@
 #include <cstddef>
 #include <memory>
 
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+
 
 namespace mongo {
 
@@ -54,7 +30,7 @@ class OperationContext;
  *
  * Decorates a Collection instance. Lifecycle is the same as the Collection instance.
  */
-class MONGO_MOD_PUBLIC CollectionQueryInfo {
+class [[MONGO_MOD_PUBLIC]] CollectionQueryInfo {
 public:
     CollectionQueryInfo();
 
@@ -144,6 +120,25 @@ public:
 
     std::shared_ptr<const PathArrayness> getPathArrayness() const;
 
+    /**
+     * Rebuilds the SchemaTypeInfo from the collection's current document validator.
+     *
+     * When this runs:
+     * - At collection init/registration (see 'init').
+     * - Whenever the collection's validator is created or updated (e.g. via collMod) and query type
+     * inference is enabled.
+     */
+    void rebuildSchemaTypeInfo(OperationContext* opCtx, const Collection* coll);
+
+    /**
+     * Publishes an unconstrained SchemaTypeInfo. Used instead of 'rebuildSchemaTypeInfo' when query
+     * type inference is disabled, so that a stale snapshot is never observed if it is enabled
+     * again.
+     */
+    void invalidateSchemaTypeInfo();
+
+    std::shared_ptr<const SchemaTypeInfo> getSchemaTypeInfo() const;
+
 private:
     /**
      * Stores Clasic and SBE PlanCache-related state. Classic Plan Cache is stored per collection
@@ -199,11 +194,48 @@ private:
         mutable std::shared_ptr<const PathArrayness> pathArrayness;
     };
 
+    /**
+     * Wrapper around the SchemaTypeInfo pointer and the mutex protecting it together when
+     * collection query info is modified. Only the mutex is explicitly mutable so const can acquire
+     * a lock.
+     */
+    struct SchemaTypeInfoCollectionState {
+        SchemaTypeInfoCollectionState();
+
+        SchemaTypeInfoCollectionState(const SchemaTypeInfoCollectionState& other);
+        SchemaTypeInfoCollectionState& operator=(const SchemaTypeInfoCollectionState& other);
+
+        SchemaTypeInfoCollectionState(SchemaTypeInfoCollectionState&&) = delete;
+        SchemaTypeInfoCollectionState& operator=(SchemaTypeInfoCollectionState&&) = delete;
+
+        // Returns a snapshot of the current immutable SchemaTypeInfo. The returned shared_ptr
+        // remains valid after the read lock is released.
+        std::shared_ptr<const SchemaTypeInfo> snapshot() const;
+
+        // Publishes a new snapshot under the write lock.
+        void publish(pipeline::type_system::Type rootType);
+
+    private:
+        // Mutex to protect concurrent writers from re-assigning the schemaConstraints pointer.
+        mutable WriteRarelyRWMutex rwMutex;
+
+        // Replaces the current snapshot under the write lock. The supplied SchemaTypeInfo must be
+        // fully initialized and immutable;
+        void replace(std::shared_ptr<const SchemaTypeInfo> schemaTypeInfo);
+
+        // All clones of CollectionQueryInfo will initially point to the same SchemaTypeInfo
+        // instance. Rebuilds publish a new immutable instance under rwMutex, allowing readers to
+        // retain a consistent snapshot.
+        std::shared_ptr<const SchemaTypeInfo> schemaConstraints;
+    };
+
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
 
     std::shared_ptr<PlanCacheState> _planCacheState;
 
     PathArraynessCollectionState _pathArraynessState;
+
+    SchemaTypeInfoCollectionState _schemaTypeInfoState;
 };
 
 }  // namespace mongo

@@ -32,19 +32,67 @@ trading off weaker consistency/isolation guarantees for performance.
 
 @copydoc doc_isolation_levels
 
-Snapshot isolation is a strong guarantee, but does not always
-guarantee behavior equivalent to a
-single-threaded execution of the transactions.
-(The slightly stronger model that does is known as <i>serializable</i>
-isolation.)
-Given two concurrent transactions T1 and T2 running under snapshot
-isolation, if T1 reads data items updated by T2 and T2 reads data
-items updated by
-T1, but the data they update does not overlap, both may commit.
-But because each read the data from before they both started, not the
-other's output, the execution is not equivalent to either running
-strictly before the other and the resulting state may be one that no
-serial execution could produce.
-This behavior is called <i>write skew</i>.
+@section explain_isolation_write_skew Write skew
+
+Under snapshot isolation, each transaction reads a consistent snapshot
+that excludes changes made by concurrent transactions. <i>Write skew</i>
+is an anomaly in which concurrent transactions each make decisions using data
+that the other transaction changes, but update different records. Both may
+commit because their writes do not conflict, even when their combined changes
+violate an application rule. The resulting outcome may be impossible if the
+transactions were executed one after another. <i>Serializable</i> isolation
+guarantees behavior equivalent to some serial ordering of the transactions,
+but WiredTiger does not support that isolation level.
+
+For example, an application stores reservation counts for groups A and B in
+two separate records. Each transaction attempts to add 15 reservations to its
+group after checking that the combined total would not exceed 100. The diagram
+below shows both transactions running under snapshot isolation, with time
+flowing downward.
+
+@plantuml_start{snapshot_write_skew.png }
+@startuml{snapshot_write_skew.png}
+hide footbox
+skinparam monochrome true
+skinparam shadowing false
+title Write skew under snapshot isolation
+
+participant "T1: reserve for group A" as T1
+participant "T2: reserve for group B" as T2
+
+note over T1, T2
+  Initially: A = 40, B = 40
+  Application rule: A + B <= 100
+end note
+
+T1 -> T1: Begin transaction
+T2 -> T2: Begin transaction
+T1 -> T1: Read A = 40, B = 40
+T2 -> T2: Read A = 40, B = 40
+T1 -> T1: Check 80 + 15 <= 100: passes
+T2 -> T2: Check 80 + 15 <= 100: passes
+T1 -> T1: Write A = 55
+T2 -> T2: Write B = 55
+T1 -> T1: Commit
+T2 -> T2: Commit
+
+note over T1, T2
+  Final state: A = 55, B = 55
+  Total = 110: application rule violated
+end note
+@enduml
+@plantuml_end
+
+Both transactions see the original total of 80 in their snapshots, so each
+check passes: adding 15 would give a total of 95. T1 updates only A and T2
+updates only B, so their writes do not conflict and both may commit. The final
+total is 110, violating the application rule even though each transaction's
+check passed.
+
+If these transactions ran one after another, the first would increase the
+total to 95. The second would then read that total and reject its addition,
+because 95 + 15 exceeds 100. Neither serial ordering would produce a total
+of 110. This difference illustrates why snapshot isolation does not guarantee
+serializable behavior.
 
 */

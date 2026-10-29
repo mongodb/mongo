@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,7 +14,7 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/s/balancer/move_unsharded_policy.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
@@ -74,7 +48,7 @@ class Status;
  * there is an imbalance by checking the difference in chunks between the most and least
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
-class MONGO_MOD_PUBLIC Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
+class [[MONGO_MOD_PUBLIC]] Balancer : public ReplicaSetAwareServiceConfigSvr<Balancer> {
     Balancer(const Balancer&) = delete;
     Balancer& operator=(const Balancer&) = delete;
 
@@ -123,7 +97,7 @@ public:
      * Any code in this call must not try to acquire any locks or to wait on operations, which
      * acquire locks.
      */
-    MONGO_MOD_PRIVATE void initiate(OperationContext* opCtx);
+    [[MONGO_MOD_PRIVATE]] void initiate(OperationContext* opCtx);
 
     /**
      * Invoked when this node which is currently serving as a 'PRIMARY' steps down and is invoked
@@ -137,7 +111,7 @@ public:
      * The joinTermination() method must be called afterwards in order to wait for the main
      * balancer thread to terminate and to allow initiateBalancer to be called again.
      */
-    MONGO_MOD_PRIVATE void requestTermination();
+    [[MONGO_MOD_PRIVATE]] void requestTermination();
 
     /**
      * Invoked when a node on its way to becoming a primary finishes draining and is about to
@@ -146,14 +120,14 @@ public:
      *
      * This must not be called while holding any locks!
      */
-    MONGO_MOD_PRIVATE void joinTermination();
+    [[MONGO_MOD_PRIVATE]] void joinTermination();
 
     /**
      * Potentially blocking method, which will return immediately if the balancer is not running a
      * balancer round and will block until the current round completes otherwise. If the operation
      * context's deadline is exceeded, it will throw an ExceededTimeLimit exception.
      */
-    MONGO_MOD_PRIVATE void joinCurrentRound(OperationContext* opCtx);
+    [[MONGO_MOD_PRIVATE]] void joinCurrentRound(OperationContext* opCtx);
 
     /**
      * Blocking call, which requests the balancer to move a range to the specified location
@@ -163,15 +137,15 @@ public:
      * NOTE: This call disregards the balancer enabled/disabled status and will proceed with the
      *       move regardless.
      */
-    MONGO_MOD_PRIVATE void moveRange(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const ConfigsvrMoveRange& request,
-                                     bool issuedByRemoteUser);
+    [[MONGO_MOD_PRIVATE]] void moveRange(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const ConfigsvrMoveRange& request,
+                                         bool issuedByRemoteUser);
 
     /**
      * Appends the runtime state of the balancer instance to the specified builder.
      */
-    MONGO_MOD_PRIVATE void report(OperationContext* opCtx, BSONObjBuilder* builder);
+    [[MONGO_MOD_PRIVATE]] void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Informs the balancer that a setting that affects it changed.
@@ -188,8 +162,8 @@ public:
      * Returns if a given collection is draining due to a removed shard, has chunks on an invalid
      * zone or the number of chunks is imbalanced across the cluster
      */
-    MONGO_MOD_PRIVATE BalancerCollectionStatusResponse
-    getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& nss);
+    [[MONGO_MOD_PRIVATE]] BalancerCollectionStatusResponse getBalancerStatusForNs(
+        OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     static constexpr int kMaxOutstandingStreamingOperations = 50;
@@ -331,9 +305,9 @@ private:
     // thread.
     OperationContext* _threadOperationContext{nullptr};
 
-    AtomicWord<int> _outstandingStreamingOps{0};
+    Atomic<int> _outstandingStreamingOps{0};
 
-    AtomicWord<bool> _actionStreamsStateUpdated{true};
+    Atomic<bool> _actionStreamsStateUpdated{true};
 
     // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};

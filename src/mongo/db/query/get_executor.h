@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -91,15 +65,15 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
  * prefix of the pipeline might be moved into the provided 'canonicalQuery' for pushing down into
  * the find layer.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    size_t plannerOptions = QueryPlannerParams::DEFAULT,
-    Pipeline* pipeline = nullptr,
-    bool needsMerge = false,
-    boost::optional<TraversalPreference> traversalPreference = boost::none);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorFind(OperationContext* opCtx,
+                const MultipleCollectionAccessor& collections,
+                std::unique_ptr<CanonicalQuery> canonicalQuery,
+                PlanYieldPolicy::YieldPolicy yieldPolicy,
+                size_t plannerOptions = QueryPlannerParams::DEFAULT,
+                Pipeline* pipeline = nullptr,
+                bool needsMerge = false,
+                boost::optional<TraversalPreference> traversalPreference = boost::none);
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,
@@ -188,11 +162,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
-    OpDebug* opDebug,
-    CollectionAcquisition coll,
-    CanonicalDelete& canonicalDelete,
-    boost::optional<ExplainOptions::Verbosity> verbosity);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorDelete(OpDebug* opDebug,
+                  CollectionAcquisition coll,
+                  CanonicalDelete& canonicalDelete,
+                  boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Get a PlanExecutor for an update operation. 'canonicalUpdate' describes the query predicate
@@ -214,25 +188,26 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
-    OpDebug* opDebug,
-    CollectionAcquisition coll,
-    CanonicalUpdate& canonicalUpdate,
-    boost::optional<ExplainOptions::Verbosity> verbosity);
+[[MONGO_MOD_PUBLIC]] StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+getExecutorUpdate(OpDebug* opDebug,
+                  CollectionAcquisition coll,
+                  CanonicalUpdate& canonicalUpdate,
+                  boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Direction of collection scan plan executor returned by makeCollectionScanPlanExecutor() below.
  */
-enum class MONGO_MOD_PUBLIC CollectionScanDirection {
+enum class [[MONGO_MOD_PUBLIC]] CollectionScanDirection {
     kForward = 1,
     kBackward = -1,
 };
 
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     CollectionScanDirection scanDirection,
-    const boost::optional<RecordId>& resumeAfterRecordId = boost::none);
+    const boost::optional<RecordId>& resumeAfterRecordId = boost::none,
+    bool tolerateDeletedScanPosition = false);
 
 }  // namespace mongo

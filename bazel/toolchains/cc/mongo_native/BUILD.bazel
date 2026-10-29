@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "native_toolchain.bzl",
+    "mongo_native_toolchain.BUILD.tmpl",
+])

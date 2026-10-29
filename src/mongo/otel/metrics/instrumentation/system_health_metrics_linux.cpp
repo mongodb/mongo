@@ -1,33 +1,6 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -43,6 +16,7 @@
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/procparser.h"
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -51,6 +25,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -62,10 +37,10 @@ using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
 using otel::metrics::ReportingPolicy;
 
-constexpr std::string_view kProcStatPath = "/proc/stat"_sd;
-constexpr std::string_view kProcFileNrPath = "/proc/sys/fs/file-nr"_sd;
+constexpr std::string_view kProcStatPath = "/proc/stat"sv;
+constexpr std::string_view kProcFileNrPath = "/proc/sys/fs/file-nr"sv;
 
-const std::vector<std::string_view> kStatKeys{"cpu"_sd, "procs_running"_sd, "procs_blocked"_sd};
+const std::vector<std::string_view> kStatKeys{"cpu"sv, "procs_running"sv, "procs_blocked"sv};
 
 struct SystemHealthOtelMetricsState {
     std::unique_ptr<SystemHealthMetrics> metrics;
@@ -77,16 +52,16 @@ const auto getSystemHealthOtelMetricsState =
 
 const AttributeDefinition<std::string_view> kCpuModeAttr{
     .name = "mode",
-    .values = {"user"_sd,
-               "nice"_sd,
-               "system"_sd,
-               "idle"_sd,
-               "iowait"_sd,
-               "irq"_sd,
-               "softirq"_sd,
-               "steal"_sd,
-               "guest"_sd,
-               "guest_nice"_sd},
+    .values = {"user"sv,
+               "nice"sv,
+               "system"sv,
+               "idle"sv,
+               "iowait"sv,
+               "irq"sv,
+               "softirq"sv,
+               "steal"sv,
+               "guest"sv,
+               "guest_nice"sv},
 };
 
 }  // namespace
@@ -139,6 +114,7 @@ public:
         int64_t totalDelta = 0;
 
         auto record = [&](std::string_view mode, int64_t& prev, int64_t current) {
+            invariant(n < modes.size());
             int64_t delta = std::max<int64_t>(current - std::exchange(prev, current), 0);
             modes[n++] = {mode, delta};
             totalDelta += delta;
@@ -146,16 +122,16 @@ public:
                 _cpuTime.add(delta, mode);
         };
 
-        record("user"_sd, _prev.cpuUserMs, snap.cpuUserMs);
-        record("nice"_sd, _prev.cpuNiceMs, snap.cpuNiceMs);
-        record("system"_sd, _prev.cpuSystemMs, snap.cpuSystemMs);
-        record("idle"_sd, _prev.cpuIdleMs, snap.cpuIdleMs);
-        record("iowait"_sd, _prev.cpuIowaitMs, snap.cpuIowaitMs);
-        record("irq"_sd, _prev.cpuIrqMs, snap.cpuIrqMs);
-        record("softirq"_sd, _prev.cpuSoftirqMs, snap.cpuSoftirqMs);
-        record("steal"_sd, _prev.cpuStealMs, snap.cpuStealMs);
-        record("guest"_sd, _prev.cpuGuestMs, snap.cpuGuestMs);
-        record("guest_nice"_sd, _prev.cpuGuestNiceMs, snap.cpuGuestNiceMs);
+        record("user"sv, _prev.cpuUserMs, snap.cpuUserMs);
+        record("nice"sv, _prev.cpuNiceMs, snap.cpuNiceMs);
+        record("system"sv, _prev.cpuSystemMs, snap.cpuSystemMs);
+        record("idle"sv, _prev.cpuIdleMs, snap.cpuIdleMs);
+        record("iowait"sv, _prev.cpuIowaitMs, snap.cpuIowaitMs);
+        record("irq"sv, _prev.cpuIrqMs, snap.cpuIrqMs);
+        record("softirq"sv, _prev.cpuSoftirqMs, snap.cpuSoftirqMs);
+        record("steal"sv, _prev.cpuStealMs, snap.cpuStealMs);
+        record("guest"sv, _prev.cpuGuestMs, snap.cpuGuestMs);
+        record("guest_nice"sv, _prev.cpuGuestNiceMs, snap.cpuGuestNiceMs);
 
         // If nothing has changed, just skip updating the utilization.
         // This prevents a potential divide by zero.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/write_ops/find_and_modify_image_lookup_util.h"
 
@@ -92,7 +66,7 @@ void testFetchPreOrPostImageFromSnapshot(
                                 postImageDoc,
                                 docKey,
                                 sessionInfo,
-                                {1} /* stmtIds */,
+                                /*stmtIds=*/{1},
                                 imageType);  // needsRetryImage
     if (commitTimestamp) {
         entry.setCommitTransactionTimestamp(*commitTimestamp);
@@ -131,14 +105,14 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotBasic_RetryableWrite
     auto expectedAtClusterTime0 = Timestamp(100, 1);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime0,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime0);
 
     auto entryOpTime1 = repl::OpTime(Timestamp(100, 0), 5);
     auto expectedAtClusterTime1 = Timestamp(99, kMaxTsInc);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime1,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime1);
 }
 
@@ -176,9 +150,9 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotRequiresTsULLGte1_Re
     auto expectedAtClusterTime = boost::none;
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime1,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime,
-                                        12020800 /* expectedErrorCode */);
+                                        /*expectedErrorCode=*/12020800);
 }
 
 TEST(FindAndModifyImageLookupTest,
@@ -187,7 +161,7 @@ TEST(FindAndModifyImageLookupTest,
     auto expectedAtClusterTime = Timestamp(0, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime);
 }
 
@@ -214,7 +188,7 @@ TEST(FindAndModifyImageLookupTest, FetchPostImageFromSnapshotBasic_RetryableWrit
     auto expectedAtClusterTime = Timestamp(100, 2);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPostImage,
                                         entryOpTime,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime);
 }
 
@@ -242,7 +216,7 @@ TEST(FindAndModifyImageLookupTest,
     auto expectedAtClusterTime = Timestamp(0, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPostImage,
                                         entryOpTime,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime);
 }
 

@@ -161,6 +161,11 @@ typedef enum {
 
 bool _mongocrypt_validate_and_copy_string(const char *in, int32_t in_len, char **out) MONGOCRYPT_WARN_UNUSED_RESULT;
 
+/* _mongocrypt_check_no_embedded_nul returns false and sets @status if @str contains an embedded null byte. See
+ * MONGOCRYPT-977. */
+bool _mongocrypt_check_no_embedded_nul(const char *str, uint32_t len, const char *what, mongocrypt_status_t *status)
+    MONGOCRYPT_WARN_UNUSED_RESULT;
+
 char *_mongocrypt_new_string_from_bytes(const void *in, int len);
 
 /* _mongocrypt_needs_credentials returns true if @crypt was configured to

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -3479,7 +3453,9 @@ TEST(SERVER_36024, RegressionCheck) {
     ASSERT_OK(field.setValueInt(1));
 }
 
-DEATH_TEST_REGEX(MutableBsonSerialize, PoisonDocument, "Invariant failure") {
+DEATH_TEST_REGEX(MutableBsonSerialize,
+                 PoisonDocument,
+                 "mutable bson right sibling begins outside its backing BSONObj") {
     // Expect an invariant failure if element size exceeds the parent buffer.
     BSONObj valid = BSON("_id" << "poison" << "events" << BSON_ARRAY(1 << 2) << "trailing" << "x");
 
@@ -3503,5 +3479,566 @@ DEATH_TEST_REGEX(MutableBsonSerialize, PoisonDocument, "Invariant failure") {
     }
     doc.getObject();
 }
+
+// Builds an object whose only element claims a size that makes it end exactly at the end of the
+// buffer, swallowing the byte a well-formed object reserves for its terminal EOO.
+//
+// When an element's rep is created, only where the element *begins* is validated, so nothing
+// rejects an element whose claimed extent reaches exactly to objsize. The address
+// resolveRightSibling() then derives for the next element, 'elt.rawdata() + elt.size()', is one
+// byte past the end of the buffer, which its bound check rejects.
+//
+// The allocation carries one spare trailing byte set to zero. The BSONObj still reports the smaller
+// objsize from its header, so that byte lies outside the object while remaining inside the
+// allocation, which makes the byte read past the end deterministic rather than being whatever the
+// allocator happened to leave there. Without the bound check in resolveRightSibling(), the
+// BSONElement constructed at that address would look like a terminal EOO, the '!rightElt.eoo()'
+// early exit would be taken, and the walk would report "no right sibling" with the corruption
+// entirely unreported.
+BSONObj makeObjWithElementEndingAtBufferEnd() {
+    BSONObj valid = BSON("a" << "x");
+
+    auto buf = SharedBuffer::allocate(valid.objsize() + 1);
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    buf.get()[valid.objsize()] = 0;
+
+    // Layout: [int32 objsize][0x02 type]['a', 0x00][int32 strlen]['x', 0x00][EOO]
+    // Growing 'strlen' by one makes the string absorb the terminal EOO.
+    constexpr int kStrLenOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/;
+    const int32_t strLen = ConstDataView(buf.get()).read<LittleEndian<int32_t>>(kStrLenOffset);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(strLen + 1, kStrLenOffset);
+
+    return BSONObj(std::move(buf));
+}
+
+BSONObj makeObjWithTerminalElementEndingAtBufferEnd() {
+    BSONObj valid = BSON("a" << 1 << "b"
+                             << "x");
+
+    auto buf = SharedBuffer::allocate(valid.objsize() + 1);
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    buf.get()[valid.objsize()] = 0;
+
+    const BSONElement a = valid.firstElement();
+    const int bOffset = (a.rawdata() - valid.objdata()) + a.size();
+    const int kStrLenOffset = bOffset + 1 /*type*/ + 2 /*"b\0"*/;
+    const int32_t strLen = ConstDataView(buf.get()).read<LittleEndian<int32_t>>(kStrLenOffset);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(strLen + 1, kStrLenOffset);
+
+    return BSONObj(std::move(buf));
+}
+
+BSONObj makeObjWithChildrenPastClaimedObjectSize() {
+    BSONObj valid = BSON("a" << BSON("x" << 1));
+
+    auto buf = SharedBuffer::allocate(valid.objsize());
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    constexpr int kChildOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/ + 4 /*subobject objsize*/;
+    DataView(buf.get()).write<LittleEndian<int32_t>>(kChildOffset, /*offset=*/0);
+
+    return BSONObj(std::move(buf));
+}
+
+BSONObj makeObjWithTerminalSubobjectElementEndingAtBufferEnd() {
+    BSONObj valid = BSON("a" << BSON("b" << "x"));
+
+    auto buf = SharedBuffer::allocate(valid.objsize() + 1);
+    std::memcpy(buf.get(), valid.objdata(), valid.objsize());
+    buf.get()[valid.objsize()] = 0;
+
+    constexpr int kStrLenOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/ +
+        4 /*subobject objsize*/ + 1 /*type*/ + 2 /*"b\0"*/;
+    const int32_t strLen = ConstDataView(buf.get()).read<LittleEndian<int32_t>>(kStrLenOffset);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(strLen + 2, kStrLenOffset);
+
+    return BSONObj(std::move(buf));
+}
+
+// Documents the arithmetic above, so a later change to BSON's layout or to the corruption cannot
+// silently stop exercising the intended path.
+TEST(MutableBsonOutOfBounds, ElementEndingAtBufferEndIsAcceptedAtRepCreation) {
+    BSONObj poison = makeObjWithElementEndingAtBufferEnd();
+    const BSONElement elt = poison.firstElement();
+
+    const auto offset = elt.rawdata() - poison.objdata();
+    ASSERT_EQ(offset, 4);
+    // The element begins inside the object, which is all that rep creation validates; its claimed
+    // extent swallowing the terminal EOO is not detectable from the start position alone.
+    ASSERT_EQ(offset + elt.size(), poison.objsize());
+    // Yet the address resolveRightSibling() derives is outside the object.
+    ASSERT_EQ(elt.rawdata() + elt.size(), poison.objdata() + poison.objsize());
+}
+
+// Guards against the bound checks being written so that they reject a legitimate walk ending on the
+// terminal EOO, which is how every rightward walk terminates.
+TEST(MutableBsonOutOfBounds, WalkToTerminalEooIsStillAllowed) {
+    BSONObj valid = BSON("a" << "x" << "b" << "y");
+
+    mmb::Document doc(valid);
+    int seen = 0;
+    for (auto child = doc.root().leftChild(); child.ok(); child = child.rightSibling()) {
+        ++seen;
+    }
+    ASSERT_EQ(seen, 2);
+}
+
+TEST(MutableBsonBoundCheckTooLate, ReadPastEndOfObjectGoesUnreported) {
+    BSONObj poison = makeObjWithElementEndingAtBufferEnd();
+
+    mmb::Document doc(poison);
+    auto child = doc.root().findFirstChildNamed("a");
+    ASSERT_TRUE(child.ok());
+}
+
+// Check for the exact message in resolveRightSibling().
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    RightSiblingBoundCheckCatchesReadPastEndOfBuffer,
+    R"("id":12987902,.*"msg":"mutable bson right sibling begins outside its backing BSONObj".*"offset":4,"elementSize":10,"nextOffset":14,"objsize":14)") {
+    BSONObj poison = makeObjWithElementEndingAtBufferEnd();
+
+    mmb::Document doc(poison);
+    auto child = doc.root().leftChild();
+    ASSERT_TRUE(child.ok());
+    child.rightSibling();
+}
+
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    GetElementOffsetFatalOnCorruptElement,
+    R"("id":12987900,.*"msg":"mutable bson child not bounded by object pointer".*"eoo":false,"offset":11,"elementSize":10,"objsize":21)") {
+    BSONObj poison = makeObjWithTerminalElementEndingAtBufferEnd();
+
+    mmb::Document doc(poison);
+    auto a = doc.root().findFirstChildNamed("a");
+    ASSERT_TRUE(a.ok());
+    ASSERT_OK(a.setValueInt(2));
+    doc.getObject();
+}
+
+TEST(MutableBsonOutOfBounds, ValidSubobjectChildWalkIsStillAllowed) {
+    mmb::Document doc(BSON("a" << BSON("x" << 1) << "b" << BSONObj()));
+    ASSERT_TRUE(doc.root().findFirstChildNamed("a").leftChild().ok());
+    ASSERT_FALSE(doc.root().findFirstChildNamed("b").leftChild().ok());
+}
+
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    ChildBoundCheckCatchesElementPastClaimedObjectSize,
+    R"("id":12987901,.*"msg":"mutable bson child begins outside its backing BSONObj".*"offset":4,"thisObjectOffset":7,"childOffset":11,"objsize":11)") {
+    mmb::Document doc(makeObjWithChildrenPastClaimedObjectSize());
+    doc.root().findFirstChildNamed("a").leftChild();
+}
+
+DEATH_TEST_REGEX(
+    MutableBsonOutOfBoundsDeath,
+    RightSiblingBoundCheckCatchesSubobjectElementReadPastEndOfBuffer,
+    R"("id":12987902,.*"msg":"mutable bson right sibling begins outside its backing BSONObj".*"offset":11,"elementSize":11,"nextOffset":22,"objsize":22)") {
+    mmb::Document doc(makeObjWithTerminalSubobjectElementEndingAtBufferEnd());
+    doc.root().findFirstChildNamed("a").leftChild().rightSibling();
+}
+
+// Tests for the bulk copy of runs of unmodified, still-contiguous children in writeChildren().
+//
+// The path only engages once an ElementRep has been materialized for each element of the run, which
+// is what happens naturally when an update locates a field by name in a wide document: every field
+// to the left of the target gets materialized by the sibling walk. These tests reproduce that by
+// calling findFirstChildNamed() before mutating, and then assert on the full serialized result.
+namespace bulk_copy_test {
+
+const int kWideFieldCount = 40;
+
+std::string fieldName(int i) {
+    return "f" + std::to_string(i);
+}
+
+std::string fieldValue(int i) {
+    return "v" + std::to_string(i);
+}
+
+// Builds { f0: "v0", f1: "v1", ... }, wide enough to leave long runs on either side of a change.
+BSONObj makeWideObj() {
+    BSONObjBuilder bob;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        bob.append(fieldName(i), fieldValue(i));
+    }
+    return bob.obj();
+}
+
+// Materializes an ElementRep for every child up to and including 'name', the way an update does
+// when it looks up the field it is about to modify, and returns that child.
+mmb::Element findChildMaterializingRunToItsLeft(mmb::Document* doc, std::string_view name) {
+    mmb::Element found = doc->root().findFirstChildNamed(name);
+    ASSERT_TRUE(found.ok());
+    return found;
+}
+
+TEST(BulkCopyRightSiblings, SetValueInMiddleOfWideObject) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, "f20");
+    // Growing the value rules out an in-place update, forcing a full reserialization.
+    ASSERT_OK(target.setValueString("a much longer replacement value"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 20 ? "a much longer replacement value" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, SetValueOnFirstFieldLeavesNoRunToTheLeft) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, "f0");
+    ASSERT_OK(target.setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 0 ? "replacement" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, SetValueOnLastFieldMakesEverythingElseOneRun) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    const int last = kWideFieldCount - 1;
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, fieldName(last));
+    ASSERT_OK(target.setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == last ? "replacement" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RemovedElementBreaksTheRun) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    // Remove one element from the middle of what would otherwise be a single run, then modify a
+    // later one so that the whole document still has to be rebuilt.
+    mmb::Element removed = findChildMaterializingRunToItsLeft(&doc, "f10");
+    ASSERT_OK(removed.remove());
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, "f30");
+    ASSERT_OK(target.setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        if (i == 10) {
+            continue;
+        }
+        expected.append(fieldName(i), i == 30 ? "replacement" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, InsertedElementBreaksTheRun) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    mmb::Element pivot = findChildMaterializingRunToItsLeft(&doc, "f10");
+    ASSERT_OK(pivot.addSiblingRight(doc.makeElementInt("inserted", 7)));
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, "f30");
+    ASSERT_OK(target.setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 30 ? "replacement" : fieldValue(i));
+        if (i == 10) {
+            expected.append("inserted", 7);
+        }
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RenamedElementBreaksTheRun) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    // A rename changes the field name bytes, so the element must not be copied from the original
+    // buffer even though its value is untouched.
+    mmb::Element renamed = findChildMaterializingRunToItsLeft(&doc, "f10");
+    ASSERT_OK(renamed.rename("renamed"));
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, "f30");
+    ASSERT_OK(target.setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        if (i == 10) {
+            expected.append("renamed", fieldValue(10));
+        } else {
+            expected.append(fieldName(i), i == 30 ? "replacement" : fieldValue(i));
+        }
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, TwoSeparateModificationsWithARunBetweenThem) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    ASSERT_OK(findChildMaterializingRunToItsLeft(&doc, "f5").setValueString("first change"));
+    ASSERT_OK(findChildMaterializingRunToItsLeft(&doc, "f25").setValueString("second change"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        if (i == 5) {
+            expected.append(fieldName(i), "first change");
+        } else if (i == 25) {
+            expected.append(fieldName(i), "second change");
+        } else {
+            expected.append(fieldName(i), fieldValue(i));
+        }
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RunInsideNestedSubObject) {
+    BSONObjBuilder bob;
+    bob.append("before", 1);
+    {
+        BSONObjBuilder sub(bob.subobjStart("nested"));
+        for (int i = 0; i < kWideFieldCount; ++i) {
+            sub.append(fieldName(i), fieldValue(i));
+        }
+    }
+    bob.append("after", 2);
+    const BSONObj inObj = bob.obj();
+
+    mmb::Document doc(inObj);
+    mmb::Element nested = doc.root().findFirstChildNamed("nested");
+    ASSERT_TRUE(nested.ok());
+    mmb::Element target = nested.findFirstChildNamed("f20");
+    ASSERT_TRUE(target.ok());
+    ASSERT_OK(target.setValueString("a much longer replacement value"));
+
+    BSONObjBuilder expected;
+    expected.append("before", 1);
+    {
+        BSONObjBuilder sub(expected.subobjStart("nested"));
+        for (int i = 0; i < kWideFieldCount; ++i) {
+            sub.append(fieldName(i), i == 20 ? "a much longer replacement value" : fieldValue(i));
+        }
+    }
+    expected.append("after", 2);
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, ElementWithModifiedSubObjectBreaksTheRun) {
+    BSONObjBuilder bob;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        if (i == 10) {
+            BSONObjBuilder sub(bob.subobjStart(fieldName(i)));
+            sub.append("inner", 1);
+        } else {
+            bob.append(fieldName(i), fieldValue(i));
+        }
+    }
+    const BSONObj inObj = bob.obj();
+
+    mmb::Document doc(inObj);
+    // Modifying a grandchild marks 'f10' as non-serialized; it must be rebuilt rather than copied.
+    mmb::Element inner = doc.root().findFirstChildNamed("f10").findFirstChildNamed("inner");
+    ASSERT_TRUE(inner.ok());
+    ASSERT_OK(inner.setValueString("now a string"));
+    ASSERT_OK(findChildMaterializingRunToItsLeft(&doc, "f30").setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        if (i == 10) {
+            BSONObjBuilder sub(expected.subobjStart(fieldName(i)));
+            sub.append("inner", "now a string");
+        } else {
+            expected.append(fieldName(i), i == 30 ? "replacement" : fieldValue(i));
+        }
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, ArrayIsNeverBulkCopiedAndStaysRenumbered) {
+    BSONObjBuilder bob;
+    {
+        BSONArrayBuilder arr(bob.subarrayStart("a"));
+        for (int i = 0; i < kWideFieldCount; ++i) {
+            arr.append(i);
+        }
+    }
+    const BSONObj inObj = bob.obj();
+
+    mmb::Document doc(inObj);
+    mmb::Element arr = doc.root().findFirstChildNamed("a");
+    ASSERT_TRUE(arr.ok());
+
+    // Materialize the whole array, then remove one element from the middle. The survivors must be
+    // renumbered, which is precisely why arrays are excluded from the bulk copy.
+    mmb::Element elt = arr.leftChild();
+    for (int i = 0; i < 10; ++i) {
+        elt = elt.rightSibling();
+        ASSERT_TRUE(elt.ok());
+    }
+    ASSERT_OK(elt.remove());
+
+    BSONObjBuilder expected;
+    {
+        BSONArrayBuilder arrExpected(expected.subarrayStart("a"));
+        for (int i = 0; i < kWideFieldCount; ++i) {
+            if (i == 10) {
+                continue;
+            }
+            arrExpected.append(i);
+        }
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, InPlaceModeStillProducesCorrectObject) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj, mmb::Document::kInPlaceEnabled);
+
+    // A same-size replacement is eligible for an in-place damage event, but getObject() must still
+    // return the new value rather than copying the stale bytes out of the original buffer.
+    mmb::Element target = findChildMaterializingRunToItsLeft(&doc, "f20");
+    ASSERT_OK(target.setValueString("x20"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 20 ? "x20" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RunEndingAtLastFieldWithNoOpaqueTail) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    // Materialize every child, so there is no opaque tail left for the existing tail-copy path and
+    // the run has to be terminated by the end of the sibling chain instead.
+    for (mmb::Element e = doc.root().leftChild(); e.ok(); e = e.rightSibling()) {
+    }
+    ASSERT_OK(findChildMaterializingRunToItsLeft(&doc, "f0").setValueString("replacement"));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 0 ? "replacement" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, FullyMaterializedUnmodifiedWideObjectRoundTrips) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    // Materialize everything but change nothing.
+    for (mmb::Element e = doc.root().leftChild(); e.ok(); e = e.rightSibling()) {
+    }
+    ASSERT_BSONOBJ_EQ(inObj, doc.getObject());
+}
+
+// The following tests cover the case where a bulk-copied run ends immediately before a still-opaque
+// region, so that the run copy is followed directly by the opaque tail copy. Reaching it takes a
+// modification to the *left* of the run: the modification forces a reserialization, and a later
+// lookup then materializes a prefix of the fields to its right while leaving the rest opaque.
+// Modifying a field and then serializing is not enough on its own, because locating the modified
+// field materializes every field to its left and so the run always ends at the modified field.
+
+TEST(BulkCopyRightSiblings, RunEndingAtOpaqueTailAfterEarlierModification) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    // Modify the very first field. This materializes only 'f0'.
+    mmb::Element first = findChildMaterializingRunToItsLeft(&doc, fieldName(0));
+    ASSERT_OK(first.setValueString("a much longer replacement value"));
+
+    // Now materialize f1..f5 without touching them, leaving f6.. opaque. The run f1..f5 is
+    // therefore followed directly by the opaque tail.
+    mmb::Element probe = findChildMaterializingRunToItsLeft(&doc, fieldName(5));
+    ASSERT_EQUALS(fieldName(5), probe.getFieldName());
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 0 ? "a much longer replacement value" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RunEndingAtOpaqueTailRunOfExactlyTwo) {
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    mmb::Element first = findChildMaterializingRunToItsLeft(&doc, fieldName(0));
+    ASSERT_OK(first.setValueString("longer replacement"));
+
+    // Materialize just f1 and f2, the shortest run that qualifies for bulk copying.
+    findChildMaterializingRunToItsLeft(&doc, fieldName(2));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 0 ? "longer replacement" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RunEndingAtOpaqueTailInsideNestedSubObject) {
+    // The parent of the run is a sub-object rather than the root, which exercises the
+    // 'getSerializedElement(parentRep).Obj()' branch when locating the tail bytes.
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder sub(bob.subobjStart("sub"));
+        for (int i = 0; i < kWideFieldCount; ++i) {
+            sub.append(fieldName(i), fieldValue(i));
+        }
+    }
+    bob.append("trailing", "t");
+    const BSONObj inObj = bob.obj();
+
+    mmb::Document doc(inObj);
+    mmb::Element sub = doc.root().findFirstChildNamed("sub");
+    ASSERT_TRUE(sub.ok());
+
+    // Modify the first field of the sub-object, then materialize a run to its right.
+    mmb::Element first = sub.findFirstChildNamed(fieldName(0));
+    ASSERT_TRUE(first.ok());
+    ASSERT_OK(first.setValueString("a much longer replacement value"));
+
+    mmb::Element probe = sub.findFirstChildNamed(fieldName(5));
+    ASSERT_TRUE(probe.ok());
+
+    BSONObjBuilder expected;
+    {
+        BSONObjBuilder expectedSub(expected.subobjStart("sub"));
+        for (int i = 0; i < kWideFieldCount; ++i) {
+            expectedSub.append(fieldName(i),
+                               i == 0 ? "a much longer replacement value" : fieldValue(i));
+        }
+    }
+    expected.append("trailing", "t");
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+TEST(BulkCopyRightSiblings, RunEndingAtOpaqueTailThatIsEmpty) {
+    // The run extends all the way to the last field, so the tail copy must copy zero bytes.
+    const BSONObj inObj = makeWideObj();
+    mmb::Document doc(inObj);
+
+    mmb::Element first = findChildMaterializingRunToItsLeft(&doc, fieldName(0));
+    ASSERT_OK(first.setValueString("longer replacement"));
+
+    // Materialize every remaining field, so the run f1..f39 reaches the end of the object.
+    findChildMaterializingRunToItsLeft(&doc, fieldName(kWideFieldCount - 1));
+
+    BSONObjBuilder expected;
+    for (int i = 0; i < kWideFieldCount; ++i) {
+        expected.append(fieldName(i), i == 0 ? "longer replacement" : fieldValue(i));
+    }
+    ASSERT_BSONOBJ_EQ(expected.obj(), doc.getObject());
+}
+
+}  // namespace bulk_copy_test
 
 }  // namespace

@@ -1,43 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -77,7 +43,16 @@
 #include <utility>
 #include <vector>
 
+#include <boost/intrusive_ptr.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 namespace mongo {
+using namespace std::literals::string_view_literals;
 constexpr size_t kMaxArgumentCountForSwitchAndSetExprForSbe = 100;
 
 class BSONElement;
@@ -90,6 +65,12 @@ struct EvaluationContext {
     /**
      * When non-null, accumulates memory usage observed while evaluating an expression and its
      * sub-expressions, so the entire evaluation is accounted against the same tracker.
+     *
+     * Invariant: a supplied tracker must be owned by the calling thread's operation. Trackers are
+     * not synchronized, so a tracker reachable concurrently from multiple threads must not be set
+     * here. Callers that evaluate expressions against an ExpressionContext shared across threads
+     * (e.g. collection validators evaluating $expr from concurrent writers) must leave this null
+     * and rely on a per-call tracker instead (see exec::matcher::evaluateExpression()).
      */
     SimpleMemoryUsageTracker* tracker = nullptr;
 
@@ -256,7 +237,7 @@ enum class ExpressionDisabledReason {
                                       false, /* shouldOmitDiagnosticInformation */ \
                                       getTestCommandsEnabled())
 
-class MONGO_MOD_PUBLIC Expression : public RefCountable {
+class [[MONGO_MOD_PUBLIC]] Expression : public RefCountable {
 public:
     using Parser = std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* const, BSONElement, const VariablesParseState&)>;
@@ -477,6 +458,23 @@ public:
         return false;
     }
 
+    /**
+     * Evaluates this expression, which must be a constant expression, without checking the
+     * operation-wide memory limit: constant folds may run (e.g. parse-time inline optimize(),
+     * 'let' parameter seeding) before query settings are applied, when the operation-wide,
+     * settings-overridable limit may not be read yet. The fold is bounded by the per-expression
+     * limit (internalQueryMaxSingleExpressionMemoryUsageBytes, deliberately never pqs-settable)
+     * via a standalone tracker.
+     *
+     * The fold's usage is still charged to the operation with add(), which never resolves a
+     * limit: its transient peak and, when 'retainResult' is set (the fold's output lives on for
+     * the operation, e.g. as an ExpressionConstant in the plan or a seeded 'let' value), the
+     * folded value's footprint. The retained charge makes the next ordinary limit check, which
+     * runs once query settings are applied, enforce the operation-wide limit against the fold.
+     * Pass 'retainResult' = false when the folded value is throwaway (query-shape serialization).
+     */
+    Value foldConstant(bool retainResult = true) const;
+
 protected:
     Expression(ExpressionContext* const expCtx) : Expression(expCtx, {}) {}
 
@@ -525,7 +523,7 @@ private:
 /**
  * A constant expression. Repeated calls to evaluate() will always return the same thing.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionConstant final : public Expression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionConstant final : public Expression {
 public:
     ExpressionConstant(ExpressionContext* expCtx, const Value& value);
 
@@ -755,6 +753,31 @@ public:
     }
 };
 
+class AccumulatorMin;
+class AccumulatorSum;
+class AccumulatorMax;
+class AccumulatorAvg;
+class AccumulatorStdDevPop;
+class AccumulatorStdDevSamp;
+class AccumulatorMergeObjects;
+
+template <typename AccumulatorState>
+inline constexpr bool isAccumulatorExpressionImplementedInSbe =
+    std::is_same_v<AccumulatorState, AccumulatorMergeObjects> ||
+    std::is_same_v<AccumulatorState, AccumulatorSum> ||
+    std::is_same_v<AccumulatorState, AccumulatorMin> ||
+    std::is_same_v<AccumulatorState, AccumulatorMax> ||
+    std::is_same_v<AccumulatorState, AccumulatorAvg> ||
+    std::is_same_v<AccumulatorState, AccumulatorStdDevPop> ||
+    std::is_same_v<AccumulatorState, AccumulatorStdDevSamp>;
+
+/**
+ * Returns whether 'featureFlagSbeAccumulatorExpressions' is enabled for the current operation. Read
+ * through the IFR context so that the value stays stable for the duration of the operation. Defined
+ * out-of-line to keep the feature flag definitions out of this header.
+ */
+bool isSbeAccumulatorExpressionEnabled(ExpressionContext* expCtx);
+
 /**
  * Used to make Accumulators available as Expressions, e.g., to make $sum available as an Expression
  * use "REGISTER_STABLE_EXPRESSION(sum, ExpressionAccumulator<AccumulatorSum>::parse);".
@@ -765,14 +788,14 @@ class ExpressionFromAccumulator
 public:
     explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
+        expCtx->capSbeCompatibility(getSbeCompatibility(expCtx));
     }
 
     ExpressionFromAccumulator(ExpressionContext* const expCtx,
                               Expression::ExpressionVector&& children)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx,
                                                                           std::move(children)) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
+        expCtx->capSbeCompatibility(getSbeCompatibility(expCtx));
     }
 
     Value evaluate(const Document& root,
@@ -807,6 +830,16 @@ public:
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionFromAccumulator<AccumulatorState>>(
             &expCtx, this->cloneChildren(expCtx));
+    }
+
+private:
+    static SbeCompatibility getSbeCompatibility(ExpressionContext* const expCtx) {
+        if constexpr (isAccumulatorExpressionImplementedInSbe<AccumulatorState>) {
+            return isSbeAccumulatorExpressionEnabled(expCtx) ? SbeCompatibility::noRequirements
+                                                             : SbeCompatibility::requiresSbeFull;
+        } else {
+            return SbeCompatibility::notCompatible;
+        }
     }
 };
 
@@ -974,7 +1007,8 @@ public:
     }
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionAdd final
+    : public ExpressionVariadic<ExpressionAdd> {
 public:
     explicit ExpressionAdd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
@@ -1124,6 +1158,13 @@ public:
     static boost::intrusive_ptr<ExpressionArray> create(
         ExpressionContext* const expCtx, std::vector<boost::intrusive_ptr<Expression>>&& children) {
         return make_intrusive<ExpressionArray>(expCtx, std::move(children));
+    }
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount("$array"sv);
+        return ExpressionNaryBase<ExpressionArray>::parse(expCtx, bsonExpr, vps);
     }
 
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
@@ -1441,6 +1482,13 @@ public:
     ExpressionConcatArrays(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionConcatArrays>(expCtx, std::move(children)) {}
 
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionConcatArrays>::parse(expCtx, bsonExpr, vps);
+    }
+
     Value evaluate(const Document& root,
                    Variables* variables,
                    const EvaluationContext& ctx) const final;
@@ -1464,7 +1512,7 @@ public:
 };
 
 
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionCond final
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionCond final
     : public ExpressionFixedArity<ExpressionCond, 3> {
 public:
     explicit ExpressionCond(ExpressionContext* const expCtx) : Base(expCtx) {}
@@ -2101,7 +2149,7 @@ public:
 };
 
 
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionFieldPath : public Expression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionFieldPath : public Expression {
 public:
     /**
      * Checks whether this field path is exactly "$$ROOT".
@@ -2869,12 +2917,6 @@ private:
      */
     static void _assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* expCtx,
                                                         DocumentMetadataFields::MetaType type);
-    /**
-     * Asserts that 'featureFlagRankFusionFull' feature flag is enabled, if the
-     * requested metadata field requires it.
-     */
-    static void _assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
-        ExpressionContext* expCtx, DocumentMetadataFields::MetaType type);
 
     /**
      * Asserts that the 'featureFlagStreams' is enabled, depending on the parsed meta type and
@@ -2912,7 +2954,7 @@ private:
  */
 class ExpressionInternalRawSortKey final : public Expression {
 public:
-    static constexpr std::string_view kName = "$_internalSortKey"_sd;
+    static constexpr std::string_view kName = "$_internalSortKey"sv;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext*,
                                                   BSONElement,
@@ -3120,6 +3162,8 @@ public:
                    const EvaluationContext& ctx) const final;
     Value serialize(const query_shape::SerializationOptions& options = {}) const final;
 
+    const char* getOpName() const;
+
     static boost::intrusive_ptr<ExpressionObject> create(
         ExpressionContext* expCtx,
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&&
@@ -3245,6 +3289,13 @@ public:
 
     ExpressionRange(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx, std::move(children)) {}
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionRange>::parse(expCtx, bsonExpr, vps);
+    }
 
     Value evaluate(const Document& root,
                    Variables* variables,
@@ -3665,6 +3716,13 @@ public:
         }
     }
 
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps) {
+        expCtx->checkAndIncrementMemoryIntensiveExprCount(bsonExpr.fieldNameStringData());
+        return ExpressionNaryBase<ExpressionSetUnion>::parse(expCtx, bsonExpr, vps);
+    }
+
     Value evaluate(const Document& root,
                    Variables* variables,
                    const EvaluationContext& ctx) const final;
@@ -3725,7 +3783,7 @@ protected:
 
 class ExpressionSimilarityDotProduct final : public ExpressionVectorSimilarity {
 public:
-    static constexpr auto kName = "$similarityDotProduct"_sd;
+    static constexpr auto kName = "$similarityDotProduct"sv;
 
     ExpressionSimilarityDotProduct(ExpressionContext* const expCtx,
                                    bool score,
@@ -3760,7 +3818,7 @@ public:
 
 class ExpressionSimilarityCosine final : public ExpressionVectorSimilarity {
 public:
-    static constexpr auto kName = "$similarityCosine"_sd;
+    static constexpr auto kName = "$similarityCosine"sv;
 
     ExpressionSimilarityCosine(ExpressionContext* const expCtx,
                                bool score,
@@ -3794,7 +3852,7 @@ public:
 
 class ExpressionSimilarityEuclidean final : public ExpressionVectorSimilarity {
 public:
-    static constexpr auto kName = "$similarityEuclidean"_sd;
+    static constexpr auto kName = "$similarityEuclidean"sv;
 
     ExpressionSimilarityEuclidean(ExpressionContext* const expCtx,
                                   bool score,
@@ -3830,14 +3888,10 @@ public:
 class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
 public:
     explicit ExpressionSize(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {}
 
     ExpressionSize(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSize, 1>(expCtx, std::move(children)) {
-        expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
-    }
+        : ExpressionFixedArity<ExpressionSize, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root,
                    Variables* variables,
@@ -3886,7 +3940,7 @@ public:
 
 class ExpressionSortArray final : public Expression {
 public:
-    static constexpr auto kName = "$sortArray"_sd;
+    static constexpr auto kName = "$sortArray"sv;
     ExpressionSortArray(ExpressionContext* const expCtx,
                         boost::intrusive_ptr<Expression> input,
                         const PatternValueCmp& sortBy)
@@ -3963,7 +4017,7 @@ public:
 
 class ExpressionTopN final : public Expression {
 public:
-    static constexpr auto kName = "$topN"_sd;
+    static constexpr auto kName = "$topN"sv;
 
     ExpressionTopN(ExpressionContext* const expCtx,
                    boost::intrusive_ptr<Expression> n,
@@ -4019,7 +4073,7 @@ private:
 
 class ExpressionTop final : public Expression {
 public:
-    static constexpr auto kName = "$top"_sd;
+    static constexpr auto kName = "$top"sv;
 
     ExpressionTop(ExpressionContext* const expCtx,
                   boost::intrusive_ptr<Expression> input,
@@ -4068,7 +4122,7 @@ private:
 
 class ExpressionBottomN final : public Expression {
 public:
-    static constexpr auto kName = "$bottomN"_sd;
+    static constexpr auto kName = "$bottomN"sv;
 
     ExpressionBottomN(ExpressionContext* const expCtx,
                       boost::intrusive_ptr<Expression> n,
@@ -4124,7 +4178,7 @@ private:
 
 class ExpressionBottom final : public Expression {
 public:
-    static constexpr auto kName = "$bottom"_sd;
+    static constexpr auto kName = "$bottom"sv;
 
     ExpressionBottom(ExpressionContext* const expCtx,
                      boost::intrusive_ptr<Expression> input,
@@ -4541,7 +4595,7 @@ private:
 };
 
 
-class MONGO_MOD_NEEDS_REPLACEMENT ExpressionSwitch final : public Expression {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ExpressionSwitch final : public Expression {
 public:
     using ExpressionPair =
         std::pair<boost::intrusive_ptr<Expression>&, boost::intrusive_ptr<Expression>&>;
@@ -4989,11 +5043,13 @@ public:
 
 class ExpressionZip final : public Expression {
 public:
+    using ExprRef = std::reference_wrapper<boost::intrusive_ptr<Expression>>;
+
     ExpressionZip(ExpressionContext* const expCtx,
                   bool useLongestLength,
                   ExpressionVector&& children,
-                  std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs,
-                  std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults)
+                  std::vector<ExprRef> inputs,
+                  boost::optional<ExprRef> defaults)
         : Expression(expCtx, std::move(children)),
           _useLongestLength(useLongestLength),
           _inputs(std::move(inputs)),
@@ -5012,6 +5068,7 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn);
     Value serialize(const query_shape::SerializationOptions& options = {}) const final;
+    const char* getOpName() const;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -5025,35 +5082,35 @@ public:
         return _useLongestLength;
     }
 
-    const std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>>& getInputs() const {
+    const std::vector<ExprRef>& getInputs() const {
         return _inputs;
     }
 
-    const std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>>& getDefaults()
-        const {
+    const boost::optional<ExprRef>& getDefaults() const {
         return _defaults;
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         ExpressionVector children = cloneChildren(expCtx);
-        std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs;
-        std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults;
+        const size_t numDefaultChildren = _defaults ? 1 : 0;
 
         tassert(3100301,
                 fmt::format("Input and default array sizes mismatch with children array, "
                             "input={}, defaults={}, children={}",
                             _inputs.size(),
-                            _defaults.size(),
+                            numDefaultChildren,
                             children.size()),
-                _inputs.size() + _defaults.size() == children.size());
+                _inputs.size() + numDefaultChildren == children.size());
 
+        std::vector<ExprRef> inputs;
         inputs.reserve(_inputs.size());
-        defaults.reserve(_defaults.size());
         for (size_t childIdx = 0; childIdx < _inputs.size(); ++childIdx) {
             inputs.push_back(children[childIdx]);
         }
-        for (size_t childIdx = _inputs.size(); childIdx < children.size(); ++childIdx) {
-            defaults.push_back(children[childIdx]);
+
+        boost::optional<ExprRef> defaults;
+        if (_defaults) {
+            defaults = ExprRef(children.back());
         }
 
         return make_intrusive<ExpressionZip>(&expCtx,
@@ -5064,9 +5121,21 @@ public:
     }
 
 private:
+    /**
+     * Validates a literal 'defaults' array: it must have one default per input. Any other
+     * defaults expression — including one that is (or constant-folds into) a non-array constant
+     * — is deliberately validated only at evaluation time. Such a query still records a query
+     * stats entry (it parses fine and fails lazily), and its representative shape collapses the
+     * constant into a fixed placeholder (e.g. {$const: {?: "?"}} or a fixed-length array) that
+     * must survive re-parsing — and re-optimizing, for stages like $setWindowFields that
+     * optimize their expressions at parse time — when $queryStats reshapifies the entry.
+     */
+    static void _validateZipDefaults(const boost::intrusive_ptr<Expression>& defaults,
+                                     size_t numInputs);
+
     bool _useLongestLength;
-    std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> _inputs;
-    std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> _defaults;
+    std::vector<ExprRef> _inputs;
+    boost::optional<ExprRef> _defaults;
 };
 
 enum class ConversionBase {
@@ -5103,17 +5172,17 @@ enum class BinDataFormat {
 static std::string_view toStringData(BinDataFormat type) {
     switch (type) {
         case BinDataFormat::kAuto:
-            return "auto"_sd;
+            return "auto"sv;
         case BinDataFormat::kBase64:
-            return "base64"_sd;
+            return "base64"sv;
         case BinDataFormat::kBase64Url:
-            return "base64url"_sd;
+            return "base64url"sv;
         case BinDataFormat::kHex:
-            return "hex"_sd;
+            return "hex"sv;
         case BinDataFormat::kUtf8:
-            return "utf8"_sd;
+            return "utf8"sv;
         case BinDataFormat::kUuid:
-            return "uuid"_sd;
+            return "uuid"sv;
         default:
             MONGO_UNREACHABLE_TASSERT(4341123);
     }
@@ -5889,7 +5958,7 @@ public:
             &expCtx, cloneChild(_kField, expCtx), cloneChild(_kInput, expCtx));
     }
 
-    static constexpr auto kExpressionName = "$getField"_sd;
+    static constexpr auto kExpressionName = "$getField"sv;
 
 private:
     static constexpr size_t _kField = 0;
@@ -5954,7 +6023,7 @@ public:
                                                   cloneChild(_kValue, expCtx));
     }
 
-    static constexpr auto kExpressionName = "$setField"_sd;
+    static constexpr auto kExpressionName = "$setField"sv;
 
 private:
     /**
@@ -6387,13 +6456,13 @@ public:
     const Expression* getOnError() const;
 
 private:
-    static constexpr std::string_view _kInput = "input"_sd;
+    static constexpr std::string_view _kInput = "input"sv;
     static constexpr int _kInputIdx = 0;
 
-    static constexpr std::string_view _kRelaxed = "relaxed"_sd;
+    static constexpr std::string_view _kRelaxed = "relaxed"sv;
     static constexpr int _kRelaxedIdx = 1;
 
-    static constexpr std::string_view _kOnError = "onError"_sd;
+    static constexpr std::string_view _kOnError = "onError"sv;
     static constexpr int _kOnErrorIdx = 2;
 };
 
@@ -6431,10 +6500,10 @@ public:
     const Expression* getOnError() const;
 
 private:
-    static constexpr std::string_view _kInput = "input"_sd;
+    static constexpr std::string_view _kInput = "input"sv;
     static constexpr int _kInputIdx = 0;
 
-    static constexpr std::string_view _kOnError = "onError"_sd;
+    static constexpr std::string_view _kOnError = "onError"sv;
     static constexpr int _kOnErrorIdx = 1;
 };
 
@@ -6448,8 +6517,8 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(HashAlgorithm, HASH_ALGORITHM);
 
 class ExpressionHash final : public Expression {
 public:
-    static constexpr std::string_view kInput = "input"_sd;
-    static constexpr std::string_view kAlgorithm = "algorithm"_sd;
+    static constexpr std::string_view kInput = "input"sv;
+    static constexpr std::string_view kAlgorithm = "algorithm"sv;
 
     explicit ExpressionHash(ExpressionContext* expCtx,
                             boost::intrusive_ptr<Expression> input,

@@ -10,3 +10,11 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+filegroup(
+    name = "expected_output",
+    srcs = glob(
+        ["**/*"],
+        exclude = ["BUILD.bazel"],
+    ),
+)

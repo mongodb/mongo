@@ -74,7 +74,9 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         return shouldSkip;
     };
 
+    $config.states.updateOne = ignoreQueryPlanKilled($super.states.updateOne);
     $config.states.deleteOne = ignoreQueryPlanKilled($super.states.deleteOne);
+    $config.states.updateOneWithId = ignoreQueryPlanKilled($super.states.updateOneWithId);
     $config.states.deleteOneWithId = ignoreQueryPlanKilled($super.states.deleteOneWithId);
     $config.states.findAndModify = ignoreQueryPlanKilled($super.states.findAndModify);
 

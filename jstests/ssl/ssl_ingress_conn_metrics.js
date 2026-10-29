@@ -4,7 +4,7 @@
  * @tags: [requires_fcv_63]
  */
 import {detectDefaultTLSProtocol, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
-import {windowsSupportsTLS13} from "jstests/libs/os_helpers.js";
+import {windowsSupportsTLS13} from "jstests/libs/server_security/os_helpers.js";
 
 // Short circuits for system configurations that do not support this setParameter, (i.e. OpenSSL
 // versions that don't support TLS 1.3)

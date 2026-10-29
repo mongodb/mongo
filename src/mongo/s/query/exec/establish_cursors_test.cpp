@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/establish_cursors.h"
 
@@ -42,6 +16,7 @@
 #include "mongo/db/shard_role/resource_yielders.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -53,8 +28,10 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
+#include <condition_variable>
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -100,7 +77,7 @@ public:
 
         for (size_t i = 0; i < kTestShardIds.size(); i++) {
             ShardType shardType;
-            shardType.setHandle(ShardHandle{ShardId(kTestShardIds[i].toString()), boost::none});
+            shardType.setName(kTestShardIds[i].toString());
             shardType.setHost(kTestShardHosts[i].toString());
 
             shards.push_back(shardType);
@@ -189,8 +166,8 @@ public:
                                                false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
                                                false,
                                                chunks);
 
@@ -287,7 +264,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
-                                       nullptr /* RoutingContext */,
+                                       /*routingCtx=*/nullptr,
                                        Shard::RetryPolicy::kIdempotent,
                                        {},  // providedOpKeys
                                        designatedHosts),
@@ -306,7 +283,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
     future.default_timed_get();
 
     // This ensures the fail point has been hit exactly once.
-    failPoint->waitForTimesEntered(failPoint.initialTimesEntered() + 1);
+    failPoint.waitForOneNewEntry();
 }
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessWithRoutingContext) {
@@ -328,7 +305,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessWithRoutingContext) 
                                         _nss,
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         remotes,
-                                        false /* allowPartialResults */,
+                                        /*allowPartialResults=*/false,
                                         routingCtx.get());
         ASSERT_EQUALS(remotes.size(), cursors.size());
         routingCtx->validateOnContextEnd();
@@ -362,7 +339,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         remotes,
                                         false,  // allowPartialResults
-                                        nullptr /* RoutingContext */,
+                                        /*routingCtx=*/nullptr,
                                         Shard::RetryPolicy::kIdempotent,
                                         {},  // providedOpKeys
                                         designatedHosts);
@@ -567,6 +544,82 @@ TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrors) {
     future.default_timed_get();
 }
 
+// Verify that the CleanupPool decoration on ServiceContext handles sequential cleanup requests
+// correctly: the first call lazily starts the thread pool, and the second call reuses it without
+// attempting a second startup.
+TEST_F(EstablishCursorsTest, CleanupPoolHandlesSequentialRequests) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
+
+    for (int iteration = 0; iteration < 2; ++iteration) {
+        auto future = launchAsync([&] {
+            ASSERT_THROWS(establishCursors(operationContext(),
+                                           executor(),
+                                           _nss,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           remotes,
+                                           false),  // allowPartialResults
+                          ExceptionFor<ErrorCodes::HostUnreachable>);
+        });
+
+        for (int i = 0; i < kMaxRetries + 1; ++i) {
+            onCommand([this](const RemoteCommandRequest& request) {
+                ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+                return Status(ErrorCodes::HostUnreachable, "host unreachable");
+            });
+        }
+
+        expectKillOperations(1);
+        future.default_timed_get();
+    }
+}
+
+// Verify that concurrent callers racing to lazily start the CleanupPool decoration only start the
+// underlying thread pool once, and that every scheduled task still runs to completion.
+TEST_F(EstablishCursorsTest, CleanupPoolHandlesConcurrentStartupRace) {
+    constexpr int kNumThreads = 8;
+
+    auto fp = globalFailPointRegistry().find("hangBeforeCleanupPoolStartup");
+    invariant(fp);
+    auto timesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    // Tasks count themselves in on completion. A blocking primitive (e.g. a Barrier) cannot be used
+    // here because the CleanupPool has a single worker thread: a task that blocked waiting for its
+    // peers would stall the only thread, and the remaining tasks would never run.
+    std::mutex mutex;
+    std::condition_variable cv;
+    int completed = 0;
+
+    std::vector<stdx::thread> threads;
+    for (int i = 0; i < kNumThreads; ++i) {
+        threads.emplace_back([&] {
+            scheduleOnCursorCleanupPool_forTest(getServiceContext(), [&](Status) {
+                std::lock_guard lk(mutex);
+                if (++completed == kNumThreads) {
+                    cv.notify_one();
+                }
+            });
+        });
+    }
+
+    // The failpoint hangs each thread after the lock-free running check but before the startup
+    // lock, so waiting for all threads to enter it guarantees they genuinely race on the
+    // check-and-startup logic (rather than running serially) once the failpoint is cleared.
+    fp->waitForTimesEntered(timesEntered + kNumThreads);
+    fp->setMode(FailPoint::off);
+
+    // Wait for every scheduled task to actually run, proving the pool started successfully exactly
+    // once despite the concurrent callers.
+    {
+        std::unique_lock lk(mutex);
+        cv.wait(lk, [&] { return completed == kNumThreads; });
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+}
+
 TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrorsAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
@@ -711,7 +764,7 @@ TEST_F(EstablishCursorsTest,
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
-                                       nullptr /* RoutingContext */,
+                                       /*routingCtx=*/nullptr,
                                        Shard::RetryPolicy::kIdempotent,
                                        providedOpKeys),
                       ExceptionFor<ErrorCodes::FailedToParse>);
@@ -776,7 +829,7 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
-                                       nullptr /* RoutingContext */,
+                                       /*routingCtx=*/nullptr,
                                        Shard::RetryPolicy::kIdempotent,
                                        providedOpKeys),
                       ExceptionFor<ErrorCodes::FailedToParse>);

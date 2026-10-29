@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
-#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -45,9 +20,6 @@ using namespace mongo::multikey_paths;
 MONGO_FAIL_POINT_DEFINE(pathArraynessYieldInvalidation);
 
 namespace mongo {
-
-auto& pathArraynessQueriesFailedDueToInvalidation =
-    *MetricBuilder<Counter64>{"query.pathArrayness.queriesFailedDueToInvalidation"};
 
 const PathArrayness& PathArrayness::emptyPathArrayness() {
     static const PathArrayness kEmptyPathArrayness;
@@ -94,8 +66,13 @@ void PathArrayness::addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
 
     size_t indexCounter = 0;
     for (const auto& key : indexKeyPattern) {
-        FieldPath path(key.fieldNameStringData());
-        addPath(path, multikeyPaths[indexCounter], isFullRebuild);
+        // Ignore the key path if it doesn't pass the validation, in this case this field path is
+        // considered to be an array by default.
+        StatusWith<FieldPath> fieldPath =
+            fieldPathWithValidationStatus(std::string(key.fieldNameStringData()));
+        if (fieldPath.isOK()) {
+            addPath(fieldPath.getValue(), multikeyPaths[indexCounter], isFullRebuild);
+        }
         ++indexCounter;
     }
 }
@@ -223,8 +200,13 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
 }
 
 boost::optional<FieldPath> PathArrayness::getFirstInvalidatedPath(
-    const MonotonicallyIncreasingFieldPathSet& nonArrayPaths, const PathArrayness& current) {
-    if (MONGO_unlikely(pathArraynessYieldInvalidation.shouldFail())) {
+    const MonotonicallyIncreasingFieldPathSet& nonArrayPaths,
+    const PathArrayness& current,
+    const NamespaceString& ns) {
+    if (MONGO_unlikely(pathArraynessYieldInvalidation.shouldFail([&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+            return fpNss.isEmpty() || fpNss == ns;
+        }))) {
         return FieldPath("pathArraynessYieldInvalidationShouldFail");
     }
     for (const auto& path : nonArrayPaths) {
@@ -242,12 +224,12 @@ void PathArraynessChecker::uassertIfInvalidatedAndSyncEpoch(const PathArrayness&
         return;
     }
     prevEpoch = currentEpoch;
-    if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current)) {
-        pathArraynessQueriesFailedDueToInvalidation.increment();
+    if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current, ns)) {
+        pathArraynessCounters.incrementInvalidation();
         uasserted(
             ErrorCodes::QueryPlanKilled,
-            str::stream() << "query plan killed :: non-array path became multikey during yield: "
-                             "namespace="
+            str::stream() << "query plan killed :: non-array path became multikey while the query "
+                             "was suspended: namespace="
                           << ns.toStringForErrorMsg() << ", path=" << invalidated->fullPath());
     }
 }

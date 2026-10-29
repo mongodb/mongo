@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,11 +8,12 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool_state.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
@@ -74,7 +49,7 @@ namespace mongo {
 
 class BSONObjBuilder;
 
-namespace MONGO_MOD_PUBLIC executor {
+namespace [[MONGO_MOD_PUBLIC]] executor {
 
 /**
  * The actual user visible connection pool.
@@ -280,8 +255,9 @@ public:
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        CancellationToken token = CancellationToken::uncancelable()) {
-        return _get(hostAndPort, sslMode, timeout, false /*lease*/, std::move(token));
+        CancellationToken token = CancellationToken::uncancelable(),
+        ConnectionAcquisitionPurpose purpose = ConnectionAcquisitionPurpose::kNormal) {
+        return _get(hostAndPort, sslMode, timeout, /*leased=*/false, std::move(token), purpose);
     }
 
     void get_forTest(const HostAndPort& hostAndPort,
@@ -300,7 +276,12 @@ public:
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
         CancellationToken token = CancellationToken::uncancelable()) {
-        return _get(hostAndPort, sslMode, timeout, true /*lease*/, std::move(token));
+        return _get(hostAndPort,
+                    sslMode,
+                    timeout,
+                    /*leased=*/true,
+                    std::move(token),
+                    ConnectionAcquisitionPurpose::kNormal);
     }
 
     void lease_forTest(const HostAndPort& hostAndPort,
@@ -322,11 +303,16 @@ private:
                                       transport::ConnectSSLMode sslMode,
                                       Milliseconds timeout,
                                       bool leased,
-                                      const CancellationToken& token);
+                                      const CancellationToken& token,
+                                      ConnectionAcquisitionPurpose purpose);
 
     void retrieve_forTest(RetrieveConnection retrieve, GetConnectionCallback cb);
 
     std::string _name;
+
+    // The value reported in the "connection_pool" metric attribute. Set from the pool name when
+    // the pool is created.
+    std::string_view _connectionPoolAttribute;
 
     const std::shared_ptr<DependentTypeFactoryInterface> _factory;
     const Options _options;
@@ -353,7 +339,7 @@ private:
  *
  * Minimal interface sets a timer with a callback and cancels the timer.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN ConnectionPool::TimerInterface {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConnectionPool::TimerInterface {
     TimerInterface(const TimerInterface&) = delete;
     TimerInterface& operator=(const TimerInterface&) = delete;
 
@@ -388,7 +374,7 @@ public:
  * specifically callbacks to set them up (connect + auth + whatever else),
  * refresh them (issue some kind of ping) and manage a timer.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN ConnectionPool::ConnectionInterface : public TimerInterface {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConnectionPool::ConnectionInterface : public TimerInterface {
     ConnectionInterface(const ConnectionInterface&) = delete;
     ConnectionInterface& operator=(const ConnectionInterface&) = delete;
 
@@ -507,7 +493,7 @@ protected:
 private:
     size_t _generation;
     Date_t _lastUsed;
-    AtomicWord<size_t> _timesUsed{0};
+    Atomic<size_t> _timesUsed{0};
     Status _status = ConnectionPool::kConnectionStateUnknown;
 };
 
@@ -595,7 +581,7 @@ protected:
  * This factory provides generators for connections, timers and a clock for the
  * connection pool.
  */
-class MONGO_MOD_UNFORTUNATELY_OPEN ConnectionPool::DependentTypeFactoryInterface {
+class [[MONGO_MOD_UNFORTUNATELY_OPEN]] ConnectionPool::DependentTypeFactoryInterface {
     DependentTypeFactoryInterface(const DependentTypeFactoryInterface&) = delete;
     DependentTypeFactoryInterface& operator=(const DependentTypeFactoryInterface&) = delete;
 
@@ -649,5 +635,16 @@ inline ClockSource* ConnectionPool::_getFastClockSource() const {
     return _fastClockSource;
 }
 
-}  // namespace MONGO_MOD_PUBLIC executor
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kNormalConnectionPurpose = "normal";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kKillOperationConnectionPurpose =
+    "kill_operation";
+
+// Possible values for the "connection_pool" metric attribute, derived from the pool name.
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kTaskExecutorPoolConnectionPoolAttribute =
+    "TaskExecutorPool";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kShardingFixedConnectionPoolAttribute =
+    "Sharding-Fixed";
+[[MONGO_MOD_FILE_PRIVATE]] constexpr std::string_view kOtherConnectionPoolAttribute = "other";
+
+}  // namespace executor
 }  // namespace mongo

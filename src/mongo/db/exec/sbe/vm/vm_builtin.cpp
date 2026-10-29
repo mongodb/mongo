@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
 
@@ -107,6 +81,8 @@ std::string builtinToString(Builtin b) {
             return "addToArrayCapped";
         case Builtin::mergeObjects:
             return "mergeObjects";
+        case Builtin::mergeObjectsForExpr:
+            return "mergeObjectsForExpr";
         case Builtin::addToSet:
             return "addToSet";
         case Builtin::addToSetCapped:
@@ -131,6 +107,12 @@ std::string builtinToString(Builtin b) {
             return "doubleDoublePartialSumFinalize";
         case Builtin::aggMergeDoubleDoubleSums:
             return "aggMergeDoubleDoubleSums";
+        case Builtin::doubleDoubleSumFromAcc:
+            return "doubleDoubleSumFromAcc";
+        case Builtin::stdDevPopFromAcc:
+            return "stdDevPopFromAcc";
+        case Builtin::stdDevSampFromAcc:
+            return "stdDevSampFromAcc";
         case Builtin::aggStdDev:
             return "aggStdDev";
         case Builtin::aggMergeStdDevs:
@@ -391,142 +373,24 @@ std::string builtinToString(Builtin b) {
             return "aggBottomNMerge";
         case Builtin::aggBottomNFinalize:
             return "aggBottomNFinalize";
+        case Builtin::maxFromAcc:
+            return "maxFromAcc";
+        case Builtin::avgFromAcc:
+            return "avgFromAcc";
         case Builtin::aggMaxN:
             return "aggMaxN";
         case Builtin::aggMaxNMerge:
             return "aggMaxNMerge";
         case Builtin::aggMaxNFinalize:
             return "aggMaxNFinalize";
+        case Builtin::minFromAcc:
+            return "minFromAcc";
         case Builtin::aggMinN:
             return "aggMinN";
         case Builtin::aggMinNMerge:
             return "aggMinNMerge";
         case Builtin::aggMinNFinalize:
             return "aggMinNFinalize";
-        case Builtin::aggRank:
-            return "aggRank";
-        case Builtin::aggRankColl:
-            return "aggRankColl";
-        case Builtin::aggDenseRank:
-            return "aggDenseRank";
-        case Builtin::aggDenseRankColl:
-            return "aggDenseRankColl";
-        case Builtin::aggRankFinalize:
-            return "aggRankFinalize";
-        case Builtin::aggExpMovingAvg:
-            return "aggExpMovingAvg";
-        case Builtin::aggExpMovingAvgFinalize:
-            return "aggExpMovingAvgFinalize";
-        case Builtin::aggRemovableSumAdd:
-            return "aggRemovableSumAdd";
-        case Builtin::aggRemovableSumRemove:
-            return "aggRemovableSumRemove";
-        case Builtin::aggRemovableSumFinalize:
-            return "aggRemovableSumFinalize";
-        case Builtin::aggIntegralInit:
-            return "aggIntegralInit";
-        case Builtin::aggIntegralAdd:
-            return "aggIntegralAdd";
-        case Builtin::aggIntegralRemove:
-            return "aggIntegralRemove";
-        case Builtin::aggIntegralFinalize:
-            return "aggIntegralFinalize";
-        case Builtin::aggDerivativeFinalize:
-            return "aggDerivativeFinalize";
-        case Builtin::aggCovarianceAdd:
-            return "aggCovarianceAdd";
-        case Builtin::aggCovarianceRemove:
-            return "aggCovarianceRemove";
-        case Builtin::aggCovarianceSampFinalize:
-            return "aggCovarianceSampFinalize";
-        case Builtin::aggCovariancePopFinalize:
-            return "aggCovariancePopFinalize";
-        case Builtin::aggRemovablePushAdd:
-            return "aggRemovablePushAdd";
-        case Builtin::aggRemovablePushRemove:
-            return "aggRemovablePushRemove";
-        case Builtin::aggRemovablePushFinalize:
-            return "aggRemovablePushFinalize";
-        case Builtin::aggRemovableConcatArraysInit:
-            return "aggRemovableConcatArraysInit";
-        case Builtin::aggRemovableConcatArraysAdd:
-            return "aggRemovableConcatArraysAdd";
-        case Builtin::aggRemovableConcatArraysRemove:
-            return "aggRemovableConcatArraysRemove";
-        case Builtin::aggRemovableConcatArraysFinalize:
-            return "aggRemovableConcatArraysFinalize";
-        case Builtin::aggRemovableStdDevAdd:
-            return "aggRemovableStdDevAdd";
-        case Builtin::aggRemovableStdDevRemove:
-            return "aggRemovableStdDevRemove";
-        case Builtin::aggRemovableStdDevSampFinalize:
-            return "aggRemovableStdDevSampFinalize";
-        case Builtin::aggRemovableStdDevPopFinalize:
-            return "aggRemovableStdDevPopFinalize";
-        case Builtin::aggRemovableFirstNInit:
-            return "aggRemovableFirstNInit";
-        case Builtin::aggRemovableFirstNAdd:
-            return "aggRemovableFirstNAdd";
-        case Builtin::aggRemovableFirstNRemove:
-            return "aggRemovableFirstNRemove";
-        case Builtin::aggRemovableFirstNFinalize:
-            return "aggRemovableFirstNFinalize";
-        case Builtin::aggRemovableLastNInit:
-            return "aggRemovableLastNInit";
-        case Builtin::aggRemovableLastNAdd:
-            return "aggRemovableLastNAdd";
-        case Builtin::aggRemovableLastNRemove:
-            return "aggRemovableLastNRemove";
-        case Builtin::aggRemovableLastNFinalize:
-            return "aggRemovableLastNFinalize";
-        case Builtin::aggLinearFillCanAdd:
-            return "aggLinearFillCanAdd";
-        case Builtin::aggLinearFillAdd:
-            return "aggLinearFillAdd";
-        case Builtin::aggLinearFillFinalize:
-            return "aggLinearFillFinalize";
-        case Builtin::aggRemovableSetCommonInit:
-            return "aggRemovableSetCommonInit";
-        case Builtin::aggRemovableSetCommonCollInit:
-            return "aggRemovableSetCommonCollInit";
-        case Builtin::aggRemovableAddToSetAdd:
-            return "aggRemovableAddToSetAdd";
-        case Builtin::aggRemovableAddToSetRemove:
-            return "aggRemovableAddToSetRemove";
-        case Builtin::aggRemovableSetUnionAdd:
-            return "aggRemovableSetUnionAdd";
-        case Builtin::aggRemovableSetUnionRemove:
-            return "aggRemovableSetUnionRemove";
-        case Builtin::aggRemovableSetCommonFinalize:
-            return "aggRemovableSetCommonFinalize";
-        case Builtin::aggRemovableMinMaxNCollInit:
-            return "aggRemovableMinMaxNCollInit";
-        case Builtin::aggRemovableMinMaxNInit:
-            return "aggRemovableMinMaxNInit";
-        case Builtin::aggRemovableMinMaxNAdd:
-            return "aggRemovableMinMaxNAdd";
-        case Builtin::aggRemovableMinMaxNRemove:
-            return "aggRemovableMinMaxNRemove";
-        case Builtin::aggRemovableMinNFinalize:
-            return "aggRemovableMinNFinalize";
-        case Builtin::aggRemovableMaxNFinalize:
-            return "aggRemovableMaxNFinalize";
-        case Builtin::aggRemovableTopNInit:
-            return "aggRemovableTopNInit";
-        case Builtin::aggRemovableTopNAdd:
-            return "aggRemovableTopNAdd";
-        case Builtin::aggRemovableTopNRemove:
-            return "aggRemovableTopNRemove";
-        case Builtin::aggRemovableTopNFinalize:
-            return "aggRemovableTopNFinalize";
-        case Builtin::aggRemovableBottomNInit:
-            return "aggRemovableBottomNInit";
-        case Builtin::aggRemovableBottomNAdd:
-            return "aggRemovableBottomNAdd";
-        case Builtin::aggRemovableBottomNRemove:
-            return "aggRemovableBottomNRemove";
-        case Builtin::aggRemovableBottomNFinalize:
-            return "aggRemovableBottomNFinalize";
         case Builtin::valueBlockTypeMatch:
             return "valueBlockTypeMatch";
         case Builtin::valueBlockIsTimezone:
@@ -535,6 +399,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockExists";
         case Builtin::valueBlockIsNullish:
             return "valueBlockIsNullish";
+        case Builtin::valueBlockMqlComparisonRank:
+            return "valueBlockMqlComparisonRank";
         case Builtin::valueBlockFillEmpty:
             return "valueBlockFillEmpty";
         case Builtin::valueBlockFillEmptyBlock:
@@ -704,6 +570,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAddToArrayCapped(arity).releaseToRaw();
         case Builtin::mergeObjects:
             return builtinMergeObjects(arity).releaseToRaw();
+        case Builtin::mergeObjectsForExpr:
+            return builtinMergeObjectsForExpr(arity).releaseToRaw();
         case Builtin::addToSet:
             return builtinAddToSet(arity).releaseToRaw();
         case Builtin::addToSetCapped:
@@ -724,6 +592,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinDoubleDoublePartialSumFinalize(arity).releaseToRaw();
         case Builtin::aggMergeDoubleDoubleSums:
             return builtinAggDoubleDoubleSum<true /*merging*/>(arity).releaseToRaw();
+        case Builtin::doubleDoubleSumFromAcc:
+            return builtinDoubleDoubleSumFromAcc(arity).releaseToRaw();
+        case Builtin::stdDevPopFromAcc:
+            return builtinStdDevFromAcc<false /*isSamp*/>(arity).releaseToRaw();
+        case Builtin::stdDevSampFromAcc:
+            return builtinStdDevFromAcc<true /*isSamp*/>(arity).releaseToRaw();
         case Builtin::aggStdDev:
             return builtinAggStdDev<false /*merging*/>(arity).releaseToRaw();
         case Builtin::aggMergeStdDevs:
@@ -988,6 +862,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggTopBottomNMerge<TopBottomSense::kBottom>(arity).releaseToRaw();
         case Builtin::aggBottomNFinalize:
             return builtinAggTopBottomNFinalize(arity).releaseToRaw();
+        case Builtin::avgFromAcc:
+            return builtinAvgFromAcc(arity).releaseToRaw();
+        case Builtin::maxFromAcc:
+            return builtinMinMaxNFromAcc<AccumulatorMinMaxN::MinMaxSense::kMax>(arity)
+                .releaseToRaw();
         case Builtin::aggMaxN:
             return builtinAggMinMaxN<AccumulatorMinMaxN::MinMaxSense::kMax>(arity).releaseToRaw();
         case Builtin::aggMaxNMerge:
@@ -995,6 +874,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
                 .releaseToRaw();
         case Builtin::aggMaxNFinalize:
             return builtinAggMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMax>(arity)
+                .releaseToRaw();
+        case Builtin::minFromAcc:
+            return builtinMinMaxNFromAcc<AccumulatorMinMaxN::MinMaxSense::kMin>(arity)
                 .releaseToRaw();
         case Builtin::aggMinN:
             return builtinAggMinMaxN<AccumulatorMinMaxN::MinMaxSense::kMin>(arity).releaseToRaw();
@@ -1004,139 +886,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::aggMinNFinalize:
             return builtinAggMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMin>(arity)
                 .releaseToRaw();
-        case Builtin::aggRank:
-            return builtinAggRank(arity).releaseToRaw();
-        case Builtin::aggRankColl:
-            return builtinAggRankColl(arity).releaseToRaw();
-        case Builtin::aggDenseRank:
-            return builtinAggDenseRank(arity).releaseToRaw();
-        case Builtin::aggDenseRankColl:
-            return builtinAggDenseRankColl(arity).releaseToRaw();
-        case Builtin::aggRankFinalize:
-            return builtinAggRankFinalize(arity).releaseToRaw();
-        case Builtin::aggExpMovingAvg:
-            return builtinAggExpMovingAvg(arity).releaseToRaw();
-        case Builtin::aggExpMovingAvgFinalize:
-            return builtinAggExpMovingAvgFinalize(arity).releaseToMaybeOwnedRaw();
-        case Builtin::aggRemovableSumAdd:
-            return builtinAggRemovableSum<1 /*sign*/>(arity).releaseToRaw();
-        case Builtin::aggRemovableSumRemove:
-            return builtinAggRemovableSum<-1 /*sign*/>(arity).releaseToRaw();
-        case Builtin::aggRemovableSumFinalize:
-            return builtinAggRemovableSumFinalize(arity).releaseToRaw();
-        case Builtin::aggIntegralInit:
-            return builtinAggIntegralInit(arity).releaseToRaw();
-        case Builtin::aggIntegralAdd:
-            return builtinAggIntegralAdd(arity).releaseToRaw();
-        case Builtin::aggIntegralRemove:
-            return builtinAggIntegralRemove(arity).releaseToRaw();
-        case Builtin::aggIntegralFinalize:
-            return builtinAggIntegralFinalize(arity).releaseToRaw();
-        case Builtin::aggDerivativeFinalize:
-            return builtinAggDerivativeFinalize(arity).releaseToRaw();
-        case Builtin::aggCovarianceAdd:
-            return builtinAggCovarianceAdd(arity).releaseToRaw();
-        case Builtin::aggCovarianceRemove:
-            return builtinAggCovarianceRemove(arity).releaseToRaw();
-        case Builtin::aggCovarianceSampFinalize:
-            return builtinAggCovarianceSampFinalize(arity).releaseToRaw();
-        case Builtin::aggCovariancePopFinalize:
-            return builtinAggCovariancePopFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovablePushAdd:
-            return builtinAggRemovablePushAdd(arity).releaseToRaw();
-        case Builtin::aggRemovablePushRemove:
-            return builtinAggRemovablePushRemove(arity).releaseToRaw();
-        case Builtin::aggRemovablePushFinalize:
-            return builtinAggRemovablePushFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovableConcatArraysInit:
-            return builtinAggRemovableConcatArraysInit(arity).releaseToRaw();
-        case Builtin::aggRemovableConcatArraysAdd:
-            return builtinAggRemovableConcatArraysAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableConcatArraysRemove:
-            return builtinAggRemovableConcatArraysRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableConcatArraysFinalize:
-            return builtinAggRemovableConcatArraysFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovableStdDevAdd:
-            return builtinAggRemovableStdDevAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableStdDevRemove:
-            return builtinAggRemovableStdDevRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableStdDevSampFinalize:
-            return builtinAggRemovableStdDevSampFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovableStdDevPopFinalize:
-            return builtinAggRemovableStdDevPopFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovableAvgFinalize:
-            return builtinAggRemovableAvgFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovableFirstNInit:
-            return builtinAggFirstLastNInit(arity).releaseToRaw();
-        case Builtin::aggRemovableFirstNAdd:
-            return builtinAggFirstLastNAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableFirstNRemove:
-            return builtinAggFirstLastNRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableFirstNFinalize:
-            return builtinAggFirstLastNFinalize<AccumulatorFirstLastN::Sense::kFirst>(arity)
-                .releaseToRaw();
-        case Builtin::aggRemovableLastNInit:
-            return builtinAggFirstLastNInit(arity).releaseToRaw();
-        case Builtin::aggRemovableLastNAdd:
-            return builtinAggFirstLastNAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableLastNRemove:
-            return builtinAggFirstLastNRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableLastNFinalize:
-            return builtinAggFirstLastNFinalize<AccumulatorFirstLastN::Sense::kLast>(arity)
-                .releaseToRaw();
-        case Builtin::aggRemovableSetCommonInit:
-            return builtinAggRemovableSetCommonInit(arity).releaseToRaw();
-        case Builtin::aggRemovableSetCommonCollInit:
-            return builtinAggRemovableSetCommonCollInit(arity).releaseToRaw();
-        case Builtin::aggRemovableAddToSetAdd:
-            return builtinAggRemovableAddToSetAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableAddToSetRemove:
-            return builtinAggRemovableAddToSetRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableSetUnionAdd:
-            return builtinAggRemovableSetUnionAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableSetUnionRemove:
-            return builtinAggRemovableSetUnionRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableSetCommonFinalize:
-            return builtinAggRemovableSetCommonFinalize(arity).releaseToRaw();
-        case Builtin::aggRemovableMinMaxNCollInit:
-            return builtinAggRemovableMinMaxNCollInit(arity).releaseToRaw();
-        case Builtin::aggRemovableMinMaxNInit:
-            return builtinAggRemovableMinMaxNInit(arity).releaseToRaw();
-        case Builtin::aggRemovableMinMaxNAdd:
-            return builtinAggRemovableMinMaxNAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableMinMaxNRemove:
-            return builtinAggRemovableMinMaxNRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableMinNFinalize:
-            return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMin>(arity)
-                .releaseToRaw();
-        case Builtin::aggRemovableMaxNFinalize:
-            return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMax>(arity)
-                .releaseToRaw();
-        case Builtin::aggRemovableTopNInit:
-        case Builtin::aggRemovableBottomNInit:
-            return builtinAggRemovableTopBottomNInit(arity).releaseToRaw();
-        case Builtin::aggRemovableTopNAdd:
-        case Builtin::aggRemovableBottomNAdd:
-            return builtinAggRemovableTopBottomNAdd(arity).releaseToRaw();
-        case Builtin::aggRemovableTopNRemove:
-        case Builtin::aggRemovableBottomNRemove:
-            return builtinAggRemovableTopBottomNRemove(arity).releaseToRaw();
-        case Builtin::aggRemovableTopNFinalize:
-            return builtinAggRemovableTopBottomNFinalize<TopBottomSense::kTop>(arity)
-                .releaseToRaw();
-        case Builtin::aggRemovableBottomNFinalize:
-            return builtinAggRemovableTopBottomNFinalize<TopBottomSense::kBottom>(arity)
-                .releaseToRaw();
-        case Builtin::aggLinearFillCanAdd:
-            return builtinAggLinearFillCanAdd(arity).releaseToRaw();
-        case Builtin::aggLinearFillAdd:
-            return builtinAggLinearFillAdd(arity).releaseToRaw();
-        case Builtin::aggLinearFillFinalize:
-            return builtinAggLinearFillFinalize(arity).releaseToRaw();
         case Builtin::valueBlockExists:
             return builtinValueBlockExists(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockIsNullish:
             return builtinValueBlockIsNullish(arity).releaseToMaybeOwnedRaw();
+        case Builtin::valueBlockMqlComparisonRank:
+            return builtinValueBlockMqlComparisonRank(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockTypeMatch:
             return builtinValueBlockTypeMatch(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockIsTimezone:

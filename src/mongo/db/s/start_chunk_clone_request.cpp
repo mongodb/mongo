@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/start_chunk_clone_request.h"
 
@@ -58,7 +32,14 @@ const char kFromShardId[] = "fromShardName";
 const char kToShardId[] = "toShardName";
 const char kChunkMinKey[] = "min";
 const char kChunkMaxKey[] = "max";
+// The donor chunk that encloses the migrated range (equal to it for a whole-chunk move, wider for a
+// moveRange that splits the chunk), as a {min, max} sub-object. The recipient uses this span for
+// the shard-catalog PIT-reachability check, and its presence is the signal that the migration is on
+// the authoritative path. Absent on requests from a pre-upgrade donor and on the legacy path.
+const char kEnclosingChunk[] = "enclosingChunk";
 const char kShardKeyPattern[] = "shardKeyPattern";
+// TODO (SERVER-127253): Remove this once v9.0 branches out.
+const char kIsAuthoritative[] = "isAuthoritative";
 
 }  // namespace
 
@@ -161,6 +142,31 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
         }
     }
 
+    {
+        // Optional: absent on requests from a pre-upgrade donor and on the legacy path. When
+        // present it carries the enclosing donor chunk used for the recipient's PIT-reachability
+        // check and marks the migration as being on the authoritative path.
+        BSONElement elem;
+        Status status = bsonExtractTypedField(obj, kEnclosingChunk, BSONType::object, &elem);
+        if (status.isOK()) {
+            const auto range = ChunkRange::fromBSON(elem.Obj());
+            request._enclosingChunk =
+                ChunkRange(range.getMin().getOwned(), range.getMax().getOwned());
+        } else if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+    }
+
+    {
+        // Absent on the legacy path, so default to false to preserve the pre-existing refresh
+        // behavior when the donor does not send the field.
+        Status status = bsonExtractBooleanFieldWithDefault(
+            obj, kIsAuthoritative, false, &request._isAuthoritative);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     request._migrationId = UUID::parse(obj);
     request._lsid =
         LogicalSessionId::parse(obj[kLsid].Obj(), IDLParserContext("StartChunkCloneRequest"));
@@ -182,7 +188,9 @@ void StartChunkCloneRequest::appendAsCommand(
     const BSONObj& chunkMinKey,
     const BSONObj& chunkMaxKey,
     const BSONObj& shardKeyPattern,
-    const MigrationSecondaryThrottleOptions& secondaryThrottle) {
+    const MigrationSecondaryThrottleOptions& secondaryThrottle,
+    const boost::optional<ChunkRange>& enclosingChunk,
+    bool isAuthoritative) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
     invariant(fromShardConnectionString.isValid());
@@ -200,7 +208,12 @@ void StartChunkCloneRequest::appendAsCommand(
     builder->append(kToShardId, toShardId.toString());
     builder->append(kChunkMinKey, chunkMinKey);
     builder->append(kChunkMaxKey, chunkMaxKey);
+    if (enclosingChunk) {
+        builder->append(kEnclosingChunk, enclosingChunk->toBSON());
+    }
     builder->append(kShardKeyPattern, shardKeyPattern);
+    // TODO (SERVER-127253): Remove this once v9.0 branches out.
+    builder->append(kIsAuthoritative, isAuthoritative);
     secondaryThrottle.append(builder);
 }
 

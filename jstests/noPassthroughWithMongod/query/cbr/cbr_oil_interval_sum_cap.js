@@ -28,14 +28,11 @@
  *
  * So std::min returns 2600.4999 instead of 2600, and the subsequent division
  * 2600.4999 / 2600.0 fires tassert 9274202 ("must be <=").
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
-
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    quit();
-}
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -58,6 +55,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "heuristicCE",
         }),
     );

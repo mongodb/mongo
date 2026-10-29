@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -219,16 +193,16 @@ TEST(OpLegacy, UnsupportedReadOps) {
     // Issue the unsupported requests. They all should fail one way or another.
     Message opQueryRequest = makeUnsupportedOpQueryMessage(ns,
                                                            fromjson("{}"),
-                                                           2 /*nToReturn*/,
-                                                           0 /*nToSkip*/,
-                                                           nullptr /*fieldsToReturn*/,
-                                                           0 /*queryOptions*/);
+                                                           /*nToReturn=*/2,
+                                                           /*nToSkip=*/0,
+                                                           /*fieldsToReturn=*/nullptr,
+                                                           /*queryOptions=*/0);
     Message opQueryReply = conn->call(opQueryRequest);
     assertFailure(opQueryReply, "OP_QUERY is no longer supported");
 
     const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "UnsupportedReadOps");
 
-    auto opGetMore = makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
+    auto opGetMore = makeUnsupportedOpGetMoreMessage(ns, cursorId, /*nToReturn=*/2, /*flags=*/0);
     Message opGetMoreReply = conn->call(opGetMore);
     assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
@@ -253,10 +227,10 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
     // The actual command doesn't matter, as long as it's not 'hello' or 'isMaster'.
     auto opQuery = makeUnsupportedOpQueryMessage("testOpLegacy.$cmd",
                                                  fromjson("{serverStatus: 1}"),
-                                                 1 /*nToReturn*/,
-                                                 0 /*nToSkip*/,
-                                                 nullptr /*fieldsToReturn*/,
-                                                 0 /*queryOptions*/);
+                                                 /*nToReturn=*/1,
+                                                 /*nToSkip=*/0,
+                                                 /*fieldsToReturn=*/nullptr,
+                                                 /*queryOptions=*/0);
     Message replyQuery = conn->call(opQuery);
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
     BufReader data(qr.data(), qr.dataLen());
@@ -273,10 +247,10 @@ void testAllowedCommand(const char* command,
 
     auto opQuery = makeUnsupportedOpQueryMessage("testOpLegacy.$cmd",
                                                  fromjson(command),
-                                                 1 /*nToReturn*/,
-                                                 0 /*nToSkip*/,
-                                                 nullptr /*fieldsToReturn*/,
-                                                 0 /*queryOptions*/);
+                                                 /*nToReturn=*/1,
+                                                 /*nToSkip=*/0,
+                                                 /*fieldsToReturn=*/nullptr,
+                                                 /*queryOptions=*/0);
 
     auto serverStatusCmd = fromjson("{serverStatus: 1}");
     BSONObj serverStatus;
@@ -299,27 +273,27 @@ void testAllowedCommand(const char* command,
 }
 
 TEST(OpLegacy, IsSelfCommandViaOpQuery) {
-    testAllowedCommand("{_isSelf: 1}", true /* expectToBeCounted */);
+    testAllowedCommand("{_isSelf: 1}", /*expectToBeCounted=*/true);
 }
 
 TEST(OpLegacy, BuildinfoCommandViaOpQuery) {
-    testAllowedCommand("{buildinfo: 1}", true /* expectToBeCounted */);
+    testAllowedCommand("{buildinfo: 1}", /*expectToBeCounted=*/true);
 }
 
 TEST(OpLegacy, BuildInfoCommandViaOpQuery) {
-    testAllowedCommand("{buildInfo: 1}", true /* expectToBeCounted */);
+    testAllowedCommand("{buildInfo: 1}", /*expectToBeCounted=*/true);
 }
 
 TEST(OpLegacy, HelloCommandViaOpQuery) {
-    testAllowedCommand("{hello: 1}", false /* expectToBeCounted */);
+    testAllowedCommand("{hello: 1}", /*expectToBeCounted=*/false);
 }
 
 TEST(OpLegacy, IsMasterCommandViaOpQuery) {
-    testAllowedCommand("{isMaster: 1}", false /* expectToBeCounted */);
+    testAllowedCommand("{isMaster: 1}", /*expectToBeCounted=*/false);
 }
 
 TEST(OpLegacy, IsmasterCommandViaOpQuery) {
-    testAllowedCommand("{ismaster: 1}", false /* expectToBeCounted */);
+    testAllowedCommand("{ismaster: 1}", /*expectToBeCounted=*/false);
 }
 
 TEST(OpLegacy, SaslStartCommandViaOpQuery) {
@@ -376,7 +350,7 @@ TEST(OpLegacy, AuthenticateCommandViaOpQuery) {
     // an invalid authentication request. The AuthenticationFailed error code means that it passes
     // request parsing.
     testAllowedCommand(R"({authenticate: 1, mechanism: "MONGODB-X509"})",
-                       true /* expectToBeCounted */,
+                       /*expectToBeCounted=*/true,
                        ErrorCodes::AuthenticationFailed);
 }
 

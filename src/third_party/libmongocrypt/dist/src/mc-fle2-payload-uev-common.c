@@ -93,7 +93,7 @@ const _mongocrypt_buffer_t *_mc_FLE2UnindexedEncryptedValueCommon_decrypt(_mongo
     memcpy(AD.data + 1, key_uuid->data, key_uuid->len);
     AD.data[1 + key_uuid->len] = (uint8_t)original_bson_type;
     const uint32_t plaintext_len = fle2aead->get_plaintext_len(ciphertext->len, status);
-    if (plaintext_len == 0) {
+    if (!mongocrypt_status_ok(status)) {
         _mongocrypt_buffer_cleanup(&AD);
         return NULL;
     }

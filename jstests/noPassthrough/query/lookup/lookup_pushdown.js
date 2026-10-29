@@ -3,6 +3,7 @@
  *
  * @tags: [requires_sharding, uses_transactions]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     aggPlanHasStage,
     assertEngine,
@@ -16,7 +17,7 @@ import {
 import {
     checkSbeRestrictedOrFullyEnabled,
     checkSbeRestricted,
-    checkSbeEqLookupUnwindEnabled,
+    isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -27,6 +28,7 @@ const JoinAlgorithm = {
     INLJ: 2,
     HJ: 3,
     NonExistentForeignCollection: 4,
+    DILJ: 5,
 };
 
 // Standalone cases.
@@ -39,7 +41,12 @@ const viewName = "view_lookup_pushdown";
 let db = conn.getDB(name);
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const sbeRestricted = checkSbeRestricted(db);
-const sbeEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(db);
+const ffSbeEqLookupUnwindHashJoin = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEqLookupUnwindHashJoin",
+);
+const sbeEqLookupUnwindPushdownEnabled =
+    isDeferredGetExecutorEnabled(db) && ffSbeEqLookupUnwindHashJoin;
 
 if (!sbeEnabled) {
     jsTest.log.info("Skipping test because SBE is disabled");
@@ -60,7 +67,7 @@ function verifyEqLookupNodeStrategy(
     indexKeyPattern = {},
 ) {
     // Collect both EQ_LOOKUP and EQ_LOOKUP_UNWIND nodes. The latter appears when
-    // featureFlagSbeEqLookupUnwind is enabled and $lookup absorbs a subsequent $unwind.
+    // featureFlagGetExecutorDeferredEngineChoice is enabled and $lookup absorbs a subsequent $unwind.
     const eqLookupNodes = [
         ...getAggPlanStages(explain, "EQ_LOOKUP"),
         ...getAggPlanStages(explain, "EQ_LOOKUP_UNWIND"),
@@ -113,6 +120,8 @@ function getJoinAlgorithmStrategyName(joinAlgorithm) {
             return "IndexedLoopJoin";
         case JoinAlgorithm.HJ:
             return "HashJoin";
+        case JoinAlgorithm.DILJ:
+            return "DynamicIndexedLoopJoin";
         case JoinAlgorithm.NonExistentForeignCollection:
             return "NonExistentForeignCollection";
         case JoinAlgorithm.Classic:
@@ -329,7 +338,7 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
-    // $lookup that absorbs $unwind. When featureFlagSbeEqLookupUnwind is enabled, this is
+    // $lookup that absorbs $unwind. When featureFlagGetExecutorDeferredEngineChoice is enabled, this is
     // SBE-compatible even in restricted mode and will use hash join (small collection, no index).
     runTest(
         coll,
@@ -337,12 +346,12 @@ function setLookupPushdownDisabled(value) {
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
             {$unwind: "$out"},
         ],
-        sbeEqLookupUnwindEnabled
+        sbeEqLookupUnwindPushdownEnabled
             ? JoinAlgorithm.HJ
             : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
-    // $lookup that absorbs $match. When featureFlagSbeEqLookupUnwind is enabled, the absorbed
+    // $lookup that absorbs $match. When featureFlagGetExecutorDeferredEngineChoice is enabled, the absorbed
     // $unwind makes this SBE-compatible even in restricted mode and will use hash join.
     runTest(
         coll,
@@ -351,7 +360,7 @@ function setLookupPushdownDisabled(value) {
             {$unwind: "$out"},
             {$match: {out: {$gte: 0}}},
         ],
-        sbeEqLookupUnwindEnabled
+        sbeEqLookupUnwindPushdownEnabled
             ? JoinAlgorithm.HJ
             : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
@@ -400,14 +409,17 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
-// Construct an index with a partial filter expression. In this case, we should use Classic.
-(function testPartialFilterExpressionIndexesAreIgnored() {
+// Construct an index with a partial filter expression with 'allowDiskUse' false. In this case,
+// we should use DynamicIndexedLoopJoin.
+(function testPartialFilterExpressionIndexesCanUseDynamicIndexedJoin() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1}, {partialFilterExpression: {b: 1}}));
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        {b: 1} /* indexKeyPattern */,
+        {allowDiskUse: false},
     );
 
     // If we add an index that is not a partial index, we should then use INLJ.
@@ -436,15 +448,20 @@ function setLookupPushdownDisabled(value) {
 })();
 
 (function testWildcardIndex() {
-    // A compatible wildcard index on the foreign collection that matches the foreignField. In this case, it
-    // should not be pushed to SBE.
+    // A compatible, sparse-like wildcard index on the foreignField is pushed to SBE: hash join by
+    // default, or DILJ when hash join is unavailable.
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({"$**": 1}, {name: "wcidx"}));
+    const wildcardPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, wildcardPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        wildcardPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
     // A wildcard index on the foreign collection that excludes the foreignField. In this case, it
@@ -475,19 +492,31 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
-    // A compatible wildcard index with no other SBE compatible indexes should use classic.
+    // A compatible scoped wildcard index ("b.$**") covers its own root field "b" and is pushed to
+    // SBE the same way a full wildcard index is.
+    const scopedWildcardOnBPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, scopedWildcardOnBPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        scopedWildcardOnBPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
+    // The same scoped wildcard index also covers sub-paths under "b".
+    const scopedWildcardOnBDotCPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b.c", as: "out"}},
+    ];
+    runTest(coll, scopedWildcardOnBDotCPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b.c", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        scopedWildcardOnBDotCPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
     // A compatible index with incompatible collations should use HJ
@@ -498,15 +527,22 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
     );
 
+    // A wildcard index with an inclusion projection that covers the foreignField is pushed to SBE
+    // the same way a full wildcard index is.
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(
         foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1}}),
     );
+    const inclusionWildcardPipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, inclusionWildcardPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
-        "wcidx" /* indexKeyPattern */,
+        inclusionWildcardPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
     // A compatible wildcard index with a compatible regular index over the foreignField. We should
@@ -520,18 +556,22 @@ function setLookupPushdownDisabled(value) {
     );
     assert.commandWorked(foreignColl.dropIndexes());
 
-    // The index can be used in classic so lookup is not pushed but classic does not use it at the end.
+    // A wildcard index covering the foreignField is pushed to SBE regardless of an earlier $match
+    // on an unrelated field.
     assert.commandWorked(
         foreignColl.createIndex({"$**": 1}, {name: "wcidx", wildcardProjection: {b: 1, c: 1}}),
     );
+    const matchThenLookupPipeline = [
+        {$match: {"c.d": 1}},
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+    runTest(coll, matchThenLookupPipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
     runTest(
         coll,
-        [
-            {$match: {"c.d": 1}},
-            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
-        ],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        matchThenLookupPipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
         null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
     assert.commandWorked(foreignColl.deleteOne(mkDoc));
     assert.commandWorked(foreignColl.dropIndexes());
@@ -624,22 +664,36 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
-// Build a sparse index on the foreign collection that matches the foreignField. In this case, we
-// should use classic.
-(function testSparseIndexesNotUsedForPushDown() {
+// Build a sparse index on the foreign collection that matches the foreignField. SBE can use a
+// sparse index via the dynamic indexed loop join (DILJ), which decides per local key whether the
+// sparse index is safe to seek or a collection scan is required; a hash join is used instead when
+// disk use is allowed and the foreign collection is small.
+(function testSparseIndexUsedForPushDown() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1}, {sparse: true}));
+    const pipeline = [
+        {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
+    ];
+
+    // With disk use allowed and a small foreign collection, a hash join is chosen.
+    runTest(coll, pipeline, JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
+
+    // With hash join disabled, the dynamic indexed loop join is used so the sparse index can still
+    // be leveraged for non-null local keys.
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        pipeline,
+        JoinAlgorithm.DILJ /* expectedJoinAlgorithm */,
+        null /* indexKeyPattern */,
+        {allowDiskUse: false} /* aggOptions */,
     );
 
-    // If we add an index that is not a sparse index, we should then use INLJ.
+    // If we add a non-sparse index, it is preferred and we use INLJ (no regression from making
+    // sparse indexes eligible).
     assert.commandWorked(foreignColl.createIndex({b: 1, a: 1}));
     runTest(
         coll,
-        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        pipeline,
         JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
         {b: 1, a: 1} /* indexKeyPattern */,
     );
@@ -994,6 +1048,8 @@ MongoRunner.stopMongod(conn);
 
     assert.commandWorked(lcoll.insert({a: 1}));
     assert.commandWorked(fcoll.insert([{a: 1}, {a: 1}]));
+    // Ensure stable on-disk sizes.
+    assert.commandWorked(db.adminCommand({fsync: 1}));
 
     // The foreign collection is very small and first verifies that the HJ is chosen under the
     // default query knob values.

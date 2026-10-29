@@ -1,38 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -52,6 +26,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
@@ -74,6 +49,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class CursorResponse;
 
@@ -105,7 +81,7 @@ class AsyncResultsMerger : public std::enable_shared_from_this<AsyncResultsMerge
 public:
     // When mongos has to do a merge in order to return results to the client in the correct sort
     // order, it requests a sortKey meta-projection using this field name.
-    static constexpr std::string_view kSortKeyField = "$sortKey"_sd;
+    static constexpr std::string_view kSortKeyField = "$sortKey"sv;
 
     // The expected sort key pattern when 'compareWholeSortKey' is true.
     static const BSONObj kWholeSortKeySortPattern;
@@ -334,22 +310,50 @@ public:
     /**
      * For sorted tailable cursors, returns the most recent available sort key. This guarantees that
      * we will never return any future results which precede this key. If no results are ready to be
-     * returned, this method may cause the high water mark to advance to the lowest promised sortkey
-     * received from the shards. Returns an empty BSONObj if no such sort key is available.
-     *
-     * A side-effect of calling this method is that it can advance the 'AsyncResultsMerger's high
-     * watermark.
+     * returned, the returned value may be advanced to the lowest promised sortkey received from the
+     * shards, provided that doing so would not regress the current high water mark. Returns an
+     * empty BSONObj if no such sort key is available.
      */
     BSONObj getHighWaterMark();
 
     /**
-     * Unconditionally sets the current high water mark of the 'AsyncResultsMerger'.
-     * Called from change streams-specific code in the 'ChangeStreamsHandleTopologyChangeV2' stage,
-     * when the initial cursors for V2 change streams or opened. Also called for v2 change streams
-     * in degraded mode when reversing the high water mark to the resume token of an already
-     * returned event.
+     * Returns the high water mark to be exposed to the client as the post-batch resume token. This
+     * is a monotonically increasing value that is never rolled back, even if the internal high
+     * water mark is (e.g. when degraded-mode overfetch is undone). It is advanced by returned
+     * documents, by explicit 'setHighWaterMark()' calls, and, unless disabled, by the minimum
+     * promised sort key received from the shards. See
+     * 'disablePromisedSortKeyHighWaterMarkAdvancement()'.
+     */
+    BSONObj getHighWaterMarkForClient();
+
+    /**
+     * Sets the current high water mark of the 'AsyncResultsMerger'. Called from change
+     * streams-specific code in the 'ChangeStreamsHandleTopologyChangeV2' stage, when the initial
+     * cursors for V2 change streams are opened. Also called for v2 change streams in degraded mode
+     * when reversing the high water mark to the resume token of an already returned event.
+     *
+     * This setter intentionally permits rollback when degraded-mode overfetch is undone.
      */
     void setHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Disables advancement of the client-visible high water mark based on the minimum promised sort
+     * key received from the shards. This is used for change streams that ignore removed shards
+     * while they are reading a bounded change stream segment: a promise may have been made by a
+     * shard that is about to be removed, and the segment end may be earlier than that promise, so
+     * adopting it could expose a resume token beyond the current segment and skip events from the
+     * next segment. The internal high water mark continues to advance from promised sort keys so
+     * that the V2 stage can detect segment boundaries and avoid stalling.
+     */
+    void disablePromisedSortKeyHighWaterMarkAdvancement();
+
+    /**
+     * Re-enables advancement of the client-visible high water mark based on the minimum promised
+     * sort key received from the shards. This is the default. It is used for change streams that
+     * ignore removed shards while reading an unbounded change stream segment, so that the
+     * post-batch resume token keeps advancing while shards are idle.
+     */
+    void enablePromisedSortKeyHighWaterMarkAdvancement();
 
     /**
      * Sets the strategy to determine the next high water mark.
@@ -423,6 +427,14 @@ public:
     SharedSemiFuture<void> kill(OperationContext* opCtx);
 
     /**
+     * Final drain of additional-participant metadata after kill() has completed: processes
+     * responses buffered by callbacks that finished after kill()'s one-shot drain, which would
+     * otherwise never be processed. Like kill()'s own drain, it no-ops unless the caller's opCtx
+     * is in the cursor's transaction — the only context that can reach that transaction's router.
+     */
+    void drainAdditionalTransactionParticipantsAfterKill(OperationContext* opCtx) noexcept;
+
+    /**
      * Returns remote metrics aggregated in this ARM without reseting the local counts.
      */
     const query_stats::DataBearingNodeMetrics& peekMetrics_forTest() const {
@@ -483,7 +495,7 @@ private:
                          ShardId shardId,
                          const ShardTag& tag,
                          bool partialResultsReturned,
-                         Shard::OwnerRetryStrategy retryStrategy);
+                         unique_function<Shard::OwnerRetryStrategy()> retryStrategyFactory);
 
         /**
          * Returns the resolved host and port on which the remote cursor resides.
@@ -566,6 +578,10 @@ private:
         // Set to an error status if there is an error retrieving a response from this remote or if
         // the command result contained an error.
         Status status = Status::OK();
+
+        // Factory to build the retry strategy so a new strategy can be used for each distinct
+        // client getMore request.
+        unique_function<Shard::OwnerRetryStrategy()> retryStrategyFactory;
 
         // Holds the retry strategy responsible for retrying failed requests.
         Shard::OwnerRetryStrategy retryStrategy;
@@ -659,9 +675,39 @@ private:
     void _updateHighWaterMark(WithLock, const BSONObj& value);
 
     /**
+     * Records the cluster time of a swallowed control event. Called for every document returned by
+     * a tailable awaitData cursor, independently of whether its remote is eligible to contribute a
+     * high water mark, so that a later shard promise that may refer to the control event is always
+     * degraded to a high-water-mark token (see '_getHighWaterMark'). The recorded value is
+     * monotonically increasing and intentionally never rolled back: a stale (older) value can only
+     * cause an additional, safe degradation of a promise to a high-water-mark token.
+     */
+    void _recordSwallowedControlEvent(const BSONObj& value);
+
+    /**
      * Checks whether or not the remote cursors are all exhausted.
      */
     bool _remotesExhausted(WithLock) const;
+
+    /**
+     * Advances '_highWaterMark' from the minimum promised sort key, if eligible. The caller must
+     * already hold '_mutex'. Use this when only the side effect is wanted; use '_getHighWaterMark'
+     * when the computed value is also needed.
+     */
+    void _refreshHighWaterMark(WithLock);
+
+    /**
+     * Computes and returns the current high water mark. The caller must already hold '_mutex'.
+     * May advance '_highWaterMark' from the minimum promised sort key.
+     */
+    BSONObj _getHighWaterMark(WithLock);
+
+    /**
+     * Advances '_clientHighWaterMark' to '_highWaterMark' if that would move it forward. The client
+     * high water mark is monotonic and is never rolled back, so it can safely be exposed to clients
+     * as the post-batch resume token even when the internal high water mark moves backward.
+     */
+    void _advanceClientHighWaterMark(WithLock);
 
     //
     // Helpers for ready().
@@ -722,6 +768,12 @@ private:
     void _processBatchResults(WithLock lk,
                               const CursorResponse& cursorResponse,
                               const RemoteCursorPtr& remote);
+
+    /**
+     * Schedules a retry loop generated callback. Needs to take caution to avoid problems like
+     * deadlocks and referencing a stale opCtx.
+     */
+    void _scheduleRetryCallback(std::function<void(Status)> callback, Milliseconds delay);
 
     /**
      * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
@@ -806,9 +858,26 @@ private:
     void _determineInitialHighWaterMark();
 
     /**
-     * Processes additional participants received in the responses if necessary.
+     * Processes additional participants received in the responses if necessary. Drains every
+     * queued response (enrolling siblings even after one raises) and returns the first failure;
+     * never throws. The caller decides whether to re-throw (active path) or latch a deferred
+     * abort (cleanup path).
      */
-    void _processAdditionalTransactionParticipants(OperationContext* opCtx);
+    Status _processAdditionalTransactionParticipants(OperationContext* opCtx, WithLock lk);
+
+    /**
+     * The cleanup drain: drains buffered additional-participant metadata for the owning
+     * transaction and latches any failure as a deferred abort on the router (raised at the end of
+     * the observing command, whose error path runs the implicit abort).
+     */
+    void _drainAndLatchAdditionalTransactionParticipants(OperationContext* opCtx,
+                                                         WithLock lk) noexcept;
+
+    /**
+     * Returns true if 'opCtx' belongs to the same transaction as this ARM, so processing its
+     * buffered additional-participant metadata is safe and correct.
+     */
+    bool _shouldProcessAdditionalParticipantsFor(OperationContext* opCtx, WithLock lk) const;
 
     /**
      * Removes a remote from the _promisedMinSortKeys set, if already present in there.
@@ -916,8 +985,34 @@ private:
     absl::btree_set<MinSortKeyRemotePair, PromisedMinSortKeyComparator> _promisedMinSortKeys;
 
     // For sorted tailable cursors, records the current high-water-mark sort key. Empty
-    // otherwise.
+    // otherwise. This value may be advanced from the minimum promised sort key and may be rolled
+    // back by 'setHighWaterMark()' when degraded-mode overfetch is undone.
     BSONObj _highWaterMark;
+
+    // The cluster time of the most recent control event returned by any shard. Control events are
+    // swallowed internally by the change stream and are never returned to the client, so their
+    // event resume tokens are not resumable. A shard promise (promised min sort key) at or before
+    // this cluster time may be such a control event's resume token; it is degraded to a
+    // high-water-mark token before being adopted into '_highWaterMark' so that it can never be
+    // exposed to clients as a resume point.
+    //
+    // This value is monotonically increasing and is intentionally not rolled back (e.g. by
+    // 'undoNextReady()'): an over-conservative value only degrades additional promises to
+    // high-water-mark tokens, which is always safe, whereas a value that was too low would allow a
+    // non-resumable control-event token to leak.
+    boost::optional<Timestamp> _lastSwallowedControlEventClusterTime;
+
+    // For sorted tailable cursors, records the high-water-mark sort key that has been exposed to
+    // clients via 'getHighWaterMarkForClient()'. Unlike '_highWaterMark', this value is never
+    // rolled back, ensuring that the client-visible post-batch resume token never regresses.
+    BSONObj _clientHighWaterMark;
+
+    // For sorted tailable cursors, whether 'getHighWaterMarkForClient()' may advance the
+    // client-visible high water mark based on the minimum promised sort key from the shards.
+    // Defaults to true. It is disabled for change streams that ignore removed shards while reading
+    // a bounded change stream segment, where a promise could belong to a shard that is about to be
+    // removed and could point beyond the end of the current segment.
+    bool _advanceHighWaterMarkFromPromisedSortKeys = true;
 
     // Strategy for determining the next high watermark in tailable, awaitData mode. Not used in
     // other modes.
@@ -933,6 +1028,12 @@ private:
      * 'nextReady()' so it can be undone later.
      */
     bool _undoModeEnabled = false;
+
+    // High-water-mark values saved before the most recent '_updateHighWaterMark()' when undo
+    // mode is enabled. 'undoNextReady()' restores these values so that an undone event does not
+    // leave the high water marks advanced beyond the last actually-returned event.
+    BSONObj _highWaterMarkBeforeUndo;
+    BSONObj _clientHighWaterMarkBeforeUndo;
 
     /**
      * State required to undo a previous invocation of the function 'nextReady()'. Will only be

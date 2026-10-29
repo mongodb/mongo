@@ -24,7 +24,7 @@ let config = replTest.getReplSetConfig();
 config.members[0].priority = 5;
 config.members[2].arbiterOnly = true;
 config.settings = {
-    electionTimeoutMillis: 2000,
+    electionTimeoutMillis: 3000,
 };
 replTest.initiate(config);
 

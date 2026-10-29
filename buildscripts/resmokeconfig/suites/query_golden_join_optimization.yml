@@ -2,26 +2,18 @@ test_kind: js_test
 
 selector:
   roots:
-    - jstests/query_golden/**/*.js
-  exclude_files:
-    - jstests/query_golden/libs/**/*.js
-    - jstests/query_golden/test_inputs/**/*.js
-    # No joins in those plan stability tests
-    - jstests/query_golden/plan_stability.js
-    - jstests/query_golden/plan_stability2.js
-    # Those tests set internalEnableJoinOptimization internally
     - jstests/query_golden/join_opt/**/*.js
-    # No joins in those tests
-    - jstests/query_golden/expr_eq_optimization_md.js
+  exclude_files:
+    # Exclude plan stability tests- they run in their own suite
+    - jstests/query_golden/join_opt/plan_stability*
 executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ""
-      objcheck: ""
       eval: |
         // Keep in sync with query_golden_*.yml.
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
-        await import("jstests/libs/override_methods/golden_overrides.js");
+        await import("jstests/libs/override_methods/query/golden_overrides.js");
         import {beginGoldenTest} from "jstests/libs/query_optimization/begin_golden_test.js";
         beginGoldenTest("jstests/query_golden/expected_output");
         // Enforce plain log format until json format is the default.
@@ -31,7 +23,10 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # Keep these parameters in sync with the Join Optimization variant to make local testing easier.
         internalEnableJoinOptimization: true
-        # Path arrayness is required for join optimization.
+        internalEnableJoinPlanCache: true
+        featureFlagCostBasedRanker: true
         featureFlagPathArrayness: true
-        internalQuerySamplingBySequentialScan: true
+        featureFlagPersistentStats: true
+        internalQuerySamplingByStrides: true

@@ -1,38 +1,13 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::collection_validation {
 
@@ -107,6 +82,9 @@ enum class RepairMode {
     kAdjustMultikey,
 };
 
+std::string_view toString(ValidateMode validateMode);
+std::string_view toString(RepairMode repairMode);
+
 /**
  * Additional validation options that can run in any mode.
  */
@@ -119,7 +97,9 @@ public:
                       boost::optional<std::string> verifyConfigurationOverride = boost::none,
                       boost::optional<Timestamp> readTimestamp = boost::none,
                       boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
-                      boost::optional<std::vector<std::string>> revealHashedIds = boost::none);
+                      boost::optional<std::vector<std::string>> revealHashedIds = boost::none,
+                      boost::optional<int64_t> targetRecordsPerRecordStoreSlice = boost::none,
+                      bool sizeStats = false);
 
     virtual ~ValidationOptions() = default;
 
@@ -155,8 +135,21 @@ public:
             _validateMode == ValidateMode::kHashDrillDown;
     }
 
+    ValidateMode getValidateMode() const {
+        return _validateMode;
+    }
+
     bool isCollHashValidation() const {
         return _validateMode == ValidateMode::kCollectionHash;
+    }
+
+    /**
+     * Returns true iff the caller opted in to accumulating and logging a storage size summary. When
+     * set, the record store and index scans are opened as size-stats cursors which log the size
+     * summary when the scan complete.
+     */
+    bool sizeStats() const {
+        return _sizeStats;
     }
 
     bool isHashDrillDown() const {
@@ -222,6 +215,17 @@ public:
         return _verifyConfigurationOverride;
     }
 
+    const boost::optional<int64_t>& getTargetRecordsPerRecordStoreSlice() const {
+        return _targetRecordsPerRecordStoreSlice;
+    }
+
+    /**
+     * The options this validation resolved to, for reporting. The mode alone determines most of
+     * what a validation does, and nothing else logs it, so a run's workload cannot otherwise be
+     * identified from its output.
+     */
+    BSONObj toBSON() const;
+
 private:
     ValidateMode _validateMode;
 
@@ -239,6 +243,12 @@ private:
     boost::optional<std::vector<std::string>> _hashPrefixes;
 
     boost::optional<std::vector<std::string>> _revealHashedIds;
+
+    boost::optional<int64_t> _targetRecordsPerRecordStoreSlice;
+
+    // Opt-in: when true (and running collHash validation), the record store and index scans
+    // accumulate a storage size summary that is read back and logged.
+    bool _sizeStats;
 };
 
 }  // namespace mongo::collection_validation

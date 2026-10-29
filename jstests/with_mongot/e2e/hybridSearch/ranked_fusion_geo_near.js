@@ -2,7 +2,7 @@
  * Tests hybrid search with rank fusion using the $rankFusion stage with $search and $geoNear
  * inputs. We manually observe returned results and see that they clearly relate to the input
  * pipeline criteria specified, then codify the results as an ordered list of document ids.
- * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";

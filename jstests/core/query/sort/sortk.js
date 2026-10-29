@@ -2,6 +2,7 @@
 // SERVER-5063 and SERVER-1205.
 
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   requires_fcv_82,
 //   requires_non_retryable_writes,

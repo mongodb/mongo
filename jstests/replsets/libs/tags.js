@@ -181,7 +181,7 @@ export var TagsTest = function (options) {
             replTest.awaitNodesAgreeOnPrimary(
                 replTest.timeoutMS,
                 expectedNodesAgreeOnPrimary,
-                nodeId,
+                replTest.nodes[nodeId],
             );
             jsTestLog(
                 "ensurePrimary - Nodes " +

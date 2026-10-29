@@ -2,6 +2,7 @@
  * Test that running explain() providing a collection UUID rather than collection name will fail
  * cleanly.
  * @tags: [
+ *   uses_explain,
  *   no_selinux,
  *   assumes_stable_collection_uuid,
  * ]

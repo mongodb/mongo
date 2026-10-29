@@ -44,12 +44,10 @@ class sweep_util(wttest.WiredTigerTestCase):
         if session is None:
             session = self.session
         if baseline is None:
-            with wttest.open_cursor(session, 'statistics:') as stat_cursor:
-                baseline = stat_cursor[statistic][2]
+            baseline = self.get_stat(statistic, session=session)
         deadline = time.time() + timeout
         while True:
-            with wttest.open_cursor(session, 'statistics:') as stat_cursor:
-                value = stat_cursor[statistic][2]
+            value = self.get_stat(statistic, session=session)
             if value - baseline >= increment:
                 return value
             self.assertLess(time.time(), deadline,

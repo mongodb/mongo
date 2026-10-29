@@ -46,8 +46,11 @@ class test_disagg_corruption_mixin(wttest.WiredTigerTestCase, DisaggCorruptionMi
     def _populate(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
         c = self.session.open_cursor(self.uri, None, None)
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         for i in range(self.nentries):
             c[f'k{i:04d}'] = f'v{i:04d}'
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         c.close()
         self.session.checkpoint()
 
@@ -91,8 +94,11 @@ class test_disagg_corruption_mixin(wttest.WiredTigerTestCase, DisaggCorruptionMi
         # Apply a series of modifications to create page deltas.
         for iteration in range(5):
             c = self.session.open_cursor(self.uri, None, None)
+            self.ts_count = getattr(self, 'ts_count', 0) + 1
+            self.session.begin_transaction()
             for i in range(self.nentries):
                 c[f'k{i:04d}'] = f'v{i:04d}-{iteration}'
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
             c.close()
             self.session.checkpoint()
 

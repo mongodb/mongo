@@ -31,7 +31,7 @@ B-tree (\c __tree_walk_internal) and (2) when verifying a tree (\c __verify_tree
 The \c __wt_session_prefetch_check function contains a few checks to decide if
 pre-fetching should be performed for a given \c ref. Pre-fetching does not operate
 on internal pages, and should not be performed until we have triggered at least two leaf page reads from sequential read requests. Pre-fetching is also disabled for
-tiered tables, and special operations with the exception of verify.
+special operations with the exception of verify.
 
 @subsection prefetch_algorithm_populate_queue Populating the Pre-fetch Queue
 

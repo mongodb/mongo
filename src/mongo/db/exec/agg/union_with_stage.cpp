@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/exec/agg/union_with_stage.h"
@@ -124,7 +98,13 @@ GetNextResult UnionWithStage::doGetNext() {
 
     if (_sharedState->_executionState ==
         UnionWithSharedState::ExecutionProgress::kStartingSubPipeline) {
-        query_shape::SerializationOptions wireOptsForSub{.isSerializingForRemoteDispatch = true};
+        // If prepareSubPipeline throws CommandOnShardedViewNotSupportedOnMongod, the serialized
+        // pipeline is fed back through parsePipelineWithMaybeViewDefinition which reparses. Use
+        // serializeForReparse so stages emit user form and the re-parse doesn't trip an
+        // internal-field check. If we don't throw, the serialized pipeline is consumed by
+        // prepareSubPipeline only for logging.
+        query_shape::SerializationOptions wireOptsForSub{.isSerializingForRemoteDispatch = true,
+                                                         .serializeForReparse = true};
         auto serializedPipeline = _sharedState->_pipeline->serializeToBson(wireOptsForSub);
 
         // Prepare the sub pipeline. This is expected to fail if the command is not supported on a
@@ -134,14 +114,13 @@ GetNextResult UnionWithStage::doGetNext() {
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             // Preparation of sub pipeline failed. The pipeline will be modified to use the view
             // definition instead, and we attempt to prepare it again.
+            const auto& resolvedNs = *e.extraInfo<ResolvedNamespace>();
             _sharedState->_pipeline = DocumentSourceUnionWith::parsePipelineWithMaybeViewDefinition(
-                pExpCtx,
-                ResolvedNamespace{e->getResolvedNamespace(), e->getBsonPipeline()},
-                std::move(serializedPipeline),
-                _userNss);
+                pExpCtx, resolvedNs, std::move(serializedPipeline), _userNss);
             logShardedViewFound(e, *_sharedState->_pipeline);
 
-            // Serialize the new pipeline.
+            // Serialize the new pipeline. Use serializeForReparse for consistency with the
+            // first serialize above.
             serializedPipeline = _sharedState->_pipeline->serializeToBson(wireOptsForSub);
 
             // If this throws again, the exception will bubble up and will be caught by an outer
@@ -184,7 +163,6 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
     const boost::intrusive_ptr<ExpressionContext>& pipelineCtx =
         _sharedState->_pipeline->getContext();
     pipelineCtx->initializeReferencedSystemVariables();
-    pipelineCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
     logPipeline(104243, "$unionWith before pipeline prep: ", *_sharedState->_pipeline);
 
@@ -192,7 +170,7 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
         pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             pipelineCtx,
             std::move(_sharedState->_pipeline),
-            true /* attachCursorAfterOptimizing */,
+            /*attachCursorAfterOptimizing=*/true,
             pipeline_optimization::optimizeAndValidatePipeline);
     logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 
@@ -33,6 +7,7 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -50,16 +25,25 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector innerKey,
                              value::SlotVector innerProjects,
                              boost::optional<value::SlotId> collatorSlot,
+                             bool allowDiskUse,
                              PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId planNodeId,
                              boost::optional<size_t> estimatedBuildCardinality,
-                             bool participateInTrialRunTracking)
-    : PlanStage("hj"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
+                             bool participateInTrialRunTracking,
+                             IntermediateTrackingBehavior intermediateTracking)
+    : PlanStage("hj"sv,
+                yieldPolicy,
+                planNodeId,
+                participateInTrialRunTracking,
+                intermediateTracking == IntermediateTrackingBehavior::kTrackIntermediateRows
+                    ? TrialRunTrackingType::TrackIntermediateRows
+                    : TrialRunTrackingType::NoTracking),
       _outerKey(std::move(outerKey)),
       _outerProjects(std::move(outerProjects)),
       _innerKey(std::move(innerKey)),
       _innerProjects(std::move(innerProjects)),
       _collatorSlot(collatorSlot),
+      _allowDiskUse(allowDiskUse),
       _estimatedBuildCardinality(estimatedBuildCardinality),
       _probeKey(_outerKey.size()),
       _probeProject(_outerProjects.size()) {
@@ -79,9 +63,12 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _innerKey,
                                            _innerProjects,
                                            _collatorSlot,
+                                           _allowDiskUse,
                                            _yieldPolicy,
                                            _commonStats.nodeId,
-                                           participateInTrialRunTracking());
+                                           _estimatedBuildCardinality,
+                                           participateInTrialRunTracking(),
+                                           intermediateTrackingBehavior());
 }
 
 void HashJoinStage::prepare(CompileCtx& ctx) {
@@ -132,8 +119,10 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
                    innerChild());
 
     _joinImpl.emplace(
-        loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill),
+        loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill)
+            .get(_opCtx),
         collator,
+        _allowDiskUse,
         _estimatedBuildCardinality,
         _stats);
 }
@@ -149,7 +138,17 @@ void HashJoinStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.opens++;
-    innerChild()->open(reOpen);
+
+    // Drop any cursor left over from a previous open before executing the children: it references
+    // _probeKey/_probeProject, which may hold views into buffers that no longer exist, and a yield
+    // during the build phase below must not attempt to save them. The stage's outputs are likewise
+    // not accessible until it produces a row.
+    _cursor.reset();
+    disableSlotAccess();
+
+    outerChild()->disableSlotAccess(/*recursive=*/true);
+
+    innerChild()->open(false);
 
     _joinImpl->reset();
 
@@ -170,7 +169,11 @@ void HashJoinStage::open(bool reOpen) {
             project.reset(idx++, p->getCopyOfValue());
         }
 
+        const bool spilledBefore = _stats.usedDisk;
         _joinImpl->addBuild(std::move(key), std::move(project));
+        if (!spilledBefore && _stats.usedDisk) {
+            trackSpill();
+        }
     }
     _joinImpl->finishBuild();
 
@@ -178,7 +181,6 @@ void HashJoinStage::open(bool reOpen) {
     outerChild()->open(reOpen);
 
     _joinPhase = JoinPhase::kProbing;  // Set initial phase
-    _cursor.reset();
 }
 
 PlanState HashJoinStage::getNext() {
@@ -197,18 +199,23 @@ PlanState HashJoinStage::getNext() {
 
         switch (_joinPhase) {
             case JoinPhase::kProbing:
+                // While the outer child advances, _probeKey/_probeProject still hold views into
+                // the previous outer row's buffers, which the child may free at any point.
+                // Disable slot access so that a yield firing inside the child does
+                // not attempt to save those stale views; they are overwritten below before this
+                // stage produces another row, and trackPlanState() re-enables slot access on
+                // ADVANCED.
+                disableSlotAccess();
                 if (auto state = outerChild()->getNext(); state == PlanState::ADVANCED) {
 
                     size_t idx = 0;
                     for (auto& p : _inOuterKeyAccessors) {
-                        auto [tag, val] = p->getViewOfValue();
-                        _probeKey.reset(idx++, false, tag, val);
+                        _probeKey.reset(idx++, p->getViewOfValue());
                     }
 
                     idx = 0;
                     for (auto& p : _inOuterProjectAccessors) {
-                        auto [tag, val] = p->getViewOfValue();
-                        _probeProject.reset(idx++, false, tag, val);
+                        _probeProject.reset(idx++, p->getViewOfValue());
                     }
 
                     _joinImpl->probe(_probeKey, _probeProject, _cursor);
@@ -360,12 +367,20 @@ size_t HashJoinStage::estimateCompileTimeSize() const {
     return size;
 }
 
+bool HashJoinStage::probeRowsLiveAcrossYield() const {
+    return slotsAccessible() || _cursor.hasPendingMatches();
+}
+
 void HashJoinStage::doSaveState() {
+    if (!probeRowsLiveAcrossYield()) {
+        // Nothing to preserve; poison the probe rows in debug builds to catch any read before
+        // they are overwritten.
+        prepareForYielding(_probeKey, /*isAccessible=*/false);
+        prepareForYielding(_probeProject, /*isAccessible=*/false);
+        return;
+    }
     _cursor.saveState();
 }
 
-void HashJoinStage::doRestoreState() {
-    _cursor.restoreState();
-}
 }  // namespace sbe
 }  // namespace mongo

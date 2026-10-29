@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -101,11 +75,12 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     bool preparingFromSbeCache,
                                     RemoteCursorMap* remoteCursors = nullptr);
 
-std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContext* opCtx,
-                                                                 const ExpressionContext& expCtx,
-                                                                 size_t remoteCursorId,
-                                                                 RemoteCursorMap* remoteCursors,
-                                                                 PlanYieldPolicySBE* yieldPolicy);
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData> buildSearchMetadataExecutorSBE(
+    OperationContext* opCtx,
+    const ExpressionContext& expCtx,
+    size_t remoteCursorId,
+    RemoteCursorMap* remoteCursors,
+    PlanYieldPolicySBE* yieldPolicy);
 
 /**
  * The PlanStageSlots class is used by SlotBasedStageBuilder to return the output slots produced
@@ -142,8 +117,8 @@ public:
     using UnownedSlotName = std::pair<SlotType, std::string_view>;
     using OwnedSlotName = std::pair<SlotType, std::string>;
 
-    using MakeMergeStageFn = std::function<std::pair<SbStage, SbSlotVector>(
-        sbe::PlanStage::Vector, std::vector<SbSlotVector>)>;
+    using MakeMergeStageFn =
+        std::function<std::pair<SbStage, SbSlotVector>(SbStage::Vector, std::vector<SbSlotVector>)>;
 
     struct NameHasher {
         using is_transparent = void;
@@ -174,12 +149,6 @@ public:
     static constexpr UnownedSlotName kIndexKey{kMeta, "indexKey"};
     static constexpr UnownedSlotName kIndexKeyPattern{kMeta, "indexKeyPattern"};
     static constexpr UnownedSlotName kPrefetchedResult{kMeta, "prefetchedResult"};
-    static constexpr UnownedSlotName kMetadataSearchScore{kMeta, "metadataSearchScore"};
-    static constexpr UnownedSlotName kMetadataSearchHighlights{kMeta, "metadataSearchHighlights"};
-    static constexpr UnownedSlotName kMetadataSearchDetails{kMeta, "metadataSearchDetails"};
-    static constexpr UnownedSlotName kMetadataSearchSortValues{kMeta, "metadataSearchSortValues"};
-    static constexpr UnownedSlotName kMetadataSearchSequenceToken{kMeta,
-                                                                  "metadataSearchSequenceToken"};
     static constexpr UnownedSlotName kBlockSelectivityBitmap{kMeta, "bitmap"};
 
     struct Data {
@@ -843,9 +812,10 @@ struct ProjectionPlan {
 /**
  * A stage builder which builds an executable tree using slot-based PlanStages.
  */
-class SlotBasedStageBuilder final : public StageBuilder<std::pair<SbStage, PlanStageData>> {
+class SlotBasedStageBuilder final
+    : public StageBuilder<std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData>> {
 public:
-    using PlanType = std::pair<SbStage, PlanStageData>;
+    using PlanType = std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData>;
     using BaseType = StageBuilder<PlanType>;
 
     static constexpr auto kMeta = PlanStageSlots::SlotType::kMeta;
@@ -860,12 +830,6 @@ public:
     static constexpr auto kIndexKey = PlanStageSlots::kIndexKey;
     static constexpr auto kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
     static constexpr auto kPrefetchedResult = PlanStageSlots::kPrefetchedResult;
-    static constexpr auto kMetadataSearchScore = PlanStageSlots::kMetadataSearchScore;
-    static constexpr auto kMetadataSearchHighlights = PlanStageSlots::kMetadataSearchHighlights;
-    static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
-    static constexpr auto kMetadataSearchSortValues = PlanStageSlots::kMetadataSearchSortValues;
-    static constexpr auto kMetadataSearchSequenceToken =
-        PlanStageSlots::kMetadataSearchSequenceToken;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -977,6 +941,17 @@ private:
     std::pair<SbStage, PlanStageSlots> buildSort(const QuerySolutionNode* root,
                                                  const PlanStageReqs& reqs);
 
+    // This function is called as the last step of buildSort, to build the sort stage and produce
+    // its outputs. Its aim is to reduce the stack space required by the buildSort function, which
+    // is valuable in case we have to build pipelines composed of multiple $sort.
+    MONGO_COMPILER_NOINLINE
+    std::pair<SbStage, PlanStageSlots> buildSortStageAndOutputs(const QuerySolutionNode* root,
+                                                                const PlanStageReqs& reqs,
+                                                                const PlanStageReqs& forwardingReqs,
+                                                                BuildSortKeysPlan plan,
+                                                                SbStage stage,
+                                                                PlanStageSlots childOutputs);
+
     std::pair<SbStage, PlanStageSlots> buildSortCovered(const QuerySolutionNode* root,
                                                         const PlanStageReqs& reqs);
 
@@ -1042,12 +1017,6 @@ private:
     std::pair<SbStage, PlanStageSlots> buildShardFilter(const QuerySolutionNode* root,
                                                         const PlanStageReqs& reqs);
 
-    std::pair<SbStage, PlanStageSlots> buildSearch(const QuerySolutionNode* root,
-                                                   const PlanStageReqs& reqs);
-
-    std::pair<SbStage, PlanStageSlots> buildWindow(const QuerySolutionNode* root,
-                                                   const PlanStageReqs& reqs);
-
     /**
      * Constructs an optimized SBE plan for 'root' in the case that the fields of the shard key
      * pattern are provided by the child index scan. In this case, the SBE plan for the child
@@ -1060,6 +1029,15 @@ private:
 
     std::pair<SbStage, PlanStageSlots> buildGroup(const QuerySolutionNode* root,
                                                   const PlanStageReqs& reqs);
+
+    std::pair<SbStage, PlanStageSlots> buildStreamingGroup(const QuerySolutionNode* root,
+                                                           const PlanStageReqs& reqs);
+
+    MONGO_COMPILER_NOINLINE
+    std::pair<SbStage, PlanStageSlots> buildGroupFinalizeOutputs(const PlanStageReqs& reqs,
+                                                                 const GroupNode* groupNode,
+                                                                 SbStage stage,
+                                                                 PlanStageSlots childOutputs);
 
     std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> buildGroupImpl(
         SbStage stage,
@@ -1091,6 +1069,9 @@ private:
 
     std::pair<SbStage, PlanStageSlots> buildIndexedJoinEmbeddingNode(const QuerySolutionNode* root,
                                                                      const PlanStageReqs& reqs);
+
+    std::pair<SbStage, PlanStageSlots> buildIndexedJoinIndexProbe(const QuerySolutionNode* root,
+                                                                  const PlanStageReqs& reqs);
 
     std::pair<SbStage, PlanStageSlots> buildUnpackTsBucket(const QuerySolutionNode* root,
                                                            const PlanStageReqs& reqs);
@@ -1183,8 +1164,6 @@ private:
      */
     const CollectionPtr& getCollection(const NamespaceString& nss) const;
 
-    std::pair<std::vector<std::string>, sbe::value::SlotVector> buildSearchMetadataSlots();
-
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
@@ -1195,8 +1174,8 @@ private:
     // Hash set tracking the Collators used by the SBE plan being built.
     absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*> _collatorsMap;
 
-    // Maintains a mapping from AccumulationStatements / WindowFunctionStatements to their
-    // corresponding SortSpecs (stored in slots).
+    // Maintains a mapping from AccumulationStatements to their corresponding SortSpecs (stored in
+    // slots).
     absl::flat_hash_map<const void*, sbe::value::SlotId> _sortSpecMap;
 
     const MultipleCollectionAccessor& _collections;

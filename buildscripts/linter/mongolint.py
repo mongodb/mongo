@@ -33,7 +33,7 @@ _RE_HEADER = re.compile(r"\.(h|hpp)$")
 class Linter:
     """Simple C++ Linter."""
 
-    _license_header = """\
+    _sspl_license_header = """\
 /**
  *    Copyright (C) {year}-present MongoDB, Inc.
  *
@@ -62,6 +62,11 @@ class Linter:
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */""".splitlines()
+
+    _spdx_license_header = """\
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
+""".splitlines()
 
     def __init__(self, file_name, raw_lines):
         """Create new linter."""
@@ -152,24 +157,47 @@ class Linter:
         self._error(linenum, category, "{} See {}".format(msg, style_url))
         return (False, linenum)
 
-    def _check_for_server_side_public_license(self):
-        """Return the number of the line at which the check ended."""
+    def _match_license_header(self, license_header):
+        """Try to match a license header against the start of the file.
+
+        Returns a tuple (linenum, error). If the header matches, error is None.
+        Otherwise error is a str describing the first mismatch,
+        which the caller can report if no other license header matches either.
+        """
         src_iter = (x.rstrip() for x in self.raw_lines)
         linenum = 0
-        for linenum, lic_line in enumerate(self._license_header):
+        for linenum, lic_line in enumerate(license_header):
             src_line = next(src_iter, None)
             if src_line is None:
-                self._license_error(linenum, "Missing or incomplete license header.")
-                return linenum
+                return (linenum, "Missing or incomplete license header.")
             lic_re = re.escape(lic_line).replace(r"\{year\}", r"\d{4}")
             if not re.fullmatch(lic_re, src_line):
-                self._license_error(
-                    linenum,
-                    'Incorrect license header.\n  Expected: "{}"\n  Received: "{}"\n'.format(
-                        lic_line, src_line
-                    ),
+                msg = 'Incorrect license header.\n  Expected: "{}"\n  Received: "{}"\n'.format(
+                    lic_line, src_line
                 )
-                return linenum
+                return (linenum, msg)
+        return (linenum, None)
+
+    def _check_for_server_side_public_license(self):
+        """Either the traditional SSPL or SPDX license headers are acceptable.
+
+        Returns the number of the line at which the check ended.
+        """
+        first_error = None
+        for header in (
+            self._spdx_license_header,
+            self._sspl_license_header,
+        ):
+            linenum, msg = self._match_license_header(header)
+            if msg is None:
+                break
+            if first_error is None:
+                first_error = (linenum, msg)
+        else:
+            # No license header matched; report the first mismatch encountered.
+            (error_linenum, error_msg) = first_error
+            self._license_error(error_linenum, error_msg)
+            return error_linenum
 
         # Warn if SSPL appears in Enterprise code, which has a different license.
         expect_sspl_license = (

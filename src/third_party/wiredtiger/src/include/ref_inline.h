@@ -19,6 +19,42 @@ __wt_ref_is_root(WT_REF *ref)
 }
 
 /*
+ * __wt_ref_type_matches_page --
+ *     Return if the reference's internal/leaf flag matches the page type.
+ */
+static WT_INLINE bool
+__wt_ref_type_matches_page(WT_REF *ref, uint8_t page_type)
+{
+    return (F_ISSET(ref, WT_REF_FLAG_INTERNAL) == WT_PAGE_TYPE_IS_INTERNAL(page_type));
+}
+
+/*
+ * __wt_page_type_matches_btree --
+ *     Return if the page type belongs in a tree of this format.
+ */
+static WT_INLINE bool
+__wt_page_type_matches_btree(WT_BTREE *btree, uint8_t page_type)
+{
+    switch (btree->type) {
+    case BTREE_COL_VAR:
+        return (page_type == WT_PAGE_COL_INT || page_type == WT_PAGE_COL_VAR);
+    case BTREE_ROW:
+        return (page_type == WT_PAGE_ROW_INT || page_type == WT_PAGE_ROW_LEAF);
+    }
+    return (false);
+}
+
+/*
+ * __wt_ref_type_mismatch_returns_error --
+ *     Return if a reference/page type mismatch should return an error instead of panicking.
+ */
+static WT_INLINE bool
+__wt_ref_type_mismatch_returns_error(WT_SESSION_IMPL *session)
+{
+    return (WT_SESSION_READ_CORRUPT_OK(session) || F_ISSET(S2BT(session), WT_BTREE_VERIFY));
+}
+
+/*
  * # The ref state API. #
  *
  * Macros are defined to manipulate the ref state. This is a highly sensitive field and protected

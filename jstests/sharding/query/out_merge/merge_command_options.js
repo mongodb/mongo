@@ -16,7 +16,7 @@ const st = new ShardingTest({
         // Heartbeat will be dropped when the maxTimeAlwaysTimeOut failpoint is set, so increase the
         // heartbeat interval and the time before an election will start to avoid a stepdown during
         // slow execution of the test.
-        settings: {heartbeatIntervalMillis: 600 * 1000, electionTimeoutMillis: 600 * 1000},
+        settings: {heartbeatIntervalMillis: 600 * 1000, electionTimeoutMillis: 900 * 1000},
     },
 });
 
@@ -26,6 +26,16 @@ const target = mongosDB.getCollection("target");
 const primaryDB = st.rs0.getPrimary().getDB("test");
 const nonPrimaryDB = st.rs1.getPrimary().getDB("test");
 const maxTimeMS = 5 * 60 * 1000;
+
+// DDL coordinators probe for in-progress index builds with listIndexes includeIndexBuildInfo.
+// Those entries are not the listIndexes commands this test is checking.
+function userListIndexesFilter(coll) {
+    return {
+        ns: coll.getFullName(),
+        "command.listIndexes": coll.getName(),
+        "command.includeIndexBuildInfo": {$ne: true},
+    };
+}
 
 // Enable profiling on the test DB.
 assert.commandWorked(primaryDB.setProfilingLevel(2));
@@ -54,7 +64,7 @@ assert.commandWorked(source.insert({sk: "dummy"}));
 // The shardCollection command will send a listIndexes on the target collection.
 profilerHasNumMatchingEntriesOrThrow({
     profileDB: primaryDB,
-    filter: {ns: target.getFullName(), "command.listIndexes": target.getName()},
+    filter: userListIndexesFilter(target),
     numExpectedMatches: 1,
 });
 
@@ -106,7 +116,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
     // the remote command vs. part of the command itself.
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: primaryDB,
-        filter: {ns: target.getFullName(), "command.listIndexes": target.getName()},
+        filter: userListIndexesFilter(target),
         numExpectedMatches: 2,
     });
 })();
@@ -160,7 +170,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
     // but due to SERVER-47998 it does not show up in the profiler.
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: primaryDB,
-        filter: {ns: target.getFullName(), "command.listIndexes": target.getName()},
+        filter: userListIndexesFilter(target),
         numExpectedMatches: 2,
     });
 
@@ -197,14 +207,14 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShar
     // Verify that the profiler on the secondary includes an entry for the listIndexes.
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: secondaryDB,
-        filter: {ns: target.getFullName(), "command.listIndexes": target.getName()},
+        filter: userListIndexesFilter(target),
         numExpectedMatches: 1,
     });
 
     // Verify that the primary shard does *not* have an additional listIndexes profiler entry.
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: primaryDB,
-        filter: {ns: target.getFullName(), "command.listIndexes": target.getName()},
+        filter: userListIndexesFilter(target),
         numExpectedMatches: 2,
     });
 

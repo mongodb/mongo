@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/oplog_entry.h"
 
@@ -149,12 +123,12 @@ TEST_F(OplogEntryTest, Create) {
 
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
     const auto oplogEntryObjectDoc =
-        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+        MutableOplogEntry::makeCreateCollObject(nss, opts, /*idIndex=*/BSONObj());
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15));
 
     const auto entry = makeCommandOplogEntry(
-        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
+        entryOpTime, nss, oplogEntryObjectDoc, /*object2=*/boost::none, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -177,13 +151,13 @@ TEST_F(OplogEntryTest, CreateWithRecordIdsReplicatedFalse) {
 
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
     const auto oplogEntryObjectDoc = MutableOplogEntry::makeCreateCollObject(
-        nss, opts, BSONObj() /* idIndex */, /*recordIdsReplicated=*/false);
+        nss, opts, /*idIndex=*/BSONObj(), /*recordIdsReplicated=*/false);
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15
                                     << "recordIdsReplicated" << false));
 
     const auto entry = makeCommandOplogEntry(
-        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
+        entryOpTime, nss, oplogEntryObjectDoc, /*object2=*/boost::none, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -208,13 +182,13 @@ TEST_F(OplogEntryTest, CreateWithRecordIdsReplicatedTrue) {
 
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
     const auto oplogEntryObjectDoc = MutableOplogEntry::makeCreateCollObject(
-        nss, opts, BSONObj() /* idIndex */, /*recordIdsReplicated=*/true);
+        nss, opts, /*idIndex=*/BSONObj(), /*recordIdsReplicated=*/true);
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15
                                     << "recordIdsReplicated" << true));
 
     const auto entry = makeCommandOplogEntry(
-        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
+        entryOpTime, nss, oplogEntryObjectDoc, /*object2=*/boost::none, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -238,7 +212,7 @@ TEST_F(OplogEntryTest, CreateWithCatalogIdentifier) {
     opts.uuid = UUID::gen();
 
     const auto oplogEntryObjectDoc =
-        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+        MutableOplogEntry::makeCreateCollObject(nss, opts, /*idIndex=*/BSONObj());
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15));
 
@@ -538,7 +512,7 @@ TEST_F(OplogEntryTest, ContainerInsertORoundTripIntKey) {
         ContainerInsertOplogEntryO::parse(rawO, IDLParserContext("ContainerInsertOplogEntryO"));
     ASSERT_TRUE(parsed.getKey().isIntKey());
     ASSERT_EQ(parsed.getKey().getIntKey(), 42);
-    ASSERT_EQ(parsed.getValue().data().size(), 5);
+    ASSERT_EQ(parsed.getValue().value().data().size(), 5);
 
     const auto serialized = parsed.toBSON();
     ASSERT_BSONOBJ_EQ(rawO, serialized);
@@ -2478,9 +2452,9 @@ TEST_F(OplogEntryTest,
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
-                                              boost::none /* multiOpType */);
+                                              /*stmtIds=*/{},
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
+                                              /*multiOpType=*/boost::none);
     ASSERT_EQ(entry.extractCommitTransactionTimestamp(), opTime.getTimestamp());
 }
 
@@ -2497,9 +2471,9 @@ TEST_F(OplogEntryTest,
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
-                                              boost::none /* multiOpType */);
+                                              /*stmtIds=*/{},
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
+                                              /*multiOpType=*/boost::none);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
@@ -2517,9 +2491,9 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_TerminalApplyOpsOp
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
-                                              boost::none /* multiOpType */);
+                                              /*stmtIds=*/{},
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
+                                              /*multiOpType=*/boost::none);
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
 }
@@ -2538,8 +2512,8 @@ TEST_F(OplogEntryTest,
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*stmtIds=*/{},
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2559,9 +2533,9 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PartialApplyOpsOpl
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
-                                              boost::none /* multiOpType */,
+                                              /*stmtIds=*/{},
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
+                                              /*multiOpType=*/boost::none,
                                               repl::ApplyOpsType::kPartial);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2581,9 +2555,9 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PrepareApplyOpsOpl
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
-                                              boost::none /* multiOpType */,
+                                              /*stmtIds=*/{},
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
+                                              /*multiOpType=*/boost::none,
                                               repl::ApplyOpsType::kPrepare);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2622,7 +2596,7 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_NoopOplogEntry) {
     auto sessionId = makeLogicalSessionIdForTest();
     auto txnNumber = 0;
     auto entry = makeNoopOplogEntry(
-        opTime, nss, uuid, sessionId, txnNumber, {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+        opTime, nss, uuid, sessionId, txnNumber, /*stmtIds=*/{}, /*prevOpTime=*/repl::OpTime());
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
@@ -2654,12 +2628,41 @@ TEST_F(OplogEntryTest, SizeMetadataSingleOpRoundTrip) {
     EXPECT_EQ(expectedSizeMetadata.getSz(), parsedSingleOpSizeMetadata->getSz());
 }
 
+TEST_F(OplogEntryTest, SizeMetadataSingleOpAbsentSzRoundTrip) {
+    SingleOpSizeMetadata expectedSizeMetadata;
+    ASSERT_FALSE(expectedSizeMetadata.getSz().has_value());
+
+    const BSONObj oplogEntryBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "i");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("wall", Date_t());
+        bob.append("o", BSON("_id" << 1));
+        bob.append("m", expectedSizeMetadata.toBSON());
+        return bob.obj();
+    }();
+
+    const auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogEntryBson));
+    const auto& parsedSizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(parsedSizeMetadata.has_value());
+    const auto* parsedSingleOpSizeMetadata =
+        std::get_if<SingleOpSizeMetadata>(&parsedSizeMetadata.value());
+    ASSERT_NE(parsedSingleOpSizeMetadata, nullptr);
+    EXPECT_FALSE(parsedSingleOpSizeMetadata->getSz().has_value());
+}
+
 TEST_F(OplogEntryTest, SizeMetadataMultiOpRoundTrip) {
+    const int64_t expectedHash = 0x0011223344556677LL;
+
     MultiOpSizeMetadata expectedMeta1;
     expectedMeta1.setUuid(UUID::gen());
     expectedMeta1.setSz(100);
     expectedMeta1.setCt(3);
+    expectedMeta1.setH(expectedHash);
 
+    // 'h' is optional; leave it unset on the second entry.
     MultiOpSizeMetadata expectedMeta2;
     expectedMeta2.setUuid(UUID::gen());
     expectedMeta2.setSz(200);
@@ -2691,10 +2694,13 @@ TEST_F(OplogEntryTest, SizeMetadataMultiOpRoundTrip) {
     EXPECT_EQ(expectedMeta1.getUuid(), (*parsedMultiOpSizeMetadata)[0].getUuid());
     EXPECT_EQ(expectedMeta1.getSz(), (*parsedMultiOpSizeMetadata)[0].getSz());
     EXPECT_EQ(expectedMeta1.getCt(), (*parsedMultiOpSizeMetadata)[0].getCt());
+    ASSERT_TRUE((*parsedMultiOpSizeMetadata)[0].getH().has_value());
+    EXPECT_EQ(expectedHash, *(*parsedMultiOpSizeMetadata)[0].getH());
 
     EXPECT_EQ(expectedMeta2.getUuid(), (*parsedMultiOpSizeMetadata)[1].getUuid());
     EXPECT_EQ(expectedMeta2.getSz(), (*parsedMultiOpSizeMetadata)[1].getSz());
     EXPECT_EQ(expectedMeta2.getCt(), (*parsedMultiOpSizeMetadata)[1].getCt());
+    EXPECT_FALSE((*parsedMultiOpSizeMetadata)[1].getH().has_value());
 }
 
 TEST_F(OplogEntryTest, SizeMetadataMultiOpEmptyArray) {

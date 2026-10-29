@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/handoff/handoff_session.h"
 
@@ -38,6 +12,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/proxy_protocol_tlv_extraction.h"
 #include "mongo/transport/transport_options_gen.h"
@@ -60,6 +35,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport {
+using namespace std::literals::string_view_literals;
 
 namespace {
 
@@ -153,8 +129,8 @@ HandoffSession::HandoffSession(Params params)
       _fd(params.fd),
       _state(State::Cleartext),
       _isShutDown(false),
-      _endpointsBeforeHandoff{.local = HostAndPort(params.localAddress.string()),
-                              .remote = HostAndPort("anonymous unix socket")},
+      _endpointsBeforeHandoff{.local = HostAndPort(params.localAddress.string(), -1),
+                              .remote = HostAndPort("anonymous unix socket", -1)},
       _s2nConnection(nullptr),
       _s2nConfig(params.s2nConfig),
       _posix(params.posix),
@@ -469,7 +445,7 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     // will not modify through it, it's just a C-style convention.
     auto status =
         s2nCheck(s2n_connection_set_config(_s2nConnection, const_cast<s2n_config*>(_s2nConfig)),
-                 "s2n_connection_set_config"_sd);
+                 "s2n_connection_set_config"sv);
     if (!status.isOK()) {
         return status;
     }
@@ -478,19 +454,19 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
                           _s2nConnection,
                           const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(s2nState.data())),
                           static_cast<uint32_t>(s2nState.length())),
-                      "s2n_connection_deserialize"_sd);
+                      "s2n_connection_deserialize"sv);
     if (!status.isOK()) {
         return status;
     }
 
     // Self-service blinding: s2n returns errors immediately instead of sleeping.
     status = s2nCheck(s2n_connection_set_blinding(_s2nConnection, S2N_SELF_SERVICE_BLINDING),
-                      "s2n_connection_set_blinding"_sd);
+                      "s2n_connection_set_blinding"sv);
     if (!status.isOK()) {
         return status;
     }
 
-    status = s2nCheck(s2n_connection_set_fd(_s2nConnection, clientFd), "s2n_connection_set_fd"_sd);
+    status = s2nCheck(s2n_connection_set_fd(_s2nConnection, clientFd), "s2n_connection_set_fd"sv);
     if (!status.isOK()) {
         return status;
     }
@@ -569,7 +545,7 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
 
     // Don't need to lock the mutex here, because _restrictionEnvironment is never accessed from
     // another thread.
-    if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"_sd) {
+    if (_proxiedSource && clientSourceAuthenticationRestrictionMode == "origin"sv) {
         _restrictionEnvironment = RestrictionEnvironment(_proxiedSource->address, localSa);
     } else {
         _restrictionEnvironment = RestrictionEnvironment(peerSa, localSa);
@@ -646,7 +622,11 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
 
     ON_BLOCK_EXIT([this] {
         struct timeval tv = {0, 0};
-        _posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+        // There are no reasonable errors that could happen with this socket operation that wouldn't
+        // have happened when setting this socket option earlier. In the interest of not throwing an
+        // exception in a scope guard destructor, ignore the error.
+        (void)_posix.setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     });
 
     int timeoutMs = static_cast<int>(
@@ -718,6 +698,9 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
         uassertStatusOK(_syncRead(proxyBuf.data() + kProxyV2FixedHeaderSize, addrLen));
     }
 
+    MessageHooks::onProxyHeaderReceived(
+        *this, proxyBuf.data(), proxyBuf.size(), /*isUnixSocket=*/true);
+
     std::string_view proxyData(proxyBuf.data(), proxyBuf.size());
     auto results = transport::parseProxyProtocolHeader(proxyData, /*isProxyUnixSock=*/true);
     uassert(ErrorCodes::ProtocolError,
@@ -737,6 +720,7 @@ void HandoffSession::prelude() {
         };
     }
     applyProxyProtocolTlvs(proxyHeader, shared_from_this());
+    MessageHooks::onConnectionEstablished(*this);
 }
 
 StatusWith<Message> HandoffSession::sourceMessage() {
@@ -778,6 +762,8 @@ StatusWith<Message> HandoffSession::sourceMessage() {
         }
             MONGO_UNREACHABLE;
     }
+
+    MessageHooks::onHeaderReceived(*this, headerBuf, kHeaderSize);
 
     // Validate message length and read the body.
     MSGHEADER::ConstView headerView(headerBuf);
@@ -837,6 +823,12 @@ Status HandoffSession::waitForData() {
     // This function is called from the service executor thread only. It may access any data members
     // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
     // _isShutDown, it must hold a lock on _mutex.
+
+    // Note: If we ever `s2n_connection_set_recv_buffering` to `true`, we might need to check
+    // `s2n_peek_buffered` here, too.
+    if (_state == State::TLS && (!_unconsumedBytes.empty() || s2n_peek(_s2nConnection) > 0)) {
+        return Status::OK();
+    }
     const int noTimeout = -1;
     return pollForRead(_posix, _fd, noTimeout);
 }
@@ -845,12 +837,6 @@ Future<void> HandoffSession::asyncWaitForData() {
     MONGO_UNREACHABLE;
 }
 
-void HandoffSession::setIsLoadBalancerPeer(bool value) {
-    // This function is called from the service executor thread only. It may access any data members
-    // except _isShutDown without holding a lock on _mutex. To modify data members, or to access
-    // _isShutDown, it must hold a lock on _mutex.
-    _isLoadBalancerPeer = value;
-}
 
 Status HandoffSession::validateProxyUnixSocketPeerPermissions() {
     // This function is an implementation detail of AsioTransportLayer, and as such cannot be called

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -41,7 +15,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -68,7 +42,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 class ServiceContext;
@@ -87,7 +61,7 @@ extern FailPoint PrimaryOnlyServiceHangBeforeRunningInstance;
  * will have a dedicated collection where state documents are stored containing the state of any
  * running instances, which are used to recreate the running instances after failover.
  */
-class MONGO_MOD_OPEN PrimaryOnlyService {
+class [[MONGO_MOD_OPEN]] PrimaryOnlyService {
 public:
     /**
      * Client decoration used by Clients that are a part of a PrimaryOnlyService.
@@ -121,7 +95,7 @@ public:
      * implementations shouldn't have their Instance subclass extended this Instance class directly,
      * instead they should extend TypedInstance, defined below.
      */
-    class MONGO_MOD_PUB Instance {
+    class [[MONGO_MOD_PUBLIC]] Instance {
     public:
         virtual ~Instance() = default;
 
@@ -182,8 +156,8 @@ public:
      * proper derived Instance type.
      */
     template <class InstanceType>
-    class MONGO_MOD_OPEN TypedInstance : public Instance,
-                                         public std::enable_shared_from_this<InstanceType> {
+    class [[MONGO_MOD_OPEN]] TypedInstance : public Instance,
+                                             public std::enable_shared_from_this<InstanceType> {
     public:
         TypedInstance() = default;
         ~TypedInstance() override = default;
@@ -328,10 +302,18 @@ public:
     void waitForStateNotRebuilding_forTest(OperationContext* opCtx);
 
     /**
+     * Test-only step-down that marks this service as being in a lightweight stepdown/stepup test
+     * cycle (see _isOnStepUpStepDownTestMode below), then steps down normally. Must be paired
+     * with a subsequent onStepUp_forTest() call, which clears the flag once the rebuild triggered
+     * by that stepup completes.
+     */
+    [[MONGO_MOD_PUBLIC]] void onStepDown_forTest();
+
+    /**
      * Test-only step-up that bypasses the term-monotonicity invariant. Use when simulating a
      * step-down/step-up cycle without a real replica-set election (so the term doesn't advance).
      */
-    MONGO_MOD_PUBLIC void onStepUp_forTest();
+    [[MONGO_MOD_PUBLIC]] void onStepUp_forTest();
 
 protected:
     /**
@@ -546,8 +528,13 @@ private:
      *
      * The majorityWaitOpTime is the time to wait for before proceeding to read the backing state
      * documents and rebuild the instances.
+     *
+     * If clearTestModeOnCompletion is true, _isOnStepUpStepDownTestMode is cleared once the
+     * rebuild this call triggers leaves State::kRebuilding (whether it succeeds or fails).
      */
-    void _doStepUp(long long newTerm, const OpTime& majorityWaitOpTime);
+    void _doStepUp(long long newTerm,
+                   const OpTime& majorityWaitOpTime,
+                   bool clearTestModeOnCompletion = false);
 
     ServiceContext* const _serviceContext;
 
@@ -572,7 +559,7 @@ private:
     // Note: This method has to be accessed only via _setHasExecutor() and _getHasExecutor()
     // methods. This is present to make PrimaryOnlyService::_executor to have (W) synchronization
     // rule instead of (M).
-    AtomicWord<bool> _hasExecutor{false};  //(S)
+    Atomic<bool> _hasExecutor{false};  //(S)
 
     // TODO SERVER-52901: Make the synchronization rule as (R).
     // The concrete TaskExecutor backing _scopedExecutor. While _scopedExecutor is created and
@@ -584,6 +571,11 @@ private:
     std::shared_ptr<executor::TaskExecutor> _executor;  // (W)
 
     State _state = State::kPaused;  // (M)
+
+    // Set for the duration of a test-only lightweight stepdown/stepup cycle: from
+    // onStepDown_forTest() until the rebuild triggered by the paired onStepUp_forTest() call
+    // completes.
+    bool _isOnStepUpStepDownTestMode = false;  // (M)
 
     // If rebuilding the instances fails, for example due to a failure reloading the state documents
     // from disk, this Status gets set to a non-ok value and calls to lookup() or getOrCreate() will
@@ -679,4 +671,4 @@ private:
 };
 
 }  // namespace repl
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

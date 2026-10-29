@@ -27,7 +27,9 @@ executor:
       - src/mongo/db/modules/*/jstests/live_restore/*.js
   config:
     shell_options:
-      eval: await import('jstests/libs/override_methods/implicitly_retry_transactions_on_write_conflicts.js');
+      eval:
+        await import('jstests/libs/override_methods/implicitly_retry_transactions_on_write_conflicts.js');
+        await import('jstests/libs/override_methods/implicitly_retry_resharding.js');
       global_vars:
         TestData:
           setParameters:
@@ -38,11 +40,13 @@ executor:
               mode:
                 activationProbability: 0
             featureFlagContainerWrites: true
+            featureFlagExtensionsApiSignatureValidation: false
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
             featureFlagResumablePrimaryDrivenIndexBuilds: true
           setParametersMongos:
             featureFlagContainerWrites: true
+            featureFlagExtensionsApiSignatureValidation: false
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
             featureFlagResumablePrimaryDrivenIndexBuilds: true
@@ -51,11 +55,11 @@ matrix_suite: true
 selector:
   exclude_with_any_tags:
     - requires_kernel_619
+    - requires_kernel_7014
     - resumable_primary_driven_index_builds_incompatible
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
     - requires_commit_quorum
-    - requires_capped
     - requires_rollbacks
     - requires_index_build_resumability
   roots:

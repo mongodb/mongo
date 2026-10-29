@@ -1,49 +1,29 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/rpc/metadata/client_metadata.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/rpc/metadata/client_metadata_server_parameters_gen.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
@@ -59,6 +39,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -79,6 +60,8 @@ constexpr auto kPid = "pid"sv;
 constexpr auto kType = "type"sv;
 constexpr auto kVersion = "version"sv;
 
+// "cid" is a driver-assigned client identifier reported in clientUpdate metadata documents.
+constexpr auto kCid = "cid"sv;
 constexpr auto kMongoS = "mongos"sv;
 constexpr auto kHost = "host"sv;
 constexpr auto kClient = "client"sv;
@@ -89,6 +72,23 @@ constexpr uint32_t kMaxMongoSMetadataDocumentByteLength = 512U;
 constexpr uint32_t kMaxMongoDMetadataDocumentByteLength = 1024U;
 constexpr uint32_t kMaxApplicationNameByteLength = 128U;
 
+logv2::SeveritySuppressor& getClientMetadataUpdateLogSuppressor() {
+    static logv2::SeveritySuppressor suppressor{
+        Milliseconds(1000 / gClientMetadataUpdateLogRatePerSec),
+        logv2::LogSeverity::Info(),
+        logv2::LogSeverity::Debug(2)};
+    return suppressor;
+}
+
+int getClientMetadataUpdateLogSeverityLevel() {
+    if (gClientMetadataUpdateLogRatePerSec == 0) {
+        // 0 means "no suppression": log all entries at INFO.
+        return logv2::LogSeverity::Info().toInt();
+    }
+    auto& suppressor = getClientMetadataUpdateLogSuppressor();
+    return suppressor().toInt();
+}
+
 struct ClientMetadataState {
     bool isFinalized = false;
     boost::optional<ClientMetadata> meta;
@@ -96,7 +96,20 @@ struct ClientMetadataState {
 const auto getClientState = Client::declareDecoration<ClientMetadataState>();
 const auto getOperationState = OperationContext::declareDecoration<ClientMetadataState>();
 
+// Timestamp (milliseconds since epoch) of the last clientUpdate log emitted for this connection.
+const auto getLastClientMetadataUpdateLogTimeMillis = Client::declareDecoration<int64_t>();
+
+auto& clientMetadataUpdateValidationFailures =
+    *MetricBuilder<Counter64>("network.clientMetadataUpdate.validationFailures");
 }  // namespace
+
+void ClientMetadata::setUpdateLogSuppressorClockSource_forTest(ClockSource* cs) {
+    auto& suppressor = getClientMetadataUpdateLogSuppressor();
+    suppressor.resetWithClockSource_forTest(cs);
+    // The suppressor's period is captured once at first construction. Resyncing it here allows a
+    // test that changes gClientMetadataUpdateLogRatePerSec between cases to observe the new value.
+    suppressor.setPeriod(Milliseconds(1000 / gClientMetadataUpdateLogRatePerSec));
+}
 
 StatusWith<boost::optional<ClientMetadata>> ClientMetadata::parse(const BSONElement& element) try {
     if (element.eoo()) {
@@ -435,6 +448,65 @@ void ClientMetadata::logClientMetadata(Client* client) const {
 
 std::string_view ClientMetadata::fieldName() {
     return kClientMetadataFieldName;
+}
+
+Status ClientMetadata::validateClientMetadataUpdate(const BSONObj& doc) {
+    if (doc.objsize() > gClientMetadataUpdateDocumentMaxByteLength) {
+        return Status(
+            ErrorCodes::ClientMetadataDocumentTooLarge,
+            fmt::format(
+                "The client metadata update document must be less than or equal to {} bytes",
+                gClientMetadataUpdateDocumentMaxByteLength));
+    }
+
+    const BSONElement cidElem = doc.getField(kCid);
+    if (!cidElem.eoo() && cidElem.type() != BSONType::string) {
+        return Status(
+            ErrorCodes::TypeMismatch,
+            fmt::format("The '{}' field must be a string in the client metadata update document",
+                        kCid));
+    }
+
+    return Status::OK();
+}
+
+void ClientMetadata::logClientMetadataUpdate(Client* client, const BSONObj& updateDoc) {
+    if (serverGlobalParams.quiet.load()) {
+        return;
+    }
+
+    auto& lastLogTimeMillis = getLastClientMetadataUpdateLogTimeMillis(client);
+    const auto now = client->getServiceContext()->getFastClockSource()->now();
+    const Date_t lastLogTime = Date_t::fromMillisSinceEpoch(lastLogTimeMillis);
+    if (now - lastLogTime < Seconds(gClientMetadataUpdateLogPerConnectionThrottlingSecs.load())) {
+        return;
+    }
+
+    lastLogTimeMillis = now.toMillisSinceEpoch();
+
+    // Skip validation and auth enrichment when the entry won't be emitted - validation traverses
+    // the BSON document and should not run on suppressed entries.
+    const auto severity = logv2::LogSeverity::cast(getClientMetadataUpdateLogSeverityLevel());
+    if (!logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, severity)) {
+        return;
+    }
+
+    auto status = validateClientMetadataUpdate(updateDoc);
+    if (!status.isOK()) {
+        clientMetadataUpdateValidationFailures.increment();
+        return;
+    }
+
+    const bool authenticated = AuthorizationSession::exists(client) &&
+        AuthorizationSession::get(client)->isAuthenticated();
+
+    LOGV2_DEBUG(51817,
+                severity.toInt(),
+                "client metadata",
+                "remote"_attr = client->getRemote(),
+                "client"_attr = client->desc(),
+                "auth"_attr = authenticated,
+                "doc"_attr = updateDoc);
 }
 
 bool ClientMetadata::tryFinalize(Client* client) {

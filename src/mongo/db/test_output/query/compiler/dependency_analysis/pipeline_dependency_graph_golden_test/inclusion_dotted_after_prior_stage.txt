@@ -1,0 +1,112 @@
+VARIATION InclusionDottedPathAfterPriorStageIsNotArray
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": 1
+            }
+        },
+        {
+            "$project": {
+                "_id": true,
+                "a": {
+                    "b": {
+                        "c": true,
+                        "d": {
+                            "e": true
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
+output: {
+    "$match:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    },
+    "$project:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
+                    "dependencies": []
+                },
+                "_id:-1": "_id:-1",
+                "a:2": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:2",
+                        "fields": {
+                            "<missing>:3": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "b:4": {
+                                "declaringScope": "scope:2",
+                                "scope:3": {
+                                    "exhaustiveScope": "scope:3",
+                                    "fields": {
+                                        "<missing>:5": {
+                                            "declaringScope": "scope:3",
+                                            "dependencies": []
+                                        },
+                                        "c:-1": "c:-1",
+                                        "d:6": {
+                                            "declaringScope": "scope:3",
+                                            "scope:4": {
+                                                "exhaustiveScope": "scope:4",
+                                                "fields": {
+                                                    "<missing>:7": {
+                                                        "declaringScope": "scope:4",
+                                                        "dependencies": []
+                                                    },
+                                                    "e:-1": "e:-1"
+                                                }
+                                            },
+                                            "dependencies": [
+                                                "<base document>:-1"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": [
+                                    "<base document>:-1"
+                                ]
+                            }
+                        }
+                    },
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    }
+}
+

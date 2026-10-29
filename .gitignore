@@ -57,6 +57,9 @@ venv
 *.core
 iwyu.dat
 
+/bazel/hermetic_container/__pycache__/
+/bazel/hermetic_container/dist/
+
 /src/ipch
 /src/mongo/*/ipch
 /src/mongo/*/*/ipch
@@ -234,6 +237,9 @@ codereview.rc
 python-venv*
 python3-venv*
 python2-venv*
+# uv's default project environment (created if uv sync runs without
+# UV_PROJECT_ENVIRONMENT / --active)
+.venv/
 
 # Generated resmoke configuration file
 resmoke.ini

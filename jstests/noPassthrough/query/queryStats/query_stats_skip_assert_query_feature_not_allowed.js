@@ -31,7 +31,7 @@ const collName = jsTestName();
 const options = {
     setParameter: {
         internalQueryStatsErrorsAreCommandFatal: 1,
-        internalQueryStatsRateLimit: -1,
+        internalQueryStatsSampleRate: 1,
     },
 };
 

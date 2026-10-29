@@ -78,7 +78,7 @@ functions:
               export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
               export TESTUTIL_MSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ TSan ]]; then
-              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3:history_size=7:print_suppressions=0:suppressions=$WT_TOPDIR/test/evergreen/tsan_warnings.supp"
               export TESTUTIL_TSAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
               export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
@@ -143,8 +143,14 @@ functions:
           fi
 
           echo "mongodbtoolchain $MDB_TOOLCHAIN_REV not installed, downloading..."
+
+          # The pinned toolchain tarball sources a script that it does not contain.
+          # pipefail preserves the installer's real exit status.
+          # FIXME-WT-18153: Remove this filter once the toolchain has been fixed.
+          set -o pipefail
           curl -fsSL https://s3.amazonaws.com/mongodbtoolchain.build.10gen.cc/installer.sh \
-              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV"
+              | bash -s -- --revision-id "$MDB_TOOLCHAIN_REV" 2>&1 \
+              | sed -E '/scripts\/installer\.sh: No such file or directory/d; /return: can only .return. from a function or sourced script/d'
 
   "dump stacktraces": &dump_stacktraces
     command: shell.exec
@@ -543,21 +549,6 @@ functions:
           fi
         done
 
-  "timestamp abort disagg":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/timestamp_abort"
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ${PREPARE_TEST_ENV}
-        ${additional_san_vars}
-        for i in $(seq ${times|1}); do
-          echo Iteration $i/${times}
-          ./test_timestamp_abort -G -s
-        done
-
 #######################################
 #               Variables             #
 #######################################
@@ -575,65 +566,6 @@ variables:
           # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
           format_args: disagg.mode=switch debug.disagg_slow_truncate_follower=off runs.timer=10:15 ops.prepare=0 ops.verify=1 runs.mirror=1
           times: 5
-
-  - &format-stress-test-disagg-multi
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          # FIXME-WT-17278 Enable removes in disagg multi mode once the related issues have been resolved.
-          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000 ops.pct.delete=0
-          times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
-
-  - &format-stress-test-disagg-multi-data-validation
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          # Validate data with a non-layered table.
-          # FIXME-WT-17278 Enable removes in disagg multi mode once the related issues have been resolved.
-          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 disagg.preserve=1 runs.ops=500000:2000000 ops.pct.delete=0
-          times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
-
-  # FIXME-WT-17278 We can get rid of this task once the issues related to removes in disagg multi mode have been resolved.
-  - &format-stress-test-disagg-multi-delete-enabled
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
-          times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
-
-  # FIXME-WT-17278 We can get rid of this task once the issues related to removes in disagg multi mode have been resolved.
-  - &format-stress-test-disagg-multi-delete-enabled-data-validation
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test disagg"
-        vars:
-          # Validate data with a non-layered table.
-          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 disagg.preserve=1 runs.ops=500000:2000000
-          times: 5
-          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
-
-  - &timestamp-abort-test-disagg
-    depends_on:
-        - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "timestamp abort disagg"
-        vars:
-          times: 50
 
   # Configure flags for builtins.
   - &configure_flags_with_builtins
@@ -668,37 +600,6 @@ tasks:
   - <<: *format-stress-test-disagg-switch-fast-truncate
     name: format-stress-test-disagg-switch-fast-truncate-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-multi
-    name: format-stress-test-disagg-multi-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-multi
-    name: format-stress-test-disagg-multi-2
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-data-validation
-    name: format-stress-test-disagg-multi-validation-1
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-data-validation
-    name: format-stress-test-disagg-multi-validation-2
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-delete-enabled
-    name: format-stress-test-disagg-multi-delete-enabled-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
-  - <<: *format-stress-test-disagg-multi-delete-enabled
-    name: format-stress-test-disagg-multi-delete-enabled-2
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-delete-enabled-data-validation
-    name: format-stress-test-disagg-multi-delete-enabled-validation-1
-    tags: ["stress-test-disagg-fail"]
-  - <<: *format-stress-test-disagg-multi-delete-enabled-data-validation
-    name: format-stress-test-disagg-multi-delete-enabled-validation-2
-    tags: ["stress-test-disagg-fail"]
-
-  - <<: *timestamp-abort-test-disagg
-    name: timestamp-abort-test-disagg-1
-    tags: ["stress-test-disagg-fail"]
-  - <<: *timestamp-abort-test-disagg
-    name: timestamp-abort-test-disagg-2
-    tags: ["stress-test-disagg-fail"]
 
 #######################################
 #            Buildvariants            #

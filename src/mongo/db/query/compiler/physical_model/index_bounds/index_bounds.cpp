@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -40,6 +13,7 @@
 #include <algorithm>
 #include <iterator>
 #include <utility>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 
@@ -259,7 +233,7 @@ bool OrderedIntervalList::boundsOverlapObjectTypeBracket() const {
         BSONObjBuilder objBracketBounds;
         objBracketBounds.appendMinForType("", stdx::to_underlying(BSONType::object));
         objBracketBounds.appendMaxForType("", stdx::to_underlying(BSONType::object));
-        return Interval(objBracketBounds.obj(), false /*startIncluded*/, false /*endIncluded*/);
+        return Interval(objBracketBounds.obj(), /*startIncluded=*/false, /*endIncluded=*/false);
     }();
 
     // Determine whether any of the ordered intervals overlap with the object type bracket. Because
@@ -306,7 +280,7 @@ void OrderedIntervalList::complement() {
     // We will build up a list of intervals that represents the inversion of those in the OIL.
     vector<Interval> newIntervals;
     for (const auto& curInt : intervals) {
-        if ((0 != curInt.start.woCompare(curBoundary, /*compareFieldNames*/ false) ||
+        if ((0 != curInt.start.woCompare(curBoundary, /*rules=*/false) ||
              (!curInclusive && !curInt.startInclusive))) {
             // Make a new interval from 'curBoundary' to the start of 'curInterval'.
             BSONObjBuilder intBob;
@@ -326,7 +300,7 @@ void OrderedIntervalList::complement() {
     maxBob.appendMaxKey("");
     BSONObj maxObj = maxBob.obj();
     BSONElement maxKey = maxObj.firstElement();
-    if (0 != maxKey.woCompare(curBoundary, /*compareFieldNames*/ false) || !curInclusive) {
+    if (0 != maxKey.woCompare(curBoundary, /*rules=*/false) || !curInclusive) {
         BSONObjBuilder intBob;
         intBob.append(curBoundary);
         intBob.append(maxKey);
@@ -611,35 +585,36 @@ bool IndexBoundsChecker::getStartSeekPoint(IndexSeekPoint* out) {
 
 namespace {
 
-IndexBoundsChecker::Location intervalCmpImpl(const Interval& interval,
-                                             const BSONElement& key,
-                                             int expectedDirection) {
+IntervalPosition intervalCmpImpl(const Interval& interval,
+                                 const BSONElement& key,
+                                 int expectedDirection) {
     int cmp = sgn(key.woCompare(interval.start, false));
     bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
     if (!startOK) {
-        return IndexBoundsChecker::BEHIND;
+        return IntervalPosition::BEHIND;
     }
     cmp = sgn(key.woCompare(interval.end, false));
     bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
     if (!endOK) {
-        return IndexBoundsChecker::AHEAD;
+        return IntervalPosition::AHEAD;
     }
-    return IndexBoundsChecker::WITHIN;
+    return IntervalPosition::WITHIN;
 }
 
 }  // namespace
 
-bool IndexBoundsChecker::findLeftmostProblem(const vector<BSONElement>& keyValues,
+bool IndexBoundsChecker::findLeftmostProblem(const KeyComponents& key,
                                              size_t* where,
-                                             Location* what) {
+                                             IntervalPosition* what) const {
     // For each field in the index key, see if it's in the interval it should be.
     for (size_t i = 0; i < _curInterval.size(); ++i) {
         const OrderedIntervalList& field = _bounds->fields[i];
         const Interval& currentInterval = field.intervals[_curInterval[i]];
-        Location cmp = intervalCmpImpl(currentInterval, keyValues[i], _expectedDirection[i]);
+        IntervalPosition cmp =
+            intervalCmpImpl(currentInterval, key.values[i], _expectedDirection[i]);
 
         // If it's not in the interval we think it is...
-        if (0 != cmp) {
+        if (IntervalPosition::WITHIN != cmp) {
             *where = i;
             *what = cmp;
             return true;
@@ -649,8 +624,7 @@ bool IndexBoundsChecker::findLeftmostProblem(const vector<BSONElement>& keyValue
     return false;
 }
 
-bool IndexBoundsChecker::spaceLeftToAdvance(size_t fieldsToCheck,
-                                            const vector<BSONElement>& keyValues) {
+bool IndexBoundsChecker::spaceLeftToAdvance(const KeyComponents& key, size_t fieldsToCheck) const {
     // Check end conditions.  Since we need to move the keys before
     // firstNonContainedField forward, let's make sure that those fields are not at the
     // end of their bounds.
@@ -672,7 +646,7 @@ bool IndexBoundsChecker::spaceLeftToAdvance(size_t fieldsToCheck,
 
         // If it's a closed interval, we're fine so long as we haven't hit the end point of
         // the interval.
-        if (-_expectedDirection[i] == sgn(keyValues[i].woCompare(ival.end, false))) {
+        if (-_expectedDirection[i] == sgn(key.values[i].woCompare(ival.end, false))) {
             return true;
         }
     }
@@ -686,9 +660,9 @@ bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
     while (it.more()) {
         BSONElement elt = it.next();
         size_t whichInterval;
-        Location loc = findIntervalForField(
+        IntervalPosition loc = findIntervalForField(
             elt, _bounds->fields[curOil], _expectedDirection[curOil], &whichInterval);
-        if (WITHIN != loc) {
+        if (IntervalPosition::WITHIN != loc) {
             return false;
         }
         ++curOil;
@@ -696,15 +670,14 @@ bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
     return true;
 }
 
-IndexBoundsChecker::KeyState IndexBoundsChecker::checkKeyWithEndPosition(
-    const BSONObj& currentKey,
-    IndexSeekPoint* query,
-    key_string::Builder& endKey,
-    Ordering ord,
-    bool forward) {
+KeyState IndexBoundsChecker::checkKeyWithEndPosition(const BSONObj& currentKey,
+                                                     IndexSeekPoint* query,
+                                                     key_string::Builder& endKey,
+                                                     Ordering ord,
+                                                     bool forward) {
     auto state = checkKey(currentKey, query);
     endKey.resetToEmpty(ord);
-    if (state == VALID && !_bounds->fields.back().isPoint()) {
+    if (state == KeyState::VALID && !_bounds->fields.back().isPoint()) {
         auto size = _keyValues.size();
         std::vector<const BSONElement*> out(size);
         key_string::Discriminator discriminator;
@@ -726,10 +699,126 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKeyWithEndPosition(
     return state;
 }
 
-IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, IndexSeekPoint* out) {
-    MONGO_verify(_curInterval.size() > 0);
-    out->keySuffix.resize(_curInterval.size());
+namespace {
 
+/**
+ * Returns true if key (first member of pair) is AHEAD of interval
+ * along 'direction' (second member of pair).
+ */
+bool isKeyAheadOfInterval(const Interval& interval,
+                          const std::pair<BSONElement, int>& keyAndDirection) {
+    return intervalCmpImpl(interval, keyAndDirection.first, keyAndDirection.second) ==
+        IntervalPosition::AHEAD;
+}
+
+template <typename Checker, typename Key, typename SeekPoint>
+KeyState checkKeyGeneric(Checker& checker, const Key& key, SeekPoint* seekPoint) {
+    auto& curInterval = checker.curInterval();
+    const auto* bounds = checker.bounds();
+    const auto& expectedDirection = checker.expectedDirection();
+
+    MONGO_verify(curInterval.size() > 0);
+
+    const auto keyComponents = checker.parseKey(key);
+
+    size_t firstNonContainedField;
+    IntervalPosition orientation;
+
+    if (!checker.findLeftmostProblem(keyComponents, &firstNonContainedField, &orientation)) {
+        // All fields in the index are within the current interval.  Caller can use the key.
+        return KeyState::VALID;
+    }
+
+    // Field number 'firstNonContainedField' of the index key is before its current interval.
+    if (IntervalPosition::BEHIND == orientation) {
+        // It's behind our current interval, but our current interval could be wrong.  Start all
+        // intervals from firstNonContainedField to the right over...
+        for (size_t i = firstNonContainedField; i < curInterval.size(); ++i) {
+            curInterval[i] = 0;
+        }
+
+        // ...and try again.  This call modifies 'orientation', so we may check its value again
+        // in the clause below if field number 'firstNonContainedField' isn't in its first
+        // interval.
+        if (!checker.findLeftmostProblem(keyComponents, &firstNonContainedField, &orientation)) {
+            return KeyState::VALID;
+        }
+    }
+
+    // Field number 'firstNonContainedField' of the index key is before all current intervals.
+    if (IntervalPosition::BEHIND == orientation) {
+        // Tell the caller to move forward to the start of the current interval.
+        checker.buildSeekPoint(keyComponents, firstNonContainedField, orientation, seekPoint);
+        return KeyState::MUST_ADVANCE;
+    }
+
+    MONGO_verify(IntervalPosition::AHEAD == orientation);
+
+    // Field number 'firstNonContainedField' of the index key is after interval we think it's
+    // in.  Fields 0 through 'firstNonContained-1' are within their current intervals and we can
+    // ignore them.
+    while (firstNonContainedField < curInterval.size()) {
+        // Find the interval that contains our field.
+        size_t newIntervalForField;
+
+        IntervalPosition where =
+            Checker::findIntervalForField(keyComponents.values[firstNonContainedField],
+                                          bounds->fields[firstNonContainedField],
+                                          expectedDirection[firstNonContainedField],
+                                          &newIntervalForField);
+
+        if (IntervalPosition::WITHIN == where) {
+            // Found a new interval for field firstNonContainedField.  Move our internal choice
+            // of interval to that.
+            curInterval[firstNonContainedField] = newIntervalForField;
+            // Let's find valid intervals for fields to the right.
+            ++firstNonContainedField;
+        } else if (IntervalPosition::BEHIND == where) {
+            // firstNonContained field is between the intervals (newIntervalForField-1) and
+            // newIntervalForField.  We have to tell the caller to move forward until he at
+            // least hits our new current interval.
+            curInterval[firstNonContainedField] = newIntervalForField;
+
+            // All other fields to the right start at their first interval.
+            for (size_t i = firstNonContainedField + 1; i < curInterval.size(); ++i) {
+                curInterval[i] = 0;
+            }
+
+            checker.buildSeekPoint(keyComponents, firstNonContainedField, where, seekPoint);
+            return KeyState::MUST_ADVANCE;
+        } else {
+            MONGO_verify(IntervalPosition::AHEAD == where);
+            // Field number 'firstNonContainedField' cannot possibly be placed into an interval,
+            // as it is already past its last possible interval.  The caller must move forward
+            // to a key with a greater value for the previous field.
+
+            // If all fields to the left have hit the end of their intervals, we can't ask them
+            // to move forward and we should stop iterating.
+            if (!checker.spaceLeftToAdvance(keyComponents, firstNonContainedField)) {
+                return KeyState::DONE;
+            }
+
+            for (size_t i = firstNonContainedField; i < curInterval.size(); ++i) {
+                curInterval[i] = 0;
+            }
+
+            checker.buildSeekPoint(keyComponents, firstNonContainedField, where, seekPoint);
+            return KeyState::MUST_ADVANCE;
+        }
+    }
+
+    MONGO_verify(firstNonContainedField == curInterval.size());
+    return KeyState::VALID;
+}
+
+}  // namespace
+
+KeyState IndexBoundsChecker::checkKey(const BSONObj& key, IndexSeekPoint* out) {
+    out->keySuffix.resize(_curInterval.size());
+    return checkKeyGeneric(*this, key, out);
+}
+
+IndexBoundsChecker::KeyComponents IndexBoundsChecker::parseKey(const BSONObj& key) {
     // It's useful later to go from a field number to the value for that field.  Store these.
     size_t i = 0;
     BSONObjIterator keyIt(key);
@@ -741,139 +830,39 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
     }
     MONGO_verify(i == _curInterval.size());
 
-    size_t firstNonContainedField;
-    Location orientation;
-
-    if (!findLeftmostProblem(_keyValues, &firstNonContainedField, &orientation)) {
-        // All fields in the index are within the current interval.  Caller can use the key.
-        return VALID;
-    }
-
-    // Field number 'firstNonContainedField' of the index key is before its current interval.
-    if (BEHIND == orientation) {
-        // It's behind our current interval, but our current interval could be wrong.  Start all
-        // intervals from firstNonContainedField to the right over...
-        for (size_t i = firstNonContainedField; i < _curInterval.size(); ++i) {
-            _curInterval[i] = 0;
-        }
-
-        // ...and try again.  This call modifies 'orientation', so we may check its value again
-        // in the clause below if field number 'firstNonContainedField' isn't in its first
-        // interval.
-        if (!findLeftmostProblem(_keyValues, &firstNonContainedField, &orientation)) {
-            return VALID;
-        }
-    }
-
-    // Field number 'firstNonContainedField' of the index key is before all current intervals.
-    if (BEHIND == orientation) {
-        // Tell the caller to move forward to the start of the current interval.
-        out->keyPrefix = key.getOwned();
-        out->prefixLen = static_cast<int>(firstNonContainedField);
-        out->firstExclusive = -1;
-
-        for (int j = static_cast<int>(_curInterval.size()) - 1; j >= out->prefixLen; --j) {
-            const OrderedIntervalList& oil = _bounds->fields[j];
-            out->keySuffix[j] = oil.intervals[_curInterval[j]].start;
-            if (!oil.intervals[_curInterval[j]].startInclusive) {
-                out->firstExclusive = j;
-            }
-        }
-
-        return MUST_ADVANCE;
-    }
-
-    MONGO_verify(AHEAD == orientation);
-
-    // Field number 'firstNonContainedField' of the index key is after interval we think it's
-    // in.  Fields 0 through 'firstNonContained-1' are within their current intervals and we can
-    // ignore them.
-    while (firstNonContainedField < _curInterval.size()) {
-        // Find the interval that contains our field.
-        size_t newIntervalForField;
-
-        Location where = findIntervalForField(_keyValues[firstNonContainedField],
-                                              _bounds->fields[firstNonContainedField],
-                                              _expectedDirection[firstNonContainedField],
-                                              &newIntervalForField);
-
-        if (WITHIN == where) {
-            // Found a new interval for field firstNonContainedField.  Move our internal choice
-            // of interval to that.
-            _curInterval[firstNonContainedField] = newIntervalForField;
-            // Let's find valid intervals for fields to the right.
-            ++firstNonContainedField;
-        } else if (BEHIND == where) {
-            // firstNonContained field is between the intervals (newIntervalForField-1) and
-            // newIntervalForField.  We have to tell the caller to move forward until he at
-            // least hits our new current interval.
-            _curInterval[firstNonContainedField] = newIntervalForField;
-
-            // All other fields to the right start at their first interval.
-            for (size_t i = firstNonContainedField + 1; i < _curInterval.size(); ++i) {
-                _curInterval[i] = 0;
-            }
-
-            out->keyPrefix = key.getOwned();
-            out->prefixLen = firstNonContainedField;
-            out->firstExclusive = -1;
-            for (int i = _curInterval.size() - 1; i >= out->prefixLen; --i) {
-                const OrderedIntervalList& oil = _bounds->fields[i];
-                out->keySuffix[i] = oil.intervals[_curInterval[i]].start;
-                if (!oil.intervals[_curInterval[i]].startInclusive) {
-                    out->firstExclusive = i;
-                }
-            }
-
-            return MUST_ADVANCE;
-        } else {
-            MONGO_verify(AHEAD == where);
-            // Field number 'firstNonContainedField' cannot possibly be placed into an interval,
-            // as it is already past its last possible interval.  The caller must move forward
-            // to a key with a greater value for the previous field.
-
-            // If all fields to the left have hit the end of their intervals, we can't ask them
-            // to move forward and we should stop iterating.
-            if (!spaceLeftToAdvance(firstNonContainedField, _keyValues)) {
-                return DONE;
-            }
-
-            out->keyPrefix = key.getOwned();
-            out->prefixLen = firstNonContainedField;
-            out->firstExclusive = firstNonContainedField - 1;
-
-            for (size_t i = firstNonContainedField; i < _curInterval.size(); ++i) {
-                _curInterval[i] = 0;
-            }
-
-            // If movePastKeyElts is true, we don't examine any fields after the keyEltsToUse
-            // fields of the key.  As such we don't populate the out/incOut.
-            return MUST_ADVANCE;
-        }
-    }
-
-    MONGO_verify(firstNonContainedField == _curInterval.size());
-    return VALID;
+    return {key, _keyValues};
 }
 
-namespace {
+void IndexBoundsChecker::buildSeekPoint(const KeyComponents& key,
+                                        size_t prefixLen,
+                                        IntervalPosition where,
+                                        IndexSeekPoint* out) const {
+    tassert(13180101,
+            "`buildSeekPoint` must be called with `where` being ahead or behind",
+            where == IntervalPosition::BEHIND || where == IntervalPosition::AHEAD);
 
-/**
- * Returns true if key (first member of pair) is AHEAD of interval
- * along 'direction' (second member of pair).
- */
-bool isKeyAheadOfInterval(const Interval& interval,
-                          const std::pair<BSONElement, int>& keyAndDirection) {
-    return intervalCmpImpl(interval, keyAndDirection.first, keyAndDirection.second) ==
-        IndexBoundsChecker::AHEAD;
+    out->keyPrefix = key.obj.getOwned();
+    out->prefixLen = static_cast<int>(prefixLen);
+
+    if (where == IntervalPosition::AHEAD) {
+        out->firstExclusive = static_cast<int>(prefixLen) - 1;
+        return;
+    }
+
+    out->firstExclusive = -1;
+    for (int j = static_cast<int>(_curInterval.size()) - 1; j >= out->prefixLen; --j) {
+        const OrderedIntervalList& oil = _bounds->fields[j];
+        out->keySuffix[j] = oil.intervals[_curInterval[j]].start;
+        if (!oil.intervals[_curInterval[j]].startInclusive) {
+            out->firstExclusive = j;
+        }
+    }
 }
-
-}  // namespace
 
 // static
-IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& interval,
-                                                             const BSONElement& key,
-                                                             Interval::Direction direction) {
+IntervalPosition IndexBoundsChecker::intervalCmp(const Interval& interval,
+                                                 const BSONElement& key,
+                                                 Interval::Direction direction) {
     // Point intervals (eg. [x,x]) have Direction kDirectionNone. We default to the ascending
     // operator in this case.
     const int intDir = (direction == Interval::Direction::kDirectionDescending) ? -1 : 1;
@@ -881,11 +870,10 @@ IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& int
 }
 
 // static
-IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
-    const BSONElement& elt,
-    const OrderedIntervalList& oil,
-    const int expectedDirection,
-    size_t* newIntervalIndex) {
+IntervalPosition IndexBoundsChecker::findIntervalForField(const BSONElement& elt,
+                                                          const OrderedIntervalList& oil,
+                                                          const int expectedDirection,
+                                                          size_t* newIntervalIndex) {
     // Binary search for interval.
     // Intervals are ordered in the same direction as our keys.
     // Key behind all intervals: [BEHIND, ..., BEHIND]
@@ -901,17 +889,17 @@ IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
 
     // Key ahead of all intervals.
     if (i == oil.intervals.end()) {
-        return AHEAD;
+        return IntervalPosition::AHEAD;
     }
 
     // Found either interval containing key or left-most BEHIND interval.
     *newIntervalIndex = std::distance(oil.intervals.begin(), i);
 
     // Additional check to determine if interval contains key.
-    Location where = intervalCmpImpl(*i, elt, expectedDirection);
+    IntervalPosition where = intervalCmpImpl(*i, elt, expectedDirection);
     tassert(11051913,
             "Expect the element to be either behind, or within the interval",
-            BEHIND == where || WITHIN == where);
+            IntervalPosition::BEHIND == where || IntervalPosition::WITHIN == where);
 
     return where;
 }

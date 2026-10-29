@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 
@@ -73,7 +48,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
                                      opDebug.getQueryStatsInfo().keyHash,
                                      cursor->takeKey(),
                                      snapshot,
-                                     {} /* supplementalMetrics */,
+                                     /*supplementalMetrics=*/{},
                                      cursor->isChangeStreamCursor());
     }
 }
@@ -96,9 +71,41 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
                                      opDebug.getQueryStatsInfo().keyHash,
                                      nullptr,
                                      snapshot,
-                                     {} /* supplementalMetrics */,
+                                     /*supplementalMetrics=*/{},
                                      cursor->isChangeStreamCursor());
     }
+}
+
+void collectQueryStatsMongosReadErrored(OperationContext* opCtx, ErrorCodes::Error errorCode) {
+    if (!feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled()) {
+        return;
+    }
+
+    // Writes register their key per statement at a separate opIndex, never the slot read here, so
+    // the lookup always misses for them. Batch writes additionally report per-statement failures in
+    // 'writeErrors' under a top-level ok:1, where this hook is not called.
+    auto& queryStatsInfo = CurOp::get(opCtx)->debug().getQueryStatsInfo();
+
+    // Only record when there is a live key still owned by this operation. The key's lifetime on
+    // OpDebug is therefore the window in which an error can be attributed to a shape. A null key
+    // means:
+    //  - The key was never created. registerRequest() opens the window, so an operation that fails
+    //    ahead of it (command parsing, query shape computation) has no shape to attribute to and is
+    //    invisible to $queryStats.
+    //  - The key was moved into a cursor, which closes the window. ClusterClientCursorImpl's
+    //    constructor std::moves it off OpDebug; mongos construction happens before the first batch
+    //    is fetched.
+    if (!queryStatsInfo.key) {
+        return;
+    }
+
+    // We deliberately do not capture metrics here, as writeQueryStats/updateStatistics discards the
+    // partial timing/exec metrics for errored snapshots.
+    query_stats::QueryStatsSnapshot snapshot{};
+    snapshot.errorCode = errorCode;
+
+    query_stats::writeQueryStats(
+        opCtx, queryStatsInfo.keyHash, std::move(queryStatsInfo.key), snapshot);
 }
 
 void collectQueryStatsMongosBatchWrites(OperationContext* opCtx) {

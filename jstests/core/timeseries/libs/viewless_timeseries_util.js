@@ -8,6 +8,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isFCVlt, isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 // Checks if the viewless timeseries feature flag is currently enabled.
 // Do not use this function in passthrough tests, because the feature flag may get enabled or
@@ -261,8 +262,8 @@ export function findTimeseriesConfigCollectionsDocument(coll) {
                     return null;
                 }
 
-                if (e.code === ErrorCodes.HostUnreachable) {
-                    // Retry if the host is not available.
+                if (RetryableWritesUtil.isRetryableCode(e.code) && retries > 0) {
+                    // Retry if the error is retryable.
                     sleep(500);
                     continue;
                 }
@@ -321,15 +322,6 @@ export function assertExplainTargetsExpectedTimeseriesNamespace(
         }
 
         if (isTrackedTimeseries(coll)) {
-            if (isFCVlt(db.getMongo(), "8.3")) {
-                // In versions 8.2 findAndModify explain return the main namespace instead of the system.buckets
-                // TODO SERVER-114161 enable the check once the fix have been backported to previous versions
-                jsTest.log(
-                    "Skipping namespace check for findAndModify explain output since FCV is less then 8.3 (BACKPORT-26389)",
-                );
-                return;
-            }
-
             // In sharded clusters for findAndModify over legacy tracked timeseries we convert the namespace on the router and we send the command
             // with translated namespace to the shard,
             // thus we expect explain to report the command targeting system.buckets internal namespace.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/balancer/balancer_policy.h"
@@ -145,10 +119,10 @@ DistributionStatus::DistributionStatus(NamespaceString nss,
     for (size_t zoneRangeIdx = 0; zoneRangeIdx < _normalizedZones.size(); zoneRangeIdx++) {
         const auto& zoneRange = _normalizedZones[zoneRangeIdx];
         chunkMngr.forEachOverlappingChunk(
-            zoneRange.min, zoneRange.max, false /* isMaxInclusive */, [&](const auto& chunkInfo) {
+            zoneRange.min, zoneRange.max, /*isMaxInclusive=*/false, [&](const auto& chunkInfo) {
                 auto [zoneIt, created] =
                     _shardZoneInfoMap[chunkInfo.getShardId().toString()].try_emplace(
-                        zoneRange.zone, 1 /* numChunks */, zoneRangeIdx, chunkInfo.getMin());
+                        zoneRange.zone, /*numChunks=*/1, zoneRangeIdx, chunkInfo.getMin());
 
                 if (!created) {
                     ++(zoneIt->second.numChunks);
@@ -444,9 +418,7 @@ boost::optional<MigrateInfo> chooseRandomMigration(
         return rndChunk;
     }();
 
-    tassert(8245222,
-            "randomChunk's shard is invalid",
-            ShardRef::validate(randomChunk.getShard()).isOK());
+    tassert(8245222, "randomChunk's shard is invalid", randomChunk.getShard().isValid());
 
     return MigrateInfo{recipientShard.get(),
                        randomChunk.getShard(),
@@ -520,7 +492,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             distribution.nss(),
                             distribution.getChunkManager().getUUID(),
                             chunk.getMin(),
-                            boost::none /* max */,
+                            /*max=*/boost::none,
                             chunk.getLastmod(),
                             // Do not force jumbo chunks to be migrated off draining shards. Jumbo
                             // chunks need to be moved manually, similar to how they are handled
@@ -650,7 +622,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                                 distribution.nss(),
                                                 distribution.getChunkManager().getUUID(),
                                                 chunk.getMin(),
-                                                boost::none /* max */,
+                                                /*max=*/boost::none,
                                                 chunk.getLastmod(),
                                                 forceJumbo ? ForceJumbo::kForceBalancer
                                                            : ForceJumbo::kDoNotForce,
@@ -823,7 +795,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
                                      distribution.nss(),
                                      distribution.getChunkManager().getUUID(),
                                      chunk.getMin(),
-                                     boost::none /* max */,
+                                     /*max=*/boost::none,
                                      chunk.getLastmod(),
                                      forceJumbo,
                                      collDataSizeInfo.maxChunkSizeBytes);
@@ -1011,7 +983,7 @@ NamespaceStringToShardDataSizeMap getStatsForBalancing(
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto responsesFromShards = sharding_util::sendCommandToShards(
-        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
+        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, /*throwOnError=*/false);
 
     NamespaceStringToShardDataSizeMap namespaceToShardDataSize;
     for (auto&& response : responsesFromShards) {

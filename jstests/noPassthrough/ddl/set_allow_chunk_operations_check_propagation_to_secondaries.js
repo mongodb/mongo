@@ -3,8 +3,7 @@
  * allowChunkOperations flag to secondaries.
  *
  * @tags: [
- *  featureFlagAuthoritativeShardsDDL,
- *  featureFlagAuthoritativeShardsCRUD,
+ *  requires_fcv_90,
  * ]
  */
 

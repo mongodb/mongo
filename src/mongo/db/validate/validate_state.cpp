@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/validate/validate_state.h"
@@ -56,6 +30,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <string_view>
@@ -150,28 +125,16 @@ ValidateState::ValidateState(OperationContext* opCtx,
     }
 }
 
-Status ValidateState::_checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const {
-    if (shouldUseReplicatedFastCountContainers(opCtx)) {
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        auto* engine = storageEngine->getEngine();
+Status ValidateState::_checkReplicatedFastCountContainer(OperationContext* opCtx) const {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto* engine = storageEngine->getEngine();
 
-        if (!engine->hasIdent(ru, ident::kFastCountMetadataStore)) {
-            return Status(
-                ErrorCodes::Error{12231705},
-                str::stream()
-                    << "Internal FastCount container ident '" << ident::kFastCountMetadataStore
-                    << "' does not exist to validate. Required for enforcing fast count.");
-        }
-        return Status::OK();
-    }
-    const NamespaceString fastCountNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto catalog = CollectionCatalog::get(opCtx);
-    if (!catalog->lookupCollectionByNamespace(opCtx, fastCountNss)) {
-        return Status(ErrorCodes::NamespaceNotFound,
+    if (!engine->hasIdent(ru, ident::kFastCountMetadataStore)) {
+        return Status(ErrorCodes::Error{12231705},
                       str::stream()
-                          << "Internal FastCount Collection '" << fastCountNss.toStringForErrorMsg()
+                          << "Internal FastCount container ident '"
+                          << ident::kFastCountMetadataStore
                           << "' does not exist to validate. Required for enforcing fast count.");
     }
     return Status::OK();
@@ -188,13 +151,9 @@ Status ValidateState::_checkUnreplicatedFastCountCollectionExists(OperationConte
 }
 
 bool ValidateState::_isNSEligibleForSizeStorerValidation() const {
-    if (_nss.isOplog() || _nss.isChangeStreamPreImagesCollection()) {
-        // Oplog writers only take a global IX lock, so the oplog can still be written to even
-        // during full validation despite its collection X lock. This can cause validate to
-        // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
-        // mode.
-        // The oplog entries are also written to the change stream pre-images collection. This
-        // collection is also prone to fast count failures.
+    if (isConcurrentlyWritable()) {
+        // Writes racing with validation can cause validate to incorrectly report an incorrect fast
+        // count when run in enforceFastCount mode.
         return false;
     } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
         // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
@@ -223,6 +182,9 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx, FastCountTyp
     if (isBackground()) {
         return false;
     }
+    if (getReadTimestamp()) {
+        return false;
+    }
     if (rss::ReplicatedStorageService::get(opCtx)
             .getPersistenceProvider()
             .shouldUseReplicatedFastCount()) {
@@ -243,6 +205,9 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
     if (isBackground()) {
         return false;
     }
+    if (getReadTimestamp()) {
+        return false;
+    }
     if (rss::ReplicatedStorageService::get(opCtx)
             .getPersistenceProvider()
             .shouldUseReplicatedFastCount()) {
@@ -257,7 +222,7 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
 }
 
 FastCountType ValidateState::getDetectedFastCountType(OperationContext* opCtx) const {
-    const Status replicatedFastCountStatus = _checkReplicatedFastCountCollectionExists(opCtx);
+    const Status replicatedFastCountStatus = _checkReplicatedFastCountContainer(opCtx);
     const Status legacyFastCountStatus = _checkUnreplicatedFastCountCollectionExists(opCtx);
     if (replicatedFastCountStatus.isOK() && legacyFastCountStatus.isOK()) {
         return FastCountType::both;
@@ -282,6 +247,10 @@ FastCountType ValidateState::getExpectedFastCountType(OperationContext* opCtx) c
 
     if (persistenceProviderUsesRFC) {
         return FastCountType::replicated;
+    }
+
+    if (isReplicatedFastCountDisabledForTest(opCtx)) {
+        return FastCountType::legacySizeStorer;
     }
 
     return (featureFlagEnabled && isOplogPresent) ? FastCountType::both
@@ -375,8 +344,27 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
 }
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
-    _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-        opCtx, getCollection()->getRecordStore(), &_dataThrottle);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    // Accumulate a size summary only on the full-scan cursors (the record-store traverse cursor
+    // and each index cursor). Opening a size-stats cursor resets its counters, so the flag is
+    // left off for the seek cursor and every other cursor. Opt-in only; results are logged after
+    // the scans complete.
+    const bool collectSizeStats = isCollHashValidation() && sizeStats();
+
+    {
+        if (collectSizeStats) {
+            ru.setSizeStatsCursor(true);
+        }
+        // Clear on any exit so the flag can't leak onto later cursors on this recovery unit.
+        ScopeGuard resetSizeStats([&] {
+            if (collectSizeStats) {
+                ru.setSizeStatsCursor(false);
+            }
+        });
+        _traverseRecordStoreCursor = std::make_shared<SeekableRecordThrottleCursor>(
+            opCtx, getCollection()->getRecordStore(), &_dataThrottle);
+    }
     _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, getCollection()->getRecordStore(), &_dataThrottle);
 
@@ -388,8 +376,27 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
         const auto iam = entry->accessMethod()->asSortedData();
-        auto indexCursor =
-            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
+        std::unique_ptr<SortedDataInterfaceThrottleCursor> indexCursor;
+        {
+            if (collectSizeStats) {
+                ru.setSizeStatsCursor(true);
+            }
+            // Clear on any exit so the flag can't leak onto later cursors on this recovery unit.
+            ScopeGuard resetSizeStats([&] {
+                if (collectSizeStats) {
+                    ru.setSizeStatsCursor(false);
+                }
+            });
+            indexCursor =
+                std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
+        }
+        if (collectSizeStats) {
+            // A direct seek doesn't drive the size-summary accumulation, so probe once from an
+            // unpositioned cursor to measure the parts of the index that the scan's initial seek
+            // would otherwise skip. The scan re-seeks to the start afterwards, so consuming this
+            // key is harmless.
+            indexCursor->nextKeyString(opCtx);
+        }
         _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
         _indexIdents.push_back(entry->getIdent());
     }

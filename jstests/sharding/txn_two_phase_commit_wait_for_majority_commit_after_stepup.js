@@ -5,11 +5,8 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
-// The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
-// test causes failovers on a shard, so the cached connection is not usable.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {stopServerReplication, restartReplSetReplication} from "jstests/libs/write_concern_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -72,9 +69,11 @@ const setUp = function () {
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
     // refresh after the transaction has started.
-    assert.commandWorked(participant0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(participant1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(participant2.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    if (!FeatureFlagUtil.isPresentAndEnabled(participant0, "AuthoritativeShardsCRUD")) {
+        assert.commandWorked(participant0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        assert.commandWorked(participant1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        assert.commandWorked(participant2.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+    }
     st.refreshCatalogCacheForNs(st.s, ns);
 
     // Start a new transaction by inserting a document onto each shard.

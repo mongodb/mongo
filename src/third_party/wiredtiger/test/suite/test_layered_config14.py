@@ -63,6 +63,8 @@ class test_layered_config14(wttest.WiredTigerTestCase):
             self.assertTrue(uri in metadata)
             if uri.endswith("wt_ingest") or uri.endswith("wt_stable") or uri in self.file_uris:
                 self.assertTrue("log=(enabled=false)" in metadata[uri])
+            if uri.endswith("wt_stable"):
+                self.assertTrue("block_manager=disagg" in metadata[uri])
         for uri in expect_missing:
             self.assertFalse(uri in metadata)
         cursor.close()
@@ -96,12 +98,15 @@ class test_layered_config14(wttest.WiredTigerTestCase):
 
         # Put data to tables
         value_prefix = 'aaa'
+        self.session.begin_transaction()
         for uri in self.all_uris:
             cursor = self.session.open_cursor(uri, None, None)
             for i in range(self.nitems):
                 cursor[str(i)] = value_prefix + str(i)
             cursor.close()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
         checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
 
@@ -149,12 +154,14 @@ class test_layered_config14(wttest.WiredTigerTestCase):
 
         # Do a few more updates to ensure that the tables continue to be writable
         value_prefix2 = 'bbb'
+        self.session.begin_transaction()
         for uri in self.update_uris:
             cursor = self.session.open_cursor(uri, None, None)
             for i in range(self.nitems):
                 if i % 10 == 0:
                     cursor[str(i)] = value_prefix2 + str(i)
             cursor.close()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
 
         # Ensure that the leader sees its own writes before a checkpoint
         for uri in self.update_uris:
@@ -174,6 +181,7 @@ class test_layered_config14(wttest.WiredTigerTestCase):
         # Ensure that the shared metadata table has all the expected URIs
         self.check_shared_metadata(self.all_uris)
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(2))
         self.session.checkpoint()
         checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/checked_cast.h"
@@ -137,8 +111,7 @@ public:
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
             const auto collEntry = catalogClient->getCollection(opCtx, nss);
             const auto dbPrimary =
-                catalogClient
-                    ->getDatabase(opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
+                catalogClient->getDatabase(opCtx, nss.dbName(), repl::ReadConcernArgs::kMajority)
                     .getPrimary();
 
             if (!mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
@@ -191,8 +164,6 @@ public:
                 resharding::validateShardDistribution(
                     *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
             }
-            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
-                                                    request().getPerformVerification());
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]()
@@ -200,12 +171,6 @@ public:
                 FixedFCVRegion fixedFcv(opCtx);
 
                 const auto fcvSnapshot = (*fixedFcv).acquireFCVSnapshot();
-                // (Generic FCV reference): To run this command and ensure the consistency of
-                // the metadata we need to make sure we are on a stable state.
-                uassert(ErrorCodes::CommandNotSupported,
-                        "Resharding is not supported during FCV changes, please wait for the FCV "
-                        "change to complete.",
-                        !fcvSnapshot.isUpgradingOrDowngrading());
 
                 // We only want to use provenance in resharding if FCV is latest but it's still
                 // possible for a mongos on a higher fcv to send a reshard collection request to a
@@ -243,7 +208,12 @@ public:
 
                 auto coordinatorDoc = resharding::createReshardingCoordinatorDoc(
                     opCtx, request(), collEntry, dbPrimary, nss, setProvenance);
-                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
+
+                resharding::validatePerformVerification(
+                    coordinatorDoc.getCommonReshardingMetadata().getForwardableOpMetadata(),
+                    request().getPerformVerification());
+
+                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc, fixedFcv);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);
                 return instance;
             })();
@@ -262,7 +232,9 @@ public:
          * due to client disconnect etc.
          */
         std::shared_ptr<const ReshardingCoordinator> getOrCreateReshardingCoordinator(
-            OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
+            OperationContext* opCtx,
+            const ReshardingCoordinatorDocument& coordinatorDoc,
+            const FixedFCVRegion& fcvRegion);
 
     private:
         NamespaceString ns() const override {
@@ -305,11 +277,14 @@ MONGO_REGISTER_COMMAND(ConfigsvrReshardCollectionCommand).forShard();
 
 std::shared_ptr<const ReshardingCoordinator>
 ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    const FixedFCVRegion& fcvRegion) {
     try {
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-        auto instance = ReshardingCoordinator::getOrCreate(opCtx, service, coordinatorDoc.toBSON());
+        auto instance =
+            ReshardingCoordinator::getOrCreate(opCtx, service, coordinatorDoc.toBSON(), fcvRegion);
 
         return std::shared_ptr<const ReshardingCoordinator>(instance);
     } catch (

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,6 +9,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/unittest/unittest.h"
 
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -57,6 +32,15 @@
 #define ASSERT_DOCUMENT_GT(a, b) _ASSERT_DOCVAL_COMPARISON(DocumentGT, a, b)
 #define ASSERT_DOCUMENT_GTE(a, b) _ASSERT_DOCVAL_COMPARISON(DocumentGTE, a, b)
 #define ASSERT_DOCUMENT_NE(a, b) _ASSERT_DOCVAL_COMPARISON(DocumentNE, a, b)
+
+/**
+ * Use to compare two collections which are convertible to `std::span<const Document>` under the
+ * default DocumentComparator in unit tests.
+ */
+#define ASSERT_DOCUMENTS_EQ(expectDocs, actualDocs) \
+    ASSERT_THAT(actualDocs, ::mongo::unittest::detail::DocumentsEq(expectDocs))
+#define ASSERT_DOCUMENTS_NE(expectDocs, actualDocs) \
+    ASSERT_THAT(actualDocs, ::testing::Not(::mongo::unittest::detail::DocumentsEq(expectDocs)))
 
 /**
  * Document/Value comparison utility macro. Do not use directly.
@@ -91,6 +75,23 @@ _DECLARE_DOCVAL_CMP_FUNC(Document, GT);
 _DECLARE_DOCVAL_CMP_FUNC(Document, GTE);
 _DECLARE_DOCVAL_CMP_FUNC(Document, NE);
 #undef _DECLARE_DOCVAL_CMP_FUNC
+
+namespace detail {
+
+MATCHER_P(DocumentsEq, expectDocs, "") {
+    const auto actualDocs = arg;
+    auto cmp = [](std::span<const Document> expectDocs, std::span<const Document> actualDocs) {
+        for (size_t i = 0; i < expectDocs.size() && i < actualDocs.size(); i++) {
+            if (DocumentComparator().evaluate(expectDocs[i] != actualDocs[i])) {
+                return false;
+            }
+        }
+        return expectDocs.size() == actualDocs.size();
+    };
+    return cmp(expectDocs, actualDocs);
+}
+
+}  // namespace detail
 
 }  // namespace unittest
 }  // namespace mongo

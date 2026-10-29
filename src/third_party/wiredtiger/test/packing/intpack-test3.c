@@ -71,8 +71,8 @@ test_value(int64_t val)
           "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
           ", got %" WT_SIZET_FMT "\n",
           sinput, used_len,
-          cp > p ? used_len + (size_t)(cp - p) : /* More than buf used */
-                   used_len - (size_t)(p - cp));        /* Less than buf used */
+          /* More or less buffer used than expected. */
+          cp > p ? used_len + (size_t)(cp - p) : used_len - (size_t)(p - cp));
         abort();
     }
 

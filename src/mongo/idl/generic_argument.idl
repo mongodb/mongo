@@ -1,30 +1,5 @@
-# Copyright (C) 2020-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 global:
     cpp_namespace: "mongo"
     cpp_includes:
@@ -37,6 +12,7 @@ imports:
     - "mongo/client/read_preference_setting.idl"
     - "mongo/db/admission/execution_control/execution_admission_type.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/feature_flag.idl"
     - "mongo/db/repl/read_concern.idl"
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
@@ -50,6 +26,33 @@ imports:
     - "mongo/db/transaction/transaction_runtime_context.idl"
 
 structs:
+    IFRSenderVersion:
+        description: >-
+            The full binary version of the sender of a request, decomposed into its numeric
+            components so that receivers can compare it against another version. The components
+            mirror 'VersionInfoInterface' (major.minor.patch plus an 'extra' component that encodes
+            pre-release ordering: e.g. a release-candidate build sorts *before* the corresponding
+            final release). Comparing two 'IFRSenderVersion's lexicographically in
+            (major, minor, patch, extra) order therefore yields correct version ordering, including
+            at patch-release granularity. This is intentionally finer-grained than an FCV string
+            (e.g. "9.0") so IFR flags shipped in patch releases can be resolved correctly.
+        strict: true
+        generate_comparison_operators: true
+        fields:
+            major:
+                type: int
+                comparison_order: 0
+            minor:
+                type: int
+                comparison_order: 1
+            patch:
+                type: int
+                comparison_order: 2
+            extra:
+                type: int
+                comparison_order: 3
+                validator: {lte: 0}
+
     GenericArguments:
         description: "Arguments accepted by all commands."
         strict: false
@@ -345,10 +348,10 @@ structs:
                 optional: true
                 stability: "internal"
             # Indicates whether write-based commands should be allowed even if the server is blocking
-            # user writes as part of replica set write blocking mode.
+            # user writes as part of replica set writes blocking.
             # Authorization: This field can only be set if the client possesses action type `internal`
-            # or `bypassReplicaSetWriteBlocking` on the `cluster` resource.
-            mayBypassReplicaSetWriteBlocking:
+            # or `bypassReplicaSetWritesBlocking` on the `cluster` resource.
+            mayBypassReplicaSetWritesBlocking:
                 type: bool
                 forward_to_shards: false
                 optional: true
@@ -378,16 +381,6 @@ structs:
             # `startOrContinueTransaction: true` on the request it is sending to the targeted shard.
             startOrContinueTransaction:
                 type: bool
-                forward_to_shards: true
-                optional: true
-                stability: "internal"
-            # OpenTelemetry trace context used for tracking this operation across a replica set or
-            # a sharded cluster for debugging purposes. The propagation of trace contexts is only
-            # supported on mongods, mongoses and legacy shell compiled with ENABLE_OTEL_BUILD set.
-            # Currently, this is only set for testing binaries.
-            $traceCtx:
-                type: object_owned
-                cpp_name: "traceCtx"
                 forward_to_shards: true
                 optional: true
                 stability: "internal"
@@ -425,6 +418,25 @@ structs:
                 # command BSON. See also: rawData, isDirectSystemBucketsAccess.
                 forward_to_shards: false
                 stability: "internal"
+            # Set by the router on versioned requests to indicate how many times the router loop has
+            # retried this operation on a StaleConfig error.
+            staleConfigRetryAttempt:
+                type: safeInt
+                validator: {gte: 0}
+                # Manually appended by the egress metadata hook from an OperationContext decoration,
+                # not present in the original command BSON.
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # Set by the router to indicate that the transaction was initiated by the server itself
+            # (an internal transaction) rather than explicitly by a user. This lets the shard
+            # participant attribute its transaction lifecycle counters and metrics as internal vs.
+            # external.
+            isServerInitiatedTransaction:
+                type: bool
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
             # Contains context fields of the current transaction
             transactionRuntimeContext:
                 type: TransactionRuntimeContext
@@ -434,8 +446,23 @@ structs:
             # Records IFR flags from the router's IFRContext. This ensures consistent view of feature flag across nodes
             # throughout the query's execution. Currently, used only in Agg command pipeline.
             ifrFlags:
-                type: array<object_owned>
-                forward_to_shards: true
+                type: array<IFRFlagWireEntry>
+                # This is manually forwarded on appropriate operations.
+                forward_to_shards: false
+                optional: true
+                stability: "internal"
+            # The sender's full binary version, decomposed into numeric components (see
+            # IFRSenderVersion). Used by the receiver to resolve IFR flags that were active on the
+            # receiver but absent from the payload: if ifrSenderVersion < flag.introductionVersion
+            # the flag defaults to false (sender predates the flag); otherwise the receiver uses its
+            # local default (sender is newer and has likely removed/promoted the flag). Carrying the
+            # full binary version rather than an FCV string lets this comparison stay correct when
+            # IFR flags ship in patch releases (a 9.0.1 router and a 9.0.5 shard report distinct
+            # versions instead of both reporting "9.0").
+            ifrSenderVersion:
+                type: IFRSenderVersion
+                # This is manually forwarded on appropriate operations.
+                forward_to_shards: false
                 optional: true
                 stability: "internal"
             # Requests a specific priority or task type for execution control for the command.

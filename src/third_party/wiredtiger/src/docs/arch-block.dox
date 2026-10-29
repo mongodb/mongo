@@ -54,9 +54,8 @@ system and cannot be interpreted meaningfully.
 The address cookie is made up of 4 components:
  - offset: The offset in the file. In order to avoid storing large offsets this
    value is divided by the allocation size.
- - object_id: Optional and only relevant to the tiered storage type, the object_id
-   is maintained in the address. When it is missing, it indicates that the
-   reference is to the same object as where the cookie was stored.
+ - object_id: Optional. Identifies which object holds the block. When it is missing, it
+   indicates that the reference is to the same object as where the cookie was stored.
  - size: The size of the block, also divided by the allocation size.
  - checksum: The checksum of the block for validation purposes.
 
@@ -268,10 +267,10 @@ four address cookies and two additional values:
   - the file size for the checkpoint, the first byte position past the end of the checkpoint data
   - the checkpoint size, a byte size of all written checkpoint data
 
-As described in @ref block_address_cookie, an address cookie used with a tiered storage
-has an additional value (the \c object_id). As a result, the checkpoint cookie for a
-tiered btree will include four additional \c object_id values that are not in other
-checkpoints.
+As described in @ref block_address_cookie, an address cookie may include an
+\c object_id. Checkpoint cookies do not store that value in each of the four
+address cookies. When an object id is present, it is appended once after the
+file and checkpoint sizes and applies to all four cookies.
 
 The program in \c tools/wt_ckpt_decode.py can be used to unpack a set of bytes representing
 a checkpoint cookie and show its values.

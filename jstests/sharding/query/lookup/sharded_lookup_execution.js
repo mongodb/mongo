@@ -143,6 +143,7 @@ function assertLookupExecution(pipeline, opts, expected, forceRoutingTableRefres
                     "command.aggregate": ordersColl.getName(),
                     "command.comment": opts.comment,
                     "command.pipeline.$lookup": {$exists: true},
+                    "errName": {$nin: ["StaleConfig", "CommandOnShardedViewNotSupportedOnMongod"]},
                 },
                 numExpectedMatches: expected.toplevelExec[i],
             });

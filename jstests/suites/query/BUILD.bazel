@@ -16,6 +16,7 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "aggregation",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
@@ -23,7 +24,7 @@ resmoke_suite_test(
     shard_count = 4,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     deps = [
@@ -34,16 +35,17 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_auth",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_auth.yml",
     data = [
         "//jstests/libs:authTestsKey",
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 4,
+    shard_count = 3,
     tags = [
         "aggregation",
         "auth",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     target_compatible_with = select({
@@ -59,6 +61,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_read_concern_majority_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_read_concern_majority_passthrough.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
@@ -66,9 +69,8 @@ resmoke_suite_test(
     shard_count = 8,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "read_write_concern",
-        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -82,16 +84,16 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_sharded_collections_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/aggregation_sharded_collections_passthrough.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    shard_count = 8,
+    shard_count = 9,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
-        "cpu:2",
         "sharded",
     ],
     target_compatible_with = select({
@@ -112,7 +114,7 @@ resmoke_suite_test(
         "--fuzzMongodConfigs=normal",
         "--fuzzRuntimeParams",
         "--excludeWithAnyTags=does_not_support_config_fuzzer",
-        "--setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'",
+        "--setShellParameter={defaultFindReplicaSetHostTimeoutMS: 120000}",
     ],
     shard_count = 4,
     tags = [
@@ -144,6 +146,7 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "config_fuzzer",
+        "incompatible_debug_mode",
         "incompatible_inmemory",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],

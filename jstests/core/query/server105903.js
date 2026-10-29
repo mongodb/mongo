@@ -2,6 +2,7 @@
  * Reproduces SERVER-105903.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_index_creation,

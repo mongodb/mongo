@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/keypattern.h"
@@ -50,6 +25,20 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
+
+sbe::value::TagValueOwned GoldenSbeStageBuilderTestFixture::sortArray(
+    sbe::value::TagValueView array) {
+    sbe::value::ArrayMultiSet sorted{/*collator=*/nullptr};
+    for (sbe::value::ArrayEnumerator it{array.tag, array.value}; !it.atEnd(); it.advance()) {
+        auto [tag, val] = it.getViewOfValue();
+        sorted.push_back_raw(sbe::value::copyValue(tag, val));
+    }
+    auto result = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    for (auto [tag, val] : sorted.values()) {
+        sbe::value::getArrayView(result.value())->push_back_raw(sbe::value::copyValue(tag, val));
+    }
+    return result;
+}
 
 unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/query/stage_builder/sbe"};
 
@@ -76,6 +65,9 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
 
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    if (!param.cqPipeline.empty()) {
+        cq->setCqPipeline(std::move(param.cqPipeline), /*containsEntirePipeline=*/true);
+    }
     if (hasRecordId) {
         // Force the builder to generate the RecordId output even if it isn't needed by the plan.
         cq->setForceGenerateRecordId(true);
@@ -136,6 +128,22 @@ void SbeStageBuilderTestFixture::insertDocuments(const NamespaceString& nss,
     wuow.commit();
 }
 
+MultipleCollectionAccessor SbeStageBuilderTestFixture::acquireCollections(
+    const NamespaceString& main, const std::vector<NamespaceString>& secondaries) {
+    CollectionOrViewAcquisitionRequests requests;
+    for (const auto& nss : secondaries) {
+        requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+            operationContext(), nss, AcquisitionPrerequisites::kRead));
+    }
+    requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+        operationContext(), main, AcquisitionPrerequisites::kRead));
+    auto acquisitions =
+        makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(operationContext(), requests));
+    auto mainAcquisition = acquisitions.extract(main).mapped();
+    return MultipleCollectionAccessor(
+        mainAcquisition, acquisitions, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
+}
+
 void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONObj>& docs,
                                                         boost::optional<BSONObj> indexKeyPattern,
                                                         CollectionOptions options) {
@@ -151,6 +159,19 @@ void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONOb
                       << *indexKeyPattern)}));
     }
     insertDocuments(_nss, docs);
+}
+
+void GoldenSbeStageBuilderTestFixture::createSecondaryCollection(
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& docs,
+    const std::vector<BSONObj>& indexSpecs) {
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+    if (!indexSpecs.empty()) {
+        ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+            operationContext(), nss, indexSpecs));
+    }
+    insertDocuments(nss, docs);
+    _secondaryNamespaces.push_back(nss);
 }
 
 IndexEntry SbeStageBuilderTestFixture::makeIndexEntry(const NamespaceString& nss,
@@ -186,45 +207,43 @@ IndexEntry SbeStageBuilderTestFixture::makeIndexEntry(const NamespaceString& nss
 void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode> root,
                                                const mongo::BSONArray& expectedValue,
                                                BuildPlanStageParam param) {
-    auto querySolution = makeQuerySolution(std::move(root));
-
-    // Translate the QuerySolution tree to an sbe::PlanStage.
-    boost::optional<CollectionOrViewAcquisition> localColl;
-    MultipleCollectionAccessor colls;
-    if (_collInitialized) {
-        localColl.emplace(
-            acquireCollectionOrView(operationContext(),
-                                    CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                        operationContext(), _nss, AcquisitionPrerequisites::kRead),
-                                    MODE_IS));
-        colls = MultipleCollectionAccessor(*localColl);
-    }
-    attachCollectionAcquisition(colls);
-
-    auto [resultSlots, stage, data, _] =
-        buildPlanStage(std::move(querySolution), colls, false /*hasRecordId*/, std::move(param));
-    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
-    ASSERT_EQ(resultAccessors.size(), 1u);
+    auto [explain, results] = runPlan(makeQuerySolution(std::move(root)), std::move(param));
 
     // Print the stage explain output and verify.
     _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
-    sbe::DebugPrintInfo debugPrintInfo{};
-    auto explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
-    _gctx->outStream() << (localColl ? replaceUuid(explain, localColl->getCollection().uuid())
-                                     : explain);
+    _gctx->outStream() << explain;
     _gctx->outStream() << std::endl;
     _gctx->verifyOutput();
 
     // Execute the plan to verify explain output is correct.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
-    sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
+    sbe::value::TagValueOwned expectedResult =
+        sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
 
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
-    sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    ASSERT_SBE_VALUE_EQ(
+        results.tag(), results.value(), expectedResult.tag(), expectedResult.value());
+}
 
-    ASSERT_TRUE(PlanStageTestFixture::valueEquals(resultsTag, resultsVal, expectedTag, expectedVal))
-        << "expected: " << std::make_pair(expectedTag, expectedVal)
-        << " but got: " << std::make_pair(resultsTag, resultsVal);
+GoldenSbeStageBuilderTestFixture::PlanRun GoldenSbeStageBuilderTestFixture::runPlan(
+    std::unique_ptr<QuerySolution> querySolution, BuildPlanStageParam param) {
+    // Translate the QuerySolution tree to an sbe::PlanStage.
+    auto colls = _collInitialized ? acquireCollections(_nss, _secondaryNamespaces)
+                                  : MultipleCollectionAccessor();
+    std::vector<UUID> uuids;
+    colls.forEach([&](const CollectionPtr& coll) { uuids.push_back(coll->uuid()); });
+    attachCollectionAcquisition(colls);
+
+    auto [resultSlots, stage, data, _] =
+        buildPlanStage(std::move(querySolution), colls, /*hasRecordId=*/false, std::move(param));
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
+    ASSERT_EQ(resultAccessors.size(), 1u);
+
+    sbe::DebugPrintInfo debugPrintInfo{};
+    std::string explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
+    for (const auto& uuid : uuids) {
+        explain = replaceUuid(std::move(explain), uuid);
+    }
+    return {std::move(explain),
+            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]))};
 }
 
 std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUID uuid) {
@@ -253,7 +272,7 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
                    _env,
                    _planStageData.get(),
                    _variables,
-                   nullptr /* yieldPolicy */,
+                   /*yieldPolicy=*/nullptr,
                    &_slotIdGenerator,
                    &_frameIdGenerator,
                    &_spoolIdGenerator,
@@ -261,8 +280,8 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
                    &_collatorsMap,
                    &_sortSpecMap,
                    _expCtx,
-                   false /* needsMerge */,
-                   false /* allowDiskUse */,
+                   /*needsMerge=*/false,
+                   /*allowDiskUse=*/false,
                    *_expCtx->getIfrContext());
 }
 
@@ -283,9 +302,6 @@ void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,
     auto results = vm.run(&code);
 
 
-    ASSERT_TRUE(
-        PlanStageTestFixture::valueEquals(results.tag(), results.value(), expectedTag, expectedVal))
-        << "for test: " << test << " expected: " << std::make_pair(expectedTag, expectedVal)
-        << " but got: " << results.raw();
+    ASSERT_SBE_VALUE_EQ(results.tag(), results.value(), expectedTag, expectedVal);
 }
 }  // namespace mongo

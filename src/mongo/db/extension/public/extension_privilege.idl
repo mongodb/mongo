@@ -1,0 +1,53 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+# Privilege declaration types shared by every extension-defined entity that declares the
+# privileges a caller must hold (e.g. aggregation stages and commands).
+
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo::extension"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+enums:
+    MongoExtensionPrivilegeResourcePattern:
+        description: What resource the privilege applies to.
+        type: string
+        values:
+            kNamespace: "namespace"
+    MongoExtensionPrivilegeAction:
+        description: >-
+            Actions an extension may require on a specific namespace. Each value maps to a
+            server-defined ActionType. This enum is append-only: never remove or rename a value.
+        type: string
+        values:
+            kFind: "find"
+            kListIndexes: "listIndexes"
+            kListSearchIndexes: "listSearchIndexes"
+            kPlanCacheRead: "planCacheRead"
+            kCollStats: "collStats"
+            kIndexStats: "indexStats"
+            kCreateSearchIndexes: "createSearchIndexes"
+            kUpdateSearchIndex: "updateSearchIndex"
+            kDropSearchIndex: "dropSearchIndex"
+
+structs:
+    MongoExtensionPrivilegeActionEntry:
+        description: >-
+            Represents one entry in a MongoExtensionRequiredPrivilege's actions array.
+            Each entry wraps a MongoExtensionPrivilegeAction enum to satisfy the IDL restriction
+            that arrays cannot directly contain enums.
+        fields:
+            action:
+                type: MongoExtensionPrivilegeAction
+    MongoExtensionRequiredPrivilege:
+        description: A constrained privilege specification.
+        fields:
+            resourcePattern:
+                description: Kinds of resources targetable by the access control system.
+                type: MongoExtensionPrivilegeResourcePattern
+            actions:
+                description: Actions required on the target.
+                type: array<MongoExtensionPrivilegeActionEntry>

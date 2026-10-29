@@ -6,6 +6,7 @@
  * @tags: [requires_fcv_60, uses_transactions]
  */
 import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -14,9 +15,6 @@ import {
     makeCommitTransactionCmdObj,
     makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
-
-// This test requires running transactions directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -29,9 +27,11 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 const shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
-assert.commandWorked(
-    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}),
-);
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}),
+    );
+}
 
 function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
     const cmdObj = {

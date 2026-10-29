@@ -6,6 +6,7 @@
  * Queries on a sharded collection can't be covered when they aren't on the shard key. The document
  * must be fetched to support the SHARDING_FILTER stage.
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  * ]
  */

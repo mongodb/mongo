@@ -42,6 +42,9 @@ type python3 > /dev/null 2>&1 || {
     exit 1
 }
 
+# We require clang-format which may not be installed.
+check_clang_format
+
 echo 'dist/s_all run started...'
 
 export WT_FAST=""
@@ -163,6 +166,8 @@ run --bg "s_longlines" &
 run --bg "s_python" &
 run --bg "s_stat" &
 run --bg "s_string" &
+run --bg "s_tombstone_encoding.py" &
+run --bg "test_tombstone_encoding.py" &
 run --bg "s_typedef -c" &
 run --bg "s_visibility_checks" &
 run --bg "s_void" &

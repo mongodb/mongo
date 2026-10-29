@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator.h"
@@ -47,7 +21,6 @@
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
-#include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -99,22 +72,12 @@ std::vector<ShardId> getShardsWithDataForCollection(OperationContext* opCtx,
     return std::vector<ShardId>(vecsSet.begin(), vecsSet.end());
 }
 
-std::vector<ShardRef> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
-                                                     const NamespaceString& nss) {
+std::vector<ShardId> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
     auto shards = getShardsWithDataForCollection(opCtx, nss);
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     if (std::find(shards.begin(), shards.end(), primaryShardId) == shards.end()) {
         shards.push_back(primaryShardId);
-    }
-    return std::vector<ShardRef>(shards.cbegin(), shards.cend());
-}
-
-std::vector<ShardId> getDataShardsAndConfigServer(OperationContext* opCtx,
-                                                  const NamespaceString& nss) {
-    auto shards = getShardsWithDataForCollection(opCtx, nss);
-    const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
-    if (std::find(shards.begin(), shards.end(), configShardId) == shards.end()) {
-        shards.push_back(configShardId);
     }
     return shards;
 }
@@ -228,12 +191,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kRemoteIndexValidation,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 // Stop migrations during most of the execution of the coordinator to guarantee a
                 // stable placement.
                 sharding_ddl_util::stopMigrations(
@@ -265,12 +222,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kBlockCrud,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 const auto shardIds = getDataShardsAndDbPrimaryShard(opCtx, nss());
                 const auto session = getNewSession(opCtx);
                 sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
@@ -305,12 +256,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
                 ConfigsvrCommitRefineCollectionShardKey commitRequest(nss());
 
                 CommitRefineCollectionShardKeyRequest cRCSreq(_doc.getNewShardKey(),
@@ -346,17 +291,10 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 // removable that was committed during the critical section.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
             }))
-        .then(_buildPhaseHandler(
-            Phase::kReleaseCritSec,
-            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    ParticipantCausalityBarrier barrier{
-                        getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
-                    performCausalityBarrier(opCtx, barrier);
-                }
-
-                _exitCriticalSection(opCtx, executor, token);
-            }))
+        .then(_buildPhaseHandler(Phase::kReleaseCritSec,
+                                 [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
+                                     _exitCriticalSection(opCtx, executor, token);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kResumeMigrations,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {

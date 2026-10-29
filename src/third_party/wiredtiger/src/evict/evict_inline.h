@@ -8,6 +8,39 @@
 
 #pragma once
 
+/*
+ * __evict_bounded_wait_limit_us --
+ *     Return how long a bounded caller may wait.
+ */
+static WT_INLINE uint64_t
+__evict_bounded_wait_limit_us(WT_SESSION_IMPL *session)
+{
+    uint64_t elapsed_us;
+
+    /*
+     * Prefer what remains of the caller's own operation timeout: it has already agreed to wait that
+     * long, and returning sooner only pushes the cache work onto threads that cannot do as much of
+     * it. The transaction timer is cleared by transaction release, but the session's copy belongs
+     * to the enclosing API call and is still running here.
+     */
+    if (session->operation_timeout_us == 0 || session->operation_start_us == 0)
+        return (WTI_EVICT_BOUNDED_WAIT_US);
+
+    elapsed_us = WT_CLOCKDIFF_US(__wt_clock(session), session->operation_start_us);
+    return (
+      elapsed_us > session->operation_timeout_us ? 0 : session->operation_timeout_us - elapsed_us);
+}
+
+/*
+ * __evict_bounded_wait_remaining_us --
+ *     Return the remaining bounded eviction wait time.
+ */
+static WT_INLINE uint64_t
+__evict_bounded_wait_remaining_us(uint64_t elapsed_us, uint64_t limit_us)
+{
+    return (elapsed_us > limit_us ? 0 : limit_us - elapsed_us);
+}
+
 /* !!!
  * __wt_evict_aggressive --
  *     Check whether eviction is unable to make any progress for some amount of time.
@@ -321,31 +354,13 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     /* Update the bytes in-memory to reflect the eviction. */
     __wt_cache_decr_check_uint64(
       session, &btree->bytes_inmem, btree_footprint, "WT_BTREE.bytes_inmem");
-    __wt_cache_decr_check_uint64(
-      session, &cache->bytes_inmem, memory_footprint, "WT_CACHE.bytes_inmem");
-    if (is_disagg) {
-        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-            __wt_cache_decr_check_uint64(
-              session, &cache->bytes_inmem_ingest, memory_footprint, "WT_CACHE.bytes_inmem_ingest");
-        else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-            __wt_cache_decr_check_uint64(
-              session, &cache->bytes_inmem_stable, memory_footprint, "WT_CACHE.bytes_inmem_stable");
-    }
+    WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_inmem, memory_footprint);
 
     /* Update the bytes_internal value to reflect the eviction */
     if (WT_PAGE_IS_INTERNAL(page)) {
         __wt_cache_decr_check_uint64(
           session, &btree->bytes_internal, btree_footprint, "WT_BTREE.bytes_internal");
-        __wt_cache_decr_check_uint64(
-          session, &cache->bytes_internal, memory_footprint, "WT_CACHE.bytes_internal");
-        if (is_disagg) {
-            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-                __wt_cache_decr_check_uint64(session, &cache->bytes_internal_ingest,
-                  memory_footprint, "WT_CACHE.bytes_internal_ingest");
-            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-                __wt_cache_decr_check_uint64(session, &cache->bytes_internal_stable,
-                  memory_footprint, "WT_CACHE.bytes_internal_stable");
-        }
+        WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_internal, memory_footprint);
     }
 
     /* Update the cache's dirty-byte count. */
@@ -353,29 +368,11 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
         if (WT_PAGE_IS_INTERNAL(page)) {
             __wt_cache_decr_check_uint64(
               session, &btree->bytes_dirty_intl, modify->bytes_dirty, "WT_BTREE.bytes_dirty_intl");
-            __wt_cache_decr_check_uint64(
-              session, &cache->bytes_dirty_intl, modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
-            if (is_disagg) {
-                if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-                    __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl_ingest,
-                      modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl_ingest");
-                else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-                    __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl_stable,
-                      modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl_stable");
-            }
+            WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_dirty_intl, modify->bytes_dirty);
         } else {
             __wt_cache_decr_check_uint64(
               session, &btree->bytes_dirty_leaf, modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
-            __wt_cache_decr_check_uint64(
-              session, &cache->bytes_dirty_leaf, modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
-            if (is_disagg) {
-                if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-                    __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf_ingest,
-                      modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf_ingest");
-                else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-                    __wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf_stable,
-                      modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf_stable");
-            }
+            WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_dirty_leaf, modify->bytes_dirty);
         }
     }
 
@@ -383,20 +380,12 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     if (modify != NULL) {
         __wt_cache_decr_check_uint64(
           session, &btree->bytes_updates, modify->bytes_updates, "WT_BTREE.bytes_updates");
-        __wt_cache_decr_check_uint64(
-          session, &cache->bytes_updates, modify->bytes_updates, "WT_CACHE.bytes_updates");
-        if (is_disagg) {
-            if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-                __wt_cache_decr_check_uint64(session, &cache->bytes_updates_ingest,
-                  modify->bytes_updates, "WT_CACHE.bytes_updates_ingest");
-            else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-                __wt_cache_decr_check_uint64(session, &cache->bytes_updates_stable,
-                  modify->bytes_updates, "WT_CACHE.bytes_updates_stable");
-        }
+        WT_CACHE_DECR(session, is_disagg, btree, cache, bytes_updates, modify->bytes_updates);
     }
 
     /* Update bytes and pages evicted. */
     (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_evict, memory_footprint);
+    __wt_cache_top_flow_incr(session, btree, WT_CACHE_TOP_EVICT, memory_footprint);
     (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted, 1);
     if (!WT_PAGE_IS_INTERNAL(page))
         (void)__wt_atomic_add_uint64_v_relaxed(&cache->pages_evicted_leaf, 1);
@@ -559,6 +548,23 @@ __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
         100);
 }
 
+/*
+ * __wti_evict_threshold_pct --
+ *     Return the cache-full percentage used by the eviction trigger check: one hundred minus the
+ *     smallest margin between a usage percentage and its trigger, floored at zero. Exceeding any
+ *     trigger therefore yields a percentage of at least one hundred. Kept separate from
+ *     __wt_evict_needed, as pure arithmetic, so it can be unit tested without live cache state.
+ */
+static WT_INLINE double
+__wti_evict_threshold_pct(double pct_clean, double pct_dirty, double pct_updates,
+  double clean_trigger, double dirty_trigger, double updates_trigger)
+{
+    return (WT_MAX(0.0,
+      100.0 -
+        WT_MIN(WT_MIN(clean_trigger - pct_clean, dirty_trigger - pct_dirty),
+          updates_trigger - pct_updates)));
+}
+
 /* !!!
  * __wt_evict_needed --
  *     Check whether the configured clean/dirty/update eviction trigger thresholds for the cache
@@ -620,13 +626,16 @@ __wt_evict_needed(
         updates_needed = __wti_evict_updates_needed(session, &pct_updates);
 
         /*
-         * Temporary solution to not do updates and dirty eviction using application threads on
-         * followers or during step-up. Log an error and log an error if the cache is full of
-         * updates or dirty pages.
+         * Temporary solution: application threads skip update and dirty eviction on followers,
+         * during step-up, and on a leader with the step-down timestamp set. In these states the
+         * dirty content is mostly ingest pages that cannot be evicted until a drain or checkpoint
+         * releases them, so pressing application threads into dirty eviction would stall them on
+         * work that cannot succeed. Log a message if the cache fills with updates or dirty pages.
          */
         if (ignore_updates_dirty && __wt_conn_is_disagg(session) &&
-          (!conn->layered_table_manager.leader ||
-            F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP))) {
+          (!__wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader) ||
+            F_ISSET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_STEP_UP) ||
+            __wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)) {
             double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
             if (pct_updates > cache_full)
                 __wt_verbose_debug1(
@@ -651,10 +660,9 @@ __wt_evict_needed(
      */
     dirty_trigger = __wt_atomic_load_double_relaxed(&evict->eviction_dirty_trigger);
     if (pct_fullp != NULL)
-        *pct_fullp = WT_MAX(0.0,
-          100.0 -
-            WT_MIN(WT_MIN(evict->eviction_trigger - pct_full, dirty_trigger - pct_dirty),
-              __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger) - pct_updates));
+        *pct_fullp =
+          __wti_evict_threshold_pct(pct_full, pct_dirty, pct_updates, evict->eviction_trigger,
+            dirty_trigger, __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger));
 
     /*
      * Only check the dirty trigger when the session is not busy.
@@ -706,7 +714,9 @@ __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
 
     return (__wt_cache_bytes_plus_overhead(
               cache, __wt_atomic_load_uint64_relaxed(&cache->bytes_hs_dirty)) >=
-      ((uint64_t)(conn->evict->eviction_dirty_trigger * bytes_max) / 100));
+      ((uint64_t)(__wt_atomic_load_double_relaxed(&conn->evict->eviction_dirty_trigger) *
+         bytes_max) /
+        100));
 }
 
 /*
@@ -851,14 +861,16 @@ __evict_is_session_cache_trigger_tolerant(WT_SESSION_IMPL *session, uint8_t cach
  *       (2) `readonly`: A flag indicating if the session is read-only, in which case dirty and
  *          update triggers are ignored.
  *       (3) `interruptible`: A flag indicating if the user is allowed to interrupt eviction.
- *       (4) `didworkp`: A pointer to indicate whether eviction work was done (optional).
+ *       (4) `bounded`: A flag indicating the caller pins no transaction state, in which case the
+ *            wait is capped rather than continuing until the cache drops below its triggers.
+ *       (5) `didworkp`: A pointer to indicate whether eviction work was done (optional).
  *
  *     Return an error code from `__wti_evict_app_assist_worker` if it is unable to perform
  *     meaningful work (eviction cache stuck).
  */
 static WT_INLINE int
-__wt_evict_app_assist_worker_check(
-  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, bool *didworkp)
+__wt_evict_app_assist_worker_check(WT_SESSION_IMPL *session, bool busy, bool readonly,
+  bool interruptible, bool bounded, bool *didworkp)
 {
     if (didworkp != NULL)
         *didworkp = false;
@@ -893,12 +905,6 @@ __wt_evict_app_assist_worker_check(
     if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (0);
 
-    /* Setting cache_max_wait_us to 1 effectively means "disable eviction when possible" */
-    uint64_t cache_max_wait_us =
-      session->cache_max_wait_us != 0 ? session->cache_max_wait_us : conn->evict->cache_max_wait_us;
-    if (cache_max_wait_us == 1)
-        return (0);
-
     /*
      * If the current transaction is keeping the oldest ID pinned, it is in the middle of an
      * operation. This may prevent the oldest ID from moving forward, leading to deadlock, so only
@@ -907,6 +913,9 @@ __wt_evict_app_assist_worker_check(
      */
     WT_TXN_GLOBAL *txn_global = &conn->txn_global;
     WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
+
+    /* A bounded caller is at a transaction boundary, with nothing left to roll back. */
+    WT_ASSERT(session, !bounded || session->txn->mod_count == 0);
     busy = busy || __wt_atomic_load_uint64_v_relaxed(&txn_shared->id) != WT_TXN_NONE ||
       session->hazards.num_active > 0 ||
       (__wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id) != WT_TXN_NONE &&
@@ -935,7 +944,8 @@ __wt_evict_app_assist_worker_check(
      * other resources that could block checkpoints or eviction.
      */
     WT_BTREE *btree = S2BT_SAFE(session);
-    if (btree != NULL && (F_ISSET(btree, WT_BTREE_NO_EVICT) || WT_IS_METADATA(session->dhandle)))
+    if (btree != NULL &&
+      (F_ISSET(btree, WT_BTREE_NO_EVICT) || WT_IS_ANY_METADATA(session->dhandle)))
         return (0);
 
     /* Check if eviction is needed. */
@@ -987,7 +997,7 @@ __wt_evict_app_assist_worker_check(
     if (didworkp != NULL)
         *didworkp = true;
 
-    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible));
+    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible, bounded));
 }
 
 /*
@@ -1072,4 +1082,52 @@ __evict_page_updates_candidate(WT_PAGE *page)
      * updates cache pressure.
      */
     return (page->modify->bytes_updates != 0);
+}
+
+/*
+ * __wti_evict_prune_ts_unmoved --
+ *     Return whether the prune timestamp has not advanced since the page's last reconciliation.
+ */
+static WT_INLINE bool
+__wti_evict_prune_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    wt_timestamp_t prune_timestamp;
+
+    prune_timestamp = __wt_atomic_load_uint64_acquire(&S2BT(session)->prune_timestamp);
+    return (prune_timestamp != WT_TS_NONE && page->modify->rec_prune_timestamp >= prune_timestamp);
+}
+
+/*
+ * __wti_evict_restored_page_unchanged --
+ *     Return whether the last reconciliation's pinned stable timestamp and the last eviction
+ *     attempt's oldest transaction ID are still current for a restored page.
+ */
+static WT_INLINE bool
+__wti_evict_restored_page_unchanged(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    WT_PAGE_MODIFY *mod;
+    wt_timestamp_t pinned_stable_ts;
+
+    mod = page->modify;
+    if (!FLD_ISSET(mod->restore_state, WT_PAGE_RS_RESTORED))
+        return (false);
+
+    pinned_stable_ts = __wt_txn_pinned_stable_timestamp(session);
+    return (pinned_stable_ts != WT_TS_NONE &&
+      mod->rec_pinned_stable_timestamp >= pinned_stable_ts &&
+      mod->rec_evict_attempt_oldest_id >= __wt_txn_oldest_id(session));
+}
+
+/*
+ * __wti_evict_ckpt_ts_unmoved --
+ *     Return whether the checkpoint timestamp has not advanced since the page's last
+ *     reconciliation.
+ */
+static WT_INLINE bool
+__wti_evict_ckpt_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    wt_timestamp_t checkpoint_timestamp =
+      __wt_atomic_load_uint64_acquire(&S2C(session)->txn_global.checkpoint_timestamp);
+    return (checkpoint_timestamp != WT_TS_NONE &&
+      page->modify->rec_pinned_stable_timestamp >= checkpoint_timestamp);
 }

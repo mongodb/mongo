@@ -132,6 +132,17 @@ mongo_cc_unit_test(
     copts = [
         "-Isrc/mongo/embedded",
     ],
+    # The test is executed directly by Evergreen on IBM hosts. Keep the C++
+    # runtime from the cross toolchain in the executable instead of resolving
+    # the host's older /lib64/libstdc++.so.6 at runtime. Other Linux hosts
+    # retain the normal dynamically linked runtime.
+    linkopts = select({
+        # Keep only libstdc++ static: the target's glibc and other shared
+        # libraries remain dynamically linked.
+        "@platforms//cpu:ppc64le": ["-static-libstdc++"],
+        "@platforms//cpu:s390x": ["-static-libstdc++"],
+        "//conditions:default": [],
+    }),
     provides_main = True,
     tags = [
         "mongo_unittest_third_group",

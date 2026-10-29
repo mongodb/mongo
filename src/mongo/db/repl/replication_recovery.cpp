@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
@@ -76,7 +50,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -133,8 +107,8 @@ public:
         return recoveryOplogApplier.obj();
     }
 
-    AtomicWord<size_t> numBatches{0};
-    AtomicWord<size_t> numOpsApplied{0};
+    Atomic<size_t> numBatches{0};
+    Atomic<size_t> numOpsApplied{0};
 };
 
 auto& recoveryOplogApplierSection =
@@ -636,6 +610,18 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
         if (!gTakeUnstableCheckpointOnShutdown) {
             _consistencyMarkers->clearAppliedThrough(opCtx);
         }
+
+        // _applyOplogOperations advances the stable and oldest timestamps to the
+        // top of the oplog after each applied batch. However, when there is no oplog to replay,
+        // that code path is never triggered and the oldest timestamp is left behind the initial
+        // data timestamp. During initial sync we must still advance them so that the oldest
+        // timestamp is aligned with the initial data timestamp.
+        if (_duringInitialSync) {
+            auto* replCoord = ReplicationCoordinator::get(opCtx);
+            replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
+                topOfOplog.getTimestamp(), /*force=*/false);
+            replCoord->setOldestTimestamp(topOfOplog.getTimestamp());
+        }
     }
 }
 
@@ -664,7 +650,7 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         // We advance both appliedThrough and the oldest timestamp together during oplog application
         // for restore after each batch, so the oldest timestamp cannot be behind appliedThrough.
         opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-            appliedThrough.getTimestamp(), false /*force*/);
+            appliedThrough.getTimestamp(), /*force=*/false);
 
         if (startupRecoveryForRestore) {
             // This branch only runs when there is no stable checkpoint to recover from, so there is
@@ -701,7 +687,7 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
     // playing oplog entries from.
     opCtx->getServiceContext()->getStorageEngine()->waitUntilUnjournaledWritesDurable(
         opCtx,
-        /*stableCheckpoint*/ true);
+        /*stableCheckpoint=*/true);
 
     // Now that we have set the initial data timestamp and taken an unstable checkpoint with the
     // appliedThrough being the topOfOplog, it is safe to clear the appliedThrough. This minValid
@@ -827,7 +813,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
             invariant(!applyThroughOpTime.isNull());
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
             replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
-                applyThroughOpTime.getTimestamp(), false /*force*/);
+                applyThroughOpTime.getTimestamp(), /*force=*/false);
             replCoord->setOldestTimestamp(applyThroughOpTime.getTimestamp());
         }
     }
@@ -955,7 +941,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
             opCtx,
             *shard_role_details::getRecoveryUnit(opCtx),
             truncateAfterRecordId,
-            false /*inclusive*/);
+            /*inclusive=*/false);
     wunit.commit();
     if (result.recordsRemoved > 0) {
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {

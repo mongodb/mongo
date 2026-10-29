@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 
@@ -35,7 +9,7 @@
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
-std::string_view nodeStageTypeToString(const QuerySolutionNode* node) {
+std::string_view nodeStageTypeToString(const QuerySolutionNode* node, bool brief) {
     switch (node->getType()) {
         case STAGE_AND_HASH:
             return "AND_HASH"sv;
@@ -68,12 +42,16 @@ std::string_view nodeStageTypeToString(const QuerySolutionNode* node) {
             return "EQ_LOOKUP_UNWIND"sv;
         case STAGE_FETCH:
             return "FETCH"sv;
+        case STAGE_BATCHED_FETCH:
+            return "BATCHED_FETCH"sv;
         case STAGE_GEO_NEAR_2D:
             return "GEO_NEAR_2D"sv;
         case STAGE_GEO_NEAR_2DSPHERE:
             return "GEO_NEAR_2DSPHERE"sv;
         case STAGE_GROUP:
             return "GROUP"sv;
+        case STAGE_STREAMING_GROUP:
+            return "STREAMING_GROUP"sv;
         case STAGE_IDHACK:
             return "IDHACK"sv;
         case STAGE_IXSCAN:
@@ -142,16 +120,14 @@ std::string_view nodeStageTypeToString(const QuerySolutionNode* node) {
             return "UNWIND"sv;
         case STAGE_UPDATE:
             return "UPDATE"sv;
-        case STAGE_WINDOW:
-            return "WINDOW"sv;
         case STAGE_HASH_JOIN_EMBEDDING_NODE:
-            return "HASH_JOIN_EMBEDDING"sv;
+            return brief ? "HJ"sv : "HASH_JOIN_EMBEDDING"sv;
         case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
-            return "NESTED_LOOP_JOIN_EMBEDDING"sv;
+            return brief ? "NLJ"sv : "NESTED_LOOP_JOIN_EMBEDDING"sv;
         case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
-            return "INDEXED_NESTED_LOOP_JOIN_EMBEDDING"sv;
+            return brief ? "INLJ"sv : "INDEXED_NESTED_LOOP_JOIN_EMBEDDING"sv;
         case STAGE_INDEX_PROBE_NODE:
-            return "INDEX_PROBE_NODE"sv;
+            return brief ? "IXPROBE"sv : "INDEX_PROBE_NODE"sv;
         default:
             return "UNKNOWN"sv;
     }

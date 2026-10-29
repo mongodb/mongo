@@ -7,8 +7,7 @@ column-store. In the past WiredTiger also supported a third storage
 format which was column-store combined with fixed length values suitably
 referred to as "fixed-length column-store". This storage format is now
 deprecated. Row-store and column-store are both B+tree implementations
-of key/value stores. In addition, there is experimental support for @ref
-tiered_storage, allowing a B+tree to span multiple files and cloud objects.
+of key/value stores.
 
 In a row-store, both keys and data are variable-length byte strings.  In
 a column-store, keys are 64-bit record numbers (key_format type 'r'),

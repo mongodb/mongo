@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * Replacements for <cctype> or <ctype.h> functions and macros.
@@ -71,12 +45,12 @@
 #include <array>
 #include <cstdint>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace ctype {
 namespace detail {
 
 /** Define a bit position for each character class queryable with this API. */
-enum MONGO_MOD_FILE_PRIVATE ClassBit : uint16_t {
+enum [[MONGO_MOD_FILE_PRIVATE]] ClassBit : uint16_t {
     kUpper = 1 << 0,   //< [upper] UPPERCASE
     kLower = 1 << 1,   //< [lower] lowercase
     kAlpha = 1 << 2,   //< [alpha] Alphabetic (upper case or lower case)
@@ -92,7 +66,7 @@ enum MONGO_MOD_FILE_PRIVATE ClassBit : uint16_t {
 };
 
 /** Returns the bitwise-or of all `ClassBit` pertinent to character `c`.  */
-MONGO_MOD_FILE_PRIVATE constexpr uint16_t calculateClassBits(unsigned char c) {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr uint16_t calculateClassBits(unsigned char c) {
     if (c >= 0x80)
         return 0;
     uint16_t r = 0;
@@ -124,19 +98,19 @@ MONGO_MOD_FILE_PRIVATE constexpr uint16_t calculateClassBits(unsigned char c) {
 }
 
 /** The character class memberships for each char. */
-MONGO_MOD_FILE_PRIVATE constexpr auto chClassTable = [] {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto chClassTable = [] {
     std::array<uint16_t, 256> arr{};
     for (size_t i = 0; i < arr.size(); ++i)
         arr[i] = calculateClassBits(i);
     return arr;
 }();
 
-MONGO_MOD_FILE_PRIVATE constexpr bool isMember(char c, uint16_t mask) {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr bool isMember(char c, uint16_t mask) {
     return chClassTable[static_cast<unsigned char>(c)] & mask;
 }
 
 /** Lookup table for `toUpper`. */
-MONGO_MOD_FILE_PRIVATE constexpr auto chUpperTable = [] {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto chUpperTable = [] {
     std::array<char, 256> arr{};
     for (size_t i = 0; i < arr.size(); ++i)
         arr[i] = isMember(i, kLower) ? 'A' + (i - 'a') : i;
@@ -144,7 +118,7 @@ MONGO_MOD_FILE_PRIVATE constexpr auto chUpperTable = [] {
 }();
 
 /** Lookup table for `toLower`. */
-MONGO_MOD_FILE_PRIVATE constexpr auto chLowerTable = [] {
+[[MONGO_MOD_FILE_PRIVATE]] constexpr auto chLowerTable = [] {
     std::array<char, 256> arr{};
     for (size_t i = 0; i < arr.size(); ++i)
         arr[i] = isMember(i, kUpper) ? 'a' + (i - 'A') : i;
@@ -214,4 +188,4 @@ constexpr char toLower(char c) noexcept {
 }
 
 }  // namespace ctype
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

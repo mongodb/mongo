@@ -1,47 +1,25 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/histogram.h"
 #include "mongo/util/modules.h"
 
 #include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::admission::execution_control {
+using namespace std::literals::string_view_literals;
 
 // Forward declaration to avoid circular dependency.
 enum class OperationType;
@@ -67,17 +45,17 @@ class AdmissionsHistogram {
 public:
     static constexpr size_t kNumBuckets = 11;
 
-    static constexpr std::array<std::string_view, kNumBuckets> kBucketNames = {"1-2"_sd,
-                                                                               "3-4"_sd,
-                                                                               "5-8"_sd,
-                                                                               "9-16"_sd,
-                                                                               "17-32"_sd,
-                                                                               "33-64"_sd,
-                                                                               "65-128"_sd,
-                                                                               "129-256"_sd,
-                                                                               "257-512"_sd,
-                                                                               "513-1024"_sd,
-                                                                               "1025+"_sd};
+    static constexpr std::array<std::string_view, kNumBuckets> kBucketNames = {"1-2"sv,
+                                                                               "3-4"sv,
+                                                                               "5-8"sv,
+                                                                               "9-16"sv,
+                                                                               "17-32"sv,
+                                                                               "33-64"sv,
+                                                                               "65-128"sv,
+                                                                               "129-256"sv,
+                                                                               "257-512"sv,
+                                                                               "513-1024"sv,
+                                                                               "1025+"sv};
 
     AdmissionsHistogram() = default;
 
@@ -97,7 +75,32 @@ private:
      */
     size_t _getBucketIndex(int32_t admissions);
 
-    std::array<AtomicWord<int64_t>, kNumBuckets> _buckets{};
+    std::array<Atomic<int64_t>, kNumBuckets> _buckets{};
+};
+
+/**
+ * Histogram tracking the distribution of per-operation queue wait times for a single ticket queue.
+ *
+ * It's a wrapper around the Histogram<t> for a convenient use of appendStats and a sanitization
+ * point for recording a new datapoint.
+ */
+class QueueWaitTimeHistogram {
+public:
+    // Lower-bound partitions (microseconds). The implicit first bucket below the smallest
+    // partition captures the "did not wait" (0us) samples.
+    static std::vector<int64_t> partitions() {
+        return {1,       10,      25,        50,        100,       250,       500,
+                1'000,   2'500,   5'000,     10'000,    25'000,    50'000,    100'000,
+                250'000, 500'000, 1'000'000, 2'500'000, 5'000'000, 10'000'000};
+    }
+
+    QueueWaitTimeHistogram() : _hist(partitions()) {}
+
+    void record(Microseconds queueWaitTime);
+    void appendStats(BSONArrayBuilder& arr) const;
+
+private:
+    Histogram<int64_t> _hist;
 };
 
 /**
@@ -113,9 +116,9 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalDelinquentAcquisitions{0};
-    AtomicWord<int64_t> totalAcquisitionDelinquencyMillis{0};
-    AtomicWord<int64_t> maxAcquisitionDelinquencyMillis{0};
+    Atomic<int64_t> totalDelinquentAcquisitions{0};
+    Atomic<int64_t> totalAcquisitionDelinquencyMillis{0};
+    Atomic<int64_t> maxAcquisitionDelinquencyMillis{0};
 };
 
 /**
@@ -132,14 +135,14 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalCPUUsageMicros{0};
-    AtomicWord<int64_t> totalElapsedTimeMicros{0};
-    AtomicWord<int64_t> totalOpsFinished{0};
-    AtomicWord<int64_t> totalOpsLoadShed{0};
-    AtomicWord<int64_t> totalCPUUsageLoadShed{0};
-    AtomicWord<int64_t> totalElapsedTimeMicrosLoadShed{0};
-    AtomicWord<int64_t> totalAdmissionsLoadShed{0};
-    AtomicWord<int64_t> totalQueuedTimeMicrosLoadShed{0};
+    Atomic<int64_t> totalCPUUsageMicros{0};
+    Atomic<int64_t> totalElapsedTimeMicros{0};
+    Atomic<int64_t> totalOpsFinished{0};
+    Atomic<int64_t> totalOpsLoadShed{0};
+    Atomic<int64_t> totalCPUUsageLoadShed{0};
+    Atomic<int64_t> totalElapsedTimeMicrosLoadShed{0};
+    Atomic<int64_t> totalAdmissionsLoadShed{0};
+    Atomic<int64_t> totalQueuedTimeMicrosLoadShed{0};
 };
 
 /**
@@ -156,11 +159,11 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalTimeQueuedMicros{0};
-    AtomicWord<int64_t> totalTimeProcessingMicros{0};
-    AtomicWord<int64_t> totalAdmissions{0};
-    AtomicWord<int64_t> totalNormalPriorityAdmissions{0};
-    AtomicWord<int64_t> totalLowPriorityAdmissions{0};
+    Atomic<int64_t> totalTimeQueuedMicros{0};
+    Atomic<int64_t> totalTimeProcessingMicros{0};
+    Atomic<int64_t> totalAdmissions{0};
+    Atomic<int64_t> totalNormalPriorityAdmissions{0};
+    Atomic<int64_t> totalLowPriorityAdmissions{0};
     DelinquencyStats delinquencyStats;
 };
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
@@ -496,6 +470,206 @@ TEST(DocumentSize, ApproximateSizeDuringBuildIsUpdated) {
     ASSERT_EQ(beforeFreezeSize, frozenSize);
 }
 
+/**
+ * Returns the comma-separated field names of 'document' in iteration order, without ever
+ * dereferencing a value. For a document whose cache starts out empty, this leaves it empty.
+ */
+std::string fieldNamesNoCaching(const Document& document) {
+    std::string out;
+    for (FieldIterator it(document); it.more(); it.advance()) {
+        if (!out.empty())
+            out += ',';
+        out += it.fieldName();
+    }
+    return out;
+}
+
+/**
+ * Returns the comma-separated field names of 'document' in iteration order, dereferencing every
+ * value and thereby pulling each field into the cache as iteration proceeds.
+ */
+std::string fieldNamesWithCaching(const Document& document) {
+    std::string out;
+    for (FieldIterator it(document); it.more();) {
+        auto field = it.next();
+        if (!out.empty())
+            out += ',';
+        out += field.first;
+    }
+    return out;
+}
+
+TEST(DocumentStorageModifiedFlag, CachingAFieldDoesNotMarkStorageModified) {
+    // 'DocumentStorage::computeSize()' and 'Document::empty()' both take a fast path when the
+    // storage is unmodified, relying on an unmodified storage's cache holding nothing but mirrors
+    // of fields that are still present in the backing BSON. Bringing a field into the cache must
+    // therefore leave the flag alone.
+    Document document = fromBson(BSON("a" << 1 << "sub" << BSON("b" << 2)));
+    ASSERT_FALSE(document.isModified());
+
+    ASSERT_EQUALS(1, document["a"].getInt());
+    ASSERT_FALSE(document.isModified());
+
+    ASSERT_EQUALS(2, document["sub"]["b"].getInt());
+    ASSERT_FALSE(document.isModified());
+
+    document.loadIntoCache();
+    ASSERT_FALSE(document.isModified());
+    ASSERT_EQUALS(2ULL, document.computeSize());
+}
+
+TEST(DocumentStorageModifiedFlag, AddingAFieldMarksStorageModified) {
+    // The other half of the invariant above: an inserted field must mark the storage modified, so
+    // that the fast paths do not miss it. 'appendField()' relies on returning through the non-const
+    // 'getField(Position)' overload to set the flag.
+    MutableDocument md;
+    md.addField("a", Value(1));
+    ASSERT_TRUE(md.peek().isModified());
+
+    MutableDocument fromExisting(fromBson(BSON("a" << 1)));
+    ASSERT_FALSE(fromExisting.peek().isModified());
+    fromExisting.addField("b", Value(2));
+    ASSERT_TRUE(fromExisting.peek().isModified());
+}
+
+TEST(DocumentFieldCount, UnmodifiedDocumentCountsBsonFields) {
+    Document document = fromBson(BSON("a" << 1 << "b" << 2 << "c" << 3));
+    ASSERT_FALSE(document.isModified());
+    ASSERT_EQUALS(3ULL, document.computeSize());
+
+    // Caching a field must not change the count.
+    ASSERT_EQUALS(2, document["b"].getInt());
+    ASSERT_EQUALS(3ULL, document.computeSize());
+}
+
+TEST(DocumentFieldCount, UnmodifiedDocumentDoesNotCountMetadataFields) {
+    Document document = Document::fromBsonWithMetaData(
+        BSON("a" << 1 << Document::metaFieldTextScore << 10.0 << "b" << 2));
+    ASSERT_FALSE(document.isModified());
+    ASSERT_EQUALS(2ULL, document.computeSize());
+    ASSERT_EQUALS(10.0, document.metadata().getTextScore());
+}
+
+TEST(DocumentFieldCount, ModifiedDocumentCountsInsertedAndRemovedFields) {
+    MutableDocument md(fromBson(BSON("a" << 1 << "b" << 2 << "c" << 3)));
+    md.addField("d", Value(4));
+    md.remove("b");
+    Document document = md.freeze();
+
+    ASSERT_TRUE(document.isModified());
+    ASSERT_EQUALS(3ULL, document.computeSize());
+    ASSERT_EQUALS("a,c,d", fieldNamesNoCaching(document));
+}
+
+TEST(DocumentFieldCount, ModifiedDocumentWithMetadataDoesNotCountMetadataFields) {
+    MutableDocument md(Document::fromBsonWithMetaData(
+        BSON("a" << 1 << Document::metaFieldTextScore << 10.0 << "b" << 2)));
+    md.addField("c", Value(3));
+    Document document = md.freeze();
+
+    ASSERT_TRUE(document.isModified());
+    ASSERT_EQUALS(3ULL, document.computeSize());
+    ASSERT_EQUALS("a,b,c", fieldNamesNoCaching(document));
+}
+
+TEST(DocumentIteration, EmptyCacheIterationVisitsAllBsonFields) {
+    Document document = fromBson(BSON("a" << 1 << "b" << 2 << "c" << 3));
+    ASSERT_EQUALS("a,b,c", fieldNamesNoCaching(document));
+
+    // The names above came straight from the backing BSON, so nothing was brought into the cache.
+    ASSERT_FALSE(document.isModified());
+    ASSERT_EQUALS(3ULL, document.computeSize());
+}
+
+TEST(DocumentIteration, CachePopulatedMidIterationStillVisitsAllFields) {
+    Document document = fromBson(BSON("a" << 1 << "b" << 2 << "c" << 3));
+
+    // Dereferencing each value pulls it into the cache, so the cache is empty when the first field
+    // is visited and non-empty for the rest. Iterating again sees a fully populated cache. All
+    // three combinations must agree.
+    ASSERT_EQUALS("a,b,c", fieldNamesWithCaching(document));
+    ASSERT_EQUALS("a,b,c", fieldNamesWithCaching(document));
+    ASSERT_EQUALS("a,b,c", fieldNamesNoCaching(document));
+}
+
+TEST(DocumentIteration, PartiallyPopulatedCacheVisitsAllFields) {
+    Document document = fromBson(BSON("a" << 1 << "b" << 2 << "c" << 3));
+
+    // Cache exactly one field, so the cache is non-empty from the very start of iteration but most
+    // lookups still miss.
+    ASSERT_EQUALS(2, document["b"].getInt());
+    ASSERT_EQUALS("a,b,c", fieldNamesNoCaching(document));
+    ASSERT_EQUALS("a,b,c", fieldNamesWithCaching(document));
+}
+
+TEST(DocumentIteration, SkipsRemovedFields) {
+    MutableDocument md(fromBson(BSON("a" << 1 << "b" << 2 << "c" << 3)));
+    md.remove("b");
+    Document document = md.freeze();
+
+    ASSERT_EQUALS("a,c", fieldNamesNoCaching(document));
+    ASSERT_EQUALS("a,c", fieldNamesWithCaching(document));
+    ASSERT_EQUALS(2ULL, document.computeSize());
+}
+
+TEST(DocumentIteration, SkipsMetadataFields) {
+    Document document = Document::fromBsonWithMetaData(
+        BSON("a" << 1 << Document::metaFieldTextScore << 10.0 << "b" << 2));
+
+    ASSERT_EQUALS("a,b", fieldNamesNoCaching(document));
+    ASSERT_EQUALS("a,b", fieldNamesWithCaching(document));
+}
+
+TEST(DocumentIteration, VisitsInsertedFieldsAfterBsonFields) {
+    MutableDocument md(fromBson(BSON("a" << 1 << "b" << 2)));
+    md.addField("z", Value(3));
+    Document document = md.freeze();
+
+    ASSERT_EQUALS("a,b,z", fieldNamesNoCaching(document));
+    ASSERT_EQUALS("a,b,z", fieldNamesWithCaching(document));
+    ASSERT_EQUALS(3ULL, document.computeSize());
+}
+
+TEST(DocumentEmpty, DefaultConstructedIsEmpty) {
+    ASSERT_TRUE(Document().empty());
+}
+
+TEST(DocumentEmpty, EmptyMutableDocumentIsEmpty) {
+    ASSERT_TRUE(MutableDocument().freeze().empty());
+}
+
+TEST(DocumentEmpty, EmptyBsonIsEmpty) {
+    ASSERT_TRUE(fromBson(BSONObj()).empty());
+}
+
+TEST(DocumentEmpty, NonEmptyBsonIsNotEmpty) {
+    Document document = fromBson(BSON("a" << 1));
+    ASSERT_FALSE(document.empty());
+
+    // Caching the field must not change the answer.
+    ASSERT_EQUALS(1, document["a"].getInt());
+    ASSERT_FALSE(document.empty());
+}
+
+TEST(DocumentEmpty, MetadataOnlyBsonIsEmpty) {
+    // Metadata fields are hidden from iteration, so this document has no user-visible fields even
+    // though its backing BSON is not empty. This is why 'empty()' cannot consult the backing BSON
+    // when the BSON carries metadata.
+    Document document = Document::fromBsonWithMetaData(BSON(Document::metaFieldTextScore << 10.0));
+    ASSERT_TRUE(document.empty());
+    ASSERT_EQUALS(0ULL, document.computeSize());
+    ASSERT_EQUALS(10.0, document.metadata().getTextScore());
+}
+
+TEST(DocumentEmpty, DocumentWithAllFieldsRemovedIsEmpty) {
+    MutableDocument md(fromBson(BSON("a" << 1)));
+    md.remove("a");
+    Document document = md.freeze();
+
+    ASSERT_TRUE(document.empty());
+    ASSERT_EQUALS(0ULL, document.computeSize());
+}
+
 TEST(ShredDocument, OutputHasNoBackingBSON) {
     BSONObj bson =
         BSON("a" << 1 << "subObj" << BSON("a" << 1) << "subArray" << BSON_ARRAY(BSON("a" << 1)));
@@ -514,6 +688,20 @@ TEST(ShredDocument, OutputHasNoBackingBSON) {
     // Accessing a field shouldn't change the size since all fields are already cached.
     shredded["a"];
     ASSERT_EQ(shredded.getCurrentApproximateSize(), shreddedSize);
+
+    // shred() recurses through arrays, so an object reached through 'subArray' is cache-only too.
+    // Measure on the nested document rather than on 'shredded': Document::getApproximateSize()
+    // memoizes into '_snapshottedSize', so a delta taken on the outer document would not observe
+    // a nested cache being populated. getCurrentApproximateSize() recomputes.
+    Document nestedInArray = shredded["subArray"].getArray()[0].getDocument();
+    auto nestedInArraySize = nestedInArray.getCurrentApproximateSize();
+    nestedInArray["a"];
+    ASSERT_EQ(nestedInArray.getCurrentApproximateSize(), nestedInArraySize);
+
+    Document nestedInObject = shredded["subObj"].getDocument();
+    auto nestedInObjectSize = nestedInObject.getCurrentApproximateSize();
+    nestedInObject["a"];
+    ASSERT_EQ(nestedInObject.getCurrentApproximateSize(), nestedInObjectSize);
 }
 
 TEST(ShredDocument, HandlesModifiedDocuments) {
@@ -1268,8 +1456,6 @@ TEST(MetaFields, FromBsonWithMetadataHandlesEmptyFieldName) {
 }
 
 TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     Document source = Document::fromBsonWithMetaData(
         BSON("a" << 1 << "$textScore" << 9.9 << "b" << 1 << "$randVal" << 42.0 << "c" << 1
                  << "$sortKey" << BSON("x" << 1) << "d" << 1 << "$dis" << 3.2 << "e" << 1 << "$pt"
@@ -1626,8 +1812,6 @@ TEST_F(SerializationTest, MetaSerializationSearchHighlightsNonArray) {
 }
 
 TEST(MetaFields, ToAndFromBson) {
-    // Used to set 'score' metadata.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     MutableDocument docBuilder;
     docBuilder.metadata().setTextScore(10.0);
     docBuilder.metadata().setRandVal(20.0);
@@ -2174,6 +2358,30 @@ public:
     }
 };
 
+// Integer limits.
+const int kIntMax = std::numeric_limits<int>::max();
+const int kIntMin = std::numeric_limits<int>::lowest();
+const long long kIntMaxAsLongLong = kIntMax;
+const long long kIntMinAsLongLong = kIntMin;
+const double kIntMaxAsDouble = kIntMax;
+const double kIntMinAsDouble = kIntMin;
+const Decimal128 kIntMaxAsDecimal = Decimal128(kIntMax);
+const Decimal128 kIntMinAsDecimal = Decimal128(kIntMin);
+
+// 64-bit integer limits.
+const long long kLongLongMax = std::numeric_limits<long long>::max();
+const long long kLongLongMin = std::numeric_limits<long long>::lowest();
+const double kLongLongMaxAsDouble = static_cast<double>(kLongLongMax);
+const double kLongLongMinAsDouble = static_cast<double>(kLongLongMin);
+const Decimal128 kLongLongMaxAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMax));
+const Decimal128 kLongLongMinAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMin));
+
+// Double limits.
+const double kDoubleMax = std::numeric_limits<double>::max();
+const double kDoubleMin = std::numeric_limits<double>::lowest();
+const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMax);
+const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
+
 namespace Coerce {
 
 class ToBoolBase {
@@ -2336,12 +2544,42 @@ class IntToInt : public ToIntBase {
 };
 
 /** Coerce long to int. */
-class LongToInt : public ToIntBase {
+class LongToIntTooLarge : public ToIntBase {
     Value value() override {
         return Value(0xff00000007LL);
     }
     bool asserts() override {
         return true;
+    }
+};
+
+/** Coerce long to int. */
+class LongToIntMinLong : public ToIntBase {
+    Value value() override {
+        return Value(kLongLongMin);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce long to int. */
+class LongToIntMaxLong : public ToIntBase {
+    Value value() override {
+        return Value(kLongLongMax);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce long to int. */
+class LongToInt : public ToIntBase {
+    Value value() override {
+        return Value(-10LL);
+    }
+    int expected() override {
+        return -10;
     }
 };
 
@@ -2352,6 +2590,136 @@ class DoubleToInt : public ToIntBase {
     }
     int expected() override {
         return 9;
+    }
+};
+
+/** Coerce negative value to int. */
+class DoubleNegativeToInt : public ToIntBase {
+    Value value() override {
+        return Value(-35.992);
+    }
+    int expected() override {
+        return -35;
+    }
+};
+
+/** Coerce min int as double to int. */
+class DoubleMinIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMinAsDouble);
+    }
+    int expected() override {
+        return kIntMin;
+    }
+};
+
+/** Coerce max int as double to int. */
+class DoubleMaxIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMaxAsDouble);
+    }
+    int expected() override {
+        return kIntMax;
+    }
+};
+
+/** Coerce Decimal128 to int **/
+class Decimal128ToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128("952.1234"));
+    }
+    int expected() override {
+        return 952;
+    }
+};
+
+/** Coerce negative Decimal128 to int **/
+class Decimal128NegativeToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128("-35.992"));
+    }
+    int expected() override {
+        return -36;
+    }
+};
+
+/** Coerce Decimal128 int to int **/
+class Decimal128MinIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMinAsDecimal);
+    }
+    int expected() override {
+        return kIntMin;
+    }
+};
+
+/** Coerce Decimal128 int max to int **/
+class Decimal128MaxIntToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMaxAsDecimal);
+    }
+    int expected() override {
+        return kIntMax;
+    }
+};
+
+/** Coerce Decimal128 int min - 1 to int **/
+class Decimal128TooSmallToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMinAsDecimal.subtract(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 int max + 1 to int **/
+class Decimal128TooLargeToInt : public ToIntBase {
+    Value value() override {
+        return Value(kIntMaxAsDecimal.add(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +Inf to int **/
+class Decimal128PositiveInfToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -Inf to int **/
+class Decimal128NegativeInfToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +NaN to int **/
+class Decimal128PositiveNaNToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveNaN);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -NaN to int **/
+class Decimal128NegativeNaNToInt : public ToIntBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeNaN);
+    }
+    bool asserts() override {
+        return true;
     }
 };
 
@@ -2473,6 +2841,77 @@ class DoubleToLong : public ToLongBase {
     }
 };
 
+/** Coerce negative value to long. */
+class DoubleNegativeToLong : public ToLongBase {
+    Value value() override {
+        return Value(-35.992);
+    }
+    long long expected() override {
+        return -35;
+    }
+};
+
+/** Coerce long min double to long. */
+class DoubleMinLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMinAsDouble);
+    }
+    long long expected() override {
+        return kLongLongMin;
+    }
+};
+
+/** Coerce smallest safe long as double to long. */
+class DoubleSmallestSafeLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(static_cast<double>(BSONElement::kSmallestSafeLongLongAsDouble));
+    }
+    long long expected() override {
+        return BSONElement::kSmallestSafeLongLongAsDouble;
+    }
+};
+
+/** Coerce largest safe long as double to long. */
+class DoubleLargestSafeLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(static_cast<double>(BSONElement::kLargestSafeLongLongAsDouble));
+    }
+    long long expected() override {
+        return BSONElement::kLargestSafeLongLongAsDouble;
+    }
+};
+
+/** Coerce large double value to long. */
+class DoubleLargeWithPrecisionLossToLong : public ToLongBase {
+    Value value() override {
+        // Large number that can be safely represented as a double.
+        return Value(9223372036854772736.0);
+    }
+    long long expected() override {
+        return 9223372036854772736LL;
+    }
+};
+
+/** Coerce largest long + 1 as double to long. */
+class DoubleLongMaxPlusOneToLong : public ToLongBase {
+    Value value() override {
+        return Value(BSONElement::kLongLongMaxPlusOneAsDouble);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce long max double to long. */
+class DoubleMaxLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMaxAsDouble);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
 /** Coerce infinity to long. */
 class InfToLong : public ToLongBase {
     Value value() override {
@@ -2518,6 +2957,106 @@ class TowardsInfinityToLong : public ToLongBase {
     Value value() override {
         return Value(static_cast<double>(std::nextafter(std::numeric_limits<long long>::lowest(),
                                                         std::numeric_limits<double>::lowest())));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 to long **/
+class Decimal128ToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128("952.1234"));
+    }
+    long long expected() override {
+        return 952;
+    }
+};
+
+/** Coerce negative Decimal128 to long **/
+class Decimal128NegativeToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128("-35.992"));
+    }
+    long long expected() override {
+        return -36;
+    }
+};
+
+/** Coerce Decimal128 long min to long **/
+class Decimal128MinLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMinAsDecimal);
+    }
+    long long expected() override {
+        return kLongLongMin;
+    }
+};
+
+/** Coerce Decimal128 long max to long **/
+class Decimal128MaxLongToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMaxAsDecimal);
+    }
+    long long expected() override {
+        return kLongLongMax;
+    }
+};
+
+/** Coerce Decimal128 long min - 1 to long **/
+class Decimal128TooSmallToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMinAsDecimal.subtract(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 long long max + 1 to long **/
+class Decimal128TooLargeToLong : public ToLongBase {
+    Value value() override {
+        return Value(kLongLongMaxAsDecimal.add(Decimal128(1)));
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +Inf to long **/
+class Decimal128PositiveInfToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -Inf to long **/
+class Decimal128NegativeInfToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeInfinity);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 +NaN to long **/
+class Decimal128PositiveNaNToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kPositiveNaN);
+    }
+    bool asserts() override {
+        return true;
+    }
+};
+
+/** Coerce Decimal128 -NaN to long **/
+class Decimal128NegativeNaNToLong : public ToLongBase {
+    Value value() override {
+        return Value(Decimal128::kNegativeNaN);
     }
     bool asserts() override {
         return true;
@@ -3072,30 +3611,6 @@ public:
     }
 };
 
-// Integer limits.
-const int kIntMax = std::numeric_limits<int>::max();
-const int kIntMin = std::numeric_limits<int>::lowest();
-const long long kIntMaxAsLongLong = kIntMax;
-const long long kIntMinAsLongLong = kIntMin;
-const double kIntMaxAsDouble = kIntMax;
-const double kIntMinAsDouble = kIntMin;
-const Decimal128 kIntMaxAsDecimal = Decimal128(kIntMax);
-const Decimal128 kIntMinAsDecimal = Decimal128(kIntMin);
-
-// 64-bit integer limits.
-const long long kLongLongMax = std::numeric_limits<long long>::max();
-const long long kLongLongMin = std::numeric_limits<long long>::lowest();
-const double kLongLongMaxAsDouble = static_cast<double>(kLongLongMax);
-const double kLongLongMinAsDouble = static_cast<double>(kLongLongMin);
-const Decimal128 kLongLongMaxAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMax));
-const Decimal128 kLongLongMinAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMin));
-
-// Double limits.
-const double kDoubleMax = std::numeric_limits<double>::max();
-const double kDoubleMin = std::numeric_limits<double>::lowest();
-const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMin);
-const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
-
 TEST(ValueIntegral, CorrectlyIdentifiesValidIntegralValues) {
     ASSERT_TRUE(Value(kIntMax).integral());
     ASSERT_TRUE(Value(kIntMin).integral());
@@ -3202,8 +3717,13 @@ public:
         add<Value::Coerce::NullToBool>();
         add<Value::Coerce::UndefinedToBool>();
         add<Value::Coerce::IntToInt>();
-        add<Value::Coerce::LongToInt>();
+        add<Value::Coerce::LongToIntTooLarge>();
+        add<Value::Coerce::LongToIntMinLong>();
+        add<Value::Coerce::LongToIntMaxLong>();
         add<Value::Coerce::DoubleToInt>();
+        add<Value::Coerce::DoubleNegativeToInt>();
+        add<Value::Coerce::DoubleMinIntToInt>();
+        add<Value::Coerce::DoubleMaxIntToInt>();
         add<Value::Coerce::NullToInt>();
         add<Value::Coerce::UndefinedToInt>();
         add<Value::Coerce::StringToInt>();
@@ -3214,6 +3734,23 @@ public:
         add<Value::Coerce::IntToLong>();
         add<Value::Coerce::LongToLong>();
         add<Value::Coerce::DoubleToLong>();
+        add<Value::Coerce::DoubleNegativeToLong>();
+        add<Value::Coerce::DoubleMinLongToLong>();
+        add<Value::Coerce::DoubleMaxLongToLong>();
+        add<Value::Coerce::DoubleSmallestSafeLongToLong>();
+        add<Value::Coerce::DoubleLargestSafeLongToLong>();
+        add<Value::Coerce::DoubleLargeWithPrecisionLossToLong>();
+        add<Value::Coerce::DoubleLongMaxPlusOneToLong>();
+        add<Value::Coerce::Decimal128ToInt>();
+        add<Value::Coerce::Decimal128NegativeToInt>();
+        add<Value::Coerce::Decimal128MinIntToInt>();
+        add<Value::Coerce::Decimal128MaxIntToInt>();
+        add<Value::Coerce::Decimal128TooSmallToInt>();
+        add<Value::Coerce::Decimal128TooLargeToInt>();
+        add<Value::Coerce::Decimal128PositiveInfToInt>();
+        add<Value::Coerce::Decimal128NegativeInfToInt>();
+        add<Value::Coerce::Decimal128PositiveNaNToInt>();
+        add<Value::Coerce::Decimal128NegativeNaNToInt>();
         add<Value::Coerce::NullToLong>();
         add<Value::Coerce::UndefinedToLong>();
         add<Value::Coerce::StringToLong>();
@@ -3222,6 +3759,16 @@ public:
         add<Value::Coerce::InvalidLargeToLong>();
         add<Value::Coerce::LowestDoubleToLong>();
         add<Value::Coerce::TowardsInfinityToLong>();
+        add<Value::Coerce::Decimal128ToLong>();
+        add<Value::Coerce::Decimal128NegativeToLong>();
+        add<Value::Coerce::Decimal128MinLongToLong>();
+        add<Value::Coerce::Decimal128MaxLongToLong>();
+        add<Value::Coerce::Decimal128TooSmallToLong>();
+        add<Value::Coerce::Decimal128TooLargeToLong>();
+        add<Value::Coerce::Decimal128PositiveInfToLong>();
+        add<Value::Coerce::Decimal128NegativeInfToLong>();
+        add<Value::Coerce::Decimal128PositiveNaNToLong>();
+        add<Value::Coerce::Decimal128NegativeNaNToLong>();
         add<Value::Coerce::IntToDouble>();
         add<Value::Coerce::LongToDouble>();
         add<Value::Coerce::DoubleToDouble>();

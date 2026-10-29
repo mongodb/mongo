@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/initialize_placement_history_coordinator.h"
 
@@ -100,7 +74,7 @@ void blockAndDrainConflictingDDLs(OperationContext* opCtx) {
 }
 
 void unblockConflictingDDLs(OperationContext* opCtx) {
-    broadcastHistoryInitializationState(opCtx, false /*isInProgress*/);
+    broadcastHistoryInitializationState(opCtx, /*isInProgress=*/false);
 }
 
 void broadcastPlacementHistoryChangedNotification(
@@ -109,7 +83,7 @@ void broadcastPlacementHistoryChangedNotification(
     const OperationSessionInfo& osi,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
-    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     ShardsvrNotifyShardingEventRequest request(
         notify_sharding_event::kPlacementHistoryMetadataChanged,
@@ -123,7 +97,7 @@ void broadcastPlacementHistoryChangedNotification(
         **executor, token, std::move(request));
 
     auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, std::move(allShards), false /* throwOnError */);
+        opCtx, opts, std::move(allShards), /*throwOnError=*/false);
     for (const auto& response : responses) {
         auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
         if (status.isOK()) {
@@ -158,6 +132,11 @@ std::set<NamespaceString> InitializePlacementHistoryCoordinator::_getAdditionalL
     // The execution of this coordinator requires a stable topology on multiple phases.
     // Request the acquisition of an X lock on config.shards to block shard add/remove operations.
     return {NamespaceString::kConfigsvrShardsNamespace};
+}
+
+std::set<NamespaceString> InitializePlacementHistoryCoordinator::_conflictingIndexBuildNamespaces(
+    ShardingCoordinator& self, OperationContext* opCtx) {
+    return {self.originalNss()};
 }
 
 ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
@@ -197,6 +176,8 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                 // global catalog. Use this section to:
                 // - Delete the existing content of config.placementHistory, which may be
                 // incomplete/inconsistent; a collection drop is performed to reduce execution time.
+                // - Recreate the collection and its supporting indexes, so that any subsequent
+                //   placement writer observes a well-formed collection.
                 // - Establish the point-in-time for the snapshot read that will support its
                 //   recreation during the kInitialization phase.
                 auto noChunkMigrationCommitsRegion =
@@ -209,6 +190,13 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace,
                     &dropReply,
                     DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
+                // Recreate the collection and its indexes before unblocking DDLs to prevent
+                // placement writes from implicitly creating it without the required indexes,
+                // which would cause a subsequent primary step-up to fail.
+                uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+                    opCtx,
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    getPlacementHistoryCollectionIndexSpecs()));
                 auto initializationTime = now.configTime().asTimestamp();
 
                 _doc.setInitializationTime(initializationTime);
@@ -227,10 +215,12 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                       "Initializing config.placementHistory",
                       "initializationTime"_attr = initTimeRef);
                 auto* shardingCatalogManager = ShardingCatalogManager::get(opCtx);
-                // Recreate the collection and its supporting index, following the drop performed
-                // within Phase::kDefineInitializationTime.
-                uassertStatusOK(
-                    shardingCatalogManager->createIndexesForConfigPlacementHistory(opCtx));
+                // Ensure the collection and indexes exist when resuming coordinators from older
+                // binaries. Normally, kDefineInitializationTime has already created them.
+                uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+                    opCtx,
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    getPlacementHistoryCollectionIndexSpecs()));
                 try {
                     shardingCatalogManager->initializePlacementHistory(opCtx, initTimeRef);
                 } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>& e) {

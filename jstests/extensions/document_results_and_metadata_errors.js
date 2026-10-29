@@ -3,13 +3,15 @@
  *
  * @tags: [
  *  featureFlagExtensionsAPI,
- *  featureFlagExtensionsInsideHybridSearch,
+ *  requires_fcv_90,
  * ]
  */
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
-
-const expectedMeta = {count: {lowerBound: 42}};
+import {
+    getDrmShardInfo,
+    kSimpleExpectedMeta,
+    setupDrmCollection,
+} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 const errorCases = [
     {
@@ -37,39 +39,21 @@ const errorCases = [
         // $setVariableFromSubPipeline requires exactly one metadata document.
         name: "errors when source produces no metadata documents",
         pipeline: [
-            {$extensionMultiStream: {numDocs: 3, meta: expectedMeta, numMeta: 0}},
+            {$extensionMultiStream: {numDocs: 3, meta: kSimpleExpectedMeta, numMeta: 0}},
             {$project: {name: 1, meta: "$$SEARCH_META"}},
         ],
         code: 625296,
-    },
-    {
-        // numMeta:2 makes the source emit 2 kMetaResult docs; $setVariableFromSubPipeline
-        // expects exactly one. A passthrough mergePipeline preserves the multi-doc condition
-        // in sharded topologies (the default $group-based merge would collapse the two docs
-        // into one and mask the error after merge).
-        name: "errors when source produces multiple metadata documents",
-        pipeline: [
-            {
-                $extensionMultiStream: {
-                    numDocs: 1,
-                    meta: expectedMeta,
-                    numMeta: 2,
-                    mergePipeline: [{$match: {}}],
-                },
-            },
-            {$project: {meta: "$$SEARCH_META"}},
-        ],
-        code: 625297,
     },
 ];
 
 describe("$_internalDocumentResultsAndMetadata error cases", function () {
     let coll;
+    let nShards;
 
     before(function () {
         coll = db[jsTestName()];
-        assertDropCollection(db, coll.getName());
-        assert.commandWorked(coll.insertOne({placeholder: true}));
+        setupDrmCollection(db, coll);
+        ({nShards} = getDrmShardInfo(db, coll));
     });
 
     for (const {name, pipeline, code} of errorCases) {
@@ -80,4 +64,23 @@ describe("$_internalDocumentResultsAndMetadata error cases", function () {
             );
         });
     }
+
+    it("[sharded] errors when the merged metadata has multiple documents", function () {
+        if (nShards < 2) return;
+        const pipeline = [
+            {
+                $extensionMultiStream: {
+                    numDocs: 1,
+                    meta: kSimpleExpectedMeta,
+                    numMeta: 2,
+                    mergePipeline: [{$match: {}}],
+                },
+            },
+            {$project: {_id: 0, meta: "$$SEARCH_META"}},
+        ];
+        assert.commandFailedWithCode(
+            db.runCommand({aggregate: coll.getName(), pipeline, cursor: {}}),
+            625297,
+        );
+    });
 });

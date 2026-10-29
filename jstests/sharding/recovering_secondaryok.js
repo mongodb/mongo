@@ -3,10 +3,6 @@
  * goes into RECOVERING state, and don't break
  */
 
-// Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does
-// not see the secondaries. Either the primary connection gets reset, or the primary could change.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

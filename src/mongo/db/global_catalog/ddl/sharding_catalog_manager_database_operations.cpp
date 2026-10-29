@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -62,7 +36,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -76,6 +49,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -97,11 +71,14 @@
 
 
 namespace mongo {
+namespace {
+MONGO_FAIL_POINT_DEFINE(commitMovePrimaryFailsAfterDurableChange);
+}
 
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardRef>& optResolvedPrimaryShard,
+    const boost::optional<ShardId>& optResolvedPrimaryShard,
     const SerializationContext& serializationContext) {
     // Make sure to force update of any stale metadata
     ON_BLOCK_EXIT([&] { RoutingInformationCache::get(opCtx)->purgeDatabase(dbName); });
@@ -133,9 +110,9 @@ DatabaseType ShardingCatalogManager::createDatabase(
                        shard_role_details::getLocker(opCtx),
                        DatabaseNameUtil::deserialize(
                            boost::none, str::toLower(dbNameStr), serializationContext),
-                       "createDatabase" /* reason */,
+                       /*reason=*/"createDatabase",
                        MODE_X,
-                       true /*waitForRecovery*/);
+                       /*waitForRecovery=*/true);
     }
 
     // Expensive createDatabase code path
@@ -233,16 +210,13 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             fmt::format("Requested primary shard {} does not exist", toShardId.toString()),
             !toShardDoc.isEmpty());
 
-    const auto toShardEntry = uassertStatusOK(ShardType::fromBSON(toShardDoc));
-    uassert(ErrorCodes::ShardNotFound,
-            fmt::format("Requested primary shard {} is draining", toShardId.toString()),
-            !toShardEntry.getDraining());
-
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
 
+    int updatesDone = 0;
+
     const auto transactionChain =
-        [dbName, expectedDbVersion, toShardId, validAfter, serializationContext](
+        [dbName, expectedDbVersion, toShardId, validAfter, serializationContext, &updatesDone](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             int currStmtId = 0;
             // Find database entry to get current dbPrimary
@@ -317,8 +291,10 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 txnClient.runCRUDOpSync(updateDatabaseEntryOp, {currStmtId++});
             uassertStatusOK(updateDatabaseEntryResponse.toStatus());
 
+            updatesDone++;
+
             NamespacePlacementType placementInfo(
-                NamespaceString(dbName), validAfter, std::vector<mongo::ShardRef>{toShardId});
+                NamespaceString(dbName), validAfter, std::vector<mongo::ShardId>{toShardId});
 
             write_ops::InsertCommandRequest insertPlacementHistoryOp(
                 NamespaceString::kConfigsvrPlacementHistoryNamespace);
@@ -328,6 +304,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 txnClient.runCRUDOpSync(insertPlacementHistoryOp, {currStmtId++});
             uassertStatusOK(insertDatabasePlacementHistoryResponse.toStatus());
 
+            updatesDone++;
+
             return SemiFuture<void>::makeReady();
         };
 
@@ -336,9 +314,14 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     txn_api::SyncTransactionWithRetries txn(opCtx,
                                             executor,
-                                            nullptr, /*resourceYielder*/
+                                            /*resourceYielder=*/nullptr,
                                             inlineExecutor);
     txn.run(opCtx, transactionChain);
+
+    if (updatesDone > 0 && MONGO_unlikely(commitMovePrimaryFailsAfterDurableChange.shouldFail())) {
+        uasserted(ErrorCodes::LockBusy,
+                  "Failing because of commitMovePrimaryFailsAfterDurableChange");
+    }
 }
 
 DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCtx,
@@ -365,7 +348,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         const auto shardDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrShardsNamespace,
             BSON(ShardType::name << primaryShard),
             {},
@@ -383,8 +366,6 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         const auto now = VectorClock::get(opCtx)->getTime();
         const auto clusterTime = now.clusterTime().asTimestamp();
 
-        // TODO SERVER-127411: once featureFlagUniqueShardIdentifiers is enabled, pass a ShardRef
-        // with the shard's UUID here instead of the ShardId string.
         DatabaseType db(dbName, primaryShard, DatabaseVersion(UUID::gen(), clusterTime));
 
         LOGV2(21938, "Registering new database in sharding catalog", "db"_attr = db);
@@ -401,7 +382,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
                     NamespacePlacementType placementInfo(
                         NamespaceString(db.getDbName()),
                         db.getVersion().getTimestamp(),
-                        std::vector<mongo::ShardRef>{db.getPrimary()});
+                        std::vector<mongo::ShardId>{db.getPrimary()});
                     write_ops::InsertCommandRequest insertPlacementHistoryOp(
                         NamespaceString::kConfigsvrPlacementHistoryNamespace);
                     insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});
@@ -419,7 +400,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
         txn_api::SyncTransactionWithRetries txn(
-            opCtx, executor, nullptr /*resourceYielder*/, inlineExecutor);
+            opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
         txn.run(opCtx, transactionChain);
 
         return db;

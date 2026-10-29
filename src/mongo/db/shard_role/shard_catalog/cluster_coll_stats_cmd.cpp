@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -40,6 +14,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
@@ -52,6 +28,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -79,6 +56,8 @@ namespace mongo {
 namespace {
 
 Rarely _sampler;
+
+MONGO_FAIL_POINT_DEFINE(clusterCollStatsThrowsStaleEpochAfterAppendingMetrics);
 
 auto fieldIsAnyOf = [](std::string_view v, std::initializer_list<std::string_view> il) {
     auto ei = il.end();
@@ -201,6 +180,30 @@ void appendTimeseriesInfoToResult(const std::map<std::string, long long>& cluste
     timeseriesSubObjBuilder.done();
 }
 
+/**
+ * Filters and appends results when metrics filtering is enabled. Filters both the per-shard
+ * metrics in the "shards" field and cluster metrics using the provided matcher.
+ */
+void appendFilteredResults(BSONObjBuilder& inputResultBuilder,
+                           const BSONObj& unfilteredResult,
+                           const PathMatcherNode& matcher) {
+    // Filter and append cluster metrics.
+    BSONObjBuilder filtered;
+    metrics_filtering_util::appendPaths(filtered, unfilteredResult, matcher);
+
+    // Filter and append per-shard metrics.
+    const auto& shardsObj = unfilteredResult.getField("shards").Obj();
+    BSONObjBuilder filteredShards;
+    for (const auto& shardElement : shardsObj) {
+        BSONObjBuilder filteredShardResponse;
+        metrics_filtering_util::appendPaths(filteredShardResponse, shardElement.Obj(), matcher);
+        filteredShards.append(shardElement.fieldName(), filteredShardResponse.obj());
+    }
+
+    inputResultBuilder.appendElements(filtered.obj());
+    inputResultBuilder.append("shards", filteredShards.obj());
+}
+
 class CollectionStats : public BasicCommand {
 public:
     CollectionStats() : BasicCommand("collStats", "collstats") {}
@@ -240,7 +243,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
+             BSONObjBuilder& inputResultBuilder) override {
         if (_sampler.tick())
             LOGV2_WARNING(7024601,
                           "The collStats command is deprecated. For more information, see "
@@ -248,8 +251,21 @@ public:
 
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
+        // If filtering is required by the metrics policy, append the metrics to a temporary
+        // result builder and filter them at the end. Otherwise, append directly to the input
+        // result builder to avoid additional costs in the non-filtering case.
+        auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+        bool requireFiltering = metricsPolicyManager.requiresFiltering(
+            opCtx, MetricsCategoryEnum::kCollStats, /*forceFiltered=*/false);
+
+        boost::optional<BSONObjBuilder> tmpResultBuilder;
+        if (requireFiltering) {
+            tmpResultBuilder.emplace();
+        }
+        BSONObjBuilder& result = requireFiltering ? *tmpResultBuilder : inputResultBuilder;
+
         sharding::router::CollectionRouter router(opCtx, nss);
-        return router.routeWithRoutingContext(
+        bool success = router.routeWithRoutingContext(
             getName(), [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
                 // The CollectionRouter is not capable of implicitly translate the namespace to a
                 // timeseries buckets collection, which is required in this command. Hence, we'll
@@ -306,10 +322,10 @@ public:
                                 CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
                             ReadPreferenceSetting::get(opCtx),
                             Shard::RetryPolicy::kIdempotent,
-                            {} /*query*/,
-                            {} /*collation*/,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*query=*/{},
+                            /*collation=*/{},
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
 
                         BSONObjBuilder shardStats;
                         std::map<std::string, long long> counts;
@@ -461,9 +477,34 @@ public:
                         result.append("nchunks", cm.numChunks());
                         result.append("shards", shardStats.obj());
 
+                        clusterCollStatsThrowsStaleEpochAfterAppendingMetrics.executeIf(
+                            [&](const BSONObj& data) {
+                                uasserted(StaleEpochInfo(nss),
+                                          "Throwing StaleEpoch after appending metrics");
+                            },
+                            [&](const BSONObj& data) {
+                                if (!data.hasField("namespace")) {
+                                    return true;
+                                }
+                                const auto targetNss = data.getStringField("namespace");
+                                const auto serializedNss = NamespaceStringUtil::serialize(
+                                    nss, SerializationContext::stateDefault());
+                                return std::string(targetNss) == serializedNss;
+                            });
+
                         return true;
                     });
             });
+
+        // If filtering is required, we appended the metrics in a temporary result builder.
+        // Now extract and append only the ones matching the allowlist to the input result builder.
+        if (success && requireFiltering) {
+            const auto& matcher =
+                metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kCollStats);
+            appendFilteredResults(inputResultBuilder, tmpResultBuilder->obj(), matcher);
+        }
+
+        return success;
     }
 };
 MONGO_REGISTER_COMMAND(CollectionStats).forRouter();

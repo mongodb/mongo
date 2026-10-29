@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 
@@ -299,7 +273,8 @@ Decimal128 ValueWriter::toDecimal128() {
 
 OID ValueWriter::toOID() {
     if (getCommonRuntime(_context)->oidProto().instanceOf(_value)) {
-        return OIDInfo::getOID(_context, _value);
+        return OIDInfo::getOID(
+            _context, _value, getCommonRuntime(_context)->oidProto().getJSClass());
     }
 
     throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write ObjectId value.");
@@ -335,32 +310,26 @@ Timestamp ValueWriter::toTimestamp() {
 }
 
 JSRegEx ValueWriter::toRegEx() {
-    /* TODO SERVER-127482: Replace the rfind-based implementation below with this fix once
-       mozjs regex handling is corrected. GetRegExpSource avoids the off-by-one that includes
-       the closing '/' delimiter in the extracted pattern.
-
     JS::RootedObject regExpObj(_context, _value.toObjectOrNull());
-    uassert(XXXXX, "Invalid regular expression", regExpObj);
+    uassert(12748201, "Invalid regular expression", regExpObj);
     JS::RootedString regExpSource(_context, JS::GetRegExpSource(_context, regExpObj));
-    uassert(XXXXX, "Failed to get regex source", regExpSource);
+    uassert(12748202, "Failed to get regex source", regExpSource);
     JSStringWrapper regExpSourceWrapper(_context, regExpSource);
     JS::RegExpFlags regExpFlags = JS::GetRegExpFlags(_context, regExpObj);
     std::string flags;
-    if (regExpFlags.global())     flags += 'g';
-    if (regExpFlags.ignoreCase()) flags += 'i';
-    if (regExpFlags.multiline())  flags += 'm';
-    if (regExpFlags.dotAll())     flags += 's';
-    if (regExpFlags.unicode())    flags += 'u';
-    if (regExpFlags.sticky())     flags += 'y';
+    if (regExpFlags.global())
+        flags += 'g';
+    if (regExpFlags.ignoreCase())
+        flags += 'i';
+    if (regExpFlags.multiline())
+        flags += 'm';
+    if (regExpFlags.dotAll())
+        flags += 's';
+    if (regExpFlags.unicode())
+        flags += 'u';
+    if (regExpFlags.sticky())
+        flags += 'y';
     return JSRegEx(regExpSourceWrapper.toString(), flags);
-    */
-
-    std::string regexStr = toString();
-    uassert(6123401, "Empty regular expression", regexStr.size() > 0);
-    uassert(6123402, "Invalid regular expression", regexStr[0] == '/');
-
-    return JSRegEx(regexStr.substr(1, regexStr.rfind('/')),
-                   regexStr.substr(regexStr.rfind('/') + 1));
 }
 
 void ValueWriter::writeThis(BSONObjBuilder* b,
@@ -429,7 +398,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
         if (jsclass) {
             if (runtime->oidProto().getJSClass() == jsclass) {
-                b->append(sd, OIDInfo::getOID(_context, obj));
+                b->append(sd, OIDInfo::getOID(_context, obj, runtime->oidProto().getJSClass()));
 
                 return;
             }
@@ -480,7 +449,12 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 JS::RootedValue id(_context);
                 o.getValue("id", &id);
 
-                b->appendDBRef(sd, o.getString("ns"), OIDInfo::getOID(_context, id));
+                uassert(
+                    ErrorCodes::BadValue, "DBPointer ObjectID must be and object", id.isObject());
+
+                b->appendDBRef(sd,
+                               o.getString("ns"),
+                               OIDInfo::getOID(_context, id, runtime->oidProto().getJSClass()));
 
                 return;
             }
@@ -538,10 +512,6 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 return;
             }
             case JSProto_RegExp: {
-                /* TODO SERVER-127482: Replace the toString()-based implementation below with
-                   GetRegExpSource/GetRegExpFlags to correctly handle patterns containing '/'
-                   and to handle RegExp.prototype via IdentifyStandardPrototype.
-
                 if (JS::IdentifyStandardPrototype(obj) == JSProto_RegExp) {
                     b->appendRegex(sd, "(?:)", "");
                     return;
@@ -553,26 +523,19 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 std::string r(srcWrapper.toStringData());
                 JS::RegExpFlags jsFlags = JS::GetRegExpFlags(_context, reObj);
                 std::string o;
-                if (jsFlags.global())     o += 'g';
-                if (jsFlags.ignoreCase()) o += 'i';
-                if (jsFlags.multiline())  o += 'm';
-                if (jsFlags.dotAll())     o += 's';
-                if (jsFlags.unicode())    o += 'u';
-                if (jsFlags.sticky())     o += 'y';
+                if (jsFlags.global())
+                    o += 'g';
+                if (jsFlags.ignoreCase())
+                    o += 'i';
+                if (jsFlags.multiline())
+                    o += 'm';
+                if (jsFlags.dotAll())
+                    o += 's';
+                if (jsFlags.unicode())
+                    o += 'u';
+                if (jsFlags.sticky())
+                    o += 'y';
                 b->appendRegex(sd, r, o);
-                return;
-                */
-
-                JS::RootedValue v(_context);
-                v.setObjectOrNull(obj);
-
-                std::string regex = ValueWriter(_context, v).toString();
-                regex = regex.substr(1);
-                std::string r = regex.substr(0, regex.rfind('/'));
-                std::string o = regex.substr(regex.rfind('/') + 1);
-
-                b->appendRegex(sd, r, o);
-
                 return;
             }
             case JSProto_Date: {

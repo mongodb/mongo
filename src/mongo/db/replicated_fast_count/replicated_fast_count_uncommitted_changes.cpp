@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 
@@ -39,75 +13,77 @@ namespace mongo {
 namespace {
 // Decoration on the Snapshot to ensure the uncommitted changes are preserved across the lifetime of
 // a multi-document transaction.
-const auto getUncommittedFastCountChange =
-    RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<UncommittedFastCountChange>>();
+const auto getUncommittedFastCountChanges =
+    RecoveryUnit::Snapshot::declareDecoration<std::unique_ptr<UncommittedFastCountChanges>>();
 
-std::shared_ptr<UncommittedFastCountChange>& getUncommittedFastCountChangeFromOpCtx(
+std::unique_ptr<UncommittedFastCountChanges>& getUncommittedFastCountChangeFromOpCtx(
     OperationContext* opCtx) {
-    return getUncommittedFastCountChange(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
+    return getUncommittedFastCountChanges(
+        shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 }  // namespace
 
-const UncommittedFastCountChange& UncommittedFastCountChange::getForRead(OperationContext* opCtx) {
-    // TODO SERVER-119919: Re-evaluate why this bypasses reference counting.
-    std::shared_ptr<UncommittedFastCountChange>& ptr =
+CollectionSizeCount UncommittedFastCountChanges::find(OperationContext* opCtx, UUID uuid) {
+    const std::unique_ptr<UncommittedFastCountChanges>& ptr =
         getUncommittedFastCountChangeFromOpCtx(opCtx);
     if (ptr) {
-        return *ptr;
-    }
-
-    static UncommittedFastCountChange empty;
-    return empty;
-}
-
-
-UncommittedFastCountChange& UncommittedFastCountChange::getForWrite(OperationContext* opCtx) {
-    std::shared_ptr<UncommittedFastCountChange>& ptr =
-        getUncommittedFastCountChangeFromOpCtx(opCtx);
-    if (ptr) {
-        return *ptr;
-    }
-
-    auto metaChange = std::make_shared<UncommittedFastCountChange>();
-
-    ptr = std::move(metaChange);
-
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
-            auto& fn = getFastCountCommitFn();
-
-            invariant(fn, "FastCountCommitFn is not set");
-
-            fn(opCtx, getUncommittedFastCountChangeFromOpCtx(opCtx)->_trackedChanges);
-            // The 'RecoveryUnit::Snapshot' is reset on commit, so decorations like the
-            // UncommittedFastCountChange don't need manual cleanup.
-        });
-    return *ptr;
-}
-
-CollectionSizeCount UncommittedFastCountChange::find(const UUID& uuid) const {
-    auto it = _trackedChanges.find(uuid);
-    if (it != _trackedChanges.end()) {
-        return it->second;
+        return ptr->_find(uuid);
     }
     return {};
 }
 
-void UncommittedFastCountChange::record(const NamespaceString& nss,
-                                        const UUID& uuid,
-                                        int64_t numDelta,
-                                        int64_t sizeDelta) {
+void UncommittedFastCountChanges::record(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         UUID uuid,
+                                         UncommittedFastCountChange change) {
+    std::unique_ptr<UncommittedFastCountChanges>& ptr =
+        getUncommittedFastCountChangeFromOpCtx(opCtx);
+    if (!ptr) {
+        ptr = std::make_unique<UncommittedFastCountChanges>();
+
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
+                auto& fn = getFastCountCommitFn();
+
+                invariant(fn, "FastCountCommitFn is not set");
+
+                auto& ptr = getUncommittedFastCountChangeFromOpCtx(opCtx);
+                invariant(ptr, "UncommittedFastCountChanges instance is not set");
+                fn(opCtx, ptr->_trackedChanges);
+                // The 'RecoveryUnit::Snapshot' is reset on commit, so decorations like the
+                // UncommittedFastCountChanges don't need manual cleanup.
+            });
+    }
+
+    ptr->_record(nss, uuid, change);
+}
+
+CollectionSizeCount UncommittedFastCountChanges::_find(UUID uuid) const {
+    auto it = _trackedChanges.find(uuid);
+    if (it != _trackedChanges.end()) {
+        return it->second.delta;
+    }
+    return {};
+}
+
+void UncommittedFastCountChanges::_record(const NamespaceString& nss,
+                                          UUID uuid,
+                                          UncommittedFastCountChange change) {
     if (!isReplicatedFastCountEligible(nss)) {
         return;
     }
-    if (numDelta == 0 && sizeDelta == 0) {
+    if (change.delta.count == 0 && change.delta.size == 0) {
         return;
     }
 
+    invariant(change.recordStore,
+              fmt::format("Cannot record a fast count change without a RecordStore for {}",
+                          nss.toStringForErrorMsg()));
+
     auto& collChanges = _trackedChanges[uuid];
-    collChanges.count += numDelta;
-    collChanges.size += sizeDelta;
+    if (!collChanges.recordStore) {
+        collChanges.recordStore = change.recordStore;
+    }
+    collChanges.delta = collChanges.delta + change.delta;
 }
-
 }  // namespace mongo
-

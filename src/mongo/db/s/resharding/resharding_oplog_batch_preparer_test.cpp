@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
@@ -495,7 +469,7 @@ TEST_F(ReshardingOplogBatchPreparerTest,
        DiscardsProgressMarkOplogCreatedBeforeOplogApplicationStarted) {
     OplogBatch batch;
 
-    auto op = makeProgressMarkNoopOplogEntry(false /* createdAfterOplogApplicationStarted */);
+    auto op = makeProgressMarkNoopOplogEntry(/*createdAfterOplogApplicationStarted=*/false);
     batch.emplace_back(std::move(op));
 
     std::list<repl::OplogEntry> derivedOpsForCrudWriters;
@@ -517,7 +491,7 @@ TEST_F(ReshardingOplogBatchPreparerTest,
        CrudWriterDoesNotDiscardProgressMarkOplogCreatedAfterOplogApplicationStarted) {
     OplogBatch batch;
 
-    auto op = makeProgressMarkNoopOplogEntry(true /* createdAfterOplogApplicationStarted */);
+    auto op = makeProgressMarkNoopOplogEntry(/*createdAfterOplogApplicationStarted=*/true);
     batch.emplace_back(std::move(op));
 
     std::list<repl::OplogEntry> derivedOpsForCrudWriters;
@@ -570,8 +544,8 @@ TEST_F(ReshardingOplogBatchPreparerTest,
         repl::DurableReplOperation(repl::OpTypeEnum::kNoop, {}, kWouldChangeOwningShardSentinel);
     op.setObject2(BSONObj());
     op.setStatementIds({0});
-    batch.emplace_back(makeApplyOpsOplogEntry(
-        {op}, lsid, txnNumber, false /* isPrepare */, false /* isPartial */));
+    batch.emplace_back(
+        makeApplyOpsOplogEntry({op}, lsid, txnNumber, /*isPrepare=*/false, /*isPartial=*/false));
 
     std::list<repl::OplogEntry> derivedOpsForCrudWriters;
     auto crudWriterVectors =
@@ -618,8 +592,8 @@ TEST_F(ReshardingOplogBatchPreparerTest,
     batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSONObj(), BSON("_id" << 1)},
                                              lsid,
                                              txnNumber,
-                                             false /* isPrepare */,
-                                             false /* isPartial */));
+                                             /*isPrepare=*/false,
+                                             /*isPartial=*/false));
 
     std::list<repl::OplogEntry> derivedOps;
     auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
@@ -645,8 +619,8 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForSmallUnpreparedTx
         batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
                                                  lsid,
                                                  txnNumber,
-                                                 false /* isPrepare */,
-                                                 false /* isPartial */));
+                                                 /*isPrepare=*/false,
+                                                 /*isPartial=*/false));
 
         std::list<repl::OplogEntry> derivedOps;
         auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
@@ -685,10 +659,10 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForLargeUnpreparedTx
         batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
                                                  lsid,
                                                  txnNumber,
-                                                 false /* isPrepare */,
-                                                 true /* isPartial */));
+                                                 /*isPrepare=*/false,
+                                                 /*isPartial=*/true));
         batch.emplace_back(makeApplyOpsForInsert(
-            {BSON("_id" << 2)}, lsid, txnNumber, false /* isPrepare */, false /* isPartial */));
+            {BSON("_id" << 2)}, lsid, txnNumber, /*isPrepare=*/false, /*isPartial=*/false));
 
         std::list<repl::OplogEntry> derivedOps;
         auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
@@ -727,8 +701,8 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForSmallCommittedPre
         batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
                                                  lsid,
                                                  txnNumber,
-                                                 true /* isPrepare */,
-                                                 false /* isPartial */));
+                                                 /*isPrepare=*/true,
+                                                 /*isPartial=*/false));
         batch.emplace_back(makeCommandOp(BSON("commitTransaction" << 1), lsid, txnNumber));
 
         std::list<repl::OplogEntry> derivedOps;
@@ -768,10 +742,10 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForLargeCommittedPre
         batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1)},
                                                  lsid,
                                                  txnNumber,
-                                                 false /* isPrepare */,
-                                                 true /* isPartial */));
+                                                 /*isPrepare=*/false,
+                                                 /*isPartial=*/true));
         batch.emplace_back(makeApplyOpsForInsert(
-            {BSON("_id" << 2)}, lsid, txnNumber, true /* isPrepare */, false /* isPartial */));
+            {BSON("_id" << 2)}, lsid, txnNumber, /*isPrepare=*/true, /*isPartial=*/false));
         batch.emplace_back(makeCommandOp(BSON("commitTransaction" << 1), lsid, txnNumber));
 
         std::list<repl::OplogEntry> derivedOps;
@@ -833,7 +807,7 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForPartialUnprepared
 
         OplogBatch batch;
         batch.emplace_back(makeApplyOpsForInsert(
-            {BSON("_id" << 0)}, lsid, txnNumber, false /* isPrepare */, true /* isPartial */));
+            {BSON("_id" << 0)}, lsid, txnNumber, /*isPrepare=*/false, /*isPartial=*/true));
 
         std::list<repl::OplogEntry> derivedOps;
         auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
@@ -885,10 +859,10 @@ TEST_P(ReshardingOplogBatchPreparerRetryableApplyOpsTest,
     batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)},
                                              lsid,
                                              txnNumber,
-                                             false /* isPrepare */,
-                                             false /* isPartial */,
+                                             /*isPrepare=*/false,
+                                             /*isPartial=*/false,
                                              multiOpType,
-                                             true /* useStmtIds */));
+                                             /*useStmtIds=*/true));
 
     std::list<repl::OplogEntry> derivedOps;
     auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
@@ -918,18 +892,18 @@ TEST_F(ReshardingOplogBatchPreparerTest,
     batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0)},
                                              lsid,
                                              txnNumber,
-                                             false /* isPrepare */,
-                                             true /* isPartial */,
+                                             /*isPrepare=*/false,
+                                             /*isPartial=*/true,
                                              repl::MultiOplogEntryType::kApplyOpsAppliedAtomically,
-                                             true /* useStmtIds */));
+                                             /*useStmtIds=*/true));
     // Terminal entry holding only non-retryable ops (no stmtIds), like index side writes.
     batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 1)},
                                              lsid,
                                              txnNumber,
-                                             false /* isPrepare */,
-                                             false /* isPartial */,
+                                             /*isPrepare=*/false,
+                                             /*isPartial=*/false,
                                              repl::MultiOplogEntryType::kApplyOpsAppliedAtomically,
-                                             false /* useStmtIds */));
+                                             /*useStmtIds=*/false));
 
     std::list<repl::OplogEntry> derivedOps;
     auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);

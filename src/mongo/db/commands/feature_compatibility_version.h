@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,12 +12,15 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
+#include <type_traits>
+
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 struct ResolvedFCVTransition {
     /**
@@ -116,13 +93,18 @@ public:
     /**
      * Updates the on-disk feature compatibility version document to the given version.
      * `version` may be a transitional or non-transitional FCV.
+     *
+     * Holds the 'fcvLock' in exclusive mode for the duration of the update, serialising with
+     * concurrent 'FixedFCVRegions'. If provided, 'withFCVLockHeld' runs under that lock before the
+     * document is written, letting the caller perform checks that must be atomic with the update.
      */
     static void updateFeatureCompatibilityVersionDocument(
         OperationContext* opCtx,
         multiversion::FeatureCompatibilityVersion version,
         boost::optional<SetFCVPhaseEnum> phase,
         boost::optional<Timestamp> timestamp,
-        boost::optional<bool> setIsCleaningServerMetadata);
+        boost::optional<bool> setIsCleaningServerMetadata,
+        unique_function<void()> withFCVLockHeld = {});
 
     /**
      * If we are in clean startup (the server has no replicated collections), store the
@@ -149,13 +131,6 @@ public:
      * current featureCompatibilityVersion value.
      */
     static void updateMinWireVersion(OperationContext* opCtx);
-
-    /**
-     * Returns a scoped object, which holds the 'fcvLock' in exclusive mode for the given scope. It
-     * must only be used by the setFeatureCompatibilityVersion command in order to serialise with
-     * concurrent 'FixedFCVRegions'.
-     */
-    static Lock::ExclusiveLock enterFCVChangeRegion(OperationContext* opCtx);
 
     /**
      * Used by the FCV OpObserver to set the timestamp of the last opTime where the FCV was updated.
@@ -187,6 +162,8 @@ public:
     explicit FixedFCVRegion(OperationContext* opCtx);
     ~FixedFCVRegion();
 
+    FixedFCVRegion(FixedFCVRegion&&) = default;
+
     bool operator==(const multiversion::FeatureCompatibilityVersion& other) const;
     bool operator!=(const multiversion::FeatureCompatibilityVersion& other) const;
 
@@ -197,4 +174,60 @@ private:
     Lock::SharedLock _lk;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+/*
+ * Returns true if an FCV upgrade or downgrade is currently in progress, as determined by the
+ * presence of a transition phase on the on-disk FCV document.
+ *
+ * Unlike the FCV snapshot's isUpgradingOrDowngrading(), which can still evaluate to true while
+ * some shards remain mid-transition, this function effectively only evaluates to true once all
+ * shards and the config server have fully upgraded or downgraded.
+ *
+ * The caller MUST hold the FCV region (the lock taken by FixedFCVRegion) so that the on-disk FCV
+ * cannot change while it is read.
+ */
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isFcvTransitionInProgress(OperationContext* opCtx);
+
+/*
+ * Optimistically runs the specified checks over a stable (fully upgraded / fully downgraded) FCV.
+ * This is intended for commands such as `validate` or `checkMetadataConsistency` to check the
+ * metadata is consistent with FCV, avoiding both acquiring locks and false positives.
+ * Returns boost::none if a concurrent upgrade/downgrade happened during the check.
+ */
+template <typename Fn>
+auto tryCheckUnderStableFCV(OperationContext* opCtx, Fn&& checkFn)
+    -> boost::optional<std::invoke_result_t<Fn, ServerGlobalParams::FCVSnapshot>> {
+    // Without Symmetric FCV, the FCV document may show the fully upgraded/downgraded state
+    // but there may still be metadata changes being done by setFCV.
+    if (!gFeatureFlagSymmetricFCV.isEnabled()) {
+        return boost::none;
+    }
+
+    // TODO SERVER-130577: Generalize changeTimestamp to replica sets to lift this restriction.
+    tassert(12797701,
+            "tryCheckUnderStableFCV currently only supports sharded clusters",
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+
+    auto readFCVDocument = [&] {
+        return FeatureCompatibilityVersionDocument::parse(uassertStatusOK(
+            FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx)));
+    };
+
+    const auto initialFCVDocument = readFCVDocument();
+    if (initialFCVDocument.getTargetVersion()) {
+        // We are upgrading or downgrading, so the check can not be reliably run.
+        return boost::none;
+    }
+
+    auto result = checkFn(ServerGlobalParams::FCVSnapshot(initialFCVDocument.getVersion()));
+
+    if (readFCVDocument() != initialFCVDocument) {
+        // An upgrade or downgrade happened during the check, so discard to avoid false positives.
+        // Note that the FCV document includes a `changeTimestamp`, so we will correctly discard the
+        // result even if a full downgrade + full upgrade cycle happened across the check.
+        return boost::none;
+    }
+
+    return result;
+}
+
+}  // namespace mongo

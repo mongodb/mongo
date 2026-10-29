@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,7 +12,6 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -77,9 +49,10 @@
 // clang-format off
 // jq '.[] | select((.loc | startswith("src/mongo/idl/idl_parser.h")) and (.display_name | startswith("IDLParserContext") | not)) | .used_from |= map((.locs |= map(select(test("^bazel-out/.*_gen\\.(h|cpp):") | not))) | select(.locs != [] and .mod != "core.idl")) | select(.used_from != [])' merged_decls.json
 // clang-format on
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS;
+[[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]];
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 namespace idl {
 
@@ -196,7 +169,7 @@ inline auto idlPreparsedValue(std::type_identity<multiversion::FeatureCompatibil
  * `type_identity<T>` argument.
  */
 template <typename T, typename... A>
-MONGO_MOD_NEEDS_REPLACEMENT T preparsedValue(A&&... args) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] T preparsedValue(A&&... args) {
     using preparsed_value_adl_barrier::idlPreparsedValue;
     return idlPreparsedValue(std::type_identity<T>{}, std::forward<A>(args)...);
 }
@@ -256,7 +229,7 @@ void handleMissingRequiredFields(const auto& hasMembers,
         for (size_t i = 0; i < meta.size(); ++i) {
             auto&& [name, required] = meta[i];
             if (required && !hasMembers.get(reqIdx++)) {
-                msg += std::exchange(sep, ", "_sd);
+                msg += std::exchange(sep, ", "sv);
                 msg += name;
             }
         }
@@ -352,7 +325,7 @@ struct BasicOrderOps<boost::optional<T>> {
  * TODO(SERVER-122446): Split this class into the parts that should be public and the parts that are
  * only for internal use by generated code.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT IDLParserContext {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] IDLParserContext {
     IDLParserContext(const IDLParserContext&) = delete;
     IDLParserContext& operator=(const IDLParserContext&) = delete;
 
@@ -367,9 +340,9 @@ public:
     /**
      * String constants for well-known IDL fields.
      */
-    static constexpr auto kOpMsgDollarDB = "$db"_sd;
-    static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
-    static constexpr auto kTenantIdField = "$tenant"_sd;
+    static constexpr auto kOpMsgDollarDB = "$db"sv;
+    static constexpr auto kOpMsgDollarDBDefault = "admin"sv;
+    static constexpr auto kTenantIdField = "$tenant"sv;
 
     explicit IDLParserContext(std::string_view fieldName)
         : IDLParserContext{fieldName,
@@ -564,7 +537,7 @@ private:
  * This class is used to record information about deserialization which a caller can later use to
  * perform extra parsing validation.
  */
-class MONGO_MOD_PUBLIC DeserializationContext {
+class [[MONGO_MOD_PUBLIC]] DeserializationContext {
 public:
     /**
      * Marks that an unstable struct field was parsed.
@@ -596,10 +569,10 @@ private:
  * Throw an error when a user calls a setter and it fails the comparison.
  */
 template <typename T>
-MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(std::string_view fieldName,
-                                                      std::string_view op,
-                                                      T actualValue,
-                                                      T expectedValue) {
+[[MONGO_MOD_NEEDS_REPLACEMENT]] void throwComparisonError(std::string_view fieldName,
+                                                          std::string_view op,
+                                                          T actualValue,
+                                                          T expectedValue) {
     uasserted(ErrorCodes::BadValue,
               str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
                             << expectedValue << ", actual value '" << actualValue << "'");
@@ -632,39 +605,9 @@ std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDa
  * Generated enums specialize this with their element count.
  */
 template <typename E>
-MONGO_MOD_PUBLIC constexpr inline size_t idlEnumCount = 0;
+[[MONGO_MOD_PUBLIC]] constexpr inline size_t idlEnumCount = 0;
 
 namespace idl {
-/**
- * Parse an IDL-defined command from a command request document.
- * If the request includes apiStrict: true along with any unstable fields, an exception will be
- * thrown.
- */
-template <typename T>
-MONGO_MOD_PUBLIC T parseCommandDocument(const BSONObj& cmdObj, const IDLParserContext& ctx) {
-    DeserializationContext dctx;
-    auto cmd = T::parse(cmdObj, ctx, &dctx);
-    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
-        dctx.validateApiStrict();
-    }
-    return cmd;
-}
-
-/**
- * Parse an IDL-defined command from a command request.
- * If the request includes apiStrict: true along with any unstable fields, an exception will be
- * thrown.
- */
-template <typename T>
-MONGO_MOD_PUBLIC T parseCommandRequest(const OpMsgRequest& req, const IDLParserContext& ctx) {
-    DeserializationContext dctx;
-    auto cmd = T::parse(req, ctx, &dctx);
-    if (cmd.getGenericArguments().getApiStrict().value_or(false)) {
-        dctx.validateApiStrict();
-    }
-    return cmd;
-}
-
 template <typename E>
 concept EnumWithStringSerializer = requires(E e) {
     { idlSerialize(e) } -> std::same_as<std::string_view>;
@@ -690,7 +633,7 @@ concept EnumWithIntDeserializer = requires(E e, std::int32_t i, const IDLParserC
  * Serialize an IDL-defined enum of type "string".
  */
 template <EnumWithStringSerializer E>
-MONGO_MOD_PUBLIC std::string_view serialize(E en) {
+[[MONGO_MOD_PUBLIC]] std::string_view serialize(E en) {
     return idlSerialize(en);
 }
 
@@ -698,7 +641,7 @@ MONGO_MOD_PUBLIC std::string_view serialize(E en) {
  * Serialize an IDL-defined enum of type "int".
  */
 template <EnumWithIntSerializer E>
-MONGO_MOD_PUBLIC std::int32_t serialize(E en) {
+[[MONGO_MOD_PUBLIC]] std::int32_t serialize(E en) {
     return idlSerialize(en);
 }
 
@@ -707,9 +650,9 @@ MONGO_MOD_PUBLIC std::int32_t serialize(E en) {
  * The default IDLParserContext is created with the type name of the enum as `fieldName`.
  */
 template <EnumWithStringDeserializer E>
-MONGO_MOD_PUBLIC E
-deserialize(std::string_view sd,
-            const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
+[[MONGO_MOD_PUBLIC]] E deserialize(
+    std::string_view sd,
+    const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
     E ret;
     idlDeserialize(ret, sd, ctxt);
     return ret;
@@ -720,9 +663,9 @@ deserialize(std::string_view sd,
  * The default IDLParserContext is created with the type name of the enum as `fieldName`.
  */
 template <EnumWithIntDeserializer E>
-MONGO_MOD_PUBLIC E
-deserialize(std::int32_t i,
-            const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
+[[MONGO_MOD_PUBLIC]] E deserialize(
+    std::int32_t i,
+    const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
     E ret;
     idlDeserialize(ret, i, ctxt);
     return ret;

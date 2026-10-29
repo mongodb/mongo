@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 
@@ -57,6 +31,13 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(throwErrorBeforeGetNext);
+
+// Test-only. When enabled, the change stream cursor does not advance its post-batch resume token
+// to a high-water-mark token when it runs out of results, but instead keeps the resume token of the
+// last returned event. This models the racy production situation where the shard has not yet
+// scanned past its last returned event, and makes it possible to deterministically test how the
+// router handles a shard promise that refers to an internally swallowed control event.
+MONGO_FAIL_POINT_DEFINE(changeStreamKeepLastEventResumeTokenAsPBRT);
 
 namespace {
 auto& changeStreamsLargeEventsFailedCounter =
@@ -192,22 +173,40 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
     if (doc) {
         // While we have more results to return, we track both the timestamp and the resume token of
         // the latest event observed in the oplog, the latter via its sort key metadata field.
+        // '_latestOplogTimestamp' is the raw upstream scan position, which a stage that buffers
+        // events ahead of emitting them (e.g. BatchedEnrichmentStage batching > 1) can advance past
+        // this document before it is emitted here.
         _validateChangeStreamsResumeToken(*doc);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
         _postBatchResumeToken = doc->metadata().getSortKey().getDocument().toBson();
+
+        // Reseting '_postBatchResumeTokenTimestamp' value to avoid recomputing it by parsing
+        // ResumeToken. The value is needed to determine the PBRT advanced past 'highWaterMark'.
+        _postBatchResumeTokenTimestamp = boost::none;
+
         _setSpeculativeReadTimestamp();
     } else {
+        if (MONGO_unlikely(changeStreamKeepLastEventResumeTokenAsPBRT.shouldFail())) {
+            // Test-only: leave '_postBatchResumeToken' at the resume token of the last returned
+            // event instead of advancing it to a high-water-mark token.
+            return;
+        }
+
         // We ran out of results to return. Check whether the oplog cursor has moved forward since
         // the last recorded timestamp. Because we advance _latestOplogTimestamp for every event we
         // return, if the new time is higher than the last then we are guaranteed not to have
         // already returned any events at this timestamp. We can set _postBatchResumeToken to a new
         // high-water-mark token at the current clusterTime.
+        if (!_postBatchResumeTokenTimestamp) {
+            _postBatchResumeTokenTimestamp = ResumeToken::extractClusterTime(_postBatchResumeToken);
+        }
         auto highWaterMark = PipelineD::getLatestOplogTimestamp(_execPipeline.get());
-        if (highWaterMark > _latestOplogTimestamp) {
+        if (highWaterMark > *_postBatchResumeTokenTimestamp) {
             auto token = ResumeToken::makeHighWaterMarkToken(
                 highWaterMark, _pipeline->getContext()->getChangeStreamTokenVersion());
             _postBatchResumeToken = token.toDocument().toBson();
             _latestOplogTimestamp = highWaterMark;
+            _postBatchResumeTokenTimestamp = highWaterMark;
             _setSpeculativeReadTimestamp();
         }
     }
@@ -268,7 +267,8 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
                     "expected initialPostBatchResumeToken to be not empty",
                     !_expCtx->getInitialPostBatchResumeToken().isEmpty());
             _postBatchResumeToken = _expCtx->getInitialPostBatchResumeToken().getOwned();
-            _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+            _postBatchResumeTokenTimestamp = ResumeToken::extractClusterTime(_postBatchResumeToken);
+            _latestOplogTimestamp = *_postBatchResumeTokenTimestamp;
             break;
         case ResumableScanType::kOplogScan:
             // Initialize the oplog timestamp and postBatchResumeToken here in case the request has

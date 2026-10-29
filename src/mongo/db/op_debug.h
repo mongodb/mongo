@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/operation_metrics_registry.h"
@@ -39,19 +12,22 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/compiler/optimizer/join/fallback_reason.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <string_view>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -63,7 +39,7 @@ class CurOp;
 
 
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
-class MONGO_MOD_PUB OpDebug {
+class [[MONGO_MOD_PUBLIC]] OpDebug {
 public:
     /**
      * Holds counters for execution statistics that can be accumulated by one or more operations.
@@ -262,6 +238,11 @@ public:
         // the best plan.
         boost::optional<long long> nDocsSampled;
 
+        // Counts of the winning plan's query stats plan shape. On mongod this records
+        // the single winning plan's shape (at most one count of one); on mongos it sums the
+        // shapes reported by each shard.
+        plan_shape_counters::PlanShapeCounts planShapeCounts;
+
         // Local peak tracked memory usage in bytes (max across getMore batches).
         boost::optional<uint64_t> peakTrackedMemBytes;
 
@@ -269,7 +250,7 @@ public:
         boost::optional<uint64_t> clusterPeakTrackedMemBytes;
     };
 
-    MONGO_MOD_PRIVATE OpDebug() = default;
+    [[MONGO_MOD_PRIVATE]] OpDebug() = default;
 
     /**
      * Adds information about the current operation to "pAttrs". Since this information will end up
@@ -303,13 +284,13 @@ public:
      * Generally, the metrics/fields reported here should be a superset of what is reported in
      * report(). The profiler is meant to be more verbose than the slow query log.
      */
-    MONGO_MOD_PRIVATE void append(OperationContext* opCtx,
-                                  const SingleThreadedLockStats& lockStats,
-                                  FlowControlTicketholder::CurOp flowControlStats,
-                                  const SingleThreadedStorageMetrics& storageMetrics,
-                                  long long prepareReadConflicts,
-                                  bool omitCommand,
-                                  BSONObjBuilder& builder) const;
+    [[MONGO_MOD_PRIVATE]] void append(OperationContext* opCtx,
+                                      const SingleThreadedLockStats& lockStats,
+                                      FlowControlTicketholder::CurOp flowControlStats,
+                                      const SingleThreadedStorageMetrics& storageMetrics,
+                                      long long prepareReadConflicts,
+                                      bool omitCommand,
+                                      BSONObjBuilder& builder) const;
 
     /**
      * Bundles the three objects needed to build a profile/slow-query log document from a snapshot
@@ -324,42 +305,42 @@ public:
         const CurOp& curop;
     };
 
-    MONGO_MOD_PRIVATE static std::function<BSONObj(AppendArgs args)> appendStaged(
+    [[MONGO_MOD_PRIVATE]] static std::function<BSONObj(AppendArgs args)> appendStaged(
         OperationContext* opCtx, StringSet requestedFields, bool needWholeDocument);
-    MONGO_MOD_PRIVATE static void appendUserInfo(const CurOp&,
-                                                 BSONObjBuilder&,
-                                                 AuthorizationSession*);
+    [[MONGO_MOD_PRIVATE]] static void appendUserInfo(const CurOp&,
+                                                     BSONObjBuilder&,
+                                                     AuthorizationSession*);
 
-    MONGO_MOD_PRIVATE static void appendDelinquentInfo(OperationContext* opCtx,
-                                                       BSONObjBuilder&,
-                                                       bool reportAcquisitions = true);
+    [[MONGO_MOD_PRIVATE]] static void appendDelinquentInfo(OperationContext* opCtx,
+                                                           BSONObjBuilder&,
+                                                           bool reportAcquisitions = true);
 
     /**
      * Moves relevant plan summary metrics to this OpDebug instance.
      */
-    MONGO_MOD_PRIVATE void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
+    [[MONGO_MOD_PRIVATE]] void setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats);
 
     /**
      * The resulting object has zeros omitted. As is typical in this file.
      */
-    MONGO_MOD_PRIVATE static BSONObj makeFlowControlObject(
+    [[MONGO_MOD_PRIVATE]] static BSONObj makeFlowControlObject(
         FlowControlTicketholder::CurOp flowControlStats);
 
     /**
      * Make object from $search stats with non-populated values omitted.
      */
-    MONGO_MOD_PRIVATE BSONObj makeMongotDebugStatsObject() const;
+    [[MONGO_MOD_PRIVATE]] BSONObj makeMongotDebugStatsObject() const;
 
     /**
      * Accumulate resolved views.
      */
-    MONGO_MOD_PRIVATE void addResolvedViews(const std::vector<NamespaceString>& namespaces,
-                                            const std::vector<BSONObj>& pipeline);
+    [[MONGO_MOD_PRIVATE]] void addResolvedViews(const std::vector<NamespaceString>& namespaces,
+                                                const std::vector<BSONObj>& pipeline);
 
     /**
      * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
      */
-    MONGO_MOD_PRIVATE CursorMetrics getCursorMetrics(size_t opIndex = kCurrentOpIndex) const;
+    [[MONGO_MOD_PRIVATE]] CursorMetrics getCursorMetrics(size_t opIndex = kCurrentOpIndex) const;
 
     /**
      * Convenience method that computes QueryShapeHash if '_queryShapeHash' has not been previously
@@ -368,7 +349,7 @@ public:
      * QueryShapeHash is recorded in CurOp::OpDebug.
      */
     template <typename Fn>
-    MONGO_MOD_PRIVATE boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(
+    [[MONGO_MOD_PRIVATE]] boost::optional<query_shape::QueryShapeHash> ensureQueryShapeHash(
         OperationContext* opCtx, Fn&& queryShapeHashFn) {
         // QueryShapeHash may be accessed by other thread running $currentOp and therefore needs to
         // be synchronized.
@@ -386,14 +367,26 @@ public:
     /**
      * Returns '_queryShapeHash' value without acquiring the lock.
      */
-    MONGO_MOD_PRIVATE boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
+    [[MONGO_MOD_PRIVATE]] boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const;
 
     /**
      * Sets '_queryShapeHash' value to the new  'hash'. Acquires Client lock prior to setting the
      * hash.
      */
-    MONGO_MOD_PRIVATE void setQueryShapeHash(
+    [[MONGO_MOD_PRIVATE]] void setQueryShapeHash(
         OperationContext* opCtx, const boost::optional<query_shape::QueryShapeHash>& hash);
+
+    /**
+     * Returns the installed settings without acquiring the client lock. The caller must hold the
+     * client lock or be the operation's executing thread.
+     */
+    [[MONGO_MOD_PRIVATE]] const query_settings::QuerySettings& getQuerySettings() const;
+
+    /**
+     * Installs a copy of the settings under the client lock for threadsafe curOp reporting.
+     */
+    [[MONGO_MOD_PRIVATE]] void setQuerySettings(OperationContext* opCtx,
+                                                query_settings::QuerySettings settings);
 
     // -------------------
 
@@ -423,6 +416,115 @@ public:
         double numCandidatesLimitRatio = 0.0;
     };
     boost::optional<VectorSearchMetrics> vectorSearchMetrics = boost::none;
+
+    // Join optimization statistics captured per query shape for reporting by query stats. Populated
+    // only when a query appears to be join-optimizable (though we may still bail out).
+    struct JoinOptimizationMetrics {
+        // Was this query eligible for join optimization.
+        bool joinOptimizable = false;
+        // Why join optimization stopped doing more than it did, if it stopped early. Read together
+        // with 'joinOptimizable': when false, this is why we bailed out entirely; when true, this
+        // is why the join-graph prefix stopped growing and the query was only optimized over that
+        // prefix.
+        boost::optional<join_ordering::JoinFallbackReason> fallbackReason;
+        // Number of unique namespaces that were pushed into the join model.
+        int numNamespaces = 0;
+        // Number of $lookup stages that remained in the non-join-reorderable query suffix.
+        int numLookupsInSuffix = 0;
+        // Number of suffix document sources we were able to lower into SBE after the
+        // join-optimizable prefix.
+        int numSuffixSourcesPushedToSbe = 0;
+        // Number of "residual" document sources that had to execute in classic DocumentSource land.
+        int numResidualClassicSources = 0;
+        // Number of nodes in the join graph. Note: this is the same as the number of $lookup stages
+        // that were pushed down into the join-reorderable query prefix.
+        int numJoinGraphNodes = 0;
+        // Number of edges in the join graph before inference.
+        int numSyntacticEdges = 0;
+        // Number of inferred edges.
+        int numInferredEdges = 0;
+        // Number of $expr equality join predicates in the join graph (before inference).
+        int numSyntacticExprJoinPredicates = 0;
+        // Number of simple equality ($eq) join predicates in the join graph (before inference).
+        int numSyntacticEqJoinPredicates = 0;
+        // Number of simple equality ($eq) join predicates that were inferred- note that these are
+        // the only type of join predicates we infer.
+        int numInferredEqJoinPredicates = 0;
+        // Number of inferred single-table predicates (one per predicate per table).
+        int numInferredSingleTablePredicates = 0;
+
+        // Whether the join graph is complete, i.e. every pair of nodes is joined (post-inference).
+        bool isClique = false;
+        // Whether one hub node is joined to every other node, and there are no other edges
+        // (post-inference).
+        bool isStar = false;
+        // Whether the join graph contains at least one cycle between nodes (post-inference).
+        bool isCycle = false;
+        // Whether the nodes form a single path, each joined to at most two others (post-inference).
+        bool isChain = false;
+
+        // Time taken to extract a join model from the query.
+        int64_t joinModelingTimeMicros = 0;
+        // Time taken to lower the chosen QSN to SBE.
+        int64_t sbeLoweringTimeMicros = 0;
+
+        // Metrics gathered while enumerating join plans. We only populate these fields if we have a
+        // cache miss.
+        struct PlanEnumerationMetrics {
+            // Number of plans considered in the final subset during plan enumeration.
+            int numPlansEnumerated = 0;
+            // Number of hash joins enumerated across all levels.
+            int numHashJoins = 0;
+            // Number of indexed nested loop joins enumerated across all levels.
+            int numIndexedNestedLoopJoins = 0;
+            // Number of nested loop joins enumerated across all levels.
+            int numNestedLoopJoins = 0;
+            // Number of hash joins in the best (winning) plan.
+            int numFinalPlanHashJoins = 0;
+            // Number of indexed nested loop joins in the best (winning) plan.
+            int numFinalPlanIndexedNestedLoopJoins = 0;
+            // Number of nested loop joins in the best (winning) plan.
+            int numFinalPlanNestedLoopJoins = 0;
+            // Number of join nodes considered but rejected due to cost.
+            int numJoinNodesRejectedByCost = 0;
+            // Number of nodes memoized during plan enumeration.
+            int numMemoizedNodes = 0;
+            // Cost of the best (winning) plan.
+            double winningPlanCost = 0.0;
+            // Number of times we generated a sample during join optimization (one per distinct
+            // namespace in the join graph).
+            int numSamplingCalls = 0;
+            // Number of those samples that were served from a persistent sample rather than freshly
+            // scanned.
+            int numPersistentSamplesUsed = 0;
+            // Number of join edges whose NDV came from index uniqueness metadata instead of
+            // sampling.
+            int numUniqueIndexesUsedForNDV = 0;
+            // Number of distinct persisted NDV statistics (analyze mode "ndv") served during
+            // plan enumeration, for edge selectivity estimation or costing. Repeated requests
+            // for the same statistics are memoized and counted once.
+            int numPersistentNDVStatsUsed = 0;
+            // Number of join-graph collections for which the storage engine did not report a
+            // usable approximate leaf page count (see RecordStore::approxNumLeafPages()), forcing
+            // cost estimation to fall back to a size-based estimate. 'boost::none' until catalog
+            // statistics are collected, so a planning failure reads as "never measured" rather
+            // than as a measured zero.
+            boost::optional<int> numApproxLeafPagesUnavailable;
+
+            // Time spent acquiring samples for CE.
+            int64_t samplingTimeMicros = 0;
+            // Time spent generating single-table access plans in CBR.
+            int64_t cbrPlanningTimeMicros = 0;
+            // Time taken to enumerate plans and pick a winning plan.
+            int64_t planEnumerationTimeMicros = 0;
+            // Time spent evaluating CE for join optimization: up-front edge selectivity estimation
+            // plus the per-subset cardinality estimates computed lazily during enumeration. This
+            // is separate from the CE performed inside CBR.
+            int64_t ceTimeMicros = 0;
+        };
+        boost::optional<PlanEnumerationMetrics> planEnumerationMetrics = boost::none;
+    };
+    boost::optional<JoinOptimizationMetrics> joinOptimizationMetrics = boost::none;
 
     /**
      * Tracks the number of documents seen and returned by the $_internalSearchIdLookup
@@ -517,6 +619,16 @@ public:
 
     bool isChangeStreamQuery{false};
 
+    // True iff this change-stream cursor was opened on the v2 precise shard-targeting path (router
+    // only). Recorded on the ClusterClientCursor (mirroring isChangeStreamQuery) so the getMore
+    // precondition can kill-and-resume the cursor if the IFR flag is turned off.
+    bool usesChangeStreamV2ShardTargeting{false};
+
+    // True iff this change stream cursor's updateLookup stage was wired on the optimized
+    // (Express/SBE) path. Recorded on the ClientCursor so the getMore precondition can
+    // kill-and-resume the cursor if the optimization flag is turned off.
+    bool usesOptimizedUpdateLookup{false};
+
     BSONObj execStats;  // Owned here.
 
     // The hash of the PlanCache key for the query being run. This may change depending on what
@@ -553,7 +665,7 @@ public:
      *      - It seemed odd to have ClientCursor and ClusterClientCursorImpl using the struct but
      *        never needing other fields.
      */
-    struct MONGO_MOD_PRIVATE QueryStatsInfo {
+    struct [[MONGO_MOD_PRIVATE]] QueryStatsInfo {
         // Uniquely identifies one query stats entry.
         // `key` may be a nullptr during a subquery execution, but will
         // be non-null at the highest-level operation as long as query stats are
@@ -576,12 +688,12 @@ public:
     };
 
     // Return true if the query stats info for batch writes has been created.
-    MONGO_MOD_PRIVATE bool queryStatsInfoForBatchWritesExists() const {
+    [[MONGO_MOD_PRIVATE]] bool queryStatsInfoForBatchWritesExists() const {
         return _queryStatsInfoForBatchWrites != nullptr;
     }
 
     // Initialize the query stats info map for batch writes if it does not exist.
-    MONGO_MOD_PRIVATE void ensureQueryStatsInfoForBatchWrites() const {
+    [[MONGO_MOD_PRIVATE]] void ensureQueryStatsInfoForBatchWrites() const {
         if (!_queryStatsInfoForBatchWrites) {
             _queryStatsInfoForBatchWrites =
                 std::make_unique<absl::flat_hash_map<size_t, QueryStatsInfo>>();
@@ -589,7 +701,7 @@ public:
     }
 
     // Return true if the entry for 'opIndex' has been created.
-    MONGO_MOD_PRIVATE bool hasQueryStatsInfo(size_t opIndex = kCurrentOpIndex) const {
+    [[MONGO_MOD_PRIVATE]] bool hasQueryStatsInfo(size_t opIndex = kCurrentOpIndex) const {
         if (opIndex == kCurrentOpIndex) {
             return true;
         }
@@ -599,27 +711,27 @@ public:
 
 
     // Return the QueryStatsInfo for the given operation. By default, return the current operation.
-    MONGO_MOD_PRIVATE QueryStatsInfo& getQueryStatsInfo(size_t opIndex = kCurrentOpIndex) {
+    [[MONGO_MOD_PRIVATE]] QueryStatsInfo& getQueryStatsInfo(size_t opIndex = kCurrentOpIndex) {
         return _getQueryStatsInfoHelper(this, opIndex);
     }
 
     // Return the QueryStatsInfo for the given operation. By default, return the current main
     // operation. Const version.
-    MONGO_MOD_PRIVATE const QueryStatsInfo& getQueryStatsInfo(
+    [[MONGO_MOD_PRIVATE]] const QueryStatsInfo& getQueryStatsInfo(
         size_t opIndex = kCurrentOpIndex) const {
         return _getQueryStatsInfoHelper(this, opIndex);
     }
 
     // Returns true if there are any QueryStatsInfo entries for writes statements being processed on
     // the router.
-    MONGO_MOD_PRIVATE bool hasBatchWriteMetrics() const {
+    [[MONGO_MOD_PRIVATE]] bool hasBatchWriteMetrics() const {
         return _queryStatsInfoForBatchWrites && !_queryStatsInfoForBatchWrites->empty();
     }
 
     // Create a new default-constructed QueryStatsInfo for the given opIndex, and return a reference
     // to it.
-    MONGO_MOD_PRIVATE void setQueryStatsInfoAtOpIndex(size_t opIndex,
-                                                      QueryStatsInfo queryStatsInfo) {
+    [[MONGO_MOD_PRIVATE]] void setQueryStatsInfoAtOpIndex(size_t opIndex,
+                                                          QueryStatsInfo queryStatsInfo) {
         uassert(11487700,
                 "cannot create QueryStatsInfo for current operation",
                 opIndex != kCurrentOpIndex);
@@ -635,7 +747,7 @@ public:
     // If we have any write statements for which query stats are being collected in the router
     // role, then execute the function passed in for each QueryStatsInfo instance.
     template <typename Func>
-    MONGO_MOD_PRIVATE void forEachQueryStatsInfoForBatchWrites(Func&& fn) {
+    [[MONGO_MOD_PRIVATE]] void forEachQueryStatsInfoForBatchWrites(Func&& fn) {
         if (!_queryStatsInfoForBatchWrites) {
             return;
         }
@@ -645,7 +757,7 @@ public:
     }
 
     // Gathers and returns a vector of all queryStatsMetrics for registered batch write operations.
-    MONGO_MOD_PRIVATE std::vector<write_ops::QueryStatsMetrics>
+    [[MONGO_MOD_PRIVATE]] std::vector<write_ops::QueryStatsMetrics>
     gatherQueryStatsMetricsForBatchWrites() const {
         std::vector<write_ops::QueryStatsMetrics> queryStatsMetrics;
         if (_queryStatsInfoForBatchWrites) {
@@ -660,10 +772,13 @@ public:
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
 
-    // The plan ranker (multi-planner or cost-based ranker) that selected the winning plan for this
-    // operation. Will be unknown when no ranking took place (single solution, plan cache hit, or a
-    // non-query operation).
-    PlanRankerMethod planRankerMethod{PlanRankerMethod::kNone};
+    // The strategy that selected the winning plan. Written by setPlanSummaryMetrics.
+    // Reported as "none" when no plan selection took place.
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy;
+
+    // Whether the winning plan was produced by the join optimizer. Written by
+    // setPlanSummaryMetrics. Only ever true when join optimization is enabled.
+    bool usedJoinOptimization{false};
 
     // Tracks the amount of dynamic indexed loop joins in a pushed down stage.
     int lookupDynamicIndexedLoopJoin{0};
@@ -703,6 +818,25 @@ public:
     // Tracks the amount of complex local plan types (e.g. OR of indexes) in a pushed down
     // lookup+unwind stage.
     int luLocalComplex{0};
+
+    // Tracks whether a non leading $match was pushed down to SBE in the trySbeRestricted mode. This
+    // is a bool to ensure it's set only once per query.
+    bool nlpMatch{false};
+    // Tracks whether a non leading $project was pushed down to SBE in the trySbeRestricted mode.
+    // This is a bool to ensure it's set only once per query.
+    bool nlpProject{false};
+    // Tracks whether a non leading $addFields was pushed down to SBE in the trySbeRestricted mode.
+    // This is a bool to ensure it's set only once per query.
+    bool nlpAddFields{false};
+    // Tracks whether a non leading $replaceRoot was pushed down to SBE in the trySbeRestricted
+    // mode. This is a bool to ensure it's set only once per query.
+    bool nlpReplaceRoot{false};
+
+    // 'true' if the query has a leading match filter.
+    bool pathArraynessLeadingFilter{false};
+    // 'true' if the query has simplified a leading match filter by leveraging path arrayness
+    // information.
+    bool pathArraynessSimplified{false};
 
     // Tracks the number of spilled bytes by hash lookup in a pushed down lookup stage. The spilled
     // storage size after compression might be different from the bytes spilled.
@@ -864,5 +998,9 @@ private:
 
     // Flag indicates if query_shape::QueryShapeHash has already been computed.
     bool _didComputeQueryShapeHash{false};
+
+    // Access is synchronized with $currentOp by the client lock.
+    // TODO SERVER-136425 Remove this once QueryLifespan::get() is threadsafe.
+    query_settings::QuerySettings _querySettings;
 };
 }  // namespace mongo

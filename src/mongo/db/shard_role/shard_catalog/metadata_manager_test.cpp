@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 
@@ -47,7 +21,7 @@
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/versioning_protocol/database_version.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/unittest.h"
 
@@ -65,10 +39,8 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kPattern = "key";
 const KeyPattern kShardKeyPattern(BSON(kPattern << 1));
-// TODO SERVER-127411: use ShardRef instead of ShardId when all consumers have been migrated to
-// ShardRef
-const ShardId kThisShard{"thisShard"};
-const ShardId kOtherShard{"otherShard"};
+const std::string kThisShard{"thisShard"};
+const std::string kOtherShard{"otherShard"};
 
 class MetadataManagerTest : public ShardServerTestFixture {
 protected:
@@ -103,8 +75,8 @@ protected:
             false,
             epoch,
             Timestamp(1, 1),
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+            /*timeseriesFields=*/boost::none,
+            /*reshardingFields=*/boost::none,
 
             true,
             {ChunkType{uuid, range, ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}), kOtherShard}});
@@ -155,12 +127,11 @@ protected:
                                  chunkVersion,
                                  kOtherShard);
 
-        auto rt =
-            cm->getRoutingTableHistory_forTest().makeUpdated(boost::none /* timeseriesFields */,
-                                                             boost::none /* reshardingFields */,
-                                                             true,
-                                                             false, /* unsplittable */
-                                                             splitChunks);
+        auto rt = cm->getRoutingTableHistory_forTest().makeUpdated(/*timeseriesFields=*/boost::none,
+                                                                   /*reshardingFields=*/boost::none,
+                                                                   true,
+                                                                   false, /* unsplittable */
+                                                                   splitChunks);
 
         return CollectionMetadata(
             CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
@@ -182,8 +153,8 @@ protected:
         chunkVersion.incMajor();
 
         auto rt = cm->getRoutingTableHistory_forTest().makeUpdated(
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+            /*timeseriesFields=*/boost::none,
+            /*reshardingFields=*/boost::none,
             true,
             false, /* unsplittable */
             {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
@@ -262,7 +233,7 @@ TEST_F(MetadataManagerTest, GetActiveMetadataDoesNotAlwaysPreserveRange) {
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0);
 
     auto metadataWithoutTimestampPreserveRange =
-        _manager->getActiveMetadata(boost::none, true /* preserveRange */);
+        _manager->getActiveMetadata(boost::none, /*preserveRange=*/true);
 
     _manager->setCollectionMetadata(
         cloneMetadataPlusChunk(metadataWithoutTimestampPreserveRange->get(), cr3));

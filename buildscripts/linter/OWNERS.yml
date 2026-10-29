@@ -1,0 +1,5 @@
+version: 2.0.0
+filters:
+  - "mongolint.py":
+    approvers:
+      - 10gen/server-programmability

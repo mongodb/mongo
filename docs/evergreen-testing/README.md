@@ -6,6 +6,7 @@ Documentation about how MongoDB is tested in Evergreen.
 - [Burn_in_tests](burn_in_tests.md)
 - [Task Timeouts](task_timeouts.md)
 - [Task Generation](task_generation.md)
+- [Resmoke suite execution via Bazel](resmoke_bazel_execution.md)
 - [Multiversion Testing](multiversion.md)
 - YAML configuration
   - [Configuration for Evergreen Integration](yaml_configuration/configuration.md)

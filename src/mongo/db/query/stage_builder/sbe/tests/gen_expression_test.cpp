@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 
@@ -33,18 +7,106 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
+#include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::stage_builder {
 using namespace std::literals::string_view_literals;
+
+class SubstrBytesGenExpressionTest : public sbe::EExpressionTestFixture {
+public:
+    void setUp() override {
+        sbe::EExpressionTestFixture::setUp();
+        auto rootSlot = SbSlot{bindAccessor(&_rootAccessor), TypeSignature::kObjectType};
+        auto expression =
+            Expression::parseExpression(_expCtx.get(),
+                                        fromjson("{$substrBytes: ['$s', '$start', '$length']}"),
+                                        _expCtx->variablesParseState);
+        PlanStageSlots slots;
+        _sbeExpression =
+            generateExpression(_state, expression.get(), rootSlot, slots).lower(_state);
+        _compiled = compileExpression(*_sbeExpression);
+    }
+
+protected:
+    sbe::value::ViewOfValueAccessor _rootAccessor;
+    std::unique_ptr<sbe::EExpression> _sbeExpression;
+    std::unique_ptr<sbe::vm::CodeFragment> _compiled;
+};
+
+struct SubstrBytesCoercionTestCase {
+    BSONObj root;
+    std::string_view expected;
+};
+
+class SubstrBytesNumericCoercionTest
+    : public SubstrBytesGenExpressionTest,
+      public testing::WithParamInterface<SubstrBytesCoercionTestCase> {};
+
+TEST_P(SubstrBytesNumericCoercionTest, CoercesNumericArguments) {
+    const auto& test = GetParam();
+    _rootAccessor.reset(sbe::value::TypeTags::bsonObject,
+                        sbe::value::bitcastFrom<const char*>(test.root.objdata()));
+    auto expected = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(test.expected));
+    auto actual = sbe::value::TagValueOwned::fromRaw(runCompiledExpression(_compiled.get()));
+    ASSERT_SBE_VALUE_EQ(actual.tag(), actual.value(), expected.tag(), expected.value());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    NumericCoercion,
+    SubstrBytesNumericCoercionTest,
+    testing::ValuesIn(std::vector<SubstrBytesCoercionTestCase>{
+        {BSON("s" << "abc" << "start" << 1.5 << "length" << 1.5), "b"},
+        {BSON("s" << "abc" << "start" << -0.5 << "length" << 2), "ab"},
+        {BSON("s" << "abc" << "start" << 1 << "length" << -0.5), ""},
+        {BSON("s" << "abc" << "start" << Decimal128("1.5") << "length" << Decimal128("1.5")), "c"},
+        {BSON("s" << "abc" << "start" << Decimal128("2.5") << "length" << 2), "c"},
+        {BSON("s" << "abc" << "start" << Decimal128("-0.5") << "length" << 2), "ab"},
+        {BSON("s" << "abc" << "start" << std::numeric_limits<int64_t>::max() << "length" << 2), ""},
+        {BSON("s" << "abc" << "start" << 1 << "length" << std::numeric_limits<int64_t>::min()),
+         "bc"},
+    }));
+
+struct SubstrBytesValidationTestCase {
+    BSONObj root;
+    int expectedError;
+};
+
+class SubstrBytesNumericValidationTest
+    : public SubstrBytesGenExpressionTest,
+      public testing::WithParamInterface<SubstrBytesValidationTestCase> {};
+
+TEST_P(SubstrBytesNumericValidationTest, RejectsInvalidNumericArguments) {
+    const auto& test = GetParam();
+    _rootAccessor.reset(sbe::value::TypeTags::bsonObject,
+                        sbe::value::bitcastFrom<const char*>(test.root.objdata()));
+    ASSERT_THROWS_CODE(runCompiledExpression(_compiled.get()), DBException, test.expectedError);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    InvalidNumericArguments,
+    SubstrBytesNumericValidationTest,
+    testing::ValuesIn(std::vector<SubstrBytesValidationTestCase>{
+        {BSON("s" << "abc" << "start" << 1 << "length" << std::numeric_limits<double>::quiet_NaN()),
+         13626501},
+        {BSON("s" << "abc" << "start" << std::numeric_limits<double>::quiet_NaN() << "length" << 2),
+         13626500},
+        {BSON("s" << "abc" << "start" << 1 << "length" << Decimal128("9223372036854775807.5")),
+         13626501},
+        {BSON("s" << "abc" << "start" << Decimal128("9223372036854775807.5") << "length" << 2),
+         13626500},
+    }));
 
 class GoldenGenExpressionTest : public GoldenSbeExprBuilderTestFixture {
 public:
@@ -75,9 +137,9 @@ public:
                  boost::optional<SbSlot> rootSlot,
                  Value expected,
                  std::string_view test) {
-        auto [expectedTag, expectedVal] = sbe::value::makeValue(expected);
-        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
-        runTest(expr, rootSlot, expectedTag, expectedVal, test);
+        sbe::value::TagValueOwned expectedTv =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(expected));
+        runTest(expr, rootSlot, expectedTv.tag(), expectedTv.value(), test);
     }
 };
 
@@ -129,6 +191,17 @@ TEST_F(GoldenGenExpressionTest, TestSimpleExpr) {
         auto constArr = ExpressionConstant::create(_expCtx.get(), arrVal);
         ExpressionArrayToObject arr2ObjExpr(_expCtx.get(), {constArr});
         runTest(&arr2ObjExpr, rootSlot, Value(root), "ExpressionArrayToObject"sv);
+    }
+    {
+        // Wrap in $objectToArray (rather than using a constant array) so the argument isn't
+        // constant-folded away before it reaches the SBE stage builder.
+        auto varExpr = ExpressionFieldPath::createVarFromString(
+            _expCtx.get(), "ROOT", _expCtx->variablesParseState);
+        boost::intrusive_ptr<ExpressionObjectToArray> obj2arrExpr{
+            new ExpressionObjectToArray(_expCtx.get())};
+        obj2arrExpr->addOperand(varExpr);
+        ExpressionSize sizeExpr(_expCtx.get(), {obj2arrExpr});
+        runTest(&sizeExpr, rootSlot, Value(4), "ExpressionSize"sv);
     }
     {
         auto varExpr = ExpressionFieldPath::createVarFromString(
@@ -600,10 +673,10 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateAdd dateAddExpr(
             _expCtx.get(),
-            date1 /* startDate */,
-            ExpressionConstant::create(_expCtx.get(), Value("quarter"sv)) /* unit */,
-            ExpressionConstant::create(_expCtx.get(), Value(1)) /* amount */,
-            ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)) /* timezone */,
+            /*startDate=*/date1,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("quarter"sv)),
+            /*amount=*/ExpressionConstant::create(_expCtx.get(), Value(1)),
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)),
             "$dateAdd"sv);
         // expect 02/18/2025 10:43:44 PM GMT
         runTest(&dateAddExpr,
@@ -614,10 +687,10 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateSubtract dateSubExpr(
             _expCtx.get(),
-            date1 /* startDate */,
-            ExpressionConstant::create(_expCtx.get(), Value("week"sv)) /* unit */,
-            ExpressionConstant::create(_expCtx.get(), Value(1)) /* amount */,
-            ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)) /* timezone */,
+            /*startDate=*/date1,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("week"sv)),
+            /*amount=*/ExpressionConstant::create(_expCtx.get(), Value(1)),
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)),
             "$dateAdd"sv);
         // expect 11/11/2024 10:43:44 PM
         runTest(&dateSubExpr,
@@ -628,21 +701,21 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateDiff dateDiffExpr(
             _expCtx.get(),
-            date1 /* startDate */,
-            date2 /* endDate */,
-            ExpressionConstant::create(_expCtx.get(), Value("week"sv)) /* unit */,
-            ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)) /* timezone */,
-            nullptr /* startOfWeek */);
+            /*startDate=*/date1,
+            /*endDate=*/date2,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("week"sv)),
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)),
+            /*startOfWeek=*/nullptr);
         runTest(&dateDiffExpr, rootSlot, Value(-53), "ExpressionDateDiff"sv);
     }
     {
         ExpressionDateFromString dateFromStrExpr(
             _expCtx.get(),
             dateStr,
-            ExpressionConstant::create(_expCtx.get(), Value("GMT"sv)) /* timezone */,
-            ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)) /* format */,
-            nullptr /* onNull */,
-            nullptr /* onError */);
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("GMT"sv)),
+            /*format=*/ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)),
+            /*onNull=*/nullptr,
+            /*onError=*/nullptr);
         runTest(&dateFromStrExpr,
                 rootSlot,
                 Value(Date_t::fromMillisSinceEpoch(1731924900000)),
@@ -652,17 +725,17 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
 
         ExpressionDateFromParts dateFromPartExpr(
             _expCtx.get(),
-            ExpressionConstant::create(_expCtx.get(), Value(2024)) /* year */,
-            ExpressionConstant::create(_expCtx.get(), Value(11)) /* month */,
-            ExpressionConstant::create(_expCtx.get(), Value(18)) /* day */,
-            ExpressionConstant::create(_expCtx.get(), Value(14)) /* hour */,
-            ExpressionConstant::create(_expCtx.get(), Value(30)) /* minute */,
-            ExpressionConstant::create(_expCtx.get(), Value(15)) /* second */,
-            nullptr /* millisecond */,
-            nullptr /* isoWeekYear */,
-            nullptr /* isoWeek */,
-            nullptr /* isoDayOfWeek */,
-            nullptr /* timeZone */);
+            /*year=*/ExpressionConstant::create(_expCtx.get(), Value(2024)),
+            /*month=*/ExpressionConstant::create(_expCtx.get(), Value(11)),
+            /*day=*/ExpressionConstant::create(_expCtx.get(), Value(18)),
+            /*hour=*/ExpressionConstant::create(_expCtx.get(), Value(14)),
+            /*minute=*/ExpressionConstant::create(_expCtx.get(), Value(30)),
+            /*second=*/ExpressionConstant::create(_expCtx.get(), Value(15)),
+            /*millisecond=*/nullptr,
+            /*isoWeekYear=*/nullptr,
+            /*isoWeek=*/nullptr,
+            /*isoDayOfWeek=*/nullptr,
+            /*timeZone=*/nullptr);
         runTest(&dateFromPartExpr,
                 rootSlot,
                 Value(Date_t::fromMillisSinceEpoch(1731940215000)),
@@ -671,9 +744,9 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateToParts dateToPartExpr(
             _expCtx.get(),
-            date1 /* date */,
-            nullptr /* timeZone */,
-            ExpressionConstant::create(_expCtx.get(), Value(false)) /* iso8601 */);
+            /*date=*/date1,
+            /*timeZone=*/nullptr,
+            /*iso8601=*/ExpressionConstant::create(_expCtx.get(), Value(false)));
         runTest(&dateToPartExpr,
                 rootSlot,
                 Value(BSON("year" << 2024 << "month" << 11 << "day" << 18 << "hour" << 22
@@ -683,21 +756,21 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateToString dateToStrExpr(
             _expCtx.get(),
-            date1 /* date */,
-            ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)) /* format */,
-            nullptr /* timeZone */,
-            ExpressionConstant::create(_expCtx.get(), Value(false)) /* onNull */);
+            /*date=*/date1,
+            /*format=*/ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)),
+            /*timeZone=*/nullptr,
+            /*onNull=*/ExpressionConstant::create(_expCtx.get(), Value(false)));
         runTest(
             &dateToStrExpr, rootSlot, Value("11/18/2024 22:43:44"sv), "ExpressionDateToString"sv);
     }
     {
         ExpressionDateTrunc dateTruncExpr(
             _expCtx.get(),
-            date1 /* date */,
-            ExpressionConstant::create(_expCtx.get(), Value("week"sv)) /* unit */,
-            nullptr /* binSize */,
-            nullptr /* timeZone */,
-            nullptr /* startOfWeek */);
+            /*date=*/date1,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("week"sv)),
+            /*binSize=*/nullptr,
+            /*timeZone=*/nullptr,
+            /*startOfWeek=*/nullptr);
         // expected 11/17/2024 12:00:00 AM
         runTest(&dateTruncExpr,
                 rootSlot,
@@ -788,11 +861,17 @@ TEST_F(GoldenGenExpressionTest, TestExprArraySet) {
     }
     {
         ExpressionSetDifference setDiffExpr(_expCtx.get(), {fieldArr2Expr, fieldArr3Expr});
-        auto [tag, val] = sbe::value::makeNewArraySet();
-        sbe::value::ValueGuard valGuard{tag, val};
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(2.5)));
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value("str"sv)));
-        runTest(&setDiffExpr, rootSlot, tag, val, "ExpressionSetDifference"sv);
+        sbe::value::TagValueOwned setDiffResult =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet());
+        sbe::value::getArraySetView(setDiffResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value(2.5)));
+        sbe::value::getArraySetView(setDiffResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value("str"sv)));
+        runTest(&setDiffExpr,
+                rootSlot,
+                setDiffResult.tag(),
+                setDiffResult.value(),
+                "ExpressionSetDifference"sv);
     }
     {
         ExpressionSetEquals setEqExpr(_expCtx.get(), {fieldArr2Expr, fieldArr3Expr});
@@ -809,14 +888,23 @@ TEST_F(GoldenGenExpressionTest, TestExprArraySet) {
     }
     {
         ExpressionSetUnion setUnionExpr(_expCtx.get(), {fieldArr2Expr, fieldArr3Expr});
-        auto [tag, val] = sbe::value::makeNewArraySet();
-        sbe::value::ValueGuard valGuard{tag, val};
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(1)));
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(2.5)));
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value("str"sv)));
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(5)));
-        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value("str2"sv)));
-        runTest(&setUnionExpr, rootSlot, tag, val, "ExpressionSetUnion"sv);
+        sbe::value::TagValueOwned setUnionResult =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArraySet());
+        sbe::value::getArraySetView(setUnionResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value(1)));
+        sbe::value::getArraySetView(setUnionResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value(2.5)));
+        sbe::value::getArraySetView(setUnionResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value("str"sv)));
+        sbe::value::getArraySetView(setUnionResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value(5)));
+        sbe::value::getArraySetView(setUnionResult.value())
+            ->push_back_raw(sbe::value::makeValue(Value("str2"sv)));
+        runTest(&setUnionExpr,
+                rootSlot,
+                setUnionResult.tag(),
+                setUnionResult.value(),
+                "ExpressionSetUnion"sv);
     }
     {
         ExpressionReverseArray arrReverseExpr(_expCtx.get());

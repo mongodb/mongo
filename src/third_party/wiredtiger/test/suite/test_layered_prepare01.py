@@ -80,7 +80,7 @@ class test_layered_prepare01(wttest.WiredTigerTestCase):
 
         # Follower: prepare removes of prepared_keys into ingest.
         prep_session = conn_follow.open_session('')
-        prep_cursor = prep_session.open_cursor(uri)
+        prep_cursor = prep_session.open_cursor(uri, None, 'overwrite=false')
         prep_session.begin_transaction()
         for k in self.prepared_keys:
             prep_cursor.set_key(k)

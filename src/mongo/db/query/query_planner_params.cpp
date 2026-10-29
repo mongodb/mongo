@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_planner_params.h"
 
@@ -34,12 +8,16 @@
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/distinct_access.h"
+#include "mongo/db/query/max_estimated_scan_bytes_metrics.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings_decoration.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/s/query/shard_targeting_collation_helpers.h"
@@ -53,16 +31,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(pauseAfterFillingOutIndexEntries);
 
-namespace {
-/**
- * Converts the catalog metadata for an index into an IndexEntry, which is a format that is meant to
- * be consumed by the query planner. This function can perform index reads and should not be called
- * unless access to the storage engine is permitted.
- *
- * When 'canonicalQuery' is not null, only multikey metadata paths that intersect with the query
- * field set will be retrieved for a multikey wildcard index. Otherwise all multikey metadata paths
- * will be retrieved.
- */
 IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const CollectionPtr& collection,
                                            std::shared_ptr<const IndexCatalogEntry> ice,
@@ -143,6 +111,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             std::move(ice)};
 }
 
+namespace {
 void fillOutIndexEntries(OperationContext* opCtx,
                          const CanonicalQuery& canonicalQuery,
                          const CollectionPtr& collection,
@@ -231,6 +200,14 @@ void applyQuerySettingsIndexHintsForCollection(const CanonicalQuery& canonicalQu
     indexes.erase(std::remove_if(indexes.begin(), indexes.end(), notInAllowedIndexes),
                   indexes.end());
 }
+
+// A limit exempts a query from maxEstimatedScanBytes rejection, so an override only counts if the
+// query has no limit (i.e. it would otherwise have been rejected).
+void incrementRejectedAndOverriddenIfNoLimit(const CanonicalQuery& canonicalQuery) {
+    if (!QueryPlannerCommon::hasEffectiveLimit(canonicalQuery)) {
+        maxEstimatedScanBytesMetrics::maxEstimatedScanRejectedAndOverridden.increment();
+    }
+}
 }  // namespace
 
 // Handle the '$natural' and cluster key (for clustered indexes) cases. Iterate over the
@@ -302,16 +279,22 @@ void QueryPlannerParams::applyQuerySettingsNaturalHintsForCollection(
               allowedIndex.getHint());
     }
 
-    constexpr auto strictNoTableScan = (QueryPlannerParams::Options::NO_TABLE_SCAN |
-                                        QueryPlannerParams::Options::STRICT_NO_TABLE_SCAN);
+    // Flags PQS sets to disallow all scan types.
+    constexpr auto strictNoTableScanFlags = (QueryPlannerParams::Options::NO_TABLE_SCAN |
+                                             QueryPlannerParams::Options::STRICT_NO_TABLE_SCAN);
+    constexpr auto clearCollscanFlags =
+        (strictNoTableScanFlags | QueryPlannerParams::Options::COLLECTION_EXCEEDS_SCAN_BYTES |
+         QueryPlannerParams::Options::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN);
     if (!forwardAllowed && !backwardAllowed) {
         // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
-        collectionInfo.options |= strictNoTableScan;
+        collectionInfo.options |= strictNoTableScanFlags;
     } else {
-        // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' and
-        // 'STRICT_NO_TABLE_SCAN' flags if they exist, as query settings should have a higher
-        // precedence over server parameters.
-        collectionInfo.options &= ~strictNoTableScan;
+        // PQS $natural hint overrides server-parameter scan restrictions. Track overrides of
+        // COLLECTION_EXCEEDS_SCAN_BYTES before clearing.
+        if (collectionInfo.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) {
+            incrementRejectedAndOverriddenIfNoLimit(canonicalQuery);
+        }
+        collectionInfo.options &= ~clearCollscanFlags;
 
         // Enforce the scan direction if needed.
         const bool bothDirectionsAllowed = forwardAllowed && backwardAllowed;
@@ -445,11 +428,29 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
             fillOutIndexEntries(opCtx, canonicalQuery, secondaryColl, secondaryInfo.indexes);
             fillOutPlannerCollectionInfo(
                 opCtx, secondaryColl, &secondaryInfo.stats, includeSizeStats);
-            if (storageGlobalParams.noTableScan.load()) {
+            if (canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getNoTableScan()) {
                 // There are certain cases where we ignore this restriction.
                 bool ignore = nss.isSystem() || nss.isOnInternalDb();
                 if (!ignore) {
                     secondaryInfo.options |= QueryPlannerParams::NO_TABLE_SCAN;
+                }
+            }
+            {
+                const long long maxScanBytes =
+                    QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytes();
+                if (maxScanBytes >= 0) {
+                    const bool ignore = nss.isSystem() || nss.isOnInternalDb();
+                    if (!ignore && secondaryColl &&
+                        secondaryColl->getRecordStore()->dataSize() > maxScanBytes) {
+                        secondaryInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+                        secondaryInfo.maxEstimatedScanBytesCollectionSize =
+                            secondaryColl->getRecordStore()->dataSize();
+                        secondaryInfo.maxEstimatedScanBytesThreshold = maxScanBytes;
+                        if (QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytesDryRun()) {
+                            secondaryInfo.options |=
+                                QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+                        }
+                    }
                 }
             }
         } else {
@@ -495,8 +496,7 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
         return;
     }
 
-    fillOutSecondaryCollectionsInfo(
-        opCtx, canonicalQuery, collections, true /* includeSizeStats */);
+    fillOutSecondaryCollectionsInfo(opCtx, canonicalQuery, collections, /*includeSizeStats=*/true);
 }
 
 void QueryPlannerParams::fillOutMainCollectionPlannerParams(
@@ -508,7 +508,8 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
     // solutions.
-    if (storageGlobalParams.noTableScan.load()) {
+    const auto& knobConfig = canonicalQuery.getExpCtx()->getQueryKnobConfiguration();
+    if (knobConfig.getNoTableScan()) {
         const auto& nss = canonicalQuery.nss();
         // There are certain cases where we ignore this restriction:
         bool ignore =
@@ -518,15 +519,38 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
         }
     }
 
-    if (internalQueryPlannerEnableIndexIntersection.load()) {
+    {
+        const long long maxScanBytes = knobConfig.getMaxEstimatedScanBytes();
+        const auto& nss = canonicalQuery.nss();
+        const bool ignore = nss.isSystem() || nss.isOnInternalDb();
+        if (maxScanBytes >= 0 && mainColl && !ignore &&
+            mainColl->getRecordStore()->dataSize() > maxScanBytes) {
+            // A $natural hint in the command overrides the rejection.
+            const auto& hint = canonicalQuery.getFindCommandRequest().getHint();
+            if (!hint.isEmpty() && hint[query_request_helper::kNaturalSortField]) {
+                incrementRejectedAndOverriddenIfNoLimit(canonicalQuery);
+            } else {
+                mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+                mainCollectionInfo.maxEstimatedScanBytesCollectionSize =
+                    mainColl->getRecordStore()->dataSize();
+                mainCollectionInfo.maxEstimatedScanBytesThreshold = maxScanBytes;
+                if (QueryKnobConfiguration::get(opCtx).getMaxEstimatedScanBytesDryRun()) {
+                    mainCollectionInfo.options |=
+                        QueryPlannerParams::MAX_ESTIMATED_SCAN_BYTES_DRY_RUN;
+                }
+            }
+        }
+    }
+
+    if (knobConfig.getPlannerEnableIndexIntersection()) {
         mainCollectionInfo.options |= QueryPlannerParams::INDEX_INTERSECTION;
     }
 
-    if (internalQueryEnumerationPreferLockstepOrEnumeration.load()) {
+    if (knobConfig.getEnumerationPreferLockstepOrEnumeration()) {
         mainCollectionInfo.options |= QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     }
 
-    if (internalQueryPlannerGenerateCoveredWholeIndexScans.load()) {
+    if (knobConfig.getPlannerGenerateCoveredWholeIndexScans()) {
         mainCollectionInfo.options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     }
 
@@ -536,7 +560,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 
     // Populate collection statistics for CBR. In the case of clustered collections, a query may
-    // appear to be ID-hack eligible as per 'ExpCtx::isIdHackQuery()', but 'buildIdHackPlan()' fails
+    // appear to be ID-hack eligible as per 'isIdHackEligibleQuery()', but 'buildIdHackPlan()' fails
     // as there is no _id index. In these cases, we will end up invoking the query planner and CBR,
     // so we need this catalog information.
     if (cbrEnabled) {
@@ -545,9 +569,8 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 
     // _id queries can skip checking the catalog for indices since they will always use the _id
-    // index. This applies to both find commands (flag set at ExpCtx build time) and aggregation
-    // pipelines starting with {$match: {_id: X}} (flag set later in prepareExecutor()).
-    if (canonicalQuery.getExpCtx()->isIdHackQuery()) {
+    // index. Only skip this step if alwaysFillOutCollectionInfo is false.
+    if (isIdHackEligibleQuery(mainColl, canonicalQuery) && !alwaysFillOutCollectionInfo) {
         return;
     }
 
@@ -556,7 +579,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, collections);
 
     fillOutPlannerCollectionInfo(
-        opCtx, mainColl, &mainCollectionInfo.stats, false /* includeSizeStats */);
+        opCtx, mainColl, &mainCollectionInfo.stats, /*includeSizeStats=*/false);
 }
 
 void QueryPlannerParams::setTargetSbeStageBuilder(const CanonicalQuery& canonicalQuery,
@@ -613,7 +636,8 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
                                        key,
                                        query,
                                        distinctArgs.flipDistinctScanDirection,
-                                       strictDistinctOnly)) {
+                                       strictDistinctOnly,
+                                       canonicalQuery.getDistinct()->unwindsArrays())) {
             indices.push_back(indexEntryFromIndexCatalogEntry(
                 opCtx, collectionPtr, std::move(ice), canonicalQuery));
         }
@@ -686,8 +710,13 @@ bool QueryPlannerParams::requiresShardFiltering(const CanonicalQuery& canonicalQ
         return false;
     }
 
-    // Check whether the query is running over multiple shards and will require merging.
     const auto expCtx = canonicalQuery.getExpCtx();
+    if (expCtx->forceShardFilter()) {
+        // The caller specified that we must always include the shard filter.
+        return true;
+    }
+
+    // Check whether the query is running over multiple shards and will require merging.
     if (expCtx->needsUnsortedMerge() || expCtx->needsSortedMerge()) {
         return true;
     }

@@ -1,14 +1,19 @@
 /**
  * Ensure limit and skip stages in find queries are estimated correctly.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ceEqual} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -23,14 +28,15 @@ for (let i = 0; i < 1000; i++) {
 assert.commandWorked(coll.insert(docs));
 
 coll.createIndexes([{a: 1}]);
-assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "b"}));
 
 function runTest({query, sort, skip, limit, expectedCard}) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -92,12 +98,13 @@ try {
     });
     assert.commandWorked(coll.insert(docs));
     coll.createIndexes([{a: 1}]);
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
 
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "histogramCE",
         }),
     );
@@ -114,7 +121,7 @@ try {
 
     // Add more docs to the collection and update histogram
     assert.commandWorked(coll.insert(docs));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
 
     // Get the cost of the skip stage
     const largeCardSkipExplain = coll.find(query).skip(skip).explain();

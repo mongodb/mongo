@@ -17,7 +17,21 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 const dbName = "test";
 const collName = "rollback_aborted_prepared_transaction";
 
-const rollbackTest = new RollbackTest(dbName);
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
+const nodeOptions = isMultiversion
+    ? undefined
+    : {
+          setParameter: {
+              // Force off replicated fast count so the test exercises the legacy size/count
+              // tracking path.
+              "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+          },
+      };
+const rollbackTest = new RollbackTest(dbName, undefined, nodeOptions);
 let primary = rollbackTest.getPrimary();
 
 // Create collection we're using beforehand.

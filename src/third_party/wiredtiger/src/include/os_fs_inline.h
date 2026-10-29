@@ -15,7 +15,7 @@
 static WT_INLINE WT_FILE_SYSTEM *
 __wt_fs_file_system(WT_SESSION_IMPL *session)
 {
-    return (S2FS(session));
+    return (S2C(session)->file_system);
 }
 
 /*

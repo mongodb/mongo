@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -66,9 +40,9 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace key_string {
-class MONGO_MOD_OPEN BuilderInterface {
+class [[MONGO_MOD_OPEN]] BuilderInterface {
 public:
     virtual ~BuilderInterface() = default;
 
@@ -437,7 +411,7 @@ private:
 /**
  * A compact type which fits a keystring version and a record id size into four bytes.
  */
-class MONGO_MOD_FILE_PRIVATE VersionAndSize {
+class [[MONGO_MOD_FILE_PRIVATE]] VersionAndSize {
 public:
     constexpr VersionAndSize() = default;
     constexpr VersionAndSize(Version version, int32_t size) : _value(_encode(version, size)) {}
@@ -789,7 +763,7 @@ enum class Discriminator {
     kExclusiveAfter,
 };
 
-enum class MONGO_MOD_FILE_PRIVATE BuildState {
+enum class [[MONGO_MOD_FILE_PRIVATE]] BuildState {
     kEmpty,                  // Buffer is empty.
     kAppendingBSONElements,  // In the process of appending BSON Elements
     kEndAdded,               // Finished appedning BSON Elements.
@@ -801,7 +775,7 @@ enum class MONGO_MOD_FILE_PRIVATE BuildState {
 /**
  * Encodes the kind of NumberDecimal that is stored.
  */
-enum MONGO_MOD_FILE_PRIVATE DecimalContinuationMarker {
+enum [[MONGO_MOD_FILE_PRIVATE]] DecimalContinuationMarker {
     kDCMEqualToDouble = 0x0,
     kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits = 0x1,
     kDCMEqualToDoubleRoundedUpTo15Digits = 0x2,
@@ -1154,7 +1128,7 @@ protected:
 // Helper class to hold a buffer builder. This class needs to be before BuilderBase when inheriting
 // to ensure the buffer is constructed first
 template <typename BufferBuilderT>
-class MONGO_MOD_FILE_PRIVATE BufferHolder {
+class [[MONGO_MOD_FILE_PRIVATE]] BufferHolder {
 protected:
     template <typename... Args>
     BufferHolder(Args&&... args) : _bufferBuilder(std::forward<Args>(args)...) {}
@@ -1258,7 +1232,7 @@ public:
  * on are KeyStrings.
  */
 template <class T>
-struct MONGO_MOD_FILE_PRIVATE isKeyString : public std::false_type {};
+struct [[MONGO_MOD_FILE_PRIVATE]] isKeyString : public std::false_type {};
 
 template <>
 struct isKeyString<Builder> : public std::true_type {};
@@ -1480,4 +1454,4 @@ std::string explain(std::span<const char> buffer,
 
 using KeyStringSet = boost::container::flat_set<key_string::Value>;
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

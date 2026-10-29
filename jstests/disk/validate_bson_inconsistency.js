@@ -11,7 +11,9 @@ import {
     insertInvalidRegex,
     insertInvalidUTF8,
     insertNonSequentialArrayIndexes,
+    rewriteTable,
     startMongodOnExistingPath,
+    wtHeaderLines,
 } from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "validate_bson_inconsistency";
@@ -77,6 +79,14 @@ resetDbpath(dbpath);
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 2);
     assert.eq(res.warnings.length, 1);
+    // The warning must disambiguate which conformance check failed (UUID length) and point at the
+    // per-document log id (6825900).
+    assert(
+        res.warnings.some(
+            (w) => w.includes("BSON UUID length should be 16 bytes") && w.includes("6825900"),
+        ),
+        tojson(res.warnings),
+    );
 
     res = coll.validate({checkBSONConformance: false});
     assert(res.valid, tojson(res));
@@ -110,7 +120,13 @@ resetDbpath(dbpath);
     res = coll.validate({checkBSONConformance: true});
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 5);
-    assert.eq(res.warnings.length, 1);
+    // Disambiguation splits the previously-collapsed single warning into one per distinct reason:
+    // invalid regex option vs. unsorted regex options.
+    assert.eq(res.warnings.length, 2, tojson(res.warnings));
+    assert(
+        res.warnings.some((w) => w.includes("Bad regex options") && w.includes("6825900")),
+        tojson(res.warnings),
+    );
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
@@ -150,6 +166,11 @@ resetDbpath(dbpath);
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 2);
     assert.eq(res.warnings.length, 1);
+    // The warning must disambiguate the failing check (MD5 length).
+    assert(
+        res.warnings.some((w) => w.includes("MD5 must be 16 bytes") && w.includes("6825900")),
+        tojson(res.warnings),
+    );
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
@@ -201,7 +222,22 @@ resetDbpath(dbpath);
     res = assert.commandWorked(testColl.validate({checkBSONConformance: true}));
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 7);
-    assert.eq(res.warnings.length, 1);
+    // Disambiguation splits the previously-collapsed single warning into one per distinct reason:
+    // deprecated BSON type vs. deprecated BSON binary data subtype.
+    assert.eq(res.warnings.length, 2, tojson(res.warnings));
+    assert(
+        res.warnings.some(
+            (w) => w.includes("Use of deprecated BSON type") && w.includes("6825900"),
+        ),
+        tojson(res.warnings),
+    );
+    assert(
+        res.warnings.some(
+            (w) =>
+                w.includes("Use of deprecated BSON binary data subtype") && w.includes("6825900"),
+        ),
+        tojson(res.warnings),
+    );
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
@@ -215,8 +251,6 @@ resetDbpath(dbpath);
     db.createCollection(collName);
     let testColl = db[collName];
 
-    // Inserts a rubbish (random string) BSON Column (should fail validation to insert)
-    testColl.insert({a: BinData(7, "O2FkZmdqYWtsamhnJ2xhamhkZzthaCdmZGphZ2hkYQ==")});
     // Inserts one valid BSON Column to check that it doesn't cause a false positive.
     testColl.insert({
         a: BinData(7, "AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA="),
@@ -328,15 +362,88 @@ resetDbpath(dbpath);
         ]),
     );
 
+    // Disambiguation splits the previously-collapsed single warning into one per distinct failing
+    // check, and each of the four bad documents fails a different one: unsupported subtype
+    // (improperFLE1), unsupported original BSON type for the subtype (improperFLE2), a missing
+    // subtype byte (improperFLE3), and an FLE2 value shorter than the minimum (improperFLE4).
+    const expectedEncryptedWarnings = [
+        "Unsupported Encrypted BSON Value type in the collection",
+        "BSON type is not supported for the Encrypted BSON Value subtype",
+        "Encrypted BSON Value is missing its subtype byte",
+        "Invalid FLE2 Encrypted BSON Value length",
+    ];
+
     let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 4);
-    assert.eq(res.warnings.length, 1);
+    assert.eq(res.warnings.length, 4, tojson(res.warnings));
+    assert(
+        res.warnings.every((w) => w.includes("6825900")),
+        tojson(res.warnings),
+    );
+    for (const expected of expectedEncryptedWarnings) {
+        assert(
+            res.warnings.some((w) => w.includes(expected)),
+            tojson({expected, warnings: res.warnings}),
+        );
+    }
 
     res = assert.commandWorked(testColl.validate({checkBSONConformance: true}));
     assert(res.valid, tojson(res));
     assert.eq(res.nNonCompliantDocuments, 4);
-    assert.eq(res.warnings.length, 1);
+    assert.eq(res.warnings.length, 4, tojson(res.warnings));
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+})();
+
+(function validateInvalidBSONAfterNonConformantElement() {
+    jsTest.log.info("Validate documents with an unknown BSON type after a non-conformant element");
+
+    const toHex = (str) =>
+        str
+            .split("")
+            .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
+            .join("");
+    // {validString: "p"} -> {validString: "\x80"}: invalid UTF-8, so only non-conformant.
+    const stringElem = "02" + toHex("validString") + "00" + "02000000" + "70";
+    // {zzzz: NumberInt(1)} -> type byte 0x7e, which does not exist, so the document is invalid.
+    const intElem = "10" + toHex("zzzz") + "00";
+    const corrupt = function (lines) {
+        for (let i = wtHeaderLines; i < lines.length; i += 2) {
+            assert(lines[i].includes(stringElem) && lines[i].includes(intElem), lines[i]);
+            lines[i] = lines[i]
+                .replace(stringElem, stringElem.slice(0, -2) + "80")
+                .replace(intElem, "7e" + intElem.slice(2));
+        }
+    };
+
+    for (const indexSpec of [null, {partialFilterExpression: {zzzz: {$gt: 0}}}]) {
+        let mongod = startMongodOnExistingPath(dbpath);
+        let db = mongod.getDB(baseName);
+        const collName = collNamePrefix + count++;
+        db.createCollection(collName);
+        let testColl = db[collName];
+        if (indexSpec) {
+            assert.commandWorked(testColl.createIndex({zzzz: 1}, indexSpec));
+        }
+
+        const numDocs = 10;
+        for (let i = 0; i < numDocs; ++i) {
+            assert.commandWorked(testColl.insert({validString: "p", zzzz: NumberInt(1)}));
+        }
+        rewriteTable(getUriForColl(testColl), mongod, corrupt);
+
+        mongod = startMongodOnExistingPath(dbpath);
+        db = mongod.getDB(baseName);
+        testColl = db[collName];
+
+        for (const options of [{}, {checkBSONConformance: true}]) {
+            const res = assert.commandWorked(testColl.validate(options));
+            assert(!res.valid, tojson(res));
+            assert.eq(res.nInvalidDocuments, numDocs, tojson(res));
+        }
+        assert.commandWorked(db.adminCommand({ping: 1}));
+
+        MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+    }
 })();

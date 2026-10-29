@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/pipeline/accumulator.h"
@@ -37,7 +11,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
@@ -531,8 +504,36 @@ TEST(Accumulators, MinN) {
             {{Value(100), Value(), Value(BSONNULL), Value(), Value(3)},
              {Value(std::vector<Value>{Value(3), Value(100)})}},
         },
-        false /*skipMerging*/,
+        /*skipMerging=*/false,
         n);
+}
+
+TEST(Accumulators, MinNMergeUnsortedInput) {
+    auto expCtx = ExpressionContextForTest{};
+    auto accum = make_intrusive<AccumulatorMinN>(&expCtx);
+    accum->startNewGroup(Value(3));
+
+    // Verify input does not need to be sorted. SBE's native minN/maxN
+    // accumulators rely on this to avoid sorting on the shards.
+    accum->process(Value(std::vector<Value>{Value(9), Value(1), Value(7), Value(3), Value(5)}),
+                   true /* merging */);
+
+    Value result = accum->getValue(false);
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(1), Value(3), Value(5)}), result);
+}
+
+TEST(Accumulators, MaxNMergeUnsortedInput) {
+    auto expCtx = ExpressionContextForTest{};
+    auto accum = make_intrusive<AccumulatorMaxN>(&expCtx);
+    accum->startNewGroup(Value(3));
+
+    // Verify input does not need to be sorted. SBE's native minN/maxN
+    // accumulators rely on this to avoid sorting on the shards.
+    accum->process(Value(std::vector<Value>{Value(1), Value(9), Value(3), Value(7), Value(5)}),
+                   true /* merging */);
+
+    Value result = accum->getValue(false);
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(9), Value(7), Value(5)}), result);
 }
 
 TEST(Accumulators, MinNRespectsCollation) {
@@ -545,7 +546,7 @@ TEST(Accumulators, MinNRespectsCollation) {
         &expCtx,
         {{{Value("abc"sv), Value("cba"sv), Value("cca"sv)},
           Value(std::vector<Value>{Value("cba"sv), Value("cca"sv)})}},
-        false /* skipMerging */,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -578,7 +579,7 @@ TEST(Accumulators, MaxN) {
             {{Value(100), Value(), Value(BSONNULL), Value(), Value(3)},
              {Value(std::vector<Value>{Value(100), Value(3)})}},
         },
-        false /*skipMerging*/,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -592,7 +593,7 @@ TEST(Accumulators, MaxNRespectsCollation) {
         &expCtx,
         {{{Value("abc"sv), Value("cba"sv), Value("cca"sv)},
           Value(std::vector<Value>{Value("abc"sv), Value("cca"sv)})}},
-        false /* skipMerging */,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -1754,7 +1755,7 @@ TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
 
 template <typename RankType>
 auto makeLegacyRank(ExpressionContext* const expCtx) {
-    return make_intrusive<RankType>(expCtx, true /* isAscending */);
+    return make_intrusive<RankType>(expCtx, /*isAscending=*/true);
 }
 
 TEST(Accumulators, Rank) {
@@ -1834,7 +1835,7 @@ TEST(Accumulators, AddToSetRespectsCollation) {
 
 TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto addToSet = AccumulatorAddToSet(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         addToSet.process(
@@ -1845,7 +1846,7 @@ TEST(Accumulators, AddToSetRespectsMaxMemoryConstraint) {
 
 TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto addToSet = AccumulatorPush(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         addToSet.process(
@@ -2014,68 +2015,69 @@ TEST(Accumulators, AccumulatorExpMovingAvg) {
     AccumulatorExpMovingAvg acc{expCtx.get(), Decimal128{0.75}};  // alpha (decay factor) == 0.75
 
     // The constructor arg does not "initialize" 'acc', it just sets its decaying avg multiplier.
-    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(/*toBeMerged=*/false).getType());
 
     // Process a non-numeric input. Still not initialized.
-    acc.processInternal(Value("string"sv), false /* merging */);
-    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
+    acc.processInternal(Value("string"sv), /*merging=*/false);
+    ASSERT_EQ(BSONType::null, acc.getValue(/*toBeMerged=*/false).getType());
 
     // Process integer input 1. This will initialize the accumulator to the value of the input,
     // but it will not be internally stored as a decimal as this is not needed to maintain the
     // precision.
-    acc.processInternal(Value(1), false /* merging */);
-    ASSERT_EQ(0, ValueComparator().compare(acc.getValue(false /* toBeMerged */), Value(1)))
+    acc.processInternal(Value(1), /*merging=*/false);
+    ASSERT_EQ(0, ValueComparator().compare(acc.getValue(/*toBeMerged=*/false), Value(1)))
         << " acc: " << acc.getValue(false);
 
     // Now process decimal input 4.0. This will change the internal representation to decimal to
     // maintain the precision and will, under the configured alpha == 0.75, give decaying average as
     // 3.25 == 0.75 * 4.0 + 0.25 * 1.
-    acc.processInternal(Value(Decimal128{4.0}), false /* merging */);
+    acc.processInternal(Value(Decimal128{4.0}), /*merging=*/false);
     ASSERT_EQ(
-        0, ValueComparator().compare(acc.getValue(false /* toBeMerged */), Value(Decimal128{3.25})))
+        0, ValueComparator().compare(acc.getValue(/*toBeMerged=*/false), Value(Decimal128{3.25})))
         << " acc: " << acc.getValue(false);
 
     // Back to uninitialized after reset().
     acc.reset();
-    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(/*toBeMerged=*/false).getType());
 }
 
 /* ------------------------- AccumulatorPercentile ---------------------------------------------- */
 
 // Runs AccumulatorPercentile tests with the various different percentile algorithms.
-void accumulatorPercentileHelper(PercentileMethodEnum method,
-                                 const std::vector<double>& percentiles,
-                                 const std::string& mergeFalseExpected,
-                                 boost::optional<int> maxMemoryUsageBytes = 1024) {
+void accumulatorPercentileHelper(
+    PercentileMethodEnum method,
+    const std::vector<double>& percentiles,
+    const std::string& mergeFalseExpected,
+    boost::optional<MemoryUsageLimit> maxMemoryUsageBytes = MemoryUsageLimit{1024}) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx =
         make_intrusive<ExpressionContextForTest>();
     AccumulatorPercentile acc{expCtx.get(), percentiles, method, maxMemoryUsageBytes};
 
     // Processing a non-numeric input when not merging does not accumulate anything, so the current
     // value should be an array of [null, null].
-    acc.processInternal(Value("string"sv), false /* merging */);
-    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
+    acc.processInternal(Value("string"sv), /*merging=*/false);
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/false).getType());
     std::ostringstream oss;
-    oss << acc.getValue(false /* toBeMerged */);  // final value
+    oss << acc.getValue(/*toBeMerged=*/false);  // final value
     ASSERT_EQ("[null, null]", oss.str());
 
     // Process some numbers the percentiles of which are easy to understand.
     for (int i = 1; i <= 10; ++i) {
         double val = 0.1 * i;
-        acc.processInternal(Value(val), false /* merging */);
+        acc.processInternal(Value(val), /*merging=*/false);
     }
-    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/false).getType());
     oss.str("");
-    oss << acc.getValue(false /* toBeMerged */);  // final value
+    oss << acc.getValue(/*toBeMerged=*/false);  // final value
     ASSERT_EQ(mergeFalseExpected, oss.str());
-    ASSERT_EQ(BSONType::array, acc.getValue(true /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/true).getType());
     // We cannot easily test the getValue(true) values as they differ on different platforms.
 
     // Verify reset() clears the accumulator.
     acc.reset();
-    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/false).getType());
     oss.str("");
-    oss << acc.getValue(false /* toBeMerged */);  // final value
+    oss << acc.getValue(/*toBeMerged=*/false);  // final value
     ASSERT_EQ("[null, null]", oss.str());
 }
 
@@ -2100,22 +2102,28 @@ TEST(Accumulators, AccumulatorPercentileContinuous) {
 // Tests the AccumulatorPercentile class when it runs out of memory using
 // PercentileMethodEnum::kApproximate
 TEST(Accumulators, AccumulatorPercentileOOMApproximate) {
-    accumulatorPercentileHelper(
-        PercentileMethodEnum::kApproximate, std::vector<double>{0.5, 0.8}, "[0.5, 0.8]", 1);
+    accumulatorPercentileHelper(PercentileMethodEnum::kApproximate,
+                                std::vector<double>{0.5, 0.8},
+                                "[0.5, 0.8]",
+                                MemoryUsageLimit{1});
 }
 
 // Tests the AccumulatorPercentile class when it runs out of memory using
 // PercentileMethodEnum::kDiscrete
 TEST(Accumulators, AccumulatorPercentileOOMDiscrete) {
-    accumulatorPercentileHelper(
-        PercentileMethodEnum::kDiscrete, std::vector<double>{0.5, 0.8}, "[0.5, 0.8]", 1);
+    accumulatorPercentileHelper(PercentileMethodEnum::kDiscrete,
+                                std::vector<double>{0.5, 0.8},
+                                "[0.5, 0.8]",
+                                MemoryUsageLimit{1});
 }
 
 // Tests the AccumulatorPercentile class when it runs out of memory using
 // PercentileMethodEnum::kContinuous
 TEST(Accumulators, AccumulatorPercentileOOMContinuous) {
-    accumulatorPercentileHelper(
-        PercentileMethodEnum::kContinuous, std::vector<double>{0.5, 0.8}, "[0.55, 0.82]", 1);
+    accumulatorPercentileHelper(PercentileMethodEnum::kContinuous,
+                                std::vector<double>{0.5, 0.8},
+                                "[0.55, 0.82]",
+                                MemoryUsageLimit{1});
 }
 
 /* ------------------------- Other accumulators ------------------------------------------------- */
@@ -2516,7 +2524,7 @@ TEST(ExpressionMergeObjects, MergingNonObjectsShouldThrowException) {
 
 TEST(AccumulatorConcatArrays, ConcatArraysRespectsMaxMemoryContraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto concatArrays = AccumulatorConcatArrays(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(concatArrays.process(
                            Value(std::vector<Value>{Value("A somewhat long string"sv),
@@ -2630,13 +2638,13 @@ static void assertSetUnionResults(
     assertExpectedResults1(expCtx,
                            OperationsType(operations),
                            initializeAccumulator,
-                           false /*skipMerging*/,
-                           true /*ignoreArrayOrdering*/);
+                           /*skipMerging=*/false,
+                           /*ignoreArrayOrdering=*/true);
 }
 
 TEST(AccumulatorSetUnion, SetUnionRespectsMaxMemoryContraint) {
     auto expCtx = ExpressionContextForTest{};
-    const int maxMemoryBytes = 20ull;
+    const MemoryUsageLimit maxMemoryBytes{20};
     auto setUnion = AccumulatorSetUnion(&expCtx, maxMemoryBytes);
     ASSERT_THROWS_CODE(
         setUnion.process(Value(std::vector<Value>{Value("A somewhat long string"sv),
@@ -2900,12 +2908,12 @@ TEST(ExpressionFromAccumulators, StdDevSampRepeated) {
 
     for (int i = 0; i < 100; i++) {
         AccumulatorStdDevPop acc(&expCtx);
-        acc.process(Value(std::exp(14.0)), false /*merging*/);
-        Value mergedValue = acc.getValue(true /*toBeMerged*/);
-        mergedAcc.process(mergedValue, true /*merging*/);
+        acc.process(Value(std::exp(14.0)), /*merging=*/false);
+        Value mergedValue = acc.getValue(/*toBeMerged=*/true);
+        mergedAcc.process(mergedValue, /*merging=*/true);
     }
 
-    Value result = mergedAcc.getValue(false /*toBeMerged*/);
+    Value result = mergedAcc.getValue(/*toBeMerged=*/false);
     const double doubleVal = result.coerceToDouble();
     ASSERT_EQ(0.0, doubleVal);
 }
@@ -2918,12 +2926,12 @@ TEST(ExpressionFromAccumulators, StdDevExtremeValuesMerging) {
 
     for (int i = 0; i < 100; i++) {
         AccumulatorStdDevPop acc(&expCtx);
-        acc.process(Value(kValue), false /*merging*/);
-        Value mergedValue = acc.getValue(true /*toBeMerged*/);
-        mergedAcc.process(mergedValue, true /*merging*/);
+        acc.process(Value(kValue), /*merging=*/false);
+        Value mergedValue = acc.getValue(/*toBeMerged=*/true);
+        mergedAcc.process(mergedValue, /*merging=*/true);
     }
 
-    Value result = mergedAcc.getValue(false /*toBeMerged*/);
+    Value result = mergedAcc.getValue(/*toBeMerged=*/false);
     const double doubleVal = result.coerceToDouble();
     ASSERT_EQ(0.0, doubleVal);
 }

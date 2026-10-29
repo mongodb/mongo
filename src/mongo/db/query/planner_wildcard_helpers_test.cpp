@@ -1,53 +1,27 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
-#include <set>
+#include "mongo/db/query/planner_wildcard_helpers.h"
 
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-
-// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <set>
 #include <string_view>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 
 namespace mongo::wildcard_planning {
@@ -157,11 +131,14 @@ TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScan
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     IndexScanNode idxScan{testNss, expandedIndex};
 
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    ietBuilders.resize(3);
     idxScan.bounds.fields = {{"a"}, {"b"}, {"c"}};
-    finalizeWildcardIndexScanConfiguration(&idxScan);
+    finalizeWildcardIndexScanConfiguration(&idxScan, &ietBuilders);
 
     auto expectedPattern = BSON("a" << 1 << "$_path" << 1 << "b" << 1 << "c" << 1);
     ASSERT_EQ(expectedPattern.woCompare(idxScan.index.keyPattern), 0);
+    ASSERT_EQ(4, ietBuilders.size());
     ASSERT_EQ(4, idxScan.bounds.fields.size());
     ASSERT_EQ("$_path", idxScan.bounds.fields[idxScan.index.wildcardFieldPos - 1].name);
     ASSERT_EQ(2, idxScan.index.wildcardFieldPos);
@@ -184,10 +161,12 @@ TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     IndexScanNode idxScan{testNss, expandedIndex};
 
+    std::vector<interval_evaluation_tree::Builder> ietBuilders;
+    ietBuilders.resize(2);
     idxScan.bounds.fields = {{"a"}, {"b"}};
     auto objectPointInterval = fromjson("{'': {a: 1}, '': {a: 1}}");
     idxScan.bounds.fields[0].intervals.push_back({objectPointInterval, true, true});
-    finalizeWildcardIndexScanConfiguration(&idxScan);
+    finalizeWildcardIndexScanConfiguration(&idxScan, &ietBuilders);
 
     // Because the interval "[{a: 1}, {a: 1}]" overlaps with the Object type bracket we should add
     // all sub-paths to $_path's interval by adding a range interval - ["a.", "a/")

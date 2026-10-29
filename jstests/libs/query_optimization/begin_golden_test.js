@@ -1,11 +1,8 @@
+import {getPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 import {
-    getPlanRankerMode,
-    getAutomaticCEPlanRankingStrategy,
-} from "jstests/libs/query/cbr_utils.js";
-import {
+    checkSbeAccumulatorExpressionsEnabled,
     checkSbeStatus,
     checkJoinOptimizationStatus,
-    checkSbeTransformStagesEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
@@ -34,42 +31,51 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     // We may have different output files for different SBE or CBR configurations. If that is the
     // case, we need to pick the correct directory for the curent configuration.
     const sbeStatus = checkSbeStatus(typeof db === "undefined" ? null : db);
-    const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
-    const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(
-        typeof db === "undefined" ? null : db,
-    );
+    const config = getPlanRankerConfig(typeof db === "undefined" ? null : db);
+    // Ensure using multiplanning if the feature flag is false.
+    const planRanker = config.featureFlagCostBasedRanker
+        ? config.internalQueryPlanRanker
+        : "multiPlanning";
+    const ceMode = config.internalQueryCBRCEMode;
+    const mixedPlanRankingStrategy = config.internalQueryMixedPlanRankingStrategy;
+
     const joinOptimizationStatus = checkJoinOptimizationStatus(
         typeof db === "undefined" ? null : db,
-    );
-    const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(
-        typeof db === "undefined" ? null : db,
-    );
-    const sbeIndividualFeaturesEnabled = sbeTransformStagesEnabled;
-
-    const sbeIndividualFeaturesExpectedExists = fileExists(
-        relativePathToExpectedOutput + "/sbeIndividualFeatures/" + outputName,
     );
     const sbeExpectedExists = fileExists(
         relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName,
     );
 
-    const outputDirPlanRanking =
-        planRankerMode != "automaticCE"
-            ? relativePathToExpectedOutput + "/" + planRankerMode
-            : relativePathToExpectedOutput + "/" + planRankerMode + "/" + autoPlanRankingStrategy;
-    const planRankerModeExpectedExists = fileExists(outputDirPlanRanking + "/" + outputName);
+    const sbeAccumulatorExpressionsEnabled = checkSbeAccumulatorExpressionsEnabled(
+        typeof db === "undefined" ? null : db,
+    );
+    const sbeAccumulatorExpressionsExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/featureFlagSbeAccumulatorExpressions/" + outputName,
+    );
 
+    const outputDirPlanRanking = (() => {
+        switch (planRanker) {
+            case "multiPlanning":
+                return relativePathToExpectedOutput + "/" + planRanker;
+            case "mixed":
+                return (
+                    relativePathToExpectedOutput + "/" + planRanker + "/" + mixedPlanRankingStrategy
+                );
+            default:
+                return relativePathToExpectedOutput + "/" + ceMode;
+        }
+    })();
+    const planRankerModeExpectedExists = fileExists(outputDirPlanRanking + "/" + outputName);
     const joinOptimizationExpectedExists = fileExists(
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
-
-    if (joinOptimizationStatus && joinOptimizationExpectedExists) {
+    if (sbeAccumulatorExpressionsEnabled && sbeAccumulatorExpressionsExpectedExists) {
+        relativePathToExpectedOutput += "/featureFlagSbeAccumulatorExpressions";
+    } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
-    } else if (sbeIndividualFeaturesEnabled && sbeIndividualFeaturesExpectedExists) {
-        relativePathToExpectedOutput += "/sbeIndividualFeatures";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.
-        assert.fail(
+        doassert(
             "Both SBE and CBR expected outputs exist for " +
                 outputName +
                 ", cannot determine which one to use. ",

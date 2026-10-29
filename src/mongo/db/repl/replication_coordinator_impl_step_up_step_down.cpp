@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -254,8 +228,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         // current term. Also see TopologyCoordinator::isSafeToStepDown.
         invariant(lastAppliedOpTime.getTerm() == currentTerm);
 
-        auto [future, waiter] =
-            _replicationWaiterList.add(lk, lastAppliedOpTime, waiterWriteConcern);
+        // Registering the waiter has to stay under _mutex: a secondary reaching lastAppliedOpTime
+        // in the gap would wake nobody, and with the node stepping down there may be no later
+        // advance to wake it. Removing it below does not need the mutex.
+        auto [future, waiter] = _replicationWaiterList.add(lastAppliedOpTime, waiterWriteConcern);
         lk.unlock();
 
         // Operations that can be interrupted through opCtx should be executed inside this try/catch
@@ -266,12 +242,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 opCtx, future, std::min(stepDownUntil, waitUntil), ErrorCodes::ExceededTimeLimit);
 
             // Remove the waiter from the list if it times out before the future is ready.
-            // The replicationWaiterList does not support delayed removal with waiter->givenUp.
+            // The replicationWaiterList does not support delayed removal with waiter->givenUp. The
+            // list synchronizes itself, so removing does not need _mutex.
             if (!status.isOK() && !future.isReady()) {
-                lk.lock();
                 invariant(waiter);
-                _replicationWaiterList.remove(lk, lastAppliedOpTime, waiter);
-                lk.unlock();
+                _replicationWaiterList.remove(lastAppliedOpTime, waiter);
             }
 
             // We ignore the case where runWithDeadline returns timeoutError because in that case
@@ -354,8 +329,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
               (endTimeYieldLocksInvalidateSessions - startTimeYieldLocksInvalidateSessions));
 }
 
-Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) {
-
+Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx,
+                                                    bool skipDryRun,
+                                                    boost::optional<Date_t>) {
     auto reason = skipDryRun ? StartElectionReasonEnum::kStepUpRequestSkipDryRun
                              : StartElectionReasonEnum::kStepUpRequest;
     _startElectSelfIfEligibleV1(reason);
@@ -377,7 +353,7 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(OperationContext* opCtx, boo
         // process of stepping down. If we know we are going to step down, we should fail the
         // replSetStepUp command so caller can retry if necessary.
         std::lock_guard lk(_mutex);
-        if (!_getMemberState(lk).primary())
+        if (!_getMemberState().primary())
             return Status(ErrorCodes::CommandFailed, "Election failed.");
         else if (_topCoord->isSteppingDown())
             return Status(ErrorCodes::CommandFailed, "Election failed due to concurrent stepdown.");

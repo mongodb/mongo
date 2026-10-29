@@ -39,7 +39,6 @@ from wiredtiger import stat
 # 6. Checkpoint
 # 7. Repeat steps 5,6 and validate that the page read back into memory should
 #    not be reconciled every time with the help of btree stat.
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
 
     test_name = __qualname__
@@ -48,10 +47,7 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         return config
 
     def pages_reconciled_stat(self, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
-        btree_ckpt_pages_rec = stat_cursor[stat.dsrc.btree_checkpoint_pages_reconciled][2]
-        stat_cursor.close()
-        return btree_ckpt_pages_rec
+        return self.get_stat(stat.dsrc.btree_checkpoint_pages_reconciled, uri)
 
     def read_key(self, uri):
         cur2 = self.session.open_cursor(uri)
@@ -59,6 +55,9 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         self.assertEqual(cur2.search(), 0)
         cur2.close()
 
+    @wttest.skip_for_hook(
+        "disagg", "new tables cannot be evicted until their publication takes effect",
+        param="schema_epochs")
     def test_scrub_eviction_prepare(self):
         uri = f'table:{self.test_name}'
 

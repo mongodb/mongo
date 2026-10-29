@@ -1,38 +1,11 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -42,6 +15,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
@@ -72,11 +46,13 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <set>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -88,20 +64,21 @@
 
 namespace mongo {
 namespace resharding {
+using namespace std::literals::string_view_literals;
 
 inline const Status kUserAbortReason{ErrorCodes::ReshardCollectionAborted,
                                      "resharding aborted by user"};
-MONGO_MOD_PUBLIC inline const Status kFCVChangeAbortReason{
+[[MONGO_MOD_PUBLIC]] inline const Status kFCVChangeAbortReason{
     ErrorCodes::ReshardCollectionInterruptedDueToFCVChange, "resharding aborted due to FCV change"};
 inline const Status kCriticalTimeoutAbortReason{ErrorCodes::ReshardingCriticalSectionTimeout,
                                                 "resharding critical section timed out"};
 inline const Status kQuiesceAbortReason{ErrorCodes::ReshardCollectionQuiescing,
                                         "resharding operation completed and is in quiesce"};
 
-enum MONGO_MOD_PUBLIC AbortType { kAbortWithQuiesce, kAbortSkipQuiesce };
+enum [[MONGO_MOD_PUBLIC]] AbortType { kAbortWithQuiesce, kAbortSkipQuiesce };
 
-MONGO_MOD_NEEDS_REPLACEMENT constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
-constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"_sd;
+[[MONGO_MOD_NEEDS_REPLACEMENT]] constexpr auto kReshardFinalOpLogType = "reshardFinalOp"sv;
+constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"sv;
 static const auto kReshardErrorMaxBytes = 2000;
 
 const WriteConcernOptions kMajorityWriteConcern{
@@ -314,8 +291,8 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
  *      <db>.system.resharding.<existing collection's UUID>
  * or   <db>.system.buckets.resharding.<existing collection's UUID> for a timeseries source ns.
  */
-MONGO_MOD_NEEDS_REPLACEMENT NamespaceString
-constructTemporaryReshardingNss(const NamespaceString& nss, const UUID& sourceUuid);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] NamespaceString constructTemporaryReshardingNss(
+    const NamespaceString& nss, const UUID& sourceUuid);
 
 /**
  * Asserts that there is not a hole or overlap in the chunks.
@@ -350,6 +327,20 @@ void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones);
  */
 std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext* opCtx,
                                                                const NamespaceString& sourceNss);
+
+/**
+ * Selects the zones to use when calculating participant shards and chunks for a resharding
+ * operation: 'requestedZones' if the caller supplied any, the source collection's existing zones
+ * if 'forceRedistribution' is set and no zones were supplied, or none otherwise. Throws if zones
+ * were requested for an unshardCollection operation, whose resulting collection cannot have
+ * zones.
+ */
+std::vector<ReshardingZoneType> selectZonesForParticipantShardsAndChunks(
+    OperationContext* opCtx,
+    const boost::optional<ReshardingProvenanceEnum>& provenance,
+    const boost::optional<std::vector<ReshardingZoneType>>& requestedZones,
+    bool forceRedistribution,
+    const NamespaceString& sourceNss);
 
 /**
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
@@ -525,6 +516,8 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
  * If 'performVerification' is true, asserts that both featureFlagReshardingVerification and the
  * reshardingDocumentVerification server parameter are enabled.
  */
+void validatePerformVerification(const boost::optional<ForwardableOperationMetadata>& fom,
+                                 OptionalBool performVerification);
 void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification);
 
 /**
@@ -562,13 +555,17 @@ void verifyIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
     }
 }
 
+using CollSizeEstimator =
+    std::function<boost::optional<long long>(OperationContext*, const NamespaceString&)>;
+
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     OperationContext* opCtx,
     const ConfigsvrReshardCollection& request,
     const CollectionType& collEntry,
     const ShardId& dbPrimary,
     const NamespaceString& nss,
-    const bool& setProvenance);
+    const bool& setProvenance,
+    CollSizeEstimator collSizeEstimator = nullptr);
 
 inline Status validateReshardBlockingWritesO2FieldType(const std::string& value) {
     if (value != kReshardFinalOpLogType) {
@@ -657,14 +654,40 @@ CancelableOperationContext makeReshardingOperationContext(
     const boost::optional<ForwardableOperationMetadata>& fom = boost::none);
 
 /**
- * Extracts the VersionContext from an optional ForwardableOperationMetadata, falling back to
- * "version context with FCV v8.0" when it is absent.
+ * Extracts the VersionContext from an optional ForwardableOperationMetadata. When no VersionContext
+ * is present, falls back to a default derived from the current global FCV: uses v8.3 when the
+ * cluster is at v8.3 (or upgrading from v8.3 to v9.0), or uses v8.0 when the cluster is at v8.0 (or
+ * upgrading from v8.0 to v9.0).
  *
  * NOTE: The returned VersionContext is tied to the lifetime of the resharding coordinator.
  * Using it after the resharding coordinator has finished is incorrect, as it won't serialize with
  * setFCV.
+ *
+ * TODO (SERVER-99655): Update comment to reflect that ForwadableOpMetadata should always have a
+ * pinned FCV when this function is called.
  */
 VersionContext getVersionContextOrDefault(const boost::optional<ForwardableOperationMetadata>& fom);
+
+/**
+ * Returns true if 'flag' is enabled for the FCV pinned in 'fom'. When 'fom' is absent or carries
+ * no VersionContext, falls back to default defined in getVersionContextOrDefault.
+ */
+bool isEnabledWithPinnedVersion(const boost::optional<ForwardableOperationMetadata>& fom,
+                                const FCVGatedFeatureFlag& flag);
+
+/**
+ * Returns true if 'fcv' matches the FCV snapshotted in 'metadata' when the resharding operation
+ * started. Coordinator documents written before the startingFCV field existed are treated as
+ * matching kLastLTS and kLastContinuous, since they can only have been created on an older binary.
+ */
+bool isFCVTheSame(const CommonReshardingMetadata& metadata,
+                  const multiversion::FeatureCompatibilityVersion& fcv);
+
+/**
+ * Returns the FCV snapshotted in 'metadata' as a human readable string, or "uninitialized" if the
+ * document does not have one.
+ */
+std::string getStartingFCVString(const CommonReshardingMetadata& metadata);
 
 /**
  * Chooses the index hint for the covered clone-count aggregation run against a donor's source
@@ -673,6 +696,51 @@ VersionContext getVersionContextOrDefault(const boost::optional<ForwardableOpera
 boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
                                                  const CollectionPtr& collection,
                                                  const boost::optional<BSONObj>& shardKeyPattern);
+
+template <typename F>
+auto withCriticalSectionForTempCollection(OperationContext* opCtx,
+                                          const NamespaceString& tempNss,
+                                          const BSONObj& critSecReason,
+                                          bool mustClearCollectionMetadata,
+                                          F&& f) {
+    ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx,
+        tempNss,
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        mustClearCollectionMetadata);
+    ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx,
+        tempNss,
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+    auto customAction =
+        [&]() -> std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> {
+        if (mustClearCollectionMetadata) {
+            return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+        } else {
+            return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+        }
+    }();
+    if constexpr (std::is_same_v<void, std::invoke_result_t<F&>>) {
+        std::forward<F>(f)();
+        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+            opCtx,
+            tempNss,
+            critSecReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            *customAction);
+    } else {
+        auto result = std::forward<F>(f)();
+        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+            opCtx,
+            tempNss,
+            critSecReason,
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            *customAction);
+        return result;
+    }
+}
 
 }  // namespace resharding
 }  // namespace mongo

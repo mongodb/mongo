@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,6 +11,7 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::sbe {
+using namespace std::literals::string_view_literals;
 /**
  * A plan stage which discards or retains values based on a predicate expression.
  *
@@ -66,8 +41,8 @@ public:
                 std::unique_ptr<EExpression> filter,
                 PlanNodeId planNodeId,
                 bool participateInTrialRunTracking = true)
-        : PlanStage(IsConst ? "cfilter"_sd : (IsEof ? "efilter" : "filter"_sd),
-                    nullptr /* yieldPolicy */,
+        : PlanStage(IsConst ? "cfilter"sv : (IsEof ? "efilter" : "filter"sv),
+                    /*yieldPolicy=*/nullptr,
                     planNodeId,
                     participateInTrialRunTracking),
           _filter(std::move(filter)) {
@@ -84,6 +59,7 @@ public:
     }
 
     void prepare(CompileCtx& ctx) final {
+        _bytecode = ctx.getByteCode();
         _children[0]->prepare(ctx);
 
         ctx.root = this;
@@ -102,7 +78,7 @@ public:
         if constexpr (IsConst) {
             _specificStats.numTested++;
 
-            auto pass = _bytecode.runPredicate(_filterCode.get());
+            auto pass = _bytecode->runPredicate(_filterCode.get());
             if (!pass) {
                 close();
                 return;
@@ -133,7 +109,7 @@ public:
             if (state == PlanState::ADVANCED) {
                 _specificStats.numTested++;
 
-                pass = _bytecode.runPredicate(_filterCode.get());
+                pass = _bytecode->runPredicate(_filterCode.get());
 
                 if constexpr (IsEof) {
                     if (!pass) {
@@ -185,7 +161,7 @@ public:
         DebugPrinter::addNewLine(ret);
 
         if (debugPrintInfo.printBytecode) {
-            PlanStage::debugPrintBytecode(ret, _filterCode, "FILTER" /*title*/);
+            PlanStage::debugPrintBytecode(ret, _filterCode, /*title=*/"FILTER");
         }
 
         DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
@@ -209,7 +185,7 @@ private:
     const std::unique_ptr<EExpression> _filter;
     std::unique_ptr<vm::CodeFragment> _filterCode;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     bool _childOpened{false};
     FilterStats _specificStats;

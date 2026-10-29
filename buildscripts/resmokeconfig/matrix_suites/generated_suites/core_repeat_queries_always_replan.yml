@@ -15,8 +15,7 @@ executor:
       crashOnInvalidBSONError: ""
       eval:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
-        await import("jstests/libs/override_methods/rerun_queries.js");
-      objcheck: ""
+        await import("jstests/libs/override_methods/query/rerun_queries.js");
   fixture:
     class: MongoDFixture
     mongod_options:
@@ -25,7 +24,7 @@ executor:
         failpoint.planCacheAlwaysReplanClassic: "{mode: 'alwaysOn'}"
         failpoint.planCacheAlwaysReplanSBE: "{mode: 'alwaysOn'}"
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
   hooks:
     - class: RunQueryStats

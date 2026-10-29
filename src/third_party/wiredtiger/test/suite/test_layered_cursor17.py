@@ -114,7 +114,8 @@ class test_layered_cursor17(wttest.WiredTigerTestCase):
 
         self.create_follower()
         self.disagg_advance_checkpoint(self.conn_follow)
-        cursor_follow = self.session_follow.open_cursor(self.uri)
+        cursor_config = 'overwrite=false' if self.do_op == _op_remove else None
+        cursor_follow = self.session_follow.open_cursor(self.uri, None, cursor_config)
 
         key = 5
         self.session_follow.begin_transaction()

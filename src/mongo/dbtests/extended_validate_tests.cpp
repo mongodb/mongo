@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -130,11 +104,11 @@ public:
             beginTransaction();
 
             // Create both collections
-            auto coll1 =
-                db->createCollection(&_opCtx, _nss1, CollectionOptions(), /*createIdIndex*/ true);
+            auto coll1 = db->createCollection(
+                &_opCtx, _nss1, CollectionOptions(), /*createDefaultIndexes=*/true);
             ASSERT_TRUE(coll1) << _nss1.toStringForErrorMsg();
-            auto coll2 =
-                db->createCollection(&_opCtx, _nss2, CollectionOptions(), /*createIdIndex*/ true);
+            auto coll2 = db->createCollection(
+                &_opCtx, _nss2, CollectionOptions(), /*createDefaultIndexes=*/true);
             ASSERT_TRUE(coll2) << _nss2.toStringForErrorMsg();
 
             // Insert documents on both collections.
@@ -164,7 +138,7 @@ public:
             ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
                               collection_validation::RepairMode::kNone,
                               /*logDiagnostics=*/true},
-            &results1));
+            results1));
         ASSERT_TRUE(results1.isValid()) << "Validation failed when it should've worked.";
 
         ASSERT_OK(collection_validation::validate(
@@ -173,7 +147,7 @@ public:
             ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
                               collection_validation::RepairMode::kNone,
                               /*logDiagnostics=*/true},
-            &results2));
+            results2));
         ASSERT_TRUE(results2.isValid()) << "Validation failed when it should've worked.";
 
         // Ensure that the hashes match up.
@@ -182,6 +156,9 @@ public:
         } else {
             ASSERT_NE(results1.getCollectionHash(), results2.getCollectionHash());
         }
+
+        EXPECT_FALSE(results1.getXxh3CollectionHash().has_value());
+        EXPECT_FALSE(results2.getXxh3CollectionHash().has_value());
 
         dumpOnErrorGuard.dismiss();
     }

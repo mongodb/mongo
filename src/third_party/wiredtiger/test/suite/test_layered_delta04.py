@@ -92,10 +92,7 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -104,18 +101,11 @@ class test_layered_delta04(wttest.WiredTigerTestCase):
                 if i % 10 == 0:
                     self.session.begin_transaction()
                     cursor[str(i)] = str(10 + 5 * j)
-                    if self.ts:
-                        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10 + 5 * j))
-                    else:
-                        self.session.commit_transaction()
+                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10 + 5 * j))
 
             self.session.checkpoint()
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
-
-        cursor = self.session.open_cursor(self.uri, None, None)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         if self.ts:
             self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))

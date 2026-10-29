@@ -11,18 +11,14 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/bazel_test_results_shutils.sh"
 
-if [[ "${resmoke_disable_rbe_mirror}" == "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
-    echo "Skipping: resmoke_disable_rbe_mirror=true on RBE mirror variant. We have force-disabled testing on this variant while resolving remote execution issues. Report to #ask-devprod-test-infrastructure if you have any issues."
+if [[ "${resmoke_rbe_mirror_reenabled}" != "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
+    echo "Skipping: the RBE mirror variant is disabled. Set the resmoke_rbe_mirror_reenabled project variable to true to enable it. Report to #ask-devprod-test-infrastructure if you have any issues."
     exit 0
 fi
 
 readonly target_prefix=$(bazel_test_results::label_to_prefix "${test_label}")
 
-readonly bazel_testlogs="${workdir}/src/bazel-testlogs"
-readonly target_outputs="${bazel_testlogs}/${target_prefix}"
-
-if [ ! -d "${target_outputs}" ]; then
-    echo "Error: No bazel test outputs found at ${target_outputs}" >&2
+if ! target_outputs=$(bazel_test_results::resolve_testlogs_dir "${workdir}/src" "${target_prefix}"); then
     echo "The test may have failed to build. Check the logs from the runner task." >&2
     exit 1
 fi
@@ -80,6 +76,23 @@ for i in "${!shard_paths[@]}"; do
         unzip -o -q "${output_zip}" -d "${target_dir}/test.outputs"
     fi
 
+    # Locate the undeclared-outputs manifest. Copy it so it ends up in
+    # results/<prefix>/shard_<N>/shard_<N>_MANIFEST, matching the naming convention used by
+    # fetch_remote_test_results.sh and picked up by the teardown S3 put filter "**/*_MANIFEST".
+    manifest=""
+    for candidate in \
+        "${shard_dir}/test.outputs/outputs_manifest/MANIFEST" \
+        "${shard_dir}/outputs_manifest/MANIFEST"; do
+        if [ -f "${candidate}" ]; then
+            manifest="${candidate}"
+            break
+        fi
+    done
+
+    if [ -n "${manifest}" ]; then
+        cp "${manifest}" "${target_dir}/shard_${shard_num}_MANIFEST"
+    fi
+
     pushd "${target_dir}" >/dev/null
     bazel_test_results::symlink_test_logs
 
@@ -118,6 +131,14 @@ bazel_test_results::display_test_summary shard_names shard_statuses shard_test_c
 bazel_test_results::combine_metrics
 
 bazel_test_results::combine_reports
+
+# combine_reports writes the combined report to ${workdir}/report.json. Unlike the RBE result task
+# group (which attaches it from the workdir root via its own teardown_task), the standalone local
+# task has no teardown and relies on the project post's "attach report", which reads
+# ${report_file|src/report.json}. Copy the report to ${workdir}/src/report.json so post finds it.
+if [ -f "${workdir}/report.json" ]; then
+    cp "${workdir}/report.json" "${workdir}/src/report.json"
+fi
 
 # Check for system-level failures (TIMEOUT or NO_REPORT)
 for status in "${shard_statuses[@]}"; do

@@ -1,56 +1,40 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/util/modules.h"
 
 #include <string_view>
+#include <type_traits>
+#include <utility>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 /**
  * Represents options passed to the explain command (aside from the command which is being explained
  * and its parameters).
  */
-class MONGO_MOD_PUB ExplainOptions {
+class [[MONGO_MOD_PUBLIC]] ExplainOptions {
 public:
     /**
-     * The various supported verbosity levels for explain. The order is significant: the enum values
-     * are assigned in order of increasing verbosity.
+     * The various supported verbosity levels for explain. The enum order is not
+     * content-significant: explain content decisions go through ExplainPolicy / explainPolicyFor()
+     * (see explain_policy.h), and the relational operators on this enum are deleted so no ordinal
+     * comparison can compile. Reordering or inserting values here cannot change explain semantics.
      */
     using Verbosity = explain::VerbosityEnum;
 
-    static constexpr std::string_view kVerbosityName = "verbosity"_sd;
+    static constexpr std::string_view kVerbosityName = "verbosity"sv;
+
+    /**
+     * Returns true if 'verbosity' is one of the "version 3" (V3) explain verbosity modes. When any
+     * of these is requested, explain reports "explainVersion: '3'".
+     */
+    static bool isV3Verbosity(ExplainOptions::Verbosity verbosity);
 
     /**
      * Converts an explain verbosity to its string representation.
@@ -63,5 +47,39 @@ public:
      */
     static BSONObj toBSON(ExplainOptions::Verbosity verbosity);
 };
+
+namespace explain {
+// Deleting the relational operators makes every ordinal comparison of a Verbosity (e.g. "v >=
+// kExecStats", "v < kExecAllPlans") ill-formed, so explain content decisions must go through
+// ExplainPolicy / explainPolicyFor() (see explain_policy.h) instead of the enum's order. As a
+// result the enum's order is semantically irrelevant: new verbosity values can never mislead a
+// comparison because no such comparison compiles.
+//
+// These are declared in the enum's own namespace (mongo::explain) so ADL finds them from every
+// translation unit that compares two VerbosityEnum values. Equality (== / !=) is intentionally not
+// deleted: exact-value checks and hashed containers remain valid.
+bool operator<(VerbosityEnum, VerbosityEnum) = delete;
+bool operator<=(VerbosityEnum, VerbosityEnum) = delete;
+bool operator>(VerbosityEnum, VerbosityEnum) = delete;
+bool operator>=(VerbosityEnum, VerbosityEnum) = delete;
+
+// Permanent compile-time regression guard: proves that an ordinal Verbosity comparison is
+// ill-formed. If anyone re-enables ordinal comparison later (e.g. by removing the deleted operators
+// above), this static_assert fails and the build fails.
+//
+// This is a SFINAE trait rather than a "requires(...) { a < b; }" expression on purpose: selecting
+// a deleted operator inside a requires-expression is a hard error under clang (it is not treated
+// as an unsatisfied requirement), whereas the same selection in a decltype/void_t partial
+// specialization is a substitution failure.
+template <typename T, typename = void>
+struct HasOrdinalVerbosityComparison : std::false_type {};
+template <typename T>
+struct HasOrdinalVerbosityComparison<T,
+                                     std::void_t<decltype(std::declval<T>() < std::declval<T>())>>
+    : std::true_type {};
+
+static_assert(!HasOrdinalVerbosityComparison<VerbosityEnum>::value,
+              "Ordinal Verbosity comparison must not compile - use ExplainPolicy (SERVER-130812)");
+}  // namespace explain
 
 }  // namespace mongo

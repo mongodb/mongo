@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,7 +9,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/modules.h"
@@ -50,7 +24,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT StaleConfigInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] StaleConfigInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleConfig;
     enum class OperationType { kRead, kWrite };
@@ -58,16 +32,16 @@ public:
     StaleConfigInfo(NamespaceString nss,
                     ShardVersion received,
                     boost::optional<ShardVersion> wanted,
-                    ShardRef shardRef,
+                    ShardId shardId,
                     boost::optional<CriticalSectionSignal> criticalSectionSignal = boost::none,
                     boost::optional<OperationType> duringOperationType = boost::none)
         : _nss(std::move(nss)),
           _received(received),
           _wanted(wanted),
-          _shardRef(std::move(shardRef)),
+          _shardId(shardId),
           _criticalSectionSignal(std::move(criticalSectionSignal)),
           _duringOperationType{duringOperationType} {
-        tassert(11993000, "Invalid ShardRef.", ShardRef::validate(_shardRef).isOK());
+        tassert(11993000, "Invalid ShardId.", shardId.isValid());
     }
 
     const auto& getNss() const {
@@ -82,8 +56,8 @@ public:
         return _wanted;
     }
 
-    const auto& getShardRef() const {
-        return _shardRef;
+    const auto& getShardId() const {
+        return _shardId;
     }
 
     auto getCriticalSectionSignal() const {
@@ -101,7 +75,7 @@ private:
     NamespaceString _nss;
     ShardVersion _received;
     boost::optional<ShardVersion> _wanted;
-    ShardRef _shardRef;
+    ShardId _shardId;
 
     // The following fields are not serialized and therefore do not get propagated to the router.
     boost::optional<CriticalSectionSignal> _criticalSectionSignal;
@@ -110,7 +84,7 @@ private:
 
 // TODO (SERVER-75888): Rename the StaleEpoch code to StaleUpstreamRouter and the info to
 // StaleUpstreamRouterInfo
-class MONGO_MOD_NEEDS_REPLACEMENT StaleEpochInfo final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] StaleEpochInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleEpoch;
 
@@ -141,7 +115,7 @@ private:
     boost::optional<ShardVersion> _wanted;
 };
 
-class MONGO_MOD_NEEDS_REPLACEMENT StaleDbRoutingVersion final : public ErrorExtraInfo {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] StaleDbRoutingVersion final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleDbVersion;
 
@@ -186,6 +160,6 @@ private:
 /*
  * Returns true if 'errorCode' corresponds to an error related to stale sharding metadata.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool isStaleShardingMetadataError(ErrorCodes::Error errorCode);
+[[MONGO_MOD_NEEDS_REPLACEMENT]] bool isStaleShardingMetadataError(ErrorCodes::Error errorCode);
 
 }  // namespace mongo

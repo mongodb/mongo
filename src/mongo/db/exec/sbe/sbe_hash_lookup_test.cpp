@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::HashLookupStage.
@@ -33,6 +7,7 @@
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 
 namespace mongo::sbe {
@@ -349,13 +324,9 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
             const auto [resTag, resValue] = resultAccessors[i]->getViewOfValue();
-            const auto [expectedTag, exprectedValue] = expectedResults[idx][i];
+            const auto [expectedTag, expectedValue] = expectedResults[idx][i];
 
-            auto [compTag, compVal] =
-                value::compareValue(expectedTag, exprectedValue, resTag, resValue);
-
-            ASSERT_EQ(value::TypeTags::NumberInt32, compTag);
-            ASSERT_EQ(0, compVal);
+            ASSERT_SBE_VALUE_EQ(expectedTag, expectedValue, resTag, resValue);
         }
 
         if (idx == 1) {
@@ -372,7 +343,7 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
             lookupStage->saveState();
 
             // Force spill.
-            lookupStage->forceSpill(nullptr /*yieldPolicy*/);
+            lookupStage->forceSpill(/*yieldPolicy=*/nullptr);
 
             // Check stats to make sure it spilled
             stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());
@@ -450,16 +421,14 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
 
     ASSERT_EQ(actualResults.size(), 1);
     ASSERT_EQ(actualResults[0].size(), 2);
-    ASSERT_EQ(value::compareValue(actualResults[0][0].tag(),
-                                  actualResults[0][0].value(),
-                                  value::TypeTags::bsonObject,
-                                  value::bitcastFrom<const char*>(lookupInput.objdata())),
-              std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
-    ASSERT_EQ(value::compareValue(actualResults[0][1].tag(),
-                                  actualResults[0][1].value(),
-                                  value::TypeTags::bsonArray,
-                                  value::bitcastFrom<const char*>(lookupOutput.objdata())),
-              std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
+    ASSERT_SBE_VALUE_EQ(actualResults[0][0].tag(),
+                        actualResults[0][0].value(),
+                        value::TypeTags::bsonObject,
+                        value::bitcastFrom<const char*>(lookupInput.objdata()));
+    ASSERT_SBE_VALUE_EQ(actualResults[0][1].tag(),
+                        actualResults[0][1].value(),
+                        value::TypeTags::bsonArray,
+                        value::bitcastFrom<const char*>(lookupOutput.objdata()));
 }
 
 TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
@@ -545,15 +514,15 @@ TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
         const auto& result = actualResultView[i];
         ASSERT_EQ(result.size(), 2);
         const BSONObj input = BSON("_id" << static_cast<long long>(i));
-        assertValuesEqual(result[0].first,
-                          result[0].second,
-                          value::TypeTags::bsonObject,
-                          value::bitcastFrom<const char*>(input.objdata()));
+        ASSERT_SBE_VALUE_EQ(result[0].first,
+                            result[0].second,
+                            value::TypeTags::bsonObject,
+                            value::bitcastFrom<const char*>(input.objdata()));
         const BSONArray output = BSON_ARRAY(input);
-        assertValuesEqual(result[1].first,
-                          result[1].second,
-                          value::TypeTags::bsonArray,
-                          value::bitcastFrom<const char*>(output.objdata()));
+        ASSERT_SBE_VALUE_EQ(result[1].first,
+                            result[1].second,
+                            value::TypeTags::bsonArray,
+                            value::bitcastFrom<const char*>(output.objdata()));
     }
 }
 

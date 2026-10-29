@@ -99,9 +99,6 @@ from packing import pack, unpack
 %typemap(in, numinputs=0) WT_KEY_PROVIDER ** (WT_KEY_PROVIDER *temp = NULL) {
     $1 = &temp;
  }
-%typemap(in, numinputs=0) WT_STORAGE_SOURCE ** (WT_STORAGE_SOURCE *temp = NULL) {
-    $1 = &temp;
- }
 %typemap(in, numinputs=0) bool * (bool temp = false) {
     $1 = &temp;
  }
@@ -152,9 +149,9 @@ from packing import pack, unpack
         PyObject_SetAttrString($result, "is_version_cursor",
             PyBool_FromLong(version_cursor != 0));
         PyObject_SetAttrString($result, "key_format",
-            PyString_InternFromString((*$1)->key_format));
+            PyUnicode_InternFromString((*$1)->key_format));
         PyObject_SetAttrString($result, "value_format",
-            PyString_InternFromString((*$1)->value_format));
+            PyUnicode_InternFromString((*$1)->value_format));
 
         Py_XINCREF($result);
         (*$1)->lang_private = $result;
@@ -178,9 +175,9 @@ from packing import pack, unpack
         PyObject_SetAttrString(o, "data", PyBytes_FromStringAndSize(
             $1[i].data.data, $1[i].data.size));
         PyObject_SetAttrString(o, "offset",
-            PyInt_FromLong($1[i].offset));
+            PyLong_FromSize_t($1[i].offset));
         PyObject_SetAttrString(o, "size",
-            PyInt_FromLong($1[i].size));
+            PyLong_FromSize_t($1[i].size));
         PyList_SetItem($result, i, o);
     }
 }
@@ -198,9 +195,9 @@ from packing import pack, unpack
         PyObject_SetAttrString(o, "data", PyUnicode_FromStringAndSize(
             $1[i].data.data, $1[i].data.size));
         PyObject_SetAttrString(o, "offset",
-            PyInt_FromLong($1[i].offset));
+            PyLong_FromSize_t($1[i].offset));
         PyObject_SetAttrString(o, "size",
-            PyInt_FromLong($1[i].size));
+            PyLong_FromSize_t($1[i].size));
         PyList_SetItem($result, i, o);
     }
 }
@@ -252,8 +249,37 @@ from packing import pack, unpack
 }
 
 /*
+ * This typemap removes the two last arguments for plh_get_page_ids, and uses local variables for
+ * them instead. The local variables will be used in the matching argout typemap.
+ * Code in this typemap appears before the call to the API function.
+ */
+%typemap(in,numinputs=0) (WT_ITEM *item, size_t *size) (WT_ITEM ids, size_t count) {
+    memset(&ids, 0, sizeof(ids));
+    count = 0;
+    $1 = &ids;
+    $2 = &count;
+}
+
+/*
+ * This typemap is for plh_get_page_ids, and is used in conjunction with the previous typemap.
+ * Code in this typemap appears after the call to the API function.
+ * The packed array of page ids is converted to a python list of integers.
+ */
+%typemap(argout) (WT_ITEM *item, size_t *size) {
+    const uint64_t *ids;
+    size_t n;
+
+    ids = (const uint64_t *)$1->data;
+    $result = PyList_New((Py_ssize_t)*$2);
+    for (n = 0; n < *$2; n++)
+        PyList_SetItem($result, (Py_ssize_t)n, PyLong_FromUnsignedLongLong(ids[n]));
+    free($1->mem);
+}
+
+/*
  * This typemap removes the argument for pl_get_complete_checkpoint and allocates a local
- * WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS struct instead.
+ * WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS struct instead. Zeroing it selects the most recently
+ * completed checkpoint; the wrapper below overwrites the selector when the caller supplies one.
  * Code in this typemap appears before the call to the API function.
  */
 %typemap(in,numinputs=0) WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *
@@ -302,7 +328,7 @@ from packing import pack, unpack
      * but that's awkward, since we don't have the file system and session.
      */
     for (i = 0; i < *$2; i++) {
-        PyObject *o = PyString_InternFromString(list[i]);
+        PyObject *o = PyUnicode_InternFromString(list[i]);
         PyList_SetItem($result, i, o);
         free(list[i]);
     }
@@ -329,16 +355,12 @@ from packing import pack, unpack
     $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_page_log_handle, 0);
 }
 
-%typemap(argout) WT_STORAGE_SOURCE ** {
-    $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_storage_source, 0);
-}
-
 %typemap(argout) bool * {
     $result = PyBool_FromLong(*$1);
 }
 
 %typemap(argout) wt_off_t * {
-    $result = PyInt_FromLong(*$1);
+    $result = PyLong_FromLongLong(*$1);
 }
 
 %typemap(freearg) (WT_MODIFY *, int *nentriesp) {
@@ -388,7 +410,7 @@ from packing import pack, unpack
         Py_DECREF(dataobj);
 
         WT_GETATTR(offsetobj, modobj, "offset");
-        if ((offset = PyInt_AsLong(offsetobj)) < 0) {
+        if ((offset = PyLong_AsLong(offsetobj)) < 0) {
             Py_DECREF(offsetobj);
             Py_DECREF(modobj);
             freeModifyArray(modarray);
@@ -399,7 +421,7 @@ from packing import pack, unpack
         Py_DECREF(offsetobj);
 
         WT_GETATTR(sizeobj, modobj, "size");
-        if ((size = PyInt_AsLong(sizeobj)) < 0) {
+        if ((size = PyLong_AsLong(sizeobj)) < 0) {
             Py_DECREF(sizeobj);
             Py_DECREF(modobj);
             freeModifyArray(modarray);
@@ -477,7 +499,6 @@ DESTRUCTOR(__wt_file_handle, close)
 DESTRUCTOR(__wt_page_log, pl_terminate)
 DESTRUCTOR(__wt_page_log_handle, plh_close)
 DESTRUCTOR(__wt_session, close)
-DESTRUCTOR(__wt_storage_source, ss_terminate)
 DESTRUCTOR(__wt_file_system, fs_terminate)
 
 /*
@@ -659,7 +680,6 @@ SELFHELPER(struct __wt_file_system, file_system)
 SELFHELPER(struct __wt_page_log, page_log)
 SELFHELPER(struct __wt_page_log_handle, page_log_handle)
 SELFHELPER(struct __wt_key_provider, key_provider)
-SELFHELPER(struct __wt_storage_source, storage_source)
 
  /*
   * Create an error exception if it has not already
@@ -726,6 +746,7 @@ NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
 NOTFOUND_OK(__wt_cursor::_modify)
 NOTFOUND_OK(__wt_cursor::largest_key)
+ANY_OK(__wt_cursor::checkpoint_id)
 ANY_OK(__wt_modify::__wt_modify)
 ANY_OK(__wt_modify::~__wt_modify)
 ANY_OK(__wt_page_log_discard_args::__wt_page_log_discard_args)
@@ -754,6 +775,7 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %exception __wt_cursor::_set_value;
 %exception __wt_cursor::_set_value_str;
 %exception wiredtiger_strerror;
+%exception wiredtiger_repair;
 %exception wiredtiger_version;
 %exception diagnostic_build;
 %exception standalone_build;
@@ -1051,7 +1073,7 @@ typedef int int_void;
      */
     int _modify(WT_MODIFY *list) {
         int count = (int)list[0].size;
-        return (self->modify(self, &list[1], count));
+        return ($self->modify($self, &list[1], count));
     }
 
 %pythoncode %{
@@ -1188,7 +1210,7 @@ typedef int int_void;
 
 %extend __wt_session {
     int _log_printf(const char *msg) {
-        return self->log_printf($self, "%s", msg);
+        return $self->log_printf($self, "%s", msg);
     }
 
     int _clear() {
@@ -1215,179 +1237,174 @@ typedef int int_void;
 %rename (method) cclass::CONCAT(_,method);
 %extend cclass {
     int CONCAT(_, method) cargs {
-        return (self->method cargs_call );
+        return ($self->method cargs_call );
      }
 };
 %enddef
 
+SIDESTEP_METHOD(__wt_page_log, pl_abandon_checkpoint,
+  (WT_SESSION *session),
+  ($self, session))
+
 SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint,
   (WT_SESSION *session, WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args),
-  (self, session, args))
+  ($self, session, args))
 
-SIDESTEP_METHOD(__wt_page_log, pl_get_complete_checkpoint,
-  (WT_SESSION *session, WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args),
-  (self, session, args))
+/*
+ * Optionally ask for specific checkpoint LSN. If omitted, it defaults to zero, which asks for the
+ * most recently completed checkpoint.
+ */
+%ignore __wt_page_log::pl_get_complete_checkpoint;
+%rename (pl_get_complete_checkpoint) __wt_page_log::_pl_get_complete_checkpoint;
+%extend __wt_page_log {
+    int _pl_get_complete_checkpoint(WT_SESSION *session,
+      WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS *args, uint64_t lsn = 0) {
+        args->lsn = lsn;
+        return ($self->pl_get_complete_checkpoint($self, session, args));
+     }
+};
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_last_lsn,
   (WT_SESSION *session, uint64_t *lsn),
-  (self, session, lsn))
+  ($self, session, lsn))
 
 SIDESTEP_METHOD(__wt_page_log, pl_get_open_checkpoint,
   (WT_SESSION *session, uint64_t *checkpoint_id),
-  (self, session, checkpoint_id))
+  ($self, session, checkpoint_id))
 
 SIDESTEP_METHOD(__wt_page_log, pl_open_handle,
   (WT_SESSION *session, int table_id, WT_PAGE_LOG_HANDLE **handle),
-  (self, session, table_id, handle))
+  ($self, session, table_id, handle))
 
 SIDESTEP_METHOD(__wt_page_log, pl_set_last_materialized_lsn,
   (WT_SESSION *session, uint64_t lsn),
-  (self, session, lsn))
+  ($self, session, lsn))
 
 SIDESTEP_METHOD(__wt_page_log, pl_trim_table,
   (WT_SESSION *session, uint64_t table_id, uint64_t start_lsn, uint64_t *lsnp),
-  (self, session, table_id, start_lsn, lsnp))
+  ($self, session, table_id, start_lsn, lsnp))
 
 SIDESTEP_METHOD(__wt_page_log, terminate,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_key_provider, set_key,
   (WT_SESSION *session, const WT_CRYPT_KEYS *crypt),
-  (self, session, crypt))
+  ($self, session, crypt))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_put,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, const WT_ITEM *buf),
-  (self, session, page_id, checkpoint_id, put_args, buf))
+  ($self, session, page_id, checkpoint_id, put_args, buf))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_get,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args,
     WT_ITEM *results_array, u_int *results_count),
-  (self, session, page_id, checkpoint_id, get_args, results_array, results_count))
+  ($self, session, page_id, checkpoint_id, get_args, results_array, results_count))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_get_page_ids,
   (WT_SESSION *session, int checkpoint_lsn, WT_ITEM *item, size_t *size),
-  (self, session, checkpoint_lsn, item, size))
+  ($self, session, checkpoint_lsn, item, size))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_discard,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *discard_args),
-  (self, session, page_id, checkpoint_id, discard_args))
+  ($self, session, page_id, checkpoint_id, discard_args))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_close,
   (WT_SESSION *session),
-  (self, session))
-
-SIDESTEP_METHOD(__wt_storage_source, ss_customize_file_system,
-  (WT_SESSION *session, const char *bucket_name,
-    const char *auth_token, const char *config, WT_FILE_SYSTEM **file_systemp),
-  (self, session, bucket_name, auth_token, config, file_systemp))
-
-SIDESTEP_METHOD(__wt_storage_source, ss_flush,
-  (WT_SESSION *session, WT_FILE_SYSTEM *file_system,
-    const char *source, const char *object, const char *config),
-  (self, session, file_system, source, object, config))
-
-SIDESTEP_METHOD(__wt_storage_source, ss_flush_finish,
-  (WT_SESSION *session, WT_FILE_SYSTEM *file_system,
-    const char *source, const char *object, const char *config),
-  (self, session, file_system, source, object, config))
-
-SIDESTEP_METHOD(__wt_storage_source, terminate,
-  (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_system, fs_exist,
   (WT_SESSION *session, const char *name, bool *existp),
-  (self, session, name, existp))
+  ($self, session, name, existp))
 
 SIDESTEP_METHOD(__wt_file_system, fs_open_file,
   (WT_SESSION *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type,
     uint32_t flags, WT_FILE_HANDLE **file_handlep),
-  (self, session, name, file_type, flags, file_handlep))
+  ($self, session, name, file_type, flags, file_handlep))
 
 SIDESTEP_METHOD(__wt_file_system, fs_remove,
   (WT_SESSION *session, const char *name, uint32_t flags),
-  (self, session, name, flags))
+  ($self, session, name, flags))
 
 SIDESTEP_METHOD(__wt_file_system, fs_rename,
   (WT_SESSION *session, const char *from, const char *to, uint32_t flags),
-  (self, session, from, to, flags))
+  ($self, session, from, to, flags))
 
 SIDESTEP_METHOD(__wt_file_system, fs_size,
   (WT_SESSION *session, const char *name, wt_off_t *sizep),
-  (self, session, name, sizep))
+  ($self, session, name, sizep))
 
 SIDESTEP_METHOD(__wt_file_system, terminate,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, close,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_advise,
   (WT_SESSION *session, wt_off_t offset, wt_off_t len, int advice),
-  (self, session, offset, len, advice))
+  ($self, session, offset, len, advice))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_extend,
   (WT_SESSION *session, wt_off_t offset),
-  (self, session, offset))
+  ($self, session, offset))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_extend_nolock,
   (WT_SESSION *session, wt_off_t offset),
-  (self, session, offset))
+  ($self, session, offset))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_lock,
   (WT_SESSION *session, bool lock),
-  (self, session, lock))
+  ($self, session, lock))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_map,
   (WT_SESSION *session, bool lock, void *mapped_regionp, size_t *lengthp, void *mapped_cookiep),
-  (self, session, mapped_regionp, lengthp, mapped_cookiep))
+  ($self, session, mapped_regionp, lengthp, mapped_cookiep))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_map_discard,
   (WT_SESSION *session, void *map, size_t length, void *mapped_cookie),
-  (self, session, map, length, mapped_cookie))
+  ($self, session, map, length, mapped_cookie))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_map_preload,
   (WT_SESSION *session, const void *map, size_t length, void *mapped_cookie),
-  (self, session, map, length, mapped_cookie))
+  ($self, session, map, length, mapped_cookie))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_unmap,
   (WT_SESSION *session, void *mapped_region, size_t length, void *mapped_cookie),
-  (self, session, mapped_region, length, mapped_cookie))
+  ($self, session, mapped_region, length, mapped_cookie))
 
    /*
 SIDESTEP_METHOD(__wt_file_handle, fh_read,
   (WT_SESSION *session, wt_off_t offset, size_t len, void *buf),
-  (self, session, offset, len, buf))
+  ($self, session, offset, len, buf))
    */
 
 SIDESTEP_METHOD(__wt_file_handle, fh_size,
   (WT_SESSION *session, wt_off_t *sizep),
-  (self, session, sizep))
+  ($self, session, sizep))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_sync,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_sync_nowait,
   (WT_SESSION *session),
-  (self, session))
+  ($self, session))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_truncate,
   (WT_SESSION *session, wt_off_t offset),
-  (self, session, offset))
+  ($self, session, offset))
 
 SIDESTEP_METHOD(__wt_file_handle, fh_write,
   (WT_SESSION *session, unsigned long offset, size_t length, const void *buf),
-  (self, session, offset, length, buf))
+  ($self, session, offset, length, buf))
 
 %ignore __wt_file_handle::fh_read;
 %rename (fh_read) __wt_file_handle::_fh_read;
 %extend __wt_file_handle {
     int _fh_read(WT_SESSION *session, unsigned long offset, size_t length, void *buf) {
-        return (self->fh_read(self, session, offset, length, buf));
+        return ($self->fh_read($self, session, offset, length, buf));
     }
 };
 
@@ -1398,11 +1415,11 @@ SIDESTEP_METHOD(__wt_file_handle, fh_write,
 %extend __wt_file_system {
     int _fs_directory_list(WT_SESSION *session, const char *directory, const char *prefix,
       char ***dirlist, int *countp) {
-        return (self->fs_directory_list(self, session, directory, prefix, dirlist, countp));
+        return ($self->fs_directory_list($self, session, directory, prefix, dirlist, countp));
     }
     int _fs_directory_list_single(WT_SESSION *session, const char *directory, const char *prefix,
       char ***dirlist, int *countp) {
-        return (self->fs_directory_list_single(self, session, directory, prefix, dirlist, countp));
+        return ($self->fs_directory_list_single($self, session, directory, prefix, dirlist, countp));
     }
 };
 
@@ -1496,7 +1513,6 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(PageLogGetArgs) __wt_page_log_get_args;
 %rename(PageLogHandle) __wt_page_log_handle;
 %rename(PageLogPutArgs) __wt_page_log_put_args;
-%rename(StorageSource) __wt_storage_source;
 %rename(FileSystem) __wt_file_system;
 
 %include "wiredtiger.h"

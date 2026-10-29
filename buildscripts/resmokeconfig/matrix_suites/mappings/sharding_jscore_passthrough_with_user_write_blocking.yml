@@ -1,0 +1,11 @@
+# Authenticated sharding jscore passthrough with global user write blocking and bypass privilege enabled.
+base_suite: sharding_jscore_passthrough_base
+overrides:
+  - "write_blocking.auth_shell_options_sharding"
+  - "write_blocking.authenticated_sharding_hooks"
+  - "write_blocking.fixture_with_auth_sharded"
+eval:
+  - "write_blocking.user_write_blocking_eval"
+excludes:
+  - "write_blocking.user_write_blocking_exclude_files"
+  - "write_blocking.write_blocking_auth_exclude_tags"

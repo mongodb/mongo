@@ -39,9 +39,6 @@ class test_compact14(compact_util):
     table_numkv = 1
 
     def test_compact14(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create an table and populate small amount of data.
         uri = f"table:{self.test_name}"
         self.session.create(uri, self.create_params)
@@ -51,7 +48,7 @@ class test_compact14(compact_util):
         self.session.checkpoint()
 
         # Enable background compaction.
-        bg_compact_config = 'background=true,free_space_target=1MB'
+        bg_compact_config = 'free_space_target=1MB'
         self.turn_on_bg_compact(bg_compact_config)
 
         while self.get_bg_compaction_files_skipped() == 0:

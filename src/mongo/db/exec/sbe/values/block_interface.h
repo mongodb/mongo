@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -373,6 +347,64 @@ inline constexpr bool validHomogeneousType(TypeTags tag) {
     return tag == TypeTags::NumberInt32 || tag == TypeTags::NumberInt64 || tag == TypeTags::Date ||
         tag == TypeTags::NumberDouble || tag == TypeTags::Boolean;
 }
+
+/**
+ * A dense block of integer RecordIds. Only the integers are stored until extraction, which
+ * lazily materializes the RecordIds into a backing vector owned by this block. The deblocked
+ * values are unowned views into that backing vector, so they are only valid while the block
+ * that produced them remains alive.
+ */
+class Int64RecordIdBlock final : public ValueBlock {
+public:
+    Int64RecordIdBlock() = default;
+
+    explicit Int64RecordIdBlock(std::vector<int64_t> vals) : _vals(std::move(vals)) {}
+
+    // Copy the compact backing storage _vals but not the materialized RecordIds or the
+    // DeblockedTagValStorage. A subsequent call to deblock() can rematerialize if necessary.
+    Int64RecordIdBlock(const Int64RecordIdBlock& other) : ValueBlock(other), _vals(other._vals) {
+        _deblockedStorage.reset();
+    }
+
+    // Move the compact backing storage and the materialized RecordIds. If the source has a
+    // deblocked view, it will still point into the moved _ridStorage vector;
+    Int64RecordIdBlock(Int64RecordIdBlock&& other) = default;
+
+    void clear() noexcept {
+        _deblockedStorage.reset();
+        _vals.clear();
+        _ridStorage.clear();
+    }
+
+    const std::vector<int64_t>& getVector() const {
+        return _vals;
+    }
+
+    size_t count() override {
+        return _vals.size();
+    }
+
+    std::unique_ptr<ValueBlock> clone() const override {
+        return std::make_unique<Int64RecordIdBlock>(*this);
+    }
+
+    boost::optional<bool> tryDense() const override {
+        return true;
+    }
+
+    int getApproximateSize() const override;
+
+protected:
+    // Consumers of this block type should use getVector() and operate over the raw ints if
+    // possible.
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override;
+
+private:
+    std::vector<int64_t> _vals;
+
+    // A deblocked Int64RecordIdBlock will contain unowned pointers into this vector.
+    std::vector<RecordId> _ridStorage;
+};
 
 /**
  * A block that is a run of repeated values.

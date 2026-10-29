@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/rpc/metadata.h"
 
@@ -40,15 +14,19 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/stats/external_client_on_router.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -69,6 +47,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 namespace mongo {
 namespace rpc {
 MONGO_FAIL_POINT_DEFINE(failIfOperationKeyMismatch);
@@ -78,6 +58,14 @@ BSONObj makeEmptyMetadata() {
 }
 
 namespace {
+// True if the request's client holds the internal-cluster privilege required to propagate
+// internal-only generic arguments (operation key, write-blocking bypass, versionContext, ifrFlags).
+bool hasInternalAuthorization(OperationContext* opCtx) {
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    return authSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(authSession->getUserTenantId()), ActionType::internal);
+}
+
 void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArguments& requestArgs) {
     // If we are in direct client, privileged metadata should already be set by the initial request.
     if (opCtx->getClient()->isInDirectClient()) {
@@ -89,10 +77,7 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
 
     // Check for authorization lazily, to optimize for the common case with no arguments present.
     Deferred hasInternalAuthorization{[&] {
-        auto authSession = AuthorizationSession::get(opCtx->getClient());
-        return authSession->isAuthorizedForActionsOnResource(
-            ResourcePattern::forClusterResource(authSession->getUserTenantId()),
-            ActionType::internal);
+        return rpc::hasInternalAuthorization(opCtx);
     }};
 
     if (requestArgs.getClientOperationKey() &&
@@ -118,11 +103,11 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
     WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, requestArgs.getMayBypassWriteBlocking());
 
     uassert(12097002,
-            "Client is not properly authorized to propagate mayBypassReplicaSetWriteBlocking",
-            !requestArgs.getMayBypassReplicaSetWriteBlocking() || hasInternalAuthorization());
+            "Client is not properly authorized to propagate mayBypassReplicaSetWritesBlocking",
+            !requestArgs.getMayBypassReplicaSetWritesBlocking() || hasInternalAuthorization());
     // setFromMetadata must still be called to set the default value if it's not set in the request
     ReplicaSetWriteBlockBypass::get(opCtx).setFromMetadata(
-        opCtx, requestArgs.getMayBypassReplicaSetWriteBlocking());
+        opCtx, requestArgs.getMayBypassReplicaSetWritesBlocking());
 
     uassert(9955800,
             "Client is not properly authorized to propagate versionContext",
@@ -147,8 +132,56 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
             !requestArgs.getExecutionAdmissionContextType() || hasInternalAuthorization());
     ExecutionAdmissionContext::get(opCtx).setFromMetadata(
         opCtx, requestArgs.getExecutionAdmissionContextType());
+
+    // Typed commands which go through TypedCommand::InvocationBaseInternal will already have this
+    // installed, but we keep the install check here to ensure even legacy commands can benefit from
+    // a stable IFRContext.
+    installIfrContextFromWire(opCtx, requestArgs);
 }
 }  // namespace
+
+void installIfrContextFromWire(OperationContext* opCtx, const GenericArguments& requestArgs) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        // Nested operations (DBDirectClient sub-commands) share the parent operation's opCtx and
+        // must never install: they inherit the parent's context once it is installed. Several
+        // flows run nested commands *before* the parent command is even parsed — e.g. the
+        // localhost-auth-bypass check. If such a nested command installed here, it would claim the
+        // decoration with a conservative no-flags context and the parent's later install would be
+        // skipped, silently discarding the wire-provided IFR flag values.
+        // TODO SERVER-131000 consider if we can get an IFRContext initialized earlier for this
+        // case.
+        return;
+    }
+    if (IncrementalFeatureRolloutContext::isInstalled(opCtx)) {
+        LOGV2_DEBUG(13002304,
+                    4,
+                    "Skipping IFRContext initialization since the given opCtx already has one");
+        return;
+    }
+
+    if (const auto& ifrFlags = requestArgs.getIfrFlags()) {
+        // Both ifrFlags and ifrSenderVersion are internal-only fields; check authorization once
+        // here rather than unconditionally on every command (the common path has no ifrFlags).
+        uassert(13002302,
+                "ifrFlags are an internal mechanism. Client is not properly authorized to "
+                "propagate ifrFlags",
+                hasInternalAuthorization(opCtx));
+
+        const auto& senderVersion = requestArgs.getIfrSenderVersion();
+        IncrementalFeatureRolloutContext::set(
+            opCtx,
+            IncrementalFeatureRolloutContext::fromWire(
+                *ifrFlags,
+                senderVersion ? std::make_unique<IFRSenderVersion>(*senderVersion) : nullptr));
+    } else {
+        // Sender didn't include the ifrFlags field at all — either a binary that predates the
+        // IFR wire protocol (e.g. a last-lts mongos forwarding to a latest shard) or a caller
+        // that isn't participating in the protocol. Conservatively disables kLatest-introduced
+        // flags on a shard server (no router coordinated a value) and uses local defaults on a
+        // standalone / plain replica set.
+        IncrementalFeatureRolloutContext::installForRequestWithoutIfrFlags(opCtx);
+    }
+}
 
 void readRequestMetadata(OperationContext* opCtx,
                          const GenericArguments& requestArgs,
@@ -187,6 +220,10 @@ void readRequestMetadata(OperationContext* opCtx,
 
     if (requestArgs.getIsExternalClientOnRouter()) {
         isExternalClientOnRouter(opCtx) = true;
+    }
+
+    if (auto retryAttempt = requestArgs.getStaleConfigRetryAttempt()) {
+        staleConfigRetryAttempt(opCtx) = *retryAttempt;
     }
 }
 

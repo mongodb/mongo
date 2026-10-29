@@ -31,6 +31,7 @@ from buildscripts.util.read_config import read_config_file
 GENERATED_TASK_PREFIX = "core_analysis"
 RANDOM_STRING_LENGTH = 5
 LOCAL_BIN_DIR = os.path.join("dist-test", "bin")
+GATHERED_BIN_DIR = os.path.join("dist-tests", "bin")
 MULTIVERSION_BIN_DIR = os.path.normpath("/data/multiversion")
 
 
@@ -92,11 +93,15 @@ class CoreAnalysisTaskGenerator(ABC):
                     "the evergreen function 'configure evergreen api credentials' is called before this task",
                     file=sys.stderr,
                 )
-                return None
+                self.evg_api = None
 
     def generate(self) -> Optional[dict]:
         if not sys.platform.startswith("linux"):
             print("This platform is not supported, skipping core analysis task generation.")
+            return None
+
+        if self.evg_api is None:
+            print("No Evergreen API connection, skipping core analysis task generation.")
             return None
 
         # gather information from the current task being run
@@ -215,7 +220,6 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
         )
 
     def get_core_analysis_task_dependencies(self, compile_variant: str) -> set[TaskDependency]:
-        # TODO SERVER-92571 add archive_jstestshell_debug dep for variants that have it.
         return {TaskDependency("archive_dist_test_debug", compile_variant)}
 
     def find_cores(self) -> list[CoreInfo]:
@@ -237,11 +241,12 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
         dumpers = dumper.get_dumpers(None, None)
 
         for artifact in task_info.artifacts:
-            regex = re.search(r"Core Dump (.*?)\.gz", artifact.name)
+            # The upload's display_name ends in a space, so artifact names contain two.
+            regex = re.search(r"Core Dump\s+(.*?)\.gz", artifact.name)
             if not regex:
                 continue
 
-            core_file = regex.group(1)
+            core_file = regex.group(1).strip()
             binary_name, bin_version = dumpers.dbg.get_binary_from_core_dump(core_file)
             dir_to_check = MULTIVERSION_BIN_DIR if bin_version else LOCAL_BIN_DIR
             binary_files = os.listdir(dir_to_check)
@@ -259,6 +264,19 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
 
 
 class BazelCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
+    def get_core_analysis_task_dependencies(self, compile_variant: str) -> set[TaskDependency]:
+        """Depend on the runner task only when this result task did not build its own binaries."""
+        if os.path.isdir(GATHERED_BIN_DIR):
+            return []
+
+        variant = self.expansions.get("build_variant")
+        current_task_name = self.expansions.get("task_name", "")
+        if "_burn_in_" in current_task_name:
+            runner = f"resmoke_tests_burn_in_{variant}"
+        else:
+            runner = "resmoke_tests"
+        return {TaskDependency(runner, variant)}
+
     def get_core_analyzer_commands(
         self,
         task_id: str,

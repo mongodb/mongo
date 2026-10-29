@@ -1,44 +1,22 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/expression/evaluate_test_helpers.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/unittest/unittest.h"
 
 #include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/expression/evaluate_test_helpers.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/unittest.h"
 
 
 namespace mongo {
@@ -810,6 +788,131 @@ TEST(ExpressionTrimTest, ShouldReturnNullIfBothCharsAndCharsAreNullish) {
                         "$ltrim", Document{{"input", "$missingField"sv}, {"chars", BSONNULL}}),
                     Value(BSONNULL));
 }
+
+namespace concat {
+
+intrusive_ptr<Expression> parseConcat(ExpressionContextForTest* expCtx, const BSONObj& spec) {
+    VariablesParseState vps = expCtx->variablesParseState;
+    return Expression::parseExpression(expCtx, spec, vps);
+}
+
+TEST(ExpressionConcatTest, TracksOutputMemoryAndReleasesAfterEvaluation) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{1024}};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", "hello"sv}, {"b", "world"sv}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx), Value("helloworld"sv));
+
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GTE(tracker.peakTrackedMemoryBytes(), 10);
+}
+
+TEST(ExpressionConcatTest, FallbackTrackerWithinLimitDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    const int64_t limit = 10 * 1024 * 1024;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    ASSERT_VALUE_EQ(expr->evaluate(doc, &expCtx.variables, ctx),
+                    Value(std::string(10, 'x') + std::string(10, 'y')));
+
+    // The fallback tracker recorded usage but stayed within the configured limit.
+    auto& tracker = expCtx.getExpressionFallbackTracker();
+    ASSERT_GT(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_LT(tracker.peakTrackedMemoryBytes(), limit);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
+}
+
+TEST(ExpressionConcatTest, FallbackTrackerEnforcesLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    const int64_t limit = 8;
+    // Disable expression tracking so the fallback is standalone and enforces the per-expression cap
+    unittest::ServerParameterGuard exprFlag{"featureFlagExpressionMemoryTracking", false};
+    unittest::ServerParameterGuard limitGuard{"internalQueryMaxSingleExpressionMemoryUsageBytes",
+                                              limit};
+
+    EvaluationContext ctx{};
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concat");
+    }
+    ASSERT_EQ(expCtx.getExpressionFallbackTracker().inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(expCtx.getExpressionFallbackTracker().peakTrackedMemoryBytes(), limit);
+}
+
+TEST(ExpressionConcatTest, ThrowsExceededMemoryLimitWhenQueryLimitExceeded) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY("$a"sv << "$b"sv)));
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    Document doc{{"a", std::string(10, 'x')}, {"b", std::string(10, 'y')}};
+    try {
+        expr->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$concat");
+    }
+    ASSERT_EQ(operationTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_GT(operationTracker.peakTrackedMemoryBytes(), limit);
+}
+
+TEST(ExpressionConcatTest, ManySmallOperandsCollectivelyExceedingLimitStillThrow) {
+    // Many small operands, none individually near the limit, must still trip it once their
+    // accumulated size crosses it.
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder bab;
+    for (int i = 0; i < 200; ++i) {
+        bab.append(std::string(50, 'x'));
+    }
+    auto expr = parseConcat(&expCtx, BSON("$concat" << bab.arr()));
+
+    const int64_t limit = 512;  // Well under the ~10KB (200 * 50) of total operand data.
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expr->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+    ASSERT_LT(operationTracker.peakTrackedMemoryBytes(), limit + 1024 * 1024);
+}
+
+TEST(ExpressionConcatTest, SingleOversizedOperandThrowsImmediately) {
+    // A single operand larger than the whole limit must be caught immediately.
+    auto expCtx = ExpressionContextForTest{};
+    auto expr = parseConcat(&expCtx, BSON("$concat" << BSON_ARRAY(std::string(1024, 'x'))));
+
+    const int64_t limit = 8;
+    SimpleMemoryUsageTracker operationTracker{MemoryUsageLimit{limit}};
+    SimpleMemoryUsageTracker stageTracker{&operationTracker, MemoryUsageLimit{100 * 1024 * 1024}};
+    EvaluationContext ctx{.tracker = &stageTracker};
+
+    ASSERT_THROWS_CODE(expr->evaluate(MutableDocument().freeze(), &expCtx.variables, ctx),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+}  // namespace concat
 
 }  // namespace expression_evaluation_test
 }  // namespace mongo

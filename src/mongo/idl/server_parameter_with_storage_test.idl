@@ -1,30 +1,5 @@
-#    Copyright (C) 2018-present MongoDB, Inc.
-#
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the Server Side Public License, version 1,
-#    as published by MongoDB, Inc.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    Server Side Public License for more details.
-#
-#    You should have received a copy of the Server Side Public License
-#    along with this program. If not, see
-#    <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-#    As a special exception, the copyright holders give permission to link the
-#    code of portions of this program with the OpenSSL library under certain
-#    conditions as described in each individual source file and distribute
-#    linked combinations including the program with the OpenSSL library. You
-#    must comply with the Server Side Public License in all respects for
-#    all of the code used other than as permitted herein. If you modify file(s)
-#    with this exception, you may extend this exception to your version of the
-#    file(s), but you are not obligated to do so. If you do not wish to do so,
-#    delete this exception statement from your version. If you delete this
-#    exception statement from all source files in the program, then also delete
-#    it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
     cpp_namespace: "mongo::test"
@@ -50,7 +25,7 @@ server_parameters:
     stdIntDeclared:
         set_at: [startup, runtime]
         description: "Create a simple int value, and declare storage"
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gStdIntDeclared
         default: 42
         validator:
@@ -115,7 +90,7 @@ server_parameters:
     storageIntDeprecated:
         set_at: [startup, runtime]
         description: "Server parameter with storage marked deprecated."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntDeprecated
         default: 42
         validator:
@@ -127,7 +102,7 @@ server_parameters:
     storageIntAnnotated:
         set_at: [startup, runtime]
         description: "Server parameter with annotations."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntAnnotated
         default: 7
         redact: false
@@ -141,7 +116,7 @@ server_parameters:
     storageIntArrayOfObjects:
         set_at: [startup, runtime]
         description: "Parameter with array-of-objects annotations."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntArrayOfObjects
         default: 1
         redact: false
@@ -155,7 +130,7 @@ server_parameters:
     storageIntNestedArrays:
         set_at: [startup, runtime]
         description: "Parameter with nested array annotations."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntNestedArrays
         default: 1
         redact: false
@@ -169,7 +144,7 @@ server_parameters:
     storageIntEmptyArray:
         set_at: [startup, runtime]
         description: "Parameter with empty array annotation."
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: Atomic<int>
         cpp_varname: gIntEmptyArray
         default: 1
         redact: false

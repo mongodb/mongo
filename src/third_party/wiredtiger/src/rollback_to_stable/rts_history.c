@@ -147,7 +147,7 @@ __wti_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
     newest_stop_durable_ts = newest_stop_ts = WT_TS_NONE;
     WT_ERR(__wt_config_getones(session, config, "checkpoint", &cval));
     __wt_config_subinit(session, &ckptconf, &cval);
-    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+    for (; (ret = __wt_config_next(&ckptconf, &key, &cval)) == 0;) {
         ret = __wt_config_subgets(session, &cval, "newest_stop_durable_ts", &durableval);
         if (ret == 0)
             newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts, (wt_timestamp_t)durableval.val);
@@ -157,6 +157,7 @@ __wti_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
             newest_stop_ts = WT_MAX(newest_stop_ts, (wt_timestamp_t)durableval.val);
         WT_ERR_NOTFOUND_OK(ret, false);
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
     max_durable_ts = WT_MAX(newest_stop_ts, newest_stop_durable_ts);
     WT_ERR(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0));
     release_dhandle = true;

@@ -182,11 +182,10 @@ retry:
     __wt_atomic_add_uint32(&slot->slot_end_lsn.l.offset, (uint32_t)end_offset);
     WT_STAT_CONN_INCRV(session, log_slot_consolidated, end_offset);
     /*
-     * XXX Would like to change so one piece of code advances the LSN.
+     * FIXME-WT-18493 Would like to change so one piece of code advances the LSN.
      */
     WT_ASSIGN_LSN(&log->alloc_lsn, &slot->slot_end_lsn);
-    WT_ASSERT(
-      session, log->alloc_lsn.l.file >= __wt_atomic_load_uint32_relaxed(&log->write_lsn.l.file));
+    WT_ASSERT(session, __wt_lsn_file(&log->alloc_lsn) >= __wt_lsn_file(&log->write_lsn));
     return (0);
 }
 
@@ -502,10 +501,11 @@ int
 __wti_log_slot_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     WTI_LOG *log;
     WTI_LOGSLOT *slot;
     int64_t rel;
-    int i;
+    int i, write_ret;
 
     conn = S2C(session);
     log = conn->log_mgr.log;
@@ -519,15 +519,22 @@ __wti_log_slot_destroy(WT_SESSION_IMPL *session)
               WTI_LOG_SLOT_RESERVED)) {
             rel =
               WTI_LOG_SLOT_RELEASED_BUFFERED(__wt_atomic_load_int64_v_relaxed(&slot->slot_state));
-            if (rel != 0)
+            if (rel != 0) {
                 /* Writes are not throttled. */
-                WT_RET(__wt_write(session, slot->slot_fh,
+                write_ret = __wt_write(session, slot->slot_fh,
                   __wt_atomic_load_int64_relaxed(&slot->slot_start_offset), (size_t)rel,
-                  slot->slot_buf.mem));
+                  slot->slot_buf.mem);
+                if (write_ret != 0)
+                    __wt_verbose_warning(session, WT_VERB_LOG,
+                      "log_slot_destroy: failed to write slot %d to %s: %s", i,
+                      slot->slot_fh == NULL ? "(null)" : slot->slot_fh->name,
+                      __wt_strerror(session, write_ret, NULL, 0));
+                WT_TRET(write_ret);
+            }
         }
         __wt_buf_free(session, &log->slot_pool[i].slot_buf);
     }
-    return (0);
+    return (ret);
 }
 
 /*

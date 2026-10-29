@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -67,13 +41,12 @@ public:
         return _path;
     }
 
-    TemporaryDirectory() {
-        char buffer[] = "/tmp/HandoffTest-XXXXXX";
-        const char* const path = ::mkdtemp(buffer);
-        if (path == nullptr) {
+    explicit TemporaryDirectory(std::string pathPattern = "/tmp/HandoffTest-XXXXXX") {
+        if (::mkdtemp(pathPattern.data()) == nullptr) {
             throw std::system_error(errno, std::system_category());
         }
-        _path = path;
+        // `mkdtemp` modified `pathPattern` in place.
+        _path = std::move(pathPattern);
     }
 
     ~TemporaryDirectory() {
@@ -97,6 +70,7 @@ public:
     std::function<int(int, int)> onListen;
     std::function<int(int*)> onPipe;
     std::function<int(struct pollfd*, nfds_t, int)> onPoll;
+    std::function<int(int, int, int, const void*, socklen_t)> onSetsockopt;
     std::function<int(int, int, int)> onSocket;
     std::function<ssize_t(int, const void*, size_t)> onWrite;
 
@@ -129,6 +103,15 @@ public:
     }
     int poll(struct pollfd* fds, nfds_t n, int t) override {
         return onPoll ? onPoll(fds, n, t) : POSIXInterface::poll(fds, n, t);
+    }
+    int setsockopt(int socket,
+                   int level,
+                   int option_name,
+                   const void* option_value,
+                   socklen_t option_len) override {
+        return onSetsockopt
+            ? onSetsockopt(socket, level, option_name, option_value, option_len)
+            : POSIXInterface::setsockopt(socket, level, option_name, option_value, option_len);
     }
     int socket(int domain, int type, int protocol) override {
         return onSocket ? onSocket(domain, type, protocol)
@@ -193,6 +176,7 @@ public:
     std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override {
         return {};
     }
+    void onLoadBalancerPeerSet(bool) override {}
 
 private:
     bool _shutdownResult;

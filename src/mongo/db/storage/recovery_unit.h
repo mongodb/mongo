@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -49,7 +23,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo {
 
@@ -278,6 +252,14 @@ public:
     virtual void setOperationContext(OperationContext* opCtx);
 
     /**
+     * Returns the OperationContext that currently owns this RecoveryUnit, or nullptr if none is set
+     * (e.g. for internal RecoveryUnits not tied to a user operation).
+     */
+    OperationContext* getOperationContext() const {
+        return _opCtx;
+    }
+
+    /**
      * Extensible structure for configuring options to begin a new transaction.
      *
      * - roundUpPreparedTimestamps dictates whether to round up prepare and commit timestamp of a
@@ -392,6 +374,24 @@ public:
      * while a commit timestamp is set.
      */
     virtual void setCommitTimestamp(Timestamp timestamp) {}
+
+    /**
+     * Sets a schema epoch for a transaction which creates tables using untimestamped writes. Must
+     * be called inside a WriteUnitOfWork, may only be called once, and is mutually exclusive with
+     * having timestamps set.
+     *
+     * The schema epoch for table creations is normally derived from the commit timestamp, but
+     * timestamps are not available until the oplog table has been created. Any operations which
+     * create tables prior to that must explicitly set a schema epoch to use.
+     */
+    virtual void setSchemaEpoch(uint64_t schemaEpoch) {}
+
+    /**
+     * Returns the schema epoch set via setSchemaEpoch(), or boost::none if not set.
+     */
+    virtual boost::optional<uint64_t> getSchemaEpoch() const {
+        return boost::none;
+    }
 
     /**
      * Sets a timestamp that decides when all the future writes on this RecoveryUnit will be
@@ -610,6 +610,16 @@ public:
     };
 
     /**
+     * Sets whether cursors subsequently opened on this RecoveryUnit should accumulate a size
+     * summary as they traverse.
+     */
+    virtual void setSizeStatsCursor(bool sizeStatsCursor) {};
+
+    virtual bool getSizeStatsCursor() const {
+        return false;
+    };
+
+    /**
      * Indicates whether the RecoveryUnit has an open snapshot. A snapshot can be opened inside or
      * outside of a WriteUnitOfWork.
      */
@@ -672,7 +682,7 @@ public:
      * OperationContext and may not be the same as when the Change was registered on the
      * RecoveryUnit. See above for usage restrictions.
      */
-    class MONGO_MOD_OPEN Change {
+    class [[MONGO_MOD_OPEN]] Change {
     public:
         virtual ~Change() {}
 
@@ -915,11 +925,13 @@ public:
     }
 
     /**
-     * Sets a maximum timeout that the storage engine will block an operation when the cache is
-     * under pressure.
-     * If not set (default 0) then the storage engine will block indefinitely.
+     * Bounds every storage operation on this recovery unit's session: once exceeded, WiredTiger
+     * fails the operation with WT_ROLLBACK (surfaced as a WriteConflict/TemporarilyUnavailable
+     * error) instead of waiting indefinitely. Unlike a cache-wait bound, this also makes a
+     * read-only transaction eligible for rollback when it is stuck behind cache eviction that
+     * cannot progress. 0 disables.
      */
-    virtual void setCacheMaxWaitTimeout(Milliseconds) {}
+    virtual void setOperationTimeout(Milliseconds) {}
 
     /**
      * Marks this recovery unit as exempt from participating in optional cache eviction.

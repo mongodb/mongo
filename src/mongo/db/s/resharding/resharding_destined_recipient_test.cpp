@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -74,7 +48,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -131,7 +104,7 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
     ASSERT(txnParticipant);
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNum},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart,
                                    transactionRuntimeContext);
     txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
@@ -161,6 +134,15 @@ public:
             _featureFlagScope.emplace("featureFlagReshardingRegistry", false);
         }
 
+        // This suite installs filtering metadata through the deprecated non-authoritative refresh
+        // path (forceDatabaseMetadataRefresh_DEPRECATED /
+        // forceCollectionMetadataRefresh_DEPRECATED), which is rejected once shards are
+        // authoritative for their metadata. Pin the authoritative shards flags off so the legacy
+        // refresh path remains valid.
+        // TODO (SERVER-98118): adapt this unit test to work with authoritative shards.
+        _authoritativeDDLScope.emplace("featureFlagAuthoritativeShardsDDL", false);
+        _authoritativeCRUDScope.emplace("featureFlagAuthoritativeShardsCRUD", false);
+
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
@@ -186,6 +168,8 @@ public:
 
         ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
 
+        _authoritativeCRUDScope.reset();
+        _authoritativeDDLScope.reset();
         _featureFlagScope.reset();
     }
 
@@ -194,20 +178,20 @@ public:
         StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
 
         repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
-                                                              repl::ReadConcernLevel readConcern,
+                                                              repl::ReadConcernArgs readConcern,
                                                               BSONObj filter) override {
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
         std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
                                                           const DatabaseName& dbName,
-                                                          repl::ReadConcernLevel readConcernLevel,
+                                                          repl::ReadConcernArgs readConcern,
                                                           const BSONObj& sort) override {
             return {};
         }
 
         std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
-                                                   repl::ReadConcernLevel readConcernLevel,
+                                                   repl::ReadConcernArgs readConcern,
                                                    const BSONObj& sort) override {
             return _colls;
         }
@@ -231,16 +215,12 @@ protected:
                                         const Timestamp& timestamp,
                                         const std::string& shardKey) {
         auto range1 = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << 5));
-        ChunkType chunk1(uuid,
-                         range1,
-                         ChunkVersion({epoch, timestamp}, {1, 0}),
-                         ShardRef(kShardList[0].getName()));
+        ChunkType chunk1(
+            uuid, range1, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[0].getName());
 
         auto range2 = ChunkRange(BSON(shardKey << 5), BSON(shardKey << MAXKEY));
-        ChunkType chunk2(uuid,
-                         range2,
-                         ChunkVersion({epoch, timestamp}, {1, 0}),
-                         ShardRef(kShardList[1].getName()));
+        ChunkType chunk2(
+            uuid, range2, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[1].getName());
 
         return {chunk1, chunk2};
     }
@@ -301,7 +281,7 @@ protected:
                             Date_t::now(),
                             env.sourceUuid,
                             BSON(kShardKey << 1));
-        coll.setAllowMigrations(false);
+        coll.setAllowChunkOperations(false);
 
         const auto chunksWithXShardKey = createChunks(env.version.placementVersion().epoch(),
                                                       env.sourceUuid,
@@ -312,15 +292,15 @@ protected:
                                                       env.version.placementVersion().getTimestamp(),
                                                       "y");
 
-        getShardServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(DatabaseType(
-            kNss.dbName(), ShardRef{std::string{kShardList[0].getName()}}, env.dbVersion));
+        getShardServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+            DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
         getShardServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
             kNss, coll, chunksWithXShardKey, reshardingFields);
         getShardServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
             env.tempNss, coll, chunksWithYShardKey, boost::none);
 
-        getConfigServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(DatabaseType(
-            kNss.dbName(), ShardRef{std::string{kShardList[0].getName()}}, env.dbVersion));
+        getConfigServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+            DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
         getConfigServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
             kNss, coll, chunksWithXShardKey, reshardingFields);
         getConfigServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
@@ -397,6 +377,8 @@ protected:
 
     boost::optional<CommonReshardingMetadata> _registeredMetadata;
     boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
+    boost::optional<unittest::ServerParameterGuard> _authoritativeDDLScope;
+    boost::optional<unittest::ServerParameterGuard> _authoritativeCRUDScope;
 };
 
 INSTANTIATE_TEST_SUITE_P(DestinedRecipient,
@@ -511,7 +493,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
     OperationShardingState::setShardRole(
         opCtx, kNss, ShardVersionFactory::make(ChunkVersion::IGNORED()), env.dbVersion);
     client.update(
-        kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), false /*upsert*/, true /*multi*/);
+        kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), /*upsert=*/false, /*multi=*/true);
 
     auto entry = getLastOplogEntry(opCtx);
     auto recipShard = entry.getDestinedRecipient();
@@ -593,7 +575,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(
-        opCtx, kNss, env.version /* shardVersion */, env.dbVersion /* databaseVersion */);
+        opCtx, kNss, /*shardVersion=*/env.version, /*dbVersion=*/env.dbVersion);
     runInTransaction(opCtx, [&]() { deleteDoc(opCtx, kNss, BSON("_id" << 0), env); });
 
     // Look for destined recipient in latest oplog entry. Since this write was done in a

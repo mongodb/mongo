@@ -1,44 +1,22 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 
+#include <cstring>
 #include <string_view>
 
 #include <wiredtiger.h>
@@ -51,15 +29,35 @@ namespace mongo {
 namespace {
 using namespace std::literals::string_view_literals;
 static constexpr std::string_view kOverwriteFalse = "overwrite=false"sv;
+
+void setKeyOnCursor(WT_CURSOR* c, const std::variant<std::span<const char>, int64_t>& key) {
+    std::visit(OverloadedVisitor{
+                   [&](const std::span<const char> k) { c->set_key(c, WiredTigerItem{k}.get()); },
+                   [&](int64_t k) {
+                       c->set_key(c, k);
+                   }},
+               key);
+}
 }  // namespace
 
-WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session)
-    : _tableID(params.tableID), _session(session) {
+WiredTigerCursor::WiredTigerCursor(Params params,
+                                   const std::string& uri,
+                                   WiredTigerSession& session)
+    : _tableID(params.tableID), _session(session), _sizeStats(params.sizeStats) {
+    invariant(!(params.sizeStats && params.random),
+              "size_stats is incompatible with a random cursor");
+
+    // Retain the URI only for size_stats cursors; onScanComplete() uses it to read back and log the
+    // accumulated summary. Left unset otherwise.
+    if (_sizeStats) {
+        _uri.emplace(uri);
+    }
+
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;
 
     // If we have uncommon cursor options, use a costlier string builder.
-    if (params.readOnce || params.random) {
+    if (params.readOnce || params.random || params.sizeStats) {
         str::stream builder;
         if (params.readOnce) {
             builder << "read_once=true,";
@@ -67,6 +65,10 @@ WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTig
 
         if (params.random) {
             builder << "next_random,";
+        }
+
+        if (params.sizeStats) {
+            builder << "debug=(size_stats=true),";
         }
 
         // Add this option last as the string does not have a trailing comma.
@@ -85,10 +87,13 @@ WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTig
         }
     }
 
-    // Attempt to retrieve a cursor from the cache.
-    _cursor = _session.getCachedCursor(_tableID, _config);
-    if (_cursor) {
-        return;
+    // A size_stats cursor initializes its size-summary counters on open, bypass the cache.
+    if (!_sizeStats) {
+        // Attempt to retrieve a cursor from the cache.
+        _cursor = _session.getCachedCursor(_tableID, _config);
+        if (_cursor) {
+            return;
+        }
     }
 
     try {
@@ -99,7 +104,30 @@ WiredTigerCursor::WiredTigerCursor(Params params, std::string_view uri, WiredTig
     }
 }
 
+void WiredTigerCursor::onScanComplete() {
+    if (MONGO_likely(!_sizeStats || _sizeStatsLogged)) {
+        return;
+    }
+    _sizeStatsLogged = true;
+    // The forward walk is complete, so the accumulated summary is whole. Read it back and log it.
+    // A size-stats read failure must not fail the surrounding scan (diagnostic-only), so swallow
+    // errors into a warning.
+    try {
+        WiredTigerUtil::logStorageSizeStats(_session, *_uri);
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(12951901,
+                      "Failed to log storage size summary for size_stats cursor",
+                      "uri"_attr = *_uri,
+                      "error"_attr = ex.toStatus());
+    }
+}
+
 WiredTigerCursor::~WiredTigerCursor() {
+    if (_sizeStats) {
+        // Never cache a size_stats cursor: closing it guarantees the next open resets the counters.
+        _session.closeCursor(_cursor);
+        return;
+    }
     _session.releaseCursor(_tableID, _cursor, std::move(_config));
 }
 
@@ -133,5 +161,68 @@ WiredTigerPrepareCursor::WiredTigerPrepareCursor(WiredTigerSession& session) : _
 
 WiredTigerPrepareCursor::~WiredTigerPrepareCursor() {
     _session.closeCursor(_cursor);
+}
+
+Status WiredTigerDirectCrudCursor::insert(RecoveryUnit& ru, Key key, std::span<const char> value) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+    c->set_value(c, WiredTigerItem{value}.get());
+
+    int rc = WT_OP_CHECK(wiredTigerCursorInsert(wtRu, c));
+    return wtRCToStatus(rc, _cursor->session);
+}
+
+Status WiredTigerDirectCrudCursor::update(RecoveryUnit& ru, Key key, std::span<const char> value) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+    c->set_value(c, WiredTigerItem{value}.get());
+
+    int rc = WT_OP_CHECK(wiredTigerCursorUpdate(wtRu, c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    return wtRCToStatus(rc, _cursor->session);
+}
+
+StatusWith<UniqueBuffer> WiredTigerDirectCrudCursor::get(Key key) {
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+
+    int rc = WT_OP_CHECK(c->search(c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    if (auto status = wtRCToStatus(rc, _cursor->session); !status.isOK())
+        return status;
+
+    WiredTigerItem v;
+    rc = c->get_value(c, v.get());
+    if (auto status = wtRCToStatus(rc, _cursor->session); !status.isOK())
+        return status;
+
+    UniqueBuffer out = UniqueBuffer::allocate(v.size());
+    std::copy(v.data(), v.data() + v.size(), out.get());
+    return out;
+}
+
+Status WiredTigerDirectCrudCursor::remove(RecoveryUnit& ru, Key key) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = _cursor.get();
+
+    setKeyOnCursor(c, key);
+
+    int rc = WT_OP_CHECK(wiredTigerCursorRemove(wtRu, c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    return wtRCToStatus(rc, _cursor->session);
 }
 }  // namespace mongo

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 
@@ -53,6 +27,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_impl.h"
@@ -106,8 +81,22 @@ ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 void ConfigServerTestFixture::setUpAndInitializeConfigDb() {
     ConfigServerTestFixture::setUp();
     // Initialize the config database while we have exclusive access.
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->initializeConfigDatabaseIfNeeded(operationContext()));
+    ASSERT_OK(initializeConfigDatabaseIfNeededAtStepUp());
+}
+
+Status ConfigServerTestFixture::initializeConfigDatabaseIfNeededAtStepUp() {
+    auto* opCtx = operationContext();
+    const auto canAcceptNonLocalWrites = replicationCoordinator()->canAcceptNonLocalWrites();
+    replicationCoordinator()->setCanAcceptNonLocalWrites(false);
+
+    Status status = Status::OK();
+    {
+        repl::AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
+        status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
+    }
+
+    replicationCoordinator()->setCanAcceptNonLocalWrites(canAcceptNonLocalWrites);
+    return status;
 }
 
 void ConfigServerTestFixture::setUp() {
@@ -164,7 +153,7 @@ void ConfigServerTestFixture::tearDown() {
 }
 
 std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient() {
-    return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
+    return std::make_unique<ShardingCatalogClientImpl>(/*overrideConfigShard=*/nullptr);
 }
 
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {
@@ -277,7 +266,7 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
     invariant(config);
 
     auto findStatus = config->exhaustiveFindOnConfig(
-        opCtx, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, sort, 1);
+        opCtx, kReadPref, repl::ReadConcernArgs::kMajority, ns, filter, sort, 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -292,9 +281,24 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
 }
 
 void ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
+    const auto decorateWithUuid = [](const ShardType& shard) {
+        if (shard.getUuid()) {
+            return shard;
+        }
+
+        auto decoratedShard = shard;
+        if (shard.getName() == ShardId::kConfigServerId) {
+            decoratedShard.setUuid(ShardType::kConfigServerUuid);
+        } else {
+            decoratedShard.setUuid(UUID::gen());
+        }
+        return decoratedShard;
+    };
+
     const NamespaceString shardNS(NamespaceString::kConfigsvrShardsNamespace);
-    for (const auto& shard : shards) {
-        ASSERT_OK(insertToConfigCollection(operationContext(), shardNS, shard.toBSON()));
+    for (auto& shard : shards) {
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), shardNS, decorateWithUuid(shard).toBSON()));
     }
 }
 
@@ -391,8 +395,8 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
     auto chunkDoc =
         findOneOnConfigCollection(opCtx,
                                   NamespaceString::kConfigsvrChunksNamespace,
-                                  BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
-                                  BSON(ChunkType::lastmod << -1) /* sort */);
+                                  /*filter=*/BSON(ChunkType::collectionUUID << coll.getUuid()),
+                                  /*sort=*/BSON(ChunkType::lastmod << -1));
 
     if (!chunkDoc.isOK())
         return chunkDoc.getStatus();
@@ -446,7 +450,7 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     auto config = getConfigShard();
     auto findStatus = config->exhaustiveFindOnConfig(opCtx,
                                                      kReadPref,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
+                                                     repl::ReadConcernArgs::kMajority,
                                                      NamespaceString::kKeysCollectionNamespace,
                                                      BSONObj(),
                                                      BSON("expiresAt" << 1),

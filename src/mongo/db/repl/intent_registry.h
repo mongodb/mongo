@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
@@ -47,7 +21,7 @@
 #include <vector>
 
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace rss {
 namespace consensus {
 
@@ -121,7 +95,7 @@ public:
     /**
      * Class used to represent a unique Intent for a specific operation.
      */
-    class MONGO_MOD_PRIVATE IntentToken {
+    class [[MONGO_MOD_PRIVATE]] IntentToken {
         friend class IntentRegistry;
         using idType = uint64_t;
 
@@ -132,7 +106,7 @@ public:
 
     private:
         IntentToken(Intent intent, idType id) : _intent(intent), _id(id) {}
-        static inline AtomicWord<idType> _currentTokenId = {};
+        static inline Atomic<idType> _currentTokenId = {};
         Intent _intent;
         idType _id;
     };
@@ -188,6 +162,32 @@ public:
         }
     }
 
+    struct ActiveStateTransition {
+        OperationContext* opCtx;
+        InterruptionType type;
+
+        // Whether this transition acquires the global lock in MODE_X before changing storage, so
+        // that the change is ordered after any operation already holding the global lock.
+        //
+        // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
+        bool orderedByGlobalLock;
+
+        bool operator==(const ActiveStateTransition&) const = default;
+    };
+
+    /**
+     * Returns the opCtx driving the active replication state transition along with its type, or
+     * boost::none if there is no active transition.
+     */
+    boost::optional<ActiveStateTransition> activeStateTransitionInfo() {
+        std::shared_lock lock(_stateMutex);
+        if (!_interruptionCtx) {
+            return boost::none;
+        }
+        return ActiveStateTransition{
+            _interruptionCtx, _lastInterruption, _interruptionOrderedByGlobalLock};
+    }
+
     /**
      * Returns true when the active state transition is draining an intent held by this opCtx,
      * meaning the operation should call checkForInterrupt() so the drain can complete.
@@ -223,12 +223,15 @@ public:
      *
      * postInterruptionCallback, if provided, is invoked on the async drain thread after active
      * conflicting operations are killed, before waiting for the drain to complete.
+     *
+     * Nolint note: forced to use std::future as it is a std::async handle.
      */
-    std::future<ReplicationStateTransitionGuard> killConflictingOperations(
-        InterruptionType interruption,
-        OperationContext* opCtx,
-        std::function<void()> postInterruptionCallback = nullptr,
-        boost::optional<uint32_t> timeout_sec = boost::none);
+    std::future<ReplicationStateTransitionGuard>  // NOLINT(mongo-banned-names-check)
+    killConflictingOperations(InterruptionType interruption,
+                              OperationContext* opCtx,
+                              std::function<void()> postInterruptionCallback = nullptr,
+                              boost::optional<uint32_t> timeout_sec = boost::none,
+                              bool orderedByGlobalLock = false);
 
     /**
      * Updates metrics around user ops when a state transition that kills operations occurs (i.e.
@@ -313,6 +316,8 @@ private:
     RWMutex _stateMutex;
     stdx::condition_variable _activeInterruptionCV;
     InterruptionType _lastInterruption = InterruptionType::None;
+    // TODO(SERVER-122542): Remove once step up no longer takes the global lock in MODE_X.
+    bool _interruptionOrderedByGlobalLock = false;
     OperationContext* _interruptionCtx = nullptr;
     std::vector<tokenMap> _tokenMaps;
     Atomic<int> _pendingStateChange = 0;
@@ -321,11 +326,11 @@ private:
     // Maps opCtx opId -> write intent counter pointer. Removed when the opCtx is destroyed
     // (via WriteIntentCleanup) so deferred callbacks don't corrupt a new opCtx's counter.
     mutable std::mutex _opIdMutex;
-    absl::flat_hash_map<uint64_t, AtomicWord<int32_t>*> _opIdToWriteCountPtr;
+    absl::flat_hash_map<uint64_t, Atomic<int32_t>*> _opIdToWriteCountPtr;
 
     // Tracks number of operations killed on state transition.
     size_t _totalOpsKilled = 0;
 };
 }  // namespace consensus
 }  // namespace rss
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

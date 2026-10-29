@@ -4,6 +4,7 @@
  * admission queueing stats are included in slow query logging.
  */
 
+import {AdmissionQueue} from "jstests/libs/admission/queues.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Set the number of tickets to a small value to force ticket exhaustion.
@@ -109,10 +110,12 @@ for (let i = 0; i < queuedReaders.length; i++) {
     queuedReaders[i]();
 }
 
+const kLoggedQueues = `${AdmissionQueue.Execution}|${AdmissionQueue.Ingress}`;
+const kQueueStats = `{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}`;
 const predicate = new RegExp(
     `Slow query.*"${coll}.*"queues".*` +
-        `"(execution|ingress)":{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}` +
-        `.*"(execution|ingress)":{"admissions":\\d+(?:,"totalTimeQueuedMicros":\\d+)?}`,
+        `"(${kLoggedQueues})":${kQueueStats}` +
+        `.*"(${kLoggedQueues})":${kQueueStats}`,
 );
 assert(
     checkLog.checkContainsOnce(primary, predicate),

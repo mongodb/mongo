@@ -108,15 +108,15 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         if exit_code == 143 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongot on port {:d}.".format(self.port))
         else:
+            # mongot is a supporting fixture rather than the code under test, and any crash during
+            # the test itself would already have been caught by the is_running() check above. An
+            # unexpected exit code here only reflects mongot's own teardown/shutdown behavior, so we
+            # log it for visibility but do not fail the test. There are known transient race
+            # conditions in mongot which occur at shutdown, which we ignore here to reduce test
+            # flakiness.
             self.logger.warning(
-                "Stopped the mongot on port {:d}. " "Process exited with code {:d}.".format(
-                    self.port, exit_code
-                )
-            )
-            raise self.fixturelib.ServerFailure(
-                "mongot on port {:d} with pid {:d} exited with code {:d}".format(
-                    self.port, self.mongot.pid, exit_code
-                )
+                "Stopped the mongot on port {:d} with pid {:d}, but it exited with unexpected code "
+                "{:d}.".format(self.port, self.mongot.pid, exit_code)
             )
         # It is necessary for correctness purposes to delete the config journals during fixture teardown
         # (instead of in a hook) to ensure that there are no zombie index entries left from a previous

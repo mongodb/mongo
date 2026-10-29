@@ -1,39 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
+#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 
@@ -118,6 +95,11 @@ protected:
     void runTest(F createMock) {
         unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking",
                                                              true);
+        // runTest verifies that the stage's memory usage reaches CurOp. The operation-wide
+        // tracker latches its chunk size from this knob at creation and only writes to CurOp once
+        // usage crosses it; each document stays below the 1MB default, so report every update.
+        unittest::ServerParameterGuard chunkSizeGuard(
+            "internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
         int64_t inUseTrackedMemBytes, peakTrackedMemBytes;
 
         std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
@@ -195,6 +177,151 @@ TEST_F(OperationMemoryUsageTrackerTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff)
     ASSERT_EQ(peakTrackedMemBytes, 0);
 
     ASSERT_TRUE(mock->getNext().isEOF());
+}
+
+/**
+ * Contexts that opt out of operation-wide memory tracking get standalone stage trackers: per-stage
+ * limits still apply, but usage neither counts toward the per-operation limit nor reaches CurOp.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, StageTrackersAreStandaloneWhenOperationTrackingExcluded) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard perOpLimit("internalQueryMaxMemoryUsageBytesPerOperation", 4);
+
+    auto expCtx = getExpCtx();
+    expCtx->setExcludeOperationMemoryTracking(true);
+
+    auto assertStandalone = [&](auto tracker) {
+        tracker.add(100);  // Exceeds the per-operation limit; a chained tracker would fail.
+        ASSERT_TRUE(tracker.withinMemoryLimit(expCtx->getOperationContext()));
+
+        int64_t inUseTrackedMemBytes, peakTrackedMemBytes;
+        std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseTrackedMemBytes, 0);
+        ASSERT_EQ(peakTrackedMemBytes, 0);
+        tracker.add(-100);
+    };
+
+    assertStandalone(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx));
+    assertStandalone(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(*expCtx));
+}
+
+/**
+ * The attach-time publish must consume the "never reported" state. A tracker that never crossed a
+ * chunk boundary before being stashed publishes its exact totals on reattach, and a later release
+ * to zero must still report through the return-to-zero rule -- otherwise CurOp keeps a stale
+ * non-zero value for the resumed operation.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, AttachPublishConsumesNeverReportedState) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    // A large chunk size keeps every update in this test below the first boundary, so nothing is
+    // reported through addInternal() and the tracker stays in the "never reported" state.
+    unittest::ServerParameterGuard chunkSizeGuard("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                  10 * 1024 * 1024);
+
+    auto expCtx = getExpCtx();
+    OperationContext* opCtx = expCtx->getOperationContext();
+
+    auto stageTracker =
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
+    stageTracker.add(100);
+
+    // Sub-chunk usage never reaches CurOp on its own.
+    ASSERT_EQ(getCurOpMemoryStats().first, 0);
+
+    // Stash the tracker (as a cursor does between getMores) and reattach it: the attach publishes
+    // the exact totals to CurOp even though no boundary was ever crossed.
+    auto opTracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(opTracker));
+    auto [inUseTrackedMemBytes, peakTrackedMemBytes] = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemBytes, 100);
+    ASSERT_GT(peakTrackedMemBytes, 0);
+
+    // An increase that stays within the same chunk must not report: consuming the "never reported"
+    // state does not turn chunking off.
+    stageTracker.add(150);
+    std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemBytes, 100);
+
+    // Releasing all memory must drive CurOp back to zero rather than leave it stale at 100: the
+    // publish above consumed the "never reported" state. The peak reflects the high-water mark.
+    stageTracker.add(-250);
+    std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemBytes, 0);
+    ASSERT_EQ(peakTrackedMemBytes, 250);
+}
+
+/**
+ * A knob-backed limit built via loadMemoryLimit() must resolve its value from the query knob (its
+ * backing server parameter) against the operation, not from any snapshot taken at construction.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, KnobBackedLimitResolvesFromKnob) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+
+    SimpleMemoryUsageTracker tracker{
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes)};
+    ASSERT_EQ(tracker.maxAllowedMemoryUsageBytes(opCtx), 100);
+}
+
+/**
+ * withinMemoryLimit()/assertWithinMemoryLimit() on a knob-backed tracker must enforce the knob's
+ * value, not a hard-coded default.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, WithinMemoryLimitEnforcesKnobBackedLimit) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+
+    SimpleMemoryUsageTracker tracker{
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes)};
+
+    tracker.add(50);
+    ASSERT_TRUE(tracker.withinMemoryLimit(opCtx));
+
+    tracker.add(51);
+    ASSERT_FALSE(tracker.withinMemoryLimit(opCtx));
+}
+
+/**
+ * The value is genuinely read from the knob: a different guarded value yields a different limit.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, KnobBackedLimitTracksGuardedValue) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 4242LL};
+
+    SimpleMemoryUsageTracker tracker{
+        loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes)};
+    ASSERT_EQ(tracker.maxAllowedMemoryUsageBytes(opCtx), 4242);
+}
+
+/**
+ * With a null OperationContext a knob-backed limit returns the knob's global value without
+ * latching it: a later read that does have an operation resolves against that operation's
+ * QueryKnobConfiguration.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, NullOpCtxReadsGlobalValueWithoutLatching) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    MemoryUsageLimit limit = loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes);
+    {
+        QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+        ASSERT_EQ(limit.get(nullptr), 100);
+    }
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 4242LL};
+    ASSERT_EQ(limit.get(opCtx), 4242);
+}
+
+/**
+ * The first get() with an operation latches the resolved value: a second get() under a different
+ * configuration still returns the first-resolved value.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, KnobBackedLimitLatchesFirstResolvedValue) {
+    OperationContext* opCtx = getExpCtx()->getOperationContext();
+    MemoryUsageLimit limit = loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes);
+    {
+        QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 100LL};
+        ASSERT_EQ(limit.get(opCtx), 100);
+    }
+    QueryKnobGuardForTest knobGuard{opCtx, "internalDocumentSourceGroupMaxMemoryBytes", 4242LL};
+    ASSERT_EQ(limit.get(opCtx), 100);
 }
 
 }  // namespace

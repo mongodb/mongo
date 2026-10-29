@@ -85,7 +85,7 @@ class test_layered_cursor05(wttest.WiredTigerTestCase):
 
     def remove_keys_on(self, session, keys):
         """Remove keys on a specific session."""
-        cursor = session.open_cursor(self.uri)
+        cursor = session.open_cursor(self.uri, None, 'overwrite=false')
         for key in keys:
             session.begin_transaction()
             cursor.set_key(key)

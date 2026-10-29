@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
@@ -52,10 +26,10 @@ public:
         ctx.outStream() << "input " << toString(pipeline) << std::endl;
 
         auto joinModel = AggJoinModel::constructJoinModel(
-            *pipeline, buildParams.get_value_or(defaultBuildParams));
+            *pipeline, buildParams.get_value_or(defaultBuildParams), getFreshJoinOptMetrics());
 
         if (joinModel.isOK()) {
-            ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty*/ true)
+            ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty=*/true)
                             << std::endl;
         } else {
             ctx.outStream() << "output: " << joinModel.getStatus() << std::endl;
@@ -80,7 +54,7 @@ public:
 TEST_F(AggJoinModelGoldenTest, longPrefix) {
     const auto query = R"([
             {$match: {c: 1, h: 12}},
-            {$project: {k: 0}},
+            {$project: {c: 1, h: 1, a: 1}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
             {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
@@ -90,13 +64,43 @@ TEST_F(AggJoinModelGoldenTest, longPrefix) {
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "longPrefix");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: the inferred edge closes a triangle, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 }
 
 TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
-    auto pipeline = makePipelineOfSize(/*numJoins*/ kHardMaxNodesInJoin + 3);
+    auto pipeline = makePipelineOfSize(/*numJoins=*/kHardMaxNodesInJoin + 3);
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "veryLargePipeline");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 2);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 4);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 64);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 63);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 63);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 64 nodes and 66 edges: cyclic, but far too sparse to be a clique.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
 }
 
 /**
@@ -114,6 +118,21 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_OneImplictEdge) {
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}, {"B", {"b"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_OneImplictEdge");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -135,6 +154,21 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_MultipleImplictEdges) {
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"a"sv}}, {"B", {"b"sv}}, {"C", {"c"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_MultipleImplictEdges");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 6);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 4 nodes and 6 edges: every pair is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 4);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 6);
 }
@@ -167,6 +201,21 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_TwoConnectedComponents) {
         {{"A", {"a"sv}}, {"B", {"b"sv}}, {"C", {"c"sv, "d"sv}}, {"D", {"d"sv}}, {"E", {"e"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_TwoConnectedComponents");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 6);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 6);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 4);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 9);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 6 nodes and 9 edges: cyclic, but neither a clique nor a tree.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 6);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 9);
 }
@@ -199,6 +248,21 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_NoImplicitEdges) {
                         {"E", {"e"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_NoImplicitEdges");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 6);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 6);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 5);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 6 nodes and 5 edges, each joined to the next: a chain. No node is a hub.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 6);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 5);
 }
@@ -236,6 +300,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEnd) {
 
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEnd");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 5);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 8);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
 }
@@ -266,6 +345,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEndNonScalar) {
                        {{"A", {"s1"sv}}, {"B", {"s2"sv}}, {"C", {"s3"sv}}, {"D", {"s4"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEndNonScalar");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 2);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 2 edges: a path, which for 3 nodes is also a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     // $match gets pushed up by optimization, then renders remaining suffix ineligible!
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 2);
@@ -300,6 +394,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetween) {
                         {"D", {"s4"sv, "c"sv, "d"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetween");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 5);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 8);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
 }
@@ -327,6 +436,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetweenNonScalar) {
     auto joinModel =
         runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetweenNonScalar");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 2);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 2 edges: a path, which for 3 nodes is also a star.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_FALSE(getJoinOptMetrics().isCycle);
+    ASSERT_TRUE(getJoinOptMetrics().isChain);
+    ASSERT_TRUE(getJoinOptMetrics().isStar);
     // $match moves up, disqualifying 2 nodes.
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 2);
@@ -361,6 +485,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEnd) {
         {{"A", {"s1"sv, "a"sv}}, {"B", {"s2"sv, "a"sv, "b"sv}}, {"C", {"s3"sv}}, {"D", {"s4"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEnd");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 2);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -391,6 +530,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNumeric) {
          {"D", {"s4"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEndNumeric");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 2);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -421,6 +575,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNonScalar) {
                         {"D", {"s4"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEndNonScalar");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 3);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 2);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 0);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 3 nodes and 3 edges: a triangle, which is also a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
@@ -455,6 +624,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdge) {
                         {"D", {"a"sv, "d"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdge");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 5);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 10);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
     ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 10);
@@ -481,6 +665,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdgeNonScalar) {
         {{"A", {"a"sv, "b"sv}}, {"B", {"b"sv, "s"sv}}, {"C", {"s"sv, "c"sv}}, {"D", {"d"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdgeNonScalar");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 5);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 1);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 7 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     // Can't add potentially multikey edge "A.a" - "D.a".
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 7);
@@ -530,6 +729,21 @@ TEST_F(AggJoinModelGoldenTest, subPipelineEdge_addImplicitEdge) {
                         {"D", {"d"sv, "a"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "subPipelineEdge_addImplicitEdge");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 5);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 5);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 10);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 5 nodes and 8 edges: cyclic, but a clique would need 10 edges.
+    ASSERT_FALSE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
     ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 10);
@@ -568,6 +782,21 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_subPipelineEdge_addImplicitEdge)
     auto joinModel =
         runVariation(std::move(pipeline), "addEdgesFromExpr_subPipelineEdge_addImplicitEdge");
     ASSERT_OK(joinModel);
+    ASSERT_TRUE(getJoinOptMetrics().joinOptimizable);
+    ASSERT_EQ(getJoinOptMetrics().numNamespaces, 4);
+    ASSERT_EQ(getJoinOptMetrics().numLookupsInSuffix, 0);
+    ASSERT_EQ(getJoinOptMetrics().numJoinGraphNodes, 4);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticEqJoinPredicates, 3);
+    ASSERT_EQ(getJoinOptMetrics().numSyntacticExprJoinPredicates, 2);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEdges, 3);
+    ASSERT_EQ(getJoinOptMetrics().numInferredEqJoinPredicates, 8);
+    ASSERT_EQ(getJoinOptMetrics().numInferredSingleTablePredicates, 0);
+    // 4 nodes and 6 edges: every pair is joined, i.e. a clique.
+    ASSERT_TRUE(getJoinOptMetrics().isClique);
+    ASSERT_TRUE(getJoinOptMetrics().isCycle);
+    ASSERT_FALSE(getJoinOptMetrics().isChain);
+    ASSERT_FALSE(getJoinOptMetrics().isStar);
     ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 4);
     ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 6);
     ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 8);

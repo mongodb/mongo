@@ -10,6 +10,7 @@
  *  assumes_unsharded_collection,
  *  # resharding can't run during FCV transitions
  *  cannot_run_during_upgrade_downgrade,
+ *  uses_parallel_shell,
  * ]
  */
 

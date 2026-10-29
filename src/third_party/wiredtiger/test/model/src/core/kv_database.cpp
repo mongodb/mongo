@@ -53,6 +53,7 @@ kv_database_config::kv_database_config()
 {
     disaggregated = false;
     leader = true;
+    logging = false;
 }
 
 /*
@@ -71,6 +72,8 @@ kv_database_config::from_string(const std::string &config)
             r.disaggregated = m.get_bool(k.c_str());
         else if (k == "leader")
             r.leader = m.get_bool(k.c_str());
+        else if (k == "logging")
+            r.logging = m.get_bool(k.c_str());
         else
             throw std::runtime_error("Invalid database configuration key: " + k);
     }

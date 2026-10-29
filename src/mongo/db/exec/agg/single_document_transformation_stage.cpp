@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/single_document_transformation_stage.h"
 
@@ -34,7 +8,6 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
 #include <string_view>
 
@@ -76,13 +49,14 @@ SingleDocumentTransformationStage::SingleDocumentTransformationStage(
     : Stage(stageName, pExpCtx),
       _ownedStageName(stageName),
       _transformationProcessor(transformationProcessor),
-      _memoryTracker(OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
-          *pExpCtx,
-          loadMemoryLimit(
-              StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes))) {
+      _memoryTracker(
+          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     _commonStats.stageTypeStr = _ownedStageName;
-    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        _expressionEvalCtx.tracker = &_memoryTracker;
+    }
+    _expressionEvalCtx.stageName = _commonStats.stageTypeStr;
 }
 
 GetNextResult SingleDocumentTransformationStage::doGetNext() {
@@ -97,15 +71,23 @@ GetNextResult SingleDocumentTransformationStage::doGetNext() {
         return input;
     }
 
-    return _transformationProcessor->process(
-        input.releaseDocument(),
-        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{});
+    return _transformationProcessor->process(input.releaseDocument(), _expressionEvalCtx);
 }
 
 void SingleDocumentTransformationStage::doDispose() {
     if (_transformationProcessor) {
         _transformationProcessor.reset();
     }
+}
+
+Document SingleDocumentTransformationStage::getExplainOutput(
+    const query_shape::SerializationOptions& opts) const {
+    MutableDocument out(Stage::getExplainOutput(opts));
+    if (_expressionEvalCtx.tracker) {
+        out["expressionEvaluationPeakMemoryBytes"] = opts.serializeLiteral(
+            static_cast<long long>(_expressionEvalCtx.tracker->peakTrackedMemoryBytes()));
+    }
+    return out.freeze();
 }
 
 }  // namespace agg

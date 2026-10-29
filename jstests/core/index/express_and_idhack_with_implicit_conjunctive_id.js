@@ -1,6 +1,7 @@
 /**
  * Tests the express and idhack code path for query predicates with implicit conjunctive _id
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_82,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,

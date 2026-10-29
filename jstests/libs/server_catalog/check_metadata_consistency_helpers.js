@@ -13,6 +13,15 @@ export var MetadataConsistencyChecker = (function () {
                 return true;
             }
 
+            const isStepdownSuite =
+                Boolean(TestData.runningWithShardStepdowns) ||
+                Boolean(TestData.runningWithStepdowns);
+            if (isStepdownSuite && e.code === ErrorCodes.CallbackCanceled) {
+                // Metadata consistency check can fail with CallbackCanceled if a node gets
+                // killed or steps down while the check is establishing cursors on it.
+                return true;
+            }
+
             if (
                 ErrorCodes.isRetriableError(e.code) ||
                 ErrorCodes.isInterruption(e.code) ||
@@ -63,7 +72,9 @@ export var MetadataConsistencyChecker = (function () {
 
             // Since bucket collections are not created atomically with their view, it may happen
             // that checkMetadataConsistency interleaves with the creation steps in case of stepdown
-            const isStepdownSuite = Boolean(jsTest.options().runningWithShardStepdowns);
+            const isStepdownSuite =
+                Boolean(TestData.runningWithShardStepdowns) ||
+                Boolean(TestData.runningWithStepdowns);
             if (isStepdownSuite) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].type == "MalformedTimeseriesBucketsCollection") {

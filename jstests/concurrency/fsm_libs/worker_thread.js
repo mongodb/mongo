@@ -131,10 +131,7 @@ export const workerThread = (function () {
                 let connectionDesc = "";
                 // In sharded environments, mongos is acting as a proxy for the mongo shell and
                 // therefore has a different outbound port than the 'whatsmyuri' command returns.
-                if (
-                    !Cluster.isSharded(args.clusterOptions) &&
-                    !TestData.testingReplicaSetEndpoint
-                ) {
+                if (!Cluster.isSharded(args.clusterOptions)) {
                     let res = assert.commandWorked(myDB.runCommand({whatsmyuri: 1}));
                     const myUri = res.you;
 
@@ -209,12 +206,20 @@ export const workerThread = (function () {
                     assert(!TestData.hasOwnProperty("networkErrorAndTxnOverrideConfig"), TestData);
                     TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
                     await import("jstests/libs/override_methods/network_error_and_txn_override.js");
-                    if (TestData.killShards) {
-                        // TODO (SERVER-107404): Remove the override below.
-                        await import(
-                            "jstests/libs/override_methods/implicitly_retry_resharding.js"
-                        );
+                    await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
+                } else if (TestData.runningWithStepdowns) {
+                    const newOptions = {
+                        alwaysInjectTransactionNumber: true,
+                        defaultReadConcernLevel: "majority",
+                        logRetryAttempts: true,
+                        overrideRetryAttempts: 3,
+                    };
+                    Object.assign(TestData, newOptions);
+
+                    if (!TestData.hasOwnProperty("networkErrorAndTxnOverrideConfig")) {
+                        TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
                     }
+                    await import("jstests/libs/override_methods/network_error_and_txn_override.js");
                 }
 
                 // Operations that run after a "dropDatabase" command has been issued may fail with

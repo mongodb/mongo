@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -127,6 +101,26 @@ protected:
      * returned in the sorted results.
      */
     virtual double computeDistance(WorkingSetMember* member) = 0;
+
+    /**
+     * Returns the largest distance this search can ever return, in the same units as
+     * computeDistance(). This is the maximum distance of the last interval, so a document beyond it
+     * fails the interval check of every interval and can never be returned. bufferNext() therefore
+     * discards such a document right away instead of buffering it. Defaults to no limit.
+     */
+    virtual double maxSearchDistance() const {
+        return std::numeric_limits<double>::infinity();
+    }
+
+    /**
+     * Returns the residual document-level predicate to apply to each buffered document, or nullptr
+     * if there is none. This predicate is evaluated only on documents that the near search would
+     * otherwise return, that is, after the distance checks against the current interval and against
+     * maxSearchDistance(). See the call site in bufferNext() for why the ordering matters.
+     */
+    virtual const MatchExpression* residualFilter() const {
+        return nullptr;
+    }
 
     /*
      * Initialize near stage before buffering the data.

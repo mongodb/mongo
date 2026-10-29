@@ -1,4 +1,8 @@
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load("@rules_cc//cc/common:cc_shared_library_info.bzl", "CcSharedLibraryInfo")
+load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 TagInfo = provider(
     doc = "A rule provider to pass around tags that were passed to rules.",
@@ -11,6 +15,30 @@ WITH_DEBUG_SUFFIX = "_with_debug"
 CC_SHARED_LIBRARY_SUFFIX = "_shared"
 SHARED_ARCHIVE_SUFFIX = "_shared_archive"
 MAC_DEBUG_FOLDER_EXTENSION = ".dSYM"
+
+def _gdb_index_message_impl(ctx):
+    if not ctx.attr.enabled:
+        print("WARNING: GDB index generation is disabled for this build. To add an index to a binary, run: bazel run gdb-add-index -- <path-to-binary>. CI compile tasks disable index generation explicitly.")
+    return [DefaultInfo()]
+
+gdb_index_message = rule(
+    implementation = _gdb_index_message_impl,
+    attrs = {
+        "enabled": attr.bool(mandatory = True),
+    },
+)
+
+def flat_solib_name(short_path):
+    """
+    Map a library's workspace-relative path to a unique, flat file name in _solib_<cpu>.
+
+    Binaries record the solib file name in DT_NEEDED (our libraries set no SONAME), and Bazel
+    adds one RUNPATH entry per distinct solib directory. A flat name derived from the full path
+    keeps RUNPATH to a single entry while making every library name unique, so a stale library
+    left in the output tree after a target moves packages can never be loaded in place of the
+    current one. Escaping follows Bazel's own solib mangling ("_" -> "_U", "/" -> "_S").
+    """
+    return "lib" + short_path.replace("_", "_U").replace("/", "_S")
 
 def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     """
@@ -48,14 +76,20 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
             if shared_lib:
                 basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
 
+            output_bin = ctx.actions.declare_file(basename + shared_ext)
+
+            # Regular libraries are installed under their flat solib name, so name the debug info
+            # to match. This keeps the debuglink, the installed debug file, and the installed
+            # library consistent for tools that pair "<lib>" with "<lib>.debug" by name.
+            # cc_shared_library outputs keep their plain names.
+            debug_basename = basename + shared_ext if shared_lib else flat_solib_name(output_bin.short_path)
             if ctx.attr.enabled:
                 if debug_ext == MAC_DEBUG_FOLDER_EXTENSION:
-                    debug_info = ctx.actions.declare_directory(basename + shared_ext + debug_ext)
+                    debug_info = ctx.actions.declare_directory(debug_basename + debug_ext)
                 else:
-                    debug_info = ctx.actions.declare_file(basename + shared_ext + debug_ext)
+                    debug_info = ctx.actions.declare_file(debug_basename + debug_ext)
             else:
                 debug_info = None
-            output_bin = ctx.actions.declare_file(basename + shared_ext)
             input_bin = shared_input
             if shared_lib:
                 input_bin = shared_lib
@@ -166,8 +200,12 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
 
         if shared_lib or static_lib:
             binary_linker_inputs = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()
-            if shared_lib:
+            if shared_lib and cc_shared_library != None:
+                # cc_shared_library outputs keep their plain, package-relative names (see
+                # get_inputs_and_outputs).
                 so_path = shared_lib.path.replace(ctx.bin_dir.path + "/", "")
+            elif shared_lib:
+                so_path = flat_solib_name(shared_lib.short_path)
             else:
                 so_path = ""
             direct_lib = cc_common.create_library_to_link(
@@ -305,21 +343,60 @@ def linux_strip_resource_set(os, numInputs):
         "local_test": 1,
     }
 
+def _generate_gdb_index(ctx, inputs, input_bin):
+    binary_output_groups = ctx.attr.binary_with_debug[OutputGroupInfo]
+    dwo_files = binary_output_groups.dwo_files if "dwo_files" in binary_output_groups else depset()
+    index_bundle = ctx.actions.declare_directory(input_bin.basename + ".gdb_index")
+    ctx.actions.run(
+        executable = ctx.executable.gdb_generate_index,
+        outputs = [index_bundle],
+        inputs = depset([input_bin], transitive = [inputs, dwo_files]),
+        tools = [ctx.attr.gdb_generate_index[DefaultInfo].files_to_run],
+        arguments = [input_bin.path, index_bundle.path],
+        env = {"BUILD_WORKING_DIRECTORY": ""},
+        resource_set = linux_extract_resource_set,
+        mnemonic = "GdbGenerateIndex",
+    )
+    return index_bundle
+
+def _apply_gdb_index(ctx, cc_toolchain, input_bin, index_bundle, output_bin):
+    ctx.actions.run(
+        executable = ctx.executable.gdb_apply_index,
+        outputs = [output_bin],
+        inputs = depset([input_bin, index_bundle], transitive = [cc_toolchain.all_files]),
+        tools = [ctx.attr.gdb_apply_index[DefaultInfo].files_to_run],
+        arguments = [index_bundle.path, input_bin.path, output_bin.path],
+        env = {"OBJCOPY": cc_toolchain.objcopy_executable},
+        execution_requirements = {
+            "no-remote": "1",
+            "local": "1",
+        },
+        resource_set = linux_strip_resource_set,
+        mnemonic = "GdbApplyIndex",
+    )
+
 def linux_extraction(ctx, cc_toolchain, inputs):
     outputs = []
     unstripped_static_bin = None
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
     input_file = ctx.attr.binary_with_debug.files.to_list()
     if input_bin:
+        gdb_index_added = ctx.attr.type == "program" and ctx.attr.gdb_index_enabled
+        input_bin_with_gdb_index = input_bin
+        if gdb_index_added:
+            index_bundle = _generate_gdb_index(ctx, inputs, input_bin)
+            input_bin_with_gdb_index = ctx.actions.declare_file(input_bin.basename + ".gdb_indexed") if ctx.attr.enabled else output_bin
+            _apply_gdb_index(ctx, cc_toolchain, input_bin, index_bundle, input_bin_with_gdb_index)
+
         if ctx.attr.enabled:
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [debug_info],
-                inputs = depset([input_bin], transitive = [cc_toolchain.all_files]),
+                inputs = depset([input_bin_with_gdb_index], transitive = [cc_toolchain.all_files]),
                 resource_set = linux_extract_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--only-keep-debug",
-                    input_bin.path,
+                    input_bin_with_gdb_index.path,
                     debug_info.path,
                 ],
                 mnemonic = "ExtractDebugInfo",
@@ -328,23 +405,24 @@ def linux_extraction(ctx, cc_toolchain, inputs):
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [output_bin],
-                inputs = depset([input_bin, debug_info], transitive = [cc_toolchain.all_files]),
+                inputs = depset([input_bin_with_gdb_index, debug_info], transitive = [cc_toolchain.all_files]),
                 resource_set = linux_strip_resource_set if ctx.attr.type == "program" else None,
                 arguments = [
                     "--strip-debug",
                     "--add-gnu-debuglink",
                     debug_info.path,
-                    input_bin.path,
+                    input_bin_with_gdb_index.path,
                     output_bin.path,
                 ],
                 mnemonic = "StripDebugInfo",
             )
             outputs += [output_bin, debug_info]
         else:
-            ctx.actions.symlink(
-                output = output_bin,
-                target_file = input_bin,
-            )
+            if not gdb_index_added:
+                ctx.actions.symlink(
+                    output = output_bin,
+                    target_file = input_bin,
+                )
             outputs += [output_bin]
 
     if len(input_file):
@@ -623,7 +701,7 @@ def wasi_extraction(ctx, cc_toolchain, inputs):
     return provided_info
 
 def extract_debuginfo_impl(ctx):
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     inputs = depset(transitive = [
         ctx.attr.binary_with_debug.files,
         ctx.attr.cc_shared_library.files if ctx.attr.cc_shared_library != None else depset([]),
@@ -679,6 +757,19 @@ extract_debuginfo = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
+        "gdb_generate_index": attr.label(
+            default = "//bazel:gdb-generate-index-noop",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to generate a GDB index bundle for a program binary.",
+        ),
+        "gdb_apply_index": attr.label(
+            default = "//bazel:gdb-apply-index",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to apply a GDB index bundle to a program binary.",
+        ),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "linkstatic": attr.bool(default = True, doc = "If binaries are meant to be statically linked."),
@@ -691,7 +782,7 @@ extract_debuginfo = rule(
             allow_files = True,
         ),
         "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
@@ -714,6 +805,19 @@ extract_debuginfo_binary = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
+        "gdb_generate_index": attr.label(
+            default = "//bazel:gdb-generate-index-noop",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to generate a GDB index bundle for a program binary.",
+        ),
+        "gdb_apply_index": attr.label(
+            default = "//bazel:gdb-apply-index",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to apply a GDB index bundle to a program binary.",
+        ),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(
@@ -725,7 +829,7 @@ extract_debuginfo_binary = rule(
             allow_files = True,
         ),
         "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
@@ -748,6 +852,19 @@ extract_debuginfo_test = rule(
             doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
         "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "gdb_index_enabled": attr.bool(default = False, doc = "Flag to add a GDB index to program binaries."),
+        "gdb_generate_index": attr.label(
+            default = "//bazel:gdb-generate-index-noop",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to generate a GDB index bundle for a program binary.",
+        ),
+        "gdb_apply_index": attr.label(
+            default = "//bazel:gdb-apply-index",
+            executable = True,
+            cfg = "exec",
+            doc = "Executable used to apply a GDB index bundle to a program binary.",
+        ),
         "enable_pdb": attr.bool(default = False, doc = "Flag to enable pdb outputs on windows."),
         "deps": attr.label_list(providers = [CcInfo]),
         "cc_shared_library": attr.label(
@@ -759,7 +876,7 @@ extract_debuginfo_test = rule(
             allow_files = True,
         ),
         "skip_archive": attr.bool(default = False, doc = "Flag to skip generating archives."),
-        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
@@ -783,4 +900,96 @@ extract_debuginfo_test = rule(
     fragments = ["cpp", "coverage"],
     executable = True,
     test = True,
+)
+
+def _extract_debuginfo_rust_impl(ctx):
+    """Split debug info out of a rust shared library.
+
+    The cc extraction rules above are shaped around CcInfo/CcSharedLibraryInfo and the
+    static/shared archive pairs that mongo_cc_library produces. A rust cdylib has none of
+    that - nothing links against it, it is dlopen'd at runtime - so this rule only needs to
+    run the same objcopy steps and hand back the resulting files.
+    """
+    cc_toolchain = find_cc_toolchain(ctx)
+
+    shared_input = None
+    for file in ctx.attr.shared_library_with_debug.files.to_list():
+        if file.basename.endswith(WITH_DEBUG_SUFFIX + ctx.attr.shared_ext):
+            shared_input = file
+    if shared_input == None:
+        fail("Expected a '{}{}' file from {}".format(
+            WITH_DEBUG_SUFFIX,
+            ctx.attr.shared_ext,
+            ctx.attr.shared_library_with_debug.label,
+        ))
+
+    basename = shared_input.basename[:-len(WITH_DEBUG_SUFFIX + ctx.attr.shared_ext)]
+    output_bin = ctx.actions.declare_file(basename + ctx.attr.shared_ext)
+
+    # The objcopy steps below are ELF specific. Rust shared libraries are currently
+    # linux only, so rather than guess at the mac/windows equivalents, pass the
+    # library through untouched there and leave that for whoever needs it first.
+    linux_constraint = ctx.attr._linux_constraint[platform_common.ConstraintValueInfo]
+    if not ctx.attr.enabled or not ctx.target_platform_has_constraint(linux_constraint):
+        ctx.actions.symlink(output = output_bin, target_file = shared_input)
+        return [
+            DefaultInfo(files = depset([output_bin])),
+            OutputGroupInfo(shared_library = depset([output_bin])),
+            TagInfo(tags = ctx.attr.tags),
+        ]
+
+    debug_info = ctx.actions.declare_file(basename + ctx.attr.shared_ext + ".debug")
+
+    ctx.actions.run(
+        executable = cc_toolchain.objcopy_executable,
+        outputs = [debug_info],
+        inputs = depset([shared_input], transitive = [cc_toolchain.all_files]),
+        arguments = [
+            "--only-keep-debug",
+            shared_input.path,
+            debug_info.path,
+        ],
+        mnemonic = "ExtractDebugInfo",
+    )
+
+    ctx.actions.run(
+        executable = cc_toolchain.objcopy_executable,
+        outputs = [output_bin],
+        inputs = depset([shared_input, debug_info], transitive = [cc_toolchain.all_files]),
+        arguments = [
+            "--strip-debug",
+            "--add-gnu-debuglink",
+            debug_info.path,
+            shared_input.path,
+            output_bin.path,
+        ],
+        mnemonic = "StripDebugInfo",
+    )
+
+    return [
+        DefaultInfo(files = depset([output_bin, debug_info])),
+        OutputGroupInfo(
+            shared_library = depset([output_bin]),
+            debug_file = depset([debug_info]),
+        ),
+        TagInfo(tags = ctx.attr.tags),
+    ]
+
+extract_debuginfo_rust = rule(
+    _extract_debuginfo_rust_impl,
+    attrs = {
+        "shared_library_with_debug": attr.label(
+            doc = "The rust shared library to extract debuginfo from.",
+            allow_files = True,
+        ),
+        "shared_ext": attr.string(
+            doc = "Platform extension for shared libraries, e.g. '.so'.",
+        ),
+        "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
+        "_linux_constraint": attr.label(default = "@platforms//os:linux"),
+    },
+    doc = "Extract debuginfo from a rust shared library into a separate file",
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+    fragments = ["cpp"],
 )

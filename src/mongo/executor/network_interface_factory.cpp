@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/executor/network_interface_factory.h"
 
@@ -57,55 +31,50 @@ std::string makeInstanceName(std::string_view name) {
     return fmt::format("NetworkInterfaceTL-{}", name);
 }
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string_view instanceName) {
-    return makeNetworkInterface(instanceName, nullptr, nullptr);
-}
-
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::string_view instanceName,
-    std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-    ConnectionPool::Options connPoolOptions,
-    transport::TransportProtocol protocol,
-    bool trackRequestCounts) {
+    std::string_view instanceName, ConnectionPoolNetworkInterfaceOptions options) {
     // instanceName flows into PooledAsyncClientFactory::_name which is sent as the
     // applicationName in the hello handshake for every connection this interface opens.
     // An empty name would make those connections invisible to server-side policies that
     // identify internal clients by appName (e.g. ingress rate limiting exemptions).
     dassert(!instanceName.empty(), "makeNetworkInterface requires a non-empty instanceName");
 
+    auto connPoolOptions = std::move(options.connectionPoolOptions);
     if (!connPoolOptions.egressConnectionCloserManager && hasGlobalServiceContext()) {
         connPoolOptions.egressConnectionCloserManager =
             &EgressConnectionCloserManager::get(getGlobalServiceContext());
     }
 
+    auto clientFactory =
+        std::make_shared<PooledAsyncClientFactory>(makeInstanceName(instanceName),
+                                                   std::move(connPoolOptions),
+                                                   std::move(options.connectionHook),
+                                                   options.protocol);
     return makeNetworkInterfaceWithClientFactory(
         instanceName,
-        std::make_shared<PooledAsyncClientFactory>(
-            makeInstanceName(instanceName), std::move(connPoolOptions), std::move(hook), protocol),
-        std::move(metadataHook),
-        trackRequestCounts);
+        std::move(clientFactory),
+        {.metadataHook = std::move(options.metadataHook),
+         .trackRequestCounts = options.trackRequestCounts});
 }
 
 #ifdef MONGO_CONFIG_GRPC
-std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
-    std::string_view instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(std::string_view instanceName,
+                                                           NetworkInterfaceOptions options) {
     return makeNetworkInterfaceWithClientFactory(
         instanceName,
         std::make_shared<transport::grpc::GRPCAsyncClientFactory>(makeInstanceName(instanceName)),
-        std::move(metadataHook));
+        std::move(options));
 }
 #endif
 
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     std::string_view instanceName,
     std::shared_ptr<AsyncClientFactory> clientFactory,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-    bool trackRequestCounts) {
+    NetworkInterfaceOptions options) {
     return std::make_unique<NetworkInterfaceTL>(makeInstanceName(instanceName),
                                                 std::move(clientFactory),
-                                                std::move(metadataHook),
-                                                trackRequestCounts);
+                                                std::move(options.metadataHook),
+                                                options.trackRequestCounts);
 }
 
 }  // namespace executor

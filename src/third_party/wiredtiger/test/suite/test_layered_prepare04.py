@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, os.path, shutil, threading, time, wiredtiger, wttest
+import os, os.path, shutil, threading, wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -164,11 +164,8 @@ class test_layered_prepare04(wttest.WiredTigerTestCase):
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # Only the committed update can be garbage collected.
-        self.assertEqual(garbage_collected, 1)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_ingest_garbage_collection_keys_update_chain, uri, session=self.session_follow), 1)
 
         # Insert another committed update.
         self.session.begin_transaction()
@@ -199,11 +196,8 @@ class test_layered_prepare04(wttest.WiredTigerTestCase):
         evict_cursor.search()
         evict_cursor.close()
 
-        stat_cursor = self.session_follow.open_cursor('statistics:' + uri)
-        garbage_collected = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_update_chain][2]
         # The aborted prepared update is garbage collected.
-        self.assertEqual(garbage_collected, 2)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_ingest_garbage_collection_keys_update_chain, uri, session=self.session_follow), 2)
 
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(40)}")
 

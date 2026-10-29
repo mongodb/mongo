@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -127,7 +101,7 @@ void updateWithDamages(bool usePreexistingCursor, bool positionCursorCorrectly) 
 
             if (!usePreexistingCursor) {
                 auto newRecStatus = rs->updateWithDamages(
-                    opCtx.get(), ru, loc, rec, data.c_str(), dv, nullptr /*cursor*/);
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus.getStatus());
                 ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             } else if (positionCursorCorrectly) {
@@ -159,12 +133,12 @@ void updateWithDamages(bool usePreexistingCursor, bool positionCursorCorrectly) 
 
 TEST(RecordStoreTest, UpdateWithDamages) {
     for (bool usePreexistingCursor : {false, true}) {
-        updateWithDamages(usePreexistingCursor, true /*positionCursorCorrectly*/);
+        updateWithDamages(usePreexistingCursor, /*positionCursorCorrectly=*/true);
     }
 }
 
 DEATH_TEST(RecordStoreDeathTest, ErrorNotPositioned, "expected cursor to be positioned") {
-    updateWithDamages(true /*usePreexistingCursor*/, false /*positionCursorCorrectly*/);
+    updateWithDamages(/*usePreexistingCursor=*/true, /*positionCursorCorrectly=*/false);
 }
 
 // Insert a record and try to perform an in-place update on it with a DamageVector
@@ -218,7 +192,7 @@ void updateWithOverlappingDamageEvents(bool usePreexistingCursor) {
             StorageWriteTransaction txn(ru);
             if (!usePreexistingCursor) {
                 auto newRecStatus = rs->updateWithDamages(
-                    opCtx.get(), ru, loc, rec, data.c_str(), dv, nullptr /*cursor*/);
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus.getStatus());
                 ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             } else {
@@ -301,7 +275,7 @@ void updateWithOverlappingDamageEventsReversed(bool usePreexistingCursor) {
             StorageWriteTransaction txn(ru);
             if (!usePreexistingCursor) {
                 auto newRecStatus = rs->updateWithDamages(
-                    opCtx.get(), ru, loc, rec, data.c_str(), dv, nullptr /*cursor*/);
+                    opCtx.get(), ru, loc, rec, data.c_str(), dv, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus.getStatus());
                 ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             } else {
@@ -373,7 +347,7 @@ void updateWithNoDamages(bool usePreexistingCursor) {
             StorageWriteTransaction txn(ru);
             if (!usePreexistingCursor) {
                 auto newRecStatus =
-                    rs->updateWithDamages(opCtx.get(), ru, loc, rec, "", dv, nullptr /*cursor*/);
+                    rs->updateWithDamages(opCtx.get(), ru, loc, rec, "", dv, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus.getStatus());
                 ASSERT_EQUALS(data, newRecStatus.getValue().data());
             } else {
@@ -453,7 +427,7 @@ void updateWithDamagesScalar(bool usePreexistingCursor) {
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, false);
             if (!usePreexistingCursor) {
                 auto newRecStatus1 = rs->updateWithDamages(
-                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, nullptr /*cursor*/);
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus1.getStatus());
                 ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
             } else {
@@ -491,7 +465,7 @@ void updateWithDamagesScalar(bool usePreexistingCursor) {
                                                            rs->dataFor(opCtx.get(), ru, loc),
                                                            damageSource.get(),
                                                            damages,
-                                                           nullptr /*cursor*/);
+                                                           /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus2.getStatus());
                 ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
             } else {
@@ -581,7 +555,7 @@ void updateWithDamagesNested(bool usePreexistingCursor) {
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, true);
             if (!usePreexistingCursor) {
                 auto newRecStatus1 = rs->updateWithDamages(
-                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, nullptr /*cursor*/);
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus1.getStatus());
                 ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
             } else {
@@ -659,7 +633,7 @@ void updateWithDamagesArray(bool usePreexistingCursor) {
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, true);
             if (!usePreexistingCursor) {
                 auto newRecStatus1 = rs->updateWithDamages(
-                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, nullptr /*cursor*/);
+                    opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages, /*cursor=*/nullptr);
                 ASSERT_OK(newRecStatus1.getStatus());
                 ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
             } else {

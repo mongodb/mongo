@@ -54,8 +54,3 @@ ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailov
         this.startContinuousFailover();
     }
 };
-
-// The checkUUIDsConsistentAcrossCluster() function is defined on ShardingTest's prototype, but
-// ShardingTest's prototype gets reset when ShardingTest is reassigned. We reload the override
-// to redefine checkUUIDsConsistentAcrossCluster() on the new ShardingTest's prototype.
-await import("jstests/libs/override_methods/check_uuids_consistent_across_cluster.js");

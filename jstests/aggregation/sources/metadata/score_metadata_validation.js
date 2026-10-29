@@ -4,11 +4,7 @@
  *
  * TODO SERVER-100945 Enable this test to be run in $facets.
  *
- * featureFlagRankFusionBasic is required to enable use of "score".
- * featureFlagSearchHybridScoringFull is required to enable use of $score.
  * @tags: [
- *   featureFlagRankFusionFull,
- *   featureFlagSearchHybridScoringFull,
  *   do_not_wrap_aggregations_in_facets,
  *   requires_fcv_82
  *  ]

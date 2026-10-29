@@ -7,6 +7,8 @@
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {assertTimeseriesConsistentWithViewlessFlag} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {assertShardUuidMetadataConsistency} from "jstests/libs/sharded_cluster_topology/shard_uuid_helpers.js";
 
 if (typeof db === "undefined") {
     throw new Error(
@@ -66,7 +68,11 @@ const sendFCVUpDown = function (ver) {
         }
         throw e;
     }
-    assertTimeseriesConsistentWithViewlessFlag(db);
+
+    RetryableWritesUtil.retryOnRetryableCode(() => {
+        assertTimeseriesConsistentWithViewlessFlag(db);
+        assertShardUuidMetadataConsistency(db);
+    }, "Retrying post-setFCV consistency checks interrupted by a retryable error");
 };
 
 Random.setRandomSeed();

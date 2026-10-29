@@ -52,13 +52,18 @@ class test_layered_cursor06(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, None)
         value1 = "aaaa"
 
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor[str(i)] = value1
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
+        self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(1))
         self.session.checkpoint()
 
+        self.session.begin_transaction()
         for i in range(self.nitems, 2 * self.nitems):
             cursor[str(i)] = value1
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(2))
 
         cursor.close()
 
@@ -66,9 +71,7 @@ class test_layered_cursor06(wttest.WiredTigerTestCase):
         self.assertEqual(random_cursor.next(), 0)
         random_cursor.close()
 
-        follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        self.reopen_conn(config = follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         random_cursor = self.session.open_cursor(self.uri, None, "next_random=true")
         self.assertEqual(random_cursor.next(), 0)

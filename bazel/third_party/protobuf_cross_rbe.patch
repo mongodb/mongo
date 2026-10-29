@@ -1,0 +1,893 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 734bec81a26..353cc6a3b29 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -357,6 +357,12 @@ cc_binary(
+     name = "protoc_stage0",
+     copts = COPTS,
+     linkopts = LINK_OPTS,
++    target_compatible_with = select({
++        "@@//bazel/config:mongo_ibm_cross": [
++            "@@//bazel/platforms:use_mongo_linux_cross_execution",
++        ],
++        "//conditions:default": [],
++    }),
+     visibility = ["//:__subpackages__"],
+     deps = ["//src/google/protobuf/compiler:protoc_lib_stage0"],
+ )
+diff --git a/bazel/private/bazel_cc_proto_library.bzl b/bazel/private/bazel_cc_proto_library.bzl
+index 3dba4880ac7..86fd9bdbcbe 100644
+--- a/bazel/private/bazel_cc_proto_library.bzl
++++ b/bazel/private/bazel_cc_proto_library.bzl
+@@ -54,7 +54,9 @@ def _aspect_impl(target, ctx):
+     headers = []
+     textual_hdrs = []
+ 
+-    proto_toolchain = toolchains.find_toolchain(ctx, "_aspect_cc_proto_toolchain", _CC_PROTO_TOOLCHAIN)
++    proto_toolchain = (
++        ctx.exec_groups["cross"].toolchains[_CC_PROTO_TOOLCHAIN].proto if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION else toolchains.find_toolchain(ctx, "_aspect_cc_proto_toolchain", _CC_PROTO_TOOLCHAIN)
++    )
+     should_generate_code = proto_common.experimental_should_generate_code(proto_info, proto_toolchain, "cc_proto_library", target.label)
+ 
+     if should_generate_code:
+@@ -93,6 +95,7 @@ def _aspect_impl(target, ctx):
+         proto_lang_toolchain_info = proto_toolchain,
+         generated_files = sources + headers,
+         experimental_output_files = "multiple",
++        experimental_exec_group = "cross",
+     )
+ 
+     deps = []
+@@ -126,6 +129,15 @@ cc_proto_aspect = aspect(
+         default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc"),
+     )}),
+     toolchains = use_cc_toolchain() + toolchains.use_toolchain(_CC_PROTO_TOOLCHAIN),
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                _CC_PROTO_TOOLCHAIN,
++                toolchains.PROTO_TOOLCHAIN,
++            ],
++        ),
++    },
+ )
+ 
+ def _cc_proto_library_impl(ctx):
+diff --git a/bazel/private/bazel_java_proto_library_rule.bzl b/bazel/private/bazel_java_proto_library_rule.bzl
+index 91bf77e5a95..e4e21c2cda5 100644
+--- a/bazel/private/bazel_java_proto_library_rule.bzl
++++ b/bazel/private/bazel_java_proto_library_rule.bzl
+@@ -37,7 +37,9 @@ def _bazel_java_proto_aspect_impl(target, ctx):
+       runtime jars.
+     """
+     _proto_library = ctx.rule.attr
+-    proto_toolchain_info = toolchains.find_toolchain(ctx, "_aspect_java_proto_toolchain", _JAVA_PROTO_TOOLCHAIN)
++    proto_toolchain_info = (
++        ctx.exec_groups["cross"].toolchains[_JAVA_PROTO_TOOLCHAIN].proto if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION else toolchains.find_toolchain(ctx, "_aspect_java_proto_toolchain", _JAVA_PROTO_TOOLCHAIN)
++    )
+     source_jar = None
+     if proto_common.experimental_should_generate_code(target[ProtoInfo], proto_toolchain_info, "java_proto_library", target.label):
+         # Generate source jar using proto compiler.
+@@ -48,6 +50,7 @@ def _bazel_java_proto_aspect_impl(target, ctx):
+             proto_toolchain_info,
+             [source_jar],
+             experimental_output_files = "single",
++            experimental_exec_group = "cross",
+         )
+ 
+     # Compile Java sources (or just merge if there aren't any)
+@@ -83,6 +86,15 @@ bazel_java_proto_aspect = aspect(
+     required_providers = [ProtoInfo],
+     provides = [JavaInfo, JavaProtoAspectInfo],
+     fragments = ["java"],
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                _JAVA_PROTO_TOOLCHAIN,
++                toolchains.PROTO_TOOLCHAIN,
++            ],
++        ),
++    },
+ )
+ 
+ def bazel_java_proto_library_rule(ctx):
+diff --git a/bazel/private/java_lite_proto_library.bzl b/bazel/private/java_lite_proto_library.bzl
+index 466253f7051..a34a0256634 100644
+--- a/bazel/private/java_lite_proto_library.bzl
++++ b/bazel/private/java_lite_proto_library.bzl
+@@ -33,10 +33,12 @@ def _aspect_impl(target, ctx):
+ 
+     deps = [dep[JavaInfo] for dep in ctx.rule.attr.deps]
+     exports = [exp[JavaInfo] for exp in ctx.rule.attr.exports]
+-    proto_toolchain_info = toolchains.find_toolchain(
+-        ctx,
+-        "_aspect_proto_toolchain_for_javalite",
+-        _JAVA_LITE_PROTO_TOOLCHAIN,
++    proto_toolchain_info = (
++        ctx.exec_groups["cross"].toolchains[_JAVA_LITE_PROTO_TOOLCHAIN].proto if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION else toolchains.find_toolchain(
++            ctx,
++            "_aspect_proto_toolchain_for_javalite",
++            _JAVA_LITE_PROTO_TOOLCHAIN,
++        )
+     )
+     source_jar = None
+ 
+@@ -48,6 +50,7 @@ def _aspect_impl(target, ctx):
+             proto_toolchain_info,
+             [source_jar],
+             experimental_output_files = "single",
++            experimental_exec_group = "cross",
+         )
+         runtime = proto_toolchain_info.runtime
+         if runtime:
+@@ -81,6 +84,15 @@ _java_lite_proto_aspect = aspect(
+     provides = [JavaInfo, JavaProtoAspectInfo],
+     toolchains = ["@bazel_tools//tools/jdk:toolchain_type"] +
+                  toolchains.use_toolchain(_JAVA_LITE_PROTO_TOOLCHAIN),
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                _JAVA_LITE_PROTO_TOOLCHAIN,
++                toolchains.PROTO_TOOLCHAIN,
++            ],
++        ),
++    },
+ )
+ 
+ def _rule_impl(ctx):
+diff --git a/bazel/private/proto_lang_toolchain_rule.bzl b/bazel/private/proto_lang_toolchain_rule.bzl
+index d99b58c9dcb..f308ed6c5a1 100644
+--- a/bazel/private/proto_lang_toolchain_rule.bzl
++++ b/bazel/private/proto_lang_toolchain_rule.bzl
+@@ -26,8 +26,9 @@ def _rule_impl(ctx):
+         plugin = ctx.attr.plugin[DefaultInfo].files_to_run
+ 
+     if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION:
+-        proto_compiler = ctx.toolchains[toolchains.PROTO_TOOLCHAIN].proto.proto_compiler
+-        protoc_opts = ctx.toolchains[toolchains.PROTO_TOOLCHAIN].proto.protoc_opts
++        proto_toolchain = ctx.exec_groups["cross"].toolchains[toolchains.PROTO_TOOLCHAIN]
++        proto_compiler = proto_toolchain.proto.proto_compiler
++        protoc_opts = proto_toolchain.proto.protoc_opts
+     else:
+         proto_compiler = ctx.attr._proto_compiler.files_to_run
+         protoc_opts = ctx.fragments.proto.experimental_protoc_opts
+@@ -111,7 +112,7 @@ The value must contain a single %s which is replaced with plugin executable.
+ <code>--plugin=protoc-gen-PLUGIN=&lt;executable&gt;.</code>"""),
+         "plugin": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             doc = """
+ If provided, will be made available to the action that calls the proto-compiler, and will be
+ passed to the proto-compiler:
+@@ -138,12 +139,12 @@ This is used for .proto files that are already linked into proto runtimes, such
+         "toolchain_type": attr.label(),
+         # DO NOT USE. For Protobuf incremental changes only: b/305068148.
+         "protoc_minimal_do_not_use": attr.label(
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             executable = True,
+         ),
+     } | ({} if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION else {
+         "_proto_compiler": attr.label(
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             executable = True,
+             allow_files = True,
+             default = configuration_field("proto", "proto_compiler"),
+@@ -152,4 +153,12 @@ This is used for .proto files that are already linked into proto runtimes, such
+     provides = [ProtoLangToolchainInfo],
+     fragments = ["proto"],
+     toolchains = toolchains.use_toolchain(toolchains.PROTO_TOOLCHAIN),  # Used to obtain protoc
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                toolchains.PROTO_TOOLCHAIN,
++            ],
++        ),
++    },
+ )
+diff --git a/bazel/private/proto_library_rule.bzl b/bazel/private/proto_library_rule.bzl
+index e40546b9a84..ab1a68b429d 100644
+--- a/bazel/private/proto_library_rule.bzl
++++ b/bazel/private/proto_library_rule.bzl
+@@ -156,6 +156,10 @@ def _symlink_to_virtual_imports(ctx, srcs, import_prefix, strip_import_prefix):
+ 
+ def _write_descriptor_set(ctx, proto_info, deps, exports, descriptor_set):
+     """Writes descriptor set."""
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++
+     if proto_info.direct_sources == []:
+         ctx.actions.write(descriptor_set, "")
+         return
+@@ -207,7 +211,9 @@ def _write_descriptor_set(ctx, proto_info, deps, exports, descriptor_set):
+                 join_with = ":",
+             )
+     if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION:
+-        toolchain = ctx.toolchains[toolchains.PROTO_TOOLCHAIN]
++        toolchain = (
++            ctx.exec_groups[cross_exec_group].toolchains[toolchains.PROTO_TOOLCHAIN] if cross_exec_group else ctx.toolchains[toolchains.PROTO_TOOLCHAIN]
++        )
+         if not toolchain:
+             fail("Protocol compiler toolchain could not be resolved.")
+         proto_lang_toolchain_info = toolchain.proto
+@@ -217,7 +223,9 @@ def _write_descriptor_set(ctx, proto_info, deps, exports, descriptor_set):
+             output_files = "single",
+             mnemonic = "GenProtoDescriptorSet",
+             progress_message = "Generating Descriptor Set proto_library %{label}",
+-            proto_compiler = ctx.executable._proto_compiler,
++            proto_compiler = (
++                ctx.executable._cross_proto_compiler if cross_exec_group else ctx.executable._proto_compiler
++            ),
+             protoc_opts = ctx.fragments.proto.experimental_protoc_opts,
+             plugin = None,
+         )
+@@ -229,6 +237,7 @@ def _write_descriptor_set(ctx, proto_info, deps, exports, descriptor_set):
+         generated_files = [descriptor_set],
+         additional_inputs = dependencies_descriptor_sets,
+         additional_args = args,
++        experimental_exec_group = cross_exec_group,
+     )
+ 
+ _extra_doc = ""
+@@ -342,6 +351,10 @@ lang_proto_library that is not in one of the listed packages.""",
+         "_strict_public_imports": attr.label(
+             default = "//bazel/private:strict_public_imports",
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
+     } | toolchains.if_legacy_toolchain({
+         "_proto_compiler": attr.label(
+             cfg = "exec",
+@@ -349,10 +362,28 @@ lang_proto_library that is not in one of the listed packages.""",
+             allow_files = True,
+             default = configuration_field("proto", "proto_compiler"),
+         ),
++        "_cross_proto_compiler": attr.label(
++            cfg = config.exec(exec_group = "cross"),
++            executable = True,
++            allow_files = True,
++            default = configuration_field("proto", "proto_compiler"),
++        ),
+     }),  # buildifier: disable=attr-licenses (attribute called licenses)
+     fragments = [
+         "proto",
+     ],
+     provides = [ProtoInfo],
+     toolchains = toolchains.use_toolchain(toolchains.PROTO_TOOLCHAIN),
++    exec_groups = {
++        # The C++ toolchain has the cross-execution constraint in IBM builds,
++        # which makes this group select the x86_64/aarch64 protoc binary. The
++        # proto toolchain entry keeps the same selection correct when Bazel's
++        # modern proto-toolchain resolution is enabled.
++        "cross": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                toolchains.PROTO_TOOLCHAIN,
++            ],
++        ),
++    },
+ )
+diff --git a/bazel/private/proto_toolchain_rule.bzl b/bazel/private/proto_toolchain_rule.bzl
+index 700bb146432..1658a869a0c 100644
+--- a/bazel/private/proto_toolchain_rule.bzl
++++ b/bazel/private/proto_toolchain_rule.bzl
+@@ -41,11 +41,16 @@ proto_toolchain = rule(
+             "command_line": attr.string(default = "--descriptor_set_out=%s"),
+             "output_files": attr.string(values = ["single", "multiple", "legacy"], default = "single"),
+             "proto_compiler": attr.label(
+-                cfg = "exec",
++                cfg = config.exec(exec_group = "cross"),
+                 executable = True,
+                 allow_files = True,  # Used by mocks in tests. Consider fixing tests and removing it.
+             ),
+         },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
++    },
+     provides = [platform_common.ToolchainInfo],
+     fragments = ["proto"],
+ )
+diff --git a/bazel/private/toolchains/BUILD.bazel b/bazel/private/toolchains/BUILD.bazel
+index 1449b61d528..05ae89c033f 100644
+--- a/bazel/private/toolchains/BUILD.bazel
++++ b/bazel/private/toolchains/BUILD.bazel
+@@ -1,5 +1,7 @@
+ load("//bazel/toolchains:proto_toolchain.bzl", "proto_toolchain")
+ 
++package(default_visibility = ["//visibility:public"])
++
+ # Keep this file as small as possible and free of any unnecessary loads
+ # It is loaded by every use of protobuf repository, and loads here can force
+ # fetching of additional external repositories
+@@ -10,7 +12,6 @@ load("//bazel/toolchains:proto_toolchain.bzl", "proto_toolchain")
+ 
+ proto_toolchain(
+     name = "protoc_sources",
+-    exec_compatible_with = [],
+     proto_compiler = "//:protoc",
+ )
+ 
+diff --git a/bazel/py_proto_library.bzl b/bazel/py_proto_library.bzl
+index f84bf1b3d0f..f3f702d4507 100644
+--- a/bazel/py_proto_library.bzl
++++ b/bazel/py_proto_library.bzl
+@@ -51,7 +51,7 @@ def _py_proto_aspect_impl(target, ctx):
+             ))
+ 
+     if proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION:
+-        toolchain = ctx.toolchains[_PY_PROTO_TOOLCHAIN]
++        toolchain = ctx.exec_groups["cross"].toolchains[_PY_PROTO_TOOLCHAIN]
+         if not toolchain:
+             fail("No toolchains registered for '%s'." % _PY_PROTO_TOOLCHAIN)
+         proto_lang_toolchain_info = toolchain.proto
+@@ -90,6 +90,7 @@ def _py_proto_aspect_impl(target, ctx):
+             proto_lang_toolchain_info = proto_lang_toolchain_info,
+             generated_files = generated_sources,
+             plugin_output = plugin_output,
++            experimental_exec_group = "cross",
+         )
+ 
+     # Generated sources == Python sources
+@@ -127,12 +128,21 @@ _py_proto_aspect = aspect(
+     attrs = toolchains.if_legacy_toolchain({
+         "_aspect_proto_toolchain": attr.label(
+             default = "//python:python_toolchain",
++            cfg = config.exec(exec_group = "cross"),
+         ),
+     }),
+     attr_aspects = ["deps"],
+     required_providers = [ProtoInfo],
+     provides = [_PyProtoInfo],
+     toolchains = toolchains.use_toolchain(_PY_PROTO_TOOLCHAIN),
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                _PY_PROTO_TOOLCHAIN,
++            ],
++        ),
++    },
+ )
+ 
+ def _py_proto_library_rule(ctx):
+diff --git a/bazel/upb_c_proto_library.bzl b/bazel/upb_c_proto_library.bzl
+index ebeebed7f90..f601441b2c7 100644
+--- a/bazel/upb_c_proto_library.bzl
++++ b/bazel/upb_c_proto_library.bzl
+@@ -50,7 +50,11 @@ upb_c_proto_library_aspect = aspect(
+     fragments = ["cpp"],
+     toolchains = upb_use_cpp_toolchain(),
+     exec_groups = {
+-        "proto_compiler": exec_group(),
++        "proto_compiler": exec_group(
++            toolchains = upb_use_cpp_toolchain() + [
++                "//bazel/private:proto_toolchain_type",
++            ],
++        ),
+     },
+ )
+ 
+diff --git a/bazel/upb_minitable_proto_library.bzl b/bazel/upb_minitable_proto_library.bzl
+index 0a178421a26..a033d989a9e 100644
+--- a/bazel/upb_minitable_proto_library.bzl
++++ b/bazel/upb_minitable_proto_library.bzl
+@@ -58,7 +58,11 @@ upb_minitable_proto_library_aspect = aspect(
+     fragments = ["cpp"],
+     toolchains = upb_use_cpp_toolchain(),
+     exec_groups = {
+-        "proto_compiler": exec_group(),
++        "proto_compiler": exec_group(
++            toolchains = upb_use_cpp_toolchain() + [
++                "//bazel/private:proto_toolchain_type",
++            ],
++        ),
+     },
+ )
+ 
+diff --git a/bazel/upb_proto_reflection_library.bzl b/bazel/upb_proto_reflection_library.bzl
+index 8347dfb7f0c..e53d40799b9 100644
+--- a/bazel/upb_proto_reflection_library.bzl
++++ b/bazel/upb_proto_reflection_library.bzl
+@@ -1,7 +1,6 @@
+ """upb_c_proto_reflection_library() exposes upb reflection for protobuf (foo.upbdefs.h)"""
+ 
+ load("//bazel:upb_minitable_proto_library.bzl", "UpbMinitableCcInfo", "upb_minitable_proto_library_aspect")
+-load("//bazel/common:proto_common.bzl", "proto_common")
+ load("//bazel/common:proto_info.bzl", "ProtoInfo")
+ load("//bazel/private:upb_proto_library_internal/aspect.bzl", "upb_proto_aspect_impl")
+ load("//bazel/private:upb_proto_library_internal/cc_library_func.bzl", "upb_use_cpp_toolchain")
+@@ -32,7 +31,6 @@ _upb_proto_reflection_library_aspect = aspect(
+         ),
+         "_upbdefs_toolchain": attr.label(
+             default = Label("//upb_generator/reflection:toolchain"),
+-            cfg = getattr(proto_common, "proto_lang_toolchain_cfg", "target"),
+         ),
+         "_cc_toolchain": attr.label(
+             default = "@bazel_tools//tools/cpp:current_cc_toolchain",
+@@ -49,7 +47,11 @@ _upb_proto_reflection_library_aspect = aspect(
+     fragments = ["cpp"],
+     toolchains = upb_use_cpp_toolchain(),
+     exec_groups = {
+-        "proto_compiler": exec_group(),
++        "proto_compiler": exec_group(
++            toolchains = upb_use_cpp_toolchain() + [
++                "//bazel/private:proto_toolchain_type",
++            ],
++        ),
+     },
+ )
+ 
+diff --git a/editions/defaults.bzl b/editions/defaults.bzl
+index 7d83865b9a5..3d5c857ccc7 100644
+--- a/editions/defaults.bzl
++++ b/editions/defaults.bzl
+@@ -29,13 +29,20 @@ def _compile_edition_defaults_impl(ctx):
+         args.add("--proto_path", p)
+     for source in sources:
+         args.add(source)
+-    ctx.actions.run(
+-        outputs = [out_file],
+-        inputs = sources,
+-        executable = ctx.executable.protoc or ctx.executable._protoc_minimal,
+-        arguments = [args],
+-        progress_message = "Generating edition defaults",
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "outputs": [out_file],
++        "inputs": sources,
++        "executable": ctx.executable.protoc or ctx.executable._protoc_minimal,
++        "arguments": [args],
++        "mnemonic": "GenProto",
++        "progress_message": "Generating edition defaults",
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+ 
+ compile_edition_defaults = rule(
+     attrs = {
+@@ -49,12 +56,21 @@ compile_edition_defaults = rule(
+         "protoc": attr.label(
+             mandatory = False,
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+         ),
+         "_protoc_minimal": attr.label(
+             default = "//src/google/protobuf/compiler:protoc_minimal",
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
++        ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+         ),
+     },
+     implementation = _compile_edition_defaults_impl,
+@@ -71,12 +87,19 @@ def _embed_edition_defaults_impl(ctx):
+     args.add(ctx.outputs.output, format = "--output_path=%s")
+     args.add(ctx.attr.placeholder, format = "--placeholder=%s")
+ 
+-    ctx.actions.run(
+-        executable = ctx.executable._escape,
+-        arguments = [args],
+-        outputs = [ctx.outputs.output],
+-        inputs = [ctx.file.defaults, ctx.file.template],
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "executable": ctx.executable._escape,
++        "arguments": [args],
++        "outputs": [ctx.outputs.output],
++        "inputs": [ctx.file.defaults, ctx.file.template],
++        "mnemonic": "EmbedEditionDefaults",
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+ 
+ embed_edition_defaults = rule(
+     doc = "genrule to embed edition defaults binary data into a template file.",
+@@ -109,7 +132,16 @@ embed_edition_defaults = rule(
+         "_escape": attr.label(
+             default = "//editions:internal_defaults_escape",
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
++        ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+         ),
+     },
+     implementation = _embed_edition_defaults_impl,
+diff --git a/hpb/bazel/hpb_proto_library.bzl b/hpb/bazel/hpb_proto_library.bzl
+index b874cad62b2..3a337d3206c 100644
+--- a/hpb/bazel/hpb_proto_library.bzl
++++ b/hpb/bazel/hpb_proto_library.bzl
+@@ -159,7 +159,12 @@ _hpb_proto_library_aspect = aspect(
+         ),
+     },
+     exec_groups = {
+-        "proto_compiler": exec_group(),
++        "proto_compiler": exec_group(
++            toolchains = [
++                "@bazel_tools//tools/cpp:toolchain_type",
++                "//bazel/private:proto_toolchain_type",
++            ],
++        ),
+     },
+     implementation = _upb_cc_proto_library_aspect_impl,
+     provides = [
+diff --git a/protobuf.bzl b/protobuf.bzl
+index fdf09bd6be7..caadf69cb48 100644
+--- a/protobuf.bzl
++++ b/protobuf.bzl
+@@ -133,6 +133,9 @@ def _proto_gen_impl(ctx):
+         ]
+ 
+     generated_files = []
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
+     for src in srcs:
+         args = []
+         if enable_editions:
+@@ -186,15 +189,18 @@ def _proto_gen_impl(ctx):
+             tools.append(plugin)
+ 
+         if not in_gen_dir:
+-            ctx.actions.run(
+-                inputs = inputs,
+-                tools = tools,
+-                outputs = outs,
+-                arguments = args + import_flags.to_list() + [src.path],
+-                executable = ctx.executable.protoc,
+-                mnemonic = "ProtoCompile",
+-                use_default_shell_env = True,
+-            )
++            action_kwargs = {
++                "inputs": inputs,
++                "tools": tools,
++                "outputs": outs,
++                "arguments": args + import_flags.to_list() + [src.path],
++                "executable": ctx.executable.protoc,
++                "mnemonic": "ProtoCompile",
++                "use_default_shell_env": True,
++            }
++            if cross_exec_group:
++                action_kwargs["exec_group"] = cross_exec_group
++            ctx.actions.run(**action_kwargs)
+         else:
+             for out in outs:
+                 orig_command = " ".join(
+@@ -210,14 +216,17 @@ def _proto_gen_impl(ctx):
+                 generated_out = "/".join([gen_dir, out.basename])
+                 if generated_out != out.path:
+                     command += ";mv %s %s" % (generated_out, out.path)
+-                ctx.actions.run_shell(
+-                    inputs = inputs,
+-                    outputs = [out],
+-                    command = command,
+-                    mnemonic = "ProtoCompile",
+-                    tools = tools,
+-                    use_default_shell_env = True,
+-                )
++                action_kwargs = {
++                    "inputs": inputs,
++                    "outputs": [out],
++                    "command": command,
++                    "mnemonic": "ProtoCompile",
++                    "tools": tools,
++                    "use_default_shell_env": True,
++                }
++                if cross_exec_group:
++                    action_kwargs["exec_group"] = cross_exec_group
++                ctx.actions.run_shell(**action_kwargs)
+ 
+     return [
+         ProtoGenInfo(
+@@ -258,13 +267,13 @@ _proto_gen = rule(
+         "enable_editions": attr.bool(),
+         "includes": attr.string_list(),
+         "protoc": attr.label(
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             executable = True,
+             allow_single_file = True,
+             mandatory = True,
+         ),
+         "plugin": attr.label(
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             allow_files = True,
+             executable = True,
+         ),
+@@ -275,6 +284,15 @@ _proto_gen = rule(
+         "out_type": attr.string(
+             default = "all",
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
+     },
+     implementation = _proto_gen_impl,
+ )
+@@ -309,14 +327,20 @@ def _internal_gen_well_known_protos_java_impl(ctx):
+             offset = len(source_root) + 1  # + '/'.
+             args.add_all([src.path[offset:] for src in dep.direct_sources])
+ 
+-    ctx.actions.run(
+-        executable = ctx.executable._protoc,
+-        inputs = descriptors,
+-        outputs = [srcjar],
+-        arguments = [args],
+-        mnemonic = "ProtoCompile",
+-        use_default_shell_env = True,
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "executable": ctx.executable._protoc,
++        "inputs": descriptors,
++        "outputs": [srcjar],
++        "arguments": [args],
++        "mnemonic": "ProtoCompile",
++        "use_default_shell_env": True,
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+ 
+     return [
+         DefaultInfo(
+@@ -336,9 +360,18 @@ internal_gen_well_known_protos_java = rule(
+         ),
+         "_protoc": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             default = "//:protoc",
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
+     },
+ )
+ 
+@@ -372,14 +405,20 @@ def _internal_gen_kt_protos(ctx):
+             offset = len(source_root) + 1  # + '/'.
+             args.add_all([src.path[offset:] for src in dep.direct_sources])
+ 
+-    ctx.actions.run(
+-        executable = ctx.executable._protoc,
+-        inputs = descriptors,
+-        outputs = [srcjar],
+-        arguments = [args],
+-        mnemonic = "ProtoCompile",
+-        use_default_shell_env = True,
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "executable": ctx.executable._protoc,
++        "inputs": descriptors,
++        "outputs": [srcjar],
++        "arguments": [args],
++        "mnemonic": "ProtoCompile",
++        "use_default_shell_env": True,
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+ 
+     return [
+         DefaultInfo(
+@@ -399,9 +438,18 @@ internal_gen_kt_protos = rule(
+         ),
+         "_protoc": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             default = "//:protoc",
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
++    },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
+     },
+ )
+ 
+diff --git a/upb/bazel/amalgamation.bzl b/upb/bazel/amalgamation.bzl
+index 8f19516fc97..f63206c2f93 100644
+--- a/upb/bazel/amalgamation.bzl
++++ b/upb/bazel/amalgamation.bzl
+@@ -40,22 +40,33 @@ def _upb_amalgamation(ctx):
+     for lib in ctx.attr.libs:
+         inputs += lib[SrcList].srcs
+     srcs = [src for src in inputs if not src.path.endswith("hpp")]
+-    ctx.actions.run(
+-        inputs = inputs,
+-        outputs = ctx.outputs.outs,
+-        arguments = [f.path for f in ctx.outputs.outs] + [f.path for f in srcs],
+-        progress_message = "Making amalgamation",
+-        executable = ctx.executable._amalgamator,
+-    )
++    cross_exec_group = "cross" if ctx.target_platform_has_constraint(
++        ctx.attr._cross_constraint[platform_common.ConstraintValueInfo],
++    ) else None
++    action_kwargs = {
++        "inputs": inputs,
++        "outputs": ctx.outputs.outs,
++        "arguments": [f.path for f in ctx.outputs.outs] + [f.path for f in srcs],
++        "progress_message": "Making amalgamation",
++        "executable": ctx.executable._amalgamator,
++        "mnemonic": "UpbAmalgamation",
++    }
++    if cross_exec_group:
++        action_kwargs["exec_group"] = cross_exec_group
++    ctx.actions.run(**action_kwargs)
+     return []
+ 
+ upb_amalgamation = rule(
+     attrs = {
+         "_amalgamator": attr.label(
+             executable = True,
+-            cfg = "exec",
++            cfg = config.exec(exec_group = "cross"),
+             default = "//upb/bazel:amalgamate",
+         ),
++        "_cross_constraint": attr.label(
++            default = Label("@@//bazel/platforms:use_mongo_linux_cross_toolchain"),
++            providers = [platform_common.ConstraintValueInfo],
++        ),
+         "prefix": attr.string(
+             default = "",
+         ),
+@@ -63,5 +74,10 @@ upb_amalgamation = rule(
+         "outs": attr.output_list(),
+         "strip_import_prefix": attr.string_list(),
+     },
++    exec_groups = {
++        "cross": exec_group(
++            toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
++        ),
++    },
+     implementation = _upb_amalgamation,
+ )
+diff --git a/upb_generator/bootstrap_compiler.bzl b/upb_generator/bootstrap_compiler.bzl
+index cdd005b3bd6..aea5450c955 100644
+--- a/upb_generator/bootstrap_compiler.bzl
++++ b/upb_generator/bootstrap_compiler.bzl
+@@ -82,11 +82,23 @@ def bootstrap_cc_binary(name, visibility = [], deps = [], bootstrap_deps = [], *
+           upb_proto_library().
+     """
+     for stage in _stages:
++        stage_kwargs = dict(kwargs)
++        if stage:
++            # Bootstrap compilers are execution tools.  In an IBM cross build
++            # they must be analyzed for the foreign RBE execution platform;
++            # otherwise the target PPC/s390x toolchain produces an executable
++            # that cannot run on the x86_64/aarch64 worker.
++            stage_kwargs["target_compatible_with"] = select({
++                "@@//bazel/config:mongo_ibm_cross": [
++                    "@@//bazel/platforms:use_mongo_linux_cross_execution",
++                ],
++                "//conditions:default": [],
++            })
+         cc_binary(
+             name = name + stage,
+             deps = deps + [dep + stage for dep in bootstrap_deps],
+             visibility = _stage_visibility(stage, visibility),
+-            **kwargs
++            **stage_kwargs
+         )
+ 
+ def _generated_file(proto, stage, generator, suffix):
+
+diff --git a/bazel/private/upb_proto_library_internal/rule.bzl b/bazel/private/upb_proto_library_internal/rule.bzl
+index feb29292c3d..3726e30b8a2 100644
+--- a/bazel/private/upb_proto_library_internal/rule.bzl
++++ b/bazel/private/upb_proto_library_internal/rule.bzl
+@@ -1,5 +1,8 @@
+ """Internal rule implementation for upb_*_proto_library() rules."""
+
++load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
++load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
++
+ def _filter_none(elems):
+     out = []
+     for elem in elems:
+@@ -7,6 +10,39 @@ def _filter_none(elems):
+             out.append(elem)
+     return out
+
++def _reown_linker_inputs(ctx, cc_info):
++    """Re-owns the linker inputs of the aspect-generated CcInfo to ctx.label.
++
++    cc_shared_library() (rules_cc) decides which static libraries to link by
++    walking a dependency graph built by an aspect over the rule attribute
++    graph (GraphNodeInfo). The linker inputs produced by the upb aspects are
++    owned by the proto_library() target, which contributes no linker inputs
++    of its own, so cc_shared_library() silently drops them. Any
++    cc_shared_library() link that requires full symbol resolution then fails
++    with undefined upb symbols (for example *_msg_init). Re-owning the
++    linker inputs to this rule's label, which is a regular node in the
++    dependency graph, makes cc_shared_library() link them. Plain binaries
++    are unaffected because they link every linker input of the merged
++    CcInfo regardless of owner.
++    """
++    linker_inputs = []
++    for old_linker_input in cc_info.linking_context.linker_inputs.to_list():
++        # Reuse the original library_to_link values and only change the owner
++        # of the linker input. Recreating the library_to_link objects would
++        # drop LTO metadata (the bitcode member lists) that the LTO indexing
++        # action needs to resolve the .imports file of the link, failing with
++        # "missing bitcode files".
++        linker_inputs.append(cc_common.create_linker_input(
++            owner = ctx.label,
++            libraries = depset(old_linker_input.libraries),
++        ))
++    return CcInfo(
++        compilation_context = cc_info.compilation_context,
++        linking_context = cc_common.create_linking_context(
++            linker_inputs = depset(linker_inputs),
++        ),
++    )
++
+ def upb_proto_rule_impl(ctx, cc_info_provider, srcs_provider):
+     """An implementation for upb_*proto_library() rules.
+
+@@ -35,5 +71,5 @@ def upb_proto_rule_impl(ctx, cc_info_provider, srcs_provider):
+     return [
+         DefaultInfo(files = depset(files + srcs.hdrs + srcs.srcs)),
+         srcs,
+-        cc_info,
++        _reown_linker_inputs(ctx, cc_info),
+     ]

@@ -1,4 +1,5 @@
 // @tags: [
+//   uses_explain,
 //   requires_collstats,
 //   requires_getmore,
 // ]

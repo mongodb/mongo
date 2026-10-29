@@ -5,6 +5,7 @@
  * Originally intended to reproduce SERVER-82717.
  *
  * @tags: [
+ *    uses_explain,
  *    # Explain command does not support read concerns other than local.
  *    assumes_read_concern_local,
  *    # Time series collections do not support text indexes.

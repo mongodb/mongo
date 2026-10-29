@@ -1,39 +1,9 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/error_codes.h"
 #include "mongo/db/index_builds/active_index_builds.h"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -42,6 +12,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_gauge.h"
+#include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -53,37 +24,70 @@
 #include <string_view>
 #include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 
 namespace mongo {
+
+std::string_view toString(IndexBuildOutcome outcome) {
+    switch (outcome) {
+        case IndexBuildOutcome::kSuccess:
+            return "success";
+        case IndexBuildOutcome::kFailure:
+            return "failure";
+        case IndexBuildOutcome::kToBeResumed:
+            return "to_be_resumed";
+    }
+    MONGO_UNREACHABLE;
+}
 
 namespace {
 
 auto& activeIndexBuildsGauge = otel::metrics::MetricsService::instance().createInt64Gauge(
     otel::metrics::MetricNames::kIndexBuildsActive,
     "Number of index builds currently in progress",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::GaugeOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.active", .role = ClusterRole::ShardServer}});
 
 auto& succeededIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsSucceeded,
     "Number of index builds that completed successfully, including no-op completions",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.succeeded", .role = ClusterRole::ShardServer}});
 
 auto& failedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsFailed,
     "Number of index builds that did not complete successfully",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.failed", .role = ClusterRole::ShardServer}});
 
 auto& toBeResumedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsToBeResumed,
     "Number of index builds that were interrupted and will be resumed",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.toBeResumed", .role = ClusterRole::ShardServer}});
 
 auto& startedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsStarted,
     "Number of index builds started",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.started", .role = ClusterRole::ShardServer}});
 
 auto& resumeSucceededCounter =
     otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(
@@ -119,6 +123,98 @@ void recordIndexBuildOutcome(IndexBuildOutcome outcome) {
     MONGO_UNREACHABLE;
 }
 
+// The histogram buckets for `kIndexBuildCompletedDurationMillis`. Index builds range from
+// milliseconds for a no-op completion to days for a large collection.
+const std::vector<double> kIndexBuildDurationBucketsMillis = {
+    60'000,       // 1min
+    3'600'000,    // 1h
+    28'800'000,   // 8h
+    86'400'000,   // 1d
+    259'200'000,  // 3d
+};
+
+// The histogram buckets for `kIndexBuildCompletedKeysWritten`.
+const std::vector<double> kIndexBuildKeysWrittenBuckets = {
+    1'000'000,        // 1M
+    50'000'000,       // 50M
+    500'000'000,      // 500M
+    1'000'000'000,    // 1B
+    5'000'000'000,    // 5B
+    10'000'000'000,   // 10B
+    100'000'000'000,  // 100B
+};
+
+// The histogram buckets for `kIndexBuildCompletedBytesWritten`, from small builds up to
+// multi-terabyte builds.
+const std::vector<double> kIndexBuildBytesWrittenBuckets = {
+    16'777'216,         // 16 MiB
+    1'073'741'824,      // 1 GiB
+    8'589'934'592,      // 8 GiB
+    17'179'869'184,     // 16 GiB
+    68'719'476'736,     // 64 GiB
+    137'438'953'472,    // 128 GiB
+    1'099'511'627'776,  // 1 TiB
+};
+
+otel::metrics::AttributeDefinition<std::string_view> makeStartPhaseAttribute() {
+    return {.name = "start_phase",
+            .values = {
+                idl::serialize(IndexBuildPhaseEnum::kInitialized),
+                idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+                idl::serialize(IndexBuildPhaseEnum::kBulkLoad),
+                idl::serialize(IndexBuildPhaseEnum::kDrainWrites),
+            }};
+}
+
+otel::metrics::AttributeDefinition<std::string_view> makeOutcomeAttribute() {
+    return {.name = "outcome",
+            .values = {
+                toString(IndexBuildOutcome::kSuccess),
+                toString(IndexBuildOutcome::kFailure),
+                toString(IndexBuildOutcome::kToBeResumed),
+            }};
+}
+
+auto& indexBuildsCompletedDurationMillisHistogram =
+    otel::metrics::MetricsService::instance()
+        .createInt64Histogram<std::string_view, std::string_view>(
+            otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
+            "Duration of index builds on this node, by the phase they were "
+            "started or resumed from and by their outcome",
+            otel::metrics::MetricUnit::kMilliseconds,
+            makeStartPhaseAttribute(),
+            makeOutcomeAttribute(),
+            {.explicitBucketBoundaries = kIndexBuildDurationBucketsMillis});
+
+auto& indexBuildsCompletedKeysWrittenHistogram =
+    otel::metrics::MetricsService::instance()
+        .createInt64Histogram<std::string_view, std::string_view>(
+            otel::metrics::MetricNames::kIndexBuildCompletedKeysWritten,
+            "Number of index keys written to the index tables by index builds on this node, "
+            "including deletions, by the phase they were started or resumed from and by their "
+            "outcome",
+            otel::metrics::MetricUnit::kCount,
+            makeStartPhaseAttribute(),
+            makeOutcomeAttribute(),
+            {.explicitBucketBoundaries = kIndexBuildKeysWrittenBuckets});
+
+auto& indexBuildsCompletedBytesWrittenHistogram =
+    otel::metrics::MetricsService::instance()
+        .createInt64Histogram<std::string_view, std::string_view>(
+            otel::metrics::MetricNames::kIndexBuildCompletedBytesWritten,
+            "Number of key string bytes written to the index tables by index builds on this "
+            "node, including deletions, by the phase they were started or resumed from and by "
+            "their outcome",
+            otel::metrics::MetricUnit::kBytes,
+            makeStartPhaseAttribute(),
+            makeOutcomeAttribute(),
+            {.explicitBucketBoundaries = kIndexBuildBytesWrittenBuckets});
+
+bool includesPrimaryDriven(std::initializer_list<IndexBuildProtocol> protocols) {
+    return std::find(protocols.begin(), protocols.end(), IndexBuildProtocol::kPrimaryDriven) !=
+        protocols.end();
+}
+
 }  // namespace
 
 ActiveIndexBuilds::~ActiveIndexBuilds() {
@@ -134,7 +230,11 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStop(Interruptible* interruptible
 
     // All index builds should have been signaled to stop via the ServiceContext.
 
-    if (_allIndexBuilds.empty()) {
+    auto noneRegistered = [this]() {
+        return !_primaryDrivenRegistry || _primaryDrivenRegistry->all().empty();
+    };
+
+    if (_allIndexBuilds.empty() && noneRegistered()) {
         return;
     }
 
@@ -148,22 +248,32 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStop(Interruptible* interruptible
           "indexBuilds"_attr = logv2::seqLog(begin, end));
 
     // Wait for all the index builds to stop.
-    auto pred = [this]() {
-        return _allIndexBuilds.empty();
+    auto pred = [&, this]() {
+        return _allIndexBuilds.empty() && noneRegistered();
     };
     interruptible->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, pred);
 }
 
 void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
     std::unique_lock<std::mutex> lk(_mutex);
-    if (!_allIndexBuilds.empty()) {
-        auto firstIndexBuild = _allIndexBuilds.cbegin()->second;
-        uasserted(ErrorCodes::BackgroundOperationInProgressForDatabase,
-                  fmt::format("cannot perform operation: there are currently {} index builds "
-                              "running. Found index build: {}",
-                              _allIndexBuilds.size(),
-                              firstIndexBuild->buildUUID.toString()));
+    auto matching = _filterIndexBuilds_inlock(lk, [](const auto& replState) { return true; });
+    uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
+            fmt::format("cannot perform operation: there are currently {} index builds "
+                        "running. Found index build: {}",
+                        matching.size(),
+                        matching.front()->buildUUID.toString()),
+            matching.empty());
+
+    if (!_primaryDrivenRegistry) {
+        return;
     }
+    auto registered = _primaryDrivenRegistry->all();
+    uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
+            fmt::format("cannot perform operation: there are currently {} primary-driven "
+                        "index builds registered. Found index build: {}",
+                        registered.size(),
+                        registered.front().first.toString()),
+            registered.empty());
 }
 
 void ActiveIndexBuilds::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, Date_t deadline) {
@@ -186,28 +296,59 @@ void ActiveIndexBuilds::verifyNoIndexBuilds_forTestOnly() const {
     invariant(_allIndexBuilds.empty());
 }
 
-void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
-                                                                 const UUID& collectionUUID,
-                                                                 IndexBuildProtocol protocol) {
+void ActiveIndexBuilds::_awaitNoIndexBuildInProgressForFilter(OperationContext* opCtx,
+                                                              IndexBuildFilterFn indexBuildFilter) {
     std::unique_lock<std::mutex> lk(_mutex);
     auto noIndexBuildsPred = [&, this]() {
-        auto indexBuilds = _filterIndexBuilds_inlock(lk, [&](const auto& replState) {
-            return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
-        });
+        auto indexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
         return indexBuilds.empty();
     };
     opCtx->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, noIndexBuildsPred);
 }
 
 void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
-                                                                 const UUID& collectionUUID) {
+                                                                 const UUID& collectionUUID,
+                                                                 IndexBuildProtocol protocol) {
+    _awaitNoIndexBuildInProgressForFilters(
+        opCtx,
+        [&](const auto& replState) {
+            return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
+        },
+        // Every build in the registry is primary-driven.
+        [&](const auto& build) {
+            return protocol == IndexBuildProtocol::kPrimaryDriven &&
+                collectionUUID == build.collectionUUID;
+        });
+}
+
+void ActiveIndexBuilds::_awaitNoIndexBuildInProgressForFilters(
+    OperationContext* opCtx,
+    IndexBuildFilterFn runningFilter,
+    std::function<bool(const index_builds::primary_driven::Registry::Entry&)> registeredFilter) {
     std::unique_lock<std::mutex> lk(_mutex);
-    auto pred = [&, this]() {
-        auto indexBuilds = _filterIndexBuilds_inlock(
-            lk, [&](const auto& replState) { return collectionUUID == replState.collectionUUID; });
-        return indexBuilds.empty();
+    auto noIndexBuildsPred = [&, this]() {
+        if (!_filterIndexBuilds_inlock(lk, runningFilter).empty()) {
+            return false;
+        }
+        if (!_primaryDrivenRegistry) {
+            return true;
+        }
+        for (auto&& [buildUUID, build] : _primaryDrivenRegistry->all()) {
+            if (registeredFilter(build)) {
+                return false;
+            }
+        }
+        return true;
     };
-    _indexBuildsCondVar.wait(lk, pred);
+    opCtx->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, noIndexBuildsPred);
+}
+
+void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
+                                                                 const UUID& collectionUUID) {
+    _awaitNoIndexBuildInProgressForFilters(
+        opCtx,
+        [&](const auto& replState) { return collectionUUID == replState.collectionUUID; },
+        [&](const auto& build) { return collectionUUID == build.collectionUUID; });
 }
 
 StatusWith<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getIndexBuild(
@@ -234,13 +375,47 @@ void ActiveIndexBuilds::unregisterIndexBuild(
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 
-    LOGV2_DEBUG(4656004,
-                1,
-                "Index build: unregistering",
-                "buildUUID"_attr = replIndexBuildState->buildUUID,
-                "collectionUUID"_attr = replIndexBuildState->collectionUUID);
+    const auto metrics = replIndexBuildState->getIndexBuildMetrics();
+    // The phase that the index build was in when we unregistered it, and the number of keys and
+    // amount of data it wrote to index tables. If there are no index builds with this build UUID
+    // present (i.e, if we registered it as an active index build but did not successfully set it
+    // up), fall back to reporting kInitialized as the endPhase, and leave the write stats unset.
+    const auto endPhase = indexBuildsManager->getPhase(replIndexBuildState->buildUUID)
+                              .value_or(IndexBuildPhaseEnum::kInitialized);
+    const auto writeStats =
+        indexBuildsManager->getNumKeysAndBytesWritten(replIndexBuildState->buildUUID);
+    const int64_t durationMillis =
+        std::max(int64_t{0}, (Date_t::now() - metrics.startTime).count());
+
+    LOGV2(4656004,
+          "Index build: completed",
+          "buildUUID"_attr = replIndexBuildState->buildUUID,
+          "collectionUUID"_attr = replIndexBuildState->collectionUUID,
+          "outcome"_attr = toString(outcome),
+          "startPhase"_attr = idl::serialize(metrics.startPhase),
+          "endPhase"_attr = idl::serialize(endPhase),
+          "durationMillis"_attr = durationMillis,
+          "numKeysWrittenBulkLoad"_attr = writeStats ? writeStats->numKeysWrittenBulkLoad : 0,
+          "numBytesWrittenBulkLoad"_attr = writeStats ? writeStats->numBytesWrittenBulkLoad : 0,
+          "numKeysWrittenSideWritesDrain"_attr =
+              writeStats ? writeStats->numKeysWrittenSideWritesDrain : 0,
+          "numBytesWrittenSideWritesDrain"_attr =
+              writeStats ? writeStats->numBytesWrittenSideWritesDrain : 0);
 
     recordIndexBuildOutcome(outcome);
+    // A build that was never set up did no index build work, so it is left out of the completion
+    // histograms rather than recorded as a zero.
+    if (writeStats) {
+        const auto histogramAttrs =
+            std::tuple{idl::serialize(metrics.startPhase), toString(outcome)};
+        indexBuildsCompletedDurationMillisHistogram.record(durationMillis, histogramAttrs);
+        indexBuildsCompletedKeysWrittenHistogram.record(
+            writeStats->numKeysWrittenBulkLoad + writeStats->numKeysWrittenSideWritesDrain,
+            histogramAttrs);
+        indexBuildsCompletedBytesWrittenHistogram.record(
+            writeStats->numBytesWrittenBulkLoad + writeStats->numBytesWrittenSideWritesDrain,
+            histogramAttrs);
+    }
     activeIndexBuildsGauge.set(_allIndexBuilds.size());
     indexBuildsManager->tearDownAndUnregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;
@@ -253,6 +428,69 @@ void ActiveIndexBuilds::incrementResumeSucceeded(IndexBuildPhaseEnum phase) {
 
 void ActiveIndexBuilds::incrementResumeFailed() {
     resumeFailedCounter.add(1);
+}
+
+void ActiveIndexBuilds::setPrimaryDrivenRegistry(index_builds::primary_driven::Registry& registry) {
+    {
+        std::unique_lock<std::mutex> lk(_mutex);
+        _primaryDrivenRegistry = &registry;
+    }
+    registry.setOnChangeHandler([this] {
+        std::lock_guard<std::mutex> lk{_mutex};
+        _indexBuildsCondVar.notify_all();
+    });
+}
+
+std::vector<UUID> ActiveIndexBuilds::buildUUIDsForCollection(const UUID& collectionUUID) const {
+    return _buildUUIDs(
+        [&](const auto& replState) { return collectionUUID == replState.collectionUUID; },
+        [&](const auto& build) { return collectionUUID == build.collectionUUID; });
+}
+
+std::vector<UUID> ActiveIndexBuilds::buildUUIDsForCollection(const UUID& collectionUUID,
+                                                             IndexBuildProtocol protocol) const {
+    return _buildUUIDs(
+        [&](const auto& replState) {
+            return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
+        },
+        [&](const auto& build) {
+            return protocol == IndexBuildProtocol::kPrimaryDriven &&
+                collectionUUID == build.collectionUUID;
+        });
+}
+
+std::vector<UUID> ActiveIndexBuilds::buildUUIDsForDb(const DatabaseName& dbName) const {
+    return _buildUUIDs([&](const auto& replState) { return dbName == replState.dbName; },
+                       [&](const auto& build) { return dbName == build.dbName; });
+}
+
+std::vector<UUID> ActiveIndexBuilds::_buildUUIDs(
+    const IndexBuildFilterFn& runningFilter,
+    const std::function<bool(const index_builds::primary_driven::Registry::Entry&)>&
+        registeredFilter) const {
+    std::vector<UUID> buildUUIDs;
+    index_builds::primary_driven::Registry* registry = nullptr;
+    {
+        std::unique_lock<std::mutex> lk(_mutex);
+        for (const auto& replState : _filterIndexBuilds_inlock(lk, runningFilter)) {
+            buildUUIDs.push_back(replState->buildUUID);
+        }
+        registry = _primaryDrivenRegistry;
+    }
+
+    if (!registry) {
+        return buildUUIDs;
+    }
+
+    // A primary-driven build is registered for as long as it exists on this node, so the registry
+    // also holds the builds we are running and which are already accounted for above.
+    for (auto&& [buildUUID, build] : registry->all()) {
+        if (registeredFilter(build) &&
+            std::find(buildUUIDs.begin(), buildUUIDs.end(), buildUUID) == buildUUIDs.end()) {
+            buildUUIDs.push_back(buildUUID);
+        }
+    }
+    return buildUUIDs;
 }
 
 std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::filterIndexBuilds(
@@ -276,17 +514,19 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
     return indexBuilds;
 }
 
-void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
-                                               const DatabaseName& dbName) {
-    std::unique_lock<std::mutex> lk(_mutex);
-    auto indexBuildFilter = [dbName](const auto& replState) {
-        return dbName == replState.dbName;
-    };
-    auto pred = [&, this]() {
-        auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
-        return dbIndexBuilds.empty();
-    };
-    _indexBuildsCondVar.wait(lk, pred);
+void ActiveIndexBuilds::awaitNoBgOpInProgForDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    std::initializer_list<IndexBuildProtocol> protocols) {
+    const bool withPrimaryDriven = includesPrimaryDriven(protocols);
+    _awaitNoIndexBuildInProgressForFilters(
+        opCtx,
+        [&](const auto& replState) {
+            return dbName == replState.dbName &&
+                std::find(protocols.begin(), protocols.end(), replState.protocol) !=
+                protocols.end();
+        },
+        [&](const auto& build) { return withPrimaryDriven && dbName == build.dbName; });
 }
 
 Status ActiveIndexBuilds::registerIndexBuild(
@@ -317,9 +557,8 @@ Status ActiveIndexBuilds::registerIndexBuild(
     return Status::OK();
 }
 
-size_t ActiveIndexBuilds::getActiveIndexBuildsCount() const {
-    std::unique_lock<std::mutex> lk(_mutex);
-    return _allIndexBuilds.size();
+size_t ActiveIndexBuilds::getIndexBuildsCount() const {
+    return _buildUUIDs([](const auto&) { return true; }, [](const auto&) { return true; }).size();
 }
 
 void ActiveIndexBuilds::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {

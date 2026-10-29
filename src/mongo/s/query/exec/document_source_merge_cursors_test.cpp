@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
@@ -56,6 +30,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -69,6 +44,8 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/s/query/exec/merge_cursors_stage.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -109,12 +86,11 @@ const CursorId kExhaustedCursorID = 0;
 class DocumentSourceMergeCursorsTest : public ShardingTestFixture {
 public:
     DocumentSourceMergeCursorsTest()
-        : _nss(NamespaceString::createNamespaceString_forTest(boost::none, kMergeCursorNsStr)) {
-        TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
-    }
+        : _nss(NamespaceString::createNamespaceString_forTest(boost::none, kMergeCursorNsStr)) {}
 
     void setUp() override {
         ShardingTestFixture::setUp();
+        TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         _expCtx = makeExpCtx();
@@ -123,7 +99,7 @@ public:
         std::vector<ShardType> shards;
         for (size_t i = 0; i < kTestShardIds.size(); i++) {
             ShardType shardType;
-            shardType.setHandle(ShardHandle{ShardId(kTestShardIds[i].toString()), boost::none});
+            shardType.setName(kTestShardIds[i].toString());
             shardType.setHost(kTestShardHosts[i].toString());
 
             shards.push_back(shardType);
@@ -274,6 +250,133 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldReportEOFWithNoCursors) {
     ASSERT_TRUE(stage->getNext().isEOF());
 }
 
+// Builds a $mergeCursors stage over two already-exhausted remotes, which is enough to exercise the
+// high water mark accessors without having to schedule any network responses.
+exec::agg::MergeCursorsStage* buildMergeCursorsStageWithExhaustedRemotes(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    boost::intrusive_ptr<exec::agg::Stage>& stageOut) {
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(nss);
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+
+    stageOut =
+        exec::agg::buildStage(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
+    auto* mergeCursorsStage = dynamic_cast<exec::agg::MergeCursorsStage*>(stageOut.get());
+    ASSERT_TRUE(mergeCursorsStage);
+    return mergeCursorsStage;
+}
+
+TEST_F(DocumentSourceMergeCursorsTest, ShouldReportNoHighWaterMarkClusterTimeWhenNoneIsTracked) {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    auto* mergeCursorsStage =
+        buildMergeCursorsStageWithExhaustedRemotes(getExpCtx(), getTenantIdNss(), stage);
+
+    // The remotes are not change stream cursors, so the results merger tracks no high water mark at
+    // all.
+    ASSERT_BSONOBJ_EQ(mergeCursorsStage->getHighWaterMark(), BSONObj());
+    ASSERT_FALSE(mergeCursorsStage->getHighWaterMarkClusterTime());
+}
+
+TEST_F(DocumentSourceMergeCursorsTest, ShouldReportClusterTimeOfHighWaterMarkResumeToken) {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    auto* mergeCursorsStage =
+        buildMergeCursorsStageWithExhaustedRemotes(getExpCtx(), getTenantIdNss(), stage);
+
+    const Timestamp clusterTime(42, 7);
+    mergeCursorsStage->setHighWaterMark(
+        ResumeToken::makeHighWaterMarkToken(clusterTime, ResumeTokenData::kDefaultTokenVersion)
+            .toDocument()
+            .toBson());
+
+    ASSERT_EQ(*mergeCursorsStage->getHighWaterMarkClusterTime(), clusterTime);
+}
+
+TEST_F(DocumentSourceMergeCursorsTest, ShouldReportNoHighWaterMarkClusterTimeForNonResumeToken) {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    auto* mergeCursorsStage =
+        buildMergeCursorsStageWithExhaustedRemotes(getExpCtx(), getTenantIdNss(), stage);
+
+    // A high water mark which is not a change stream resume token carries no cluster time. We must
+    // report that we have none rather than failing to parse it.
+    mergeCursorsStage->setHighWaterMark(BSON("x" << 1));
+
+    ASSERT_BSONOBJ_EQ(mergeCursorsStage->getHighWaterMark(), BSON("x" << 1));
+    ASSERT_FALSE(mergeCursorsStage->getHighWaterMarkClusterTime());
+}
+
+// Returns the shards registered by the fixture's setUp(), for answering the config.shards find that
+// getShard()'s forced reload issues.
+std::vector<ShardType> makeConfigShards() {
+    std::vector<ShardType> shards;
+    for (size_t i = 0; i < kTestShardIds.size(); i++) {
+        ShardType shardType;
+        shardType.setName(kTestShardIds[i].toString());
+        shardType.setHost(kTestShardHosts[i].toString());
+        shards.push_back(shardType);
+    }
+    return shards;
+}
+
+// Building the executable stage validates every remote's shardId against the ShardRegistry. A
+// remote on a shard the registry does not know about (even after a reload) must fail with
+// 'ShardNotFound'.
+TEST_F(DocumentSourceMergeCursorsTest, ShouldFailToBuildStageIfShardIsUnknown) {
+    auto expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(getTenantIdNss());
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(ShardId("NonExistentShard"),
+                         HostAndPort("NonExistentShardHost", 12345),
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto source = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS_CODE(
+            exec::agg::buildStage(source), AssertionException, ErrorCodes::ShardNotFound);
+    });
+    // Answer getShard()'s forced reload; the response omits the bogus shard, so it stays
+    // unresolved.
+    expectGetShards(makeConfigShards());
+    future.default_timed_get();
+}
+
+// The validation must fire even when only one of several remotes references an unknown shard.
+TEST_F(DocumentSourceMergeCursorsTest, ShouldFailToBuildStageIfAnyShardIsUnknown) {
+    auto expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(getTenantIdNss());
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(ShardId("NonExistentShard"),
+                         HostAndPort("NonExistentShardHost", 12345),
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto source = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS_CODE(
+            exec::agg::buildStage(source), AssertionException, ErrorCodes::ShardNotFound);
+    });
+    expectGetShards(makeConfigShards());
+    future.default_timed_get();
+}
+
 BSONObj cursorResponseObj(const NamespaceString& nss,
                           CursorId cursorId,
                           std::vector<BSONObj> batch) {
@@ -395,6 +498,32 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
         return BSON("ok" << 1);
     });
     future.default_timed_get();
+}
+
+using DocumentSourceMergeCursorsDeathTest = DocumentSourceMergeCursorsTest;
+
+DEATH_TEST_F(DocumentSourceMergeCursorsDeathTest,
+             DisposeAfterDetachTripsAssert,
+             "requires a valid operation context") {
+    const auto& expCtx = getExpCtx();
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(getTenantIdNss());
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+    auto pipeline = Pipeline::create({}, expCtx);
+    pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+
+    execPipeline->detachFromOperationContext();
+    execPipeline->dispose();
 }
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {

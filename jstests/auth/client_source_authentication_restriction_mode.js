@@ -2,7 +2,7 @@
 // the clientSourceAuthenticationRestrictionMode server parameter.
 
 import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 

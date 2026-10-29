@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 
@@ -300,6 +274,13 @@ std::pair<typename FlatBSONStore<Element, Value>::Iterator,
           typename FlatBSONStore<Element, Value>::Iterator>
 FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterator pos,
                                            std::string fieldName) {
+    // Check if the field name is already in the fast lookup map before inserting the new entry.
+    if (_pos->_fieldNameToIndex) {
+        uassert(12602101,
+                "Duplicate field names cannot be present in the same FlatBSON object",
+                !_pos->_fieldNameToIndex->contains(fieldName));
+    }
+
     // Remember our iterator position so we can restore it after inserting a new element.
     auto index = std::distance(_entries.begin(), _pos);
     auto inserted = _entries.emplace(pos._pos, _trackingContext, 1, 0);
@@ -309,14 +290,12 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
 
     // Also store our offset in the fast lookup map if it is available.
     if (_pos->_fieldNameToIndex) {
-        uassert(12602101,
-                "Duplicate field names cannot be present in the same FlatBSON object",
-                _pos->_fieldNameToIndex
-                    ->try_emplace(tracking::make_string(_trackingContext,
-                                                        inserted->_element.fieldName().data(),
-                                                        inserted->_element.fieldName().size()),
-                                  inserted->_offsetParent)
-                    .second);
+        invariant(_pos->_fieldNameToIndex
+                      ->try_emplace(tracking::make_string(_trackingContext,
+                                                          inserted->_element.fieldName().data(),
+                                                          inserted->_element.fieldName().size()),
+                                    inserted->_offsetParent)
+                      .second);
     }
 
     // We need to traverse the hiearchy up to the root and modify stored offsets to account for
@@ -396,11 +375,11 @@ typename std::string FlatBSON<Derived, Element, Value>::updateStatusString(
 template <class Derived, class Element, class Value>
 typename FlatBSON<Derived, Element, Value>::UpdateStatus FlatBSON<Derived, Element, Value>::update(
     const BSONObj& doc,
-    boost::optional<std::string_view> omitField,
+    boost::optional<std::string_view> metaField,
     const StringDataComparator* stringComparator) {
     auto obj = _store.root();
-    return _updateObj(obj, doc, {}, stringComparator, [&omitField](std::string_view fieldName) {
-        return omitField && fieldName == omitField;
+    return _updateObj(obj, doc, {}, stringComparator, [&metaField](std::string_view fieldName) {
+        return metaField && fieldName == metaField;
     });
 }
 

@@ -1,7 +1,12 @@
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 // ]
-import {getExecutionStats, getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {
+    getExecutionStats,
+    getPlanStages,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 let t = db.geo_2d_explain;
 
@@ -34,7 +39,7 @@ assert.lte(stats.nReturned, stats.totalDocsExamined);
 assert.eq(stats.executionSuccess, true, "expected success: " + tojson(explain));
 
 // Check for the existence of a indexVersion field in explain output.
-let indexStages = getPlanStages(explain.queryPlanner.winningPlan, "GEO_NEAR_2D");
+let indexStages = getPlanStages(getWinningPlanFromExplain(explain), "GEO_NEAR_2D");
 print(tojson(indexStages));
 assert.gt(indexStages.length, 0);
 for (var i = 0; i < indexStages.length; i++) {

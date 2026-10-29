@@ -29,6 +29,18 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "authoritative_metadata_clone_failover.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "authoritative_metadata_historical_snapshot_read.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "authoritative_metadata_historical_owner_removed.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "authoritative_shard_retries_nonauthoritative_ddl_after_ddl_lock.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "authoritative_shards_setfcv_blocks_chunk_operations.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
@@ -46,12 +58,18 @@ filters:
   - "*upgrade_downgrade_viewless_timeseries_*.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "fixed_bucketing_ddl_*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "s2_index_v4_downgrade.js":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
   - "fcv_upgrade_downgrade_during_index_build.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "fcv_upgrade_downgrade_manages_shard_uuids.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "replica_set_write_block_upgrade_downgrade.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

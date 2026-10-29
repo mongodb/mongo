@@ -13,9 +13,10 @@
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/bazel_test_results_shutils.sh"
+. "$DIR/engflow_links_shutils.sh"
 
-if [[ "${resmoke_disable_rbe_mirror}" == "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
-    echo "Skipping: resmoke_disable_rbe_mirror=true on RBE mirror variant. We have force-disabled testing on this variant while resolving remote execution issues. Report to #ask-devprod-test-infrastructure if you have any issues."
+if [[ "${resmoke_rbe_mirror_reenabled}" != "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
+    echo "Skipping: the RBE mirror variant is disabled. Set the resmoke_rbe_mirror_reenabled project variable to true to enable it. Report to #ask-devprod-test-infrastructure if you have any issues."
     exit 0
 fi
 
@@ -100,18 +101,43 @@ function unzip_outputs() {
 }
 
 # Writes a user-friendly bazel invocation for re-running this test target.
+# If the test was a jstestfuzz suite, pin the seed, the upstream jstestfuzz
+# commit, and (on release branches) the MongoDB target version so the run
+# reproduces:
+#   --//bazel/resmoke:jstestfuzz_seed=<seed>
+#   --repo_env=JSTESTFUZZ_COMMIT=<sha>
+#   --//bazel/resmoke:jstestfuzz_branch=<branch>     # only when not master
 # If the test was a config fuzzer suite, pins the seed so the run reproduces:
 #   --//bazel/resmoke:config_fuzz_seed=<seed>
 function write_bazel_invocation() {
     local extra_flags=""
-
-    local seed_file
-    seed_file=$(find "${workdir}/results" -name config_fuzz_seed.txt -type f 2>/dev/null | head -n 1)
+    local seed_file commit_file config_fuzz_seed_file
+    seed_file=$(find "${workdir}/results" -name jstestfuzz_seed.txt -type f 2>/dev/null | head -n 1)
     if [[ -n "$seed_file" ]]; then
         local seed
         seed=$(tr -d '[:space:]' <"$seed_file")
         if [[ -n "$seed" ]]; then
-            extra_flags+="--//bazel/resmoke:config_fuzz_seed=${seed} "
+            extra_flags+="--//bazel/resmoke:jstestfuzz_seed=${seed} "
+        fi
+    fi
+    commit_file=$(find "${workdir}/results" -name jstestfuzz_commit_sha.txt -type f 2>/dev/null | head -n 1)
+    if [[ -n "$commit_file" ]]; then
+        local commit
+        commit=$(tr -d '[:space:]' <"$commit_file")
+        if [[ -n "$commit" ]]; then
+            extra_flags+="--repo_env=JSTESTFUZZ_COMMIT=${commit} "
+        fi
+    fi
+    # Only emit --jstestfuzz_branch on release branches; master is the rule's default.
+    if [[ -n "${branch_name:-}" && "${branch_name}" != "master" ]]; then
+        extra_flags+="--//bazel/resmoke:jstestfuzz_branch=${branch_name} "
+    fi
+    config_fuzz_seed_file=$(find "${workdir}/results" -name config_fuzz_seed.txt -type f 2>/dev/null | head -n 1)
+    if [[ -n "$config_fuzz_seed_file" ]]; then
+        local config_fuzz_seed
+        config_fuzz_seed=$(tr -d '[:space:]' <"$config_fuzz_seed_file")
+        if [[ -n "$config_fuzz_seed" ]]; then
+            extra_flags+="--//bazel/resmoke:config_fuzz_seed=${config_fuzz_seed} "
         fi
     fi
 
@@ -120,6 +146,19 @@ function write_bazel_invocation() {
     replacement_escaped=$(echo "$replacement" | sed 's/[][\/\.\*^$&]/\\&/g')
     mkdir -p "${workdir}/src/"
     sed "s/\S*\$/${replacement_escaped}/" ${workdir}/resmoke-tests-bazel-invocation.txt | tail -n 1 >"${workdir}/bazel-invocation.txt"
+}
+function write_engflow_links() {
+    local invocation_id link
+    invocation_id=$(engflow_links::invocation_id "$BEP_FILE")
+    if [[ -z "$invocation_id" ]]; then
+        echo "No invocation id in ${BEP_FILE}; not attaching EngFlow links."
+        return
+    fi
+
+    link=$(engflow_links::target_url "$invocation_id" "${test_label}")
+    engflow_links::entry "EngFlow remote execution details - this target" "$link" |
+        jq --slurp '.' >"${workdir}/src/engflow_links.json"
+    echo "Attaching EngFlow link: ${link}"
 }
 
 # Resolves a file path from a list of candidate locations. Returns the first existing file path found.
@@ -227,6 +266,8 @@ bazel_test_results::combine_metrics
 failures=$(bazel_test_results::combine_reports)
 
 write_bazel_invocation
+
+write_engflow_links
 
 # Check for system-level failures (TIMEOUT or NO_REPORT)
 for status in "${shard_statuses[@]}"; do

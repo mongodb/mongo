@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 
@@ -173,6 +147,7 @@ TEST(EstimatesFramework, SourceMerge) {
     CardinalityEstimate ce_mi(CardinalityType{4142.2}, EstimationSource::Mixed);
     CardinalityEstimate ce_me(CardinalityType{5142.1}, EstimationSource::Metadata);
     CardinalityEstimate ce_co(CardinalityType{5142.1}, EstimationSource::Code);
+    CardinalityEstimate ce_hl(CardinalityType{6142.0}, EstimationSource::HyperLogLog);
 
     // Test all combinations systematically
 
@@ -183,6 +158,7 @@ TEST(EstimatesFramework, SourceMerge) {
     ASSERT_EQUALS((cc * ce_mi).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((cc * ce_me).source(), EstimationSource::Metadata);
     ASSERT_EQUALS((cc * ce_co).source(), EstimationSource::Code);
+    ASSERT_EQUALS((cc * ce_hl).source(), EstimationSource::HyperLogLog);
 
     // Histogram x Any
     ASSERT_EQUALS((ce_hi + ce_hi).source(), EstimationSource::Histogram);
@@ -191,6 +167,7 @@ TEST(EstimatesFramework, SourceMerge) {
     ASSERT_EQUALS((ce_hi + ce_mi).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((ce_hi + ce_me).source(), EstimationSource::Histogram);
     ASSERT_EQUALS((ce_hi + ce_co).source(), EstimationSource::Histogram);
+    ASSERT_EQUALS((ce_hi + ce_hl).source(), EstimationSource::Mixed);
 
     // Sampling x Any
     ASSERT_EQUALS((ce_sa + ce_hi).source(), EstimationSource::Mixed);
@@ -199,6 +176,7 @@ TEST(EstimatesFramework, SourceMerge) {
     ASSERT_EQUALS((ce_sa + ce_mi).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((ce_sa + ce_me).source(), EstimationSource::Sampling);
     ASSERT_EQUALS((ce_sa + ce_co).source(), EstimationSource::Sampling);
+    ASSERT_EQUALS((ce_sa + ce_hl).source(), EstimationSource::Mixed);
 
     // Heuristics
     ASSERT_EQUALS((ce_he + ce_hi).source(), EstimationSource::Mixed);
@@ -207,6 +185,7 @@ TEST(EstimatesFramework, SourceMerge) {
     ASSERT_EQUALS((ce_he + ce_mi).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((ce_he + ce_me).source(), EstimationSource::Heuristics);
     ASSERT_EQUALS((ce_he + ce_co).source(), EstimationSource::Heuristics);
+    ASSERT_EQUALS((ce_he + ce_hl).source(), EstimationSource::Mixed);
 
     // Mixed
     ASSERT_EQUALS((ce_mi + ce_hi).source(), EstimationSource::Mixed);
@@ -215,6 +194,7 @@ TEST(EstimatesFramework, SourceMerge) {
     ASSERT_EQUALS((ce_mi + ce_mi).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((ce_mi + ce_me).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((ce_mi + ce_co).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_mi + ce_hl).source(), EstimationSource::Mixed);
 
     // Metadata
     ASSERT_EQUALS((ce_me + ce_hi).source(), EstimationSource::Histogram);
@@ -223,6 +203,16 @@ TEST(EstimatesFramework, SourceMerge) {
     ASSERT_EQUALS((ce_me + ce_mi).source(), EstimationSource::Mixed);
     ASSERT_EQUALS((ce_me + ce_me).source(), EstimationSource::Metadata);
     ASSERT_EQUALS((ce_me + ce_co).source(), EstimationSource::Metadata);
+    ASSERT_EQUALS((ce_me + ce_hl).source(), EstimationSource::HyperLogLog);
+
+    // HyperLogLog
+    ASSERT_EQUALS((ce_hl + ce_hi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hl + ce_sa).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hl + ce_he).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hl + ce_mi).source(), EstimationSource::Mixed);
+    ASSERT_EQUALS((ce_hl + ce_me).source(), EstimationSource::HyperLogLog);
+    ASSERT_EQUALS((ce_hl + ce_co).source(), EstimationSource::HyperLogLog);
+    ASSERT_EQUALS((ce_hl + ce_hl).source(), EstimationSource::HyperLogLog);
 
     // Test source merging across few different types of estimates and operations
 

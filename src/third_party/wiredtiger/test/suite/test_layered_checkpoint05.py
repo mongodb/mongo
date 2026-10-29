@@ -53,14 +53,16 @@ class test_layered_checkpoint05(checkpoint_util):
         # The node started as a follower, so step it up as the leader
         self.conn.reconfigure('disaggregated=(role="leader")')
 
-        # Avoid checkpoint error with precise checkpoint
-        self.conn.set_timestamp('stable_timestamp=1')
-
         # Create a table with some data
         self.session.create(self.uri + 'x', self.create_session_config)
         cursor = self.session.open_cursor(self.uri + 'x', None, None)
+        self.session.begin_transaction()
         cursor['a'] = 'b'
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
         cursor.close()
+
+        # Avoid checkpoint error with precise checkpoint
+        self.conn.set_timestamp('stable_timestamp=1')
 
         # Start a checkpoint in a separate thread
         def checkpoint_thread_fn(conn):

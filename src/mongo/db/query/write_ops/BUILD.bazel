@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -111,6 +111,7 @@ mongo_cc_library(
     deps = [
         ":find_and_modify_image_lookup_util",
         "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/db:local_executor",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:profile_collection",
@@ -216,6 +217,7 @@ mongo_cc_library(
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:profile_collection",
         "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/admission:write_throttler",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query:explain_diagnostic_printer",
         "//src/mongo/db/query:shard_key_diagnostic_printer",
@@ -224,9 +226,8 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape:insert_cmd_shape",
         "//src/mongo/db/query/query_shape:update_cmd_shape",
         "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/query/query_stats:delete_key",
-        "//src/mongo/db/query/query_stats:insert_key",
-        "//src/mongo/db/query/query_stats:update_key",
+        "//src/mongo/db/query/query_stats:write_cmd_shape_registration",
+        "//src/mongo/db/query/query_stats:write_key",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/s:query_analysis_writer",
@@ -291,5 +292,18 @@ mongo_cc_integration_test(
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "insert_bm",
+    srcs = [
+        "insert_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":write_ops",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/topology/vector_clock:vector_clock_trivial",
     ],
 )

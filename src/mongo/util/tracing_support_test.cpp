@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/tracing_support.h"
 
@@ -101,7 +75,6 @@ TEST(TracingSupportTest, TraceIsEmptyWithActiveSpans) {
 TEST(TracingSupportTest, BasicUsage) {
     const auto kSpanDuration = Seconds(5);
     auto tracer = TracerProvider::get().getTracer(kTracerName);  // NOLINT
-    const auto startTicks = tracer->getTickSource()->getTicks();
 
     {
         auto rootSpan = tracer->startSpan("root");
@@ -130,22 +103,20 @@ TEST(TracingSupportTest, BasicUsage) {
     const auto expected = BSON(
         "tracer" << kTracerName << "root"
                  << BSON("startedMicros"
-                         << startTicks << "spans"
+                         << 0 << "spans"
                          << BSON("child" << BSON(
                                      "startedMicros"
-                                     << startTicks + kSpanDurationMicros << "spans"
+                                     << kSpanDurationMicros << "spans"
                                      << BSON("grand child #1"
-                                             << BSON("startedMicros"
-                                                     << startTicks + 2 * kSpanDurationMicros
-                                                     << "stoppedMicros"
-                                                     << startTicks + 3 * kSpanDurationMicros)
+                                             << BSON("startedMicros" << 2 * kSpanDurationMicros
+                                                                     << "stoppedMicros"
+                                                                     << 3 * kSpanDurationMicros)
                                              << "grand child #2"
-                                             << BSON("startedMicros"
-                                                     << startTicks + 3 * kSpanDurationMicros
-                                                     << "stoppedMicros"
-                                                     << startTicks + 4 * kSpanDurationMicros))
-                                     << "stoppedMicros" << startTicks + 4 * kSpanDurationMicros))
-                         << "stoppedMicros" << startTicks + 4 * kSpanDurationMicros));
+                                             << BSON("startedMicros" << 3 * kSpanDurationMicros
+                                                                     << "stoppedMicros"
+                                                                     << 4 * kSpanDurationMicros))
+                                     << "stoppedMicros" << 4 * kSpanDurationMicros))
+                         << "stoppedMicros" << 4 * kSpanDurationMicros));
     ASSERT_BSONOBJ_EQ(expected, trace.value());
 }
 

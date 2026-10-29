@@ -30,11 +30,9 @@ selector:
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
     - requires_commit_quorum
-    - requires_capped
     - requires_rollbacks
     - requires_index_build_resumability
   roots:
-    - jstests/replsets/*index_build*.js
     - jstests/replsets/**/*index_build*.js
     - jstests/replsets/container_operations.js
 test_kind: js_test

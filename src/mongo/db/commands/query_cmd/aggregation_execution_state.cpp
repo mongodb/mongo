@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 
@@ -138,6 +112,9 @@ public:
         }
 
         ResolvedNamespaceMap resolvedNamespaces;
+        for (const auto& [nss, rn] : _aggExState.getPreResolvedForeignViews()) {
+            resolvedNamespaces.insert_or_assign(nss, rn);
+        }
         std::deque<NamespaceString> namespaces(pipelineInvolvedNamespaces.begin(),
                                                pipelineInvolvedNamespaces.end());
         auto status = extendResolvedNamespaces(opCtx, std::move(namespaces), resolvedNamespaces);
@@ -167,9 +144,10 @@ public:
                         << "Failed to resolve view '" << involvedNs.toStringForErrorMsg());
                 }
 
-                // The mongos all-view resolution path doesn't correctly handle timeseries views.
-                // Since mongos view resolution and viewless timeseries are released in 9.0, we do
-                // not need to support this for timeseries views.
+                // The mongos all-view resolution path doesn't correctly handle timeseries views. We
+                // still need to handle timeseries views in 9.0 because of FCV downgrades. We
+                // perform a kickback here to retry the aggregation without hybrid search enabled to
+                // ensure we handle the view correctly.
                 const auto& ifrContext = getIfrContext();
                 const bool extensionsInsideHybridSearchEnabled = ifrContext &&
                     ifrContext->getSavedFlagValue(
@@ -203,7 +181,7 @@ public:
                 LiteParsedPipeline resolvedViewLitePipeline(
                     resolvedView.getValue().getResolvedNamespace(),
                     resolvedView.getValue().getBsonPipeline(),
-                    /*makeSubpipelineOwned=*/false,
+                    /*isRunningAgainstView_ForHybridSearch=*/false,
                     resolvedViewLpOpts);
 
                 const auto& resolvedViewInvolvedNamespaces =
@@ -245,14 +223,24 @@ public:
         // still
         // refers to other map entries by namespace.
         //
-        // The 'mainNss' passed to the recursive resolver is each entry's BACKING namespace
-        // (entry.ns), not the view's own key. Backing namespaces are never view entries, so the
+        // The 'mainNss' passed to the recursive resolver is each entry's BACKING namespace, not the
+        // view's own key. Backing namespaces are never view entries, so the
         // top-level binding branch in resolveInvolvedNamespacesOnLiteParsedPipeline is skipped — we
         // don't apply this view to itself, we only recurse into its subpipelines.
         for (auto& [_, entry] : resolvedNamespaces) {
-            if (auto* parsed = entry.getMutableParsedPipeline()) {
+            if (entry.getMutableParsedPipeline()) {
+                // Desugar the view's lite-parsed pipeline before resolving its subpipeline views.
+                // TODO SERVER-131677: combine desugaring and resolveInvolvedNamespaces into a
+                // single API so callers cannot resolve a non-desugared pipeline by mistake.
+                if (!entry.getLiteParserOptions()) {
+                    entry.setLiteParserOptions(std::make_shared<LiteParserOptions>(
+                        LiteParserOptions{.ifrContext = getIfrContext()}));
+                }
+                entry.desugarViewPipeline();
                 PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
-                    &parsed->pipeline(), entry.ns, resolvedNamespaces);
+                    &entry.getMutableParsedPipeline()->pipeline(),
+                    entry.getResolvedNamespace(),
+                    resolvedNamespaces);
             }
         }
 
@@ -539,6 +527,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool isCollectionlessAggregation() const override {
+        return true;
+    }
+
     query_shape::CollectionType getMainCollectionType() const override {
         MONGO_UNREACHABLE;
     }
@@ -618,7 +610,7 @@ bool AggExState::canReadUnderlyingCollectionLocally(const CollectionRoutingInfo&
         if (cm.isSharded()) {
             return false;
         } else if (cm.isUnsplittable()) {
-            return cm.getMinKeyShardIdWithSimpleCollation(_opCtx) == myShardId;
+            return cm.getMinKeyShardIdWithSimpleCollation() == myShardId;
         } else {
             return cri.getDbPrimaryShardId() == myShardId;
         }
@@ -743,8 +735,10 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
       _resolvedViewRequest_DO_NOT_USE_DIRECTLY(PipelineResolver::buildRequestWithResolvedPipeline(
           _ifrContext, _resolvedNamespace, _originalAggReqDerivatives->request)),
-      _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(_resolvedViewRequest_DO_NOT_USE_DIRECTLY,
-                                                          true) {
+      _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(
+          _resolvedViewRequest_DO_NOT_USE_DIRECTLY,
+          true,
+          LiteParserOptions{.ifrContext = _ifrContext}) {
     bool isExplain = _originalAggReqDerivatives->request.getExplain().get_value_or(false);
     uassert(std::move(_resolvedNamespace),
             "Explain of a resolved view must be executed by mongos",
@@ -807,12 +801,12 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
     if (cri.hasRoutingTable()) {
         const auto myShardId = ShardingState::get(_opCtx)->shardId();
 
-        auto sv = cri.getShardVersion(_opCtx, myShardId);
+        auto sv = cri.getShardVersion(myShardId);
         if (optPlacementConflictTimestamp) {
             sv.setPlacementConflictTime_DEPRECATED(*optPlacementConflictTimestamp);
         }
         return ScopedSetShardRole(
-            _opCtx, underlyingNss, sv /*shardVersion*/, boost::none /*databaseVersion*/);
+            _opCtx, underlyingNss, /*shardVersion=*/sv, /*databaseVersion=*/boost::none);
     } else {
         auto sv = ShardVersion::UNTRACKED();
         auto dbv = cri.getDbVersion();
@@ -821,7 +815,7 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
             dbv.setPlacementConflictTime_DEPRECATED(*optPlacementConflictTimestamp);
         }
         return ScopedSetShardRole(
-            _opCtx, underlyingNss, sv /*shardVersion*/, dbv /*databaseVersion*/);
+            _opCtx, underlyingNss, /*shardVersion=*/sv, /*databaseVersion=*/dbv);
     }
 }
 
@@ -834,11 +828,19 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
     // connections), there is no mongos to receive the ResolvedView exception — the existing
     // ExpressionContext view-resolution path handles those cases in-line.
     const bool fromRouter = OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx);
-    if (!extensionsInsideHybridSearchEnabled || !fromRouter) {
+
+    // The merging half of a sharded aggregation is dispatched by mongos with a leading
+    // $mergeCursors, but - because it merges already-established cursors rather than targeting a
+    // versioned collection - it carries no shard/database version, so shouldBeTreatedAsFromRouter()
+    // returns false for it. A mongos is nonetheless present to receive a kickback, and the merging
+    // pipeline is the only place a merge-stage $lookup/$unionWith foreign view surfaces as an
+    // involved namespace. Treat it as from-router so the proactive resolver inspects those
+    // namespaces and can kick the view resolution back to mongos.
+    const auto& lpp = aggExState.getOriginalLiteParsedPipeline();
+    if (!extensionsInsideHybridSearchEnabled || (!fromRouter && !lpp.isMergePipeline())) {
         return;
     }
 
-    const auto& lpp = aggExState.getOriginalLiteParsedPipeline();
     const bool mainIsView = shouldExpandMainView();
     if (lpp.getInvolvedNamespaces().empty() && !mainIsView) {
         return;
@@ -852,11 +854,11 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
 
     if (mainIsView) {
         auto mainViewResolved = uassertStatusOK(
-            resolveView(opCtx, aggExState.getExecutionNss(), boost::none /* timeSeriesCollator */));
+            resolveView(opCtx, aggExState.getExecutionNss(), /*timeSeriesCollator=*/boost::none));
         operationCollationSpec = mainViewResolved.getDefaultCollation();
         LiteParsedPipeline mainViewLpp(mainViewResolved.getResolvedNamespace(),
                                        mainViewResolved.getBsonPipeline(),
-                                       /*makeSubpipelineOwned=*/false,
+                                       /*isRunningAgainstView_ForHybridSearch=*/false,
                                        LiteParserOptions{.ifrContext = ifrContext});
         const auto& namespacesSet = mainViewLpp.getInvolvedNamespaces();
         std::deque<NamespaceString> namespaces(namespacesSet.begin(), namespacesSet.end());
@@ -899,7 +901,7 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
                 CollatorInterface::collatorsMatch(viewCollator.get(), operationCollator.get()));
 
         ResolvedNamespaceViewOptions opts{
-            .collUUID = rn.uuid,
+            .collUUID = rn.getCollUUID(),
             .involvedNamespaceIsAView = true,
             .timeseriesMetadata = rn.getTimeseriesViewMetadata(),
         };
@@ -915,7 +917,7 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
 
     if (shouldExpandMainView()) {
         auto topLevelResolved = uassertStatusOK(
-            resolveView(opCtx, aggExState.getExecutionNss(), boost::none /* timeSeriesCollator */));
+            resolveView(opCtx, aggExState.getExecutionNss(), /*timeSeriesCollator=*/boost::none));
         topLevelResolved.setAdditionalResolvedNamespaces(std::move(viewEntries));
         uassertStatusOK(Status(std::move(topLevelResolved),
                                "Involved namespaces include views; kickback to mongos with "
@@ -952,7 +954,7 @@ bool AggCatalogState::requiresExtendedRangeSupportForTimeseries(
     // range support (e.g. in the foreign coll of a $lookup), so we check for that as well.
     if (!requiresExtendedRange) {
         for (auto& [_, resolvedNs] : resolvedNamespaces) {
-            const auto& nss = resolvedNs.ns;
+            const auto& nss = resolvedNs.getResolvedNamespace();
             auto readTimestamp = shard_role_details::getRecoveryUnit(_aggExState.getOpCtx())
                                      ->getPointInTimeReadTimestamp();
             auto collPtr = CollectionPtr(getCatalog()->establishConsistentCollection(
@@ -969,9 +971,6 @@ bool AggCatalogState::requiresExtendedRangeSupportForTimeseries(
 
 boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext() {
     auto [collator, collationMatchesDefault] = resolveCollator();
-    const bool canPipelineBeRejected =
-        query_settings::canPipelineBeRejected(_aggExState.getRequest().getPipeline());
-
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check. Route through the memoized accessor so that if the
     // proactive kickback path already resolved involved namespaces earlier in _runAggregate(), we
@@ -995,7 +994,6 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
         .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
         .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
         .collationMatchesDefault(collationMatchesDefault)
-        .canBeRejected(canPipelineBeRejected)
         .explain(_aggExState.getVerbosity())
         .ifrContext(_aggExState.getIfrContext());
 
@@ -1060,6 +1058,9 @@ void AggCatalogState::validate() const {
             !(_aggExState.getRequest().getIsMapReduceCommand() && isTimeseriesQuery));
 
     if (_aggExState.getRequest().getResumeAfter() || _aggExState.getRequest().getStartAt()) {
+        uassert(12848201,
+                "$_resumeAfter is not supported for collectionless aggregations",
+                !isCollectionlessAggregation());
         const auto& collectionOrView = getMainCollectionOrView();
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on timeseries collections",

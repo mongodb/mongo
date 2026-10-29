@@ -54,7 +54,9 @@ mongo_cc_library(
         "//src/mongo/db:wire_version",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:object_check",
         "//src/mongo/transport:grpc_connection_stats",
+        "//src/mongo/transport:message_filter_hooks",
         "//src/mongo/transport:service_executor",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_common",
@@ -221,6 +223,18 @@ mongo_cc_unit_test(
         "//src/mongo/util:periodic_runner_factory",
         "@com_github_grpc_grpc//:grpc++_reflection",
         "@com_google_protobuf//:protobuf",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "grpc_session_manager_test",
+    srcs = ["grpc_session_manager_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":grpc_transport_layer",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role:service_context_non_d",
     ],
 )
 

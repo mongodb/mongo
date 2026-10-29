@@ -1,5 +1,16 @@
+/**
+ * Tests the idempotency of the _configsvrSetAllowMigrations command.
+ *
+ * TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+ * _configsvrSetAllowMigrations belongs to the legacy (non-authoritative) protocol: it bumps the
+ * collection placement version and relies on tellShardsToRefresh (i.e. the deprecated
+ * _flushRoutingTableCacheUpdates(WithWriteConcern) commands) to propagate the change to shards.
+ * Once shards are authoritative for collection metadata, that command is no longer served, so this
+ * test no longer applies.
+ */
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allowMigrations) {
     let res;
@@ -29,6 +40,8 @@ function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allo
 }
 
 const st = new ShardingTest({shards: 1});
+
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 
 const dbName = "test";
 const collName = "foo";

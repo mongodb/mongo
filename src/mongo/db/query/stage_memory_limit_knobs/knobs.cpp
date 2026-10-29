@@ -1,124 +1,69 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
+#include "mongo/db/query/stage_memory_limit_knobs/query_knob_descriptors.h"
 #include "mongo/db/query/stage_memory_limit_knobs/stage_memory_limit_knobs_gen.h"
 
 namespace mongo {
 
 namespace {
 
-AtomicWord<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
+const QueryKnob<long long>& getMemoryLimitKnob(StageMemoryLimit stage) {
     switch (stage) {
         case StageMemoryLimit::DocumentSourceLookupCacheSizeBytes:
-            return internalDocumentSourceLookupCacheSizeBytes;
+            return query_knobs::kDocumentSourceLookupCacheSizeBytes;
         case StageMemoryLimit::DocumentSourceGraphLookupMaxMemoryBytes:
-            return internalDocumentSourceGraphLookupMaxMemoryBytes;
+            return query_knobs::kDocumentSourceGraphLookupMaxMemoryBytes;
         case StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes:
-            return internalDocumentSourceGroupMaxMemoryBytes;
+            return query_knobs::kDocumentSourceGroupMaxMemoryBytes;
         case StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes:
-            return internalDocumentSourceSetWindowFieldsMaxMemoryBytes;
+            return query_knobs::kDocumentSourceSetWindowFieldsMaxMemoryBytes;
         case StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes:
-            return internalDocumentSourceBucketAutoMaxMemoryBytes;
+            return query_knobs::kDocumentSourceBucketAutoMaxMemoryBytes;
         case StageMemoryLimit::DocumentSourceDensifyMaxMemoryBytes:
-            return internalDocumentSourceDensifyMaxMemoryBytes;
+            return query_knobs::kDocumentSourceDensifyMaxMemoryBytes;
         case StageMemoryLimit::QueryFacetBufferSizeBytes:
-            return internalQueryFacetBufferSizeBytes;
+            return query_knobs::kQueryFacetBufferSizeBytes;
         case StageMemoryLimit::TextOrStageMaxMemoryBytes:
-            return internalTextOrStageMaxMemoryBytes;
+            return query_knobs::kTextOrStageMaxMemoryBytes;
         case StageMemoryLimit::QuerySBELookupApproxMemoryUseInBytesBeforeSpill:
-            return internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill;
+            return query_knobs::kSbeHashLookupApproxMemoryUseInBytesBeforeSpill;
         case StageMemoryLimit::QuerySBEAggApproxMemoryUseInBytesBeforeSpill:
-            return internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill;
+            return query_knobs::kSbeHashAggApproxMemoryUseInBytesBeforeSpill;
         case StageMemoryLimit::QueryMaxSpoolMemoryUsageBytes:
-            return internalQueryMaxSpoolMemoryUsageBytes;
+            return query_knobs::kQueryMaxSpoolMemoryUsageBytes;
         case StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes:
-            return internalQueryMaxBlockingSortMemoryUsageBytes;
+            return query_knobs::kQueryMaxBlockingSortMemoryUsageBytes;
         case StageMemoryLimit::OrStageMaxMemoryBytes:
-            return internalOrStageMaxMemoryBytes;
+            return query_knobs::kOrStageMaxMemoryBytes;
         case StageMemoryLimit::NearStageMaxMemoryBytes:
-            return internalNearStageMaxMemoryBytes;
+            return query_knobs::kNearStageMaxMemoryBytes;
         case StageMemoryLimit::MergeSortStageMaxMemoryBytes:
-            return internalMergeSortStageMaxMemoryBytes;
+            return query_knobs::kMergeSortStageMaxMemoryBytes;
         case StageMemoryLimit::IndexScanStageMaxMemoryBytes:
-            return internalIndexScanStageMaxMemoryBytes;
+            return query_knobs::kIndexScanStageMaxMemoryBytes;
         case StageMemoryLimit::SBEUniqueStageMaxMemoryBytes:
-            return internalSBEUniqueStageMaxMemoryBytes;
+            return query_knobs::kSbeUniqueStageMaxMemoryBytes;
         case StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill:
-            return internalQuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill;
+            return query_knobs::kSbeHashJoinApproxMemoryUseInBytesBeforeSpill;
         case StageMemoryLimit::UpdateStageMaxMemoryBytes:
-            return internalUpdateStageMaxMemoryBytes;
+            return query_knobs::kUpdateStageMaxMemoryBytes;
         case StageMemoryLimit::CountScanStageMaxMemoryBytes:
-            return internalCountScanStageMaxMemoryBytes;
-        case StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes:
-            return internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes;
-        case StageMemoryLimit::MatchStageMaxExpressionEvaluationBytes:
-            return internalMatchStageMaxExpressionEvaluationBytes;
-        case StageMemoryLimit::LookupStageMaxExpressionEvaluationBytes:
-            return internalLookupStageMaxExpressionEvaluationBytes;
-        case StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes:
-            return internalRedactStageMaxExpressionEvaluationBytes;
+            return query_knobs::kCountScanStageMaxMemoryBytes;
         case StageMemoryLimit::SBEMergeJoinStageMaxMemoryBytes:
-            return internalSBEMergeJoinStageMaxMemoryBytes;
+            return query_knobs::kSbeMergeJoinStageMaxMemoryBytes;
         case StageMemoryLimit::SBEAndHashStageMaxMemoryBytes:
-            return internalSBEAndHashStageMaxMemoryBytes;
+            return query_knobs::kSbeAndHashStageMaxMemoryBytes;
     };
     MONGO_UNREACHABLE_TASSERT(10869600);
 }
 
 }  // namespace
 
-long long loadMemoryLimit(StageMemoryLimit stage) {
-    return getMemoryLimitKnob(stage).loadRelaxed();
-}
-
-void appendStageMemoryLimitsToExplain(BSONObjBuilder& bob) {
-    bob.appendNumber("internalQueryFacetBufferSizeBytes",
-                     loadMemoryLimit(StageMemoryLimit::QueryFacetBufferSizeBytes));
-    bob.appendNumber("internalDocumentSourceGroupMaxMemoryBytes",
-                     loadMemoryLimit(StageMemoryLimit::DocumentSourceGroupMaxMemoryBytes));
-    bob.appendNumber("internalQueryMaxBlockingSortMemoryUsageBytes",
-                     loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes));
-    bob.appendNumber(
-        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-        loadMemoryLimit(StageMemoryLimit::DocumentSourceSetWindowFieldsMaxMemoryBytes));
-    bob.appendNumber(
-        "internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes",
-        loadMemoryLimit(
-            StageMemoryLimit::SingleDocumentTransformationStageMaxExpressionEvaluationBytes));
-    bob.appendNumber("internalMatchStageMaxExpressionEvaluationBytes",
-                     loadMemoryLimit(StageMemoryLimit::MatchStageMaxExpressionEvaluationBytes));
-    bob.appendNumber("internalLookupStageMaxExpressionEvaluationBytes",
-                     loadMemoryLimit(StageMemoryLimit::LookupStageMaxExpressionEvaluationBytes));
-    bob.appendNumber("internalRedactStageMaxExpressionEvaluationBytes",
-                     loadMemoryLimit(StageMemoryLimit::RedactStageMaxExpressionEvaluationBytes));
+MemoryUsageLimit loadMemoryLimit(StageMemoryLimit stage) {
+    return MemoryUsageLimit{getMemoryLimitKnob(stage)};
 }
 
 }  // namespace mongo

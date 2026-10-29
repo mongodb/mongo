@@ -52,6 +52,8 @@ function verifyServerStatusFields(res) {
         "singleWriteShard",
         "readOnly",
         "twoPhaseCommit",
+        "twoPhaseCommitInternal",
+        "twoPhaseCommitExternal",
         "recoverWithToken",
     ];
     const commitTypeFields = ["initiated", "successful", "successfulDurationMicros"];
@@ -121,6 +123,8 @@ class ExpectedTransactionServerStatus {
             singleWriteShard: new ExpectedCommitType(),
             readOnly: new ExpectedCommitType(),
             twoPhaseCommit: new ExpectedCommitType(),
+            twoPhaseCommitInternal: new ExpectedCommitType(),
+            twoPhaseCommitExternal: new ExpectedCommitType(),
             recoverWithToken: new ExpectedCommitType(),
         };
     }
@@ -214,6 +218,20 @@ function verifyServerStatusValues(st, expectedStats) {
             );
         }
     });
+
+    assert.eq(
+        commitTypes.twoPhaseCommit.initiated,
+        commitTypes.twoPhaseCommitInternal.initiated + commitTypes.twoPhaseCommitExternal.initiated,
+        "twoPhaseCommit.initiated should equal internal + external",
+        {commitTypes: commitTypes},
+    );
+    assert.eq(
+        commitTypes.twoPhaseCommit.successful,
+        commitTypes.twoPhaseCommitInternal.successful +
+            commitTypes.twoPhaseCommitExternal.successful,
+        "twoPhaseCommit.successful should equal internal + external",
+        {commitTypes: commitTypes},
+    );
 
     const abortCause = res.transactions.abortCause;
     Object.keys(abortCause).forEach((cause) => {
@@ -534,6 +552,8 @@ jsTest.log("Successful two phase commit transaction.");
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
     expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+    expectedStats.commitTypes.twoPhaseCommitExternal.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommitExternal.successful += 1;
     expectedStats.totalParticipantsAtCommit += 2;
     expectedStats.totalRequestsTargeted += 1;
     verifyServerStatusValues(st, expectedStats);
@@ -557,6 +577,7 @@ jsTest.log("Failed two phase commit transaction.");
     expectedStats.totalAborted += 1;
     expectedStats.abortCause["NoSuchTransaction"] += 1;
     expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommitExternal.initiated += 1;
     expectedStats.totalParticipantsAtCommit += 2;
     // There are no implicit aborts after two phase commit, so the coordinator is targeted once.
     expectedStats.totalRequestsTargeted += 1;
@@ -789,6 +810,8 @@ jsTest.log("Change shard key with retryable write - findAndModify.");
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
     expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+    expectedStats.commitTypes.twoPhaseCommitInternal.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommitInternal.successful += 1;
     expectedStats.totalContactedParticipants += 2;
     expectedStats.totalParticipantsAtCommit += 2;
     expectedStats.totalRequestsTargeted += 4;
@@ -808,6 +831,8 @@ jsTest.log("Change shard key with retryable write - batch write command.");
     expectedStats.totalCommitted += 1;
     expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
     expectedStats.commitTypes.twoPhaseCommit.successful += 1;
+    expectedStats.commitTypes.twoPhaseCommitInternal.initiated += 1;
+    expectedStats.commitTypes.twoPhaseCommitInternal.successful += 1;
     expectedStats.totalContactedParticipants += 2;
     expectedStats.totalParticipantsAtCommit += 2;
     expectedStats.totalRequestsTargeted += 4;

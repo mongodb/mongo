@@ -14,10 +14,9 @@
  *
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
-
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // Helper to add generic txn fields to a command.
 function addTxnFieldsToCmd(cmd, lsid, txnNumber) {
@@ -46,8 +45,27 @@ st.rs0.getPrimary().adminCommand({configureFailPoint: "suspendRangeDeletion", mo
 // Move a chunk away from Shard0 (the donor) so its range deleter will asynchronously delete the
 // chunk's range. Flush its metadata to avoid StaleConfig during the later transaction.
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: st.shard1.shardName}));
-assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 st.refreshCatalogCacheForNs(st.s, ns);
+
+// Wait for the MaxKey orphan guard to finish classifying tasks before preparing the transaction, so
+// the range deletion below and not the MaxKey classification read meets the prepare conflict.
+//
+// Poll the durable completion marker rather than the log. The guard logs once when the
+// range deleter starts at step-up during ShardingTest setup. In suites where the setup is
+// slow, the entry is evicted before this point and the wait is never satisfied.
+// persistBlockedTasks() writes 'blockedTasks' before that log line, so its presence marks the same event.
+assert.soon(
+    () =>
+        st.rs0
+            .getPrimary()
+            .getDB("config")
+            .maxKeyOrphanScanState.findOne({_id: "scanState", blockedTasks: {$exists: true}}) !==
+        null,
+    "MaxKey orphan guard did not finish classifying range-deletion tasks",
+);
 
 // Insert a doc into the chunk still owned by the donor shard in a transaction then prepare the
 // transaction so readers of that doc will enter a prepare conflict retry loop.

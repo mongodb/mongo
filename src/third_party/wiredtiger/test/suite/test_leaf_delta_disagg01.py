@@ -71,19 +71,14 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.conn_base_config + self.conn_delta_config
 
-    def get_stat(self, stat, uri = None):
-        if not uri:
-            uri = ''
-        stat_cursor = self.session.open_cursor(f'statistics:{uri}', None, None)
-        val = stat_cursor[stat][2]
-        stat_cursor.close()
-        return val
-
     def insert_or_update(self, ids, vals):
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None, None)
         for id, val in zip(ids, vals):
             cursor[self.init_key * id] = val.encode()
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
 
     def verify(self, dict):
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -94,11 +89,14 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
         cursor.close()
 
     def delete(self, ids):
+        self.ts_count = getattr(self, 'ts_count', 0) + 1
+        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None, None)
         for i in ids:
             cursor.set_key(self.init_key * i)
             cursor.remove()
         cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(self.ts_count))
         self.session.checkpoint()
 
     def verify_delete(self, ids):
@@ -116,7 +114,7 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
         self.insert_or_update(self.base_ids, self.base_vals)
         self.session.checkpoint()
         if (self.prefix_enabled):
-            self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
+            self.assertStatGreaterSoon(stat.dsrc.rec_prefix_compression_full, 0, uri=self.uri)
         else:
             self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_full, self.uri), 0)
         self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_leaf, self.uri), 0)
@@ -140,7 +138,7 @@ class test_leaf_delta_disagg01(wttest.WiredTigerTestCase):
         # There should be 3 deltas generated for the page.
         self.assertEqual(delta_cnt, 3)
         if (self.prefix_enabled):
-            self.assertGreater(self.get_stat(stat.dsrc.rec_prefix_compression_delta, self.uri), 0)
+            self.assertStatGreaterSoon(stat.dsrc.rec_prefix_compression_delta, 0, uri=self.uri)
         else:
             self.assertEqual(self.get_stat(stat.dsrc.rec_prefix_compression_delta, self.uri), 0)
 

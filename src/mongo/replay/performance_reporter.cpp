@@ -1,44 +1,22 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/replay/performance_reporter.h"
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <ios>
+#include <limits>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -201,16 +179,24 @@ uint64_t PerformanceReporter::extractNumberOfDocuments(const BSONObj& response) 
 }
 
 std::string PerformanceReporter::readURI(std::ifstream& inFile) {
-    std::string_view::size_type uriLen = 0;
-    inFile.read((char*)(&uriLen), sizeof(uriLen));
+    std::array<char, sizeof(uint64_t)> lenBuf;
+    inFile.read(lenBuf.data(), lenBuf.size());
     uassert(ErrorCodes::ReplayClientInternalError,
             "Reading perf file URI length header failed",
             !(inFile.fail() || inFile.eof()));
+    const uint64_t encodedLen = ConstDataView(lenBuf.data()).read<LittleEndian<uint64_t>>();
+    uassert(ErrorCodes::ReplayClientInternalError,
+            fmt::format("Perf file URI length header is out of range: {}", encodedLen),
+            encodedLen <= std::numeric_limits<std::string::size_type>::max());
+    const auto uriLen = static_cast<std::string::size_type>(encodedLen);
     if (!uriLen) {
         return {};
     }
     std::string buf;
     buf.resize(uriLen);
+    uassert(ErrorCodes::ReplayClientInternalError,
+            fmt::format("Perf file URI length is out of range: {}", uriLen),
+            uriLen <= static_cast<decltype(uriLen)>(std::numeric_limits<std::streamsize>::max()));
     inFile.read(buf.data(), uriLen);
     uassert(ErrorCodes::ReplayClientInternalError,
             "Reading perf file URI failed",
@@ -219,8 +205,11 @@ std::string PerformanceReporter::readURI(std::ifstream& inFile) {
 }
 
 void PerformanceReporter::writeURI(std::string_view uri) {
+    uassert(ErrorCodes::ReplayClientInternalError,
+            fmt::format("URI length is out of range: {}", uri.size()),
+            uri.size() <= std::numeric_limits<uint64_t>::max());
     DataBuilder db;
-    uassertStatusOK(db.writeAndAdvance<LittleEndian<std::string_view::size_type>>(uri.size()));
+    uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(uri.size()));
     uassertStatusOK(db.writeAndAdvance<std::string_view>(uri));
     _outFile.write(db.getCursor().data(), db.size());
 }

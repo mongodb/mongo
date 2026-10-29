@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/client_cursor/clientcursor.h"
 
@@ -34,10 +8,15 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
+#include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_latency_accumulator.h"
+#include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -46,6 +25,7 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -65,18 +45,18 @@ auto& gCursorStats = *new CursorStats{};
 namespace change_stream_metrics {
 
 // The total number of change stream cursors opened since the start of the mongoD process. This
-// counter corresponds to the OTEL metric "change_streams.cursor.total_opened".
+// counter corresponds to the OTEL metric "serverStatus.metrics.changeStreams.cursor.totalOpened".
 auto& gCursorsTotalOpened = change_stream::createCurorsTotalOpened();
 
-// The OTEL metric "change_streams.cursor.lifespan" in the mongoD process.
+// The OTEL metric "serverStatus.metrics.changeStreams.cursor.lifespan" in the mongoD process.
 auto& gLifespan = change_stream::createCursorsLifespan();
 
-// The OTEL metric "change_streams.cursor.open.total" for the currently open cursors in the mongoD
-// process.
+// The OTEL metric "serverStatus.metrics.changeStreams.cursor.open.total" for the currently open
+// cursors in the mongoD process.
 auto& gCursorsOpenTotal = change_stream::createCursorsOpenTotal();
 
-// The OTEL metric "change_streams.cursor.open.pinned" for the currently active cursors in the
-// mongoD process.
+// The OTEL metric "serverStatus.metrics.changeStreams.cursor.open.pinned" for the currently active
+// cursors in the mongoD process.
 auto& gCursorsOpenPinned = change_stream::createCursorsOpenPinned();
 
 // Error counters — registered at startup so they appear in serverStatus before any errors occur.
@@ -87,6 +67,13 @@ auto& gErrorNonRetriableOther = change_stream::errorNonRetriableOther();
 auto& gErrorRetriableInterruptedDueToReplStateChange =
     change_stream::errorRetriableInterruptedDueToReplStateChange();
 auto& gErrorRetriableOther = change_stream::errorRetriableOther();
+
+// Throughput metrics
+auto& gCursorDocsReturned = change_stream::cursorDocsReturned();
+auto& gCursorBytesReturned = change_stream::cursorBytesReturned();
+auto& gCursorBatchesReturned = change_stream::cursorBatchesReturned();
+auto& gCursorDocsExamined = change_stream::cursorDocsExamined();
+auto& gCursorBytesRead = change_stream::cursorBytesRead();
 
 }  // namespace change_stream_metrics
 }  // namespace
@@ -147,7 +134,9 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _readConcernArgs(std::move(params.readConcernArgs)),
       _readPreferenceSetting(std::move(params.readPreferenceSetting)),
       _rawData(isRawDataOperation(operationUsingCursor)),
-      _originatingCommand(params.originatingCommandObj),
+      _originatingCommand(generic_cursor::maybeRedactOriginatingCommand(
+          params.originatingCommandObj,
+          CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation())),
       _originatingPrivileges(std::move(params.originatingPrivileges)),
       _tailableMode(params.tailableMode),
       _isNoTimeout(params.isNoTimeout),
@@ -159,14 +148,28 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _planCacheShapeHash(CurOp::get(operationUsingCursor)->debug().planCacheShapeHash),
       _queryShapeHash(CurOp::get(operationUsingCursor)->debug().getQueryShapeHash()),
+      _querySettings(CurOp::get(operationUsingCursor)->debug().getQuerySettings()),
       _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().key)),
       _isChangeStreamQuery(CurOp::get(operationUsingCursor)->debug().isChangeStreamQuery),
+      _usesOptimizedUpdateLookup(
+          CurOp::get(operationUsingCursor)->debug().usesOptimizedUpdateLookup),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
-      _opKey(operationUsingCursor->getOperationKey()) {
+      _opKey(operationUsingCursor->getOperationKey()),
+      _mayHoldMongotTaskExecutor(params.mayHoldMongotTaskExecutor),
+      // Take a co-owning reference to the operation's memory tracker.
+      _memoryUsageTracker(OperationMemoryUsageTracker::getOwningIfExists(operationUsingCursor)) {
     invariant(_exec);
     invariant(_operationUsingCursor);
+
+    _queryLifespan = QueryLifespan::get(operationUsingCursor).handle();
+
+    // Exclude tailable and change-stream cursors from queryLatencies since they can stay open
+    // indefinitely.
+    if (_tailableMode != TailableModeEnum::kNormal) {
+        QueryLatencyAccumulator::get(operationUsingCursor).exclude();
+    }
 
     cursorStats().open.increment();
     cursorStats().totalOpened.increment();
@@ -220,7 +223,8 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
                                                       std::move(_queryStatsKey),
                                                       _isChangeStreamQuery,
                                                       _firstResponseExecutionTime,
-                                                      _metrics);
+                                                      _metrics,
+                                                      takeSupplementalMetrics());
 }
 
 GenericCursor ClientCursor::toGenericCursor() const {
@@ -231,6 +235,9 @@ GenericCursor ClientCursor::toGenericCursor() const {
     gc.setTailable(isTailable());
     gc.setAwaitData(isAwaitData());
     gc.setNoCursorTimeout(isNoTimeout());
+    if (_shouldOmitDiagnosticInformation && !_originatingCommand.isEmpty()) {
+        gc.setRedacted(true);
+    }
     gc.setOriginatingCommand(getOriginatingCommandObj());
     gc.setLsid(getSessionId());
     gc.setTxnNumber(_txnNumber);
@@ -289,6 +296,25 @@ void ClientCursor::updateMetricsOnUnpin(const ChangeStreamCursorMetrics& csMetri
     }
 }
 
+void ClientCursor::captureSupplementalMetricsIfNeeded(const OpDebug& opDebug) {
+    if (_supplementalMetrics) {
+        return;
+    }
+    _supplementalMetrics = query_stats::computeSupplementalQueryStatsMetrics(opDebug);
+}
+
+std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>>
+ClientCursor::takeSupplementalMetrics() {
+    // We intentionally leave _supplementalMetrics engaged after the move rather than resetting it
+    // to boost::none so that its has_value() is the once-guard that prevents
+    // captureSupplementalMetricsIfNeeded from re-capturing on getMores, whose OpDebug has no
+    // planning data.
+    if (!_supplementalMetrics) {
+        return {};
+    }
+    return std::move(*_supplementalMetrics);
+}
+
 //
 // Pin methods
 //
@@ -311,8 +337,8 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     if (_cursor->_isChangeStreamQuery) {
         change_stream_metrics::gCursorsOpenPinned.add(1);
     }
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
-                                                        std::move(_cursor->_memoryUsageTracker));
+    // Publish a copy of the tracker onto the operation context.
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, _cursor->_memoryUsageTracker);
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
@@ -371,8 +397,12 @@ void ClientCursorPin::release() {
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
 
-    _cursor->_memoryUsageTracker =
-        OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(_cursor->_operationUsingCursor);
+    // Reclaim the tracker from the operation context, but only overwrite the cursor's reference if
+    // one was there -- otherwise keep the reference captured at construction (don't clobber it).
+    if (auto tracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(
+            _cursor->_operationUsingCursor)) {
+        _cursor->_memoryUsageTracker = std::move(tracker);
+    }
     const bool isChangeStream = _cursor->_isChangeStreamQuery;
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
@@ -423,23 +453,56 @@ public:
     void run() override {
         ThreadClient tc("clientcursormon", getGlobalServiceContext()->getService());
 
+        // The timeout and idle-cursor shedding sweeps have independent intervals. Each pass runs
+        // whichever sweeps are due, then sleeps until the next one is.
+        Date_t lastTimeoutSweep;
+        Date_t lastSheddingSweep;
         while (!globalInShutdownDeprecated()) {
+            const Milliseconds timeoutInterval = Seconds(getClientCursorMonitorFrequencySecs());
+            const boost::optional<Milliseconds> shedInterval =
+                queryMemoryIdleQuerySheddingInterval();
+            Date_t now;
+            Date_t afterSweeps;
             {
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
-                auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
-                try {
-                    cursorStats().timedOut.increment(
-                        CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
-                } catch (const DBException& e) {
-                    LOGV2_WARNING(
-                        7466202,
-                        "Cursor Time Out job encountered unexpected error, will retry after cursor "
-                        "time out interval",
-                        "error"_attr = e.toString());
+                now = opCtx->getServiceContext()->getPreciseClockSource()->now();
+                auto* cursorManager = CursorManager::get(opCtx.get());
+                if (now - lastTimeoutSweep >= timeoutInterval) {
+                    lastTimeoutSweep = now;
+                    try {
+                        cursorStats().timedOut.increment(
+                            cursorManager->timeoutCursors(opCtx.get(), now));
+                    } catch (const DBException& e) {
+                        LOGV2_WARNING(
+                            7466202,
+                            "Cursor Time Out job encountered unexpected error, will retry after "
+                            "cursor time out interval",
+                            "error"_attr = e.toString());
+                    }
+                    cursorManager->expireReapedCursorReasons(now);
                 }
+                if (shedInterval && now - lastSheddingSweep >= *shedInterval) {
+                    lastSheddingSweep = now;
+                    try {
+                        cursorStats().shedForMemory.increment(
+                            cursorManager->shedCursorsForMemoryPressure(opCtx.get()));
+                    } catch (const DBException& e) {
+                        LOGV2_WARNING(13200202,
+                                      "Idle-cursor query-memory load shedding encountered "
+                                      "unexpected error, will retry after cursor monitor interval",
+                                      "error"_attr = e.toString());
+                    }
+                }
+                // Measure the remaining wait from after the sweeps, which may have taken a while.
+                afterSweeps = opCtx->getServiceContext()->getPreciseClockSource()->now();
+            }
+            Date_t nextSweep = lastTimeoutSweep + timeoutInterval;
+            if (shedInterval) {
+                nextSweep = std::min(nextSweep, lastSheddingSweep + *shedInterval);
             }
             MONGO_IDLE_THREAD_BLOCK;
-            sleepsecs(getClientCursorMonitorFrequencySecs());
+            sleepmillis(
+                std::max<long long>(1, durationCount<Milliseconds>(nextSweep - afterSweeps)));
         }
     }
 };

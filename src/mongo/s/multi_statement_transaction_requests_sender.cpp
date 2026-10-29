@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 
@@ -82,8 +56,8 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
 
     for (const auto& request : requests) {
         newRequests.emplace_back(
-            request.shardRef,
-            txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardRef, request.cmdObj));
+            request.shardId,
+            txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
     }
 
     return newRequests;
@@ -107,7 +81,7 @@ void processReplyMetadataForAsyncGetMore(
     OperationContext* opCtx,
     const ShardId& shardId,
     const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse) {
-    processReplyMetadata(opCtx, shardId, parsedResponse, true /* forAsyncGetMore */);
+    processReplyMetadata(opCtx, shardId, parsedResponse, /*forAsyncGetMore=*/true);
 }
 
 }  // namespace transaction_request_sender_details
@@ -156,7 +130,27 @@ bool MultiStatementTransactionRequestsSender::done() const {
 
 AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next(bool forMergeCursors) {
     auto response = nextResponse();
-    validateResponse(response, forMergeCursors);
+    try {
+        validateResponse(response, forMergeCursors);
+    } catch (const DBException& ex) {
+        // A metadata failure (e.g. a term mismatch) must not abandon sibling responses whose
+        // participants are not yet enrolled: stop retrying (the failure follows a failover, so
+        // retries would only delay the error), drain the rest, then surface the first failure.
+        // Validation throws only when the operation has a transaction router, so outside a
+        // transaction nothing drains. The drain is bounded by opCtx interruption, after which
+        // AsyncRequestsSender::next() returns every remaining response without waiting.
+        _ars->stopRetrying();
+        auto firstStatus = ex.toStatus();
+        while (!done()) {
+            auto rest = nextResponse();
+            try {
+                validateResponse(rest, forMergeCursors);
+            } catch (const DBException&) {
+                // The first failure wins.
+            }
+        }
+        uassertStatusOK(firstStatus);
+    }
     return response;
 }
 

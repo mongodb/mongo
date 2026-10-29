@@ -1,46 +1,22 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/agg/query_stats_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_query_stats.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
+#include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/buildinfo.h"
 
+#include <deque>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
@@ -57,7 +33,9 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceQueryStatsToStageFn(
         queryStatsDS->getExpCtx(),
         queryStatsDS->_algorithm,
         queryStatsDS->_hmacKey,
-        queryStatsDS->serialize().getDocument().toBson());
+        queryStatsDS->serialize().getDocument().toBson(),
+        queryStatsDS->_keyHashLookupSet,
+        queryStatsDS->_topKSortSpec);
 }
 
 REGISTER_AGG_STAGE_MAPPING(queryStats,
@@ -75,18 +53,24 @@ MONGO_FAIL_POINT_DEFINE(queryStatsGenerateQueryFeatureNotAllowedError);
 namespace {
 auto& queryStatsHmacApplicationErrors =
     *MetricBuilder<Counter64>{"queryStats.numHmacApplicationErrors"};
-}
+
+auto& queryStatsTopKOptimizations = *MetricBuilder<Counter64>{"queryStats.numTopKOptimizations"};
+}  // namespace
 
 QueryStatsStage::QueryStatsStage(std::string_view stageName,
                                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  TransformAlgorithmEnum algorithm,
                                  std::string hmacKey,
-                                 BSONObj serializedForDebug)
+                                 BSONObj serializedForDebug,
+                                 boost::optional<std::vector<std::string>> keyHashLookupSet,
+                                 boost::optional<query_stats::TopKSortSpec> topKSortSpec)
     : Stage(stageName, expCtx),
       _currentCopiedPartition(0),
       _algorithm{algorithm},
       _hmacKey{hmacKey},
-      _serializedForDebug{serializedForDebug.getOwned()} {}
+      _serializedForDebug{serializedForDebug.getOwned()},
+      _keyHashLookupSet(std::move(keyHashLookupSet)),
+      _topKSortSpec{std::move(topKSortSpec)} {}
 
 BSONObj QueryStatsStage::computeQueryStatsKey(
     std::shared_ptr<const Key> key, const SerializationContext& serializationContext) const {
@@ -107,8 +91,56 @@ BSONObj QueryStatsStage::computeQueryStatsKey(
     return key->toBson(pExpCtx->getOperationContext(), opts, serializationContext);
 }
 
+void QueryStatsStage::conditionallyLogOutput(const Document& doc) const {
+    if (_algorithm != TransformAlgorithmEnum::kNone) {
+        LOGV2_DEBUG_OPTIONS(7808301,
+                            3,
+                            {logv2::LogTruncation::Disabled},
+                            "Logging all outputs of $queryStats",
+                            "thisOutput"_attr = doc);
+    }
+}
+
+void QueryStatsStage::conditionallyLogFinished() const {
+    if (_algorithm != TransformAlgorithmEnum::kNone) {
+        LOGV2_DEBUG_OPTIONS(
+            7808302, 3, {logv2::LogTruncation::Disabled}, "Finished logging output of $queryStats");
+    }
+}
+
+GetNextResult QueryStatsStage::_eof() const {
+    conditionallyLogFinished();
+    return GetNextResult::makeEOF();
+}
+
 GetNextResult QueryStatsStage::doGetNext() {
-    const auto shouldLog = _algorithm != TransformAlgorithmEnum::kNone;
+    auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
+
+    // If we pushed down a subsequent $match, then proceed with the optimized lookup fast-path.
+    if (_keyHashLookupSet) {
+        return doGetNextViaKeyHashLookup();
+    }
+
+    // Top-K fast path: do one full cheap scan to identify candidates, then materialize only them.
+    if (_topKSortSpec) {
+        if (auto doc = nextTopKDocument(queryStatsStore, *_topKSortSpec)) {
+            return std::move(*doc);
+        }
+        // Every candidate materialized, so the retained $sort + $limit already has the top K.
+        if (!_topKCandidateFailed) {
+            return _eof();
+        }
+        // Resort to the full store scan, if we did not materialize enough documents in the top-k
+        // optimization. The $sort/$limit that follows this stage will ensure the documents are
+        // returned in the correct order.
+        // TODO SERVER-136027: revisit whether the $sort/$limit can be removed once they are no
+        // longer needed here.
+    }
+
+    return nextFullScanDocument(queryStatsStore);
+}
+
+GetNextResult QueryStatsStage::nextFullScanDocument(QueryStatsStore& queryStatsStore) {
     /**
      * When a CopiedPartition is present (loaded) and contains more elements (QueryStatsEntry), we
      * can process and return the next element in the _currentCopiedPartition.
@@ -120,66 +152,116 @@ GetNextResult QueryStatsStage::doGetNext() {
      * We iterate over a copied container (CopiedPartition) containing the entries in
      * the partition to reduce the time under which the partition lock is held.
      */
-    auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
-
     while (_currentCopiedPartition.isValidPartitionId(queryStatsStore.numPartitions())) {
         if (!_currentCopiedPartition.isLoaded()) {
-            _currentCopiedPartition.load(queryStatsStore);
+            _currentCopiedPartition.load(queryStatsStore, _topKConsumedKeys);
         }
         // CopiedPartition::load() will throw if any errors occur.
         // Safe to assume _currentCopiedPartition is now loaded.
 
         // Exhaust all elements in the current copied partition.
-        // Use a while loop here to handle cases where toDocument() may fail for a specific
-        // QueryStatsEntry, in which case we suppress the thrown exception and continue
-        // iterating to the next available entry.
-        while (!_currentCopiedPartition.empty()) {
-            auto& statsEntries = _currentCopiedPartition.statsEntries;
-            const auto& queryStatsEntry = statsEntries.front();
-            ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
-            if (auto doc =
-                    toDocument(_currentCopiedPartition.getReadTimestamp(), queryStatsEntry)) {
-                if (shouldLog) {
-                    LOGV2_DEBUG_OPTIONS(7808301,
-                                        3,
-                                        {logv2::LogTruncation::Disabled},
-                                        "Logging all outputs of $queryStats",
-                                        "thisOutput"_attr = *doc);
-                }
-                return std::move(*doc);
-            }
+        if (auto doc = nextDocument(_currentCopiedPartition.statsEntries,
+                                    _currentCopiedPartition.getReadTimestamp())) {
+            return std::move(*doc);
         }
         // Once we have exhausted entries in this partition, move on to the next partition.
         _currentCopiedPartition.incrementPartitionId();
     }
 
-    if (shouldLog) {
-        LOGV2_DEBUG_OPTIONS(
-            7808302, 3, {logv2::LogTruncation::Disabled}, "Finished logging output of $queryStats");
+    return _eof();
+}
+
+GetNextResult QueryStatsStage::doGetNextViaKeyHashLookup() {
+    // Resolution happens once, on the first getNext(), which also stamps the read time reported by
+    // every entry this scan materializes.
+    if (!_resolvedKeyHashLocations) {
+        auto* opCtx = getContext()->getOperationContext();
+        _resolvedKeyHashLocations = QueryStatsStoreManager::get(opCtx->getServiceContext())
+                                        ->findStoreKeysByUserHash(*_keyHashLookupSet);
+        _optimizationTimestamp = Date_t::now();
     }
-    return DocumentSource::GetNextResult::makeEOF();
+
+    // Materialize the corresponding document.
+    if (auto doc = _nextKeyHashDocument(*_resolvedKeyHashLocations)) {
+        return std::move(*doc);
+    }
+
+    return _eof();
+}
+
+boost::optional<Document> QueryStatsStage::nextDocument(std::deque<QueryStatsEntry>& statsEntries,
+                                                        const Date_t& readTimestamp) const {
+    // Use a while loop here to handle cases where toDocument() may fail for a specific
+    // QueryStatsEntry, in which case we suppress the thrown exception and continue iterating to the
+    // next available entry.
+    while (!statsEntries.empty()) {
+        const auto& queryStatsEntry = statsEntries.front();
+        ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
+        if (auto doc = _materialize(readTimestamp, queryStatsEntry)) {
+            return doc;
+        }
+    }
+    return boost::none;
+}
+
+boost::optional<Document> QueryStatsStage::_nextKeyHashDocument(
+    std::deque<KeyHashLocation>& locations) {
+    auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
+
+    while (!locations.empty()) {
+        const auto& [partitionId, storeKey] = locations.front();
+        locations.pop_front();
+
+        // Copy the entry out under the partition lock, then materialize it off-lock.
+        const auto partition = queryStatsStore.getPartition(partitionId);
+        auto statusWithMetrics = partition->peek(storeKey);
+        if (!statusWithMetrics.isOK()) {
+            // The index mapped this hash to a store key with no live entry, which means the entry
+            // was concurrently evicted between the index lookup and this read. The hash simply has
+            // no match, so skip it and continue with the remaining locations.
+            LOGV2_DEBUG(13519300,
+                        2,
+                        "Error encountered when copying query stats entry",
+                        "status"_attr = statusWithMetrics.getStatus(),
+                        "hash"_attr = storeKey);
+            continue;
+        }
+
+        const auto& entry = statusWithMetrics.getValue()->second;
+        if (auto doc = _materialize(_optimizationTimestamp, entry)) {
+            return doc;
+        }
+    }
+    return boost::none;
+}
+
+boost::optional<Document> QueryStatsStage::_materialize(
+    const Date_t& readTimestamp, const QueryStatsEntry& queryStatsEntry) const {
+    auto doc = toDocument(readTimestamp, queryStatsEntry);
+    if (doc) {
+        conditionallyLogOutput(*doc);
+    }
+    return doc;
 }
 
 boost::optional<Document> QueryStatsStage::toDocument(
-    const Date_t& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
+    const Date_t& readTimestamp, const QueryStatsEntry& queryStatsEntry) const {
     const auto& key = queryStatsEntry.key;
     try {
         auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
+        // Skip entries where the key is over BSONObjMaxUserSize or too deeply nested for the reply.
+        uassertStatusOK(query_stats::validateQueryStatsKeyBson(queryStatsKey));
         // We use the representative shape to generate the key and shape hashes. This avoids
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
-        auto representativeShapeKey = key->toBson(
-            pExpCtx->getOperationContext(),
-            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-            SerializationContext::stateDefault());
-        // This SHA256 version of the hash is output to aid in data analytics use cases. In these
-        // cases, we often care about comparing hashes from different hosts, potentially on
-        // different versions and platforms. The thinking here is that the SHA256 algorithm is more
-        // stable across these different environments than the quicker 'absl::HashOf'
-        // implementation.
-        auto keyHash = SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
-                                                representativeShapeKey.objsize())
-                           .toString();
+        //
+        // The user-visible hash is cached on the entry only when a secondary index is maintained.
+        // Compute it here otherwise.
+        const auto& opCtx = pExpCtx->getOperationContext();
+        const std::string userVisibleHash =
+            QueryStatsStoreManager::get(opCtx->getServiceContext())->hasSecondaryIndex()
+            ? queryStatsEntry.userVisibleHash
+            : computeUserVisibleHash(opCtx, *key);
         auto queryShapeHash = key->getQueryShapeHash(pExpCtx->getOperationContext(),
                                                      SerializationContext::stateDefault())
                                   .toHexString();
@@ -205,14 +287,16 @@ boost::optional<Document> QueryStatsStage::toDocument(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         bool useQueryStatsWithSubsectionsFormat =
             feature_flags::gFeatureFlagQueryStatsMetricsSubsections.isEnabled();
+        bool includeErrorMetrics = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
         return Document{{"key", std::move(queryStatsKey)},
-                        {"keyHash", keyHash},
+                        {"keyHash", userVisibleHash},
                         {"queryShapeHash", queryShapeHash},
                         {"metrics",
                          queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat,
                                                 includeWriteMetrics,
-                                                includeCBRMetrics)},
-                        {"asOf", partitionReadTime}};
+                                                includeCBRMetrics,
+                                                includeErrorMetrics)},
+                        {"asOf", readTimestamp}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
         const auto& hash = absl::HashOf(key);
@@ -245,10 +329,19 @@ boost::optional<Document> QueryStatsStage::toDocument(
         //  tests do on purpose. The query shape reported here can be bigger than the original query
         //  due to hmac application or other format changes. So this is not a concerning failure
         //  mode.
+        //  - Error code 10071200 occurs when a query referencing the $$CLUSTER_TIME system
+        //  variable errored on a standalone node, since it is unavailable outside of replica
+        //  sets/sharded clusters. Re-parsing later on the same standalone node reliably hits the
+        //  same restriction. TODO SERVER-132688: Remove this exclusion.
+        //  - The Overflow error occurs when the shape is too deeply nested to be wrapped in the
+        //  reply, which some tests do on purpose. Skipping the entry is the intended behavior.
         if ((kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) &&
             ex.code() != ErrorCodes::QueryFeatureNotAllowed &&
-            ex.code() != ErrorCodes::BSONObjectTooLarge &&
-            ex.code() != 16490 /* Document grew too large - before hitting BSON */) {
+            ex.code() != ErrorCodes::BSONObjectTooLarge &&  // query shape too large
+            ex.code() != 10071200 &&              // $$CLUSTER_TIME unavailable in standalone mode
+            ex.code() != ErrorCodes::Overflow &&  // query shape too deeply nested
+            ex.code() != 16490                    // document grew too large - before hitting BSON
+        ) {
             auto keyString = std::to_string(hash);
             uasserted(Status{
                 QueryStatsFailedToRecordInfo(
@@ -260,12 +353,50 @@ boost::optional<Document> QueryStatsStage::toDocument(
     return {};
 }
 
+void QueryStatsStage::computeTopKCandidates(const QueryStatsStore& queryStatsStore,
+                                            const TopKSortSpec& spec) {
+    queryStatsTopKOptimizations.increment();
+
+    auto accessor = query_stats::getCheapMetricAccessor(spec.dottedMetricsPath);
+    tassert(12938701, "TopKSortSpec set for unsupported path", accessor);
+
+    // The scan locks one partition at a time and only reads the cheap metric.
+    _optimizationTimestamp = Date_t::now();
+    _topKCandidateEntries = queryStatsStore.topKCandidateEntries(
+        spec.limit,
+        *accessor,
+        [&spec](int64_t a, int64_t b) { return spec.isBetter(a, b); },
+        // Check for interrupts between partitions, since 'topKCandidateEntries' scans the entire
+        // store.
+        [this] { pExpCtx->checkForInterrupt(); });
+}
+
+boost::optional<Document> QueryStatsStage::nextTopKDocument(QueryStatsStore& queryStatsStore,
+                                                            const TopKSortSpec& spec) {
+    if (!_topKCandidateEntries.has_value()) {
+        computeTopKCandidates(queryStatsStore, spec);
+    }
+
+    while (!_topKCandidateEntries->empty()) {
+        ON_BLOCK_EXIT([this] { _topKCandidateEntries->pop_back(); });
+        const auto& [key, queryStatsEntry] = _topKCandidateEntries->back();
+        _topKConsumedKeys.insert(key);
+
+        if (auto doc = _materialize(_optimizationTimestamp, queryStatsEntry)) {
+            return doc;
+        }
+        _topKCandidateFailed = true;
+    }
+    return boost::none;
+}
+
 /**
  * Loads the current CopiedPartition with copies of the QueryStatsEntries located in partition of
  * cache corresponding to the partitionId of the current CopiedPartition. This ensures that the
  * partition mutex is only held for the duration of copying.
  */
-void QueryStatsStage::CopiedPartition::load(QueryStatsStore& queryStatsStore) {
+void QueryStatsStage::CopiedPartition::load(QueryStatsStore& queryStatsStore,
+                                            const stdx::unordered_set<std::size_t>& skipKeys) {
     tassert(7932100,
             "Attempted to load invalid partition.",
             _partitionId < queryStatsStore.numPartitions());
@@ -283,7 +414,9 @@ void QueryStatsStage::CopiedPartition::load(QueryStatsStore& queryStatsStore) {
         // Note the intentional copy of QueryStatsEntry.
         // This will give us a snapshot of all the metrics we want to report.
         for (auto&& [hash, metrics] : *partition) {
-            statsEntries.push_back(metrics);
+            if (!skipKeys.contains(hash)) {
+                statsEntries.push_back(metrics);
+            }
         }
     }
     _isLoaded = true;
@@ -306,10 +439,6 @@ bool QueryStatsStage::CopiedPartition::isValidPartitionId(
 
 const Date_t& QueryStatsStage::CopiedPartition::getReadTimestamp() const {
     return _readTimestamp;
-}
-
-bool QueryStatsStage::CopiedPartition::empty() const {
-    return statsEntries.empty();
 }
 
 }  // namespace exec::agg

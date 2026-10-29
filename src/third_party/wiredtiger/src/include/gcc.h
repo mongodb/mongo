@@ -28,6 +28,12 @@
 #define WT_GCC_FUNC_ATTRIBUTE(x)
 #define WT_GCC_FUNC_DECL_ATTRIBUTE(x) __attribute__(x)
 
+#ifdef __cplusplus
+#define WT_THREAD_LOCAL thread_local
+#else
+#define WT_THREAD_LOCAL _Thread_local
+#endif
+
 /*
  * For details on the hardware requirements of WiredTiger see the portability documentation. For
  * details on concurrency primitive usage in WiredTiger see the architecture guide page "WiredTiger

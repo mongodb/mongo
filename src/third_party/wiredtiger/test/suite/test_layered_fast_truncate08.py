@@ -52,7 +52,7 @@ class test_layered_fast_truncate08(LayeredFastTruncateConfigMixin, wttest.WiredT
 
     def populate(self, keys, value=b"v"):
         with closing(self.session.open_cursor(self.uri)) as cursor:
-            with self.transaction():
+            with self.transaction(commit_timestamp=self.next_commit_ts()):
                 for key in keys:
                     cursor[key] = value
 

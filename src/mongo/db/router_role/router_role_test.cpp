@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/router_role/router_role.h"
 
@@ -35,7 +9,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/stale_config_retry_attempt.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
@@ -85,17 +59,13 @@ public:
         ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
         UUID uuid{UUID::gen()};
 
-        ChunkType chunk1(uuid,
-                         {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                         version,
-                         ShardRef{"0"});
+        ChunkType chunk1(
+            uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
         chunk1.setName(OID::gen());
         version.incMinor();
 
-        ChunkType chunk2(uuid,
-                         {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
-                         version,
-                         ShardRef{"1"});
+        ChunkType chunk2(
+            uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
         chunk2.setName(OID::gen());
         version.incMinor();
 
@@ -106,7 +76,7 @@ public:
     void mockConfigServerQueriesForDbRefresh(const DatabaseName& dbName,
                                              const DatabaseVersion& dbVersion) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(dbName, ShardRef{std::string{"0"}}, dbVersion);
+            DatabaseType db(dbName, {"0"}, dbVersion);
             return std::vector<BSONObj>{db.toBSON()};
         }());
     }
@@ -146,22 +116,22 @@ public:
             ChunkType chunk1(uuid,
                              {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                              latestVersion,
-                             ShardRef{"0"});
+                             {"0"});
             chunk1.setOnCurrentShardSince(Timestamp(300, 0));
-            chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardRef{"0"}),
-                               ChunkHistory(Timestamp(200, 300), ShardRef{"1"}),
-                               ChunkHistory(Timestamp(100, 200), ShardRef{"0"})});
+            chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
+                               ChunkHistory(Timestamp(200, 300), ShardId("1")),
+                               ChunkHistory(Timestamp(100, 200), ShardId("0"))});
             chunk1.setName(OID::gen());
 
             latestVersion.incMinor();
             ChunkType chunk2(uuid,
                              {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                              latestVersion,
-                             ShardRef{"1"});
+                             {"1"});
             chunk2.setOnCurrentShardSince(Timestamp(300, 0));
-            chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardRef{"1"}),
-                               ChunkHistory(Timestamp(200, 300), ShardRef{"0"}),
-                               ChunkHistory(Timestamp(100, 200), ShardRef{"1"})});
+            chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardId("1")),
+                               ChunkHistory(Timestamp(200, 300), ShardId("0")),
+                               ChunkHistory(Timestamp(100, 200), ShardId("1"))});
             chunk2.setName(OID::gen());
 
             results.push_back(BSON("chunks" << chunk1.toConfigBSON()));
@@ -439,11 +409,11 @@ TEST_F(RouterRoleTest, DBPrimaryRouterDoesntImplicitlyCreateDbByDefault) {
 
     // 3. Expect a NamespaceNotFound error since the database doesn't exist and the implicit db
     // creation is disabled.
-    ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
-                                DBException,
-                                ErrorCodes::NamespaceNotFound,
-                                str::stream() << "database " << _nss.dbName().toStringForErrorMsg()
-                                              << " not found");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        future.default_timed_get(),
+        DBException,
+        ErrorCodes::NamespaceNotFound,
+        fmt::format("database {} not found", _nss.dbName().toStringForErrorMsg()));
     ASSERT_EQ(tries, 1);
 }
 
@@ -463,7 +433,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryForSubRouter) {
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -488,7 +458,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterDoesNotRetryOnStaleConfigInTxnForNonSu
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -523,13 +493,18 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
     auto future = launchAsync([&] {
         router.route("test", [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
             ASSERT_TRUE(cri.hasRoutingTable());
+
+            const auto& attempt = staleConfigRetryAttempt(opCtx);
+            ASSERT_TRUE(attempt.has_value());
+            ASSERT_EQ(*attempt, tries);
+
             tries++;
             if (tries == 1) {
                 uasserted(StaleConfigInfo(
                               _nss,
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
                               boost::none,
-                              ShardRef{"0"}),
+                              ShardId{"0"}),
                           "StaleConfig error");
             }
         });
@@ -538,6 +513,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigWithoutTxn) {
     future.default_timed_get();
 
     ASSERT_EQ(tries, 2);
+    ASSERT_EQ(*staleConfigRetryAttempt(operationContext()), 1);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleDbVersionWithoutTxn) {
@@ -637,7 +613,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterRetryOnTransactionParticipantFailedUny
                                                             ShardVersionFactory::make(ChunkVersion(
                                                                 {epoch, timestamp}, {2, 0})),
                                                             boost::none,
-                                                            ShardRef{"0"}),
+                                                            ShardId{"0"}),
                                             "StaleConfig error");
                                         uasserted(TransactionParticipantFailedUnyieldInfo(status),
                                                   "StaleConfig error");
@@ -663,7 +639,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextDoesNotRetryForSubRo
                                                          ShardVersionFactory::make(ChunkVersion(
                                                              {epoch, timestamp}, {2, 0})),
                                                          boost::none,
-                                                         ShardRef{"0"}),
+                                                         ShardId{"0"}),
                                          "StaleConfig error");
                            }),
                        DBException,
@@ -689,7 +665,7 @@ TEST_F(RouterRoleTestTxn,
                                                          ShardVersionFactory::make(ChunkVersion(
                                                              {epoch, timestamp}, {2, 0})),
                                                          boost::none,
-                                                         ShardRef{"0"}),
+                                                         ShardId{"0"}),
                                          "StaleConfig error");
                            }),
                        DBException,
@@ -717,7 +693,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetryOnStaleConfigWitho
                                               ShardVersionFactory::make(
                                                   ChunkVersion({epoch, timestamp}, {2, 0})),
                                               boost::none,
-                                              ShardRef{"0"}),
+                                              ShardId{"0"}),
                               "StaleConfig error");
                 } else {
                     routingCtx.onRequestSentForNss(_nss);
@@ -766,7 +742,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterWithRoutingContextAtTransactionCluster
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                         routingCtx.onRequestSentForNss(_nss);
                         return BSONObj();
                     });
@@ -804,7 +780,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextAtReadConcernClusterTim
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                         routingCtx.onRequestSentForNss(_nss);
                         return BSONObj();
                     });
@@ -840,7 +816,7 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterDoesNotRetryForSubRouter) {
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -866,7 +842,7 @@ TEST_F(RouterRoleTestTxn, MultiCollectionRouterDoesNotRetryOnStaleConfigForNonSu
                                                    ShardVersionFactory::make(
                                                        ChunkVersion({epoch, timestamp}, {2, 0})),
                                                    boost::none,
-                                                   ShardRef{"0"}),
+                                                   ShardId{"0"}),
                                    "StaleConfig error");
                      }),
         DBException,
@@ -898,7 +874,7 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetryOnStaleConfig) {
                                                        ShardVersionFactory::make(ChunkVersion(
                                                            {epoch, timestamp}, {2, 0})),
                                                        boost::none,
-                                                       ShardRef{"0"}),
+                                                       ShardId{"0"}),
                                        "StaleConfig error");
                          }
                      });
@@ -934,7 +910,7 @@ TEST_F(RouterRoleTest,
                               NamespaceString::createNamespaceString_forTest("test.foo_not_exist"),
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
                               ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 1})),
-                              ShardRef{"0"}),
+                              ShardId{"0"}),
                           "StaleConfig error");
             });
     });
@@ -1102,9 +1078,7 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
     // Simulate queries to update the cache when stale errors occur.
     for (int i = 0; i < maxTestRetries; i++) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(_nss.dbName(),
-                            ShardRef{std::string{"0"}},
-                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
+            DatabaseType db(_nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
             return std::vector<BSONObj>{db.toBSON()};
         }());
 
@@ -1164,9 +1138,7 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnShardNotFound) {
                      });
     });
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(_nss.dbName(),
-                        ShardRef{std::string{"0"}},
-                        DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
+        DatabaseType db(_nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
         return std::vector<BSONObj>{db.toBSON()};
     }());
     mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);
@@ -1195,8 +1167,8 @@ TEST_F(RouterRoleTestTxn, CatalogCacheGetRoutingInfoAtTransactionClusterTime) {
                        .getValue();
         ASSERT_TRUE(cri.hasRoutingTable());
         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
-        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-            operationContext(), BSON("_id" << testId), ShardId(expectedShardId)));
+        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(BSON("_id" << testId),
+                                                            ShardId(expectedShardId)));
         txnId++;
     };
 
@@ -1229,8 +1201,8 @@ TEST_F(RouterRoleTest, CatalogCacheGetRoutingInfoAtReadConcernClusterTime) {
                        .getValue();
         ASSERT_TRUE(cri.hasRoutingTable());
         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
-        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-            operationContext(), BSON("_id" << testId), ShardId(expectedShardId)));
+        ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(BSON("_id" << testId),
+                                                            ShardId(expectedShardId)));
     };
 
     // Test different timestamps to verify history works
@@ -1265,7 +1237,7 @@ TEST_F(RouterRoleTestTxn, CollectionRouterGetRoutingInfoAtTransactionClusterTime
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                     });
             });
             future.default_timed_get();
@@ -1302,7 +1274,7 @@ TEST_F(RouterRoleTest, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
                         ASSERT_TRUE(cri.hasRoutingTable());
                         ASSERT_EQ(3, cri.getCollectionVersion().placementVersion().majorVersion());
                         ASSERT_TRUE(cri.getChunkManager().keyBelongsToShard(
-                            opCtx, BSON("_id" << testId), ShardId(expectedShardId)));
+                            BSON("_id" << testId), ShardId(expectedShardId)));
                     });
             });
             future.default_timed_get();
@@ -1317,36 +1289,6 @@ TEST_F(RouterRoleTest, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
     testAtTimestamp(Timestamp(350, 0), -2, "0");
     ASSERT_THROWS_CODE(
         testAtTimestamp(Timestamp(1, 0), 2, "0"), DBException, ErrorCodes::StaleChunkHistory);
-}
-
-TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
-    const OID epoch{OID::gen()};
-    const Timestamp timestamp{1, 0};
-
-    auto bucketNss = _nss.makeTimeseriesBucketsNamespace();
-
-    // The CollectionRouter should retry because bucket collection maps to targeted timeseries view.
-    int tries = 0;
-    sharding::router::CollectionRouter router(operationContext(), _nss);
-    auto future = launchAsync([&] {
-        router.route("test timeseries routing",
-                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                         ASSERT_TRUE(cri.hasRoutingTable());
-                         tries++;
-                         if (tries == 1) {
-                             uasserted(StaleConfigInfo(bucketNss,
-                                                       ShardVersionFactory::make(ChunkVersion(
-                                                           {epoch, timestamp}, {2, 0})),
-                                                       boost::none,
-                                                       ShardRef{"0"}),
-                                       "StaleConfig error");
-                         }
-                     });
-    });
-    mockConfigServerQueriesForCollRefresh(bucketNss, epoch, timestamp);
-    future.default_timed_get();
-
-    ASSERT_EQ(tries, 2);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
@@ -1374,11 +1316,11 @@ TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
 
     // 3. Expect a NamespaceNotFound error since the database doesn't exist and the implicit db
     // creation is disabled.
-    ASSERT_THROWS_CODE_AND_WHAT(future.default_timed_get(),
-                                DBException,
-                                ErrorCodes::NamespaceNotFound,
-                                str::stream() << "database " << _nss.dbName().toStringForErrorMsg()
-                                              << " not found");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        future.default_timed_get(),
+        DBException,
+        ErrorCodes::NamespaceNotFound,
+        fmt::format("database {} not found", _nss.dbName().toStringForErrorMsg()));
     ASSERT_EQ(tries, 1);
 }
 

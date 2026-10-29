@@ -2,7 +2,7 @@
  * An identity view has an empty pipeline but a different namespace. This test confirms that a
  * $lookup.$search query on an identity view returns correct results.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";

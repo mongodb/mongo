@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
 #include "mongo/unittest/unittest.h"
@@ -52,7 +26,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromDefaultStartingSi
     // The first GetMore request should contain a batchSize of kDefaultMongotBatchSize *
     // kInternalSearchBatchSizeGrowthFactor.
     BSONObj getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 101, /*totalNumReceived*/ 101);
+        cursorId, nss, /*prevBatchNumReceived=*/101, /*totalNumReceived=*/101);
     BSONObj expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                                     << "cursorOptions" << BSON("batchSize" << 152));
 
@@ -63,7 +37,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromDefaultStartingSi
     // The next GetMore should exponentially increase the batchSize by
     // kInternalSearchBatchSizeFactor.
     getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 152, /*totalNumReceived*/ 253);
+        cursorId, nss, /*prevBatchNumReceived=*/152, /*totalNumReceived=*/253);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 228));
 
@@ -74,7 +48,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromDefaultStartingSi
 
 TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSize) {
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
-        MongotTaskExecutorCursorGetMoreStrategy(/*startingBatchSize*/ 3);
+        MongotTaskExecutorCursorGetMoreStrategy(/*startingBatchSize=*/3);
 
     // Check that GetMoreStrategy is properly initialized with our specified startingBatchSize
     // value.
@@ -84,7 +58,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSiz
     // The first GetMore request should contain a batchSize of startingBatchSize *
     // kInternalSearchBatchSizeGrowthFactor.
     BSONObj getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 3, /*totalNumReceived*/ 3);
+        cursorId, nss, /*prevBatchNumReceived=*/3, /*totalNumReceived=*/3);
     BSONObj expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                                     << "cursorOptions" << BSON("batchSize" << 5));
 
@@ -95,7 +69,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSiz
     // The next GetMore should exponentially increase the batchSize by
     // kInternalSearchBatchSizeFactor.
     getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 5, /*totalNumReceived*/ 8);
+        cursorId, nss, /*prevBatchNumReceived=*/5, /*totalNumReceived=*/8);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 8));
 
@@ -106,7 +80,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowsExponentiallyFromCustomStartingSiz
 
 TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
-        MongotTaskExecutorCursorGetMoreStrategy(/*startingBatchSize*/ 10);
+        MongotTaskExecutorCursorGetMoreStrategy(/*startingBatchSize=*/10);
 
     // Check that GetMoreStrategy is properly initialized with our specified startingBatchSize
     // value.
@@ -115,7 +89,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
 
     // The batchSize shouldn't increase if it only received 9 but requested 10.
     BSONObj getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 9, /*totalNumReceived*/ 9);
+        cursorId, nss, /*prevBatchNumReceived=*/9, /*totalNumReceived=*/9);
     BSONObj expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                                     << "cursorOptions" << BSON("batchSize" << 10));
 
@@ -125,7 +99,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
 
     // The next GetMore batchSize should exponentially increase if it received all 10 requested.
     getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 10, /*totalNumReceived*/ 19);
+        cursorId, nss, /*prevBatchNumReceived=*/10, /*totalNumReceived=*/19);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 15));
 
@@ -135,7 +109,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
 
     // The next GetMore batchSize should exponentially increase if it received all requested.
     getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 15, /*totalNumReceived*/ 34);
+        cursorId, nss, /*prevBatchNumReceived=*/15, /*totalNumReceived=*/34);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 23));
 
@@ -145,7 +119,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
 
     // batchSize growth should pause again if it doesn't receive all requested.
     getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 20, /*totalNumReceived*/ 54);
+        cursorId, nss, /*prevBatchNumReceived=*/20, /*totalNumReceived=*/54);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 23));
 
@@ -155,7 +129,7 @@ TEST_F(MongotCursorHelpersTest, BatchSizeGrowthPausesAndResumes) {
 
     // batchSize growth should remain paused if it doesn't receive all requested.
     getMoreRequest = getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 22, /*totalNumReceived*/ 76);
+        cursorId, nss, /*prevBatchNumReceived=*/22, /*totalNumReceived=*/76);
     expectedGetMoreRequest = BSON("getMore" << cursorId << "collection" << nss.coll()
                                             << "cursorOptions" << BSON("batchSize" << 23));
 
@@ -169,12 +143,12 @@ TEST_F(MongotCursorHelpersTest, DefaultStrategyPrefetchAfterThreeBatches) {
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
         MongotTaskExecutorCursorGetMoreStrategy();
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 1));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/1));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 2));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 3));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 4));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 5));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/4));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/5));
 }
 
 TEST_F(MongotCursorHelpersTest, DiscreteMinBoundsUnknownMaxBoundsPrefetch) {
@@ -182,18 +156,18 @@ TEST_F(MongotCursorHelpersTest, DiscreteMinBoundsUnknownMaxBoundsPrefetch) {
     // bounds, still prefetch always after third batch.
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
         MongotTaskExecutorCursorGetMoreStrategy(
-            /*startingBatchSize*/ 101, DocsNeededBounds(50, docs_needed_bounds::Unknown()));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 30, /*numBatchesReceived*/ 1));
-    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 1));
-    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 70, /*numBatchesReceived*/ 1));
+            /*startingBatchSize=*/101, DocsNeededBounds(50, docs_needed_bounds::Unknown()));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/30, /*numBatchesReceived=*/1));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/50, /*numBatchesReceived=*/1));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/70, /*numBatchesReceived=*/1));
 
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 30, /*numBatchesReceived*/ 2));
-    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 2));
-    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 70, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/30, /*numBatchesReceived=*/2));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/50, /*numBatchesReceived=*/2));
+    ASSERT_FALSE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/70, /*numBatchesReceived=*/2));
 
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 30, /*numBatchesReceived*/ 3));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 3));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 70, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/30, /*numBatchesReceived=*/3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/50, /*numBatchesReceived=*/3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/70, /*numBatchesReceived=*/3));
 }
 
 TEST_F(MongotCursorHelpersTest, DiscreteMinBoundsDiscreteMaxBoundsPrefetch) {
@@ -201,45 +175,45 @@ TEST_F(MongotCursorHelpersTest, DiscreteMinBoundsDiscreteMaxBoundsPrefetch) {
     // minBounds.
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
         MongotTaskExecutorCursorGetMoreStrategy(
-            /*startingBatchSize*/ 101, DocsNeededBounds(50, 150));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 40, /*numBatchesReceived*/ 1));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 49, /*numBatchesReceived*/ 1));
+            /*startingBatchSize=*/101, DocsNeededBounds(50, 150));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/40, /*numBatchesReceived=*/1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/49, /*numBatchesReceived=*/1));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 100, /*numBatchesReceived*/ 1));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/100, /*numBatchesReceived=*/1));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 150, /*numBatchesReceived*/ 1));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/150, /*numBatchesReceived=*/1));
 
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 40, /*numBatchesReceived*/ 2));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 49, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/40, /*numBatchesReceived=*/2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/49, /*numBatchesReceived=*/2));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 100, /*numBatchesReceived*/ 2));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/100, /*numBatchesReceived=*/2));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 150, /*numBatchesReceived*/ 2));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/150, /*numBatchesReceived=*/2));
 
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 40, /*numBatchesReceived*/ 3));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 49, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/40, /*numBatchesReceived=*/3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/49, /*numBatchesReceived=*/3));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 100, /*numBatchesReceived*/ 3));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/100, /*numBatchesReceived=*/3));
     ASSERT_FALSE(
-        getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 150, /*numBatchesReceived*/ 3));
+        getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/150, /*numBatchesReceived=*/3));
 }
 
 TEST_F(MongotCursorHelpersTest, AlwaysPrefetchNeedAllBounds) {
     MongotTaskExecutorCursorGetMoreStrategy getMoreStrategy =
         MongotTaskExecutorCursorGetMoreStrategy(
-            /*startingBatchSize*/ 101,
+            /*startingBatchSize=*/101,
             DocsNeededBounds(docs_needed_bounds::NeedAll(), docs_needed_bounds::NeedAll()));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 0, /*numBatchesReceived*/ 1));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 1));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/0, /*numBatchesReceived=*/1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/50, /*numBatchesReceived=*/1));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/1));
 
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 0, /*numBatchesReceived*/ 2));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 2));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/0, /*numBatchesReceived=*/2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/50, /*numBatchesReceived=*/2));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/2));
 
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 0, /*numBatchesReceived*/ 3));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 50, /*numBatchesReceived*/ 3));
-    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived*/ 101, /*numBatchesReceived*/ 3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/0, /*numBatchesReceived=*/3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/50, /*numBatchesReceived=*/3));
+    ASSERT_TRUE(getMoreStrategy.shouldPrefetch(/*totalNumReceived=*/101, /*numBatchesReceived=*/3));
 }
 
 /*
@@ -260,7 +234,7 @@ TEST_F(MongotCursorHelpersTest, QueryHasExtractableLimitAndNotAllDocsFoundInLook
         MongotTaskExecutorCursorGetMoreStrategy(
             startingBatchSize,
             DocsNeededBounds(extractableLimit, extractableLimit),
-            /*tenantId*/ boost::none,
+            /*tenantId=*/boost::none,
             searchIdLookupMetrics);
 
     ASSERT_EQ(startingBatchSize, getMoreStrategy.getCurrentBatchSize());
@@ -271,7 +245,7 @@ TEST_F(MongotCursorHelpersTest, QueryHasExtractableLimitAndNotAllDocsFoundInLook
         searchIdLookupMetrics->incrementDocsSeenByIdLookup();
     }
     getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 101, /*totalNumReceived*/ 101);
+        cursorId, nss, /*prevBatchNumReceived=*/101, /*totalNumReceived=*/101);
     ASSERT_EQ(152, getMoreStrategy.getCurrentBatchSize());
 
     // Now, add in some realistic search id lookup metrics where some,
@@ -286,7 +260,7 @@ TEST_F(MongotCursorHelpersTest, QueryHasExtractableLimitAndNotAllDocsFoundInLook
     // Now we expect to fall into the special case where the batch size grows by a factor
     // relative to the success rate of how many docs have been seen vs returned in id lookup.
     getMoreStrategy.createGetMoreRequest(
-        cursorId, nss, /*prevBatchNumReceived*/ 152, /*totalNumReceived*/ 253);
+        cursorId, nss, /*prevBatchNumReceived=*/152, /*totalNumReceived=*/253);
 
     long long nDocsStillNeeded = extractableLimit - (extractableLimit * 0.7);  // 30
     double idLookupSuccessRate = (extractableLimit * 0.7) / 253;               // ~0.2767

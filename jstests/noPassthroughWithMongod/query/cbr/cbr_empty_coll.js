@@ -1,5 +1,9 @@
 /**
  * Test that CBR is able to properly estimate empty collections.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 import {
     getRejectedPlans,
@@ -10,9 +14,10 @@ import {
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 
@@ -84,7 +89,7 @@ function testEmptyColl() {
 function createHistogram(field) {
     // Creating a histogram requires at least one document
     assert.commandWorked(coll.insert({_id: 1, [field]: 1}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: field}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: field}));
     // Delete the document to get an empty collection
     assert.commandWorked(coll.deleteOne({_id: 1}));
 }
@@ -95,6 +100,7 @@ try {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: true,
+                internalQueryPlanRanker: "costBased",
                 internalQueryCBRCEMode: mode,
             }),
         );
@@ -106,7 +112,11 @@ try {
         createHistogram("a");
         createHistogram("b");
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "histogramCE"}),
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryPlanRanker: "costBased",
+                internalQueryCBRCEMode: "histogramCE",
+            }),
         );
         testEmptyColl();
     }

@@ -6,7 +6,6 @@ import configparser
 import datetime
 import glob
 import json
-import logging
 import os
 import os.path
 import platform
@@ -35,7 +34,7 @@ from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import multiversionsetupconstants, utils
 from buildscripts.resmokelib.generate_fuzz_config import mongo_fuzzer_configs
 from buildscripts.resmokelib.run import TestRunner
-from buildscripts.resmokelib.utils import autoloader, evergreen_conn
+from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.resmokelib.utils.otel_id_generator import ResmokeOtelIdGenerator
@@ -59,34 +58,10 @@ def validate_and_update_config(
 
     _validate_options(parser, args)
     _update_config_vars(parser, args, should_configure_otel)
-    _apply_evergreen_tss_project_config()
     _update_symbolizer_secrets()
     _validate_config(parser)
     _set_up_modules()
     _set_logging_config()
-
-
-def _apply_evergreen_tss_project_config():
-    """Override TSS enablement from Evergreen project config, unless it was explicitly set elsewhere."""
-    if not _config.EVERGREEN_TASK_ID or not _config.EVERGREEN_PROJECT_NAME:
-        return
-
-    if not _config.EVERGREEN_PATCH_BUILD:
-        return  # TSS only runs on patch builds; skip the API call on regular tasks
-
-    if _config.ENABLE_EVERGREEN_API_TEST_SELECTION is not None:
-        return  # Explicitly set (e.g. CLI flag or config file); it supersedes project config
-
-    try:
-        evg_api = evergreen_conn.get_evergreen_api()
-        project = evg_api.project_by_id(_config.EVERGREEN_PROJECT_NAME)
-        tss_config = project.json.get("test_selection")
-        if tss_config is not None:
-            _config.ENABLE_EVERGREEN_API_TEST_SELECTION = tss_config.get("allowed", False)
-    except Exception as ex:
-        logging.getLogger(__name__).warning(
-            "Could not fetch Evergreen project config for TSS: %s", ex
-        )
 
 
 def process_feature_flag_file(path: str) -> list[str]:
@@ -738,6 +713,7 @@ flags in common: {common_set}
     _config.SHARD_COUNT = int(shard_count) if shard_count is not None else None
 
     _config.HISTORIC_TEST_RUNTIMES = config.pop("historic_test_runtimes")
+    _config.TSS_TEST_LIST = config.pop("tss_test_list")
 
     mongo_version_file = config.pop("mongo_version_file")
     if mongo_version_file is not None:
@@ -789,16 +765,6 @@ flags in common: {common_set}
         return utils.dump_yaml(ret)
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
-
-    # TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
-    # Remove this js_engine handling section and _detect_js_engine once mozjs-wasm supports all WASM functionality,
-    # eliminating the need for this startup-time binary invocation.
-    _config.JS_ENGINE = _detect_js_engine(_config.MONGOD_EXECUTABLE)
-    if _config.JS_ENGINE == "mozjs-wasm":
-        _config.EXCLUDE_WITH_ANY_TAGS.append("mozjs_wasm_unsupported")
-        _config.EXCLUDE_FILES = _find_mozjs_jstestfuzz_files()
-    else:
-        _config.EXCLUDE_WITH_ANY_TAGS.append("requires_mozjs_wasm")
 
     mongod_set_parameters = config.pop("mongod_set_parameters")
 
@@ -983,6 +949,7 @@ flags in common: {common_set}
     _config.EVERGREEN_REVISION_ORDER_ID = config.pop("revision_order_id")
     _config.EVERGREEN_TASK_ID = config.pop("task_id")
     _config.EVERGREEN_TASK_NAME = config.pop("task_name")
+    _config.EVERGREEN_DISPLAY_TASK_NAME = config.pop("display_task_name")
     _config.EVERGREEN_TASK_DOC = config.pop("task_doc")
     _config.EVERGREEN_VARIANT_NAME = config.pop("variant_name")
     _config.EVERGREEN_VERSION_ID = config.pop("version_id")
@@ -1219,29 +1186,6 @@ def _set_logging_config():
         raise IOError("Directory {} does not exist.".format(_config.LOGGER_DIR))
 
 
-_MOZJS_PATTERNS = (
-    # TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
-    '"$function"',
-)
-
-
-def _find_mozjs_jstestfuzz_files() -> list[str]:
-    """Return paths of jstestfuzz output files that contain MozJS-dependent operations.
-
-    Scans all files under jstestfuzz/out/ and excludes any that reference $function or $where —
-    operators that require the MozJS JavaScript engine and fail on a mozjs-wasm server.
-    """
-    excluded = []
-    for path in glob.glob("jstestfuzz/out/*.js"):
-        try:
-            content = Path(path).read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if any(pattern in content for pattern in _MOZJS_PATTERNS):
-            excluded.append(path)
-    return excluded
-
-
 def _find_mfp_plugin_source() -> str:
     """Return the path to the compiled MFP Rust plugin .so, or raise if not found."""
     candidates = [
@@ -1264,47 +1208,6 @@ def _find_mfp_plugin_source() -> str:
         "or ensure dist-test/lib/ is populated. "
         f"Searched: {candidates}"
     )
-
-
-def _detect_js_engine(mongod_executable: Optional[str]) -> Optional[str]:
-    """Return the JS engine name reported by the mongod binary, or None if the binary does not exist
-    or it cannot be determined (i.e. --version does not output javascriptEngine).
-
-    Runs ``mongod --version`` and parses the ``javascriptEngine`` field from the Build Info JSON.
-    If the binary exists, returns e.g. ``"mozjs"`` or ``"mozjs-wasm"``, or ``none``.
-    Note that ''none'' is a valid JS engine that indicates the server was built without a JS engine,
-    and is not the same as returning None to indicate the binary doesn't exist.
-
-    When ``mongod_executable`` is not specified, falls back to the default executable name
-    (``"mongod"``), which may be resolved via PATH (e.g. via DEPS_PATH in the Bazel test runner).
-    """
-    executable = mongod_executable or _config.DEFAULT_MONGOD_EXECUTABLE
-    if shutil.which(executable) is None:
-        return None
-    # Sanitizer builds can take tens of seconds to start up.
-    version_timeout_secs = 120 if _config.IS_SAN else 10
-    try:
-        result = subprocess.run(
-            [executable, "--version"],
-            capture_output=True,
-            text=True,
-            timeout=version_timeout_secs,
-        )
-        # The output is: "db version v...\nBuild Info: <pretty-printed JSON>\n"
-        # Grab everything from "Build Info: " to the end and parse it as one JSON blob.
-        marker = "Build Info:"
-        idx = result.stdout.find(marker)
-        if idx != -1:
-            build_info = json.loads(result.stdout[idx + len(marker) :].strip())
-            return build_info.get("javascriptEngine")
-        reason = "'Build Info:' marker not found in --version output"
-    except Exception as exc:  # pylint: disable=broad-except
-        reason = repr(exc)
-    print(
-        f"Warning: failed to detect the JS engine from '{executable} --version' ({reason}).",
-        file=sys.stderr,
-    )
-    return None
 
 
 def _expand_user(pathname):

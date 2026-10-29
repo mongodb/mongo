@@ -21,7 +21,7 @@
 ###
 
 load(
-    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "@rules_cc//cc:cc_toolchain_config_lib.bzl",
     "action_config",
     "artifact_name_pattern",
     "env_entry",
@@ -35,9 +35,11 @@ load(
     "variable_with_value",
     "with_feature_set",
 )
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@//bazel/config:configs.bzl", "sdkroot_provider")
 load("@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl", "get_apple_features")
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 _OBJCPP_EXECUTABLE_ACTION_NAME = "objc++-executable"
 
@@ -748,20 +750,9 @@ def _impl(ctx):
         ],
     )
 
-    fission_support_feature = feature(
-        name = "fission_support",
-        flag_sets = [
-            flag_set(
-                actions = all_link_actions + lto_index_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = ["-Wl,--gdb-index"],
-                        expand_if_available = "is_using_fission",
-                    ),
-                ],
-            ),
-        ],
-    )
+    # Shadow Bazel's built-in fission_support feature so split DWARF does not
+    # implicitly add a linker-generated GDB index.
+    fission_support_feature = feature(name = "fission_support")
 
     shared_flag_feature = feature(
         name = "shared_flag",
@@ -1629,6 +1620,7 @@ def _impl(ctx):
         macos_default_link_flags_feature,
         dependency_file_feature,
         runtime_library_search_directories_feature,
+        fission_support_feature,
         set_install_name_feature,
         libtool_feature,
         archiver_flags_feature,

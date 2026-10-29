@@ -77,15 +77,22 @@ libzstd
 openssl
 "
 
+ADDITIONAL_PACKAGES["public.ecr.aws/amazonlinux/amazonlinux:2023.3.20240312.0"]="
+hostname
+iproute
+libzstd
+openssl
+"
+
 ADDITIONAL_PACKAGES["redhat/ubi8:8.9"]="
 ncurses-compat-libs
 "
 
-ADDITIONAL_PACKAGES["debian:10"]="
-libfl2
+ADDITIONAL_PACKAGES["debian:12"]="
+libncurses6
 "
 
-ADDITIONAL_PACKAGES["opensuse/leap:15.2"]="
+ADDITIONAL_PACKAGES["opensuse/leap:15.5"]="
 libfl2
 "
 
@@ -106,20 +113,41 @@ systemtap-sdt-dev
 libncurses-dev
 "
 
+ADDITIONAL_PACKAGES["ubuntu:26.04"]="
+systemtap-sdt-dev
+libncurses-dev
+"
+
+declare -A PREPARE_COMMANDS
+PREPARE_COMMANDS["redhat/ubi10:10.0"]="export OPENSSL_ppccap=0"
+
+# Per-image extra Dockerfile commands appended after the package install step.
+declare -A ADDITIONAL_DOCKERFILE_COMMANDS
+# iproute installs ss to /usr/sbin/ss, but Bazel RBE's PATH only includes
+# /usr/bin. Symlink it so tests can find it without /usr/sbin in PATH.
+ADDITIONAL_DOCKERFILE_COMMANDS["amazonlinux:2023"]="
+RUN ln -sf /usr/sbin/ss /usr/bin/ss
+"
+ADDITIONAL_DOCKERFILE_COMMANDS["public.ecr.aws/amazonlinux/amazonlinux:2023.3.20240312.0"]="
+RUN ln -sf /usr/sbin/ss /usr/bin/ss
+"
+
 # This maps container images to the output locations for the generated
 # Dockerfiles.
 declare -A IMAGE_DIRS
 IMAGE_DIRS["amazonlinux:2"]="amazon_linux_2"
 IMAGE_DIRS["amazonlinux:2023"]="amazon_linux_2023"
-IMAGE_DIRS["debian:10"]="debian10"
+IMAGE_DIRS["public.ecr.aws/amazonlinux/amazonlinux:2023.3.20240312.0"]="amazon_linux_2023_3"
 IMAGE_DIRS["debian:12"]="debian12"
 IMAGE_DIRS["redhat/ubi8:8.9"]="rhel89"
 IMAGE_DIRS["redhat/ubi9:9.3"]="rhel93"
-IMAGE_DIRS["opensuse/leap:15.2"]="suse"
+IMAGE_DIRS["redhat/ubi10:10.0"]="rhel10"
+IMAGE_DIRS["opensuse/leap:15.5"]="suse"
 IMAGE_DIRS["ubuntu:18.04"]="ubuntu18"
 IMAGE_DIRS["ubuntu:20.04"]="ubuntu20"
 IMAGE_DIRS["ubuntu:22.04"]="ubuntu22"
 IMAGE_DIRS["ubuntu:24.04"]="ubuntu24"
+IMAGE_DIRS["ubuntu:26.04"]="ubuntu26"
 
 # Fetch the latest sha256:xxx hash for an image.
 get_latest_sha() {
@@ -166,13 +194,16 @@ get_package_versions() {
     case "$pkg_manager" in
     yum)
         docker run --rm "$image" bash -c "
+                ${PREPARE_COMMANDS[$image]:+${PREPARE_COMMANDS[$image]} && }
                 yum info ${packages[*]} 2>/dev/null | 
                 awk '/^Name/ {name=\$3} /^Version/ {version=\$3} /^Release/ {release=\$3} 
                 /^Release/ {print name \"-\" version \"-\" release}' | 
-                sort -u"
+                sort -u" |
+            sed -E 's/(\.el[0-9]+(_[0-9]+)?)\.[0-9]+(\.[0-9]+)*$/\1*/'
         ;;
     apt)
         docker run --rm "$image" bash -c "
+                ${PREPARE_COMMANDS[$image]:+${PREPARE_COMMANDS[$image]} && }
                 apt-get update >/dev/null 2>&1 && 
                 apt-cache policy ${packages[*]} | 
                 awk '/^[^ ]/ {pkg=\$1} /Candidate:/ {print pkg \"=\" \$2}' | 
@@ -215,16 +246,25 @@ generate_dockerfile() {
     pkg_manager=$(get_package_manager "$image")
 
     local install_lines
-    install_lines=$(get_package_versions "$image" "${packages[@]}" | sed 's/^/        /' | sed 's/$/\ \\/')
+    install_lines=$(get_package_versions "$image" "${packages[@]}" |
+        sed -E "s/^(.*\*)$/'\1'/" | sed 's/^/        /' | sed 's/$/\ \\/')
 
     case "$pkg_manager" in
     yum)
         update_cmd="yum check-update || true"
+        if [[ -n "${PREPARE_COMMANDS[$image]:-}" ]]; then
+            update_cmd="${PREPARE_COMMANDS[$image]} && \\
+    $update_cmd"
+        fi
         install_cmd="yum install -y"
         clean_cmd="&& yum clean all && rm -rf /var/cache/yum/*"
         ;;
     apt)
         update_cmd="apt-get update"
+        if [[ -n "${PREPARE_COMMANDS[$image]:-}" ]]; then
+            update_cmd="${PREPARE_COMMANDS[$image]} && \\
+    $update_cmd"
+        fi
         install_cmd="DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends"
         clean_cmd="&& rm -rf /var/lib/apt/lists/*"
         ;;
@@ -243,6 +283,9 @@ generate_dockerfile() {
     if [[ "$pkg_manager" == "apt" ]]; then
         install_lines=${install_lines//:=/=}
     fi
+
+    local extra_commands
+    extra_commands=$(echo "${ADDITIONAL_DOCKERFILE_COMMANDS[$image]:-}" | sed '/^[[:space:]]*$/d')
 
     mkdir -p "$output_dir"
     cat <<EOF >"$output_dir/dockerfile"
@@ -266,7 +309,7 @@ RUN $update_cmd && \\
     $install_cmd \\
 $install_lines
     $clean_cmd
-
+$(if [[ -n "$extra_commands" ]]; then echo -e "\n$extra_commands"; fi)
 CMD ["/bin/bash"]
 EOF
 
@@ -277,11 +320,27 @@ EOF
 # all of them asynchronously to speed up processing.
 
 echo "Generating Dockerfiles..."
+declare -A pids
 for image in "${!IMAGE_DIRS[@]}"; do
     (
         generate_dockerfile "$image"
     ) &
+    pids[$image]=$!
 done
 
-wait
+# A bare 'wait' returns zero once every job has finished, whatever their exit statuses, so a
+# worker that died (an image whose repos are unreachable, say) would leave the old pins in
+# place and look like a success. Wait on each PID so a failure is reported.
+failed=()
+for image in "${!pids[@]}"; do
+    if ! wait "${pids[$image]}"; then
+        failed+=("$image")
+    fi
+done
+
+if ((${#failed[@]})); then
+    echo "Failed to generate Dockerfiles for: ${failed[*]}" >&2
+    exit 1
+fi
+
 echo "Done."

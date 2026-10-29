@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/scripting/mozjs/wasm/api.h"
 
@@ -136,9 +110,12 @@ static bool run_safely(F&& f, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err)
 // leaks for the lifetime of the WASM instance. Linear memory never shrinks, so leaked
 // inputs accumulate until the wasmtime store cap traps with "cannot leave component
 // instance" (a reused bridge leaked ~333 KB of invoke-function args per
-// call until it hit the 1210 MB cap). Any BSONObj built over an argument buffer must be
-// copied with getOwned() before the guard frees it: the engine may create lazy BSON
-// proxies that read from the object after this call returns.
+// call until it hit the 1210 MB cap).
+//
+// invokeFunction args are the exception to the usual getOwned() rule: the engine
+// increments its generation counter at the start of each invocation, so any lazy
+// BSONHolder proxy created over an argument buffer will fail its uassertValid() check
+// if it is retained across the next call — no owned copy is needed.
 struct ArgListGuard {
     api_list_u8_t* list;
     ~ArgListGuard() {
@@ -363,7 +340,10 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_function(
                 if (!validate_bson(bson->ptr, bson->len, &e)) {
                     return return_err(err, &e);
                 }
-                argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr)).getOwned();
+                // bson->ptr is WASM linear memory — not a C++ heap allocation, so ASAN does not
+                // track it. The generation counter in the engine detects any retained cross-
+                // invocation proxy before its _objdata is read, so no owned copy is needed.
+                argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr));
             }
 
             // When the caller doesn't need the return value, skip the JS->BSON conversion.
@@ -515,6 +495,33 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global_value(
 
             auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobalValue(
                 reinterpret_cast<const char*>(name->ptr), name->len, valueObj, &e));
+
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
+}
+
+extern "C" bool exports_mongo_mozjs_mozjs_delete_global(
+    api_string_t* name,
+    exports_mongo_mozjs_mozjs_ok_t* ret,
+    exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    return run_safely(
+        [&]() -> bool {
+            ArgStringGuard nameGuard{name};
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+
+            if (!name || name->len == 0) {
+                e.code = mongo::mozjs::wasm::SM_E_INVALID_ARG;
+                return return_err(err, &e);
+            }
+
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.deleteGlobal(
+                reinterpret_cast<const char*>(name->ptr), name->len, &e));
 
             if (rc == mongo::mozjs::wasm::SM_OK) {
                 if (ret)

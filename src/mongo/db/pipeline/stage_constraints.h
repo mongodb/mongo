@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -42,7 +16,7 @@ namespace mongo {
  * A struct describing various constraints about where this stage can run, where it must be in
  * the pipeline, what resources it may require, etc.
  */
-struct MONGO_MOD_PUBLIC StageConstraints {
+struct [[MONGO_MOD_PUBLIC]] StageConstraints {
     /**
      * A StreamType defines whether this stage is streaming (can produce output based solely on
      * the current input document) or blocking (must examine subsequent documents before
@@ -72,13 +46,13 @@ struct MONGO_MOD_PUBLIC StageConstraints {
         kNone,
         // Indicates that the stage must run on the host to which it was originally sent and
         // cannot be forwarded from mongoS to the shards.
-        kLocalOnly,
+        kReceivingHostOnly,
         // Indicates that the stage must run exactly once, but it is ok to forward it from the
         // router to a shard to execute if some other stage in the pipeline needs to run on a
         // shard. The stage provides its own data and is independent of any collection.
-        kRunOnceAnyNode,
-        // Indicates that the stage must run on any participating shard.
-        kAnyShard,
+        kCollectionlessSourceRunOnceAnyNode,
+        // Indicates that the stage must run on all participating shards.
+        kTargetedShards,
         // Indicates that the stage can run in a router-role context.
         kRouter,
         // Indicates that the stage should run on all data-bearing hosts, primary and secondary, for
@@ -204,7 +178,7 @@ struct MONGO_MOD_PUBLIC StageConstraints {
                 "A stage which is allowlisted for $changeStream cannot have a requirement to run "
                 "on a shard, since it needs to be able to run on mongoS in a cluster",
                 !(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
-                  (hostRequirement == HostTypeRequirement::kAnyShard ||
+                  (hostRequirement == HostTypeRequirement::kTargetedShards ||
                    hostRequirement == HostTypeRequirement::kAllShardHosts)));
 
         tassert(11282902,
@@ -238,21 +212,22 @@ struct MONGO_MOD_PUBLIC StageConstraints {
 
     /**
      * Returns the literal HostTypeRequirement used to initialize the StageConstraints, or the
-     * effective HostTypeRequirement (kAnyShard or kRouter) if kLocalOnly was specified.
+     * effective HostTypeRequirement (kTargetedShards or kRouter) if kReceivingHostOnly was
+     * specified.
      */
     HostTypeRequirement resolvedHostTypeRequirement(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
-        return (hostRequirement != HostTypeRequirement::kLocalOnly
+        return (hostRequirement != HostTypeRequirement::kReceivingHostOnly
                     ? hostRequirement
                     : (expCtx->getInRouter() ? HostTypeRequirement::kRouter
-                                             : HostTypeRequirement::kAnyShard));
+                                             : HostTypeRequirement::kTargetedShards));
     }
 
     /**
      * True if this stage must run on the same host to which it was originally sent.
      */
     bool mustRunLocally() const {
-        return hostRequirement == HostTypeRequirement::kLocalOnly;
+        return hostRequirement == HostTypeRequirement::kReceivingHostOnly;
     }
 
     /**

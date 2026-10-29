@@ -2,9 +2,12 @@
  * Smoke tests for v2 database-level change streams, ignoreRemovedShards mode in a sharded cluster.
  *
  * @tags: [
+ *   # Whitebox test tied to database-scope removed-shard bookkeeping; breaks once upconverted.
+ *   do_not_run_in_whole_cluster_passthrough,
  *   # Assume balancer is off, and we do not get random moveChunk events during the test.
  *   assumes_balancer_off,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   featureFlagChangeStreamReaderV2,
  *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,

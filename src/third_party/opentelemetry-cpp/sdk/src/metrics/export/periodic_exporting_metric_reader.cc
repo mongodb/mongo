@@ -293,6 +293,11 @@ bool PeriodicExportingMetricReader::OnShutDown(std::chrono::microseconds timeout
 {
   if (worker_thread_.joinable())
   {
+    {
+      // Acquiring cv_m_ guarantees that the next time the worker thread checks the wait condition
+      // on cv_ (either from notify below or any other reason) it will see IsShutdown() return true.
+      std::lock_guard<std::mutex> cv_guard{cv_m_};
+    }
     cv_.notify_all();
     worker_thread_.join();
   }

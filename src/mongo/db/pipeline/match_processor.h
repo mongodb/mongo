@@ -1,42 +1,19 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -44,7 +21,7 @@ namespace mongo {
  * This class is used by the aggregation framework and streams enterprise module to perform the
  * document processing needed for $match.
  */
-class MONGO_MOD_PUBLIC MatchProcessor {
+class [[MONGO_MOD_PUBLIC]] MatchProcessor {
 public:
     MatchProcessor(std::unique_ptr<MatchExpression> expr,
                    DepsTracker dependencies,
@@ -54,6 +31,9 @@ public:
     // the MatchExpression. The optional 'ctx' parameter carries evaluation state (see
     // EvaluationContext); when it holds a memory tracker, memory usage observed while evaluating
     // any $expr sub-expressions within the match expression is accumulated against it.
+    //
+    // Not thread-safe: callers must ensure no concurrent calls to process() on the same
+    // instance.
     bool process(const Document& input, const EvaluationContext& ctx = {}) const;
 
     std::unique_ptr<MatchExpression>& getExpression() {
@@ -72,10 +52,16 @@ public:
         return _predicate;
     }
 
+    void releaseBuffer(SimpleMemoryUsageTracker* tracker) const;
+
+    int64_t bufferCapacity() const;
+
 private:
     // Determines whether all paths have unique first fields. This is called once during object
     // construction to determine the value of '_dependenciesHaveUniqueFirstFields'.
     static bool dependenciesHaveUniqueFirstFields(const OrderedPathSet& paths);
+
+    void trackBufferMemory(const EvaluationContext& ctx) const;
 
     std::unique_ptr<MatchExpression> _expression;
 
@@ -91,6 +77,12 @@ private:
     // Store the BSONObj that backs this '_expression' so that it doesn't get disposed before the
     // match expression does.
     BSONObj _predicate;
+
+    // Reused across process() calls.
+    mutable boost::optional<BSONObjBuilder> _buffer;
+
+    // The '_buffer' capacity charged to memory tracking so far.
+    mutable int64_t _trackedBufferBytes = 0;
 };
 
 }  // namespace mongo

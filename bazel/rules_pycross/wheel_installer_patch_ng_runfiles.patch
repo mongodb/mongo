@@ -1,0 +1,130 @@
+Windows: resolve wheel-installer dependencies from manifest-only runfiles.
+
+The wheel installer is a Python action tool. On Windows, its runtime venv can
+be recreated from a manifest-only runfiles tree without materializing the
+explicit venv links for its external dependencies. Importing `patch_ng`,
+`installer`, or `pycross` then fails even though those files are present in the
+action manifest.
+
+Resolve those modules before importing them so the installer remains usable
+when the venv's site-packages directory is incomplete.
+
+--- a/pycross/private/tools/wheel_installer.py
++++ b/pycross/private/tools/wheel_installer.py
+@@ -21,5 +21,86 @@
+-import patch_ng
+-from installer import install
++_PATCH_NG_RUNFILES_PATH = "rules_pycross++_repo_rules+patch-ng/patch_ng.py"
++_INSTALLER_RUNFILES_PATH = (
++    "rules_pycross++pycross+rules_pycross_internal/"
++    "_installer_extracted/installer/__init__.py"
++)
++
++
++def _resolve_module_runfile(
++    runfiles_path: str,
++    runfiles_suffix: str,
++    package_parent_count: int,
++) -> None:
++    """Add a manifest-resolved module directory to sys.path."""
++    import sys
++
++    runfiles_dir = os.environ.get("RUNFILES_DIR", "")
++    manifest_file = os.environ.get("RUNFILES_MANIFEST_FILE", "")
++    if not os.path.isfile(manifest_file):
++        for candidate in (
++            runfiles_dir + "_manifest",
++            os.path.join(runfiles_dir, "MANIFEST"),
++        ):
++            if os.path.isfile(candidate):
++                manifest_file = candidate
++                break
++
++    candidates = []
++    if runfiles_dir:
++        candidates.append(os.path.join(runfiles_dir, runfiles_path))
++    if manifest_file:
++        try:
++            with open(manifest_file, encoding="utf-8") as manifest:
++                for line in manifest:
++                    line = line.rstrip("\n")
++                    escaped = line.startswith(" ")
++                    fields = (line[1:] if escaped else line).split(" ", 1)
++                    if len(fields) != 2:
++                        continue
++                    runfile, target = fields
++                    if escaped:
++                        # Decode backslashes last so literal escape-like path
++                        # components (e.g. \\newline) are preserved.
++                        runfile = runfile.replace(r"\s", " ").replace(r"\n", "\n").replace(r"\b", "\\")
++                        target = target.replace(r"\s", " ").replace(r"\n", "\n").replace(r"\b", "\\")
++                    runfile = runfile.replace("\\", "/")
++                    if runfile == runfiles_path or runfile.endswith(runfiles_suffix):
++                        candidates.append(target or runfile)
++                        break
++        except OSError:
++            pass
++
++    for candidate in candidates:
++        if os.path.isfile(candidate):
++            module_path = os.path.dirname(candidate)
++            for _ in range(package_parent_count):
++                module_path = os.path.dirname(module_path)
++            sys.path.insert(0, module_path)
++            return
++
++
++try:
++    import patch_ng
++except ModuleNotFoundError as exc:
++    if exc.name != "patch_ng":
++        raise
++    _resolve_module_runfile(
++        _PATCH_NG_RUNFILES_PATH,
++        "+patch-ng/patch_ng.py",
++        0,
++    )
++    import patch_ng
++
++try:
++    from installer import install
++except ModuleNotFoundError as exc:
++    if exc.name != "installer":
++        raise
++    _resolve_module_runfile(
++        _INSTALLER_RUNFILES_PATH,
++        "/_installer_extracted/installer/__init__.py",
++        1,
++    )
++    from installer import install
+ from installer.destinations import SchemeDictionaryDestination
+ from installer.sources import WheelContentElement
+ from installer.sources import WheelFile
+@@ -26,2 +107,12 @@
+-from pycross.private.tools import namespace_pkgs
++try:
++    from pycross.private.tools import namespace_pkgs
++except ModuleNotFoundError as exc:
++    if exc.name != "pycross":
++        raise
++    _resolve_module_runfile(
++        "rules_pycross+/pycross/private/tools/namespace_pkgs.py",
++        "/pycross/private/tools/namespace_pkgs.py",
++        3,
++    )
++    from pycross.private.tools import namespace_pkgs
+ from pycross.private.tools.args import FlagFileArgumentParser
+
+--- a/pycross/private/tools/BUILD.bazel
++++ b/pycross/private/tools/BUILD.bazel
+@@ -3,3 +3,9 @@
+ package(default_visibility = ["//pycross:__subpackages__"])
+-
++
++filegroup(
++    name = "wheel_installer_source",
++    srcs = ["wheel_installer.py"],
++    visibility = ["@@//bazel/rules_pycross:__pkg__"],
++)
++
+ py_library(

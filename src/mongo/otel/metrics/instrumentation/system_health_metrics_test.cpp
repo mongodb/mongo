@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
 
@@ -45,6 +19,7 @@ extern void runSystemHealthCollectionCycle(SystemHealthMetrics&);
 
 namespace mongo {
 namespace {
+using namespace std::literals::string_view_literals;
 
 using otel::metrics::AttributeDefinition;
 using otel::metrics::MetricNames;
@@ -74,11 +49,11 @@ TEST_F(SystemHealthOtelMetricsTest, FirstUpdateSetsMetricsCorrectly) {
     _metrics.update(snap);
 
     ASSERT_EQ(1000,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"sv}));
     ASSERT_EQ(500,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"sv}));
     ASSERT_EQ(200,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"sv}));
     ASSERT_EQ(4, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(1, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
     ASSERT_EQ(512, _capturer.readInt64Gauge(MetricNames::kFdOpen));
@@ -105,11 +80,11 @@ TEST_F(SystemHealthOtelMetricsTest, SecondUpdateUpdatesMetricsCorrectly) {
 
     // Counters accumulate deltas: first=1000/500/200, delta=300/150/50.
     ASSERT_EQ(1300,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"sv}));
     ASSERT_EQ(650,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"sv}));
     ASSERT_EQ(250,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"sv}));
 
     ASSERT_EQ(5, _capturer.readInt64Gauge(MetricNames::kThreadActive));
     ASSERT_EQ(3, _capturer.readInt64Gauge(MetricNames::kThreadQueued));
@@ -137,11 +112,11 @@ TEST_F(SystemHealthOtelMetricsTest, NegativeDeltaOnWrapIsSkipped) {
 
     // Negative deltas are skipped; counters retain the value from before the reset.
     ASSERT_EQ(5000,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"user"sv}));
     ASSERT_EQ(2000,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"system"sv}));
     ASSERT_EQ(800,
-              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"_sd}));
+              _capturer.readInt64Counter<std::string_view>(MetricNames::kCpuTime, {"iowait"sv}));
 }
 
 struct CPUModeField {
@@ -150,16 +125,16 @@ struct CPUModeField {
 };
 
 inline constexpr auto kCpuModeFields = std::to_array<CPUModeField>({
-    {"user"_sd, &SystemHealthSnapshot::cpuUserMs},
-    {"nice"_sd, &SystemHealthSnapshot::cpuNiceMs},
-    {"system"_sd, &SystemHealthSnapshot::cpuSystemMs},
-    {"idle"_sd, &SystemHealthSnapshot::cpuIdleMs},
-    {"iowait"_sd, &SystemHealthSnapshot::cpuIowaitMs},
-    {"irq"_sd, &SystemHealthSnapshot::cpuIrqMs},
-    {"softirq"_sd, &SystemHealthSnapshot::cpuSoftirqMs},
-    {"steal"_sd, &SystemHealthSnapshot::cpuStealMs},
-    {"guest"_sd, &SystemHealthSnapshot::cpuGuestMs},
-    {"guest_nice"_sd, &SystemHealthSnapshot::cpuGuestNiceMs},
+    {"user"sv, &SystemHealthSnapshot::cpuUserMs},
+    {"nice"sv, &SystemHealthSnapshot::cpuNiceMs},
+    {"system"sv, &SystemHealthSnapshot::cpuSystemMs},
+    {"idle"sv, &SystemHealthSnapshot::cpuIdleMs},
+    {"iowait"sv, &SystemHealthSnapshot::cpuIowaitMs},
+    {"irq"sv, &SystemHealthSnapshot::cpuIrqMs},
+    {"softirq"sv, &SystemHealthSnapshot::cpuSoftirqMs},
+    {"steal"sv, &SystemHealthSnapshot::cpuStealMs},
+    {"guest"sv, &SystemHealthSnapshot::cpuGuestMs},
+    {"guest_nice"sv, &SystemHealthSnapshot::cpuGuestNiceMs},
 });
 
 TEST_F(SystemHealthOtelMetricsTest, CpuTimeDeltaAllFields) {

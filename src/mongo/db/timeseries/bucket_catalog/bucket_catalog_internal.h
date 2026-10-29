@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -62,12 +36,6 @@ namespace mongo::timeseries::bucket_catalog::internal {
  */
 using BucketDocumentValidator =
     std::function<std::pair<Collection::DocumentValidationResult, Status>(const BSONObj&)>;
-
-enum class MONGO_MOD_PARENT_PRIVATE StageInsertBatchResult {
-    Success,
-    RolloverNeeded,
-    NoMeasurementsStaged,
-};
 
 /**
  * Mode enum to control whether the bucket retrieval methods will return buckets that have a state
@@ -148,6 +116,8 @@ void rollover(BucketCatalog& catalog,
 /**
  * Perform archived-based reopening and returns the fetched bucket document.
  * Increments statistics accordingly.
+ * This function does not throw if querying the bucket fails, and will return an empty BSONObj in
+ * that case.
  */
 BSONObj reopenFetchedBucket(OperationContext* opCtx,
                             const Collection* bucketsColl,
@@ -158,6 +128,8 @@ BSONObj reopenFetchedBucket(OperationContext* opCtx,
  * Perform query-based reopening and returns the fetched bucket document if the supporting index
  * exists.
  * Increments statistics accordingly.
+ * This function does not throw if querying the bucket fails, and will return an empty BSONObj in
+ * that case.
  */
 BSONObj reopenQueriedBucket(OperationContext* opCtx,
                             const Collection* bucketsColl,
@@ -256,7 +228,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
  * buckets. Returns a pair of the effective value that respects the absolute bucket max and min
  * sizes and the raw value.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
                                                          int64_t workloadCardinality);
 
@@ -346,7 +318,7 @@ void resetBucketOIDCounter();
 /**
  * Allocates a new bucket and adds it to the catalog.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
@@ -361,7 +333,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
  * Will also update the bucket catalog stats incNumBucketsKeptOpenDueToLargeMeasurements as
  * appropriate.
  */
-MONGO_MOD_PARENT_PRIVATE
+[[MONGO_MOD_PARENT_PRIVATE]]
 RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        int64_t numberOfActiveBuckets,
@@ -424,40 +396,21 @@ void closeArchivedBucket(BucketCatalog& catalog,
                          ExecutionStatsController& stats);
 
 /**
- * Inserts measurements into the provided eligible bucket. On success of all measurements being
- * inserted into the provided bucket, returns true. Otherwise, returns false.
- * Also increments `currentPosition` to one past the index of the last measurement inserted.
+ * Inserts measurements into the provided eligible bucket. Returns the WriteBatch used for
+ * insertions, which becomes the caller's responsibility to commit or abort. This will be null if no
+ * measurements were actually inserted. Increments `currentPosition` to one past the index of the
+ * last measurement inserted.
  */
-MONGO_MOD_PARENT_PRIVATE
-StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
-                                                          OperationId opId,
-                                                          const StringDataComparator* comparator,
-                                                          BatchedInsertContext& batch,
-                                                          Stripe& stripe,
-                                                          WithLock stripeLock,
-                                                          uint64_t storageCacheSizeBytes,
-                                                          Bucket& eligibleBucket,
-                                                          size_t& currentPosition,
-                                                          std::shared_ptr<WriteBatch>& writeBatch);
-
-/**
- * Given an already-selected 'bucket', inserts the measurement in 'batchedInsertTuple' to the bucket
- * if possible.
- * Returns true if successfully inserted.
- * Returns false if 'bucket' needs to be rolled over. Marks its 'rolloverReason' accordingly.
- */
-bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
-                                          Stripe& stripe,
-                                          WithLock stripeLock,
-                                          const BatchedInsertTuple& batchedInsertTuple,
-                                          OperationId opId,
-                                          const TimeseriesOptions& timeseriesOptions,
-                                          const StripeNumber& stripeNumber,
-                                          uint64_t storageCacheSizeBytes,
-                                          const StringDataComparator* comparator,
-                                          Bucket& bucket,
-                                          ExecutionStatsController& stats,
-                                          std::shared_ptr<WriteBatch>& writeBatch);
+[[MONGO_MOD_PARENT_PRIVATE]]
+std::shared_ptr<WriteBatch> stageInsertBatchIntoEligibleBucket(
+    BucketCatalog& catalog,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    BatchedInsertContext& batch,
+    WithLock stripeLock,
+    uint64_t storageCacheSizeBytes,
+    Bucket& eligibleBucket,
+    size_t& currentPosition);
 
 /**
  * Given a bucket 'bucket', a measurement 'doc', and the 'writeBatch', updates the 'writeBatch'

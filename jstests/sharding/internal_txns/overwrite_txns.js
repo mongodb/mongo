@@ -9,9 +9,6 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
-// This test requires running transactions directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
-
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
 const kDbName = "testDb";

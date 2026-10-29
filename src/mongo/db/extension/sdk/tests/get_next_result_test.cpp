@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/shared/get_next_result.h"
 
@@ -179,6 +153,97 @@ TEST(ExtensionBSONObjTest, makeFromByteContainerByteViewRoundtrip) {
     newContainer.bytes.view = guardedByteContainer.getByteView();
     extensionBSONObj = ExtensionBSONObj::makeFromByteContainer(newContainer);
     ASSERT_BSONOBJ_EQ(BSON("meow" << "santiago"), extensionBSONObj.getUnownedBSONObj());
+}
+
+TEST(ExtensionGetNextResultTest, isEmptyByteContainerTreatsDanglingEmptyViewAsEmpty) {
+    ::MongoExtensionByteContainer container;
+    container.type = ::MongoExtensionByteContainerType::kByteView;
+    // Non-null dangling pointer (Rust empty Vec<u8> sentinel) with len 0.
+    container.bytes.view = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(0x1), 0};
+    ASSERT_TRUE(ExtensionGetNextResult::isEmptyByteContainer(container));
+}
+
+TEST(ExtensionGetNextResultTest, isEmptyByteContainerNullEmptyView) {
+    auto container = createEmptyByteContainer();
+    ASSERT_TRUE(ExtensionGetNextResult::isEmptyByteContainer(container));
+}
+
+TEST(ExtensionGetNextResultTest, isEmptyByteContainerTreatsNullDataWithBogusLengthAsEmpty) {
+    ::MongoExtensionByteContainer container;
+    container.type = ::MongoExtensionByteContainerType::kByteView;
+    // Null data with a non-zero length is never valid BSON; treat as empty so the host
+    // does not dereference null trying to build a BSONObj from it.
+    container.bytes.view = ::MongoExtensionByteView{nullptr, 5};
+    ASSERT_TRUE(ExtensionGetNextResult::isEmptyByteContainer(container));
+}
+
+TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedEmptyDocumentThrows) {
+    ::MongoExtensionGetNextResult apiResult;
+    apiResult.code = ::MongoExtensionGetNextResultCode::kAdvanced;
+    apiResult.resultDocument.type = ::MongoExtensionByteContainerType::kByteView;
+    apiResult.resultDocument.bytes.view =
+        ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(0x1), 0};
+    apiResult.resultMetadata = createEmptyByteContainer();
+
+    ASSERT_THROWS_CODE(ExtensionGetNextResult::makeFromApiResult(apiResult),
+                       DBException,
+                       ErrorCodes::ExtensionSerializationError);
+}
+
+TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedDanglingEmptyMetadataSkipsMetadata) {
+    auto doc = BSON("meow" << "santiago");
+    ::MongoExtensionGetNextResult apiResult;
+    apiResult.code = ::MongoExtensionGetNextResultCode::kAdvanced;
+    apiResult.resultDocument.type = ::MongoExtensionByteContainerType::kByteView;
+    apiResult.resultDocument.bytes.view = objAsByteView(doc);
+    apiResult.resultMetadata.type = ::MongoExtensionByteContainerType::kByteView;
+    apiResult.resultMetadata.bytes.view =
+        ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(0x1), 0};
+
+    auto result = ExtensionGetNextResult::makeFromApiResult(apiResult);
+    ASSERT_EQ(GetNextCode::kAdvanced, result.code);
+    ASSERT_TRUE(result.resultDocument.has_value());
+    ASSERT_FALSE(result.resultMetadata.has_value());  // dangling-empty metadata skipped
+}
+
+TEST(ExtensionGetNextResultTest, makeFromApiResultAdvancedNullDataWithBogusLengthThrows) {
+    ::MongoExtensionGetNextResult apiResult;
+    apiResult.code = ::MongoExtensionGetNextResultCode::kAdvanced;
+    apiResult.resultDocument.type = ::MongoExtensionByteContainerType::kByteView;
+    // Null data with non-zero length; isEmptyByteContainer's `data == nullptr` branch must
+    // reject it before bsonObjFromByteView() dereferences null to read the BSON header.
+    apiResult.resultDocument.bytes.view = ::MongoExtensionByteView{nullptr, 5};
+    apiResult.resultMetadata = createEmptyByteContainer();
+
+    ASSERT_THROWS_CODE(ExtensionGetNextResult::makeFromApiResult(apiResult),
+                       DBException,
+                       ErrorCodes::ExtensionSerializationError);
+}
+
+TEST(ExtensionGetNextResultTest, makeFromApiResultPauseReclaimsTransferredDocumentBuf) {
+    auto doc = BSON("meow" << "santiago");
+    ::MongoExtensionGetNextResult apiResult = createDefaultExtensionGetNext();
+    apiResult.code = ::MongoExtensionGetNextResultCode::kPauseExecution;
+    auto byteBufObj = ExtensionBSONObj::makeAsByteBuf(doc);
+    byteBufObj.toByteContainer(apiResult.resultDocument);
+
+    auto result = ExtensionGetNextResult::makeFromApiResult(apiResult);
+    ASSERT_EQ(GetNextCode::kPauseExecution, result.code);
+    ASSERT_FALSE(result.resultDocument.has_value());
+    ASSERT_FALSE(result.resultMetadata.has_value());
+}
+
+TEST(ExtensionGetNextResultTest, makeFromApiResultEOFReclaimsTransferredMetadataBuf) {
+    auto doc = BSON("meow" << "santiago");
+    ::MongoExtensionGetNextResult apiResult = createDefaultExtensionGetNext();
+    apiResult.code = ::MongoExtensionGetNextResultCode::kEOF;
+    auto byteBufObj = ExtensionBSONObj::makeAsByteBuf(doc);
+    byteBufObj.toByteContainer(apiResult.resultMetadata);
+
+    auto result = ExtensionGetNextResult::makeFromApiResult(apiResult);
+    ASSERT_EQ(GetNextCode::kEOF, result.code);
+    ASSERT_FALSE(result.resultDocument.has_value());
+    ASSERT_FALSE(result.resultMetadata.has_value());
 }
 }  // namespace
 }  // namespace mongo::extension::sdk

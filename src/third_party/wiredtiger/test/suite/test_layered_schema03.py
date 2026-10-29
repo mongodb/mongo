@@ -97,8 +97,10 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         self.session.create(uri, base_create)
 
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
         for i in range(1000):
             cursor[str(i)] = str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         self.session.checkpoint()
@@ -121,8 +123,10 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         custom_session.create(uri, base_create)
 
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
         for i in range(1000):
             cursor[str(i)] = str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         custom_session.checkpoint()
@@ -143,20 +147,16 @@ class test_layered_schema03(wttest.WiredTigerTestCase):
         self.session.create(uri, base_create)
 
         cursor = self.session.open_cursor(uri)
+        self.session.begin_transaction()
         for i in range(1000):
             cursor[str(i)] = str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
 
         self.session.checkpoint()
-        # Get the checkpoint metadata before closing
-        checkpoint_meta = self.disagg_get_complete_checkpoint_meta()
-
-        # Configure as follower with checkpoint pickup (not using backup)
-        follower_config = 'disaggregated=(role="follower",' + \
-                         f'checkpoint_meta="{checkpoint_meta}")'
 
         # Switch to follower mode.
-        self.reopen_conn(config=follower_config)
+        self.conn.reconfigure('disaggregated=(role="follower")')
         self.session.drop(uri, "")
         self.validate_drop()
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
@@ -93,9 +67,9 @@ protected:
         registration.setPrimaryParser(std::move(primaryParser));
         LiteParserOptions options;
         if (ifrFlagValue) {
-            std::vector<BSONObj> flagValues{
-                BSON("name" << mockFlag.getName() << "value" << *ifrFlagValue)};
-            options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+            std::vector<IFRFlagWireEntry> flagValues{
+                IFRFlagWireEntry{mockFlag.getName(), *ifrFlagValue}};
+            options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
         }
         return {std::move(registration), std::move(options)};
     }
@@ -418,18 +392,18 @@ TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
     ASSERT_NE(original.getStages()[0].get(), cloned.getStages()[0].get());
 
     // Verify both stages have subpipelines.
-    auto* originalSubPipelinesPtr = original.getStages()[0]->getSubPipelines();
-    auto* clonedSubPipelinesPtr = cloned.getStages()[0]->getSubPipelines();
-    ASSERT_NE(originalSubPipelinesPtr, nullptr);
-    ASSERT_NE(clonedSubPipelinesPtr, nullptr);
-    const auto& originalSubPipelines = *originalSubPipelinesPtr;
-    const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
+    auto originalSubPipelinesOpt = original.getStages()[0]->getSubPipelines();
+    auto clonedSubPipelinesOpt = cloned.getStages()[0]->getSubPipelines();
+    ASSERT(originalSubPipelinesOpt);
+    ASSERT(clonedSubPipelinesOpt);
+    const auto& originalSubPipelines = *originalSubPipelinesOpt;
+    const auto& clonedSubPipelines = *clonedSubPipelinesOpt;
 
     ASSERT_EQ(originalSubPipelines.size(), 1);
     ASSERT_EQ(clonedSubPipelines.size(), 1);
 
     // Verify the subpipelines are different objects (deep copy).
-    ASSERT_NE(&originalSubPipelines[0], &clonedSubPipelines[0]);
+    ASSERT_NE(&*originalSubPipelines[0], &*clonedSubPipelines[0]);
 
     // Verify the subpipeline stages are also cloned (different pointers).
     ASSERT_EQ(originalSubPipelines[0]->getStages().size(), 1);
@@ -472,7 +446,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 }
 
@@ -492,7 +466,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ResolvedNamespaceMap map;
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
-    ASSERT_FALSE(stage->getResolvedBackingNss().involvedNamespaceIsAView);
+    ASSERT_FALSE(stage->getResolvedBackingNss().isInvolvedNamespaceAView());
 }
 
 TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
@@ -510,7 +484,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     auto& stage = lpp.getStages()[0];
 
     // Before bind: _pipelines must be empty so needsViewSubpipelineMaterialized() returns true.
-    ASSERT_TRUE(stage->getMutableSubPipelines() != nullptr);
+    ASSERT_TRUE(stage->getMutableSubPipelines().has_value());
     ASSERT_TRUE(stage->getMutableSubPipelines()->empty());
 
     ResolvedNamespaceViewOptions opts;
@@ -528,12 +502,12 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // _resolvedBackingNss must be set to the view entry.
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // The view pipeline must have been materialized into _pipelines.
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_FALSE(subPipelines->empty());
 }
 
@@ -560,7 +534,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     auto& stage = lpp.getStages()[0];
 
     // Before bind: no pipeline slot yet.
-    ASSERT_TRUE(stage->getMutableSubPipelines() != nullptr);
+    ASSERT_TRUE(stage->getMutableSubPipelines().has_value());
     ASSERT_TRUE(stage->getMutableSubPipelines()->empty());
 
     ResolvedNamespaceViewOptions opts;
@@ -577,11 +551,11 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_FALSE(subPipelines->empty());
 }
 
@@ -594,11 +568,10 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // Build an ifrContext with featureFlagExtensionsInsideHybridSearch = true so that
     // LiteParsedLookUp::parse sets _noUserPipeline=true and leaves _pipelines empty.
-    std::vector<BSONObj> flagValues{
-        BSON("name" << feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName() << "value"
-                    << true)};
+    std::vector<IFRFlagWireEntry> flagValues{
+        IFRFlagWireEntry{feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName(), true}};
     LiteParserOptions options;
-    options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     // No `pipeline:` field — _pipelines stays empty and the view is materialized on bind.
     std::vector<BSONObj> pipelineStages = {
@@ -614,8 +587,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     auto& stage = lpp.getStages()[0];
 
     // Before bind: _pipelines must be empty so needsViewSubpipelineMaterialized() returns true.
-    auto* subPipelinesBefore = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelinesBefore, nullptr);
+    auto subPipelinesBefore = stage->getMutableSubPipelines();
+    ASSERT(subPipelinesBefore);
     ASSERT_TRUE(subPipelinesBefore->empty());
 
     ResolvedNamespaceViewOptions opts;
@@ -633,14 +606,72 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // _resolvedBackingNss must now reflect the view.
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // The view pipeline must have been materialized into _pipelines.
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1u);
     ASSERT_FALSE((*subPipelines)[0]->getStages().empty());
+}
+
+// bindResolvedNamespace() can run more than once against the same logical stage:
+// AggCatalogState::maybeProactivelyResolveInvolvedNamespaces copies the resolved-namespace map
+// (which owns the parsed view pipelines) and re-binds the copy. The copy carries the
+// already-materialized subpipeline, so a naive re-bind would call materializeViewSubpipeline() with
+// a non-empty _pipelines and trip the empty-list invariant. Cloning the stage after the first bind
+// mimics that map copy; the second bind must be a no-op.
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     LookupShorthandRebindOfMaterializedCopyIsIdempotent) {
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "viewColl");
+    const NamespaceString kBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "backingColl");
+
+    std::vector<IFRFlagWireEntry> flagValues{
+        IFRFlagWireEntry{feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName(), true}};
+    LiteParserOptions options;
+    options.ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
+
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "viewColl"
+                                      << "localField"
+                                      << "a"
+                                      << "foreignField"
+                                      << "b"
+                                      << "as"
+                                      << "result")),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages, false, options);
+    auto& stage = lpp.getStages()[0];
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kForeignNss,
+                ResolvedNamespace(kForeignNss,
+                                  kBackingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("v" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    // First bind materializes the view pipeline.
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
+    ASSERT_EQ(stage->getMutableSubPipelines()->size(), 1u);
+
+    // Clone the stage the way copying the resolved-namespace map does. The clone carries the
+    // already-materialized subpipeline.
+    auto clonedStage = stage->clone();
+    ASSERT_EQ(clonedStage->getMutableSubPipelines()->size(), 1u);
+
+    // Re-binding the clone must not re-materialize (and must not trip tassert 12792401).
+    clonedStage->bindResolvedNamespace(ResolvedNamespace{}, map);
+    ASSERT_EQ(clonedStage->getMutableSubPipelines()->size(), 1u);
+    auto backingNss = clonedStage->getResolvedBackingNss();
+    ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 }
 
 TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
@@ -660,14 +691,14 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
 
     // Not a view: involvedNamespaceIsAView must be false.
     auto backingNss = stage->getResolvedBackingNss();
-    ASSERT_FALSE(backingNss.involvedNamespaceIsAView);
+    ASSERT_FALSE(backingNss.isInvolvedNamespaceAView());
 
     // Identity default: namespace should equal the foreign nss.
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // Nothing was materialized: _pipelines must remain empty.
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_TRUE(subPipelines->empty());
 }
 
@@ -748,9 +779,9 @@ TEST(LiteParsedPipelineClone, CloneRemainsValidAfterOriginalIsDestroyed) {
     ASSERT_EQ(cloned->getStages().size(), 1);
 
     // Verify the stage data is still accessible.
-    auto* clonedSubPipelinesPtr = cloned->getStages()[0]->getSubPipelines();
-    ASSERT_NE(clonedSubPipelinesPtr, nullptr);
-    const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
+    auto clonedSubPipelinesOpt = cloned->getStages()[0]->getSubPipelines();
+    ASSERT(clonedSubPipelinesOpt);
+    const auto& clonedSubPipelines = *clonedSubPipelinesOpt;
     ASSERT_EQ(clonedSubPipelines.size(), 1);
     ASSERT_EQ(clonedSubPipelines[0]->getStages().size(), 1);
 
@@ -783,9 +814,9 @@ TEST(LiteParsedPipelineClone, OriginalRemainsValidAfterCloneIsDestroyed) {
     ASSERT_EQ(original.getStages().size(), 1);
 
     // Verify the stage data is still accessible.
-    auto* originalSubPipelinesPtr = original.getStages()[0]->getSubPipelines();
-    ASSERT_NE(originalSubPipelinesPtr, nullptr);
-    const auto& originalSubPipelines = *originalSubPipelinesPtr;
+    auto originalSubPipelinesOpt = original.getStages()[0]->getSubPipelines();
+    ASSERT(originalSubPipelinesOpt);
+    const auto& originalSubPipelines = *originalSubPipelinesOpt;
     ASSERT_EQ(originalSubPipelines.size(), 1);
     ASSERT_EQ(originalSubPipelines[0]->getStages().size(), 1);
 
@@ -863,12 +894,12 @@ protected:
 
     MockMetricResults mockSuccess(const ExtensionMetricsAllocation& allocation,
                                   const std::vector<BSONObj>& pipeline) {
-        return parsePipelineAndGetCounterDeltas(allocation, pipeline, true /* markSuccess */);
+        return parsePipelineAndGetCounterDeltas(allocation, pipeline, /*markSuccess=*/true);
     }
 
     MockMetricResults mockFailure(const ExtensionMetricsAllocation& allocation,
                                   const std::vector<BSONObj>& pipeline) {
-        return parsePipelineAndGetCounterDeltas(allocation, pipeline, false /* markSuccess */);
+        return parsePipelineAndGetCounterDeltas(allocation, pipeline, /*markSuccess=*/false);
     }
 
     /**

@@ -9,6 +9,8 @@
  *   simulate_mongoq_incompatible,
  *   # TODO (SERVER-103880) Remoe this tab once getMore is supported in stepdown scenarios.
  *   requires_getmore,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

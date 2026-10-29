@@ -352,7 +352,7 @@ config_reorder(WT_SESSION *session, char **list)
          * information.
          */
         if ((list[0] == NULL || list[1] == NULL || list[2] != NULL) ||
-          (!WT_PREFIX_MATCH(list[0], "file:") && !WT_PREFIX_MATCH(list[0], "tiered:")))
+          !WT_PREFIX_MATCH(list[0], "file:"))
             return (format(session));
 
         entry = list;
@@ -393,8 +393,7 @@ config_update(WT_SESSION *session, char **list)
     if (cmdname != NULL) {
         for (listp = list; *listp != NULL; listp += 2)
             if (WT_PREFIX_MATCH(*listp, "colgroup:") || WT_PREFIX_MATCH(*listp, "file:") ||
-              WT_PREFIX_MATCH(*listp, "index:") || WT_PREFIX_MATCH(*listp, "table:") ||
-              WT_PREFIX_MATCH(*listp, "tiered:"))
+              WT_PREFIX_MATCH(*listp, "index:") || WT_PREFIX_MATCH(*listp, "table:"))
                 if (config_rename(session, listp, cmdname))
                     return (1);
 

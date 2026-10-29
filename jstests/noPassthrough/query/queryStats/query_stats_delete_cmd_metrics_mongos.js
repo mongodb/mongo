@@ -1,6 +1,7 @@
 /**
  * Tests query stats for delete commands that go through various mongos dispatch paths.
- * @tags: [featureFlagQueryStatsDelete]
+ *
+ * @tags: [requires_fcv_90]
  */
 import {getQueryStatsDeleteCmd} from "jstests/libs/query/query_stats_utils.js";
 import {runMongosWriteMetricsTests} from "jstests/libs/query/query_stats_write_cmd_utils.js";
@@ -43,6 +44,5 @@ runMongosWriteMetricsTests({
     }),
     validateCmdFn: (result) => assert.eq(result.n, 1, result),
     getQueryStatsFn: getQueryStatsDeleteCmd,
-    // TODO SERVER-128278 remove special handling for deletes on sharded clusters.
     docsExaminedOverride: true,
 });

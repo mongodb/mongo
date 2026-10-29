@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,6 +12,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/histogram.h"
 #include "mongo/util/moving_average.h"
+#include "mongo/util/static_immortal.h"
 
 #include <algorithm>
 #include <atomic>
@@ -64,7 +39,7 @@ concept HistogramValueType = std::same_as<T, int64_t> || std::same_as<T, double>
  * so MetricsService can access it without knowing the attribute types.
  */
 template <HistogramValueType T>
-class MONGO_MOD_PUBLIC HistogramBase : public Metric {
+class [[MONGO_MOD_PUBLIC]] HistogramBase : public Metric {
 public:
     explicit HistogramBase(boost::optional<std::vector<double>> boundaries = boost::none)
         : explicitBucketBoundaries(std::move(boundaries)) {}
@@ -78,7 +53,7 @@ public:
  * General case: histogram with one or more attributes.
  */
 template <HistogramValueType T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC Histogram : public HistogramBase<T> {
+class [[MONGO_MOD_PUBLIC]] Histogram : public HistogramBase<T> {
 public:
     using Attributes = std::tuple<AttributeTs...>;
 
@@ -100,7 +75,7 @@ public:
  * callers don't need to pass an empty tuple.
  */
 template <HistogramValueType T>
-class MONGO_MOD_PUBLIC Histogram<T> : public HistogramBase<T> {
+class [[MONGO_MOD_PUBLIC]] Histogram<T> : public HistogramBase<T> {
 public:
     using Attributes = std::tuple<>;
 
@@ -114,6 +89,37 @@ public:
     void record(T value) {
         record(value, {});
     }
+};
+
+/**
+ * A no-op, attribute-free Histogram that silently discards all recorded values. The single shared
+ * instance is obtained via instance(); it is stateless and therefore safe to share across threads
+ * and recorders.
+ */
+template <HistogramValueType T>
+class [[MONGO_MOD_PUBLIC]] NoopHistogram final : public Histogram<T> {
+public:
+    using Histogram<T>::record;
+
+    static NoopHistogram* instance() {
+        static StaticImmortal<NoopHistogram> histogram;
+        return &*histogram;
+    }
+
+    void record(T, const std::tuple<>&) override {}
+
+    BSONObj serializeToBson(const std::string&) const override {
+        return BSONObj{};
+    }
+
+#ifdef MONGO_CONFIG_OTEL
+    void reset(opentelemetry::metrics::Meter*) override {}
+#endif  // MONGO_CONFIG_OTEL
+
+private:
+    friend class StaticImmortal<NoopHistogram>;
+
+    NoopHistogram() = default;
 };
 
 // OTel's default explicit bucket boundaries, matching those used internally by the OTel SDK when
@@ -205,6 +211,11 @@ private:
     // kDefaultBucketBoundaries.
     boost::optional<mongo::Histogram<double>> _bucketCounts;
 
+    // BSON field names for each bucket of `_bucketCounts`, built once at construction. Empty when
+    // `_bucketCounts` is disengaged. Bucket boundaries never change after construction, so these
+    // stay valid across `reset()`.
+    std::vector<std::string> _bucketKeys;
+
     std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
 
     OwnedAttributeValueLists<AttributeTs...> _ownedValueLists;
@@ -266,6 +277,8 @@ HistogramImpl<T, AttributeTs...>::HistogramImpl(
                         ? boost::optional<mongo::Histogram<double>>(
                               makeBucketCountsHistogram(this->explicitBucketBoundaries))
                         : boost::none),
+      _bucketKeys(_bucketCounts ? mongo::makeHistogramBucketKeys(*_bucketCounts)
+                                : std::vector<std::string>{}),
       _attributeNames{defs.name...},
       _ownedValueLists(makeOwnedAttributeValueLists(defs...)),
       _validCombinations([this] {
@@ -296,6 +309,8 @@ HistogramImpl<T, AttributeTs...>::HistogramImpl(
                         ? boost::optional<mongo::Histogram<double>>(
                               makeBucketCountsHistogram(this->explicitBucketBoundaries))
                         : boost::none),
+      _bucketKeys(_bucketCounts ? mongo::makeHistogramBucketKeys(*_bucketCounts)
+                                : std::vector<std::string>{}),
       _attributeNames{defs.name...},
       _ownedValueLists(makeOwnedAttributeValueLists(defs...)),
       _validCombinations([this] {
@@ -365,7 +380,7 @@ BSONObj HistogramImpl<T, AttributeTs...>::serializeToBson(const std::string& key
 #ifdef MONGO_CONFIG_OTEL
         auto readLock = _rwMutex.readLock();
 #endif
-        mongo::appendHistogram(builder, *_bucketCounts, key);
+        mongo::appendHistogram(builder, *_bucketCounts, key, _bucketKeys);
     }
     return builder.obj();
 }

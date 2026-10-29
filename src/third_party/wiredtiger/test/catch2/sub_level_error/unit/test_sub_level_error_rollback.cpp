@@ -36,7 +36,8 @@ TEST_CASE("Test functions for error handling in rollback workflows",
 
         // If the eviction server isn't running, then the threads have not been set up yet and it's
         // not safe to evict.
-        CHECK(__wt_evict_app_assist_worker_check(session_impl, false, false, true, NULL) == 0);
+        CHECK(
+          __wt_evict_app_assist_worker_check(session_impl, false, false, true, false, NULL) == 0);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
 
         // Set the eviction server as running.
@@ -45,7 +46,8 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // percent full.
         conn_impl->cache_size = 10 * 1024 * 1024;
         conn_impl->cache->bytes_inmem = 9 * 1024 * 1024;
-        CHECK(__wt_evict_app_assist_worker_check(session_impl, true, false, true, NULL) == 0);
+        CHECK(
+          __wt_evict_app_assist_worker_check(session_impl, true, false, true, false, NULL) == 0);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
@@ -55,16 +57,23 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // It is possible to get WT_OLDEST_FOR_EVICTION as the sub-level rollback error from this
         // function. This should not be overwritten by WT_CACHE_OVERFLOW.
 
-        // Set the eviction cache as stuck.
-        conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
-        F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
+        // The eviction server rebuilds the aggressive score and the cache flags on every pass, so
+        // hold the pass lock while the stuck state is hand-set.
+        WT_WITH_LOCK_WAIT(
+          session_impl, &conn_impl->evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, {
+              // Set the eviction cache as stuck.
+              conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
+              F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
 
-        // Set transaction's update amount to 1 and ID to be equal to the oldest transaction ID.
-        session_impl->txn->mod_count = 1;
-        WT_SESSION_TXN_SHARED(session_impl)->id = S2C(session)->txn_global.oldest_id;
-        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true) == WT_ROLLBACK);
-        check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
-          "Transaction has the oldest pinned transaction ID");
+              // Set transaction's update amount to 1 and ID to be equal to the oldest transaction
+              // ID.
+              session_impl->txn->mod_count = 1;
+              WT_SESSION_TXN_SHARED(session_impl)->id = S2C(session)->txn_global.oldest_id;
+              CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true, false) ==
+                WT_ROLLBACK);
+              check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
+                "Transaction has the oldest pinned transaction ID");
+          });
 
         // Reset updates to the initial value.
         session_impl->txn->mod_count = 0;
@@ -87,7 +96,8 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         cursor->set_key(cursor, "key");
         cursor->set_value(cursor, "value");
 
-        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true) == WT_ROLLBACK);
+        CHECK(
+          __wti_evict_app_assist_worker(session_impl, false, false, true, false) == WT_ROLLBACK);
         check_error_info(err_info, WT_ROLLBACK, WT_CACHE_OVERFLOW, "Cache capacity has overflown");
 
         // Drop the table.
@@ -163,28 +173,94 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // Set the transaction to have 1 modification.
         session_impl->txn->mod_count = 1;
 
-        // Check if the transaction's ID or its pinned ID is equal to the oldest transaction ID.
-        CHECK(__wt_txn_is_blocking(session_impl) == 0);
-        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
+        // The oldest-for-eviction check only applies once eviction reports itself stuck, and the
+        // eviction server rebuilds that state on every pass, so hold the pass lock throughout.
+        WT_WITH_LOCK_WAIT(
+          session_impl, &conn_impl->evict->evict_pass_lock, WT_SESSION_LOCKED_PASS, {
+              conn_impl->evict->evict_aggressive_score = WT_EVICT_SCORE_MAX;
+              F_SET(conn_impl->evict, WT_EVICT_CACHE_HARD);
 
-        // Set transaction's pinned ID to be equal to the oldest transaction ID.
-        WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session_impl);
-        txn_shared->pinned_id = S2C(session)->txn_global.oldest_id;
-        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
-        check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
-          "Transaction has the oldest pinned transaction ID");
+              // Check if the transaction's ID or its pinned ID is equal to the oldest transaction
+              // ID.
+              CHECK(__wt_txn_is_blocking(session_impl) == 0);
+              check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
 
-        // Reset error.
-        __wt_session_reset_last_error(session_impl);
+              // Set transaction's pinned ID to be equal to the oldest transaction ID.
+              WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session_impl);
+              txn_shared->pinned_id = S2C(session)->txn_global.oldest_id;
+              CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+              check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
+                "Transaction has the oldest pinned transaction ID");
 
-        // Set transaction's ID to be equal to the oldest transaction ID.
-        txn_shared->id = S2C(session)->txn_global.oldest_id;
-        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
-        check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
-          "Transaction has the oldest pinned transaction ID");
+              // Reset error.
+              __wt_session_reset_last_error(session_impl);
+
+              // Set transaction's ID to be equal to the oldest transaction ID.
+              txn_shared->id = S2C(session)->txn_global.oldest_id;
+              CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+              check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
+                "Transaction has the oldest pinned transaction ID");
+          });
 
         // Reset updates to the initial value.
         session_impl->txn->mod_count = 0;
+    }
+
+    SECTION("Test WT_TXN_TOO_LARGE_FOR_CACHE in __wt_txn_is_blocking - dirty content footprint")
+    {
+        WT_TXN *txn = session_impl->txn;
+
+        // Pick a threshold of 100 bytes: the lower of the two triggers is 10% of the cache size.
+        conn_impl->cache_size = 1000;
+        conn_impl->evict->eviction_dirty_trigger = 20;
+        conn_impl->evict->eviction_updates_trigger = 10;
+
+        // The check requires a modification, otherwise a reader could be rolled back.
+        txn->mod_count = 1;
+
+        // A footprint at or below the threshold is not grounds for rollback.
+        txn->update_dirty_bytes = 60;
+        txn->truncate_dirty_bytes = 40;
+        CHECK(__wt_txn_is_blocking(session_impl) == 0);
+        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
+
+        // Neither half exceeds the threshold alone, but together they do. The updates half is the
+        // larger one, so the rollback is reported as a transaction that wrote too much.
+        txn->update_dirty_bytes = 60;
+        txn->truncate_dirty_bytes = 41;
+        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+        check_error_info(err_info, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+          "Transaction dirty content alone exceeds the eviction updates or dirty trigger");
+
+        __wt_session_reset_last_error(session_impl);
+
+        // Same condition and sub-error code, but now the truncate half dominates, so the rollback
+        // is attributed to the truncate instead.
+        txn->update_dirty_bytes = 41;
+        txn->truncate_dirty_bytes = 60;
+        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+        check_error_info(err_info, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+          "Truncate pinned too much dirty cache in the transaction");
+
+        __wt_session_reset_last_error(session_impl);
+
+        // A truncate footprint on its own is enough to trip the bound.
+        txn->update_dirty_bytes = 0;
+        txn->truncate_dirty_bytes = 101;
+        CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);
+        check_error_info(err_info, WT_ROLLBACK, WT_TXN_TOO_LARGE_FOR_CACHE,
+          "Truncate pinned too much dirty cache in the transaction");
+
+        __wt_session_reset_last_error(session_impl);
+
+        // A zero trigger is treated as a value we raced with, not a threshold to enforce.
+        conn_impl->evict->eviction_updates_trigger = 0;
+        CHECK(__wt_txn_is_blocking(session_impl) == 0);
+        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
+
+        // Reset to the initial values.
+        txn->update_dirty_bytes = txn->truncate_dirty_bytes = 0;
+        txn->mod_count = 0;
     }
 
     SECTION(

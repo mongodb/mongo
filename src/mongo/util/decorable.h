@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This header describes a mechanism for making "decorable" types.
@@ -79,7 +53,7 @@
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 namespace decorable_detail {
 
@@ -246,19 +220,19 @@ public:
      * Decoration `t` can also be given as a pointer, in which case a pointer to
      * its owner is returned.
      */
-    MONGO_MOD_PUBLIC const DecoratedType& owner(const DecorationType& t) const {
+    [[MONGO_MOD_PUBLIC]] const DecoratedType& owner(const DecorationType& t) const {
         // The decoration block starts with a backlink to the decorable.
         const void* p = &t;
         const void* block = static_cast<const char*>(p) - _offset;
         return *DecoratedType::downcastBackLink(*reinterpret_cast<const void* const*>(block));
     }
-    MONGO_MOD_PUBLIC DecoratedType& owner(DecorationType& t) const {
+    [[MONGO_MOD_PUBLIC]] DecoratedType& owner(DecorationType& t) const {
         return const_cast<DecoratedType&>(owner(std::as_const(t)));
     }
-    MONGO_MOD_PUBLIC const DecoratedType* owner(const DecorationType* t) const {
+    [[MONGO_MOD_PUBLIC]] const DecoratedType* owner(const DecorationType* t) const {
         return &owner(*t);
     }
-    MONGO_MOD_PUBLIC DecoratedType* owner(DecorationType* t) const {
+    [[MONGO_MOD_PUBLIC]] DecoratedType* owner(DecorationType* t) const {
         return &owner(*t);
     }
 
@@ -266,16 +240,16 @@ public:
      * Syntactic sugar, equivalent to decoration(d). As a convenience, overloads
      * are provided so that a pointer `&d` can be given instead.
      */
-    MONGO_MOD_PUBLIC const DecorationType& operator()(const DecoratedType& d) const {
+    [[MONGO_MOD_PUBLIC]] const DecorationType& operator()(const DecoratedType& d) const {
         return decoration(d);
     }
-    MONGO_MOD_PUBLIC DecorationType& operator()(DecoratedType& d) const {
+    [[MONGO_MOD_PUBLIC]] DecorationType& operator()(DecoratedType& d) const {
         return decoration(d);
     }
-    MONGO_MOD_PUBLIC const DecorationType& operator()(const DecoratedType* d) const {
+    [[MONGO_MOD_PUBLIC]] const DecorationType& operator()(const DecoratedType* d) const {
         return decoration(*d);
     }
-    MONGO_MOD_PUBLIC DecorationType& operator()(DecoratedType* d) const {
+    [[MONGO_MOD_PUBLIC]] DecorationType& operator()(DecoratedType* d) const {
         return decoration(*d);
     }
 
@@ -419,7 +393,7 @@ private:
 }  // namespace decorable_detail
 
 template <typename D>
-class MONGO_MOD_OPEN Decorable {
+class [[MONGO_MOD_OPEN]] Decorable {
 public:
     using DerivedType = D;  // CRTP
 
@@ -494,4 +468,4 @@ private:
     decorable_detail::DecorationBuffer<DerivedType> _decorations;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

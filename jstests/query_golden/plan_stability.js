@@ -13,6 +13,8 @@
  * @tags: [
  * incompatible_aubsan,
  * tsan_incompatible,
+ * # The Join Opt variant requires sequential scans, unlike this test.
+ * incompatible_with_join_optimization
  * ]
  *
  */

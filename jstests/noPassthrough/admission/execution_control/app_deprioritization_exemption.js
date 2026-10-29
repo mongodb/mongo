@@ -353,6 +353,7 @@ describe("Execution control deprioritization exemptions", function () {
             const newNode = replTest.add();
             replTest.reInitiate();
             replTest.awaitSecondaryNodes();
+            replTest.waitForAllNewlyAddedRemovals();
 
             assert.eq(newNode.getDB(jsTestName()).coll.countDocuments({}), kNumDocs);
             const afterLowPriority = getLowPriorityReadCount(primary);
@@ -375,6 +376,7 @@ describe("Execution control deprioritization exemptions", function () {
             const newNode = replTest.add();
             replTest.reInitiate();
             replTest.awaitSecondaryNodes();
+            replTest.waitForAllNewlyAddedRemovals();
 
             assert.eq(newNode.getDB(jsTestName()).coll.countDocuments({}), 2 * kNumDocs);
             const afterLowPriority = getLowPriorityReadCount(primary);

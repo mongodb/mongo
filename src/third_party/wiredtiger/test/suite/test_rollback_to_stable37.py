@@ -111,8 +111,4 @@ class test_rollback_to_stable37(test_rollback_to_stable_base):
         else:
             self.check(value_c, uri, nrows, 3000)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        stat_cursor.close()
-
-        self.assertEqual(keys_removed, 0)
+        self.assertEqual(self.get_stat(stat.conn.txn_rts_keys_removed), 0)

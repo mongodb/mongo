@@ -340,7 +340,7 @@ __wti_rts_btree_walk_btree_apply(
 
     WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
     __wt_config_subinit(session, &ckptconf, &cval);
-    for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
+    for (; (ret = __wt_config_next(&ckptconf, &key, &cval)) == 0;) {
         ret = __wt_config_subgets(session, &cval, "newest_start_durable_ts", &value);
         if (ret == 0)
             newest_start_durable_ts = WT_MAX(newest_start_durable_ts, (wt_timestamp_t)value.val);
@@ -378,6 +378,8 @@ __wti_rts_btree_walk_btree_apply(
               __wt_timestamp_to_string(newest_stop_durable_ts, ts_string[1]), rollback_txnid,
               write_gen);
     }
+    WT_RET_NOTFOUND_OK(ret);
+
     max_durable_ts = WT_MAX(newest_start_durable_ts, newest_stop_durable_ts);
 
     /*

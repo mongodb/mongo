@@ -12,7 +12,9 @@ generate-tasks: generates Evergreen task configurations to execute burn-in tests
 Usage:
     # First, generate resmoke configs:
     bazel build //... --build_tag_filters=resmoke_config
-    bazel cquery "kind(resmoke_config, //...)" --output=starlark --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()])" > resmoke_suite_configs.yml
+    bazel cquery --build_tag_filters=resmoke_config "kind(resmoke_config, //...)" \
+        --output=starlark \
+        --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()]) if target.files.to_list() else ''" > resmoke_suite_configs.yml
 
     # Generate burn-in test targets in BUILD.bazel files:
     python buildscripts/bazel_burn_in.py generate-targets <origin_rev>
@@ -46,7 +48,11 @@ from buildscripts.burn_in_tests import (
     MockFileChangeDetector,
 )
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
-from buildscripts.generate_result_tasks import make_results_task, make_task_group
+from buildscripts.generate_result_tasks import (
+    make_results_task,
+    make_task_group,
+    variant_cquery_flags,
+)
 from buildscripts.util import buildozer_utils as buildozer
 from buildscripts.util.read_config import read_config_file
 
@@ -284,7 +290,7 @@ def query_targets_to_burn_in(
         for test in tests_changed:
             if test in exclusions["selector"].get(test_kind, {}).get("exclude_tests", []):
                 continue
-            if not _test_matches_roots(test, config["selector"].get("roots", [])):
+            if not _test_matches_roots(test, (config.get("selector") or {}).get("roots") or []):
                 continue
 
             burn_in_target = (
@@ -321,6 +327,76 @@ def get_targets_with_tag(tag: str) -> list[str]:
         raise
 
 
+def get_targets_matching_tag_filter(tag_filter: str) -> set[str]:
+    """Resolve a comma-separated resmoke tag filter to the set of matching targets.
+
+    Entries prefixed with '-' are negations: targets carrying that tag are excluded from
+    the union of the targets matched by the positive entries.
+    """
+    included = set()
+    excluded = set()
+    for entry in tag_filter.split(","):
+        tag = entry.strip()
+        if not tag:
+            continue
+        if tag.startswith("-"):
+            excluded.update(get_targets_with_tag(tag.removeprefix("-")))
+        else:
+            included.update(get_targets_with_tag(tag))
+    return included - excluded
+
+
+@cache
+def get_platform_compatible_targets(
+    variant_name: str, cquery_flags: tuple[str, ...], targets: tuple[str, ...]
+) -> set[str]:
+    """Filter targets to those compatible with the variant's target platform."""
+    if not targets:
+        return set()
+
+    candidate_set = "set(" + " ".join(sorted(set(targets))) + ")"
+    try:
+        result = subprocess.run(
+            ["bazel", "cquery", "--config=no-remote-exec"]
+            + list(cquery_flags)
+            + [
+                candidate_set,
+                "--output=starlark",
+                "--starlark:expr",
+                "str(target.label) + ("
+                '" INCOMPATIBLE" if "IncompatiblePlatformProvider" in providers(target)'
+                ' else " OK")',
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to cquery targets for platform compatibility on {variant_name}: {e}")
+        print(f"stdout: {e.stdout}")
+        print(f"stderr: {e.stderr}")
+        raise
+
+    compatible = set()
+    for line in result.stdout.splitlines():
+        label, _, verdict = line.strip().rpartition(" ")
+        if verdict == "OK":
+            compatible.add(label.removeprefix("@@").removeprefix("@"))
+    return compatible
+
+
+def filter_burn_in_targets(
+    targets: set[BurnInTargetInfo], targets_with_tag: set[str], compatible_originals: set[str]
+) -> list[str]:
+    """Return the burn-in targets to run for a variant."""
+    return [
+        target.burn_in_target
+        for target in targets
+        if target.original_target in targets_with_tag
+        and target.original_target in compatible_originals
+    ]
+
+
 def make_task(targets_to_run, variant_name):
     task = Task(
         name=f"resmoke_tests_burn_in_{variant_name}",
@@ -348,7 +424,7 @@ def make_task(targets_to_run, variant_name):
             FunctionCall("set up venv"),
             FunctionCall("configure evergreen api credentials"),
             FunctionCall("set up credentials"),
-            FunctionCall("get engflow creds"),
+            FunctionCall("setup bazel (credentials, bazelrc)"),
         ],
         teardown_task=[
             FunctionCall("s3.put bazel build events"),
@@ -401,7 +477,9 @@ def generate_tasks(
 
     targets = query_targets_to_burn_in(origin_rev, test_changed_files)
 
-    evg_conf = parse_evergreen_file("etc/evergreen.yml")
+    evg_conf = parse_evergreen_file(
+        expansions.get("evergreen_config_file_path", "etc/evergreen.yml")
+    )
 
     project = {"tasks": [], "task_groups": [], "buildvariants": []}
 
@@ -417,16 +495,23 @@ def generate_tasks(
             continue
         task = variant.get_task("resmoke_tests")
         if task:
-            tags = variant.expansion("resmoke_tests_tag_filter").split(",")
-            targets_with_tag = []
-            for tag in tags:
-                targets_with_tag += get_targets_with_tag(tag)
+            targets_with_tag = get_targets_matching_tag_filter(
+                variant.expansion("resmoke_tests_tag_filter")
+            )
 
-            burn_in_targets_to_run = [
-                target.burn_in_target
+            _, cquery_flags, _ = variant_cquery_flags(variant, task, expansions)
+            candidate_originals = tuple(
+                target.original_target
                 for target in targets
                 if target.original_target in targets_with_tag
-            ]
+            )
+            compatible_originals = get_platform_compatible_targets(
+                variant_name, tuple(cquery_flags), candidate_originals
+            )
+
+            burn_in_targets_to_run = filter_burn_in_targets(
+                targets, targets_with_tag, compatible_originals
+            )
             if burn_in_targets_to_run:
                 targets_all.update(burn_in_targets_to_run)
 

@@ -16,7 +16,7 @@ executor:
       nodb: ""
 matrix_suite: true
 selector:
-  exclude_files: null
+  exclude_files: []
   roots:
     - jstests/replsets/*.js
     - jstests/replsets/**/*.js

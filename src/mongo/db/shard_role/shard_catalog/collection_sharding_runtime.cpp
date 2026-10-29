@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 
@@ -43,6 +17,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -211,7 +186,7 @@ CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const Names
 }
 
 void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
-    OperationContext* opCtx, const ChunkVersion& shardVersion, const UUID& collectionUUID) {
+    const ChunkVersion& shardVersion, const UUID& collectionUUID) {
     if (shardVersion == ChunkVersion::IGNORED()) {
         return;
     }
@@ -229,7 +204,7 @@ void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
                 "shardVersion"_attr = shardVersion);
             return;
         }
-        _metadataManager->invalidateRangePreserversOlderThanShardVersion(opCtx, shardVersion);
+        _metadataManager->invalidateRangePreserversOlderThanShardVersion(shardVersion);
     }
 }
 
@@ -250,7 +225,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
         _getMetadataWithVersionCheckAt(opCtx,
                                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                        optReceivedShardVersion,
-                                       true /* preserveRange */,
+                                       /*preserveRange=*/true,
                                        supportNonVersionedOperations);
 
     return {std::move(metadata)};
@@ -263,7 +238,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     return _getMetadataWithVersionCheckAt(opCtx,
                                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                           receivedShardVersion,
-                                          true /* preserveRange */);
+                                          /*preserveRange=*/true);
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
@@ -285,14 +260,14 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 
     auto& oss = OperationShardingState::get(opCtx);
 
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, false /* preserveRange */);
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, /*preserveRange=*/false);
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
                         receivedShardVersion ? *receivedShardVersion
                                              : ShardVersionPlacementIgnored(),
-                        boost::none /* wantedVersion */,
-                        ShardingState::get(_serviceContext)->asShardRef(opCtx)),
+                        /*wanted=*/boost::none,
+                        ShardingState::get(_serviceContext)->shardId()),
         str::stream() << "sharding status of collection " << _nss.toStringForErrorMsg()
                       << " is not currently available for description and needs to be recovered "
                       << "from the config server",
@@ -302,7 +277,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 }
 
 boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() const {
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, false /* preserveRange */);
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, /*preserveRange=*/false);
     if (!optMetadata)
         return boost::none;
     return optMetadata->get();
@@ -318,7 +293,7 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 void CollectionShardingRuntime::checkShardVersionOrThrow(
     OperationContext* opCtx, const ShardVersion& receivedShardVersion) const {
     (void)_getMetadataWithVersionCheckAt(
-        opCtx, boost::none, receivedShardVersion, false /* preserveRange */);
+        opCtx, boost::none, receivedShardVersion, /*preserveRange=*/false);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
@@ -328,7 +303,7 @@ void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContex
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
     if (_placementVersionInRecoverOrRefresh) {
-        _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
+        _placementVersionInRecoverOrRefresh->recovererTrackerAcquisition.cancel();
     }
 }
 
@@ -423,13 +398,24 @@ void CollectionShardingRuntime::setCollectionMetadata(OperationContext* opCtx,
         auto result = waitingVersion <=> newChunkVersion;
         return result == std::partial_ordering::less;
     });
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerCollectionMetadataCacheSet();
 }
 
 void CollectionShardingRuntime::clearCollectionMetadata(OperationContext* opCtx,
                                                         bool collIsDropped) {
     if (_placementVersionInRecoverOrRefresh) {
-        _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
+        _placementVersionInRecoverOrRefresh->recovererTrackerAcquisition.cancel();
     }
+
+    // Drop any in-flight synchronizer immediately so op observers stop enqueueing into a recovery
+    // round that has already been canceled.
+    _metadataSynchronizer.reset();
+
+    // Metadata is gone; clear needsDbPrimaryClassification so a later recover does not wait on
+    // the database primary critical section based on stale empty-catalog state.
+    _needsDbPrimaryClassification = false;
 
     _shardVersionWaiters.cancelWaiters(Status{ErrorCodes::CallbackCanceled,
                                               "Filtering metadata got cleared, cancelling callback "
@@ -454,27 +440,51 @@ void CollectionShardingRuntime::clearCollectionMetadata(OperationContext* opCtx,
     }
 
     _metadataType = MetadataType::kUnknown;
+
+    ShardingStatistics::get(opCtx)
+        .collectionShardingMetadataStatistics.registerCollectionMetadataCacheClear();
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& collectionUuid,
                                                ChunkRange orphanRange,
-                                               Date_t deadline) {
+                                               Date_t deadline,
+                                               bool refreshMetadataIfUnknown) {
     while (true) {
         const auto rangeDeleterService = RangeDeleterService::get(opCtx);
         rangeDeleterService->getServiceUpFuture().get(opCtx);
 
-        SharedSemiFuture<void> orphanCleanupFuture = [&]() {
+        auto getOrphanCleanupFuture = [&]() -> SharedSemiFuture<void> {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             const auto self =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 
+            // On the authoritative path the filtering metadata may have been transiently cleared on
+            // this node by a concurrent metadata commit (for example movePrimary registering the
+            // collection on the new DB primary) while we wait. That is not a reset of the
+            // collection itself: signal the shard-role loop to recover the metadata from the
+            // durable catalog and retry, rather than treating it as a conflict. A StaleConfig with
+            // no wanted version is how "this shard doesn't know its version" is reported. Whether
+            // the migration is authoritative is decided by the donor and passed in by the caller;
+            // this node does not consult the feature flag itself.
+            if (refreshMetadataIfUnknown && self->_metadataType == MetadataType::kUnknown) {
+                uasserted(StaleConfigInfo(nss,
+                                          ShardVersionPlacementIgnored(),
+                                          /*wanted=*/boost::none,
+                                          ShardingState::get(opCtx)->shardId()),
+                          str::stream() << "Filtering metadata for " << nss.toStringForErrorMsg()
+                                        << " is not known; recovering before waiting for orphan "
+                                           "cleanup");
+            }
+
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
-            if (self->_metadataType != MetadataType::kTracked ||
-                !self->_metadataManager->getCollectionUuid().has_value() ||
-                collectionUuid != self->_metadataManager->getCollectionUuid().get()) {
+            const bool metadataIsOk = self->_metadataType == MetadataType::kUnowned ||
+                (self->_metadataType == MetadataType::kTracked &&
+                 self->_metadataManager->getCollectionUuid().has_value() &&
+                 collectionUuid == self->_metadataManager->getCollectionUuid().get());
+            if (!metadataIsOk) {
                 return SemiFuture<void>::makeReady(
                            Status(ErrorCodes::ConflictingOperationInProgress,
                                   "Collection being migrated was dropped and created or otherwise "
@@ -482,9 +492,25 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                     .share();
             }
 
-            return rangeDeleterService->getOverlappingRangeDeletionsFuture(
-                self->_metadataManager->getCollectionUuid().get(), orphanRange);
-        }();
+            return rangeDeleterService->getOverlappingRangeDeletionsFuture(collectionUuid,
+                                                                           orphanRange);
+        };
+
+        SharedSemiFuture<void> orphanCleanupFuture;
+        if (refreshMetadataIfUnknown) {
+            try {
+                orphanCleanupFuture =
+                    shard_role_loop::withStaleShardRetry(opCtx, getOrphanCleanupFuture);
+            } catch (const ExceptionFor<ErrorCodes::StaleConfig>&) {
+                // The shard-role loop exhausted its metadata recovery attempts without establishing
+                // known metadata for the collection. Surface the historical "metadata reset" error.
+                return {ErrorCodes::ConflictingOperationInProgress,
+                        "Collection being migrated was dropped and created or otherwise had its "
+                        "metadata reset"};
+            }
+        } else {
+            orphanCleanupFuture = getOrphanCleanupFuture();
+        }
 
         if (orphanCleanupFuture.isReady()) {
             LOGV2_OPTIONS(21918,
@@ -569,8 +595,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     alwaysThrowStaleConfigInfo.execute([&](const auto&) {
         uasserted(StaleConfigInfo(_nss,
                                   receivedShardVersion,
-                                  boost::none /* wantedVersion */,
-                                  ShardingState::get(opCtx)->asShardRef(opCtx)),
+                                  /*wanted=*/boost::none,
+                                  ShardingState::get(opCtx)->shardId()),
                   "Failing with StaleConfig as alwaysThrowStaleConfigInfo is enabled");
     });
 
@@ -587,8 +613,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
         uassert(StaleConfigInfo(_nss,
                                 receivedShardVersion,
-                                boost::none /* wantedVersion */,
-                                ShardingState::get(opCtx)->asShardRef(opCtx),
+                                /*wanted=*/boost::none,
+                                ShardingState::get(opCtx)->shardId(),
                                 std::move(criticalSectionSignal),
                                 shard_role_details::getLocker(opCtx)->isWriteLocked()
                                     ? StaleConfigInfo::OperationType::kWrite
@@ -601,8 +627,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime, preserveRange);
     uassert(StaleConfigInfo(_nss,
                             receivedShardVersion,
-                            boost::none /* wantedVersion */,
-                            ShardingState::get(opCtx)->asShardRef(opCtx)),
+                            /*wanted=*/boost::none,
+                            ShardingState::get(opCtx)->shardId()),
             str::stream() << "sharding status of collection " << _nss.toStringForErrorMsg()
                           << " is not currently known and needs to be recovered",
             optCurrentMetadata);
@@ -658,10 +684,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         return optCurrentMetadata;
     }
 
-    StaleConfigInfo sci(_nss,
-                        receivedShardVersion,
-                        wantedShardVersion,
-                        ShardingState::get(opCtx)->asShardRef(opCtx));
+    StaleConfigInfo sci(
+        _nss, receivedShardVersion, wantedShardVersion, ShardingState::get(opCtx)->shardId());
 
     uassert(std::move(sci),
             str::stream() << "timestamp mismatch detected for " << _nss.toStringForErrorMsg(),
@@ -709,9 +733,11 @@ void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) cons
 }
 
 void CollectionShardingRuntime::setPlacementVersionRecoverRefreshFuture(
-    SharedSemiFuture<void> future, CancellationSource cancellationSource) {
+    SharedSemiFuture<void> future,
+    ShardCatalogRecovererTracker::Acquisition recovererTrackerAcquisition) {
     invariant(!_placementVersionInRecoverOrRefresh);
-    _placementVersionInRecoverOrRefresh.emplace(std::move(future), std::move(cancellationSource));
+    _placementVersionInRecoverOrRefresh.emplace(std::move(future),
+                                                std::move(recovererTrackerAcquisition));
 }
 
 boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getMetadataRefreshFuture()
@@ -724,17 +750,18 @@ boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getMetadataRe
 void CollectionShardingRuntime::resetPlacementVersionRecoverRefreshFuture() {
     invariant(_placementVersionInRecoverOrRefresh);
     _placementVersionInRecoverOrRefresh = boost::none;
+    _metadataSynchronizer.reset();
 }
 
-void CollectionShardingRuntime::setCollectionRecoverer(
-    std::shared_ptr<CollectionCacheRecoverer> recoverer) {
-    invariant(!(_collectionRecoverer && recoverer));
-    _collectionRecoverer = std::move(recoverer);
+void CollectionShardingRuntime::setMetadataSynchronizer(
+    std::shared_ptr<CollectionMetadataSynchronizer> synchronizer) {
+    invariant(!(_metadataSynchronizer && synchronizer));
+    _metadataSynchronizer = std::move(synchronizer);
 }
 
-std::shared_ptr<CollectionCacheRecoverer> CollectionShardingRuntime::getCollectionCacheRecoverer()
+std::shared_ptr<CollectionMetadataSynchronizer> CollectionShardingRuntime::getMetadataSynchronizer()
     const {
-    return _collectionRecoverer;
+    return _metadataSynchronizer;
 }
 
 SharedSemiFuture<void> CollectionShardingRuntime::registerWaiterForChunkVersion(
@@ -770,19 +797,6 @@ SharedSemiFuture<void> CollectionShardingRuntime::registerWaiterForChunkVersion(
         return whenAllSucceed(std::move(execFut), std::move(execVersionFut)).share();
     }
     return versionFut;
-}
-
-CollectionShardingRuntime::AuthoritativeState CollectionShardingRuntime::getAuthoritativeState()
-    const {
-    return _authoritativeState;
-}
-
-void CollectionShardingRuntime::setNonAuthoritative() {
-    _authoritativeState = AuthoritativeState::kNonAuthoritative;
-}
-
-void CollectionShardingRuntime::setAuthoritative() {
-    _authoritativeState = AuthoritativeState::kAuthoritative;
 }
 
 bool CollectionShardingRuntime::allowChunkOperations() const {

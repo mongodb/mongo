@@ -1,41 +1,12 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 // IWYU pragma: no_include "bits/types/__sigset_t.h"
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 // IWYU pragma: no_include "bits/types/stack_t.h"
-#include <fmt/format.h>
-#include <fmt/printf.h>  // IWYU pragma: keep
-#include <fmt/ranges.h>  // IWYU pragma: keep
-// IWYU pragma: no_include "syscall.h"
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/util/stacktrace.h"
+
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/json.h"
@@ -48,7 +19,6 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_test_helpers.h"
 
 #include <algorithm>
@@ -70,9 +40,14 @@
 #include <thread>
 #include <vector>
 
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
+#include <fmt/ranges.h>  // IWYU pragma: keep
+
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+#include <sys/syscall.h>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -167,6 +142,129 @@ bool consume(const pcre::Regex& re, std::string_view* in, std::string* out) {
     *in = in->substr(m[0].size());
     *out = std::string{m[1]};
     return true;
+}
+
+// Log IDs used by StackTrace::sink and StackTrace::log.
+constexpr int errorCollectingStackTraceId = 31430;
+constexpr int stacktraceLogId = 31380;
+
+// Asserts exactly one log line with log id `id` was captured, and returns its index.
+size_t singleLogIndex(const unittest::LogCaptureGuard& logs, int id) {
+    auto indices = logs.indicesOfBSONContainingSubset(BSON("id" << id));
+    ASSERT_EQ(indices.size(), 1u);
+    return indices[0];
+}
+
+// Returns the number of non-overlapping occurrences of `needle` in `haystack`.
+size_t countOccurrences(std::string_view haystack, std::string_view needle) {
+    size_t count = 0;
+    for (auto pos = haystack.find(needle); pos != std::string_view::npos;
+         pos = haystack.find(needle, pos + needle.size())) {
+        ++count;
+    }
+    return count;
+}
+
+TEST(StackTrace, Log) {
+    std::string testData = "foobarbaz";
+    StackTrace trace(BSON("data" << testData));
+
+    unittest::LogCaptureGuard logs;
+    trace.log();
+
+    // The stacktrace (and no error) go into the logs.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << errorCollectingStackTraceId)), 0)
+        << "log() logged the error for a trace without an error";
+    singleLogIndex(logs, stacktraceLogId);
+}
+
+TEST(StackTrace, LogWithError) {
+    std::string testData = "foobarbaz";
+    std::string errorString = "errorbazbarfoo";
+    StackTrace trace(BSON("data" << testData), errorString);
+
+    unittest::LogCaptureGuard logs;
+    trace.log();
+
+    // The error and stacktrace are both logged, with the error going first.
+    auto errorIndex = singleLogIndex(logs, errorCollectingStackTraceId);
+    auto stacktraceIndex = singleLogIndex(logs, stacktraceLogId);
+    ASSERT_LT(errorIndex, stacktraceIndex)
+        << "log() logged the stacktrace and error in the wrong order";
+}
+
+TEST(StackTrace, Sink) {
+    std::string testData = "foobarbaz";
+    StackTrace trace(BSON("data" << testData));
+
+    std::string s;
+    StringStackTraceSink sink(s);
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(&sink);
+
+    // The stacktrace goes to the sink.
+    ASSERT_EQ(countOccurrences(s, testData), 1u)
+        << "sink() did not write the stacktrace to the sink exactly once";
+    // The stacktrace does not go to the log.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << stacktraceLogId)), 0)
+        << "sink() logged the stacktrace to logv2";
+}
+
+TEST(StackTrace, SinkWithError) {
+    std::string testData = "foobarbaz";
+    std::string errorString = "errorbazbarfoo";
+    StackTrace trace(BSON("data" << testData), errorString);
+
+    std::string s;
+    StringStackTraceSink sink(s);
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(&sink);
+
+    // The stacktrace and error go to the sink.
+    ASSERT_EQ(countOccurrences(s, errorString), 1u)
+        << "sink() did not write the error to the sink exactly once";
+    ASSERT_EQ(countOccurrences(s, testData), 1u)
+        << "sink() did not write the stacktrace to the sink exactly once";
+
+    // The error is written before the stacktrace.
+    ASSERT_LT(s.find(errorString), s.find(testData))
+        << "sink() wrote the stacktrace and error in the wrong order";
+
+    // The messages do not go to the logs.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << stacktraceLogId)), 0)
+        << "sink() logged the stacktrace to logv2";
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << errorCollectingStackTraceId)), 0)
+        << "sink() logged the error to logv2";
+}
+
+TEST(StackTrace, NullSink) {
+    std::string testData = "foobarbaz";
+    StackTrace trace(BSON("data" << testData));
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(nullptr);
+
+    // Null sink, no error, stacktrace goes to the log.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << errorCollectingStackTraceId)), 0)
+        << "sink(nullptr) logged the error for a trace without an error";
+    singleLogIndex(logs, stacktraceLogId);
+}
+
+TEST(StackTrace, NullSinkWithError) {
+    std::string testData = "foobarbaz";
+    std::string errorString = "errorbazbarfoo";
+    StackTrace trace(BSON("data" << testData), errorString);
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(nullptr);
+
+    // Null sink, the error and stacktrace are both logged, error first.
+    auto errorIndex = singleLogIndex(logs, errorCollectingStackTraceId);
+    auto stacktraceIndex = singleLogIndex(logs, stacktraceLogId);
+    ASSERT_LT(errorIndex, stacktraceIndex)
+        << "sink(nullptr) logged the stacktrace and error in the wrong order";
 }
 
 // Break down a printStackTrace output for a contrived call tree and sanity-check it.
@@ -649,6 +747,7 @@ public:
         reapWorkers();
 
         std::set<int> seenTids;
+        std::set<int> missedTids;
 
         // Make some assertions about `dumped`.
         BSONObj jsonObj = fromjson(dumped);
@@ -659,8 +758,35 @@ public:
             ASSERT(obj.hasElement("backtrace"));
         }
 
-        for (auto&& w : workers)
-            ASSERT(seenTids.find(w.tid) != seenTids.end()) << "missing tid:" << w.tid;
+        // Collect missing thread ids. Check after we've checked for lost thread ids, since lost is
+        // worse than missing.
+        for (const auto& el : jsonObj.getObjectField("missedThreadIds")) {
+            missedTids.insert(el.Int());
+        }
+        // Confirm all the threads we spawned are accounted for in either seenTids or missedTids.
+        //
+        // Since non-test controlled threads may be running, we can only assert behavior for the
+        // worker threads spawned.
+        //
+        // TODO(SERVER-134299): It's rare but possible some worker threads have exited before we
+        // dump them during testing, leading to test flakiness.
+        std::set<int> lostTids;
+        std::set<int> missedWorkerTids;
+        for (auto&& w : workers) {
+            const int tid = w.tid;
+            if (missedTids.contains(tid)) {
+                missedWorkerTids.insert(tid);
+            } else if (!seenTids.contains(tid)) {
+                lostTids.insert(tid);
+            }
+        }
+        ASSERT_THAT(lostTids, ::testing::IsEmpty())
+            << "spawned threads unaccounted for. Recorded missedTids:" << LogVec(missedTids)
+            << ", Recorded seenTids:" << LogVec(seenTids);
+        ASSERT_THAT(missedWorkerTids, ::testing::IsEmpty()) << "spawned threads missing backtraces";
+        for (auto&& w : workers) {
+            ASSERT_TRUE(seenTids.contains(w.tid));
+        }
     }
 
     std::mutex mutex;

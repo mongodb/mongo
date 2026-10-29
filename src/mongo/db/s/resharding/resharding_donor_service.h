@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
@@ -72,40 +45,41 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUBLIC ReshardingDonorService : public repl::PrimaryOnlyService {
+class [[MONGO_MOD_PUBLIC]] ReshardingDonorService : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "ReshardingDonorService"_sd;
+    static constexpr std::string_view kServiceName = "ReshardingDonorService"sv;
 
     explicit ReshardingDonorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingDonorService() override = default;
 
-    class MONGO_MOD_PRIVATE DonorStateMachine;
+    class [[MONGO_MOD_PRIVATE]] DonorStateMachine;
 
-    class MONGO_MOD_PRIVATE DonorStateMachineExternalState;
+    class [[MONGO_MOD_PRIVATE]] DonorStateMachineExternalState;
 
-    MONGO_MOD_PRIVATE std::string_view getServiceName() const override {
+    [[MONGO_MOD_PRIVATE]] std::string_view getServiceName() const override {
         return kServiceName;
     }
 
-    MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override {
+    [[MONGO_MOD_PRIVATE]] NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kDonorReshardingOperationsNamespace;
     }
 
-    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
+    [[MONGO_MOD_PRIVATE]] ThreadPoolLimits getThreadPoolLimits() const override;
 
     // The service implemented its own conflict check before this method was added.
-    MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
+    [[MONGO_MOD_PRIVATE]] void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
         const std::vector<const Instance*>& existingInstances) override {}
 
-    MONGO_MOD_PRIVATE std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+    [[MONGO_MOD_PRIVATE]] std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override;
 
-    MONGO_MOD_PRIVATE void stepDown_forTest();
-    MONGO_MOD_PRIVATE void stepUp_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepDown_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepUp_forTest();
 
 private:
     ServiceContext* _serviceContext;
@@ -468,7 +442,8 @@ public:
     virtual void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                                 const NamespaceString& sourceNss) = 0;
 
-    virtual void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) = 0;
+    virtual void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx, const boost::optional<ForwardableOperationMetadata>& metadata) = 0;
 };
 
 }  // namespace mongo

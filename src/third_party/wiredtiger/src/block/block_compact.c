@@ -26,6 +26,14 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
           is_bg_compact ? "Background" : "Foreground", block->name, block->compact_session_id);
     }
 
+    /*
+     * Start the background compaction bookkeeping first: it is the only call here that can fail,
+     * and the block is left marked as compacting and in first-fit allocation if it does, making the
+     * file permanently unavailable for compaction.
+     */
+    if (session == S2C(session)->background_compact.session)
+        WT_RET(__wt_background_compact_start(session));
+
     /* Switch to first-fit allocation. */
     __wti_block_configure_first_fit(block, true);
 
@@ -43,9 +51,6 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     block->compact_prev_pages_rewritten = 0;
     block->compact_prev_size = 0;
     block->compact_session_id = session->id;
-
-    if (session == S2C(session)->background_compact.session)
-        WT_RET(__wt_background_compact_start(session));
 
     return (0);
 }
@@ -552,8 +557,6 @@ __compact_page_skip(
   WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset, uint32_t size, bool *skipp)
 {
     WT_DECL_RET;
-    WT_EXT *ext;
-    WT_EXTLIST *el;
     wt_off_t limit;
 
     *skipp = true; /* Return a default skip. */
@@ -563,19 +566,17 @@ __compact_page_skip(
      * list that appears before that percentage of the file, rewrite the block. Checking the
      * available list is necessary (otherwise writing the block would extend the file), but there's
      * an obvious race if the file is sufficiently busy.
+     *
+     * We only need to know whether such an extent exists, so query the by-size buckets rather than
+     * walking the by-offset list up to the limit on every reviewed page. That trades a walk of the
+     * extents in front of the limit for a walk of the buckets large enough to hold the block.
      */
     __wt_spin_lock(session, &block->live_lock);
     limit = block->size - ((block->size / 10) * block->compact_pct_tenths);
     if (offset > limit && !session->compact->dryrun) {
-        el = &block->live.avail;
-        WT_EXT_FOREACH (ext, el->off) {
-            if (ext->off >= limit)
-                break;
-            if (ext->size >= size) {
-                *skipp = false;
-                break;
-            }
-        }
+        if (__wti_block_avail_front_extent(
+              session, block, &block->live.avail, (wt_off_t)size, limit))
+            *skipp = false;
     }
     __wt_spin_unlock(session, &block->live_lock);
 

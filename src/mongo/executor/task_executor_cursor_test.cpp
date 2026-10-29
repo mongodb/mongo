@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/executor/task_executor_cursor.h"
@@ -112,7 +86,7 @@ public:
                                                 bool preFetchNextBatch = true) {
         // pinConnection is a required argument to construct the options, but will be overriden in
         // the base class to the correct value.
-        TaskExecutorCursorOptions options(/*pinConnection*/ false, batchSize, preFetchNextBatch);
+        TaskExecutorCursorOptions options(/*pinConnection=*/false, batchSize, preFetchNextBatch);
         return Base::makeTec(rcr, std::move(options));
     }
 
@@ -409,7 +383,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        auto tec = makeTec(rcr, /*batchSize*/ 3);
+        auto tec = makeTec(rcr, /*batchSize=*/3);
 
         scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
@@ -463,7 +437,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        auto tec = makeTec(rcr, /*batchSize*/ 3);
+        auto tec = makeTec(rcr, /*batchSize=*/3);
 
         // Schedule a cursor response with an empty "firstBatch". Use end < start so we don't
         // append any doc to "firstBatch".
@@ -501,7 +475,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        auto tec = makeTec(rcr, /*batchSize*/ 3);
+        auto tec = makeTec(rcr, /*batchSize=*/3);
 
         // Schedule a cursor response with a non-empty "firstBatch".
         ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
@@ -552,11 +526,11 @@ public:
 
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
-            auto tec = makeTec(rcr, /*batchSize*/ 2, /*preFetchNextBatch*/ false);
+            auto tec = makeTec(rcr, /*batchSize=*/2, /*preFetchNextBatch=*/false);
 
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 2, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 2, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
@@ -575,7 +549,7 @@ public:
             // response on the NetworkInterfaceMock.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto recievedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 3, 4, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 3, 4, 0, /*expectedPrefetch=*/false);
 
                 // Assert that the command processed for the above response matches with the
                 // lambda to augment the getMore command used during construction of the TEC
@@ -728,7 +702,7 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, LsidIsPassed) {
                              opCtx.get());
 
     std::unique_ptr<TaskExecutorCursor> tec;
-    tec = makeTec(rcr, /*batchSize*/ 1);
+    tec = makeTec(rcr, /*batchSize=*/1);
 
     // lsid in the first batch
     ASSERT_BSONOBJ_EQ(BSON("find" << "test"

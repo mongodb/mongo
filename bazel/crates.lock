@@ -1,5 +1,5 @@
 {
-  "checksum": "b01cc541b36e01fc3bdb689603bcc4967bc3f75d36e39e5f2ff96e7d45f306df",
+  "checksum": "9f58d9521be5db6e457e07ee78c32bdc685775f21fc31a92c6bf67ac15bdb54b",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -2525,12 +2525,18 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
+            "all-native-arch",
+            "arm64",
             "gimli",
             "host-arch",
             "pulley",
+            "riscv64",
+            "s390x",
             "std",
             "timing",
-            "unwind"
+            "unwind",
+            "x86"
           ],
           "selects": {}
         },
@@ -17149,13 +17155,14 @@
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime/44.0.1/download",
           "sha256": "372db8bbad8ec962038101f75ab2c3ffcd18797d7d3ae877a58ab9873cd0c4bd",
+          "patch_args": [
+            "-p1"
+          ],
           "patches": [
+            "@@//bazel/wasmtime:signals_sigaltstack_ss_disable.patch",
             "@@//bazel/wasmtime:val_bytes_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_lift_fast_path.patch",
             "@@//bazel/wasmtime:val_bytes_wave_fast_path.patch"
-          ],
-          "patch_args": [
-            "-p1"
           ]
         }
       },
@@ -17193,6 +17200,7 @@
         "crate_features": {
           "common": [
             "addr2line",
+            "all-arch",
             "anyhow",
             "async",
             "backtrace",
@@ -17547,9 +17555,15 @@
             "-p1"
           ],
           "patches": [
+            "@@//bazel/wasmtime:config_wasm_backtrace_h.patch",
+            "@@//bazel/wasmtime:config_wasm_backtrace_hh.patch",
+            "@@//bazel/wasmtime:config_wasm_backtrace_rs.patch",
             "@@//bazel/wasmtime:store_h.patch",
+            "@@//bazel/wasmtime:store_h_resource_limiter.patch",
             "@@//bazel/wasmtime:store_hh.patch",
+            "@@//bazel/wasmtime:store_hh_resource_limiter.patch",
             "@@//bazel/wasmtime:store_rs.patch",
+            "@@//bazel/wasmtime:store_rs_resource_limiter.patch",
             "@@//bazel/wasmtime:val_raw_u8_list_h.patch",
             "@@//bazel/wasmtime:val_raw_u8_list_rs.patch"
           ]
@@ -17714,6 +17728,7 @@
         "crate_features": {
           "common": [
             "addr2line",
+            "all-arch",
             "cache",
             "compile",
             "completion",
@@ -18647,6 +18662,7 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
             "component-model",
             "gc",
             "gc-drc",
@@ -19349,6 +19365,7 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
             "component-model",
             "gc",
             "gc-drc",
@@ -20196,11 +20213,11 @@
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime-wast/44.0.1/download",
           "sha256": "5db969fb0fbd4c3e4acfa73f768b2530b6cec43180902934599b1668480094c2",
-          "patches": [
-            "@@//bazel/wasmtime:val_bytes_wast_fast_path.patch"
-          ],
           "patch_args": [
             "-p1"
+          ],
+          "patches": [
+            "@@//bazel/wasmtime:val_bytes_wast_fast_path.patch"
           ]
         }
       },
@@ -21191,11 +21208,14 @@
         ],
         "crate_features": {
           "common": [
+            "all-arch",
+            "arm64",
             "gc",
             "gc-drc",
             "gc-null",
             "stack-switching",
-            "threads"
+            "threads",
+            "x64"
           ],
           "selects": {}
         },

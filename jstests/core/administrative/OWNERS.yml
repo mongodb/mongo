@@ -14,7 +14,7 @@ filters:
       - 10gen/server-hello
   - "getlog*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "block_replica_set_writes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

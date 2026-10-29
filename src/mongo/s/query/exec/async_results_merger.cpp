@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/query/exec/async_results_merger.h"
 
@@ -34,8 +8,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
@@ -45,18 +21,25 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string_view>
+#include <utility>
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
@@ -64,6 +47,75 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+// Test-only. When enabled, holds ('parks') a scheduled ARM getMore retry callback at the start of
+// its execution: after the owning 'AsyncResultsMerger' has been re-locked via its weak_ptr but
+// before it inspects '_opCtx' or defers. This deterministically widens the window in which the
+// callback can observe (and re-target its request at) an 'OperationContext' belonging to a *later*
+// getMore than the one that originally scheduled the retry.
+MONGO_FAIL_POINT_DEFINE(stallBeforeReDispatchingArmRetry);
+
+// Test-only and observation-only. Entered at the end of '_scheduleRetryCallback', after the backoff
+// timer (or 'sleepFor') has been armed with a fixed deadline. Tests enable this fail point and call
+// 'waitForTimesEntered()' to deterministically learn that the retry alarm has been registered, so
+// they can advance the mock clock *after* the deadline is fixed. This replaces fixed 'sleepmillis'
+// waits that could not prove the alarm was armed and were vulnerable to a deadline-shift race.
+MONGO_FAIL_POINT_DEFINE(armRetryScheduledForTesting);
+
+// Test-only. Overrides the batchSize field used for getMore requests that the AsyncResultsMerger
+// sends to shards. The batch size normally comes from the originating command's parameters, which
+// are not populated for change stream merge pipelines. This failpoint lets tests force a bounded
+// batch size (e.g. 1) on the to-shard requests. It is a no-op unless explicitly enabled and its
+// data contains a 'batchSize' field.
+MONGO_FAIL_POINT_DEFINE(overrideBatchSizeForShardGetMore);
+
+namespace {
+
+// How often 'StallableRetryCallback' re-checks 'stallBeforeReDispatchingArmRetry'.
+constexpr auto kArmRetryStallPollInterval = Milliseconds(10);
+
+/**
+ * Test-only wrapper which delays invoking 'task' for as long as the
+ * 'stallBeforeReDispatchingArmRetry' failpoint is enabled.
+ *
+ * This deliberately does *not* use 'FailPoint::pauseWhileSet()'. Sharding task executors are backed
+ * by a 'NetworkInterfaceThreadPool', which runs scheduled work inline on the network interface's
+ * (single) reactor thread. Blocking there would stall every egress operation on the process, so
+ * instead of holding the thread we repeatedly re-post ourselves to the executor until the failpoint
+ * is disabled. Note that this means 'timesEntered' grows once per poll rather than once per stalled
+ * callback; tests should only rely on it becoming non-zero.
+ */
+template <typename Task>
+struct StallableRetryCallback {
+    void operator()(Status status) const {
+        // 'sleeping' is set on the copy we hand to 'sleepFor()' below. If that sleep did not
+        // complete successfully - e.g. because the executor is shutting down, in which case
+        // 'sleepFor()' completes inline - stop polling. Otherwise we would recurse without bound.
+        const bool sleepFailed = sleeping && !status.isOK();
+
+        if (!sleepFailed && MONGO_unlikely(stallBeforeReDispatchingArmRetry.shouldFail())) {
+            auto reposted = *this;
+            reposted.sleeping = true;
+            executor->sleepFor(kArmRetryStallPollInterval, token).getAsync(std::move(reposted));
+            return;
+        }
+
+        task(std::move(status));
+    }
+
+    std::shared_ptr<executor::TaskExecutor> executor;
+    CancellationToken token;
+    Task task;
+    bool sleeping = false;
+};
+
+template <typename Task>
+StallableRetryCallback<Task> makeStallableRetryCallback(
+    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken token, Task task) {
+    return StallableRetryCallback<Task>{std::move(executor), std::move(token), std::move(task)};
+}
+
+}  // namespace
 
 const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern =
     BSON(AsyncResultsMerger::kSortKeyField << 1);
@@ -141,7 +193,8 @@ Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Resp
     return Status::OK();
 }
 
-Shard::OwnerRetryStrategy buildRetryStrategy(OperationContext* opCtx, const ShardId& shardId) {
+unique_function<Shard::OwnerRetryStrategy()> buildRetryStrategyFactory(OperationContext* opCtx,
+                                                                       const ShardId& shardId) {
     auto connType = std::invoke([&]() -> ConnectionString::ConnectionType {
         auto shState = ShardingState::get(opCtx);
         if (shState->enabled() && shState->shardId() == shardId) {
@@ -156,10 +209,12 @@ Shard::OwnerRetryStrategy buildRetryStrategy(OperationContext* opCtx, const Shar
         ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
         : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
 
-    return Shard::OwnerRetryStrategy(connType,
-                                     ShardSharedStateCache::get(opCtx).getShardState(shardId),
-                                     Shard::RetryPolicy::kStrictlyNotIdempotent,
-                                     isStartTransaction);
+    auto shardState = ShardSharedStateCache::get(opCtx).getShardState(shardId);
+
+    return [connType, shardState = std::move(shardState), isStartTransaction]() {
+        return Shard::OwnerRetryStrategy(
+            connType, shardState, Shard::RetryPolicy::kStrictlyNotIdempotent, isStartTransaction);
+    };
 }
 
 }  // namespace
@@ -184,7 +239,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         // later via a call to `setNextHighWaterMarkDeterminingStrategy()'.
         _nextHighWaterMarkDeterminingStrategy =
             NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-                _params.getCompareWholeSortKey(), false /* recognizeControlEvents */);
+                _params.getCompareWholeSortKey(), /*recognizeControlEvents=*/false);
     } else {
         // In all other modes than tailable, awaitData, we should never call the function to
         // determine the next high water mark. The following strategy object will ensure that.
@@ -320,7 +375,7 @@ void AsyncResultsMerger::detachFromOperationContext() {
     // Before we're done detaching we do a last attempt to process any additional responses
     // received. This ensures that the only possible state for ARM to have unprocessed responses is
     // when it's been stashed between cursor checkouts or after it's been marked as killed.
-    _processAdditionalTransactionParticipants(_opCtx);
+    _drainAndLatchAdditionalTransactionParticipants(_opCtx, lk);
 
     _subBaton.shutdown();
 
@@ -457,6 +512,8 @@ void AsyncResultsMerger::disableUndoNextReadyMode() {
     std::lock_guard<std::mutex> lk(_mutex);
     _undoModeEnabled = false;
     _stateForNextReadyCallUndo.reset();
+    _highWaterMarkBeforeUndo = BSONObj();
+    _clientHighWaterMarkBeforeUndo = BSONObj();
 }
 
 void AsyncResultsMerger::undoNextReady() {
@@ -485,6 +542,12 @@ void AsyncResultsMerger::undoNextReady() {
         // because the remote may have a different document in the merge queue already.
         _rebuildMergeQueueFromRemainingRemotes(lk);
     }
+
+    // Restore the high water marks to their state before the undone 'nextReady()' call.
+    _highWaterMark = std::move(_highWaterMarkBeforeUndo);
+    _clientHighWaterMark = std::move(_clientHighWaterMarkBeforeUndo);
+    _highWaterMarkBeforeUndo = BSONObj();
+    _clientHighWaterMarkBeforeUndo = BSONObj();
 
     _stateForNextReadyCallUndo.reset();
     _eofNext = false;
@@ -538,28 +601,57 @@ std::size_t AsyncResultsMerger::numberOfBufferedRemoteResponses_forTest() const 
     return _remoteResponses.size();
 }
 
-BSONObj AsyncResultsMerger::getHighWaterMark() {
-    std::lock_guard<std::mutex> lk(_mutex);
-
+void AsyncResultsMerger::_refreshHighWaterMark(WithLock lk) {
     // At this point, the high water mark may be the resume token of the last document we returned.
-    // If no further results are eligible for return, we advance to the minimum promised sort key.
-    // If the remote associated with the minimum promised sort key is not currently eligible to
-    // provide a high water mark, then we do not advance even if no further results are ready.
+    // If no further results are eligible for return, we advance to the minimum promised sort key,
+    // but only if doing so would not cause the high water mark to regress. A remote whose minimum
+    // promised sort key has not yet caught up to the current high water mark (e.g. a config-server
+    // cursor opened at the resume cluster time) must not be allowed to pull the high water mark
+    // backward.
     if (auto minPromisedSortKey = _getMinPromisedSortKey(lk); minPromisedSortKey && !_ready(lk)) {
         const auto& minRemote = minPromisedSortKey->second;
         if (minRemote->eligibleForHighWaterMark) {
-            // The following check is potentially very costly on large resume tokens, so we only
-            // execute it in debug mode.
-            dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
-                _highWaterMark, minPromisedSortKey->first, *_params.getSort()));
-            _highWaterMark = std::move(minPromisedSortKey->first);
-            LOGV2_DEBUG(12163603,
-                        5,
-                        "Updated high water mark from min remote's min promised sort key",
-                        "highWaterMark"_attr = _highWaterMark,
-                        "remote"_attr = minRemote->shardId);
+            BSONObj candidate = minPromisedSortKey->first;
+
+            // A shard promise at or before the most recent swallowed control event may be that
+            // control event's resume token. Control events are swallowed internally and are never
+            // returned to the client, so such a token is not resumable. Degrade it to a
+            // high-water-mark token at the same cluster time before adopting it into the high water
+            // mark.
+            if (_lastSwallowedControlEventClusterTime) {
+                const auto candidateClusterTime =
+                    ResumeToken::extractClusterTime(candidate.firstElement().Obj());
+                if (candidateClusterTime <= *_lastSwallowedControlEventClusterTime) {
+                    candidate =
+                        BSON("" << ResumeToken::makeHighWaterMarkToken(
+                                       candidateClusterTime, ResumeTokenData::kDefaultTokenVersion)
+                                       .toDocument()
+                                       .toBson());
+                }
+            }
+
+            if (_highWaterMark.isEmpty() ||
+                compareSortKeys(_highWaterMark, candidate, *_params.getSort()) < 0) {
+                _highWaterMark = std::move(candidate);
+                LOGV2_DEBUG(12163603,
+                            5,
+                            "Updated high water mark from min remote's min promised sort key",
+                            "highWaterMark"_attr = _highWaterMark,
+                            "remote"_attr = minRemote->shardId);
+
+                // Advance the client-visible high water mark from the promised sort key, unless
+                // advancement from promises is currently disabled (e.g. while reading a bounded
+                // change stream segment in ignore-removed-shards mode).
+                if (_advanceHighWaterMarkFromPromisedSortKeys) {
+                    _advanceClientHighWaterMark(lk);
+                }
+            }
         }
     }
+}
+
+BSONObj AsyncResultsMerger::_getHighWaterMark(WithLock lk) {
+    _refreshHighWaterMark(lk);
 
     // The high water mark is stored in sort-key format: {"": <high watermark>}. We only return
     // the <high watermark> part of the sort key, which looks like {_data: ..., _typeBits: ...}.
@@ -567,7 +659,66 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
             str::stream() << "Expected _highWaterMark to be either empty or of object type, got "
                           << _highWaterMark,
             _highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::object);
-    return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
+    if (_highWaterMark.isEmpty()) {
+        return BSONObj();
+    }
+
+    // Return the <high watermark> part of the sort key without deep-copying it. The sub-object view
+    // returned by 'Obj()' is unowned, so share the (immutable, ref-counted) buffer of
+    // '_highWaterMark' with it instead of calling 'getOwned()', which would malloc and memcpy on
+    // every call. This is called once per returned event on mongos.
+    BSONObj result = _highWaterMark.firstElement().Obj();
+    result.shareOwnershipWith(_highWaterMark);
+    return result;
+}
+
+void AsyncResultsMerger::_advanceClientHighWaterMark(WithLock) {
+    if (_highWaterMark.isEmpty()) {
+        return;
+    }
+    if (_clientHighWaterMark.isEmpty() ||
+        compareSortKeys(_highWaterMark, _clientHighWaterMark, *_params.getSort()) > 0) {
+        _clientHighWaterMark = _highWaterMark;
+    }
+}
+
+BSONObj AsyncResultsMerger::getHighWaterMark() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    return _getHighWaterMark(lk);
+}
+
+BSONObj AsyncResultsMerger::getHighWaterMarkForClient() {
+    std::lock_guard<std::mutex> lk(_mutex);
+
+    // Let the internal high water mark advance from the (sanitized) minimum promised sort key of
+    // the shards. Depending on whether promised-sort-key advancement is currently enabled, this may
+    // also advance the client high water mark. The client high water mark is monotonic and is never
+    // rolled back, so it is always safe to expose to clients, even if the internal high water mark
+    // moves backward (e.g. when degraded-mode overfetch is undone).
+    _refreshHighWaterMark(lk);
+
+    // If promised-sort-key advancement is enabled, make sure the client high water mark reflects
+    // the (sanitized) internal high water mark. This also lets it catch up after advancement is
+    // re-enabled following a bounded change stream segment.
+    if (_advanceHighWaterMarkFromPromisedSortKeys) {
+        _advanceClientHighWaterMark(lk);
+    }
+
+    tassert(13479500,
+            "Expected the client high water mark to be set when the internal high water mark is",
+            _highWaterMark.isEmpty() || !_clientHighWaterMark.isEmpty());
+
+    if (_clientHighWaterMark.isEmpty()) {
+        return BSONObj();
+    }
+
+    // Return the <high watermark> part of the sort key without deep-copying it, sharing the
+    // (immutable, ref-counted) buffer of '_clientHighWaterMark' with the unowned sub-object view
+    // returned by 'Obj()' instead of calling 'getOwned()'. This is called once per returned event
+    // on mongos.
+    BSONObj result = _clientHighWaterMark.firstElement().Obj();
+    result.shareOwnershipWith(_clientHighWaterMark);
+    return result;
 }
 
 void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {
@@ -576,8 +727,29 @@ void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {
     auto newHighWaterMark = BSON("" << highWaterMark);
     LOGV2_DEBUG(12163600, 5, "Setting high water mark", "highWaterMark"_attr = newHighWaterMark);
 
+    // This setter permits rollback of the internal high water mark when degraded-mode overfetch is
+    // undone, but it must never roll back below the most recent event that has actually been
+    // returned to the client. Doing so would allow the merge queue to re-deliver already-returned
+    // events. The client-visible high water mark itself is never rolled back.
     std::lock_guard<std::mutex> lk(_mutex);
     _highWaterMark = std::move(newHighWaterMark);
+
+    if (!_clientHighWaterMark.isEmpty() &&
+        compareSortKeys(_highWaterMark, _clientHighWaterMark, *_params.getSort()) < 0) {
+        _highWaterMark = _clientHighWaterMark;
+    }
+
+    _advanceClientHighWaterMark(lk);
+}
+
+void AsyncResultsMerger::disablePromisedSortKeyHighWaterMarkAdvancement() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _advanceHighWaterMarkFromPromisedSortKeys = false;
+}
+
+void AsyncResultsMerger::enablePromisedSortKeyHighWaterMarkAdvancement() {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _advanceHighWaterMarkFromPromisedSortKeys = true;
 }
 
 boost::optional<AsyncResultsMerger::MinSortKeyRemotePair>
@@ -602,7 +774,7 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
                                          shardId,
                                          tag,
                                          rc.getCursorResponse().getPartialResultsReturned(),
-                                         buildRetryStrategy(_opCtx, shardId));
+                                         buildRetryStrategyFactory(_opCtx, shardId));
 
     // We don't check the return value of _addBatchToBuffer here; if there was an error, it will be
     // stored in the remote and the first call to ready() will return true.
@@ -670,6 +842,7 @@ void AsyncResultsMerger::_determineInitialHighWaterMark() {
     for (auto&& [minSortKey, remote] : _promisedMinSortKeys) {
         if (remote->eligibleForHighWaterMark) {
             _highWaterMark = minSortKey;
+            _clientHighWaterMark = minSortKey;
             LOGV2_DEBUG(12163601,
                         5,
                         "Determined initial high water mark",
@@ -764,7 +937,9 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
 
     // We process additional transaction participants that have been put in the queue for
     // processing. This can happen at any time since receiving a response is asynchronous in nature.
-    _processAdditionalTransactionParticipants(_opCtx);
+    // The active-fetch path re-raises the first metadata failure so the command boundary implicitly
+    // aborts the transaction and the client learns it is dead.
+    uassertStatusOK(_processAdditionalTransactionParticipants(_opCtx, lk));
 
     if (!_status.isOK()) {
         return _status;
@@ -794,13 +969,66 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
     return std::get<ClusterQueryResult>(std::move(result));
 }
 
-void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationContext* opCtx) {
+Status AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationContext* opCtx,
+                                                                     WithLock) {
+    auto firstError = Status::OK();
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     while (!_remoteResponses.empty()) {
-        const auto& response = _remoteResponses.front();
-        processAdditionalTransactionParticipantFromResponse(opCtx, response, fcvSnapshot);
+        // Dequeue before processing so a response that raises during validation cannot be
+        // reprocessed by a later drain (a re-raise from a cleanup drain during exception unwind
+        // would terminate mongos). Continue after a failure so sibling responses still enroll
+        // their participants; the first error wins.
+        RemoteResponse response = std::move(_remoteResponses.front());
         _remoteResponses.pop();
+        try {
+            processAdditionalTransactionParticipantFromResponse(opCtx, response, fcvSnapshot);
+        } catch (const DBException& ex) {
+            if (firstError.isOK()) {
+                firstError = ex.toStatus();
+                LOGV2_DEBUG(13412900,
+                            2,
+                            "Failed to process additional transaction participant metadata",
+                            "error"_attr = redact(firstError));
+            }
+        }
     }
+    return firstError;
+}
+
+bool AsyncResultsMerger::_shouldProcessAdditionalParticipantsFor(OperationContext* opCtx,
+                                                                 WithLock) const {
+    return opCtx->inMultiDocumentTransaction() &&
+        opCtx->getLogicalSessionId() == _params.getSessionId().map([&](const auto& lsid) {
+            return makeLogicalSessionId(lsid, opCtx);
+        }) &&
+        opCtx->getTxnNumber() == _params.getTxnNumber();
+}
+
+void AsyncResultsMerger::_drainAndLatchAdditionalTransactionParticipants(OperationContext* opCtx,
+                                                                         WithLock lk) noexcept {
+    // Reachable from the implicitly-noexcept ~PinnedCursor: nothing may escape. The gate's
+    // makeLogicalSessionId can uassert; the drain itself reports failures as Status.
+    try {
+        if (!_shouldProcessAdditionalParticipantsFor(opCtx, lk)) {
+            return;
+        }
+        if (auto status = _processAdditionalTransactionParticipants(opCtx, lk); !status.isOK()) {
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter.recordDeferredAbort(status);
+            }
+        }
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(13412901,
+                    2,
+                    "Failed to drain transaction participant metadata during cursor cleanup",
+                    "error"_attr = redact(ex.toStatus()));
+    }
+}
+
+void AsyncResultsMerger::drainAdditionalTransactionParticipantsAfterKill(
+    OperationContext* opCtx) noexcept {
+    std::lock_guard<std::mutex> lk(_mutex);
+    _drainAndLatchAdditionalTransactionParticipants(opCtx, lk);
 }
 
 AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLock lk) {
@@ -841,9 +1069,23 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLoc
                            smallestRemote};
 
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
-    if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
-        smallestRemote->eligibleForHighWaterMark) {
-        _updateHighWaterMark(lk, *std::get<ClusterQueryResult>(result).getResult());
+    if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+        // Record swallowed control events regardless of whether the remote is eligible to
+        // contribute a high water mark. This keeps '_lastSwallowedControlEventClusterTime' in sync
+        // with every control event that is returned, so a promise that may refer to one of them can
+        // never be adopted as a client-visible resume token.
+        _recordSwallowedControlEvent(*std::get<ClusterQueryResult>(result).getResult());
+
+        if (smallestRemote->eligibleForHighWaterMark) {
+            // If the caller may undo this 'nextReady()' call, save the current high water marks so
+            // that 'undoNextReady()' can restore them. This prevents an undone overfetched event
+            // from advancing the client-visible high water mark.
+            if (_undoModeEnabled) {
+                _highWaterMarkBeforeUndo = _highWaterMark;
+                _clientHighWaterMarkBeforeUndo = _clientHighWaterMark;
+            }
+            _updateHighWaterMark(lk, *std::get<ClusterQueryResult>(result).getResult());
+        }
     }
 
     return result;
@@ -883,7 +1125,21 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadyUnsorted(WithL
     return NextReadyResult{};
 }
 
-void AsyncResultsMerger::_updateHighWaterMark(WithLock, const BSONObj& value) {
+void AsyncResultsMerger::_recordSwallowedControlEvent(const BSONObj& value) {
+    if (!value.hasField(Document::metaFieldChangeStreamControlEvent)) {
+        return;
+    }
+
+    const auto sortKey = extractSortKey(value, _params.getCompareWholeSortKey());
+    const auto controlEventClusterTime =
+        ResumeToken::extractClusterTime(sortKey.firstElement().Obj());
+    if (!_lastSwallowedControlEventClusterTime ||
+        controlEventClusterTime > *_lastSwallowedControlEventClusterTime) {
+        _lastSwallowedControlEventClusterTime = controlEventClusterTime;
+    }
+}
+
+void AsyncResultsMerger::_updateHighWaterMark(WithLock lk, const BSONObj& value) {
     BSONObj nextHighWaterMark = (*_nextHighWaterMarkDeterminingStrategy)(value, _highWaterMark);
 
     LOGV2_DEBUG(10657528,
@@ -899,6 +1155,9 @@ void AsyncResultsMerger::_updateHighWaterMark(WithLock, const BSONObj& value) {
         _highWaterMark, nextHighWaterMark, *_params.getSort()));
     _highWaterMark = std::move(nextHighWaterMark);
     LOGV2_DEBUG(12163602, 5, "Updated high water mark", "highWaterMark"_attr = _highWaterMark);
+
+    // Advance the client-visible high water mark to match, but never roll it back.
+    _advanceClientHighWaterMark(lk);
 }
 
 boost::optional<Milliseconds> AsyncResultsMerger::_calculateEffectiveAwaitDataTimeout(
@@ -923,6 +1182,12 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
 
     GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
+
+    // Test-only override, only reachable while the failpoint is enabled.
+    if (auto scoped = overrideBatchSizeForShardGetMore.scoped();
+        MONGO_unlikely(scoped.isActive())) {
+        getMoreRequest.setBatchSize(scoped.getData().getIntField("batchSize"));
+    }
 
     if (auto effectiveAwaitDataTimeout = _calculateEffectiveAwaitDataTimeout(lk)) {
         getMoreRequest.setMaxTimeMS(
@@ -1002,7 +1267,7 @@ Status AsyncResultsMerger::releaseMemory() {
                        requests,
                        ReadPreferenceSetting::get(_opCtx),
                        Shard::RetryPolicy::kStrictlyNotIdempotent,
-                       nullptr /*resourceYielder*/,
+                       /*resourceYielder=*/nullptr,
                        shardHostMap);
     }
 
@@ -1335,6 +1600,35 @@ bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
         compareSortKeys(newMinSortKey, *remote.promisedMinSortKey, *_params.getSort()) > 0;
 }
 
+void AsyncResultsMerger::_scheduleRetryCallback(std::function<void(Status)> callback,
+                                                Milliseconds delay) {
+    auto stallableCallback =
+        makeStallableRetryCallback(_executor, _cancellationSource.token(), std::move(callback));
+    if (!_opCtx) {
+        // ARM is detached — scheduling a retry on the dead SubBaton would cause it to
+        // resolve immediately and attempt to re-acquire _mutex on the same thread,
+        // deadlocking. Instead, wait on the executor.
+        _executor->sleepFor(delay, _cancellationSource.token()).getAsync(stallableCallback);
+    } else {
+        // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance
+        // is captured here using a weak_ptr, so that the scheduled retry operation does not
+        // block the destruction of the instance. If the retry is scheduled after the
+        // instance was destroyed, we will notice this inside the callback and do nothing.
+        _subBaton
+            ->waitUntil(getGlobalServiceContext()->getPreciseClockSource()->now() + delay,
+                        _cancellationSource.token())
+            .thenRunOn(_executor)
+            .getAsync(stallableCallback);
+    }
+
+    // The backoff timer (or 'sleepFor') is now armed with a deadline fixed relative to the current
+    // mock-clock reading. Enter the observation-only fail point so tests can synchronize on this
+    // point via 'waitForTimesEntered()' before advancing the mock clock. Behavior is unchanged.
+    if (MONGO_unlikely(armRetryScheduledForTesting.shouldFail())) {
+        // Intentionally empty: only the entry count is observed.
+    }
+}
+
 void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               CbData const& cbData,
                                               StatusWith<CursorResponse>& parsedResponse,
@@ -1354,6 +1648,17 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                  .parsedMetadata = TransactionRouter::Router::parseParticipantResponseMetadata(
                      cbData.response.data)});
             // To avoid data race issues we delay processing until the actual owner thread of the
+            // ARM drains the queue.
+            // Only log when additional participants were actually added.
+            if (const auto& additionalParticipants =
+                    _remoteResponses.back()
+                        .parsedMetadata.txnResponseMetadata.getAdditionalParticipants();
+                additionalParticipants && !additionalParticipants->empty()) {
+                LOGV2_DEBUG(13412904,
+                            2,
+                            "Buffered response for additional transaction participant processing",
+                            "shardId"_attr = remote->shardId);
+            }
         }
     }
 
@@ -1379,57 +1684,67 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
         if (parsedResponse.isOK()) {
             retryStrategy.recordSuccess(remote->shardHostAndPort);
             _processBatchResults(lk, parsedResponse.getValue(), remote);
+            if (!remote->exhausted()) {
+                // Reset the retryStrategy so it doesn't leak state across getMores. Note this must
+                // come after recordSuccess() above to fulfill the RetryStrategy usage contract.
+                remote->retryStrategy = remote->retryStrategyFactory();
+            }
         } else if (retryStrategy.recordFailureAndEvaluateShouldRetry(
                        parsedResponse.getStatus(),
                        remote->shardHostAndPort,
-                       cbData.response.getErrorLabels())) {
+                       cbData.response.getErrorLabels(),
+                       cbData.response.getBaseBackoffMS())) {
+            // The getMore failed with a retryable error. We want to apply the backoff policy to
+            // schedule the next retry after the proscribed delay.
+            //
+            // Note: the code block here does not actually schedule any remote command retry. The
+            // new network request to the shard won't be scheduled until the next call to
+            // 'nextEvent()'. That calling thread will be blocked on '_currentEvent' until this
+            // callback signals it, and then it will re-enter '_scheduleGetMores()' to schedule a
+            // new getMore with a fresh OperationContext.
+            //
+            // This complexity is because there have been historical problems with attempting to
+            // schedule the retry immediately, since the callback from the executor is not
+            // guaranteed to be on the same thread as the original getMore, and the original
+            // getMore's OperationContext may have been detached from the ARM by the time this
+            // callback runs. Doing a prompt/speedy retry is not the priority here - correctness is
+            // more important. So, we simply record the backoff delay and signal '_currentEvent' so
+            // that the next call to 'nextEvent()' will schedule a new getMore with a fresh
+            // OperationContext.
             const auto delay = retryStrategy.getNextRetryDelay();
-            auto callback = [weak = weak_from_this(),
-                             request = cbData.request,
-                             remote /* intrusive_ptr copy! */,
-                             delay](Status s) {
-                auto self = weak.lock();
-                if (!self) {
-                    // Do not continue here if the last shared_ptr pointing to this
-                    // 'AsyncResultsMerger' instance has already gone out of scope. In this case
-                    // there is no need to schedule further retries.
-                    return;
-                }
-
-                std::lock_guard<std::mutex> lk(self->_mutex);
-
-                if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
-                    remote->outstandingRequest = false;
-                    self->_signalCurrentEventIfReady(
-                        lk);  // First, wake up anyone waiting on '_currentEvent'.
-                    if (self->_lifecycleState == kKillStarted) {
-                        self->_cleanUpKilledBatch(lk);
+            // Note this is wrapped in a 'StallableRetryCallback' below, which - for tests only -
+            // can hold it back (without holding '_mutex', so detach/reattach on other threads can
+            // proceed) so that a test can line up a *different*, later getMore's OperationContext
+            // to be attached by the time the retry callback defers.
+            auto retryCallback =
+                [weak = weak_from_this(), remote /* intrusive_ptr copy! */, delay](Status s) {
+                    auto self = weak.lock();
+                    if (!self) {
+                        // Do not continue here if the last shared_ptr pointing to this
+                        // 'AsyncResultsMerger' instance has already gone out of scope. In this case
+                        // there is no need to schedule further retries.
+                        return;
                     }
-                    return;
-                }
 
-                remote->retryStrategy.recordBackoff(delay);
-                auto status = self->_sendRequestWithRetries(lk, request, remote);
-                if (!status.isOK()) {
+                    std::lock_guard<std::mutex> lk(self->_mutex);
+
+                    if (self->_lifecycleState != kAlive || !self->_status.isOK()) {
+                        remote->outstandingRequest = false;
+                        remote->cbHandle = executor::TaskExecutor::CallbackHandle();
+                        self->_signalCurrentEventIfReady(
+                            lk);  // First, wake up anyone waiting on '_currentEvent'.
+                        if (self->_lifecycleState == kKillStarted) {
+                            self->_cleanUpKilledBatch(lk);
+                        }
+                        return;
+                    }
+
+                    remote->retryStrategy.recordBackoff(delay);
+                    remote->outstandingRequest = false;
+                    remote->cbHandle = executor::TaskExecutor::CallbackHandle();
                     self->_signalCurrentEventIfReady(lk);
-                }
-            };
-            if (!_opCtx) {
-                // ARM is detached — scheduling a retry on the dead SubBaton would cause it to
-                // resolve immediately and attempt to re-acquire _mutex on the same thread,
-                // deadlocking. Instead, wait on the executor.
-                _executor->sleepFor(delay, _cancellationSource.token()).getAsync(callback);
-            } else {
-                // Schedule a retry for the request on the baton. The 'AsyncResultsMerger' instance
-                // is captured here using a weak_ptr, so that the scheduled retry operation does not
-                // block the destruction of the instance. If the retry is scheduled after the
-                // instance was destroyed, we will notice this inside the callback and do nothing.
-                _subBaton
-                    ->waitUntil(getGlobalServiceContext()->getPreciseClockSource()->now() + delay,
-                                _cancellationSource.token())
-                    .thenRunOn(_executor)
-                    .getAsync(callback);
-            }
+                };
+            _scheduleRetryCallback(std::move(retryCallback), delay);
 
             remote->outstandingRequest = true;
             return;
@@ -1614,7 +1929,7 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
                                            cmdObj,
                                            rpc::makeEmptyMetadata(),
                                            opCtx,
-                                           true /* fireAndForget */);
+                                           /*fireAndForget=*/true);
 
     // The 'RemoteCommandRequest' takes the remaining time from the 'opCtx' parameter. If the cursor
     // was killed due to a maxTimeMs timeout, the remaining time will be 0, and the remote request
@@ -1688,13 +2003,7 @@ SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     // under the same transaction. Processing additional participants on a different transaction
     // would result in modifying the list of participants of a transaction that has nothing to do
     // with the original one.
-    if (opCtx->inMultiDocumentTransaction() &&
-        opCtx->getLogicalSessionId() == _params.getSessionId().map([&](const auto& lsid) {
-            return makeLogicalSessionId(lsid, opCtx);
-        }) &&
-        opCtx->getTxnNumber() == _params.getTxnNumber()) {
-        _processAdditionalTransactionParticipants(opCtx);
-    }
+    _drainAndLatchAdditionalTransactionParticipants(opCtx, lk);
 
     if (!_haveOutstandingBatchRequests(lk)) {
         _lifecycleState = kKillComplete;
@@ -1745,7 +2054,7 @@ AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
     ShardId shardId,
     const ShardTag& tag,
     bool partialResultsReturned,
-    Shard::OwnerRetryStrategy retryStrategy)
+    unique_function<Shard::OwnerRetryStrategy()> retryStrategyFactoryArg)
     : id(id),
       cursorId(establishedCursorId),
       cursorNss(std::move(cursorNss)),
@@ -1753,7 +2062,8 @@ AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
       shardId(std::move(shardId)),
       tag(tag),
       partialResultsReturned(partialResultsReturned),
-      retryStrategy(std::move(retryStrategy)) {
+      retryStrategyFactory(std::move(retryStrategyFactoryArg)),
+      retryStrategy(retryStrategyFactory()) {
     // If the 'partialResultsReturned' flag is set, the cursorId must be zero (closed).
     tassert(11103800,
             "expecting partialResultsFlag to be set only for cursorId == 0",

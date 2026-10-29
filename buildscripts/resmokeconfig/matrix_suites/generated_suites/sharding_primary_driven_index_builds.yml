@@ -12,6 +12,7 @@ executor:
       - jstests/sharding/*reshard*.js
   config:
     shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       global_vars:
         TestData:
           setParameters:
@@ -33,7 +34,6 @@ selector:
     - primary_driven_index_builds_incompatible
     - rolling_index_builds
     - requires_commit_quorum
-    - requires_capped
     - requires_rollbacks
     - requires_index_build_resumability
   roots:

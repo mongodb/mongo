@@ -1,0 +1,8 @@
+VARIATION EmptyPipeline
+input: {
+    "pipeline": []
+}
+output:
+  end of pipeline
+    x: any
+

@@ -254,6 +254,12 @@ public:
 
 protected:
     /*
+     * debug_log_parser::colgroup_bind --
+     *     Map the column group's file ID to its table, creating the table if it does not exist.
+     */
+    void colgroup_bind(const std::string &name, const std::string &source, uint64_t fileid);
+
+    /*
      * debug_log_parser::metadata_apply --
      *     Handle the given metadata operation.
      */

@@ -1,35 +1,12 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+
+#include <span>
 
 /**
  * Framework for matching patterns in QuerySolutions.
@@ -68,27 +45,28 @@ template <class Rule>
 concept HasFinish = requires(Rule& rule, RuleEngine& engine) { rule.finish(engine); };
 
 template <class Rule, class N>
-void callPreVisit(Rule& rule, RuleEngine& engine, const N& node, size_t index) {
+void callPreVisit(
+    Rule& rule, RuleEngine& engine, const N& node, size_t index, bool allowEarlyExit) {
     if constexpr (HasPreVisit<Rule, N>) {
-        if (engine.hasMatch())
+        if (allowEarlyExit && engine.hasMatch())
             return;
         rule.preVisit(engine, node, index);
     }
 }
 
 template <class Rule, class N>
-void callPostVisit(Rule& rule, RuleEngine& engine, const N& node) {
+void callPostVisit(Rule& rule, RuleEngine& engine, const N& node, bool allowEarlyExit) {
     if constexpr (HasPostVisit<Rule, N>) {
-        if (engine.hasMatch())
+        if (allowEarlyExit && engine.hasMatch())
             return;
         rule.postVisit(engine, node);
     }
 }
 
 template <class Rule>
-void callFinish(Rule& rule, RuleEngine& engine) {
+void callFinish(Rule& rule, RuleEngine& engine, bool allowEarlyExit) {
     if constexpr (HasFinish<Rule>) {
-        if (engine.hasMatch())
+        if (allowEarlyExit && engine.hasMatch())
             return;
         rule.finish(engine);
     }
@@ -103,7 +81,11 @@ void visit(F&& f, const QuerySolutionNode& node) {
             f(static_cast<const EqLookupNode&>(node));
             break;
         case STAGE_GROUP:
+        case STAGE_STREAMING_GROUP:
             f(static_cast<const GroupNode&>(node));
+            break;
+        case STAGE_COLLSCAN:
+            f(static_cast<const CollectionScanNode&>(node));
             break;
         case STAGE_IXSCAN:
             f(static_cast<const IndexScanNode&>(node));
@@ -154,35 +136,47 @@ void visit(F&& f, const QuerySolutionNode& node) {
  * };
  */
 template <class... Rules>
-const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... rules) {
+const QuerySolutionNode* _treeSearch(const QuerySolutionNode* root,
+                                     bool allowEarlyExit,
+                                     Rules&&... rules) {
     RuleEngine engine;
     std::function<void(const QuerySolutionNode*, size_t)> walk = [&](const QuerySolutionNode* node,
                                                                      size_t index) {
-        visit([&](const auto& node) { (callPreVisit(rules, engine, node, index), ...); }, *node);
-        if (engine.hasMatch())
+        visit(
+            [&](const auto& node) {
+                (callPreVisit(rules, engine, node, index, allowEarlyExit), ...);
+            },
+            *node);
+        if (allowEarlyExit && engine.hasMatch())
             return;
 
         for (size_t i = 0; i < node->children.size(); ++i) {
             walk(node->children[i].get(), i);
-            if (engine.hasMatch())
+            if (allowEarlyExit && engine.hasMatch())
                 return;
         }
 
-        visit([&](const auto& node) { (callPostVisit(rules, engine, node), ...); }, *node);
+        visit([&](const auto& node) { (callPostVisit(rules, engine, node, allowEarlyExit), ...); },
+              *node);
     };
 
     walk(root, 0);
-    (callFinish(rules, engine), ...);
+    (callFinish(rules, engine, allowEarlyExit), ...);
 
     return engine.getMatchedNode();
+}
+
+template <class... Rules>
+const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... rules) {
+    return _treeSearch(root, /*allowEarlyExit=*/true, rules...);
 }
 
 /**
  * Returns 'true' if the query solution tree at 'root' matches any of the rules defined by 'rules'.
  */
 template <class... Rules>
-bool treeMatchesAny(const QuerySolutionNode* root, Rules&&... rules) {
-    return treeSearch(root, std::forward<Rules>(rules)...) != nullptr;
+bool treeMatchesAny(const QuerySolutionNode* root, bool allowEarlyExit, Rules&&... rules) {
+    return _treeSearch(root, allowEarlyExit, std::forward<Rules>(rules)...) != nullptr;
 }
 
 struct Range {
@@ -192,6 +186,8 @@ struct Range {
     Range() : Range(0) {}
     Range(size_t index) : min(index), max(index + 1) {}
     explicit Range(size_t amin, size_t amax) : min(amin), max(amax) {}
+
+    bool operator==(const Range&) const = default;
 
     bool contains(size_t childIndex) const {
         return childIndex >= min && childIndex < max;
@@ -207,14 +203,11 @@ enum class PredicateType {
 
 /**
  * This is a configurable rule that can match any tree pattern detectable by a state machine.
- *
- * To obtain a match, all the possible paths from root to leaf have to end in a matching state in
- * the state machine (similar to an all-paths NFA). This is a useful property for recognizing nodes
- * that have multiple branches.
+ * Should be immutable after being built.
  */
-class StateMachineRule {
+class StateMachine {
 public:
-    StateMachineRule(bool ignoreNonEssentialNodes = false);
+    StateMachine();
 
     int getStartState() const {
         return kStart;
@@ -235,14 +228,15 @@ public:
                  PredicateType predicate = PredicateType::kNone);
 
     /**
-     * Like 'addState' above, but transitions to a single new state when the machine receives a node
-     * of any of the types in 'stages'. Useful for matching a family of related node types (e.g. all
-     * projection or sort variants) as one logical step in a pattern.
+     * Like 'addState' above, but if 'state' already has a transition for this stage (because an
+     * earlier pattern that shares this prefix added it), returns that existing destination state
+     * instead of adding a conflicting duplicate. This lets several patterns be assembled into one
+     * shared trie by simply walking each pattern's path step by step.
      */
-    int addState(int state,
-                 std::initializer_list<StageType> stages,
-                 Range allowedChildren,
-                 PredicateType predicate = PredicateType::kNone);
+    int addOrGetState(int state,
+                      StageType stage,
+                      Range allowedChildren,
+                      PredicateType predicate = PredicateType::kNone);
 
     void addMatch(int state) {
         validateState(state);
@@ -255,15 +249,26 @@ public:
         _states[state].matchTag = matchTag;
     }
 
-    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index);
-
-    boost::optional<int> getMatchedTag() const {
-        return _matchedTag;
+    void shrinkToFit() {
+        _states.shrink_to_fit();
     }
 
-    void postVisit(RuleEngine& engine, const QuerySolutionNode& node);
+    /**
+     * Estimate memory usage in bytes of this object.
+     */
+    size_t sizeInBytes() const {
+        return sizeof(*this) +
+            container_size_helper::estimateObjectSizeInBytes(
+                   _states,
+                   [](const StateSpec& state) {
+                       return container_size_helper::estimateObjectSizeInBytes(state.edges);
+                   },
+                   /*includeShallowSize=*/true);
+    }
 
 private:
+    friend class StateMachineMatcher;
+
     enum {
         kNotMatch = 0,
         kStart = 1,
@@ -296,6 +301,33 @@ private:
             12308401, "Invalid tree recognition state", state < static_cast<int>(_states.size()));
     }
 
+    // State machine description (very similar to a graph). The std::vector index provides the state
+    // numbers and each state specification (vertex) contains the configured transitions (edges).
+    std::vector<StateSpec> _states;
+};
+
+/**
+ * Matches patterns in a QuerySolution by referencing the given StateMachine rule.
+ *
+ * To obtain a match, all the possible paths from root to leaf have to end in a matching state in
+ * the state machine (similar to an all-paths NFA). This is a useful property for recognizing nodes
+ * that have multiple branches.
+ */
+class StateMachineMatcher {
+public:
+    explicit StateMachineMatcher(const StateMachine& machine, bool ignoreNonEssentialNodes = false);
+
+    StateMachineMatcher(StateMachine&&) = delete;
+
+    void preVisit(RuleEngine& engine, const QuerySolutionNode& node, size_t index);
+
+    boost::optional<int> getMatchedTag() const {
+        return _matchedTag;
+    }
+
+    void postVisit(RuleEngine& engine, const QuerySolutionNode& node);
+
+private:
     void validateStack() const {
         tassert(12308403, "Invalid engine selection stack state", !_stack.empty());
     }
@@ -304,13 +336,15 @@ private:
         return currentState().isMatch;
     }
 
-    const StateSpec& currentState() const {
+    const StateMachine::StateSpec& currentState() const {
         validateStack();
-        validateState(_stack.top());
-        return _states[_stack.top()];
+        _machine.validateState(_stack.top());
+        return _machine._states[_stack.top()];
     }
 
-    bool matchesPredicate(const Edge& edge, const QuerySolutionNode& node, size_t index) const;
+    bool matchesPredicate(const StateMachine::Edge& edge,
+                          const QuerySolutionNode& node,
+                          size_t index) const;
 
     void step(const QuerySolutionNode& node, size_t index);
 
@@ -318,12 +352,10 @@ private:
 
     void dumpStates();
 
+    const StateMachine& _machine;
     // State of each active frame in the QSN recursion. This is an useful state machine extension
     // for unwinding when exploring several branches.
     std::stack<int> _stack;
-    // State machine description (very similar to a graph). The std::vector index provides the state
-    // numbers and each state specification (vertex) contains the configured transitions (edges).
-    std::vector<StateSpec> _states;
     bool _allBranchesMatch = true;
     // The tag recorded at the first leaf that ended in a tagged match state; any later leaf ending
     // in a match state with a different tag rejects the tree.
@@ -331,7 +363,7 @@ private:
     // When true, non-plan-shape nodes are ignored during matching.
     bool _ignoreNonEssentialNodes = false;
 };
-static_assert(HasPreVisit<StateMachineRule, QuerySolutionNode>);
-static_assert(HasPostVisit<StateMachineRule, QuerySolutionNode>);
+static_assert(HasPreVisit<StateMachineMatcher, QuerySolutionNode>);
+static_assert(HasPostVisit<StateMachineMatcher, QuerySolutionNode>);
 
 }  // namespace mongo::query_solution_analyzer

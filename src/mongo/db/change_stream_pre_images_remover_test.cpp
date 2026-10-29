@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -83,7 +57,8 @@ using namespace change_stream_pre_image_test_helper;
 
 class ChangeStreamPreImageExpirationPolicyTest : public ServiceContextTest {
 public:
-    ChangeStreamPreImageExpirationPolicyTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         ChangeStreamOptionsManager::create(getServiceContext());
     }
 };
@@ -135,11 +110,8 @@ protected:
     const CollectionTruncateMarkers::MarkersCreationMethod kArbitraryMarkerCreationMethod{
         CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
 
-    PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {
-        // Advance the clock to generate valid Timestamp objects. Timestamp objects in this test are
-        // generated with the walltime, and Timestamp uses the higher 32 bits of a Date_t as the
-        // secs part. Timestamps which have secs == 0 are considered null.
-        clockSource()->advance(Milliseconds{int64_t(1) << 32});
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().useMockClock(true);
     }
 
     ChangeStreamPreImage generatePreImage(
@@ -198,7 +170,7 @@ protected:
             MODE_IS);
 
         int count = 0;
-        auto cursor = preImagesCollection.getCollectionPtr()->getCursor(opCtx, true /* forward */);
+        auto cursor = preImagesCollection.getCollectionPtr()->getCursor(opCtx, /*forward=*/true);
 
         RecordId seekTo =
             change_stream_pre_image_id_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID)
@@ -261,6 +233,12 @@ protected:
 
     void setUp() override {
         CatalogTestFixture::setUp();
+
+        // Advance the clock to generate valid Timestamp objects. Timestamp objects in this test
+        // are generated with the walltime, and Timestamp uses the higher 32 bits of a Date_t as
+        // the secs part. Timestamps which have secs == 0 are considered null.
+        clockSource()->advance(Milliseconds{int64_t(1) << 32});
+
         ChangeStreamOptionsManager::create(getServiceContext());
 
         // Set up OpObserver so that the test will append actual oplog entries to the oplog using
@@ -455,7 +433,7 @@ TEST_F(PreImagesRemoverTest, TruncateThrowsExceptionWhenNotPrimaryWithReplicated
     {
         FailPointEnableBlock failPoint("preImagesRemovalFailsWithNotWritablePrimary");
 
-        auto passStats = performPass(Milliseconds{0}, true /* useReplicatedTruncates */);
+        auto passStats = performPass(Milliseconds{0}, /*useReplicatedTruncates=*/true);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
 
         // The removal pass should have done nothing.
@@ -466,7 +444,7 @@ TEST_F(PreImagesRemoverTest, TruncateThrowsExceptionWhenNotPrimaryWithReplicated
     }
 
     // After removing the fail point, the removal should actually remove the pre-images.
-    auto passStats = performPass(Milliseconds{0}, true /* useReplicatedTruncates */);
+    auto passStats = performPass(Milliseconds{0}, /*useReplicatedTruncates=*/true);
 
     ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 360448);
@@ -544,16 +522,16 @@ TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimestampRetrieval) {
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithLocalTruncates) {
     unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
                                                     false};
-    testEnsureNoMoreInternalScansWithTruncates(2 /* expectedDocsDeleted */,
-                                               false /* useReplicatedTruncates */);
+    testEnsureNoMoreInternalScansWithTruncates(/*expectedDocsDeleted=*/2,
+                                               /*useReplicatedTruncates=*/false);
 }
 
 // Run test with replicated truncates.
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithReplicatedTruncates) {
     unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
                                                     true};
-    testEnsureNoMoreInternalScansWithTruncates(3 /* expectedDocsDeleted */,
-                                               true /* useReplicatedTruncates */);
+    testEnsureNoMoreInternalScansWithTruncates(/*expectedDocsDeleted=*/3,
+                                               /*useReplicatedTruncates=*/true);
 }
 
 TEST_F(PreImagesRemoverTest,
@@ -561,7 +539,7 @@ TEST_F(PreImagesRemoverTest,
     unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
                                                     false};
     testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
-        1000 /* expectedDocsDeleted */, false /* useReplicatedTruncates */);
+        /*expectedDocsDeleted=*/1000, /*useReplicatedTruncates=*/false);
 }
 
 TEST_F(PreImagesRemoverTest,
@@ -571,7 +549,7 @@ TEST_F(PreImagesRemoverTest,
     // Note: the expected value here is very inaccurate, but this is due to no size information
     // being used when estimating the number of documents in the truncate markers.
     testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
-        360448 /* expectedDocsDeleted */, true /* useReplicatedTruncates */);
+        /*expectedDocsDeleted=*/360448, /*useReplicatedTruncates=*/true);
 }
 
 TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTruncates) {
@@ -580,7 +558,7 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTrunca
 
     setExpirationTime(Seconds{1});
 
-    auto passStats = performPass(Milliseconds{0}, false /* useReplicatedTruncates */);
+    auto passStats = performPass(Milliseconds{0}, /*useReplicatedTruncates=*/false);
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
@@ -592,7 +570,7 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesT
 
     setExpirationTime(Seconds{1});
 
-    auto passStats = performPass(Milliseconds{0}, true /* useReplicatedTruncates */);
+    auto passStats = performPass(Milliseconds{0}, /*useReplicatedTruncates=*/true);
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
@@ -601,8 +579,8 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesT
 TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
     unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
                                                     false};
-    testTruncatesAreOnlyAfterAllDurable(1000 /* expectedDocsDeleted */,
-                                        false /* useReplicatedTruncates */);
+    testTruncatesAreOnlyAfterAllDurable(/*expectedDocsDeleted=*/1000,
+                                        /*useReplicatedTruncates=*/false);
 }
 
 // This test will currently fail when enabling the feature flag for replicated truncates.
@@ -625,8 +603,12 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
  * Tests the conditions under which the ChangeStreamExpiredPreImagesRemoverService starts
  * periodic pre-image removal.
  */
-class PreImagesRemoverServiceTest : service_context_test::WithSetupTransportLayer,
-                                    public CatalogTestFixture {
+class PreImagesRemoverServiceTest : public CatalogTestFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -656,13 +638,13 @@ TEST_F(PreImagesRemoverServiceTest, PeriodicJobStartupHonorsRollbackFlagOnConsis
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
-        opCtx, false /* isMajority */, true /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/true);
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     // Test a second call doesn't start up the periodic remover, since 'isRollback' true may be
     // called multiple times throughout the lifetime of the mongod.
     preImageRemoverService->onConsistentDataAvailable(
-        opCtx, false /* isMajority */, true /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/true);
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 }
 
@@ -679,11 +661,11 @@ TEST_F(PreImagesRemoverServiceTest, PeriodicJobOnSecondary) {
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
-        opCtx, false /* isMajority */, true /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/true);
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
-        opCtx, false /* isMajority */, false /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/false);
     ASSERT_EQ((ChangeStreamExpiredPreImagesRemoverService::PreImagesRemovalJobContext{
                   .id = 1, .usesReplicatedTruncates = false}),
               preImageRemoverService->getJobContext_forTest());
@@ -703,7 +685,7 @@ TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesntStartOnStandalone) {
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
-        opCtx, false /* isMajority */, false /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/false);
 
     ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 }

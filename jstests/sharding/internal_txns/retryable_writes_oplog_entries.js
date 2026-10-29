@@ -16,9 +16,6 @@ import {
     makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-// This test requires running prepareTransaction and commitTransaction directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
-
 const kDbName = "testDb";
 const kCollName = "testColl";
 
@@ -85,7 +82,7 @@ function verifyOplogEntries(
 
         const writeRes = mongosTestDB.runCommand(writeCmdObj);
         if (customStmtIdsOption == kStmtIdsOption.isRepeated) {
-            assert.commandFailedWithCode(writeRes, 5875600);
+            assert.commandFailedWithCode(writeRes, ErrorCodes.InvalidOptions);
             assert.commandWorked(mongosTestColl.remove({}));
             return;
         }

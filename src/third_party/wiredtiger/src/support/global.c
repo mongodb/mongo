@@ -8,8 +8,9 @@
 
 #include "wt_internal.h"
 
-WT_PROCESS __wt_process;             /* Per-process structure */
-static int __wt_pthread_once_failed; /* If initialization failed */
+WT_PROCESS __wt_process;                               /* Per-process structure */
+WT_THREAD_LOCAL const char *__wt_conn_api_name = NULL; /* Connection method name for this thread */
+static int __wt_pthread_once_failed;                   /* If initialization failed */
 
 /*
  * This is the list of the timing stress configuration names and flags. It is a global structure
@@ -26,6 +27,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
    */
   {"aggressive_stash_free", WT_TIMING_STRESS_AGGRESSIVE_STASH_FREE},
   {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
+  {"backup_blkmod_delay", WT_TIMING_STRESS_BACKUP_BLKMOD_DELAY},
   {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
   {"checkpoint_evict_page", WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE},
   {"checkpoint_handle", WT_TIMING_STRESS_CHECKPOINT_HANDLE},
@@ -34,7 +36,12 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"commit_transaction_slow", WT_TIMING_STRESS_COMMIT_TRANSACTION_SLOW},
   {"compact_slow", WT_TIMING_STRESS_COMPACT_SLOW},
   {"conn_close_stress_log_printf", WT_TIMING_STRESS_CLOSE_STRESS_LOG},
+  {"disagg_pickup_skip_signal", WT_TIMING_STRESS_DISAGG_PICKUP_SKIP_SIGNAL},
+  {"disagg_stable_dhandle_delay", WT_TIMING_STRESS_DISAGG_STABLE_DHANDLE_DELAY},
+  {"disagg_role_transition", WT_TIMING_STRESS_DISAGG_ROLE_TRANSITION},
+  {"drop_deferred_hold", WT_TIMING_STRESS_DROP_DEFERRED_HOLD},
   {"evict_reposition", WT_TIMING_STRESS_EVICT_REPOSITION},
+  {"failpoint_disagg_checkpoint_apply", WT_TIMING_STRESS_FAILPOINT_DISAGG_CHECKPOINT_APPLY},
   {"failpoint_disagg_checkpoint_queue_drain",
     WT_TIMING_STRESS_FAILPOINT_DISAGG_CHECKPOINT_QUEUE_DRAIN},
   {"failpoint_eviction_split", WT_TIMING_STRESS_FAILPOINT_EVICTION_SPLIT},
@@ -58,8 +65,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
   {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
   {"split_5", WT_TIMING_STRESS_SPLIT_5}, {"split_6", WT_TIMING_STRESS_SPLIT_6},
-  {"split_7", WT_TIMING_STRESS_SPLIT_7}, {"split_8", WT_TIMING_STRESS_SPLIT_8},
-  {"tiered_flush_finish", WT_TIMING_STRESS_TIERED_FLUSH_FINISH}, {NULL, 0}};
+  {"split_7", WT_TIMING_STRESS_SPLIT_7}, {"split_8", WT_TIMING_STRESS_SPLIT_8}, {NULL, 0}};
 
 /*
  * __endian_check --
@@ -351,11 +357,6 @@ __global_once(void)
     __wt_process.checksum_with_seed = wiredtiger_crc32c_with_seed_func();
 
     __global_setup_clock();
-
-    /* Run-time configuration. */
-#ifdef WT_STANDALONE_BUILD
-    __wt_process.tiered_shared_2023 = true;
-#endif
 }
 
 /*

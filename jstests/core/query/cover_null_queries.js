@@ -1,10 +1,10 @@
 /**
  * Test to verify that null queries can be fully covered by an index.
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
- *   # In 8.0, we changed behavior for equality to null.
- *   requires_fcv_80,
+ *   requires_fcv_91,
  *   # This test could produce unexpected explain output if additional indexes are created.
  *   assumes_no_implicit_index_creation,
  *   requires_getmore,

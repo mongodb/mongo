@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -220,6 +193,27 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsDuringFetching) {
     latencies = getCumulativeMetricsReportForSection(kLatencies);
     ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInserts"), 1);
     ASSERT_EQ(latencies.getIntField("oplogFetchingTotalLocalInsertTimeMillis"), 17);
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCoordinatorRetriesByLabel) {
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    BSONObjBuilder bob;
+    _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+    auto report = bob.done();
+    ASSERT_FALSE(report.getObjectField(kResharding).hasField("coordinatorRetries"));
+
+    _reshardingCumulativeMetrics->onCoordinatorRetry("_initializeCoordinator");
+    _reshardingCumulativeMetrics->onCoordinatorRetry("_initializeCoordinator");
+    _reshardingCumulativeMetrics->onCoordinatorRetry("_runUntilReadyToCommit");
+
+    BSONObjBuilder bob2;
+    _reshardingCumulativeMetrics->reportForServerStatus(&bob2);
+    auto retries =
+        bob2.done().getObjectField(kResharding).getObjectField("coordinatorRetries").getOwned();
+    ASSERT_EQ(retries.getIntField("_initializeCoordinator"), 2);
+    ASSERT_EQ(retries.getIntField("_runUntilReadyToCommit"), 1);
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchRetrievedDuringApplying) {
@@ -596,8 +590,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
     auto uuidOne = UUID::gen();
     auto uuidTwo = UUID::gen();
 
-    _reshardingCumulativeMetrics->onStarted(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -626,8 +620,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
     _reshardingCumulativeMetrics->onStarted(false, uuidOne);
     _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
 
-    _reshardingCumulativeMetrics->onSuccess(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -656,8 +650,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
     _reshardingCumulativeMetrics->onStarted(false, uuidOne);
     _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
 
-    _reshardingCumulativeMetrics->onFailure(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -686,8 +680,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
     _reshardingCumulativeMetrics->onStarted(false, uuidOne);
     _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
 
-    _reshardingCumulativeMetrics->onCanceled(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -711,8 +705,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnStartedDoesNotIncrement
 
     auto uuid = UUID::gen();
 
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;
@@ -737,8 +731,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnFailedDoesNotIncrementC
 
     _reshardingCumulativeMetrics->onStarted(true, uuid);
 
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;
@@ -763,8 +757,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnSuccessDoesNotIncrement
 
     _reshardingCumulativeMetrics->onStarted(true, uuid);
 
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;
@@ -789,8 +783,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnCanceledDoesNotIncremen
 
     _reshardingCumulativeMetrics->onStarted(true, uuid);
 
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;

@@ -1,47 +1,31 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/pipeline_rewrite_context.h"
 #include "mongo/db/extension/host/query_execution_context.h"
+#include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
+#include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 #include <memory>
 
@@ -236,6 +220,111 @@ DEATH_TEST(PipelineRewriteContextAdapterDeathTest,
         host::PipelineRewriteContext::make(&rbrCtx));
 
     PipelineRewriteContextAPI(&adapter).eraseNthNext(1);
+}
+
+// ---- Host exec agg stage adapter/handle death tests ----
+
+class HostExecAggStageAdapterDeathTest : public unittest::Test {
+public:
+    void setUp() override {
+        // Initialize HostServices so that aggregation stages will be able to access member
+        // functions, e.g. to run assertions.
+        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get());
+    }
+};
+
+DEATH_TEST_F(HostExecAggStageAdapterDeathTest,
+             HostExecAggStageAdapterNullStageAsserts,
+             "10957207") {
+    [[maybe_unused]] auto adapter = host_connector::HostExecAggStageAdapter{nullptr};
+}
+
+DEATH_TEST_F(HostExecAggStageAdapterDeathTest, SetSourceOnSourceStageFails, "10957210") {
+    // Setting the source of a source stage should fail irrespective of the type of the stage being
+    // set as the source.
+    auto sourceHandle = ExecAggStageHandle{new sdk::ExtensionExecAggStageAdapter(
+        sdk::shared_test_stages::AddFruitsToDocumentsExecStage::make())};
+    // ValidExtensionExecAggStage is a source stage.
+    auto handle = ExecAggStageHandle{new sdk::ExtensionExecAggStageAdapter(
+        sdk::shared_test_stages::ValidExtensionExecAggStage::make())};
+
+    // Calling setSource on a source stage should fail.
+    handle->setSource(sourceHandle);
+}
+
+DEATH_TEST_F(HostExecAggStageAdapterDeathTest, GetSourceOnSourceStageFails, "10957208") {
+    sdk::shared_test_stages::FruitsAsDocumentsExecStage sourceStage{};
+    // Calling getSource on a source stage should fail.
+    [[maybe_unused]] auto source = sourceStage._getSource();
+}
+
+DEATH_TEST_F(HostExecAggStageAdapterDeathTest, GetNameOnMovedHandleFails, "10596403") {
+    auto sourceHandle = ExecAggStageHandle{new sdk::ExtensionExecAggStageAdapter(
+        sdk::shared_test_stages::AddFruitsToDocumentsExecStage::make())};
+
+    auto sourceHandle2 = std::move(sourceHandle);
+
+    // Calling getName on a source handle should fail.
+    [[maybe_unused]] auto source = sourceHandle->getName();
+}
+
+// ---- Host AST node adapter death tests ----
+
+/**
+ * Helper that builds an IdLookupAstNode wrapping a $_internalSearchIdLookup LiteParsed.
+ */
+std::unique_ptr<host::AggStageAstNode> makeIdLookupAstNode() {
+    DocumentSourceIdLookupSpec spec;
+    return std::make_unique<host::IdLookupAstNode>(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec));
+}
+
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "517") {
+    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
+    vtable.get_name = nullptr;
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetProperties, "517") {
+    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
+    vtable.get_properties = nullptr;
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsPromote, "517") {
+    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
+    vtable.promote = nullptr;
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(HostAstNodeVTableDeathTest,
+           InvalidAstNodeVTableFailsGetFirstStageViewApplicationPolicy,
+           "517") {
+    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
+    vtable.get_first_stage_view_application_policy = nullptr;
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsBindResolvedNamespace, "517") {
+    auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
+    vtable.bind_resolved_namespace = nullptr;
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
+}
+
+DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801") {
+    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto handle = AggStageAstNodeHandle{noOpAstNode};
+
+    ::MongoExtensionByteBuf** buf = nullptr;
+    handle.get()->vtable->get_properties(noOpAstNode, buf);
+}
+
+DEATH_TEST(HostAstNodeTestDeathTest, HostPromoteUnimplemented, "11133600") {
+    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
+    auto handle = AggStageAstNodeHandle{noOpAstNode};
+
+    ::MongoExtensionLogicalAggStage** bind = nullptr;
+    handle.get()->vtable->promote(noOpAstNode, nullptr, bind);
 }
 
 }  // namespace

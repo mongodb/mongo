@@ -3,11 +3,42 @@ load("//bazel/platforms:platform_util.bzl", "setup_platform")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(["platform_util.bzl"])
+
 constraint_setting(name = "mongo_toolchain")
 
 constraint_value(
     name = "use_mongo_toolchain",
     constraint_setting = ":mongo_toolchain",
+)
+
+# Marks the auto-generated host platform as using a native/third-party system
+# compiler. The native cc toolchain requires this so it never matches on a
+# platform configured for the hermetic mongo toolchain.
+constraint_setting(name = "native_toolchain")
+
+constraint_value(
+    name = "use_native_toolchain",
+    constraint_setting = ":native_toolchain",
+)
+
+constraint_setting(name = "mongo_linux_cross_toolchain")
+
+constraint_value(
+    name = "use_mongo_linux_cross_toolchain",
+    constraint_setting = ":mongo_linux_cross_toolchain",
+)
+
+# Marks execution platforms reserved for tools in an IBM cross build.  Keeping
+# this separate from the ordinary RHEL execution platforms is important: an
+# unconstrained host action must continue to use the native IBM platform, while
+# WheelBuild/protoc and the cross compiler tools must be forced onto the foreign
+# RBE architecture.
+constraint_setting(name = "mongo_linux_cross_execution")
+
+constraint_value(
+    name = "use_mongo_linux_cross_execution",
+    constraint_setting = ":mongo_linux_cross_execution",
 )
 
 constraint_setting(name = "distro")
@@ -23,8 +54,10 @@ constraint_setting(name = "distro")
         "ubuntu20",
         "ubuntu22",
         "ubuntu24",
+        "ubuntu26",
         "amazon_linux_2",
         "amazon_linux_2023",
+        "amazon_linux_2023_3",
         "debian10",
         "debian12",
         "debian13",
@@ -49,9 +82,10 @@ constraint_setting(name = "distro")
         "ubuntu20",
         "ubuntu22",
         "ubuntu24",
+        "ubuntu26",
         "amazon_linux_2",
         "amazon_linux_2023",
-        "debian10",
+        "amazon_linux_2023_3",
         "debian12",
         "rhel8",
         "rhel9",
@@ -64,11 +98,53 @@ constraint_setting(name = "distro")
     ]
 ]
 
+# The normal RHEL execution platforms remain available to native builds. IBM
+# cross-RBE actions use equivalent same-release platforms with an additional
+# constraint, allowing rules whose tools are foreign-architecture executables
+# to opt into the cross execution platform without changing native builds.
+[
+    setup_platform(
+        arch,
+        distro,
+        "",
+        extra_constraints = [":use_mongo_linux_cross_execution"],
+        name_suffix = "_cross",
+    )
+    for distro in [
+        "rhel8",
+        "rhel9",
+        "rhel10",
+    ]
+    for arch in [
+        "arm64",
+        "amd64",
+    ]
+]
+
 constraint_setting(name = "mongo_windows_toolchain_config")
 
 constraint_value(
     name = "use_mongo_windows_toolchain_config",
     constraint_setting = ":mongo_windows_toolchain_config",
+)
+
+constraint_setting(name = "mongo_windows_cross_toolchain")
+
+constraint_value(
+    name = "use_mongo_windows_cross_toolchain",
+    constraint_setting = ":mongo_windows_cross_toolchain",
+)
+
+constraint_setting(name = "mongo_apple_cross_toolchain")
+
+constraint_value(
+    name = "use_mongo_native_apple_toolchain",
+    constraint_setting = ":mongo_apple_cross_toolchain",
+)
+
+constraint_value(
+    name = "use_mongo_apple_cross_toolchain",
+    constraint_setting = ":mongo_apple_cross_toolchain",
 )
 
 platform(
@@ -80,10 +156,28 @@ platform(
 )
 
 platform(
+    name = "windows_x86_64_cross",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        ":use_mongo_windows_cross_toolchain",
+    ],
+)
+
+config_setting(
+    name = "windows_cross",
+    constraint_values = [
+        "@platforms//os:windows",
+        ":use_mongo_windows_cross_toolchain",
+    ],
+)
+
+platform(
     name = "macos_arm64",
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:macos",
+        ":use_mongo_native_apple_toolchain",
     ],
 )
 
@@ -92,6 +186,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:macos",
+        ":use_mongo_native_apple_toolchain",
     ],
 )
 
@@ -103,6 +198,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:arm64",
         "@platforms//os:macos",
+        ":use_mongo_apple_cross_toolchain",
     ],
 )
 
@@ -111,6 +207,7 @@ platform(
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:macos",
+        ":use_mongo_apple_cross_toolchain",
     ],
 )
 
@@ -151,6 +248,16 @@ platform(
 )
 
 platform(
+    name = "rhel10_ppc64le",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+        ":rhel10",
+    ],
+)
+
+platform(
     name = "rhel8_s390x",
     constraint_values = [
         "@platforms//cpu:s390x",
@@ -170,6 +277,37 @@ platform(
     ],
 )
 
+platform(
+    name = "rhel10_s390x",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+        ":rhel10",
+    ],
+)
+
+[
+    platform(
+        name = distro + "_" + arch + "_cross",
+        constraint_values = [
+            "@platforms//cpu:" + arch,
+            "@platforms//os:linux",
+            ":use_mongo_linux_cross_toolchain",
+            ":" + distro,
+        ],
+    )
+    for distro in [
+        "rhel8",
+        "rhel9",
+        "rhel10",
+    ]
+    for arch in [
+        "ppc64le",
+        "s390x",
+    ]
+]
+
 # WASM platform for WebAssembly compilation
 platform(
     name = "wasm32",
@@ -179,12 +317,37 @@ platform(
     ],
 )
 
-load("@rules_python//python:defs.bzl", "py_binary")
+load("//bazel/uv:defs.bzl", "dependency")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 py_binary(
     name = "remote_execution_containers_generator",
     srcs = ["remote_execution_containers_generator.py"],
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "remote_execution_containers_generator_test",
+    srcs = ["remote_execution_containers_generator_test.py"],
+    data = ["remote_execution_containers_generator.py"],
+)
+
+py_binary(
+    name = "remote_execution_containers_pr",
+    srcs = ["remote_execution_containers_pr.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pygithub",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
+    name = "remote_execution_containers_pr_test",
+    srcs = ["remote_execution_containers_pr_test.py"],
+    data = ["remote_execution_containers_pr.py"],
 )
 
 exports_files([

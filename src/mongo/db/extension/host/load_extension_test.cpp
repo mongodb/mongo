@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/extension/host/load_extension.h"
 
@@ -47,6 +21,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #include <filesystem>
 
@@ -74,16 +49,20 @@ protected:
     static inline const std::string kMatchTopNLibExtensionPath = "libmatch_topN_mongo_extension.so";
 
     void setUp() override {
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
         _previousExtensionsSignaturePublicKeyPath =
             serverGlobalParams.extensionsSignaturePublicKeyPath;
         serverGlobalParams.extensionsSignaturePublicKeyPath =
             mongo::extension::host::test_util::getPublicKeyPath();
+#endif
     }
     void tearDown() override {
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
         if (!_previousExtensionsSignaturePublicKeyPath.empty()) {
             serverGlobalParams.extensionsSignaturePublicKeyPath =
                 _previousExtensionsSignaturePublicKeyPath;
         }
+#endif
         LiteParsedDocumentSource::unregisterParser_forTest(kTestFooStageName);
         LiteParsedDocumentSource::unregisterParser_forTest(kDesugarFooStageName);
         ExtensionLoader::unload_forTest("foo");
@@ -103,10 +82,42 @@ protected:
         return test_util::makeEmptyExtensionConfig(kMatchTopNLibExtensionPath);
     }
 
+    /**
+     * Copies a signed test extension and its detached signature into a temp directory we own, so
+     * tests can control the on-disk file (permissions, etc.). Normalizes the copy to owner
+     * read/write with no group/other write, so it passes the loader's permission gate by default;
+     * individual tests loosen this to exercise rejection. Returns the path to the copied .so.
+     */
+    std::filesystem::path copySignedExtensionToTempDir(const std::string& libName) {
+        namespace fs = std::filesystem;
+        // Use a fresh subdirectory per call so repeated copies don't have to overwrite read-only
+        // files left behind by a previous call (copied .so/.sig inherit the source's read-only
+        // mode, which would make a subsequent copy_file fail with EACCES).
+        const fs::path destDir = fs::path(_tempDir.path()) / std::to_string(_tempCopyCounter++);
+        fs::create_directories(destDir);
+        const fs::path dest = destDir / libName;
+        const auto src = test_util::getExtensionPath(libName);
+        fs::copy_file(src, dest, fs::copy_options::overwrite_existing);
+        fs::copy_file(std::string{src} + ".sig",
+                      std::string{dest} + ".sig",
+                      fs::copy_options::overwrite_existing);
+        fs::permissions(
+            dest, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
+        return dest;
+    }
+
+    static ExtensionConfig makeConfigForPath(const std::filesystem::path& path) {
+        return ExtensionConfig{.sharedLibraryPath = path.string(),
+                               .extOptions = YAML::Node(YAML::NodeType::Map)};
+    }
+
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
     static inline NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "load_extension_test");
+
+    unittest::TempDir _tempDir{"load_extension_test"};
+    size_t _tempCopyCounter{0};
 
 private:
     unittest::ServerParameterGuard _featureFlagExtensionsAPI{"featureFlagExtensionsAPI", true};
@@ -208,9 +219,10 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
                        10930201);
 }
 
-// null_initialize_function_bad_extension has a null initialization function.
 using LoadExtensionsTestDeathTest = LoadExtensionsTest;
-DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullInitialize, "10930101") {
+
+// null_initialize_function_bad_extension has a null initialization function.
+DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullInitialize, "517") {
     ExtensionLoader::load(
         "null_initialize_function_bad_extension",
         test_util::makeEmptyExtensionConfig("libnull_initialize_function_bad_extension.so"));
@@ -253,6 +265,28 @@ TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
         parsedPipeline->getSources().front().get());
     ASSERT_TRUE(firstStage != nullptr);
     ASSERT_EQUALS(std::string(firstStage->getSourceName()), std::string(kTestFooStageName));
+}
+
+// The loader pins the extension to a file descriptor and verifies/loads it through
+// "/proc/self/fd/N", and (when signature validation is enabled) refuses to load a file that an
+// untrusted party could mutate underneath us. A read-only, owner-owned copy must still load.
+TEST_F(LoadExtensionsTest, LoadExtensionAcceptsOwnerOwnedNonWritableFile) {
+    const auto path = copySignedExtensionToTempDir(kTestFooLibExtensionPath);
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("foo", makeConfigForPath(path)));
+    ASSERT_TRUE(ExtensionLoader::isLoaded("foo"));
+}
+
+// A group- or other-writable extension file is rejected: such a file could be overwritten in place
+// by another user between signature verification and dlopen.
+TEST_F(LoadExtensionsTest, LoadExtensionRejectsGroupOrOtherWritableFile) {
+    namespace fs = std::filesystem;
+    for (const auto writeBit : {fs::perms::group_write, fs::perms::others_write}) {
+        const auto path = copySignedExtensionToTempDir(kTestFooLibExtensionPath);
+        fs::permissions(path, writeBit, fs::perm_options::add);
+        ASSERT_THROWS_CODE(
+            ExtensionLoader::load("foo", makeConfigForPath(path)), AssertionException, 10929854);
+        ASSERT_FALSE(ExtensionLoader::isLoaded("foo"));
+    }
 }
 
 // Tests successful desugar extension loading and verifies stage registration works in pipelines.
@@ -368,7 +402,7 @@ TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
                        10726600);
 }
 
-DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullStageDescriptor, "10596400") {
+DEATH_TEST_F(LoadExtensionsTestDeathTest, LoadExtensionNullStageDescriptor, "519") {
     ExtensionLoader::load(
         "null_stage_descriptor_bad_extension",
         test_util::makeEmptyExtensionConfig("libnull_stage_descriptor_bad_extension.so"));
@@ -697,6 +731,14 @@ TEST(SelectCompatibleVersionTest, MultipleHostMajorsPicksHighestCompatible) {
     auto chosen = selectCompatibleVersion(hostVec, extVec);
     ASSERT_EQ(chosen.major, 2u);
     ASSERT_EQ(chosen.minor, 1u);
+}
+
+TEST_F(LoadExtensionsTest, LoadExtensionConfigFailsWhenConfigPathEmpty) {
+    const auto previousExtensionsConfigPath = serverGlobalParams.extensionsConfigPath;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.extensionsConfigPath = previousExtensionsConfigPath; });
+
+    serverGlobalParams.extensionsConfigPath = "";
+    ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig("foo"), AssertionException, 12773200);
 }
 
 }  // namespace mongo::extension::host

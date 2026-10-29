@@ -355,6 +355,18 @@ repos:
     repos:
       - apt/ubuntu/dists/noble/mongodb-org
 
+  - name: ubuntu2604
+    type: deb
+    code_name: "resolute"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+    repos:
+      - apt/ubuntu/dists/resolute/mongodb-org
+
   ####################
   #
   # Enterprise Repos:
@@ -693,3 +705,15 @@ repos:
       - arm64
     repos:
       - apt/ubuntu/dists/noble/mongodb-enterprise
+
+  - name: ubuntu2604
+    type: deb
+    code_name: "resolute"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+    repos:
+      - apt/ubuntu/dists/resolute/mongodb-enterprise

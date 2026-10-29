@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/window_function/window_function_avg.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/window_function/window_function_state_serialization_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -166,6 +141,44 @@ TEST_F(WindowFunctionAvgTest, HandleInfs) {
     avg.remove(nan);
     avg.remove(negInf2);  // 1
     ASSERT_VALUE_EQ(avg.getValue(), Value{1});
+}
+
+TEST_F(WindowFunctionAvgTest, SerializedStateLayoutIsStable) {
+    // This layout is persisted in checkpoints. Changing it requires a
+    // version bump and a restore path for the old layout.
+    avg.add(Value{10});
+    auto state = avg.serializeState().getDocument();
+    ASSERT_EQUALS(state.computeSize(), 3);
+    ASSERT_VALUE_EQ(state["v"], Value{1});
+    ASSERT_EQUALS(state["sum"].getType(), BSONType::object);
+    ASSERT_VALUE_EQ(state["count"], Value{1LL});
+}
+
+TEST_F(WindowFunctionAvgTest, RestoreRejectsUnknownStateVersion) {
+    avg.add(Value{10});
+    MutableDocument state(avg.serializeState().getDocument());
+    state["v"] = Value{2};
+    WindowFunctionAvg restored(nullptr);
+    ASSERT_THROWS_CODE(
+        restored.restoreState(state.freezeToValue()), DBException, ErrorCodes::UnsupportedFormat);
+}
+
+TEST_F(WindowFunctionAvgTest, SerializeRoundTripThenAddRemove) {
+    avg.add(Value{10});
+    avg.add(Value{20});
+    avg.add(Value{"not a number"sv});
+
+    WindowFunctionAvg restored(nullptr);
+    assertSerializeRoundTrip(avg,
+                             restored,
+                             {
+                                 {true, Value{30}},
+                                 {false, Value{10}},
+                                 {false, Value{20}},
+                                 {false, Value{30}},
+                                 {true, Value{"not a number"sv}},
+                             });
+    ASSERT_VALUE_EQ(restored.getValue(), Value{BSONNULL});
 }
 
 }  // namespace

@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 #
 # Test reading a cursor when the aggregate time window is visible to the snapshot
 # but not all deleted keys on-disk version are not visible.
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),

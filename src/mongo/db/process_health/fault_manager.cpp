@@ -1,46 +1,8 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <algorithm>
-#include <iterator>
-#include <set>
-#include <type_traits>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include <unistd.h>
+#include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -48,7 +10,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
-#include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface.h"
@@ -64,8 +25,21 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <iterator>
 #include <mutex>
+#include <set>
 #include <string_view>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include <unistd.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
@@ -170,7 +144,7 @@ void FaultManager::_healthMonitoringIntensitiesUpdatedImpl(HealthObserverIntensi
                 // off -> {critical, non-critical}
                 if (auto* observer = _getHealthObserver(toFaultFacetType(setting.getType()));
                     observer != nullptr) {
-                    scheduleNextHealthCheck(observer, cancellationToken, true /* immediate */);
+                    scheduleNextHealthCheck(observer, cancellationToken, /*immediately=*/true);
                 }
             } else if (newIntensity == HealthObserverIntensityEnum::kOff) {
                 // {critical, non-critical} -> off
@@ -447,7 +421,7 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
             setState(FaultState::kActiveFault, HealthCheckStatus(observer->getType()));
             return;
         }
-        scheduleNextHealthCheck(observer, token, true /* immediate */);
+        scheduleNextHealthCheck(observer, token, /*immediately=*/true);
     }
     LOGV2(5936804, "Health observers started", "detail"_attr = listOfActiveObservers);
 }
@@ -625,7 +599,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
                 }
                 if (!_config->periodicChecksDisabledForTests() &&
                     _config->isHealthObserverEnabled(observer->getType())) {
-                    scheduleNextHealthCheck(observer, token, false /* immediate */);
+                    scheduleNextHealthCheck(observer, token, /*immediately=*/false);
                 }
             });
 

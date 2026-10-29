@@ -63,6 +63,7 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "maxdiff_histogram_test",
+    size = "large",
     srcs = [
         "maxdiff_histogram_test.cpp",
     ],

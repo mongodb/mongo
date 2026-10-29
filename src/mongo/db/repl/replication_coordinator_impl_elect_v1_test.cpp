@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -192,7 +166,8 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
 }
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
-    auto configObj = generateConfigObj(3, 1, BSON("electionTimeoutMillis" << 1));
+    auto configObj = generateConfigObj(
+        3, 1, BSON("electionTimeoutMillis" << 2 << "heartbeatIntervalMillis" << 1));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
     // Make sure that an election timeout of 1ms doesn't make the random number
@@ -604,13 +579,12 @@ TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
 
     auto metricsAfterVoteRequestWithDryRun = [&](bool dryRun) {
         repl::VoteRequester::Algorithm requester(getReplCoord()->getConfig(),
-                                                 1 /* candidateIndex */,
-                                                 1 /* term */,
+                                                 /*candidateIndex=*/1,
+                                                 /*term=*/1,
                                                  dryRun,
                                                  lastOplogEntry,
                                                  lastOplogEntry,
-                                                 -1 /* primaryIndex */
-        );
+                                                 /*primaryIndex=*/-1);
 
         auto opCtxHolder{makeOperationContext()};
         auto* const opCtx{opCtxHolder.get()};
@@ -1032,6 +1006,12 @@ public:
                                     const OpTime& otherNodesOpTime) {
 
         auto net = getNet();
+
+        // A live primary initiates heartbeats towards us as well as answering ours, and a
+        // secondary only postpones its election timeout if it has seen such a request recently.
+        // Model that here so the mocked primary looks alive in both directions.
+        _receiveHeartbeatRequestFromPrimary(config, primaryHostAndPort);
+
         net->enterNetwork();
 
         // If 'until' is equal to net->now(), process any currently queued requests and return,
@@ -1044,6 +1024,12 @@ public:
                 // Run clock forward to time 'until', or until the time of the next queued request.
                 net->runUntil(until);
                 _respondToHeartbeatsNow(config, primaryHostAndPort, otherNodesOpTime);
+
+                // Keep the primary's inbound heartbeats current as the clock advances, which
+                // requires leaving the network since this goes through the command path.
+                net->exitNetwork();
+                _receiveHeartbeatRequestFromPrimary(config, primaryHostAndPort);
+                net->enterNetwork();
             }
         }
 
@@ -1087,6 +1073,32 @@ private:
      *
      * Intended as a helper function only.
      */
+    /*
+     * Simulates 'primaryHostAndPort' initiating a heartbeat towards us, which is what proves to a
+     * secondary that the primary is still doing work rather than merely answering requests. Does
+     * nothing if that host is not a member of 'config'. Must not be called while in the network.
+     */
+    void _receiveHeartbeatRequestFromPrimary(const ReplSetConfig& config,
+                                             const HostAndPort& primaryHostAndPort) {
+        const MemberConfig* primaryMember = config.findMemberByHostAndPort(primaryHostAndPort);
+        if (!primaryMember) {
+            return;
+        }
+
+        auto replCoord = getReplCoord();
+        ReplSetHeartbeatArgsV1 hbArgs;
+        hbArgs.setSetName(std::string{config.getReplSetName()});
+        hbArgs.setConfigVersion(config.getConfigVersion());
+        hbArgs.setConfigTerm(config.getConfigTerm());
+        hbArgs.setSenderId(primaryMember->getId().getData());
+        hbArgs.setSenderHost(primaryHostAndPort);
+        hbArgs.setTerm(replCoord->getTerm());
+
+        ReplSetHeartbeatResponse hbResp;
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(replCoord->processHeartbeatV1(opCtx.get(), hbArgs, &hbResp));
+    }
+
     void _respondToHeartbeatsNow(const ReplSetConfig& config,
                                  const HostAndPort& primaryHostAndPort,
                                  const OpTime& otherNodesOpTime) {
@@ -3001,7 +3013,8 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
         hbArgs.setTerm(getReplCoord()->getTerm());
         ASSERT(hbArgs.isInitialized());
         ReplSetHeartbeatResponse response;
-        ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
+        ASSERT_OK(
+            getReplCoord()->processHeartbeatV1(makeOperationContext().get(), hbArgs, &response));
     });
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     ASSERT(getReplCoord()->getOplogSyncState() == OplogSyncState::Running);

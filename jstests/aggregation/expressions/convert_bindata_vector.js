@@ -3,7 +3,6 @@
  * @tags: [
  *   # BinData $convert array was added in v8.3.
  *   requires_fcv_83,
- *   featureFlagConvertBinDataVectors,
  * ]
  */
 
@@ -398,7 +397,7 @@ binToBsonErrorCases.forEach((testCase) => {
 let bsonToBinErrorCases = [
     // Invalid string BSON array
     {invalid_bson_array: ["oh", "hi", "mark"], error_code: ErrorCodes.ConversionFailure},
-    // Must be an array
+    // Must be an array. Subtype 9 is rejected for non-array input.
     {invalid_bson_array: "theroom", error_code: ErrorCodes.ConversionFailure},
     // TODO SERVER-106059 Remove this test.
     {
@@ -438,6 +437,30 @@ bsonToBinErrorCases.forEach((testCase) => {
         testCase.error_code,
     );
 });
+
+(function nonArrayInputWithOnErrorReturnsFallback() {
+    const coll = db.expression_convert_bindata_vector;
+    coll.drop();
+    assert.commandWorked(coll.insertMany([{_id: 0, bson_array: "theroom"}]));
+
+    let bsonToBindataPipeline = [
+        {
+            $project: {
+                _id: 0,
+                output: {
+                    $convert: {
+                        to: {type: "binData", subtype: 9},
+                        input: "$bson_array",
+                        format: "base64",
+                        onError: "fallback",
+                    },
+                },
+            },
+        },
+    ];
+
+    assert.eq(coll.aggregate(bsonToBindataPipeline).toArray(), [{output: "fallback"}]);
+})();
 
 (function bsonArrayWithLargePositiveIntFailsToBeConverted() {
     let doc = {_id: 0, bson_array: [NumberInt(5), NumberInt(6), NumberInt(200)]};

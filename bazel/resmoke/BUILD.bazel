@@ -1,6 +1,10 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
-load("@poetry//:dependencies.bzl", "dependency")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//bazel/resmoke:resmoke.bzl", "tss_settings_file")
+load("//bazel/uv:defs.bzl", "dependency")
 
 genrule(
     name = "resmoke_mongo_version",
@@ -12,22 +16,29 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
+# This target runs on the native execution platform so its Windows command remains
+# compatible with Bazel's native genrule implementation.
 genrule(
     name = "multiversion_config",
     srcs = [":resmoke_mongo_version"],
     outs = [".multiversion_config.yml"],
     cmd = """
-export GIT_DIR=$$(dirname "$$(readlink -f WORKSPACE.bazel)")/.git
-$(location //buildscripts:resmoke) \
+export GIT_DIR=$$(dirname "$$(readlink -f MODULE.bazel)")/.git
+# The multiversion-config command imports GitPython through resmoke's shared
+# setup, but this invocation does not execute any Git commands. The hermetic
+# Linux action image intentionally omits git.
+export GIT_PYTHON_REFRESH=quiet
+$(location //buildscripts:resmoke_local_host_tool) \
     --mongoVersionFile $(location :resmoke_mongo_version) \
     multiversion-config \
     --config-file-output $@ > /dev/null
 """,
+    exec_compatible_with = HOST_CONSTRAINTS,
     tags = [
         "no-cache",
         "no-remote",
     ],
-    tools = ["//buildscripts:resmoke"],
+    tools = ["//buildscripts:resmoke_local_host_tool"],
     visibility = ["//visibility:public"],
 )
 
@@ -114,6 +125,24 @@ bool_flag(
     build_setting_default = False,
 )
 
+# Suites with shard_count > 50 exceed the cap Bazel enforces on the native shard_count attribute,
+# so resmoke_suite_test forces their shard count through a rule transition instead. Bazel omits a
+# target whose own transition changed its configuration from cquery output, so any cquery over
+# resmoke test targets must set this to False to see them (see buildscripts/generate_result_tasks.py).
+bool_flag(
+    name = "support_extended_shard_count",
+    build_setting_default = True,
+)
+
+# Stands in for the jstestfuzz bundle under --//bazel/resmoke:skip_deps_for_cquery, so cquery over
+# fuzzer suites does not fetch (clone, npm install, compile) the jstestfuzz repositories.
+write_file(
+    name = "jstestfuzz_cquery_placeholder_bundle",
+    out = "jstestfuzz_cquery_placeholder_bundle.tar",
+    content = [],
+    visibility = ["//visibility:public"],
+)
+
 config_setting(
     name = "skip_deps_for_cquery_enabled",
     flag_values = {
@@ -135,6 +164,26 @@ int_flag(
     visibility = ["//visibility:public"],
 )
 
+# Seed for jstestfuzz_generate. Empty (default) makes generation depend on the
+# build's volatile-status, so each run produces a fresh random test set.
+# Set to a numeric value to pin the seed.
+string_flag(
+    name = "jstestfuzz_seed",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+# MongoDB target version forwarded to jstestfuzz as --branch. Selects which
+# server features the generated tests may use (see jstestfuzz's
+# generate_version_info.ts). Defaults to "master"; release branches and
+# Evergreen tasks should pass the project's branch_name, e.g.
+# --//bazel/resmoke:jstestfuzz_branch=v8.0.
+string_flag(
+    name = "jstestfuzz_branch",
+    build_setting_default = "master",
+    visibility = ["//visibility:public"],
+)
+
 # Seed for config fuzzer suites. Empty (default) derives the seed from
 # volatile-status at build time so each run gets a fresh configuration.
 # Set to a numeric value to pin the seed for reproduction.
@@ -144,11 +193,75 @@ string_flag(
     visibility = ["//visibility:public"],
 )
 
+# Whether to ask test selection which tests to keep. Off by default: each suite's test list is
+# still generated, but the service is not called. Set by evergreen/resmoke_tests_execute_bazel.sh,
+# which knows whether this is a patch build and whether the project has test selection enabled.
+bool_flag(
+    name = "enable_test_selection",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+# Comma separated test selection strategies, from the ${test_selection_strategies_array} patch
+# parameter -- the same input the non-bazel resmoke flow uses. Empty means "the default", which is
+# resmoke's DEFAULT_EVERGREEN_TEST_SELECTION_STRATEGY, so both flows agree. Valid values come from
+# the service's StrategyEnum: ExcludeManuallyQuarantined, Existential, NotFailing, NotPassing,
+# Optimistic, StartsWithT.
+string_flag(
+    name = "test_selection_strategies",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+# The test selection settings are the same for every suite, so every suite's test list genrule
+# reads this one file rather than materializing its own copy of the flags.
+tss_settings_file(
+    name = "tss_settings",
+    visibility = ["//visibility:public"],
+)
+
 py_binary(
     name = "download_historic_runtimes",
     srcs = ["download_historic_runtimes.py"],
+    exec_compatible_with = HOST_CONSTRAINTS,
     main = "download_historic_runtimes.py",
     visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_tss_test_list",
+    srcs = ["generate_tss_test_list.py"],
+    # resmoke resolves its config directory from resmokelib's own __file__, which lands in the
+    # runfiles tree rather than the execroot, so the suite and matrix-suite YAML has to be here
+    # too or suite lookup fails on the missing matrix_suites/mappings directory.
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/evg_task_doc:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    exec_compatible_with = HOST_CONSTRAINTS,
+    main = "generate_tss_test_list.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:resmoke_local_host_tool",
+    ],
+)
+
+py_test(
+    name = "generate_tss_test_list_test",
+    srcs = [
+        "generate_tss_test_list.py",
+        "generate_tss_test_list_test.py",
+    ],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/evg_task_doc:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    main = "generate_tss_test_list_test.py",
+    deps = [
+        "//buildscripts:resmoke",
+    ],
 )
 
 py_binary(
@@ -195,6 +308,14 @@ py_binary(
 )
 
 py_binary(
+    name = "query_correctness_corpus_fetch",
+    srcs = ["query_correctness_corpus_fetch.py"],
+    exec_compatible_with = HOST_CONSTRAINTS,
+    main = "query_correctness_corpus_fetch.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "derive_suite_selectors",
     srcs = [
         "derive_suite_selectors.py",
@@ -211,3 +332,38 @@ py_binary(
 exports_files([
     "resmoke_shim.py",
 ])
+
+sh_binary(
+    name = "jstestfuzz_run",
+    srcs = ["jstestfuzz_run.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# Node.js 16.18.1 runtime (jstestfuzz's pinned version), selected for the
+# execution platform. Only Linux runtimes are bundled, so key the selects on
+# os:linux + cpu and fail fast with a clear message on any other platform
+# rather than silently pulling a Linux node distribution.
+_NODE16 = {
+    "//bazel/config:linux_aarch64": "@nodejs16_linux_arm64",
+    "//bazel/config:linux_x86_64": "@nodejs16_linux_amd64",
+}
+
+_NODE16_NO_MATCH_ERROR = "jstestfuzz generation requires a Linux aarch64/x86_64 execution platform."
+
+alias(
+    name = "jstestfuzz_npm_cli",
+    actual = select(
+        {setting: repo + "//:npm_bin" for setting, repo in _NODE16.items()},
+        no_match_error = _NODE16_NO_MATCH_ERROR,
+    ),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "jstestfuzz_node_files",
+    actual = select(
+        {setting: repo + "//:npm_files" for setting, repo in _NODE16.items()},
+        no_match_error = _NODE16_NO_MATCH_ERROR,
+    ),
+    visibility = ["//visibility:public"],
+)

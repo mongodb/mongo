@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/oplog_entry.h"
@@ -194,7 +168,7 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
 }
 
 void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
-    if (gMultitenancySupport &&
+    if (value && gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
         DurableReplOperation::setTid(value);
@@ -366,21 +340,39 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
 
         const BSONObj& o = getObject();
         switch (opType) {
-            case OpTypeEnum::kContainerInsert:
-                ContainerInsertOplogEntryO::parse(o,
-                                                  IDLParserContext("ContainerInsertOplogEntryO"));
-                break;
-            case OpTypeEnum::kContainerUpdate:
-                ContainerUpdateOplogEntryO::parse(o,
-                                                  IDLParserContext("ContainerUpdateOplogEntryO"));
-                break;
-            case OpTypeEnum::kContainerDelete:
+            case OpTypeEnum::kContainerInsert: {
+                const auto containerInsertEntryO = ContainerInsertOplogEntryO::parse(
+                    o, IDLParserContext("ContainerInsertOplogEntryO"));
+                const auto& key = containerInsertEntryO.getKey();
+                const auto& maybeVal = containerInsertEntryO.getValue();
+                uassert(13064100,
+                        "inserts must specify key with type array, bytes, or integer",
+                        key.isArrayKey() || key.isBytesKey() || key.isIntKey());
+                if (maybeVal && maybeVal->isArrayVal()) {
+                    uassert(13174600,
+                            "array-valued inserts must specify a single int key or an equivalent "
+                            "length array of keys",
+                            key.isIntKey() ||
+                                (key.isArrayKey() &&
+                                 key.getArrayKey().size() == maybeVal->getArrayVal().size()));
+                }
+            } break;
+            case OpTypeEnum::kContainerUpdate: {
+                const auto containerUpdateEntryO = ContainerUpdateOplogEntryO::parse(
+                    o, IDLParserContext("ContainerUpdateOplogEntryO"));
+                const auto& key = containerUpdateEntryO.getKey();
+                const auto& val = containerUpdateEntryO.getValue();
+                uassert(13064101,
+                        "One key and one value must be specified for container update",
+                        !key.isArrayKey() && !val.isArrayVal());
+            } break;
+            case OpTypeEnum::kContainerDelete: {
                 ContainerDeleteOplogEntryO::parse(o,
                                                   IDLParserContext("ContainerDeleteOplogEntryO"));
                 uassert(10704704,
                         str::stream() << "delete should not contain value: " << redact(o),
                         !o["v"]);
-                break;
+            } break;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -495,8 +487,6 @@ bool DurableOplogEntry::shouldPrepare() const {
 }
 
 bool DurableOplogEntry::applyOpsIsLinkedTransactionally() const {
-    // An applyOps with a prevWriteOpTime is part of a transaction, unless multiOpType is
-    // kApplyOpsAppliedSeparately.
     return static_cast<bool>(getPrevWriteOpTimeInTransaction()) &&
         getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
         MultiOplogEntryType::kApplyOpsAppliedSeparately;
@@ -770,10 +760,6 @@ boost::optional<bool> OplogEntry::getIsTimeseries() const {
 
 const boost::optional<OplogEntrySizeMetadata>& OplogEntry::getSizeMetadata() const {
     return _entry.getSizeMetadata();
-}
-
-boost::optional<std::int32_t> OplogEntry::getDocHash() const {
-    return _entry.getDocHash();
 }
 
 boost::optional<bool> OplogEntry::getUpsert() const {

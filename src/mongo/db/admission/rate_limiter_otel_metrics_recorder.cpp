@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
@@ -37,6 +10,7 @@
 #include "mongo/util/moving_average.h"
 
 #include <algorithm>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -44,12 +18,27 @@
 #include <fmt/format.h>
 
 namespace mongo::admission {
+namespace {
+
+template <typename T>
+bool isNoopGauge(const otel::metrics::Gauge<T>* gauge) {
+    return gauge == otel::metrics::NoopGauge<T>::instance();
+}
+
+}  // namespace
 
 RateLimiterOtelMetricsRecorder::RateLimiterOtelMetricsRecorder(MetricsSpec spec) {
     auto& svc = otel::metrics::MetricsService::instance();
 
-    const auto makeInt64Counter = [&](otel::metrics::MetricName name, const char* description) {
-        return &svc.createInt64Counter(name, description, otel::metrics::MetricUnit::kCount);
+    // Each instrument is only created when its name is supplied in the spec; an unset name leaves
+    // the corresponding pointer at the shared no-op counter, which record() writes to and the
+    // accessors read back as zero.
+    const auto makeInt64Counter = [&](const boost::optional<otel::metrics::MetricName>& name,
+                                      const char* description) -> otel::metrics::Counter<int64_t>* {
+        if (!name) {
+            return otel::metrics::NoopCounter<int64_t>::instance();
+        }
+        return &svc.createInt64Counter(*name, description, otel::metrics::MetricUnit::kCount);
     };
 
     _attemptedCounter =
@@ -65,37 +54,49 @@ RateLimiterOtelMetricsRecorder::RateLimiterOtelMetricsRecorder(MetricsSpec spec)
     _exemptedAdmissionsCounter =
         makeInt64Counter(spec.exemptedAdmissions, "Number of exempted admissions");
 
-    _tokensAcquiredCounter = &svc.createDoubleCounter(
-        spec.tokensAcquired, "Cumulative tokens acquired", otel::metrics::MetricUnit::kCount);
+    if (spec.tokensAcquired) {
+        _tokensAcquiredCounter = &svc.createDoubleCounter(
+            *spec.tokensAcquired, "Cumulative tokens acquired", otel::metrics::MetricUnit::kCount);
+    }
 
-    _queueDepthGauge = &svc.createInt64Gauge(
-        spec.currentQueueDepth, "Current queue depth", otel::metrics::MetricUnit::kCount);
+    if (spec.currentQueueDepth) {
+        _queueDepthGauge = &svc.createInt64Gauge(
+            *spec.currentQueueDepth, "Current queue depth", otel::metrics::MetricUnit::kCount);
+    }
 
-    _tokensAvailableGauge = &svc.createDoubleGauge(
-        spec.totalAvailableTokens, "Total available tokens", otel::metrics::MetricUnit::kCount);
+    if (spec.totalAvailableTokens) {
+        _tokensAvailableGauge = &svc.createDoubleGauge(*spec.totalAvailableTokens,
+                                                       "Total available tokens",
+                                                       otel::metrics::MetricUnit::kCount);
+    }
 
-    _averageTimeQueuedMicrosGauge =
-        &svc.createDoubleGauge(spec.averageTimeQueuedMicros,
-                               "Exponential moving average of queue time (micros)",
-                               otel::metrics::MetricUnit::kMicroseconds);
+    if (spec.averageTimeQueuedMicros) {
+        _averageTimeQueuedMicrosGauge =
+            &svc.createDoubleGauge(*spec.averageTimeQueuedMicros,
+                                   "Exponential moving average of queue time (micros)",
+                                   otel::metrics::MetricUnit::kMicroseconds);
+    }
 
-    _timeQueuedMicrosHistogram = &svc.createInt64Histogram(
-        spec.timeQueuedMicros,
-        "Distribution of per-request queue time (micros)",
-        otel::metrics::MetricUnit::kMicroseconds,
-        otel::metrics::HistogramOptions{.explicitBucketBoundaries = std::vector<double>{50,
-                                                                                        100,
-                                                                                        250,
-                                                                                        500,
-                                                                                        1000,
-                                                                                        2500,
-                                                                                        5000,
-                                                                                        10000,
-                                                                                        25000,
-                                                                                        50000,
-                                                                                        100000,
-                                                                                        250000,
-                                                                                        1000000}});
+    if (spec.timeQueuedMicros) {
+        _timeQueuedMicrosHistogram = &svc.createInt64Histogram(
+            *spec.timeQueuedMicros,
+            "Distribution of per-request queue time (micros)",
+            otel::metrics::MetricUnit::kMicroseconds,
+            otel::metrics::HistogramOptions{.explicitBucketBoundaries =
+                                                std::vector<double>{50,
+                                                                    100,
+                                                                    250,
+                                                                    500,
+                                                                    1000,
+                                                                    2500,
+                                                                    5000,
+                                                                    10000,
+                                                                    25000,
+                                                                    50000,
+                                                                    100000,
+                                                                    250000,
+                                                                    1000000}});
+    }
 }
 
 void RateLimiterOtelMetricsRecorder::record(const RateLimiterMetricsRecorderEvent& event) noexcept {
@@ -125,6 +126,8 @@ void RateLimiterOtelMetricsRecorder::record(const RateLimiterMetricsRecorderEven
                 const auto avg = _averageTimeQueuedMicros.addSample(typedEvent.sample);
                 _averageTimeQueuedMicrosGauge->set(avg);
                 _timeQueuedMicrosHistogram->record(static_cast<int64_t>(typedEvent.sample));
+            } else if constexpr (std::is_same_v<TypedEvent, TimeQueuedMicros>) {
+                _totalTimeQueuedMicros.incrementRelaxed(typedEvent.micros);
             } else if constexpr (std::is_same_v<TypedEvent, TokensAcquired>) {
                 _tokensAcquiredCounter->add(typedEvent.tokens);
             } else if constexpr (std::is_same_v<TypedEvent, TokensAvailable>) {
@@ -165,7 +168,13 @@ int64_t RateLimiterOtelMetricsRecorder::attemptedAdmissions() const {
 }
 
 boost::optional<double> RateLimiterOtelMetricsRecorder::averageTimeQueuedMicros() const {
-    return _averageTimeQueuedMicros.get();
+    return MONGO_unlikely(isNoopGauge(_averageTimeQueuedMicrosGauge))
+        ? boost::none
+        : _averageTimeQueuedMicros.get();
+}
+
+int64_t RateLimiterOtelMetricsRecorder::totalTimeQueuedMicros() const {
+    return _totalTimeQueuedMicros.get();
 }
 
 double RateLimiterOtelMetricsRecorder::tokensAcquired() const {
@@ -173,11 +182,11 @@ double RateLimiterOtelMetricsRecorder::tokensAcquired() const {
 }
 
 double RateLimiterOtelMetricsRecorder::tokensAvailable() const {
-    return _tokensAvailable.loadRelaxed();
+    return MONGO_unlikely(isNoopGauge(_tokensAvailableGauge)) ? 0 : _tokensAvailable.loadRelaxed();
 }
 
 int64_t RateLimiterOtelMetricsRecorder::currentQueueDepth() const {
-    return _queueDepthCounter.loadRelaxed();
+    return MONGO_unlikely(isNoopGauge(_queueDepthGauge)) ? 0 : _queueDepthCounter.loadRelaxed();
 }
 
 PeriodicRunner::JobAnchor RateLimiterOtelMetricsRecorder::installOtelMetrics(
@@ -192,7 +201,7 @@ PeriodicRunner::JobAnchor RateLimiterOtelMetricsRecorder::installOtelMetrics(
             record(TokensAvailable{sampleAvailableTokens()});
         },
         period,
-        false /* isKillableByStepdown */));
+        /*isKillableByStepdown=*/false));
     anchor.start();
     return anchor;
 }

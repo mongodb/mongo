@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -125,7 +99,9 @@ public:
         return std::make_unique<ShardingRecoveryService::NoCustomAction>();
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) {
+    void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx,
+        const boost::optional<ForwardableOperationMetadata> forwardableMetadata) {
         _maybeThrowErrorForFunction(opCtx,
                                     ExternalFunction::kAbortUnpreparedTransactionIfNecessary);
     }
@@ -188,8 +164,10 @@ public:
         return _impl->getOnReleaseCriticalSectionCustomAction(mustClearMetadata);
     }
 
-    void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
-        _impl->abortUnpreparedTransactionIfNecessary(opCtx);
+    void abortUnpreparedTransactionIfNecessary(
+        OperationContext* opCtx,
+        const boost::optional<ForwardableOperationMetadata>& metadata) override {
+        _impl->abortUnpreparedTransactionIfNecessary(opCtx, metadata);
     }
 
 private:
@@ -298,6 +276,11 @@ public:
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
         commonMetadata.setPerformVerification(testOptions.performVerification);
 
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
+
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         return doc;
     }
@@ -329,8 +312,8 @@ public:
             client.update(donorDoc.getSourceNss(),
                           BSON("_id" << 0),
                           BSON("$inc" << BSON("x" << 1)),
-                          false /*upsert*/,
-                          false /*multi*/);
+                          /*upsert=*/false,
+                          /*multi=*/false);
         }
         for (int i = 0; i <= numDeletes; i++) {
             client.remove(donorDoc.getSourceNss(), BSON("_id" << i), false);
@@ -366,7 +349,7 @@ public:
         auto status = donor.createAndStartChangeStreamsMonitor(cloneTimestamp).getNoThrow(opCtx);
         if (donorDoc.getPerformVerification()) {
             ASSERT_OK(status);
-            checkChangeStreamsMonitor(opCtx, donorDoc, boost::none /* documentsDelta */);
+            checkChangeStreamsMonitor(opCtx, donorDoc, /*documentsDelta=*/boost::none);
             // Perform some writes against the source collection so we can verify the delta later
             // in the test.
             writeToSourceCollection(opCtx, donorDoc, _numInserts, _numUpdates, _numDeletes);
@@ -1097,6 +1080,33 @@ TEST_F(ReshardingDonorServiceTest, StepDownBeforeRunFulfillsCompletionPromise) {
     fp.setMode(FailPoint::off);
 }
 
+TEST_F(ReshardingDonorServiceTest, OnReshardingFieldsChangesTassertsInAuthoritativePath) {
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
+    auto commonMetadata = doc.getCommonReshardingMetadata();
+    commonMetadata.setAuthoritativeMetadataAccessLevel(
+        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
+    doc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+    DonorStateMachine donor{checked_cast<ReshardingDonorService*>(_service),
+                            doc,
+                            std::make_unique<ExternalStateForTest>(),
+                            getServiceContext()};
+
+    auto opCtx = makeOperationContext();
+    auto reshardingFields = TypeCollectionReshardingFields{doc.getReshardingUUID()};
+    reshardingFields.setDonorFields(TypeCollectionDonorFields{
+        doc.getTempReshardingNss(), doc.getReshardingKey(), doc.getRecipientShards()});
+    reshardingFields.setState(CoordinatorStateEnum::kCloning);
+
+    // onReshardingFieldsChanges throws when called in the authoritative path.
+    ASSERT_THROWS_WITH_CHECK(donor.onReshardingFieldsChanges(opCtx.get(), reshardingFields),
+                             DBException,
+                             [](const DBException& ex) {
+                                 EXPECT_EQ(ex.code(), 12862900);
+                                 assertionCount.tripwire.subtractAndFetch(1);
+                             });
+}
+
 TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
     for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641803,
@@ -1229,14 +1239,16 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
 
     // This acquires the critical section required by resharding donor machine when it is in
     // kBlockingWrites.
+    const auto critSecReason =
+        BSON("command" << "resharding_donor"
+                       << "collection" << doc.getSourceNss().toString_forTest());
     ShardingRecoveryService::get(opCtx.get())
         ->acquireRecoverableCriticalSectionBlockWrites(
             opCtx.get(),
             doc.getSourceNss(),
-            BSON("command" << "resharding_donor"
-                           << "collection" << doc.getSourceNss().toString_forTest()),
+            critSecReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     notifyReshardingCommitting(opCtx.get(), *donor, doc);
@@ -1279,7 +1291,7 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
 
     createSourceCollection(opCtx.get(), doc);
     auto makeChangeStreamsMonitorCtx = [&]() {
-        ChangeStreamsMonitorContext changeStreamsMonitorCtx(cloneTimestamp, 0 /* documentsDelta */);
+        ChangeStreamsMonitorContext changeStreamsMonitorCtx(cloneTimestamp, /*documentsDelta=*/0);
         return changeStreamsMonitorCtx;
     };
     doc.setChangeStreamsMonitor(makeChangeStreamsMonitorCtx());
@@ -1295,7 +1307,7 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
             BSON("command" << "resharding_donor"
                            << "collection" << doc.getSourceNss().toString_forTest()),
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     ASSERT_OK(donor->awaitChangeStreamsMonitorStarted().getNoThrow());

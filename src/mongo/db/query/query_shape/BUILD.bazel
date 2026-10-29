@@ -105,12 +105,6 @@ mongo_cc_library(
     ],
 )
 
-# TODO(SERVER-96861): Remove cycle created by moving //src/mongo/db/query/query_shape:serialization_options.h to //src/mongo/db/query/query_shape:query_shape_common
-filegroup(
-    name = "serialization_options_hdrs",
-    srcs = [":serialization_options.h"],
-)
-
 mongo_cc_unit_test(
     name = "db_query_query_shape_test",
     srcs = [

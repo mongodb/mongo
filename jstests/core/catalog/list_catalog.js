@@ -172,6 +172,49 @@ describe("Basic tests for the $listCatalog aggregation stage", function () {
         }
     });
 
+    // Test that, when auth is disabled, internal namespaces (config.*/local.*/<db>.system.*)
+    // are not filtered out from non-internal callers.
+    // TODO(SERVER-129978): perform this test unconditionally for both auth and non-auth case once
+    // the namespace filter workaround is removed.
+    it("collectionless $listCatalog is not filtered when auth is disabled", () => {
+        if (TestData.auth) {
+            jsTest.log.info("Skipping: auth is enabled.");
+            return;
+        }
+
+        // Create a view so <testDB>.system.views exists as a system.* sentinel.
+        assert.commandWorked(testDB.createView("noAuthView", "collSimple", []));
+
+        const res = adminDB.aggregate([{$listCatalog: {}}]).toArray();
+
+        // Check system.views created by createView above.
+        assert(
+            res.some((e) => e.db === testDB.getName() && e.name === "system.views"),
+            "expected system.views entry when auth is disabled",
+            {res},
+        );
+
+        // Check local (local.startup_log is always created automatically).
+        assert(
+            res.some((e) => e.db === "local"),
+            "expected local.* entries when auth is disabled",
+            {res},
+        );
+
+        // Check config - config.* entries are reliably present only on replica sets and sharded
+        // clusters, where config.system.indexBuilds is created on step-up; on standalone 'config'
+        // might be missing, so skip it.
+        if (FixtureHelpers.isReplSet(adminDB) || FixtureHelpers.isMongos(adminDB)) {
+            assert(
+                res.some((e) => e.db === "config"),
+                "expected config.* entries when auth is disabled",
+                {res},
+            );
+        }
+
+        assert(testDB.noAuthView.drop());
+    });
+
     it("$listCatalog can't run on a non-admin DB", () => {
         assert.commandFailedWithCode(
             testDB.runCommand({aggregate: 1, pipeline: [{$listCatalog: {}}], cursor: {}}),

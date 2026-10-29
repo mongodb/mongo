@@ -71,7 +71,6 @@ mongo_cc_library(
     # that accomplishes this in an allow-list approach. This makes it self-sufficient.
     auto_header = False,
     private_hdrs = [
-        "//src/mongo/base:string_data.h",
         "//src/mongo/scripting:engine.h",
         "//src/mongo/scripting:js_regex.h",
         "//src/mongo/scripting/mozjs/common:jsfile.h",

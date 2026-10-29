@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 
 #include "mongo/db/pipeline/document_source.h"
@@ -49,7 +23,15 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
             expCtx->getUUID());
     expCtx->getUUID().value().appendToBuilder(&cmdBob, mongot_cursor::kCollectionUuidField);
     if (expCtx->getExplain()) {
-        cmdBob.append("explain",
+        // mongod owns the "explain" field when the aggregate is being explained. A user-supplied
+        // "explain" in the stage spec would collide with the field appended here and produce a
+        // mongot command with duplicate top-level keys, so reject it. Outside of explain a
+        // user-supplied "explain" is intentionally passed through untouched.
+        uassert(10804601,
+                "Cannot specify the 'explain' field in a $vectorSearch stage when the aggregate "
+                "command is run with explain",
+                !request.hasField(mongot_cursor::kExplainField));
+        cmdBob.append(mongot_cursor::kExplainField,
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->getExplain())));
     }
 
@@ -62,11 +44,11 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
         request.removeField(search_helpers::kViewFieldName);
     }
 
-    auto commandObj = cmdBob.obj();
+    // Pass through remaining user-supplied fields from the request.
+    cmdBob.appendElements(request);
 
-    // Copy over all fields from the original object for passthrough.
     return mongot_cursor::getRemoteCommandRequest(
-        expCtx->getOperationContext(), expCtx->getNamespaceString(), commandObj.addFields(request));
+        expCtx->getOperationContext(), expCtx->getNamespaceString(), cmdBob.obj());
 }
 }  // namespace
 
@@ -80,8 +62,8 @@ std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     // will only see multiple batches if this upper bound doesn't fit in 16MB. This should be a rare
     // enough case that it shouldn't overwhelm mongot to pre-fetch.
     auto getMoreStrategy = std::make_unique<executor::DefaultTaskExecutorCursorGetMoreStrategy>(
-        /*batchSize*/ boost::none,
-        /*preFetchNextBatch*/ true);
+        /*batchSize=*/boost::none,
+        /*preFetchNextBatch=*/true);
     auto cursors = mongot_cursor::establishCursors(
         expCtx,
         getRemoteCommandRequestForVectorSearchQuery(expCtx, request),

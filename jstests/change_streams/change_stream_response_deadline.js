@@ -9,7 +9,7 @@
  *   each subsequent doWork() call. After the first doWork() completes and takes kDelayMS ms, the
  *   very next yield check fires and detects elapsed > kScanMaxMS. Using kDelayMS >
  *   kScanMaxMS guarantees that exactly ONE doWork() call exhausts the budget, making the
- *   behaviour reliable regardless of timer granularity.
+ *   behavior reliable regardless of timer granularity.
  *
  * Test flow:
  *   1. Record clusterTime T0 before creating the collection.
@@ -24,21 +24,31 @@
  *   5. Assert that at least two empty batches were returned before the document, each carrying a
  *      postBatchResumeToken.
  *
+ * The functionality is tested with both setting the query knob via setParameter and via query settings.
+ *
  * @tags: [
- *   assumes_read_preference_unchanged,
- *   assumes_stable_shard_list,
- *   assumes_unsharded_collection,
+ *   assumes_against_mongod_not_mongos,
  *   # Cannot wrap initial insert operations into a single transaction, in order to make them
  *   # individual statements, not just a single applyOps command.
  *   change_stream_does_not_expect_txns,
- *   uses_change_streams,
+ *   featureFlagAllowUserFacingQuerySettings,
+ *   incompatible_aubsan,
  *   requires_fcv_90,
  *   requires_replication,
+ *   tsan_incompatible,
+ *   uses_change_streams,
  * ]
  */
-import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
-import {ChangeStreamTest, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    ChangeStreamWatchMode,
+    changeStreamPassthroughType,
+    getClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {checkLog} from "src/mongo/shell/check_log.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () => {
@@ -54,7 +64,42 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
     // are produced before the matching document is returned.
     const kNumDocs = 10;
 
+    // Log ID emitted by PlanExecutorImpl::_handleResponseDeadline() at debug level 3 when the
+    // operationResponseMaxMS deadline interrupts a collection scan.
+    const kResponseDeadlineLogId = 10290000;
+
     const collName = jsTestName();
+
+    let coll;
+    let cst;
+    let startTime;
+
+    // Connections to replica set nodes  where log 10290000 is expected.
+    // Populated in 'before()' after topology discovery.
+    let replicaSetNodes = [];
+
+    // Returns an array of Mongo connections to RS nodes. Works for both a direct RS connection (change_streams suite) and a mongos connection (sharded passthrough suites).
+    const getReplicaSetNodes = (mongoConn) => {
+        let nodes = [];
+        const topology = DiscoverTopology.findConnectedNodes(mongoConn);
+        if (topology.type === Topology.kReplicaSet) {
+            topology.nodes.forEach((n) => {
+                nodes.push({conn: new Mongo(n)});
+            });
+        } else if (topology.type === Topology.kShardedCluster) {
+            Object.values(topology.shards)
+                .filter((s) => s.type === Topology.kReplicaSet)
+                .forEach((s) => {
+                    s.nodes.forEach((n) => {
+                        nodes.push({conn: new Mongo(n)});
+                    });
+                });
+        } else {
+            // Standalone topology is not supported for change streams, so this should never happen.
+            throw new Error(`Unexpected topology type: ${topology.type}`);
+        }
+        return nodes;
+    };
 
     const runWithFailPoint = (conn, failPointName, data = {}, cb) => {
         configureFailPointForAllShardsAndMongos({
@@ -70,24 +115,137 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
         }
     };
 
-    let coll;
-    let cst;
+    // Test that a change stream opened on a collection returns multiple empty batches with a
+    // postBatchResumeToken before it returns the single matching document.
+    const runTest = (querySettings = undefined, withChangeStreamRestart = false) => {
+        // Clear logs and capture near-zero offsets before the test runs. This avoids false
+        // negatives caused by the ring buffer wrapping around when many entries accumulate.
+        for (const node of replicaSetNodes) {
+            node.conn.adminCommand({clearLog: "global"});
+        }
+        const logOffsets = replicaSetNodes.map((node) => checkLog.getGlobalLog(node.conn).length);
 
-    beforeEach(() => {
+        runWithFailPoint(db.getMongo(), "hangCollScanDoWork", {delay: kDelayMS}, () => {
+            // Open the change stream at startTime with batchSize: 0.
+            let cursor = cst.startWatchingChanges({
+                pipeline: [
+                    {$changeStream: {startAtOperationTime: startTime}},
+                    {$match: {"fullDocument._id": kNumDocs - 1}},
+                ],
+                collection: collName,
+                aggregateOptions: {cursor: {batchSize: 0}},
+                querySettings,
+            });
+
+            if (withChangeStreamRestart) {
+                // Optionally restart change stream from the initial point.
+                cursor = cst.restartChangeStream(cursor);
+            }
+
+            const initialPBRT = cursor.postBatchResumeToken;
+            assert(initialPBRT, "Expected a postBatchResumeToken in the aggregate response", {
+                cursor,
+            });
+
+            let differentPBRTsReturned = 0;
+            let foundDoc = null;
+            let lastPBRT = initialPBRT;
+
+            // Issue getMore requests until the matching document is returned. Each non-matching
+            // oplog entry (createCollection, periodic no-ops, or non-matching inserts) causes the
+            // scan budget to expire after one doWork() call, returning an empty batch. Once the
+            // scan reaches the matching insert, the document is returned before the next yield check.
+            for (let i = 0; i < 100 && foundDoc === null; i++) {
+                cst.getNextBatch(cursor);
+
+                const batch = cursor.nextBatch;
+                const pbrt = cursor.postBatchResumeToken;
+
+                // Every response must carry a postBatchResumeToken.
+                assert(pbrt, `Expected a postBatchResumeToken in getMore response ${i}`, {
+                    cursor,
+                });
+
+                const pbrtCompareResult = bsonWoCompare(lastPBRT, pbrt);
+                assert.lte(pbrtCompareResult, 0, `PBRT must be monotonically non-decreasing`);
+                if (batch.length === 0) {
+                    assert.neq(
+                        NumberLong(0),
+                        cursor.id,
+                        "Cursor must stay open after an empty batch",
+                        {cursor},
+                    );
+                } else {
+                    assert.eq(
+                        1,
+                        batch.length,
+                        "Expected exactly one document when the scan finds a match",
+                        {
+                            cursor,
+                        },
+                    );
+                    foundDoc = batch[0];
+                }
+                if (pbrtCompareResult < 0) {
+                    lastPBRT = pbrt;
+                    differentPBRTsReturned++;
+                }
+            }
+
+            assert(
+                foundDoc !== null,
+                "Did not receive the matching document within the iteration limit",
+            );
+            assert.eq(
+                kNumDocs - 1,
+                foundDoc.fullDocument._id,
+                "Expected the last inserted document (_id: kNumDocs-1)",
+                {foundDoc},
+            );
+
+            // Core assertion: multiple empty batches with postBatchResumeTokens were returned
+            // before the matching document. The oplog scan will process createCollection and the
+            // first (kNumDocs - 1) non-matching inserts before reaching the matching insert. Because
+            // kDelayMS > kScanMaxMS, each doWork() call exhausts the scan budget and yields an empty
+            // batch with an updated PBRT.
+            assert.gte(
+                differentPBRTsReturned,
+                5,
+                "Expected multiple empty batches with PBRT values before the matching document",
+                {differentPBRTsReturned},
+            );
+        });
+
+        // Verify that log 10290000 was emitted on at least one shard. In sharded passthrough mode
+        // the collection is unsharded and only the primary shard will have a cursor, so "at least
+        // one" is sufficient.
+        assert.soon(
+            () =>
+                replicaSetNodes.some((node, i) => {
+                    const offset = logOffsets[i];
+                    return checkLog
+                        .getGlobalLog(node.conn)
+                        .slice(offset)
+                        .some((log) => {
+                            try {
+                                return JSON.parse(log).id === kResponseDeadlineLogId;
+                            } catch (e) {
+                                return false;
+                            }
+                        });
+                }),
+            `Expected log ${kResponseDeadlineLogId} on at least one shard node, indicating ` +
+                "the response deadline was applied and interrupted the collection scan",
+        );
+    };
+
+    before(() => {
         coll = db.getCollection(collName);
         coll.drop();
-        cst = new ChangeStreamTest(db);
-    });
 
-    afterEach(() => {
-        cst.cleanUp();
-        coll.drop();
-    });
-
-    it("returns multiple empty batches with a postBatchResumeToken before the single matching document", () => {
         // Record the cluster time before creating the collection. The change stream will start
         // at T0, so the oplog scan covers the createCollection entry and all subsequent inserts.
-        const startTime = getClusterTime(db);
+        startTime = getClusterTime(db);
 
         assert.commandWorked(db.createCollection(collName));
 
@@ -98,91 +256,72 @@ describe("change stream oplog scan PBRT updates via operationResponseMaxMS", () 
             assert.commandWorked(coll.insert({_id: i}));
         }
 
-        runWithParamsAllNonConfigNodes(db, {internalOperationResponseMaxMS: kScanMaxMS}, () => {
-            runWithFailPoint(db.getMongo(), "hangCollScanDoWork", {delay: kDelayMS}, () => {
-                // Open the change stream at startTime with batchSize:0.
-                const cursor = cst.startWatchingChanges({
-                    pipeline: [
-                        {$changeStream: {startAtOperationTime: startTime}},
-                        {$match: {"fullDocument._id": kNumDocs - 1}},
-                    ],
-                    collection: collName,
-                    aggregateOptions: {cursor: {batchSize: 0}},
-                });
+        // Discover replica set nodes and enable verbosity 3 for the query log component so that
+        // debug-level-3 log entries (including log 10290000) are visible. Dynamic setParameter is
+        // used instead of startup parameters to avoid conflicts with resmoke's global verbosity.
+        replicaSetNodes = getReplicaSetNodes(db.getMongo());
+        for (const node of replicaSetNodes) {
+            const res = assert.commandWorked(
+                node.conn.adminCommand({
+                    setParameter: 1,
+                    logComponentVerbosity: {query: {verbosity: 3}},
+                }),
+            );
+            node.previousQueryVerbosity = res.was.query;
+        }
+    });
 
-                const initialPBRT = cursor.postBatchResumeToken;
-                assert(initialPBRT, "Expected a postBatchResumeToken in the aggregate response", {
-                    cursor,
-                });
+    after(() => {
+        assert(coll.drop());
+        // Restore default query verbosity and close the connections opened for log checks.
+        for (const node of replicaSetNodes) {
+            assert.commandWorked(
+                node.conn.adminCommand({
+                    setParameter: 1,
+                    logComponentVerbosity: {query: node.previousQueryVerbosity},
+                }),
+            );
+            node.conn.close();
+        }
+        replicaSetNodes = [];
+    });
 
-                let differentPBRTsReturned = 0;
-                let foundDoc = null;
-                let lastPBRT = initialPBRT;
+    beforeEach(() => {
+        cst = new ChangeStreamTest(db);
+    });
 
-                // Issue getMore requests until the matching document is returned. Each non-matching
-                // oplog entry (createCollection, periodic no-ops, or non-matching inserts) causes the
-                // scan budget to expire after one doWork() call, returning an empty batch. Once the
-                // scan reaches the matching insert, the document is returned before the next yield check.
-                for (let i = 0; i < 100 && foundDoc === null; i++) {
-                    cst.getNextBatch(cursor);
+    afterEach(() => {
+        cst.cleanUp();
+        cst = null;
+    });
 
-                    const batch = cursor.nextBatch;
-                    const pbrt = cursor.postBatchResumeToken;
-
-                    // Every response must carry a postBatchResumeToken.
-                    assert(pbrt, `Expected a postBatchResumeToken in getMore response ${i}`, {
-                        cursor,
-                    });
-
-                    const pbrtCompareResult = bsonWoCompare(lastPBRT, pbrt);
-                    assert.lte(pbrtCompareResult, 0, `PBRT must be monotonically non-decreasing`);
-                    if (batch.length === 0) {
-                        assert.neq(
-                            NumberLong(0),
-                            cursor.id,
-                            "Cursor must stay open after an empty batch",
-                            {cursor},
-                        );
-                    } else {
-                        assert.eq(
-                            1,
-                            batch.length,
-                            "Expected exactly one document when the scan finds a match",
-                            {
-                                cursor,
-                            },
-                        );
-                        foundDoc = batch[0];
-                    }
-                    if (pbrtCompareResult < 0) {
-                        lastPBRT = pbrt;
-                        differentPBRTsReturned++;
-                    }
-                }
-
-                assert(
-                    foundDoc !== null,
-                    "Did not receive the matching document within the iteration limit",
-                );
-                assert.eq(
-                    kNumDocs - 1,
-                    foundDoc.fullDocument._id,
-                    "Expected the last inserted document (_id: kNumDocs-1)",
-                    {foundDoc},
-                );
-
-                // Core assertion: multiple empty batches with postBatchResumeTokens were returned
-                // before the matching document. With kNumDocs = 10, the oplog scan covers
-                // createCollection + 2 non-matching inserts = at least 10 non-matching entries, each
-                // causing one empty-batch getMore (because kDelayMS = 1500 ms > kScanMaxMS =
-                // 200 ms, so a single doWork() call exhausts the scan budget).
-                assert.gte(
-                    differentPBRTsReturned,
-                    5,
-                    "Expected multiple empty batches with PBRT values before the matching document",
-                    {differentPBRTsReturned},
-                );
+    [false, true].forEach((restartChangeStream) => {
+        const testCaseSuffix = restartChangeStream ? " - with stream restart" : "";
+        it(`returns multiple empty batches with a postBatchResumeToken - using server parameter${testCaseSuffix}`, () => {
+            runWithParamsAllNonConfigNodes(db, {internalOperationResponseMaxMS: kScanMaxMS}, () => {
+                runTest(undefined, restartChangeStream);
             });
+        });
+
+        it(`returns multiple empty batches with a postBatchResumeToken - using query settings override${testCaseSuffix}`, () => {
+            // TODO SERVER-135301: querySettings is never applied to a whole-cluster stream
+            // (admin db, allChangesForCluster) because isEligbleForQuerySettings() rejects the
+            // admin namespace outright. Remove this skip once that is fixed.
+            const isDirectToShard =
+                TestData.connectedDirectlyToShard || TestData.changeStreamCommandsDirectToShard;
+            if (
+                isDirectToShard &&
+                changeStreamPassthroughType() === ChangeStreamWatchMode.kCluster
+            ) {
+                jsTest.log.info(
+                    "Skipping case: querySettings has no effect on a whole-cluster stream when directly connected to a shard",
+                );
+                return;
+            }
+            runTest(
+                {queryKnobs: {operationResponseMaxMS: NumberLong(kScanMaxMS)}},
+                restartChangeStream,
+            );
         });
     });
 });

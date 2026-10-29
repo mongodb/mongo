@@ -1,7 +1,15 @@
+/**
+ * @tags: [
+ *   # Assumes mongod uses the host distro's SSL stack configuration (e.g. RHEL
+ *   # crypto-policies, system FIPS module); custom builds that link a bundled
+ *   # OpenSSL instead exclude this test via --excludeWithAnyTags.
+ *   assumes_system_ssl_stack
+ * ]
+ */
 // Ensure that TLS version alerts are correctly propagated
 
 import {determineSSLProvider, sslProviderSupportsTLS1_1} from "jstests/ssl/libs/ssl_helpers.js";
-import {windowsSupportsTLS13} from "jstests/libs/os_helpers.js";
+import {windowsSupportsTLS13} from "jstests/libs/server_security/os_helpers.js";
 
 const clientOptions = [
     "--tls",
@@ -27,8 +35,10 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
         // TLS 1.3 mismatches:
         //  - server only TLS 1.3, client only TLS 1.2 -> Connection closed by peer
         //  - server only TLS 1.2, client only TLS 1.3 -> SEC_E_ALGORITHM_MISMATCH text
-        // Legacy TLS 1.2 mismatch path:
-        //  - Connection reset by peer
+        // Legacy TLS 1.2 mismatch path: the server drops the connection with an abortive close,
+        // which the egress client now classifies as ConnectionClosedByPeer ("Connection closed by
+        // peer: ...") instead of the former "Connection reset by peer". Accept either so the test
+        // passes on both current and older builds.
         if (serverDisabledProtos === "TLS1_2" && clientDisabledProtos === "TLS1_3") {
             expectedRegex =
                 /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*Connection closed by peer/;
@@ -37,11 +47,13 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
                 /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*cannot communicate, because they do not possess a common algorithm/;
         } else {
             expectedRegex =
-                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*Connection reset by peer/;
+                /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*(Connection reset by peer|Connection closed by peer)/;
         }
     } else if (implementation === "apple") {
+        // The peer close is reported as either "closed" or "reset" by peer depending on timing;
+        // accept both so the test doesn't flake on whichever variant occurs.
         expectedRegex =
-            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: HostUnreachable: futurize.* Connection closed by peer.*/;
+            /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: .*(Connection closed by peer|Connection reset by peer)/;
     } else {
         throw Error("Unrecognized TLS implementation!");
     }
@@ -69,7 +81,8 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
             mongoOutput = rawMongoProgramOutput(".*");
             return mongoOutput.match(expectedRegex);
         },
-        "Mongo shell output was as follows:\n" + mongoOutput + "\n************",
+        // Lazy so the message shows the actual output, not the pre-assignment `undefined`.
+        () => "Mongo shell output was as follows:\n" + mongoOutput + "\n************",
         60 * 1000,
     );
 

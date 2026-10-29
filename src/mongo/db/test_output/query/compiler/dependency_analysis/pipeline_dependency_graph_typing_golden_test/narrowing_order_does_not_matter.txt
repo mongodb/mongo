@@ -1,0 +1,27 @@
+VARIATION NarrowingOrderDoesNotMatter
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+  end of pipeline
+    x: number
+

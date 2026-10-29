@@ -49,7 +49,6 @@
       - primary_driven_index_builds_incompatible
       - rolling_index_builds
       - requires_commit_quorum
-      - requires_capped
       - requires_rollbacks
       # Primary-driven index builds are not resumable.
       - requires_index_build_resumability
@@ -113,6 +112,7 @@
         shell_options:
           eval: >-
             await import('jstests/libs/override_methods/implicitly_retry_transactions_on_write_conflicts.js');
+            await import('jstests/libs/override_methods/implicitly_retry_resharding.js');
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:
@@ -124,7 +124,6 @@
     selector:
       exclude_files: null
       roots:
-        - jstests/replsets/*index_build*.js
         - jstests/replsets/**/*index_build*.js
         - jstests/replsets/container_operations.js
 - name: all_sharding_index_builds_tests_selector

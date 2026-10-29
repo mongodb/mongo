@@ -17,7 +17,7 @@
 static WT_INLINE int
 __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
   WT_UPDATE *onpage_upd, WT_UPDATE *tombstone, WT_TIME_WINDOW *tw, bool supd_restore,
-  size_t upd_memsize)
+  size_t upd_memsize, bool count_for_split)
 {
     WT_SAVE_UPD *supd;
 
@@ -39,14 +39,19 @@ __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT
     supd->free_upds = NULL;
     supd->tw = *tw;
     supd->restore = supd_restore;
+    supd->count_for_split = count_for_split;
     ++r->supd_next;
     /*
      * We don't need to worry about the saved update's impact on page split if we only have a
-     * tombstone as we will skip writing it to the disk.
+     * tombstone as we will skip writing it to the disk. Similarly, a disaggregated btree save that
+     * exists only to check reconciliation progress carries no content beyond what the disk image
+     * already holds, so it shouldn't bias the split heuristic either.
      */
     if (onpage_upd != NULL || supd_restore) {
-        ++r->supd_onpage_or_restore;
-        r->supd_memsize += upd_memsize;
+        if (count_for_split) {
+            ++r->supd_onpage_or_restore;
+            r->supd_memsize += upd_memsize;
+        }
     } else
         WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT) || upd_memsize == 0);
 
@@ -87,11 +92,12 @@ __rec_delete_hs_upd_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *
  */
 static int
 __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
-  WT_CELL_UNPACK_KV *unpack, bool write_prepared)
+  WT_CELL_UNPACK_KV *unpack, bool keep_prepare_fallback)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
+    WT_ITEM cell_ref, *src;
     WT_UPDATE *append, *oldest_upd, *onpage_upd_or_tombstone, *tombstone;
     size_t size, total_size;
     bool seen_committed, tombstone_globally_visible;
@@ -132,16 +138,16 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
          * possible for an update on the chain to be globally visible and followed by an (earlier)
          * update that is not yet globally visible.
          *
-         * Skip this shortcut when writing as prepared. The decision to write as prepared was taken
-         * against the pinned stable timestamp captured at reconcile start, which can lag the
-         * current global oldest. By the time we reach here, the chain may have become globally
-         * visible even though we still need to encode this entry as prepared. In that case we must
-         * not return early; the caller relies on the on-page value being available as a rollback
-         * fallback for the prepared update.
+         * Skip this shortcut when the on-page value must be kept as a prepared update's rollback
+         * fallback: visibility can shift between when that need was determined and when we reach
+         * here (the pinned stable timestamp used earlier can lag the current global oldest, or the
+         * prepared update may have been skipped this round entirely), so the chain may look
+         * globally visible even though the fallback is still required. In that case we must not
+         * return early.
          */
         if (WT_UPDATE_DATA_VALUE(upd) &&
           (onpage_upd_or_tombstone != upd || onpage_upd_or_tombstone->type != WT_UPDATE_TOMBSTONE ||
-            !write_prepared) &&
+            !keep_prepare_fallback) &&
           __wt_txn_upd_visible_all(session, upd))
             return (0);
 
@@ -189,7 +195,7 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
                  * wrongly leave this key as prepared indefinitely if we rollback the prepared
                  * update.
                  */
-                if (seen_committed || !write_prepared)
+                if (seen_committed || !keep_prepare_fallback)
                     return (0);
             }
 
@@ -230,15 +236,26 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
 
     /* We need the original on-page value for some reader: get a copy. */
     if (!tombstone_globally_visible) {
-        WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-        WT_ERR(__wt_page_cell_data_ref_kv(session, page, unpack, tmp));
         /*
          * We should never see an overflow removed value because we haven't freed the overflow
          * blocks.
          */
         WT_ASSERT(session,
           unpack->cell == NULL || __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
-        WT_ERR(__wt_upd_alloc(session, tmp, WT_UPDATE_STANDARD, &append, &size));
+        /*
+         * A non-overflow value is already fully in memory, so reference it directly rather than
+         * decoding into a scratch buffer; the allocation below copies it out immediately.
+         */
+        if (unpack->type == WT_CELL_VALUE) {
+            cell_ref.data = unpack->data;
+            cell_ref.size = unpack->size;
+            src = &cell_ref;
+        } else {
+            WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+            WT_ERR(__wt_page_cell_data_ref_kv(session, page, unpack, tmp));
+            src = tmp;
+        }
+        WT_ERR(__wt_upd_alloc(session, src, WT_UPDATE_STANDARD, &append, &size));
         total_size += size;
         /*
          * When reconciling during recovery, we need to clear the transaction id as we haven't done
@@ -252,7 +269,12 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
         append->upd_start_ts = unpack->tw.start_ts;
         append->upd_durable_ts = unpack->tw.durable_start_ts;
         F_SET(append, WT_UPDATE_RESTORED_FROM_DS);
-        if (is_disagg)
+        /*
+         * A fuzzy checkpoint writes a stop that is newer than the stable timestamp, so rollback to
+         * stable can take that stop away and bring the value below it back to life. Only mark the
+         * value durable when there is no stop above it to disappear.
+         */
+        if (is_disagg && !WT_TIME_WINDOW_HAS_STOP(&unpack->tw))
             F_SET(append, WT_UPDATE_DURABLE);
     }
 
@@ -262,7 +284,7 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
     }
 
     /* Append the new entry into the update list. */
-    WT_RELEASE_WRITE_WITH_BARRIER(upd->next, append);
+    __wt_atomic_store_ptr_release(&upd->next, append);
 
     __wt_cache_page_inmem_incr(session, page, total_size, false);
 
@@ -366,13 +388,12 @@ __rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECO
 
 /*
  * __rec_need_save_upd --
- *     Return if we need to save the update chain
+ *     Return if we need to save the update chain.
  */
 static WT_INLINE bool
 __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELECT *upd_select,
   WT_CELL_UNPACK_KV *vpack, bool supd_restore)
 {
-    WT_BTREE *btree;
     WT_UPDATE *upd;
     bool visible_all;
 
@@ -382,49 +403,8 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
     if (supd_restore)
         return (true);
 
-    btree = S2BT(session);
-
-    if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+    if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
         return (false);
-    /*
-     * We need to save the update chain to check whether the reconciliation makes progress for
-     * disaggregated btrees. Don't save the update chain if the selected update is already durable.
-     */
-    if (upd_select->upd != NULL && F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
-        if (upd_select->tombstone != NULL) {
-            if (!F_ISSET(upd_select->tombstone, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
-                return (true);
-
-            /* Save the update if we overwrite the previous prepared update. */
-            if (F_ISSET(upd_select->tombstone, WT_UPDATE_PREPARE_DURABLE) &&
-              !WT_TIME_WINDOW_HAS_STOP_PREPARE(&upd_select->tw))
-                return (true);
-        }
-
-        if (upd_select->upd->type == WT_UPDATE_TOMBSTONE) {
-            /*
-             * Save the update if we haven't deleted the key from the disk image. We may have
-             * written the tombstone to disk already but we still need to do another delta to remove
-             * it from disk.
-             *
-             * Deleting the key with a stop timestamp in the delta is not saving disk space but
-             * actually increases our disk usage. We need to write a full image to really delete
-             * these keys. But if we don't do that, we will have a lot of deleted keys in memory and
-             * search will be less efficient. Particularly it will be a problem for the history
-             * store.
-             */
-            if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE))
-                return (true);
-        } else {
-            if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
-                return (true);
-
-            /* Save the update if we overwrite the previous prepared update. */
-            if (F_ISSET(upd_select->upd, WT_UPDATE_PREPARE_DURABLE) &&
-              !WT_TIME_WINDOW_HAS_START_PREPARE(&upd_select->tw))
-                return (true);
-        }
-    }
 
     /* No need to save the update chain if we want to delete the key from the disk image. */
     if (upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE)
@@ -460,6 +440,66 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
     }
 
     return (true);
+}
+
+/*
+ * __rec_need_save_upd_disagg --
+ *     Return if we need to save the update chain of a disaggregated btree. On top of the usual
+ *     reasons, we save it to check whether the reconciliation makes progress. A save for that
+ *     reason alone holds nothing beyond the disk image, so it is left out of the split estimate.
+ */
+static WT_INLINE bool
+__rec_need_save_upd_disagg(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
+  WTI_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, bool supd_restore,
+  bool *count_for_splitp)
+{
+    *count_for_splitp = true;
+
+    if (__rec_need_save_upd(session, r, upd_select, vpack, supd_restore))
+        return (true);
+
+    if (upd_select->upd == NULL || F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
+        return (false);
+
+    /* Don't save the update chain if the selected update is already durable. */
+    *count_for_splitp = false;
+    if (upd_select->tombstone != NULL) {
+        if (!F_ISSET(upd_select->tombstone, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
+            return (true);
+
+        /* Save the update if we overwrite the previous prepared update. */
+        if (F_ISSET(upd_select->tombstone, WT_UPDATE_PREPARE_DURABLE) &&
+          !WT_TIME_WINDOW_HAS_STOP_PREPARE(&upd_select->tw))
+            return (true);
+
+        /*
+         * When a tombstone and the value below it are written together, only the tombstone is
+         * marked durable, so there is nothing left to check on the value itself.
+         */
+    } else if (upd_select->upd->type == WT_UPDATE_TOMBSTONE) {
+        /*
+         * Save the update if we haven't deleted the key from the disk image. We may have written
+         * the tombstone to disk already but we still need to do another delta to remove it from
+         * disk.
+         *
+         * Deleting the key with a stop timestamp in the delta is not saving disk space but actually
+         * increases our disk usage. We need to write a full image to really delete these keys. But
+         * if we don't do that, we will have a lot of deleted keys in memory and search will be less
+         * efficient. Particularly it will be a problem for the history store.
+         */
+        if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE))
+            return (true);
+    } else {
+        if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
+            return (true);
+
+        /* Save the update if we overwrite the previous prepared update. */
+        if (F_ISSET(upd_select->upd, WT_UPDATE_PREPARE_DURABLE) &&
+          !WT_TIME_WINDOW_HAS_START_PREPARE(&upd_select->tw))
+            return (true);
+    }
+
+    return (false);
 }
 
 /*
@@ -766,12 +806,9 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
             txnid = upd->upd_saved_txnid;
         }
 
-        /*
-         * Give up if the update is from this transaction and on the metadata file or disaggregated
-         * shared metadata file.
-         */
-        if ((WT_IS_METADATA(session->dhandle) || WT_IS_DISAGG_META(session->dhandle)) &&
-          session_txnid != WT_TXN_NONE && txnid == session_txnid)
+        /* Give up if the update is from this transaction and on a metadata tree. */
+        if (WT_IS_ANY_METADATA(session->dhandle) && session_txnid != WT_TXN_NONE &&
+          txnid == session_txnid)
             return (__wt_set_return(session, EBUSY));
 
         /*
@@ -781,13 +818,15 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
         *first_txn_updp = upd;
 
         /*
-         * Special handling for application threads evicting their own updates.
+         * Special handling for application threads evicting their own updates, whether reconciling
+         * under their own snapshot or the checkpoint's.
          */
-        if (!is_hs_page && F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT) &&
+        if (!is_hs_page &&
+          F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT | WT_REC_APP_EVICTION_CKPT_SNAPSHOT) &&
           session_txnid != WT_TXN_NONE && txnid == session_txnid) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
-            WT_ASSERT(session, !upd_select->skip_aborted_prepared_value);
+            WT_ASSERT(session, upd_select->prepare_rollback_upd == NULL);
             continue;
         }
         /*
@@ -820,13 +859,9 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
 
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
-            /*
-             * Same reason as the aborted-prepared skip earlier: this rolled-back prepared value has
-             * no in-chain fallback, so the on-disk cell must not be dropped on this reconciliation.
-             */
-            if (upd->txnid == WT_TXN_ABORTED && upd->type != WT_UPDATE_TOMBSTONE)
-                upd_select->skip_aborted_prepared_value = true;
-
+            if (upd->txnid == WT_TXN_ABORTED && upd->type != WT_UPDATE_TOMBSTONE &&
+              upd_select->prepare_rollback_upd == NULL)
+                upd_select->prepare_rollback_upd = upd;
             continue;
         }
 
@@ -853,14 +888,9 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                     WT_ASSERT(session, !is_hs_page);
                     *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
                     *has_newer_updatesp = true;
-
-                    /*
-                     * Same reason as the aborted-prepared skip earlier: this rolled-back prepared
-                     * value has no in-chain fallback, so the on-disk cell must not be dropped on
-                     * this reconciliation.
-                     */
-                    if (upd->txnid == WT_TXN_ABORTED && upd->type != WT_UPDATE_TOMBSTONE)
-                        upd_select->skip_aborted_prepared_value = true;
+                    if (upd->txnid == WT_TXN_ABORTED && upd->type != WT_UPDATE_TOMBSTONE &&
+                      upd_select->prepare_rollback_upd == NULL)
+                        upd_select->prepare_rollback_upd = upd;
                     continue;
                 }
 
@@ -1009,6 +1039,19 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
 }
 
 /*
+ * __rec_upd_select_track_modify_base --
+ *     Track whether a retained update chain needs the on-page value to reconstruct a modify.
+ */
+static WT_INLINE void
+__rec_upd_select_track_modify_base(WTI_UPDATE_SELECT *upd_select, WT_UPDATE *upd)
+{
+    if (upd->type == WT_UPDATE_MODIFY)
+        upd_select->modify_needs_onpage_value = true;
+    else if (WT_UPDATE_DATA_VALUE(upd))
+        upd_select->modify_needs_onpage_value = false;
+}
+
+/*
  * __rec_upd_select_inmem --
  *     Select the update to write to disk image for in-memory btree. For in-memory btree, we select
  *     the first globally visible update in the update chain that is not a tombstone. If there is no
@@ -1058,12 +1101,17 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
                     found_last_upd_to_keep = false;
                     WT_STAT_CONN_DSRC_INCR(session, rec_ingest_keep_prepare_rollback);
                 }
+                /*
+                 * A rolled-back prepared MODIFY is retained and may still be reconstructed during
+                 * draining.
+                 */
+                __rec_upd_select_track_modify_base(upd_select, upd);
             }
 
             continue;
         }
-        /* Give up if the update is from this transaction and on the metadata file. */
-        if (WT_IS_METADATA(session->dhandle) && session_txnid != WT_TXN_NONE &&
+        /* Give up if the update is from this transaction and on a metadata tree. */
+        if (WT_IS_ANY_METADATA(session->dhandle) && session_txnid != WT_TXN_NONE &&
           upd->txnid == session_txnid)
             return (__wt_set_return(session, EBUSY));
         /* Track the first update in the chain that is not aborted */
@@ -1071,10 +1119,11 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
             *first_txn_updp = upd;
 
         /* Special handling for application threads evicting their own updates. */
-        if (F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT) && session_txnid != WT_TXN_NONE &&
-          upd->txnid == session_txnid) {
+        if (F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT | WT_REC_APP_EVICTION_CKPT_SNAPSHOT) &&
+          session_txnid != WT_TXN_NONE && upd->txnid == session_txnid) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
         /*
@@ -1105,6 +1154,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
         /*
@@ -1120,12 +1170,14 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
         if (upd->prepare_state == WT_PREPARE_INPROGRESS) {
             *has_newer_updatesp = true;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             continue;
         }
 
         if (WT_REC_CAN_PRUNE_UPD(upd->txnid, upd->upd_durable_ts, r)) {
             first_pruned_update = upd;
             found_last_upd_to_keep = upd_select->upd != NULL;
+            __rec_upd_select_track_modify_base(upd_select, upd);
             /* Mark we are making progress for eviction so eviction doesn't stall. */
             r->update_used = true;
             break;
@@ -1133,7 +1185,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
         if (!found_last_upd_to_keep) {
             upd_select->upd = upd;
-            upd_select->was_modify = upd->type == WT_UPDATE_MODIFY;
+            __rec_upd_select_track_modify_base(upd_select, upd);
 
             /*
              * Non-timestamped tombstones on ingest btrees are written non-transactionally by the
@@ -1472,6 +1524,59 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
 }
 
 /*
+ * __rec_append_orig_value_if_needed --
+ *     Append the on-page value to the update chain if a reader or an unresolved prepared update may
+ *     still need it once this reconciliation replaces or drops the on-page cell.
+ */
+static int
+__rec_append_orig_value_if_needed(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page,
+  WT_CELL_UNPACK_KV *vpack, WTI_UPDATE_SELECT *upd_select)
+{
+    /*
+     * There is no on-page value to preserve, or the on-page value is itself a prepared update: a
+     * prepared full update is already on the update chain, and for a prepared tombstone the on-page
+     * value was appended to the update chain when the page was read into memory.
+     */
+    if (!WT_REC_HAS_ON_DISK(vpack) || WT_TIME_WINDOW_HAS_PREPARE(&vpack->tw))
+        return (0);
+
+    /*
+     * If we skipped an unresolved aborted prepared update and selected nothing, the on-page value
+     * is its only rollback fallback: this reconciliation may drop the on-page cell (or a later one
+     * may free its backing overflow blocks), so the fallback must move to the update chain where it
+     * survives the page image being rewritten. Anchor the walk on the skipped prepared update
+     * itself rather than the chain head, which a concurrent writer may be prepending to, and force
+     * the append even though the on-page value's stop may be globally visible.
+     *
+     * Gate this on WT_REC_HS: prepared updates only reach the disk image on timestamped tables
+     * backed by the history store, so an in-memory database or a non-timestamped table never needs
+     * this fallback.
+     */
+    if (upd_select->upd == NULL) {
+        if (F_ISSET(r, WT_REC_HS) && F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+          upd_select->prepare_rollback_upd != NULL)
+            return (__rec_append_orig_value(
+              session, page, upd_select->prepare_rollback_upd, vpack, true));
+        return (0);
+    }
+
+    /*
+     * Returning an update means the original on-page value might be lost, and that's a problem if
+     * there's a reader that needs it: make a copy of the on-page value. We do that any time there
+     * are saved updates (we may need the original on-page value to terminate the update chain, for
+     * example, in the case of an update that modifies the original value). Additionally, make a
+     * copy of the on-page value if the value is an overflow item and anything other than the
+     * on-page cell is being written, because the value's backing overflow blocks aren't part of the
+     * page and are physically removed when this page is next written.
+     */
+    if (F_ISSET(r, WT_REC_HS) && (upd_select->upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
+        return (__rec_append_orig_value(
+          session, page, upd_select->upd, vpack, WT_TIME_WINDOW_HAS_PREPARE(&upd_select->tw)));
+
+    return (0);
+}
+
+/*
  * __wti_rec_upd_select --
  *     Return the update in a list that should be written (or NULL if none can be written).
  */
@@ -1531,7 +1636,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * checkpoint in a concurrent session.
      */
     WT_ASSERT_ALWAYS(session,
-      !WT_IS_METADATA(session->dhandle) || upd == NULL || upd->txnid == WT_TXN_NONE ||
+      !WT_IS_ANY_METADATA(session->dhandle) || upd == NULL || upd->txnid == WT_TXN_NONE ||
         upd->txnid !=
           __wt_atomic_load_uint64_v_relaxed(&S2C(session)->txn_global.checkpoint_txn_shared.id) ||
         WT_SESSION_IS_CHECKPOINT(session),
@@ -1625,10 +1730,17 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      *
      * Additionally history store reconciliation is not set skip saving an update.
      */
-    if (__rec_need_save_upd(session, r, upd_select, vpack, supd_restore)) {
+    bool count_for_split = true;
+    bool need_save;
+    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED))
+        need_save =
+          __rec_need_save_upd_disagg(session, r, upd_select, vpack, supd_restore, &count_for_split);
+    else
+        need_save = __rec_need_save_upd(session, r, upd_select, vpack, supd_restore);
+    if (need_save) {
         upd_memsize = __rec_calc_upd_memsize(onpage_upd, upd_select->tombstone, upd_memsize);
         WT_RET(__rec_update_save(session, r, ins, rip, onpage_upd, upd_select->tombstone,
-          &upd_select->tw, supd_restore, upd_memsize));
+          &upd_select->tw, supd_restore, upd_memsize, count_for_split));
         upd_select->upd_saved = true;
     }
 
@@ -1655,26 +1767,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
           WT_TIME_WINDOW_HAS_PREPARE(&upd_select->tw)),
       "Updated selected that has since been rolled back");
 
-    /*
-     * Returning an update means the original on-page value might be lost, and that's a problem if
-     * there's a reader that needs it, make a copy of the on-page value. We do that any time there
-     * are saved updates (we may need the original on-page value to terminate the update chain, for
-     * example, in the case of an update that modifies the original value). Additionally, make a
-     * copy of the on-page value if the value is an overflow item and anything other than the
-     * on-page cell is being written. This is because the value's backing overflow blocks aren't
-     * part of the page, and they are physically removed by checkpoint writing this page, that is,
-     * the checkpoint doesn't include the overflow blocks so they're removed and future readers of
-     * this page won't be able to find them.
-     *
-     * We never append prepared updates back to the onpage value. If it is a prepared full update,
-     * it is already on the update chain. If it is a prepared tombstone, the onpage value is already
-     * appended to the update chain when the page is read into memory.
-     */
-    if (F_ISSET(r, WT_REC_HS) && upd_select->upd != NULL && WT_REC_HAS_ON_DISK(vpack) &&
-      !WT_TIME_WINDOW_HAS_PREPARE(&(vpack->tw)) &&
-      (upd_select->upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
-        WT_RET(__rec_append_orig_value(
-          session, page, upd_select->upd, vpack, WT_TIME_WINDOW_HAS_PREPARE(&upd_select->tw)));
+    WT_RET(__rec_append_orig_value_if_needed(session, r, page, vpack, upd_select));
 
     __wti_rec_time_window_clear_obsolete(session, upd_select, NULL, r);
 

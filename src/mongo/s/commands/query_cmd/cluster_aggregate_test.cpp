@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/s/query/planner/cluster_aggregate.h"
@@ -39,16 +13,19 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/util/retry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -57,6 +34,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string_view>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -66,6 +45,33 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * A test-only IFR flag, registered on first use, that a mocked shard can ask the router to disable.
+ */
+IncrementalRolloutFeatureFlag& testIFRFlag() {
+    static IncrementalRolloutFeatureFlag flag{
+        "featureFlagClusterAggregateTestIfrRetry", RolloutPhase::inDevelopment, true};
+    // The global flag registry does not support re-registration, so register exactly once even
+    // though each test's setUp() runs again.
+    static std::once_flag registered;
+    std::call_once(registered, [] { flag.registerFlag(); });
+    return flag;
+}
+
+/**
+ * Builds the reply a shard sends when it wants the router to disable an IFR flag and re-plan the
+ * request: an IFRFlagRetry error whose extra info names the flag.
+ */
+BSONObj makeIFRFlagRetryResponse(std::string_view disabledFlagName) {
+    BSONObjBuilder bob;
+    bob.append("ok", 0.0);
+    bob.append("code", static_cast<int>(ErrorCodes::IFRFlagRetry));
+    bob.append("codeName", ErrorCodes::errorString(ErrorCodes::IFRFlagRetry));
+    bob.append("errmsg", "forced IFR flag kickback for testing");
+    bob.append("disabledFlagName", disabledFlagName);
+    return bob.obj();
+}
 
 class ClusterAggregateTest : public ClusterCommandTestFixture {
 protected:
@@ -191,6 +197,111 @@ TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
     ASSERT_EQ(51028, res.code());
 }
 
+TEST_F(ClusterAggregateTest, ShouldFailWhenAllowPartialResultsIsUsedWithWriteStage) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$out: 'out'}], cursor: {}, allowPartialResults: true, "
+        "$db: 'test'}");
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(ErrorCodes::InvalidOptions, res.code());
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenAllowPartialResultsIsUsedWithChangeStream) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$changeStream: {}}], cursor: {}, allowPartialResults: "
+        "true, $db: 'test'}");
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(ErrorCodes::InvalidOptions, res.code());
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenAllowPartialResultsIsUsedWithSearch) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$search: {text: {query: 'abc', path: 'a'}}}], cursor: {}, "
+        "allowPartialResults: true, $db: 'test'}");
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(ErrorCodes::InvalidOptions, res.code());
+}
+
+TEST_F(ClusterAggregateTest, AllowPartialResultsIsNotForwardedToShardAggregateCommand) {
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, allowPartialResults: "
+        "true, cursor: {batchSize: 10}}");
+    runCommandInspectRequests(
+        inputBson,
+        [](const executor::RemoteCommandRequest& request) {
+            ASSERT_FALSE(request.cmdObj.hasField("allowPartialResults"));
+        },
+        /*isTargeted=*/true);
+}
+
+// When a shard asks for an IFR flag to be disabled, the router disables it and re-dispatches the
+// user's original request rather than failing the command.
+TEST_F(ClusterAggregateTest, RetriesOriginalRequestOnIFRFlagKickback) {
+    const auto flagName = testIFRFlag().getName();
+
+    auto future = launchAsync([&] { return runCommand(kAggregateCmdTargeted); });
+
+    // The shard asks for the flag to be disabled instead of answering the aggregate.
+    // 'request.cmdObj' is only valid for the duration of the callback, so take an owned copy of the
+    // pipeline to compare the retry against.
+    BSONObj firstAttemptPipeline;
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+        firstAttemptPipeline = request.cmdObj["pipeline"].wrap().getOwned();
+        return makeIFRFlagRetryResponse(flagName);
+    });
+
+    // The router has to disable the flag and re-run this same aggregate.
+    const std::vector<BSONObj> batch = {BSON("_id" << 0)};
+    bool sawRetry = false;
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+
+        // Assert the flag is disabled in the retry.
+        auto ifrCtx = IncrementalFeatureRolloutContext::tryGet(request.opCtx);
+        ASSERT(ifrCtx) << "expected an IFR context on the dispatching opCtx";
+        ASSERT_FALSE(ifrCtx->getSavedFlagValue(testIFRFlag()));
+
+        ASSERT_BSONOBJ_EQ(firstAttemptPipeline, request.cmdObj["pipeline"].wrap());
+        sawRetry = true;
+
+        BSONObjBuilder bob(CursorResponse(kNss, CursorId(0), batch)
+                               .toBSON(CursorResponse::ResponseType::InitialResponse));
+        appendTxnResponseMetadata(bob);
+        return bob.obj();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT(sawRetry);
+
+    // The retry's results must reach the client.
+    const auto replyBody = OpMsgRequest::parse(response.response).body;
+    ASSERT_OK(getStatusFromCommandResult(replyBody));
+    const auto firstBatch = replyBody["cursor"].Obj()["firstBatch"].Array();
+    ASSERT_EQ(1u, firstBatch.size()) << replyBody;
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 0), firstBatch[0].Obj());
+}
+
+TEST_F(ClusterAggregateTest, ExhaustsRetriesOnRepeatedIFRFlagKickbacks) {
+    const auto flagName = testIFRFlag().getName();
+
+    auto future = launchAsync([&] { return runCommand(kAggregateCmdTargeted); });
+
+    // 'retryOn()' runs the command once and then retries it 'kDefaultMaxRetries' times, so the
+    // kickback has to be answered one more time than 'kDefaultMaxRetries'.
+    for (size_t attempt = 0; attempt < kDefaultMaxRetries + 1; ++attempt) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+            return makeIFRFlagRetryResponse(flagName);
+        });
+    }
+
+    auto response = future.default_timed_get();
+    const auto replyBody = OpMsgRequest::parse(response.response).body;
+    const auto status = getStatusFromCommandResult(replyBody);
+    ASSERT_EQ(ErrorCodes::IFRFlagRetry, status.code()) << replyBody;
+    ASSERT_STRING_CONTAINS(status.reason(), "Exhausted max retries");
+}
+
 }  // namespace
 
 /**
@@ -267,14 +378,14 @@ protected:
         auto pinnedCursor =
             unittest::assertGet(cursorManager->checkOutCursorNoAuthCheck(cursorId, &*opCtx));
         // Make sure to return the tracker and the cursor when we're done.
-        std::unique_ptr<OperationMemoryUsageTracker> memoryUsageTracker;
+        std::shared_ptr<OperationMemoryUsageTracker> memoryUsageTracker;
         ScopeGuard guard{[&] {
-            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx.get(),
-                                                                std::move(memoryUsageTracker));
+            OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx.get(),
+                                                                  std::move(memoryUsageTracker));
             pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
         }};
         // The tracker should be on the opCtx now.
-        memoryUsageTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx.get());
+        memoryUsageTracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx.get());
         ASSERT_NE(nullptr, memoryUsageTracker);
         // Since we took the tracker off of the opCtx, the tracker's opCtx pointer will be null.
         ASSERT_EQ(nullptr, memoryUsageTracker->_opCtx);

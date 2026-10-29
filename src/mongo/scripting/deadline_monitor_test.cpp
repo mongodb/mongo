@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // DeadlineMonitor unit tests
 
@@ -189,6 +163,31 @@ TEST(DeadlineMonitor, IsKillPendingKills) {
     dm.startDeadline(&task, -1);
     task.killPending.store(true);
     group.waitForKillCount(1);
+    ASSERT(task._killed);
+}
+
+// Regression test for BF-44678. A task with an infinite deadline (timeoutMs <= 0) is killed only
+// via the periodic isKillPending() poll. Registering such a task must wake a monitor that is
+// already parked in its indefinite wait because it previously had no tasks -- otherwise the poll
+// never resumes and the task hangs forever (the notify used to be sent only when the new deadline
+// beat _nearestDeadlineWallclock, which an infinite deadline never does).
+TEST(DeadlineMonitor, InfiniteDeadlineWakesIdleMonitor) {
+    DeadlineMonitor<Task> dm;
+    TaskGroup group;
+
+    // Prime the monitor: register a task that expires almost immediately and wait for its kill.
+    // Once observed, the monitor has emptied its task list and is parking in the indefinite wait.
+    // This reliably reproduces the "monitor idle, then task added" order that hung.
+    Task primer(&group);
+    dm.startDeadline(&primer, 1);
+    group.waitForKillCount(1);
+
+    // The mutex is released by the monitor only once it is parked, so this call is serialized after
+    // the monitor is idle. Without the fix it sends no notify and the monitor sleeps forever.
+    Task task(&group);
+    dm.startDeadline(&task, -1);
+    task.killPending.store(true);
+    group.waitForKillCount(2);
     ASSERT(task._killed);
 }
 }  // namespace mongo

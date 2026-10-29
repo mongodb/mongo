@@ -44,8 +44,7 @@ class checkpoint_util(wttest.WiredTigerTestCase):
             session = self.session
         deadline = time.time() + timeout
         while True:
-            with wttest.open_cursor(session, 'statistics:') as stat_cursor:
-                state = stat_cursor[stat.conn.checkpoint_state][2]
+            state = self.get_stat(stat.conn.checkpoint_state, session=session)
             if state != 0:
                 break
             self.assertLess(time.time(), deadline,

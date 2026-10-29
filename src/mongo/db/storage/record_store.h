@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -76,7 +50,7 @@ class ValidationOptions;
 /**
  * The data items stored in a RecordStore.
  */
-struct MONGO_MOD_PUBLIC Record {
+struct [[MONGO_MOD_PUBLIC]] Record {
     RecordId id;
     RecordData data;
 };
@@ -124,7 +98,7 @@ struct MONGO_MOD_PUBLIC Record {
  * TODO SERVER-18934 Handle this above the storage engine layer so storage engines don't have to
  * deal with capped visibility.
  */
-class MONGO_MOD_OPEN RecordCursor {
+class [[MONGO_MOD_OPEN]] RecordCursor {
 public:
     virtual ~RecordCursor() = default;
 
@@ -195,7 +169,7 @@ public:
  * some cursors are not required to support seeking. All storage engines must support detecting the
  * existence of Records.
  */
-class MONGO_MOD_OPEN SeekableRecordCursor : public RecordCursor {
+class [[MONGO_MOD_OPEN]] SeekableRecordCursor : public RecordCursor {
 public:
     /**
      * Tells bounded 'seek' whether the bound excludes or includes the bound 'start'.
@@ -246,7 +220,7 @@ public:
  * Queries with the awaitData option use this notifier object to wait for more data to be
  * inserted into the capped collection.
  */
-class MONGO_MOD_PUBLIC CappedInsertNotifier {
+class [[MONGO_MOD_PUBLIC]] CappedInsertNotifier {
 public:
     /**
      * Wakes up all threads waiting.
@@ -306,7 +280,7 @@ private:
  * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
  * methods must be thread safe, see MDBCatalog.
  */
-class MONGO_MOD_OPEN RecordStore {
+class [[MONGO_MOD_OPEN]] RecordStore {
 public:
     class Capped;
     class Oplog;
@@ -412,7 +386,7 @@ public:
      * Adopt `source`'s size-tracking state so this RecordStore and `source` share counters. Both
      * must refer to the same ident. Test-only: only valid when the testing proctor is enabled.
      */
-    MONGO_MOD_PUBLIC virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
+    [[MONGO_MOD_PUBLIC]] virtual void adoptSharedSizeState_forTest(const RecordStore& source) {}
 
     /**
      * Override the size of the collection (number of records and data size), required when
@@ -457,6 +431,15 @@ public:
      * unknown.
      */
     virtual int64_t freeStorageSize(RecoveryUnit&) const = 0;
+
+    /**
+     * Returns the storage engine's approximate count of leaf pages backing this record store, or
+     * boost::none if the engine does not maintain such a statistic or has not yet recorded a
+     * meaningful value for this table. The count is maintained incrementally by the storage engine
+     * and is cheap to read (no tree walk), but is not exact. Used by the query optimizer's cost
+     * model.
+     */
+    virtual boost::optional<int64_t> approxNumLeafPages(RecoveryUnit&) const = 0;
 
     /**
      * Get the RecordData at loc, which must exist.
@@ -688,7 +671,7 @@ public:
     virtual RecordStoreContainer getContainer() = 0;
 };
 
-class MONGO_MOD_OPEN RecordStore::Capped {
+class [[MONGO_MOD_OPEN]] RecordStore::Capped {
 public:
     struct TruncateAfterResult {
         int64_t recordsRemoved = 0;
@@ -730,7 +713,7 @@ public:
                                               bool inclusive) = 0;
 };
 
-class MONGO_MOD_OPEN RecordStore::Oplog {
+class [[MONGO_MOD_OPEN]] RecordStore::Oplog {
 public:
     /**
      * Storage engines can choose whether to support changing the oplog size online.
@@ -764,6 +747,13 @@ public:
      * Unsupported RecordStores return the OplogOperationUnsupported error code.
      */
     virtual StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) = 0;
+
+    /**
+     * Returns the newest value observed for this record store's earliest timestamp, from
+     * getEarliestTimestamp() or a truncation's commit-time refresh, or an empty Timestamp if
+     * none has been observed. The value never moves backward. Never performs storage I/O.
+     */
+    virtual Timestamp getCachedEarliestTimestamp() const = 0;
 };
 
 }  // namespace mongo

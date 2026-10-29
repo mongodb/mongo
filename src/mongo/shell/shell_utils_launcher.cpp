@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/shell/shell_utils_launcher.h"
 
@@ -46,14 +20,11 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/format.h>
-
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/iterator/iterator_facade.hpp>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <fmt/format.h>
 
 #ifdef _WIN32
 #include <io.h>
@@ -93,6 +64,8 @@
 #include "mongo/util/text.h"          // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -270,7 +243,7 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     auto runner = registry->createProgramRunner(args, env, /*isMongo=*/true, loggingPrefix);
     runner.start();
     invariant(registry->isPidRegistered(runner.pid()));
-    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), true /* shouldLogOutput */);
+    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), /*shouldLogOutput=*/true);
     registry->registerReaderThread(runner.pid(), std::move(t));
     return BSON(string("") << runner.pid().asLongLong());
 }
@@ -283,7 +256,7 @@ BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo, bool isQuiet = fa
     runner.start(!isQuiet);
 
     invariant(registry->isPidRegistered(runner.pid()));
-    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), !isQuiet /* shouldLogOutput */);
+    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), /*shouldLogOutput=*/!isQuiet);
     registry->registerReaderThread(runner.pid(), std::move(t));
     int exit_code = -123456;  // sentinel value
     registry->waitForPid(runner.pid(), true, &exit_code);
@@ -544,7 +517,7 @@ int getSignal(const BSONObj& a) {
 }
 
 BSONObj getStopMongodOpts(const BSONObj& a) {
-    if (a.nFields() == 3) {
+    if (a.nFields() >= 3) {
         BSONObjIterator i(a);
         i.next();
         i.next();
@@ -586,13 +559,14 @@ BSONObj StopMongoProgram(const BSONObj& a, void* data) {
     return BSON("" << (double)code);
 }
 
+/** stopMongoProgramByPid(pid[, signal[, opts[, waitPid]]]) */
 BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
     int nFields = a.nFields();
-    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 3);
+    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 4);
     uassert(
         ErrorCodes::BadValue, "stopMongoProgramByPid needs a number", a.firstElement().isNumber());
     ProcessId pid = ProcessId::fromNative(int(a.firstElement().number()));
-    int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a));
+    int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a), getWaitPid(a));
     LOGV2_INFO(22822, "shell: Stopped mongo program with pid", "pid"_attr = pid);
     return BSON("" << (double)code);
 }

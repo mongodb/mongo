@@ -21,9 +21,9 @@ Learn more about related topics using their own targeted documentation:
 First, ensure that your python `venv` is active and up to date:
 
 ```
-python3 -m venv python3-venv
+/opt/mongodbtoolchain/v5/bin/python3.13 -m venv python3-venv
 source python3-venv/bin/activate
-buildscripts/poetry_sync.sh
+buildscripts/uv_sync.sh
 ```
 
 and you've built the source binaries to run against, eg:

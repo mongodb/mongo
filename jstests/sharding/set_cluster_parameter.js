@@ -16,9 +16,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-// This test requires running commands directly against the shard.
-TestData.replicaSetEndpointIncompatible = true;
-
 const clusterParameter1Value = {
     intData: 42,
 };

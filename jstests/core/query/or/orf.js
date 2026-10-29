@@ -1,5 +1,6 @@
 // Test a query with 200 $or clauses
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 //   # `explain.executionStats` is not causally consistent.

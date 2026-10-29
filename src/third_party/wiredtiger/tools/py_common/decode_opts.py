@@ -42,6 +42,8 @@ class DecodeOptions:
     # --- Decode behavior ---
     # Input comes from disaggregated storage.
     disagg: bool = False
+    # Input is the history store file.
+    history_store: bool = False
     # Skip reading/processing cell data (print headers only).
     skip_data: bool = False
     # Continue decoding past checksum failures instead of stopping.

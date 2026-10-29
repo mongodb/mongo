@@ -1,6 +1,7 @@
 /**
  * Verify that `$search` queries that set '$$SEARCH_META' succeed on unsharded collections on
  * sharded clusters even with a stage in the pipeline that can't be passed to the shards.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite (the merge-forcing case in e2e/search/search_collector.js).
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mockPlanShardedSearchResponse} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

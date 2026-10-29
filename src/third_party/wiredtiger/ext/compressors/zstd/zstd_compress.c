@@ -248,6 +248,12 @@ zstd_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, si
     wt_api = ((ZSTD_COMPRESSOR *)compressor)->wt_api;
     zcompressor = (ZSTD_COMPRESSOR *)compressor;
 
+    if (src_len < ZSTD_PREFIX) {
+        (void)wt_api->err_printf(
+          wt_api, session, "WT_COMPRESSOR.decompress: source size is smaller than the size prefix");
+        return (WT_ERROR);
+    }
+
     /*
      * Retrieve the saved length, handling little- to big-endian conversion as necessary.
      */
@@ -255,7 +261,12 @@ zstd_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, si
 #ifdef WORDS_BIGENDIAN
     zstd_len = zstd_bswap64(zstd_len);
 #endif
-    if (zstd_len + ZSTD_PREFIX > src_len) {
+
+    /*
+     * We avoid the risk of overflow by using subtraction in this check. The stored size comes from
+     * disk, and if it is corrupted it might be close to the maximum integer value.
+     */
+    if (zstd_len > src_len - ZSTD_PREFIX) {
         (void)wt_api->err_printf(
           wt_api, session, "WT_COMPRESSOR.decompress: stored size exceeds source size");
         return (WT_ERROR);

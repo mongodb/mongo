@@ -144,6 +144,7 @@
         (ta)->newest_txn = WT_TXN_NONE;             \
         (ta)->newest_stop_ts = WT_TS_MAX;           \
         (ta)->newest_stop_txn = WT_TXN_MAX;         \
+        (ta)->oldest_stop_txn = WT_TXN_MAX;         \
         (ta)->prepare = 0;                          \
         (ta)->init_merge = 0;                       \
     } while (0)
@@ -164,6 +165,7 @@
         (ta)->newest_txn = WT_TXN_NONE;             \
         (ta)->newest_stop_ts = WT_TS_NONE;          \
         (ta)->newest_stop_txn = WT_TXN_NONE;        \
+        (ta)->oldest_stop_txn = WT_TXN_MAX;         \
         (ta)->prepare = 0;                          \
         (ta)->init_merge = 1;                       \
     } while (0)
@@ -184,37 +186,45 @@
 #define WT_TIME_AGGREGATE_COPY(dest, source) (*(dest) = *(source))
 
 /* Update the aggregated window to reflect for a new time window. */
-#define WT_TIME_AGGREGATE_UPDATE(session, ta, tw)                                          \
-    do {                                                                                   \
-        WT_ASSERT(session, (ta)->init_merge == 1);                                         \
-        if ((tw)->start_prepare_ts == WT_TS_NONE) {                                        \
-            (ta)->oldest_start_ts = WT_MIN((tw)->start_ts, (ta)->oldest_start_ts);         \
-            (ta)->newest_start_durable_ts =                                                \
-              WT_MAX((tw)->durable_start_ts, (ta)->newest_start_durable_ts);               \
-        } else {                                                                           \
-            (ta)->oldest_start_ts = WT_MIN((tw)->start_prepare_ts, (ta)->oldest_start_ts); \
-            (ta)->newest_start_durable_ts =                                                \
-              WT_MAX((tw)->start_prepare_ts, (ta)->newest_start_durable_ts);               \
-        }                                                                                  \
-        (ta)->newest_txn = WT_MAX((tw)->start_txn, (ta)->newest_txn);                      \
-        /*                                                                                 \
-         * Aggregation of newest transaction is calculated from both start and             \
-         * stop transactions. Consider only valid stop transactions.                       \
-         */                                                                                \
-        if ((tw)->stop_txn != WT_TXN_MAX)                                                  \
-            (ta)->newest_txn = WT_MAX((tw)->stop_txn, (ta)->newest_txn);                   \
-        if ((tw)->stop_prepare_ts == WT_TS_NONE) {                                         \
-            (ta)->newest_stop_ts = WT_MAX((tw)->stop_ts, (ta)->newest_stop_ts);            \
-            (ta)->newest_stop_durable_ts =                                                 \
-              WT_MAX((tw)->durable_stop_ts, (ta)->newest_stop_durable_ts);                 \
-        } else {                                                                           \
-            (ta)->newest_stop_ts = WT_MAX((tw)->stop_prepare_ts, (ta)->newest_stop_ts);    \
-            (ta)->newest_stop_durable_ts =                                                 \
-              WT_MAX((tw)->stop_prepare_ts, (ta)->newest_stop_durable_ts);                 \
-        }                                                                                  \
-        (ta)->newest_stop_txn = WT_MAX((tw)->stop_txn, (ta)->newest_stop_txn);             \
-        if (WT_TIME_WINDOW_HAS_PREPARE(tw))                                                \
-            (ta)->prepare = 1;                                                             \
+#define WT_TIME_AGGREGATE_UPDATE(session, ta, tw)                                           \
+    do {                                                                                    \
+        WT_ASSERT(session, (ta)->init_merge == 1);                                          \
+        if ((tw)->start_prepare_ts == WT_TS_NONE) {                                         \
+            (ta)->oldest_start_ts = WT_MIN((tw)->start_ts, (ta)->oldest_start_ts);          \
+            (ta)->newest_start_durable_ts =                                                 \
+              WT_MAX((tw)->durable_start_ts, (ta)->newest_start_durable_ts);                \
+        } else {                                                                            \
+            (ta)->oldest_start_ts = WT_MIN((tw)->start_prepare_ts, (ta)->oldest_start_ts);  \
+            (ta)->newest_start_durable_ts =                                                 \
+              WT_MAX((tw)->start_prepare_ts, (ta)->newest_start_durable_ts);                \
+        }                                                                                   \
+        (ta)->newest_txn = WT_MAX((tw)->start_txn, (ta)->newest_txn);                       \
+        /*                                                                                  \
+         * Aggregation of newest transaction is calculated from both start and              \
+         * stop transactions. Consider only valid stop transactions.                        \
+         */                                                                                 \
+        if ((tw)->stop_txn != WT_TXN_MAX)                                                   \
+            (ta)->newest_txn = WT_MAX((tw)->stop_txn, (ta)->newest_txn);                    \
+        if ((tw)->stop_prepare_ts == WT_TS_NONE) {                                          \
+            (ta)->newest_stop_ts = WT_MAX((tw)->stop_ts, (ta)->newest_stop_ts);             \
+            (ta)->newest_stop_durable_ts =                                                  \
+              WT_MAX((tw)->durable_stop_ts, (ta)->newest_stop_durable_ts);                  \
+        } else {                                                                            \
+            (ta)->newest_stop_ts = WT_MAX((tw)->stop_prepare_ts, (ta)->newest_stop_ts);     \
+            (ta)->newest_stop_durable_ts =                                                  \
+              WT_MAX((tw)->stop_prepare_ts, (ta)->newest_stop_durable_ts);                  \
+        }                                                                                   \
+        (ta)->newest_stop_txn = WT_MAX((tw)->stop_txn, (ta)->newest_stop_txn);              \
+        /*                                                                                  \
+         * Track the smallest stop transaction so readers can test their concurrent         \
+         * snapshot against the page's stop range. Ignore records with no stop (WT_TXN_MAX) \
+         * and stops already cleared as globally visible (WT_TXN_NONE); neither constrains  \
+         * any reader.                                                                      \
+         */                                                                                 \
+        if ((tw)->stop_txn != WT_TXN_MAX && (tw)->stop_txn != WT_TXN_NONE)                  \
+            (ta)->oldest_stop_txn = WT_MIN((tw)->stop_txn, (ta)->oldest_stop_txn);          \
+        if (WT_TIME_WINDOW_HAS_PREPARE(tw))                                                 \
+            (ta)->prepare = 1;                                                              \
     } while (0)
 
 /*
@@ -230,6 +240,23 @@
         (ta)->newest_txn = WT_MAX((page_del)->txnid, (ta)->newest_txn);                   \
         (ta)->newest_stop_ts = WT_MAX((page_del)->pg_del_start_ts, (ta)->newest_stop_ts); \
         (ta)->newest_stop_txn = WT_MAX((page_del)->txnid, (ta)->newest_stop_txn);         \
+        if ((page_del)->txnid != WT_TXN_NONE)                                             \
+            (ta)->oldest_stop_txn = WT_MIN((page_del)->txnid, (ta)->oldest_stop_txn);     \
+    } while (0)
+
+/*
+ * Merge a page deletion as the global stop point for every record in an aggregate. The aggregate
+ * unpacked from a deleted-address cell describes the child page as it was before the truncate, so
+ * its stop information is stale and must be replaced.
+ */
+#define WT_TIME_AGGREGATE_MERGE_PAGE_DEL(ta, page_del)                                \
+    do {                                                                              \
+        (ta)->newest_stop_durable_ts = (page_del)->pg_del_durable_ts;                 \
+        (ta)->newest_txn = (page_del)->txnid;                                         \
+        (ta)->newest_stop_ts = (page_del)->pg_del_start_ts;                           \
+        (ta)->newest_stop_txn = (page_del)->txnid;                                    \
+        if ((page_del)->txnid != WT_TXN_NONE)                                         \
+            (ta)->oldest_stop_txn = WT_MIN((page_del)->txnid, (ta)->oldest_stop_txn); \
     } while (0)
 
 /* Merge an aggregated time window into another - choosing the most conservative value from each. */
@@ -244,6 +271,7 @@
         (dest)->newest_txn = WT_MAX((dest)->newest_txn, (source)->newest_txn);                \
         (dest)->newest_stop_ts = WT_MAX((dest)->newest_stop_ts, (source)->newest_stop_ts);    \
         (dest)->newest_stop_txn = WT_MAX((dest)->newest_stop_txn, (source)->newest_stop_txn); \
+        (dest)->oldest_stop_txn = WT_MIN((dest)->oldest_stop_txn, (source)->oldest_stop_txn); \
         /*                                                                                    \
          * Aggregation of newest transaction is calculated from both start and stop           \
          * transactions. Consider only valid stop transactions.                               \
@@ -284,6 +312,13 @@
         (out_ta)->newest_txn = WT_MAX((out_ta)->newest_txn, (in_ta)->newest_txn);                \
         (out_ta)->newest_stop_ts = WT_MAX((out_ta)->newest_stop_ts, (in_ta)->newest_stop_ts);    \
         (out_ta)->newest_stop_txn = WT_MAX((out_ta)->newest_stop_txn, (in_ta)->newest_stop_txn); \
+        (out_ta)->oldest_stop_txn = WT_MIN((out_ta)->oldest_stop_txn, (in_ta)->oldest_stop_txn); \
+        /*                                                                                       \
+         * Carry the prepare flag: an obsolete visibility check reads the merged                 \
+         * aggregate, and the flag is the only record that a stop point is prepared.             \
+         */                                                                                      \
+        if ((in_ta)->prepare != 0)                                                               \
+            (out_ta)->prepare = 1;                                                               \
     } while (0)
 
 /* Check if the stop time aggregate is set. */
@@ -320,6 +355,31 @@ __wt_get_stable_timestamp(WT_SESSION_IMPL *session)
     return (__wt_atomic_load_bool_acquire(&txn_global->has_stable_timestamp) ?
         __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp) :
         txn_global->recovery_timestamp);
+}
+
+/*
+ * __wt_ts_stable_violation --
+ *     Check that a start/stop timestamp pair is not greater than the global stable timestamp. This
+ *     check is done only when verify is configured with "stable_timestamp" (verify is called
+ *     post-RTS) so every record beyond the stable timestamp should have been rolled back already.
+ */
+static WT_INLINE bool
+__wt_ts_stable_violation(wt_timestamp_t start_ts, wt_timestamp_t stop_ts,
+  wt_timestamp_t stable_timestamp, bool *startp, wt_timestamp_t *tsp)
+{
+    if (start_ts != WT_TS_NONE && start_ts > stable_timestamp) {
+        *startp = true;
+        *tsp = start_ts;
+        return (true);
+    }
+
+    if (stop_ts != WT_TS_MAX && stop_ts > stable_timestamp) {
+        *startp = false;
+        *tsp = stop_ts;
+        return (true);
+    }
+
+    return (false);
 }
 
 /*

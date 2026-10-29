@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,27 +7,53 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
-namespace MONGO_MOD_PUBLIC mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ServiceContext;
+
+namespace replicated_fast_count {
+
+struct CheckpointWriteCounts {
+    size_t entryWriteCount;
+    size_t insertCount;
+    size_t updateCount;
+
+    bool operator==(const CheckpointWriteCounts&) const = default;
+};
+
+}  // namespace replicated_fast_count
 
 /**
  * Free functions wrapping the ReplicatedFastCountManager OpenTelemetry metric instruments. All
  * metrics are reported via OTel and serverStatus.
  */
-void setIsRunning(bool running);
+void setTailerIsRunning(bool running);
+void setFlusherIsRunning(bool running);
 
 void incrementFlushFailureCount();
+void incrementTailerFailureCount();
+void incrementRetriedFlushCount();
+void incrementRetriedTailerScanCount();
 
 void incrementInsertCount();
 
 void incrementUpdateCount();
 
+void incrementWatermarksWrittenCount();
+void incrementTailerWatermarksSeenCount();
+void incrementCheckpointsValidatedCount();
 /**
- * Records metrics for a successful flush. Updates flush timing, success count, and
- * flushed-document counters.
+ * Accumulates the time the flusher spent blocked in
+ * `SizeCountCheckpointBuffer::awaitCheckoutForFlush()` waiting for the oplog tailer to cut a
+ * batch at a watermark.
  */
-void recordFlush(Date_t startTime, size_t batchSize);
+void recordWatermarkAwaitTime(Milliseconds waitTime);
+
+/**
+ * Records metrics for a successful flush. Updates flush timing, success count, flushed-document
+ * counters, and the insert/update write counters from `writeCounts`.
+ */
+void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts writeCounts);
 
 /**
  * Free functions for recording checkpoint oplog scan metrics. These functions are safe to call from
@@ -92,4 +92,4 @@ void registerAppliedOpTimeObserver(ServiceContext* svcCtx);
  */
 void resetOplogLagState_ForTest();
 
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo

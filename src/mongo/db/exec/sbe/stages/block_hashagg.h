@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -130,6 +104,21 @@ protected:
     }
 
 private:
+    friend class HashAggBaseStage<BlockHashAggStage>;
+
+    boost::optional<TableType>& ht() {
+        return _ht;
+    }
+    TableType::iterator& htIt() {
+        return _htIt;
+    }
+
+    std::pair<int64_t, int64_t> spillImpl(SpillingStore* recordStore);
+
+    int64_t estimatedEntrySizeInBytes() const {
+        return _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
+    }
+
     /*
      * Given the groupby key, looks up the entry in our hash table and runs the block and row
      * accumulators. Assumes that our input slots to these accumulators are already setup.
@@ -258,13 +247,17 @@ private:
     // Hash table where we'll map groupby key to the accumulators.
     std::vector<std::unique_ptr<HashKeyAccessor>> _idHtAccessors;
 
+    // Hash table where we'll map groupby key to the accumulators.
+    boost::optional<TableType> _ht;
+    TableType::iterator _htIt;
+
     size_t _currentBlockSize = 0;
     value::ValueBlock* _bitmapBlock = nullptr;
     std::vector<value::ValueBlock*> _gbBlocks;
     std::vector<value::ValueBlock*> _dataBlocks;
     std::deque<boost::optional<value::MonoBlock>> _monoBlocks;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
     bool _compiled = false;
 
     bool _done = false;

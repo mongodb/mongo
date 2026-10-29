@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -36,6 +10,7 @@
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/otel_metric_name_validation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/procparser.h"
@@ -86,11 +61,22 @@ const auto getDiskMetricsState = ServiceContext::declareDecoration<DiskMetricsSt
 
 class DiskMetrics::Impl {
 public:
-    explicit Impl(std::vector<std::string> disks) : _disks(std::move(disks)) {
-        _instruments.resize(_disks.size());
+    explicit Impl(std::vector<std::string> disks) {
+        _instruments.reserve(disks.size());
 
-        for (size_t i = 0; i < _disks.size(); ++i) {
-            const std::string& disk = _disks[i];
+        // Skip any disk whose name produces an invalid metric name.
+        // TODO (SERVER-131016): Include these.
+        for (auto& disk : disks) {
+            const std::string testName = fmt::format("systemMetrics.disks.{}.reads", disk);
+            if (Status s = otel::metrics::validateOtelMetricName(testName); !s.isOK()) {
+                LOGV2_DEBUG(13054301,
+                            2,
+                            "Skipping unsupported OTel disk metric name",
+                            "disk"_attr = disk,
+                            "error"_attr = s);
+                continue;
+            }
+
             const auto makeCounter = [&](std::string_view field,
                                          std::string desc,
                                          MetricUnit unit) -> Counter<int64_t>* {
@@ -102,23 +88,25 @@ public:
                     unit);
             };
 
-            _instruments[i].reads = makeCounter(
+            auto& instrument = _instruments.emplace_back();
+            instrument.reads = makeCounter(
                 "reads", "Number of read operations completed", MetricUnit::kOperations);
-            _instruments[i].readSectors =
+            instrument.readSectors =
                 makeCounter("read_sectors", "Number of sectors read", MetricUnit::kCount);
-            _instruments[i].readTimeMs =
+            instrument.readTimeMs =
                 makeCounter("read_time_ms", "Time spent reading", MetricUnit::kMilliseconds);
-            _instruments[i].writes = makeCounter(
+            instrument.writes = makeCounter(
                 "writes", "Number of write operations completed", MetricUnit::kOperations);
-            _instruments[i].writeSectors =
+            instrument.writeSectors =
                 makeCounter("write_sectors", "Number of sectors written", MetricUnit::kCount);
-            _instruments[i].writeTimeMs =
+            instrument.writeTimeMs =
                 makeCounter("write_time_ms", "Time spent writing", MetricUnit::kMilliseconds);
-            _instruments[i].ioTimeMs = makeCounter(
+            instrument.ioTimeMs = makeCounter(
                 "io_time_ms", "Time disk was busy doing I/O", MetricUnit::kMilliseconds);
-            _instruments[i].ioQueuedMs = makeCounter("io_queued_ms",
-                                                     "Weighted time spent in the disk I/O queue",
-                                                     MetricUnit::kMilliseconds);
+            instrument.ioQueuedMs = makeCounter("io_queued_ms",
+                                                "Weighted time spent in the disk I/O queue",
+                                                MetricUnit::kMilliseconds);
+            _disks.push_back(std::move(disk));
         }
     }
 

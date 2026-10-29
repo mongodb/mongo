@@ -1,37 +1,13 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -39,6 +15,21 @@ namespace mongo {
 // stages in view definitions without a direct dependency on the lite_parsed_desugarer target.
 MONGO_INITIALIZER(RegisterViewPipelineDesugarer)(InitializerContext*) {
     ResolvedNamespace::setViewPipelineDesugarer(&LiteParsedDesugarer::desugar);
+}
+
+void LiteParsedDesugarer::registerStageExpander(StageParams::Id id,
+                                                StageExpander stageExpander,
+                                                std::string_view name) {
+    tassert(
+        12880501,
+        str::stream() << "StageParams::id not allocated for lite-parsed desugarer stage expander '"
+                      << name << "'",
+        id != StageParams::kUnallocatedId);
+    const auto [_, inserted] = _stageExpanders.insert({id, std::move(stageExpander)});
+    tassert(12880500,
+            str::stream() << "Duplicate lite-parsed desugarer stage expander registered for '"
+                          << name << "'",
+            inserted);
 }
 
 bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
@@ -54,12 +45,9 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
         // that the subpipeline was modified, we will need to potentially reparse the full pipeline
         // from LPP - stages with subpipelines should pass the desugared LP subpipelines through
         // StageParams.
-        // TODO SERVER-121094 Remove when feature flag is removed.
-        auto hybridSearchFlagEnabled = ifrContext &&
-            ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-        if (hybridSearchFlagEnabled) {
-            if (auto* subpipelines = stage.getMutableSubPipelines()) {
-                for (auto& subpipelineLpp : *subpipelines) {
+        if (ifrContext) {
+            if (auto subpipelines = stage.getMutableSubPipelines()) {
+                for (auto subpipelineLpp : *subpipelines) {
                     modified |= LiteParsedDesugarer::desugar(&*subpipelineLpp, ifrContext);
                 }
             }
@@ -82,5 +70,12 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
 
     return modified;
 }
+
+MONGO_INITIALIZER_GROUP(BeginLiteParsedDesugarerStageExpanderRegistration,
+                        ("EndStageIdAllocation"),
+                        ("EndLiteParsedDesugarerStageExpanderRegistration"))
+MONGO_INITIALIZER_GROUP(EndLiteParsedDesugarerStageExpanderRegistration,
+                        ("BeginLiteParsedDesugarerStageExpanderRegistration"),
+                        ())
 
 }  // namespace mongo

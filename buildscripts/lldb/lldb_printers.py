@@ -28,7 +28,7 @@ except ImportError:
 
 def __lldb_init_module(debugger, *_args):
     """Register pretty printers."""
-    debugger.HandleCommand("type summary add -s '${var._value}' -x '^mongo::AtomicWord<.+>$'")
+    debugger.HandleCommand("type summary add -s '${var._value}' -x '^mongo::Atomic<.+>$'")
     debugger.HandleCommand("type summary add -s '${var._M_base._M_i}' 'std::atomic<bool>'")
     debugger.HandleCommand("type summary add -s '${var._M_i}' -x '^std::atomic<.+>$'")
 

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/migration_util.h"
 
@@ -52,10 +26,12 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
@@ -79,7 +55,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -134,6 +110,12 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 
 }  // namespace
 
+BSONObj makeCriticalSectionReasonForMoveRange(const ShardsvrMoveRangeRequest& request,
+                                              const UUID& migrationId) {
+    return BSON("command" << "moveChunk" << "fromShard" << request.getFromShard() << "toShard"
+                          << request.getToShard() << "migrationId" << migrationId);
+}
+
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
     hangBeforeFilteringMetadataRefresh.pauseWhileSet();
 
@@ -159,23 +141,18 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
 }
 
 void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term) {
-    // Reset the stat before either recovery path (standalone batch or per-coordinator) contributes
-    // its count via fetchAndAdd on onStepUpComplete.
+    // Reset the stat before either recovery path (standalone batch or MoveRangeCoordinator batch)
+    // contributes its count via fetchAndAdd on onStepUpComplete.
     ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(0);
 
     // Register a recovery job for migrationutil::resumeMigrationCoordinationsOnStepUp(), which
     // recovers all standalone MigrationCoordinators as a single batch and calls
     // notifyRecoveryJobComplete once when the entire batch finishes.
-    RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+    RangeDeleterService::get(opCtx)->registerRecoveryJob(term, RecoveryJob::kLegacyMigration);
 
-    // Register one recovery job per unfinished MoveRangeCoordinator. Each coordinator calls
-    // notifyRecoveryJobComplete individually at the end of its _recoveryFlow.
-    DBDirectClient client(opCtx);
-    const auto count = client.count(NamespaceString::kShardingDDLCoordinatorsNamespace,
-                                    BSON("_id.operationType" << "moveRange"));
-    for (long long i = 0; i < count; ++i) {
-        RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
-    }
+    // Register one recovery job for the MoveRangeCoordinator recovered from disk. If there is no
+    // such coordinator, ShardingCoordinatorService resolves this job during its rebuild.
+    RangeDeleterService::get(opCtx)->registerRecoveryJob(term, RecoveryJob::kMoveRangeCoordinator);
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
@@ -395,20 +372,24 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
                 return true;
             }
 
+            const auto& nss = doc.getNss();
+
+            // Clear the collection metadata to avoid data loss if a failover interrupts the
+            // migration. Otherwise, secondaries could serve queries with a stale ShardVersion.
+            // This is required for legacy migrations, where the critical section is in memory and
+            // unreplicated. Thus, the new node stepping up must resolve the legacy migration before
+            // serving any CRUD operation.
+            {
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+                scopedCsr->clearCollectionMetadata(opCtx);
+            }
+
             LOGV2_DEBUG(4798511,
                         3,
                         "Found unfinished migration on step-up",
                         "term"_attr = term,
                         "migrationCoordinatorDoc"_attr = redact(doc.toBSON()),
                         "unfinishedMigrationsCount"_attr = recoveryFutures.size() + 1);
-
-            const auto& nss = doc.getNss();
-
-            // TODO (SERVER-127444): Remove this and tassert with the feature flag.
-            {
-                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-                scopedCsr->setNonAuthoritative();
-            }
 
             recoveryFutures.emplace_back(
                 asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss).thenRunOn(executor));
@@ -432,7 +413,8 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
         return whenAll(std::move(futures)).ignoreValue().thenRunOn(executor);
     }()
         .onCompletion([term](const auto&) {
-            RangeDeleterService::get(getGlobalServiceContext())->notifyRecoveryJobComplete(term);
+            RangeDeleterService::get(getGlobalServiceContext())
+                ->notifyRecoveryJobComplete(term, RecoveryJob::kLegacyMigration);
             LOGV2_DEBUG(11420100,
                         2,
                         "Finished all migration coordinator step-up recovery tasks",
@@ -445,7 +427,8 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     OperationContext* opCtx,
     const ShardId& recipientShardId,
     const NamespaceString& nss,
-    const MigrationSessionId& sessionId) {
+    const MigrationSessionId& sessionId,
+    bool clearShardCatalogCache) {
     const auto serviceContext = opCtx->getServiceContext();
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
@@ -458,6 +441,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
         builder.append("_recvChunkReleaseCritSec",
                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         sessionId.append(&builder);
+        builder.append("clearShardCatalogCache", clearShardCatalogCache);
         builder.append(WriteConcernOptions::kWriteConcernField,
                        defaultMajorityWriteConcernDoNotUse().toBSON());
         const auto commandObj = builder.obj();
@@ -489,6 +473,26 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             },
             Backoff(Seconds(1), Milliseconds::max()));
     });
+}
+
+void notifyChangeStreamsOnChunkMigrationCommitted(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const UUID& collectionUuid,
+                                                  const ShardId& fromShard,
+                                                  const ShardId& toShard,
+                                                  bool transfersFirstChunkToRecipient) {
+    // The authoritative post-commit placement lives on the config server. Read it from the catalog
+    // cache to decide whether the donor still owns any chunk of the collection.
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    const bool noMoreCollectionChunksOnDonor = !cm.getVersion(fromShard).isSet();
+    notifyChangeStreamsOnChunkMigrated(opCtx,
+                                       nss,
+                                       collectionUuid,
+                                       fromShard,
+                                       toShard,
+                                       noMoreCollectionChunksOnDonor,
+                                       transfersFirstChunkToRecipient);
 }
 
 void persistMigrationRecipientRecoveryDocument(
@@ -561,7 +565,7 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
                     nss,
                     doc.getRange(),
                     doc.getDonorShardIdForLoggingPurposesOnly(),
-                    true /* waitForCompletionOfMigrationOps */,
+                    /*waitForCompletionOfMigrationOps=*/true,
                     ActiveMigrationsRegistry::BypassRecoveryWait{})));
 
             const auto mdm = MigrationDestinationManager::get(opCtx);
@@ -596,8 +600,26 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     }
 }
 
+void assertNoMigrationsRemaining(OperationContext* opCtx) {
+    PersistentTaskStore<MigrationCoordinatorDocument> migrationCoordinators(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    tassert(12952700,
+            "Found migration coordinator documents on disk",
+            migrationCoordinators.count(opCtx) == 0);
+
+    tassert(12952702,
+            "Found ongoing migrations in the ActiveMigrationsRegistry",
+            ActiveMigrationsRegistry::get(opCtx).getActiveMigrationStatusReport(opCtx).isEmpty());
+}
+
 SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                                                              const NamespaceString& nss) {
+    tassert(12795310,
+            "Legacy asynchronous migration recovery must not run when AuthoritativeShardsDDL is "
+            "enabled; the MoveRangeCoordinator drives migration recovery instead",
+            !feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     return ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, nss] {
             ThreadClient tc{"MigrationRecovery", svcCtx->getService()};

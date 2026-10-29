@@ -1,34 +1,9 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
@@ -577,6 +552,7 @@ Value evaluateReplace(
     // find.getType() == BSONType::string
     return replaceOpStr(input.getStringData(), find.getStringData(), replacement.getStringData());
 }
+
 }  // namespace
 
 Value evaluate(const ExpressionReplaceOne& expr,
@@ -619,11 +595,19 @@ Value evaluate(const ExpressionReplaceAll& expr,
                Variables* variables,
                const EvaluationContext& ctx) {
     auto replaceAllOpStr =
-        [](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
+        [&](std::string_view input, std::string_view find, std::string_view replacement) -> Value {
+        BatchedExpressionMemoryCharger memCharger(expr, ctx);
+
         // An empty string matches at every position, so replaceAll should insert 'replacement'
         // at every position when 'find' is empty. Handling this as a special case lets us
         // assume 'find' is nonempty in the usual case.
         if (find.size() == 0) {
+            const int64_t inputSize = static_cast<int64_t>(input.size());
+            const int64_t replacementSize = static_cast<int64_t>(replacement.size());
+            const int64_t expectedSize = (inputSize + 1) * replacementSize + inputSize;
+            memCharger.setTotal(expectedSize);
+            memCharger.flush();
+
             StringBuilder output;
             for (char c : input) {
                 output << replacement << c;
@@ -643,15 +627,19 @@ Value evaluate(const ExpressionReplaceAll& expr,
             size_t endIndex = startIndex + find.size();
             output << input.substr(0, startIndex);
             output << replacement;
+            memCharger.setTotal(output.len());
             // This step assumes 'find' is nonempty. If 'find' were empty then input.find would
             // always find a match at position 0, and the input would never shrink.
             input = input.substr(endIndex);
         }
+        memCharger.setTotal(output.len());
+        memCharger.flush();
         return Value(output.stringData());
     };
     auto replaceAllOpRegEx = [&](std::string_view input,
                                  RegexExecutionState executionState,
                                  std::string_view replacement) -> Value {
+        BatchedExpressionMemoryCharger memCharger(expr, ctx);
         StringBuilder output;
 
         // Condition uses <= instead of < to also capture possible empty matches at the end of the
@@ -664,8 +652,11 @@ Value evaluate(const ExpressionReplaceAll& expr,
                 break;
             }
             output << beforeMatch << replacement;
+            memCharger.setTotal(output.len());
         }
         output << input.substr(executionState.beforeMatchStrStart);
+        memCharger.setTotal(output.len());
+        memCharger.flush();
 
         return Value(output.stringData());
     };

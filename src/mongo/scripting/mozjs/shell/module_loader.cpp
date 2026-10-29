@@ -1,48 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <js/JSON.h>
-#include <js/Modules.h>
-#include <js/SourceText.h>
-#include <js/StableStringChars.h>
-// IWYU pragma: no_include "boost/system/detail/errc.hpp"
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include "mongo/scripting/mozjs/shell/module_loader.h"
+
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/scripting/mozjs/shell/internal_module_registry.h"
-#include "mongo/scripting/mozjs/shell/module_loader.h"
 #include "mongo/util/file.h"
 
 #include <algorithm>
@@ -53,6 +17,11 @@
 #include <jsapi.h>
 #include <jscustomallocator.h>
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <js/CallArgs.h>
@@ -61,12 +30,16 @@
 #include <js/Context.h>
 #include <js/ErrorReport.h>
 #include <js/GlobalObject.h>
+#include <js/JSON.h>
 #include <js/MapAndSet.h>
+#include <js/Modules.h>
 #include <js/Object.h>
 #include <js/PropertyAndElement.h>
 #include <js/PropertyDescriptor.h>
 #include <js/RootingAPI.h>
 #include <js/ScriptPrivate.h>
+#include <js/SourceText.h>
+#include <js/StableStringChars.h>
 #include <js/String.h>
 #include <js/TypeDecls.h>
 #include <js/Utility.h>
@@ -74,6 +47,8 @@
 #include <mozilla/Range.h>
 #include <mozilla/RangedPtr.h>
 #include <mozilla/UniquePtr.h>
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -217,6 +192,12 @@ bool internalModuleFunction(JSContext* cx, unsigned argc, JS::Value* vp) {
 }
 }  // namespace
 
+ModuleLoader::ModuleLoader(ExecutionEnvironment executionEnvironment) {
+    tassert(12883202,
+            "ModuleLoader must not be constructed in the server execution environment",
+            executionEnvironment != ExecutionEnvironment::Server);
+}
+
 bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
     _baseUrl = resolveBaseUrl(cx, loadPath);
     LOGV2_DEBUG(716281, 2, "Resolved module base url.", "baseUrl"_attr = _baseUrl.c_str());
@@ -315,7 +296,7 @@ JSObject* ModuleLoader::moduleResolveHook(JSContext* cx,
                                           JS::HandleObject moduleRequest) {
 
     auto scope = getScope(cx);
-    return scope->getModuleLoader()->resolveImportedModule(cx, referencingPrivate, moduleRequest);
+    return scope->getModuleLoader().resolveImportedModule(cx, referencingPrivate, moduleRequest);
 }
 
 JSObject* ModuleLoader::resolveImportedModule(JSContext* cx,
@@ -335,7 +316,7 @@ bool ModuleLoader::dynamicModuleImportHook(JSContext* cx,
                                            JS::HandleObject moduleRequest,
                                            JS::HandleObject promise) {
     auto scope = getScope(cx);
-    return scope->getModuleLoader()->importModuleDynamically(
+    return scope->getModuleLoader().importModuleDynamically(
         cx, referencingPrivate, moduleRequest, promise);
 }
 

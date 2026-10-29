@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -48,7 +22,7 @@
 #include <vector>
 
 namespace mongo {
-namespace MONGO_MOD_PRIVATE sharding_ddl_util_detail {
+namespace [[MONGO_MOD_PRIVATE]] sharding_ddl_util_detail {
 
 template <typename CommandType>
 void preprocessCommand(OperationContext* opCtx, CommandType& cmd) {
@@ -68,7 +42,8 @@ void preprocessCommand(OperationContext* opCtx, CommandType& cmd) {
     const auto fcvSnap = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (feature_flags::gFeatureFlagBlockReplicaSetWrites.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx), fcvSnap)) {
-        cmd.setMayBypassReplicaSetWriteBlocking(ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
+        cmd.setMayBypassReplicaSetWritesBlocking(
+            ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
     }
 }
 
@@ -118,8 +93,6 @@ auto sendCommands(OperationContext* opCtx,
                 [&getShardId,
                  formatResponse](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
                                  size_t index) -> AsyncRequestsSender::Response {
-                    // TODO (SERVER-128062): Update the response to include the shard
-                    // handle.
                     return AsyncRequestsSender::Response{getShardId(index), formatResponse(reply)};
                 })
                 .getNoThrow();
@@ -143,7 +116,7 @@ auto sendCommands(OperationContext* opCtx,
                                return formatResponse(swReply.getValue());
                            }
                        }();
-                       // TODO (SERVER-128062): Update the response to include the shard handle.
+
                        return AsyncRequestsSender::Response{getShardId(index), response};
                    })
             .get();
@@ -195,17 +168,17 @@ template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError) {
-    if (shardRefs.size() == 0) {
+    if (shardIds.size() == 0) {
         return {};
     }
     if (shardVersions) {
         tassert(11532300,
                 "shardIds and shardVersions must have the same size",
-                shardRefs.size() == shardVersions->size());
+                shardIds.size() == shardVersions->size());
     }
 
     preprocessCommand(opCtx, originalOpts->cmd);
@@ -214,14 +187,14 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         opCtx,
         originalOpts.get(),
         throwOnError,
-        [&](int index) { return shardRefs[index]; },
+        [&](int index) { return shardIds[index]; },
         [&](const CancellationSource& cancelSource, auto& futures) {
-            for (size_t i = 0; i < shardRefs.size(); ++i) {
+            for (size_t i = 0; i < shardIds.size(); ++i) {
                 std::unique_ptr<async_rpc::Targeter> targeter =
                     std::make_unique<async_rpc::ShardIdTargeter>(
-                        originalOpts->exec, opCtx, shardRefs[i], readPref);
+                        originalOpts->exec, opCtx, shardIds[i], readPref);
                 auto shard = uassertStatusOK(
-                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardRefs[i]));
+                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
                 Shard::RetryStrategy::RequestStartTransactionState startTxnState =
                     originalOpts->cmd.getStartTransaction().value_or(false)
                     ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
@@ -248,7 +221,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<write_ops::UpdateCommandRequest>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -257,7 +230,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrDropCollectionParticipant>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -266,7 +239,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrCommitCreateDatabaseMetadata>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitCreateDatabaseMetadata>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -275,10 +248,10 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrCommitDropDatabaseMetadata>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitDropDatabaseMetadata>> originalOpts,
-    const std::vector<ShardRef>& shardRefs,
+    const std::vector<ShardId>& shardIds,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
 
-}  // namespace MONGO_MOD_PRIVATE sharding_ddl_util_detail
+}  // namespace sharding_ddl_util_detail
 }  // namespace mongo

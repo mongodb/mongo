@@ -475,7 +475,7 @@ exiting success if the data source is correct, and failure if the data source is
 If no URI argument is provided, it verifies each table in the database, reporting on any
 that are damaged. If the abort on error option \c -a is specified, terminate the verification
 process if one of the tables is damaged. Currently, the verify operation is not supported with
-tiered tables and the history store file.
+the history store file.
 
 @subsection util_verify_synopsis Synopsis
 `wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] verify [-acSstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages ] [uri]`

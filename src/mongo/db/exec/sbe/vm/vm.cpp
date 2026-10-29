@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/vm/vm.h"
 
@@ -217,7 +191,7 @@ void ByteCode::traverseP(const CodeFragment* code,
     auto [own, tag, val] = getFromStack(0);
 
     if (value::isArray(tag) && maxDepth > 0) {
-        value::ValueGuard input(own, tag, val);
+        value::TagValueMaybeOwned input(own, tag, val);
         popStack();
 
         if (maxDepth != std::numeric_limits<int64_t>::max()) {
@@ -251,9 +225,8 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
         return d == std::numeric_limits<int64_t>::max() ? d : d - 1;
     };
 
-    auto [tagArrOutput, valArrOutput] = value::makeNewArray();
-    auto arrOutput = value::getArrayView(valArrOutput);
-    value::ValueGuard guard{tagArrOutput, valArrOutput};
+    value::TagValueOwned newArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrOutput = value::getArrayView(newArr.value());
     // The array position we will be sending to the lambda holds the depth in the highest 32 bit,
     // and the actual index in the current array in the lowest 32 bit.
     size_t arrayPos = curDepth << 32;
@@ -289,7 +262,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
         }
         arrOutput->push_back_raw(retTag, retVal);
     });
-    guard.reset();
+    auto [tagArrOutput, valArrOutput] = newArr.releaseToRaw();
     pushStack(true, tagArrOutput, valArrOutput);
 }
 
@@ -339,14 +312,9 @@ void ByteCode::traverseF(const CodeFragment* code,
 
 bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
     runLambdaInternal(code, position);
-    auto [retOwn, retTag, retVal] = getFromStack(0);
+    auto ret = getMaybeOwnedFromStack(0);
     popStack();
-
-    bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
-    if (retOwn) {
-        value::releaseValue(retTag, retVal);
-    }
-    return isTrue;
+    return (ret.tag() == value::TypeTags::Boolean) && value::bitcastTo<bool>(ret.value());
 }
 
 void ByteCode::traverseFInArray(const CodeFragment* code,
@@ -355,7 +323,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
                                 bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
-    value::ValueGuard input(ownInput, tagInput, valInput);
+    value::TagValueMaybeOwned input(ownInput, tagInput, valInput);
     popStack();
 
     size_t arrayPos = 0;
@@ -391,7 +359,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
         if (providePosition) {
             pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
         }
-        input.reset();
+        input.disown();
         runLambdaInternal(code, position);
         if (providePosition) {
             swapStack();
@@ -463,15 +431,13 @@ void ByteCode::genericResetDoubleDoubleSumState(value::Array* state) {
 }
 
 std::pair<value::TypeTags, value::Value> ByteCode::genericInitializeDoubleDoubleSumState() {
-    auto [accTag, accValue] = value::makeNewArray();
-    value::ValueGuard newArrGuard{accTag, accValue};
-    auto arr = value::getArrayView(accValue);
+    value::TagValueOwned result = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arr = value::getArrayView(result.value());
     arr->reserve(AggSumValueElems::kMaxSizeOfArray);
 
     genericResetDoubleDoubleSumState(arr);
 
-    newArrGuard.reset();
-    return {accTag, accValue};
+    return result.releaseToRaw();
 }
 
 value::TagValueOwned ByteCode::aggMin(value::TagValueView acc,
@@ -689,7 +655,8 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
             newSetMembers.tag(),
             newSetMembers.value(),
             [&](value::TypeTags tagNewElem, value::Value valNewElem) {
-                value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+                value::TagValueOwned newElem =
+                    value::TagValueOwned::fromRaw(tagNewElem, valNewElem);
 
                 if (accSet->values().contains({tagNewElem, valNewElem})) {
                     // Skip this element, because it's already in the set, and continue with the
@@ -705,8 +672,7 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
                                       << " elements and is " << currentSize << " bytes.",
                         currentSize < static_cast<int64_t>(sizeCap));
 
-                guardNewElem.reset();
-                accSet->push_back_raw(tagNewElem, valNewElem);
+                accSet->push_back(std::move(newElem));
             });
     }
 
@@ -718,53 +684,46 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
     return accumulatorStateTagVal;
 }
 
-ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
-                                                   value::Value stateVal) {
+ByteCode::MultiAccState ByteCode::getMultiAccState(value::TagValueView state) {
     uassert(
-        7548600, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
-    auto state = value::getArrayView(stateVal);
+        7548600, "The accumulator state should be an array", state.tag == value::TypeTags::Array);
+    auto stateArray = value::getArrayView(state.value);
 
     uassert(7548601,
             "The accumulator state should have correct number of elements",
-            state->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
+            stateArray->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
 
-    auto arrayTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
+    auto arrayTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
     uassert(7548602,
             "Internal array component is not of correct type",
             arrayTagVal.tag == value::TypeTags::Array);
     auto array = value::getArrayView(arrayTagVal.value);
 
-    auto startIndexTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
+    auto startIndexTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
     uassert(7548700,
             "Index component be a 64-bit integer",
             startIndexTagVal.tag == value::TypeTags::NumberInt64);
     int64_t startIndex = value::bitcastTo<int64_t>(startIndexTagVal.value);
 
-    auto maxSizeTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
+    auto maxSizeTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
     uassert(7548603,
             "MaxSize component should be a 64-bit integer",
             maxSizeTagVal.tag == value::TypeTags::NumberInt64);
     int64_t maxSize = value::bitcastTo<int64_t>(maxSizeTagVal.value);
 
-    auto memUsageTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
+    auto memUsageTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
     uassert(7548612,
             "MemUsage component should be a 32-bit integer",
             memUsageTagVal.tag == value::TypeTags::NumberInt32);
     int32_t memUsage = value::bitcastTo<int32_t>(memUsageTagVal.value);
 
-    auto memLimitTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
+    auto memLimitTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
     uassert(7548613,
             "MemLimit component should be a 32-bit integer",
             memLimitTagVal.tag == value::TypeTags::NumberInt32);
     auto memLimit = value::bitcastTo<int32_t>(memLimitTagVal.value);
 
-    auto isGroupAccumTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
-    uassert(8070611,
-            "IsGroupAccum component should be a boolean",
-            isGroupAccumTagVal.tag == value::TypeTags::Boolean);
-    auto isGroupAccum = value::bitcastTo<bool>(isGroupAccumTagVal.value);
-
-    return {state, array, startIndex, maxSize, memUsage, memLimit, isGroupAccum};
+    return {stateArray, array, startIndex, maxSize, memUsage, memLimit};
 }
 
 int32_t updateAndCheckMemUsage(
@@ -863,142 +822,6 @@ int32_t ByteCode::aggBottomNAdd(value::Array* state,
                                 TopBottomArgs& args) {
     return aggTopBottomNAdd<TopBottomSense::kBottom>(
         state, array, maxSize, memUsage, memLimit, args);
-}
-
-std::tuple<value::Array*, int64_t, int64_t, int64_t, int64_t, int64_t>
-ByteCode::genericRemovableSumState(value::Array* state) {
-    uassert(7795101,
-            "incorrect size of state array",
-            state->size() == static_cast<size_t>(AggRemovableSumElems::kSizeOfArray));
-
-    auto sumAccTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kSumAcc));
-    uassert(7795102,
-            "sum accumulator elem should be of array type",
-            sumAccTagVal.tag == value::TypeTags::Array);
-    auto sumAcc = value::getArrayView(sumAccTagVal.value);
-
-    auto nanCountTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kNanCount));
-    uassert(7795103,
-            "nanCount elem should be of int64 type",
-            nanCountTagVal.tag == value::TypeTags::NumberInt64);
-    auto nanCount = value::bitcastTo<int64_t>(nanCountTagVal.value);
-
-    auto posInfinityCountTagVal =
-        state->getAt(static_cast<size_t>(AggRemovableSumElems::kPosInfinityCount));
-    uassert(7795104,
-            "posInfinityCount elem should be of int64 type",
-            posInfinityCountTagVal.tag == value::TypeTags::NumberInt64);
-    auto posInfinityCount = value::bitcastTo<int64_t>(posInfinityCountTagVal.value);
-
-    auto negInfinityCountTagVal =
-        state->getAt(static_cast<size_t>(AggRemovableSumElems::kNegInfinityCount));
-    uassert(7795105,
-            "negInfinityCount elem should be of int64 type",
-            negInfinityCountTagVal.tag == value::TypeTags::NumberInt64);
-    auto negInfinityCount = value::bitcastTo<int64_t>(negInfinityCountTagVal.value);
-
-    auto doubleCountTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kDoubleCount));
-    uassert(7795106,
-            "doubleCount elem should be of int64 type",
-            doubleCountTagVal.tag == value::TypeTags::NumberInt64);
-    auto doubleCount = value::bitcastTo<int64_t>(doubleCountTagVal.value);
-
-    auto decimalCountTagVal =
-        state->getAt(static_cast<size_t>(AggRemovableSumElems::kDecimalCount));
-    uassert(7795107,
-            "decimalCount elem should be of int64 type",
-            decimalCountTagVal.tag == value::TypeTags::NumberInt64);
-    auto decimalCount = value::bitcastTo<int64_t>(decimalCountTagVal.value);
-
-    return {sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount};
-}
-
-value::TagValueMaybeOwned ByteCode::aggRemovableSumFinalizeImpl(value::Array* state) {
-    auto [sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount] =
-        genericRemovableSumState(state);
-
-    if (nanCount > 0) {
-        if (decimalCount > 0) {
-            return {true,
-                    value::TypeTags::NumberDecimal,
-                    value::makeCopyDecimal(Decimal128::kPositiveNaN).second};
-        } else {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
-        }
-    }
-    if (posInfinityCount > 0 && negInfinityCount > 0) {
-        if (decimalCount > 0) {
-            return {true,
-                    value::TypeTags::NumberDecimal,
-                    value::makeCopyDecimal(Decimal128::kPositiveNaN).second};
-        } else {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
-        }
-    }
-    if (posInfinityCount > 0) {
-        if (decimalCount > 0) {
-            return {true,
-                    value::TypeTags::NumberDecimal,
-                    value::makeCopyDecimal(Decimal128::kPositiveInfinity).second};
-        } else {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(std::numeric_limits<double>::infinity())};
-        }
-    }
-    if (negInfinityCount > 0) {
-        if (decimalCount > 0) {
-            return {true,
-                    value::TypeTags::NumberDecimal,
-                    value::makeCopyDecimal(Decimal128::kNegativeInfinity).second};
-        } else {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(-std::numeric_limits<double>::infinity())};
-        }
-    }
-
-    auto [sumOwned, sumTag, sumVal] = aggDoubleDoubleSumFinalizeImpl(sumAcc).releaseToRaw();
-    value::ValueGuard sumGuard{sumOwned, sumTag, sumVal};
-
-    if (sumTag == value::TypeTags::NumberDecimal && decimalCount == 0) {
-        auto decimalVal = value::bitcastTo<Decimal128>(sumVal);
-        if (doubleCount > 0) {  // Narrow Decimal128 to double.
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(decimalVal.toDouble())};
-        }
-        std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
-        auto longVal = decimalVal.toLong(&signalingFlags);  // Narrow Decimal128 to integral.
-        if (signalingFlags == Decimal128::SignalingFlag::kNoFlag) {
-            auto [numTag, numVal] = value::makeIntOrLong(longVal);
-            return {false, numTag, numVal};
-        }
-        // Narrow Decimal128 to double if overflows long.
-        return {false,
-                value::TypeTags::NumberDouble,
-                value::bitcastFrom<double>(decimalVal.toDouble())};
-    }
-    if (sumTag == value::TypeTags::NumberDouble && doubleCount == 0 &&
-        value::bitcastTo<double>(sumVal) >= std::numeric_limits<long long>::min() &&
-        value::bitcastTo<double>(sumVal) <
-            static_cast<double>(std::numeric_limits<long long>::max())) {
-        // Narrow double to integral.
-        auto longVal = llround(value::bitcastTo<double>(sumVal));
-        auto [numTag, numVal] = value::makeIntOrLong(longVal);
-        return {false, numTag, numVal};
-    }
-    if (sumTag == value::TypeTags::NumberInt64) {  // Narrow long to int
-        auto longVal = value::bitcastTo<long long>(sumVal);
-        auto [numTag, numVal] = value::makeIntOrLong(longVal);
-        return {false, numTag, numVal};
-    }
-    sumGuard.reset();
-    return {sumOwned, sumTag, sumVal};
 }
 
 }  // namespace vm

@@ -1,31 +1,33 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
+
+#include "mongo/db/pipeline/expression.h"
+
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/convert_utils.h"
+#include "mongo/db/exec/expression/evaluate.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_parser_gen.h"
+#include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <array>
@@ -47,31 +49,6 @@
 // IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/crypto/fle_crypto.h"
-#include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/exec/expression/evaluate.h"
-#include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_parser_gen.h"
-#include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/str.h"
-
 namespace mongo {
 using namespace std::literals::string_view_literals;
 using Parser = Expression::Parser;
@@ -80,6 +57,12 @@ using boost::intrusive_ptr;
 using std::pair;
 using std::string;
 using std::vector;
+
+bool isSbeAccumulatorExpressionEnabled(ExpressionContext* const expCtx) {
+    const auto& ifrContext = expCtx->getIfrContext();
+    return ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSbeAccumulatorExpressions);
+}
 
 Expression::ExpressionVector Expression::cloneChildren(ExpressionContext& expCtx) const {
     if (_children.empty()) {
@@ -256,7 +239,7 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
         expCtx->ignoreFeatureInParserOrRejectAndThrow(opName, *entry.featureFlag);
     }
 
-    if (expCtx->getOperationContext()) {
+    if (expCtx->getOperationContext() && !expCtx->getIsReparsingRepresentativeQueryShape()) {
         assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
                                        opName,
                                        entry.allowedWithApiStrict,
@@ -314,7 +297,7 @@ boost::intrusive_ptr<Expression> parseDateExpressionAcceptingTimeZone(
     BSONElement operatorElem,
     const VariablesParseState& variablesParseState) {
     if (operatorElem.type() == BSONType::object) {
-        if (operatorElem.embeddedObject().firstElementFieldName()[0] == '$') {
+        if (operatorElem.embeddedObject().firstElementFieldNameStringData().starts_with('$')) {
             // Assume this is an expression specification representing the date argument
             // like {$add: [<date>, 1000]}.
             return new SubClass(expCtx,
@@ -584,6 +567,37 @@ const char* ExpressionAnyElementTrue::getOpName() const {
 
 /* ---------------------- ExpressionArray --------------------------- */
 
+Value Expression::foldConstant(bool retainResult) const {
+    // Fold against a standalone tracker seeded with the per-expression fallback cap rather than the
+    // operation-wide tracker. Constant folding can run before query settings are resolved (e.g.
+    // representative query-shape serialization and 'let'-parameter evaluation at ExpressionContext
+    // construction). The operation-wide limit is pqs-settable, so reading it here would materialize
+    // (and latch) a value before settings had a chance to override it, tripping the
+    // settings-ordering invariant. The fallback cap is a plain constant that is always safe to
+    // read, so it bounds the fold without touching the per-operation limit; the result is rolled up
+    // into the operation tracker below purely for accounting.
+    SimpleMemoryUsageTracker foldingTracker{
+        MemoryUsageLimit{query_knobs::kMaxSingleExpressionMemoryUsageBytes}};
+    Value folded = evaluate(Document{},
+                            &(getExpressionContext()->variables),
+                            EvaluationContext{.tracker = &foldingTracker});
+    // Only charge the fallback when it rolls up into the operation tracker (same condition under
+    // which the ExpressionContext creates that flavor): charging the standalone flavor would pin
+    // unreleased bytes against the per-expression cap it shares with later evaluations.
+    auto* expCtx = getExpressionContext();
+    if (int64_t peak = foldingTracker.peakTrackedMemoryBytes(); peak > 0 &&
+        expCtx->getOperationContext() &&
+        feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
+        const int64_t retained =
+            retainResult ? std::min<int64_t>(folded.getApproximateSize(), peak) : 0;
+        auto& fallbackTracker = expCtx->getExpressionFallbackTracker();
+        fallbackTracker.add(peak);
+        fallbackTracker.add(retained - peak);
+    }
+    return folded;
+}
+
 Value ExpressionArray::evaluate(const Document& root,
                                 Variables* variables,
                                 const EvaluationContext& ctx) const {
@@ -592,8 +606,12 @@ Value ExpressionArray::evaluate(const Document& root,
 
 Value ExpressionArray::serialize(const query_shape::SerializationOptions& options) const {
     if (!options.isKeepingLiteralsUnchanged() && selfAndChildrenAreConstant()) {
-        return ExpressionConstant::serializeConstant(
-            options, evaluate(Document{}, &(getExpressionContext()->variables), {}));
+        // Query-shape serialization folds before query settings are applied; other serialization
+        // modes run post-settings and keep charging the operation-wide tracker.
+        Value folded = options.isReplacingLiteralsWithRepresentativeValues()
+            ? foldConstant(/*retainResult=*/false)
+            : evaluate(Document{}, &(getExpressionContext()->variables), {});
+        return ExpressionConstant::serializeConstant(options, folded);
     }
     vector<Value> expressions;
     expressions.reserve(_children.size());
@@ -615,8 +633,7 @@ intrusive_ptr<Expression> ExpressionArray::optimize() {
 
     // If all values in ExpressionArray are constant evaluate to ExpressionConstant.
     if (allValuesConstant) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables), {}));
+        return ExpressionConstant::create(getExpressionContext(), foldConstant());
     }
     return this;
 }
@@ -897,7 +914,15 @@ const char* ExpressionCond::getOpName() const {
 intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const expCtx,
                                                     BSONElement exprElement,
                                                     const VariablesParseState& vps) {
-    return new ExpressionConstant(expCtx, Value(exprElement));
+    exec::expression::convert_utils::uassertValidUserConstructedBinData(exprElement,
+                                                                        /*allowColumn=*/false);
+    Value exprValue = Value(exprElement);
+    // Shred values when parsing collection-validator constants to avoid lazily
+    // populating the BSON cache on write paths.
+    if (MONGO_unlikely(expCtx->getIsParsingCollectionValidator())) {
+        exprValue = exprValue.shred();
+    }
+    return new ExpressionConstant(expCtx, std::move(exprValue));
 }
 
 
@@ -1641,6 +1666,7 @@ boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
 intrusive_ptr<ExpressionObject> ExpressionObject::parse(ExpressionContext* const expCtx,
                                                         BSONObj obj,
                                                         const VariablesParseState& vps) {
+    expCtx->checkAndIncrementMemoryIntensiveExprCount("$object"sv);
     // Make sure we don't have any duplicate field names.
     stdx::unordered_set<string> specifiedFields;
 
@@ -1681,8 +1707,7 @@ intrusive_ptr<Expression> ExpressionObject::optimize() {
     }
     // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
     if (allValuesConstant) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables), {}));
+        return ExpressionConstant::create(getExpressionContext(), foldConstant());
     }
     return this;
 }
@@ -1729,6 +1754,10 @@ Expression::ComputedPaths ExpressionObject::getComputedPaths(const std::string& 
     }
 
     return outputPaths;
+}
+
+const char* ExpressionObject::getOpName() const {
+    return "$object";
 }
 
 /* --------------------- ExpressionFieldPath --------------------------- */
@@ -1780,7 +1809,7 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::createVarFromString(
 ExpressionFieldPath::ExpressionFieldPath(ExpressionContext* const expCtx,
                                          const string& theFieldPath,
                                          Variables::Id variable)
-    : Expression(expCtx), _fieldPath(theFieldPath, true /*precomputeHashes*/), _variable(variable) {
+    : Expression(expCtx), _fieldPath(theFieldPath, /*precomputeHashes=*/true), _variable(variable) {
     const auto varName = theFieldPath.substr(0, theFieldPath.find('.'));
     tassert(5943201,
             std::string{"Variable with $$ROOT's id is not $$CURRENT or $$ROOT as expected, "
@@ -1846,7 +1875,7 @@ Value ExpressionFieldPath::serialize(const query_shape::SerializationOptions& op
         return ExpressionConstant::serializeConstant(
             options,
             evaluate(Document(), &(getExpressionContext()->variables), {}),
-            true /* wrapRepresentativeValue */);
+            /*wrapRepresentativeValue=*/true);
     }
 
     // First handles special cases for redaction of system variables. User variables will fall
@@ -1985,19 +2014,6 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
             !apiStrict || !usesUnstableField);
 }
 
-void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
-    ExpressionContext* const expCtx, MetaType type) {
-    static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore,
-                                                                     MetaType::kScoreDetails};
-    const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
-    const bool hybridScoringFeatureFlagEnabled =
-        expCtx->shouldParserIgnoreFeatureFlagCheck() || isRankFusionFullEnabled();
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "'featureFlagRankFusionFull' must be enabled to use "
-            "'score' or 'scoreDetails' meta field",
-            !usesHybridScoringProtectedField || hybridScoringFeatureFlagEnabled);
-}
-
 boost::intrusive_ptr<Expression> ExpressionMeta::_rewriteAsLet(
     ExpressionContext* const expCtx,
     DocumentMetadataFields::MetaType type,
@@ -2070,7 +2086,6 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
     const auto [metaType, typeName, optionalPath] = _parseMetaType(expCtx, expr.valueStringData());
 
     _assertMetaFieldCompatibleWithStrictAPI(expCtx, metaType);
-    _assertMetaFieldCompatibleWithHybridScoringFeatureFlag(expCtx, metaType);
     _assertMetaFieldCompatibleWithStreamsFeatureFlag(expCtx, metaType, typeName, optionalPath);
 
     if (optionalPath) {
@@ -2480,12 +2495,12 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             ++constOperandCount;
         }
     }
+
     // If all the operands are constant expressions, collapse the expression into one constant
     // expression.
     if (constOperandCount == _children.size()) {
-        return intrusive_ptr<Expression>(ExpressionConstant::create(
-            getExpressionContext(),
-            evaluate(Document(), &(getExpressionContext()->variables), {})));
+        return intrusive_ptr<Expression>(
+            ExpressionConstant::create(getExpressionContext(), foldConstant()));
     }
 
     // An operator cannot be left-associative and commutative, because left-associative
@@ -2536,9 +2551,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
                 if (constExpressions.size() > 1) {
                     ExpressionVector childrenSave = std::move(_children);
                     _children = std::move(constExpressions);
-                    optimizedOperands.emplace_back(ExpressionConstant::create(
-                        getExpressionContext(),
-                        evaluate(Document(), &(getExpressionContext()->variables))));
+                    optimizedOperands.emplace_back(
+                        ExpressionConstant::create(getExpressionContext(), foldConstant()));
                     _children = std::move(childrenSave);
                 } else {
                     optimizedOperands.insert(
@@ -2562,9 +2576,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
 
         if (constExpressions.size() > 1) {
             _children = std::move(constExpressions);
-            optimizedOperands.emplace_back(ExpressionConstant::create(
-                getExpressionContext(),
-                evaluate(Document(), &(getExpressionContext()->variables))));
+            optimizedOperands.emplace_back(
+                ExpressionConstant::create(getExpressionContext(), foldConstant()));
         } else {
             optimizedOperands.insert(
                 optimizedOperands.end(), constExpressions.begin(), constExpressions.end());
@@ -2592,7 +2605,7 @@ Value ExpressionNary::serialize(const query_shape::SerializationOptions& options
         ExpressionConstant const* exprConst = dynamic_cast<ExpressionConstant*>(_children[i].get());
         if (exprConst) {
             array.push_back(exprConst->serializeConstant(
-                options, exprConst->getValue(), false /* wrapRepresentativeValue */));
+                options, exprConst->getValue(), /*wrapRepresentativeValue=*/false));
         } else {
             array.push_back(_children[i]->serialize(options));
         }
@@ -3354,13 +3367,7 @@ intrusive_ptr<Expression> ExpressionSigmoid::parseExpressionSigmoid(
     return make_intrusive<ExpressionDivide>(expCtx, std::move(divideChildren));
 }
 
-// Note: we do not bypass FCV-gating with 'bypassRankFusionFCVGate' here because this expression was
-// not backported to 8.0.
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
-                                      ExpressionSigmoid::parseExpressionSigmoid,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagRankFusionBasic);
+REGISTER_STABLE_EXPRESSION(sigmoid, ExpressionSigmoid::parseExpressionSigmoid);
 
 /* ----------------------- ExpressionSize ---------------------------- */
 
@@ -3823,6 +3830,19 @@ const char* ExpressionIsNumber::getOpName() const {
 /* -------------------------- ExpressionZip ------------------------------ */
 
 REGISTER_STABLE_EXPRESSION(zip, ExpressionZip::parse);
+const char* ExpressionZip::getOpName() const {
+    return "$zip";
+}
+
+void ExpressionZip::_validateZipDefaults(const boost::intrusive_ptr<Expression>& defaults,
+                                         size_t numInputs) {
+    if (auto* arrayDefaults = dynamic_cast<ExpressionArray*>(defaults.get())) {
+        uassert(34467,
+                "defaults and inputs must have the same length",
+                arrayDefaults->getChildren().size() == numInputs);
+    }
+}
+
 intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vps) {
@@ -3830,12 +3850,14 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
             str::stream() << "$zip only supports an object as an argument, found "
                           << typeName(expr.type()),
             expr.type() == BSONType::object);
+    expCtx->checkAndIncrementMemoryIntensiveExprCount(expr.fieldNameStringData());
 
     auto useLongestLength = false;
     std::vector<boost::intrusive_ptr<Expression>> children;
-    // We need to ensure defaults appear after inputs so we build them seperately and then
-    // concatenate them.
-    std::vector<boost::intrusive_ptr<Expression>> tempDefaultChildren;
+    // The defaults are stored as a single expression that evaluates to the whole defaults array.
+    // A literal defaults array parses to an ExpressionArray; any other expression is used as-is
+    // and its array-ness and length are validated at evaluation time.
+    boost::intrusive_ptr<Expression> defaultsExpr;
 
     for (auto&& elem : expr.Obj()) {
         const auto field = elem.fieldNameStringData();
@@ -3848,13 +3870,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
                 children.push_back(parseOperand(expCtx, subExpr, vps));
             }
         } else if (field == "defaults") {
-            uassert(34462,
-                    str::stream() << "defaults must be an array of expressions, found "
-                                  << typeName(elem.type()),
-                    elem.type() == BSONType::array);
-            for (auto&& subExpr : elem.Array()) {
-                tempDefaultChildren.push_back(parseOperand(expCtx, subExpr, vps));
-            }
+            defaultsExpr = parseOperand(expCtx, elem, vps);
         } else if (field == "useLongestLength") {
             uassert(34463,
                     str::stream() << "useLongestLength must be a bool, found "
@@ -3867,27 +3883,32 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
         }
     }
 
-    auto numInputs = children.size();
-    std::move(tempDefaultChildren.begin(), tempDefaultChildren.end(), std::back_inserter(children));
+    const auto numInputs = children.size();
+    uassert(34465, "$zip requires at least one input array", numInputs > 0);
 
-    std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs;
-    std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults;
-    for (auto&& child : children) {
-        if (numInputs == 0) {
-            defaults.push_back(child);
-        } else {
-            inputs.push_back(child);
-            numInputs--;
-        }
+    // An empty literal defaults array is equivalent to not specifying defaults at all.
+    if (auto* arrayDefaults = dynamic_cast<ExpressionArray*>(defaultsExpr.get());
+        arrayDefaults && arrayDefaults->getChildren().empty()) {
+        defaultsExpr = nullptr;
     }
-
-    uassert(34465, "$zip requires at least one input array", !inputs.empty());
+    if (defaultsExpr) {
+        _validateZipDefaults(defaultsExpr, numInputs);
+    }
     uassert(34466,
             "cannot specify defaults unless useLongestLength is true",
-            (useLongestLength || defaults.empty()));
-    uassert(34467,
-            "defaults and inputs must have the same length",
-            (defaults.empty() || defaults.size() == inputs.size()));
+            (useLongestLength || !defaultsExpr));
+
+    boost::optional<ExprRef> defaults;
+    if (defaultsExpr) {
+        children.push_back(std::move(defaultsExpr));
+        defaults = ExprRef(children.back());
+    }
+
+    std::vector<ExprRef> inputs;
+    inputs.reserve(numInputs);
+    for (size_t i = 0; i < numInputs; ++i) {
+        inputs.push_back(children[i]);
+    }
 
     return new ExpressionZip(
         expCtx, useLongestLength, std::move(children), std::move(inputs), std::move(defaults));
@@ -3902,27 +3923,66 @@ Value ExpressionZip::evaluate(const Document& root,
 boost::intrusive_ptr<Expression> ExpressionZip::optimize() {
     for (auto&& input : _inputs)
         input.get() = input.get()->optimize();
-    for (auto&& zipDefault : _defaults)
-        zipDefault.get() = zipDefault.get()->optimize();
+    if (_defaults) {
+        // An all-constant literal defaults array folds into a single constant here; serialize()
+        // reconstructs the per-element query shape from it. A defaults expression that folds
+        // into a non-array constant is deliberately not rejected here: see the comment on
+        // _validateZipDefaults.
+        _defaults->get() = _defaults->get()->optimize();
+    }
     return this;
 }
 
 Value ExpressionZip::serialize(const query_shape::SerializationOptions& options) const {
     vector<Value> serializedInput;
-    vector<Value> serializedDefaults;
     Value serializedUseLongestLength = Value(_useLongestLength);
 
     for (auto&& expr : _inputs) {
         serializedInput.push_back(expr.get()->serialize(options));
     }
 
-    for (auto&& expr : _defaults) {
-        serializedDefaults.push_back(expr.get()->serialize(options));
-    }
+    // Absent defaults serialize to an empty array, which parses back to absent defaults.
+    Value serializedDefaults = [&]() -> Value {
+        if (!_defaults) {
+            return Value(std::vector<Value>{});
+        }
+        // A literal defaults array serializes per element. Delegating to
+        // ExpressionArray::serialize instead would collapse an all-constant array into a single
+        // placeholder literal whenever literals are being replaced (query shape serialization),
+        // changing the queryShapeHash.
+        if (auto* literalDefaults = dynamic_cast<ExpressionArray*>(_defaults->get().get())) {
+            vector<Value> perElement;
+            perElement.reserve(literalDefaults->getChildren().size());
+            for (auto&& element : literalDefaults->getChildren()) {
+                perElement.push_back(element->serialize(options));
+            }
+            return Value(std::move(perElement));
+        }
+        // A defaults array that constant-folded during optimization serializes per element as
+        // well, so that the query shape is identical before and after optimization. The length
+        // guard keeps representative shapes re-parseable: array placeholders have fixed lengths,
+        // so a wrong-length constant (which can only fail at evaluation) must keep serializing
+        // as a single literal that re-parses as a constant, rather than as a literal defaults
+        // array that parse would reject.
+        if (auto* constDefaults = dynamic_cast<ExpressionConstant*>(_defaults->get().get())) {
+            const Value& value = constDefaults->getValue();
+            if (value.isArray() && value.getArrayLength() == _inputs.size()) {
+                vector<Value> perElement;
+                perElement.reserve(value.getArrayLength());
+                for (auto&& element : value.getArray()) {
+                    perElement.push_back(ExpressionConstant::serializeConstant(options, element));
+                }
+                return Value(std::move(perElement));
+            }
+        }
+        // Any other defaults expression serializes to the expression itself, so that re-parsing
+        // the serialization produces the same mode.
+        return _defaults->get()->serialize(options);
+    }();
 
-    return Value(DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults"
-                                            << Value(serializedDefaults) << "useLongestLength"
-                                            << serializedUseLongestLength)));
+    return Value(
+        DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults" << serializedDefaults
+                                   << "useLongestLength" << serializedUseLongestLength)));
 }
 
 /* -------------------------- ExpressionConvert ------------------------------ */
@@ -4185,8 +4245,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
                                                _children[_kOnError],
                                                _children[_kOnNull],
                                                _children[_kByteOrder]})) {
-        return ExpressionConstant::create(
-            getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables), {}));
+        return ExpressionConstant::create(getExpressionContext(), foldConstant());
     }
 
     return this;
@@ -5120,6 +5179,11 @@ boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
                       << typeName(expr.type()),
         expr.type() == BSONType::object);
 
+    uassert(10131412,
+            "$_internalKeyStringValue is not allowed inside collection validators or profile "
+            "filters",
+            !expCtx->getIsParsingCollectionValidator() && !expCtx->getIsProfileFilter());
+
     boost::intrusive_ptr<Expression> inputExpr;
     boost::intrusive_ptr<Expression> collationExpr;
 
@@ -5575,7 +5639,7 @@ ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx
             // initiate _evaluatorV2 with the zerosTokens.
             // Pass empty string and boost::none to skip validation, since validation already
             // happened in the rewrite layer and we have no schema context here.
-            auto tokens = ParsedFindTextSearchPayload(value, ""_sd, boost::none);
+            auto tokens = ParsedFindTextSearchPayload(value, ""sv, boost::none);
             _evaluatorV2 = EncryptedPredicateEvaluatorV2(
                 {ServerZerosEncryptionToken::deriveFrom(tokens.server)});
         } else {
@@ -5887,11 +5951,7 @@ Value ExpressionVectorSimilarity::serialize(
 
 /* ----------------------- ExpressionSimilarityDotProduct ---------------------------- */
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityDotProduct,
-                                      ExpressionSimilarityDotProduct::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagVectorSimilarity);
+REGISTER_STABLE_EXPRESSION(similarityDotProduct, ExpressionSimilarityDotProduct::parse);
 
 intrusive_ptr<Expression> ExpressionSimilarityDotProduct::parse(ExpressionContext* const expCtx,
                                                                 BSONElement expr,
@@ -5909,11 +5969,7 @@ Value ExpressionSimilarityDotProduct::evaluate(const Document& root,
 
 /* ----------------------- ExpressionSimilarityCosine ---------------------------- */
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityCosine,
-                                      ExpressionSimilarityCosine::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagVectorSimilarity);
+REGISTER_STABLE_EXPRESSION(similarityCosine, ExpressionSimilarityCosine::parse);
 
 intrusive_ptr<Expression> ExpressionSimilarityCosine::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
@@ -5929,11 +5985,7 @@ Value ExpressionSimilarityCosine::evaluate(const Document& root,
 }
 
 /* ----------------------- ExpressionSimilarityEuclidean ---------------------------- */
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityEuclidean,
-                                      ExpressionSimilarityEuclidean::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      &feature_flags::gFeatureFlagVectorSimilarity);
+REGISTER_STABLE_EXPRESSION(similarityEuclidean, ExpressionSimilarityEuclidean::parse);
 
 intrusive_ptr<Expression> ExpressionSimilarityEuclidean::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,

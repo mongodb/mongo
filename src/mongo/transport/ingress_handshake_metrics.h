@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -42,7 +16,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC transport {
+namespace [[MONGO_MOD_PUBLIC]] transport {
 
 /**
  * A decoration on the Session object used to capture and report the metrics around connection
@@ -71,8 +45,18 @@ public:
     void onSessionStarted(TickSource* tickSource);
 
     /**
+     * Marks the time when the TLS (SSL) handshake with the client begins. Unlike the other
+     * observations on this class, this one does not require onSessionStarted to have been called:
+     * the TLS handshake latency is measured on its own clock, independently of the session-start
+     * state machine. The tick source must remain valid for at least as long as the last method
+     * call on this instance.
+     */
+    void onTLSHandshakeStarted(TickSource* tickSource);
+
+    /**
      * Marks the time when the TLS (SSL) handshake with the client was completed, if the
-     * connection uses TLS.
+     * connection uses TLS. If onTLSHandshakeStarted was called, reports the TLS handshake
+     * latency metrics.
      */
     void onTLSHandshakeCompleted();
 
@@ -115,9 +99,11 @@ private:
     };
     State _state = State::kWaitingForSessionStart;
     TickSource* _tickSource = nullptr;
-    TickSource::Tick _sessionStartedTicks;
-    TickSource::Tick _mostRecentHandshakeCommandReceivedTicks;
-    TickSource::Tick _mostRecentHandshakeCommandProcessedTicks;
+    TickSource* _tlsHandshakeTickSource = nullptr;
+    TickSource::Tick _tlsHandshakeStartedTicks = 0;
+    TickSource::Tick _sessionStartedTicks = 0;
+    TickSource::Tick _mostRecentHandshakeCommandReceivedTicks = 0;
+    TickSource::Tick _mostRecentHandshakeCommandProcessedTicks = 0;
 };
 
 /**
@@ -133,5 +119,5 @@ public:
                     rpc::ReplyBuilderInterface* response) override;
 };
 
-}  // namespace MONGO_MOD_PUBLIC transport
+}  // namespace transport
 }  // namespace mongo

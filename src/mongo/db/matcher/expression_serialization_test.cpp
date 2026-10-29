@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // Unit tests for MatchExpression::serialize serialization.
 
@@ -479,6 +453,15 @@ TEST(SerializeInternalSchema, ExpressionInternalSchemaMaxPropertiesSerializesCor
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
+TEST(SerializeInternalSchema, ExpressionNotInternalSchemaMaxPropertiesSerializesCorrectly) {
+    auto maxProperties = std::make_unique<InternalSchemaMaxPropertiesMatchExpression>(5);
+    auto notExpr = std::make_unique<NotMatchExpression>(
+        std::make_unique<AndMatchExpression>(std::move(maxProperties)));
+
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"$nor":[{"$_internalSchemaMaxProperties":5}]})",
+                           serialize(notExpr.get()));
+}
+
 TEST(SerializeInternalSchema, ExpressionInternalSchemaMatchArrayIndexSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{a: {$_internalSchemaMatchArrayIndex:"
@@ -874,5 +857,78 @@ TEST(SerializeBasic, SerializesNestedElemMatchCorrectly) {
         })",
         objMatch.getValue()->serialize(opts));
 }
+
+TEST(SerializeBasic, SerializesElemMatchObj) {
+    auto query = fromjson(R"({a: {$elemMatch: {bar:123}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{"bar":{"$eq":"?number"}}}})",
+                           objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchAllAsAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {$all:[1,2,3,3]}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{"$all":[1,2,3,3]}}})",
+                           objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchAndWithPathIsNotAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {$and:[{x: 1}, {y: 2}]}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "a": {
+                "$elemMatch": {
+                    "$and": [
+                        {
+                            "x": {
+                                "$eq": "?number"
+                            }
+                        },
+                        {
+                            "y": {
+                                "$eq": "?number"
+                            }
+                        }
+                    ]
+                }
+            }
+        })",
+        objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchAndIsNotAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {$eq: 1, $lt: 2}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{"$eq":"?number","$lt":"?number"}}})",
+                           objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchEmptyIsNotAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{}}})", objMatch.getValue()->serialize(opts));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -2,6 +2,7 @@
  * Confirm that a hashed index field does not prevent the index prefix field to be used for covered
  * projection and to produce correct result.
  * @tags: [
+ *      uses_explain,
  *      # Explain may return incomplete results if interrupted by a stepdown.
  *      does_not_support_stepdowns,
  *      # Time series collections do not support hashed indexes on measurement fields.

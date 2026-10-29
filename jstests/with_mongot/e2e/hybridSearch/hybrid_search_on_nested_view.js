@@ -2,7 +2,7 @@
  * Tests that $rankFusion and $scoreFusion on a nested view namespace is allowed and works
  * correctly.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
+ * @tags: [requires_fcv_82]
  */
 
 import {verifyExplainStagesAreEqual} from "jstests/with_mongot/e2e_lib/explain_utils.js";

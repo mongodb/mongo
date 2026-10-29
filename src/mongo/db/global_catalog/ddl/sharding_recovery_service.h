@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,6 +10,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 #include <functional>
 #include <set>
@@ -43,7 +18,7 @@
 
 namespace mongo {
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingRecoveryService
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingRecoveryService
     : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
 
 public:
@@ -174,10 +149,19 @@ public:
                                            bool throwIfReasonDiffers = true);
 
     /**
+     * Returns true if a recoverable critical section is currently held for the given namespace with
+     * the exact given reason, false otherwise.
+     */
+    bool isCriticalSectionHeld(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& reason);
+
+    /**
      * Recovers the in-memory sharding state from disk in case of rollback.
      */
     void onReplicationRollback(OperationContext* opCtx,
-                               const std::set<NamespaceString>& rollbackNamespaces);
+                               const std::set<NamespaceString>& rollbackNamespaces,
+                               const StringMap<long long>& rollbackCommandCounts);
 
     /**
      * Recovers the in-memory sharding state from disk when either initial sync or startup recovery
@@ -189,8 +173,11 @@ private:
     /**
      * This method is called to reset the states before recover (mirror the state on disk to
      * memory). It must be called before the recover functions.
+     *
+     * When 'clearCollectionShardingRuntimes' is false, the CollectionShardingRuntime filtering
+     * metadata is left untouched.
      */
-    void _resetInMemoryStates(OperationContext* opCtx);
+    void _resetInMemoryStates(OperationContext* opCtx, bool clearCollectionShardingRuntimes = true);
 
     /**
      * This method is called when we have to mirror the state on disk of the recoverable critical

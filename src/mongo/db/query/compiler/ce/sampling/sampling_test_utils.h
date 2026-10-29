@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -43,6 +17,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
@@ -53,7 +28,7 @@ public:
     using SamplingEstimatorImpl::SamplingEstimatorImpl;
 
     const std::vector<BSONObj>& getSample() {
-        return _sample;
+        return _sample->docs();
     }
 
     boost::optional<size_t> getUniqueDocCountForTesting() const {
@@ -69,16 +44,26 @@ public:
      * specific samples (including duplicate documents that simulate sampling with replacement)
      * without needing a real collection.
      */
-    void setSampleForTesting(std::vector<BSONObj> sample, bool wasPersisted = false) {
-        _sample = std::move(sample);
-        _sampleSize = _sample.size();
+    void setSampleForTesting(std::vector<BSONObj> sample,
+                             bool wasPersisted = false,
+                             boost::optional<SamplingTechniqueEnum> technique = boost::none) {
+        // Keep whatever technique the sample already carries unless the caller names one. Before
+        // any sample is set, default to kRandom.
+        const SamplingTechniqueEnum sampleTechnique = technique.value_or(
+            _sample.has_value() ? _sample->technique() : SamplingTechniqueEnum::kRandom);
+        _sample = wasPersisted ? Sample::makePersisted(std::move(sample),
+                                                       sampleTechnique,
+                                                       Date_t::now(),
+                                                       /*numPages=*/1)
+                               : Sample::makeOnTheFly(std::move(sample), sampleTechnique);
         _uniqueDocCount = boost::none;
-        _isSampleGenerated = true;
-        _wasSamplePersisted = wasPersisted;
     }
 
-    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {
-        return SamplingEstimatorImpl::calculateSampleSize(ci, marginOfError);
+    /**
+     * Overrides the persisted-sample method independently of the on-the-fly sampling style.
+     */
+    void setPersistentSamplingMethodForTesting(SamplingCEMethodEnum method) {
+        _spec.persistentSamplingMethod = method;
     }
 
     static bool matches(const OrderedIntervalList& oil, BSONElement val) {
@@ -227,6 +212,14 @@ struct PlanRankingExecutionStatistics {
     std::vector<double> selectivities;
 };
 
+/**
+ * Sets the confidence interval, margin of error, and sample size override knobs to the given values
+ * and returns the sample size that the sampling estimator derives from them.
+ */
+size_t sampleSizeForKnobs(SamplingConfidenceIntervalEnum ci,
+                          double marginOfError,
+                          int sampleSizeOverride = 0);
+
 size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef);
 
 std::pair<SamplingCEMethodEnum, boost::optional<int>> iniitalizeSamplingAlgoBasedOnChunks(
@@ -268,10 +261,15 @@ bool dataConfigurationCoversQueryWorkload(DataConfiguration& dataConfig,
 void initializeSamplingEstimator(DataConfiguration& configuration,
                                  SamplingEstimatorTest& samplingEstimatorTest);
 
-
+/**
+ * Create a collection with the given name and insert the given documents.
+ * Persistent sample docs must be stored in a clustered collection indexed on _id, so clustered =
+ * true must be passed when this helper is used to simulate the persisted samples collection.
+ */
 void createCollAndInsertDocuments(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  const std::vector<BSONObj>& docs);
+                                  const std::vector<BSONObj>& docs,
+                                  bool clustered = false);
 
 /**
  * Given a MatchExpression and a vector of BSONObj, evaluate the MatchExpression against all the
@@ -331,9 +329,29 @@ size_t numberKeysMatch(const IndexBounds& bounds,
  */
 BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  SamplingTechniqueEnum method,
-                                 size_t sampleSize,
+                                 size_t requestedSampleSize,
                                  const std::vector<BSONObj>& docs,
                                  boost::optional<int> numChunks = boost::none,
                                  int schemaVersion = kPersistentSampleSchemaVersion,
-                                 BSONObj overrides = BSONObj());
+                                 BSONObj overrides = BSONObj(),
+                                 int pageNo = 0,
+                                 size_t numDocsDiscarded = 0);
+
+/**
+ * Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
+ * same identity fields and differ only in page number and the docs they contain.
+ */
+BSONObj buildPage(const UUID& uuid,
+                  SamplingTechniqueEnum method,
+                  size_t requestedSampleSize,
+                  const std::vector<BSONObj>& docs,
+                  int pageNo,
+                  boost::optional<int> numChunks = boost::none,
+                  size_t numDocsDiscarded = 0);
+
+/**
+ * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the
+ * field names if `sizeBytes` is less than that.
+ */
+BSONObj makeSizedDoc(int id, size_t sizeBytes);
 }  // namespace mongo::ce

@@ -246,6 +246,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
               WT_WITH_TABLE_WRITE_LOCK(session,
                 ret =
                   __wt_schema_drop(session, meta_state.partial_backup_names[i], drop_cfg, false)));
+            __wt_drop_pending_apply(session);
             WT_ERR(ret);
             __wt_free(session, metadata_conf);
         }

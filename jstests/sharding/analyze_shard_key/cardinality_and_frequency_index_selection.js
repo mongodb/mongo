@@ -2,7 +2,11 @@
  * Tests that the cardinality and frequency metrics calculation within the analyzeShardKey command
  * prioritizes indexes that allows it to infer if the shard key is unique.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   # Requires all nodes to be running the latest binary.
+ *   multiversion_incompatible,
+ *   requires_fcv_70,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -12,7 +16,19 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 
-function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, metrics}) {
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS,
+};
+
+function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics, collectionOptions}) {
+    assert(
+        !(collectionOptions && indexSpecs),
+        "Cannot specify both collectionOptions and indexSpecs",
+    );
+
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -21,7 +37,11 @@ function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, m
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
+    if (collectionOptions) {
+        assert.commandWorked(db.createCollection(collName, collectionOptions));
+    } else {
+        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
+    }
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     for (let shardKey of shardKeys) {
@@ -38,8 +58,42 @@ function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, m
     }
 }
 
-function runTest(conn, writeConcern) {
-    testAnalyzeShardKey(conn, writeConcern, {
+function testAnalyzeShardKeyFails(
+    conn,
+    {docs, indexSpecs, shardKey, expectedErrorCode, expectedErrorMsg},
+) {
+    const dbName = "testDb-" + extractUUIDFromObject(UUID());
+    const collName = "testColl";
+    const ns = dbName + "." + collName;
+    jsTest.log(
+        `Testing ${tojson({dbName, collName, docs, indexSpecs, shardKey, expectedErrorCode})}`,
+    );
+
+    const db = conn.getDB(dbName);
+    const coll = db.getCollection(collName);
+
+    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
+
+    const res = assert.commandFailedWithCode(
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: shardKey,
+            // Skip calculating the read and write distribution metrics since they are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+        expectedErrorCode,
+    );
+    if (expectedErrorMsg) {
+        assert.eq(res.errmsg, expectedErrorMsg, "Unexpected error message", {res});
+    }
+
+    assert(coll.drop());
+}
+
+function runTest(conn) {
+    testAnalyzeShardKey(conn, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [
             {
@@ -65,7 +119,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [
             {
@@ -91,7 +145,69 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
+        docs: [{x: -1}, {x: 1}],
+        indexSpecs: [
+            {
+                name: "x_1",
+                key: {x: 1},
+            },
+            {
+                name: "x_1_unique_ci",
+                key: {x: 1},
+                unique: true,
+                collation: {locale: "en", strength: 2},
+            },
+            {
+                name: "x_1_unique_hidden",
+                key: {x: 1},
+                unique: true,
+                hidden: true,
+            },
+        ],
+        shardKeys: [{x: 1}, {x: "hashed"}],
+        metrics: {
+            numDocs: 2,
+            isUnique: false,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
+
+    testAnalyzeShardKey(conn, {
+        docs: [
+            {x: -1, y: -1},
+            {x: 1, y: 1},
+        ],
+        indexSpecs: [
+            {
+                name: "x_1_y_1",
+                key: {x: 1, y: 1},
+            },
+            {
+                name: "x_1_y_1_unique",
+                key: {x: 1, y: 1},
+                unique: true,
+            },
+        ],
+        shardKeys: [{x: 1}, {x: "hashed"}],
+        metrics: {
+            numDocs: 2,
+            isUnique: false,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
+
+    testAnalyzeShardKey(conn, {
         docs: [
             {x: -1, y: -1},
             {x: 1, y: 1},
@@ -120,7 +236,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
         docs: [
             {x: -1, y: -1, z: -1},
             {x: 1, y: 1, z: 1},
@@ -152,6 +268,59 @@ function runTest(conn, writeConcern) {
             numMostCommonValues,
         },
     });
+
+    testAnalyzeShardKey(conn, {
+        docs: [
+            {x: -1, y: -1},
+            {x: 1, y: 1},
+        ],
+        indexSpecs: [{name: "x_1_y_-1", key: {x: 1, y: -1}}],
+        shardKeys: [{x: 1}, {x: "hashed"}],
+        metrics: {
+            numDocs: 2,
+            isUnique: false,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
+
+    testAnalyzeShardKeyFails(conn, {
+        docs: [{x: -1}, {x: 1}],
+        indexSpecs: [{name: "x_-1", key: {x: -1}}],
+        shardKey: {x: 1},
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+        expectedErrorMsg:
+            "Cannot analyze the characteristics of a shard key that does not have a supporting index",
+    });
+
+    testAnalyzeShardKeyFails(conn, {
+        docs: [{x: -1}, {x: 1}],
+        indexSpecs: [{name: "x_-1", key: {x: -1}, unique: true}],
+        shardKey: {x: 1},
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+        expectedErrorMsg:
+            "Cannot analyze the characteristics of a shard key that does not have a supporting index",
+    });
+
+    testAnalyzeShardKey(conn, {
+        docs: [{_id: -1}, {_id: 1}],
+        collectionOptions: {clusteredIndex: {key: {_id: 1}, unique: true}},
+        shardKeys: [{_id: 1}],
+        metrics: {
+            numDocs: 2,
+            isUnique: true,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {_id: -1}, frequency: 1},
+                {value: {_id: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
 }
 
 const setParameterOpts = {
@@ -164,8 +333,7 @@ const setParameterOpts = {
         rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
     });
 
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
-    runTest(st.s, writeConcern);
+    runTest(st.s);
 
     st.stop();
 }
@@ -180,8 +348,7 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(primary, numNodesPerRS);
-    runTest(primary, writeConcern);
+    runTest(primary);
 
     rst.stopSet();
 }

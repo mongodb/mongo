@@ -52,7 +52,6 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 from test_import01 import test_import_base
 
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_import04(test_import_base):
     conn_config = 'cache_size=50MB'
 

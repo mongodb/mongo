@@ -47,8 +47,9 @@ __curhs_file_cursor_open(WT_SESSION_IMPL *session, const char *uri, const char *
         WT_ERR(__wt_snprintf(tmp, len, "checkpoint=%s", session->hs_checkpoint));
         open_cursor_cfg[2] = tmp;
     } else if (checkpoint_name != NULL) {
-        WT_ASSERT(
-          session, __wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader);
+        WT_ASSERT(session,
+          __wt_conn_is_disagg(session) &&
+            !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
         WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
         /*
          * Use a URI with a "/<checkpoint name> suffix. This is interpreted as reading from the
@@ -85,18 +86,30 @@ __wt_curhs_get_cached(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_bt
     uint64_t hash_value;
     const char *uri;
 
+    /* The caller must hold the eviction pass lock to use the returned btree without a reference. */
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->evict->evict_pass_lock);
+
     uri = NULL;
     WT_HS_ID_TO_URI(session, hs_id, uri);
 
     __wt_cursor_get_hash(session, uri, NULL, &hash_value);
-    if ((ret = __wt_cursor_cache_get(session, uri, hash_value, NULL, NULL, &cursor)) == 0) {
+    /*
+     * A cache-hit reopen leaves the dhandle on the session, matching normal cursor-open behavior.
+     * This caller only borrows the cursor, so restore the caller's dhandle rather than retaining a
+     * pointer without a reference.
+     */
+    WT_WITHOUT_DHANDLE(
+      session, ret = __wt_cursor_cache_get(session, uri, hash_value, NULL, NULL, &cursor));
+    if (ret == 0) {
         *hs_btreep = CUR2BT(cursor);
         /*
          * The pattern of acquiring a cursor, obtaining its dhandle, and then closing the cursor is
          * generally unsafe and can lead to undefined behavior. This is because the sweep server
          * checks for references to dhandles, and closing the cursor may result in the dhandle being
-         * swept while still in use. However, history store dhandles are an exception as they are
-         * not subject to sweeping.
+         * swept while still in use. The local history store dhandle is never swept, and the shared
+         * history store dhandle is only swept after a step-down marks it outdated. Even then this
+         * caller is safe: it reads the btree under the eviction pass lock, and sweep must close the
+         * btree before freeing it, which waits for that lock.
          */
         WT_RET(cursor->close(cursor));
     }
@@ -140,7 +153,7 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      */
     if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_RECOVERING_METADATA) ||
       F_ISSET(session, WT_SESSION_NO_RECONCILE) ||
-      (session->dhandle != NULL && WT_IS_METADATA(S2BT(session)->dhandle)) ||
+      (session->dhandle != NULL && WT_IS_ANY_METADATA(S2BT(session)->dhandle)) ||
       session == conn->default_session)
         return (0);
 
@@ -160,7 +173,8 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      * reconciliation for shared tables. It is also unsafe to cache the shared history store on the
      * standby as the sweep server may close the outdated history store dhandles.
      */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+    if (__wt_conn_is_disagg(session) &&
+      __wt_atomic_load_bool_relaxed(&conn->layered_table_manager.leader)) {
         WT_RET(__curhs_file_cursor_open(session, WT_HS_URI_SHARED, NULL, NULL, &cursor));
         WT_RET(cursor->close(cursor));
     }
@@ -1041,7 +1055,7 @@ __curhs_insert(WT_CURSOR *cursor)
 
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) || !F_ISSET(CUR2BT(file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /*
      * Disable bulk loads into history store. This would normally occur when updating a record with
@@ -1149,6 +1163,9 @@ __curhs_remove_int(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type
         WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, false));
         WT_ERR(ret);
     }
+    WT_ERR(ret);
+    /* We no longer own the update memory, the page does; don't free it under any circumstances. */
+    hs_tombstone = NULL;
 
     if (0) {
 err:
@@ -1180,7 +1197,7 @@ __curhs_remove(WT_CURSOR *cursor)
 
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) || !F_ISSET(CUR2BT(file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /* Remove must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
@@ -1226,7 +1243,7 @@ __curhs_update(WT_CURSOR *cursor)
 
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) || !F_ISSET(CUR2BT(file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /* Update must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
@@ -1270,6 +1287,9 @@ __curhs_update(WT_CURSOR *cursor)
         WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, false));
         WT_ERR(ret);
     }
+    WT_ERR(ret);
+    /* We no longer own the update memory, the page does; don't free it under any circumstances. */
+    hs_tombstone = hs_upd = NULL;
 
     __curhs_set_key_ptr(cursor, file_cursor);
     __curhs_set_value_ptr(cursor, file_cursor);
@@ -1300,7 +1320,7 @@ __curhs_range_truncate(WT_TRUNCATE_INFO *trunc_info)
     WT_ASSERT(session,
       !__wt_conn_is_disagg(session) ||
         !F_ISSET(CUR2BT(start_file_cursor), WT_BTREE_DISAGGREGATED) ||
-        S2C(session)->layered_table_manager.leader);
+        __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     WT_STAT_DSRC_INCR(session, cursor_truncate);
 
@@ -1440,7 +1460,7 @@ __wt_curhs_open(WT_SESSION_IMPL *session, uint32_t btree_id, const char *checkpo
  * __wt_curhs_open_ext --
  *     Initialize a history store cursor using a logical history store ID. This does not check
  *     whether the btree ID actually belongs to the selected history store; use 0 to simply ignore
- *     the it.
+ *     it.
  */
 int
 __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,

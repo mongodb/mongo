@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/transport/proxy_protocol_header_parser.h"
 
@@ -619,7 +593,7 @@ TEST(ProxyProtocolHeaderParser, MacSockAddrUnParsing) {
 
 boost::optional<ParserResults> parseWithTLV(AddressFamily type, const std::string& tlvData) {
     auto header = buildValidPP2Header(type, tlvData);
-    return parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
+    return parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true);
 }
 
 std::string buildTLV(uint8_t type, const std::string& data) {
@@ -708,7 +682,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
     auto header = buildValidPP2Header(type);
     header.metadata = "Adding some junk data";
 
-    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */),
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true),
                        DBException,
                        ErrorCodes::FailedToParse);
 }
@@ -719,7 +693,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
     auto header = buildValidPP2Header(type, tlvData);
     header.metadata = "Adding some junk data";
 
-    auto result = parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
+    auto result = parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true);
     ASSERT_TRUE(result);
     ASSERT_TRUE(result->endpoints);
     ASSERT_EQ(result->tlvs.size(), 1u);
@@ -729,7 +703,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
 
 TEST_P(ProxyProtocolParameterizedTestFixture, UnixProxySocketWithV1ProtocolIsRejected) {
     auto header = "PROXY TCP4 1.1.1.1 2.2.2.2 10 300\r\n";
-    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, true /* isProxyUnixSock */),
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, /*isProxyUnixSock=*/true),
                        DBException,
                        ErrorCodes::FailedToParse);
 }

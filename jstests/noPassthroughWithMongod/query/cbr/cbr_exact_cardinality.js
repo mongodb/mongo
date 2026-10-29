@@ -1,5 +1,9 @@
 /**
  * Test exact cardinality mode of cost-based ranking.
+ *
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
  */
 
 import {
@@ -8,10 +12,17 @@ import {
     isIndexOnly,
     planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+// In the legacy (non-deferred) getExecutor path, CBR is disabled for queries that will be
+// executed via SBE.
+// TODO SERVER-119581: Once the feature flag controlling the deferred engine selection is
+// deleted, this block should be able to be deleted.
+if (checkSbeFullyEnabled(db) && !isDeferredGetExecutorEnabled(db)) {
+    jsTestLog(
+        `Skipping ${jsTestName()}: CBR is not run for SBE plans without deferred engine choice`,
+    );
     quit();
 }
 
@@ -291,6 +302,19 @@ function testEof() {
     });
 }
 
+function testTailableCollScan() {
+    // Tailable collscans never reach permanent EOF. exactCE runs plans until EOF, so without
+    // the tailable short-circuit in PlanRanker::rankPlans this explain would hang forever.
+    assert(coll.drop());
+    assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1024}));
+    assert.commandWorked(coll.insert({_id: 1, a: 1}));
+    // The explain used to force costing before SERVER-132813, otherwise there is only one plan and no need to cost.
+    // Use addOption to set just the tailable flag (not awaitData, which would block).
+    assert.commandWorked(
+        coll.explain("executionStats").find({a: 1}).addOption(DBQuery.Option.tailable).finish(),
+    );
+}
+
 function testNodeUnsupportedByCBR() {
     assert(coll.drop());
     assert.commandWorked(coll.insert({}));
@@ -310,6 +334,7 @@ try {
         db.adminCommand({
             setParameter: 1,
             featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "exactCE",
         }),
     );
@@ -338,6 +363,8 @@ try {
     testEof();
     // Ensure that exactCE succeeds when it encounters a node not yet supported by CBR.
     testNodeUnsupportedByCBR();
+    // Ensure that exactCE does not hang on tailable collscans which never reach EOF.
+    testTailableCollScan();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));

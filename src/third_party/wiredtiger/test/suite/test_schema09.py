@@ -26,12 +26,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import re, signal
 import wttest, wiredtiger
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
 # Test that incomplete tables are properly cleaned up during recovery.
-@wttest.skip_for_hook("tiered", "test depends on metadata recovery")
 @wttest.skip_for_hook("disagg", "log tables is not supported on disagg")
 class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
     test_name = __qualname__
@@ -48,10 +48,14 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
     # __metadata_clean_incomplete_table should force drop any incomplete tables, allowing
     # new tables with the same name to be created.
     crash_point_values = [
-        ('before_insert_file',      dict(crash_point='before_insert_file')),
-        ('before_insert_colgroup',  dict(crash_point='before_insert_colgroup')),
-        ('after_drop_file',         dict(crash_point='after_drop_file')),
-        ('after_drop_colgroup',     dict(crash_point='after_drop_colgroup')),
+        ('before_insert_file', dict(crash_point='before_insert_file',
+            state='colgroup exists, file missing')),
+        ('before_insert_colgroup', dict(crash_point='before_insert_colgroup',
+            state='colgroup missing, file missing')),
+        ('after_drop_file', dict(crash_point='after_drop_file',
+            state='colgroup exists, file missing')),
+        ('after_drop_colgroup', dict(crash_point='after_drop_colgroup',
+            state='colgroup missing, file missing')),
     ]
     scenarios = make_scenarios(crash_point_values)
 
@@ -89,10 +93,12 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
 
         subdir = f'SUBPROCESS_crash_point_{self.crash_point}'
         func = f'{self.test_name}.{self.test_name}.subprocess_crash_point_{self.crash_point}'
-        [ignore_result, new_home_dir] = self.run_subprocess_function(
-            subdir, func, silent=True)
+        # Without asserting the crash the test only notices a crash point that never fired
+        # through the recovery message, which the drop scenarios do not need.
+        new_home_dir = self.crash_in_subprocess(subdir, func, signal.SIGABRT)
 
-        with self.expectedStdoutPattern('removing incomplete table'):
+        message = f"removing incomplete table '{self.tablename}' ({self.state})"
+        with self.expectedStdoutPattern(re.escape(message)):
             self.conn = self.setUpConnectionOpen(new_home_dir)
         self.session = self.setUpSessionOpen(self.conn)
 

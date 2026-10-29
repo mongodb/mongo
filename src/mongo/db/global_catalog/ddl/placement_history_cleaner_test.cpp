@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 
@@ -53,7 +27,6 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -106,12 +79,10 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     {ClusterRole::ShardServer, ClusterRole::ConfigServer},
                                     ConnectionString::forLocal(),
-                                    ShardId("config")},
-                                   UUID::gen());
+                                    ShardId("config")});
 
         // Create indexes for config.placementHistory and other config collections.
-        ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                      ->initializeConfigDatabaseIfNeeded(operationContext()));
+        ASSERT_OK(initializeConfigDatabaseIfNeededAtStepUp());
 
         // The DDL lock manager must be "recovered" so that getHistoricalPlacement() can acquire
         // its shared lock on config.placementHistory.
@@ -136,10 +107,10 @@ public:
         // The correct approach for this fixture is: insert shard docs, reload the registry
         // synchronously, then configure mock targeters on the resulting shard objects.
         ShardType shard0Doc;
-        shard0Doc.setHandle(ShardHandle{ShardId(kShard0.toString()), boost::none});
+        shard0Doc.setName(kShard0.toString());
         shard0Doc.setHost(kShard0Host.toString());
         ShardType shard1Doc;
-        shard1Doc.setHandle(ShardHandle{ShardId(kShard1.toString()), boost::none});
+        shard1Doc.setName(kShard1.toString());
         shard1Doc.setHost(kShard1Host.toString());
         setupShards({shard0Doc, shard1Doc});
         shardRegistry()->reload(operationContext());
@@ -160,7 +131,7 @@ public:
 
     NamespacePlacementType insertPlacementChangeDoc(const std::string& nss,
                                                     const Timestamp& timestamp,
-                                                    const std::vector<ShardRef>& shards = {}) {
+                                                    const std::vector<ShardId>& shards = {}) {
         NamespacePlacementType doc(
             NamespaceString::createNamespaceString_forTest(nss), timestamp, shards);
         doc.setUuid(UUID::gen());
@@ -173,7 +144,7 @@ public:
     // Insert the operational initialization marker at the given timestamp.
     // `shards` is empty for the "real" init marker (the one used by getHistoricalPlacement to
     // determine that accurate data is available) and non-empty for the dawn-of-time approximation.
-    void insertInitMarker(Timestamp ts, std::vector<ShardRef> shards = {}) {
+    void insertInitMarker(Timestamp ts, std::vector<ShardId> shards = {}) {
         NamespacePlacementType marker(
             ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker, ts, shards);
         ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -282,7 +253,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsBelowThreshold) {
     // minEntries = 10 > 3 docs -> cleaner must skip without sending any network command.
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 10 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/10);
     });
     future.default_timed_get();
 
@@ -315,7 +286,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsWhenShardResponseFails) {
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     // sendCommandToShards() dispatches to all shards asynchronously. Respond to both; the error
@@ -361,7 +332,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsWhenAllShardsReturnZeroTimestamp) {
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     onCommand([](const executor::RemoteCommandRequest&) {
@@ -405,7 +376,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsWhenInitMarkerIsAheadOfEarliestOptime) 
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     onCommand([](const executor::RemoteCommandRequest&) {
@@ -460,7 +431,7 @@ TEST_F(PlacementHistoryCleanerTest, PerformsCleanupWhenAllConditionsAreMet) {
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     // Set earliest op times on each shard (The minimum value will be the one setting the cut
@@ -519,7 +490,7 @@ TEST_F(PlacementHistoryCleanerTest, CleanupFailsWhenEmptyShardsInitMarkerIsMissi
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     // The dawn-of-time marker at T(0,1) does not satisfy timestamp >= T(100,0), so the
@@ -567,7 +538,7 @@ TEST_F(PlacementHistoryCleanerTest, CleanupSucceedsWithMultipleEmptyShardsInitMa
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     onCommand([&](const executor::RemoteCommandRequest&) {
@@ -600,7 +571,7 @@ TEST_F(PlacementHistoryCleanerRecoveryFailedTest, SkipsWhenShardingStateRecovery
     // No DB setup or network mocks are needed: runOnce() must return before touching anything.
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
     // If runOnce() hangs or crashes the test fails; a clean return is the expected outcome.
     future.default_timed_get();

@@ -6,10 +6,7 @@ setup_trap
 cd_top
 check_fast_mode_flag
 
-if ! command -v clang-format &> /dev/null; then
-    echo "error: clang-format not found; please install it and ensure it is on PATH"
-    exit 1
-fi
+check_clang_format
 
 # Parallel execution: if it's the main invocation of the script, collect the file names
 # to process and run them in subprocesses.
@@ -28,7 +25,7 @@ fi
 # We want to be able to detect modifications.
 for f in "$@"; do
     cat "$f" | \
-            clang-format --fallback-style=none | \
+            "$clang_format" --fallback-style=none | \
             python3 dist/s_comment.py > "$t" || exit 1
     if ! cmp -s "$f" "$t"; then
         if [[ -n "$S_RECURSE" ]] ; then

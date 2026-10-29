@@ -13,7 +13,6 @@
 // The following checks involve talking to shards, but this test shuts down shards.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 

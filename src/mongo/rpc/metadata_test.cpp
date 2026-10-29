@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/rpc/metadata.h"
 
@@ -33,7 +7,11 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/feature_flag_test_gen.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -165,6 +143,122 @@ TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
         ASSERT_BSONOBJ_EQ(converted.body, addDollarDB(cmd, "db"));
         ASSERT_EQ(converted.sequences.size(), 0u);
     }
+}
+
+class InstallIfrContextFromWireTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = cc().makeOperationContext();
+    }
+
+    static GenericArguments argsWithIfrFlags() {
+        GenericArguments args;
+        args.setIfrFlags(std::vector<IFRFlagWireEntry>{});
+        return args;
+    }
+
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+TEST_F(InstallIfrContextFromWireTest, InstallsWireContextWhenIfrFlagsPresent) {
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+}
+
+TEST_F(InstallIfrContextFromWireTest, NoContextInstalledWhenIfrFlagsAbsent) {
+    installIfrContextFromWire(_opCtx.get(), GenericArguments{});
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_FALSE(ctx);
+}
+
+TEST_F(InstallIfrContextFromWireTest, NoopInDirectClient) {
+    // Nested operations (DBDirectClient sub-commands) share the parent operation's opCtx and must
+    // never install, even when their request carries ifrFlags.
+    _opCtx->getClient()->setInDirectClient(true);
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+}
+
+TEST_F(InstallIfrContextFromWireTest, NestedDirectClientDoesNotMaskOuterWireInstall) {
+    // Regression test: a nested operation without ifrFlags (e.g. the 'usersInfo' run by the
+    // localhost-auth-bypass check in AuthorizationSession::startRequest()) can run on the
+    // parent's opCtx before the parent command is parsed and installs. It must not claim the
+    // decoration with a conservative no-flags context, or the parent's wire-provided flag values
+    // would be silently discarded by the install-once check.
+    _opCtx->getClient()->setInDirectClient(true);
+    installIfrContextFromWire(_opCtx.get(), GenericArguments{});
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()));
+
+    _opCtx->getClient()->setInDirectClient(false);
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+}
+
+TEST_F(InstallIfrContextFromWireTest, SecondInstallIsNoopAndPreservesExistingContext) {
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+    auto first = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(first);
+
+    installIfrContextFromWire(_opCtx.get(), GenericArguments{});
+    ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), first);
+}
+
+TEST_F(InstallIfrContextFromWireTest, SecondInstallWithIfrFlagsIsNoopAndPreservesExistingContext) {
+    // Even when the second call carries ifrFlags, the install-once check prevents overwriting the
+    // existing context.
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+    auto first = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(first);
+
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+    ASSERT_EQ(IncrementalFeatureRolloutContext::tryGet(_opCtx.get()), first);
+}
+
+TEST_F(InstallIfrContextFromWireTest, NestedDirectClientGetDoesNotMaskOuterWireInstall) {
+    // A pre-parse nested DBDirectClient op calls get() on the shared opCtx before the parent
+    // installs its wire context. get() must hand it a detached context rather than materializing
+    // the decoration; otherwise the parent's wire flag values are silently discarded by the
+    // install-once check.
+    _opCtx->getClient()->setInDirectClient(true);
+    auto nestedCtx = IncrementalFeatureRolloutContext::get(_opCtx.get());
+    ASSERT_TRUE(nestedCtx);
+    ASSERT_FALSE(IncrementalFeatureRolloutContext::isInstalled(_opCtx.get()));
+
+    _opCtx->getClient()->setInDirectClient(false);
+    installIfrContextFromWire(_opCtx.get(), argsWithIfrFlags());
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_TRUE(ctx->isInstalledFromWire());
+    ASSERT_NE(ctx.get(), nestedCtx.get());
+}
+
+TEST_F(InstallIfrContextFromWireTest, WireFlagValueSurvivesNestedDirectClientGet) {
+    // The wire value must win over the node-local default even after a nested direct-client get()
+    // ran first: featureFlagReleaseForTest defaults true locally, so a wire value of false proves
+    // the parent's wire install was not masked.
+    auto& flag = feature_flags::gFeatureFlagReleaseForTest;
+    GenericArguments args;
+    args.setIfrFlags(std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), false}});
+
+    _opCtx->getClient()->setInDirectClient(true);
+    (void)IncrementalFeatureRolloutContext::get(_opCtx.get());
+
+    _opCtx->getClient()->setInDirectClient(false);
+    installIfrContextFromWire(_opCtx.get(), args);
+
+    auto ctx = IncrementalFeatureRolloutContext::tryGet(_opCtx.get());
+    ASSERT_TRUE(ctx);
+    ASSERT_FALSE(ctx->getSavedFlagValue(flag));
 }
 
 }  // namespace

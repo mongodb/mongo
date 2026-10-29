@@ -64,9 +64,6 @@ assert.eq(findChunksUtil.countChunksForNs(mongos.getDB("config"), ns), nChunks +
 // check_orphans_are_deleted.js is skipped because it takes 1 minute to run on an optimized build
 // and this test doesn't insert any data for there to be unowned documents anyway.
 TestData.skipCheckOrphans = true;
-// check_uuids_consistent_across_cluster.js is skipped because it takes nearly 1 minute to run on an
-// optimized build.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // check_routing_table_consistency.js is skipped because its $group + $lookup aggregation over the
 // config.chunks documents exceeds 100MB and fails.
 TestData.skipCheckRoutingTableConsistency = true;

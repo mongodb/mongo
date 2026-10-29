@@ -2,6 +2,7 @@
  * This test enables a failpoint that recreates an interruption on the OpCtx while planShardedSearch
  * is executing. The test assures that the correct error is thrown instead of the server
  * segfaulting.
+ * TODO (SERVER-131069): Remove this mocked test file now that this test has been migrated to an e2e suite (e2e/sharding_no_passthrough/sharded_search_network_interruption.js).
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {

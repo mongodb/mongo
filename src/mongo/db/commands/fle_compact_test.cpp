@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
@@ -178,7 +152,7 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 
 UUID fieldNameToUUID(std::string_view field) {
     std::array<char, UUID::kNumBytes> buf;
-    murmur3(field, 123456 /*seed*/, buf);
+    murmur3(field, /*seed=*/123456, buf);
     return UUID::fromCDR(buf);
 }
 
@@ -722,7 +696,7 @@ void FleCompactTest::testCompactValueV2_WithNullAnchor(
     escCount++;
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
-    assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
+    assertESCNullAnchorDocument(testPair, true, /*apos=*/0, /*cpos=*/5);
     logCounts(_queryImpl, _namespaces);
     anchorsToDelete = cleanupOneFieldValuePair(_queryImpl.get(),
                                                &hmacCtx,
@@ -892,7 +866,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
     escCount++;
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
-    assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
+    assertESCNullAnchorDocument(testPair, true, /*apos=*/0, /*cpos=*/5);
 
     // Run cleanup again; (tests emuBinary apos = null, cpos = null)
     anchorsToDelete = cleanupOneFieldValuePair(
@@ -901,7 +875,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Assert null anchor is unchanged
-    assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
+    assertESCNullAnchorDocument(testPair, true, /*apos=*/0, /*cpos=*/5);
 
     // Insert new documents
     values[value].toInsertCount = 5;
@@ -917,7 +891,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Assert null anchor is updated with new cpos
-    assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 10 /*cpos*/);
+    assertESCNullAnchorDocument(testPair, true, /*apos=*/0, /*cpos=*/10);
 }
 
 // Tests case (E) in cleanup algorithm, where apos = null and (cpos = null or cpos > 0).
@@ -936,13 +910,13 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_WithAnchors) {
     size_t anchorLimit = 100;
 
     // Run a few insert & compact cycles to populate the ESC with non-anchors & plain anchors
-    doInsertAndCompactCycles(key, values, true, 5 /*cycles*/, 25 /*insertsPerCycle*/);
+    doInsertAndCompactCycles(key, values, true, /*cycles=*/5, /*insertsPerCycle=*/25);
     numAnchors = 5;
     edcCount = 25 * 5;
     escCount = edcCount + numAnchors;
     ecocCount = edcCount;
     assertDocumentCounts(edcCount, escCount, ecocCount);
-    assertESCAnchorDocument(testPair, true, numAnchors /*apos*/, edcCount /*cpos*/);
+    assertESCAnchorDocument(testPair, true, /*apos=*/numAnchors, /*cpos=*/edcCount);
 
     // Run cleanup to insert the null anchor
     anchorsToDelete = cleanupOneFieldValuePair(
@@ -1029,13 +1003,13 @@ TEST_F(FleCompactTest, CleanupValue_NewAnchorsExist) {
     size_t anchorLimit = 100;
 
     // Run a few insert & compact cycles to populate the ESC with non-anchors & plain anchors
-    doInsertAndCompactCycles(key, values, true, 5 /*cycles*/, 25 /*insertsPerCycle*/);
+    doInsertAndCompactCycles(key, values, true, /*cycles=*/5, /*insertsPerCycle=*/25);
     numAnchors = 5;
     edcCount = 25 * 5;
     escCount = edcCount + numAnchors;
     ecocCount = edcCount;
     assertDocumentCounts(edcCount, escCount, ecocCount);
-    assertESCAnchorDocument(testPair, true, numAnchors /*apos*/, edcCount /*cpos*/);
+    assertESCAnchorDocument(testPair, true, /*apos=*/numAnchors, /*cpos=*/edcCount);
 
     // Run cleanup; (tests emuBinary apos > 0, cpos = null)
     // Assert null doc is inserted & has the latest apos & cpos
@@ -1048,7 +1022,7 @@ TEST_F(FleCompactTest, CleanupValue_NewAnchorsExist) {
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
 
     // Run a few more insert & compact cycles, but don't compact on last cycle
-    doInsertAndCompactCycles(key, values, false /*compactOnLastCycle*/, 5, 25);
+    doInsertAndCompactCycles(key, values, /*compactOnLastCycle=*/false, 5, 25);
     numAnchors += 4;
     escDeletesCount = 4;
     edcCount += (25 * 5);

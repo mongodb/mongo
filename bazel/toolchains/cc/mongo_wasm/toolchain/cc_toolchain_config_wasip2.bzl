@@ -1,7 +1,7 @@
 """WASI Preview2 (wasm32-wasip2) Bazel C/C++ toolchain config (wasi-sdk based)."""
 
 load(
-    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "@rules_cc//cc:cc_toolchain_config_lib.bzl",
     "action_config",
     "env_entry",
     "env_set",
@@ -12,7 +12,7 @@ load(
     "tool_path",
     "with_feature_set",
 )
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
     "all_c_compile_actions",
@@ -22,8 +22,12 @@ load(
     "//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl",
     "all_link_actions",
 )
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 def _wasi_cc_toolchain_config_wasip2_impl(ctx):
+    wasi_sdk = ctx.executable.clang.dirname.rsplit("/", 1)[0]
+
     # We must use action configs instead of tool paths because of the external dependency.
     # This defines the binaries we use.
     action_configs = [
@@ -78,10 +82,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             flag_groups = [flag_group(flags = [
                 "--target=wasm32-wasip2",
                 "-no-canonical-prefixes",
-                # This may change depending on the repo rule used to generate it.
-                # find $(bazel info output_base) -name wasi-sysroot # BASH SCRIPT
-                # can be used to find it if we use a different repository rule later.
-                "--sysroot={}".format("external/_main~_repo_rules~wasi_sdk/share/wasi-sysroot"),
+                "--sysroot={}/share/wasi-sysroot".format(wasi_sdk),
                 "-fno-common",
                 "-Oz",
                 "-ffunction-sections",
@@ -156,9 +157,8 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
         )],
     )
 
-    # WASI SDK paths (relative to execroot), matching the default search order
-    # reported by: wasm32-wasip2-clang++ -v -x c++ /dev/null -fsyntax-only
-    wasi_sdk = "external/_main~_repo_rules~wasi_sdk"
+    # WASI sysroot, matching the default search order reported by:
+    # wasm32-wasip2-clang++ -v -x c++ /dev/null -fsyntax-only
     wasi_sysroot = wasi_sdk + "/share/wasi-sysroot"
 
     # Linker flags
@@ -264,6 +264,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             external_include_paths_feature,
             feature(name = "archive_param_file", enabled = True),
             feature(name = "supports_dynamic_linker", enabled = False),
+            feature(name = "supports_start_end_lib", enabled = True),
             # Override Bazel's built-in coverage feature with a no-op.
             # The WASI SDK does not ship libclang_rt.profile.a, so coverage
             # instrumentation cannot work on wasm32 targets.  Without this

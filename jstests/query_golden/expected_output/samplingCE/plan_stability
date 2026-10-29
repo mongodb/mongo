@@ -36,7 +36,7 @@
 
 {">>>pipelines":[
 {">>>pipeline": [{"$match":{"$nor":[{"d_compound":{"$exists":false}},{"d_idx":{"$gte":19}},{"a_compound":{"$all":[13,19,6]}}],"i_compound":{"$in":[2,7]},"z_compound":{"$nin":[5,14]}}},{"$limit":31}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[2.0, 2.0]","[7.0, 7.0]"]}}}},
+    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1_z_compound_1","indexBounds":{"i_compound":["[2.0, 2.0]","[7.0, 7.0]"],"z_compound":["[MinKey, 5.0)","(5.0, 14.0)","(14.0, MaxKey]"]}}}},
     "keys" :      4,
     "docs" :      2,
     "sorts":      0,
@@ -4444,8 +4444,8 @@
     "rows" :      3},
 
 {">>>pipeline": [{"$match":{"a_compound":{"$elemMatch":{"$exists":true,"$lt":7}},"i_compound":{"$gte":15},"k_compound":{"$in":[19,4,18,7]}}}],
-    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1_a_compound_1","indexBounds":{"k_compound":["[4.0, 4.0]","[7.0, 7.0]","[18.0, 18.0]","[19.0, 19.0]"],"a_compound":["[-inf, 7.0)"]}}},
-    "keys" :    499,
+    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"k_compound_1","indexBounds":{"k_compound":["[4.0, 4.0]","[7.0, 7.0]","[18.0, 18.0]","[19.0, 19.0]"]}}},
+    "keys" :    403,
     "docs" :    400,
     "sorts":      0,
     "plans":      6,
@@ -7964,9 +7964,9 @@
     "rows" :  89980},
 
 {">>>pipeline": [{"$match":{"$and":[{"i_compound":{"$lte":16}},{"a_compound":{"$all":[10,1]}}],"a_noidx":{"$elemMatch":{"$in":[12,4,1]}}}},{"$limit":93},{"$project":{"a_idx":1}}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[-inf, 16.0]"]}}}}},
-    "keys" :     17,
-    "docs" :     17,
+    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[10.0, 10.0]"],"i_compound":["[-inf, 16.0]"]}}}}},
+    "keys" :      1,
+    "docs" :      1,
     "sorts":      0,
     "plans":      7,
     "rows" :      1},
@@ -8140,9 +8140,9 @@
     "rows" :  59996},
 
 {">>>pipeline": [{"$match":{"$nor":[{"a_idx":{"$gt":15}},{"d_compound":{"$in":[7,17]}},{"i_compound":{"$nin":[6,9,17,12,4]}}],"a_compound":{"$in":[12,13]}}},{"$limit":248}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[4.0, 4.0]","[6.0, 6.0]","[9.0, 9.0]","[12.0, 12.0]","[17.0, 17.0]"]}}}},
-    "keys" :     10,
-    "docs" :      5,
+    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[12.0, 12.0]","[13.0, 13.0]"],"i_compound":["[4.0, 4.0]","[6.0, 6.0]","[9.0, 9.0]","[12.0, 12.0]","[17.0, 17.0]"]}}}},
+    "keys" :      4,
+    "docs" :      1,
     "sorts":      0,
     "plans":      7,
     "rows" :      1},
@@ -8164,9 +8164,9 @@
     "rows" :  29986},
 
 {">>>pipeline": [{"$match":{"$and":[{"a_noidx":{"$elemMatch":{"$lt":12}}},{"$and":[{"i_compound":{"$eq":3}},{"z_compound":{"$in":[15,2]}}]}],"a_noidx":{"$in":[3,10,12]}}},{"$limit":29}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[3.0, 3.0]"]}}}},
+    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1_z_compound_1","indexBounds":{"i_compound":["[3.0, 3.0]"],"z_compound":["[2.0, 2.0]","[15.0, 15.0]"]}}}},
     "keys" :      1,
-    "docs" :      1,
+    "docs" :      0,
     "sorts":      0,
     "plans":      4,
     "rows" :      0},
@@ -8188,9 +8188,9 @@
     "rows" :  99963},
 
 {">>>pipeline": [{"$match":{"$nor":[{"$and":[{"$and":[{"k_idx":{"$nin":[8,15,6]}},{"a_noidx":{"$elemMatch":{"$exists":false}}},{"a_noidx":{"$exists":true}},{"a_noidx":{"$elemMatch":{"$exists":true}}},{"a_compound":{"$elemMatch":{"$exists":true}}}]},{"a_idx":{"$all":[11,6,8]}}]},{"k_compound":{"$in":[13,2,9]}}],"a_compound":{"$all":[20,2,20]},"i_compound":{"$in":[17,20]}}},{"$project":{"_id":0,"i_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[17.0, 17.0]","[20.0, 20.0]"]}}}},
-    "keys" :      4,
-    "docs" :      2,
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1_i_compound_1","indexBounds":{"a_compound":["[20.0, 20.0]"],"i_compound":["[17.0, 17.0]","[20.0, 20.0]"]}}}},
+    "keys" :      2,
+    "docs" :      1,
     "sorts":      0,
     "plans":      9,
     "rows" :      1},
@@ -8380,8 +8380,8 @@
     "rows" :  20000}
 
 ],
-">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 85039308, "docs": 52976779, "sorts": 78897837, "rows": 38020022, "errors":      0},
-">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
+">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 85039188, "docs": 52976757, "sorts": 78897837, "rows": 38020022, "errors":      0},
+">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"costBased","internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 
 [jsTest] ----

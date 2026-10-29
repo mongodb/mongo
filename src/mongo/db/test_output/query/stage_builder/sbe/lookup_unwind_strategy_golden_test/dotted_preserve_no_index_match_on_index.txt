@@ -1,0 +1,127 @@
+# Golden test output of LookupUnwindStrategyGoldenTest/DottedPreserveNoIndexMatchOnIndex
+{ $lookup: { from: "<strategy>", localField: "lkey", foreignField: "fkey", as: "a.b" } }
+{ $unwind: { path: "$a.b", preserveNullAndEmptyArrays: true } }
+{ $match: { idx: { $gt: 0 } } }
+
+## HashJoin
+[4] project [s11 = makeBsonObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s10)] 
+[4] hash_lookup_unwind left s10 
+    outer s8 
+        [4] project [s8 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [2] filter {traverseF(s3, lambda(l4.0) { ((move(l4.0) > 0) ?: false) }, false)} 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = idx, s4 = lkey] @"UUID" 
+    inner s9 s5 
+        [4] project [s9 = arrayToSet(
+            let [
+                l5.0 = (s7 ?: null) 
+            ] 
+            in 
+                if isArray(l5.0) 
+                then concatArrays(l5.0, newArray(l5.0)) 
+                else newArray(move(l5.0)) 
+       )] 
+        [3] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"UUID" 
+
+## NestedLoopJoin
+[4] project [s9 = makeBsonObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s5)] 
+[4] nlj left [s1] [s8] 
+    left 
+        [4] project [s8 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [2] filter {traverseF(s3, lambda(l6.0) { ((move(l6.0) > 0) ?: false) }, false)} 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = idx, s4 = lkey] @"UUID" 
+    right 
+        [4] filter {traverseF((s7 ?: null), lambda(l7.0) { isMember(move(l7.0), s8) }, true)} 
+        [3] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"UUID" 
+
+## IndexedLoopJoin
+[5] project [s19 = makeBsonObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s12)] 
+[5] nlj left [s1] [s15] 
+    left 
+        [5] project [s15 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [2] filter {traverseF(s3, lambda(l8.0) { ((move(l8.0) > 0) ?: false) }, false)} 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = idx, s4 = lkey] @"UUID" 
+    right 
+        [5] filter {traverseF((s14 ?: null), lambda(l11.0) { isMember(move(l11.0), s15) }, true)} 
+        [5] nlj inner [] [s5, s6] 
+            left 
+                [5] project [s5 = ks(1ll, 0, s17, 1ll), s6 = ks(1ll, 0, s17, 2ll)] 
+                [5] unwind s17 = outField, s18 = outIndex, s16 = inField _preserveNullAndEmptyArrays 
+                [5] project [s16 = 
+                    if traverseF(s15, lambda(l9.0) { isArray(move(l9.0)) }, false) 
+                    then arrayToSet(concatArrays(s15, traverseP(s15, lambda(l10.0) { 
+                        if isArray(l10.0) 
+                        then (getElement(move(l10.0), 0) ?: undefined) 
+                        else move(l10.0) 
+                    }, 1))) 
+                    else s15 
+               ] 
+                [5] limit 1ll 
+                [5] coscan 
+            right 
+                [4] fetch s7 = seek, s12 = result, s13 = recordId, s10 = inSnapshotId, s8 = inIndexIdent, s9 = inIndexKey, s11 = inIndexKeyPattern [s14 = fkey] @"UUID" 
+                [3] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
+
+## DynamicIndexedLoopJoin
+[6] project [s24 = makeBsonObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s22)] 
+[6] nlj left [s1] [s18, s1] 
+    left 
+        [6] project [s18 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [2] filter {traverseF(s3, lambda(l9.0) { ((move(l9.0) > 0) ?: false) }, false)} 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = idx, s4 = lkey] @"UUID" 
+    right 
+        [6] filter {traverseF((s23 ?: null), lambda(l13.0) { isMember(move(l13.0), s18) }, true)} 
+        [6] branch {!(traverseF(s18, lambda(l12.0) { typeMatch(move(l12.0), 1024) }, false))} [s22, s23] 
+        [s12, s14] [6] nlj inner [] [s5, s6] 
+            left 
+                [6] project [s5 = ks(1ll, 0, s20, 1ll), s6 = ks(1ll, 0, s20, 2ll)] 
+                [6] unwind s20 = outField, s21 = outIndex, s19 = inField _preserveNullAndEmptyArrays 
+                [6] project [s19 = 
+                    if traverseF(s18, lambda(l10.0) { isArray(move(l10.0)) }, false) 
+                    then arrayToSet(concatArrays(s18, traverseP(s18, lambda(l11.0) { 
+                        if isArray(l11.0) 
+                        then (getElement(move(l11.0), 0) ?: undefined) 
+                        else move(l11.0) 
+                    }, 1))) 
+                    else s18 
+               ] 
+                [6] limit 1ll 
+                [6] coscan 
+            right 
+                [4] fetch s7 = seek, s12 = result, s13 = recordId, s10 = inSnapshotId, s8 = inIndexIdent, s9 = inIndexKey, s11 = inIndexKeyPattern [s14 = fkey] @"UUID" 
+                [3] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
+        
+        [s15, s17] [5] scan generic [s15 = record, s16 = recordId] [s17 = fkey] @"UUID" 
+
+## Results

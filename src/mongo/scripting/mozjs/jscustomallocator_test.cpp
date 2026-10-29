@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/scripting/engine.h"
@@ -39,6 +13,8 @@
 
 #include <jscustomallocator.h>
 
+#include "mozilla/RefPtr.h"
+#include "mozilla/StringBuffer.h"
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <fmt/format.h>
@@ -153,8 +129,8 @@ TEST_F(JSCustomAllocatorTest, SingleAlloc) {
 
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
-                                      true /* printResult */,
-                                      true /* reportError */,
+                                      /*printResult=*/true,
+                                      /*reportError=*/true,
                                       true /* assertOnError , timeout*/));
     scope.reset();
     setGlobalScriptEngine(nullptr);
@@ -197,8 +173,8 @@ TEST_F(JSCustomAllocatorTest, ResizeMany) {
 
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
-                                      true /* printResult */,
-                                      true /* reportError */,
+                                      /*printResult=*/true,
+                                      /*reportError=*/true,
                                       true /* assertOnError , timeout*/));
     scope.reset();
     setGlobalScriptEngine(nullptr);
@@ -324,6 +300,71 @@ TEST_F(JSCustomAllocatorTest, MmapTrackingToggle) {
     mongo::sm::reset(0, false);
     mongo::sm::record_mmap_alloc(2048);
     ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+}
+
+// Allocating a StringBuffer from a JS arena counts against malloc_bytes; releasing it returns the
+// counter to zero.
+TEST_F(JSCustomAllocatorTest, StringBufferArenaAllocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    {
+        RefPtr<mozilla::StringBuffer> buffer =
+            mozilla::StringBuffer::Alloc(1024, mozilla::Some(js::StringBufferArena));
+        ASSERT_TRUE(buffer);
+        ASSERT_GREATER_THAN(mongo::sm::get_malloc_bytes(), 0);
+    }
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// Reallocating an arena-backed StringBuffer and releasing it returns the counter to zero.
+TEST_F(JSCustomAllocatorTest, StringBufferArenaReallocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    mozilla::StringBuffer* buffer =
+        mozilla::StringBuffer::Alloc(1024, mozilla::Some(js::StringBufferArena)).take();
+    ASSERT_TRUE(buffer);
+
+    buffer = mozilla::StringBuffer::Realloc(buffer, 4096, mozilla::Some(js::StringBufferArena));
+    ASSERT_TRUE(buffer);
+
+    buffer->Release();
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// A StringBuffer allocated without an arena uses plain malloc and is not counted; releasing it
+// leaves the counter at zero.
+TEST_F(JSCustomAllocatorTest, StringBufferPlainAllocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    {
+        RefPtr<mozilla::StringBuffer> buffer = mozilla::StringBuffer::Alloc(1024);
+        ASSERT_TRUE(buffer);
+        ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    }
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// Reallocating a plain-malloc StringBuffer with plain realloc and releasing it leaves the counter
+// at zero.
+TEST_F(JSCustomAllocatorTest, StringBufferPlainReallocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    mozilla::StringBuffer* buffer = mozilla::StringBuffer::Alloc(1024).take();
+    ASSERT_TRUE(buffer);
+
+    buffer = mozilla::StringBuffer::Realloc(buffer, 4096, mozilla::Nothing());
+    ASSERT_TRUE(buffer);
+
+    buffer->Release();
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
 }
 
 }  // namespace mozjs

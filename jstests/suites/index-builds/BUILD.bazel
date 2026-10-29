@@ -17,9 +17,8 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 resmoke_suite_test(
     name = "concurrency_replication_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_primary_driven_index_builds.yml",
-    shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "primary_driven_index_builds",
@@ -39,12 +38,13 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "concurrency_sharded_replication_primary_driven_index_builds",
+    size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_primary_driven_index_builds.yml",
-    shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
+        "incompatible_debug_mode",
         "large",
         "primary_driven_index_builds",
         "read_concern_maj",
@@ -65,6 +65,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "replica_sets_jscore_passthrough_primary_driven_index_builds",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough_primary_driven_index_builds.yml",
     shard_count = 50,
     tags = [
@@ -81,7 +82,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_passthrough_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/retryable_writes_jscore_passthrough_primary_driven_index_builds.yml",
-    shard_count = 50,
+    shard_count = 13,
     tags = [
         "ci-default",
         "primary_driven_index_builds",
@@ -96,7 +97,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "retryable_writes_jscore_stepdown_passthrough_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/retryable_writes_jscore_stepdown_passthrough_primary_driven_index_builds.yml",
-    shard_count = 50,
+    shard_count = 4,
     tags = [
         "ci-default",
         "primary_driven_index_builds",
@@ -110,8 +111,9 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_primary_driven_index_builds",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_primary_driven_index_builds.yml",
-    shard_count = 50,
+    shard_count = 16,
     tags = [
         "ci-default",
         "jscore",
@@ -127,14 +129,14 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "timeseries_write_pbt_fixed_seed",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/timeseries_write_pbt.yml",
     data = [
         "//jstests/write_path/timeseries/pbt:all_subpackage_javascript_files",
     ],
     resmoke_args = [
-        "--fastCheckParameters='{\"numRuns\":25,\"seed\":42}'",
+        "--fastCheckParameters={\"numRuns\":25,\"seed\":42}",
     ],
-    shard_count = 4,
     tags = [
         "ci-default",
     ],
@@ -146,8 +148,9 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "v1index_jscore_passthrough",
+    size = "large",
     config = "//buildscripts/resmokeconfig:suites/v1index_jscore_passthrough.yml",
-    shard_count = 50,
+    shard_count = 16,
     tags = [
         "ci-default",
     ],
@@ -162,7 +165,8 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_primary_driven_index_builds.yml",
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
+        "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # TODO(SERVER-123233) index_build_maximum_memory_usage.js checks default memory limits, but inconsistently handles cgroup memory limits that are used by remote executors.
         "primary_driven_index_builds",
         "requires_execution_on_windows_patch_build",
@@ -173,6 +177,55 @@ resmoke_suite_test(
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_primary_driven_index_builds",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_primary_driven_index_builds.yml",
+    tags = [
+        "ci-default",
+        "incompatible_debug_mode",
+        "primary_driven_index_builds",
+        "replica_sets",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+        "//src/third_party/wiredtiger:wt",
+    ],
+)
+
+resmoke_suite_test(
+    name = "auth_primary_driven_index_builds",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/auth_primary_driven_index_builds.yml",
+    shard_count = 8,
+    tags = [
+        "auth",
+        "ci-default",
+        "primary_driven_index_builds",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_primary_driven_index_builds",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_primary_driven_index_builds.yml",
+    tags = [
+        "ci-default",
+        "primary_driven_index_builds",
+        "sharding",
+    ],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",

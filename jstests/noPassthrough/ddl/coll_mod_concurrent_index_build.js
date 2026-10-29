@@ -2,11 +2,12 @@
  * Regression test for SERVER-107819. Tests running a collMod operation while an index build is
  * in progress in a non-DB-primary shard.
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
@@ -15,6 +16,27 @@ assert.commandWorked(
 );
 
 function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBuildAbort} = {}) {
+    // Pause the collMod coordinator right after it checked for in-progress index builds, so that
+    // the index build below is only started once the check has already passed.
+    const hangCollMod = configureFailPoint(
+        st.rs0.getPrimary(),
+        "hangAfterIndexBuildInProgressCheck",
+    );
+
+    // Use collMod to change the granularity on the collection.
+    const collModThread = new Thread(
+        function (host, dbName, collName, collModOptions) {
+            const db = new Mongo(host).getDB(dbName);
+            assert.commandWorked(db.runCommand({collMod: collName, ...collModOptions}));
+        },
+        db.getMongo().host,
+        db.getName(),
+        coll.getName(),
+        collModOptions,
+    );
+    collModThread.start();
+    hangCollMod.wait();
+
     // Force a two-phase index build to hang on the non DB primary shard.
     const shardConn = st.rs1.getPrimary();
     IndexBuildTest.pauseIndexBuilds(shardConn);
@@ -31,18 +53,8 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
         "a_1",
     );
 
-    // Use collMod to change the granularity on the collection.
-    const collModThread = new Thread(
-        function (host, dbName, collName, collModOptions) {
-            const db = new Mongo(host).getDB(dbName);
-            assert.commandWorked(db.runCommand({collMod: collName, ...collModOptions}));
-        },
-        db.getMongo().host,
-        db.getName(),
-        coll.getName(),
-        collModOptions,
-    );
-    collModThread.start();
+    // Let the collMod proceed now that the index build is in progress.
+    hangCollMod.off();
 
     // Wait some time for the collMod to likely run into the index build.
     sleep(1000);
@@ -88,7 +100,8 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
         {timeseries: {timeField: "t", metaField: "m"}},
     );
     coll.insertOne({t: ISODate(), m: 123, temp: 42});
-    // Since timeseries granularity changes block CRUD operations, the index build may be aborted to unblock them.
+    // Since timeseries granularity changes block CRUD operations, the index build may be aborted to
+    // unblock them.
     runCollModWithConcurrentIndexBuild(
         coll,
         {timeseries: {granularity: "minutes"}},
@@ -114,7 +127,8 @@ function runCollModWithConcurrentIndexBuild(coll, collModOptions, {permitIndexBu
         }),
     );
     coll.insertOne({t: ISODate(), temp: 42});
-    // Since timeseries granularity changes block CRUD operations, the index build may be aborted to unblock them.
+    // Since timeseries granularity changes block CRUD operations, the index build may be aborted to
+    // unblock them.
     runCollModWithConcurrentIndexBuild(
         coll,
         {timeseries: {granularity: "minutes"}},

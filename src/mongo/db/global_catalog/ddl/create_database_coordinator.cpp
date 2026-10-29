@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/ddl/create_database_coordinator.h"
 
@@ -35,6 +9,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
+#include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/executor/async_rpc.h"
 
 namespace mongo {
@@ -72,6 +47,29 @@ void refreshDatabaseCache(OperationContext* opCtx,
 }
 }  // namespace
 
+void CreateDatabaseCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
+    if (!GlobalUserWriteBlockState::get(getGlobalServiceContext())
+             ->isUserShardedDDLBlockingEnabled()) {
+        return;
+    }
+
+    const auto incomingMetadata = extractShardingCoordinatorMetadata(stateDoc);
+    const auto& incomingForwardableMetadata = incomingMetadata.getForwardableOpMetadata();
+    const auto& currentForwardableMetadata = metadata().getForwardableOpMetadata();
+
+    const auto getEffectiveBypass = [](const auto& forwardableMetadata) {
+        return forwardableMetadata
+            ? forwardableMetadata->getMayBypassWriteBlocking().value_or(false)
+            : false;
+    };
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Another createDatabase operation with different write-block bypass metadata is "
+            "already running",
+            getEffectiveBypass(currentForwardableMetadata) ==
+                getEffectiveBypass(incomingForwardableMetadata));
+}
+
 void CreateDatabaseCoordinator::_checkPreconditions() {
     auto opCtxHolder = makeOperationContext();
     auto* opCtx = opCtxHolder.get();
@@ -105,7 +103,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
                 auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                _exitCriticalSection(opCtx, executor, token, true /* throwIfReasonDiffers */);
+                _exitCriticalSection(opCtx, executor, token, /*throwIfReasonDiffers=*/true);
             }
         });
 }
@@ -117,7 +115,7 @@ void CreateDatabaseCoordinator::_setupPrimaryShard(OperationContext* opCtx) {
     // Selects the primary candidate shard if not specified by the user or selected by the
     // coordinator already. Persists the primary shard information for later phases.
     StateDoc newDoc(_doc);
-    newDoc.setPrimaryShard(ShardRef{sharding_util::selectLeastLoadedNonDrainingShard(opCtx)});
+    newDoc.setPrimaryShard(sharding_util::selectLeastLoadedNonDrainingShard(opCtx));
     _updateStateDocument(opCtx, std::move(newDoc));
 }
 
@@ -226,7 +224,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                             dbVersion.is_initialized());
                     _result = ConfigsvrCreateDatabaseResponse(dbVersion.get());
                 }
-                _exitCriticalSection(opCtx, executor, token, false /* throwIfReasonDiffers */);
+                _exitCriticalSection(opCtx, executor, token, /*throwIfReasonDiffers=*/false);
                 if (_doc.getAuthoritativeMetadataAccessLevel() ==
                     AuthoritativeMetadataAccessLevelEnum::kNone) {
                     refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());

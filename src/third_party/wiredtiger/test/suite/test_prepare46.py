@@ -61,6 +61,7 @@ class test_prepare46(wttest.WiredTigerTestCase):
     def test_prepared_cell_preserved_after_eviction_at_unstable_prepare_ts(self):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+
         self.session.create(self.uri, 'key_format=i,value_format=S')
         cursor = self.session.open_cursor(self.uri)
 

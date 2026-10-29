@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/storage/storage_engine_impl.h"
@@ -38,16 +12,21 @@
 #include "mongo/db/client.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
+#include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_options.h"
@@ -62,11 +41,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #ifdef _WIN32
 #define NVALGRIND
@@ -95,6 +78,15 @@ MONGO_FAIL_POINT_DEFINE(pauseTimestampMonitor);
 
 namespace {
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
+
+// The storage engine transiently rejects an auto-compaction reconfigure while a previous one is
+// still being consumed. Retry for up to ~30 seconds before giving up.
+constexpr Milliseconds kAutoCompactReconfigureRetryInterval{50};
+constexpr int kMaxAutoCompactReconfigureAttempts = 600;
+
+bool isTransientAutoCompactStatus(Status status) {
+    return status == ErrorCodes::ObjectIsBusy;
+}
 
 // Returns true if the ident refers to a resumable index build table.
 bool isResumableIndexBuildIdent(std::string_view ident) {
@@ -195,7 +187,13 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     // This maintains current and earlier behavior of a MongoD.
     const auto catalogRecordStoreOpts = RecordStore::Options{};
     if (!catalogExists) {
-        WriteUnitOfWork uow(opCtx);
+        StorageWriteTransaction uow(ru);
+        // Normally schema epochs are set based on the timestamp, but we have to create the catalog
+        // before we can begin timestamping operations, so explicitly set the stable epoch to the
+        // initial value and the schema epoch for this write to a sentinel value. Has no effect if
+        // schema epochs are not in use.
+        _engine->setStableSchemaEpoch(KVEngine::kInitialSchemaEpoch);
+        ru.setSchemaEpoch(KVEngine::kUntimestampedSchemaEpoch);
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         LOGV2(11503104, "Creating MDB catalog as it did not already exist");
@@ -215,7 +213,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                                                   kCatalogInfoNamespace,
                                                   ident::kMdbCatalog,
                                                   catalogRecordStoreOpts,
-                                                  boost::none /* uuid */);
+                                                  /*uuid=*/boost::none);
 
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadMDBCatalog:");
@@ -229,8 +227,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     _catalog->init(opCtx);
 
     LOGV2(9529902, "Retrieving all idents from storage engine");
-    std::vector<std::string> identsKnownToStorageEngine =
-        _engine->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx));
+    std::vector<std::string> identsKnownToStorageEngine = _engine->getAllIdents(ru);
     std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
 
     std::vector<MDBCatalog::EntryIdentifier> catalogEntries = _catalog->getAllCatalogEntries(opCtx);
@@ -274,8 +271,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                     // collection, we create an new entry for it.
                     WriteUnitOfWork wuow(opCtx);
 
-                    auto keyFormat =
-                        _engine->getKeyFormat(*shard_role_details::getRecoveryUnit(opCtx), ident);
+                    auto keyFormat = _engine->getKeyFormat(ru, ident);
                     // TODO SERVER-105436 investigate usage of isClustered
                     bool isClustered = keyFormat == KeyFormat::String;
                     StatusWith<std::string> statusWithNs =
@@ -410,7 +406,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
         }
     }
 
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    ru.abandonSnapshot();
 }
 
 void StorageEngineImpl::closeMDBCatalog(OperationContext* opCtx) {
@@ -709,10 +705,7 @@ void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, std::string_view ident)
     // Dropping the spill table may transiently return ObjectIsBusy if another spill engine user has
     // a storage snapshot from before an earlier write to this table. Retry until the drop succeeds.
     for (size_t retries = 0;; ++retries) {
-        auto status = _spillEngine->dropIdent(ru,
-                                              ident,
-                                              false, /* identHasSizeInfo */
-                                              nullptr /* onDrop */);
+        auto status = _spillEngine->dropIdent(ru, ident, /*identHasSizeInfo=*/false);
         if (status.isOK()) {
             return;
         }
@@ -758,7 +751,7 @@ std::unique_ptr<RecordStore> StorageEngineImpl::makeInternalRecordStore(Operatio
         // so, we can re-use the ident if it is empty, which should always be the case. When layered
         // table drops are supported, dropIdent's effect should always be consistent with its
         // return status and a collision on re-creating an ident should be an error.
-        uassertStatusOK(_engine->dropIdent(ru, ident, false /* identHasSizeInfo */));
+        uassertStatusOK(_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/false));
 
         try {
             rs = createInternal();
@@ -796,16 +789,16 @@ void StorageEngineImpl::setLastMaterializedLsn(uint64_t lsn) {
     _engine->setLastMaterializedLsn(lsn);
 }
 
-void StorageEngineImpl::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
-    _engine->setRecoveryCheckpointMetadata(checkpointMetadata);
+Status StorageEngineImpl::setRecoveryCheckpointMetadata(std::string_view checkpointMetadata) {
+    return _engine->setRecoveryCheckpointMetadata(checkpointMetadata);
 }
 
 void StorageEngineImpl::promoteToLeader() {
     _engine->promoteToLeader();
 }
 
-void StorageEngineImpl::demoteFromLeader() {
-    // The engine itself doesn't need to do anything here yet.
+void StorageEngineImpl::demoteToFollower() {
+    _engine->demoteToFollower();
 }
 
 void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force) {
@@ -814,6 +807,14 @@ void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force
 
 Timestamp StorageEngineImpl::getStableTimestamp() const {
     return _engine->getStableTimestamp();
+}
+
+void StorageEngineImpl::setStepDownTimestamp(WithLock lock, Timestamp stepDownTimestamp) {
+    _engine->setStepDownTimestamp(lock, stepDownTimestamp);
+}
+
+Timestamp StorageEngineImpl::getStepDownTimestamp() const {
+    return _engine->getStepDownTimestamp();
 }
 
 void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
@@ -927,14 +928,13 @@ void StorageEngineImpl::dropIdent(RecoveryUnit& ru, std::string_view ident) {
         // A concurrent operation, such as a checkpoint could be holding an open data
         // handle on the ident. Handoff the ident drop to the ident reaper to retry
         // later.
-        addDropPendingIdent(Immediate{}, std::make_shared<Ident>(ident), nullptr);
+        addDropPendingIdent(Immediate{}, std::make_shared<Ident>(ident));
     }
 }
 
 void StorageEngineImpl::addDropPendingIdent(const DropTime& dropTime,
-                                            std::shared_ptr<Ident> ident,
-                                            DropIdentCallback&& onDrop) {
-    _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident, std::move(onDrop));
+                                            std::shared_ptr<Ident> ident) {
+    _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident);
 }
 
 void StorageEngineImpl::dropUnknownIdent(RecoveryUnit& ru,
@@ -1046,7 +1046,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             }
         },
         Seconds(1),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     _job = _periodicRunner->makeJob(std::move(job));
     _job.start();
@@ -1189,6 +1189,85 @@ Status StorageEngineImpl::autoCompact(RecoveryUnit& ru, const AutoCompactOptions
     return _engine->autoCompact(ru, options);
 }
 
+StatusWith<std::string> StorageEngineImpl::wiredTigerRepair(const std::string& config) {
+    return _engine->wiredTigerRepair(config);
+}
+
+Status StorageEngineImpl::fixDatabaseSize() {
+    return _engine->fixDatabaseSize();
+}
+
+void StorageEngineImpl::pauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
+    if (!rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().supportsCompaction()) {
+        return;
+    }
+
+    Status status = Status::OK();
+    for (int attempt = 0; attempt < kMaxAutoCompactReconfigureAttempts; ++attempt) {
+        status = [&] {
+            Lock::GlobalLock lk{
+                opCtx,
+                MODE_IS,
+                Date_t::max(),
+                Lock::InterruptBehavior::kThrow,
+                Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+            return _engine->pauseAutoCompactForReplicaSetWritesBlock(
+                *shard_role_details::getRecoveryUnit(opCtx));
+        }();
+        if (!isTransientAutoCompactStatus(status)) {
+            break;
+        }
+        opCtx->sleepFor(kAutoCompactReconfigureRetryInterval);
+    }
+    if (!status.isOK() && status != ErrorCodes::IllegalOperation) {
+        LOGV2_WARNING(12966500,
+                      "Failed to pause auto-compaction for replica set write block",
+                      "error"_attr = status);
+    }
+}
+
+Status StorageEngineImpl::tryPauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
+    if (!rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().supportsCompaction()) {
+        return Status::OK();
+    }
+
+    // Try to acquire the global lock to guard against racing with storage shutdown, but never wait
+    // for it, so it is safe to call from a RecoveryUnit::Change commit handler, which must not
+    // block.
+    Lock::GlobalLock lk{
+        opCtx,
+        MODE_IS,
+        Date_t(),
+        Lock::InterruptBehavior::kLeaveUnlocked,
+        Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+    if (!lk.isLocked()) {
+        LOGV2_WARNING(13374201,
+                      "Could not acquire the global lock without waiting to pause auto-compaction "
+                      "for a replica set write block");
+        return {ErrorCodes::LockTimeout,
+                "Could not acquire the global lock without waiting to pause auto-compaction for a "
+                "replica set write block"};
+    }
+
+    const auto status = [&] {
+        try {
+            return _engine->pauseAutoCompactForReplicaSetWritesBlock(
+                *shard_role_details::getRecoveryUnit(opCtx));
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }();
+
+    // IllegalOperation indicates that auto-compaction is unsupported in this configuration and
+    // should not be logged as a warning.
+    if (!status.isOK() && status != ErrorCodes::IllegalOperation) {
+        LOGV2_WARNING(13374202,
+                      "Failed to pause auto-compaction for replica set write block",
+                      "error"_attr = status);
+    }
+    return status;
+}
+
 bool StorageEngineImpl::underCachePressure(int concurrentOpOuts) {
     return _engine->underCachePressure(concurrentOpOuts);
 };
@@ -1199,6 +1278,20 @@ size_t StorageEngineImpl::getCacheSizeMB() {
 
 bool StorageEngineImpl::hasOngoingLiveRestore() {
     return _engine->hasOngoingLiveRestore();
+}
+
+bool StorageEngineImpl::isInLeaderMode() {
+    return _engine->isInLeaderMode();
+}
+
+StatusWith<int64_t> StorageEngineImpl::getIndexStorageSize(
+    OperationContext* opCtx, const std::vector<std::string>& indexIdents) const {
+    return _engine->getIndexStorageSize(opCtx, indexIdents);
+}
+
+StatusWith<int64_t> StorageEngineImpl::getSharedHistoryStoreStorageSize(
+    OperationContext* opCtx) const {
+    return _engine->getSharedHistoryStoreStorageSize(opCtx);
 }
 
 }  // namespace mongo

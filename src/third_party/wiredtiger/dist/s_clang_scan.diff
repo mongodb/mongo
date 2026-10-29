@@ -4,7 +4,6 @@ wiredtiger/src/block_cache/block_io.c Called function pointer is null (null dere
 wiredtiger/src/btree/bt_delete.c The left operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult]
 wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
 wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
-wiredtiger/src/btree/bt_sync_obsolete.c The left operand of '==' is a garbage value [core.UndefinedBinaryOperatorResult]
 wiredtiger/src/include/intpack_inline.h Assigned value is garbage or undefined [core.uninitialized.Assign]
 wiredtiger/src/os_posix/os_fs.c The 1st argument to 'fdatasync' is -1 but should be >= 0 [unix.StdCLibraryFunctions]
 wiredtiger/src/reconcile/rec_row.c Branch condition evaluates to a garbage value [core.uninitialized.Branch]

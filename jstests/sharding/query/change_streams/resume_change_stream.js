@@ -24,6 +24,8 @@ const st = new ShardingTest({
     },
 });
 
+// This test relies on marker-based oplog truncation, which may be disabled in disagg.
+// TODO(SERVER-125068) remove this once this feature flag is deleted
 skipTestIfSizeBasedOplogTruncationDisabled(st.rs0.getPrimary(), () => st.stop());
 
 const mongosDB = st.s0.getDB(jsTestName());
@@ -83,7 +85,6 @@ function testResume(mongosColl, collToWatch) {
     let changeStream = cst.startWatchingChanges({
         pipeline: [{$changeStream: {}}],
         collection: collToWatch,
-        includeToken: true,
     });
 
     // We awaited the replication of the first writes, so the change stream shouldn't return
@@ -242,7 +243,6 @@ function testResume(mongosColl, collToWatch) {
     let allChangesCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {}}],
         collection: collToWatch,
-        includeToken: true,
     });
 
     // Perform the multi-update that will induce timestamp collisions

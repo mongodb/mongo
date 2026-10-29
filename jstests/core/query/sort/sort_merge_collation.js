@@ -2,6 +2,7 @@
  * Tests $or queries which can be answered with a SORT_MERGE stage using a non-default collation
  * with numeric ordering.
  * @tags: [
+ *   uses_explain,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_getmore,
  *   # Views do not inherit default collection collation.

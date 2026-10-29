@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/mongo-default-approvers
+      - 10gen/devprod-test-infrastructure
   - "README.md":
     approvers:
       - 10gen/devprod-test-infrastructure
@@ -30,6 +30,9 @@ filters:
   - "magic_restore.py":
     approvers:
       - 10gen/server-recovery
+  - "metrics_filtering_background.py":
+    approvers:
+      - 10gen/query-integration-observability
   - "maintenance.py":
     approvers:
       - 10gen/server-jstest-infra
@@ -100,3 +103,6 @@ filters:
   - "check_multikey_consistency_background.py":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "lightweight_resharding_stepdown.py":
+    approvers:
+      - 10gen/server-cluster-scalability

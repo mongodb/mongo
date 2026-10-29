@@ -22,7 +22,7 @@ const maxChunkSizeMB = 10;
 
 import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunks.js";
 
 function getRandomDb(db) {
     return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));

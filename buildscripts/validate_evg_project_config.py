@@ -1,3 +1,4 @@
+import logging
 import os.path
 import re
 import subprocess
@@ -6,6 +7,7 @@ from collections import defaultdict
 
 import structlog
 import typer
+import yaml
 from typing_extensions import Annotated
 
 if __name__ == "__main__" and __package__ is None:
@@ -18,6 +20,9 @@ DEFAULT_EVG_PROJECT_NAME = "mongodb-mongo-master"
 DEFAULT_EVG_NIGHTLY_PROJECT_NAME = "mongodb-mongo-master-nightly"
 DEFAULT_EVG_PROJECT_CONFIG = "etc/evergreen.yml"
 DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
+# Quality-check callers use this distinct status to skip the Evergreen
+# validation check when the local OAuth/device-auth flow is unavailable.
+AUTHENTICATION_FAILURE_EXIT_CODE = 75
 
 # SET TO TRUE IN RAPID RELEASE BRANCHES - see docs/branching/README.md
 RELEASE_BRANCH = False
@@ -35,10 +40,6 @@ ALLOWABLE_EVG_VALIDATE_MESSAGE_REGEXES = [
     re.compile(
         r".*task 'select_multiversion_binaries' defined but not used by any variants; consider using or disabling.*"
     ),  # this task is added to variants only alongside multiversion generated tasks
-    re.compile(
-        r".*depends on task 'archive_jstestshell' in build variant 'dsc-amazon2023-(arm64|x86)-compile', but it was not found.*"
-    ),  # archive_jstestshell is produced by the compile_test_and_package_serial_TG task group
-    # and is not visible to the static validator
 ]
 ALLOWABLE_IF_NOT_IN_ALL_PROJECTS_EVG_VALIDATE_MESSAGE_REGEXES = [
     re.compile(r".*task .+ defined but not used by any variants; consider using or disabling.*"),
@@ -75,13 +76,40 @@ def default_evg_config():
     sys.exit(1)
 
 
+def ensure_authenticated(evergreen_bin, evg_auth_config):
+    """Log in before running any command whose output we capture.
+
+    A missing or expired OAuth token otherwise turns `validate` into a silent five minute hang:
+    it starts a device auth flow whose verification URI is swallowed by our output capture.
+
+    Configs without an `oauth` section authenticate  with a static api key, so there is nothing to do here.
+    """
+    with open(evg_auth_config, encoding="utf-8") as auth_config_file:
+        if not yaml.safe_load(auth_config_file).get("oauth"):
+            return
+
+    cmd = [evergreen_bin, "--config", evg_auth_config, "login"]
+    LOGGER.info(f"Logging in to evergreen: {' '.join(cmd)}")
+    if subprocess.run(cmd).returncode:
+        sys.exit(AUTHENTICATION_FAILURE_EXIT_CODE)
+    LOGGER.info("Logged in to evergreen.")
+
+
 def main(
     evg_project_name: Annotated[
         str, typer.Option(help="Evergreen project name")
     ] = DEFAULT_EVG_PROJECT_NAME,
     evg_auth_config: Annotated[str, typer.Option(help="Evergreen auth config file")] = None,
+    quiet: Annotated[
+        bool, typer.Option(help="Only report errors and anything needing user interaction")
+    ] = False,
 ):
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
+    if quiet:
+        structlog.configure(
+            wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING),
+        )
 
     if not evg_auth_config:
         evg_auth_config = default_evg_config()
@@ -93,6 +121,8 @@ def main(
         }
 
     evergreen_bin = find_evergreen_binary("evergreen")
+
+    ensure_authenticated(evergreen_bin, evg_auth_config)
 
     if RELEASE_BRANCH:
         for _, project_config in evg_project_config_map.items():
@@ -108,7 +138,10 @@ def main(
             subprocess.run(cmd, capture_output=True, text=True, check=True)
             sys.exit(0)
 
-    if evg_project_name == DEFAULT_EVG_PROJECT_NAME:
+    # The nightly config intentionally includes shared task definitions that are not
+    # selected by any nightly variant. Validate it alongside the master config so
+    # those warnings are only errors when a task is unused in both configurations.
+    if evg_project_name in {DEFAULT_EVG_PROJECT_NAME, DEFAULT_EVG_NIGHTLY_PROJECT_NAME}:
         evg_project_config_map[DEFAULT_EVG_PROJECT_NAME] = DEFAULT_EVG_PROJECT_CONFIG
 
     shared_evg_validate_messages = []

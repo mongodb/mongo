@@ -2,6 +2,7 @@
  * Tests that SBE avoids building traverseF instructions in leading $match when path arrayness information is available.
  *
  * @tags: [
+ *    uses_explain,
  *    assumes_against_mongod_not_mongos,
  *    # Explain command does not support read concerns other than local.
  *    assumes_read_concern_local,
@@ -16,7 +17,7 @@
  * ]
  */
 
-import {getEngine, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -52,7 +53,7 @@ function runTestCase(
         assertFilterStages(filterStages);
 
         if (createClustered) {
-            const stages = getQueryPlanner(explain).winningPlan.slotBasedPlan.stages;
+            const stages = getWinningPlanFromExplain(explain, true /*isSBEPlan*/).stages;
             assert(
                 stages.includes("minRecordId") || stages.includes("maxRecordId"),
                 `Expected a clustered scan (min/maxRecordId slot) in the SBE plan: ${stages}`,

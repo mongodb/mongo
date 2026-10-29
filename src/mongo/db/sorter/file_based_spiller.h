@@ -1,37 +1,8 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"
@@ -49,7 +20,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace sorter {
 
 constexpr inline std::size_t kSortedFileBufferSize = size_t{64} << 10;
@@ -371,9 +342,13 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     // The size is both written to and read from in platform-specific endian order. In the unlikely
     // event that data files are written and read by platforms of differing endianness, the result
     // will be a read checksum mismatch in the worst case, which callers must recover from.
+    //
+    // One writer is one logical spill: only its first chunk counts as a spill.
+    const bool isFirstChunk = _file->currentOffset() == _fileStartOffset;
     _file->write(reinterpret_cast<const char*>(&signedSize), sizeof(signedSize));
     _file->write(outBuffer, size);
-    sortCounters.incrementSortCountersPerSpilling(/*sortSpills=*/1, sizeof(signedSize) + size);
+    sortCounters.incrementSortCountersPerSpilling(/*sortSpills=*/isFirstChunk ? 1 : 0,
+                                                  sizeof(signedSize) + size);
 
     this->_buffer.reset();
 }
@@ -627,5 +602,5 @@ boost::filesystem::path FileBasedSpiller<Key, Value, Comparator>::getSpillDir() 
 }
 
 }  // namespace sorter
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

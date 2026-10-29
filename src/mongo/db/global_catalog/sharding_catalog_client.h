@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -51,7 +24,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/client/shard_gen.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/duration.h"
@@ -61,6 +34,7 @@
 #include <string_view>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 class ChunkType;
 class CollectionType;
@@ -77,7 +51,7 @@ class LogicalTime;
  * and should avoid doing any caching of their own. The caching is delegated to a parallel
  * read-only view of the catalog, which is maintained by a higher level code.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClient {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingCatalogClient {
     ShardingCatalogClient(const ShardingCatalogClient&) = delete;
     ShardingCatalogClient& operator=(const ShardingCatalogClient&) = delete;
 
@@ -93,7 +67,7 @@ public:
 
     // Identifier of the config.shardRemovalLog document about the latest removeShard operation
     // committed on the cluster.
-    static constexpr auto kLatestShardRemovalLogId = "latestShardRemovalLog"_sd;
+    static constexpr auto kLatestShardRemovalLogId = "latestShardRemovalLog"sv;
 
     virtual ~ShardingCatalogClient() = default;
 
@@ -116,7 +90,7 @@ public:
      */
     virtual DatabaseType getDatabase(OperationContext* opCtx,
                                      const DatabaseName& db,
-                                     repl::ReadConcernLevel readConcernLevel) = 0;
+                                     repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Retrieves all databases in a cluster by querying the config.databases collection on the
@@ -133,7 +107,7 @@ public:
      */
     virtual std::vector<DatabaseType> getAllDBs(
         OperationContext* opCtx,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<ReadPreferenceSetting>& readPref = boost::none) = 0;
 
     /**
@@ -149,12 +123,12 @@ public:
     virtual CollectionType getCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority) = 0;
 
     virtual CollectionType getCollection(
         OperationContext* opCtx,
         const UUID& uuid,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority) = 0;
 
     /**
      * Retrieves all collections under a specified database (or in the system) which are sharded. If
@@ -165,7 +139,7 @@ public:
     virtual std::vector<CollectionType> getShardedCollections(
         OperationContext* opCtx,
         const DatabaseName& db,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -177,7 +151,7 @@ public:
     virtual std::vector<CollectionType> getCollections(
         OperationContext* opCtx,
         const DatabaseName& db,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernArgs readConcern = repl::ReadConcernArgs::kMajority,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -190,7 +164,7 @@ public:
     virtual std::vector<NamespaceString> getShardedCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -203,7 +177,7 @@ public:
     virtual std::vector<NamespaceString> getCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -216,7 +190,7 @@ public:
     virtual std::vector<NamespaceString> getUnsplittableCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
     /**
@@ -224,8 +198,8 @@ public:
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual StatusWith<std::vector<DatabaseName>> getDatabasesForShard(
-        OperationContext* opCtx, const ShardRef& shardRef) = 0;
+    virtual StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
+                                                                       const ShardId& shardId) = 0;
 
     /**
      * Gets the requested number of chunks (of type ChunkType) that satisfy a query.
@@ -251,7 +225,7 @@ public:
         repl::OpTime* opTime,
         const OID& epoch,
         const Timestamp& timestamp,
-        repl::ReadConcernLevel readConcern,
+        repl::ReadConcernArgs readConcern,
         const boost::optional<BSONObj>& hint = boost::none) = 0;
 
     /**
@@ -287,10 +261,9 @@ public:
      * (default), it retrieves all shards. Otherwise, it retrieves only shards that are not
      * draining.
      */
-    virtual repl::OpTimeWith<std::vector<ShardType>> getAllShards(
-        OperationContext* opCtx,
-        repl::ReadConcernLevel readConcern,
-        BSONObj filter = BSONObj()) = 0;
+    virtual repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                                  repl::ReadConcernArgs readConcern,
+                                                                  BSONObj filter = BSONObj()) = 0;
 
     /**
      * Runs a user management command on the config servers. Do not use for general write command
@@ -334,7 +307,7 @@ public:
      * version as well as the clusterID.
      */
     virtual StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
-                                                     repl::ReadConcernLevel readConcern) = 0;
+                                                     repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Returns internal keys for the given purpose and have an expiresAt value greater than
@@ -344,15 +317,13 @@ public:
         OperationContext* opCtx,
         std::string_view purpose,
         const LogicalTime& newerThanThis,
-        repl::ReadConcernLevel readConcernLevel) = 0;
+        repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Returns all external (i.e. validation-only) keys for the given purpose.
      */
     virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
-        OperationContext* opCtx,
-        std::string_view purpose,
-        repl::ReadConcernLevel readConcernLevel) = 0;
+        OperationContext* opCtx, std::string_view purpose, repl::ReadConcernArgs readConcern) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server. The document
@@ -424,7 +395,7 @@ private:
     virtual StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const repl::ReadConcernLevel& readConcern,
+        const repl::ReadConcernArgs& readConcern,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,

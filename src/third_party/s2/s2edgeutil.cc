@@ -406,6 +406,24 @@ int S2EdgeUtil::EdgeCrosser::RobustCrossingInternal(S2Point const* d) {
   return (dac == acb_) ? 1 : -1;
 }
 
+// MongoDB addition: see the declaration in s2edgeutil.h for rationale.
+const double S2EdgeUtil::EdgeCrosser::kDegenerateDetError = 0.2e-16;
+
+int S2EdgeUtil::EdgeCrosser::TriageOrExpensiveCCW(S2Point const& a, S2Point const& b,
+                                                   S2Point const& c,
+                                                   S2Point const& a_cross_b) {
+  int ccw = S2::TriageCCW(a, b, c, a_cross_b);
+  // case 1: |det| > kMaxDetError, conclusive, return ccw
+  // case 2: |det| < kDegenerateDetError, treat it as degenerate case and return 0   
+  // case 3: kDegenerateDetError <= |det| <= kMaxDetError, call ExpensiveCCW
+  if (ccw != 0) return ccw;  
+  double det = a_cross_b.DotProd(c);
+  if (fabs(det) < kDegenerateDetError) {
+    return 0;  // Genuinely degenerate: give up rather than trust ExpensiveCCW.
+  }
+  return S2::ExpensiveCCW(a, b, c);
+}
+
 void S2EdgeUtil::RectBounder::AddPoint(S2Point const* b) {
   DCHECK(S2::IsUnitLength(*b));
   S2LatLng b_latlng(*b);

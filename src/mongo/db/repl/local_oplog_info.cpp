@@ -1,38 +1,9 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/local_oplog_info.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/admission/flow_control.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
@@ -43,7 +14,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -57,7 +28,6 @@
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 
 namespace mongo {
 namespace {
@@ -93,13 +63,20 @@ RecordStore* LocalOplogInfo::getRecordStore() const {
 }
 
 void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
+    invariant(rs);
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
     Timestamp lastAppliedOpTime;
     if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
-        lastAppliedOpTime =
-            repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp();
+        lastAppliedOpTime = replCoord->getMyLastAppliedOpTime().getTimestamp();
     }
 
     std::lock_guard<std::mutex> lk(_rsMutex);
+    if (_oplogManager) {
+        invariant(_rs);
+        _oplogManager->stop(_rs);
+    }
     _rs = rs;
     // If the server was started in read-only mode, or we are restoring the node, don't truncate.
     // If async marker generation is enabled, skip calculating the oplog truncate markers here.
@@ -114,10 +91,18 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
     if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
         _oplogVisibilityManager.reInit(_rs, lastAppliedOpTime);
     }
+    auto& engine = *opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    if ((_oplogManager = engine.getOplogManager())) {
+        _oplogManager->start(opCtx, engine, *_rs);
+    }
 }
 
 void LocalOplogInfo::resetRecordStore() {
     std::lock_guard<std::mutex> lk(_rsMutex);
+    if (_oplogManager) {
+        _oplogManager->stop(_rs);
+        _oplogManager = nullptr;
+    }
     _rs = nullptr;
 
     if (repl::feature_flags::gFeatureFlagOplogVisibility.isEnabled()) {
@@ -137,7 +122,7 @@ void LocalOplogInfo::setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> ma
     _truncateMarkers = std::move(markers);
     // Re-adjust in case the max size changed while sampling.
     if (_truncateMarkers) {
-        _truncateMarkers->adjust(_rs->oplog()->getMaxSize());
+        _truncateMarkers->adjust(*_rs);
     }
 }
 
@@ -147,7 +132,8 @@ void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& n
 
 std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
                                                       std::size_t count,
-                                                      std::size_t opTimeOffset) {
+                                                      std::size_t opTimeOffset,
+                                                      OnReserveOpTimesFn onReserveWithMutexHeld) {
     auto& intentRegistry = rss::consensus::IntentRegistry::get(opCtx->getServiceContext());
     if (gFeatureFlagIntentRegistration.isEnabled() && intentRegistry.isPrimaryEnforcementActive() &&
         !intentRegistry.hasWriteIntentDeclared(opCtx) && !repl::alwaysAllowNonLocalWrites(opCtx)) {
@@ -197,6 +183,12 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
         invariant(opTimeOffset < count);
         Timestamp registerTs(ts.asULL() + opTimeOffset);
         fassert(28560, storageEngine->oplogDiskLocRegister(opCtx, _rs, registerTs, orderedCommit));
+
+        // Run any caller-supplied action that must be strictly ordered against every other
+        // reservation, while _newOpMutex is still held (e.g. recording the step-down timestamp).
+        if (onReserveWithMutexHeld) {
+            onReserveWithMutexHeld(ts);
+        }
     }
 
     const auto prevAssertOnLockAttempt =

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/scripting/mozjs/common/types/bson.h"
 
@@ -142,7 +116,7 @@ struct BSONHolder {
     bool _resolved;
     bool _readOnly;
     bool _altered;
-    StringMap<bool> _removed;
+    StringSet _removed;
 };
 
 BSONHolder* getValidHolder(JSContext* cx, JSObject* obj) {
@@ -230,10 +204,8 @@ void BSONInfo::enumerate(JSContext* cx,
     while (i.more()) {
         BSONElement e = i.next();
 
-        // TODO SERVER-122826: when we get heterogeneous set lookup, switch to std::string_view
-        // rather than involving the temporary string
         auto fieldNameStringData = e.fieldNameStringData();
-        if (holder->_removed.find(std::string{fieldNameStringData}) != holder->_removed.end())
+        if (holder->_removed.contains(fieldNameStringData))
             continue;
 
         ValueReader(cx, &val).fromStringData(fieldNameStringData);
@@ -272,11 +244,8 @@ void BSONInfo::setProperty(JSContext* cx,
             uasserted(ErrorCodes::BadValue, "Read only object");
         }
 
-        auto iter = holder->_removed.find(IdWrapper(cx, id).toString());
-
-        if (iter != holder->_removed.end()) {
-            holder->_removed.erase(iter);
-        }
+        JSStringWrapper jsstr;
+        holder->_removed.erase(IdWrapper(cx, id).toStringData(&jsstr));
 
         holder->_altered = true;
     }
@@ -300,7 +269,7 @@ void BSONInfo::delProperty(JSContext* cx,
         holder->_altered = true;
 
         JSStringWrapper jsstr;
-        holder->_removed[IdWrapper(cx, id).toStringData(&jsstr)] = true;
+        holder->_removed.emplace(IdWrapper(cx, id).toStringData(&jsstr));
     }
 
     result.succeed();
@@ -321,7 +290,7 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     auto sname = idw.toStringData(&jsstr);
     if (sname.find('\0') != std::string::npos)
         return;
-    if (!holder->_readOnly && holder->_removed.find(std::string{sname}) != holder->_removed.end())
+    if (!holder->_readOnly && holder->_removed.contains(sname))
         return;
     if (!holder->_obj.hasField(sname))
         return;

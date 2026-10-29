@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 
@@ -76,6 +50,10 @@ public:
                 return "WT_OLDEST_FOR_EVICTION";
             case WT_CACHE_OVERFLOW:
                 return "WT_CACHE_OVERFLOW";
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+            case WT_TXN_TOO_LARGE_FOR_CACHE:
+                return "WT_TXN_TOO_LARGE_FOR_CACHE";
+#endif
             case WT_NONE:
                 return "WT_NONE";
             default:
@@ -99,11 +77,24 @@ TEST_F(WiredTigerUtilHelperTest, transactionExceededCacheThreshold) {
     ASSERT_FALSE(txnExceededCacheThreshold(1, 2, 0.5));
 }
 
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+TEST_F(WiredTigerUtilHelperTest, cacheIsInsufficientForTransactionSkipsStatsForTxnTooLarge) {
+    // WT_TXN_TOO_LARGE_FOR_CACHE must short-circuit before touching the session, since WT has
+    // already made the determination itself; passing a null session would crash if the stats
+    // path were consulted instead.
+    ASSERT_TRUE(cacheIsInsufficientForTransaction(
+        /*session=*/nullptr, cacheThreshold, WT_TXN_TOO_LARGE_FOR_CACHE));
+}
+#endif
+
 TEST_F(WiredTigerUtilHelperTest, rollbackReasonWasCachePressure) {
     ASSERT_FALSE(rollbackReasonWasCachePressure(WT_BACKGROUND_COMPACT_ALREADY_RUNNING));
     ASSERT_FALSE(rollbackReasonWasCachePressure(WT_NONE));
     ASSERT_TRUE(rollbackReasonWasCachePressure(WT_OLDEST_FOR_EVICTION));
     ASSERT_TRUE(rollbackReasonWasCachePressure(WT_CACHE_OVERFLOW));
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+    ASSERT_TRUE(rollbackReasonWasCachePressure(WT_TXN_TOO_LARGE_FOR_CACHE));
+#endif
 }
 
 TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
@@ -113,6 +104,11 @@ TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
     std::vector<TestCase> transactionTooLargeTestCases = {
         {.txnTooLarge = true, .cacheInsufficient = true, .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true, .cacheInsufficient = true, .sub_level_err = WT_CACHE_OVERFLOW},
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+        {.txnTooLarge = true,
+         .cacheInsufficient = true,
+         .sub_level_err = WT_TXN_TOO_LARGE_FOR_CACHE},
+#endif
     };
 
     for (auto testCase : transactionTooLargeTestCases) {
@@ -131,6 +127,13 @@ TEST_F(WiredTigerUtilHelperTest, throwTemporarilyUnavailableException) {
         {.txnTooLarge = false, .cacheInsufficient = true, .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = true, .cacheInsufficient = false, .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true, .cacheInsufficient = false, .sub_level_err = WT_CACHE_OVERFLOW},
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+        // cacheInsufficient is always forced true for this sub-level error in the real code path,
+        // so only txnTooLarge=false is a reachable case here.
+        {.txnTooLarge = false,
+         .cacheInsufficient = false,
+         .sub_level_err = WT_TXN_TOO_LARGE_FOR_CACHE},
+#endif
     };
 
     for (auto testCase : temporarilyUnavailableTestCases) {

@@ -20,7 +20,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
-        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+        await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
       global_vars:
         TestData:
           isMultiShardedClusterFixture: true
@@ -36,7 +36,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
     num_rs_nodes_per_shard: 2

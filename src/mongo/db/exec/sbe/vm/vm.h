@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,6 +8,7 @@
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
@@ -67,6 +42,8 @@
 #endif
 
 namespace mongo {
+class SimpleMemoryUsageTracker;
+
 namespace sbe {
 namespace vm {
 /**
@@ -79,17 +56,8 @@ namespace vm {
  * - The element at index `kMaxSize` is the maximum number entries the data structure holds.
  * - The element at index `kMemUsage` holds the current memory usage
  * - The element at index `kMemLimit` holds the max memory limit allowed
- * - The element at index `kIsGroupAccum` specifies if the accumulator belongs to group-by stage
  */
-enum class AggMultiElems {
-    kInternalArr,
-    kStartIdx,
-    kMaxSize,
-    kMemUsage,
-    kMemLimit,
-    kIsGroupAccum,
-    kSizeOfArray
-};
+enum class AggMultiElems { kInternalArr, kStartIdx, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
 
 /**
  * Less than comparison based on a sort pattern.
@@ -208,123 +176,14 @@ enum AggStdDevValueElems {
 };
 
 /**
- * This enum defines indices into an 'Array' that store state for rank expressions.
- *
- * The array contains three elements:
- * - The element at index `kLastValue` is the last value.
- * - The element at index `kLastValueIsNothing` is true if the last value is nothing.
- * - The element at index `kLastRank` is the rank of the last value.
- * - The element at index `kSameRankCount` is how many values are of the same rank as the last
- * value.
- * - The element at index `kSortSpec` is the sort spec object used to generate sort key for adjacent
- * value comparison.
- */
-enum AggRankElems {
-    kLastValue,
-    kLastValueIsNothing,
-    kLastRank,
-    kSameRankCount,
-    kSortSpec,
-    kRankArraySize
-};
-
-/**
  * This enum defines indices into an 'Array' that returns the result of accumulators that track the
  * size of accumulated values, such as 'addToArrayCapped' and 'addToSetCapped'.
  */
 enum class AggArrayWithSize { kValues = 0, kSizeOfValues, kLast = kSizeOfValues + 1 };
 
 /**
- * This enum defines indices into an 'Array' that stores the state for $expMovingAvg accumulator
- */
-enum class AggExpMovingAvgElems { kResult, kAlpha, kIsDecimal, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that stores the state for $sum window function
- * accumulator. Index `kSumAcc` stores the accumulator state of aggDoubleDoubleSum. Rest of the
- * indices store respective count of values encountered.
- */
-enum class AggRemovableSumElems {
-    kSumAcc,
-    kNanCount,
-    kPosInfinityCount,
-    kNegInfinityCount,
-    kDoubleCount,
-    kDecimalCount,
-    kSizeOfArray
-};
-
-/**
- * This enum defines indices into an 'Array' that stores the state for $integral accumulator
- * Element at `kInputQueue` stores the queue of input values
- * Element at `kSortByQueue` stores the queue of sortBy values
- * Element at `kIntegral` stores the integral over the current window
- * Element at `kNanCount` stores the count of NaN values encountered
- * Element at `kunitMillis` stores the date unit (Null if not valid)
- * Element at `kIsNonRemovable` stores whether it belongs to a non-removable window
- */
-enum class AggIntegralElems {
-    kInputQueue,
-    kSortByQueue,
-    kIntegral,
-    kNanCount,
-    kUnitMillis,
-    kIsNonRemovable,
-    kMaxSizeOfArray
-};
-
-/**
- * This enum defines indices into an 'Array' that stores the state for $derivative accumulator
- * Element at `kInputQueue` stores the queue of input values
- * Element at `kSortByQueue` stores the queue of sortBy values
- * Element at `kunitMillis` stores the date unit (Null if not valid)
- */
-enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that stores the state for a queue backed by a
- * circular array
- * Element at `kArray` stores the underlying array thats holds the elements. This should be
- * initialized to a non-zero size initially.
- * Element at `kStartIdx` stores the start position of the queue
- * Element at `kQueueSize` stores the size of the queue
- * The empty values in the array are filled with Null
- */
-enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that store state for the removable
- * $covarianceSamp/$covariancePop expressions.
- */
-enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that store state for the removable
- * $stdDevSamp/$stdDevPop expressions.
- */
-enum class AggRemovableStdDevElems { kSum, kM2, kCount, kNonFiniteCount, kSizeOfArray };
-
-/**
- * This enum defines indices into an `Array` that store state for $linearFill
- * X, Y refers to sortby field and input field respectively
- * At any time, (X1, Y1) and (X2, Y2) defines two end-points with non-null input values
- * with zero or more null input values in between. Count stores the number of values left
- * till (X2, Y2). Initially it is equal to number of values between (X1, Y1) and (X2, Y2),
- * exclusive of first and inclusive of latter. It is decremented after each finalize call,
- * till this segment is exhausted and after which we find next segement(new (X2, Y2)
- * while (X1, Y1) is set to previous (X2, Y2))
- */
-enum class AggLinearFillElems { kX1, kY1, kX2, kY2, kPrevX, kCount, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that store state for $firstN/$lastN
- * window functions
- */
-enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
-
-/**
  * This enum defines indices into an 'Array' that store state for $minN/$maxN/$topN/$bottomN
- * window functions.
+ * accumulators.
  * Element at `kValues` stores the accmulator data structure with the elements
  * Element at `kN` stores an integer with the number of values minN/maxN should return
  * Element at `kMemUsage`stores the size of the multiset in bytes
@@ -351,6 +210,16 @@ public:
     class TopBottomArgsDirect;
     class TopBottomArgsFromStack;
     class TopBottomArgsFromBlocks;
+
+    /**
+     * Ranks a value's position relative to a missing value in the MQL comparison order:
+     *
+     *   MinKey (0) < Nothing/missing/bsonUndefined (1) < any other value (2)
+     *
+     * 'bsonUndefined' shares its rank with Nothing because canonicalizeBSONType() maps both
+     * 'undefined' and 'eoo' to the same canonical type.
+     */
+    static int32_t mqlComparisonRank(value::TypeTags tag);
 
     static void aggDoubleDoubleSumImpl(value::Array* accumulator,
                                        value::TypeTags rhsTag,
@@ -421,9 +290,11 @@ public:
     ByteCode(const ByteCode&) = delete;
     ByteCode& operator=(const ByteCode&) = delete;
 
+    void setMemoryTracker(SimpleMemoryUsageTracker* tracker) {
+        _memoryTracker = tracker;
+    }
+
     static std::pair<value::TypeTags, value::Value> genericInitializeDoubleDoubleSumState();
-    static std::tuple<value::Array*, int64_t, int64_t, int64_t, int64_t, int64_t>
-    genericRemovableSumState(value::Array* state);
     static void genericResetDoubleDoubleSumState(value::Array* state);
 
     /**
@@ -436,7 +307,7 @@ public:
      */
     bool runPredicate(const CodeFragment* code);
 
-    typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
+    typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t>
         MultiAccState;
 
     value::TagValueView getField_test(value::TagValueView obj, std::string_view fieldStr) {
@@ -476,15 +347,15 @@ private:
     value::TagValueMaybeOwned genericLog10(value::TagValueView operand);
     value::TagValueMaybeOwned genericSqrt(value::TagValueView operand);
     value::TagValueMaybeOwned genericPow(value::TagValueView base, value::TagValueView exponent);
-    value::TagValueMaybeOwned genericRoundTrunc(std::string funcName,
+    value::TagValueMaybeOwned genericRoundTrunc(std::string_view funcName,
                                                 Decimal128::RoundingMode roundingMode,
                                                 int32_t place,
                                                 value::TypeTags numTag,
                                                 value::Value numVal);
-    value::TagValueMaybeOwned scalarRoundTrunc(std::string funcName,
+    value::TagValueMaybeOwned scalarRoundTrunc(std::string_view funcName,
                                                Decimal128::RoundingMode roundingMode,
                                                ArityType arity);
-    value::TagValueMaybeOwned blockRoundTrunc(std::string funcName,
+    value::TagValueMaybeOwned blockRoundTrunc(std::string_view funcName,
                                               Decimal128::RoundingMode roundingMode,
                                               ArityType arity);
     value::TagValueOwned genericNot(value::TypeTags tag, value::Value value);
@@ -630,8 +501,7 @@ private:
     value::TagValueMaybeOwned genericISOWeek(value::TagValueView date, value::TagValueView tz);
     value::TagValueMaybeOwned genericNewKeyString(ArityType arity,
                                                   CollatorInterface* collator = nullptr);
-    value::TagValueMaybeOwned dateTrunc(value::TypeTags dateTag,
-                                        value::Value dateValue,
+    value::TagValueMaybeOwned dateTrunc(value::TagValueView date,
                                         TimeUnit unit,
                                         int64_t binSize,
                                         TimeZone timezone,
@@ -688,6 +558,7 @@ private:
     value::TagValueMaybeOwned builtinAddToArray(ArityType arity);
     value::TagValueMaybeOwned builtinAddToArrayCapped(ArityType arity);
     value::TagValueMaybeOwned builtinMergeObjects(ArityType arity);
+    value::TagValueMaybeOwned builtinMergeObjectsForExpr(ArityType arity);
     value::TagValueMaybeOwned builtinAddToSet(ArityType arity);
     value::TagValueMaybeOwned builtinCollAddToSet(ArityType arity);
     value::TagValueMaybeOwned isMemberImpl(value::TagValueView expr,
@@ -716,6 +587,35 @@ private:
 
     value::TagValueMaybeOwned builtinConvertSimpleSumToDoubleDoubleSum(ArityType arity);
     value::TagValueMaybeOwned builtinDoubleDoubleSum(ArityType arity);
+
+    /**
+     * Invokes 'processOne(tag, val)' on the stack arguments in the range [startIdx, endIdx), where
+     * a range holding a single array is processed element-wise, while a single non-array value or
+     * multiple values are each processed directly.
+     */
+    template <typename ProcessOne>
+    void processStackRange(ArityType startIdx, ArityType endIdx, const ProcessOne& processOne) {
+        if (endIdx - startIdx == 1) {
+            auto arg = viewFromStack(startIdx);
+            if (value::isArray(arg.tag)) {
+                value::arrayForEach(arg.tag, arg.value, [&](value::TypeTags tag, value::Value val) {
+                    processOne(tag, val);
+                });
+            } else {
+                processOne(arg.tag, arg.value);
+            }
+        } else {
+            for (ArityType idx = startIdx; idx < endIdx; ++idx) {
+                auto arg = viewFromStack(idx);
+                processOne(arg.tag, arg.value);
+            }
+        }
+    }
+
+    value::TagValueMaybeOwned builtinDoubleDoubleSumFromAcc(ArityType arity);
+    template <AccumulatorMinMaxN::MinMaxSense S>
+    value::TagValueMaybeOwned builtinMinMaxNFromAcc(ArityType arity);
+    value::TagValueMaybeOwned builtinAvgFromAcc(ArityType arity);
     // The template parameter is false for a regular DoubleDouble summation and true if merging
     // partially computed DoubleDouble sums.
     template <bool merging>
@@ -728,6 +628,8 @@ private:
     // standard devations.
     template <bool merging>
     value::TagValueMaybeOwned builtinAggStdDev(ArityType arity);
+    template <bool isSamp>
+    value::TagValueMaybeOwned builtinStdDevFromAcc(ArityType arity);
 
     value::TagValueMaybeOwned builtinStdDevPopFinalize(ArityType arity);
     value::TagValueMaybeOwned builtinStdDevSampFinalize(ArityType arity);
@@ -863,7 +765,7 @@ private:
      */
     value::TagValueMaybeOwned builtinCollArrayToSet(ArityType arity);
 
-    static MultiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
+    static MultiAccState getMultiAccState(value::TagValueView state);
 
     value::TagValueMaybeOwned builtinAggFirstNNeedsMoreInput(ArityType arity);
     value::TagValueMaybeOwned builtinAggFirstN(ArityType arity);
@@ -910,94 +812,12 @@ private:
     template <AccumulatorMinMaxN::MinMaxSense S>
     value::TagValueMaybeOwned builtinAggMinMaxNFinalize(ArityType arity);
 
-    value::TagValueMaybeOwned builtinAggRank(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRankColl(ArityType arity);
-    value::TagValueMaybeOwned builtinAggDenseRank(ArityType arity);
-    value::TagValueMaybeOwned builtinAggDenseRankColl(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRankFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggExpMovingAvg(ArityType arity);
-    value::TagValueOwned builtinAggExpMovingAvgFinalize(ArityType arity);
-    template <int sign>
-    value::TagValueMaybeOwned builtinAggRemovableSum(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSumFinalize(ArityType arity);
-    template <int sign>
-    void aggRemovableSumImpl(value::Array* state, value::TypeTags rhsTag, value::Value rhsVal);
-    value::TagValueMaybeOwned aggRemovableSumFinalizeImpl(value::Array* state);
-    template <class T, int sign>
-    void updateRemovableSumAccForIntegerType(value::Array* sumAcc,
-                                             value::TypeTags rhsTag,
-                                             value::Value rhsVal);
-    value::TagValueMaybeOwned builtinAggIntegralInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggIntegralAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggIntegralRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggIntegralFinalize(ArityType arity);
-    value::TagValueMaybeOwned integralOfTwoPointsByTrapezoidalRule(
-        value::TagValueView prevInput,
-        value::TagValueView prevSortByVal,
-        value::TagValueView newInput,
-        value::TagValueView newSortByVal);
-    value::TagValueMaybeOwned builtinAggDerivativeFinalize(ArityType arity);
-    value::TagValueMaybeOwned aggRemovableAvgFinalizeImpl(value::Array* sumState, int64_t count);
-    value::TagValueMaybeOwned builtinAggCovarianceAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggCovarianceRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggCovarianceFinalize(ArityType arity, bool isSamp);
-    value::TagValueMaybeOwned builtinAggCovarianceSampFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggCovariancePopFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovablePushAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovablePushRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovablePushFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysFinalize(ArityType arity);
-    template <int quantity>
-    void aggRemovableStdDevImpl(value::TypeTags stateTag,
-                                value::Value stateVal,
-                                value::TypeTags inputTag,
-                                value::Value inputVal);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevFinalize(ArityType arity, bool isSamp);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevSampFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevPopFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableAvgFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggFirstLastNInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggFirstLastNAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggFirstLastNRemove(ArityType arity);
-    template <AccumulatorFirstLastN::Sense S>
-    value::TagValueMaybeOwned builtinAggFirstLastNFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggLinearFillCanAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggLinearFillAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggLinearFillFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetCommonInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetCommonCollInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableAddToSetAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableAddToSetRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetUnionAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetUnionRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetCommonFinalize(ArityType arity);
-    value::TagValueMaybeOwned aggRemovableMinMaxNInitImpl(CollatorInterface* collator);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNCollInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNRemove(ArityType arity);
-    template <AccumulatorMinMaxN::MinMaxSense S>
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNFinalize(ArityType arity);
-    value::TagValueMaybeOwned linearFillInterpolate(value::TagValueView x1,
-                                                    value::TagValueView y1,
-                                                    value::TagValueView x2,
-                                                    value::TagValueView y2,
-                                                    value::TagValueView x);
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNRemove(ArityType arity);
-    template <TopBottomSense>
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNFinalize(ArityType arity);
 
     // Block builtins
 
     value::TagValueOwned builtinValueBlockExists(ArityType arity);
     value::TagValueOwned builtinValueBlockIsNullish(ArityType arity);
+    value::TagValueOwned builtinValueBlockMqlComparisonRank(ArityType arity);
     value::TagValueOwned builtinValueBlockTypeMatch(ArityType arity);
     value::TagValueOwned builtinValueBlockIsTimezone(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockFillEmpty(ArityType arity);
@@ -1149,6 +969,18 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
+    value::TagValueMaybeOwned getMaybeOwnedFromStack(size_t offset) {
+        auto [owned, tag, val] = getFromStack(offset);
+        return {owned, tag, val};
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
+    value::TagValueMaybeOwned getMaybeOwnedFromStack(size_t offset, bool pop) {
+        auto [owned, tag, val] = getFromStack(offset, pop);
+        return {owned && pop, tag, val};
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
     value::TagValueView viewFromStack(size_t offset) const {
         auto ret = readTuple(_argStackTop - offset * sizeOfElement);
         return value::rawToView({ret.b, ret.c});
@@ -1196,16 +1028,6 @@ private:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    std::pair<value::TypeTags, value::Value> moveRawOwnedFromStack(size_t offset) {
-        auto [owned, tag, val] = moveFromStack(offset);
-        if (!owned) {
-            std::tie(tag, val) = value::copyValue(tag, val);
-        }
-
-        return {tag, val};
-    }
-
-    MONGO_COMPILER_ALWAYS_INLINE_OPT
     void setTagToNothing(size_t offset) noexcept {
         if (MONGO_likely(offset == 0)) {
             writeToMemory(_argStackTop + offsetTag, value::TypeTags::Nothing);
@@ -1248,11 +1070,7 @@ private:
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
     void popAndReleaseStack() {
-        auto [owned, tag, val] = getFromStack(0);
-        if (owned) {
-            value::releaseValue(tag, val);
-        }
-
+        auto ret = getMaybeOwnedFromStack(0);
         popStack();
     }
 
@@ -1279,6 +1097,9 @@ private:
 
     // Expression execution stack of (owned, tag, value) tuples each of 'sizeOfElement' bytes.
     uint8_t* _argStack{nullptr};
+
+    // Some builtins track their memory usage against per-query limits. nullptr disables this.
+    SimpleMemoryUsageTracker* _memoryTracker{nullptr};
 };
 
 class ByteCode::MakeObjImplBase {
@@ -1336,7 +1157,7 @@ struct ByteCode::InvokeLambdaFunctor {
         bytecode.pushStack(false, tag, val);
         bytecode.runLambdaInternal(code, lamPos);
         // Move the result off the stack, make sure it's owned, and return it.
-        auto result = bytecode.moveRawOwnedFromStack(0);
+        auto result = bytecode.moveOwnedFromStack(0).releaseToRaw();
         bytecode.popStack();
         return result;
     }
@@ -1399,12 +1220,9 @@ public:
 
 protected:
     template <TopBottomSense Sense>
-    static int32_t compare(value::TypeTags leftElemTag,
-                           value::Value leftElemVal,
-                           value::TypeTags rightElemTag,
-                           value::Value rightElemVal) {
+    static int32_t compare(value::TagValueView leftElem, value::TagValueView rightElem) {
         auto [cmpTag, cmpVal] =
-            value::compareValue(leftElemTag, leftElemVal, rightElemTag, rightElemVal);
+            value::compareValue(leftElem.tag, leftElem.value, rightElem.tag, rightElem.value);
 
         if (cmpTag == value::TypeTags::NumberInt32) {
             int32_t cmp = value::bitcastTo<int32_t>(cmpVal);

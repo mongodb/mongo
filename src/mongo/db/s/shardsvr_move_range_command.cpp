@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/checked_cast.h"
@@ -66,10 +40,11 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/uuid.h"
@@ -88,10 +63,12 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeLegacyRegisterDonateChunk);
+
 /**
- * Attempts to execute the migration through the sharding coordinator service. Returns true if the
- * migration completed via the coordinator; returns false if the caller should fall back to the
- * legacy path.
+ * Attempts to execute the migration through the sharding coordinator service. Returns boost::none
+ * if the migration completed via the coordinator; otherwise returns the FixedFCVRegion, still
+ * held, for the caller to register through the legacy path under the same pin.
  *
  * The FixedFCVRegion is scoped to span both the feature-flag check and `getOrCreateInstance`, so
  * the FCV snapshot stays pinned for the entire coordinator construction (no window between
@@ -99,9 +76,9 @@ namespace {
  * before waiting on the coordinator's completion future, since holding the FCV pin across the
  * blocking `get(opCtx)` would block FCV transitions for the entire duration of the migration.
  */
-bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const ShardsvrMoveRange& req) {
+boost::optional<FixedFCVRegion> tryRunMoveRangeCoordinator(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const ShardsvrMoveRange& req) {
     std::shared_ptr<MoveRangeCoordinator> coordinator;
     {
         FixedFCVRegion fcvRegion{opCtx};
@@ -109,7 +86,7 @@ bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
         if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
                 VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot()) ==
             AuthoritativeMetadataAccessLevelEnum::kNone) {
-            return false;
+            return fcvRegion;
         }
 
         auto coordinatorDoc = MoveRangeCoordinatorDocument();
@@ -128,8 +105,15 @@ bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), fcvRegion));
     }
 
-    coordinator->getCompletionFuture().get(opCtx);
-    return true;
+    try {
+        coordinator->getCompletionFuture().get(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        // A migration that times out acquiring the critical-section lock is counted so the count is
+        // observable through serverStatus.
+        ShardingStatistics::get(opCtx).countDonorMoveChunkLockTimeout.addAndFetch(1);
+        throw;
+    }
+    return boost::none;
 }
 
 /**
@@ -189,9 +173,21 @@ void _runLegacyImpl(OperationContext* opCtx,
  * ScopedDonateChunk, run the migration on the fixed executor (execute mode) or block on
  * waitForCompletion (join mode), and propagate the result via _runLegacyImpl.
  */
-void runLegacyMoveRange(OperationContext* opCtx, ShardsvrMoveRange req) {
+void runLegacyMoveRange(OperationContext* opCtx,
+                        ShardsvrMoveRange req,
+                        boost::optional<FixedFCVRegion>& fcvRegionForLegacyRegister) {
+    hangBeforeLegacyRegisterDonateChunk.pauseWhileSet();
+
     auto scopedMigration = uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(
         opCtx, req.getCommandParameter(), req.getShardsvrMoveRangeRequest()));
+    fcvRegionForLegacyRegister.reset();
+
+    tassert(
+        12796800,
+        "Legacy chunk migration must not run when shards are authoritative",
+        sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+            VersionContext::getDecoration(opCtx), FixedFCVRegion(opCtx)->acquireFCVSnapshot()) ==
+            AuthoritativeMetadataAccessLevelEnum::kNone);
 
     // Check if there is an existing migration running and if so, join it
     if (scopedMigration.mustExecute()) {
@@ -299,8 +295,9 @@ public:
             sharding_ddl_util::assertDataMovementAllowed();
 
             const auto& nss = ns();
-            if (!tryRunMoveRangeCoordinator(opCtx, nss, request())) {
-                runLegacyMoveRange(opCtx, request());
+            if (auto fcvRegionForLegacyRegister =
+                    tryRunMoveRangeCoordinator(opCtx, nss, request())) {
+                runLegacyMoveRange(opCtx, request(), fcvRegionForLegacyRegister);
             }
 
             if (request().getWaitForDelete()) {

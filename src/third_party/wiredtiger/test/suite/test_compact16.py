@@ -43,9 +43,6 @@ class test_compact16(compact_util):
     table_numkv = 1000 * 1000
 
     def test_compact16(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create and populate a table.
         self.session.create(self.uri, self.create_params)
         self.populate(self.uri, 0, self.table_numkv)
@@ -68,9 +65,7 @@ class test_compact16(compact_util):
             # Wait for checkpoint to start before calling compact.
             ckpt_started = False
             while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
                 time.sleep(0.1)
             self.session.compact(self.uri)
         finally:

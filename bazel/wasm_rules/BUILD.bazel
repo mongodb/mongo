@@ -1,0 +1,3 @@
+load(":wasm_aot_compile_test.bzl", "wasm_aot_compile_test_suite")
+
+wasm_aot_compile_test_suite(name = "wasm_aot_compile_test")

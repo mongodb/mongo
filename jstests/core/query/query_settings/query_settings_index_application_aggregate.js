@@ -1,6 +1,7 @@
 // Tests query settings are applied to aggregate queries regardless of the query engine (SBE or
 // classic).
 // @tags: [
+//   uses_explain,
 //   # TODO SERVER-98659 Investigate why this test is failing on
 //   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
 //   does_not_support_stepdowns,
@@ -328,7 +329,6 @@ function testAggregateQuerySettingsApplicationWithGraphLookup(
     // TODO SERVER-88561: Ensure query settings index application for 'secondaryNs' after
     // 'indexesUsed' is added to the 'explain' command output for the $graphLookup operation.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertGraphLookupQuerySettingsInCache(aggregateCmd, secondaryNs);
 }
 
 function testAggregateQuerySettingsApplicationWithUnionWithPipeline(

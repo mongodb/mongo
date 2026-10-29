@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/stages/unique.h"
 
@@ -68,7 +42,7 @@ UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("unique"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("unique"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _keySlots(keys),
       _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
           [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
@@ -89,7 +63,7 @@ void UniqueStage::prepare(CompileCtx& ctx) {
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
     }
 
-    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
 
@@ -116,8 +90,7 @@ PlanState UniqueStage::getNext() {
         value::MaterializedRow key{_inKeyAccessors.size()};
         size_t idx = 0;
         for (auto& accessor : _inKeyAccessors) {
-            auto [tag, val] = accessor->getViewOfValue();
-            key.reset(idx++, false, tag, val);
+            key.reset(idx++, accessor->getViewOfValue());
         }
 
         ++_specificStats.dupsTested;
@@ -125,13 +98,14 @@ PlanState UniqueStage::getNext() {
         if (inserted) {
             const_cast<value::MaterializedRow&>(*it).makeOwned();
             size_t newSeenSizeBytes = estimateSetSizeBytes(_seen);
-            _memoryTracker->add((newSeenSizeBytes - _prevSeenSizeBytes) +
-                                estimateRowSizeBytes(*it));
-            _dedupReporter.add((newSeenSizeBytes - _prevSeenSizeBytes) + estimateRowSizeBytes(*it));
+            const auto deduplicatedBytes =
+                (newSeenSizeBytes - _prevSeenSizeBytes) + estimateRowSizeBytes(*it);
+            _memoryTracker->add(deduplicatedBytes);
+            _dedupReporter.add(deduplicatedBytes);
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130301,
                     "Exceeded memory limit in record id deduplicator for unique stage",
-                    _memoryTracker->withinMemoryLimit());
+                    _memoryTracker->withinMemoryLimit(_opCtx));
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
@@ -206,7 +180,7 @@ UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
                                        PlanNodeId planNodeId,
                                        bool participateInTrialRunTracking)
     : PlanStage(
-          "unique_roaring"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+          "unique_roaring"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _keySlot(key),
       _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
             static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
@@ -229,7 +203,7 @@ std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
 void UniqueRoaringStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
-    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
 
@@ -292,7 +266,7 @@ PlanState UniqueRoaringStage::getNext() {
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130300,
                     "Exceeded memory limit in record id deduplicator for unique_roaring stage",
-                    _memoryTracker->withinMemoryLimit());
+                    _memoryTracker->withinMemoryLimit(_opCtx));
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.

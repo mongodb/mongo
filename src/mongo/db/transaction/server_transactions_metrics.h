@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transactions_stats_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -70,22 +44,34 @@ public:
     void incrementCurrentOpen();
 
     unsigned long long getTotalStarted() const;
-    void incrementTotalStarted();
+    unsigned long long getTotalStartedInternal() const;
+    unsigned long long getTotalStartedExternal() const;
+    void incrementTotalStarted(bool isServerInitiated);
 
     unsigned long long getTotalAborted() const;
-    void incrementTotalAborted();
+    unsigned long long getTotalAbortedInternal() const;
+    unsigned long long getTotalAbortedExternal() const;
+    void incrementTotalAborted(bool isServerInitiated);
 
     unsigned long long getTotalCommitted() const;
-    void incrementTotalCommitted();
+    unsigned long long getTotalCommittedInternal() const;
+    unsigned long long getTotalCommittedExternal() const;
+    void incrementTotalCommitted(bool isServerInitiated);
 
     unsigned long long getTotalPrepared() const;
-    void incrementTotalPrepared();
+    unsigned long long getTotalPreparedInternal() const;
+    unsigned long long getTotalPreparedExternal() const;
+    void incrementTotalPrepared(bool isServerInitiated);
 
     unsigned long long getTotalPreparedThenCommitted() const;
-    void incrementTotalPreparedThenCommitted();
+    unsigned long long getTotalPreparedThenCommittedInternal() const;
+    unsigned long long getTotalPreparedThenCommittedExternal() const;
+    void incrementTotalPreparedThenCommitted(bool isServerInitiated);
 
     unsigned long long getTotalPreparedThenAborted() const;
-    void incrementTotalPreparedThenAborted();
+    unsigned long long getTotalPreparedThenAbortedInternal() const;
+    unsigned long long getTotalPreparedThenAbortedExternal() const;
+    void incrementTotalPreparedThenAborted(bool isServerInitiated);
 
     unsigned long long getCurrentPrepared() const;
     void incrementCurrentPrepared();
@@ -109,37 +95,46 @@ public:
 
 private:
     // The number of multi-document transactions currently active.
-    AtomicWord<unsigned long long> _currentActive{0};
+    Atomic<unsigned long long> _currentActive{0};
 
     // The number of multi-document transactions currently inactive.
-    AtomicWord<unsigned long long> _currentInactive{0};
+    Atomic<unsigned long long> _currentInactive{0};
 
     // The total number of open transactions.
-    AtomicWord<unsigned long long> _currentOpen{0};
+    Atomic<unsigned long long> _currentOpen{0};
+
+    // Total counts are classified as "external" if the transactions were started explicitly
+    // by a user and "internal" if they were server-initiated.
 
     // The total number of multi-document transactions started since the last server startup.
-    AtomicWord<unsigned long long> _totalStarted{0};
+    Atomic<unsigned long long> _totalStartedInternal{0};
+    Atomic<unsigned long long> _totalStartedExternal{0};
 
     // The total number of multi-document transaction aborts.
-    AtomicWord<unsigned long long> _totalAborted{0};
+    Atomic<unsigned long long> _totalAbortedInternal{0};
+    Atomic<unsigned long long> _totalAbortedExternal{0};
 
     // The total number of multi-document transaction commits.
-    AtomicWord<unsigned long long> _totalCommitted{0};
+    Atomic<unsigned long long> _totalCommittedInternal{0};
+    Atomic<unsigned long long> _totalCommittedExternal{0};
 
     // The total number of prepared transactions since the last server startup.
-    AtomicWord<unsigned long long> _totalPrepared{0};
+    Atomic<unsigned long long> _totalPreparedInternal{0};
+    Atomic<unsigned long long> _totalPreparedExternal{0};
 
     // The total number of prepared transaction commits.
-    AtomicWord<unsigned long long> _totalPreparedThenCommitted{0};
+    Atomic<unsigned long long> _totalPreparedThenCommittedInternal{0};
+    Atomic<unsigned long long> _totalPreparedThenCommittedExternal{0};
 
     // The total number of prepared transaction aborts.
-    AtomicWord<unsigned long long> _totalPreparedThenAborted{0};
+    Atomic<unsigned long long> _totalPreparedThenAbortedInternal{0};
+    Atomic<unsigned long long> _totalPreparedThenAbortedExternal{0};
 
     // The current number of transactions in the prepared state.
-    AtomicWord<unsigned long long> _currentPrepared{0};
+    Atomic<unsigned long long> _currentPrepared{0};
 
-    AtomicWord<long long> _reclaimedPreparedTxnsCommitted{0};
-    AtomicWord<long long> _reclaimedPreparedTxnsAborted{0};
+    Atomic<long long> _reclaimedPreparedTxnsCommitted{0};
+    Atomic<long long> _reclaimedPreparedTxnsAborted{0};
 
     // Protects member variables below.
     mutable std::mutex _mutex;

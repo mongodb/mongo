@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/engine_selection_plan.h"
 
@@ -42,7 +16,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <cstdint>
+
 namespace mongo {
+
+// Default sort memory limit used when constructing SortNodes in these tests.
+constexpr uint64_t kSortMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
 class EngineSelectionPlanFixture : public mongo::unittest::Test {
 public:
@@ -106,8 +85,11 @@ public:
                                                                BSONObj sortPattern,
                                                                size_t limit = 0) {
         auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexKeys));
-        auto sort = std::make_unique<SortNodeDefault>(
-            std::move(indexScan), sortPattern, limit, LimitSkipParameterization::Disabled);
+        auto sort = std::make_unique<SortNodeDefault>(std::move(indexScan),
+                                                      sortPattern,
+                                                      limit,
+                                                      LimitSkipParameterization::Disabled,
+                                                      kSortMaxMemoryUsageBytes);
         return std::make_unique<FetchNode>(std::move(sort), nss);
     }
 
@@ -169,13 +151,21 @@ public:
             ExpressionConstant::create(expCtx.get(), Value(BSONNULL)),
             std::vector<AccumulationStatement>{AccumulationStatement::parseAccumulationStatement(
                 expCtx.get(), countSpec["n"], expCtx->variablesParseState)},
-            false /* merging */,
-            false /* willBeMerged */,
-            true /* shouldProduceBson */);
+            /*merging=*/false,
+            /*willBeMerged=*/false,
+            /*shouldProduceBson=*/true);
     }
 
 protected:
     NamespaceString nss;
+    unittest::ServerParameterGuard _hashJoinParamGuard{"featureFlagSbeEqLookupUnwindHashJoin",
+                                                       true};
+    unittest::ServerParameterGuard _localCollscanParamGuard{
+        "featureFlagSbeEqLookupUnwindLocalCollscan", true};
+    unittest::ServerParameterGuard _localIxscanFetchParamGuard{
+        "featureFlagSbeEqLookupUnwindLocalIxscanFetch", true};
+    unittest::ServerParameterGuard _localComplexParamGuard{
+        "featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans", true};
 };
 
 // Test selection of IXSCAN + FETCH + LU plans.
@@ -302,8 +292,7 @@ TEST_F(EngineSelectionPlanFixture, MatchProjectLookupUnwindFetchSortIxScanSelect
 }
 
 TEST_F(EngineSelectionPlanFixture, LookupUnwindFetchSortIxScanWithAbsorbedLimitSelection) {
-    auto dataAccess =
-        makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), 1 /* limit */);
+    auto dataAccess = makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), /*limit=*/1);
     const auto* dataAccessNode = dataAccess.get();
     auto solution = makePlan(
         makeLuNodeWithStrategy(std::move(dataAccess), EqLookupNode::LookupStrategy::kHashJoin));
@@ -347,9 +336,13 @@ TEST_F(EngineSelectionPlanFixture, GroupLookupUnwindProjectFetchIxScanSelection)
     ASSERT_EQ(result.planPushdownRoot, groupNodePtr);
 }
 
-// When all flags are on (the default), every combination of join strategy and local access plan
-// runs in SBE.
+// When all flags are on, every combination of join strategy and local access plan runs in SBE.
 TEST_F(EngineSelectionPlanFixture, LuAllFlagsEnabledSelectsSbeForAllCombinations) {
+    unittest::ServerParameterGuard inljOn{"featureFlagSbeEqLookupUnwindIndexedLoopJoin", true};
+    unittest::ServerParameterGuard nljOn{"featureFlagSbeEqLookupUnwindNestedLoopJoin", true};
+    unittest::ServerParameterGuard dinljOn{"featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin",
+                                           true};
+
     using Strategy = EqLookupNode::LookupStrategy;
     const Strategy strategies[] = {
         Strategy::kHashJoin,
@@ -508,7 +501,7 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
     // Unlisted patterns: all should be rejected (Classic).
 
     // FETCH -> SORT_DEFAULT -> IXSCAN with absorbed limit
-    ASSERT_EQ(runRule(makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), 1 /*limit*/)),
+    ASSERT_EQ(runRule(makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), /*limit=*/1)),
               EngineChoice::kClassic);
 
     // OR -> FETCH -> IXSCAN with more than 100 branches
@@ -523,8 +516,11 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
     {
         auto innerIxscan =
             std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{a: 1}")));
-        auto sort = std::make_unique<SortNodeDefault>(
-            std::move(innerIxscan), fromjson("{a: 1}"), 5, LimitSkipParameterization::Disabled);
+        auto sort = std::make_unique<SortNodeDefault>(std::move(innerIxscan),
+                                                      fromjson("{a: 1}"),
+                                                      5,
+                                                      LimitSkipParameterization::Disabled,
+                                                      kSortMaxMemoryUsageBytes);
         ASSERT_EQ(runRule(std::make_unique<FetchNode>(std::move(sort), nss)),
                   EngineChoice::kClassic);
     }
@@ -544,6 +540,11 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
 // For each of the 7 IFR flags, disabling it must fall back exactly the combinations that are gated
 // by that flag, no more, no less.
 TEST_F(EngineSelectionPlanFixture, LuEachFlagDisablesExactlyExpectedCombinations) {
+    unittest::ServerParameterGuard inljOn{"featureFlagSbeEqLookupUnwindIndexedLoopJoin", true};
+    unittest::ServerParameterGuard nljOn{"featureFlagSbeEqLookupUnwindNestedLoopJoin", true};
+    unittest::ServerParameterGuard dinljOn{"featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin",
+                                           true};
+
     using Strategy = EqLookupNode::LookupStrategy;
 
     // Each combo carries pointers to the flags that gate it; disabling either causes Classic.
@@ -673,8 +674,9 @@ TEST_F(EngineSelectionPlanFixture, LuEachFlagDisablesExactlyExpectedCombinations
 TEST_F(EngineSelectionPlanFixture, LuNonExistentForeignCollectionFlagGatedByNlj) {
     using Strategy = EqLookupNode::LookupStrategy;
 
-    // With NLJ flag on (default): NonExistentForeignCollection runs in SBE.
+    // With NLJ flag on: NonExistentForeignCollection runs in SBE.
     {
+        unittest::ServerParameterGuard flagOn{"featureFlagSbeEqLookupUnwindNestedLoopJoin", true};
         auto dataAccess = std::make_unique<CollectionScanNode>(nss);
         const auto* dan = dataAccess.get();
         auto solution = makePlan(

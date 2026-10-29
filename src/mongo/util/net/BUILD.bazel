@@ -24,6 +24,17 @@ filegroup(
 )
 
 mongo_cc_library(
+    name = "connection_purpose",
+    srcs = [
+        "connection_purpose.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:metrics_attributes",
+    ],
+)
+
+mongo_cc_library(
     name = "ssl_options",
     srcs = [
         "ssl_options.cpp",
@@ -362,6 +373,23 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "http_client_curl_test",
+    srcs = ["http_client_curl_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        ":http_client_enabled_windows": ["@platforms//:incompatible"],
+        "//bazel/config:http_client_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":http_client",
+        ":http_client_impl",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
 )
 
 mongo_cc_unit_test(

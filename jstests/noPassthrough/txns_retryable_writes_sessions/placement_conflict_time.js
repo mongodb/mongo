@@ -9,6 +9,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -59,12 +60,16 @@ describe("Test placementConflictTime", function () {
         );
 
         // Force refreshes to avoid getting stale config errors
-        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
-        assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
+            assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollA}));
+        }
         st.refreshCatalogCacheForNs(st.s, nsCollA);
 
-        assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
-        assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+            assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
+            assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: nsCollB}));
+        }
         st.refreshCatalogCacheForNs(st.s, nsCollB);
     });
 
@@ -162,15 +167,14 @@ describe("Test placementConflictTime", function () {
         st.s.getDB(otherDb).dropDatabase();
 
         const session = st.s.startSession();
-        const sessionDB = session.getDatabase(dbName);
 
         // Start the transaction
         session.startTransaction({readConcern: {level: "local"}});
 
-        // Start the txn with a random operation to setup the placementConflictTime for this txn.
-        assert.eq(1, sessionDB.getCollection(nameCollA).find().itcount());
-
-        // Create a database within the txn.
+        // There is no need to run a dummy statement to establish a placementConflictTime, this
+        // statement will do it. It's important to make sure that createCollection is the first
+        // statement of the txn, otherwise the transaction could be aborted by the StaleConfig
+        // thrown to recover the CollectionMetadata (which was set to UNKNOWN by the DB drop).
         const otherSessionDB = session.getDatabase(otherDb);
         assert.commandWorked(otherSessionDB.createCollection(otherColl));
 
@@ -184,8 +188,11 @@ describe("Test placementConflictTime", function () {
     // Verifies that a transaction gets aborted if a participant steps down.
     // This is important because the placementConflictTime is an in memory variable on each participant shard.
     it("Verify transaction gets aborted if a participant steps down", () => {
-        if (TestData.doesNotSupportGracefulStepdown) {
-            // TODO (SLS-1414): Enable once graceful stepdown is supported on disagg.
+        // TODO (SERVER-136017): Remove graceful stepdown gating.
+        if (
+            TestData.doesNotSupportGracefulPlannedStepdown ||
+            TestData.doesNotSupportGracefulUnplannedStepdown
+        ) {
             return;
         }
 

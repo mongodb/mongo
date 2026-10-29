@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -46,11 +20,11 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_insert_listener.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
-#include "mongo/db/query/write_conflict_storm.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -91,8 +65,6 @@ template <typename F, typename H>
     invariant(shard_role_details::getRecoveryUnit(opCtx));
     invariant(!expCtx->getTemporarilyUnavailableException());
 
-    // We do not catch ErrorCodes::WriteConflictRetryLimitExceeded. It is thrown to escape
-    // this template so the adaptive retry limit can fire.
     try {
         return f();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
@@ -160,7 +132,8 @@ public:
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
                      boost::optional<size_t> cachedPlanHash,
                      boost::optional<std::string> replanReason,
-                     boost::optional<PlanExplainerData> maybeExplainData);
+                     boost::optional<PlanExplainerData> maybeExplainData,
+                     boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     ~PlanExecutorImpl() override;
     CanonicalQuery* getCanonicalQuery() const final;
@@ -222,12 +195,6 @@ public:
     }
 
     /**
-     * Returns the current value of the process-wide WCE-retry-streak waiter gauge. Test-only
-     * accessor; production code reads the gauge via `Atomic64Metric` through serverStatus.
-     */
-    static int32_t getWriteConflictRetryWaiterCount_forTest();
-
-    /**
      * It is used to detect if the plan executor obtained after multiplanning is using a distinct
      * scan stage. That's because in this scenario modifications to the pipeline in the context of
      * aggregation need to be made.
@@ -279,11 +246,9 @@ public:
 
 private:
     // Co-locates per-call state passed between the two work loops and _handleNeedYield.
-    // Non-copyable/non-movable because it owns a WCStormWaiterGuard.
     struct WriteConflictRetryState {
         size_t writeConflictsInARow = 0;
         size_t tempUnavailErrorsInARow = 0;
-        WCStormWaiterGuard streakGuard;
     };
 
     const QuerySolution* getQuerySolution() const {
@@ -343,8 +308,6 @@ private:
     void doWaitDuringYield();
     void logWriteConflictAndBackoff(size_t numAttempts);
 
-    std::unique_ptr<insert_listener::Notifier> makeNotifier();
-
     // The OperationContext that we're executing within. This can be updated if necessary by using
     // detachFromOperationContext() and reattachToOperationContext().
     OperationContext* _opCtx;
@@ -370,9 +333,18 @@ private:
     // Whether the executor must return owned BSON.
     bool _mustReturnOwnedBson;
 
+    // Whether the query requested recordId metadata. Fixed once planning completes.
+    const bool _mustSetRecordIdMetadata;
+
     // If the current operation was "softly" interrupted. Will be set if a configured response
     // deadline is reached. Cleared upon every 'reattachToOperationContext()' call.
     bool _interrupted = false;
+
+    // The 'operationResponseMaxMS' knob value captured at construction. The knob is fixed for the
+    // query's lifetime, so it is cached here rather than re-read on every
+    // 'reattachToOperationContext' call, where the current opCtx may be foreign or absent (e.g.
+    // during cursor disposal).
+    long long _operationResponseMaxMS = 0;
 
     // The currently used response deadline type.
     ResponseDeadlineType _responseDeadlineType = ResponseDeadlineType::kNone;

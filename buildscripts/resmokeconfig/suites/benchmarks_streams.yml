@@ -7,6 +7,7 @@ selector:
     # The trailing asterisk is for handling the .exe extension on Windows.
     - bazel-bin/**/system_resource_canary_bm*
     - bazel-bin/**/streams_operator_dag_bm*
+    - bazel-bin/**/streams_stream_stats_bm*
     - bazel-bin/**/streams_window_operator_bm*
 
 executor:

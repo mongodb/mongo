@@ -1,46 +1,21 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/sbe_pushdown.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/sbe_pushdown_util.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
@@ -138,23 +113,15 @@ struct CompatiblePipelineStages {
     bool sort : 1;
     bool limitSkip : 1;
     bool search : 1;
-    bool window : 1;
     bool unpackBucket : 1;
 };
 
 SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
     // This stage has the SBE compatibility as least the same as that of the expression context.
     SbeCompatibility sbeCompatibility = lookup->getExpCtx()->getSbeCompatibility();
-    if (lookup->hasUnwindSrc()) {
-        // TODO SERVER-118544: Read the knob value through QueryKnobConfiguration.
-        if (internalQuerySlotBasedExecutionDisableLookupUnwindPushdown.loadRelaxed()) {
-            sbeCompatibility = SbeCompatibility::notCompatible;
-        } else if (!feature_flags::gFeatureFlagSbeEqLookupUnwind.checkWithContext(
-                       lookup->getExpCtx()->getVersionContext(),
-                       *lookup->getExpCtx()->getIfrContext(),
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            sbeCompatibility = std::min(sbeCompatibility, SbeCompatibility::requiresTrySbe);
-        }
+    if (lookup->hasUnwindSrc() &&
+        lookup->getExpCtx()->getQueryKnobConfiguration().getSbeDisableLookupUnwindPushdownForOp()) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
     }
     if (lookup->hasPipeline() || lookup->hasAdditionalFilter()) {
         sbeCompatibility = SbeCompatibility::notCompatible;
@@ -182,7 +149,7 @@ SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
 // Determine if 'stage' is eligible for SBE. Return false if 'stage' is ineligible, either because
 // it is disallowed by 'allowedStages' or because it requires functionality that cannot be
 // translated to SBE.
-bool pipelineStageIsCompatible(const OperationContext* opCtx,
+bool pipelineStageIsCompatible(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const boost::intrusive_ptr<DocumentSource>& stage,
                                SbeCompatibility minRequiredCompatibility,
                                const CompatiblePipelineStages& allowedStages,
@@ -224,7 +191,9 @@ bool pipelineStageIsCompatible(const OperationContext* opCtx,
         auto foreignCollItr = collectionsInfo.find(lookupStage->getFromNs());
         if (foreignCollItr != collectionsInfo.end() && foreignCollItr->second.exists &&
             QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
-                lookupStage->getForeignField()->fullPath(), foreignCollItr->second.indexes)) {
+                expCtx,
+                lookupStage->getForeignField()->fullPath(),
+                foreignCollItr->second.indexes)) {
             LOGV2_DEBUG(6408202,
                         3,
                         "Lookup is not pushed to SBE because classic can use index",
@@ -268,13 +237,6 @@ bool pipelineStageIsCompatible(const OperationContext* opCtx,
     } else if (stageId == DocumentSourceSearchMeta::id || stageId == DocumentSourceSearch::id ||
                stageId == DocumentSourceInternalSearchMongotRemote::id) {
         if (!allowedStages.search) {
-            return false;
-        }
-        return true;
-    } else if (stageId == DocumentSourceInternalSetWindowFields::id) {
-        if (!allowedStages.window ||
-            static_cast<DocumentSourceInternalSetWindowFields*>(stage.get())->sbeCompatibility() <
-                minRequiredCompatibility) {
             return false;
         }
         return true;
@@ -418,10 +380,11 @@ void removeUnpackBucketFollowedByUnsupportedStages(
  */
 void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
                          SbeCompatibility minRequiredCompatibility,
-                         bool allStagesPushedDown) {
+                         bool allStagesPushedDown,
+                         bool unpackBucketPruningDisabled) {
     // First, scan the list of stages for pushdown, and remove an unpack bucket (plus anything
-    // following) if it's followed by unsupported stages.
-    if (minRequiredCompatibility > SbeCompatibility::requiresSbeFull) {
+    // following) if it's followed by unsupported stages, unless unpack bucket pruning is disabled.
+    if (!unpackBucketPruningDisabled) {
         removeUnpackBucketFollowedByUnsupportedStages(stagesForPushdown);
     }
 
@@ -451,12 +414,7 @@ void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stag
 
 // Limit the number of aggregation pipeline stages that can be "pushed down" to the SBE stage
 // builders. Compiling too many pipeline stages during stage building would overflow the call stack.
-// The limit is higher for optimized builds, because optimization reduces the size of stack frames.
-#ifdef MONGO_CONFIG_OPTIMIZED_BUILD
-constexpr size_t kSbeMaxPipelineStages = 400;
-#else
 constexpr size_t kSbeMaxPipelineStages = 100;
-#endif
 
 size_t getNumSbeCompatibleStagesForPushdown(
     const DocumentSourceContainer& sources,
@@ -486,10 +444,10 @@ size_t getNumSbeCompatibleStagesForPushdown(
                 pipeline->getContext()->getOperationContext(),
                 *cq,
                 collections,
-                false /* includeSizeStats */);
+                /*includeSizeStats=*/false);
         }
 
-        if (!pipelineStageIsCompatible(pipeline->getContext()->getOperationContext(),
+        if (!pipelineStageIsCompatible(pipeline->getContext(),
                                        *itr,
                                        minRequiredCompatibility,
                                        allowedStages,
@@ -544,7 +502,7 @@ size_t getNumSbeCompatibleStagesForPushdown(
  *   - The foreign collection is fully local to this node, is not a view, and is not timeseries,
  *     since timeseries collections always require a pipeline.
  *   - Either there is no absorbed $unwind stage ('_unwindSrc' is null), or SBE $lookup-$unwind
- *     pushdown is enabled ('featureFlagSbeEqLookupUnwind' or 'trySbeEngine' is on and
+ *     pushdown is enabled ('featureFlagGetExecutorDeferredEngineChoice' or 'trySbeEngine' is on and
  *     'internalQuerySlotBasedExecutionDisableLookupUnwindPushdown' is false).
  *   - There is no absorbed $match stage ('_matchSrc').
  *
@@ -572,14 +530,12 @@ size_t getNumSbeCompatibleStagesForPushdown(
  *   - No additional criteria.
  *
  * $search and $searchMeta via 'DocumentSourceSearch':
- *   - The 'featureFlagSearchInSbe' flag is enabled.
- *   - The 'featureFlagSbeFull' flag is enabled.
+ *   - Never pushed down.
  *
  * 'DocumentSourceUnpackBucket':
  *   - The 'featureFlagSbeFull' flag is enabled.
  *
  * $_internalUnpackBucket via 'DocumentSourceInternalUnpackBucket':
- *   - The 'featureFlagTimeSeriesInSbe' flag is enabled and
  *   - the 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown', is _not_ enabled,
  *
  * $unwind stages ('DocumentSourceUnwind'):
@@ -647,7 +603,10 @@ bool findSbeCompatibleStagesForPushdown(
                                        : SbeCompatibility::requiresTrySbe) ||
             isTimeseriesCollection,
 
-        .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
+        .unwind = meetsRequirements(cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                                        feature_flags::gFeatureFlagSbeUnwind)
+                                        ? SbeCompatibility::requiresTrySbe
+                                        : SbeCompatibility::notCompatible),
 
         // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
@@ -657,16 +616,9 @@ bool findSbeCompatibleStagesForPushdown(
 
         .limitSkip = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
-        // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
-        // enabled.
-        .search = meetsRequirements(SbeCompatibility::requiresSbeFull) &&
-            feature_flags::gFeatureFlagSearchInSbe.isEnabled(),
+        .search = false,
 
-        .window = meetsRequirements(SbeCompatibility::requiresTrySbe),
-
-        // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = meetsRequirements(SbeCompatibility::noRequirements) &&
-            feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() &&
             !queryKnob.getSbeDisableTimeSeriesForOp() &&
             cq->getExpCtx()->getSbePipelineCompatibility() == SbeCompatibility::noRequirements,
     };
@@ -717,7 +669,11 @@ bool findSbeCompatibleStagesForPushdown(
     bool allStagesPushedDown = numSbeCompatibleStagesForPushdown == sources.size();
 
     // Remove stage patterns where pushing down may degrade performance.
-    prunePushdownStages(stagesForPushdown, minRequiredCompatibility, allStagesPushedDown);
+    prunePushdownStages(stagesForPushdown,
+                        minRequiredCompatibility,
+                        allStagesPushedDown,
+                        cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                            feature_flags::gFeatureFlagSbeDisableUnpackBucketPruning));
 
     return allStagesPushedDown;
 }  // findSbeCompatibleStagesForPushdown
@@ -763,14 +719,39 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
     canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
 };
 
-SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
-                                                bool sbeFullEnabled) {
-    if (sbeFullEnabled) {
-        return SbeCompatibility::requiresSbeFull;
-    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
-        return SbeCompatibility::requiresTrySbe;
+void incrementNonLeadingPushdownCounters(const CanonicalQuery& cq) {
+    const auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
+
+    // Increment only for trySbeRestricted. The idea is to be able to track how many non-leading
+    // operators are being used because of enabling featureFlagSbeNonLeadingMatch /
+    // featureFlagSbeTransformStages, and not because trySbeEngine is set.
+    if (queryKnob.getInternalQueryFrameworkControlForOp() !=
+        QueryFrameworkControlEnum::kTrySbeRestricted) {
+        return;
     }
-    return SbeCompatibility::noRequirements;
+
+    auto* opCtx = cq.getExpCtx()->getOperationContext();
+    if (!opCtx)
+        return;
+    auto& debug = CurOp::get(opCtx)->debug();
+
+    for (const auto& stage : cq.cqPipeline()) {
+        const auto id = stage->getId();
+
+        // Match the operators that were pushed down to SBE.
+        if (id == DocumentSourceMatch::id) {
+            debug.nlpMatch = true;
+        } else if (id == DocumentSourceInternalProjection::id) {
+            const auto* proj = static_cast<const DocumentSourceInternalProjection*>(stage.get());
+            if (proj->projection().type() == projection_ast::ProjectType::kAddition) {
+                debug.nlpAddFields = true;
+            } else {
+                debug.nlpProject = true;
+            }
+        } else if (id == DocumentSourceInternalReplaceRoot::id) {
+            debug.nlpReplaceRoot = true;
+        }
+    }
 }
 
 }  // namespace mongo

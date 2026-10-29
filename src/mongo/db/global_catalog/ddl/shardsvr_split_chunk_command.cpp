@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -60,14 +34,14 @@ namespace {
 
 /**
  * Attempts to execute the split through the sharding coordinator service, retrying while a
- * conflicting coordinator is already running for the same namespace. Returns true if the split
- * completed via the coordinator; returns false if the caller should fall back to the legacy
- * config-server path (because the authoritative metadata feature flag is disabled). Throws
- * ConflictingOperationInProgress if the configured retry budget is exhausted.
+ * conflicting coordinator is already running for the same namespace. Returns boost::none if the
+ * split completed via the coordinator; otherwise returns a FixedFCVRegion for the caller to
+ * register through the legacy path under the same pin (because the authoritative metadata feature
+ * is disabled). Throws ConflictingOperationInProgress if the configured retry budget is exhausted.
  */
-bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const ShardsvrSplitChunk& req) {
+boost::optional<FixedFCVRegion> tryRunSplitChunkCoordinator(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const ShardsvrSplitChunk& req) {
     // If a conflicting split coordinator is already running for this namespace,
     // wait for it to complete and retry.
     // TODO (SERVER-125033): Remove the retry-loop once this task gets done.
@@ -80,7 +54,7 @@ bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx),
                 optFixedFcvRegion.get()->acquireFCVSnapshot()) ==
             AuthoritativeMetadataAccessLevelEnum::kNone) {
-            return false;
+            return optFixedFcvRegion;
         }
 
         auto coordinatorDoc = SplitChunkCoordinatorDocument();
@@ -91,7 +65,7 @@ bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
         // call below, allowing the retry loop to handle ConflictingOperationInProgress.
         auto service = ShardingCoordinatorService::getService(opCtx);
         auto coordinator = checked_pointer_cast<SplitChunkCoordinator>(service->getOrCreateInstance(
-            opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+            opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, /*checkOptions=*/false));
 
         try {
             coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());
@@ -109,7 +83,7 @@ bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
 
         optFixedFcvRegion.reset();
         coordinator->getCompletionFuture().get(opCtx);
-        return true;
+        return boost::none;
     }
 
     uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -154,7 +128,8 @@ public:
             const auto& nss = ns();
             const auto& req = request();
 
-            if (tryRunSplitChunkCoordinator(opCtx, nss, req)) {
+            auto fcvRegionForLegacyRegister = tryRunSplitChunkCoordinator(opCtx, nss, req);
+            if (!fcvRegionForLegacyRegister) {
                 return;
             }
 
@@ -174,6 +149,7 @@ public:
             auto scopedChunk =
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
                     opCtx, nss, chunkRange));
+            fcvRegionForLegacyRegister.reset();
 
             uassertStatusOK(splitChunk_nonAuth(
                 opCtx,

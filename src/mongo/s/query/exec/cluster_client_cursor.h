@@ -1,38 +1,14 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
@@ -61,7 +37,7 @@ class StatusWith;
  *
  * Does not throw exceptions.
  */
-class MONGO_MOD_PUBLIC ClusterClientCursor {
+class [[MONGO_MOD_PUBLIC]] ClusterClientCursor {
     ClusterClientCursor(const ClusterClientCursor&) = delete;
     ClusterClientCursor& operator=(const ClusterClientCursor&) = delete;
 
@@ -151,6 +127,15 @@ public:
     virtual long long getNumReturnedSoFar() const = 0;
 
     /**
+     * For a change stream cursor, records the documents, bytes, and the single batch returned to
+     * the client since the previous call into the global change stream throughput counters
+     * (changeStreams.cursor.{docsReturned,bytesReturned,batchesReturned}). Intended to be called
+     * once per batch handed back to the client (the initial batch and each getMore). A no-op for
+     * non-change-stream cursors.
+     */
+    virtual void recordChangeStreamThroughputMetricsForBatch() = 0;
+
+    /**
      * Stash the ClusterQueryResult so that it gets returned from the CCC on a later call to
      * next().
      *
@@ -222,6 +207,17 @@ public:
     virtual bool getRawData() const = 0;
 
     /**
+     * Returns a fresh clone of the IFR context under which this cursor's **execution** plan was
+     * built. Installed onto each getMore's OperationContext so remote dispatch uses the same
+     * feature-flag values, including any flag disabled by an IFR kickback retry.
+     *
+     * A clone is returned rather than the cursor's own context so that callers cannot mutate the
+     * pinned state, and because the cursor's context carries a memoized egress serialization from
+     * the originating operation which a new OperationContext must not inherit.
+     */
+    virtual std::shared_ptr<IncrementalFeatureRolloutContext> cloneIfrContext() const = 0;
+
+    /**
      * Returns the creation date of the cursor.
      */
     virtual Date_t getCreatedDate() const = 0;
@@ -237,6 +233,11 @@ public:
     virtual bool isChangeStreamCursor() const = 0;
 
     /**
+     * Returns whether this change stream cursor was opened on the v2 precise shard-targeting path.
+     */
+    virtual bool usesChangeStreamV2ShardTargeting() const = 0;
+
+    /**
      * Set the last use date to the provided time.
      */
     virtual void setLastUseDate(Date_t now) = 0;
@@ -249,6 +250,8 @@ public:
     virtual boost::optional<std::size_t> getQueryStatsKeyHash() const = 0;
 
     virtual boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const = 0;
+
+    virtual const query_settings::QuerySettings& getQuerySettings() const = 0;
 
     /**
      * Returns the number of batches returned by this cursor.
@@ -269,18 +272,20 @@ public:
         if (!_firstResponseExecutionTime) {
             _firstResponseExecutionTime = _metrics.executionTime;
         }
+        // This is the per-batch consolidation point for cursor metrics (both the initial batch and
+        // each getMore), so it is also where we emit change stream read throughput for the batch
+        // just returned to the client. No-op for non-change-stream cursors.
+        recordChangeStreamThroughputMetricsForBatch();
     }
 
     void updateMetrics(const ChangeStreamCursorMetrics& csMetrics) {
-        if (!isChangeStreamCursor()) {
+        if (!isChangeStreamCursor() || !csMetrics.getOptime()) {
             return;
         }
-        if (csMetrics.getOptime() && !csMetrics.getOptime()->isNull()) {
-            if (!_changeStreamMetrics) {
-                _changeStreamMetrics.emplace();
-            }
-            _changeStreamMetrics->setOptime(csMetrics.getOptime());
+        if (!_changeStreamMetrics) {
+            _changeStreamMetrics.emplace();
         }
+        _changeStreamMetrics->setOptime(csMetrics.getOptime());
     }
 
     const boost::optional<ChangeStreamCursorMetrics>& getChangeStreamMetrics() const {
@@ -328,7 +333,7 @@ public:
      */
     virtual boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() = 0;
 
-    std::unique_ptr<OperationMemoryUsageTracker> releaseMemoryUsageTracker() {
+    std::shared_ptr<OperationMemoryUsageTracker> releaseMemoryUsageTracker() {
         return std::move(_memoryTracker);
     }
 
@@ -336,7 +341,7 @@ public:
         return _memoryTracker.get();
     }
 
-    void setMemoryUsageTracker(std::unique_ptr<OperationMemoryUsageTracker> memoryTracker) {
+    void setMemoryUsageTracker(std::shared_ptr<OperationMemoryUsageTracker> memoryTracker) {
         _memoryTracker = std::move(memoryTracker);
     }
 
@@ -355,7 +360,7 @@ private:
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
-    std::unique_ptr<OperationMemoryUsageTracker> _memoryTracker;
+    std::shared_ptr<OperationMemoryUsageTracker> _memoryTracker;
 };
 
 }  // namespace mongo

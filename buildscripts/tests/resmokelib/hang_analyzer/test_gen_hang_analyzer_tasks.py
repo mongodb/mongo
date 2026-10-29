@@ -14,6 +14,11 @@ from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
 )
 
 
+def setUpModule():
+    if not sys.platform.startswith("linux"):
+        raise unittest.SkipTest("Core analysis is only support on linux")
+
+
 class TestCorePidExtraction(unittest.TestCase):
     """Unit tests for get_core_pid function."""
 
@@ -38,10 +43,6 @@ class TestCorePidExtraction(unittest.TestCase):
             get_core_pid("dump_mongod.notanumber.core")
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
 class TestGetCoreAnalyzerCommands(unittest.TestCase):
     """Unit tests for get_core_analyzer_commands function."""
 
@@ -223,10 +224,6 @@ class TestGetCoreAnalyzerCommands(unittest.TestCase):
             self.assertIn(expected_str, args)
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
 class TestCoreAnalysisTaskGenerator(unittest.TestCase):
     """Unit tests for CoreAnalysisTaskGenerator base class."""
 
@@ -325,10 +322,6 @@ class TestCoreAnalysisTaskGenerator(unittest.TestCase):
             self.assertFalse(generator._should_skip_task(mock_task))
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
 class TestResmokeCoreAnalysisTaskGenerator(unittest.TestCase):
     """Unit tests for ResmokeCoreAnalysisTaskGenerator."""
 
@@ -367,9 +360,10 @@ class TestResmokeCoreAnalysisTaskGenerator(unittest.TestCase):
 
         # Mock task artifacts
         mock_artifact1 = MagicMock()
-        mock_artifact1.name = "Core Dump dump_mongod.12345.core.gz"
+        # Two spaces is what evergreen actually produces.
+        mock_artifact1.name = "Core Dump  dump_mongod.12345.core.gz"
         mock_artifact2 = MagicMock()
-        mock_artifact2.name = "Core Dump dump_mongos.67890.core.gz"
+        mock_artifact2.name = "Core Dump  dump_mongos.67890.core.gz"
 
         mock_task = MagicMock()
         mock_task.artifacts = [mock_artifact1, mock_artifact2]
@@ -435,10 +429,50 @@ class TestResmokeCoreAnalysisTaskGenerator(unittest.TestCase):
             self.assertTrue(cores[0].marked_boring)
 
 
-@unittest.skipIf(
-    not sys.platform.startswith("linux"),
-    reason="Core analysis is only support on linux",
-)
+class TestBazelCoreAnalysisTaskDependencies(unittest.TestCase):
+    """The generated core analysis task must wait for the runner's debug binaries."""
+
+    def setUp(self):
+        self.expansions = {
+            "task_name": "//jstests/suites/core:core",
+            "task_id": "test_task_123",
+            "execution": "0",
+            "build_variant": "ubuntu2204",
+            "distro_id": "ubuntu2204-large",
+            "core_analyzer_results_url": "s3://bucket/results.tgz",
+            "compile_variant": "ubuntu2204-compile",
+            "workdir": "/data/mci",
+        }
+
+    def _generate(self, built_own_binaries=False):
+        cores = [CoreInfo(path="/tmp/c.core", binary_name="mongod", pid="1", marked_boring=False)]
+        with (
+            patch(
+                "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.read_config_file",
+                return_value=self.expansions,
+            ),
+            patch(
+                "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.os.path.isdir",
+                return_value=built_own_binaries,
+            ),
+        ):
+            with patch.object(BazelCoreAnalysisTaskGenerator, "find_cores", return_value=cores):
+                generator = BazelCoreAnalysisTaskGenerator("expansions.yml", use_mock_tasks=True)
+                return generator.generate()["buildvariants"][0]["tasks"][0]
+
+    def test_depends_on_runner_task_in_same_variant(self):
+        task = self._generate()
+        self.assertEqual(task["depends_on"], [{"name": "resmoke_tests", "variant": "ubuntu2204"}])
+
+    def test_depends_on_burn_in_runner_for_burn_in_tasks(self):
+        self.expansions["task_name"] = "//jstests/suites/core:core_burn_in_0"
+        task = self._generate()
+        self.assertEqual(
+            task["depends_on"],
+            [{"name": "resmoke_tests_burn_in_ubuntu2204", "variant": "ubuntu2204"}],
+        )
+
+
 class TestBazelCoreAnalysisTaskGenerator(unittest.TestCase):
     """Unit tests for BazelCoreAnalysisTaskGenerator."""
 
@@ -562,6 +596,30 @@ class TestBazelCoreAnalysisTaskGenerator(unittest.TestCase):
         cmd_dict = subprocess_cmd.as_dict()
         args = cmd_dict["params"]["args"]
         self.assertIn("--is-bazel-task", args)
+
+
+class TestMissingEvergreenApiCredentials(unittest.TestCase):
+    """Generation must be skipped, not crash, when the Evergreen API config is absent.
+
+    Tasks that never call the 'configure evergreen api credentials' function reach this path
+    routinely, so it has to degrade to a no-op.
+    """
+
+    @patch("buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.read_config_file")
+    @patch(
+        "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.evergreen_conn.get_evergreen_api"
+    )
+    def test_generate_returns_none_without_credentials(self, mock_get_api, mock_read_config):
+        mock_read_config.return_value = {"task_name": "resmoke_test", "task_id": "test_task_123"}
+        mock_get_api.side_effect = RuntimeError("evergreen api config not found")
+
+        # The guard lives on the shared base class, so both generators must degrade alike.
+        for generator_cls in (ResmokeCoreAnalysisTaskGenerator, BazelCoreAnalysisTaskGenerator):
+            with self.subTest(generator=generator_cls.__name__):
+                generator = generator_cls("test_expansions.yml")
+
+                self.assertIsNone(generator.evg_api)
+                self.assertIsNone(generator.generate())
 
 
 if __name__ == "__main__":

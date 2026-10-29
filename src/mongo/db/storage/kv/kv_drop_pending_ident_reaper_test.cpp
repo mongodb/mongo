@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 
@@ -44,6 +18,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -94,13 +69,10 @@ public:
     Status dropIdent(RecoveryUnit& ru,
                      std::string_view ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop,
-                     boost::optional<uint64_t> schemaEpoch) override {
+                     boost::optional<uint64_t> schemaEpoch,
+                     bool waitForLocks) override {
         auto status = dropIdentFn(ru, ident);
         if (status.isOK()) {
-            if (onDrop) {
-                onDrop();
-            }
             droppedIdents.emplace_back(std::string{ident}, schemaEpoch);
         }
         return status;
@@ -112,6 +84,11 @@ public:
 
     StorageEngine::CheckpointIteration getCheckpointIteration() const override {
         return checkpointIteration;
+    }
+
+    std::unique_lock<std::mutex> lockStepDown() override {
+        ++stepdownLockCount;
+        return std::unique_lock(_stepdownMutex);
     }
 
     std::vector<std::string> getDroppedIdentNames() const {
@@ -132,6 +109,12 @@ public:
     };
 
     StorageEngine::CheckpointIteration checkpointIteration{0};
+
+    // Number of times lockStepDown() was called.
+    int stepdownLockCount = 0;
+
+private:
+    std::mutex _stepdownMutex;
 };
 
 class KVDropPendingIdentReaperTest : public ServiceContextTest {
@@ -592,6 +575,66 @@ DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest,
     reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
 }
 
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanRetriesOnWriteConflict) {
+    Timestamp dropTimestamp{Seconds{1}, 0};
+    std::string identName = "myident";
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{dropTimestamp}, ident);
+    }
+
+    int attempts = 0;
+    engine->dropIdentFn = [&](RecoveryUnit&, std::string_view) -> Status {
+        if (++attempts < 2) {
+            return Status(ErrorCodes::WriteConflict, "simulated write conflict at commit");
+        }
+        return Status::OK();
+    };
+
+    auto opCtx = makeOpCtx();
+    // First call: WriteConflict should not crash, ident remains pending.
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_TRUE(engine->droppedIdents.empty());
+    EXPECT_EQ(1, attempts);
+
+    // Second call: succeeds.
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_EQ(1U, engine->droppedIdents.size());
+    EXPECT_EQ(identName, engine->droppedIdents[0].identName);
+}
+
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanRetriesOnObjectIsBusy) {
+    Timestamp dropTimestamp{Seconds{1}, 0};
+    std::string identName = "myident";
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(StorageEngine::OldestTimestamp{dropTimestamp}, ident);
+    }
+
+    engine->dropIdentFn = [](RecoveryUnit&, std::string_view) -> Status {
+        return Status(ErrorCodes::ObjectIsBusy, "simulated EBUSY from WiredTiger");
+    };
+
+    auto opCtx = makeOpCtx();
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_TRUE(engine->droppedIdents.empty());
+    EXPECT_EQ(reaper.getAllIdentNames(), (std::set<std::string>{identName}));
+
+    // Second call without the injected error completes the drop.
+    engine->dropIdentFn = [](RecoveryUnit&, std::string_view) {
+        return Status::OK();
+    };
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    EXPECT_EQ(engine->getDroppedIdentNames(), (std::vector<std::string>{identName}));
+    EXPECT_TRUE(reaper.getAllIdentNames().empty());
+}
+
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropUnknownIdent) {
     auto engine = getEngine();
     KVDropPendingIdentReaper reaper(engine);
@@ -819,21 +862,6 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropOnlyDropsTheRequestedIdent) 
     EXPECT_EQ(reaper.getAllIdentNames(), std::set{otherIdentName});
 }
 
-TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropCallsOnDropCallback) {
-    const std::string identName = "ident";
-    auto engine = getEngine();
-    KVDropPendingIdentReaper reaper(engine);
-    bool onDropCalled = false;
-    reaper.addDropPendingIdent(StorageEngine::Immediate{}, std::make_shared<Ident>(identName), [&] {
-        onDropCalled = true;
-    });
-
-    auto opCtx = makeOpCtx();
-    ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    EXPECT_EQ(engine->getDroppedIdentNames(), std::vector{identName});
-    ASSERT(onDropCalled);
-}
-
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropReportsDropErrors) {
     const std::string identName = "ident";
     auto engine = getEngine();
@@ -939,6 +967,7 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_ASCPrimaryAndSecondaryD
 
     EXPECT_EQ((std::vector<std::string>{"ident-1", "ident-2"}), engine->getDroppedIdentNames());
     ASSERT_EQUALS(2U, engine->droppedIdents.size());
+    EXPECT_EQ(0, engine->stepdownLockCount);
     EXPECT_FALSE(engine->droppedIdents[0].schemaEpoch);
     EXPECT_FALSE(engine->droppedIdents[1].schemaEpoch);
 }
@@ -966,6 +995,51 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCPrimaryReplicatesIde
     ASSERT_EQUALS(1U, engine->droppedIdents.size());
     EXPECT_EQ(identName, engine->droppedIdents.front().identName);
     EXPECT_EQ(expectedSchemaEpoch, engine->droppedIdents.front().schemaEpoch.value());
+    EXPECT_EQ(1, engine->stepdownLockCount);
+}
+
+// Replicating a primary ident drop writes an oplog entry, which can throw a transient
+// WriteConflict. That must not escape as a non-OK status that dropIdentsOlderThan() treats as fatal
+// (fassert 51022). Instead the ident stays drop-pending and the whole drop is redone on a later
+// pass.
+TEST_F(KVDropPendingIdentReaperTest,
+       DropIdentsOlderThan_DSCPrimaryLeavesIdentDropPendingOnWriteConflict) {
+    setUsesSchemaEpochs(true);
+    setPrimary(true);
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    const std::string identName("my-ident");
+    const Timestamp replicatedIdentDropOpTime(100, 0);
+    const uint64_t expectedSchemaEpoch = 42;
+    dropIdentAtOldest(reaper, Timestamp(10, 0), identName);
+
+    // The first pass throws a WriteConflict while replicating the drop; the second succeeds.
+    EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, identName, _))
+        .WillOnce([](OperationContext*, const std::string&, repl::OpTime&) {
+            throwWriteConflictException("simulated WriteConflict while replicating ident drop");
+        })
+        .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
+            opTime = repl::OpTime(replicatedIdentDropOpTime, repl::OpTime::kUninitializedTerm);
+        });
+    // The conflict happens before the drop is attempted, so the epoch is only computed on the
+    // second pass.
+    expectSchemaEpochForTimestamp(replicatedIdentDropOpTime, expectedSchemaEpoch);
+
+    auto opCtx = makeOpCtx();
+
+    // Must not fassert. Nothing was dropped and the ident is still pending.
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestamps(11));
+    EXPECT_TRUE(engine->droppedIdents.empty());
+    EXPECT_EQ(1U, reaper.getNumIdents());
+    EXPECT_EQ((std::set<std::string>{identName}), reaper.getAllIdentNames());
+
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestamps(11));
+
+    ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    EXPECT_EQ(identName, engine->droppedIdents.front().identName);
+    EXPECT_EQ(expectedSchemaEpoch, engine->droppedIdents.front().schemaEpoch.value());
+    EXPECT_EQ(0U, reaper.getNumIdents());
 }
 
 TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCPrimaryOnlyReplicatesTimestampedDrops) {

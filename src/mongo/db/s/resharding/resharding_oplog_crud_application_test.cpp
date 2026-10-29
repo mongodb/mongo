@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -120,6 +94,10 @@ using namespace std::literals::string_view_literals;
 
 class ReshardingOplogCrudApplicationTest : public ServiceContextMongoDTest {
 public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
@@ -130,8 +108,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    _myDonorHandle.name()},
-                                   _myDonorHandle.uuid().value());
+                                    _myDonorId});
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
@@ -172,9 +149,9 @@ public:
             }
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), _outputNss)
-                ->setCollectionMetadata(opCtx.get(),
-                                        CollectionMetadata(makeChunkManagerForOutputCollection(),
-                                                           _myDonorHandle.name()));
+                ->setCollectionMetadata(
+                    opCtx.get(),
+                    CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
 
             _metrics =
                 ReshardingMetrics::makeInstance_forTest(_sourceUUID,
@@ -184,12 +161,12 @@ public:
                                                         serviceContext->getFastClockSource()->now(),
                                                         serviceContext);
             _oplogApplierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
-                _myDonorHandle.name(), _metrics.get(), boost::none);
+                _myDonorId, _metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
                 0U,
-                _myDonorHandle.name(),
+                _myDonorId,
                 makeChunkManagerForSourceCollection(),
                 _oplogApplierMetrics.get());
         }
@@ -353,13 +330,13 @@ private:
                                                uuid,
                                                shardKey,
                                                false, /* unsplittable */
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
         return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
     }
@@ -375,16 +352,16 @@ private:
                 ChunkRange{BSON(_currentShardKey << MINKEY),
                            BSON(_currentShardKey << -std::numeric_limits<double>::infinity())},
                 ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
-                _myDonorHandle.name()},
+                _myDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << -std::numeric_limits<double>::infinity()),
                                  BSON(_currentShardKey << 0)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 1}),
-                      _otherDonorHandle.name()},
+                      _otherDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << 0), BSON(_currentShardKey << MAXKEY)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 2}),
-                      _myDonorHandle.name()}};
+                      _myDonorId}};
 
         return makeChunkManager(
             epoch, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
@@ -397,7 +374,7 @@ private:
             ChunkType{outputUuid,
                       ChunkRange{BSON(_newShardKey << MINKEY), BSON(_newShardKey << MAXKEY)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
-                      _myDonorHandle.name()}};
+                      _myDonorId}};
 
         return makeChunkManager(epoch, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
     }
@@ -416,17 +393,15 @@ private:
         NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");
     const UUID _sourceUUID = UUID::gen();
 
-    const ShardHandle _myDonorHandle{ShardId("myDonorId"), UUID::gen()};
-    const ShardHandle _otherDonorHandle{ShardId("otherDonorId"), UUID::gen()};
+    const ShardId _myDonorId{"myDonorId"};
+    const ShardId _otherDonorId{"otherDonorId"};
 
     const NamespaceString _outputNss =
         resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
     const NamespaceString _myStashNss =
-        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorHandle.name());
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
-        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorHandle.name());
-
-    service_context_test::ShardRoleOverride _shardRole;
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
     std::unique_ptr<ReshardingMetrics> _metrics;

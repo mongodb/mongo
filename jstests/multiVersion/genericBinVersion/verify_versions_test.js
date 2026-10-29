@@ -6,9 +6,6 @@
  * not.
  */
 
-// Checking UUID consistency involves talking to a shard node, which in this test is shutdown
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 function assertBinVersionsEqual(v1, v2) {
     assert(
         MongoRunner.areBinVersionsTheSame(v1, v2),
@@ -44,6 +41,20 @@ function assertBinVersionComparesEqual(v1, v2) {
         0,
         MongoRunner.compareBinVersions(v1, v2),
         'Expected "' + v1 + '" to compare equal to "' + v2 + '"',
+    );
+}
+
+function assertSameBuild(v1, v2) {
+    assert(
+        MongoRunner.isSameBuild(v1, v2),
+        'Expected "' + v1 + '" and "' + v2 + '" to be the same build',
+    );
+}
+
+function assertNotSameBuild(v1, v2) {
+    assert(
+        !MongoRunner.isSameBuild(v1, v2),
+        'Expected "' + v1 + '" and "' + v2 + '" not to be the same build',
     );
 }
 
@@ -99,3 +110,33 @@ assert.throws(MongoRunner.areBinVersionsTheSame, ["3.2", "3"]);
 
 // Throw an error when versions differ only by githash.
 assert.throws(MongoRunner.compareBinVersions, ["3.4.1-abc", "3.4.1-xyz"]);
+
+// "Same version" (areBinVersionsTheSame) is a compatibility judgement: every component
+// up through the shorter version matches, and pre-release tags are ignored. "Same
+// build" (isSameBuild) is exact identity of the binary. Each pair below is checked
+// through both predicates so the two semantics cannot drift apart: the same build is
+// always the same version, but the same version can be published as different builds
+// (e.g. a release candidate vs the mainline build).
+const versionPairs = [
+    // [versionA, versionB, sameVersion, sameBuild]
+    ["9.1.0", "9.1.0", true, true],
+    ["9.1.0", "9.1.0-rc1021", true, false],
+    ["9.1.0-rc1021", "9.1.0-rc1022", false, false],
+    ["3.2", "3.2.4", true, false],
+    ["9.0.29", "9.1.0", false, false],
+    ["", "latest", true, true],
+    ["latest", version(), true, true],
+];
+
+for (const [versionA, versionB, sameVersion, sameBuild] of versionPairs) {
+    if (sameVersion) {
+        assertBinVersionsEqual(versionA, versionB);
+    } else {
+        assertBinVersionsNotEqual(versionA, versionB);
+    }
+    if (sameBuild) {
+        assertSameBuild(versionA, versionB);
+    } else {
+        assertNotSameBuild(versionA, versionB);
+    }
+}

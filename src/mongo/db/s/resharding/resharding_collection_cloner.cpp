@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
@@ -72,7 +46,7 @@
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -120,16 +94,18 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
 
 }  // namespace
 
-ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metrics,
-                                                       const UUID& reshardingUUID,
-                                                       ShardKeyPattern newShardKeyPattern,
-                                                       NamespaceString sourceNss,
-                                                       const UUID& sourceUUID,
-                                                       ShardId recipientShard,
-                                                       Timestamp atClusterTime,
-                                                       NamespaceString outputNss,
-                                                       bool storeProgress,
-                                                       bool relaxed)
+ReshardingCollectionCloner::ReshardingCollectionCloner(
+    ReshardingMetrics* metrics,
+    const UUID& reshardingUUID,
+    ShardKeyPattern newShardKeyPattern,
+    NamespaceString sourceNss,
+    const UUID& sourceUUID,
+    ShardId recipientShard,
+    Timestamp atClusterTime,
+    NamespaceString outputNss,
+    bool storeProgress,
+    bool relaxed,
+    boost::optional<ForwardableOperationMetadata> forwardableOpMetadata)
     : _metrics(metrics),
       _reshardingUUID(reshardingUUID),
       _newShardKeyPattern(std::move(newShardKeyPattern)),
@@ -139,7 +115,8 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
       _atClusterTime(atClusterTime),
       _outputNss(std::move(outputNss)),
       _storeProgress(storeProgress),
-      _relaxed(std::move(relaxed)) {}
+      _relaxed(std::move(relaxed)),
+      _forwardableOpMetadata(std::move(forwardableOpMetadata)) {}
 
 std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
 ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
@@ -251,9 +228,8 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             request.setHint(BSON("$natural" << 1));
 
             // Send with rawData since the shard key is already translated for timeseries.
-            if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            if (resharding::isEnabledWithPinnedVersion(
+                    _forwardableOpMetadata, gFeatureFlagAllBinariesSupportRawDataOperations)) {
                 request.setRawData(true);
             }
 
@@ -276,11 +252,11 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 routingCtx,
                 Document(request.toBSON()),
                 sharded_agg_helpers::PipelineDataSource::kNormal,
-                false /* eligibleForSampling */,
+                /*eligibleForSampling=*/false,
                 std::move(pipeline),
-                boost::none /* explain */,
+                /*explain=*/boost::none,
                 _sourceNss,
-                IncludeMetrics{} /* remoteMetricsToInclude */,
+                /*remoteMetricsToInclude=*/IncludeMetrics{},
                 ShardTargetingPolicy::kAllowed,
                 readConcern.toBSONInner(),
                 std::move(designatedHostsMap),
@@ -341,11 +317,10 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
         _metrics);
 
     if (reshardingCollectionClonerShouldFailWithStaleConfig.shouldFail()) {
-        uassert(StaleConfigInfo(
-                    _outputNss,
-                    ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
-                    boost::none /* wantedVersion */,
-                    ShardId{"0"}),
+        uassert(StaleConfigInfo(_outputNss,
+                                /*received=*/ShardVersionFactory::make(ChunkVersion::IGNORED()),
+                                /*wanted=*/boost::none,
+                                ShardId{"0"}),
                 str::stream() << "Throwing staleConfig for reshardingCollectionCloner failpoint.",
                 false);
     }
@@ -406,8 +381,8 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
         ScopedSetShardRole scopedSetShardRole(
             opCtx,
             _outputNss,
-            ShardVersionFactory::make(ChunkVersion::IGNORED()) /* shardVersion */,
-            boost::none /* databaseVersion */);
+            /*shardVersion=*/ShardVersionFactory::make(ChunkVersion::IGNORED()),
+            /*databaseVersion=*/boost::none);
 
         Timer batchInsertTimer;
         int bytesInserted = resharding::data_copy::insertBatchTransactionally(opCtx,
@@ -449,8 +424,24 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                    // If we got here, we succeeded and there is no more to come.  Otherwise
                    // _runOnceWithNaturalOrder would uassert.
                    chainCtx->moreToCome = false;
-               })
+               },
+               // Treat ReplicaSetWritesBlocked as transient so the cloner holds and resumes (via
+               // its persisted resume token) until the replica set write block is lifted, rather
+               // than failing the operation.
+               resharding::kRetryabilityPredicateIncludeReplicaSetWritesBlockedAndWriteConcern)
         .onTransientError([this](const Status& status) {
+            if (status == ErrorCodes::ReplicaSetWritesBlocked) {
+                if (resharding::shouldLogWriteBlockWarning(_lastWriteBlockWarningAt)) {
+                    LOGV2_WARNING(12818901,
+                                  "Resharding recipient is paused because writes to this replica "
+                                  "set are currently blocked; cloning will keep retrying until the "
+                                  "write block is disabled or the operation is aborted",
+                                  "sourceNamespace"_attr = _sourceNss,
+                                  "outputNamespace"_attr = _outputNss,
+                                  "error"_attr = redact(status));
+                }
+                return;
+            }
             LOGV2(5269300,
                   "Transient error while cloning sharded collection",
                   "sourceNamespace"_attr = _sourceNss,

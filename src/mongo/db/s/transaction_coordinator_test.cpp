@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 // IWYU pragma: no_include "cxxabi.h"
@@ -70,7 +44,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -281,10 +255,6 @@ protected:
         _aws.emplace(getServiceContext());
     }
 
-    void tearDown() override {
-        TransactionCoordinatorTestBase::tearDown();
-    }
-
     boost::optional<txn::AsyncWorkScheduler> _aws;
 };
 
@@ -307,7 +277,7 @@ TEST_F(TransactionCoordinatorDriverTest, SendDecisionToParticipantShardReturnsOn
                                  aws,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
-                                 kTwoShardHandleList[0].toShardRef(operationContext()),
+                                 kTwoShardIdList[0],
                                  makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
     ASSERT(!future.isReady());
 
@@ -324,7 +294,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                  aws,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
-                                 kTwoShardHandleList[0].toShardRef(operationContext()),
+                                 kTwoShardIdList[0],
                                  makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
     ASSERT(!future.isReady());
 
@@ -344,7 +314,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                  aws,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
-                                 kTwoShardHandleList[0].toShardRef(operationContext()),
+                                 kTwoShardIdList[0],
                                  makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -363,7 +333,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                  aws,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
-                                 kTwoShardHandleList[0].toShardRef(operationContext()),
+                                 kTwoShardIdList[0],
                                  makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -379,7 +349,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                  aws,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
-                                 kTwoShardHandleList[0].toShardRef(operationContext()),
+                                 kTwoShardIdList[0],
                                  makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     // Ensure that the APIMismatchError (VoteAbortError category) is not interpreted as a success.
@@ -403,7 +373,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                  aws,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
-                                 kTwoShardHandleList[0].toShardRef(operationContext()),
+                                 kTwoShardIdList[0],
                                  makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -421,7 +391,7 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardReturnsCommitDecision
                                 aws,
                                 _lsid,
                                 _txnNumberAndRetryCounter,
-                                kTwoShardHandleList[0].toShardRef(operationContext()),
+                                kTwoShardIdList[0],
                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
     ASSERT(!future.isReady());
 
@@ -440,7 +410,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                 aws,
                                 _lsid,
                                 _txnNumberAndRetryCounter,
-                                kTwoShardHandleList[0].toShardRef(operationContext()),
+                                kTwoShardIdList[0],
                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
     ASSERT(!future.isReady());
 
@@ -462,7 +432,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                 aws,
                                 _lsid,
                                 _txnNumberAndRetryCounter,
-                                kTwoShardHandleList[0].toShardRef(operationContext()),
+                                kTwoShardIdList[0],
                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -485,7 +455,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                 aws,
                                 _lsid,
                                 _txnNumberAndRetryCounter,
-                                kTwoShardHandleList[0].toShardRef(operationContext()),
+                                kTwoShardIdList[0],
                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -504,7 +474,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                 aws,
                                 _lsid,
                                 _txnNumberAndRetryCounter,
-                                kTwoShardHandleList[0].toShardRef(operationContext()),
+                                kTwoShardIdList[0],
                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -524,7 +494,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                 aws,
                                 _lsid,
                                 _txnNumberAndRetryCounter,
-                                kTwoShardHandleList[0].toShardRef(operationContext()),
+                                kTwoShardIdList[0],
                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -545,7 +515,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
                 [&](const executor::RemoteCommandRequest& request) {
@@ -567,7 +537,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -586,7 +556,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
                 [&](const executor::RemoteCommandRequest& request) {
@@ -610,7 +580,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
@@ -632,7 +602,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
@@ -654,7 +624,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
@@ -675,7 +645,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(timestamp);
     assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
@@ -697,7 +667,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(Timestamp(100, 1));
     assertCommandSentAndRespondWith(
@@ -721,7 +691,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                           _lsid,
                                           _txnNumberAndRetryCounter,
                                           APIParameters(),
-                                          transformToShardRefs(kOneShardHandleList));
+                                          kOneShardIdList);
     onCommands({[&](const executor::RemoteCommandRequest& request) {
         ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
         ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
@@ -735,7 +705,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                         _lsid,
                                         _txnNumberAndRetryCounter,
                                         APIParameters(),
-                                        transformToShardRefs(kOneShardHandleList),
+                                        kOneShardIdList,
                                         {});
     onCommands({[&](const executor::RemoteCommandRequest& request) {
         ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
@@ -750,7 +720,7 @@ TEST_F(TransactionCoordinatorDriverTest,
                                       _lsid,
                                       _txnNumberAndRetryCounter,
                                       APIParameters(),
-                                      transformToShardRefs(kOneShardHandleList));
+                                      kOneShardIdList);
     onCommands({[&](const executor::RemoteCommandRequest& request) {
         ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
         ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
@@ -769,7 +739,7 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedName
                                    _lsid,
                                    _txnNumberAndRetryCounter,
                                    APIParameters(),
-                                   transformToShardRefs(kTwoShardHandleList));
+                                   kTwoShardIdList);
 
     assertCommandSentAndRespondWith(
         PrepareTransaction::kCommandName,
@@ -806,7 +776,7 @@ protected:
         TransactionCoordinatorDocument doc,
         LogicalSessionId expectedLsid,
         TxnNumberAndRetryCounter expectedTxnNumberAndRetryCounter,
-        std::vector<ShardRef> expectedParticipants,
+        std::vector<ShardId> expectedParticipants,
         boost::optional<txn::CommitDecision> expectedDecision = boost::none,
         boost::optional<Timestamp> expectedCommitTimestamp = boost::none,
         boost::optional<std::vector<NamespaceString>> expectedAffectedNamespaces = boost::none) {
@@ -845,7 +815,7 @@ protected:
     void persistParticipantListExpectSuccess(OperationContext* opCtx,
                                              LogicalSessionId lsid,
                                              TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                             const std::vector<ShardRef>& participants) {
+                                             const std::vector<ShardId>& participants) {
         txn::persistParticipantsList(*_aws, lsid, txnNumberAndRetryCounter, participants).get();
 
         auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
@@ -862,10 +832,8 @@ protected:
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(0));
     }
 
-    const std::vector<ShardRef> _participants{// TODO SERVER-128815: Use UUIDs when ready
-                                              ShardId("shard0001"),
-                                              ShardId("shard0002"),
-                                              ShardId("shard0003")};
+    const std::vector<ShardId> _participants{
+        ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0003")};
 
     const Timestamp _commitTimestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
 
@@ -889,15 +857,13 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistParticipantListWhenDocumentWithConflictingParticipantListExistsFailsToPersistList) {
     auto opCtx = operationContext();
-    // TODO SERVER-128815: Use UUIDs when ready
-    std::vector<ShardRef> participants{
+    std::vector<ShardId> participants{
         ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0003")};
     persistParticipantListExpectSuccess(opCtx, _lsid, _txnNumberAndRetryCounter, participants);
 
     // We should retry until shutdown. The original participants should be persisted.
 
-    // TODO SERVER-128815: Use UUIDs when ready
-    std::vector<ShardRef> smallerParticipantList{ShardId("shard0001"), ShardId("shard0002")};
+    std::vector<ShardId> smallerParticipantList{ShardId("shard0001"), ShardId("shard0002")};
     auto future = txn::persistParticipantsList(
         *_aws, _lsid, _txnNumberAndRetryCounter, smallerParticipantList);
 
@@ -962,7 +928,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                 return decision;
             }(),
             kDummyAffectedNamespaces);
-        failpoint->waitForTimesEntered(failpoint.initialTimesEntered() + 1);
+        failpoint.waitForOneNewEntry();
         _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
     }
 
@@ -1092,7 +1058,7 @@ protected:
         OperationContext* opCtx,
         LogicalSessionId lsid,
         TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-        const std::vector<ShardRef>& participants,
+        const std::vector<ShardId>& participants,
         const boost::optional<Timestamp>& commitTimestamp,
         const boost::optional<std::vector<NamespaceString>>& affectedNamespaces) {
         txn::persistDecision(
@@ -1284,7 +1250,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesCommitDecisionOnTwoCommitRes
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     assertPrepareSentAndRespondWithSuccess();
@@ -1310,7 +1276,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommi
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
@@ -1338,7 +1304,7 @@ TEST_F(TransactionCoordinatorTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
@@ -1366,7 +1332,7 @@ TEST_F(TransactionCoordinatorTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
@@ -1393,7 +1359,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnSingleAbortRe
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -1419,7 +1385,7 @@ TEST_F(TransactionCoordinatorTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     // One participant votes commit and other encounters retryable error
@@ -1452,7 +1418,7 @@ TEST_F(TransactionCoordinatorTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     // One participant votes abort and other encounters retryable error
@@ -1482,7 +1448,7 @@ TEST_F(TransactionCoordinatorTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     // One participant votes commit after retry.
@@ -1517,7 +1483,7 @@ TEST_F(TransactionCoordinatorTest,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
     // One participant votes commit and other encounters retryable error
@@ -1549,7 +1515,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
         Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kOneShardHandleList));
+    coordinator->runCommit(operationContext(), kOneShardIdList);
     assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
@@ -1587,7 +1553,7 @@ TEST_F(TransactionCoordinatorTest,
 
     // Wait until the coordinator is writing the participant list.
     FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern");
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
 
     // Shut down the coordinator's AWS with unexpected error.
     killClientOpCtx(getServiceContext(),
@@ -1602,6 +1568,26 @@ TEST_F(TransactionCoordinatorTest,
     ASSERT_GT(logs.countBSONContainingSubset(BSON("id" << 12111100)), 0);
 }
 
+TEST_F(TransactionCoordinatorTest, CanceledBeforeCommitStartIsNotLoggedAsUnexpectedError) {
+    unittest::LogCaptureGuard logs;
+
+    // Create the coordinator and cancel it before two-phase commit ever started, e.g. when the
+    // transaction is committed through the optimized single-shard commit path.
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    coordinator->start(operationContext());
+
+    coordinator->cancelIfCommitNotYetStarted();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+    ASSERT_THROWS_CODE(
+        coordinator->onCompletion().get(), DBException, ErrorCodes::TransactionCoordinatorCanceled);
+    coordinator->shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 12111100)), 0);
+}
+
 using TransactionCoordinatorTestDeathTest = TransactionCoordinatorTest;
 DEATH_TEST_REGEX_F(TransactionCoordinatorTestDeathTest,
                    CoordinatorTerminatedWithUnexpectedErrorAfterDurablyWritingDecision,
@@ -1612,7 +1598,7 @@ DEATH_TEST_REGEX_F(TransactionCoordinatorTestDeathTest,
     auto coordinator = std::make_shared<TransactionCoordinator>(
         operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
     coordinator->start(operationContext());
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     assertPrepareSentAndRespondWithRetryableError();
 
     // Shut down the coordinator's AWS with unexpected error while waiting on prepare response.
@@ -1629,9 +1615,9 @@ protected:
               Options{}.useMockClock(true).useMockTickSource<Microseconds>(true)) {}
 
     void setUp() override {
-        tickSource()->reset(1);
-
         TransactionCoordinatorTestBase::setUp();
+
+        tickSource()->reset(1);
     }
 
     ServerTransactionCoordinatorsMetrics* metrics() {
@@ -1780,7 +1766,7 @@ protected:
             Date_t::max());
         coordinator->start(operationContext());
 
-        coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+        coordinator->runCommit(operationContext(), kTwoShardIdList);
 
         assertPrepareSentAndRespondWithSuccess();
         assertPrepareSentAndRespondWithSuccess();
@@ -1981,7 +1967,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
                        BSON("mode" << "alwaysOn"
                                    << "data" << BSON("useUninterruptibleSleep" << 1)));
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     waitUntilCoordinatorDocIsPresent();
 
     checkStats(stats, expectedStats);
@@ -2246,7 +2232,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.currentInSteps[stepIndex]++;
 
     FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern");
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     waitUntilCoordinatorDocIsPresent();
 
     checkStats(stats, expectedStats);
@@ -2313,7 +2299,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.totalStartedTwoPhaseCommit++;
     expectedMetrics.currentInSteps[stepIndex]++;
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     waitUntilMessageSent();
 
     checkStats(stats, expectedStats);
@@ -2383,7 +2369,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     FailPointEnableBlock fp("hangBeforeWaitingForDecisionWriteConcern");
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     // Respond to the second prepare request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertPrepareSentAndRespondWithSuccess();
@@ -2455,7 +2441,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.totalStartedTwoPhaseCommit++;
     expectedMetrics.currentInSteps[stepIndex]++;
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     // Respond to the second prepare request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertPrepareSentAndRespondWithSuccess();
@@ -2531,7 +2517,7 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
 
     FailPointEnableBlock fp("hangAfterDeletingCoordinatorDoc");
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     // Respond to the second prepare request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertPrepareSentAndRespondWithSuccess();
@@ -2599,7 +2585,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     auto participantListFp =
         globalFailPointRegistry().find("hangBeforeWaitingForParticipantListWriteConcern");
     auto initTimesEntered = participantListFp->setMode(FailPoint::alwaysOn);
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
     participantListFp->waitForTimesEntered(initTimesEntered + 1);
 
     // We expect the "currentInSteps" metric for the kWritingParticipantList to be 1. All other step
@@ -2618,7 +2604,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
                     "hangBeforeWaitingForParticipantListWriteConcern",
                     ErrorCodes::TransactionCoordinatorReachedAbortDecision);
     participantListFp->setMode(FailPoint::off);
-    decisionFp->waitForTimesEntered(decisionFp.initialTimesEntered() + 1);
+    decisionFp.waitForOneNewEntry();
 
     // We now expect the "currentInSteps" metric for kWritingParticipantList to be 0, and for it to
     // be 1 for "kWritingDecision". All other steps, including "kWaitingForVotes" should be 0.
@@ -2670,7 +2656,7 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
         Date_t::max());
     coordinator->start(operationContext());
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
 
     tickSource()->advance(Milliseconds(99));
 
@@ -2708,7 +2694,7 @@ TEST_F(
 
     tickSource()->advance(Milliseconds(101));
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithSuccess();
@@ -2740,7 +2726,7 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
         Date_t::max());
     coordinator->start(operationContext());
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithSuccess();
@@ -2795,7 +2781,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
         Date_t::max());
     coordinator->start(operationContext());
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -2854,7 +2840,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
         FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern",
                                 BSON("useUninterruptibleSleep" << 1));
 
-        coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+        coordinator->runCommit(operationContext(), kTwoShardIdList);
         waitUntilCoordinatorDocIsPresent();
 
         // Increase the duration spent writing the participant list.
@@ -2970,7 +2956,7 @@ TEST_F(TransactionCoordinatorMetricsTest, RecoveryFromFailureIndicatedInReportSt
     assertRecoveryFlag(false);
 
     TransactionCoordinatorDocument coordinatorDoc;
-    coordinatorDoc.setParticipants(transformToShardRefs(kTwoShardHandleList));
+    coordinatorDoc.setParticipants(kTwoShardIdList);
     coordinator->continueCommit(coordinatorDoc);
 
     assertRecoveryFlag(true);
@@ -3010,7 +2996,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
     const auto expectedAppName2 = std::string("Bar");
     associateClientMetadata(getClient(), expectedAppName2);
 
-    coordinator->runCommit(operationContext(), transformToShardRefs(kTwoShardHandleList));
+    coordinator->runCommit(operationContext(), kTwoShardIdList);
 
     {
         BSONObjBuilder builder;

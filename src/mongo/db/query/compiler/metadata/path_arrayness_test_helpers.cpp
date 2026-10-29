@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
 
@@ -73,7 +47,7 @@ std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPaths
                              distribution,
                              dataInterval,
                              seed,
-                             /*arrayTypeLength*/ 0,
+                             /*arrayTypeLength=*/0,
                              data);
 
     // If right skew, invert the generated values
@@ -97,24 +71,24 @@ std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPaths
         // generate, to increase variety.
         // dataInterval defines the length of the strings
         ce::generateDataOneField(
-            /*ndv*/ length.getValue() * 5,
-            /*size*/ length.getValue(),
+            /*ndv=*/length.getValue() * 5,
+            /*size=*/length.getValue(),
             {ce::parseCollectionType(sbe::value::TypeTags::StringSmall)},
-            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*dataDistribution=*/stats::DistrType::kUniform,
             rangeFieldNameLength,
             seed2,
-            /*arrayTypeLength*/ 0,
+            /*arrayTypeLength=*/0,
             fieldNames);
 
         // Generate the arrayness of the individual fields randomly.
         std::vector<stats::SBEValue> fieldArrayness;
-        ce::generateDataOneField(/*ndv*/ 2,
-                                 /*size*/ length.getValue(),
+        ce::generateDataOneField(/*ndv=*/2,
+                                 /*size=*/length.getValue(),
                                  {ce::parseCollectionType(sbe::value::TypeTags::Boolean)},
-                                 /*dataDistribution*/ stats::DistrType::kUniform,
-                                 /*dataInterval*/ {0, 1},
+                                 /*dataDistribution=*/stats::DistrType::kUniform,
+                                 /*dataInterval=*/{0, 1},
                                  seed2,
-                                 /*arrayTypeLength*/ 0,
+                                 /*arrayTypeLength=*/0,
                                  fieldArrayness);
 
         // Keep the state of multikeyness across field paths.

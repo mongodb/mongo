@@ -136,6 +136,7 @@ restart_read:
         if ((cip = __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
             return (WT_NOTFOUND);
         cbt->slot = WT_COL_SLOT(page, cip);
+        F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
 
         /* Check any insert list for a matching record. */
         cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
@@ -648,19 +649,26 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     key_out_of_bounds = need_walk = newpage = repositioned = false;
     session = CUR2S(cbt);
     total_skipped = 0;
-    walk_skip_stats.total_del_pages_skipped = 0;
+    walk_skip_stats.total_ondisk_del_internal_pages_skipped = 0;
+    walk_skip_stats.total_del_leaf_pages_skipped = 0;
     walk_skip_stats.total_inmem_del_pages_skipped = 0;
+    walk_skip_stats.total_read_only_del_internal_pages_skipped = 0;
+    walk_skip_stats.total_skip_lock_contended = 0;
     WT_NOT_READ(time_start, 0);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_next);
 
     /* Track next calls during HS wrapup */
     if (F_ISSET(session, WT_SESSION_HS_WRAPUP))
-        session->reconcile_stats.hs_wrapup_next_prev_calls++;
+        WT_STAT_CONN_INCR(session, rec_hs_wrapup_next_prev_calls);
 
     flags = WT_READ_NO_SPLIT | WT_READ_SKIP_INTL; /* tree walk flags */
     if (truncating)
         LF_SET(WT_READ_TRUNCATE);
+
+    /* Accumulate the size summary as the walk visits each page. */
+    if (F_ISSET(cbt, WT_CBT_SIZE_STAT))
+        LF_SET(WT_READ_SIZE_STAT);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
@@ -750,6 +758,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
              */
             if (page->type != WT_PAGE_ROW_LEAF && (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {
                 F_SET(cbt, WT_CBT_ITERATE_APPEND);
+                F_CLR(cbt, WT_CBT_VAR_ONPAGE_MATCH);
                 continue;
             }
         }
@@ -779,6 +788,10 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
         if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
             LF_SET(WT_READ_VISIBLE_ALL);
 
+        /* In read-corrupt mode, skip corrupt refs during the walk. */
+        if (F_ISSET(session, WT_SESSION_READ_SKIP_CORRUPT))
+            LF_SET(WT_READ_SKIP_CORRUPT);
+
         /*
          * If we are running with snapshot isolation, and not interested in returning tombstones, we
          * could potentially skip pages. The skip function looks at the aggregated timestamp
@@ -805,12 +818,21 @@ err:
     }
 
     WT_STAT_CONN_DSRC_INCRV(session, cursor_next_skip_total, total_skipped);
-    if (walk_skip_stats.total_del_pages_skipped != 0)
-        WT_STAT_CONN_DSRC_INCRV(
-          session, cursor_tree_walk_del_page_skip, walk_skip_stats.total_del_pages_skipped);
+    if (walk_skip_stats.total_ondisk_del_internal_pages_skipped != 0)
+        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_ondisk_del_internal_page_skip,
+          walk_skip_stats.total_ondisk_del_internal_pages_skipped);
+    if (walk_skip_stats.total_del_leaf_pages_skipped != 0)
+        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_del_leaf_page_skip,
+          walk_skip_stats.total_del_leaf_pages_skipped);
     if (walk_skip_stats.total_inmem_del_pages_skipped != 0)
         WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_inmem_del_page_skip,
           walk_skip_stats.total_inmem_del_pages_skipped);
+    if (walk_skip_stats.total_read_only_del_internal_pages_skipped != 0)
+        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_read_only_del_internal_page_skip,
+          walk_skip_stats.total_read_only_del_internal_pages_skipped);
+    if (walk_skip_stats.total_skip_lock_contended != 0)
+        WT_STAT_CONN_DSRC_INCRV(
+          session, cursor_tree_walk_skip_lock_contended, walk_skip_stats.total_skip_lock_contended);
 
     /*
      * If we positioned the cursor using bounds, which is similar to a search, update the read

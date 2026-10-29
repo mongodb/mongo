@@ -177,9 +177,7 @@ of the documentation.
 - @subpage arch-toc-mem-disk
     - @ref arch-block
     - @ref arch-data-file
-
     - @ref arch-prefetch
-    - @ref arch-tiered-storage
 
 - @subpage arch-toc-on-disk
     - @ref arch-checkpoint
@@ -200,6 +198,7 @@ of the documentation.
 
 - @subpage arch-toc-disaggregated-storage
     - @ref arch-page-delta
+    - @ref arch-disagg-cross-checkpoint-caching
     - @ref arch-disagg-layered
     - @ref arch-disagg-layered-cursor
     - @ref arch-disagg-key-provider
@@ -317,11 +316,6 @@ The format of the data file is given by structures in \c block.h .
 Pre-fetch is a performance optimization that aims to reduce I/O latency by reading pages from disk
 into memory before they are required by the application.
 
-@subpage arch-tiered-storage
-
-Tiered storage allows B-Trees to be stored into multiple places, more
-recently updated blocks are on local disk and less recently updated blocks are in cloud storage.
-
 */
 
 /*! @page arch-toc-on-disk On Disk Concepts
@@ -382,6 +376,7 @@ operation.
 /*! @page arch-toc-disaggregated-storage Disaggregated Storage
 
 @subpage arch-page-delta
+@subpage arch-disagg-cross-checkpoint-caching
 @subpage arch-disagg-layered
 @subpage arch-disagg-layered-cursor
 @subpage arch-disagg-key-provider

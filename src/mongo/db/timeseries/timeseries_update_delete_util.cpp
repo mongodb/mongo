@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
@@ -131,6 +105,13 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
     // Replace any occurences of the metaField in the top-level required fields of the JSON Schema
     // object with "meta".
     if (fieldName == "$jsonSchema") {
+        // Mirror the error thrown by the $jsonSchema match expression parser for a non-object
+        // argument. Without this check, the calls to findFirstChildNamed() below would trip an
+        // invariant for non-object (e.g. array) values.
+        uassert(ErrorCodes::TypeMismatch,
+                "$jsonSchema must be an object",
+                elem.isType(BSONType::object));
+
         mutablebson::Element requiredElem = elem.findFirstChildNamed("required");
         if (requiredElem.ok()) {
             for (auto subElem = requiredElem.leftChild(); subElem.ok();
@@ -170,8 +151,6 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
 }  // namespace
 
 BSONObj translateQuery(const BSONObj& query, std::string_view metaField) {
-    invariant(!metaField.empty());
-
     mutablebson::Document queryDoc(query);
     for (auto queryElem = queryDoc.root().leftChild(); queryElem.ok();
          queryElem = queryElem.rightSibling()) {
@@ -313,28 +292,32 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
     // Split out the time field predicate which can be potentially used for bucket-level routing.
     auto timeOnlyPred = residualPred
         ? expression::splitMatchExpressionBy(std::move(residualPred),
-                                             {std::string{tsOptions.getTimeField()}} /*fields*/,
-                                             {} /*renames*/,
+                                             /*fields=*/{std::string{tsOptions.getTimeField()}},
+                                             /*renames=*/{},
                                              expression::isOnlyDependentOn,
                                              expression::isExprOnlyDependentOn)
               .first
         : std::unique_ptr<MatchExpression>{};
 
     // Translate the time field predicate into a predicate on the bucket-level time field.
+    // The router has no visibility into shard-local bucket data, so we must conservatively
+    // assume extended-range data may be present to avoid an unsafe optimization.
+    BucketSpec routingBucketSpec{
+        std::string{tsOptions.getTimeField()},
+        metaField.map([](std::string_view s) { return std::string{s}; }),
+    };
+    routingBucketSpec.setUsesExtendedRange(true);
     std::unique_ptr<MatchExpression> timeBucketPred = timeOnlyPred
         ? BucketSpec::createPredicatesOnBucketLevelField(
               timeOnlyPred.get(),
-              BucketSpec{
-                  std::string{tsOptions.getTimeField()},
-                  metaField.map([](std::string_view s) { return std::string{s}; }),
-              },
+              routingBucketSpec,
               *tsOptions.getBucketMaxSpanSeconds(),
               expCtx,
-              false /*haveComputedMetaField*/,
-              false /*includeMetaField*/,
-              true /*assumeNoMixedSchemaData*/,
-              BucketSpec::IneligiblePredicatePolicy::kIgnore /*policy*/,
-              false /* fixedBuckets */)
+              /*haveComputedMetaField=*/false,
+              /*includeMetaField=*/false,
+              /*assumeNoMixedSchemaData=*/true,
+              /*policy=*/BucketSpec::IneligiblePredicatePolicy::kIgnore,
+              /*fixedBuckets=*/false)
               .loosePredicate
         : nullptr;
 
@@ -356,14 +339,15 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
     const BSONObj& writeQuery) {
-    const bool fixedBuckets = canUseFixedBucketOptimizations(tsOptions);
+    const bool fixedBuckets = canUseFixedBucketOptimizations(
+        tsOptions, expCtx->getRequiresTimeseriesExtendedRangeSupport());
     auto [metaOnlyExpr, bucketMetricExpr, residualExpr] =
         BucketSpec::getPushdownPredicates(expCtx,
                                           tsOptions,
                                           writeQuery,
-                                          /*haveComputedMetaField*/ false,
+                                          /*haveComputedMetaField=*/false,
                                           tsOptions.getMetaField().has_value(),
-                                          /*assumeNoMixedSchemaData*/ true,
+                                          /*assumeNoMixedSchemaData=*/true,
                                           BucketSpec::IneligiblePredicatePolicy::kIgnore,
                                           fixedBuckets);
 

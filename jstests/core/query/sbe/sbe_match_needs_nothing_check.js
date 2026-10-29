@@ -2,6 +2,7 @@
  * Tests that SBE builds traverseF instructions in leading $match when the filter needs nothing check, even when path arrayness information is available.
  *
  * @tags: [
+ *    uses_explain,
  *    assumes_against_mongod_not_mongos,
  *    # Explain command does not support read concerns other than local.
  *    assumes_read_concern_local,

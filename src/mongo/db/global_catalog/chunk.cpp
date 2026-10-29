@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/global_catalog/chunk.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
@@ -41,6 +14,7 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -50,7 +24,7 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
     : _maxKeyString(ShardKeyPattern::toKeyString(from.getRange().getMax())),
       _minKeyString(ShardKeyPattern::toKeyString(from.getRange().getMin())),
       _range(from.getRange()),
-      _shardRef(from.getShard()),
+      _shardId(from.getShard()),
       _lastmod(from.getVersion()),
       _history(from.getHistory()),
       _jumbo(from.getJumbo()) {
@@ -60,27 +34,27 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
 ChunkInfo::ChunkInfo(ChunkRange range,
                      std::string maxKeyString,
                      std::string minKeyString,
-                     ShardRef shardRef,
+                     ShardId shardId,
                      ChunkVersion version,
                      std::vector<ChunkHistory> history,
                      bool jumbo)
     : _maxKeyString(std::move(maxKeyString)),
       _minKeyString(std::move(minKeyString)),
       _range(std::move(range)),
-      _shardRef(std::move(shardRef)),
+      _shardId(shardId),
       _lastmod(std::move(version)),
       _history(std::move(history)),
       _jumbo(jumbo) {}
 
-const ShardRef& ChunkInfo::getShardRefAt(const boost::optional<Timestamp>& ts) const {
+const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
     // This chunk was refreshed from FCV 3.6 config server so it doesn't have history
     if (_history.empty()) {
-        return _shardRef;
+        return _shardId;
     }
 
-    // If the timestamp is not provided then we return the current shard
+    // If the timestamp is not provided than we return the latest shardid
     if (!ts) {
-        invariant(_shardRef == _history.front().getShard());
+        invariant(_shardId == _history.front().getShard());
         return _history.front().getShard();
     }
 
@@ -91,17 +65,8 @@ const ShardRef& ChunkInfo::getShardRefAt(const boost::optional<Timestamp>& ts) c
     }
 
     uasserted(ErrorCodes::StaleChunkHistory,
-              str::stream() << "Cannot find shard the chunk belonged to at cluster time "
+              str::stream() << "Cannot find shardId the chunk belonged to at cluster time "
                             << ts.value().toString());
-}
-
-const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
-    const auto& shardRef = getShardRefAt(ts);
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Cannot represent shard " << shardRef
-                          << " as a ShardId because it is a UUID; use getShardRefAt() instead",
-            shardRef.isString());
-    return shardRef.getShardId();
 }
 
 void ChunkInfo::throwIfMovedSince(const Timestamp& ts) const {
@@ -135,7 +100,7 @@ BSONObj ChunkInfo::toBSON() const {
     _range.serialize(&bob);
     bob.append("maxKeyString", _maxKeyString);
     bob.append("minKeyString", _minKeyString);
-    _shardRef.serialize("shard", &bob);
+    bob.append("shardId", _shardId);
     _lastmod.serialize("lastmod", &bob);
     bob.append("jumbo", _jumbo.load());
 

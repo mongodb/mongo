@@ -12,7 +12,7 @@ To run:
 
 ```
 python x509/mkcert.py CONFIG [--mkcrl | --no-mkcrl] [-o OUTPUT] [--static-dir STATIC_DIR]
-    [--dry-run] [certs ...]
+    [--dry-run] [--certificate-generation-year-file YEAR_FILE] [certs ...]
 ```
 
 - CONFIG is the path to the JSON file specifying a list of certificates, required
@@ -22,16 +22,24 @@ python x509/mkcert.py CONFIG [--mkcrl | --no-mkcrl] [-o OUTPUT] [--static-dir ST
   These are hardcoded and require certain certificates to be generated to work.
 - If --dry-run is specified, no files will be written out. This can be used to test what files will
   be written and where.
+- If --certificate-generation-year-file is specified, midnight on January 1 of the year contained
+  in YEAR_FILE is used as the base time for certificate and CRL validity. The current UTC year is
+  used when this option is omitted.
 - certs is an optional list of certificate names to generate. If it is not specified, all
   certificates specified in the config are generated.
 
 If a certificate specified in certs references other certificates, its dependencies and
 subdependencies will be generated.
 
-Deterministic generation is based on the current year. This means that if mkcert is run on the same
-definitions file twice, it will produce the same certificates if both runs were in the same year.
-One exception to this is the pkcs12 format; the cryptography library does not provide
+Deterministic generation is based on the selected certificate generation year. This means that if
+mkcert is run on the same definitions file twice with the same year, it will produce the same
+certificates. One exception to this is the pkcs12 format; the cryptography library does not provide
 functionality for generating pkcs12 bundles deterministically.
+
+Bazel first extracts the UTC year from stable workspace status into a dedicated year file, then
+passes that file to mkcert. Only the extraction action depends on the complete stable-status file,
+so unrelated status changes can reuse cached certificate generation while a UTC year change
+invalidates it.
 
 Future work:
 

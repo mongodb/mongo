@@ -47,7 +47,6 @@ let validateTestCase = function (test) {
 
 let testCases = {
     _addShard: {skip: "primary only"},
-    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "primary only"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
@@ -65,8 +64,10 @@ let testCases = {
     _configsvrCommitChunkSplit: {skip: "primary only"},
     _configsvrCommitMergeAllChunksOnShard: {skip: "primary only"},
     _configsvrCommitMergeAllPrecomputedChunksOnShard: {skip: "primary only"},
+    _configsvrCommitMergeChunks: {skip: "primary only"},
+    _configsvrCommitMoveRange: {skip: "primary only"},
+    _configsvrCommitSplitChunk: {skip: "primary only"},
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
-    _configsvrConvertShardRefsInNamespaceMetadata: {skip: "primary only"},
     _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrRemoveTags: {skip: "primary only"},
@@ -166,6 +167,7 @@ let testCases = {
     checkShardingIndex: {skip: "primary only"},
     cleanupOrphaned: {skip: "primary only"},
     cleanupStructuredEncryptionData: {skip: "does not return user data"},
+    clearJoinPlanCache: {skip: "does not return user data"},
     clearJumboFlag: {skip: "primary only"},
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},
@@ -276,6 +278,7 @@ let testCases = {
     getESECMKIdentifierListStatus: {skip: "does not return user data"},
     getESERotateActiveKEKStatus: {skip: "does not return user data"},
     getLog: {skip: "does not return user data"},
+    getMetricsFilteringAllowlist: {skip: "does not return user data"},
     getMore: {skip: "shard version already established"},
     getParameter: {skip: "does not return user data"},
     getQueryableEncryptionCountInfo: {skip: "primary only"},
@@ -436,6 +439,7 @@ let testCases = {
     untrackUnshardedCollection: {skip: "primary only"},
     update: {skip: "primary only"},
     updateESECMKIdentifierList: {skip: "does not return user data"},
+    updateMetricsFilteringAllowlist: {skip: "does not return user data"},
     updateRole: {skip: "primary only"},
     updateSearchIndex: {skip: "does not return user data"},
     updateUser: {skip: "primary only"},
@@ -446,6 +450,7 @@ let testCases = {
     waitForFailPoint: {skip: "does not return user data"},
     getShardingReady: {skip: "does not return user data"},
     whatsmyuri: {skip: "does not return user data"},
+    wiredTigerRepair: {skip: "does not return user data"},
 };
 
 commandsRemovedFromMongosSinceLastLTS.forEach(function (cmd) {
@@ -534,7 +539,7 @@ for (let command of commands) {
     );
 
     let res = staleMongos.getDB(test.runsAgainstAdminDb ? "admin" : db).runCommand(
-        Object.extend(test.command, {
+        Object.assign({}, test.command, {
             $readPreference: {mode: "secondary"},
             readConcern: {"level": "local"},
         }),
@@ -564,7 +569,7 @@ for (let command of commands) {
                 {
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {$exists: false},
-                    "command.readConcern": {"level": "local"},
+                    "command.readConcern.level": "local",
                     "errCode": {"$exists": false},
                 },
                 commandProfile,
@@ -578,7 +583,7 @@ for (let command of commands) {
                 {
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "local"},
+                    "command.readConcern.level": "local",
                     "errCode": ErrorCodes.StaleConfig,
                 },
                 commandProfile,
@@ -594,7 +599,7 @@ for (let command of commands) {
                 {
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "local"},
+                    "command.readConcern.level": "local",
                     "errCode": ErrorCodes.StaleConfig,
                 },
                 commandProfile,
@@ -658,7 +663,7 @@ for (let command of commands) {
                         },
                     ],
                     "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "local"},
+                    "command.readConcern.level": "local",
                     "errCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                 commandProfile,

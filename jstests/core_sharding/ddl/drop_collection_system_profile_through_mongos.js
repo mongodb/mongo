@@ -5,6 +5,7 @@
  *   # The test creates and drops a single non-replicated collection, non shard-able collection
  *   assumes_unsharded_collection,
  *   assumes_read_preference_unchanged,
+ *   requires_profiling,
  * ]
  */
 const profileCollName = "system.profile";

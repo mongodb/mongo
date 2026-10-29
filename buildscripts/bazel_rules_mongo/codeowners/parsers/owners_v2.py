@@ -1,6 +1,9 @@
 import pathlib
 
-from codeowners.parsers.owners_v1 import OwnersParserV1
+if __package__:
+    from .owners_v1 import OwnersParserV1
+else:
+    from parsers.owners_v1 import OwnersParserV1
 
 
 # Parser for OWNERS.yml files version 2.0.0

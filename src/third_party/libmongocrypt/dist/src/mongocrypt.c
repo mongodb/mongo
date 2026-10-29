@@ -913,6 +913,17 @@ uint64_t mongocrypt_crypt_shared_lib_version(const mongocrypt_t *crypt) {
     return crypt->csfle.get_version();
 }
 
+bool _mongocrypt_check_no_embedded_nul(const char *str, uint32_t len, const char *what, mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(str);
+    BSON_ASSERT_PARAM(what);
+
+    if (strlen(str) != (size_t)len) {
+        CLIENT_ERR("%s must not contain an embedded null byte", what);
+        return false;
+    }
+    return true;
+}
+
 bool _mongocrypt_validate_and_copy_string(const char *in, int32_t in_len, char **out) {
     BSON_ASSERT_PARAM(out);
 

@@ -27,17 +27,27 @@ executor:
       - src/mongo/db/modules/*/jstests/live_restore/*.js
   config:
     shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       global_vars:
         TestData:
           setParameters:
             executionControlDeprioritizationGate: true
+            featureFlagExtensionsApiSignatureValidation: false
+          setParametersMongos:
+            featureFlagExtensionsApiSignatureValidation: false
       nodb: ""
 matrix_suite: true
 selector:
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
+    - jstests/noPassthrough/ddl/move_primary_ban_authoritative_mixed_fcv.js
+    - jstests/noPassthrough/global_catalog/clone_authoritative_db_metadata.js
+    - jstests/noPassthrough/ddl/check_metadata_consistency.js
+    - jstests/noPassthrough/ddl/check_metadata_consistency_expire_after_seconds_type.js
+    - jstests/noPassthrough/extensions/aggregation_ifr_flag_propagation.js
   exclude_with_any_tags:
     - requires_kernel_619
+    - requires_kernel_7014
     - incompatible_with_execution_control_with_prioritization
   roots:
     - jstests/noPassthrough/**/*.js
@@ -46,4 +56,5 @@ selector:
     - src/mongo/db/modules/*/jstests/live_restore/*.js
     - src/mongo/db/modules/*/jstests/no_passthrough/*.js
     - jstests/concurrency/*.js
+    - src/mongo/db/modules/*/jstests/disagg_storage/format_snapshot/libs/snapshot_validation_helpers_test.js
 test_kind: js_test

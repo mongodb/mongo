@@ -3,6 +3,7 @@
  * basic eligibility restrictions such as match expression shape and index options, and checks
  * the query results.
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_80,
  *   # "Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results"

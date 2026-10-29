@@ -81,10 +81,7 @@ for (let entry of res.cursor.firstBatch) {
     assert(collName.startsWith("recovered") || collName == importantCollName);
 
     // Assert _id index has been successfully created.
-    // TODO(SERVER-122306): Remove this check when replicated fast count no longer uses collections.
-    if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
-        assert("idIndex" in entry);
-    }
+    assert("idIndex" in entry);
 
     // Make sure we can interact with the recovered collections.
     assert.commandWorked(testDb.runCommand({find: collName}));

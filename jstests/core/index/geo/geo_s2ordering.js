@@ -3,6 +3,7 @@
 // there are not many, the index order (nongeo, geo) should be faster than (geo, nongeo)
 // for 2dsphere.
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   operations_longer_than_stepdown_interval_in_txns,
 // ]

@@ -39,9 +39,9 @@ const configShardName = "config";
 const otherShardName =
     st.shard0.shardName === configShardName ? st.shard1.shardName : st.shard0.shardName;
 
-function runTransitionTestCases(transitionType, watchMode, collSetupType) {
-    jsTest.log(
-        `Testing ${transitionType} against changestreams of mode ${watchMode} on a cluster with a ${collSetupType}.`,
+function runTransitionTestCases(transitionType, collSetupType) {
+    jsTest.log.info(
+        `Testing ${transitionType} against changestreams on a cluster with a ${collSetupType}.`,
     );
 
     // Setup the collection.
@@ -70,11 +70,11 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
         );
     }
 
-    const cst = new ChangeStreamTest(ChangeStreamTest.getDBForChangeStream(watchMode, db));
+    const cst = new ChangeStreamTest(db);
 
     // Test case 1: verify that a the CSRS transition does not impact an already opened change
     // stream.
-    let csCursor = cst.getChangeStream({watchMode: watchMode, coll: coll});
+    let csCursor = cst.getChangeStream({watchMode: ChangeStreamWatchMode.kCollection, coll: coll});
 
     // Write some documents (and encode the related expected event); We ensure that in case of
     // sharded collection all shards get targeted by one or more ops.
@@ -130,7 +130,7 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
 
     try {
         csCursor = cst.getChangeStream({
-            watchMode: watchMode,
+            watchMode: ChangeStreamWatchMode.kCollection,
             coll: coll,
             resumeAfter: resumePoint,
         });
@@ -159,11 +159,9 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
     cst.cleanUp();
 }
 
-for (let watchMode of Object.values(ChangeStreamWatchMode)) {
-    for (let collSetupType of Object.values(kCollSetupType)) {
-        runTransitionTestCases(kTransitionType.toDedicatedConfigServer, watchMode, collSetupType);
-        runTransitionTestCases(kTransitionType.fromDedicatedConfigServer, watchMode, collSetupType);
-    }
+for (let collSetupType of Object.values(kCollSetupType)) {
+    runTransitionTestCases(kTransitionType.toDedicatedConfigServer, collSetupType);
+    runTransitionTestCases(kTransitionType.fromDedicatedConfigServer, collSetupType);
 }
 
 st.stop();

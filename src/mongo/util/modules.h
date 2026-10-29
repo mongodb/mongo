@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -53,9 +27,6 @@
  * See MONGO_MOD_OPEN below.
  */
 #define MONGO_MOD_PUBLIC MONGO_MOD_ATTR_(public)
-
-/// Deprecated alias for MONGO_MOD_PUBLIC. TODO: All usages will be converted soon.
-#define MONGO_MOD_PUB MONGO_MOD_PUBLIC
 
 /**
  * Marks a class as open and everything inside as public to other modules.
@@ -93,6 +64,12 @@
  * module which haven't been cleaned up yet. Allows external usage
  * like MONGO_MOD_PUBLIC, but gives a warning to each caller for usage
  * outside the module.
+ *
+ * The replacement is free-form text. Usually you can just put an API in there,
+ * like Foo::bar(), but if you want to write a message to the reader, you can.
+ * Since [[FOO(space separated words)]] sometimes makes clang-format think the
+ * file is objective-c, you can also use [[FOO("space separated words")]]. The
+ * scanner will strip the quotes and treat them the same.
  */
 #define MONGO_MOD_USE_REPLACEMENT(replacement) MONGO_MOD_ATTR_(use_replacement::replacement)
 
@@ -138,7 +115,7 @@
 //
 
 #if MONGO_COMPILER_HAS_ATTRIBUTE(clang::annotate)
-#define MONGO_MOD_ATTR_(attr) [[clang::annotate("mongo::mod::" #attr)]]
+#define MONGO_MOD_ATTR_(attr) clang::annotate("mongo::mod::" #attr)
 #else
 #define MONGO_MOD_ATTR_(attr)
 #endif

@@ -3,6 +3,7 @@
  *  [1970-01-01 00:00:00 UTC - 2038-01-19 03:14:07 UTC].
  *
  * @tags: [
+ *   uses_explain,
  *   requires_fcv_62,
  *   # Refusing to run a test that issues an aggregation command with explain because it may
  *   # return incomplete results if interrupted by a stepdown.

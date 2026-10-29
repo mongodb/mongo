@@ -1,0 +1,43 @@
+Windows: use extended-length paths for Bazel import roots
+
+Bazel's Python site initializer adds each PyInfo import root directly from
+the runfiles tree. On Windows, a package resource nested below one of those
+roots can exceed MAX_PATH even though the import root itself does not. The
+existing helper assumes every modern Windows host has long paths enabled,
+which is not true for Evergreen images.
+
+Force only the `imports-strs` entries through the extended-length path form.
+This keeps stdlib and zip paths unchanged while making importlib.resources and
+pathlib work for nested wheel data.
+
+--- a/python/private/site_init_template.py
++++ b/python/private/site_init_template.py
+@@ -90,0 +90,12 @@
++def _force_windows_long_path(path):
++    unicode_prefix = "\\\\?\\"
++    if path.startswith(unicode_prefix):
++        return path
++
++    # os.path.abspath returns a normalized absolute path.
++    path = os.path.abspath(path)
++    if path.startswith("\\\\"):
++        return "\\\\?\\UNC\\" + path[2:]
++    return unicode_prefix + path
++
++
+@@ -90,1 +102,1 @@
+-def _get_windows_path_with_unc_prefix(path):
++def _get_windows_path_with_unc_prefix(path, force=False):
+@@ -109,1 +121,1 @@
+-    if win32_version and win32_version >= "10.0.14393":
++    if not force and win32_version and win32_version >= "10.0.14393":
+@@ -123,2 +135,1 @@
+-    # os.path.abspath returns a normalized absolute path
+-    return unicode_prefix + os.path.abspath(path)
++    return _force_windows_long_path(path)
+@@ -146,1 +157,4 @@
+-        path = _get_windows_path_with_unc_prefix(path)
++        path = _get_windows_path_with_unc_prefix(
++            path,
++            force=reason == "imports-strs",
++        )

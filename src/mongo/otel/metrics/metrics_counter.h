@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,6 +7,7 @@
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/static_immortal.h"
 
 #include <memory>
 #include <string>
@@ -44,7 +19,7 @@ namespace mongo::otel::metrics {
  * a non-virtual wrapper that calls the virtual addNonNegative().
  */
 template <typename T, AttributeType... AttributeTs>
-class MONGO_MOD_PUBLIC Counter {
+class [[MONGO_MOD_PUBLIC]] Counter {
 public:
     using Attributes = std::tuple<AttributeTs...>;
     virtual ~Counter() = default;
@@ -72,7 +47,7 @@ protected:
 
 /** Specialization when there are no attributes, adding a convenience add(T) overload. */
 template <typename T>
-class MONGO_MOD_PUBLIC Counter<T> {
+class [[MONGO_MOD_PUBLIC]] Counter<T> {
 public:
     using Attributes = std::tuple<>;
     virtual ~Counter() = default;
@@ -95,6 +70,34 @@ public:
 
 protected:
     virtual void addNonNegative(T value, const std::tuple<>& attributes) = 0;
+};
+
+/**
+ * A no-op, attribute-free Counter that silently discards all writes and always reads back zero. The
+ * single shared instance is obtained via instance(); it is stateless and therefore safe to share
+ * across threads and recorders.
+ */
+template <typename T>
+class [[MONGO_MOD_PUBLIC]] NoopCounter final : public Counter<T> {
+public:
+    static NoopCounter* instance() {
+        static StaticImmortal<NoopCounter> counter;
+        return &*counter;
+    }
+
+    void setReportingPolicy(const std::tuple<>&, ReportingPolicy) override {}
+
+    T valueForLegacyUse() const override {
+        return 0;
+    }
+
+protected:
+    void addNonNegative(T, const std::tuple<>&) override {}
+
+private:
+    friend class StaticImmortal<NoopCounter>;
+
+    NoopCounter() = default;
 };
 
 }  // namespace mongo::otel::metrics

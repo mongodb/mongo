@@ -367,6 +367,7 @@ properties:
           - description
           - cpp_type
           - bson_serialization_type
+          - is_view
   enums:
     description: YAML map that allows integer and string enumeration.
     type: object
@@ -577,7 +578,7 @@ properties:
             description: >
               Must contain the value startup, runtime, [startup, runtime], or cluster. If runtime
               is specified along with cpp_varname, then decltype(cpp_varname) must refer to a
-              thread-safe storage type, specifically: AtomicWord<T>, AtomicWord<double>, std::atomic<T>,
+              thread-safe storage type, specifically: Atomic<T>, Atomic<double>, std::atomic<T>,
               or boost::synchronized<T>. Parameters declared as cluster can only be set at
               runtime and exhibit numerous differences.
             oneOf:
@@ -943,7 +944,7 @@ properties:
 
               Setting this property should be avoided if possible, and requires careful handling to
               avoid compatibility issues with old FCVs and binaries.
-              See the FCV and Feature Flag README (FCV_AND_FEATURE_FLAG_README.md) for more detail.
+              See src/mongo/db/README.md for more detail.
           incremental_rollout_phase:
             type: string
             description: >
@@ -971,7 +972,7 @@ properties:
               Specifies whether the feature flag is checked against an Operation FCV
               (`VersionContext`), a short-lived server FCV snapshot (`FCVSnapshot`), or both.
               This determines the signature of the C++ method used for feature flag checks.
-              See the FCV and Feature Flag README (FCV_AND_FEATURE_FLAG_README.md) for more detail.
+              See src/mongo/db/README.md for more detail.
             enum:
               - operation_fcv_or_fcv_snapshot
               - operation_fcv_only

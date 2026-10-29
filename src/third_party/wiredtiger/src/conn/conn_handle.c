@@ -26,12 +26,10 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     TAILQ_INIT(&conn->fhqh);                                       /* File list */
     TAILQ_INIT(&conn->disaggregated_storage.shared_metadata_qh);   /* Shared metadata list */
     TAILQ_INIT(&conn->disaggregated_storage.pending_crypt_key_qh); /* Pending pushed crypt keys */
+    TAILQ_INIT(&conn->disaggregated_storage.deferred_ckpt_qh);     /* Deferred checkpoints */
 
     /* Prefetch. */
     WT_RET(__wti_conn_prefetch_init(session));
-
-    /* Tiered storage. */
-    WT_RET(__wti_conn_tiered_init(session));
 
     /* I/O capacity subsystem. */
     __wti_conn_capacity_init(session);
@@ -51,6 +49,8 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     /* Spinlocks. */
     WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
     WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
+    WT_RET(__wt_spin_init(session, &conn->disaggregated_storage.deferred_ckpt_lock,
+      "disagg deferred checkpoint queue"));
     WT_RET(__wt_spin_init(session, &conn->background_compact.lock, "background compact"));
     WT_RET(__wt_spin_init(
       session, &conn->disaggregated_storage.shared_metadata_queue_lock, "update shared metadata"));
@@ -115,6 +115,7 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->background_compact.lock);
     __wt_spin_destroy(session, &conn->block_lock);
     __wt_spin_destroy(session, &conn->checkpoint_lock);
+    __wt_spin_destroy(session, &conn->disaggregated_storage.deferred_ckpt_lock);
     __wt_spin_destroy(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
     __wti_disagg_pending_crypt_key_clear(session);
     __wt_spin_destroy(session, &conn->disaggregated_storage.pending_crypt_key_lock);
@@ -128,9 +129,6 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_rwlock_destroy(session, &conn->table_lock);
     __wt_spin_destroy(session, &conn->turtle_lock);
     __wti_conn_prefetch_destroy(session);
-
-    /* Tiered storage. */
-    __wti_conn_tiered_destroy(session);
 
     /* I/O capacity subsystem. */
     __wti_conn_capacity_destroy(session);
@@ -147,11 +145,16 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     /* Free allocated recovered checkpoint snapshot memory */
     __wt_free(session, conn->recovery_ckpt_snapshot);
 
+    /* Free checkpoint eviction snapshot buffer backing arrays. */
+    __wt_free(session, conn->ckpt_eviction_snap[0].snap_array);
+    __wt_free(session, conn->ckpt_eviction_snap[1].snap_array);
+
     /* Free allocated memory. */
     __wt_free(session, conn->cfg);
     __wt_free(session, conn->debug.ckpt);
     __wt_free(session, conn->error_prefix);
     __wt_free(session, conn->home);
+    __wt_buf_free(session, &conn->repair.last_report);
     __wt_free(session, WT_CONN_SESSIONS_GET(conn));
     __wt_stat_connection_discard(session, conn);
 

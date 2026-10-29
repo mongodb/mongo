@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,7 +14,7 @@
 #include <random>
 #include <utility>
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * A uniform random bit generator based on XorShift.
@@ -98,7 +72,7 @@ private:
 
 // Provides mongo-traditional functions around a pluggable UniformRandomBitGenerator.
 template <typename Urbg>
-class MONGO_MOD_FILE_PRIVATE RandomBase {
+class [[MONGO_MOD_FILE_PRIVATE]] RandomBase {
 public:
     using urbg_type = Urbg;
 
@@ -106,7 +80,7 @@ public:
     explicit RandomBase(urbg_type u) : _urbg{std::move(u)} {}
 
     /** The underlying generator */
-    MONGO_MOD_PUB urbg_type& urbg() {
+    [[MONGO_MOD_PUBLIC]] urbg_type& urbg() {
         return _urbg;
     }
 
@@ -117,52 +91,52 @@ public:
      * software-emulated on some ARM64 platforms. Prefer trueWithProbability() rather than
      * comparing this to a probability.
      */
-    MONGO_MOD_PUB double nextCanonicalDouble() {
+    [[MONGO_MOD_PUBLIC]] double nextCanonicalDouble() {
         return std::uniform_real_distribution<double>{0, 1}(_urbg);
     }
 
     /** A number uniformly distributed over all possible values. */
-    MONGO_MOD_PUB int32_t nextInt32() {
+    [[MONGO_MOD_PUBLIC]] int32_t nextInt32() {
         return _nextAny<int32_t>();
     }
 
     /** A number uniformly distributed over all possible values. */
-    MONGO_MOD_PUB uint32_t nextUInt32() {
+    [[MONGO_MOD_PUBLIC]] uint32_t nextUInt32() {
         return _nextAny<uint32_t>();
     }
 
     /** A number uniformly distributed over all possible values. */
-    MONGO_MOD_PUB int64_t nextInt64() {
+    [[MONGO_MOD_PUBLIC]] int64_t nextInt64() {
         return _nextAny<int64_t>();
     }
 
     /** A number uniformly distributed over all possible values. */
-    MONGO_MOD_PUB uint64_t nextUInt64() {
+    [[MONGO_MOD_PUBLIC]] uint64_t nextUInt64() {
         return _nextAny<uint64_t>();
     }
 
     /** A number in the half-open interval [0, max) */
-    MONGO_MOD_PUB int32_t nextInt32(int32_t max) {
+    [[MONGO_MOD_PUBLIC]] int32_t nextInt32(int32_t max) {
         return std::uniform_int_distribution<int32_t>(0, max - 1)(_urbg);
     }
 
     /** A number in the half-open interval [0, max) */
-    MONGO_MOD_PUB uint32_t nextUInt32(uint32_t max) {
+    [[MONGO_MOD_PUBLIC]] uint32_t nextUInt32(uint32_t max) {
         return std::uniform_int_distribution<uint32_t>(0, max - 1)(_urbg);
     }
 
     /** A number in the half-open interval [0, max) */
-    MONGO_MOD_PUB int64_t nextInt64(int64_t max) {
+    [[MONGO_MOD_PUBLIC]] int64_t nextInt64(int64_t max) {
         return std::uniform_int_distribution<int64_t>(0, max - 1)(_urbg);
     }
 
     /** A number in the half-open interval [0, max) */
-    MONGO_MOD_PUB uint64_t nextUInt64(uint64_t max) {
+    [[MONGO_MOD_PUBLIC]] uint64_t nextUInt64(uint64_t max) {
         return std::uniform_int_distribution<uint64_t>(0, max - 1)(_urbg);
     }
 
     /** Returns true with the given probability in [0, 1]. */
-    MONGO_MOD_PUB bool trueWithProbability(double probability) {
+    [[MONGO_MOD_PUBLIC]] bool trueWithProbability(double probability) {
         dassert(0 <= probability && probability <= 1);
         return nextUInt32(std::numeric_limits<uint32_t>::max()) <
             uint32_t(probability * std::numeric_limits<uint32_t>::max());
@@ -172,14 +146,14 @@ public:
      A number uniformly distributed over all possible values that can be safely represented as
      double without loosing precision.
     */
-    MONGO_MOD_PUB int64_t nextInt64SafeDoubleRepresentable() {
+    [[MONGO_MOD_PUBLIC]] int64_t nextInt64SafeDoubleRepresentable() {
         const int64_t maxRepresentableLimit =
             static_cast<int64_t>(std::ldexp(1, std::numeric_limits<double>::digits)) + 1;
         return nextInt64(maxRepresentableLimit);
     }
 
     /** Fill array `buf` with `n` random bytes. */
-    MONGO_MOD_PUB void fill(void* buf, size_t n) {
+    [[MONGO_MOD_PUBLIC]] void fill(void* buf, size_t n) {
         const auto p = static_cast<uint8_t*>(buf);
         size_t written = 0;
         while (written < n) {
@@ -226,4 +200,4 @@ public:
     using Base::Base;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

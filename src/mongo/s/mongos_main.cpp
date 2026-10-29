@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/s/mongos_main.h"
 
@@ -64,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/query/query_settings/query_settings_command_hooks.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -89,6 +64,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/router_uptime_reporter.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_initialization.h"
 #include "mongo/db/sharding_environment/version_mongos.h"
 #include "mongo/db/startup_check_rseq.h"
@@ -105,7 +81,7 @@
 #include "mongo/otel/metrics/instrumentation/metrics_installer.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/traces/trace_initialization.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
@@ -487,8 +463,11 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (auto grid = Grid::get(opCtx)) {
-            grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, true /* isMongos */);
+            grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, /*isMongos=*/true);
         }
+
+        // Reject new search cursors before shutting down the search executors, mirroring mongod.
+        executor::beginSearchExecutorShutdown(serviceContext);
 
         {
             SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
@@ -560,6 +539,7 @@ void initializeCommandHooks(ServiceContext* service) {
         void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override {
             _transportHook.onBeforeRun(opCtx, invocation);
             _systemBucketsHook.onBeforeRun(opCtx, invocation);
+            _querySettingsHook.onBeforeRun(opCtx, invocation);
         }
 
         void onAfterRun(OperationContext* opCtx,
@@ -571,6 +551,7 @@ void initializeCommandHooks(ServiceContext* service) {
 
         transport::IngressHandshakeMetricsCommandHooks _transportHook{};
         SystemBucketsMetricsCommandHooks _systemBucketsHook{};
+        query_settings::QuerySettingsCommandHooks _querySettingsHook{};
     };
 
     CommandInvocationHooks::set(service, std::make_unique<MongosCommandInvocationHooks>());
@@ -583,27 +564,23 @@ Status initializeSharding(
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
-    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr,
-                                                opCtx](const ShardHandle& handle,
-                                                       const ConnectionString& connStr) {
-        // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
-        auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
-        return std::make_unique<ShardRemote>(handle,
-                                             connStr,
-                                             targeterFactoryPtr->create(connStr),
-                                             shardSharedStateCache.getShardState(handle.name()));
-    };
+    ShardFactory::BuilderCallable setBuilder =
+        [targeterFactoryPtr, opCtx](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
-    ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr,
-                                                   opCtx](const ShardHandle& handle,
-                                                          const ConnectionString& connStr) {
-        // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
-        auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
-        return std::make_unique<ShardRemote>(handle,
-                                             connStr,
-                                             targeterFactoryPtr->create(connStr),
-                                             shardSharedStateCache.getShardState(handle.name()));
-    };
+    ShardFactory::BuilderCallable masterBuilder =
+        [targeterFactoryPtr, opCtx](const ShardId& shardId, const ConnectionString& connStr) {
+            auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+            return std::make_unique<ShardRemote>(shardId,
+                                                 connStr,
+                                                 targeterFactoryPtr->create(connStr),
+                                                 shardSharedStateCache.getShardState(shardId));
+        };
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet, std::move(setBuilder)},
@@ -831,8 +808,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ResourceYielderFactory::set(*serviceContext->getService(),
                                 std::make_unique<RouterResourceYielderFactory>());
 
-    // Initialize command hooks before freezing the metric tree, since
-    // SystemBucketsMetricsCommandHooks registers metrics in its constructor.
+    // Initialize command hooks before freezing the metric tree.
     initializeCommandHooks(serviceContext);
 
     // Since extensions modify the global parserMap and register metrics, both of which are not

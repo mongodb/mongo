@@ -8,6 +8,7 @@
  * into the duplicate tracker, so the memory check is never reached.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,
@@ -23,7 +24,7 @@
  * ]
  */
 
-import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db.count_scan_memory_limit;
@@ -47,7 +48,7 @@ const kFilterB = {b: {$gte: 0}};
 const explainRes = assert.commandWorked(
     db.runCommand({explain: {count: coll.getName(), query: kFilterA}, verbosity: "queryPlanner"}),
 );
-if (getPlanStage(explainRes.queryPlanner.winningPlan, "COUNT_SCAN") === null) {
+if (getPlanStage(getWinningPlanFromExplain(explainRes), "COUNT_SCAN") === null) {
     jsTest.log.info(
         "Skipping test: COUNT_SCAN stage not found. " +
             "This stage is only used by the classic engine.",

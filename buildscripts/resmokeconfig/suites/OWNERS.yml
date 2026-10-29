@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/mongo-default-approvers
+      - 10gen/devprod-test-infrastructure
   - "README.md":
     approvers:
       - 10gen/devprod-test-infrastructure
@@ -26,7 +26,10 @@ filters:
       - 10gen/query-execution-classic
   - "*join_optimization*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-join-ordering
+  - "*join_plan_cache*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
     approvers:
       - 10gen/query-execution-classic
@@ -63,6 +66,9 @@ filters:
   - "clustered_collection_passthrough.yml":
     approvers:
       - 10gen/query-execution
+  - "pbt_clustered_experiment_coll.yml":
+    approvers:
+      - 10gen/query-property-based-testing
   - "concurrency_compute_mode.yml":
     approvers:
       - 10gen/query-integration-features
@@ -120,6 +126,9 @@ filters:
   - "no_passthrough_network*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "integration_tests_replset_tls.yml":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "cwrwc*":
     approvers:
       - 10gen/server-rw-concerns
@@ -141,6 +150,9 @@ filters:
   - "mongot*":
     approvers:
       - 10gen/query-integration-search
+  - "concurrency_with_mongot_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api
   - "multiversion*":
     approvers:
       - 10gen/server-jstest-infra
@@ -176,7 +188,7 @@ filters:
       - 10gen/query-execution-query-settings
   - "timeseries_crud_jscore_passthrough.yml":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "sharding_auth.yml":
     approvers:
       - 10gen/server-security
@@ -273,3 +285,9 @@ filters:
   - "product_limits.yml":
     approvers:
       - 10gen/query-optimization-correctness
+  - "concurrency_resharding_with_lightweight_stepdowns.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "core_explain_v3_passthrough.yml":
+    approvers:
+      - 10gen/query-optimization

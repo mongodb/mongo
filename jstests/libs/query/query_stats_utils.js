@@ -1,6 +1,6 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -113,6 +113,8 @@ export function verifyMetrics(batch) {
  * @param conn - connection to database
  * @param {object} options {
  *  {String} collName - name of collection
+ *  {String} - commandName - optional argument that restricts the lookup to a single command, e.g.
+ *     "find" or "aggregate"
  *  {object} - extraMatch - optional argument that can be used to filter the pipeline
  * }
  */
@@ -137,6 +139,8 @@ export function getLatestQueryStatsEntry(
  * @param conn - connection to database
  * @param {object} options {
  *  {String} collName - name of collection
+ *  {String} - commandName - optional argument that restricts the lookup to a single command, e.g.
+ *     "find" or "aggregate"
  *  {object} - extraMatch - optional argument that can be used to filter the pipeline
  *  {object} - customSort - optional custom sort order - otherwise sorted by 'key' just to be
  * deterministic.
@@ -151,6 +155,9 @@ export function getQueryStats(
     let match = {"key.client.application.name": kShellApplicationName, ...options.extraMatch};
     if (options.collName) {
         match["key.queryShape.cmdNs.coll"] = options.collName;
+    }
+    if (options.commandName) {
+        match["key.queryShape.command"] = options.commandName;
     }
     const result = conn.adminCommand({
         aggregate: 1,
@@ -746,7 +753,7 @@ export function getValueAtPath(object, dottedPath) {
  * @param {String} collName - The desired collection name to use. The db will be "test".
  * @param {Function} callbackFn - The function to make the assertion on each connection.
  */
-export function withQueryStatsEnabled(collName, callbackFn) {
+export function withQueryStatsEnabled(collName, callbackFn, shardKey = {_id: 1}, split = {_id: 1}) {
     {
         const conn = MongoRunner.runMongod(getQueryStatsServerParameters());
         const testDB = conn.getDB("test");
@@ -765,7 +772,7 @@ export function withQueryStatsEnabled(collName, callbackFn) {
         });
         const testDB = st.getDB("test");
         var coll = testDB[collName];
-        st.shardColl(coll, {_id: 1}, {_id: 1});
+        st.shardColl(coll, shardKey, split);
 
         callbackFn(coll);
         st.stop();
@@ -800,7 +807,10 @@ export function runCommandAndValidateQueryStats({
 }) {
     const testDB = coll.getDB();
     const result = assert.commandWorked(testDB.runCommand(commandObj));
-    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
+    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {
+        collName: coll.getName(),
+        commandName,
+    });
 
     assert.eq(entry.key.queryShape.command, commandName);
     const kApplicationName = "MongoDB Shell";
@@ -853,6 +863,12 @@ export function runCommandAndValidateQueryStats({
             `Key: ${tojson(entry.key)} is missing field ${field}`,
         );
         keyFieldsPrefixes.push(field.split(".")[0]);
+    }
+
+    // On a replica set the shell adds a read preference to every command, so the key carries a
+    // field a standalone's would not. Callers list their key fields statically, so allow it here.
+    if (FixtureHelpers.isReplSet(testDB)) {
+        keyFieldsPrefixes.push("$readPreference");
     }
 
     // Every field in the key is in keyFields or is the base of a path in keyFields.
@@ -980,7 +996,9 @@ export function getAggregateQueryStatsKey({conn, collName, queryShapeExtra, extr
         cursor: {batchSize: "?number"},
     };
 
-    if (!conn.isMongos()) {
+    if (conn.isMongos()) {
+        baseStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
         // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
         baseStatsKey.collectionType =
             collName == "$cmd.aggregate" ? "virtual" : isView(conn, coll) ? "view" : "collection";
@@ -1013,7 +1031,9 @@ export function getCountQueryStatsKey(conn, collName, queryShapeExtra) {
     };
 
     const coll = conn.getDB("test")[collName];
-    if (!conn.isMongos()) {
+    if (conn.isMongos()) {
+        queryStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
         // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
         queryStatsKey.collectionType = isView(conn, coll) ? "view" : "collection";
     }
@@ -1043,7 +1063,9 @@ export function getDistinctQueryStatsKey(conn, collName, queryShapeExtra) {
     };
 
     const coll = conn.getDB("test")[collName];
-    if (!conn.isMongos()) {
+    if (conn.isMongos()) {
+        queryStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
         // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
         queryStatsKey.collectionType = isView(conn, coll) ? "view" : "collection";
     }
@@ -1204,7 +1226,12 @@ export function exhaustCursorAndGetQueryStats({conn, cmd, key, expectedDocs}) {
  * constant that we pass around (risking modification), we return the defaults from a function.
  */
 export function getQueryStatsServerParameters() {
-    return {setParameter: {internalQueryStatsRateLimit: -1}};
+    return {
+        setParameter: {
+            internalQueryStatsSampleRate: 1,
+            internalQueryStatsWriteCmdSampleRate: 0,
+        },
+    };
 }
 
 /**

@@ -32,6 +32,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
     mongos_options:
       set_parameters:
@@ -193,7 +194,6 @@ selector:
     - jstests/core/query/update/update_addToSet2.js
     - jstests/core/shell/bench_test1.js
     - jstests/core/catalog/list_catalog_stage_consistency.js
-    - jstests/core/query/query_settings/query_settings_size_limits.js
     - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
@@ -230,14 +230,12 @@ selector:
     - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagRecordIdsReplicated
-    - featureFlagRankFusionBasic
-    - featureFlagRankFusionFull
-    - featureFlagSearchHybridScoringFull
     - uses_transactions
     - requires_fcv_81
     - requires_fcv_82
     - requires_fcv_83
     - requires_fcv_90
+    - requires_fcv_91
     - cannot_run_during_upgrade_downgrade
     - does_not_support_causal_consistency
     - does_not_support_retryable_writes
@@ -249,4 +247,5 @@ selector:
     - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test

@@ -1,32 +1,35 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
+
+#include "mongo/scripting/mozjs/shell/implscope.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/operation_context.h"
+#include "mongo/logv2/constants.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/stack_locator.h"
+#include "mongo/scripting/deadline_monitor.h"
+#include "mongo/scripting/jsexception.h"
+#include "mongo/scripting/mozjs/common/exception.h"
+#include "mongo/scripting/mozjs/common/jsstringwrapper.h"
+#include "mongo/scripting/mozjs/common/objectwrapper.h"
+#include "mongo/scripting/mozjs/common/valuereader.h"
+#include "mongo/scripting/mozjs/common/valuewriter.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <mutex>
 
 #include <jsapi.h>
 #include <jscustomallocator.h>
@@ -50,6 +53,7 @@
 #include <js/GCAPI.h>
 #include <js/GCVector.h>
 #include <js/Initialization.h>
+#include <js/MemoryCallbacks.h>
 #include <js/Modules.h>
 #include <js/Object.h>
 #include <js/Promise.h>
@@ -61,31 +65,6 @@
 #include <js/Value.h>
 #include <js/friend/ErrorMessages.h>
 #include <mozilla/Utf8.h>
-// IWYU pragma: no_include "cxxabi.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/operation_context.h"
-#include "mongo/logv2/constants.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/platform/stack_locator.h"
-#include "mongo/scripting/deadline_monitor.h"
-#include "mongo/scripting/jsexception.h"
-#include "mongo/scripting/mozjs/common/exception.h"
-#include "mongo/scripting/mozjs/common/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/valuereader.h"
-#include "mongo/scripting/mozjs/common/valuewriter.h"
-#include "mongo/scripting/mozjs/shell/implscope.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <mutex>
 
 #ifdef __linux__
 #include <string_view>
@@ -94,6 +73,7 @@
 
 #include <sys/syscall.h>
 #endif
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -101,10 +81,18 @@ namespace mongo {
 
 // Generated symbols for JS files
 namespace JSFiles {
+// Shell-specific modules.
 extern const JSFile stringdiff;
 extern const JSFile types;
 extern const JSFile assert;
 extern const JSFile assert_global;
+
+// Shared helper scripts used by both the server and shell execution environments.
+extern const JSFile types;
+
+// Server-specific, self-contained (non-module) copies of the setup scripts, used to initialize the
+// JS scope in the server execution environment without the filesystem-backed module loader.
+extern const JSFile server_assert;
 }  // namespace JSFiles
 
 namespace mozjs {
@@ -193,9 +181,45 @@ bool isLogFormatJson(MozJSScriptEngine* engine,
 }
 
 /**
- * Logs the given status either as plain text or as JSON depending on the 'plainShell' parameter.
+ * A snapshot of the shell's JavaScript memory accounting. Every field is a counter read, so
+ * collecting this allocates nothing and cannot fail -- which matters, because the reason to want
+ * it is usually that allocation has just started failing.
  */
-void logStatus(const Status& status, bool plainShell) {
+struct JSMemoryStats {
+    size_t totalBytes;
+    size_t mallocBytes;
+    size_t mmapBytes;
+    size_t maxBytes;
+    uint64_t gcHeapBytes;
+};
+
+JSMemoryStats collectJSMemoryStats(JSContext* cx) {
+    return {mongo::sm::get_total_bytes(),
+            mongo::sm::get_malloc_bytes(),
+            mongo::sm::get_mmap_bytes(),
+            mongo::sm::get_max_bytes(),
+            js::GetGCHeapUsage(cx)};
+}
+
+/**
+ * Best-effort JavaScript stack, empty if one cannot be taken.
+ */
+std::string tryBuildJSStack(JSContext* cx) try {
+    auto* scope = getScope(cx);
+    return scope ? scope->buildStackString() : std::string{};
+} catch (...) {
+    return {};
+}
+
+/**
+ * Logs the given status either as plain text or as JSON depending on the 'plainShell' parameter.
+ * 'truncation' applies to the plain text output, whose stack is user-controlled.
+ */
+void logStatus(JSContext* cx,
+               const Status& status,
+               bool reportMemoryDiagnostics,
+               bool plainShell,
+               logv2::LogTruncation truncation) {
     if (plainShell) {
         str::stream ss;
         ss << redact(status.reason());
@@ -206,11 +230,21 @@ void logStatus(const Status& status, bool plainShell) {
             ss << " :\n" << extraInfo->stack;
         }
 
-        LOGV2_INFO_OPTIONS(
-            10077200,
-            logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-            "{jsError}",
-            "jsError"_attr = std::string(ss));
+        if (reportMemoryDiagnostics) {
+            const auto mem = collectJSMemoryStats(cx);
+            ss << " :: JS heap:"
+               << " totalBytes=" << mem.totalBytes << " mallocBytes=" << mem.mallocBytes
+               << " mmapBytes=" << mem.mmapBytes << " gcHeapBytes=" << mem.gcHeapBytes
+               << " maxBytes=" << mem.maxBytes;
+            if (const auto jsStack = tryBuildJSStack(cx); !jsStack.empty()) {
+                ss << " :\n" << jsStack;
+            }
+        }
+
+        LOGV2_INFO_OPTIONS(10077200,
+                           logv2::LogOptions(logv2::LogTag::kPlainShell, truncation),
+                           "{jsError}",
+                           "jsError"_attr = std::string(ss));
     } else {
         // Collect status data into log entry attributes.
         logv2::DynamicAttributes attrs;
@@ -228,6 +262,20 @@ void logStatus(const Status& status, bool plainShell) {
             }
             if (!extraInfo->extraAttr.isEmpty()) {
                 attrs.add("extra", extraInfo->extraAttr);
+            }
+        }
+
+        BSONArray jsStackArr;
+        if (reportMemoryDiagnostics) {
+            const auto mem = collectJSMemoryStats(cx);
+            attrs.add("totalBytes", mem.totalBytes);
+            attrs.add("mallocBytes", mem.mallocBytes);
+            attrs.add("mmapBytes", mem.mmapBytes);
+            attrs.add("gcHeapBytes", mem.gcHeapBytes);
+            attrs.add("maxBytes", mem.maxBytes);
+            if (const auto jsStack = tryBuildJSStack(cx); !jsStack.empty()) {
+                jsStackArr = splitToBSONArray(jsStack, '\n');
+                attrs.add("jsStack", jsStackArr);
             }
         }
         if (status.reason().starts_with(ErrorMessage::kUncaughtException)) {
@@ -373,6 +421,14 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     }
 
     return scope->_status.isOK();
+}
+
+void MozJSImplScope::_outOfMemoryCallback(JSContext* cx, void* data) {
+    // SpiderMonkey has exhausted its own recovery and is about to report the OOM, so this is
+    // unrecoverable; see setOOM().
+    if (auto* scope = getScope(cx)) {
+        scope->setOOM();
+    }
 }
 
 void MozJSImplScope::_gcCallback(JSContext* rt,
@@ -580,7 +636,18 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _status(Status::OK()),
       _generation(0),
       _requireOwnedObjects(false),
+      _baseURL{[](const MozJSImplScope& scope) {
+          tassert(12883201,
+                  "BaseURL is not supported in the current context.",
+                  scope.supportsModules());
+          return scope.getModuleLoader().getBaseURL();
+      }},
       _hasOutOfMemoryException(false),
+      _moduleLoader([&]() {
+          return engine->executionEnvironment() == ExecutionEnvironment::Server
+              ? nullptr
+              : std::make_unique<ModuleLoader>(_engine->executionEnvironment());
+      }()),
       _binDataProto(_context),
       _bsonProto(_context),
       _codeProto(_context),
@@ -611,30 +678,34 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _timestampProto(_context),
       _uriProto(_context) {
     {
+        // Only mongod/mongos scopes have user-controlled JS output, which must be bounded. The
+        // shell keeps print() unbounded.
+        if (_engine->executionEnvironment() == ExecutionEnvironment::Server) {
+            _printBudget.emplace();
+        }
+
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, static_cast<MozJSCommonRuntimeInterface*>(this));
+        JS::SetOutOfMemoryCallback(_context, _outOfMemoryCallback, nullptr);
 
         JSAutoRealm ac(_context, _global);
         _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
-        _moduleLoader = std::make_unique<ModuleLoader>();
-        uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
-        uassert(ErrorCodes::JSInterpreterFailure,
-                "Failed to initialize ModuleLoader",
-                _moduleLoader->init(_context, engine->getLoadPath()));
 
-        _baseURL = _moduleLoader->getBaseURL();
+        if (supportsModules()) {
+            uassert(
+                ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
+            uassert(ErrorCodes::JSInterpreterFailure,
+                    "Failed to initialize ModuleLoader",
+                    getModuleLoader().init(_context, engine->getLoadPath()));
+        }
 
         _checkErrorState(JS::InitRealmStandardClasses(_context));
 
         installBSONTypes();
 
         JS_FireOnNewGlobalObject(_context, _global);
-
-        execSetup(JSFiles::stringdiff);
-        execSetup(JSFiles::assert);
-        execSetup(JSFiles::assert_global);
-        execSetup(JSFiles::types);
+        _setupScripts();
 
         if (_engine->executionEnvironment() == ExecutionEnvironment::Server) {
             // For legacy support in server-side javascript execution, delete the ECMAScript defined
@@ -709,7 +780,7 @@ MozJSImplScope::~MozJSImplScope() {
 }
 
 std::string MozJSImplScope::getBaseURL() const {
-    return _baseURL;
+    return _baseURL.get(*this);
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {
@@ -1003,6 +1074,10 @@ void MozJSImplScope::setFunction(const char* field, const char* code) {
     });
 }
 
+void MozJSImplScope::deleteGlobal(std::string_view name) {
+    _runSafely([&] { ObjectWrapper(_context, _global).deleteProperty(std::string(name).c_str()); });
+}
+
 void MozJSImplScope::rename(const char* from, const char* to) {
     _runSafely([&] { ObjectWrapper(_context, _global).rename(from, to); });
 }
@@ -1015,6 +1090,16 @@ int MozJSImplScope::invoke(ScriptingFunction func,
                            bool readOnlyArgs,
                            bool readOnlyRecv) {
     return _runSafely([&] {
+        // Keep track of the pinned bytes of these BSON objects so that we can trigger GC
+        // if it grows too big. This can be important to prevent memory growth when the
+        // total size of these objects is large (BF-46311).
+        if (recv) {
+            _notePinnedHostBytes(recv->objsize());
+        }
+        if (argsObject) {
+            _notePinnedHostBytes(argsObject->objsize());
+        }
+
         auto funcValue = _funcs[func - 1];
         JS::RootedValue result(_context);
 
@@ -1078,8 +1163,8 @@ int MozJSImplScope::invoke(ScriptingFunction func,
     });
 }
 
-bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success) {
-    if (name == MozJSImplScope::kInteractiveShellName) {
+bool MozJSImplScope::_shouldTryExecAsModule(const std::string& name, bool success) const {
+    if (name == kInteractiveShellName) {
         return false;
     }
 
@@ -1087,13 +1172,17 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
         return false;
     }
 
-    JS::RootedValue ex(cx);
-    if (!JS_GetPendingException(cx, &ex) || !ex.isObject()) {
+    if (!supportsModules()) {
         return false;
     }
 
-    JS::RootedObject obj(cx, ex.toObjectOrNull());
-    JSErrorReport* report = JS_ErrorFromException(cx, obj);
+    JS::RootedValue ex(_context);
+    if (!JS_GetPendingException(_context, &ex) || !ex.isObject()) {
+        return false;
+    }
+
+    JS::RootedObject obj(_context, ex.toObjectOrNull());
+    JSErrorReport* report = JS_ErrorFromException(_context, obj);
     if (!report) {
         return false;
     }
@@ -1101,7 +1190,7 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     const JSClass* referenceError = js::ProtoKeyToClass(JSProto_ReferenceError);
     // During runtime, we can get a ReferenceError: await is not defined because there can be await
     // not in global scope, which is not detected during compile.
-    if (JS_InstanceOf(cx, obj, referenceError, nullptr) &&
+    if (JS_InstanceOf(_context, obj, referenceError, nullptr) &&
         strstr(report->message().c_str(), "await is not defined")) {
         return true;
     }
@@ -1110,7 +1199,7 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     // since these can be indistinguishable from syntax errors either caused by not loading
     // as a module, or generic syntax errors regardless of scripts/modules.
     const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
-    return JS_InstanceOf(cx, obj, syntaxError, nullptr);
+    return JS_InstanceOf(_context, obj, syntaxError, nullptr);
 }
 
 bool MozJSImplScope::exec(std::string_view code,
@@ -1135,12 +1224,12 @@ bool MozJSImplScope::exec(std::string_view code,
         success = scriptPtr != nullptr;
 
         JSObject* modulePtr = nullptr;
-        if (shouldTryExecAsModule(_context, name, success)) {
+        if (_shouldTryExecAsModule(name, success)) {
             // If we should run this as a module, we need to clear the previous exception in order
             // to catch stack traces for future exceptions.
             JS_ClearPendingException(_context);
 
-            modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+            modulePtr = getModuleLoader().loadRootModuleFromSource(_context, name, code);
             success = modulePtr != nullptr;
         }
 
@@ -1162,12 +1251,12 @@ bool MozJSImplScope::exec(std::string_view code,
                 JS::RootedScript script(_context, scriptPtr);
                 success = JS_ExecuteScript(_context, script, &out);
 
-                if (shouldTryExecAsModule(_context, name, success)) {
+                if (_shouldTryExecAsModule(name, success)) {
                     // If we should run this as a module, we need to clear the previous exception
                     // in order to catch stack traces for future exceptions.
                     JS_ClearPendingException(_context);
 
-                    modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+                    modulePtr = getModuleLoader().loadRootModuleFromSource(_context, name, code);
                     success = modulePtr != nullptr;
                 }
             }
@@ -1223,6 +1312,20 @@ void MozJSImplScope::gc() {
     JS_RequestInterruptCallback(_context);
 }
 
+void MozJSImplScope::_checkPinnedHostBytesAndGc(int64_t threshold) {
+    if (_pinnedHostBytesSinceGc >= threshold && _context) {
+        // A synchronous full GC, not gc() -- that only requests an interrupt, which is not
+        // guaranteed to be serviced before the next invocation pins more bytes.
+        JS_GC(_context);
+        _pinnedHostBytesSinceGc = 0;
+    }
+}
+
+void MozJSImplScope::_notePinnedHostBytes(int64_t nbytes) {
+    _pinnedHostBytesSinceGc += nbytes;
+    _checkPinnedHostBytesAndGc(kPinnedBytesGcThreshold);
+}
+
 void MozJSImplScope::sleep(Milliseconds ms) {
     std::unique_lock<std::mutex> lk(_mutex);
 
@@ -1255,6 +1358,10 @@ void MozJSImplScope::reset() {
     _killStatus = Status::OK();
     _pendingGC.store(false);
     _requireOwnedObjects = false;
+    if (_printBudget) {
+        _printBudget->reset();
+    }
+    _checkPinnedHostBytesAndGc(kPinnedBytesResetGcThreshold);
     advanceGeneration();
 }
 
@@ -1318,8 +1425,41 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     // expected to report and clear the errors before returning.
     JS_ClearPendingException(_context);
 
-    if (reportError)
-        logStatus(_status, !isLogFormatJson(_engine, _context, _global));
+    // Requiring _inOp keeps this to OOMs raised while JavaScript was executing
+    const bool abortForOOM = _hasOutOfMemoryException && _inOp > 0 &&
+        _engine->executionEnvironment() == ExecutionEnvironment::TestRunner &&
+        _engine->getJSAbortOnOutOfMemory();
+
+    if (reportError || abortForOOM) {
+        try {
+            // Only the shell logs errors untruncated; server-side JS output is user-controlled.
+            logStatus(_context,
+                      _status,
+                      _hasOutOfMemoryException,
+                      !isLogFormatJson(_engine, _context, _global),
+                      _printBudget ? logv2::LogTruncation::Enabled
+                                   : logv2::LogTruncation::Disabled);
+        } catch (...) {
+            if (!abortForOOM) {
+                throw;
+            }
+        }
+    }
+
+    if (abortForOOM) {
+        LOGV2_FATAL_CONTINUE(13403900,
+                             "JavaScript out of memory; aborting to capture a core dump",
+                             "errmsg"_attr = redact(_status.reason()));
+
+        // TODO SERVER-100809: abort() on Windows reaches MiniDumpWriteDump() on this same
+        // process, which is a known deadlock. Re-enable once the dump is taken out of process.
+        // Until then Windows deliberately falls through to the normal reporting path below, so
+        // the out-of-memory still surfaces as a DBException exactly as it would with the option
+        // off. Returning early here instead would skip that and swallow the error.
+#ifndef _WIN32
+        std::abort();
+#endif
+    }
 
     // Clear the status state
     auto status = std::move(_status);
@@ -1374,6 +1514,9 @@ Status MozJSImplScope::_checkForPendingException() {
             auto lineNum = errorObj.getNumberInt(InternedString::lineNumber);
             auto colNum = errorObj.getNumberInt(InternedString::columnNumber);
             stackStr = str::stream() << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
+        } else if (_printBudget) {
+            // Server-side JS can assign an arbitrarily large 'stack', so bound it like the message.
+            stackStr.resize(str::UTF8SafeTruncation(stackStr, kMaxErrorStringSize).size());
         }
         // Extract 'extraAttr' object property that might be present in case of an assertion error.
         auto extraAttrObj = errorObj.getObject(kExtraAttrFieldName);
@@ -1416,6 +1559,10 @@ bool MozJSImplScope::requiresOwnedObjects() const {
     return _requireOwnedObjects;
 }
 
+JSPrintBudget* MozJSImplScope::printBudget() {
+    return _printBudget ? &*_printBudget : nullptr;
+}
+
 const std::string& MozJSImplScope::getParentStack() const {
     return _parentStack;
 }
@@ -1435,8 +1582,26 @@ std::string MozJSImplScope::buildStackString() {
     }
 }
 
-ModuleLoader* MozJSImplScope::getModuleLoader() const {
-    return _moduleLoader.get();
+ModuleLoader& MozJSImplScope::getModuleLoader() const {
+    tassert(12883200,
+            "ModuleLoader not supported in this context.",
+            supportsModules() && _moduleLoader.get());
+    return *_moduleLoader;
+}
+
+bool MozJSImplScope::supportsModules() const {
+    return _engine->executionEnvironment() != ExecutionEnvironment::Server;
+}
+
+void MozJSImplScope::_setupScripts() {
+    if (supportsModules()) {
+        execSetup(JSFiles::stringdiff);
+        execSetup(JSFiles::assert);
+        execSetup(JSFiles::assert_global);
+    } else {
+        execSetup(JSFiles::server_assert);
+    }
+    execSetup(JSFiles::types);
 }
 
 }  // namespace mozjs

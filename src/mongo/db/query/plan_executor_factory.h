@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -42,6 +16,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner.h"
@@ -77,7 +52,7 @@ namespace mongo::plan_executor_factory {
  * Note that the PlanExecutor will use the ExpressionContext associated with 'cq' and the
  * OperationContext associated with that ExpressionContext.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -87,7 +62,8 @@ MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr,
     boost::optional<size_t> cachedPlanHash = boost::none,
-    boost::optional<std::string> replanReason = boost::none);
+    boost::optional<std::string> replanReason = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * This overload is provided for executors that do not need a CanonicalQuery. For example, the
@@ -96,7 +72,7 @@ MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
  * Note that the PlanExecutor will use the OperationContext associated with the 'expCtx'
  * ExpressionContext.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -106,7 +82,7 @@ MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr);
 
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     OperationContext* opCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rootStage,
@@ -119,7 +95,8 @@ MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
     boost::optional<std::string> replanReason,
-    boost::optional<PlanExplainerData> maybeExplainData);
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield
@@ -139,12 +116,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     bool isFromPlanCache,
     boost::optional<size_t> cachedPlanHash,
     bool usedJoinOpt = false,
-    cost_based_ranker::EstimateMap estimates = {},
     std::vector<JoinOptPlan> rejectedJoinPlans = {},
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage = nullptr,
-    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+    boost::optional<PlanExplainerData> maybeExplainData = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE
@@ -161,12 +138,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
-    boost::optional<size_t> cachedPlanHash = boost::none);
+    boost::optional<size_t> cachedPlanHash = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 /**
  * Constructs a plan executor for executing the given 'pipeline'.
  */
-MONGO_MOD_PUBLIC std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
+[[MONGO_MOD_PUBLIC]] std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline> pipeline,
     PlanExecutorPipeline::ResumableScanType resumableScanType =

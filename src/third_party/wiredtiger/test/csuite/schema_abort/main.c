@@ -160,7 +160,6 @@ usage(void)
       "\t-h home directory\n"
       "\t-l use LazyFS\n"
       "\t-m in-memory\n"
-      "\t-P tiered storage options\n"
       "\t-p preserve directory contents\n"
       "\t-S set sweep server to be aggressive\n"
       "\t-s set a stop timestamp to stop the threads to run\n"
@@ -290,9 +289,6 @@ test_bulk_unique(THREAD_DATA *td, uint64_t unique_id, int force)
         testutil_die(ret, "session.open_cursor bulk unique: %s, new_uri");
 
     testutil_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false");
-    /* For testing we want to remove objects too. */
-    if (opts->tiered_storage)
-        strcat(dropconf, ",remove_shared=true");
     while ((ret = session->drop(session, new_uri, dropconf)) != 0)
         if (ret != EBUSY)
             testutil_die(ret, "session.drop: %s %s", new_uri, dropconf);
@@ -326,20 +322,6 @@ test_cursor(THREAD_DATA *td)
     if (use_txn && (ret = session->commit_transaction(session, NULL)) != 0 && ret != EINVAL)
         testutil_die(ret, "session.commit cursor");
     testutil_check(session->close(session, NULL));
-}
-
-/*
- * set_flush_tier_delay --
- *     Set up a random delay for the next flush_tier.
- */
-static void
-set_flush_tier_delay(WT_RAND_STATE *rnd)
-{
-    /*
-     * We are checkpointing with a random interval up to MAX_CKPT_INVL seconds, and we'll do a flush
-     * tier randomly every 0-10 seconds.
-     */
-    opts->tiered_flush_interval_us = __wt_random(rnd) % (10 * WT_MILLION + 1);
 }
 
 /*
@@ -395,9 +377,6 @@ test_create_unique(THREAD_DATA *td, uint64_t unique_id, int force)
         testutil_check(session->begin_transaction(session, NULL));
 
     testutil_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false");
-    /* For testing we want to remove objects too. */
-    if (opts->tiered_storage)
-        strcat(dropconf, ",remove_shared=true");
     while ((ret = session->drop(session, new_uri, dropconf)) != 0)
         if (ret != EBUSY)
             testutil_die(ret, "session.drop: %s", new_uri);
@@ -418,21 +397,11 @@ test_drop(THREAD_DATA *td, int force)
     WT_SESSION *session;
     char dropconf[128];
 
-    /*
-     * Until tiered schema operations are debugged thoroughly, for tiered storage skip dropping the
-     * standard URI. We can still test tiered drops with uniquely named tables.
-     */
-    if (opts->tiered_storage)
-        return;
-
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if (use_txn)
         testutil_check(session->begin_transaction(session, NULL));
     testutil_snprintf(dropconf, sizeof(dropconf), "force=%s", force ? "true" : "false");
-    /* For testing we want to remove objects too. */
-    if (opts->tiered_storage)
-        strcat(dropconf, ",remove_shared=true");
     if ((ret = session->drop(session, uri, dropconf)) != 0)
         if (ret != ENOENT && ret != EBUSY)
             testutil_die(ret, "session.drop");
@@ -463,9 +432,6 @@ test_verify(THREAD_DATA *td)
     WT_DECL_RET;
     WT_SESSION *session;
 
-    /* Tiered tables do not support verify. */
-    if (opts->tiered_storage)
-        return;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if ((ret = session->verify(session, uri, NULL)) != 0)
@@ -572,8 +538,8 @@ thread_ckpt_run(void *arg)
     uint64_t sleep_time;
     wt_timestamp_t stable_ts_copy;
     int i;
-    char ckpt_flush_config[128], ckpt_config[128];
-    bool created_ready, flush_tier, ready_for_kill;
+    char ckpt_config[128];
+    bool created_ready, ready_for_kill;
     uint64_t diff_sec;
 
     td = (THREAD_DATA *)arg;
@@ -581,18 +547,12 @@ thread_ckpt_run(void *arg)
      * Keep a separate file with the records we wrote for checking.
      */
     (void)unlink(ready_file);
-    memset(ckpt_flush_config, 0, sizeof(ckpt_flush_config));
     memset(ckpt_config, 0, sizeof(ckpt_config));
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
     ts = 0;
     created_ready = ready_for_kill = false;
 
     testutil_snprintf(ckpt_config, sizeof(ckpt_config), "use_timestamp=true");
-
-    testutil_snprintf(
-      ckpt_flush_config, sizeof(ckpt_flush_config), "flush_tier=(enabled,force),%s", ckpt_config);
-
-    set_flush_tier_delay(&td->extra_rnd);
 
     /*
      * Keep writing checkpoints until killed by parent.
@@ -623,9 +583,7 @@ thread_ckpt_run(void *arg)
             }
         }
 
-        /* Determine if we're flushing once we know we're actually doing the checkpoint. */
-        flush_tier = false;
-        testutil_tiered_sleep(opts, session, sleep_time, &flush_tier);
+        __wt_sleep(sleep_time, 0);
 
         /*
          * Read the stable timestamp before performing a checkpoint. Before we say we're ready, we
@@ -635,24 +593,20 @@ thread_ckpt_run(void *arg)
          */
         WT_ACQUIRE_READ_WITH_BARRIER(stable_ts_copy, stable_timestamp);
 
-        /* Set the configuration based on whether we're flushing. */
-        testutil_check(session->checkpoint(session, flush_tier ? ckpt_flush_config : ckpt_config));
+        testutil_check(session->checkpoint(session, ckpt_config));
 
         /*
          * If we have a stop timestamp, we are ready if the stable has reached the requested stop
          * timestamp. If we don't have a stop timestamp, then we're ready to be killed after the
-         * first checkpoint, or if tiered storage, after the first flush_tier has been initiated.
+         * first checkpoint.
          */
         if (stop_timestamp != WT_TS_NONE) {
             if (stable_ts_copy >= stop_timestamp)
                 ready_for_kill = true;
-        } else if (!opts->tiered_storage)
-            ready_for_kill = true;
-        else if (flush_tier)
+        } else
             ready_for_kill = true;
 
-        printf("Checkpoint %d complete: Flush: %s. Minimum ts %" PRIu64 "\n", i,
-          flush_tier ? "YES" : "NO", ts);
+        printf("Checkpoint %d complete. Minimum ts %" PRIu64 "\n", i, ts);
         fflush(stdout);
 
         /*
@@ -664,18 +618,6 @@ thread_ckpt_run(void *arg)
         if (ready_for_kill && !created_ready) {
             testutil_sentinel(NULL, ready_file);
             created_ready = true;
-        }
-
-        if (flush_tier) {
-            /*
-             * FIXME: when we change the API to notify that a flush_tier has completed, we'll need
-             * to set up a general event handler and catch that notification, so we can pass the
-             * flush_tier "cookie" to the test utility function.
-             */
-            testutil_tiered_flush_complete(opts, session, NULL);
-            printf("Finished a flush_tier\n");
-
-            set_flush_tier_delay(&td->extra_rnd);
         }
     }
     /* NOTREACHED */
@@ -951,7 +893,7 @@ run_workload(void)
         strcat(envconf, ENV_CONFIG_SWEEP);
 
     /* Open WiredTiger without recovery. */
-    testutil_wiredtiger_open(opts, WT_HOME_DIR, envconf, &event_handler, &conn, false, false);
+    testutil_wiredtiger_open(opts, WT_HOME_DIR, envconf, &event_handler, &conn, false);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
@@ -972,11 +914,6 @@ run_workload(void)
     testutil_check(session->close(session, NULL));
 
     opts->conn = conn;
-
-    if (opts->tiered_storage) {
-        set_flush_tier_delay(&opts->extra_rnd);
-        testutil_tiered_begin(opts);
-    }
 
     opts->running = true;
 
@@ -1189,11 +1126,6 @@ main(int argc, char *argv[])
         if (use_lazyfs)
             testutil_lazyfs_setup(&lazyfs, home);
 
-        if (opts->tiered_storage) {
-            testutil_snprintf(buf, sizeof(buf), "%s/%s/bucket", home, WT_HOME_DIR);
-            testutil_mkdir(buf);
-        }
-
         if (rand_time) {
             timeout = __wt_random(&opts->extra_rnd) % MAX_TIME;
             if (timeout < MIN_TIME)
@@ -1216,17 +1148,15 @@ main(int argc, char *argv[])
                 nth = MIN_TH;
         }
 
-        printf(
-          "Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s, tiered in use: "
-          "%s\n",
+        printf("Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s\n",
           opts->compat ? "true" : "false", opts->inmem ? "true" : "false",
-          use_ts ? "true" : "false", opts->tiered_storage ? "true" : "false");
+          use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s%s -h %s -s %" PRIu64 " -T %" PRIu32 " -t %" PRIu32
+        printf("CONFIG: %s%s%s%s%s%s -h %s -s %" PRIu64 " -T %" PRIu32 " -t %" PRIu32
                " " TESTUTIL_SEED_FORMAT "\n",
           progname, opts->compat ? " -C" : "", use_lazyfs ? " -l" : "", opts->inmem ? " -m" : "",
-          opts->tiered_storage ? " -PT" : "", aggressive_sweep ? " -S" : "", !use_ts ? " -z" : "",
-          opts->home, stop_timestamp, nth, timeout, opts->data_seed, opts->extra_seed);
+          aggressive_sweep ? " -S" : "", !use_ts ? " -z" : "", opts->home, stop_timestamp, nth,
+          timeout, opts->data_seed, opts->extra_seed);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.
@@ -1293,7 +1223,7 @@ main(int argc, char *argv[])
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_wiredtiger_open(opts, WT_HOME_DIR, NULL, &event_handler, &conn, true, false);
+    testutil_wiredtiger_open(opts, WT_HOME_DIR, NULL, &event_handler, &conn, true);
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*

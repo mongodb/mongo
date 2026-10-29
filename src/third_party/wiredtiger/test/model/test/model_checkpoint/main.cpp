@@ -234,7 +234,7 @@ test_checkpoint_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "checkpoint";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -330,7 +330,7 @@ test_checkpoint_wt(void)
     testutil_check(conn->close(conn, nullptr));
 
     /* Reopen the database. We must do this for debug log printing to work. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Verify using the debug log. */
@@ -389,7 +389,7 @@ test_checkpoint_restart_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "checkpoint-restart";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(
       session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
@@ -426,7 +426,7 @@ test_checkpoint_restart_wt(void)
     wt_model_ckpt_create_both(nullptr);
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Add some data. */
@@ -460,7 +460,7 @@ test_checkpoint_restart_wt(void)
     wt_model_ckpt_create_both(nullptr);
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Add some data - use prepared transactions. */
@@ -496,7 +496,7 @@ test_checkpoint_restart_wt(void)
     wt_model_ckpt_create_both(nullptr);
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Verify using the debug log. */
@@ -612,7 +612,7 @@ test_checkpoint_logged_wt(void)
 
     std::string test_home = std::string(home) + DIR_DELIM_STR + "logged";
     testutil_recreate_dir(test_home.c_str());
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
@@ -681,7 +681,7 @@ test_checkpoint_logged_wt(void)
     testutil_check(conn->close(conn, nullptr));
 
     /* Reopen the database. We must do this for debug log printing to work. */
-    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_wiredtiger_open(opts, test_home.c_str(), ENV_CONFIG, nullptr, &conn, false);
     testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
 
     /* Verify using the debug log. */

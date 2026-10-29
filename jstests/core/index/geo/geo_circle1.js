@@ -1,5 +1,6 @@
 /**
  * @tags: [
+ *   uses_explain,
  *   assumes_balancer_off,
  *   # explain does not support majority read concern
  *   assumes_read_concern_local,

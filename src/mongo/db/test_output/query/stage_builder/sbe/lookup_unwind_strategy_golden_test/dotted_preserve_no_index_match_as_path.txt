@@ -1,0 +1,139 @@
+# Golden test output of LookupUnwindStrategyGoldenTest/DottedPreserveNoIndexMatchAsPath
+{ $lookup: { from: "<strategy>", localField: "lkey", foreignField: "fkey", as: "a.b" } }
+{ $unwind: { path: "$a.b", preserveNullAndEmptyArrays: true } }
+{ $match: { a.b: { $exists: true } } }
+
+## HashJoin
+[4] filter {traverseF(s13, lambda(l6.0) { exists(getField(move(l6.0), "b")) }, false)} 
+[3] project [s13 = getField(s12, "a")] 
+[3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
+[3] hash_lookup_unwind left s11 
+    outer s9 
+        [3] project [s9 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
+    inner s10 s5 
+        [3] project [s10 = arrayToSet(
+            let [
+                l5.0 = (s8 ?: null) 
+            ] 
+            in 
+                if isArray(l5.0) 
+                then concatArrays(l5.0, newArray(l5.0)) 
+                else newArray(move(l5.0)) 
+       )] 
+        [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"UUID" 
+
+## NestedLoopJoin
+[4] filter {traverseF(s11, lambda(l8.0) { exists(getField(move(l8.0), "b")) }, false)} 
+[3] project [s11 = getField(s10, "a")] 
+[3] project [s10 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s5)] 
+[3] nlj left [s1] [s9] 
+    left 
+        [3] project [s9 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
+    right 
+        [3] filter {traverseF((s8 ?: null), lambda(l7.0) { isMember(move(l7.0), s9) }, true)} 
+        [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"UUID" 
+
+## IndexedLoopJoin
+[5] filter {traverseF(s21, lambda(l12.0) { exists(getField(move(l12.0), "b")) }, false)} 
+[4] project [s21 = getField(s20, "a")] 
+[4] project [s20 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s12)] 
+[4] nlj left [s1] [s16] 
+    left 
+        [4] project [s16 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
+    right 
+        [4] filter {traverseF((s15 ?: null), lambda(l11.0) { isMember(move(l11.0), s16) }, true)} 
+        [4] nlj inner [] [s5, s6] 
+            left 
+                [4] project [s5 = ks(1ll, 0, s18, 1ll), s6 = ks(1ll, 0, s18, 2ll)] 
+                [4] unwind s18 = outField, s19 = outIndex, s17 = inField _preserveNullAndEmptyArrays 
+                [4] project [s17 = 
+                    if traverseF(s16, lambda(l9.0) { isArray(move(l9.0)) }, false) 
+                    then arrayToSet(concatArrays(s16, traverseP(s16, lambda(l10.0) { 
+                        if isArray(l10.0) 
+                        then (getElement(move(l10.0), 0) ?: undefined) 
+                        else move(l10.0) 
+                    }, 1))) 
+                    else s16 
+               ] 
+                [4] limit 1ll 
+                [4] coscan 
+            right 
+                [3] fetch s7 = seek, s12 = result, s13 = recordId, s10 = inSnapshotId, s8 = inIndexIdent, s9 = inIndexKey, s11 = inIndexKeyPattern [s14 = a, s15 = fkey] @"UUID" 
+                [2] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
+
+## DynamicIndexedLoopJoin
+[6] filter {traverseF(s27, lambda(l14.0) { exists(getField(move(l14.0), "b")) }, false)} 
+[5] project [s27 = getField(s26, "a")] 
+[5] project [s26 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s24)] 
+[5] nlj left [s1] [s20, s1] 
+    left 
+        [5] project [s20 = arrayToSet(
+            if (isArray(s4) ?: false) 
+            then 
+                if isArrayEmpty(s4) 
+                then [null] 
+                else s4 
+            
+            else newArray((s4 ?: null)) 
+       )] 
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"UUID" 
+    right 
+        [5] filter {traverseF((s25 ?: null), lambda(l13.0) { isMember(move(l13.0), s20) }, true)} 
+        [5] branch {!(traverseF(s20, lambda(l12.0) { typeMatch(move(l12.0), 1024) }, false))} [s24, s25] 
+        [s12, s15] [5] nlj inner [] [s5, s6] 
+            left 
+                [5] project [s5 = ks(1ll, 0, s22, 1ll), s6 = ks(1ll, 0, s22, 2ll)] 
+                [5] unwind s22 = outField, s23 = outIndex, s21 = inField _preserveNullAndEmptyArrays 
+                [5] project [s21 = 
+                    if traverseF(s20, lambda(l10.0) { isArray(move(l10.0)) }, false) 
+                    then arrayToSet(concatArrays(s20, traverseP(s20, lambda(l11.0) { 
+                        if isArray(l11.0) 
+                        then (getElement(move(l11.0), 0) ?: undefined) 
+                        else move(l11.0) 
+                    }, 1))) 
+                    else s20 
+               ] 
+                [5] limit 1ll 
+                [5] coscan 
+            right 
+                [3] fetch s7 = seek, s12 = result, s13 = recordId, s10 = inSnapshotId, s8 = inIndexIdent, s9 = inIndexKey, s11 = inIndexKeyPattern [s14 = a, s15 = fkey] @"UUID" 
+                [2] ixseek seekKeyLow = s5 seekKeyHigh = s6 [s9 = indexKey, s7 = recordId, s10 = snapshotId, s8 = indexIdent] [] @"UUID" @"fkey_1" forward 
+        
+        [s16, s19] [4] scan generic [s16 = record, s17 = recordId] [s18 = a, s19 = fkey] @"UUID" 
+
+## Results
+{ _id: 0, lkey: 1, n: 5, a: { x: 10, b: { _id: 10, fkey: 1, c: 100 } } }
+{ _id: 0, lkey: 1, n: 5, a: { x: 10, b: { _id: 11, fkey: 1, c: 200 } } }
+{ _id: 2, lkey: [ 3, 7 ], n: 9, a: { b: { _id: 12, fkey: 3, c: 300 } } }
+{ _id: 3, lkey: 3, joined: "preexisting", a: { x: 1, b: { _id: 12, fkey: 3, c: 300 } } }
+{ _id: 4, n: 1, a: { b: { _id: 13, fkey: null, c: 400 } } }
+{ _id: 5, lkey: null, joined: "preexisting", a: { b: { _id: 13, fkey: null, c: 400 } } }
+{ _id: 7, idx: "preexisting", lkey: 1, n: 3, joined: "preexisting", a: { b: { _id: 10, fkey: 1, c: 100 } } }
+{ _id: 7, idx: "preexisting", lkey: 1, n: 3, joined: "preexisting", a: { b: { _id: 11, fkey: 1, c: 200 } } }

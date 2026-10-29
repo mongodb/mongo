@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -33,6 +7,7 @@
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/sorter/typed_sorter_test_utils.h"
+#include "mongo/db/stats/counters_sort.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -161,6 +136,30 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     EXPECT_GT(sorterFileStats.bytesSpilled(), 0);
 }
 
+// One SortedFileWriter is one logical spill, but it flushes its buffer to the file once per
+// kSortedFileBufferSize worth of data. The 'query.sort.spillToDisk' counter must count the logical
+// spill rather than the individual buffer flushes.
+TEST_F(InMemIterTest, SpillLargerThanWriteBufferCountsAsOneSpill) {
+    const auto spillDir = makeSpillDir();
+    auto writer = FileTraits<>::makeWriter(SortOptions(), spillDir.path());
+
+    const auto spillsBefore = sortCounters.sortSpillsCounter.get();
+    const auto bytesBefore = sortCounters.sortSpillBytesCounter.get();
+
+    // The bytes counter only advances when the buffer is flushed, so write until it moves to get
+    // exactly one flush, then write one more pair so that done() flushes a second one. Both chunks
+    // belong to the same logical spill.
+    int i = 0;
+    while (sortCounters.sortSpillBytesCounter.get() == bytesBefore) {
+        writer->addAlreadySorted(IntWrapper(i), IntWrapper(-i));
+        ++i;
+    }
+    writer->addAlreadySorted(IntWrapper(i), IntWrapper(-i));
+    writer->done();
+
+    EXPECT_EQ(sortCounters.sortSpillsCounter.get() - spillsBefore, 1);
+}
+
 class ContainerInMemIterTest : public ServiceContextMongoDTest {
     // TODO (SERVER-116165): Remove.
     unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
@@ -186,6 +185,140 @@ TEST_F(ContainerInMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
 
     EXPECT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
     EXPECT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
+}
+
+using SorterBatchGuardTest = unittest::Test;
+
+// A budget this small is entirely consumed by the memory the sorter reserves for its spill
+// iterators, which leaves an effective budget of zero. So, every insertion outside of a batch
+// spills.
+constexpr size_t kSpillEveryInsertionBudgetBytes = 20;
+
+// Roomy enough that the iterator reserve still leaves several KB, so a small batch stays in memory.
+constexpr size_t kRoomyBudgetBytes = 64 * 1024;
+
+std::unique_ptr<IWSorter> makeSorterWithBudget(const SortOptions& opts,
+                                               const boost::filesystem::path& spillDir) {
+    return IWSorter::make(opts, IWComparator(ASC), FileTraits<>::makeSpiller(opts, spillDir), {});
+}
+
+TEST_F(SorterBatchGuardTest, SpillsPerInsertionOutsideOfBatch) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    for (int i = 0; i < 12; ++i) {
+        sorter->add(i, -i);
+    }
+
+    // Without a batch the sorter spills as soon as an insertion crosses the budget, so against this
+    // budget the insertions spill repeatedly. The exact range count is left unasserted because the
+    // sorter also merges spilled ranges as its iterators accumulate.
+    EXPECT_GT(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, BatchDefersSpillUntilFinish) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    for (int i = 0; i < 12; ++i) {
+        sorter->add(i, -i);
+    }
+
+    // The batch took the sorter well past its budget, but spilling stays suppressed so that the
+    // batch is not split across a spill boundary. Exceeding the budget for the length of one batch
+    // is the deliberate cost of keeping batches whole.
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+    EXPECT_GT(sorter->stats().memUsage(), kSpillEveryInsertionBudgetBytes);
+
+    // Closing the batch spills everything accumulated during it, as a single range.
+    batchGuard.finish();
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, BatchDefersSpillUntilFinishWithLimitedSorter) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.Limit(100).MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    for (int i = 0; i < 12; ++i) {
+        sorter->add(i, -i);
+    }
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+
+    batchGuard.finish();
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, DestructorWithoutFinishDoesNotSpill) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    {
+        SorterBatchGuard batchGuard{*sorter};
+        for (int i = 0; i < 12; ++i) {
+            sorter->add(i, -i);
+        }
+    }
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+
+    // The sorter is left over budget; the next insertion outside a batch spills it.
+    sorter->add(100, -100);
+    EXPECT_EQ(sorter->stats().spilledRanges(), 1);
+}
+
+TEST_F(SorterBatchGuardTest, FinishDoesNotSpillBatchThatStayedWithinBudget) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kRoomyBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    sorter->add(1, -1);
+    batchGuard.finish();
+
+    // Closing a batch only spills if the sorter is actually over its budget; a small batch stays in
+    // memory exactly as it would without a guard.
+    EXPECT_EQ(sorter->stats().spilledRanges(), 0);
+}
+
+TEST_F(SorterBatchGuardTest, DeferredSpillPreservesSortedOutput) {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    // Insert descending so that the output ordering comes from the sorter rather than the insertion
+    // order, with the batch boundary falling in the middle of the data.
+    {
+        SorterBatchGuard batchGuard{*sorter};
+        for (int i = 11; i >= 0; --i) {
+            sorter->add(i, -i);
+        }
+        batchGuard.finish();
+    }
+    for (int i = 15; i >= 12; --i) {
+        sorter->add(i, -i);
+    }
+
+    // Deferring a spill to the end of a batch must not lose or reorder anything: the merge of the
+    // batch's range with the keys added afterwards still yields every pair in sorted order.
+    auto expected = std::make_unique<IntIterator>(0, 16);
+    auto actual = sorter->done();
+    ASSERT_ITERATORS_EQUIVALENT(expected, actual);
+}
+
+using SorterBatchGuardDeathTest = SorterBatchGuardTest;
+
+DEATH_TEST_F(SorterBatchGuardDeathTest, OnlyOneBatchAtATime, "!_spillingSuppressed") {
+    auto spillDir = makeSpillDir();
+    auto opts = SortOptions{}.MaxMemoryUsageBytes(kSpillEveryInsertionBudgetBytes);
+    auto sorter = makeSorterWithBudget(opts, spillDir.path());
+
+    SorterBatchGuard batchGuard{*sorter};
+    SorterBatchGuard nestedBatchGuard{*sorter};
 }
 
 /**
@@ -1020,7 +1153,7 @@ TYPED_TEST(BoundedSorterTest, WrongInput) {
     };
 
     // Disable input order checking so we can see what happens.
-    this->sorter = this->makeAsc({}, /*spiller=*/nullptr, /*checkInput*/ false);
+    this->sorter = this->makeAsc({}, /*spiller=*/nullptr, /*checkInput=*/false);
     auto output = this->sort(input);
     ASSERT_EQ(output.size(), 7);
 

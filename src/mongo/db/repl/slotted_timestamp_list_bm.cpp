@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/slotted_timestamp_list.h"
 
@@ -106,8 +80,8 @@ void BM_ReusingHalfSlots(benchmark::State& state) {
         for (int i = 0; i < round; i++) {
             timeForHelpers += measureOperationTime([&] {
                 insertN(
-                    list, timestampsPerRound * i /*startValue*/, timestampsPerRound /*N*/, iters);
-                eraseN(list, 0 /*startIndex*/, (timestampsPerRound / 2) /*N/2*/, iters);
+                    list, /*startValue=*/timestampsPerRound * i, /*N=*/timestampsPerRound, iters);
+                eraseN(list, /*startIndex=*/0, (timestampsPerRound / 2) /*N/2*/, iters);
             });
             iters.erase(iters.begin(), iters.begin() + (timestampsPerRound / 2));
         }
@@ -123,10 +97,10 @@ void BM_EraseFIFO(benchmark::State& state) {
         const int64_t count = state.range(0);
 
         iters.reserve(count);
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
 
         auto duration =
-            measureOperationTime([&]() { eraseN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&]() { eraseN(list, /*startIndex=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -139,12 +113,12 @@ void BM_EraseLIFO(benchmark::State& state) {
         const int64_t count = state.range(0);
 
         iters.reserve(count);
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
 
         std::reverse(iters.begin(), iters.end());
 
         auto duration =
-            measureOperationTime([&] { eraseN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&] { eraseN(list, /*startIndex=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -158,12 +132,12 @@ void BM_InsertAfterEraseFIFO(benchmark::State& state) {
 
         iters.reserve(count);
 
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
-        eraseN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
+        eraseN(list, /*startIndex=*/0, /*N=*/count, iters);
         iters.clear();
 
         auto duration =
-            measureOperationTime([&] { insertN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&] { insertN(list, /*startValue=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -177,13 +151,13 @@ void BM_InsertAfterEraseLIFO(benchmark::State& state) {
 
         iters.reserve(count);
 
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
         std::reverse(iters.begin(), iters.end());
-        eraseN(list, 0 /* startIndex */, count /* N */, iters);
+        eraseN(list, /*startIndex=*/0, /*N=*/count, iters);
         iters.clear();
 
         auto duration =
-            measureOperationTime([&] { insertN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&] { insertN(list, /*startValue=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }

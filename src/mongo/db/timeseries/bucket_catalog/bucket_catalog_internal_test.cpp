@@ -1,40 +1,22 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -69,7 +51,7 @@ void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reaso
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -159,6 +141,86 @@ TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {
     }
 }
 
+TEST_F(BucketCatalogInternalTest, ReopenFetchedBucketPreservesIsRawDataOperationFlag) {
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const Collection* bucketsColl = (*autoColl).get();
+
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+
+    isRawDataOperation(_opCtx) = false;
+
+    internal::reopenFetchedBucket(_opCtx, bucketsColl, OID::gen(), stats);
+
+    ASSERT_FALSE(isRawDataOperation(_opCtx));
+}
+
+TEST_F(BucketCatalogInternalTest, ReopenQueriedBucketPreservesIsRawDataOperationFlag) {
+    {
+        DBDirectClient client{_opCtx};
+        BSONObj cmdResult;
+        client.runCommand(
+            _ns1.dbName(),
+            BSON("createIndexes"
+                 << _resolveTimeseriesNss(_ns1).coll() << "indexes"
+                 << BSON_ARRAY(BSON("key" << BSON("meta" << 1 << "control.min.time" << 1) << "name"
+                                          << "meta_1_control.min.time_1"))),
+            cmdResult);
+        ASSERT(cmdResult["ok"].trueValue()) << cmdResult;
+    }
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const Collection* bucketsColl = (*autoColl).get();
+    const auto tsOptions = _getTimeseriesOptions(_ns1);
+
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+
+    isRawDataOperation(_opCtx) = false;
+
+    internal::reopenQueriedBucket(_opCtx, bucketsColl, tsOptions, /*pipeline=*/{}, stats);
+
+    ASSERT_FALSE(isRawDataOperation(_opCtx));
+}
+class BucketCatalogInternalShardServerTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        createTestCollection(operationContext(),
+                             _ns,
+                             BSON("create" << _ns.coll() << "timeseries"
+                                           << BSON("timeField" << "time" << "metaField" << "tag")));
+    }
+
+    NamespaceString _ns = NamespaceString::createNamespaceString_forTest(
+        "bucket_catalog_internal_shard_server_test", "ts");
+    ExecutionStats _globalStats;
+};
+
+TEST_F(BucketCatalogInternalShardServerTest, StaleConfigWhenReopeningArchivedBucketDoesNotThrow) {
+    auto* opCtx = operationContext();
+    const auto bucketsNss = timeseries::test_util::resolveTimeseriesNss(_ns);
+
+    // Acquire the buckets collection before attaching a shard version, so obtaining the handle
+    // itself doesn't trip the version check.
+    AutoGetCollection autoColl(opCtx, bucketsNss, MODE_IS);
+    const Collection* bucketsColl = (*autoColl).get();
+
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+
+    const ShardVersion staleVersion =
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
+    ScopedSetShardRole scopedShardRole{
+        opCtx, bucketsNss, staleVersion, boost::none /* dbVersion */};
+
+    // Ensure that reopenFetchedBucket returns an empty BSONObj instead of throwing when the fetch
+    // encounters a StaleConfig exception.
+    BSONObj reopenedBucketDoc;
+    ASSERT_DOES_NOT_THROW(reopenedBucketDoc =
+                              internal::reopenFetchedBucket(opCtx, bucketsColl, OID::gen(), stats));
+    ASSERT_TRUE(reopenedBucketDoc.isEmpty());
+}
 
 struct GenerateBucketOIDExtendedRangeParam {
     static GenerateBucketOIDExtendedRangeParam create(int64_t millisSinceEpoch, bool setsFlag) {
@@ -232,6 +294,107 @@ INSTANTIATE_TEST_SUITE_P(
         // higher resolution than seconds, the flag should not be set as the control.min[timeField]
         // on the bucket will be within the standard range.
         GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'7FFF'FFFFLL * 1000 + 1LL, false)));
+
+TEST_F(BucketCatalogInternalTest, PredictNextBucketOIDMatchesActualNextOID) {
+    TimeseriesOptions options;
+    const Date_t timestamp = Date_t::now();
+
+    [[maybe_unused]] auto [oid1, unusedTs1] = internal::generateBucketOID(timestamp, options);
+    auto predicted2 = predictNextBucketOID(oid1);
+    [[maybe_unused]] auto [oid2, unusedTs2] = internal::generateBucketOID(timestamp, options);
+    ASSERT_EQ(predicted2, oid2);
+
+    auto predicted3 = predictNextBucketOID(oid2);
+    [[maybe_unused]] auto [oid3, unusedTs3] = internal::generateBucketOID(timestamp, options);
+    ASSERT_EQ(predicted3, oid3);
+}
+
+TEST_F(BucketCatalogInternalTest, OIDCollisionDoesNotRemoveExistingBucketId) {
+    // For simplicity, use only one stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+
+    auto key = BucketKey(_uuid1,
+                         BucketMetadata(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                           TrackingScope::kOpenBucketsByKey),
+                                        BSONElement{},
+                                        boost::none));
+    TimeseriesOptions options;
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+    const Date_t timestamp = Date_t::now();
+
+    auto [currentOID, roundedTime] = internal::generateBucketOID(timestamp, options);
+    auto collidingOID = predictNextBucketOID(currentOID);
+    BucketId collidingBucketId{key.collectionUUID, collidingOID, key.signature()};
+
+    // Manually insert a bucket at collidingBucketId to simulate a pre-existing entry.
+    auto [it, inserted] = _bucketCatalog->stripes[0]->openBucketsById.try_emplace(
+        collidingBucketId,
+        tracking::make_unique<Bucket>(
+            getTrackingContext(_bucketCatalog->trackingContexts, TrackingScope::kOpenBucketsById),
+            _bucketCatalog->trackingContexts,
+            collidingBucketId,
+            key,
+            options.getTimeField(),
+            roundedTime,
+            _bucketCatalog->bucketStateRegistry));
+    ASSERT_TRUE(inserted);
+    ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, collidingBucketId));
+
+    ASSERT(_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
+
+    // Allocate a bucket. The first attempt collides with collidingBucketId, after which we reset
+    // the counter and then successfully retry with a new OID.
+    Bucket& newBucket = internal::allocateBucket(*_bucketCatalog,
+                                                 *_bucketCatalog->stripes[0],
+                                                 WithLock::withoutLock(),
+                                                 key,
+                                                 options,
+                                                 timestamp,
+                                                 nullptr,
+                                                 stats);
+
+    EXPECT_NE(collidingBucketId, newBucket.bucketId);
+    // The existing entry should still exist.
+    ASSERT(_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
+}
+
+TEST_F(BucketCatalogInternalTest,
+       OIDCollisionInBucketStateRegistryDoesNotLeaveDanglingEntryInOpenBucketsById) {
+    // For simplicity, use only one stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+
+    auto key = BucketKey(_uuid1,
+                         BucketMetadata(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                           TrackingScope::kOpenBucketsByKey),
+                                        BSONElement{},
+                                        boost::none));
+    TimeseriesOptions options;
+    auto collectionStats = std::make_shared<ExecutionStats>();
+    ExecutionStatsController stats(collectionStats, _globalStats);
+    const Date_t timestamp = Date_t::now();
+
+    auto [currentOID, unused] = internal::generateBucketOID(timestamp, options);
+    auto frozenOID = predictNextBucketOID(currentOID);
+    BucketId frozenBucketId{key.collectionUUID, frozenOID, key.signature()};
+
+    // Freeze the bucket state so initializeBucketState will fail for this ID. There should be an
+    // entry for this bucketId in the bucket state registry but none in the openBucketsById map.
+    freezeBucket(_bucketCatalog->bucketStateRegistry, frozenBucketId);
+    ASSERT_FALSE(_bucketCatalog->stripes[0]->openBucketsById.contains(frozenBucketId));
+
+    Bucket& newBucket = internal::allocateBucket(*_bucketCatalog,
+                                                 *_bucketCatalog->stripes[0],
+                                                 WithLock::withoutLock(),
+                                                 key,
+                                                 options,
+                                                 timestamp,
+                                                 nullptr,
+                                                 stats);
+
+    EXPECT_NE(frozenBucketId, newBucket.bucketId);
+    ASSERT_FALSE(_bucketCatalog->stripes[0]->openBucketsById.contains(frozenBucketId));
+}
 
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

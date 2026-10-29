@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/plan_explainer_factory.h"
 
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 
 #include <utility>
 
@@ -42,15 +17,21 @@ namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
                                     boost::optional<std::string> replanReason) {
-    return make(root, cachedPlanHash, std::move(replanReason), boost::none);
+    return make(root, cachedPlanHash, std::move(replanReason), boost::none, /*isExplain=*/false);
 }
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
                                     boost::optional<std::string> replanReason,
-                                    boost::optional<PlanExplainerData> maybeExplainData) {
-    return std::make_unique<PlanExplainerImpl>(
-        root, cachedPlanHash, std::move(replanReason), std::move(maybeExplainData));
+                                    boost::optional<PlanExplainerData> maybeExplainData,
+                                    bool isExplain,
+                                    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
+    return std::make_unique<PlanExplainerImpl>(root,
+                                               cachedPlanHash,
+                                               std::move(replanReason),
+                                               std::move(maybeExplainData),
+                                               isExplain,
+                                               planSelectionStrategy);
 }
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo) {
@@ -69,9 +50,9 @@ std::unique_ptr<PlanExplainer> make(
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains,
     bool usedJoinOpt,
-    cost_based_ranker::EstimateMap estimates,
     std::vector<JoinOptPlan> rejectedPlans,
-    boost::optional<PlanExplainerData> maybeExplainData) {
+    boost::optional<PlanExplainerData> maybeExplainData,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
     if (!debugInfoSBE) {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
             plan_cache_util::buildDebugInfo(nss, solution));
@@ -87,8 +68,8 @@ std::unique_ptr<PlanExplainer> make(
         std::move(classicRuntimePlannerStage),
         remoteExplains,
         usedJoinOpt,
-        std::move(estimates),
         std::move(rejectedPlans),
-        std::move(maybeExplainData));
+        std::move(maybeExplainData),
+        planSelectionStrategy);
 }
 }  // namespace mongo::plan_explainer_factory

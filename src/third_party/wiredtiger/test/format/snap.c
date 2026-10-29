@@ -31,6 +31,18 @@
 #define SNAP_LIST_SIZE 512
 
 /*
+ * snap_repeat_ts_span --
+ *     Return the span of global timestamps a thread's snap list covers: one timestamp is allocated
+ *     per operation across all threads, and each thread keeps its last SNAP_LIST_SIZE operations.
+ *     Timestamps within this distance of stable must stay readable for snap_repeat.
+ */
+wt_timestamp_t
+snap_repeat_ts_span(void)
+{
+    return ((wt_timestamp_t)SNAP_LIST_SIZE * GV(RUNS_THREADS));
+}
+
+/*
  * snap_init --
  *     Initialize the repeatable operation tracking.
  */
@@ -505,10 +517,25 @@ int
 snap_repeat_txn(TINFO *tinfo)
 {
     SNAP_OPS *current;
+    WT_CURSOR *cursor;
+    u_int i;
 
     /* If we wrapped the buffer, we can't repeat operations. */
     if (tinfo->repeatable_wrap)
         return (0);
+
+    /*
+     * With disaggregated storage, close the operation cursors so the repeated reads go through
+     * freshly opened ones. A checkpoint pickup may have completed while this transaction was
+     * running, and a cursor opened after the pickup must still read the transaction's snapshot;
+     * only a cursor's first use exercises that path.
+     */
+    if (g.disagg_storage_config)
+        for (i = 0; i < WT_MAX(ntables, 1); ++i)
+            if ((cursor = tinfo->cursors[i]) != NULL) {
+                testutil_check(cursor->close(cursor));
+                tinfo->cursors[i] = NULL;
+            }
 
     /* Check from the first operation we saved to the last. */
     for (current = tinfo->snap_first;; ++current) {

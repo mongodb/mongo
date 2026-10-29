@@ -1,0 +1,18 @@
+VARIATION NegatedArrayTypeRemovesArrayBracket
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  end of pipeline
+    x: ~array
+

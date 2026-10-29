@@ -23,6 +23,7 @@
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 // Runs `func` and retries if it is interrupted with a transient timeseries upgrade/downgrade error.
 function withRetryOnTimeseriesUpgradeDowngradeError(func) {
@@ -162,9 +163,7 @@ export const $config = (function () {
             configureFailPoint(adminDb, "hangBeforePublishingCatalogUpdates", {}, "off");
         });
 
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
-        );
+        setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
     };
 
     return {

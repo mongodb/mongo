@@ -1,0 +1,210 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "_id": true,
+                        "renamedField": "$a"
+                    }
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromA"
+            },
+            {
+                "collectionName": "test.B",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "_id": true,
+                        "cRenamed": "$c"
+                    }
+                },
+                "embedPath": "fromB"
+            },
+            {
+                "collectionName": "test.C",
+                "accessPath": {
+                    "filter": {},
+                    "projection": {
+                        "_id": true,
+                        "dRenamed": "$d"
+                    }
+                },
+                "embedPath": "fromC"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"1"},
+                        "right": {"$numberInt":"2"}
+                    }
+                ],
+                "left": {"$numberInt":"1"},
+                "right": {"$numberInt":"2"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "exprEq",
+                        "left": {"$numberInt":"2"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": {"$numberInt":"2"},
+                "right": {"$numberInt":"3"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"2"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"2"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"3"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"1"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": {"$numberInt":"1"},
+                "right": {"$numberInt":"3"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "underlyingFieldPath": "a",
+            "fieldPathAfterRenames": "renamedField"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "underlyingFieldPath": "b"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "underlyingFieldPath": "c",
+            "fieldPathAfterRenames": "cRenamed"
+        },
+        {
+            "nodeId": {"$numberInt":"3"},
+            "underlyingFieldPath": "d",
+            "fieldPathAfterRenames": "dRenamed"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "renamedField",
+                "foreignField": "b"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "fromA.b",
+                "foreignField": "c",
+                "let": {},
+                "pipeline": [
+                    {
+                        "$project": {
+                            "_id": true,
+                            "cRenamed": "$c"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "let": {},
+                "pipeline": [
+                    {
+                        "$project": {
+                            "_id": true,
+                            "dRenamed": "$d"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$fromC.dRenamed",
+                        "$fromB.cRenamed"
+                    ]
+                }
+            }
+        }
+    ],
+    "suffix": [
+        {
+            "$project": {
+                "_id": true,
+                "renameAgain": "$fromC.dRenamed"
+            }
+        }
+    ]
+}

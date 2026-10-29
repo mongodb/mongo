@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -37,39 +11,39 @@
 #include <string_view>
 
 namespace mongo {
-namespace MONGO_MOD_PUB mongot_cursor {
+namespace [[MONGO_MOD_PUBLIC]] mongot_cursor {
+using namespace std::literals::string_view_literals;
 inline auto makeRetryOnNetworkErrorPolicy() {
     return [retried = false](const Status& st) mutable {
         return std::exchange(retried, true) ? false : ErrorCodes::isNetworkError(st);
     };
 }
 
-static constexpr std::string_view kSearchField = "search"_sd;
-static constexpr std::string_view kVectorSearchCmd = "vectorSearch"_sd;
-static constexpr std::string_view kCollectionUuidField = "collectionUUID"_sd;
-static constexpr std::string_view kQueryField = "query"_sd;
-static constexpr std::string_view kViewNameField = "viewName"_sd;
-static constexpr std::string_view kExplainField = "explain"_sd;
-static constexpr std::string_view kVerbosityField = "verbosity"_sd;
-static constexpr std::string_view kIntermediateField = "intermediate"_sd;
-static constexpr std::string_view kCursorOptionsField = "cursorOptions"_sd;
-static constexpr std::string_view kDocsRequestedField = "docsRequested"_sd;
-static constexpr std::string_view kBatchSizeField = "batchSize"_sd;
-static constexpr std::string_view kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
-static constexpr std::string_view kReturnStoredSourceArg = "returnStoredSource"_sd;
-static constexpr std::string_view kReturnScopeArg = "returnScope"_sd;
-static constexpr std::string_view kSlowQueryLogFieldName = "slowQueryLog"_sd;
-static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"_sd;
-static constexpr std::string_view kSearchRootDocumentIdFieldName = "searchRootDocumentId"_sd;
-static constexpr std::string_view kOptimizationFlagsField = "optimizationFlags"_sd;
-static constexpr std::string_view kOmitSearchDocumentResultsField = "omitSearchDocumentResults"_sd;
+static constexpr std::string_view kSearchField = "search"sv;
+static constexpr std::string_view kVectorSearchCmd = "vectorSearch"sv;
+static constexpr std::string_view kCollectionUuidField = "collectionUUID"sv;
+static constexpr std::string_view kQueryField = "query"sv;
+static constexpr std::string_view kViewNameField = "viewName"sv;
+static constexpr std::string_view kExplainField = "explain"sv;
+static constexpr std::string_view kVerbosityField = "verbosity"sv;
+static constexpr std::string_view kIntermediateField = "intermediate"sv;
+static constexpr std::string_view kCursorOptionsField = "cursorOptions"sv;
+static constexpr std::string_view kBatchSizeField = "batchSize"sv;
+static constexpr std::string_view kRequiresSearchSequenceToken = "requiresSearchSequenceToken"sv;
+static constexpr std::string_view kReturnStoredSourceArg = "returnStoredSource"sv;
+static constexpr std::string_view kReturnScopeArg = "returnScope"sv;
+static constexpr std::string_view kSlowQueryLogFieldName = "slowQueryLog"sv;
+static constexpr std::string_view kScoreDetailsFieldName = "scoreDetails"sv;
+static constexpr std::string_view kSearchRootDocumentIdFieldName = "searchRootDocumentId"sv;
+static constexpr std::string_view kOptimizationFlagsField = "optimizationFlags"sv;
+static constexpr std::string_view kOmitSearchDocumentResultsField = "omitSearchDocumentResults"sv;
 
 static constexpr long long kMinimumMongotBatchSize = 10;
 static constexpr long long kDefaultMongotBatchSize = 101;
 
 // Default sort spec is to sort decreasing by search score.
 static const BSONObj kSortSpec = BSON("$searchScore" << -1);
-static constexpr std::string_view kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
+static constexpr std::string_view kSearchSortValuesFieldPrefix = "$searchSortValues."sv;
 
 /**
  * Set of OptimizationFlags that can be passed in a mongot search request
@@ -189,5 +163,5 @@ void throwIfNotRunningWithMongotHostConfigured(
  * in TaskExecutorCursor.
  */
 bool shouldPinConnection();
-}  // namespace MONGO_MOD_PUB mongot_cursor
+}  // namespace mongot_cursor
 }  // namespace mongo

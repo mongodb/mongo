@@ -1,3 +1,6 @@
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load("@rules_cc//cc/common:debug_package_info.bzl", "DebugPackageInfo")
+
 SKIP_FUNCTIONS = []
 
 def _bolt_instrument_impl(ctx):
@@ -57,6 +60,7 @@ def _bolt_optimize_impl(ctx):
         "-split-eh",
         "-dyno-stats",
         "--lite",
+        "--lite-threshold-pct=50",
         "--update-debug-sections",
     ]
     if ctx.attr.use_gnu_stack:

@@ -1,8 +1,14 @@
+import {RateLimiterKind} from "jstests/libs/admission/rate_limiter.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const maxInt32 = Math.pow(2, 31) - 1;
-const kKeyFile = "jstests/libs/key1";
+
+/**
+ * Keyfile used to authenticate as __system for direct shard/config node access in sharded
+ * cluster tests.
+ */
+export const kKeyFile = "jstests/libs/key1";
 
 // Restore sane parameters for the end of a test to ensure
 // rate limiting is disabled during shutdown.
@@ -30,10 +36,10 @@ export const kZeroBurstCapacitySecs = 5e-6;
 export const kRateLimiterExemptAppName = "testRateLimiter";
 
 /**
- * AppName prefixes for all MongoDB-internal connections that must be exempt from the ingress
- * request rate limiter in a sharded cluster test. Covers general cluster infrastructure
- * (replication, DDL coordination, sharding executors, initial sync, rollback, cloning, oplog
- * fetching) as well as resharding-specific connections.
+ * AppName prefixes for MongoDB-internal connections that must be exempt from the ingress request rate limiter (IRRL) in sharded
+ * cluster tests. This is the subset of exemptions that applies to direct shard/config node
+ * connections opened during noPassthrough tests. It deliberately excludes ops-tooling names
+ * (Resmoke-Hook, MongoDB Automation Agent, mongotune, mongot, etc.) that are irrelevant here.
  *
  * The server uses prefix (starts_with) matching, so "NetworkInterfaceTL-Repl" covers
  * ReplNetwork, ReplCoordExternNetwork, and ReplNodeDbWorkerNetwork;
@@ -41,8 +47,14 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Reshard"
  * covers all resharding NetworkInterfaceTL names.
  *
- * Sourced from:
- *   https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs
+ * Authoritative upstream source (production config):
+ *   https://github.com/10gen/mongotune/blob/3c9fab88663772d957b901cf7501aaae5a352057/crates/mongotune-core/src/exemptions.rs#L28
+ *
+ * The suite-level counterpart (which adds Resmoke-Hook, MongoDB Automation Agent, mongotune,
+ * mongot, and other ops-tooling names not relevant here) is the appNameExemptions anchor in:
+ *   buildscripts/resmokeconfig/matrix_suites/overrides/rate_limiter_with_auth.yml
+ *
+ * When adding a new internal executor, update both this list and the YAML anchor referenced above.
  */
 export const kInternalConnectionAppNameExemptions = [
     "MongoDB Internal Client",
@@ -51,11 +63,9 @@ export const kInternalConnectionAppNameExemptions = [
     "NetworkInterfaceTL-HelloMe-TaskExecutor",
     "NetworkInterfaceTL-Repl",
     "NetworkInterfaceTL-Reshard",
-    "NetworkInterfaceTL-StandaloneNetwork",
     "NetworkInterfaceTL-Sharding-Fixed",
     "NetworkInterfaceTL-ShardingCoordinatorNetwork",
-    "ReplCoordExtern",
-    "InitialSyncer",
+    "NetworkInterfaceTL-StandaloneNetwork",
     "Rollback",
     "Cloner",
     "OplogFetcher",
@@ -90,7 +100,7 @@ const kPass = "pwd";
  *
  * To authenticate connections other than the exempt conn, use 'authenticateConnection'.
  */
-function setupAuth(conn, exemptConn) {
+export function setupAuth(conn, exemptConn) {
     // Since rate limiting only applies when authenticated, create a user and authenticate.
     const admin = conn.getDB("admin");
     admin.createUser({user: kUser, pwd: kPass, roles: ["root"]});
@@ -116,10 +126,16 @@ export function makeAuthConn(host) {
 
 /**
  * Returns a new authenticated exempt connection to host.
+ *
+ * Pass `{authenticate: false}` when the connection is opened before the admin user exists, which is
+ * the case for the exempt connection that is then handed to `setupAuth`. Authenticating such a connection
+ * here would silently fail rather than throw.
  */
-export function makeExemptConn(host) {
+export function makeExemptConn(host, {authenticate = true} = {}) {
     const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
-    authenticateConnection(conn);
+    if (authenticate) {
+        authenticateConnection(conn);
+    }
     return conn;
 }
 
@@ -141,10 +157,33 @@ export function makeKeyfileExemptConn(host) {
 /**
  * Enables a near-zero-burst IRRL on conn. Sets burst capacity to kZeroBurstCapacitySecs so the
  * token bucket starts essentially empty and every non-exempt connection is immediately rejected.
- * Uses keyfile auth via authutil.asCluster since conn is a raw (unauthenticated) node connection.
+ *
+ * By default the setParameter is issued using `conn`'s existing authentication. Pass
+ * `{useKeyFileAuth: true}` to instead authenticate `conn` as `__system` via the keyfile for the
+ * duration of the call (a side effect that re-authenticates and logs out `conn`); this is required
+ * when `conn` is a raw, unauthenticated node connection (e.g. a ReplSetTest primary).
+ *
+ * Tests that configure the ingressRequestRateLimiterFractionalRateOverride failpoint at startup
+ * (via kConfigLogsAndFailPointsForRateLimiterTests) do not need to set it again. Tests that start
+ * without that failpoint (e.g. those that toggle IRRL on and off mid-run) can pass
+ * {setRefreshRateFailpoint: true} so the near-zero refresh rate is applied here, keeping the token
+ * bucket effectively empty for the whole time IRRL is enabled.
  */
-export function enableZeroBurstRateLimiter(conn, exemptions) {
-    authutil.asCluster(conn, kKeyFile, () => {
+export function enableZeroBurstRateLimiter(
+    conn,
+    exemptions,
+    {setRefreshRateFailpoint = false, useKeyFileAuth = false} = {},
+) {
+    const configure = () => {
+        if (setRefreshRateFailpoint) {
+            assert.commandWorked(
+                conn.adminCommand({
+                    configureFailPoint: "ingressRequestRateLimiterFractionalRateOverride",
+                    mode: "alwaysOn",
+                    data: {rate: kSlowestRefreshRateSecs},
+                }),
+            );
+        }
         assert.commandWorked(
             conn.adminCommand({
                 setParameter: 1,
@@ -154,15 +193,24 @@ export function enableZeroBurstRateLimiter(conn, exemptions) {
                 ingressRequestRateLimiterEnabled: 1,
             }),
         );
-    });
+    };
+    if (useKeyFileAuth) {
+        authutil.asCluster(conn, kKeyFile, configure);
+    } else {
+        configure();
+    }
 }
 
 /**
- * Disables IRRL on the node at host and restores sane rate/burst parameters. Opens a fresh
- * keyfile-authenticated exempt connection so it works for direct shard/config nodes.
+ * Disables IRRL on the given node and restores sane rate/burst parameters.
+ *
+ * Accepts either a host string or an already-authenticated connection (e.g. an exemptConn). When
+ * given a host, it opens a fresh keyfile-authenticated exempt connection (via makeKeyfileExemptConn)
+ * so it works for direct shard/config nodes; when given a connection, it issues the setParameter
+ * using that connection's existing authentication, avoiding the keyfile auth side effect.
  */
-export function disableRateLimiter(host) {
-    const conn = makeKeyfileExemptConn(host);
+export function disableRateLimiter(hostOrConn) {
+    const conn = typeof hostOrConn === "string" ? makeKeyfileExemptConn(hostOrConn) : hostOrConn;
     assert.commandWorked(
         conn.adminCommand({
             setParameter: 1,
@@ -223,7 +271,11 @@ export function withRateLimitingDisabled(exemptConn, fn) {
  */
 export function withForcedQueueing(exemptConn, fn) {
     assert.commandWorked(
-        exemptConn.adminCommand({configureFailPoint: "hangInRateLimiter", mode: "alwaysOn"}),
+        exemptConn.adminCommand({
+            configureFailPoint: "hangInRateLimiter",
+            mode: "alwaysOn",
+            data: {limiter: RateLimiterKind.IngressRequestRateLimiter},
+        }),
     );
     try {
         fn();
@@ -250,6 +302,107 @@ export const kExpectedErrorLabels = [
 export function assertContainsExpectedErrorLabels(res) {
     assert(res.hasOwnProperty("errorLabels"), res);
     assert.sameMembers(kExpectedErrorLabels, res.errorLabels);
+}
+
+/**
+ * Returns the shardingStatistics for the given shard from a mongos admin connection.
+ */
+export function getShardStats(adminConn, shardName) {
+    return adminConn.getDB("admin").serverStatus().shardingStatistics.shards[shardName];
+}
+
+/**
+ * Returns the difference between two shardingStatistics snapshots (as returned by
+ * getShardStats), for use in asserting on overload/retry counters observed during a test.
+ */
+export function shardingStatisticsDifference(after, before) {
+    return {
+        numOperationsAttempted: after.numOperationsAttempted - before.numOperationsAttempted,
+        numOperationsRetriedAtLeastOnceDueToOverload:
+            after.numOperationsRetriedAtLeastOnceDueToOverload -
+            before.numOperationsRetriedAtLeastOnceDueToOverload,
+        numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded:
+            after.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded -
+            before.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded,
+        numRetriesDueToOverloadAttempted:
+            after.numRetriesDueToOverloadAttempted - before.numRetriesDueToOverloadAttempted,
+        numRetriesRetargetedDueToOverload:
+            after.numRetriesRetargetedDueToOverload - before.numRetriesRetargetedDueToOverload,
+        numOverloadErrorsReceived:
+            after.numOverloadErrorsReceived - before.numOverloadErrorsReceived,
+        totalBackoffTimeMillis: after.totalBackoffTimeMillis - before.totalBackoffTimeMillis,
+        retryBudgetTokenBucketBalance:
+            after.retryBudgetTokenBucketBalance - before.retryBudgetTokenBucketBalance,
+    };
+}
+
+/**
+ * Asserts that the overload-related shardingStatistics counters in `diff` (as returned by
+ * shardingStatisticsDifference) match `expected`; only the listed fields are checked, so callers
+ * can assert as many or as few counters as relevant.
+ */
+export function assertShardingStatisticsDiffEq(diff, expected) {
+    for (const [name, value] of Object.entries(expected)) {
+        assert.eq(diff[name], value, `unexpected ${name}`, {diff});
+    }
+}
+
+/**
+ * Asserts a top-level command failure carrying the IngressRequestRateLimitExceeded code and the
+ * SystemOverloadedError label mongos derives fresh for the client-facing reply (independent of
+ * whatever labels the failpoint injected at the shard).
+ */
+export function assertMongosIRRLCommandFailure(result, message) {
+    assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded, message);
+    assert.eq(result.errorLabels, ["SystemOverloadedError"]);
+}
+
+/**
+ * Arms the failCommand failpoint on shardHost via an exempt keyfile-authenticated connection, so
+ * calls to the target commands are rejected with IngressRequestRateLimitExceeded. Uses
+ * failCommand (not failIngressRequestRateLimiting) so that fires can be scoped to specific
+ * commands/namespace, preventing background operations from consuming them.
+ */
+export function enableFailCommandOnShards(shardHost, mode, failCommands, namespace) {
+    const conn = new Mongo(`mongodb://${shardHost}/?appName=${kRateLimiterExemptAppName}`);
+    authutil.asCluster(conn, kKeyFile, () => {
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "failCommand",
+                mode,
+                data: {
+                    errorCode: ErrorCodes.IngressRequestRateLimitExceeded,
+                    failCommands,
+                    failInternalCommands: true,
+                    namespace,
+                    errorLabels: kExpectedErrorLabels,
+                },
+            }),
+        );
+    });
+}
+
+/**
+ * Disables the failCommand failpoint armed by enableFailCommandOnShards on shardHost.
+ */
+export function disableFailCommandOnShards(shardHost) {
+    const conn = new Mongo(`mongodb://${shardHost}/?appName=${kRateLimiterExemptAppName}`);
+    authutil.asCluster(conn, kKeyFile, () => {
+        assert.commandWorked(conn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+    });
+}
+
+/**
+ * Sets each parameter in `params` on conn and returns the previous values, so a second call with
+ * the returned object restores the originals.
+ */
+export function setParameter(conn, params) {
+    const getCmd = {getParameter: 1};
+    for (const name in params) getCmd[name] = 1;
+    const orig = assert.commandWorked(conn.adminCommand(getCmd));
+
+    assert.commandWorked(conn.adminCommand({setParameter: 1, ...params}));
+    return Object.fromEntries(Object.keys(params).map((name) => [name, orig[name]]));
 }
 
 /**

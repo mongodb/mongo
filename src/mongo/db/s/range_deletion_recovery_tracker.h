@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,11 +8,24 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/observable_mutex.h"
 
+#include <set>
+#include <string_view>
+
 namespace mongo {
+
+enum class [[MONGO_MOD_PUBLIC]] RecoveryJob {
+    kRangeDeleter,
+    kLegacyMigration,
+    kMoveRangeCoordinator,
+};
+
+constexpr std::string_view toString(RecoveryJob job);
 
 class RangeDeletionRecoveryTracker {
 public:
     using Term = long long;
+
+
     // Indicates whether all recovery jobs completed before the term ended.
     enum class Outcome {
         kComplete,    // All recovery jobs completed before the term ended.
@@ -62,8 +49,8 @@ public:
     RangeDeletionRecoveryTracker();
 
     [[nodiscard]] std::unique_ptr<ActiveTerm> notifyStartOfTerm(Term term);
-    void registerRecoveryJob(Term term);
-    void notifyRecoveryJobComplete(Term term);
+    void registerRecoveryJob(Term term, RecoveryJob job);
+    void notifyRecoveryJobComplete(Term term, RecoveryJob job);
     SharedSemiFuture<Outcome> getRecoveryFuture(Term term);
     size_t getTrackedTermsCount() const;
 
@@ -73,14 +60,13 @@ private:
     boost::optional<Term> _highestEndedTerm;
 
     struct TermState {
-        boost::optional<int8_t> remainingJobCount;
+        std::set<RecoveryJob> recoveryJobs;
         SharedPromise<Outcome> recoveryCompletePromise;
     };
     std::map<Term, TermState> _termStates;
 
     TermState* getStateForTerm(WithLock, Term term);
     bool isTermTooOld(WithLock, Term term);
-    bool isRemainingJobCountValid(const boost::optional<int8_t>& count);
     void notifyEndOfTerm(Term term);
     void cleanUpOldTerms(WithLock);
     void ensurePromiseSet(SharedPromise<Outcome>& promise, Outcome outcome);

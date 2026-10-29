@@ -10,6 +10,7 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   featureFlagChangeStreamReaderV2,
  *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
@@ -29,7 +30,15 @@ import {createShardingTest} from "jstests/libs/util/change_stream/change_stream_
 import {ChangeStreamTest, ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
 
-const ignoredEventTypes = ["createIndexes", "dropIndexes", "startIndexBuild", "commitIndexBuild"];
+const ignoredEventTypes = [
+    "createIndexes",
+    "dropIndexes",
+    "startIndexBuild",
+    "commitIndexBuild",
+    // Not exercised by this test; upconverted under whole-db/cluster passthrough, which picks up
+    // unrelated internal transactions from resharding's temp collections.
+    "endOfTransaction",
+];
 
 function buildCommands({dbName, collName, shards, shardingType, nonEmpty}) {
     const shardKey = getShardKeySpec(shardingType);

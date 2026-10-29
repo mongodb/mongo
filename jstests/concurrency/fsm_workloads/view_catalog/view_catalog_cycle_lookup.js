@@ -161,6 +161,8 @@ export const $config = (function () {
                 ErrorCodes.CursorNotFound,
                 ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
                 ErrorCodes.QueryPlanKilled,
+                // A concurrent collMod may temporarily introduce a cycle in the view graph.
+                ErrorCodes.MaxSubPipelineDepthExceeded,
             ]);
         }
 

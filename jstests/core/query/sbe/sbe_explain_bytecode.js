@@ -2,6 +2,7 @@
  * Tests that the SBE bytecode is included in the explain output.
  *
  * @tags: [
+ *    uses_explain,
  *    assumes_against_mongod_not_mongos,
  *    # Explain command does not support read concerns other than local.
  *    assumes_read_concern_local,

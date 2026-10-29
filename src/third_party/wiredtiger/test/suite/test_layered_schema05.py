@@ -74,6 +74,11 @@ class test_layered_schema05(wttest.WiredTigerTestCase):
         # Step up and checkpoint.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
         self.conn.reconfigure('disaggregated=(role="leader")')
+
+        # Both tables were created while a follower, so stepping up creates both stable constituents.
+        self.assertEqual(
+            self.get_stat(wiredtiger.stat.conn.disagg_step_up_missing_stable_tables_created), 2)
+
         self.session.checkpoint()
 
         # Restart without local files to check that the tables are created and have correct data.

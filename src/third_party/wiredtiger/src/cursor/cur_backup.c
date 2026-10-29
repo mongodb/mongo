@@ -127,7 +127,7 @@ __wt_backup_open(WT_SESSION_IMPL *session)
      */
     F_CLR_ATOMIC_32(conn, WT_CONN_INCR_BACKUP);
     i = 0;
-    while (__wt_config_next(&blkconf, &k, &v) == 0) {
+    while ((ret = __wt_config_next(&blkconf, &k, &v)) == 0) {
         WT_ASSERT(session, i < WT_BLKINCR_MAX);
         /*
          * If we get here, we have at least one valid incremental backup. We want to set up its
@@ -136,6 +136,7 @@ __wt_backup_open(WT_SESSION_IMPL *session)
         WT_ERR(__wt_config_subgets(session, &v, "granularity", &b));
         WT_ERR(__wt_backup_set_blkincr(session, i++, (uint64_t)b.val, k.str, (uint32_t)k.len));
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
     if (ret != 0 && ret != WT_NOTFOUND)
@@ -266,7 +267,12 @@ err:
     if (F_ISSET(cb, WT_CURBACKUP_FORCE_STOP)) {
         __wt_verbose(
           session, WT_VERB_BACKUP, "%s", "Releasing resources from forced stop incremental");
-        __wt_backup_destroy(session);
+        /*
+         * Checkpoints read the connection's backup identifiers with no synchronization beyond the
+         * checkpoint lock they already hold, so take that lock to keep an in-flight checkpoint from
+         * reading an identifier as this releases it.
+         */
+        WT_WITH_CHECKPOINT_LOCK(session, __wt_backup_destroy(session));
     }
 
     /*
@@ -376,13 +382,6 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     } else if (WT_STRING_LIT_MATCH("backup:export", uri, uri_len))
         /* Special backup cursor for export operation. */
         F_SET(cb, WT_CURBACKUP_EXPORT);
-
-    /*
-     * Export cursors are for tiered storage. Do not allow backup cursors if tiered storage is in
-     * use on the connection and it isn't an export cursor.
-     */
-    if (WT_CONN_TIERED_STORAGE_ENABLED(S2C(session)) && !F_ISSET(cb, WT_CURBACKUP_EXPORT))
-        WT_ERR(ENOTSUP);
 
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
@@ -977,9 +976,8 @@ __backup_list_uri_append(WT_SESSION_IMPL *session, const char *name, bool *skip)
      * confused.
      */
     if (!WT_PREFIX_MATCH(name, "file:") && !WT_PREFIX_MATCH(name, "colgroup:") &&
-      !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, "object:") &&
-      !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) && !WT_PREFIX_MATCH(name, "table:") &&
-      !WT_PREFIX_MATCH(name, "tier:") && !WT_PREFIX_MATCH(name, "tiered:"))
+      !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) &&
+      !WT_PREFIX_MATCH(name, "table:"))
         WT_RET_MSG(session, ENOTSUP, "hot backup is not supported for objects of type %s", name);
 
     /* Add the metadata entry to the backup file. */

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/version_context.h"
@@ -33,6 +7,7 @@
 // Override waitForOperationsNotMatchingVersionContextToComplete's internal re-check interval
 MONGO_FAIL_POINT_DEFINE(waitBeforeFixedOperationFCVRegionRaceCheck);
 MONGO_FAIL_POINT_DEFINE(reduceWaitForOfcvInternalIntervalTo10Ms);
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
@@ -119,6 +94,23 @@ VersionContext::FixedOperationFCVRegion::~FixedOperationFCVRegion() {
     _getDecoration(_opCtx).resetToOperationWithoutOFCV();
 }
 
+void VersionContext::markDecorationAsLongRunning(ClientLock& /* lk */, OperationContext* opCtx) {
+    auto& decoration = _getDecoration(opCtx);
+    tassert(12540000,
+            "markDecorationAsLongRunning must be called after an OFCV has been set",
+            decoration.hasOperationFCV());
+    decoration._isLongRunningOperation = true;
+}
+
+void VersionContext::clearDecorationLongRunningMarker(ClientLock& /* lk */,
+                                                      OperationContext* opCtx) {
+    auto& decoration = _getDecoration(opCtx);
+    tassert(13342600,
+            "clearDecorationLongRunningMarker must be called after an OFCV has been set",
+            decoration.hasOperationFCV());
+    decoration._isLongRunningOperation = false;
+}
+
 void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCtx,
                                                           const VersionContext& expectedVCtx,
                                                           const Date_t deadline) {
@@ -138,6 +130,24 @@ void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCt
 
             const auto& actualVCtx = VersionContext::getDecoration(clientOpCtx);
             if (actualVCtx.hasOperationFCV() && actualVCtx != expectedVCtx) {
+                // Fail immediately for long-running index builds rather than blocking the FCV
+                // transition for potentially hours. The caller should abort the index build with
+                // abortIndexBuild and retry setFeatureCompatibilityVersion. This applies
+                // symmetrically to both upgrade and downgrade: any long-running operation holding a
+                // stale OFCV will trip this fail-fast on either path.
+                if (actualVCtx.isLongRunningOperation()) {
+                    LOGV2(11144505,
+                          "Long-running operation with stale FCV detected, failing FCV transition "
+                          "immediately",
+                          "opId"_attr = clientOpCtx->getOpID(),
+                          "operationFcv"_attr = actualVCtx.toBSON(),
+                          "currentFcv"_attr = expectedVCtx.toBSON());
+                    uasserted(ErrorCodes::BackgroundOperationInProgressForNamespace,
+                              "cannot perform FCV transition: a long-running index build is in "
+                              "progress with a stale FCV. Use abortIndexBuild to abort it and "
+                              "retry setFeatureCompatibilityVersion");
+                }
+
                 if (firstTime) {
                     LOGV2_DEBUG(11144500,
                                 1,
@@ -160,7 +170,7 @@ void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCt
         return futures;
     };
 
-    auto operationsDrainingFutures = getOperationsDrainingFutures(true /* firstTime */);
+    auto operationsDrainingFutures = getOperationsDrainingFutures(/*firstTime=*/true);
     const int initialNumOpsWithStaleOfcv = operationsDrainingFutures.size();
 
     LOGV2_DEBUG(11144502,
@@ -209,7 +219,7 @@ void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCt
             }
 
             // The deadline is in the future, re-compute list of futures to wait on and loop again
-            operationsDrainingFutures = getOperationsDrainingFutures(false /* firstTime */);
+            operationsDrainingFutures = getOperationsDrainingFutures(/*firstTime=*/false);
         }
     }
 

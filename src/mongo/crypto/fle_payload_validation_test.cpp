@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/crypto/fle_payload_validation.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/encryption_fields_validation.h"
@@ -37,12 +10,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
+#include <string_view>
 #include <variant>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 namespace {
 using QueriesVariant = std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>;
 
@@ -57,7 +32,8 @@ QueryTypeConfig rangeQtc(int64_t contention,
                          boost::optional<int64_t> sparsity = boost::none,
                          boost::optional<int32_t> precision = boost::none,
                          boost::optional<Value> min = boost::none,
-                         boost::optional<Value> max = boost::none) {
+                         boost::optional<Value> max = boost::none,
+                         boost::optional<int32_t> trimFactor = boost::none) {
     QueryTypeConfig q;
     q.setQueryType(QueryTypeEnum::Range);
     q.setContention(contention);
@@ -65,26 +41,36 @@ QueryTypeConfig rangeQtc(int64_t contention,
     q.setPrecision(precision);
     q.setMin(min);
     q.setMax(max);
+    q.setTrimFactor(trimFactor);
     return q;
 }
 
-QueryTypeConfig textQtc(QueryTypeEnum qt, int64_t contention) {
+QueryTypeConfig textQtc(QueryTypeEnum qt,
+                        int64_t contention,
+                        boost::optional<int32_t> strMinQueryLength = boost::none,
+                        boost::optional<int32_t> strMaxQueryLength = boost::none,
+                        boost::optional<int32_t> strMaxLength = boost::none) {
     QueryTypeConfig q;
     q.setQueryType(qt);
     q.setContention(contention);
+    q.setStrMinQueryLength(strMinQueryLength);
+    q.setStrMaxQueryLength(strMaxQueryLength);
+    q.setStrMaxLength(strMaxLength);
     return q;
 }
 
-EncryptedField fieldWith(std::string_view path, QueryTypeConfig qtc) {
+EncryptedField fieldWith(std::string_view path,
+                         QueryTypeConfig qtc,
+                         std::string_view bsonType = "int"sv) {
     EncryptedField ef(UUID::gen(), std::string{path});
-    ef.setBsonType("int"_sd);
+    ef.setBsonType(bsonType);
     ef.setQueries(QueriesVariant{std::move(qtc)});
     return ef;
 }
 
 EncryptedField fieldWith(std::string_view path, std::vector<QueryTypeConfig> qtcs) {
     EncryptedField ef(UUID::gen(), std::string{path});
-    ef.setBsonType("string"_sd);
+    ef.setBsonType("string"sv);
     ef.setQueries(QueriesVariant{std::move(qtcs)});
     return ef;
 }
@@ -117,7 +103,7 @@ TEST(FLEPayloadValidation, QueryTypeMismatchThrows) {
 
 TEST(FLEPayloadValidation, NoQueriesThrows) {
     EncryptedField field(UUID::gen(), "encrypted");
-    field.setBsonType("int"_sd);
+    field.setBsonType("int"sv);
     ASSERT_THROWS_CODE(
         validatePayloadAgainstQueryTypeConfig("encrypted", field, sampled(QueryTypeEnum::Equality)),
         DBException,
@@ -176,7 +162,11 @@ TEST(FLEPayloadValidation, SparsityDefaultedWhenConfigOmits) {
 }
 
 TEST(FLEPayloadValidation, Precision) {
-    auto field = fieldWith("encrypted", rangeQtc(8, boost::none, /*precision=*/int32_t(2)));
+    auto field = fieldWith(
+        "encrypted",
+        rangeQtc(
+            8, boost::none, /*precision=*/int32_t(2), /*min=*/Value(0.0), /*max=*/Value(100.0)),
+        "double"sv);
     auto good = sampled(QueryTypeEnum::Range);
     good.precision = int32_t(2);
     validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
@@ -184,6 +174,68 @@ TEST(FLEPayloadValidation, Precision) {
     badPrec.precision = int32_t(5);
     ASSERT_THROWS_CODE(
         validatePayloadAgainstQueryTypeConfig("encrypted", field, badPrec), DBException, 9188703);
+}
+
+TEST(FLEPayloadValidation, TrimFactorMatchesConfigured) {
+    auto field = fieldWith("encrypted",
+                           rangeQtc(8,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    boost::none,
+                                    /*trimFactor=*/int32_t(3)));
+    auto good = sampled(QueryTypeEnum::Range);
+    good.trimFactor = int32_t(3);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Range);
+    bad.trimFactor = int32_t(4);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12789900);
+
+    // A payload that omits trimFactor was built against the configured value, so it is accepted.
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, sampled(QueryTypeEnum::Range));
+}
+
+TEST(FLEPayloadValidation, TrimFactorDefaultedWhenConfigOmits) {
+    // Neither side sets trimFactor: both resolve to the same domain-derived default and agree.
+    auto field = fieldWith("encrypted", rangeQtc(8));
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, sampled(QueryTypeEnum::Range));
+
+    // An explicit payload trimFactor equal to that resolved default is accepted; a different one is
+    // rejected. The int field with default bounds spans 32 bits, so the default is
+    // clamp(kFLERangeTrimFactorDefault, 0, 31) == kFLERangeTrimFactorDefault.
+    auto good = sampled(QueryTypeEnum::Range);
+    good.trimFactor = int32_t(kFLERangeTrimFactorDefault);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Range);
+    bad.trimFactor = int32_t(kFLERangeTrimFactorDefault + 1);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12789900);
+}
+
+TEST(FLEPayloadValidation, TrimFactorDefaultClampedToSmallDomain) {
+    // Config omits trimFactor, so it resolves to the domain-derived default. The int domain
+    // [0, 3] spans 2 bits, so the default is clamp(kFLERangeTrimFactorDefault, 0, 1) == 1 (the
+    // configured default of 6 gets clamped down to bits - 1). This exercises the clamp path that
+    // a full 32-bit domain leaves as a no-op.
+    auto field = fieldWith("encrypted",
+                           rangeQtc(8,
+                                    boost::none,
+                                    boost::none,
+                                    /*min=*/Value(0),
+                                    /*max=*/Value(3),
+                                    /*trimFactor=*/boost::none));
+
+    auto good = sampled(QueryTypeEnum::Range);
+    good.trimFactor = int32_t(1);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Range);
+    bad.trimFactor = int32_t(kFLERangeTrimFactorDefault);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12789900);
 }
 
 TEST(FLEPayloadValidation, IndexMinMaxMatchAndMismatch) {
@@ -253,6 +305,83 @@ TEST(FLEPayloadValidation, MatchAnyStringSearchType) {
     auto eqField = fieldWith("encrypted", equalityQtc(4));
     ASSERT_THROWS_CODE(
         validatePayloadAgainstQueryTypeConfig("encrypted", eqField, anyText), DBException, 9188704);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsMatchAndMismatch) {
+    auto field =
+        fieldWith("encrypted", {textQtc(QueryTypeEnum::Suffix, 4, int32_t(2), int32_t(10))});
+    auto good = sampled(QueryTypeEnum::Suffix);
+    good.strMinQueryLength = int32_t(2);
+    good.strMaxQueryLength = int32_t(10);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto badLb = sampled(QueryTypeEnum::Suffix);
+    badLb.strMinQueryLength = int32_t(3);
+    badLb.strMaxQueryLength = int32_t(10);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, badLb), DBException, 12778600);
+
+    auto badUb = sampled(QueryTypeEnum::Suffix);
+    badUb.strMinQueryLength = int32_t(2);
+    badUb.strMaxQueryLength = int32_t(11);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, badUb), DBException, 12778601);
+}
+
+TEST(FLEPayloadValidation, TextSearchMaxLengthMatchAndMismatch) {
+    auto field = fieldWith(
+        "encrypted", {textQtc(QueryTypeEnum::Substring, 4, int32_t(2), int32_t(10), int32_t(20))});
+    auto good = sampled(QueryTypeEnum::Substring);
+    good.strMinQueryLength = int32_t(2);
+    good.strMaxQueryLength = int32_t(10);
+    good.strMaxLength = int32_t(20);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, good);
+
+    auto bad = sampled(QueryTypeEnum::Substring);
+    bad.strMinQueryLength = int32_t(2);
+    bad.strMaxQueryLength = int32_t(10);
+    bad.strMaxLength = int32_t(30);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, bad), DBException, 12778602);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsMissingFromConfigThrows) {
+    auto field = fieldWith("encrypted", {textQtc(QueryTypeEnum::Suffix, 4)});
+    auto payload = sampled(QueryTypeEnum::Suffix);
+    payload.strMinQueryLength = int32_t(2);
+    ASSERT_THROWS_CODE(
+        validatePayloadAgainstQueryTypeConfig("encrypted", field, payload), DBException, 12778600);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsResolvedPerVariant) {
+    // Suffix and prefix are configured with different bounds on the same field; the validator
+    // must resolve the QTC matching the payload's specific variant rather than the first text QTC.
+    auto field = fieldWith("encrypted",
+                           {textQtc(QueryTypeEnum::Suffix, 4, int32_t(2), int32_t(10)),
+                            textQtc(QueryTypeEnum::Prefix, 4, int32_t(5), int32_t(20))});
+    auto suffixPayload = sampled(QueryTypeEnum::Suffix);
+    suffixPayload.strMinQueryLength = int32_t(2);
+    suffixPayload.strMaxQueryLength = int32_t(10);
+    validatePayloadAgainstQueryTypeConfig("encrypted", field, suffixPayload);
+
+    auto wrongBounds = sampled(QueryTypeEnum::Suffix);
+    wrongBounds.strMinQueryLength = int32_t(5);
+    wrongBounds.strMaxQueryLength = int32_t(20);
+    ASSERT_THROWS_CODE(validatePayloadAgainstQueryTypeConfig("encrypted", field, wrongBounds),
+                       DBException,
+                       12778600);
+}
+
+TEST(FLEPayloadValidation, TextSearchBoundsAcceptsDeprecatedPreviewVariant) {
+    auto substringPreview = fieldWith(
+        "encrypted",
+        {textQtc(
+            QueryTypeEnum::SubstringPreviewDeprecated, 4, int32_t(2), int32_t(10), int32_t(20))});
+    auto good = sampled(QueryTypeEnum::Substring);
+    good.strMinQueryLength = int32_t(2);
+    good.strMaxQueryLength = int32_t(10);
+    good.strMaxLength = int32_t(20);
+    validatePayloadAgainstQueryTypeConfig("encrypted", substringPreview, good);
 }
 
 }  // namespace mongo

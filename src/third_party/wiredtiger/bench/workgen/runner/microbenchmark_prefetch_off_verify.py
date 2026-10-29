@@ -48,7 +48,8 @@ prefetch.session = prefetch.conn.open_session("")
 
 def run_workload():
     print("Start verifying...")
-    verify_op = Operation(Operation.OP_VERIFY, prefetch.table, "prefetch=(enabled=false)")
+    verify_op = Operation(Operation.OP_VERIFY, prefetch.table,
+      "session=(prefetch=(enabled=false)),verify=(skip_per_key_hs=true)")
     verify_thread = Thread(verify_op)
     verify_workload = Workload(prefetch.context, verify_thread)
     verify_workload.options.run_time = 300

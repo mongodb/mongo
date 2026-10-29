@@ -59,35 +59,40 @@ function runBasicJoinTest(pipeline) {
     subSection("Pipeline");
     code(tojson(pipeline));
 
-    const noJoinOptResults = coll.aggregate(pipeline).toArray();
+    // Drop the hint for join opt disabled, we don't support this stage without join opt.
+    const hasHint = pipeline[0].$_internalJoinHint;
+    const noJoinOptResults = coll.aggregate(hasHint ? pipeline.slice(1) : pipeline).toArray();
     subSection("Results");
     code(normalizeArray(noJoinOptResults));
 
-    const noJoinExplain = coll.explain().aggregate(pipeline);
+    const noJoinExplain = coll.explain().aggregate(hasHint ? pipeline.slice(1) : pipeline);
     assert(
         !joinOptUsed(noJoinExplain),
         "Join optimizer was used unexpectedly: " + tojson(noJoinExplain),
     );
 
-    runJoinTestAndCompare(
-        "With bottom-up plan enumeration (left-deep)",
-        coll,
-        pipeline,
-        {
-            internalEnableJoinOptimization: true,
-            internalJoinReorderMode: "bottomUp",
-            internalJoinPlanTreeShape: "leftDeep",
-        },
-        noJoinOptResults,
-    );
+    // Enable join opt.
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+    if (!hasHint) {
+        runJoinTestAndCompare(
+            "With bottom-up plan enumeration (left-deep)",
+            coll,
+            pipeline,
+            {
+                internalJoinReorderMode: "bottomUp",
+                internalJoinPlanTreeShape: "leftDeep",
+            },
+            noJoinOptResults,
+        );
 
-    runJoinTestAndCompare(
-        "With bottom-up plan enumeration (right-deep)",
-        coll,
-        pipeline,
-        {internalJoinPlanTreeShape: "rightDeep"},
-        noJoinOptResults,
-    );
+        runJoinTestAndCompare(
+            "With bottom-up plan enumeration (right-deep)",
+            coll,
+            pipeline,
+            {internalJoinPlanTreeShape: "rightDeep"},
+            noJoinOptResults,
+        );
+    }
 
     runJoinTestAndCompare(
         "With bottom-up plan enumeration (zig-zag)",
@@ -97,38 +102,40 @@ function runBasicJoinTest(pipeline) {
         noJoinOptResults,
     );
 
-    for (const internalRandomJoinOrderSeed of [44, 45]) {
+    if (!hasHint) {
+        for (const internalRandomJoinOrderSeed of [44, 45]) {
+            runJoinTestAndCompare(
+                `With random order, seed ${internalRandomJoinOrderSeed}`,
+                coll,
+                pipeline,
+                {internalJoinReorderMode: "random", internalRandomJoinOrderSeed},
+                noJoinOptResults,
+            );
+        }
+
+        // Run tests with indexes.
+        assert.commandWorked(foreignColl1.createIndex({a: 1}));
+        assert.commandWorked(foreignColl2.createIndex({b: 1}));
+
         runJoinTestAndCompare(
-            `With random order, seed ${internalRandomJoinOrderSeed}`,
+            "With random order, index join",
             coll,
             pipeline,
-            {internalJoinReorderMode: "random", internalRandomJoinOrderSeed},
+            {internalJoinReorderMode: "random"},
             noJoinOptResults,
         );
+
+        runJoinTestAndCompare(
+            "With bottom-up plan enumeration and indexes",
+            coll,
+            pipeline,
+            {internalJoinReorderMode: "bottomUp", internalJoinPlanTreeShape: "leftDeep"},
+            noJoinOptResults,
+        );
+
+        assert.commandWorked(foreignColl1.dropIndex({a: 1}));
+        assert.commandWorked(foreignColl2.dropIndex({b: 1}));
     }
-
-    // Run tests with indexes.
-    assert.commandWorked(foreignColl1.createIndex({a: 1}));
-    assert.commandWorked(foreignColl2.createIndex({b: 1}));
-
-    runJoinTestAndCompare(
-        "With random order, index join",
-        coll,
-        pipeline,
-        {internalJoinReorderMode: "random"},
-        noJoinOptResults,
-    );
-
-    runJoinTestAndCompare(
-        "With bottom-up plan enumeration and indexes",
-        coll,
-        pipeline,
-        {internalJoinReorderMode: "bottomUp", internalJoinPlanTreeShape: "leftDeep"},
-        noJoinOptResults,
-    );
-
-    assert.commandWorked(foreignColl1.dropIndex({a: 1}));
-    assert.commandWorked(foreignColl2.dropIndex({b: 1}));
 }
 
 joinTestWrapper(db, () => {
@@ -323,33 +330,37 @@ joinTestWrapper(db, () => {
         {$unwind: "$k.y.z"},
     ]);
 
-    section("Basic example with a $project excluding a field from the base collection");
+    section("Basic example with a $project including a field from the base collection");
     runBasicJoinTest([
-        {$project: {_id: false}},
+        {$project: {a: 1, b: 1}},
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
         {$unwind: "$x"},
         {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
         {$unwind: "$y"},
     ]);
 
-    section(
-        "Basic example with a $project reducing the documents of the base collection to a single field",
-    );
+    section("Basic example with a $project + rename adding synthetic fields");
     runBasicJoinTest([
-        {$project: {a: true}},
-        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$project: {a: "my-computed-field", extra: "$a"}},
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "extra", foreignField: "a"}},
         {$unwind: "$x"},
         {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
         {$unwind: "$z"},
     ]);
 
-    section("Basic example with a $project adding synthetic fields");
+    section("Basic example with a $project + rename adding synthetic fields");
     runBasicJoinTest([
-        {$project: {a: true, extra: "$a"}},
-        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "extra", foreignField: "a"}},
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                pipeline: [{$project: {a: "my-computed-field", extra: "$a"}}],
+            },
+        },
         {$unwind: "$x"},
         {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
         {$unwind: "$z"},
+        {$match: {$expr: {$eq: ["$x.extra", "$a"]}}},
     ]);
 
     section("Example with a cycle in the join graph");
@@ -504,5 +515,268 @@ joinTestWrapper(db, () => {
         },
         {$unwind: "$x"},
         {$match: {"x.c": {$eq: "blah"}}},
+    ]);
+
+    section("Basic example with a $project including fields from the base collection");
+    runBasicJoinTest([
+        {$project: {a: 1, b: 1, notUsed: 1}},
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
+        {$unwind: "$y"},
+    ]);
+
+    section(
+        "Basic example with a $project including join-predicate fields from foreign collections",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {a: 1}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$project: {b: 1, c: 1}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
+
+    section(
+        "$project as only stage in subpipeline (no $match), excluding non-join-predicate fields",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {_id: 0, c: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
+    section("$project in prefix including only the join-predicate field with single join");
+    runBasicJoinTest([
+        {$project: {_id: 0, a: 1}},
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
+    section("Subpipeline with $match followed by multi-field $project excluding non-join fields");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}, {$project: {_id: 0, c: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
+    section(
+        "Two joins: first with $match and $project subpipeline, second with $project-only subpipeline",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}, {$project: {_id: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "y",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$project: {_id: 0, d: 0}}],
+            },
+        },
+        {$unwind: "$y"},
+    ]);
+
+    // Force INLJ with projection on base & subpipeline to test INLJ + proj enumeration & lowering.
+    section("Hinted INLJ with a $project");
+    assert.commandWorked(coll.createIndex({a: 1}));
+    runBasicJoinTest([
+        {
+            $_internalJoinHint: {
+                perSubsetLevelMode: [
+                    {level: NumberInt(0), mode: "CHEAPEST"},
+                    {
+                        level: NumberInt(1),
+                        hint: {node: NumberInt(1), method: "INLJ", isLeftChild: false},
+                        mode: "CHEAPEST",
+                    },
+                ],
+            },
+        },
+        {$project: {a: 1, computed: "foo"}},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {a: 1, computed: "bar"}}],
+            },
+        },
+        {$unwind: "$x"},
+        {$project: {_id: 0, "x._id": 0}},
+    ]);
+
+    section("Hinted INLJ with a $project, reverse order");
+    assert.commandWorked(coll.createIndex({a: 1}));
+    runBasicJoinTest([
+        {
+            $_internalJoinHint: {
+                perSubsetLevelMode: [
+                    {level: NumberInt(0), mode: "CHEAPEST"},
+                    {
+                        level: NumberInt(1),
+                        hint: {node: NumberInt(1), method: "INLJ", isLeftChild: true},
+                        mode: "CHEAPEST",
+                    },
+                ],
+            },
+        },
+        {$project: {a: 1, computed: "y"}},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {a: 1, computed: "x"}}],
+            },
+        },
+        {$unwind: "$x"},
+        {$project: {_id: 0, "x._id": 0}},
+    ]);
+
+    // Now with renames.
+    section("Hinted INLJ with a $project + rename on predicate");
+    runBasicJoinTest([
+        {
+            $_internalJoinHint: {
+                perSubsetLevelMode: [
+                    {level: NumberInt(0), mode: "CHEAPEST"},
+                    {
+                        level: NumberInt(1),
+                        hint: {node: NumberInt(1), method: "INLJ", isLeftChild: false},
+                        mode: "CHEAPEST",
+                    },
+                ],
+            },
+        },
+        {$project: {m: "$a"}},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "x",
+                localField: "m",
+                foreignField: "a",
+                pipeline: [{$project: {n: "$a"}}],
+            },
+        },
+        {$unwind: "$x"},
+        {$project: {_id: 0, "x._id": 0}},
+    ]);
+
+    section("Hinted INLJ with a $project + rename on predicate, reverse order");
+    runBasicJoinTest([
+        {
+            $_internalJoinHint: {
+                perSubsetLevelMode: [
+                    {level: NumberInt(0), mode: "CHEAPEST"},
+                    {
+                        level: NumberInt(1),
+                        hint: {node: NumberInt(1), method: "INLJ", isLeftChild: true},
+                        mode: "CHEAPEST",
+                    },
+                ],
+            },
+        },
+        {$project: {m: "$a"}},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "x",
+                localField: "m",
+                foreignField: "a",
+                pipeline: [{$project: {n: "$a"}}],
+            },
+        },
+        {$unwind: "$x"},
+        {$project: {_id: 0, "x._id": 0}},
+    ]);
+
+    section("Hinted INLJ with a $project + rename + trailing $match");
+    runBasicJoinTest([
+        {
+            $_internalJoinHint: {
+                perSubsetLevelMode: [
+                    {level: NumberInt(0), mode: "CHEAPEST"},
+                    {
+                        level: NumberInt(1),
+                        hint: {node: NumberInt(1), method: "INLJ", isLeftChild: false},
+                        mode: "CHEAPEST",
+                    },
+                ],
+            },
+        },
+        {$project: {m: "$a"}},
+        {$lookup: {from: coll.getName(), as: "x", pipeline: [{$project: {n: "$a"}}]}},
+        {$unwind: "$x"},
+        {$match: {$expr: {$eq: ["$m", "$x.n"]}}},
+        {$project: {_id: 0, "x._id": 0}},
+    ]);
+
+    section("Hinted INLJ with a $project + rename + trailing $match, reverse order");
+    runBasicJoinTest([
+        {
+            $_internalJoinHint: {
+                perSubsetLevelMode: [
+                    {level: NumberInt(0), mode: "CHEAPEST"},
+                    {
+                        level: NumberInt(1),
+                        hint: {node: NumberInt(1), method: "INLJ", isLeftChild: true},
+                        mode: "CHEAPEST",
+                    },
+                ],
+            },
+        },
+        {$project: {m: "$a"}},
+        {$lookup: {from: coll.getName(), as: "x", pipeline: [{$project: {n: "$a"}}]}},
+        {$unwind: "$x"},
+        {$match: {$expr: {$eq: ["$m", "$x.n"]}}},
+        {$project: {_id: 0, "x._id": 0}},
     ]);
 }); // joinTestWrapper();

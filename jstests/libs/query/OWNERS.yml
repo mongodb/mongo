@@ -14,10 +14,13 @@ filters:
       - 10gen/query-execution-change-streams
   - "geo*.js":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
   - "group_to_distinct_scan_utils.js":
     approvers:
       - 10gen/query-optimization
+  - "internal_search_id_lookup*.js":
+    approvers:
+      - 10gen/query-integration-search
   - "query_settings*.js":
     approvers:
       - 10gen/query-execution-query-settings
@@ -36,3 +39,6 @@ filters:
   - "replicated_truncates_utils.js":
     approvers:
       - 10gen/query-execution
+  - "proactive_view_resolution_util.js":
+    approvers:
+      - 10gen/query-integration-search

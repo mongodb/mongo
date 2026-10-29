@@ -140,6 +140,16 @@ class Tests(unittest.TestCase):
 
         assert result == ["test", "//some:test", "//some:test2"]
 
+    def test_benchmark_bin_file(self):
+        def buildozer_output(autocomplete_query):
+            return "//some:some_bm [some_bm.cpp]"
+
+        args = ["wrapper_hook", "run", "+some_bm"]
+
+        result = test_runner_interface(args, False, buildozer_output)
+
+        assert result == ["run", "//some:some_bm"]
+
     def test_bin_source_redundant_mix(self):
         def buildozer_output(autocomplete_query):
             return "//some:test [source1.cpp source2.cpp]"
@@ -163,10 +173,34 @@ class Tests(unittest.TestCase):
         def buildozer_output(autocomplete_query):
             return "//some:test [source1.cpp source2.cpp]\n//some:test2 [source1.cpp source4.cpp]"
 
-        args = ["wrapper_hook", "test", "+test", "+source3"]
+        # source1 is ambiguous (in both //some:test and //some:test2), so
+        # requesting +source1 must raise and list both conflicting targets.
+        args = ["wrapper_hook", "test", "+source1"]
 
-        with self.assertRaises(DuplicateSourceNames):
+        with self.assertRaises(DuplicateSourceNames) as ctx:
             test_runner_interface(args, False, buildozer_output)
+
+        message = str(ctx.exception)
+        assert "//some:test" in message
+        assert "//some:test2" in message
+
+    def test_duplicate_source_name_does_not_break_unrelated_target(self):
+        """A duplicate source elsewhere must not break resolving an unrelated +target."""
+
+        def buildozer_output(autocomplete_query):
+            return "//some:test [source1.cpp source2.cpp]\n//some:test2 [source1.cpp source4.cpp]"
+
+        # source2 is unique even though source1 is duplicated; it should resolve.
+        args = ["wrapper_hook", "test", "+source2"]
+
+        result = test_runner_interface(args, False, buildozer_output)
+
+        assert result == [
+            "test",
+            "//some:test",
+            "--test_arg=--fileNameFilter",
+            "--test_arg=source2",
+        ]
 
     def test_autocomplete(self):
         if "linux" not in sys.platform:
@@ -307,14 +341,16 @@ class Tests(unittest.TestCase):
             return ""
 
         args = ["wrapper_hook", "build", "compiledb", "//src/mongo/base:error_codes"]
-        generate_calls = []
+        prepare_calls = []
 
-        def fake_generate_compiledb(*call_args, **call_kwargs):
-            generate_calls.append((call_args, call_kwargs))
+        def fake_prepare_compiledb_posthook_args(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return ["build", "//src/mongo/base:error_codes"]
 
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_compiledb_posthook_args = plus_interface.prepare_compiledb_posthook_args
         original_swap_default_config = plus_interface.swap_default_config
-        plus_interface.generate_compiledb = fake_generate_compiledb
+        plus_interface.prepare_compiledb_posthook_args = fake_prepare_compiledb_posthook_args
         plus_interface.swap_default_config = (
             lambda args,
             command,
@@ -327,25 +363,31 @@ class Tests(unittest.TestCase):
             result = test_runner_interface(args, False, buildozer_output)
         finally:
             plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = (
+                original_prepare_compiledb_posthook_args
+            )
             plus_interface.swap_default_config = original_swap_default_config
 
         assert result == ["build", "//src/mongo/base:error_codes"]
-        assert len(generate_calls) == 1
-        assert "requested_build_flags" not in generate_calls[0][1]
+        assert len(prepare_calls) == 1
+        assert prepare_calls[0][1]["build_targets"] == ["//src/mongo/base:error_codes"]
+        assert prepare_calls[0][1]["compiledb_targets"] == ["//src/mongo/base:error_codes"]
 
-    def test_compiledb_only_target_skips_final_bazel_invocation(self):
+    def test_compiledb_only_target_runs_integrated_bazel_invocation(self):
         def buildozer_output(autocomplete_query):
             return ""
 
         args = ["wrapper_hook", "build", "compiledb_only"]
-        generate_calls = []
+        prepare_calls = []
 
-        def fake_generate_compiledb(*call_args, **call_kwargs):
-            generate_calls.append((call_args, call_kwargs))
+        def fake_prepare_compiledb_posthook_args(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return ["build", "//src/..."]
 
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_compiledb_posthook_args = plus_interface.prepare_compiledb_posthook_args
         original_swap_default_config = plus_interface.swap_default_config
-        plus_interface.generate_compiledb = fake_generate_compiledb
+        plus_interface.prepare_compiledb_posthook_args = fake_prepare_compiledb_posthook_args
         plus_interface.swap_default_config = (
             lambda args,
             command,
@@ -358,10 +400,14 @@ class Tests(unittest.TestCase):
             result = test_runner_interface(args, False, buildozer_output)
         finally:
             plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = (
+                original_prepare_compiledb_posthook_args
+            )
             plus_interface.swap_default_config = original_swap_default_config
 
-        assert result == []
-        assert len(generate_calls) == 1
+        assert result == ["build", "//src/..."]
+        assert len(prepare_calls) == 1
+        assert prepare_calls[0][1]["build_targets"] == ["//src/..."]
 
     def test_compiledb_target_preserves_define_flag_value(self):
         def buildozer_output(autocomplete_query):
@@ -376,14 +422,22 @@ class Tests(unittest.TestCase):
             "--keep_going",
             "//src/mongo/base:error_codes",
         ]
-        generate_calls = []
+        prepare_calls = []
 
-        def fake_generate_compiledb(*call_args, **call_kwargs):
-            generate_calls.append((call_args, call_kwargs))
+        def fake_prepare_compiledb_posthook_args(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return [
+                "build",
+                "--define",
+                "MONGO_VERSION=1",
+                "--keep_going",
+                "//src/mongo/base:error_codes",
+            ]
 
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_compiledb_posthook_args = plus_interface.prepare_compiledb_posthook_args
         original_swap_default_config = plus_interface.swap_default_config
-        plus_interface.generate_compiledb = fake_generate_compiledb
+        plus_interface.prepare_compiledb_posthook_args = fake_prepare_compiledb_posthook_args
         plus_interface.swap_default_config = (
             lambda args,
             command,
@@ -396,6 +450,9 @@ class Tests(unittest.TestCase):
             result = test_runner_interface(args, False, buildozer_output)
         finally:
             plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = (
+                original_prepare_compiledb_posthook_args
+            )
             plus_interface.swap_default_config = original_swap_default_config
 
         assert result == [
@@ -405,8 +462,72 @@ class Tests(unittest.TestCase):
             "--keep_going",
             "//src/mongo/base:error_codes",
         ]
-        assert len(generate_calls) == 1
-        assert "requested_build_flags" not in generate_calls[0][1]
+        assert len(prepare_calls) == 1
+        assert prepare_calls[0][1]["build_flags"] == [
+            "--define",
+            "MONGO_VERSION=1",
+            "--keep_going",
+        ]
+
+    def test_compiledb_target_preserves_jobs_flag_value(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = [
+            "wrapper_hook",
+            "build",
+            "compiledb",
+            "--jobs",
+            "8",
+            "--keep_going",
+            "//src/mongo/base:error_codes",
+        ]
+        prepare_calls = []
+
+        def fake_prepare_compiledb_posthook_args(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return [
+                "build",
+                "--jobs",
+                "8",
+                "--keep_going",
+                "//src/mongo/base:error_codes",
+            ]
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_compiledb_posthook_args = plus_interface.prepare_compiledb_posthook_args
+        original_swap_default_config = plus_interface.swap_default_config
+        plus_interface.prepare_compiledb_posthook_args = fake_prepare_compiledb_posthook_args
+        plus_interface.swap_default_config = (
+            lambda args,
+            command,
+            config_mode,
+            compiledb_target,
+            clang_tidy,
+            user_specified_config: config_mode
+        )
+        try:
+            result = test_runner_interface(args, False, buildozer_output)
+        finally:
+            plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = (
+                original_prepare_compiledb_posthook_args
+            )
+            plus_interface.swap_default_config = original_swap_default_config
+
+        assert result == [
+            "build",
+            "--jobs",
+            "8",
+            "--keep_going",
+            "//src/mongo/base:error_codes",
+        ]
+        assert len(prepare_calls) == 1
+        assert prepare_calls[0][1]["build_flags"] == [
+            "--jobs",
+            "8",
+            "--keep_going",
+        ]
 
     def test_config_equals_compiledb_runs_normally(self):
         def buildozer_output(autocomplete_query):

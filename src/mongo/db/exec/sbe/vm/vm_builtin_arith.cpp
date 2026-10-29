@@ -1,34 +1,10 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/random_utils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace sbe {
@@ -172,7 +148,7 @@ int32_t ByteCode::convertNumericToInt32(const value::TagValueView v) {
     }
 }
 
-value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
+value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string_view funcName,
                                                       Decimal128::RoundingMode roundingMode,
                                                       int32_t place,
                                                       value::TypeTags numTag,
@@ -210,7 +186,7 @@ value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
             uint32_t flags = 0;
             auto outll = out.toLong(&flags);
             uassert(5155302,
-                    "Invalid conversion to long during " + funcName + ".",
+                    str::stream() << "Invalid conversion to long during " << funcName << ".",
                     !Decimal128::hasFlag(flags, Decimal128::kInvalid));
             if (numTag == value::TypeTags::NumberInt64 ||
                 outll > std::numeric_limits<int32_t>::max()) {
@@ -224,7 +200,7 @@ value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
     }
 }
 
-value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string funcName,
+value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string_view funcName,
                                                      Decimal128::RoundingMode roundingMode,
                                                      ArityType arity) {
     tassert(11080071, "Unexpected arity value", arity == 1 || arity == 2);
@@ -357,6 +333,44 @@ value::TagValueMaybeOwned ByteCode::builtinConvertSimpleSumToDoubleDoubleSumImpl
 
     return accTagVal;
 }
+
+value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSumFromAcc(ArityType arity) {
+    // Reuse the same DoubleDouble accumulator state and helpers as the $sum
+    auto accTagVal = value::TagValueOwned::fromRaw(genericInitializeDoubleDoubleSumState());
+    value::Array* accumulator = value::getArrayView(accTagVal.value());
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        aggDoubleDoubleSumImpl(accumulator, tag, val);
+    };
+
+    // A single array argument is summed element-wise, while a single non-array argument
+    // or multiple arguments are each processed directly. Non-numeric values are ignored.
+    processStackRange(0, arity, processOne);
+
+    return aggDoubleDoubleSumFinalizeImpl(accumulator);
+}
+
+template <bool isSamp>
+value::TagValueMaybeOwned ByteCode::builtinStdDevFromAcc(ArityType arity) {
+    auto accTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
+    value::Array* accumulator = value::getArrayView(accTagVal.value());
+    accumulator->reserve(AggStdDevValueElems::kSizeOfArray);
+
+    accumulator->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+    accumulator->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+    accumulator->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+
+    auto processOne = [&](value::TypeTags tag, value::Value val) {
+        aggStdDevImpl(accumulator, {tag, val});
+    };
+
+    processStackRange(0, arity, processOne);
+
+    return aggStdDevFinalizeImpl(accTagVal.value(), isSamp);
+}
+template value::TagValueMaybeOwned ByteCode::builtinStdDevFromAcc<false>(ArityType arity);
+template value::TagValueMaybeOwned ByteCode::builtinStdDevFromAcc<true>(ArityType arity);
+
 
 }  // namespace vm
 }  // namespace sbe

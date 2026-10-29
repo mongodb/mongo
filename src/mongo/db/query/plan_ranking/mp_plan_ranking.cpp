@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/plan_ranking/mp_plan_ranking.h"
 
-#include "mongo/db/curop.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 
 namespace mongo::plan_ranking {
 
@@ -42,10 +17,27 @@ StatusWith<PlanRankingResult> MPPlanRankingStrategy::rankPlans(PlannerData& pd,
      * rather returns all enumerated plans. This will result in multi-planning being used
      * to select a winning plan at runtime.
      */
-    if (rctx.solutions.size() > 1) {
-        CurOp::get(pd.opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
+    const auto strategy = rctx.solutions.size() > 1 ? PlanSelectionStrategy::kMultiPlanner
+                                                    : PlanSelectionStrategy::kSinglePlan;
+    PlanRankingResult out{.solutions = std::move(rctx.solutions),
+                          .planSelectionStrategy = strategy};
+    if (out.solutions.size() > 1) {
+        // Multi-planning was fixed by configuration (feature flag, knob, or a construction-time
+        // overwrite), not decided at planning time. On explain queries record that provenance for
+        // rankerChoice.reason; this strategy otherwise carries no explain data, so the carrier is
+        // created here. Non-explain queries pay nothing. The config reason can be empty: with the
+        // knob at 'mixed' this strategy still runs for SBE-bound queries, because canUseCBR
+        // requires the classic engine (see plan_ranker.cpp); such plans never reach V3 emission,
+        // so nothing is recorded for them.
+        if (pd.cq->getExplain()) {
+            const auto reason = pd.plannerParams->getPlanRankerReasonFromConfig();
+            if (reason.has_value()) {
+                out.maybeExplainData.emplace();
+                out.maybeExplainData->planRankerReason = reason;
+            }
+        }
     }
-    return PlanRankingResult{.solutions = std::move(rctx.solutions)};
+    return out;
 }
 
 }  // namespace mongo::plan_ranking

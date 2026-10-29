@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/util/histogram.h"
 
@@ -171,6 +145,44 @@ TEST_F(HistogramTest, SizeTCountsIncrementedAndStored) {
         {0, {}, 0}, {5, 0, 5}, {3, 5, 8}, {4, 8, 12}, {3, 12, {}}};
 
     ASSERT_THAT(snapshot(hist), Eq(expected));
+}
+
+TEST(AppendHistogramTest, MakeBucketKeysMatchesLegacyKeys) {
+    Histogram<int> h{{2, 4}};
+    auto keys = makeHistogramBucketKeys(h);
+    ASSERT_EQ(keys.size(), 3u);
+    ASSERT_EQ(keys[0], "(-inf, 2)");
+    ASSERT_EQ(keys[1], "[2, 4)");
+    ASSERT_EQ(keys[2], "[4, inf)");
+}
+
+TEST(AppendHistogramTest, PrecomputedKeysProduceIdenticalOutputToLegacy) {
+    Histogram<int> h{{2, 4}};
+    h.increment(1);
+    h.increment(3);
+    h.increment(3);
+
+    BSONObjBuilder legacyBob;
+    appendHistogram(legacyBob, h, "hist");
+
+    BSONObjBuilder cachedBob;
+    appendHistogram(cachedBob, h, "hist", makeHistogramBucketKeys(h));
+
+    ASSERT_BSONOBJ_EQ(legacyBob.obj(), cachedBob.obj());
+}
+
+TEST(AppendHistogramTest, IncludeEmptyBucketsByDefaultEmitsEveryBucket) {
+    Histogram<int> h{{2, 4}};
+    h.increment(3);
+
+    BSONObjBuilder bob;
+    appendHistogram(bob, h, "hist");
+    BSONObj hist = bob.obj().getObjectField("hist").getOwned();
+
+    ASSERT_EQ(hist.getObjectField("(-inf, 2)").getIntField("count"), 0);
+    ASSERT_EQ(hist.getObjectField("[2, 4)").getIntField("count"), 1);
+    ASSERT_EQ(hist.getObjectField("[4, inf)").getIntField("count"), 0);
+    ASSERT_EQ(hist.getIntField("totalCount"), 1);
 }
 
 }  // namespace

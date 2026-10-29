@@ -1,7 +1,7 @@
 - name: eval_query_shape_hash_stability
   value:
     eval: >-
-      await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+      await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
 
 - name: fuzzer_selector
   value:
@@ -52,6 +52,7 @@
       - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
       - jstests/core/timeseries/write/timeseries_insert_after_update.js
       - jstests/core/timeseries/write/timeseries_closed_update_delete.js
+      - jstests/core/timeseries/write/timeseries_write_jsonschema_non_object.js
 
     exclude_with_any_tags:
       - does_not_support_repeated_reads
@@ -115,6 +116,7 @@
       - jstests/change_streams/split_large_event.js
     exclude_with_any_tags:
       - assumes_against_mongod_not_mongos
+      - backport_required_multiversion
       - multiversion_incompatible
       - requires_2_or_more_shards
       - requires_sharding
@@ -155,6 +157,8 @@
       - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
       - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
       - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
+      - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_sparse.js
+      - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_wildcard.js
       - jstests/aggregation/explain/explain_limit.js
       - jstests/aggregation/sources/densify/generated_limit.js
       - jstests/aggregation/sources/unionWith/unionWith.js

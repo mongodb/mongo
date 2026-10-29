@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::HybridHashJoin.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -59,7 +34,9 @@ namespace {
  */
 value::MaterializedRow makeKeyRow(int64_t key) {
     value::MaterializedRow row(1);
-    row.reset(0, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(key));
+    row.reset(0,
+              value::TagValueOwned::fromRaw(value::TypeTags::NumberInt64,
+                                            value::bitcastFrom<int64_t>(key)));
     return row;
 }
 
@@ -69,7 +46,7 @@ value::MaterializedRow makeKeyRow(int64_t key) {
 value::MaterializedRow makeProjectRow(std::string_view payload) {
     auto [tag, val] = value::makeNewString(payload);
     value::MaterializedRow row(1);
-    row.reset(0, true, tag, val);
+    row.reset(0, value::TagValueOwned::fromRaw(tag, val));
     return row;
 }
 
@@ -99,7 +76,7 @@ std::vector<int64_t> drainCursor(JoinCursor& cursor) {
 value::MaterializedRow makeStringKeyRow(std::string_view key) {
     auto [tag, val] = value::makeNewString(key);
     value::MaterializedRow row(1);
-    row.reset(0, true, tag, val);
+    row.reset(0, value::TagValueOwned::fromRaw(tag, val));
     return row;
 }
 
@@ -143,8 +120,23 @@ std::vector<MatchTuple> drainCursorWithProjects(JoinCursor& cursor) {
  */
 value::MaterializedRow makeCompositeKeyRow(int64_t key1, int64_t key2) {
     value::MaterializedRow row(2);
-    row.reset(0, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(key1));
-    row.reset(1, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(key2));
+    row.reset(0,
+              value::TagValueOwned::fromRaw(value::TypeTags::NumberInt64,
+                                            value::bitcastFrom<int64_t>(key1)));
+    row.reset(1,
+              value::TagValueOwned::fromRaw(value::TypeTags::NumberInt64,
+                                            value::bitcastFrom<int64_t>(key2)));
+    return row;
+}
+
+/**
+ * Returns a single-slot MaterializedRow whose slot is an unowned view into slot 0 of
+ * 'source'. Mirrors HashJoinStage's pattern of capturing outer-child accessor views via
+ * `_probeKey.reset(idx, accessor->getViewOfValue())`.
+ */
+value::MaterializedRow makeUnownedView(const value::MaterializedRow& source) {
+    value::MaterializedRow row(1);
+    row.reset(0, source.getViewOfValue(0));
     return row;
 }
 
@@ -157,9 +149,12 @@ protected:
     static constexpr uint64_t kDefaultMemLimit = 256;
     HashJoinStats stats;
 
-    std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr) {
+    std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr,
+                                            bool allowDiskUse = true,
+                                            uint64_t memLimit = kDefaultMemLimit) {
         stats = {};
-        return std::make_unique<HybridHashJoin>(kDefaultMemLimit, collator, boost::none, stats);
+        return std::make_unique<HybridHashJoin>(
+            memLimit, collator, allowDiskUse, boost::none, stats);
     }
 };
 
@@ -381,6 +376,26 @@ TEST_F(HybridHashJoinTestFixture, SpillTriggersOnMemoryLimit) {
     ASSERT_GT(stats.spillingStats.getSpilledRecords(), 0u);
     ASSERT_GT(stats.spillingStats.getSpilledDataStorageSize(), 0u);
     ASSERT_GT(stats.numPartitionsSpilled, 0);
+}
+
+TEST_F(HybridHashJoinTestFixture, SpillThrowsWhenDiskUseNotAllowed) {
+    auto hhj = makeHHJ(/*collator=*/nullptr, /*allowDiskUse=*/false);
+
+    // Inserting enough rows to exceed the tiny memory limit must throw
+    // QueryExceededMemoryLimitNoDiskUseAllowed instead of partitioning and spilling, because disk
+    // use is not allowed.
+    ASSERT_THROWS_CODE(
+        [&] {
+            for (int i = 0; i < 50; ++i) {
+                auto payload = "payload_" + std::to_string(i);
+                hhj->addBuild(makeKeyRow(i), makeProjectRow(payload));
+            }
+        }(),
+        DBException,
+        ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+
+    // No spilling should have occurred.
+    ASSERT_FALSE(stats.usedDisk);
 }
 
 TEST_F(HybridHashJoinTestFixture, SpilledPartitionsProcessedCorrectly) {
@@ -779,6 +794,86 @@ TEST_F(HybridHashJoinTestFixture, ResetAfterSpillAllowsReuse) {
     ASSERT_EQ(matches2.size(), 0u);
 }
 
+TEST_F(HybridHashJoinTestFixture, SpillingStatsAccumulateAcrossReset) {
+    auto runSpillingPass = [&](HybridHashJoin& hhj) {
+        for (int i = 0; i < 50; ++i) {
+            hhj.addBuild(makeKeyRow(i), makeProjectRow("build_payload_" + std::to_string(i)));
+        }
+        hhj.finishBuild();
+        ASSERT_TRUE(hhj.isPartitioned());
+
+        value::MaterializedRow probeKey(1);
+        value::MaterializedRow probeProject(1);
+        auto cursor = JoinCursor::empty();
+        for (int i = 0; i < 50; ++i) {
+            probeKey = makeKeyRow(i);
+            probeProject = makeProjectRow("probe_payload_" + std::to_string(i));
+            hhj.probe(probeKey, probeProject, cursor);
+        }
+        hhj.finishProbe();
+        while (auto cursorOpt = hhj.nextSpilledJoinCursor()) {
+            while (cursorOpt->next()) {
+            }
+        }
+    };
+
+    auto hhj = makeHHJ();
+    runSpillingPass(*hhj);
+    const auto singleSpills = stats.spillingStats.getSpills();
+    const auto singleBytes = stats.spillingStats.getSpilledBytes();
+    const auto singleRecords = stats.spillingStats.getSpilledRecords();
+    const auto singleStorage = stats.spillingStats.getSpilledDataStorageSize();
+    ASSERT_GT(singleBytes, 0u);
+    ASSERT_GT(singleStorage, 0u);
+
+    hhj->reset();
+    runSpillingPass(*hhj);
+    ASSERT_EQ(stats.spillingStats.getSpills(), 2 * singleSpills);
+    ASSERT_EQ(stats.spillingStats.getSpilledRecords(), 2 * singleRecords);
+    ASSERT_EQ(stats.spillingStats.getSpilledBytes(), 2 * singleBytes);
+    ASSERT_EQ(stats.spillingStats.getSpilledDataStorageSize(), 2 * singleStorage);
+}
+
+TEST_F(HybridHashJoinTestFixture, ResetReportsUnreportedSpilledRecords) {
+    auto hhj = makeHHJ();
+    for (int i = 0; i < 50; ++i) {
+        hhj->addBuild(makeKeyRow(i), makeProjectRow("build_payload_" + std::to_string(i)));
+    }
+    hhj->finishBuild();
+    ASSERT_TRUE(hhj->isPartitioned());
+    ASSERT_EQ(stats.spillingStats.getSpilledRecords(), 50u);
+
+    const auto recordsAfterBuild = stats.spillingStats.getSpilledRecords();
+    const auto spillsAfterBuild = stats.spillingStats.getSpills();
+
+    // Write probe records to the spilled partitions, then reset before finishProbe() gets a
+    // chance to report them.
+    value::MaterializedRow probeKey(1);
+    value::MaterializedRow probeProject(1);
+    auto cursor = JoinCursor::empty();
+    for (int i = 0; i < 50; ++i) {
+        probeKey = makeKeyRow(i);
+        probeProject = makeProjectRow("probe_payload_" + std::to_string(i));
+        hhj->probe(probeKey, probeProject, cursor);
+    }
+
+    hhj->reset();
+
+    ASSERT_GT(stats.spillingStats.getSpilledRecords(), recordsAfterBuild);
+    ASSERT_EQ(stats.spillingStats.getSpills(), spillsAfterBuild + 1);
+}
+
+TEST_F(HybridHashJoinTestFixture, FinishBuildReportsFinalBufferFlushWithoutPendingRecords) {
+    auto hhj = makeHHJ();
+    hhj->addBuild(makeKeyRow(1), makeProjectRow(std::string(512, 'x')));
+    hhj->finishBuild();
+    ASSERT_TRUE(hhj->isPartitioned());
+    ASSERT_EQ(stats.spillingStats.getSpilledRecords(), 1u);
+    ASSERT_GT(stats.spillingStats.getSpilledBytes(), 0u);
+    ASSERT_GT(stats.spillingStats.getSpilledDataStorageSize(), 0u);
+    ASSERT_EQ(stats.spillingStats.getSpills(), 1u);
+}
+
 TEST_F(HybridHashJoinTestFixture, ProbeOnlyNonMatchingKeysToSpilledPartition) {
     auto hhj = makeHHJ();
 
@@ -1126,11 +1221,11 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterReducesProbeSpills) {
 }
 
 TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
-    auto hhj = makeHHJ();
+    auto hhj = makeHHJ(nullptr, /*allowDiskUse=*/true, /*memLimit=*/32 * 1024);
 
     // Build side with string keys
     std::set<std::string> buildKeys;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 5000; ++i) {
         std::string key = "key_" + std::to_string(i * 2);  // Even numbers
         hhj->addBuild(makeStringKeyRow(key), makeProjectRow("build_" + key));
         buildKeys.insert(key);
@@ -1141,7 +1236,7 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
 
     auto cursor = JoinCursor::empty();
     // Probe with odd-numbered keys (not in build) - should be filtered by bloom filter
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < 2500; ++i) {
         std::string key = "key_" + std::to_string(i * 2 + 1);  // Odd numbers
         auto probeKeyRow = makeStringKeyRow(key);
         auto probeProjectRow = makeProjectRow("probe_" + key);
@@ -1151,7 +1246,7 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
     }
 
     // Probe with even-numbered keys (in build)
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < 2500; ++i) {
         std::string key = "key_" + std::to_string(i * 2);  // Even numbers
         auto probeKeyRow = makeStringKeyRow(key);
         auto probeProjectRow = makeProjectRow("probe_" + key);
@@ -1165,6 +1260,7 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
     ASSERT_GT(stats.numProbeRecordsDiscarded, 0);
 
     // Process spilled partitions and verify correctness
+    size_t numMatches = 0;
     while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             std::string buildKey = getStringValue(matchOpt->buildKeyRow);
@@ -1172,8 +1268,10 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
             ASSERT_EQ(buildKey, probeKey);
             ASSERT_TRUE(buildKeys.count(buildKey) > 0)
                 << "Matched key " << buildKey << " should be in build set";
+            numMatches++;
         }
     }
+    ASSERT_EQ(numMatches, 2500);
 }
 
 TEST_F(HybridHashJoinTestFixture, TestPartitionDistribution) {
@@ -1312,22 +1410,19 @@ TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
     ASSERT_LT(subDocPtr, docPtr + BSONObj(docPtr).objsize());
 
     value::MaterializedRow probeProject(2);
-    probeProject.reset(0, true, docTag, docVal);  // slot 0: owns the full-document buffer
-    probeProject.reset(
-        1,
-        false,
-        value::TypeTags::bsonObject,
-        value::bitcastFrom<const char*>(subDocPtr));  // slot 1: non-owned, inside slot 0
+    // slot 0: owns the full-document buffer
+    probeProject.reset(0, value::TagValueOwned::fromRaw(docTag, docVal));
+    // slot 1: non-owned, inside slot 0
+    probeProject.reset(1,
+                       value::TagValueView{value::TypeTags::bsonObject,
+                                           value::bitcastFrom<const char*>(subDocPtr)});
 
     auto cursor = JoinCursor::empty();
     hhj->probe(probeKey, probeProject, cursor);
 
-    // First save: _savedProbeProject[0] gets an independent copy of the full doc (buffer A),
-    // _savedProbeProject[1] gets an independent copy of the sub-doc (buffer B).
+    // First save: probeProject[0] already owns the full doc and is left alone; probeProject[1]
+    // gets its own copy of the sub-doc (buffer B).
     cursor.saveState();
-
-    // First restore: probeProject[0] -> non-owned A, probeProject[1] -> non-owned B.
-    cursor.restoreState();
 
     // Simulate the cross-slot aliasing
     {
@@ -1335,20 +1430,52 @@ TEST_F(HybridHashJoinTestFixture, SaveRestoreWithBsonCrossSlotAliasing) {
         ASSERT_EQ(savedTag, value::TypeTags::bsonObject);
         const char* savedDocPtr = value::bitcastTo<const char*>(savedVal);
         const char* savedSubPtr = BSONObj(savedDocPtr)["subdoc"].embeddedObject().objdata();
-        probeProject.reset(
-            1, false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(savedSubPtr));
+        probeProject.reset(1,
+                           value::TagValueView{value::TypeTags::bsonObject,
+                                               value::bitcastFrom<const char*>(savedSubPtr)});
     }
 
-    // Second save: probeProject[1] now aliases into _savedProbeProject[0]'s buffer.
+    // Second save: probeProject[1] again aliases into probeProject[0]'s buffer and must be copied
+    // without disturbing slot 0.
     cursor.saveState();
 
-    cursor.restoreState();
-
-    // Verify the sub-document value survived both save/restore cycles correctly.
+    // Verify the sub-document value survived both save cycles correctly.
     auto [tag1, val1] = probeProject.getViewOfValue(1);
     ASSERT_EQ(tag1, value::TypeTags::bsonObject);
     BSONObj restoredSubDoc(value::bitcastTo<const char*>(val1));
     ASSERT_BSONOBJ_EQ(restoredSubDoc, BSON("value" << 99));
+}
+
+TEST_F(HybridHashJoinTestFixture, SaveStateOwnsProbeRowsWhenCursorHasMatches) {
+    auto hhj = makeHHJ();
+    // Strings longer than 7 bytes are heap-allocated.
+    hhj->addBuild(makeStringKeyRow("match_key_value"), makeProjectRow("build_projection"));
+    hhj->finishBuild();
+
+    // outerKey / outerProject play the role of the outer child's owned accessor storage.
+    // probeKey / probeProject are unowned views into it
+    auto outerKey = makeStringKeyRow("match_key_value");
+    auto outerProject = makeProjectRow("probe_projection_value");
+    auto probeKey = makeUnownedView(outerKey);
+    auto probeProject = makeUnownedView(outerProject);
+
+    auto cursor = JoinCursor::empty();
+    hhj->probe(probeKey, probeProject, cursor);
+
+    cursor.saveState();
+
+    // Simulate the yield releasing the upstream storage: the buffers backing the probe-row
+    // views are freed while the plan is saved.
+    outerKey.reset(0, value::TagValueView::nothing());
+    outerProject.reset(0, value::TagValueView::nothing());
+
+    auto matchOpt = cursor.next();
+    ASSERT_TRUE(matchOpt.has_value());
+    ASSERT_EQ(getStringValue(matchOpt->buildKeyRow), "match_key_value");
+    ASSERT_EQ(getStringValue(matchOpt->buildProjectRow), "build_projection");
+    ASSERT_EQ(getStringValue(matchOpt->probeKeyRow), "match_key_value");
+    ASSERT_EQ(getStringValue(matchOpt->probeProjectRow), "probe_projection_value");
+    ASSERT_FALSE(cursor.next().has_value());
 }
 }  // namespace
 }  // namespace mongo::sbe

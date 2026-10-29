@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,31 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+# Per-consumer OTEL metrics cell + recorder for BatchedEnrichmentStage's enrich-sub-batch count
+# (changeStreams.updateLookup.enrichBatchesStarted / search.idLookup.enrichBatchesStarted).
+# Registers both cells at load time. Split out of batched_enrichment_stage.cpp's own library
+# (which has no OTEL dependency) the same way single_document_lookup_stats is split out of the
+# single-document-lookup executors, so the base abstraction's callers stay narrowly scoped.
+mongo_cc_library(
+    name = "batched_enrichment_stats",
+    srcs = [
+        "batched_enrichment_stats.cpp",
+    ],
+    deps = [
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "batched_enrichment_stats_test",
+    srcs = [
+        "batched_enrichment_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":batched_enrichment_stats",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
 )

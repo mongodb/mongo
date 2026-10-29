@@ -2,8 +2,10 @@
 
 import logging
 import os
+import tempfile
 import unittest
 
+import yaml
 from mock import MagicMock
 
 from buildscripts.resmokelib.logging import loggers
@@ -82,6 +84,7 @@ class TestGetTestsForKind(unittest.TestCase):
         self.default_evergreen_requester = under_test._config.EVERGREEN_REQUESTER
         self.default_evergreen_patch_build = under_test._config.EVERGREEN_PATCH_BUILD
         self.default_evergreen_task_name = under_test._config.EVERGREEN_TASK_NAME
+        self.default_evergreen_display_task_name = under_test._config.EVERGREEN_DISPLAY_TASK_NAME
         self.default_selector = under_test._selector
         self.default_evergreen_conn = under_test.evergreen_conn
 
@@ -100,6 +103,7 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TASK_ID = self.default_evergreen_task_id
         under_test._config.EVERGREEN_PATCH_BUILD = self.default_evergreen_patch_build
         under_test._config.EVERGREEN_TASK_NAME = self.default_evergreen_task_name
+        under_test._config.EVERGREEN_DISPLAY_TASK_NAME = self.default_evergreen_display_task_name
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = (
             self.default_evergreen_test_selection_strategy
         )
@@ -160,6 +164,51 @@ class TestGetTestsForKind(unittest.TestCase):
                 tests=["test1", "test2"],
                 strategies="strategy",
             )
+
+    def test_test_selection_reports_display_task_name(self):
+        """TSS must be called with the display task name, not the execution task name.
+
+        Which execution task (shard) a test lands in is not stable, but the display task those
+        shards roll up to always is, so test history has to be keyed on the display task.
+        """
+        mock_selector = MagicMock()
+        mock_selector.filter_tests.return_value = (["test1"], [])
+        mock_selector.group_tests.side_effect = lambda _kind, _cfg, tests: tests
+
+        under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION = True
+        under_test._config.EVERGREEN_PROJECT_NAME = "project_name"
+        under_test._config.EVERGREEN_VARIANT_NAME = "variant_name"
+        under_test._config.EVERGREEN_REQUESTER = "requester"
+        under_test._config.EVERGREEN_TASK_ID = "task_id"
+        under_test._config.EVERGREEN_TASK_NAME = "multiversion_auth_0_variant_name"
+        under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = "strategy"
+        under_test._config.EVERGREEN_PATCH_BUILD = True
+
+        mock_evg_api = MagicMock()
+        mock_evg_api.select_tests.return_value = {"tests": ["test1"]}
+        under_test.evergreen_conn = MagicMock()
+        under_test.evergreen_conn.get_evergreen_api.return_value = mock_evg_api
+        under_test._selector = mock_selector
+
+        under_test._config.EVERGREEN_DISPLAY_TASK_NAME = "multiversion_auth"
+
+        self.suite._get_tests_for_kind("js_test")
+
+        mock_evg_api.select_tests.assert_called_once_with(
+            project_id="project_name",
+            build_variant="variant_name",
+            requester="requester",
+            task_id="task_id",
+            task_name="multiversion_auth",
+            tests=["test1"],
+            strategies="strategy",
+        )
+
+    def test_test_selection_falls_back_to_execution_task_name(self):
+        """Without a display task name, send the task's own name."""
+        under_test._config.EVERGREEN_TASK_NAME = "some_task"
+        under_test._config.EVERGREEN_DISPLAY_TASK_NAME = None
+        self.assertEqual(under_test.tss_task_name(), "some_task")
 
     def test_tss_cannot_add_tests_outside_tag_filtered_list(self):
         """TSS returning tests not in the tag-filtered list must not cause them to run.
@@ -280,6 +329,81 @@ class TestGetTestsForKind(unittest.TestCase):
 
         self.assertEqual(set(shard1), set(["1.js", "3.js"]))
         self.assertEqual(set(shard2), set(["2.js", "4.js"]))
+
+
+class TestApplyPregeneratedTestSelection(unittest.TestCase):
+    """Selection is applied from a build-time file; every failure mode must keep all tests."""
+
+    def setUp(self):
+        self.suite = under_test.Suite("suite_name", {"test_kind": "js_test"})
+        self.tests = ["a.js", "b.js", "c.js"]
+        self.original_tss_test_list = under_test._config.TSS_TEST_LIST
+        if under_test.loggers.ROOT_EXECUTOR_LOGGER is None:
+            under_test.loggers.ROOT_EXECUTOR_LOGGER = logging.getLogger("executor")
+
+    def tearDown(self):
+        under_test._config.TSS_TEST_LIST = self.original_tss_test_list
+
+    def _apply(self, contents):
+        with tempfile.NamedTemporaryFile("w", suffix=".yml", delete=False) as test_list_file:
+            if contents is not None:
+                test_list_file.write(contents)
+        under_test._config.TSS_TEST_LIST = test_list_file.name
+        try:
+            return self.suite._apply_pregenerated_test_selection(self.tests)
+        finally:
+            os.unlink(test_list_file.name)
+
+    def test_applies_a_successful_selection(self):
+        keep, excluded = self._apply(
+            yaml.safe_dump({"status": "selected", "tests": ["a.js", "c.js"]})
+        )
+        self.assertEqual(["a.js", "c.js"], keep)
+        self.assertEqual(["b.js"], excluded)
+        self.assertIsNone(self.suite.tss_selection_error)
+
+    def test_selection_cannot_add_tests_outside_the_suite(self):
+        keep, excluded = self._apply(
+            yaml.safe_dump({"status": "selected", "tests": ["a.js", "not_in_suite.js"]})
+        )
+        self.assertEqual(["a.js"], keep)
+        self.assertEqual(["b.js", "c.js"], excluded)
+
+    def test_a_selection_of_nothing_is_honoured(self):
+        # An empty list from a successful selection genuinely means every test was excluded.
+        keep, excluded = self._apply(yaml.safe_dump({"status": "selected", "tests": []}))
+        self.assertEqual([], keep)
+        self.assertEqual(self.tests, excluded)
+        self.assertIsNone(self.suite.tss_selection_error)
+
+    def test_selection_not_asked_for_runs_everything_without_an_error(self):
+        keep, excluded = self._apply(yaml.safe_dump({"status": "disabled", "tests": self.tests}))
+        self.assertEqual(self.tests, keep)
+        self.assertEqual([], excluded)
+        self.assertIsNone(self.suite.tss_selection_error)
+
+    def test_a_failed_selection_runs_everything_and_fails_the_run(self):
+        keep, excluded = self._apply(yaml.safe_dump({"status": "failed", "tests": []}))
+        self.assertEqual(self.tests, keep)
+        self.assertEqual([], excluded)
+        self.assertIsNotNone(self.suite.tss_selection_error)
+
+    def test_missing_file_runs_everything_and_fails_the_run(self):
+        under_test._config.TSS_TEST_LIST = "/nonexistent/test_list.yml"
+        keep, _ = self.suite._apply_pregenerated_test_selection(self.tests)
+        self.assertEqual(self.tests, keep)
+        self.assertIsNotNone(self.suite.tss_selection_error)
+
+    def test_unparseable_file_runs_everything_and_fails_the_run(self):
+        keep, _ = self._apply("{not: valid: yaml: at all")
+        self.assertEqual(self.tests, keep)
+        self.assertIsNotNone(self.suite.tss_selection_error)
+
+    def test_file_without_a_status_runs_everything_without_an_error(self):
+        # An older or hand-written file with no status is treated as "not asked for".
+        keep, _ = self._apply(yaml.safe_dump({"tests": []}))
+        self.assertEqual(self.tests, keep)
+        self.assertIsNone(self.suite.tss_selection_error)
 
 
 if __name__ == "__main__":

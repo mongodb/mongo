@@ -14,11 +14,13 @@
  *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
  *   # consistent, no add/remove shard operations should occur during the test.
  *   assumes_stable_shard_list,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 
+import {waitForCurOpByFilter} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {findMatchingLogLine} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -36,16 +38,6 @@ function setupCollection(coll) {
         docs.push({_id: i, index: i});
     }
     assert.commandWorked(coll.insertMany(docs));
-}
-
-function waitForLog(predicate) {
-    assert.soon(() => {
-        const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-        if (findMatchingLogLine(globalLog.log, predicate)) {
-            return true;
-        }
-        return false;
-    });
 }
 
 function assertGetMore(cursorId, collName, sessionId, txnNumber, times) {
@@ -98,20 +90,32 @@ const createInactiveCursor = function (coll) {
         ),
     );
 
-    getMoreFailpoint.wait();
-    waitForLog({id: 20477, cursorId: cursorCurrentlyPinnedId});
+    try {
+        getMoreFailpoint.wait();
+        waitForCurOpByFilter(
+            db,
+            {"cursor.cursorId": cursorCurrentlyPinnedId},
+            {localOps: true, allUsers: true},
+        );
 
-    const releaseMemoryCmd = {
-        releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId],
-    };
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
+        const releaseMemoryCmd = {
+            releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId],
+        };
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
 
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorToReleaseId], releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsNotFound, [cursorNotFoundId], releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsCurrentlyPinned, [cursorCurrentlyPinnedId], releaseMemoryRes);
-
-    getMoreFailpoint.off();
-    joinGetMore();
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorToReleaseId], releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsNotFound, [cursorNotFoundId], releaseMemoryRes);
+        assert.eq(
+            releaseMemoryRes.cursorsCurrentlyPinned,
+            [cursorCurrentlyPinnedId],
+            releaseMemoryRes,
+        );
+    } finally {
+        // Must run even if an assertion above throws, otherwise the parallel-shell getMore stays
+        // parked in pauseWhileSet forever, wedging the background hooks and the fixture.
+        getMoreFailpoint.off();
+        joinGetMore();
+    }
 }

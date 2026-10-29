@@ -4,7 +4,7 @@
  * ensure that the correct `effectivePipeline` is passed to mongot upon creation of the search
  * index.
  *
- * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ * @tags: [ requires_fcv_81 ]
  */
 import {
     createSearchIndexesAndExecuteTests,

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/stats/top.h"
 
@@ -43,11 +17,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -67,20 +42,6 @@ const auto getServiceLatencyTracker = Service::declareDecoration<ServiceLatencyT
 const otel::metrics::AttributeDefinition<std::string_view> kOpTypeAttrDef{
     .name = "op_type", .values = {"read"sv, "write"sv, "command"sv}};
 
-// Build explicit OTel bucket boundaries from OperationLatencyHistogram's lower bounds.
-// We use lower bounds [1..N-1] as OTel upper bounds, giving the same bucket edges.
-// Lower bound [0] (value 0) is omitted: OTel's implicit first bucket covers (-inf, 2].
-std::vector<double> makeOperationLatencyBucketBoundaries() {
-    const auto& lowerBounds = operation_latency_histogram_details::getLowerBounds();
-    std::vector<double> boundaries;
-    invariant(!lowerBounds.empty(), "OperationLatencyHistogram lower bounds must be non-empty");
-    boundaries.reserve(lowerBounds.size() - 1);
-    for (size_t i = 1; i < lowerBounds.size(); ++i) {
-        boundaries.push_back(static_cast<double>(lowerBounds[i]));
-    }
-    return boundaries;
-}
-
 otel::metrics::Histogram<int64_t, std::string_view>& operationLatencyHistogram =
     otel::metrics::MetricsService::instance().createInt64Histogram<std::string_view>(
         otel::metrics::MetricNames::kOperationLatency,
@@ -88,12 +49,16 @@ otel::metrics::Histogram<int64_t, std::string_view>& operationLatencyHistogram =
         "broken down by operation type (read/write/command).",
         otel::metrics::MetricUnit::kMicroseconds,
         kOpTypeAttrDef,
-        {.explicitBucketBoundaries = makeOperationLatencyBucketBoundaries()});
+        {.explicitBucketBoundaries =
+             operation_latency_histogram_details::makeOperationLatencyBucketBoundaries()});
 
-// Returns the op_type attribute string for OTel recording, or nullopt for op types excluded from
-// this histogram. kTransaction is tracked separately via incrementForTransaction and is
-// intentionally excluded here; if it should appear in future, add it in incrementForTransaction.
-std::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
+/**
+ * Returns the op_type attribute string for OTel recording, or a disengaged optional for op
+ * types excluded from this histogram. kTransaction is tracked separately via
+ * incrementForTransaction and is intentionally excluded here; if it should appear in future,
+ * add it in incrementForTransaction.
+ */
+boost::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
     switch (rwType) {
         case Command::ReadWriteType::kRead:
             return "read"sv;
@@ -102,20 +67,10 @@ std::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
         case Command::ReadWriteType::kCommand:
             return "command"sv;
         case Command::ReadWriteType::kTransaction:
-            return std::nullopt;
+            return {};
         default:
             MONGO_UNREACHABLE_TASSERT(12445300);
     }
-}
-
-// Returns true if the operation came from a network client connection (connectionId > 0)
-// and is not running under DBDirectClient.
-// Note: QE (Queryable Encryption) operations ARE included here; the isQE flag is passed separately
-// to OperationLatencyHistogram::increment so that queryableEncryptionLatencyMicros is tracked
-// correctly.
-bool isUserConnection(OperationContext* opCtx) {
-    auto* c = opCtx->getClient();
-    return c->isFromUserConnection() && !c->isInDirectClient();
 }
 
 template <typename HistogramType>
@@ -133,7 +88,7 @@ void incrementHistogramForUser(OperationContext* opCtx,
                                long long latency,
                                HistogramType& histogram,
                                Command::ReadWriteType readWriteType) {
-    if (!isUserConnection(opCtx))
+    if (!opCtx->getClient()->isExternalUserConnection())
         return;
     incrementHistogram(opCtx, latency, histogram, readWriteType);
 }
@@ -198,6 +153,10 @@ void updateCollectionData(OperationContext* opCtx,
 ServiceLatencyTracker::ServiceLatencyTracker()
     : _totalTime({.includeEmptyBuckets = true, .logBucketScalingFactor = 3}) {}
 
+bool shouldRecordLatencyStats(OperationContext* opCtx) {
+    return opCtx->shouldIncrementLatencyStats() && opCtx->getClient()->isExternalUserConnection();
+}
+
 ServiceLatencyTracker& ServiceLatencyTracker::getDecoration(Service* service) {
     return getServiceLatencyTracker(service);
 }
@@ -206,10 +165,7 @@ void ServiceLatencyTracker::increment(OperationContext* opCtx,
                                       Microseconds latency,
                                       Microseconds workingTime,
                                       Command::ReadWriteType readWriteType) {
-    if (!opCtx->shouldIncrementLatencyStats())
-        return;
-
-    if (!isUserConnection(opCtx))
+    if (!shouldRecordLatencyStats(opCtx))
         return;
 
     const bool isQE = CurOp::shouldCurOpStackOmitDiagnosticInformation(CurOp::get(opCtx));

@@ -1,38 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -117,7 +91,7 @@ class ThreadPoolTest {
     static const unsigned iterations = 10000;
     static const unsigned nThreads = 8;
 
-    AtomicWord<unsigned> counter;
+    Atomic<unsigned> counter;
     void increment(unsigned n) {
         for (unsigned i = 0; i < n; i++) {
             counter.fetchAndAdd(1);
@@ -183,7 +157,7 @@ private:
     char pad2[128];
     unsigned locks;
     char pad3[128];
-    AtomicWord<int> k;
+    Atomic<int> k;
 
     void validate() override {
         if (once++ == 0) {
@@ -205,7 +179,7 @@ private:
                 break;
         }
     }
-    AtomicWord<bool> done;
+    Atomic<bool> done;
     void subthread(int x) override {
         if (x == 1) {
             watch();
@@ -232,8 +206,8 @@ private:
 };
 
 class StdxMutexSlackTest : public Slack<std::mutex, std::lock_guard<std::mutex>> {};
-class UIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned>> {};
-class ULLIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned long long>> {};
+class UIsAtomicWordAtomicTest : public IsAtomicWordAtomic<Atomic<unsigned>> {};
+class ULLIsAtomicWordAtomicTest : public IsAtomicWordAtomic<Atomic<unsigned long long>> {};
 
 class All : public unittest::OldStyleSuiteSpecification {
 public:

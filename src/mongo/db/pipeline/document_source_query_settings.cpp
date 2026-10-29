@@ -1,44 +1,28 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_query_settings.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_internal_query_settings_debug_shape.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
+#include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/idl/idl_parser.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <deque>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -46,21 +30,114 @@ namespace mongo {
 
 using namespace query_settings;
 
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalListQuerySettings);
+
+/**
+ * '$_internalListQuerySettings' seeds the '$querySettings' desugar with the in-memory query shape
+ * configurations. It is a thin wrapper around DocumentSourceQueue whose serialization is a constant
+ * '{$_internalListQuerySettings: {}}'. That serialization is:
+ *   - stable, so $querySettings's own query shape does not change with the number of settings, and
+ *   - reparse-safe, so on a sharded cluster the configurations are re-read locally on whichever
+ * node the pipeline is dispatched to (the config server, where the downstream $lookup runs). The
+ *     query settings cluster parameter is present on every node, so reading it wherever the
+ * pipeline lands is correct.
+ */
+class DocumentSourceInternalListQuerySettings final {
+public:
+    static constexpr std::string_view kStageName = "$_internalListQuerySettings"sv;
+
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+            return std::make_unique<LiteParsed>(spec);
+        }
+
+        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSourceDefault(spec) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+            return stdx::unordered_set<NamespaceString>();
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
+            return {};
+        }
+
+        bool isInitialSource() const final {
+            return true;
+        }
+
+        std::unique_ptr<StageParams> getStageParams() const final {
+            return std::make_unique<InternalListQuerySettingsStageParams>(_originalBson);
+        }
+    };
+
+    static StageConstraints constraints() {
+        // 'kCollectionlessSourceRunOnceAnyNode' (rather than 'kReceivingHostOnly') lets the
+        // pipeline be forwarded to the config server on a sharded cluster, where the downstream
+        // $lookup into config.queryShapeRepresentativeQueries becomes a legal shard-role local
+        // read.
+        StageConstraints constraints{
+            StageConstraints::StreamType::kStreaming,
+            StageConstraints::PositionRequirement::kFirst,
+            StageConstraints::HostTypeRequirement::kCollectionlessSourceRunOnceAnyNode,
+            StageConstraints::DiskUseRequirement::kNoDiskUse,
+            StageConstraints::FacetRequirement::kNotAllowed,
+            StageConstraints::TransactionRequirement::kAllowed,
+            StageConstraints::LookupRequirement::kAllowed,
+            StageConstraints::UnionRequirement::kAllowed};
+        constraints.isIndependentOfAnyCollection = true;
+        constraints.setConstraintsForNoInputSources();
+        return constraints;
+    }
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        uassert(12915500,
+                str::stream() << kStageName << " expects a nested empty object but found: " << elem,
+                elem.type() == BSONType::object && elem.embeddedObject().isEmpty());
+
+        // The read is deferred so it runs on whichever node ends up executing the stage.
+        DocumentSourceQueue::DeferredQueue deferredConfigs{[expCtx]() {
+            auto* opCtx = expCtx->getOperationContext();
+            auto configs = QuerySettingsService::get(opCtx)
+                               .getAllQueryShapeConfigurations()
+                               .queryShapeConfigurations;
+            std::deque<DocumentSource::GetNextResult> queue;
+            for (auto&& config : configs) {
+                queue.emplace_back(Document{config.toBSON()});
+            }
+            return queue;
+        }};
+
+        return make_intrusive<DocumentSourceQueue>(
+            std::move(deferredConfigs),
+            expCtx,
+            /* stageNameOverride */ kStageName,
+            /* serializeOverride */ Value(DOC(kStageName << Document())),
+            /* constraintsOverride */ constraints());
+    }
+};
+
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalListQuerySettings,
+                                     DocumentSourceInternalListQuerySettings::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalListQuerySettings,
+                                                   DocumentSourceInternalListQuerySettings,
+                                                   InternalListQuerySettingsStageParams);
+
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(querySettings,
                                      DocumentSourceQuerySettings::LiteParsed::parse,
                                      AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(querySettings,
-                                                   DocumentSourceQuerySettings,
-                                                   QuerySettingsStageParams);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(querySettings,
+                                                             DocumentSourceQuerySettings,
+                                                             QuerySettingsStageParams);
 
-ALLOCATE_DOCUMENT_SOURCE_ID(querySettings, DocumentSourceQuerySettings::id)
-
-DocumentSourceQuerySettings::DocumentSourceQuerySettings(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool showDebugQueryShape)
-    : DocumentSource(kStageName, expCtx), _showDebugQueryShape(showDebugQueryShape) {}
-
-boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson(
+DocumentSourceContainer DocumentSourceQuerySettings::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(7746801,
             "$querySettings stage expects a document as argument",
@@ -70,10 +147,40 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
     bool showDebugQueryShape = DocumentSourceQuerySettingsSpec::parse(
                                    elem.embeddedObject(), IDLParserContext("$querySettings"))
                                    .getShowDebugQueryShape();
-    return make_intrusive<DocumentSourceQuerySettings>(expCtx, showDebugQueryShape);
-}
 
-Value DocumentSourceQuerySettings::serialize(const query_shape::SerializationOptions& opts) const {
-    return Value(DOC(getSourceName() << DOC("showDebugQueryShape" << Value(_showDebugQueryShape))));
+    const auto& repQueriesNss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
+
+    DocumentSourceContainer pipeline;
+
+    // Seed the pipeline with the in-memory query shape configurations.
+    const auto seedSpec = BSON(DocumentSourceInternalListQuerySettings::kStageName << BSONObj());
+    pipeline.push_back(
+        DocumentSourceInternalListQuerySettings::createFromBson(seedSpec.firstElement(), expCtx));
+
+    // Representative queries live in the dedicated collection on the config server, which is why
+    // the seed stage is routed there (see its stage constraints) and the join resolves locally.
+    // Unwrap the matched document in the lookup so the result is the representative query itself.
+    pipeline.push_back(DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << BSON("db" << repQueriesNss.dbName().toStringForResourceId()
+                                                   << "coll" << repQueriesNss.coll())
+                                      << "localField" << "queryShapeHash" << "foreignField"
+                                      << "_id" << "pipeline"
+                                      << BSON_ARRAY(BSON("$replaceRoot" << BSON(
+                                                             "newRoot" << "$representativeQuery")))
+                                      << "as" << "representativeQuery"))
+            .firstElement(),
+        expCtx));
+
+    // Flatten the 0-or-1 element $lookup array, keeping configurations that have no matching
+    // representative query ('includeNullIfEmptyOrMissing' keeps the field absent).
+    pipeline.push_back(DocumentSourceUnwind::create(
+        expCtx, "representativeQuery", /*includeNullIfEmptyOrMissing=*/true, boost::none));
+
+    // Optionally append the debug query shape computation.
+    if (showDebugQueryShape) {
+        pipeline.push_back(make_intrusive<DocumentSourceInternalQuerySettingsDebugShape>(expCtx));
+    }
+
+    return pipeline;
 }
 }  // namespace mongo

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_hybrid_search_desugarer_utils.h"
 
@@ -231,7 +205,7 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
     for (auto it = stages.rbegin(); it != stages.rend(); ++it) {
         if ((*it)->getParseTimeName() == "$sort") {
             BSONElement origSpec = (*it)->getOriginalBson();
-            tassert(12559415,
+            uassert(12559415,
                     "Expected $sort spec value to be an object",
                     origSpec.type() == BSONType::object);
 
@@ -251,7 +225,10 @@ void mutateRightmostSortToOutputSortKey(const NamespaceString& nss, StageSpecs& 
 std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceString& nss,
                                                              std::string_view userCollName,
                                                              StageSpecs perPipelineStages) {
-    // Serialize the already-parsed (and sort-mutated) stages back to BSON. Each .wrap() call
+    // Serialize the already-parsed (and sort-mutated) stages back to BSON for the $unionWith's
+    // own serialization/explain output. This BSON is best-effort only — it is not used to
+    // rebuild the inner pipeline below, since stages whose original BSON is only a placeholder
+    // (e.g. AST-only extension sub-stages) cannot round-trip through BSON. Each .wrap() call
     // produces a self-owning copy, so rawPipeline does not alias any stage's internal buffer.
     std::vector<BSONObj> rawPipeline;
     rawPipeline.reserve(perPipelineStages.size());
@@ -261,9 +238,9 @@ std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceStri
 
     NamespaceString foreignNss = NamespaceStringUtil::deserialize(nss.dbName(), userCollName);
 
-    // OwnedLiteParsedPipeline owns its backing BSON, so no manual setOwnedBson is needed for the
-    // inner pipeline.
-    OwnedLiteParsedPipeline innerLpp(foreignNss, rawPipeline);
+    // Move the already-parsed stages directly into the inner pipeline rather than reparsing the
+    // best-effort BSON above.
+    OwnedLiteParsedPipeline innerLpp(foreignNss, std::move(perPipelineStages));
 
     BSONObjBuilder bob;
     {
@@ -281,7 +258,6 @@ std::unique_ptr<LiteParsedDocumentSource> buildUnionWithLPDS(const NamespaceStri
         std::move(foreignNss),
         boost::optional<OwnedLiteParsedPipeline>(std::move(innerLpp)),
         std::move(rawPipeline),
-        /*hasForeignDB=*/false,  // views are flattened before this point
         /*isHybridSearch=*/true);
 
     // makeOwned() wraps _originalBson (a BSONElement view into unionWithObj) into a shared buffer,

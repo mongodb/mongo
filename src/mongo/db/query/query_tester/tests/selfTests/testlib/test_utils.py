@@ -1,5 +1,7 @@
 import argparse
+import contextlib
 import enum
+import glob
 import os
 import subprocess
 import sys
@@ -20,6 +22,20 @@ class Mode(enum.Enum):
     COMPARE = "compare"
     RUN = "run"
     NORMALIZE = "normalize"
+
+
+@contextlib.contextmanager
+def discard_coredumps(binary_name: str = "mongotest"):
+    """
+    Delete core dumps that `binary_name` produces inside this block.
+    """
+    pattern = f"dump_{binary_name}.*.core"
+    preexisting = set(glob.glob(pattern))
+    try:
+        yield
+    finally:
+        for coredump in set(glob.glob(pattern)) - preexisting:
+            os.remove(coredump)
 
 
 def assert_output_contains(actual: bytes, expected: str):

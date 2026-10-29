@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/error_labels.h"
 
@@ -63,6 +37,12 @@ const StringMap<int> commitOrAbortCommands = {{"abortTransaction", 1},
                                               {"clusterCommitTransaction", 1},
                                               {"commitTransaction", 1},
                                               {"coordinateCommitTransaction", 1}};
+
+void appendBaseBackoffMS(BSONObjBuilder& responseBuilder) {
+    if (auto retry = getExternalClientBaseBackoffMS(); retry > 0) {
+        responseBuilder.append(kBaseBackoffMSFieldName, retry);
+    }
+}
 
 }  // namespace
 
@@ -191,12 +171,9 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
 }
 
 bool ErrorLabelBuilder::isOperationIdempotent() const {
-    // TODO(SERVER-108898): When OperationContext support marking an operation as idempotent, check
-    // for idempotency to apply the error label.
-
-    // Ingress request rate-limiter rejection happens before command execution. The operation can
-    // always be retried safely because no command side effects occurred.
-    return _code && *_code == ErrorCodes::IngressRequestRateLimitExceeded;
+    // TODO: SERVER-108898 When OperationContext support marking an operation as idempotent, check
+    //       for idempotency to apply the error label
+    return false;
 }
 
 bool ErrorLabelBuilder::isErrorWithNoWritesPerformed() const {
@@ -231,11 +208,8 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
                 labels << ErrorLabel::kNoWritesPerformed;
             }
         } else if (isOperationIdempotent()) {
+            // TODO SERVER-108898: apply the NoWritesPerformed error label here too, if appropriate.
             labels << ErrorLabel::kRetryableError;
-            // TODO(SERVER-108898): Today `isOperationIdempotent` only checks for
-            // IngressRequestRateLimitExceeded, which means no writes were ever performed.
-            // Additional logic will be needed if we add additional conditions.
-            labels << ErrorLabel::kNoWritesPerformed;
         }
     }
 
@@ -281,14 +255,32 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                        bool isComingFromRouter,
                        const repl::OpTime& lastOpBeforeRun,
                        const repl::OpTime& lastOpAfterRun) {
-    if (MONGO_unlikely(errorLabelsOverride(opCtx))) {
+    if (auto labels = errorLabelsOverride(opCtx); MONGO_unlikely(labels)) {
         // This command was failed by a failCommand failpoint. Thus, we return the errorLabels
         // specified in the failpoint to suppress any other error labels that would otherwise be
         // returned by the ErrorLabelBuilder.
-        if (errorLabelsOverride(opCtx).value().isEmpty()) {
+        if (labels->isEmpty()) {
             return BSONObj();
         } else {
-            return BSON(kErrorLabelsFieldName << errorLabelsOverride(opCtx).value());
+            BSONObjBuilder responseBuilder;
+            responseBuilder.append(kErrorLabelsFieldName, *labels);
+
+            bool hasSystemOverloaded = false;
+            bool hasRetryableError = false;
+
+            for (auto&& elem : *labels) {
+                if (elem.valueStringDataSafe() == ErrorLabel::kSystemOverloadedError) {
+                    hasSystemOverloaded = true;
+                } else if (elem.valueStringDataSafe() == ErrorLabel::kRetryableError) {
+                    hasRetryableError = true;
+                }
+            }
+
+            if (hasSystemOverloaded && hasRetryableError) {
+                appendBaseBackoffMS(responseBuilder);
+            }
+
+            return responseBuilder.obj();
         }
     }
 
@@ -312,17 +304,16 @@ BSONObj getErrorLabels(OperationContext* opCtx,
     BSONObjBuilder responseBuilder;
     responseBuilder.append(kErrorLabelsFieldName, labelArray.arr());
 
+    // TODO: SERVER-108898 Add a test for this behavior once this branch becomes possible.
     if (labelBuilder.isSystemOverloadedError() && labelBuilder.isOperationIdempotent()) {
-        if (auto retry = getOverloadRetryAfterMS(); retry > 0) {
-            responseBuilder.append(kRetryAfterMSFieldName, retry);
-        }
+        appendBaseBackoffMS(responseBuilder);
     }
 
     return responseBuilder.obj();
 }
 
-long long getOverloadRetryAfterMS() {
-    return gOverloadRetryAfterMS.loadRelaxed();
+long long getExternalClientBaseBackoffMS() {
+    return gExternalClientBaseBackoffMS.loadRelaxed();
 }
 
 bool isTransientTransactionError(ErrorCodes::Error code,

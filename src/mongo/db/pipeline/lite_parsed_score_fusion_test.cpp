@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 
@@ -44,8 +18,12 @@
 namespace mongo {
 namespace {
 
-class LiteParsedScoreFusionTest : public service_context_test::WithSetupTransportLayer,
-                                  public AggregationContextFixture {
+class LiteParsedScoreFusionTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     std::unique_ptr<Pipeline> makePipelineFromStages(const std::vector<BSONObj>& pipeline) {
         return pipeline_factory::makePipeline(
@@ -55,8 +33,6 @@ protected:
     }
 
 private:
-    unittest::ServerParameterGuard featureFlagController{"featureFlagSearchHybridScoringFull",
-                                                         true};
     unittest::ServerParameterGuard _ifrFlagController{"featureFlagExtensionsInsideHybridSearch",
                                                       true};
 };
@@ -120,7 +96,8 @@ TEST_F(LiteParsedScoreFusionTest, ErrorsIfPipelineNameEmpty) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 15998);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 15998);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
@@ -137,7 +114,8 @@ TEST_F(LiteParsedScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 16410);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 16410);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
@@ -154,7 +132,8 @@ TEST_F(LiteParsedScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 16412);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 16412);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ErrorsIfDuplicatePipelineNames) {
@@ -170,7 +149,8 @@ TEST_F(LiteParsedScoreFusionTest, ErrorsIfDuplicatePipelineNames) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108715);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108715);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ErrorsIfScoreFusionNotFirstStage) {
@@ -229,7 +209,7 @@ TEST_F(LiteParsedScoreFusionTest, ValidateSucceedsWithValidScoredPipeline) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    liteParsed->validate();  // Should not throw.
+    liteParsed->validate(getExpCtx()->getOperationContext());  // Should not throw.
 }
 
 TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnEmptySubpipeline) {
@@ -238,7 +218,8 @@ TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnEmptySubpipeline) {
                                                                         << "normalization"
                                                                         << "none")));
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108710);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108710);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnNonScoredPipeline) {
@@ -255,7 +236,8 @@ TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnNonScoredPipeline) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108712);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108712);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnNonSelectionStage) {
@@ -272,7 +254,8 @@ TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnNonSelectionStage) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108713);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108713);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnNestedHybridSearch) {
@@ -289,7 +272,8 @@ TEST_F(LiteParsedScoreFusionTest, ValidateThrowsOnNestedHybridSearch) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    ASSERT_THROWS_CODE(liteParsed->validate(), AssertionException, 12108711);
+    ASSERT_THROWS_CODE(
+        liteParsed->validate(getExpCtx()->getOperationContext()), AssertionException, 12108711);
 }
 
 TEST_F(LiteParsedScoreFusionTest, ValidateSucceedsWithMultipleValidPipelines) {
@@ -307,7 +291,7 @@ TEST_F(LiteParsedScoreFusionTest, ValidateSucceedsWithMultipleValidPipelines) {
 
     auto nss = getExpCtx()->getNamespaceString();
     auto liteParsed = LiteParsedScoreFusion::parse(nss, spec.firstElement(), {});
-    liteParsed->validate();  // Should not throw.
+    liteParsed->validate(getExpCtx()->getOperationContext());  // Should not throw.
 }
 
 }  // namespace

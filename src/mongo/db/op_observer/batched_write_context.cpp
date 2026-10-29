@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/op_observer/batched_write_context.h"
 
@@ -58,8 +32,7 @@ void BatchedWriteContext::assertNoMixedBatchedOps(bool isDDL) {
     }
 }
 
-void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
-                                              const BatchedOperation& operation) {
+void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx, BatchedOperation operation) {
     invariant(_batchWrites);
     assertNoMixedBatchedOps(/*isDDL=*/false);
 
@@ -74,7 +47,41 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    invariantStatusOK(_batchedOperations.addOperation(operation));
+    if (operation.getOpType() == repl::OpTypeEnum::kContainerInsert ||
+        operation.getOpType() == repl::OpTypeEnum::kContainerUpdate ||
+        operation.getOpType() == repl::OpTypeEnum::kContainerDelete) {
+        _containerOpStaged = true;
+    }
+
+    if (_currentGroupRecordId) {
+        // Stamp the operation with its record so the packer keeps a record's operations in one
+        // entry.
+        operation.setGroupRecordId(*_currentGroupRecordId);
+        _hasAtomicOperationGroups = true;
+    }
+    invariantStatusOK(_batchedOperations.addOperation(std::move(operation)));
+}
+
+BatchedWriteContext::AtomicOperationGroup::AtomicOperationGroup(OperationContext* opCtx,
+                                                                const RecordId& recordId)
+    : _context(BatchedWriteContext::get(opCtx)) {
+    _context._enterAtomicOperationGroup(recordId);
+}
+
+BatchedWriteContext::AtomicOperationGroup::~AtomicOperationGroup() {
+    _context._leaveAtomicOperationGroup();
+}
+
+void BatchedWriteContext::_enterAtomicOperationGroup(const RecordId& recordId) {
+    // Nesting is not supported: a group must be left before another is entered.
+    invariant(!_currentGroupRecordId);
+    _currentGroupRecordId = recordId;
+}
+
+void BatchedWriteContext::_leaveAtomicOperationGroup() {
+    // Must be balanced with a preceding _enterAtomicOperationGroup().
+    invariant(_currentGroupRecordId);
+    _currentGroupRecordId = boost::none;
 }
 
 TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContext* opCtx) {
@@ -85,6 +92,9 @@ TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContex
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {
     _batchedOperations.clear();
     _ddlOperationOccurred = false;
+    _currentGroupRecordId = boost::none;
+    _hasAtomicOperationGroups = false;
+    _containerOpStaged = false;
 }
 
 bool BatchedWriteContext::writesAreBatched() const {

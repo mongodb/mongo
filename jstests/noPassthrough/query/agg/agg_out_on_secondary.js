@@ -17,7 +17,14 @@ const nDocs = 100;
 const readCollName = "readColl";
 const outCollName = "outColl";
 const dbName = "out_on_secondary_db";
-let rs = new ReplSetTest({nodes: 2});
+// Test makes assertions about profiling output, but profiling bails if it
+// takes too long to acquire an IX lock. To avoid flaky tests, bump the
+// deadline up.  Without this, test may occasionally fail, with the server
+// logging "LockTimeout: Unable to acquire IX lock on .."
+let rs = new ReplSetTest({
+    nodes: 2,
+    nodeOptions: {setParameter: {internalQueryGlobalProfilingLockDeadlineMs: 1000}},
+});
 rs.startSet();
 rs.initiate();
 rs.awaitReplication();

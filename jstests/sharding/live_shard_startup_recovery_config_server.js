@@ -38,7 +38,7 @@ rs2.initiate();
 assert.commandWorked(st.s.adminCommand({addShard: rs2.getURL(), name: "newShard2"}));
 
 jsTestLog("Restarting node. It should go into startup recovery.");
-configRS.restart(primary);
+primary = configRS.restart(primary);
 configRS.waitForState(primary, ReplSetTest.State.PRIMARY);
 
 jsTestLog("Ensuring node is up as a primary and checking sharding state");

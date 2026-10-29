@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 
@@ -64,13 +38,13 @@ namespace change_stream_rewrite {
 using MatchExpressionRewrite =
     std::function<std::unique_ptr<MatchExpression>(const boost::intrusive_ptr<ExpressionContext>&,
                                                    const PathMatchExpression*,
-                                                   bool /* allowInexact */,
+                                                   /*allowInexact=*/bool,
                                                    std::vector<BSONObj>&)>;
 
 using AggExpressionRewrite =
     std::function<boost::intrusive_ptr<Expression>(const boost::intrusive_ptr<ExpressionContext>&,
                                                    const ExpressionFieldPath*,
-                                                   bool /* allowInexact */,
+                                                   /*allowInexact=*/bool,
                                                    std::vector<BSONObj>&)>;
 
 namespace {
@@ -1098,62 +1072,62 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
 
     // The 'drop' event is rewritten to the cmdNs in 'ns' and the collection name in 'o.drop'.
     auto dropNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.drop"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.drop"sv);
     tassert(5554104, "Unexpected rewrite failure", dropNsRewrite);
     cmdCases->add(std::move(dropNsRewrite));
 
     // The 'create' event is rewritten to the cmdNs in 'ns' and the collection name in 'o.create'.
     auto createNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.create"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.create"sv);
     tassert(6280101, "Unexpected rewrite failure", createNsRewrite);
     cmdCases->add(std::move(createNsRewrite));
 
     // The 'createIndexes' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.createIndexes'.
     auto createIndexesNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.createIndexes"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.createIndexes"sv);
     tassert(6339400, "Unexpected rewrite failure", createIndexesNsRewrite);
     cmdCases->add(std::move(createIndexesNsRewrite));
 
     // The 'commitIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.commitIndexBuild'.
     auto commitIndexBuildNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.commitIndexBuild"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.commitIndexBuild"sv);
     tassert(6339401, "Unexpected rewrite failure", commitIndexBuildNsRewrite);
     cmdCases->add(std::move(commitIndexBuildNsRewrite));
 
     // The 'startIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.startIndexBuild'.
     auto startIndexBuildNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.startIndexBuild"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.startIndexBuild"sv);
     tassert(9315300, "Unexpected rewrite failure", startIndexBuildNsRewrite);
     cmdCases->add(std::move(startIndexBuildNsRewrite));
 
     // The 'abortIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.abortIndexBuild'.
     auto abortIndexBuildNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.abortIndexBuild"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.abortIndexBuild"sv);
     tassert(9315400, "Unexpected rewrite failure", abortIndexBuildNsRewrite);
     cmdCases->add(std::move(abortIndexBuildNsRewrite));
 
     // The 'dropIndexes' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.dropIndexes'.
     auto dropIndexesNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.dropIndexes"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.dropIndexes"sv);
     tassert(6339402, "Unexpected rewrite failure", dropIndexesNsRewrite);
     cmdCases->add(std::move(dropIndexesNsRewrite));
 
     // The 'modify' event is rewritten to the cmdNs in 'ns' and the collection name in
     // 'o.collMod'.
     auto collModNsRewrite = matchRewriteGenericNamespace(
-        expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */, "o.collMod"sv);
+        expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true, "o.collMod"sv);
     tassert(6316200, "Unexpected rewrite failure", collModNsRewrite);
     cmdCases->add(std::move(collModNsRewrite));
 
     // The 'dropDatabase' event is rewritten to the cmdNs in 'ns'. It does not have a collection
     // field.
     auto dropDbNsRewrite =
-        matchRewriteGenericNamespace(expCtx, predicate, "ns"sv, true /* nsFieldIsCmdNs */);
+        matchRewriteGenericNamespace(expCtx, predicate, "ns"sv, /*nsFieldIsCmdNs=*/true);
     tassert(5554105, "Unexpected rewrite failure", dropDbNsRewrite);
     auto andDropDbNsRewrite = std::make_unique<AndMatchExpression>(std::move(dropDbNsRewrite));
     andDropDbNsRewrite->add(
@@ -1539,7 +1513,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
             auto childIt = norChildren.begin();
             while (childIt != norChildren.end()) {
                 if (auto rewrittenPred = rewriteAggExpressionTree(
-                        expCtx, *childIt, fields, false /* allowInexact */, backingBsonObjs)) {
+                        expCtx, *childIt, fields, /*allowInexact=*/false, backingBsonObjs)) {
                     *childIt = rewrittenPred;
                     ++childIt;
                 } else if (allowInexact) {
@@ -1552,7 +1526,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
         }
 
         if (auto rewrittenPred = rewriteAggExpressionTree(
-                expCtx, notChild, fields, false /* allowInexact */, backingBsonObjs)) {
+                expCtx, notChild, fields, /*allowInexact=*/false, backingBsonObjs)) {
             notChild = rewrittenPred;
             return notExpr;
         }
@@ -1611,7 +1585,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
                 // Some expressions have null children, which we leave in place.
                 continue;
             } else if (auto rewrittenPred = rewriteAggExpressionTree(
-                           expCtx, *childIt, fields, false /* allowInexact */, backingBsonObjs)) {
+                           expCtx, *childIt, fields, /*allowInexact=*/false, backingBsonObjs)) {
                 *childIt = rewrittenPred;
             } else {
                 return nullptr;
@@ -1682,7 +1656,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                 if (auto rewrittenPred = rewriteMatchExpressionTree(expCtx,
                                                                     root->getChild(i),
                                                                     fields,
-                                                                    false /* allowInexact */,
+                                                                    /*allowInexact=*/false,
                                                                     backingBsonObjs)) {
                     rewrittenNor->add(std::move(rewrittenPred));
                 } else if (!allowInexact) {
@@ -1695,7 +1669,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
             // Note that children of a $not _cannot_ be inexact. If predicate P rejects a _subset_
             // of documents, then {$not: P} will incorrectly reject a _superset_ of documents.
             if (auto rewrittenPred = rewriteMatchExpressionTree(
-                    expCtx, root->getChild(0), fields, false /* allowInexact */, backingBsonObjs)) {
+                    expCtx, root->getChild(0), fields, /*allowInexact=*/false, backingBsonObjs)) {
                 return std::make_unique<NotMatchExpression>(std::move(rewrittenPred));
             }
             return nullptr;
@@ -1777,7 +1751,7 @@ std::unique_ptr<MatchExpression> rewriteFilterForFields(
 
     // Attempt to rewrite the tree. Predicates on unknown or unrequested fields will be discarded.
     return rewriteMatchExpressionTree(
-        expCtx, userMatch, includeFields, true /* allowInexact */, backingBsonObjs);
+        expCtx, userMatch, includeFields, /*allowInexact=*/true, backingBsonObjs);
 }
 }  // namespace change_stream_rewrite
 }  // namespace mongo

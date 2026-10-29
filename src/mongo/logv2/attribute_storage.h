@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_attr.h"
@@ -45,7 +18,7 @@
 #include <boost/container/small_vector.hpp>
 
 namespace mongo {
-namespace MONGO_MOD_PUBLIC logv2 {
+namespace [[MONGO_MOD_PUBLIC]] logv2 {
 
 class TypeErasedAttributeStorage;
 
@@ -74,6 +47,7 @@ template <typename It>
 auto mapLog(It begin, It end);
 
 namespace detail {
+using namespace std::literals::string_view_literals;
 
 template <template <class...> class Template, typename... Args>
 struct IsInstantiationOf : std::false_type {};
@@ -388,7 +362,7 @@ CustomAttributeValue mapValue(const T& val) {
 }
 
 template <typename It>
-class MONGO_MOD_NEEDS_REPLACEMENT SequenceContainerLogger {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] SequenceContainerLogger {
 public:
     SequenceContainerLogger(It begin, It end) : _begin(begin), _end(end) {}
 
@@ -402,8 +376,8 @@ public:
                 if constexpr (std::is_same_v<V, CustomAttributeValue&&>) {
                     if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
-                        val.BSONAppend(objBuilder, ""_sd);
-                        builder.append(objBuilder.done().getField(""_sd));
+                        val.BSONAppend(objBuilder, ""sv);
+                        builder.append(objBuilder.done().getField(""sv));
                     } else if (val.BSONSerialize) {
                         BSONObjBuilder objBuilder;
                         val.BSONSerialize(objBuilder);
@@ -461,8 +435,8 @@ public:
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                     } else if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
-                        val.BSONAppend(objBuilder, ""_sd);
-                        objBuilder.done().getField(""_sd).jsonStringBuffer(
+                        val.BSONAppend(objBuilder, ""sv);
+                        objBuilder.done().getField(""sv).jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
                     } else {
                         val.toBSONArray().jsonStringBuffer(
@@ -491,7 +465,7 @@ public:
                 append(mapValue(item));
             }
 
-            separator = ", "_sd;
+            separator = ", "sv;
         }
         buffer.push_back(')');
     }
@@ -555,7 +529,7 @@ public:
 
     // Text Format: (elem1: val1, elem2: val2, ..., elemN: valN)
     void serialize(fmt::memory_buffer& buffer) const {
-        std::string_view separator = ""_sd;
+        std::string_view separator = ""sv;
         buffer.push_back('(');
         for (auto it = _begin; it != _end; ++it) {
             const auto& item = *it;
@@ -576,9 +550,9 @@ public:
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                     } else if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
-                        val.BSONAppend(objBuilder, ""_sd);
+                        val.BSONAppend(objBuilder, ""sv);
                         fmt::format_to(std::back_inserter(buffer), "{}: ", key);
-                        objBuilder.done().getField(""_sd).jsonStringBuffer(
+                        objBuilder.done().getField(""sv).jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
                     } else {
                         fmt::format_to(std::back_inserter(buffer), "{}: ", key);
@@ -610,7 +584,7 @@ public:
                 append(key, mapValue(item.second));
             }
 
-            separator = ", "_sd;
+            separator = ", "sv;
         }
         buffer.push_back(')');
     }
@@ -621,7 +595,7 @@ private:
 };
 
 // Named attribute, storage for a name-value attribute.
-class MONGO_MOD_NEEDS_REPLACEMENT NamedAttribute {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] NamedAttribute {
 public:
     NamedAttribute() = default;
     NamedAttribute(const char* n, long double val) = delete;
@@ -777,7 +751,7 @@ class TypeErasedAttributeStorage {
 public:
     using const_iterator = const detail::NamedAttribute*;
 
-    TypeErasedAttributeStorage() : _size(0) {}
+    TypeErasedAttributeStorage() : _data(nullptr), _size(0) {}
 
     template <typename... Args>
     TypeErasedAttributeStorage(const detail::AttributeStorage<Args...>& store)
@@ -798,13 +772,15 @@ public:
         return _data;
     }
     const_iterator end() const {
-        return _data + _size;
+        // Guard against forming _data + _size when _data is null (as in a default-constructed
+        // instance), which would be undefined pointer arithmetic even when _size is 0.
+        return _data ? _data + _size : _data;
     }
 
     // Applies a function to every stored named attribute in order they are captured
     template <typename Func>
     void apply(Func&& f) const {
-        std::for_each(_data, _data + _size, [&](const auto& attr) {
+        std::for_each(begin(), end(), [&](const auto& attr) {
             visit([&](auto&& val) { f(attr.name, val); }, attr.value);
         });
     }
@@ -839,5 +815,5 @@ auto mapLog(It begin, It end) {
     return detail::AssociativeContainerLogger(begin, end);
 }
 
-}  // namespace MONGO_MOD_PUBLIC logv2
+}  // namespace logv2
 }  // namespace mongo

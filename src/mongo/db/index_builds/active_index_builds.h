@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,6 +8,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/operation_context.h"
@@ -47,8 +22,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 
@@ -61,6 +38,11 @@ enum class IndexBuildOutcome {
     // stepdown) and will be resumed.
     kToBeResumed,
 };
+
+/**
+ * Serializes the IndexBuildOutcome enum.
+ */
+std::string_view toString(IndexBuildOutcome outcome);
 
 /**
  * This is a helper class used by IndexBuildsCoordinator to safely manage the data structures
@@ -111,7 +93,9 @@ public:
     void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                   const UUID& collectionUUID);
 
-    void awaitNoBgOpInProgForDb(OperationContext* opCtx, const DatabaseName& dbName);
+    void awaitNoBgOpInProgForDb(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                std::initializer_list<IndexBuildProtocol> protocols);
 
     /**
      * Unregisters the index build.
@@ -122,6 +106,13 @@ public:
 
     void incrementResumeSucceeded(IndexBuildPhaseEnum phase);
     void incrementResumeFailed();
+
+    void setPrimaryDrivenRegistry(index_builds::primary_driven::Registry& registry);
+
+    std::vector<UUID> buildUUIDsForCollection(const UUID& collectionUUID) const;
+    std::vector<UUID> buildUUIDsForCollection(const UUID& collectionUUID,
+                                              IndexBuildProtocol protocol) const;
+    std::vector<UUID> buildUUIDsForDb(const DatabaseName& dbName) const;
 
     /**
      * Returns a list of index builds matching the criteria 'indexBuildFilter'.
@@ -136,9 +127,9 @@ public:
     Status registerIndexBuild(std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
 
     /**
-     * Get the number of in-progress index builds.
+     * Returns the number of index builds that exist on this node.
      */
-    size_t getActiveIndexBuildsCount() const;
+    size_t getIndexBuildsCount() const;
 
     /**
      * Provides passthrough access to ReplIndexBuildState for index build info.
@@ -153,6 +144,21 @@ public:
     void sleepIfNecessary_forTestOnly() const;
 
 private:
+    /**
+     * Waits until no index builds matching the criteria 'indexBuildFilter' are in progress.
+     */
+    void _awaitNoIndexBuildInProgressForFilter(OperationContext* opCtx,
+                                               IndexBuildFilterFn indexBuildFilter);
+
+    /**
+     * As '_awaitNoIndexBuildInProgressForFilter()', but also waits out the primary-driven index
+     * builds registered on this node that match 'registeredFilter'.
+     */
+    void _awaitNoIndexBuildInProgressForFilters(
+        OperationContext* opCtx,
+        IndexBuildFilterFn runningFilter,
+        std::function<bool(const index_builds::primary_driven::Registry::Entry&)> registeredFilter);
+
     /**
      * Helper function for filterIndexBuilds. This function is necessary because some callers
      * already hold the mutex before calling this function.
@@ -172,6 +178,18 @@ private:
     // Generation counter of completed index builds. Used in conjuction with the condition
     // variable to receive notifications when an index build completes.
     uint32_t _indexBuildsCompletedGen = 0;
+
+    /**
+     * Returns the UUIDs of the index builds this node is running that match 'runningFilter', plus
+     * the primary-driven index builds registered on this node that match 'registeredFilter'.
+     */
+    std::vector<UUID> _buildUUIDs(
+        const IndexBuildFilterFn& runningFilter,
+        const std::function<bool(const index_builds::primary_driven::Registry::Entry&)>&
+            registeredFilter) const;
+
+    // Null until setPrimaryDrivenRegistry is called.
+    index_builds::primary_driven::Registry* _primaryDrivenRegistry = nullptr;
 
     bool _sleepForTest = false;
 };

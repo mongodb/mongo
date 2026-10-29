@@ -1,0 +1,18 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/check_metadata_consistency_fail.js
+
+executor:
+  hooks:
+    - class: CheckMetadataConsistencyInBackground
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 1

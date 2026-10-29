@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -68,12 +41,13 @@ class AggregateCommandRequest;
 class OperationContext;
 
 namespace aggregation_request_helper {
+using namespace std::literals::string_view_literals;
 
 /**
  * Helpers to serialize/deserialize AggregateCommandRequest.
  */
-MONGO_MOD_PUBLIC static constexpr std::string_view kBatchSizeField = "batchSize"_sd;
-MONGO_MOD_PUBLIC static constexpr long long kDefaultBatchSize = 101;
+[[MONGO_MOD_PUBLIC]] static constexpr std::string_view kBatchSizeField = "batchSize"sv;
+[[MONGO_MOD_PUBLIC]] static constexpr long long kDefaultBatchSize = 101;
 
 /**
  * Create a new instance of AggregateCommandRequest by parsing the raw command object. Throws an
@@ -87,31 +61,23 @@ MONGO_MOD_PUBLIC static constexpr long long kDefaultBatchSize = 101;
  * Callers must provide the validated tenancy scope (if any) to ensure that any namespaces
  * deserialized from the aggregation request properly account for the tenant ID.
  */
-MONGO_MOD_PUBLIC AggregateCommandRequest
-parseFromBSON(const BSONObj& cmdObj,
-              const boost::optional<auth::ValidatedTenancyScope>& vts,
-              boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-              const SerializationContext& serializationContext = SerializationContext());
+[[MONGO_MOD_PUBLIC]] AggregateCommandRequest parseFromBSON(
+    const BSONObj& cmdObj,
+    const boost::optional<auth::ValidatedTenancyScope>& vts,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    const SerializationContext& serializationContext = SerializationContext());
 
-MONGO_MOD_PUBLIC StatusWith<AggregateCommandRequest> parseFromBSONForTests(
+[[MONGO_MOD_PUBLIC]] StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts = boost::none,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
 /**
- * Retrieves the query settings from 'expCtx' and if they are not empty, attaches them to the
- * request object.
+ * Retrieves the resolved query settings for the operation and, if non-default, attaches them to the
+ * request object. Thin wrapper over 'query_settings::addQuerySettingsToRequest'.
  */
 void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-/**
- * Adds IFR flags from ifrContext to request. Serializes the current flag value for all IFR
- * flags that have 'serialize_on_outgoing_requests: true' and a 'version' that the current FCV
- * is >= to, so shards use the same value as the router/sender.
- */
-void addIfrFlagsToRequest(AggregateCommandRequest& request,
-                          std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
 
 /**
  * Validate the aggregate command object. If 'client' is provided, also validates that internal
@@ -230,7 +196,7 @@ static StatusWith<std::vector<BSONObj>> attemptToParsePipelineFromBSON(
 /**
  * A throwing version of the above.
  */
-MONGO_MOD_PUBLIC static std::vector<BSONObj> parsePipelineFromBSON(
+[[MONGO_MOD_PUBLIC]] static std::vector<BSONObj> parsePipelineFromBSON(
     const BSONElement& pipelineElem) {
     return uassertStatusOK(attemptToParsePipelineFromBSON(pipelineElem));
 }

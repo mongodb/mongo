@@ -1,7 +1,7 @@
 /**
  * Stress tests the cases where a sort order is interesting, and so the rank computation needs to be
  * careful. For example, when a sub-pipeline specifies a $sort.
- * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, requires_fcv_82 ]
+ * @tags: [requires_fcv_82]
  */
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 import {rankFusionScoreDetailsDescription} from "jstests/with_mongot/e2e_lib/hybrid_search_score_details_utils.js";

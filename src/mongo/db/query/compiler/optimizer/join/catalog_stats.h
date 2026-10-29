@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -34,7 +8,12 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo::join_ordering {
+
+// Approximate size, in bytes, of a single WT data page on-disk (WT's default leaf_page_max).
+constexpr double kDefaultPageSizeBytes = 32 * 1024;
 
 /**
  * Statistics for a single collection.
@@ -42,34 +21,50 @@ namespace mongo::join_ordering {
 struct CollectionStats {
     CollectionStats(double logicalDataSizeBytes,
                     double onDiskSizeBytes,
-                    double pageSizeBytes = 32 * 1024)
+                    double pageSizeBytes = kDefaultPageSizeBytes,
+                    boost::optional<double> approxNumLeafPages = boost::none)
         : logicalDataSizeBytes(logicalDataSizeBytes),
           _onDiskSizeBytes(onDiskSizeBytes),
-          _pageSizeBytes(pageSizeBytes) {}
+          _pageSizeBytes(pageSizeBytes),
+          _approxNumLeafPages(approxNumLeafPages) {}
 
     /**
-     * Returns the estimated number of on-disk pages for this collection, rounded to the nearest
-     * power of 2^(1/4). The purpose is to smooth-out small variations that can occur in
-     * onDiskSizeBytes across different runs of plan stability tests which invoke `mongorestore`
-     * each time. Returns 0 if the collection has no on-disk data. Callers should always prefer this
-     * over accessing the raw on-disk size directly, to avoid sensitivity to non-deterministic
-     * storage engine values.
+     * Returns the estimated number of leaf pages for this collection: the storage engine's
+     * approximate leaf page count when available (see RecordStore::approxNumLeafPages()),
+     * otherwise onDiskSizeBytes / pageSizeBytes. Either way the result is quantized to the
+     * nearest power of 2^(1/4) to absorb small run-to-run variations in the raw inputs. Returns
+     * 0 if the collection has no on-disk data. Callers should always prefer this over accessing
+     * the raw on-disk size directly, to avoid sensitivity to non-deterministic storage engine
+     * values.
      */
     double numPages() const;
+
+    /**
+     * Whether the storage engine reported a usable (positive) approximate leaf page count for
+     * this collection. False when no count was reported or the reported count was non-positive
+     * (defensive; the WT record store already maps its raw "never tracked / tree never split"
+     * 0 to boost::none). When false, numPages() falls back to the size-based estimate.
+     */
+    bool hasApproxNumLeafPages() const;
 
     // Estimate of the data size of this collection when in-memory (uncompressed and unencrypted).
     double logicalDataSizeBytes;
 
 private:
     // Estimate of the data size of this collection on-disk post compression. Not exposed directly —
-    // callers must use numOnDiskPages() which applies quantization to absorb small
+    // callers must use numPages() which applies quantization to absorb small
     // platform-dependent differences in the raw value (e.g. between mongorestore runs).
     double _onDiskSizeBytes;
 
     // Approximate size, in bytes, of a single WT data page on-disk. The optimizer uses this as the
     // I/O granularity when estimating the number of disk I/Os performed by an operator for cost
-    // estimates. Default to 32KiB if not specified.
+    // estimates. Only used by the size-based fallback in numPages().
     double _pageSizeBytes;
+
+    // Approximate leaf page count reported by the storage engine, which maintains it incrementally
+    // as pages split and merge. Much more accurate than the size-based fallback, which wrongly
+    // assumes leaf pages are filled to _pageSizeBytes.
+    boost::optional<double> _approxNumLeafPages;
 };
 
 /**

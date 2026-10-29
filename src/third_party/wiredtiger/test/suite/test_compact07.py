@@ -53,22 +53,13 @@ class test_compact07(compact_util):
     n_tables = 2
 
     def get_bg_compaction_files_tracked(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        files = stat_cursor[stat.conn.background_compact_files_tracked][2]
-        stat_cursor.close()
-        return files
+        return self.get_stat(stat.conn.background_compact_files_tracked)
 
     def get_free_space(self, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri, None, 'statistics=(all)')
-        bytes = stat_cursor[stat.dsrc.block_reuse_bytes][2]
-        stat_cursor.close()
-        return bytes // megabyte
+        return self.get_stat(stat.dsrc.block_reuse_bytes, uri) // megabyte
 
     # Test the basic functionality of the background compaction server.
     def test_compact07(self):
-        if self.runningHook('tiered'):
-            self.skipTest("Tiered tables do not support compaction")
-
         # Create and populate a table.
         uri_small = self.uri_prefix + '_small'
         self.session.create(uri_small, self.create_params)
@@ -109,10 +100,8 @@ class test_compact07(compact_util):
         # Enable background compaction with a threshold big enough so it does not process the first
         # table created but only the others with more empty space. We set run_once so we don't
         # conflict with foreground compaction. If the two are running in parallel, stats cannot be
-        # checked properly. Don't use the helper function as the server may go to sleep before we
-        # have the time to check it is actually running.
-        bg_compact_config = f'background=true,free_space_target={(free_space_20 + 1)}MB,run_once=true'
-        self.session.compact(None, bg_compact_config)
+        # checked properly.
+        self.turn_on_bg_compact(f'free_space_target={(free_space_20 + 1)}MB,run_once=true')
 
         # Background compaction should run through every file as listed in the metadata file.
         # Wait until all the eligible files have been compacted.
@@ -124,12 +113,8 @@ class test_compact07(compact_util):
 
         # Check the background compaction server stats. We should have skipped at least once and
         # been successful at least once.
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        skipped = stat_cursor[stat.conn.session_table_compact_skipped][2]
-        success = stat_cursor[stat.conn.background_compact_success][2]
-        self.assertGreater(skipped, 0)
-        self.assertGreater(success, 0)
-        stat_cursor.close()
+        self.assertStatGreaterSoon(stat.conn.session_table_compact_skipped, 0)
+        self.assertStatGreaterSoon(stat.conn.background_compact_success, 0)
 
         # Perform foreground compaction on the remaining file by setting a free_space_target value
         # that is guaranteed to run on it. Make sure background compaction is disabled before

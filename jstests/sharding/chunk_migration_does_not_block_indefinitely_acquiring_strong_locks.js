@@ -4,6 +4,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
@@ -71,6 +72,17 @@ const st = new ShardingTest({
     shards: 2,
     migrationLockAcquisitionMaxWaitMS: 500,
 });
+const usesMoveRangeCoordinatorPath = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AuthoritativeShardsDDL",
+);
+const shard0PrimaryVersion = assert.commandWorked(
+    st.rs0.getPrimary().getDB("admin").runCommand({buildInfo: 1}),
+).version;
+const shard0PrimaryUsesLastLTSBinary = MongoRunner.areBinVersionsTheSame(
+    shard0PrimaryVersion,
+    MongoRunner.getBinVersionFor("last-lts"),
+);
 
 const dbName = "test";
 const collName = "foo";
@@ -130,6 +142,16 @@ assert.commandWorked(
     assert.commandWorked(sessionColl.update({x: -1}, {$set: {y: 1}}));
 
     testMigrationFailsAndWritesAreNotBlocked();
+
+    // TODO(SERVER-135801): Remove this conditional check once 10.0 is last LTS.
+    if (usesMoveRangeCoordinatorPath && !shard0PrimaryUsesLastLTSBinary) {
+        // The MoveRangeCoordinator encountering the lock timeout should preserve the legacy moveRange
+        // warning severity. Last-LTS binaries do not include the new severity handling.
+        assert(
+            checkLog.checkContainsOnceJson(st.shard0, 13580300, {}, "W"),
+            "Expected MoveRangeCoordinator LockTimeout to be logged as a warning",
+        );
+    }
 
     // Abort the transaction
     assert.commandWorked(session.abortTransaction_forTesting());

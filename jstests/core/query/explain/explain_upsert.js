@@ -1,5 +1,6 @@
 // This test asserts on query plans expected from unsharded collections.
 // @tags: [
+//   uses_explain,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_fastcount,
 // ]
@@ -17,7 +18,7 @@ let explain;
 explain = db.runCommand({
     explain: {update: t.getName(), updates: [{q: {a: 1}, u: {a: 1}, upsert: true}]},
 });
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     assert.commandWorkedOrFailedWithCode(explain, ErrorCodes.NamespaceNotFound);
 } else {
     // TODO(SERVER-18047): Make an explain against a non-existent database fail in an unsharded

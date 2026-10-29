@@ -7,7 +7,7 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 let coll = db.zip;
 coll.drop();
 
-coll.insert({"long": [1, 2, 3], "short": ["x", "y"]});
+assert.commandWorked(coll.insert({"long": [1, 2, 3], "short": ["x", "y"]}));
 
 let zipObj = 3;
 assertErrorCode(
@@ -56,14 +56,27 @@ assertErrorCode(
 );
 
 zipObj = {
-    inputs: ["$a"],
+    inputs: [[1, 2], [1]],
     defaults: {"a": "b"},
+    useLongestLength: true,
 };
 assertErrorCode(
     coll,
     [{$project: {zipped: {$zip: zipObj}}}],
-    34462,
-    "defaults is not an" + " array",
+    [10961500, 34462],
+    "defaults did not resolve to an array",
+);
+
+zipObj = {
+    inputs: [[1, 2, 3], ["A", "B"], [true]],
+    defaults: "$short",
+    useLongestLength: true,
+};
+assertErrorCode(
+    coll,
+    [{$project: {zipped: {$zip: zipObj}}}],
+    [10961501, 34462],
+    "defaults resolved to an array whose length does not match inputs",
 );
 
 zipObj = {

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -92,9 +66,9 @@ public:
     public:
         using InvocationBaseGen::InvocationBaseGen;
 
-        struct ShardDbInfo {
+        struct DatabaseAggregatedInfo {
             long long size = 0;
-            std::unique_ptr<BSONObjBuilder> shardInfo = nullptr;
+            std::unique_ptr<BSONObjBuilder> sizePerShard = nullptr;
         };
 
         static bool shouldIncludeDatabase(const DatabaseName& dbname,
@@ -170,7 +144,7 @@ public:
             // This workaround avoids fetching stale information until the issue is addressed.
             std::vector<DatabaseType> databases = Grid::get(opCtx)->catalogClient()->getAllDBs(
                 opCtx,
-                repl::ReadConcernLevel::kSnapshotReadConcern,
+                repl::ReadConcernArgs::kSnapshot,
                 ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
@@ -201,13 +175,30 @@ public:
             return ListDatabasesReply(items);
         }
 
-        std::map<std::string, ShardDbInfo> getConsistentDbInfoFromShards(OperationContext* opCtx,
-                                                                         RequestType& cmd) {
+        std::map<std::string, DatabaseAggregatedInfo> getConsistentDbInfoFromShards(
+            OperationContext* opCtx, RequestType& cmd, const MatchExpression* filter) {
 
-            std::map<std::string, ShardDbInfo> dbShardInfos;
+            std::map<std::string, DatabaseAggregatedInfo> databaseAggregatedInfos;
 
-            // { filter: matchExpression }.
-            auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON());
+            // Stripping the 'filter' field unless it contains only the 'name' field.
+            //
+            // Several reply fields are computed during aggregation on mongos and either do not
+            // exist on individual shard replies or hold different values there: 'sizeOnDisk' is
+            // summed across shards, 'empty' is recomputed from the aggregated size, and 'shards' is
+            // synthesised on mongos only. Evaluating such a filter on each shard would incorrectly
+            // drop databases that should match the aggregated result (or vice versa). The filter is
+            // always re-applied authoritatively to the aggregated reply items in 'buildReply'.
+            //
+            // As an optimization, a filter that references only the 'name' field is forwarded to
+            // the shards as well: a database's name is identical on every shard and in the
+            // aggregated reply, so shard-side evaluation is correct and reduces the amount of data
+            // each shard returns.
+            const bool filterNameOnly = filter &&
+                filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
+                filter->path() == list_databases::kName;
+            auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(
+                filterNameOnly ? cmd.toBSON()
+                               : cmd.toBSON().removeField(RequestType::kFilterFieldName));
 
             // TODO (SERVER-60746): Once SERVER-60746 is resolved, remove the explicit
             // ReadPreferenceSetting parameter to use the default read preference for
@@ -216,7 +207,7 @@ public:
             std::vector<DatabaseType> databasesSnapshotBefore =
                 Grid::get(opCtx)->catalogClient()->getAllDBs(
                     opCtx,
-                    repl::ReadConcernLevel::kSnapshotReadConcern,
+                    repl::ReadConcernArgs::kSnapshot,
                     ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
             int attempts = 0;
@@ -239,7 +230,7 @@ public:
                 std::vector<DatabaseType> databasesSnapshotAfter =
                     Grid::get(opCtx)->catalogClient()->getAllDBs(
                         opCtx,
-                        repl::ReadConcernLevel::kSnapshotReadConcern,
+                        repl::ReadConcernArgs::kSnapshot,
                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
 
                 // Broadcasting a `listDatabases` command to all shards can miss a database that is
@@ -299,57 +290,48 @@ public:
 
                     const long long sizeOnShard = dbObj["sizeOnDisk"].numberLong();
 
-                    auto [it, inserted] = dbShardInfos.try_emplace(name);
+                    auto [it, inserted] = databaseAggregatedInfos.try_emplace(name);
                     it->second.size += sizeOnShard;
 
-                    if (!it->second.shardInfo) {
-                        it->second.shardInfo = std::make_unique<BSONObjBuilder>();
+                    if (!it->second.sizePerShard) {
+                        it->second.sizePerShard = std::make_unique<BSONObjBuilder>();
                     }
-                    it->second.shardInfo->append(shardId.toString(), sizeOnShard);
+                    it->second.sizePerShard->append(shardId.toString(), sizeOnShard);
                 }
             }
 
-            // Adding empty databases presented only in the config server snapshot but not in the
-            // shards, to be consistent with the behavior of the listDatabases command with nameOnly
-            // and without a filter.
-            // TODO SERVER-121720: the empty databases from the config server are added only when
-            // the filter is empty or the filter is name only. If the filter has fields, like empty,
-            // size, shards, etc., the empty databases from the config server are not added until
-            // the filter is applied to the aggregated result on mongos.
-            std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
-            const bool filterNameOnly = filter &&
-                filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
-                filter->path() == list_databases::kName;
-            if (!filter || filterNameOnly) {
-                for (const auto& db : databasesSnapshotBefore) {
-                    const auto dbname =
-                        DatabaseNameUtil::serialize(db.getDbName(), cmd.getSerializationContext());
-                    if (dbShardInfos.find(dbname) == dbShardInfos.end()) {
-                        if (filterNameOnly &&
-                            !exec::matcher::matchesBSON(filter.get(),
-                                                        ListDatabasesReplyItem(dbname).toBSON())) {
-                            continue;
-                        }
-                        dbShardInfos.try_emplace(dbname);
-                    }
-                }
+            // Add empty databases that exist only in the config server snapshot but not on any
+            // shard, to be consistent with the behavior of the listDatabases command with nameOnly
+            // and without a filter. The user-supplied filter is re-applied to every aggregated
+            // reply item in 'buildReply', so it is safe to unconditionally seed these entries here
+            // regardless of which fields the filter references.
+            for (const auto& db : databasesSnapshotBefore) {
+                const auto dbname =
+                    DatabaseNameUtil::serialize(db.getDbName(), cmd.getSerializationContext());
+                databaseAggregatedInfos.try_emplace(dbname);
             }
 
-            return dbShardInfos;
+            return databaseAggregatedInfos;
         }
 
-        ListDatabasesReply buildReply(std::map<std::string, ShardDbInfo>& dbShardInfos,
-                                      bool authorizedDatabases,
-                                      AuthorizationSession* as,
-                                      const RequestType& cmd) {
+        ListDatabasesReply buildReply(
+            std::map<std::string, DatabaseAggregatedInfo>& databaseAggregatedInfos,
+            bool authorizedDatabases,
+            AuthorizationSession* as,
+            const RequestType& cmd,
+            const MatchExpression* filter) {
             long long totalSize = 0;
             std::vector<ListDatabasesReplyItem> items;
             const auto& tenantId = cmd.getDbName().tenantId();
 
-            for (const auto& dbShardInfo : dbShardInfos) {
-                const auto& dbName = dbShardInfo.first;
-                const auto& size = dbShardInfo.second.size;
-                const auto& shardInfo = dbShardInfo.second.shardInfo;
+            // Apply the user-supplied filter to the aggregated reply items. The filter was
+            // stripped from the per-shard requests in 'getConsistentDbInfoFromShards' because
+            // individual shards cannot correctly evaluate predicates on fields whose values are
+            // computed during aggregation on mongos (namely 'sizeOnDisk', 'empty' and 'shards').
+            for (const auto& databaseAggregatedInfo : databaseAggregatedInfos) {
+                const auto& dbName = databaseAggregatedInfo.first;
+                const auto& size = databaseAggregatedInfo.second.size;
+                const auto& sizePerShard = databaseAggregatedInfo.second.sizePerShard;
                 const auto databaseName =
                     DatabaseNameUtil::deserialize(tenantId, dbName, cmd.getSerializationContext());
 
@@ -361,14 +343,18 @@ public:
 
                 item.setSizeOnDisk(size);
                 item.setEmpty(size == 0);
-                if (shardInfo) {
-                    item.setShards(shardInfo->obj());
+                if (sizePerShard) {
+                    item.setShards(sizePerShard->obj());
                 }
 
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Found negative 'sizeOnDisk' in: "
                                       << databaseName.toStringForErrorMsg(),
                         size >= 0);
+
+                if (filter && !exec::matcher::matchesBSON(filter, item.toBSON())) {
+                    continue;
+                }
 
                 totalSize += size;
 
@@ -386,10 +372,12 @@ public:
                                            bool authorizedDatabases,
                                            AuthorizationSession* as,
                                            RequestType& cmd) {
-            auto dbShardInfos = getConsistentDbInfoFromShards(opCtx, cmd);
+            std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
+
+            auto databaseAggregatedInfos = getConsistentDbInfoFromShards(opCtx, cmd, filter.get());
             // Now that we have aggregated results for all the shards, convert to a response,
             // and compute total sizes.
-            return buildReply(dbShardInfos, authorizedDatabases, as, cmd);
+            return buildReply(databaseAggregatedInfos, authorizedDatabases, as, cmd, filter.get());
         }
 
         ListDatabasesReply typedRun(OperationContext* opCtx) final {

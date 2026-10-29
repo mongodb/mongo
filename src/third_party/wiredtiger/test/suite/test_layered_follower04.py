@@ -49,9 +49,6 @@ class test_layered_follower04(wttest.WiredTigerTestCase):
     ])
 
     def test_layered_follower04(self):
-        # Avoid checkpoint error with precise checkpoint
-        self.conn.set_timestamp('stable_timestamp=1')
-
         self.uri = self.prefix + self.test_name
 
         # The node started as a follower, so step it up as the leader
@@ -65,12 +62,18 @@ class test_layered_follower04(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.session_create_config + self.table_config)
         session_follow.create(self.uri, self.session_create_config + self.table_config)
 
-        # Put data into the primary
+        # Put data into the primary, committing at the stable timestamp that is
+        # set before the checkpoint so the precise checkpoint captures it.
         value_prefix1 = 'aaa'
         cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor[str(i)] = value_prefix1 + str(i)
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
         cursor.close()
+
+        # Avoid checkpoint error with precise checkpoint
+        self.conn.set_timestamp('stable_timestamp=1')
 
         # Create a checkpoint
         self.session.checkpoint()
@@ -108,12 +111,16 @@ class test_layered_follower04(wttest.WiredTigerTestCase):
         # Avoid checkpoint error with precise checkpoint
         conn_follow.set_timestamp('stable_timestamp=1')
 
-        # Put data into the new primary (old secondary)
+        # Put data into the new primary (old secondary), then make it stable
+        # before the precise checkpoint so the checkpoint captures it.
         value_prefix2 = 'bbb'
         cursor = session_follow.open_cursor(self.uri)
+        session_follow.begin_transaction()
         for i in range(self.nitems, 2 * self.nitems):
             cursor[str(i)] = value_prefix2 + str(i)
+        session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         cursor.close()
+        conn_follow.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
 
         # Create a checkpoint
         session_follow.checkpoint()

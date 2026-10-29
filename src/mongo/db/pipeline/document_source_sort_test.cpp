@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_sort.h"
 
@@ -339,14 +313,14 @@ public:
             }
             ASSERT_GT(_sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
-            // To avoid perf regressions, sort chunks its writes to CurOp. CurOp's reported value <=
-            // actual usage < reported value + chunksize.
+            // To avoid perf regressions, sort rate-limits its writes to CurOp to chunk-boundary
+            // crossings, but reports the exact in-use total at each crossing. Between crossings
+            // CurOp holds a recent exact sample, so it stays within the same chunk as the actual
+            // usage.
             int64_t curopUsage = curop->getInUseTrackedMemoryBytes();
-            ASSERT_EQ(curopUsage % chunkSize, 0);
-            ASSERT_LTE(curopUsage, actualUsage);
-            ASSERT_LT(actualUsage, curopUsage + chunkSize)
-                << "Actual usage (" << actualUsage << ") should be < reported (" << curopUsage
-                << ") + chunk size (" << chunkSize << ")";
+            ASSERT_EQ(curopUsage / chunkSize, actualUsage / chunkSize)
+                << "CurOp usage (" << curopUsage << ") and actual usage (" << actualUsage
+                << ") should be in the same chunk (size " << chunkSize << ")";
         }
         assertEOF();
 
@@ -926,8 +900,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
     auto sort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), expCtx},
                                                       "min",
                                                       -1,
-                                                      boost::none /*limit*/,
-                                                      false /*outputSortKeyMetadata*/,
+                                                      /*limit=*/boost::none,
+                                                      /*outputSortKeyMetadata=*/false,
                                                       expCtx);
 
     std::string largeStr(1024, 'x');
@@ -986,8 +960,8 @@ TEST_F(DocumentSourceSortExecutionTest,
     auto sort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), expCtx},
                                                       "min",
                                                       -1,
-                                                      boost::none /*limit*/,
-                                                      true /*outputSortKeyMetadata*/,
+                                                      /*limit=*/boost::none,
+                                                      /*outputSortKeyMetadata=*/true,
                                                       expCtx);
 
     std::string largeStr(1024, 'x');

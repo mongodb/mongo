@@ -1,46 +1,26 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/topology/remove_shard_commit_coordinator.h"
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/commit_database_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/remove_shard_exception.h"
 #include "mongo/db/topology/topology_change_helpers.h"
+#include "mongo/util/serialization_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -48,12 +28,14 @@ namespace mongo {
 
 namespace {
 
-void deleteAllDocumentsFromCollection(OperationContext* opCtx, const NamespaceString& nss) {
+void deleteAllDocumentsFromCollection(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      BSONObj filter = BSONObj()) {
     DBDirectClient client(opCtx);
     write_ops::DeleteCommandRequest deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
-        entry.setQ(BSONObj());
+        entry.setQ(std::move(filter));
         entry.setMulti(true);
         return entry;
     }()});
@@ -61,22 +43,27 @@ void deleteAllDocumentsFromCollection(OperationContext* opCtx, const NamespaceSt
     write_ops::checkWriteErrors(client.remove(std::move(deleteOp)));
 }
 
-void dropShardCatalogMetadata(OperationContext* opCtx) {
+void dropShardCatalogMetadata(OperationContext* opCtx,
+                              AuthoritativeMetadataAccessLevelEnum accessLevel) {
     LOGV2(9194400, "Dropping shard catalog metadata before shard removal");
 
+    const auto& sessionsNss = NamespaceString::kLogicalSessionsNamespace;
+    const auto sessionsNssSerialized =
+        NamespaceStringUtil::serialize(sessionsNss, SerializationContext::stateDefault());
+    const BSONObj allButSessionsNssFilter =
+        BSON(CollectionType::kNssFieldName << BSON("$ne" << sessionsNssSerialized));
+
     deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogDatabasesNamespace);
-    deleteAllDocumentsFromCollection(opCtx,
-                                     NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    // Excluding config.system.sessions collection entries from being removed from shard catalog
+    // since removing them, can cause config server to enter invalid state after transitioning
+    // to dedicated and back to embedded, marking it as kUnknown, while still the DB primary shard.
+    deleteAllDocumentsFromCollection(
+        opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace, allButSessionsNssFilter);
     deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
 
-    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->clearCollectionMetadata(opCtx);
-    }
-
-    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
-        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
-        scopedDsr->clearDbMetadata(opCtx);
+    if (accessLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+        shard_catalog_commit::commitInvalidateAllDatabaseMetadata(opCtx);
+        shard_catalog_commit::commitInvalidateAllCollectionMetadata(opCtx);
     }
 }
 
@@ -200,7 +187,7 @@ void RemoveShardCommitCoordinator::_stopDDLOperations(OperationContext* opCtx) {
     // Note that we do not attach session information here because the block of DDL coordinators is
     // done via a cluster parameter and so the only remote write commands are run as part of that
     // coordinator which is responsible for handling the replay protection of those updates.
-    topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx, /*persistRecoveryDocument*/ false);
+    topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx, /*persistRecoveryDocument=*/false);
 
     globalFailPointRegistry().find("hangRemoveShardAfterDrainingDDL")->pauseWhileSet();
 }
@@ -231,7 +218,7 @@ void RemoveShardCommitCoordinator::_checkShardIsEmpty(OperationContext* opCtx) {
 
 void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx) {
     auto trackedDbs = ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllDBs(
-        opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        opCtx, repl::ReadConcernArgs::kLocal);
 
     if (auto pendingCleanupState = topology_change_helpers::dropLocalCollectionsAndDatabases(
             opCtx, trackedDbs, _doc.getShardId().toString())) {
@@ -251,7 +238,7 @@ void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx
         // Once the config server is no longer a shard, its local shard catalog must not retain
         // authoritative ownership metadata. Clear both durable metadata and in-memory CSR/DSR state
         // so stale entries cannot be reused if the config server is later re-added as a shard.
-        dropShardCatalogMetadata(opCtx);
+        dropShardCatalogMetadata(opCtx, _doc.getAuthoritativeMetadataAccessLevel());
     }
 }
 
@@ -283,7 +270,7 @@ void RemoveShardCommitCoordinator::_resumeDDLOperations(OperationContext* opCtx)
     // Note that we do not attach session information here because the block of DDL coordinators is
     // done via a cluster parameter and so the only remote write commands are run as part of that
     // coordinator which is responsible for handling the replay protection of those updates.
-    topology_change_helpers::unblockDDLCoordinators(opCtx, /*removeRecoveryDocument*/ false);
+    topology_change_helpers::unblockDDLCoordinators(opCtx, /*removeRecoveryDocument=*/false);
 }
 
 void RemoveShardCommitCoordinator::_updateClusterCardinalityParameterIfNeeded(

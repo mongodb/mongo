@@ -37,7 +37,7 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           sessionOptions:
-            maybeUseCausalConsistency: true
+            causalConsistency: true
             readConcern:
               level: majority
             readPreference:
@@ -56,16 +56,17 @@ executor:
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
       syncdelay: 5
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 2
     num_rs_nodes_per_shard: 3
@@ -79,6 +80,10 @@ executor:
     - class: ContinuousStepdown
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            runningWithShardStepdowns: true
     - class: ValidateCollections
       shell_options:
         global_vars:
@@ -146,16 +151,12 @@ selector:
     - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagRecordIdsReplicated
-    - featureFlagRankFusionBasic
-    - featureFlagRankFusionFull
-    - featureFlagSearchHybridScoringFull
-    - featureFlagRankFusion
-    - featureFlagMongotIndexedViews
     - uses_transactions
     - requires_fcv_81
     - requires_fcv_82
     - requires_fcv_83
     - requires_fcv_90
+    - requires_fcv_91
     - cannot_run_during_upgrade_downgrade
     - assumes_standalone_mongod
     - requires_getmore

@@ -48,3 +48,9 @@ filters:
   - "run_check_multikey_consistency.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "run_check_routing_table_consistency.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "run_check_orphans_are_deleted.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

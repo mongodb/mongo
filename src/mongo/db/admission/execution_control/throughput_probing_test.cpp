@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/execution_control/throughput_probing.h"
 
@@ -47,6 +21,7 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo::admission::execution_control::throughput_probing {
 
@@ -63,26 +38,43 @@ TEST(ThroughputProbingParameterTest, InitialConcurrency) {
 
 class InitStateWarningTest : public ServiceContextTest {
 protected:
-    InitStateWarningTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {
-        _svcCtx->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()));
+    }
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _readTicketHolder.emplace(
+            getServiceContext(), 0, /*trackPeakUsed=*/true, TicketHolder::kDefaultMaxQueueDepth);
+        _writeTicketHolder.emplace(
+            getServiceContext(), 0, /*trackPeakUsed=*/true, TicketHolder::kDefaultMaxQueueDepth);
+        getServiceContext()->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
     }
 
     void createAndInitProbing(int32_t initialConcurrency) {
         gInitialConcurrency = initialConcurrency;
         throughput_probing::gConcurrencyAdjustmentIntervalMillis.store(1);
-        _throughputProbing =
-            std::make_unique<ThroughputProbing>(_svcCtx, &_readTicketHolder, &_writeTicketHolder);
-        _throughputProbing->_initState();
+        _throughputProbing = std::make_unique<ThroughputProbing>(
+            getServiceContext(), &readTicketHolder(), &writeTicketHolder());
+        throughputProbing()._initState();
     }
 
-    ServiceContext* _svcCtx{getServiceContext()};
-    TicketHolder _readTicketHolder{
-        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
-    TicketHolder _writeTicketHolder{
-        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
+private:
+    TicketHolder& readTicketHolder() {
+        return *_readTicketHolder;
+    }
+
+    TicketHolder& writeTicketHolder() {
+        return *_writeTicketHolder;
+    }
+
+    ThroughputProbing& throughputProbing() {
+        return *_throughputProbing;
+    }
+
+    boost::optional<TicketHolder> _readTicketHolder;
+    boost::optional<TicketHolder> _writeTicketHolder;
     std::unique_ptr<ThroughputProbing> _throughputProbing;
 };
 
@@ -157,30 +149,38 @@ TEST(ThroughputProbingParameterTest, MaxConcurrency) {
 
 class ThroughputProbingTest : public ServiceContextTest {
 protected:
-    explicit ThroughputProbingTest(int32_t size = 64, double readWriteRatio = 0.5)
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {
-        _svcCtx->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()));
+    }
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _svcCtx = getServiceContext();
+        _readTicketHolder.emplace(
+            _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+        _writeTicketHolder.emplace(
+            _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
 
         // The ThroughputProbing constructor requires the periodic runner to be set up on _svcCtx.
-        throughput_probing::gInitialConcurrency = size;
-        throughput_probing::gReadWriteRatio.store(readWriteRatio);
+        _svcCtx->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
+        throughput_probing::gInitialConcurrency = size();
+        throughput_probing::gReadWriteRatio.store(readWriteRatio());
         throughput_probing::gConcurrencyAdjustmentIntervalMillis.store(1);
         _throughputProbing =
-            std::make_unique<ThroughputProbing>(_svcCtx, &_readTicketHolder, &_writeTicketHolder);
+            std::make_unique<ThroughputProbing>(_svcCtx, &readTicketHolder(), &writeTicketHolder());
 
         {
             auto client = _svcCtx->getService()->makeClient("ThroughputProbingInit");
             auto opCtx = client->makeOperationContext();
-            _throughputProbing->_job =
+            throughputProbing()._job =
                 _svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
                     "ThroughputProbingTicketHolderMonitor",
-                    [this](Client* client) { _throughputProbing->_run(client); },
+                    [this](Client* client) { throughputProbing()._run(client); },
                     Milliseconds{throughput_probing::gConcurrencyAdjustmentIntervalMillis.load()},
                     true /* isKillableByStepdown */});
-            _throughputProbing->_initState();
-            _throughputProbing->_resetConcurrency(opCtx.get());
+            throughputProbing()._initState();
+            throughputProbing()._resetConcurrency(opCtx.get());
         }
 
         // We need to advance the ticks to something other than zero, since that is used to
@@ -191,9 +191,17 @@ protected:
         _run();
     }
 
+    virtual int32_t size() const {
+        return 64;
+    }
+
+    virtual double readWriteRatio() const {
+        return 0.5;
+    }
+
     void _run() {
         _runner()->run(getClient());
-        _statsTester.set(*_throughputProbing);
+        _statsTester.set(throughputProbing());
     }
 
     void _tick() {
@@ -208,11 +216,23 @@ protected:
         return checked_cast<decltype(_runner())>(getServiceContext()->getPeriodicRunner());
     }
 
-    ServiceContext* _svcCtx{getServiceContext()};
-    TicketHolder _readTicketHolder{
-        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
-    TicketHolder _writeTicketHolder{
-        _svcCtx, 0, true /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth};
+    TicketHolder& readTicketHolder() {
+        return *_readTicketHolder;
+    }
+
+    TicketHolder& writeTicketHolder() {
+        return *_writeTicketHolder;
+    }
+
+    ThroughputProbing& throughputProbing() {
+        return *_throughputProbing;
+    }
+
+    // Built in setUp(): default member initializers run before the ServiceContext exists on
+    // the deferred-setup path.
+    ServiceContext* _svcCtx = nullptr;
+    boost::optional<TicketHolder> _readTicketHolder;
+    boost::optional<TicketHolder> _writeTicketHolder;
     std::unique_ptr<ThroughputProbing> _throughputProbing;
 
     class StatsTester {
@@ -265,51 +285,65 @@ class ThroughputProbingMaxConcurrencyTest : public ThroughputProbingTest {
 protected:
     // This input is the total initial concurrency between both ticketholders, so it will be split
     // evenly between each ticketholder. We are attempting to test a limit that is per-ticketholder.
-    ThroughputProbingMaxConcurrencyTest() : ThroughputProbingTest(gMaxConcurrency.load() * 2) {}
+    int32_t size() const override {
+        return gMaxConcurrency.load() * 2;
+    }
 };
 
 class ThroughputProbingMinConcurrencyTest : public ThroughputProbingTest {
 protected:
     // This input is the total initial concurrency between both ticketholders, so it will be split
     // evenly between each ticketholder. We are attempting to test a limit that is per-ticketholder.
-    ThroughputProbingMinConcurrencyTest() : ThroughputProbingTest(gMinConcurrency.load() * 2) {}
+    int32_t size() const override {
+        return gMinConcurrency.load() * 2;
+    }
 };
 
 class ThroughputProbingReadHeavyTest : public ThroughputProbingTest {
 protected:
-    ThroughputProbingReadHeavyTest() : ThroughputProbingTest(16, 0.9) {}
+    int32_t size() const override {
+        return 16;
+    }
+    double readWriteRatio() const override {
+        return 0.9;
+    }
 };
 
 class ThroughputProbingWriteHeavyTest : public ThroughputProbingTest {
 protected:
-    ThroughputProbingWriteHeavyTest() : ThroughputProbingTest(16, 0.1) {}
+    int32_t size() const override {
+        return 16;
+    }
+    double readWriteRatio() const override {
+        return 0.1;
+    }
 };
 
 TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     // Tickets are exhausted.
-    auto initialSize = _readTicketHolder.outof();
+    auto initialSize = readTicketHolder().outof();
     auto size = initialSize;
-    _readTicketHolder.setPeakUsed_forTest(size);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    readTicketHolder().setPeakUsed_forTest(size);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
-    ASSERT_GT(_readTicketHolder.outof(), size);
-    ASSERT_GT(_writeTicketHolder.outof(), size);
+    ASSERT_GT(readTicketHolder().outof(), size);
+    ASSERT_GT(writeTicketHolder().outof(), size);
 
     // Throughput inreases.
-    size = _readTicketHolder.outof();
-    _readTicketHolder.setNumFinishedProcessing_forTest(3);
+    size = readTicketHolder().outof();
+    readTicketHolder().setNumFinishedProcessing_forTest(3);
     _tick();
 
     // Probing up succeeds; the new value is somewhere between the initial value and the probed-up
     // value.
     _run();
-    ASSERT_LT(_readTicketHolder.outof(), size);
-    ASSERT_GT(_readTicketHolder.outof(), initialSize);
-    ASSERT_LT(_writeTicketHolder.outof(), size);
-    ASSERT_GT(_writeTicketHolder.outof(), initialSize);
+    ASSERT_LT(readTicketHolder().outof(), size);
+    ASSERT_GT(readTicketHolder().outof(), initialSize);
+    ASSERT_LT(writeTicketHolder().outof(), size);
+    ASSERT_GT(writeTicketHolder().outof(), initialSize);
     ASSERT_TRUE(_statsTester.probeIncemented("timesProbedUp"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedDown"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedStable"));
@@ -318,24 +352,24 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
 
 TEST_F(ThroughputProbingTest, ProbeUpFails) {
     // Tickets are exhausted.
-    auto size = _readTicketHolder.outof();
-    _readTicketHolder.setPeakUsed_forTest(size);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    auto size = readTicketHolder().outof();
+    readTicketHolder().setPeakUsed_forTest(size);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
-    ASSERT_GT(_readTicketHolder.outof(), size);
-    ASSERT_GT(_writeTicketHolder.outof(), size);
+    ASSERT_GT(readTicketHolder().outof(), size);
+    ASSERT_GT(writeTicketHolder().outof(), size);
 
     // Throughput does not increase.
-    _readTicketHolder.setNumFinishedProcessing_forTest(2);
+    readTicketHolder().setNumFinishedProcessing_forTest(2);
     _tick();
 
     // Probing up fails since throughput did not increase. Return to stable.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
+    ASSERT_EQ(readTicketHolder().outof(), size);
+    ASSERT_EQ(writeTicketHolder().outof(), size);
     ASSERT_TRUE(_statsTester.probeIncemented("timesProbedUp"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedDown"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedStable"));
@@ -344,29 +378,29 @@ TEST_F(ThroughputProbingTest, ProbeUpFails) {
 
 TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     // Tickets are not exhausted.
-    auto initialSize = _readTicketHolder.outof();
+    auto initialSize = readTicketHolder().outof();
     auto size = initialSize;
-    _readTicketHolder.setPeakUsed_forTest(size - 1);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    readTicketHolder().setPeakUsed_forTest(size - 1);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe down next since tickets are not exhausted.
     _run();
-    ASSERT_LT(_readTicketHolder.outof(), size);
-    ASSERT_LT(_writeTicketHolder.outof(), size);
+    ASSERT_LT(readTicketHolder().outof(), size);
+    ASSERT_LT(writeTicketHolder().outof(), size);
 
     // Throughput increases.
-    size = _readTicketHolder.outof();
-    _readTicketHolder.setNumFinishedProcessing_forTest(3);
+    size = readTicketHolder().outof();
+    readTicketHolder().setNumFinishedProcessing_forTest(3);
     _tick();
 
     // Probing up succeeds; the new value is somewhere between the initial value and the probed-up
     // value.
     _run();
-    ASSERT_LT(_readTicketHolder.outof(), initialSize);
-    ASSERT_GT(_readTicketHolder.outof(), size);
-    ASSERT_LT(_writeTicketHolder.outof(), initialSize);
-    ASSERT_GT(_writeTicketHolder.outof(), size);
+    ASSERT_LT(readTicketHolder().outof(), initialSize);
+    ASSERT_GT(readTicketHolder().outof(), size);
+    ASSERT_LT(writeTicketHolder().outof(), initialSize);
+    ASSERT_GT(writeTicketHolder().outof(), size);
     ASSERT_TRUE(_statsTester.probeIncemented("timesProbedDown"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedUp"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedStable"));
@@ -375,24 +409,24 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
 
 TEST_F(ThroughputProbingTest, ProbeDownFails) {
     // Tickets are not exhausted.
-    auto size = _readTicketHolder.outof();
-    _readTicketHolder.setPeakUsed_forTest(size - 1);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    auto size = readTicketHolder().outof();
+    readTicketHolder().setPeakUsed_forTest(size - 1);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe down next since tickets are not exhausted.
     _run();
-    ASSERT_LT(_readTicketHolder.outof(), size);
-    ASSERT_LT(_writeTicketHolder.outof(), size);
+    ASSERT_LT(readTicketHolder().outof(), size);
+    ASSERT_LT(writeTicketHolder().outof(), size);
 
     // Throughput does not increase.
-    _readTicketHolder.setNumFinishedProcessing_forTest(2);
+    readTicketHolder().setNumFinishedProcessing_forTest(2);
     _tick();
 
     // Probing down fails since throughput did not increase. Return back to stable.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
+    ASSERT_EQ(readTicketHolder().outof(), size);
+    ASSERT_EQ(writeTicketHolder().outof(), size);
     ASSERT_TRUE(_statsTester.probeIncemented("timesProbedDown"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedUp"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedStable"));
@@ -401,9 +435,9 @@ TEST_F(ThroughputProbingTest, ProbeDownFails) {
 
 TEST_F(ThroughputProbingMaxConcurrencyTest, NoProbeUp) {
     // Tickets are exhausted.
-    auto size = _readTicketHolder.outof();
-    _readTicketHolder.setPeakUsed_forTest(size);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    auto size = readTicketHolder().outof();
+    readTicketHolder().setPeakUsed_forTest(size);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe down since concurrency is already at its maximum allowed value, even though
@@ -411,15 +445,15 @@ TEST_F(ThroughputProbingMaxConcurrencyTest, NoProbeUp) {
     _run();
     ASSERT_TRUE(_statsTester.probeIncemented("timesProbedStable"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedUp"));
-    ASSERT_LT(_readTicketHolder.outof(), size);
-    ASSERT_LT(_writeTicketHolder.outof(), size);
+    ASSERT_LT(readTicketHolder().outof(), size);
+    ASSERT_LT(writeTicketHolder().outof(), size);
 }
 
 TEST_F(ThroughputProbingMinConcurrencyTest, NoProbeDown) {
     // Tickets are not exhausted.
-    auto size = _readTicketHolder.outof();
-    _readTicketHolder.setPeakUsed_forTest(size - 1);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    auto size = readTicketHolder().outof();
+    readTicketHolder().setPeakUsed_forTest(size - 1);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Do not probe in either direction since tickets are not exhausted but concurrency is
@@ -427,15 +461,15 @@ TEST_F(ThroughputProbingMinConcurrencyTest, NoProbeDown) {
     _run();
     ASSERT_TRUE(_statsTester.probeIncemented("timesProbedStable"));
     ASSERT_FALSE(_statsTester.probeIncemented("timesProbedDown"));
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
+    ASSERT_EQ(readTicketHolder().outof(), size);
+    ASSERT_EQ(writeTicketHolder().outof(), size);
 }
 
 TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     gStepMultiple.store(0.1);
     // This value is chosen so that it takes two iterations to increase the stable concurrency by 1.
     gConcurrencyMovingAverageWeight.store(0.3);
-    auto initialSize = _readTicketHolder.outof();
+    auto initialSize = readTicketHolder().outof();
     auto size = initialSize;
 
     // The concurrency level is low enough that the step multiple on its own is not enough to get to
@@ -443,45 +477,45 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     ASSERT_EQ(std::lround(size * (1 + gStepMultiple.load())), size);
 
     // Tickets are exhausted.
-    _readTicketHolder.setPeakUsed_forTest(size);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    readTicketHolder().setPeakUsed_forTest(size);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size + 1);
-    ASSERT_EQ(_writeTicketHolder.outof(), size + 1);
+    ASSERT_EQ(readTicketHolder().outof(), size + 1);
+    ASSERT_EQ(writeTicketHolder().outof(), size + 1);
 
     // Throughput inreases.
-    _readTicketHolder.setNumFinishedProcessing_forTest(3);
+    readTicketHolder().setNumFinishedProcessing_forTest(3);
     _tick();
 
     // Probing up succeeds; the new value is not enough to increase concurrency yet.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size);
-    ASSERT_EQ(_writeTicketHolder.outof(), size);
+    ASSERT_EQ(readTicketHolder().outof(), size);
+    ASSERT_EQ(writeTicketHolder().outof(), size);
     ASSERT(_statsTester.concurrencyKept()) << _statsTester.toString();
 
     // Run another iteration.
 
     // Tickets are exhausted.
-    _readTicketHolder.setPeakUsed_forTest(size);
-    _readTicketHolder.setNumFinishedProcessing_forTest(4);
+    readTicketHolder().setPeakUsed_forTest(size);
+    readTicketHolder().setNumFinishedProcessing_forTest(4);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size + 1);
-    ASSERT_EQ(_writeTicketHolder.outof(), size + 1);
+    ASSERT_EQ(readTicketHolder().outof(), size + 1);
+    ASSERT_EQ(writeTicketHolder().outof(), size + 1);
 
     // Throughput inreases.
-    _readTicketHolder.setNumFinishedProcessing_forTest(6);
+    readTicketHolder().setNumFinishedProcessing_forTest(6);
     _tick();
 
     // Probing up succeeds; the new value is finally enough to increase concurrency.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), size + 1);
-    ASSERT_EQ(_writeTicketHolder.outof(), size + 1);
+    ASSERT_EQ(readTicketHolder().outof(), size + 1);
+    ASSERT_EQ(writeTicketHolder().outof(), size + 1);
     ASSERT(_statsTester.concurrencyIncreased()) << _statsTester.toString();
 }
 
@@ -489,53 +523,54 @@ TEST_F(ThroughputProbingTest, ReadWriteRatio) {
     gReadWriteRatio.store(0.67);  // 33% of tickets for writes, 67% for reads
     ON_BLOCK_EXIT([]() { gReadWriteRatio.store(0.5); });
 
-    auto initialReads = _readTicketHolder.outof();
+    auto initialReads = readTicketHolder().outof();
     auto reads = initialReads;
-    auto initialWrites = _writeTicketHolder.outof();
+    auto initialWrites = writeTicketHolder().outof();
     auto writes = initialWrites;
 
     // Initially these should be equal.
     ASSERT_EQ(reads, writes);
 
     // Write tickets are exhausted
-    _writeTicketHolder.setPeakUsed_forTest(writes);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    writeTicketHolder().setPeakUsed_forTest(writes);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted. We expect write tickets to drop because
     // now the ratio is being applied. Total tickets should still increase.
     _run();
-    ASSERT_GT(_readTicketHolder.outof(), reads);
-    ASSERT_LT(_writeTicketHolder.outof(), writes);
-    ASSERT_GT(_readTicketHolder.outof() + _writeTicketHolder.outof(), reads + writes);
+    ASSERT_GT(readTicketHolder().outof(), reads);
+    ASSERT_LT(writeTicketHolder().outof(), writes);
+    ASSERT_GT(readTicketHolder().outof() + writeTicketHolder().outof(), reads + writes);
 
     // There should be an imbalance.
-    ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
+    ASSERT_GT(readTicketHolder().outof(), writeTicketHolder().outof());
 
-    reads = _readTicketHolder.outof();
-    writes = _writeTicketHolder.outof();
+    reads = readTicketHolder().outof();
+    writes = writeTicketHolder().outof();
 
     // Throughput inreases.
-    _readTicketHolder.setNumFinishedProcessing_forTest(3);
+    readTicketHolder().setNumFinishedProcessing_forTest(3);
     _tick();
 
     // Probing up succeeds; the new value is somewhere between the initial value and the probed-up
     // value.
     _run();
-    ASSERT_LT(_readTicketHolder.outof(), reads);
-    ASSERT_GT(_readTicketHolder.outof(), initialReads);
-    ASSERT_LT(_writeTicketHolder.outof(), writes);
-    ASSERT_LT(_writeTicketHolder.outof(), initialWrites);
-    ASSERT_GT(_readTicketHolder.outof() + _writeTicketHolder.outof(), initialReads + initialWrites);
+    ASSERT_LT(readTicketHolder().outof(), reads);
+    ASSERT_GT(readTicketHolder().outof(), initialReads);
+    ASSERT_LT(writeTicketHolder().outof(), writes);
+    ASSERT_LT(writeTicketHolder().outof(), initialWrites);
+    ASSERT_GT(readTicketHolder().outof() + writeTicketHolder().outof(),
+              initialReads + initialWrites);
     ASSERT(_statsTester.concurrencyIncreased()) << _statsTester.toString();
 
     // This imbalance should still exist.
-    ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
+    ASSERT_GT(readTicketHolder().outof(), writeTicketHolder().outof());
 }
 
 TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroIncreasing) {
-    auto reads = _readTicketHolder.outof();
-    auto writes = _writeTicketHolder.outof();
+    auto reads = readTicketHolder().outof();
+    auto writes = writeTicketHolder().outof();
     ASSERT_GT(reads, writes);
 
     // The concurrency level and read/write ratio are such that the step multiple on its own is not
@@ -543,20 +578,20 @@ TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroIncreasing) {
     ASSERT_EQ(std::lround(writes * (1 + gStepMultiple.load())), writes);
 
     // Write tickets are exhausted.
-    _writeTicketHolder.setPeakUsed_forTest(writes);
-    _writeTicketHolder.setNumFinishedProcessing_forTest(1);
+    writeTicketHolder().setPeakUsed_forTest(writes);
+    writeTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted. The number of write tickets should still
     // go up by 1.
     _run();
-    ASSERT_GT(_readTicketHolder.outof(), reads);
-    ASSERT_EQ(_writeTicketHolder.outof(), writes + 1);
+    ASSERT_GT(readTicketHolder().outof(), reads);
+    ASSERT_EQ(writeTicketHolder().outof(), writes + 1);
 }
 
 TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroDecreasing) {
-    auto reads = _readTicketHolder.outof();
-    auto writes = _writeTicketHolder.outof();
+    auto reads = readTicketHolder().outof();
+    auto writes = writeTicketHolder().outof();
     ASSERT_GT(reads, writes);
 
     // The concurrency level and read/write ratio are such that the step multiple on its own is not
@@ -564,20 +599,20 @@ TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_EQ(std::lround(writes * (1 - gStepMultiple.load())), writes);
 
     // Tickets are not exhausted.
-    _readTicketHolder.setPeakUsed_forTest(reads - 1);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    readTicketHolder().setPeakUsed_forTest(reads - 1);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe down next since tickets are not exhausted. The number of write tickets should
     // still go down by 1.
     _run();
-    ASSERT_LT(_readTicketHolder.outof(), reads);
-    ASSERT_EQ(_writeTicketHolder.outof(), writes - 1);
+    ASSERT_LT(readTicketHolder().outof(), reads);
+    ASSERT_EQ(writeTicketHolder().outof(), writes - 1);
 }
 
 TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroIncreasing) {
-    auto reads = _readTicketHolder.outof();
-    auto writes = _writeTicketHolder.outof();
+    auto reads = readTicketHolder().outof();
+    auto writes = writeTicketHolder().outof();
     ASSERT_LT(reads, writes);
 
     // The concurrency level and read/write ratio are such that the step multiple on its own is not
@@ -585,20 +620,20 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroIncreasing) {
     ASSERT_EQ(std::lround(reads * (1 + gStepMultiple.load())), reads);
 
     // Read tickets are exhausted.
-    _readTicketHolder.setPeakUsed_forTest(reads);
-    _readTicketHolder.setNumFinishedProcessing_forTest(1);
+    readTicketHolder().setPeakUsed_forTest(reads);
+    readTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe up next since tickets are exhausted. The number of read tickets should still
     // go up by 1.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), reads + 1);
-    ASSERT_GT(_writeTicketHolder.outof(), writes);
+    ASSERT_EQ(readTicketHolder().outof(), reads + 1);
+    ASSERT_GT(writeTicketHolder().outof(), writes);
 }
 
 TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
-    auto reads = _readTicketHolder.outof();
-    auto writes = _writeTicketHolder.outof();
+    auto reads = readTicketHolder().outof();
+    auto writes = writeTicketHolder().outof();
     ASSERT_LT(reads, writes);
 
     // The concurrency level and read/write ratio are such that the step multiple on its own is not
@@ -606,28 +641,28 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_EQ(std::lround(reads * (1 + gStepMultiple.load())), reads);
 
     // Tickets are not exhausted.
-    _writeTicketHolder.setPeakUsed_forTest(writes - 1);
-    _writeTicketHolder.setNumFinishedProcessing_forTest(1);
+    writeTicketHolder().setPeakUsed_forTest(writes - 1);
+    writeTicketHolder().setNumFinishedProcessing_forTest(1);
     _tick();
 
     // Stable. Probe down next since tickets are not exhausted. The number of read tickets should
     // still go down by 1.
     _run();
-    ASSERT_EQ(_readTicketHolder.outof(), reads - 1);
-    ASSERT_LT(_writeTicketHolder.outof(), writes);
+    ASSERT_EQ(readTicketHolder().outof(), reads - 1);
+    ASSERT_LT(writeTicketHolder().outof(), writes);
 }
 
 TEST_F(ThroughputProbingTest, SetPeriodUpdatesProbingInterval) {
     // Verify initial period matches the configured interval.
-    ASSERT_EQ(_throughputProbing->getPeriod(),
+    ASSERT_EQ(throughputProbing().getPeriod(),
               Milliseconds{gConcurrencyAdjustmentIntervalMillis.load()});
 
     // Update period to a new value.
     Milliseconds newPeriod{500};
-    _throughputProbing->setPeriod(newPeriod);
+    throughputProbing().setPeriod(newPeriod);
 
     // Verify period was updated.
-    ASSERT_EQ(_throughputProbing->getPeriod(), newPeriod);
+    ASSERT_EQ(throughputProbing().getPeriod(), newPeriod);
 }
 
 }  // namespace mongo::admission::execution_control::throughput_probing

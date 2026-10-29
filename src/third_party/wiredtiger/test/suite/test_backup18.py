@@ -37,12 +37,6 @@ class test_backup18(backup_base):
     pfx = 'test_backup'
     uri="table:test"
 
-    def get_stat(self, stat_name):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        value = stat_cursor[stat_name][2]
-        stat_cursor.close()
-        return value
-
     def id_check(self, expect):
         got = []
         bkup_c = self.session.open_cursor('backup:query_id', None, None)

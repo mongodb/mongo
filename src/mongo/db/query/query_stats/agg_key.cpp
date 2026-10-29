@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_stats/agg_key.h"
 
@@ -60,21 +34,25 @@ AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
                                    const boost::optional<ExplainOptions::Verbosity>& verbosity)
     : involvedNamespaces(std::move(involvedNamespaces_)),
       _bypassDocumentValidation(request_.getBypassDocumentValidation().value_or(false)),
+      _allowPartialResults(request_.getAllowPartialResults().value_or(false)),
       _verbosity(verbosity),
       _hasField{.batchSize = request_.getCursor().getBatchSize().has_value(),
                 .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value(),
                 .explain = request_.getExplain().has_value(),
-                .passthroughToShard = request_.getPassthroughToShard().has_value()} {}
+                .passthroughToShard = request_.getPassthroughToShard().has_value(),
+                .allowPartialResults = request_.getAllowPartialResults().has_value()} {}
 
 
 void AggCmdComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(std::move(state),
                                      _bypassDocumentValidation,
+                                     _allowPartialResults,
                                      _hasField.batchSize,
                                      _hasField.bypassDocumentValidation,
                                      _verbosity,
                                      _hasField.explain,
-                                     _hasField.passthroughToShard);
+                                     _hasField.passthroughToShard,
+                                     _hasField.allowPartialResults);
     // We don't need to add 'involvedNamespaces' here since they are already tracked/duplicated in
     // the Pipeline component of the query shape. We just expose them here for ease of
     // analysis/querying.
@@ -98,6 +76,11 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob,
     if (_hasField.bypassDocumentValidation) {
         bob.append(AggregateCommandRequest::kBypassDocumentValidationFieldName,
                    _bypassDocumentValidation);
+    }
+
+    // allowPartialResults
+    if (_hasField.allowPartialResults) {
+        bob.append(AggregateCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);
     }
 
     // We don't store the specified batch size values since they don't matter.

@@ -41,6 +41,9 @@ URLS_MAP = {
     },
 }
 
+_DOWNLOAD_CROSS_LINUX_PYTHON_ENV = "MONGO_BAZEL_DOWNLOAD_CROSS_LINUX_PYTHON"
+_CROSS_LINUX_PYTHON_ARCH_ENV = "MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH"
+
 def _py_download(ctx):
     """
     Downloads and builds a Python distribution.
@@ -74,15 +77,38 @@ def _py_download(ctx):
     is_toolchain_macos = os == "macos"
     is_toolchain_linux = os == "linux"
 
-    # Check if OS matches
-    os_matches = (
-        (is_host_windows and is_toolchain_windows) or
-        (is_host_macos and is_toolchain_macos) or
-        (is_host_linux and is_toolchain_linux)
+    host_arch = ctx.os.arch
+    arch_matches = (
+        arch == host_arch or
+        (arch == "amd64" and host_arch in ["amd64", "x86_64"]) or
+        (arch == "aarch64" and host_arch in ["aarch64", "arm64"])
     )
 
-    # If OS doesn't match, create a minimal stub BUILD file and skip download
-    if not os_matches:
+    # Check if OS and architecture match
+    os_matches = (
+        (
+            (is_host_windows and is_toolchain_windows) or
+            (is_host_macos and is_toolchain_macos) or
+            (is_host_linux and is_toolchain_linux)
+        ) and
+        arch_matches
+    )
+
+    requested_cross_linux_arch = ctx.os.environ.get(_CROSS_LINUX_PYTHON_ARCH_ENV, "aarch64")
+    if requested_cross_linux_arch == "arm64":
+        requested_cross_linux_arch = "aarch64"
+    if requested_cross_linux_arch == "x86_64":
+        requested_cross_linux_arch = "amd64"
+    download_cross_linux_python = (
+        ctx.os.environ.get(_DOWNLOAD_CROSS_LINUX_PYTHON_ENV) == "1" and
+        is_toolchain_linux and
+        arch == requested_cross_linux_arch
+    )
+
+    # If OS or architecture doesn't match, create a minimal stub BUILD file and skip download.
+    # macOS cross tests can opt in to downloading the Linux Python runtime that remote IDL
+    # generation executes inside the RBE container.
+    if not os_matches and not download_cross_linux_python:
         os_constraint = OS_TO_PLATFORM_MAP[os]
         arch_constraint = ARCH_TO_PLATFORM_MAP[arch]
         constraints = [os_constraint, arch_constraint]
@@ -91,6 +117,18 @@ def _py_download(ctx):
         ctx.file("BUILD.bazel", """
 # Stub toolchain - platform doesn't match host, not downloaded
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
+
+filegroup(
+    name = "files",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "interpreter",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
 
 py_runtime_pair(
     name = "runtime_pair",
@@ -192,7 +230,8 @@ toolchain(
         #ctx.execute(['icacls', 'dist', '/inheritance:r', '/grant:r', 'Administrators:R', '/T'])
         pass
     else:
-        ctx.execute(["chmod", "-R", "544", "dist"])
+        ctx.execute(["find", "dist", "-type", "d", "-exec", "chmod", "755", "{}", "+"])
+        ctx.execute(["find", "dist", "-type", "f", "-exec", "chmod", "544", "{}", "+"])
 
     ctx.template(
         "BUILD.bazel",
@@ -228,6 +267,10 @@ py_download = repository_rule(
             doc = "Label denoting the BUILD file template that get's installed in the repo.",
         ),
     },
+    environ = [
+        _DOWNLOAD_CROSS_LINUX_PYTHON_ENV,
+        _CROSS_LINUX_PYTHON_ARCH_ENV,
+    ],
 )
 
 def setup_mongo_python_toolchains(ctx):

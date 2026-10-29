@@ -1,44 +1,32 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/feature_compatibility_version_parser.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/version/releases.h"
+
+#include <functional>
+#include <string_view>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {
 
 using FCV = multiversion::FeatureCompatibilityVersion;
 using GenericFCV = multiversion::GenericFCV;
+
+const std::string_view kLastLTS =
+    FeatureCompatibilityVersionParser::serializeVersionForFcvString(GenericFCV::kLastLTS);
+const std::string_view kLatest =
+    FeatureCompatibilityVersionParser::serializeVersionForFcvString(GenericFCV::kLatest);
+constexpr std::string_view kUnknownVersion = "99999.0";
+constexpr std::string_view kUnknownPhase = "not_a_real_phase";
 
 // Test fixture for parser cases that exercise FCV documents with a 'phase' field set. Phase is
 // only ever written under Symmetric FCV, so reading such a doc requires the flag enabled — the
@@ -48,47 +36,26 @@ private:
     unittest::ServerParameterGuard _symmetricFCV{"featureFlagSymmetricFCV", true};
 };
 
-// Build a FeatureCompatibilityVersionDocument for an upgrade.
-// For phases >= kEnableTargetFeatures, previousVersion is set to `version` to match
-// what updateFeatureCompatibilityVersionDocument writes on disk (see
-// feature_compatibility_version.cpp: setPreviousVersion(getTransitionFCVInfo(v).from)).
-// TODO (SERVER-120670): The version becomes the targetVersion for phases >= kEnableTargetFeatures.
-static FeatureCompatibilityVersionDocument makeUpgradeDoc(
-    FCV version, FCV targetVersion, boost::optional<SetFCVPhaseEnum> phase = boost::none) {
+TEST(FeatureCompatibilityVersionParserTest, InvalidVersionIncludesDocumentationLink) {
+    ASSERT_THROWS_WITH_CHECK(FeatureCompatibilityVersionParser::parseVersionForFcvString("3.2"),
+                             DBException,
+                             [](const auto& exception) {
+                                 ASSERT_EQ(exception.code(), 4926900);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "https://www.mongodb.com/docs/manual/reference/command/"
+                                     "setFeatureCompatibilityVersion/");
+                             });
+}
+
+static FeatureCompatibilityVersionDocument makeFCVDoc(FCV version,
+                                                      boost::optional<FCV> targetVersion,
+                                                      boost::optional<FCV> previousVersion,
+                                                      boost::optional<SetFCVPhaseEnum> phase) {
     FeatureCompatibilityVersionDocument doc;
     doc.setVersion(version);
     doc.setTargetVersion(targetVersion);
-    doc.setPhase(phase);
-    if (phase && *phase >= SetFCVPhaseEnum::kEnableTargetFeatures) {
-        doc.setPreviousVersion(version);
-    }
-    return doc;
-}
-
-// Build a FeatureCompatibilityVersionDocument for a downgrade (previousVersion = kLatest).
-static FeatureCompatibilityVersionDocument makeDowngradeDoc(
-    FCV version, boost::optional<SetFCVPhaseEnum> phase = boost::none) {
-    FeatureCompatibilityVersionDocument doc;
-    doc.setVersion(version);
-    doc.setTargetVersion(version);
-    doc.setPreviousVersion(GenericFCV::kLatest);
-    doc.setPhase(phase);
-    return doc;
-}
-
-// Build a FeatureCompatibilityVersionDocument with full control over each field, allowing fields
-// to be omitted to exercise missing-field error paths in the parser.
-static FeatureCompatibilityVersionDocument makeArbitraryFCVDoc(
-    FCV version,
-    boost::optional<FCV> targetVersion,
-    boost::optional<FCV> previousVersion,
-    boost::optional<SetFCVPhaseEnum> phase) {
-    FeatureCompatibilityVersionDocument doc;
-    doc.setVersion(version);
-    if (targetVersion)
-        doc.setTargetVersion(*targetVersion);
-    if (previousVersion)
-        doc.setPreviousVersion(*previousVersion);
+    doc.setPreviousVersion(previousVersion);
     doc.setPhase(phase);
     return doc;
 }
@@ -123,98 +90,125 @@ INSTANTIATE_TEST_SUITE_P(
         // Phases that project to the target FCV.
         PhaseTestCase{"UpgradeLastLTSToLatestEnableTargetFeatures",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastLTS,
-                                                GenericFCV::kLatest,
-                                                SetFCVPhaseEnum::kEnableTargetFeatures);
+                          return makeFCVDoc(GenericFCV::kLatest,
+                                            GenericFCV::kLatest,
+                                            GenericFCV::kLastLTS,
+                                            SetFCVPhaseEnum::kEnableTargetFeatures);
                       },
                       GenericFCV::kLatest},
         PhaseTestCase{"UpgradeLastLTSToLatestCommitAddedFeatures",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastLTS,
-                                                GenericFCV::kLatest,
-                                                SetFCVPhaseEnum::kCommitAddedFeatures);
+                          return makeFCVDoc(GenericFCV::kLatest,
+                                            GenericFCV::kLatest,
+                                            GenericFCV::kLastLTS,
+                                            SetFCVPhaseEnum::kCommitAddedFeatures);
                       },
                       GenericFCV::kLatest},
         PhaseTestCase{"UpgradeLastContinuousToLatestEnableTargetFeatures",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastContinuous,
-                                                GenericFCV::kLatest,
-                                                SetFCVPhaseEnum::kEnableTargetFeatures);
+                          return makeFCVDoc(GenericFCV::kLatest,
+                                            GenericFCV::kLatest,
+                                            GenericFCV::kLastContinuous,
+                                            SetFCVPhaseEnum::kEnableTargetFeatures);
                       },
                       GenericFCV::kLatest},
         PhaseTestCase{"UpgradeLastContinuousToLatestCommitAddedFeatures",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastContinuous,
-                                                GenericFCV::kLatest,
-                                                SetFCVPhaseEnum::kCommitAddedFeatures);
+                          return makeFCVDoc(GenericFCV::kLatest,
+                                            GenericFCV::kLatest,
+                                            GenericFCV::kLastContinuous,
+                                            SetFCVPhaseEnum::kCommitAddedFeatures);
                       },
                       GenericFCV::kLatest},
         PhaseTestCase{"UpgradeLastLTSToLastContinuousEnableTargetFeatures",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastLTS,
-                                                GenericFCV::kLastContinuous,
-                                                SetFCVPhaseEnum::kEnableTargetFeatures);
+                          return makeFCVDoc(GenericFCV::kLastContinuous,
+                                            GenericFCV::kLastContinuous,
+                                            GenericFCV::kLastLTS,
+                                            SetFCVPhaseEnum::kEnableTargetFeatures);
                       },
                       GenericFCV::kLastContinuous},
         PhaseTestCase{"UpgradeLastLTSToLastContinuousCommitAddedFeatures",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastLTS,
-                                                GenericFCV::kLastContinuous,
-                                                SetFCVPhaseEnum::kCommitAddedFeatures);
+                          return makeFCVDoc(GenericFCV::kLastContinuous,
+                                            GenericFCV::kLastContinuous,
+                                            GenericFCV::kLastLTS,
+                                            SetFCVPhaseEnum::kCommitAddedFeatures);
                       },
                       GenericFCV::kLastContinuous},
         PhaseTestCase{"DowngradeLastLTSEnableTargetFeatures",
                       []() {
-                          return makeDowngradeDoc(GenericFCV::kLastLTS,
-                                                  SetFCVPhaseEnum::kEnableTargetFeatures);
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            SetFCVPhaseEnum::kEnableTargetFeatures);
                       },
                       GenericFCV::kLastLTS},
         PhaseTestCase{"DowngradeLastLTSCommitAddedFeatures",
                       []() {
-                          return makeDowngradeDoc(GenericFCV::kLastLTS,
-                                                  SetFCVPhaseEnum::kCommitAddedFeatures);
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            SetFCVPhaseEnum::kCommitAddedFeatures);
                       },
                       GenericFCV::kLastLTS},
         PhaseTestCase{"DowngradeLastContinuousEnableTargetFeatures",
                       []() {
-                          return makeDowngradeDoc(GenericFCV::kLastContinuous,
-                                                  SetFCVPhaseEnum::kEnableTargetFeatures);
+                          return makeFCVDoc(GenericFCV::kLastContinuous,
+                                            GenericFCV::kLastContinuous,
+                                            GenericFCV::kLatest,
+                                            SetFCVPhaseEnum::kEnableTargetFeatures);
                       },
                       GenericFCV::kLastContinuous},
         PhaseTestCase{"DowngradeLastContinuousCommitAddedFeatures",
                       []() {
-                          return makeDowngradeDoc(GenericFCV::kLastContinuous,
-                                                  SetFCVPhaseEnum::kCommitAddedFeatures);
+                          return makeFCVDoc(GenericFCV::kLastContinuous,
+                                            GenericFCV::kLastContinuous,
+                                            GenericFCV::kLatest,
+                                            SetFCVPhaseEnum::kCommitAddedFeatures);
                       },
                       GenericFCV::kLastContinuous},
         // Phases that project to the transitional FCV.
         PhaseTestCase{"UpgradeStart",
                       []() {
-                          return makeUpgradeDoc(
-                              GenericFCV::kLastLTS, GenericFCV::kLatest, SetFCVPhaseEnum::kStart);
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            boost::none,
+                                            SetFCVPhaseEnum::kStart);
                       },
                       GenericFCV::kUpgradingFromLastLTSToLatest},
         PhaseTestCase{"UpgradePrepare",
                       []() {
-                          return makeUpgradeDoc(
-                              GenericFCV::kLastLTS, GenericFCV::kLatest, SetFCVPhaseEnum::kPrepare);
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            boost::none,
+                                            SetFCVPhaseEnum::kPrepare);
                       },
                       GenericFCV::kUpgradingFromLastLTSToLatest},
         PhaseTestCase{"UpgradeComplete",
                       []() {
-                          return makeUpgradeDoc(GenericFCV::kLastLTS,
-                                                GenericFCV::kLatest,
-                                                SetFCVPhaseEnum::kComplete);
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            boost::none,
+                                            SetFCVPhaseEnum::kComplete);
                       },
                       GenericFCV::kUpgradingFromLastLTSToLatest},
-        PhaseTestCase{
-            "DowngradeStart",
-            []() { return makeDowngradeDoc(GenericFCV::kLastLTS, SetFCVPhaseEnum::kStart); },
-            GenericFCV::kDowngradingFromLatestToLastLTS},
-        PhaseTestCase{
-            "DowngradeComplete",
-            []() { return makeDowngradeDoc(GenericFCV::kLastLTS, SetFCVPhaseEnum::kComplete); },
-            GenericFCV::kDowngradingFromLatestToLastLTS}),
+        PhaseTestCase{"DowngradeStart",
+                      []() {
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            SetFCVPhaseEnum::kStart);
+                      },
+                      GenericFCV::kDowngradingFromLatestToLastLTS},
+        PhaseTestCase{"DowngradeComplete",
+                      []() {
+                          return makeFCVDoc(GenericFCV::kLastLTS,
+                                            GenericFCV::kLastLTS,
+                                            GenericFCV::kLatest,
+                                            SetFCVPhaseEnum::kComplete);
+                      },
+                      GenericFCV::kDowngradingFromLatestToLastLTS}),
     [](const ::testing::TestParamInfo<PhaseTestCase>& info) { return info.param.name; });
 
 // ---------- Group 2: No-phase tests (steady-state and legacy transitional) ----------
@@ -291,27 +285,27 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         PhaseErrorTestCase{"MissingTargetVersion",
                            []() {
-                               return makeArbitraryFCVDoc(GenericFCV::kLastLTS,
-                                                          boost::none,
-                                                          GenericFCV::kLastLTS,
-                                                          SetFCVPhaseEnum::kEnableTargetFeatures);
+                               return makeFCVDoc(GenericFCV::kLastLTS,
+                                                 boost::none,
+                                                 GenericFCV::kLastLTS,
+                                                 SetFCVPhaseEnum::kEnableTargetFeatures);
                            },
                            11948501},
         PhaseErrorTestCase{"MissingPreviousVersion",
                            []() {
-                               return makeArbitraryFCVDoc(GenericFCV::kLastLTS,
-                                                          GenericFCV::kLatest,
-                                                          boost::none,
-                                                          SetFCVPhaseEnum::kEnableTargetFeatures);
+                               return makeFCVDoc(GenericFCV::kLastLTS,
+                                                 GenericFCV::kLatest,
+                                                 boost::none,
+                                                 SetFCVPhaseEnum::kEnableTargetFeatures);
                            },
                            11948502},
         PhaseErrorTestCase{"InvalidTransitionalShape",
                            []() {
                                // kLatest is not a valid downgrade target.
-                               return makeArbitraryFCVDoc(GenericFCV::kLatest,
-                                                          GenericFCV::kLatest,
-                                                          GenericFCV::kLatest,
-                                                          SetFCVPhaseEnum::kEnableTargetFeatures);
+                               return makeFCVDoc(GenericFCV::kLatest,
+                                                 GenericFCV::kLatest,
+                                                 GenericFCV::kLatest,
+                                                 SetFCVPhaseEnum::kEnableTargetFeatures);
                            },
                            11948503}),
     [](const ::testing::TestParamInfo<PhaseErrorTestCase>& info) { return info.param.name; });
@@ -328,6 +322,66 @@ TEST(FCVParserSymmetricFCVGuardTest, PhasePresentWithSymmetricDisabledIsRejected
     doc.setPhase(SetFCVPhaseEnum::kEnableTargetFeatures);
     auto result = FeatureCompatibilityVersionParser::parse(doc.toBSON());
     ASSERT_EQ(result.getStatus().code(), 11948500);
+}
+
+// ---------- Rejected cases ----------
+
+struct ParseRejectedCase {
+    std::string name;
+    std::function<BSONObj()> buildDoc;
+    int expectedCode;
+};
+
+class ParseRejectedTest : public ::testing::TestWithParam<ParseRejectedCase> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    FeatureCompatibilityVersionParserTest,
+    ParseRejectedTest,
+    testing::ValuesIn(std::vector<ParseRejectedCase>{
+        // Unknown version strings — rejected by the fcv_string IDL deserializer (4926900)
+        // before any field-combination logic runs.
+        {"UnknownVersion", [] { return BSON("version" << kUnknownVersion); }, 4926900},
+        {"UnknownTargetVersion",
+         [] { return BSON("version" << kLastLTS << "targetVersion" << kUnknownVersion); },
+         4926900},
+        {"UnknownPreviousVersion",
+         [] {
+             return BSON("version" << kLastLTS << "targetVersion" << kLastLTS << "previousVersion"
+                                   << kUnknownVersion);
+         },
+         4926900},
+        // Structural errors — rejected by the IDL parser or parse() before version checks.
+        {"MissingVersionField",
+         [] { return BSON("targetVersion" << kLatest); },
+         ErrorCodes::IDLFailedToParse},
+        {"NonStringVersion", [] { return BSON("version" << 10); }, ErrorCodes::TypeMismatch},
+        // Unknown phase string — IDL SetFCVPhase enum deserializer throws.
+        {"UnknownPhaseString",
+         [] {
+             return BSON("version" << kLastLTS << "targetVersion" << kLatest << "phase"
+                                   << kUnknownPhase);
+         },
+         ErrorCodes::BadValue},
+        // Field-combination errors caught by parse() logic.
+        {"DowngradingMissingPreviousVersion",
+         [] { return BSON("version" << kLastLTS << "targetVersion" << kLastLTS); },
+         4926902},
+        {"PreviousVersionNotLatestInDowngrading",
+         [] {
+             return BSON("version" << kLastLTS << "targetVersion" << kLastLTS << "previousVersion"
+                                   << kLastLTS);
+         },
+         4926901},
+        {"PreviousVersionInSteadyState",
+         [] { return BSON("version" << kLatest << "previousVersion" << kLatest); },
+         4926903},
+    }),
+    [](const testing::TestParamInfo<ParseRejectedCase>& info) { return info.param.name; });
+
+TEST_P(ParseRejectedTest, IsRejected) {
+    auto result = FeatureCompatibilityVersionParser::parse(GetParam().buildDoc());
+
+    ASSERT_EQ(result.getStatus().code(), GetParam().expectedCode);
 }
 
 }  // namespace

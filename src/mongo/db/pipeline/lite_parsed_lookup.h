@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -51,7 +24,8 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
+namespace [[MONGO_MOD_NEEDS_REPLACEMENT]] mongo {
+using namespace std::literals::string_view_literals;
 
 class LookUpStageParams : public DefaultStageParams {
 public:
@@ -68,7 +42,10 @@ public:
                       boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
                       boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
                       bool internalFromIsAView = false,
-                      bool noUserPipeline = false)
+                      bool noUserPipeline = false,
+                      FirstStageViewApplicationPolicy subpipelineViewPolicy =
+                          FirstStageViewApplicationPolicy::kDefaultPrepend,
+                      size_t subpipelineViewPrefixLen = 0)
         : DefaultStageParams(ownedBsonObj.firstElement()),
           fromNss(std::move(fromNss)),
           as(std::move(as)),
@@ -83,6 +60,8 @@ public:
           internalFieldMatchPipelineIdx(std::move(internalFieldMatchPipelineIdx)),
           internalFromIsAView(internalFromIsAView),
           noUserPipeline(noUserPipeline),
+          subpipelineViewPolicy(subpipelineViewPolicy),
+          subpipelineViewPrefixLen(subpipelineViewPrefixLen),
           _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
     static const Id& id;
@@ -121,6 +100,19 @@ public:
     // = boost::none instead of [], even after a view subpipeline is materialized.
     bool noUserPipeline = false;
 
+    // The subpipeline's first (desugared) stage's view-application policy. kDefaultPrepend (the
+    // default) means the stage is view-agnostic, so when 'fromNss' is a view the resolved view
+    // pipeline is prepended ahead of the user subpipeline as usual. kDoNothing means the stage
+    // applies the view itself (e.g. an extension search stage), so the view pipeline must not be
+    // prepended to the resolved pipeline.
+    FirstStageViewApplicationPolicy subpipelineViewPolicy =
+        FirstStageViewApplicationPolicy::kDefaultPrepend;
+
+    // How many of the leading stages in 'subpipelineStageParams' came from the resolved view
+    // definition rather than from the user's subpipeline, used by DocumentSourceLookUp as the split
+    // point when parsing the subpipeline. 0 when 'fromNss' is not a view.
+    size_t subpipelineViewPrefixLen = 0;
+
 private:
     // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.
     BSONObj _ownedOriginalBson;
@@ -128,13 +120,14 @@ private:
 
 class LiteParsedLookUp final : public LiteParsedDocumentSourceNestedPipelines<LiteParsedLookUp> {
 public:
-    static constexpr std::string_view kStageName = "$lookup"_sd;
+    static constexpr std::string_view kStageName = "$lookup"sv;
 
     static std::unique_ptr<LiteParsedLookUp> parse(const NamespaceString& nss,
                                                    const BSONElement& spec,
                                                    const LiteParserOptions& options);
 
     LiteParsedLookUp(const BSONElement& spec,
+                     const LiteParserOptions& options,
                      NamespaceString foreignNss,
                      boost::optional<OwnedLiteParsedPipeline> pipeline,
                      std::vector<BSONObj> rawPipeline,
@@ -148,9 +141,7 @@ public:
                      boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
                      bool internalFromIsAView = false,
                      bool noUserPipeline = false,
-                     bool allowGenericForeignDbLookup = false,
-                     bool usingMongos = false,
-                     bool isParsingViewDefinition = false);
+                     bool allowGenericForeignDbLookup = false);
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const final;
@@ -167,7 +158,7 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
-    void validate() const override;
+    void validate(const OperationContext* opCtx) const override;
 
     // Moved from document_source_lookup.cpp so createFromBson can still call it.
     static void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline);
@@ -189,11 +180,9 @@ private:
     bool _hasForeignDB;
     bool _isHybridSearch;
 
-    // TODO SERVER-129127 The fields in this code block can be removed when they live on a
-    // ParseContext and are passed at parse/validation time to the LiteParsedLookup.
+    // TODO SERVER-129127 This field can be removed when it lives on a ParseContext and is passed at
+    // parse/validation time to the LiteParsedLookup.
     bool _allowGenericForeignDbLookup;
-    bool _usingMongos;
-    bool _isParsingViewDefinition;
 
     // Parsed from $_internalFieldMatchPipelineIdx at construction so getStageParams() can forward
     // it.
@@ -206,4 +195,4 @@ private:
     bool _noUserPipeline = false;
 };
 
-}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo
+}  // namespace mongo

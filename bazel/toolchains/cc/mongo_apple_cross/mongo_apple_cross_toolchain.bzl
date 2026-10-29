@@ -50,10 +50,11 @@ def get_supported_apple_cross_archs():
 
 def _apple_cross_toolchain_registration_impl(repository_ctx):
     """Generates toolchain() targets that point to the files repo."""
-    if "linux" not in repository_ctx.os.name.lower():
+    os_name = repository_ctx.os.name.lower()
+    if "linux" not in os_name and "mac" not in os_name:
         repository_ctx.file(
             "BUILD.bazel",
-            "# Apple cross-compilation toolchain is only available on Linux\n",
+            "# Apple cross-compilation toolchain is only available from Linux or macOS\n",
         )
         return
 
@@ -66,12 +67,27 @@ toolchain(
     name = "mongo_apple_cross_{arch}_toolchain",
     exec_compatible_with = [
         "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
     ],
     target_compatible_with = [
         "@platforms//os:macos",
         "@platforms//cpu:{cpu}",
+        "@//bazel/platforms:use_mongo_apple_cross_toolchain",
     ],
     toolchain = "@mongo_apple_cross_toolchain_files//:cc-compiler-apple-cross-{arch}",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+toolchain(
+    name = "mongo_apple_cross_{arch}_macos_host_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:macos",
+    ],
+    target_compatible_with = [
+        "@platforms//os:macos",
+        "@platforms//cpu:{cpu}",
+        "@//bazel/platforms:use_mongo_apple_cross_toolchain",
+    ],
+    toolchain = "@mongo_apple_cross_toolchain_files//:cc-compiler-apple-cross-host-wrapper-{arch}",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
 """.format(arch = arch, cpu = cpu))
@@ -167,6 +183,37 @@ _LLVM_TOOLS = [
     "llvm-cov",
 ]
 
+_WRAPPED_TOOL_PATHS = {
+    "ar": "llvm-ar",
+    "cpp": "clang-cpp",
+    "ld": "ld.lld",
+    "dwp": "llvm-dwp",
+    "gcc": "clang",
+    "g++": "clang++",
+    "gcov": "llvm-profdata",
+    "llvm-cov": "llvm-cov",
+    "llvm-profdata": "llvm-profdata",
+    "nm": "llvm-nm",
+    "objcopy": "llvm-objcopy",
+    "objdump": "llvm-objdump",
+    "strip": "llvm-strip",
+}
+
+_WRAPPER_TEMPLATE = """#!/usr/bin/env bash
+set -euo pipefail
+this_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd -P)"
+real_tool="${{this_dir}}/../tools/{real_tool}"
+if [[ "$(uname -s)" == "Linux" ]]; then
+  exec "${{real_tool}}" "$@"
+fi
+if [[ "${{MONGO_MACOS_CROSS_ACTION_WRAPPER:-1}}" == "0" ]]; then
+  exec "${{real_tool}}" "$@"
+fi
+wrapper="${{MONGO_MACOS_CROSS_ACTION_WRAPPER_SCRIPT:-bazel/toolchains/cc/mongo_apple_cross/macos_cross_action_wrapper.py}}"
+python="${{MONGO_MACOS_CROSS_ACTION_PYTHON:-python3}}"
+exec "${{python}}" "${{wrapper}}" "${{real_tool}}" "$@"
+"""
+
 def _symlink_toolchain_files(repository_ctx, llvm_path, llvm_version, sdk_path):
     """Symlinks LLVM tools, headers, and SDK into the repo for hermetic builds."""
 
@@ -210,6 +257,20 @@ def _symlink_toolchain_files(repository_ctx, llvm_path, llvm_version, sdk_path):
     repository_ctx.symlink(sdk_path + "/usr/lib", "sysroot/usr/lib")
     repository_ctx.symlink(sdk_path + "/System", "sysroot/System")
 
+def _write_host_wrapper_scripts(repository_ctx):
+    """Writes host-executable tool wrappers for local macOS host actions."""
+    wrapper_names = []
+    for wrapper_name in _WRAPPED_TOOL_PATHS.values():
+        if wrapper_name in wrapper_names:
+            continue
+        wrapper_names.append(wrapper_name)
+    for wrapper_name in wrapper_names:
+        repository_ctx.file(
+            "wrappers/" + wrapper_name,
+            _WRAPPER_TEMPLATE.format(real_tool = wrapper_name),
+            executable = True,
+        )
+
 def _configure_cross_toolchain(repository_ctx):
     """Configures the cross-compilation toolchain files."""
     build_file = "BUILD.bazel"
@@ -238,6 +299,7 @@ def _configure_cross_toolchain(repository_ctx):
     # Symlink LLVM tools, headers, and SDK into the repo for hermetic builds.
     repository_ctx.report_progress("Symlinking LLVM tools and macOS SDK for hermetic toolchain")
     _symlink_toolchain_files(repository_ctx, llvm_path, llvm_version, sdk_path)
+    _write_host_wrapper_scripts(repository_ctx)
 
     # Compute the execroot-relative path prefix for this external repository.
     repo_name = repository_ctx.name
@@ -259,10 +321,11 @@ def _configure_cross_toolchain(repository_ctx):
 
 def _apple_cross_toolchain_files_impl(repository_ctx):
     """Downloads and configures the actual toolchain files."""
-    if "linux" not in repository_ctx.os.name.lower():
+    os_name = repository_ctx.os.name.lower()
+    if "linux" not in os_name and "mac" not in os_name:
         repository_ctx.file(
             "BUILD.bazel",
-            "# Apple cross-compilation toolchain is only available on Linux\n",
+            "# Apple cross-compilation toolchain is only available from Linux or macOS\n",
         )
         return
 

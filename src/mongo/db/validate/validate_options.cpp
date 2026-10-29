@@ -1,35 +1,83 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/validate/validate_options.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo::collection_validation {
+
+std::string_view toString(ValidateMode validateMode) {
+    switch (validateMode) {
+        case ValidateMode::kMetadata:
+            return "metadata";
+        case ValidateMode::kBackground:
+            return "background";
+        case ValidateMode::kBackgroundCheckBSON:
+            return "backgroundCheckBSON";
+        case ValidateMode::kForeground:
+            return "foreground";
+        case ValidateMode::kForegroundFullIndexOnly:
+            return "foregroundFullIndexOnly";
+        case ValidateMode::kForegroundCheckBSON:
+            return "foregroundCheckBSON";
+        case ValidateMode::kForegroundFull:
+            return "foregroundFull";
+        case ValidateMode::kForegroundFullCheckBSON:
+            return "foregroundFullCheckBSON";
+        case ValidateMode::kForegroundFullEnforceFastCount:
+            return "foregroundFullEnforceFastCount";
+        case ValidateMode::kForegroundFullEnforceFastSize:
+            return "foregroundFullEnforceFastSize";
+        case ValidateMode::kForegroundFullEnforceFastCountAndSize:
+            return "foregroundFullEnforceFastCountAndSize";
+        case ValidateMode::kCollectionHash:
+            return "collectionHash";
+        case ValidateMode::kHashDrillDown:
+            return "hashDrillDown";
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::string_view toString(RepairMode repairMode) {
+    switch (repairMode) {
+        case RepairMode::kNone:
+            return "none";
+        case RepairMode::kFixErrors:
+            return "fixErrors";
+        case RepairMode::kAdjustMultikey:
+            return "adjustMultikey";
+    }
+    MONGO_UNREACHABLE;
+}
+
+BSONObj ValidationOptions::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("mode", toString(_validateMode));
+    builder.append("repairMode", toString(_repairMode));
+    builder.append("repair", fixErrors());
+    builder.append("fixMultikey", adjustMultikey());
+    builder.append("logDiagnostics", _logDiagnostics);
+    builder.append("validationVersion", static_cast<int>(_validationVersion));
+    builder.append("sizeStats", _sizeStats);
+    if (_verifyConfigurationOverride) {
+        builder.append("verifyConfigurationOverride", *_verifyConfigurationOverride);
+    }
+    if (_readTimestamp) {
+        builder.append("readTimestamp", *_readTimestamp);
+    }
+    if (_hashPrefixes) {
+        builder.append("hashPrefixes", *_hashPrefixes);
+    }
+    if (_revealHashedIds) {
+        builder.append("revealHashedIds", *_revealHashedIds);
+    }
+    if (_targetRecordsPerRecordStoreSlice) {
+        builder.append("targetRecordsPerRecordStoreSlice", *_targetRecordsPerRecordStoreSlice);
+    }
+    return builder.obj();
+}
 
 ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      RepairMode repairMode,
@@ -38,7 +86,9 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      boost::optional<std::string> verifyConfigurationOverride,
                                      boost::optional<Timestamp> readTimestamp,
                                      boost::optional<std::vector<std::string>> hashPrefixes,
-                                     boost::optional<std::vector<std::string>> revealHashedIds)
+                                     boost::optional<std::vector<std::string>> revealHashedIds,
+                                     boost::optional<int64_t> targetRecordsPerRecordStoreSlice,
+                                     bool sizeStats)
     : _validateMode(validateMode),
       _repairMode(repairMode),
       _logDiagnostics(logDiagnostics),
@@ -46,6 +96,8 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
       _verifyConfigurationOverride(std::move(verifyConfigurationOverride)),
       _readTimestamp(readTimestamp),
       _hashPrefixes(std::move(hashPrefixes)),
-      _revealHashedIds(std::move(revealHashedIds)) {}
+      _revealHashedIds(std::move(revealHashedIds)),
+      _targetRecordsPerRecordStoreSlice(targetRecordsPerRecordStoreSlice),
+      _sizeStats(sizeStats) {}
 
 }  // namespace mongo::collection_validation

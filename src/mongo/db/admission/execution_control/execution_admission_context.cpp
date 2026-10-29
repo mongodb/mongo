@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 
@@ -54,10 +28,15 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCt
     return contextDecoration(opCtx);
 }
 
+OperationContext* ExecutionAdmissionContext::getOperationContext() {
+    return contextDecoration.owner(this);
+}
+
 ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionContext& other)
     : AdmissionContext(other),
       _readDelinquencyStats(other._readDelinquencyStats),
       _writeDelinquencyStats(other._writeDelinquencyStats),
+      _queueWaitStats(other._queueWaitStats),
       _readNonDeprioritizableStats(other._readNonDeprioritizableStats),
       _readDeprioritizableStats(other._readDeprioritizableStats),
       _writeNonDeprioritizableStats(other._writeNonDeprioritizableStats),
@@ -74,9 +53,13 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     const ExecutionAdmissionContext& other) {
+    if (this == &other) {
+        return *this;
+    }
     AdmissionContext::operator=(other);
     _readDelinquencyStats = other._readDelinquencyStats;
     _writeDelinquencyStats = other._writeDelinquencyStats;
+    _queueWaitStats = other._queueWaitStats;
     _readNonDeprioritizableStats = other._readNonDeprioritizableStats;
     _readDeprioritizableStats = other._readDeprioritizableStats;
     _writeNonDeprioritizableStats = other._writeNonDeprioritizableStats;
@@ -192,8 +175,8 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
         // Record CPU and elapsed time to the appropriate finalized stats bucket
         // (deprioritizable/non-deprioritizable). This is independent of operation type (read/write)
         // since the type may have changed during the operation's lifetime.
-        auto& stats = _isDeprioritizable(true /* isFinalization */) ? _deprioritizableFinalStats
-                                                                    : _nonDeprioritizableFinalStats;
+        auto& stats = _isDeprioritizable(/*isFinalization=*/true) ? _deprioritizableFinalStats
+                                                                  : _nonDeprioritizableFinalStats;
 
         stats.totalOpsFinished.fetchAndAddRelaxed(1);
         stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
@@ -222,6 +205,17 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     result.wasDeprioritized = getPriorityLowered();
     result.wasMarkedNonDeprioritizable = getMarkedNonDeprioritizable();
     result.wasInMultiDocTxn = _wasInMultiDocTxn.loadRelaxed();
+
+    for (size_t opTypeIdx = 0;
+         opTypeIdx < static_cast<size_t>(ec::OperationType::kNumOperationTypes);
+         ++opTypeIdx) {
+        for (size_t queueIdx = 0; queueIdx < static_cast<size_t>(QueueType::kNumQueueTypes);
+             ++queueIdx) {
+            const auto& cell = _queueWaitStats[opTypeIdx][queueIdx];
+            result.queueWaitSamples[opTypeIdx][queueIdx] = {cell.totalQueuedMicros.loadRelaxed(),
+                                                            cell.touched.loadRelaxed()};
+        }
+    }
 
     return result;
 }
@@ -260,27 +254,74 @@ void ExecutionAdmissionContext::setTaskType(OperationContext* opCtx, TaskType ne
                 "newValue"_attr = to_string(newType));
 }
 
-void ExecutionAdmissionContext::recordExecutionAcquisition(AdmissionContext::Priority priority) {
+void ExecutionAdmissionContext::recordExecutionAcquisition(
+    AdmissionContext::Priority priority, ExecutionAdmissionContext::QueueType queue) {
     if (!_shouldRecordStats()) {
         return;
     }
 
+    const bool isLowPriority = priority == AdmissionContext::Priority::kLow;
     auto& stats = _getOperationExecutionStats();
     stats.totalAdmissions.fetchAndAddRelaxed(1);
-    if (priority == AdmissionContext::Priority::kLow) {
+    if (isLowPriority) {
         stats.totalLowPriorityAdmissions.fetchAndAddRelaxed(1);
     } else {
         stats.totalNormalPriorityAdmissions.fetchAndAddRelaxed(1);
     }
+
+    if (_statsRecorder) {
+        _statsRecorder->_record({.admissions = 1, .lowPriorityAdmissions = isLowPriority ? 1 : 0});
+    }
+
+    // Mark the queue as touched so this operation contributes a sample (0us if it never waited) to
+    // the queue's wait-time histogram at finalization.
+    _getQueueWaitStats(queue).touched.storeRelaxed(true);
 }
 
-void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds queueTimeMicros) {
+void ExecutionAdmissionContext::recordExecutionStartQueueing() {
+    if (!_shouldRecordStats()) {
+        return;
+    }
+
+    if (_statsRecorder) {
+        _statsRecorder->_record({.startedQueueing = 1});
+    }
+}
+
+void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(
+    Microseconds queueTimeMicros, ExecutionAdmissionContext::QueueType queue) {
     if (!_shouldRecordStats()) {
         return;
     }
 
     auto& stats = _getOperationExecutionStats();
     stats.totalTimeQueuedMicros.fetchAndAddRelaxed(queueTimeMicros.count());
+
+    if (_statsRecorder) {
+        _statsRecorder->_record(
+            {.finishedQueueing = 1, .timeQueuedMicros = queueTimeMicros.count()});
+    }
+
+    auto& queueStats = _getQueueWaitStats(queue);
+    queueStats.totalQueuedMicros.fetchAndAddRelaxed(queueTimeMicros.count());
+    queueStats.touched.storeRelaxed(true);
+}
+
+size_t ExecutionAdmissionContext::_queueIndex(QueueType queue) {
+    switch (queue) {
+        case ExecutionAdmissionContext::QueueType::kNormal:
+            return 0;
+        case ExecutionAdmissionContext::QueueType::kLow:
+            return 1;
+        default:
+            MONGO_UNREACHABLE_TASSERT(12919200);
+    }
+    MONGO_UNREACHABLE;
+}
+
+ExecutionAdmissionContext::PerQueueWaitStats& ExecutionAdmissionContext::_getQueueWaitStats(
+    QueueType queue) {
+    return _queueWaitStats[static_cast<size_t>(getOperationType())][_queueIndex(queue)];
 }
 
 void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTimeMicros) {
@@ -290,6 +331,11 @@ void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTim
 
     auto& stats = _getOperationExecutionStats();
     stats.totalTimeProcessingMicros.fetchAndAddRelaxed(processedTimeMicros.count());
+
+    if (_statsRecorder) {
+        _statsRecorder->_record(
+            {.releases = 1, .timeProcessingMicros = processedTimeMicros.count()});
+    }
 }
 
 void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) {
@@ -349,6 +395,9 @@ ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionSt
 
         case ec::OperationType::kWrite:
             return isDeprioritizable ? _writeDeprioritizableStats : _writeNonDeprioritizableStats;
+
+        default:
+            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;
@@ -356,6 +405,20 @@ ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionSt
 
 bool ExecutionAdmissionContext::_shouldRecordStats() {
     return getPriority() != AdmissionContext::Priority::kExempt;
+}
+
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::
+    ScopedTicketAdmissionStatsRecorder(OperationContext* opCtx, OnUpdateFn onUpdate)
+    : _opCtx(opCtx), _onUpdate(std::move(onUpdate)) {
+    auto& admCtx = ExecutionAdmissionContext::get(_opCtx);
+    invariant(!admCtx._statsRecorder,
+              "Only one ScopedTicketAdmissionStatsRecorder may be registered per operation");
+    admCtx._statsRecorder = this;
+}
+
+admission::execution_control::ScopedTicketAdmissionStatsRecorder::
+    ~ScopedTicketAdmissionStatsRecorder() {
+    ExecutionAdmissionContext::get(_opCtx)._statsRecorder = nullptr;
 }
 
 admission::execution_control::ScopedTaskTypeModifierBase::ScopedTaskTypeModifierBase(

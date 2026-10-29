@@ -5,12 +5,10 @@ test_kind: js_test
 selector:
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
-
-    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
-    - jstests/aggregation/optimization/use_query_sort.js
 
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
@@ -28,6 +26,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagCostBasedRanker: true
-        internalQueryCBRCEMode: "automaticCE"
-        automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults"
+        internalQueryPlanRanker: "mixed"
+        internalQueryCBRCEMode: "samplingCE"
+        internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults"
         internalQuerySamplingBySequentialScan: true

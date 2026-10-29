@@ -32,6 +32,18 @@
  * Explicitly suppress compiler warnings about unused variables, and function parameters.
  */
 #define WT_UNUSED(var) (void)(var)
+
+/*
+ * __builtin_prefetch(addr, rw, locality) hint parameters: rw distinguishes a read-only touch from
+ * one anticipating a write; locality selects how strongly to keep the line cached afterward (0 =
+ * no temporal locality, 3 = highest). Only meaningful where __builtin_prefetch itself is available
+ * (see the callers' own compiler guards); the values are plain integers, so defining them here
+ * unconditionally is safe on every platform.
+ */
+#define WT_WARM_READ 0
+#define WT_WARM_WRITE 1
+#define WT_WARM_LOCALITY_HIGH 3
+
 #define WT_NOT_READ(v, val) \
     do {                    \
         (v) = (val);        \

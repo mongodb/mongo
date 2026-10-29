@@ -5,11 +5,6 @@ let sh = function () {
 };
 
 sh._checkMongos = function () {
-    if (TestData !== undefined && TestData.testingReplicaSetEndpoint) {
-        // When testing the replica set endpoint, the test connects directly to a mongod on the
-        // config shard which returns mongod hello responses (i.e. do not have "isdbgrid").
-        return;
-    }
     let x = globalThis.db._helloOrLegacyHello();
     if (x.msg != "isdbgrid") {
         throw Error("not connected to a mongos");

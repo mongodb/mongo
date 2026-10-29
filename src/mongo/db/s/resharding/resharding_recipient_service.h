@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
@@ -55,6 +28,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/otel/telemetry_context.h"
 #include "mongo/otel/traces/span/span.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
@@ -68,6 +42,7 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string_view>
@@ -79,46 +54,47 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-class MONGO_MOD_PUBLIC ReshardingRecipientService : public repl::PrimaryOnlyService {
+class [[MONGO_MOD_PUBLIC]] ReshardingRecipientService : public repl::PrimaryOnlyService {
 public:
-    static constexpr std::string_view kServiceName = "ReshardingRecipientService"_sd;
+    static constexpr std::string_view kServiceName = "ReshardingRecipientService"sv;
 
     explicit ReshardingRecipientService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingRecipientService() override = default;
 
-    class MONGO_MOD_PRIVATE RecipientStateMachine;
+    class [[MONGO_MOD_PRIVATE]] RecipientStateMachine;
 
-    class MONGO_MOD_PRIVATE RecipientStateMachineExternalState;
+    class [[MONGO_MOD_PRIVATE]] RecipientStateMachineExternalState;
 
-    MONGO_MOD_PRIVATE std::string_view getServiceName() const override {
+    [[MONGO_MOD_PRIVATE]] std::string_view getServiceName() const override {
         return kServiceName;
     }
 
-    MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override {
+    [[MONGO_MOD_PRIVATE]] NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kRecipientReshardingOperationsNamespace;
     }
 
-    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
+    [[MONGO_MOD_PRIVATE]] ThreadPoolLimits getThreadPoolLimits() const override;
 
     // The service implemented its own conflict check before this method was added.
-    MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
+    [[MONGO_MOD_PRIVATE]] void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
         const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) override {
     };
 
-    MONGO_MOD_PRIVATE std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
+    [[MONGO_MOD_PRIVATE]] std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override;
 
-    MONGO_MOD_PRIVATE inline std::vector<std::shared_ptr<PrimaryOnlyService::Instance>>
+    [[MONGO_MOD_PRIVATE]] inline std::vector<std::shared_ptr<PrimaryOnlyService::Instance>>
     getAllReshardingInstances(OperationContext* opCtx) {
         return getAllInstances(opCtx);
     }
 
-    MONGO_MOD_PRIVATE void stepDown_forTest();
-    MONGO_MOD_PRIVATE void stepUp_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepDown_forTest();
+    [[MONGO_MOD_PRIVATE]] void stepUp_forTest();
 
 private:
     ServiceContext* _serviceContext;
@@ -139,7 +115,7 @@ public:
         std::unique_ptr<RecipientStateMachineExternalState> externalState,
         ServiceContext* serviceContext);
 
-    ~RecipientStateMachine() override = default;
+    ~RecipientStateMachine() override;
 
     /**
      *  Runs up until the recipient is in state kStrictConsistency or encountered an error.
@@ -520,6 +496,8 @@ private:
 
     // It states whether or not the user has aborted the resharding operation.
     boost::optional<bool> _userCanceled;
+
+    Atomic<long long> _lastWriteBlockWarningAt{std::numeric_limits<long long>::min()};
 
     ReshardingRecipientPromises _promises;
 

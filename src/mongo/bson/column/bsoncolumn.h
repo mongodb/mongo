@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -80,7 +54,7 @@ namespace mongo {
  * Thread safety: The BSONColumn class is generally NOT thread-safe, unless declared otherwise. This
  * also applies to functions declared 'const'.
  */
-class MONGO_MOD_PUBLIC BSONColumn {
+class [[MONGO_MOD_PUBLIC]] BSONColumn {
 public:
     BSONColumn(const char* buffer, size_t size);
     explicit BSONColumn(BSONElement bin);
@@ -174,13 +148,13 @@ public:
          * actual binary to allow interleaving where control bytes corresponds to separate decoding
          * states.
          */
-        struct MONGO_MOD_PRIVATE DecodingState {
+        struct [[MONGO_MOD_PRIVATE]] DecodingState {
             DecodingState();
 
             /**
              * Internal decoding state for types using 64bit arithmetic
              */
-            struct MONGO_MOD_PRIVATE Decoder64 {
+            struct [[MONGO_MOD_PRIVATE]] Decoder64 {
                 Decoder64();
 
                 BSONElement materialize(BSONElementStorage& allocator,
@@ -190,14 +164,17 @@ public:
                 Simple8b<uint64_t>::Iterator pos;
                 int64_t lastEncodedValue = 0;
                 int64_t lastEncodedValueForDeltaOfDelta = 0;
-                uint8_t scaleIndex;
+                // Only meaningful for doubles, set when loading a Simple-8b control byte. Left
+                // invalid until then so that an accidental read is caught rather than indexing
+                // out of bounds in Simple8bTypeUtil::decodeDouble().
+                uint8_t scaleIndex = bsoncolumn::kInvalidScaleIndex;
                 bool deltaOfDelta = false;
             };
 
             /**
              * Internal decoding state for types using 128bit arithmetic
              */
-            struct MONGO_MOD_PRIVATE Decoder128 {
+            struct [[MONGO_MOD_PRIVATE]] Decoder128 {
                 BSONElement materialize(BSONElementStorage& allocator,
                                         BSONElement last,
                                         std::string_view fieldName) const;
@@ -207,7 +184,7 @@ public:
                 int128_t lastEncodedValue = 0;
             };
 
-            struct MONGO_MOD_PRIVATE LoadControlResult {
+            struct [[MONGO_MOD_PRIVATE]] LoadControlResult {
                 BSONElement element;
                 int size;
             };
@@ -232,14 +209,14 @@ public:
         /**
          * Internal state for regular decoding mode (decoding of scalars)
          */
-        struct MONGO_MOD_FILE_PRIVATE Regular {
+        struct [[MONGO_MOD_FILE_PRIVATE]] Regular {
             DecodingState state;
         };
 
         /**
          * Internal state for interleaved decoding mode (decoding of objects/arrays)
          */
-        struct MONGO_MOD_FILE_PRIVATE Interleaved {
+        struct [[MONGO_MOD_FILE_PRIVATE]] Interleaved {
             Interleaved(BSONObj refObj, BSONType referenceObjType, bool interleavedArrays);
 
             std::vector<DecodingState> states;
@@ -372,7 +349,7 @@ namespace bsoncolumn {
  */
 template <class CMaterializer, class Container>
 requires Materializer<CMaterializer>
-class MONGO_MOD_PUBLIC Collector {
+class [[MONGO_MOD_PUBLIC]] Collector {
     using Element = typename CMaterializer::Element;
 
 public:
@@ -488,7 +465,7 @@ private:
     Element _last = CMaterializer::materializeMissing(*_allocator);
 };
 
-class MONGO_MOD_PUBLIC BSONColumnBlockBased {
+class [[MONGO_MOD_PUBLIC]] BSONColumnBlockBased {
 
 public:
     BSONColumnBlockBased(const char* buffer, size_t size);

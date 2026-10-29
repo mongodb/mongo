@@ -1,37 +1,10 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -128,6 +101,7 @@ class PartitionIterator;
 
 
 namespace mongo::window_function {
+using namespace std::literals::string_view_literals;
 
 /**
  * A window-function expression describes how to compute a single output value in a
@@ -147,7 +121,7 @@ namespace mongo::window_function {
  */
 class Expression : public RefCountable {
 public:
-    static constexpr std::string_view kWindowArg = "window"_sd;
+    static constexpr std::string_view kWindowArg = "window"sv;
     /**
      * Parses a single window-function expression. One of the BSONObj's keys is the function
      * name, and the other (optional) key is 'window': for example, the whole BSONObj might be
@@ -309,9 +283,7 @@ public:
                               std::string accumulatorName,
                               boost::intrusive_ptr<::mongo::Expression> input,
                               WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 };
 
 /**
@@ -433,30 +405,6 @@ public:
 template <typename RankType>
 class ExpressionFromRankAccumulator : public Expression {
 public:
-    static auto createLegacyRankWF(ExpressionContext* expCtx,
-                                   std::string_view accumulatorName,
-                                   const SortPattern& sortBy,
-                                   WindowBounds bounds) {
-        auto sortPatternPart = sortBy[0];
-        if (sortPatternPart.fieldPath) {
-            auto sortExpression = ExpressionFieldPath::createPathFromString(
-                expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx,
-                std::string{accumulatorName},
-                std::move(sortExpression),
-                sortPatternPart.isAscending,
-                std::move(bounds));
-        } else {
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx,
-                std::string{accumulatorName},
-                sortPatternPart.expression,
-                sortPatternPart.isAscending,
-                std::move(bounds));
-        }
-    }
-
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
@@ -486,24 +434,9 @@ public:
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
 
-        // Use the new $rank implementation that depends on sort key metadata if
-        // 1) we are the context of a $rankFusion query, or
-        // 2) the feature flag is enabled
-        // #1 is because $rankFusion was backported to 8.0, and we don't want $rankFusion queries to
-        // fail during an FCV-gated upgrade.
-        // #2 is because we still need to preserve FCV-gating for generic $setWindowFields queries
-        // in order to avoid failures during upgrade (this $setWindowFields feature is *only*
-        // enabled for $rankFusion on 8.0, so it is new behavior on this version).
-        // TODO SERVER-85426 Always use the new $rank implementation.
-        if (expCtx->isHybridSearch() || expCtx->isBasicRankFusionFeatureFlagEnabled()) {
-            // The 'modern' way to do $rank is to just use the sort key. But we only support this on
-            // newer versions, since we need to make sure that the $sort stage is giving us the sort
-            // key.
-            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx, std::string{*accumulatorName}, std::move(bounds));
-        }
-        // TODO SERVER-85426 This whole branch/helper can be deleted.
-        return createLegacyRankWF(expCtx, *accumulatorName, *sortBy, std::move(bounds));
+        // The 'modern' way to do $rank is to just use the sort key.
+        return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
+            expCtx, std::string{*accumulatorName}, std::move(bounds));
     }
 
     ExpressionFromRankAccumulator(ExpressionContext* expCtx,
@@ -550,10 +483,10 @@ private:
 
 class ExpressionExpMovingAvg : public Expression {
 public:
-    static constexpr std::string_view kAccName = "$expMovingAvg"_sd;
-    static constexpr std::string_view kInputArg = "input"_sd;
-    static constexpr std::string_view kNArg = "N"_sd;
-    static constexpr std::string_view kAlphaArg = "alpha"_sd;
+    static constexpr std::string_view kAccName = "$expMovingAvg"sv;
+    static constexpr std::string_view kInputArg = "input"sv;
+    static constexpr std::string_view kNArg = "N"sv;
+    static constexpr std::string_view kAlphaArg = "alpha"sv;
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx);
@@ -621,8 +554,8 @@ protected:
 
 class ExpressionWithUnit : public Expression {
 public:
-    static constexpr std::string_view kArgInput = "input"_sd;
-    static constexpr std::string_view kArgUnit = "unit"_sd;
+    static constexpr std::string_view kArgInput = "input"sv;
+    static constexpr std::string_view kArgUnit = "unit"sv;
 
     ExpressionWithUnit(ExpressionContext* expCtx,
                        std::string accumulatorName,
@@ -706,7 +639,7 @@ protected:
 
 class ExpressionDerivative : public ExpressionWithUnit {
 public:
-    static constexpr std::string_view kName = "$derivative"_sd;
+    static constexpr std::string_view kName = "$derivative"sv;
     ExpressionDerivative(ExpressionContext* expCtx,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds,
@@ -731,7 +664,7 @@ public:
             auto argName = arg.fieldNameStringData();
             if (argName == kWindowArg) {
                 bounds = WindowBounds::parse(arg, sortBy, expCtx);
-            } else if (argName == "$derivative"_sd) {
+            } else if (argName == "$derivative"sv) {
                 derivativeArgs = arg;
             } else {
                 uasserted(ErrorCodes::FailedToParse,
@@ -810,7 +743,7 @@ public:
                         "There can be only one 'window' field for $integral",
                         bounds == boost::none);
                 bounds = WindowBounds::parse(arg, sortBy, expCtx);
-            } else if (argName == "$integral"_sd) {
+            } else if (argName == "$integral"sv) {
                 integralArgs = arg;
             } else {
                 uasserted(ErrorCodes::FailedToParse,
@@ -857,7 +790,7 @@ public:
 
 class ExpressionLinearFill : public Expression {
 public:
-    static constexpr std::string_view kName = "$linearFill"_sd;
+    static constexpr std::string_view kName = "$linearFill"sv;
     ExpressionLinearFill(ExpressionContext* expCtx,
                          std::string accumulatorName,
                          boost::intrusive_ptr<::mongo::Expression> input,
@@ -900,6 +833,9 @@ public:
                               << " must be specified with a top level sortBy expression with "
                                  "exactly one element",
                 sortBy && sortBy->isSingleElementKey());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << accumulatorName << " requires a non-expression sortBy",
+                !sortBy->begin()->expression);
 
         return make_intrusive<ExpressionLinearFill>(
             expCtx, std::string{*accumulatorName}, std::move(input), std::move(bounds));
@@ -986,10 +922,10 @@ public:
 
 class ExpressionMinMaxScaler : public Expression {
 public:
-    static constexpr std::string_view kWindowFnName = "$minMaxScaler"_sd;
-    static constexpr std::string_view kInputArg = "input"_sd;
-    static constexpr std::string_view kMinArg = "min"_sd;
-    static constexpr std::string_view kMaxArg = "max"_sd;
+    static constexpr std::string_view kWindowFnName = "$minMaxScaler"sv;
+    static constexpr std::string_view kInputArg = "input"sv;
+    static constexpr std::string_view kMinArg = "min"sv;
+    static constexpr std::string_view kMaxArg = "max"sv;
 
     ExpressionMinMaxScaler(ExpressionContext* expCtx,
                            boost::intrusive_ptr<::mongo::Expression> input,
@@ -1124,9 +1060,7 @@ public:
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _ps(std::move(ps)),
           _method(method),
-          _intializeExpr(std::move(initializeExpr)) {
-        expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
-    }
+          _intializeExpr(std::move(initializeExpr)) {}
 
     Value serialize(const query_shape::SerializationOptions& opts) const final;
 

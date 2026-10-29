@@ -155,9 +155,9 @@ export function getMatchPredicateSpec({
  * and $not.
  * $or, $nor, $in and $nin are only allowed if `allowOrTypes` is true.
  */
-export function getMatchArb(allowOrTypes = true) {
+export function getMatchArb(allowOrTypes = true, {leafArb = leafParameterArb} = {}) {
     const predicateArb = getMatchPredicateSpec({
-        leafArb: leafParameterArb,
+        leafArb,
         allowOrs: allowOrTypes,
         allowNors: allowOrTypes,
         allowIn: allowOrTypes,

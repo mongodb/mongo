@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/record_id_range.h"
 
@@ -53,7 +27,7 @@ void testRange(auto getBoundOptional,
     };
 
     // narrow from unset
-    maybeNarrowBound(BSON("value" << initialValue), true /* inclusive */);
+    maybeNarrowBound(BSON("value" << initialValue), /*inclusive=*/true);
     ASSERT_TRUE(getBoundOptional());
     assertValueEq(initialValue);
     ASSERT_TRUE(checkInclusivity());
@@ -65,13 +39,13 @@ void testRange(auto getBoundOptional,
     ASSERT_FALSE(checkInclusivity());
 
     // cannot widen by re-adding inclusivity
-    maybeNarrowBound(BSON("value" << initialValue), true /* inclusive */);
+    maybeNarrowBound(BSON("value" << initialValue), /*inclusive=*/true);
     ASSERT_TRUE(getBoundOptional());
     assertValueEq(initialValue);
     ASSERT_FALSE(checkInclusivity());
 
     // cannot widen by setting a wider bound
-    maybeNarrowBound(BSON("value" << widerValue), true /* inclusive */);
+    maybeNarrowBound(BSON("value" << widerValue), /*inclusive=*/true);
     ASSERT_TRUE(getBoundOptional());
     assertValueEq(initialValue);
     ASSERT_FALSE(checkInclusivity());
@@ -195,6 +169,74 @@ TEST(RecordIdRangeTest, Compare_MaxOnlyRange) {
     ASSERT_EQ(r.compare(RecordId(4)), 0);
     ASSERT_EQ(r.compare(RecordId(5)), 1);  // at excluded max
     ASSERT_EQ(r.compare(RecordId(6)), 1);
+}
+
+// ---------------------------------------------------------------------------
+// RecordIdRange::operator==
+// ---------------------------------------------------------------------------
+
+TEST(RecordIdRangeTest, EqualityOp_BothUnbounded) {
+    RecordIdRange a, b;
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_SelfComparison) {
+    auto r = makeRange(1, true, 5, false);
+    ASSERT_TRUE(r == r);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_IdenticalBounds) {
+    auto a = makeRange(3, true, 7, false);
+    auto b = makeRange(3, true, 7, false);
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_MinOnlyEqual) {
+    auto a = makeRangeMinOnly(4, true);
+    auto b = makeRangeMinOnly(4, true);
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_MaxOnlyEqual) {
+    auto a = makeRangeMaxOnly(9, false);
+    auto b = makeRangeMaxOnly(9, false);
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMinValue) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(4, true, 7, true);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMaxValue) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(3, true, 8, true);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMinInclusivity) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(3, false, 7, true);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMaxInclusivity) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(3, true, 7, false);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_BoundedVsUnbounded) {
+    auto a = makeRange(3, true, 7, true);
+    RecordIdRange b;
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_MinOnlyVsMaxOnly) {
+    auto a = makeRangeMinOnly(5, true);
+    auto b = makeRangeMaxOnly(5, true);
+    ASSERT_FALSE(a == b);
 }
 
 }  // namespace

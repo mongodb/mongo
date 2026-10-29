@@ -104,14 +104,18 @@ typedef struct demo_file_handle {
 /*
  * Extension initialization function.
  */
-#ifdef _WIN32
+
 /*
- * Explicitly export this function so it is visible when loading extensions.
+ * On Windows, explicitly export this function so it is visible when loading extensions.
  */
-__declspec(dllexport)
+#ifdef _WIN32
+#define EX_EXPORT __declspec(dllexport)
+#else
+#define EX_EXPORT
 #endif
-int
-demo_file_system_create(WT_CONNECTION *, WT_CONFIG_ARG *);
+
+EX_EXPORT
+int demo_file_system_create(WT_CONNECTION *, WT_CONFIG_ARG *);
 
 /*
  * Forward function declarations for file system API implementation

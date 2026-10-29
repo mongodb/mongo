@@ -36,7 +36,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "auth",
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
     ],
     deps = [
@@ -55,7 +55,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
@@ -74,6 +74,7 @@ resmoke_suite_test(
         "//jstests/libs:key1",
         "//jstests/libs:test_pem_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:proxy_protocol_server",
         "//jstests/ssl:tls_enumerator",
         "//jstests/ssl/libs",
         "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:all_subpackage_javascript_files",
@@ -81,7 +82,7 @@ resmoke_suite_test(
     ],
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "incompatible_with_bazel_remote_test",  # jstests/ssl/ssl_x509_SAN.js requires IPv6, which is disabled on remote executors.
         "patch_build",
@@ -102,9 +103,9 @@ resmoke_suite_test(
         "//jstests/ssl/libs",
         "//x509:generate_main_certificates",
     ],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
@@ -122,10 +123,10 @@ resmoke_suite_test(
     data = CORE_DATA + [
         "//jstests/libs:authTestsKey",
     ],
-    shard_count = 4,
+    shard_count = 6,
     tags = [
         "auth",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
     ],
@@ -145,13 +146,16 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/ocsp.yml",
     data = [
         "//jstests/ocsp/lib:all_javascript_files",
+        "//jstests/ocsp/lib:malformed_staple_server",
         "//jstests/ocsp/lib:ocsp_mock",
         "//jstests/ssl/libs",
         "//x509:generate_main_certificates",
     ],
+    shard_count = 2,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
+        "incompatible_oscrypto",
         "ocsp",
         "patch_build",
         "ssl",
@@ -172,11 +176,15 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
     ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",
@@ -193,7 +201,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
@@ -209,7 +217,7 @@ resmoke_suite_test(
     name = "fle",
     config = "//buildscripts/resmokeconfig:suites/fle.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -228,7 +236,7 @@ resmoke_suite_test(
     name = "fle2",
     config = "//buildscripts/resmokeconfig:suites/fle2.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -246,7 +254,7 @@ resmoke_suite_test(
     name = "fle2_high_cardinality",
     config = "//buildscripts/resmokeconfig:suites/fle2_high_cardinality.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
     ],
     target_compatible_with = select({
@@ -263,7 +271,7 @@ resmoke_suite_test(
     name = "fle2_query_analysis",
     config = "//buildscripts/resmokeconfig:suites/fle2_query_analysis.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -281,9 +289,9 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "fle2_sharding",
     config = "//buildscripts/resmokeconfig:suites/fle2_sharding.yml",
-    shard_count = 4,
+    shard_count = 2,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -301,9 +309,9 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "fle2_sharding_high_cardinality",
     config = "//buildscripts/resmokeconfig:suites/fle2_sharding_high_cardinality.yml",
-    shard_count = 4,
+    shard_count = 2,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
     ],
     target_compatible_with = select({
@@ -318,10 +326,97 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "aggregation_ese",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_ese.yml",
+    shard_count = 3,
+    tags = [
+        "aggregation",
+        "ci-all-variants",
+        "encrypt",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_ese_gcm",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_ese_gcm.yml",
+    shard_count = 3,
+    tags = [
+        "aggregation",
+        "ci-all-variants",
+        "encrypt",
+        "gcm",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_ese",
+    config = "//buildscripts/resmokeconfig:suites/core_ese.yml",
+    shard_count = 6,
+    tags = [
+        "ci-all-variants",
+        "encrypt",
+        "jscore",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml",
+    shard_count = 7,
+    tags = [
+        "ci-all-variants",
+        "encrypt",
+        "gcm",
+        "jscore",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "sasl",
     config = "//buildscripts/resmokeconfig:suites/sasl.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "patch_build",
         "sasl",
     ],
@@ -331,6 +426,217 @@ resmoke_suite_test(
     }),
     deps = [
         "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "audit",
+    config = "//buildscripts/resmokeconfig:suites/audit.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_encrypt",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_manage_key",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:sts_http_server",
+    ],
+    shard_count = 20,
+    tags = [
+        "audit",
+        "ci-all-variants",
+        "incompatible_with_bazel_remote_test",  #log_rotate_command_errors.js fails, "cannot find name for user ID 108" since remote executors do not have a username set.
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/audit:mongoauditdecrypt",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "auth_audit",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:suites/auth_audit.yml",
+    data = [
+        "//jstests/sharding/libs:proxy_protocol_server",
+    ],
+    shard_count = 6,
+    tags = [
+        "audit",
+        "auth",
+        "ci-all-variants",
+        "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ese",
+    config = "//buildscripts/resmokeconfig:suites/ese.yml",
+    data = [
+        "//jstests/ssl/libs",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_encrypt",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_manage_key",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb:kmip_server",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:badekf",
+        "//x509:generate_main_certificates",
+    ],
+    tags = [
+        "ci-all-variants",
+        "encrypt",
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/encryptdb:mongodecrypt",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "external_auth",
+    config = "//buildscripts/resmokeconfig:suites/external_auth.yml",
+    data = [
+        "//jstests/ocsp/lib:ocsp_mock",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:sts_http_server",
+    ],
+    resmoke_args = ["--excludeWithAnyTags=requires_domain_controller"],
+    shard_count = 4,
+    tags = [
+        "ci-all-variants",
+        "incompatible_debian",
+        "incompatible_oscrypto",
+        "incompatible_with_bazel_remote_test",  # Connects to external AWS resources.
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "external_auth_aws",
+    config = "//buildscripts/resmokeconfig:suites/external_auth_aws.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:sts_http_server",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth_aws/lib:aws_assume_role",
+        "@external_auth_aws_setup//:aws_e2e_setup.json",
+    ],
+    shard_count = 2,
+    tags = [
+        "ci-all-variants",
+        "incompatible_with_bazel_remote_test",  # Connects to external AWS resources.
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multiversion_auth",
+    config = "//buildscripts/resmokeconfig:suites/multiversion_auth.yml",
+    multiversion_deps = [
+        "//bazel/resmoke/multiversion:last-continuous",
+        "//bazel/resmoke/multiversion:last-lts",
+    ],
+    shard_count = 9,
+    tags = [
+        "auth",
+        "ci-default",
+        "future_git_tag_incompatible",
+        "multiversion",
+        "no_multiversion_generate_tasks",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_auth_audit",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_auth_audit.yml",
+    shard_count = 50,
+    tags = [
+        "audit",
+        "auth",
+        "ci-all-variants",
+        "incompatible_debug_mode",
+        "non_live_record",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_auth",
+    config = "//buildscripts/resmokeconfig:suites/sharding_auth.yml",
+    shard_count = 50,
+    tags = [
+        "ci-all-variants",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
     ],
 )

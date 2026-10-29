@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #pragma once
@@ -51,55 +25,55 @@ namespace mongo::auth {
 
 // Checks if this connection has the privileges necessary to perform a find operation
 // on the supplied namespace identifier.
-MONGO_MOD_PUBLIC Status checkAuthForFind(AuthorizationSession* authSession,
-                                         const NamespaceString& ns,
-                                         bool hasTerm);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForFind(AuthorizationSession* authSession,
+                                             const NamespaceString& ns,
+                                             bool hasTerm);
 
 // Checks if this connection has the privileges necessary to perform a getMore operation on
 // the identified cursor, supposing that cursor is associated with the supplied namespace
 // identifier.
-MONGO_MOD_PUBLIC Status checkAuthForGetMore(AuthorizationSession* authSession,
-                                            const NamespaceString& ns,
-                                            long long cursorID,
-                                            bool hasTerm);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForGetMore(AuthorizationSession* authSession,
+                                                const NamespaceString& ns,
+                                                long long cursorID,
+                                                bool hasTerm);
 
 // Checks if this connection has the privileges necessary to perform the given update on the
 // given namespace.
-MONGO_MOD_PUBLIC Status checkAuthForUpdate(AuthorizationSession* authSession,
-                                           OperationContext* opCtx,
-                                           const NamespaceString& ns,
-                                           const BSONObj& query,
-                                           const write_ops::UpdateModification& update,
-                                           bool upsert);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForUpdate(AuthorizationSession* authSession,
+                                               OperationContext* opCtx,
+                                               const NamespaceString& ns,
+                                               const BSONObj& query,
+                                               const write_ops::UpdateModification& update,
+                                               bool upsert);
 
 // Checks if this connection has the privileges necessary to insert to the given namespace.
-MONGO_MOD_PUBLIC Status checkAuthForInsert(AuthorizationSession* authSession,
-                                           OperationContext* opCtx,
-                                           const NamespaceString& ns);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForInsert(AuthorizationSession* authSession,
+                                               OperationContext* opCtx,
+                                               const NamespaceString& ns);
 
 // Checks if this connection has the privileges necessary to perform a delete on the given
 // namespace.
-MONGO_MOD_PUBLIC Status checkAuthForDelete(AuthorizationSession* authSession,
-                                           OperationContext* opCtx,
-                                           const NamespaceString& ns,
-                                           const BSONObj& query);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForDelete(AuthorizationSession* authSession,
+                                               OperationContext* opCtx,
+                                               const NamespaceString& ns,
+                                               const BSONObj& query);
 
 // Checks if this connection has the privileges necessary to perform a killCursor on
 // the identified cursor, supposing that cursor is associated with the supplied namespace
 // identifier.
-MONGO_MOD_PUBLIC Status checkAuthForKillCursors(AuthorizationSession* authSession,
-                                                const NamespaceString& cursorNss,
-                                                const boost::optional<UserName>& cursorOwner);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForKillCursors(AuthorizationSession* authSession,
+                                                    const NamespaceString& cursorNss,
+                                                    const boost::optional<UserName>& cursorOwner);
 
 // Checks if this connection has the privileges necessary to perform a releaseMemory on
 // the identified cursor, supposing that cursor is associated with the supplied namespace
 // identifier.
-MONGO_MOD_PUBLIC Status checkAuthForReleaseMemory(AuthorizationSession* authSession,
-                                                  const NamespaceString& cursorNss);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForReleaseMemory(AuthorizationSession* authSession,
+                                                      const NamespaceString& cursorNss);
 
 // Attempts to get the privileges necessary to run the aggregation pipeline specified in
 // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.
-MONGO_MOD_PUBLIC StatusWith<PrivilegeVector> getPrivilegesForAggregate(
+[[MONGO_MOD_PUBLIC]] StatusWith<PrivilegeVector> getPrivilegesForAggregate(
     OperationContext* opCtx,
     AuthorizationSession* authSession,
     const NamespaceString& ns,
@@ -108,18 +82,18 @@ MONGO_MOD_PUBLIC StatusWith<PrivilegeVector> getPrivilegesForAggregate(
 
 // Checks if this connection has the privileges necessary to create 'ns' with the options
 // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-MONGO_MOD_PUBLIC Status checkAuthForCreate(OperationContext* opCtx,
-                                           AuthorizationSession* authSession,
-                                           const CreateCommand& cmd,
-                                           bool isMongos);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForCreate(OperationContext* opCtx,
+                                               AuthorizationSession* authSession,
+                                               const CreateCommand& cmd,
+                                               bool isMongos);
 
 // Checks if this connection has the privileges necessary to modify 'ns' with the options
 // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-MONGO_MOD_PUBLIC Status checkAuthForCollMod(OperationContext* opCtx,
-                                            AuthorizationSession* authSession,
-                                            const NamespaceString& ns,
-                                            const BSONObj& cmdObj,
-                                            bool isMongos,
-                                            const SerializationContext& serializationContext);
+[[MONGO_MOD_PUBLIC]] Status checkAuthForCollMod(OperationContext* opCtx,
+                                                AuthorizationSession* authSession,
+                                                const NamespaceString& ns,
+                                                const BSONObj& cmdObj,
+                                                bool isMongos,
+                                                const SerializationContext& serializationContext);
 
 }  // namespace mongo::auth

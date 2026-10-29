@@ -1,5 +1,6 @@
 import argparse
 import concurrent.futures
+import errno
 import hashlib
 import heapq
 import json
@@ -13,8 +14,28 @@ import sys
 import tempfile
 from typing import Any, Iterator
 
+from bazel.wrapper_hook.compiledb_windows import (
+    _rewrite_output_paths_to_writable_dir,
+    is_wrapped_command,
+    validation_command,
+)
+
 STANDARD_COMPILE_COMMAND_KEYS = frozenset({"arguments", "command", "directory", "file", "output"})
 COMPILEDB_GENERATION_TARGETS = ["compiledb", "install-wiredtiger"]
+CONTAINER_SHARED_INSTALL_ENV = "MONGO_BAZEL_SHARED_INSTALL_DIR"
+CONTAINER_SHARED_INSTALL_SUFFIX = "-mongo-shared-install"
+
+
+def _compiler_diagnostics(output: str, limit: int = 8000) -> str:
+    """Returns the tail of a compiler's output without its /showIncludes dependency notes.
+
+    A single compile can list thousands of headers; without this filter the notes push the
+    actual diagnostic out of the bounded excerpt written to the task log.
+    """
+    lines = [line for line in output.splitlines() if not line.startswith("Note: including file:")]
+    return "\n".join(lines)[-limit:]
+
+
 MONGO_TIDY_PLUGIN_CANDIDATES = frozenset(
     [
         "libmongo_tidy_checks.so",
@@ -37,6 +58,95 @@ def _get_workspace_dir() -> str:
         "This script must be run through bazel. "
         "Please run 'bazel run //evergreen:validate_compile_commands' instead."
     )
+
+
+def _probe_writable_output_dir(path: str) -> str | None:
+    """Return ``path`` when it can be created and written, otherwise ``None``."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        probe_fd, probe_path = tempfile.mkstemp(
+            prefix=".validate_compile_commands_probe-", dir=path
+        )
+        os.close(probe_fd)
+        os.unlink(probe_path)
+    except OSError as exc:
+        if exc.errno not in (errno.EACCES, errno.EROFS):
+            raise
+        return None
+    return path
+
+
+def _compiledb_shared_install_dir(compdb_path: str) -> str | None:
+    """Infer the writable persistent-container mount from a compile database entry.
+
+    Compiler commands contain output paths below Bazel's ``<output base>/execroot``.
+    The Linux persistent-container strategy mounts the sibling
+    ``<output base>-mongo-shared-install`` read-write in the compiler container, while
+    the source tree and ordinary output base are read-only. Using that sibling for
+    validation outputs keeps the host-side replay and the container-side compiler in
+    the same filesystem view.
+    """
+    try:
+        entries = _iter_compiledb_entries(compdb_path)
+        for entry in entries:
+            output = entry.get("output")
+            if not isinstance(output, str):
+                continue
+            normalized = output.replace("\\", "/")
+            marker = "/execroot/"
+            if marker not in normalized:
+                continue
+            output_base = normalized.split(marker, 1)[0]
+            if not output_base:
+                continue
+            return output_base + CONTAINER_SHARED_INSTALL_SUFFIX
+    except (OSError, ValueError, TypeError):
+        return None
+    return None
+
+
+def _validation_output_dir(workspace_dir: str, compdb_path: str | None = None) -> str:
+    """Return a writable directory for temporary compiler outputs.
+
+    The source workspace can be mounted read-only by hermetic build containers. Keep the
+    historical workspace-local directory when it is writable, but fall back to the process
+    temporary directory when the mount rejects writes.
+    """
+    configured_dir = os.environ.get("VALIDATE_COMPILE_COMMANDS_OUT_DIR")
+    if configured_dir is not None:
+        os.makedirs(configured_dir, exist_ok=True)
+        return configured_dir
+
+    # When the validator itself is running in a persistent action container, the
+    # wrapper publishes this read-write mount explicitly. Prefer it over the source
+    # workspace so compilers launched from the validator see the same writable path.
+    shared_install_dir = os.environ.get(CONTAINER_SHARED_INSTALL_ENV)
+    if shared_install_dir:
+        writable = _probe_writable_output_dir(
+            os.path.join(shared_install_dir, "validate_compile_commands_out")
+        )
+        if writable is not None:
+            return writable
+
+    # ``bazel run`` executes the validator on the host, while each replayed compiler
+    # command is routed through the persistent container. In that mode the container
+    # environment is not inherited by the validator, so infer the shared mount from
+    # the output paths recorded in compile_commands.json.
+    if compdb_path is not None:
+        inferred_shared_install_dir = _compiledb_shared_install_dir(compdb_path)
+        if inferred_shared_install_dir:
+            writable = _probe_writable_output_dir(
+                os.path.join(inferred_shared_install_dir, "validate_compile_commands_out")
+            )
+            if writable is not None:
+                return writable
+
+    workspace_output_dir = os.path.join(workspace_dir, ".validate_compile_commands_out")
+    writable = _probe_writable_output_dir(workspace_output_dir)
+    if writable is not None:
+        return writable
+
+    return tempfile.mkdtemp(prefix="validate_compile_commands_out-")
 
 
 def _ensure_compiledb_exists(compdb_path: str) -> None:
@@ -470,188 +580,6 @@ def _make_test_compile_args(args: list[str]) -> list[str]:
     return list(args)
 
 
-def _map_writable_output_path(out_root: str, original_path: str) -> str:
-    """Map an output path from compile_commands.json into a writable tree under out_root.
-
-    Must be robust on Windows where absolute paths include a drive prefix like `C:\\...`
-    (we cannot embed `:` as a path component under out_root).
-    """
-
-    def _sanitize_component(comp: str) -> str:
-        # Windows-invalid characters: <>:"/\|?* (also avoid path separators).
-        trans = str.maketrans({c: "_" for c in '<>:"/\\|?*'})
-        comp = comp.translate(trans)
-        # Windows: components cannot end with '.' or ' '.
-        comp = comp.rstrip(". ")
-        if comp in ("", ".", ".."):
-            return "_"
-        return comp
-
-    if platform.system() == "Windows":
-        drive, _ = os.path.splitdrive(original_path)
-        drive_tag = drive.rstrip(":")
-        drive_tag = drive_tag.lstrip("\\/").replace("\\", "_").replace("/", "_")
-        drive_tag = _sanitize_component(drive_tag) if drive_tag else "PATH"
-
-        normalized = os.path.normcase(os.path.normpath(original_path))
-        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
-        basename = _sanitize_component(os.path.basename(original_path)) or "out"
-        stem, ext = os.path.splitext(basename)
-        if len(stem) > 48:
-            stem = stem[:48]
-        short_name = f"{stem}-{digest}{ext}"
-
-        return os.path.normpath(os.path.join(out_root, "win", drive_tag, short_name))
-
-    drive, tail = os.path.splitdrive(original_path)
-    parts: list[str] = []
-
-    if drive:
-        # Drive may be "C:" or a UNC prefix like "\\\\server\\share".
-        drive_tag = drive.rstrip(":")
-        drive_tag = drive_tag.lstrip("\\/").replace("\\", "_").replace("/", "_")
-        drive_tag = _sanitize_component(drive_tag) if drive_tag else "DRIVE"
-        parts.append(drive_tag)
-        tail = tail.lstrip("\\/")
-    else:
-        tail = original_path.lstrip("\\/") if os.path.isabs(original_path) else original_path
-
-    tail = tail.replace("\\", "/")
-    for p in tail.split("/"):
-        if p:
-            parts.append(_sanitize_component(p))
-
-    if not parts:
-        parts = ["out"]
-
-    return os.path.normpath(os.path.join(out_root, *parts))
-
-
-def _rewrite_output_paths_to_writable_dir(
-    args: list[str], cwd: str, out_root: str, entry_output: str | None = None
-) -> list[str]:
-    """Rewrite output-producing args (-o, -MF, /Fo, etc.) into a writable directory."""
-    if not args:
-        return args
-
-    rewritten = list(args)
-
-    def _norm_abs(p: str) -> str:
-        # Normalize both Windows and POSIX-ish paths from compile_commands.json.
-        abs_p = p if os.path.isabs(p) else os.path.join(cwd, p)
-        return os.path.normcase(os.path.normpath(abs_p))
-
-    # Collect all plausible output paths (compile_commands "output" can differ from actual /Fo).
-    orig_outs: list[str] = []
-    if isinstance(entry_output, str) and entry_output:
-        orig_outs.append(entry_output)
-
-    i = 0
-    while i < len(rewritten):
-        a = rewritten[i]
-        if a == "-o" and i + 1 < len(rewritten):
-            orig_outs.append(rewritten[i + 1])
-            i += 2
-            continue
-        if a.startswith("-o") and len(a) > 2:
-            orig_outs.append(a[2:])
-        if a == "/Fo" and i + 1 < len(rewritten):
-            orig_outs.append(rewritten[i + 1])
-            i += 2
-            continue
-        if a.startswith("/Fo") and len(a) > 3:
-            orig_outs.append(a[3:])
-        i += 1
-
-    # Build mapping by normalized absolute path to destination.
-    out_map: dict[str, str] = {}
-    dep_map: dict[str, str] = {}
-    for o in orig_outs:
-        if not o:
-            continue
-        o_abs = _norm_abs(o)
-        if o_abs in out_map:
-            continue
-        dest_out = _map_writable_output_path(out_root, o_abs)
-        # Ensure the output directory exists.
-        os.makedirs(os.path.dirname(dest_out), exist_ok=True)
-        out_map[o_abs] = dest_out
-
-        dep_abs = os.path.splitext(o_abs)[0] + ".d"
-        dest_dep = os.path.splitext(dest_out)[0] + ".d"
-        os.makedirs(os.path.dirname(dest_dep), exist_ok=True)
-        dep_map[dep_abs] = dest_dep
-
-    i = 0
-    while i < len(rewritten):
-        a = rewritten[i]
-
-        # Rewrite -o <path>
-        if a == "-o" and i + 1 < len(rewritten):
-            cand = _norm_abs(rewritten[i + 1])
-            if cand in out_map:
-                rewritten[i + 1] = out_map[cand]
-            i += 2
-            continue
-
-        # Rewrite combined -o<path>
-        if a.startswith("-o") and len(a) > 2:
-            cand = _norm_abs(a[2:])
-            if cand in out_map:
-                rewritten[i] = "-o" + out_map[cand]
-            i += 1
-            continue
-
-        # Rewrite depfile -MF <path> (if it matches the common "<outbase>.d" pattern).
-        if a == "-MF" and i + 1 < len(rewritten):
-            cand = _norm_abs(rewritten[i + 1])
-            if cand in dep_map:
-                rewritten[i + 1] = dep_map[cand]
-            i += 2
-            continue
-
-        # Rewrite combined -MF<path>
-        if a.startswith("-MF") and len(a) > 3:
-            cand = _norm_abs(a[3:])
-            if cand in dep_map:
-                rewritten[i] = "-MF" + dep_map[cand]
-            i += 1
-            continue
-
-        # Rewrite MSVC /Fo forms.
-        if a == "/Fo" and i + 1 < len(rewritten):
-            cand = _norm_abs(rewritten[i + 1])
-            if cand in out_map:
-                rewritten[i + 1] = out_map[cand]
-            i += 2
-            continue
-        if a.startswith("/Fo") and len(a) > 3:
-            cand = _norm_abs(a[3:])
-            if cand in out_map:
-                rewritten[i] = "/Fo" + out_map[cand]
-            i += 1
-            continue
-
-        # Generic token replacement for exact matches (helps with toolchains that also
-        # reference the output path elsewhere on the command line).
-        if (
-            ("/" in a)
-            or ("\\" in a)
-            or (":" in a)
-            or a.startswith("bazel-out")
-            or a.startswith("external")
-        ):
-            cand = _norm_abs(a)
-            if cand in out_map:
-                rewritten[i] = out_map[cand]
-            elif cand in dep_map:
-                rewritten[i] = dep_map[cand]
-
-        i += 1
-
-    return rewritten
-
-
 def _ensure_parent_dirs_exist_for_outputs(args: list[str], cwd: str, repo_root: str) -> None:
     """Create parent dirs for any output/deps paths referenced by the command.
 
@@ -760,6 +688,13 @@ def _select_entries_for_test_compile(path: str, n: int) -> tuple[int, list[dict[
     return total, selected
 
 
+def _spawn_replay_compile(
+    test_args: list[str], directory: str, compile_env: dict[str, str]
+) -> subprocess.CompletedProcess:
+    """Execute the recorded command from its recorded working directory."""
+    return subprocess.run(test_args, cwd=directory, env=compile_env, capture_output=True, text=True)
+
+
 def main() -> int:
     try:
         workspace_dir = _get_workspace_dir()
@@ -812,13 +747,10 @@ def main() -> int:
     else:
         print(f"Selected {len(selected)} compile_commands entries for validation.", flush=True)
 
-    out_root = os.environ.get(
-        "VALIDATE_COMPILE_COMMANDS_OUT_DIR",
-        os.path.join(workspace_dir, ".validate_compile_commands_out"),
-    )
-    os.makedirs(out_root, exist_ok=True)
+    out_root = None
 
     def _prep_entry(entry: dict[str, Any]) -> tuple[str, str, list[str]]:
+        nonlocal out_root
         args = entry.get("arguments")
         if args is None and isinstance(entry.get("command"), str):
             # Fallback for standard compile_commands format.
@@ -832,6 +764,14 @@ def main() -> int:
             return ("", "", [])
         if not isinstance(directory, str):
             return ("", "", [])
+        if is_wrapped_command(args):
+            return (
+                file_name,
+                directory,
+                validation_command(args, os.environ.get("VALIDATE_COMPILE_COMMANDS_OUT_DIR")),
+            )
+        if out_root is None:
+            out_root = _validation_output_dir(workspace_dir, compdb_path)
         test_args = _make_test_compile_args(args)
         if isinstance(output_path, str) and output_path:
             test_args = _rewrite_output_paths_to_writable_dir(
@@ -858,18 +798,19 @@ def main() -> int:
     max_workers = max(1, min(max_workers, len(work)))
 
     print(f"Running {len(work)} test compiles...", flush=True)
-    compile_env = _maybe_add_windows_toolchain_env(os.environ.copy(), repo_root=workspace_dir)
+    compile_env = os.environ.copy()
+    if any(not is_wrapped_command(args) for _, _, args in work):
+        compile_env = _maybe_add_windows_toolchain_env(compile_env, repo_root=workspace_dir)
 
     def _run_one(item: tuple[str, str, list[str]]) -> tuple[str, int, list[str], str, str]:
         file_name, directory, test_args = item
         _ensure_parent_dirs_exist_for_outputs(test_args, cwd=directory, repo_root=workspace_dir)
-        proc = subprocess.run(
-            test_args, cwd=directory, env=compile_env, capture_output=True, text=True
-        )
+        proc = _spawn_replay_compile(test_args, directory, compile_env)
         return (file_name, proc.returncode, test_args, proc.stdout, proc.stderr)
 
     failures = 0
     remaining = len(work)
+    verbose_retried = False
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = [ex.submit(_run_one, item) for item in work]
         for fut in concurrent.futures.as_completed(futures):
@@ -883,10 +824,20 @@ def main() -> int:
                 sys.stderr.write(" ".join(test_args) + "\n")
                 if out:
                     sys.stderr.write("--- stdout ---\n")
-                    sys.stderr.write(out[-8000:] + "\n")
+                    sys.stderr.write(_compiler_diagnostics(out) + "\n")
                 if err:
                     sys.stderr.write("--- stderr ---\n")
-                    sys.stderr.write(err[-8000:] + "\n")
+                    sys.stderr.write(_compiler_diagnostics(err) + "\n")
+                if not verbose_retried:
+                    # Re-run the first failure with -v so the task log shows the
+                    # compiler's include search path list.
+                    verbose_retried = True
+                    proc = _spawn_replay_compile([*test_args, "-v"], directory, compile_env)
+                    sys.stderr.write("--- verbose include search (first failure) ---\n")
+                    if proc.stdout:
+                        sys.stderr.write(_compiler_diagnostics(proc.stdout) + "\n")
+                    if proc.stderr:
+                        sys.stderr.write(_compiler_diagnostics(proc.stderr) + "\n")
 
     if failures:
         sys.stderr.write(f"ERROR: {failures} / {len(work)} test compilations failed.\n")

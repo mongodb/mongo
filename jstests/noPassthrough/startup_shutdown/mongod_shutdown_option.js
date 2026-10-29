@@ -2,7 +2,7 @@
  * Test that the --shutdown option of mongod successfully shuts down another running node.
  */
 
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 
 if (!isLinux()) {
     jsTestLog("Skipping test due to non-linux platform.");

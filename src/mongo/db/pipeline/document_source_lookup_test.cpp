@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_lookup.h"
 
@@ -35,16 +9,22 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/explain_options.h"
@@ -52,7 +32,8 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -75,7 +56,8 @@ using namespace test;
 
 class DocumentSourceLookUpTest : public AggregationContextFixture {
 protected:
-    DocumentSourceLookUpTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         ShardingState::create(getServiceContext());
         // By default, make a mock mongo interface without any results from the foreign collection.
         // Individual tests will make their own interface if they need mock results.
@@ -106,46 +88,6 @@ public:
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
     }
 };
-
-const long long kDefaultMaxCacheSize =
-    loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
-
-TEST_F(DocumentSourceLookUpTest, SpecialNamespaceCrossDBLookupAllowedInView) {
-    auto expCtx = getExpCtx();
-    expCtx->setIsParsingViewDefinition(true);
-    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
-        boost::none, "config", "cache.chunks.randomNameBecauseAnyNameShouldWork");
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_DOES_NOT_THROW(DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from"
-                               << BSON("db" << "config" << "coll"
-                                            << "cache.chunks.randomNameBecauseAnyNameShouldWork")
-                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                               << "as"))
-            .firstElement(),
-        expCtx));
-    NamespaceString fromNs2 =
-        NamespaceString::createNamespaceString_forTest(boost::none, "local", "oplog.rs");
-    expCtx->setResolvedNamespaces(
-        ResolvedNamespaceMap{{fromNs2, {fromNs, std::vector<BSONObj>()}}});
-    ASSERT_DOES_NOT_THROW(DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs") << "pipeline"
-                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                      << "as"))
-            .firstElement(),
-        expCtx));
-    // must be exactly oplog.rs! when in view definition
-    ASSERT_THROWS_CODE(
-        DocumentSourceLookUp::createFromBson(
-            BSON("$lookup" << BSON("from" << BSON("db" << "local" << "coll" << "oplog.rs1")
-                                          << "pipeline"
-                                          << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
-                                          << "as"))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        ErrorCodes::FailedToParse);
-}
 
 // A 'let' variable defined in a $lookup stage is expected to be available to all sub-pipelines. For
 // sub-pipelines below the immediate one, they are passed to via ExpressionContext. This test
@@ -957,6 +899,218 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
+// Tests for the mongot_lookup_prefix helpers, which determine where the localField/foreignField
+// equality $match must be placed within a mongot $lookup subpipeline.
+
+// These exercise free functions over BSONObj and need no fixture, so use a plain TEST suite.
+TEST(MongotLookupPrefixTest, IsSourceStage) {
+    using namespace search_helper_bson_obj::mongot_lookup_prefix;
+
+    // User-facing mongot source stages.
+    ASSERT_TRUE(isSourceStage(BSON("$search" << BSON("term" << "x"))));
+    ASSERT_TRUE(isSourceStage(BSON("$searchMeta" << BSON("term" << "x"))));
+    ASSERT_TRUE(isSourceStage(BSON("$vectorSearch" << BSON("queryVector" << BSON_ARRAY(1 << 2)))));
+
+    // Legacy desugared mongot source stage.
+    ASSERT_TRUE(isSourceStage(BSON(DocumentSourceInternalSearchMongotRemote::kStageName
+                                   << BSON("mongotQuery" << BSON("term" << "asdf")))));
+
+    // Extension desugared mongot source stages.
+    ASSERT_TRUE(isSourceStage(BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName
+                                   << BSON("source" << "$_extensionSearch"))));
+    ASSERT_TRUE(
+        isSourceStage(BSON(search_helpers::kExtensionSearchStageName << BSON("term" << "asdf"))));
+    ASSERT_TRUE(isSourceStage(
+        BSON(search_helpers::kExtensionSearchMetaStageName << BSON("term" << "asdf"))));
+    ASSERT_TRUE(isSourceStage(BSON(search_helpers::kExtensionVectorSearchStageName
+                                   << BSON("queryVector" << BSON_ARRAY(1 << 2)))));
+
+    // Non-source stages must not match, including a non-storedSource $replaceRoot.
+    ASSERT_FALSE(isSourceStage(BSON("$match" << BSON("x" << 1))));
+    ASSERT_FALSE(isSourceStage(BSON("$project" << BSON("x" << 1))));
+    ASSERT_FALSE(
+        isSourceStage(BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj())));
+    ASSERT_FALSE(isSourceStage(fromjson("{$replaceRoot: {newRoot: '$x'}}")));
+}
+
+TEST(MongotLookupPrefixTest, IsSupportStage) {
+    using namespace search_helper_bson_obj::mongot_lookup_prefix;
+
+    // idLookup.
+    ASSERT_TRUE(isSupportStage(
+        BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSON("limit" << 100))));
+
+    // The storedSource $replaceRoot in both the legacy and extension desugared shapes.
+    ASSERT_TRUE(isSupportStage(
+        fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$ROOT']}}}")));
+    ASSERT_TRUE(isSupportStage(fromjson("{$replaceRoot: {newRoot: '$storedSource'}}")));
+
+    // Non-support stages must not match.
+    ASSERT_FALSE(isSupportStage(BSON("$match" << BSON("x" << 1))));
+    ASSERT_FALSE(isSupportStage(BSON("$search" << BSON("term" << "x"))));
+    // A generic $replaceRoot must not match.
+    ASSERT_FALSE(isSupportStage(fromjson("{$replaceRoot: {newRoot: '$x'}}")));
+    // Each part of the legacy $ifNull shape must match: a wrong first arg, a wrong second arg, and
+    // an $ifNull with the wrong arg count are all rejected.
+    ASSERT_FALSE(
+        isSupportStage(fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$other', '$$ROOT']}}}")));
+    ASSERT_FALSE(isSupportStage(
+        fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$NOW']}}}")));
+    ASSERT_FALSE(isSupportStage(
+        fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$ROOT', 1]}}}")));
+}
+
+TEST(MongotLookupPrefixTest, ExtractPrefix) {
+    using namespace search_helper_bson_obj::mongot_lookup_prefix;
+
+    // Empty and non-mongot pipelines have no prefix. prefixEndIdx agrees.
+    ASSERT_TRUE(extractPrefix({}).empty());
+    ASSERT_EQ(prefixEndIdx({}), 0U);
+    ASSERT_TRUE(extractPrefix({BSON("$match" << BSON("x" << 1))}).empty());
+    ASSERT_EQ(prefixEndIdx({BSON("$match" << BSON("x" << 1))}), 0U);
+    // idLookup without a leading source stage is not a valid prefix start.
+    ASSERT_TRUE(extractPrefix({BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj())})
+                    .empty());
+
+    // A lone $search is a one-stage prefix; trailing non-support stages are excluded.
+    const auto search = BSON("$search" << BSON("term" << "x"));
+    {
+        auto prefix = extractPrefix({search});
+        ASSERT_EQ(prefix.size(), 1U);
+        ASSERT_BSONOBJ_EQ(prefix[0], search);
+    }
+    {
+        auto prefix = extractPrefix({search, BSON("$match" << BSON("x" << 1))});
+        ASSERT_EQ(prefix.size(), 1U);
+        ASSERT_BSONOBJ_EQ(prefix[0], search);
+    }
+
+    // Bug 1: desugared source + idLookup. Old extractSourceStage returned {} here, pushing the
+    // $match before the source stage. The full prefix is both stages, in order.
+    {
+        const auto mongotRemote = BSON(DocumentSourceInternalSearchMongotRemote::kStageName
+                                       << BSON("mongotQuery" << BSON("term" << "asdf")));
+        const auto idLookup = BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj());
+        auto prefix = extractPrefix({mongotRemote, idLookup});
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], mongotRemote);
+        ASSERT_BSONOBJ_EQ(prefix[1], idLookup);
+    }
+
+    // Bug 1 (extension): the extension-desugared DRM + idLookup (the non-storedSource extension
+    // $search/$vectorSearch shape). Both stages form the prefix.
+    {
+        const auto drm = BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName << BSON(
+                                  "source" << BSON("$_extensionSearch" << BSON("term" << "asdf"))));
+        const auto idLookup = BSON(DocumentSourceInternalSearchIdLookUp::kStageName << BSONObj());
+        auto prefix = extractPrefix({drm, idLookup});
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], drm);
+        ASSERT_BSONOBJ_EQ(prefix[1], idLookup);
+    }
+
+    // Bug 2 (legacy): storedSource source + $ifNull $replaceRoot. The $match must go after the
+    // $replaceRoot so the join runs on the promoted (un-nested) fields. The prefix is the whole
+    // pipeline.
+    {
+        const auto mongotRemote = BSON(DocumentSourceInternalSearchMongotRemote::kStageName
+                                       << BSON("mongotQuery" << BSON("term" << "asdf")));
+        const auto replaceRoot =
+            fromjson("{$replaceRoot: {newRoot: {$ifNull: ['$storedSource', '$$ROOT']}}}");
+        auto prefix = extractPrefix({mongotRemote, replaceRoot});
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], mongotRemote);
+        ASSERT_BSONOBJ_EQ(prefix[1], replaceRoot);
+    }
+
+    // Bug 2 (extension): the extension-desugared DRM + {newRoot: "$storedSource"} $replaceRoot,
+    // followed by user stages. The prefix must span both mongot stages so the join $match lands
+    // after storedSource promotion (this is the exact shape that produced empty results on the
+    // shard for lookup_match.js). Trailing user stages are excluded.
+    {
+        const auto drm =
+            BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName << BSON(
+                     "source" << BSON("$_extensionSearch" << BSON("returnStoredSource" << true))));
+        const auto replaceRoot = fromjson("{$replaceRoot: {newRoot: '$storedSource'}}");
+        std::vector<BSONObj> storedSourceExtension = {drm,
+                                                      replaceRoot,
+                                                      fromjson("{$project: {_id: false}}"),
+                                                      fromjson("{$set: {x: {$add: [1, '$x']}}}")};
+        auto prefix = extractPrefix(storedSourceExtension);
+        ASSERT_EQ(prefix.size(), 2U);
+        ASSERT_EQ(prefixEndIdx(storedSourceExtension), 2U);
+        ASSERT_BSONOBJ_EQ(prefix[0], drm);
+        ASSERT_BSONOBJ_EQ(prefix[1], replaceRoot);
+    }
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
+// config.cache.chunks.*, config.collections, config.chunks, or local.oplog.rs.
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDBAndColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'test', coll: 'coll'}, as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(LiteParsedLookUp::parse(expCtx->getNamespaceString(),
+                                               stageSpec.firstElement(),
+                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax fails when "db" is "config" but "coll" is
+// not "cache.chunks.*", "collections", or "chunks".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "config", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec =
+        fromjson("{$lookup: {from: {db: 'config', coll: 'coll'}, as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(LiteParsedLookUp::parse(expCtx->getNamespaceString(),
+                                               stageSpec.firstElement(),
+                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace when "coll" is
+// "cache.chunks.*" but "db" is not "config".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDB) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest(
+        boost::none, "test", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto stageSpec = fromjson(
+        "{$lookup: {from: {db: 'test', coll: 'cache.chunks.test.foo'}, "
+        "as: 'as', pipeline: []}}");
+
+    ASSERT_THROWS_CODE(LiteParsedLookUp::parse(expCtx->getNamespaceString(),
+                                               stageSpec.firstElement(),
+                                               LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(stageSpec.firstElement(), expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
 TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipeline) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs =
@@ -1023,6 +1177,76 @@ TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipelineIncludingViewStages
     ASSERT_FALSE(serializedStage["pipeline"][1].getDocument().getField("$addFields").missing());
 }
 
+TEST_F(DocumentSourceLookUpTest, RejectsUserSuppliedIsHybridSearchWhenExtensionsFlagOn) {
+    // When featureFlagExtensionsInsideHybridSearch is on, the stage-params dispatch path is taken
+    // instead of createFromBson, and must equally reject a user-supplied $_internalIsHybridSearch.
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", true}});
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto client = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*tl=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$lookup" << BSON("from" << "coll" << "pipeline" << BSONArray() << "as" << "out"
+                                      << "$_internalIsHybridSearch" << true))};
+    LiteParsedPipeline liteParsedPipeline(
+        expCtx->getNamespaceString(), rawPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
+    ASSERT_THROWS_CODE(
+        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx), AssertionException, 5491300);
+}
+
+TEST_F(DocumentSourceLookUpTest,
+       BansLocalForeignFieldSyntaxForHybridSearchLookupWhenExtensionsFlagOff) {
+    // With the featureFlagExtensionsInsideHybridSearch flag off, $lookup with a hybrid search
+    // subpipeline rejects localField/foreignField syntax.
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", false}});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(getOpCtx())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from" << "coll" << "localField" << "x" << "foreignField" << "x"
+                                          << "pipeline" << BSONArray() << "as" << "out"
+                                          << "$_internalIsHybridSearch" << true))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        12982600);
+}
+
+TEST_F(DocumentSourceLookUpTest,
+       AllowsLocalForeignFieldSyntaxForHybridSearchLookupWhenExtensionsFlagOn) {
+    // With the featureFlagExtensionsInsideHybridSearch flag on, the localField/foreignField
+    // restriction is lifted for $lookup with a hybrid search subpipeline.
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", true}});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(getOpCtx())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "coll" << "localField" << "x" << "foreignField" << "x"
+                                      << "pipeline" << BSONArray() << "as" << "out"
+                                      << "$_internalIsHybridSearch" << true))
+            .firstElement(),
+        expCtx);
+    ASSERT(lookupStage);
+}
+
 TEST_F(DocumentSourceLookUpTest,
        CreateFromStageParamsRoutesThroughLppConstructorForLocalForeignFieldView) {
     // Exercises the createFromStageParams path for $lookup:{from:view, localField, foreignField}
@@ -1035,8 +1259,8 @@ TEST_F(DocumentSourceLookUpTest,
     // Enable featureFlagExtensionsInsideHybridSearch so the stage-params dispatch path is used
     // instead of the BSON-only fallback. The view pipeline is already stitched into the StageParams
     // during lite-parsing, so re-applying the view definition is incorrect.
-    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
-        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto ifrCtx = IncrementalFeatureRolloutContext::forTest(std::vector<IFRFlagWireEntry>{
+        IFRFlagWireEntry{"featureFlagExtensionsInsideHybridSearch", true}});
     auto expCtx =
         ExpressionContextBuilder{}.opCtx(getOpCtx()).ns(mainNss).ifrContext(ifrCtx).build();
     expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
@@ -1086,6 +1310,155 @@ TEST_F(DocumentSourceLookUpTest,
     // The BSON resolved pipeline must also carry the view stage (set by the base constructor).
     ASSERT_EQ(lookup->getResolvedPipelineForTest().size(), 2U);  // view stage + $match placeholder
     ASSERT_FALSE(lookup->getResolvedPipelineForTest()[0].getField("$addFields").eoo());
+}
+
+TEST_F(DocumentSourceLookUpTest, SubpipelineViewPolicyDoNothingSuppressesViewPrepend) {
+    // When the subpipeline's first stage declares FirstStageViewApplicationPolicy::kDoNothing
+    // (e.g. an extension search stage that applies the view itself), a $lookup targeting a view
+    // must not prepend the view pipeline; the user pipeline stays first.
+    auto mainNss = NamespaceString::createNamespaceString_forTest("test", "main");
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test", "foreign");
+    auto backingNss = NamespaceString::createNamespaceString_forTest("test", "backing");
+
+    auto expCtx = ExpressionContextBuilder{}.opCtx(getOpCtx()).ns(mainNss).build();
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    BSONObj viewStage = BSON("$addFields" << BSON("viewField" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(
+        viewNss,
+        ResolvedNamespace(viewNss, backingNss, std::vector<BSONObj>{viewStage}, BSONObj{}, opts));
+    expCtx->setResolvedNamespaces(std::move(nsMap));
+
+    auto lookupBson =
+        BSON("$lookup" << BSON("from" << viewNss.coll() << "as" << "r" << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))));
+    auto liteParsed =
+        LiteParsedLookUp::parse(mainNss, lookupBson.firstElement(), LiteParserOptions{});
+    liteParsed->makeOwned();
+    auto stageParams = liteParsed->getStageParams();
+    auto* params = dynamic_cast<LookUpStageParams*>(stageParams.get());
+    ASSERT_TRUE(params);
+    // Force kDoNothing directly. This isolates the createFromStageParams suppression path: a real
+    // $match subpipeline would report kDefaultPrepend, so we override it here only to drive the
+    // branch under test.
+    params->subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDoNothing;
+
+    auto sources = DocumentSourceLookUp::createFromStageParams(*params, expCtx);
+    ASSERT_EQ(sources.size(), 1U);
+    auto* lookup = dynamic_cast<DocumentSourceLookUp*>(sources.front().get());
+    ASSERT_TRUE(lookup != nullptr);
+
+    // The user pipeline must stay first, with no view stage prepended. Like the legacy mongot
+    // branch, an empty $match placeholder is inserted right after the first stage.
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 2U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$match" << BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[1], BSON("$match" << BSONObj()));
+    for (const auto& stage : resolvedPipeline) {
+        ASSERT_TRUE(stage.getField("$addFields").eoo());
+    }
+}
+
+/**
+ * Builds a $lookup against a view with subpipelineViewPolicy forced to kDoNothing, with the given
+ * user subpipeline and optional localField/foreignField.
+ */
+namespace {
+DocumentSourceLookUp* makeKDoNothingLookupOnView(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext>& expCtxOut,
+    std::list<boost::intrusive_ptr<DocumentSource>>& sourcesOut,
+    BSONArray userPipeline,
+    bool withLocalForeignFields) {
+    auto mainNss = NamespaceString::createNamespaceString_forTest("test", "main");
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test", "foreign");
+    auto backingNss = NamespaceString::createNamespaceString_forTest("test", "backing");
+
+    expCtxOut = ExpressionContextBuilder{}.opCtx(opCtx).ns(mainNss).build();
+    expCtxOut->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    BSONObj viewStage = BSON("$addFields" << BSON("viewField" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(
+        viewNss,
+        ResolvedNamespace(viewNss, backingNss, std::vector<BSONObj>{viewStage}, BSONObj{}, opts));
+    expCtxOut->setResolvedNamespaces(std::move(nsMap));
+
+    BSONObjBuilder specBuilder;
+    specBuilder.append("from", viewNss.coll());
+    specBuilder.append("as", "r");
+    specBuilder.append("pipeline", userPipeline);
+    if (withLocalForeignFields) {
+        specBuilder.append("localField", "x");
+        specBuilder.append("foreignField", "y");
+    }
+    auto lookupBson = BSON("$lookup" << specBuilder.obj());
+
+    auto liteParsed =
+        LiteParsedLookUp::parse(mainNss, lookupBson.firstElement(), LiteParserOptions{});
+    liteParsed->makeOwned();
+    auto stageParams = liteParsed->getStageParams();
+    auto* params = dynamic_cast<LookUpStageParams*>(stageParams.get());
+    invariant(params);
+    params->subpipelineViewPolicy = FirstStageViewApplicationPolicy::kDoNothing;
+
+    sourcesOut = DocumentSourceLookUp::createFromStageParams(*params, expCtxOut);
+    invariant(sourcesOut.size() == 1U);
+    return dynamic_cast<DocumentSourceLookUp*>(sourcesOut.front().get());
+}
+}  // namespace
+
+TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithEmptySubpipelineDoesNotInsertOutOfRange) {
+    // Regression test for an out-of-range insert (SIGBUS) on an empty subpipeline.
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::list<boost::intrusive_ptr<DocumentSource>> sources;
+    auto* lookup = makeKDoNothingLookupOnView(
+        getOpCtx(), expCtx, sources, BSONArray{}, /*withLocalForeignFields=*/false);
+    ASSERT_TRUE(lookup != nullptr);
+
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 1U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$addFields" << BSON("viewField" << 1)));
+}
+
+TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithEmptySubpipelineAndFieldJoinRetainsView) {
+    // Same shape with localField/foreignField: the view prefix is retained and the join $match goes
+    // after it.
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::list<boost::intrusive_ptr<DocumentSource>> sources;
+    auto* lookup = makeKDoNothingLookupOnView(
+        getOpCtx(), expCtx, sources, BSONArray{}, /*withLocalForeignFields=*/true);
+    ASSERT_TRUE(lookup != nullptr);
+
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 2U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$addFields" << BSON("viewField" << 1)));
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[1], BSON("$match" << BSONObj()));
+}
+
+TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithNonEmptySubpipelineAndFieldJoinPlacesMatch) {
+    // Control: with a non-empty subpipeline the branch is entered as before, so the placeholder
+    // lands after the first stage.
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    std::list<boost::intrusive_ptr<DocumentSource>> sources;
+    auto* lookup = makeKDoNothingLookupOnView(getOpCtx(),
+                                              expCtx,
+                                              sources,
+                                              BSON_ARRAY(BSON("$match" << BSON("x" << 1))),
+                                              /*withLocalForeignFields=*/true);
+    ASSERT_TRUE(lookup != nullptr);
+
+    const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
+    ASSERT_EQ(resolvedPipeline.size(), 2U);
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[0], BSON("$match" << BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(resolvedPipeline[1], BSON("$match" << BSONObj()));
 }
 
 TEST_F(DocumentSourceLookUpTest,
@@ -1303,7 +1676,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheNonCorrelatedSubPipelinePrefix) {
 
     auto expectedPipe = fromjson(
         str::stream() << "[{$mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
-                      << sequentialCacheStageObj() << ", {$addFields: {varField: {$const: 5}}}]");
+                      << sequentialCacheStageObj(getExpCtx()->getOperationContext())
+                      << ", {$addFields: {varField: {$const: 5}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -1337,7 +1711,7 @@ TEST_F(DocumentSourceLookUpTest,
         fromjson(str::stream() << "[{$mock: {}},"
                                   " {$match: {x:{$eq: 1}}},"
                                   " {$sort: {sortKey: {x: 1}}},"
-                               << sequentialCacheStageObj()
+                               << sequentialCacheStageObj(getExpCtx()->getOperationContext())
                                << ",{$facet: {facetPipe: ["
                                   "   {$internalFacetTeeConsumer: {}},"
                                   "   {$match: {$and: [{_id: {$_internalExprEq: 5}},"
@@ -1407,7 +1781,7 @@ TEST_F(DocumentSourceLookUpTest,
         str::stream() << "[{$mock: {}}, {$match: {x: {$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
                          "{$project: {projectedField: {$let: {vars: {var1: '$x'}, "
                          "in: '$$var1'}}, _id: false}},"
-                      << sequentialCacheStageObj()
+                      << sequentialCacheStageObj(getExpCtx()->getOperationContext())
                       << ", {$addFields: {varField: {$sum: ['$x', {$const: 5}]}}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
@@ -1437,7 +1811,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldInsertCacheBeforeCorrelatedNestedLookup) 
 
     auto expectedPipe = fromjson(
         str::stream() << "[{$mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
-                      << sequentialCacheStageObj()
+                      << sequentialCacheStageObj(getExpCtx()->getOperationContext())
                       << ", {$lookup: {from: 'coll', as: 'subas', let: {}, pipeline: "
                          "[{$match: {x: {$eq: 1}}}, {$lookup: {from: 'coll', as: 'subsubas', "
                          "let: {}, pipeline: [{$match: {$and: [{y: {$_internalExprEq: 5}}, "
@@ -1473,7 +1847,8 @@ TEST_F(DocumentSourceLookUpTest,
         str::stream() << "[{$mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
                          "{$lookup: {from: 'coll', as: 'subas', let: {var1: '$y'}, "
                          "pipeline: [{$match: {$expr: { $eq: ['$z', '$$var1']}}}]}}, "
-                      << sequentialCacheStageObj() << ", {$addFields: {varField: {$const: 5} }}]");
+                      << sequentialCacheStageObj(getExpCtx()->getOperationContext())
+                      << ", {$addFields: {varField: {$const: 5} }}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -1501,7 +1876,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
         << "[{$mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, {$lookup: {from: "
            "'coll', as: 'subas', let: {}, pipeline: [{$match: {y: {$eq: 5}}}]}}, {$addFields: "
            "{constField: {$const: 5}}}, "
-        << sequentialCacheStageObj() << "]");
+        << sequentialCacheStageObj(getExpCtx()->getOperationContext()) << "]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -1673,6 +2048,64 @@ TEST_F(DocumentSourceLookUpTest, LetVariablesCloneRebindsExpressionContext) {
     for (auto& var : lookupClone->getLetVariables()) {
         ASSERT_EQ(var.expression->getExpressionContext(), newExpCtx);
     }
+}
+
+// Mimics the router-to-shard rewrite for a localField/foreignField $lookup against a view: the
+// view's stages arrive in 'pipeline' and the join $match's target position arrives in
+// $_internalFieldMatchPipelineIdx. The placeholder must end up AFTER the view stages, otherwise the
+// join matches against fields the view has not computed yet.
+TEST_F(DocumentSourceLookUpTest, FieldMatchPlaceholderRelocatesAfterViewStagesOnShard) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "foreign"
+                                      << "as" << "c" << "localField" << "a" << "foreignField" << "b"
+                                      << "$_internalFromIsAView" << true
+                                      << "$_internalFieldMatchPipelineIdx" << 1LL << "pipeline"
+                                      << BSON_ARRAY(BSON("$addFields" << BSON("b" << 0)))))
+            .firstElement(),
+        expCtx);
+    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookupStage);
+
+    const auto& resolved = lookupStage->getResolvedPipelineForTest();
+    ASSERT_EQ(2u, resolved.size());
+    // The view stage must come first and the join $match placeholder second.
+    ASSERT(resolved[0].hasField("$addFields")) << resolved[0];
+    ASSERT(resolved[1].hasField("$match") && resolved[1]["$match"].Obj().isEmpty()) << resolved[1];
+}
+
+// As above, but with a stage trailing the placeholder's target position, so that a correct
+// relocation is distinguishable from simply appending the placeholder at the end of the
+// subpipeline.
+TEST_F(DocumentSourceLookUpTest, FieldMatchPlaceholderRelocatesBetweenSubpipelineStagesOnShard) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    // A trailing $project after the mongot prefix, so a correct placement is distinguishable from
+    // simply appending the placeholder at the end.
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << "foreign"
+                                      << "as" << "c" << "localField" << "a" << "foreignField" << "b"
+                                      << "$_internalFromIsAView" << true
+                                      << "$_internalFieldMatchPipelineIdx" << 1LL << "pipeline"
+                                      << BSON_ARRAY(BSON("$search" << BSON("term" << "asdf"))
+                                                    << BSON("$project" << BSON("b" << 1)))))
+            .firstElement(),
+        expCtx);
+    auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT(lookupStage);
+
+    const auto& resolved = lookupStage->getResolvedPipelineForTest();
+    ASSERT_EQ(3u, resolved.size());
+    ASSERT(resolved[0].hasField("$search")) << resolved[0];
+    ASSERT(resolved[1].hasField("$match") && resolved[1]["$match"].Obj().isEmpty()) << resolved[1];
+    ASSERT(resolved[2].hasField("$project")) << resolved[2];
 }
 }  // namespace
 }  // namespace mongo

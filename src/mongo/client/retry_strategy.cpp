@@ -1,40 +1,18 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/client/retry_strategy.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 
 #include <algorithm>
 #include <string_view>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
 namespace {
@@ -66,7 +44,8 @@ bool DefaultRetryStrategy::unconditionallyRetryableCriteria(
 bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
-    std::span<const std::string> errorLabels) {
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
 
     if (_retryAttemptCount >= _maxRetryAttempts || !_retryCriteria(s, errorLabels)) {
         return false;
@@ -79,6 +58,7 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
             _targetingMetadata.deprioritizedServers.emplace_back(*target);
         }
         _backoffWithJitter.incrementAttemptCount();
+        _lastBaseBackoffMS = baseBackoffMS;
     }
 
     ++_retryAttemptCount;
@@ -86,17 +66,31 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
 }
 
 auto DefaultRetryStrategy::getRetryParametersFromServerParameters() -> RetryParameters {
+    int64_t baseBackoff = gDefaultClientBaseBackoffMillis.loadRelaxed();
+    int64_t maxBackoff = gDefaultClientMaxBackoffMillis.loadRelaxed();
+    if (baseBackoff > maxBackoff) {
+        static logv2::SeveritySuppressor suppressor{
+            Seconds{10}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+        LOGV2_DEBUG(13238300,
+                    suppressor().toInt(),
+                    "defaultClientBaseBackoffMillis set to larger than "
+                    "defaultClientMaxBackoffMillis so using defaultClientMaxBackoffMillis.",
+                    "defaultClientBaseBackoffMillis"_attr = baseBackoff,
+                    "defaultClientMaxBackoffMillis"_attr = maxBackoff);
+        baseBackoff = maxBackoff;
+    }
     return {
         gDefaultClientMaxRetryAttempts.loadRelaxed(),
-        Milliseconds{gDefaultClientBaseBackoffMillis.loadRelaxed()},
-        Milliseconds{gDefaultClientMaxBackoffMillis.loadRelaxed()},
+        Milliseconds{baseBackoff},
+        Milliseconds{maxBackoff},
     };
 }
 
 bool AdaptiveRetryStrategy::recordFailureAndEvaluateShouldRetry(
     Status s,
     const boost::optional<HostAndPort>& target,
-    std::span<const std::string> errorLabels) {
+    std::span<const std::string> errorLabels,
+    boost::optional<Milliseconds> baseBackoffMS) {
     const bool targetOverloaded = containsSystemOverloadedErrorLabel(errorLabels);
 
     const auto evaluateShouldRetry = [&] {
@@ -111,7 +105,8 @@ bool AdaptiveRetryStrategy::recordFailureAndEvaluateShouldRetry(
     };
 
     return evaluateShouldRetry() &&
-        _underlyingStrategy->recordFailureAndEvaluateShouldRetry(s, target, errorLabels);
+        _underlyingStrategy->recordFailureAndEvaluateShouldRetry(
+            s, target, errorLabels, baseBackoffMS);
 }
 
 void AdaptiveRetryStrategy::recordSuccess(const boost::optional<HostAndPort>& target) {

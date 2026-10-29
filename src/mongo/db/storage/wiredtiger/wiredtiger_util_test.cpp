@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
@@ -50,6 +24,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <wiredtiger.h>
 
@@ -301,7 +276,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     auto result = WiredTigerUtil::getStatisticsValue(
         session, "statistics:table:no_such_table", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
@@ -311,7 +286,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     auto result = WiredTigerUtil::getStatisticsValue(
         session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
@@ -405,6 +380,10 @@ TEST_F(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     // Perform each test in their own limited scope in order to establish different
     // severity levels.
 
+    {
+        std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
+        ASSERT_TRUE(config.find("tiered") == std::string::npos);
+    }
     {
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
@@ -507,6 +486,29 @@ TEST_F(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
         WiredTigerUtil::removeEncryptionFromConfigString(&input);
         ASSERT_EQUALS(input, expectedOutput);
     }
+}
+
+TEST_F(WiredTigerUtilTest, CheckTableCreationOptionsRejectsManagedKeys) {
+    auto check = [](const std::string& config) {
+        return WiredTigerUtil::checkTableCreationOptions(
+            BSON(WiredTigerUtil::kConfigStringField << config).firstElement());
+    };
+
+    // Ordinary creation options are allowed.
+    ASSERT_OK(check("split_pct=88"));
+    ASSERT_OK(check(""));
+
+    // The backing file must not be overridden.
+    ASSERT_EQ(check("source=\"file:example.wt\"").code(), ErrorCodes::BadValue);
+
+    // Import settings must not be overridden.
+    ASSERT_EQ(check("import=(enabled=true)").code(), ErrorCodes::BadValue);
+
+    // A banned key mixed in with allowed options is still rejected.
+    ASSERT_EQ(check("split_pct=88,source=\"file:example.wt\"").code(), ErrorCodes::BadValue);
+
+    // A banned key name appearing inside a value (rather than as a top-level key) is allowed.
+    ASSERT_OK(check("app_metadata=\"source=file:example.wt\""));
 }
 
 TEST_F(WiredTigerUtilTest, GetSanitizedStorageOptionsForSecondaryReplication) {
@@ -682,65 +684,6 @@ TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
                                                WiredTigerUtil::FilterBehavior::kExcludeCategories);
     ASSERT_OK(status);
     ASSERT_EQ(bob4.obj().nFields(), totalNumFields);
-}
-
-TEST_F(WiredTigerUtilTest, ConcatTwoConfigs) {
-    WT_CONFIG_ITEM key;
-    WT_CONFIG_ITEM value;
-
-    // Nothing to parse.
-    const auto emptyConfig = WiredTigerUtil::concatConfigs("", "");
-    WiredTigerConfigParser emptyParser(emptyConfig);
-    ASSERT_EQUALS(emptyParser.next(&key, &value), WT_NOTFOUND);
-
-    // Validates the 'key' and 'value' populated by the 'WiredTigerConfigParser' contain the
-    // expected values.
-    auto assertKVConfig = [&](const std::string& keyData, int valData) {
-        ASSERT_EQUALS(key.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
-        ASSERT_EQUALS(std::string_view(key.str, key.len), keyData);
-        ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
-        ASSERT_EQUALS(value.val, valData);
-    };
-
-    const auto emptyLHSConfig = WiredTigerUtil::concatConfigs("", "a=123");
-    WiredTigerConfigParser emptyLHSParser(emptyLHSConfig);
-    ASSERT_EQUALS(emptyLHSParser.next(&key, &value), 0);
-    assertKVConfig("a", 123);
-
-    const auto emptyRHSConfig = WiredTigerUtil::concatConfigs("b=456", "");
-    WiredTigerConfigParser emptyRHSParser(emptyRHSConfig);
-    ASSERT_EQUALS(emptyRHSParser.next(&key, &value), 0);
-    assertKVConfig("b", 456);
-
-    const auto basicConfig = WiredTigerUtil::concatConfigs("a=123", "b=456");
-    WiredTigerConfigParser basicParser(basicConfig);
-    ASSERT_EQUALS(basicParser.next(&key, &value), 0);
-    assertKVConfig("a", 123);
-    ASSERT_EQUALS(basicParser.next(&key, &value), 0);
-    assertKVConfig("b", 456);
-
-    const auto compoundConfig = WiredTigerUtil::concatConfigs("c=789", "d=10,e=11");
-    WiredTigerConfigParser compoundParser(compoundConfig);
-    ASSERT_EQUALS(compoundParser.next(&key, &value), 0);
-    assertKVConfig("c", 789);
-    ASSERT_EQUALS(compoundParser.next(&key, &value), 0);
-    assertKVConfig("d", 10);
-    ASSERT_EQUALS(compoundParser.next(&key, &value), 0);
-    assertKVConfig("e", 11);
-
-    // Test can retrieve value by key.
-    ASSERT_EQUALS(compoundParser.get("d", &value), 0);
-    ASSERT_EQUALS(value.type, WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM);
-    ASSERT_EQUALS(value.val, 10);
-
-    // Test concatenation is compatible with parsing nested structs from one of the configs.
-    const auto logEnabledConfig =
-        WiredTigerUtil::concatConfigs("a=123,log=(enabled=true),b=436", "c=789");
-    WiredTigerConfigParser logEnabledParser(logEnabledConfig);
-
-    auto enabled = logEnabledParser.isTableLoggingEnabled();
-    ASSERT(enabled);
-    ASSERT(*enabled);
 }
 
 TEST(WiredTigerConfigParserTest, IterationAndKeyLookup) {
@@ -1142,9 +1085,26 @@ TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
         wtSession.get_last_error(&err, &sub_level_err, &err_msg);
 
         ASSERT_EQUALS(WT_ROLLBACK, err);
+#ifdef WT_TXN_TOO_LARGE_FOR_CACHE
+        // Depending on timing, WiredTiger may report either that this transaction had the oldest
+        // pinned transaction ID, or that its own dirty content alone exceeded the cache. Both
+        // reasons stem from the same test setup (a single transaction too large for the cache) and
+        // are treated identically by rollbackReasonWasCachePressure().
+        ASSERT(sub_level_err == WT_OLDEST_FOR_EVICTION ||
+               sub_level_err == WT_TXN_TOO_LARGE_FOR_CACHE);
+        if (sub_level_err == WT_OLDEST_FOR_EVICTION) {
+            ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"sv,
+                          std::string_view(err_msg));
+        } else {
+            ASSERT_EQUALS(
+                "Transaction dirty content alone exceeds the eviction updates or dirty trigger"sv,
+                std::string_view(err_msg));
+        }
+#else
         ASSERT_EQUALS(WT_OLDEST_FOR_EVICTION, sub_level_err);
         ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"sv,
                       std::string_view(err_msg));
+#endif
         break;
     } while (tryCount <= kRetryLimit);
 
@@ -1298,6 +1258,62 @@ TEST(SimpleWiredTigerUtilTest, WTMainCacheSizeCalculation) {
                   std::floor(0.8 * memSizeMB));
 }
 
+std::vector<BSONElement> leafHistogramBuckets(const BSONArray& hist) {
+    std::vector<BSONElement> buckets;
+    hist.elems(buckets);
+    return buckets;
+}
+
+TEST(SimpleWiredTigerUtilTest, LeafPageSizeHistogramUsesPublishedGeometry) {
+    constexpr int64_t kCeiling = 128 * 1024;
+    constexpr int64_t kOnDiskMax = 32 * 1024;
+    const int64_t counts[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    const BSONArray hist =
+        WiredTigerUtil::buildLeafPageSizeHistogram(9, kCeiling, kOnDiskMax, counts);
+
+    const auto buckets = leafHistogramBuckets(hist);
+    ASSERT_EQUALS(9, buckets.size());
+    const int64_t width = kCeiling / 8;
+    for (int i = 0; i < 8; ++i) {
+        const BSONObj obj = buckets[i].Obj();
+        EXPECT_EQ(width * (i + 1), obj["maxBytes"].numberLong());
+        EXPECT_TRUE(obj["gteBytes"].eoo());
+        EXPECT_EQ(counts[i], obj["count"].numberLong());
+    }
+    const BSONObj last = buckets[8].Obj();
+    EXPECT_TRUE(last["maxBytes"].eoo());
+    EXPECT_EQ(kCeiling, last["gteBytes"].numberLong());
+    EXPECT_EQ(9, last["count"].numberLong());
+}
+
+TEST(SimpleWiredTigerUtilTest, LeafPageSizeHistogramFallsBackWhenPublishedStatsMissing) {
+    // Same inputs logStorageSizeStats uses when the histogram geometry stats are missing at
+    // compile time (#else) or the read returns 0.
+    constexpr int64_t kOnDiskMax = 32 * 1024;
+    const int64_t counts[] = {0, 0, 0, 0, 0, 0, 0, 0, 4};
+    const BSONArray hist = WiredTigerUtil::buildLeafPageSizeHistogram(0, 0, kOnDiskMax, counts);
+
+    const auto buckets = leafHistogramBuckets(hist);
+    ASSERT_EQUALS(WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets, buckets.size());
+    const int64_t width = kOnDiskMax / (WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets - 1);
+    for (int i = 0; i < WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets - 1; ++i) {
+        const BSONObj obj = buckets[i].Obj();
+        EXPECT_EQ(width * (i + 1), obj["maxBytes"].numberLong());
+        EXPECT_EQ(0, obj["count"].numberLong());
+    }
+    const BSONObj last = buckets.back().Obj();
+    EXPECT_EQ(kOnDiskMax, last["gteBytes"].numberLong());
+    EXPECT_EQ(4, last["count"].numberLong());
+}
+
+TEST(SimpleWiredTigerUtilTest, LeafPageSizeHistogramClampsOversizePublishedBucketCount) {
+    constexpr int64_t kCeiling = 128 * 1024;
+    const int64_t counts[] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+    const BSONArray hist =
+        WiredTigerUtil::buildLeafPageSizeHistogram(99, kCeiling, 32 * 1024, counts);
+    EXPECT_EQ(WiredTigerUtil::kLeafPageSizeHistogramMaxBuckets, leafHistogramBuckets(hist).size());
+}
+
 DEATH_TEST_F(WiredTigerUtilDeathTest, WTMainCacheSizeInvalidValues, "invariant") {
     WiredTigerUtil::getMainCacheSizeMB(10, 0.1);
 }
@@ -1311,6 +1327,41 @@ TEST(SimpleWiredTigerUtilTest, SpillCacheSize) {
     ASSERT_EQ(WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 0, 100, 100), 100);
     ASSERT_THROWS_CODE(
         WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 5, 101, 100), DBException, 10698700);
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysRejectsImportEnabled) {
+    ASSERT_EQ(WiredTigerUtil::checkConfigStringBannedKeys("import=(enabled=true)").code(),
+              ErrorCodes::BadValue);
+    ASSERT_EQ(
+        WiredTigerUtil::checkConfigStringBannedKeys("block_compressor=snappy,import=(enabled=true)")
+            .code(),
+        ErrorCodes::BadValue);
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysRejectsSource) {
+    ASSERT_EQ(WiredTigerUtil::checkConfigStringBannedKeys("source=\"file:foo.wt\"").code(),
+              ErrorCodes::BadValue);
+    ASSERT_EQ(WiredTigerUtil::checkConfigStringBannedKeys(
+                  "block_compressor=snappy,source=\"file:foo.wt\"")
+                  .code(),
+              ErrorCodes::BadValue);
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysAllowsBenignConfig) {
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys(""));
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("block_compressor=snappy"));
+    // import is always present in a collection or index's own creation string, disabled by
+    // default. Only enabling it is rejected.
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("import=(enabled=false)"));
+    // source is always present, empty, in a collection or index's own creation string, since
+    // mongod never sets it. Only a non-empty value is rejected.
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("source="));
+}
+
+TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysIgnoresMalformedConfig) {
+    // Malformed config strings are caught earlier, by wiredtiger_config_validate in
+    // checkTableCreationOptions, so this just needs to not fassert or throw.
+    ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("key=\"unterminated"));
 }
 
 }  // namespace

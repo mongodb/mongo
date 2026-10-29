@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/matcher/expression_tree.h"
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -37,13 +10,16 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 #include <algorithm>
 #include <iterator>
 #include <string>
 #include <string_view>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo {
 using namespace std::literals::string_view_literals;
@@ -105,7 +81,6 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
         case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
         case MatchExpression::INTERNAL_SCHEMA_MAX_ITEMS:
         case MatchExpression::INTERNAL_SCHEMA_MAX_LENGTH:
-        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_MIN_ITEMS:
         case MatchExpression::INTERNAL_SCHEMA_MIN_LENGTH:
         case MatchExpression::INTERNAL_SCHEMA_TYPE:
@@ -134,6 +109,7 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
         case MatchExpression::INTERNAL_SCHEMA_COND:
         case MatchExpression::INTERNAL_SCHEMA_EQ:
         case MatchExpression::INTERNAL_SCHEMA_FMOD:
+        case MatchExpression::INTERNAL_SCHEMA_MAX_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_MIN_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
         case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ:
@@ -144,6 +120,30 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
     }
 };
 }  // namespace
+
+void ListOfMatchExpression::allowReordering() {
+    // Nothing to reorder with fewer than two children.
+    _reorderingEnabled = numChildren() > 1;
+    _reorderHits = 0;
+    for (auto&& expr : _expressions) {
+        expr->resetShortCircuitCounter();
+    }
+}
+
+void ListOfMatchExpression::_reorderPredicates() const {
+    if (_reorderingEnabled) {
+        std::sort(_expressions.begin(), _expressions.end(), [](const auto& lhs, const auto& rhs) {
+            return lhs->getShortCircuitCounter() > rhs->getShortCircuitCounter();
+        });
+    }
+
+    // Reset counters unconditionally
+    for (auto&& expr : _expressions) {
+        expr->resetShortCircuitCounter();
+    }
+
+    _reorderHits = 0;
+}
 
 void ListOfMatchExpression::_debugList(StringBuilder& debug, int indentationLevel) const {
     for (unsigned i = 0; i < _expressions.size(); i++) {
@@ -300,10 +300,9 @@ void NotMatchExpression::serialize(BSONObjBuilder* out,
     // For $pull modifier, rewrite $not{$eq/$in/$exists} back to $ne/$nin/{$exists: false} since
     // top-level $not cannot be re-parsed.
     if (opts.serializeForUpdatePullModifier) {
-        tassert(
-            11699500,
-            "serializeForUpdatePullModifier should only be set when serializing for query stats",
-            opts.isSerializingForQueryStats());
+        tassert(11699500,
+                "serializeForUpdatePullModifier should only be set when shapifying",
+                opts.isShapifying());
         const auto childType = expressionToNegate->matchType();
         if (childType == MatchExpression::EQ || childType == MatchExpression::MATCH_IN ||
             childType == MatchExpression::EXISTS) {

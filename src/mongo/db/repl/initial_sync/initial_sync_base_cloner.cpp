@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/initial_sync/initial_sync_base_cloner.h"
@@ -36,7 +10,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/initial_sync/clean_shutdown_checker.h"
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -149,7 +125,11 @@ Status InitialSyncBaseCloner::checkSyncSourceIsStillValid() {
     if (!status.isOK())
         return status;
 
-    return checkRollBackIdIsUnchanged();
+    status = checkRollBackIdIsUnchanged();
+    if (!status.isOK())
+        return status;
+
+    return checkCleanShutdownIsUnchanged();
 }
 
 Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
@@ -200,6 +180,49 @@ Status InitialSyncBaseCloner::checkRollBackIdIsUnchanged() {
             str::stream() << "Rollback occurred on our sync source " << getSource()
                           << " during initial sync",
             rollBackId == getSharedData()->getRollBackId());
+    return Status::OK();
+}
+
+Status InitialSyncBaseCloner::checkCleanShutdownIsUnchanged() {
+    // Whether this attempt checks at all was decided when it started, so that every site agrees
+    // and the baseline below is always one we actually observed.
+    if (!getSharedData()->isCleanShutdownCheckEnabled()) {
+        return Status::OK();
+    }
+
+    auto baseCleanShutdownId = getSharedData()->getBaseCleanShutdownId();
+
+    BSONObj info;
+    try {
+        getClient()->runCommand(NamespaceString::kCleanShutdownLogNamespace.dbName(),
+                                makeCleanShutdownCheckFindCmd(baseCleanShutdownId),
+                                info);
+    } catch (DBException& e) {
+        if (ErrorCodes::isRetriableError(e)) {
+            // This check exists precisely because the sync source may have restarted, so failing to
+            // reach it is the expected case rather than an edge case. Return instead of throwing so
+            // that the stage is retried, reconnects, and gets to observe the document the restarted
+            // sync source writes during its own startup.
+            static constexpr char errorMsg[] =
+                "Failed while attempting to check the sync source for clean shutdowns after "
+                "re-connect";
+            LOGV2_DEBUG(13224503, 1, errorMsg, "error"_attr = e);
+            return e.toStatus().withContext(errorMsg);
+        }
+        throw;
+    }
+
+    auto docs = uassertStatusOK(extractFirstBatch(info));
+    boost::optional<BSONObj> firstDocAfterBase;
+    if (!docs.empty()) {
+        firstDocAfterBase = docs.front();
+    }
+
+    // Only a genuine verdict throws, which fails the attempt rather than retrying it.
+    uassertStatusOK(checkCleanShutdownResult(firstDocAfterBase,
+                                             baseCleanShutdownId,
+                                             getSharedData()->getBeginApplyingTimestamp(),
+                                             getSource()));
     return Status::OK();
 }
 

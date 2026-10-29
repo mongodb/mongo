@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,14 +10,17 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
 #include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
 
-namespace MONGO_MOD_PUBLIC rpc {
+namespace [[MONGO_MOD_PUBLIC]] rpc {
 
 extern const char kReplSetMetadataFieldName[];
 
@@ -53,11 +30,11 @@ extern const char kReplSetMetadataFieldName[];
 class ReplSetMetadata {
 public:
     ReplSetMetadata() = default;
-    ReplSetMetadata(long long term,
+    ReplSetMetadata(std::int64_t term,
                     repl::OpTimeAndWallTime committedOpTime,
                     repl::OpTime visibleOpTime,
-                    long long configVersion,
-                    long long configTerm,
+                    std::int64_t configVersion,
+                    std::int64_t configTerm,
                     OID id,
                     int currentSyncSourceIndex,
                     bool isPrimary);
@@ -83,6 +60,18 @@ public:
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
+     * Helpers to carry ONLY the replication term in $replData, without the rest of ReplSetMetadata,
+     * for callers that need to convey the term without assembling or parsing a full
+     * ReplSetMetadata. appendTermOnly writes `$replData: {term: <term>}` into 'builder'.
+     * readTermOnly returns the term if 'reply' carries $replData.term, else boost::none; it does
+     * not require a full ReplSetMetadata, so it is safe on the partial object appendTermOnly
+     * produces.
+     * TODO SERVER-130332: Remove these helpers.
+     */
+    static void appendTermOnly(BSONObjBuilder* builder, std::int64_t term);
+    static boost::optional<std::int64_t> readTermOnly(const BSONObj& reply);
+
+    /**
      * Returns the OpTime of the most recent operation with which the client interacted.
      */
     repl::OpTime getLastOpVisible() const {
@@ -99,14 +88,14 @@ public:
     /**
      * Returns the ReplSetConfig version number of the sender.
      */
-    long long getConfigVersion() const {
+    std::int64_t getConfigVersion() const {
         return _configVersion;
     }
 
     /**
      * Returns the ReplSetConfig term number of the sender.
      */
-    long long getConfigTerm() const {
+    std::int64_t getConfigTerm() const {
         return _configTerm;
     }
 
@@ -142,7 +131,7 @@ public:
     /**
      * Returns the current term from the perspective of the sender.
      */
-    long long getTerm() const {
+    std::int64_t getTerm() const {
         return _currentTerm;
     }
 
@@ -154,13 +143,13 @@ public:
 private:
     repl::OpTimeAndWallTime _lastOpCommitted;
     repl::OpTime _lastOpVisible;
-    long long _currentTerm = -1;
-    long long _configVersion = -1;
-    long long _configTerm = repl::OpTime::kUninitializedTerm;
+    std::int64_t _currentTerm = -1;
+    std::int64_t _configVersion = -1;
+    std::int64_t _configTerm = repl::OpTime::kUninitializedTerm;
     OID _replicaSetId;
     int _currentSyncSourceIndex = -1;
     bool _isPrimary = false;
 };
 
-}  // namespace MONGO_MOD_PUBLIC rpc
+}  // namespace rpc
 }  // namespace mongo

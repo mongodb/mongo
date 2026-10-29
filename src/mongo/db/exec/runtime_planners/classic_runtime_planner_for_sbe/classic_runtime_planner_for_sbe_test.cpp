@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.h"
@@ -57,6 +31,10 @@ namespace mongo::classic_runtime_planner_for_sbe {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
+
+// Passed to every 'MultiPlanner' below. None of these tests replan, so it is never called.
+const std::function<void()> kNoopReplanCounterCb = []() {
+};
 const BSONObj kFindFilter = fromjson("{a: {$gte: 0}, b: {$gte: 0}}");
 const BSONObj kAddFieldsSpec = fromjson(R"({sum: {$add: ["$a", "$b"]}})");
 
@@ -196,7 +174,7 @@ protected:
                                       false,
                                       IndexEntry::Identifier{indexName},
                                       BSONObj(),
-                                      nullptr /* wildcardProjection */,
+                                      /*wildcardProjection=*/nullptr,
                                       std::move(iceStorage)));
     }
 
@@ -268,12 +246,12 @@ protected:
 
         auto addVirtualScanSolution = [&](std::vector<BSONArray> docs) {
             auto virtScan = std::make_unique<VirtualScanNode>(
-                std::move(docs), VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
+                std::move(docs), VirtualScanNode::ScanType::kCollScan, /*hasRecordId=*/false);
             virtScan->filter = cq->getPrimaryMatchExpression()->clone();
             auto solution = std::make_unique<QuerySolution>();
             solution->cacheData = std::make_unique<SolutionCacheData>();
             solution->cacheData->virtualScanData = std::make_unique<VirtualScanCacheData>(
-                virtScan->docs, false /* hasRecordId */, BSONObj() /* indexKeyPattern */);
+                virtScan->docs, /*hasRecordId=*/false, /*indexKeyPattern=*/BSONObj());
             solution->setRoot(std::move(virtScan));
             solution->cacheData->solnType = SolutionCacheData::VIRTSCAN_SOLN;
             solutions.push_back(std::move(solution));
@@ -434,7 +412,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
 
             auto root = std::make_unique<VirtualScanNode>(kDocs,
                                                           VirtualScanNode::ScanType::kIxscan,
-                                                          kHasRecordId /*hasRecordId*/,
+                                                          /*hasRecordId=*/kHasRecordId,
                                                           kIndexKeyPattern);
             auto solution = std::make_unique<QuerySolution>();
 
@@ -445,7 +423,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
             solution->setRoot(std::move(root));
 
             auto [cq, plannerData] = createPlannerData();
-            SingleSolutionPassthroughPlanner planner{std::move(plannerData), std::move(solution)};
+            SingleSolutionPassthroughPlanner planner{
+                std::move(plannerData), std::move(solution), PlanSelectionStrategy::kSinglePlan};
             auto exec = planner.makeExecutor(std::move(cq));
             assertPlanExecutorReturnsCorrectSums({3, 4, 5}, exec.get());
         }
@@ -474,10 +453,14 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
 
         auto [cq, plannerData] = createPlannerData();
         auto [solutions, expectedSums] =
-            createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
+            createVirtualScanQuerySolutionsForDefaultFilter(/*resultDocCount=*/200, plannerData.cq);
         {
-            MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+            MultiPlanner planner{std::move(plannerData),
+                                 std::move(solutions),
+                                 true /*shouldWriteToCache*/,
+                                 kNoopReplanCounterCb,
+                                 boost::none /* replanReason */,
+                                 PlanSelectionStrategy::kMultiPlanner};
             auto exec = planner.makeExecutor(std::move(cq));
             assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
         }
@@ -506,25 +489,33 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
         {
             // When the query has 200 result documents, no plan will reach EOF during multi-planner,
             // so we should use SBE.
-            auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+            auto [cq, plannerData] = createPlannerData(kFindFilter, /*addFieldsSpec=*/BSONObj{});
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
-                200 /*resultDocCount*/, plannerData.cq);
-            MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+                /*resultDocCount=*/200, plannerData.cq);
+            MultiPlanner planner{std::move(plannerData),
+                                 std::move(solutions),
+                                 true /*shouldWriteToCache*/,
+                                 kNoopReplanCounterCb,
+                                 boost::none /* replanReason */,
+                                 PlanSelectionStrategy::kMultiPlanner};
             auto exec = planner.makeExecutor(std::move(cq));
-            ASSERT_EQ(exec->getPlanExplainer().getVersion(), "2");
+            ASSERT_TRUE(exec->getPlanExplainer().isSbeExplainer());
         }
 
         {
             // When the query has only 50 result documents, winning plan will reach EOF during
             // multi-planner, so we should use the Classic Engine.
-            auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+            auto [cq, plannerData] = createPlannerData(kFindFilter, /*addFieldsSpec=*/BSONObj{});
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
-                50 /*resultDocCount*/, plannerData.cq);
-            MultiPlanner planner{
-                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+                /*resultDocCount=*/50, plannerData.cq);
+            MultiPlanner planner{std::move(plannerData),
+                                 std::move(solutions),
+                                 true /*shouldWriteToCache*/,
+                                 kNoopReplanCounterCb,
+                                 boost::none /* replanReason */,
+                                 PlanSelectionStrategy::kMultiPlanner};
             auto exec = planner.makeExecutor(std::move(cq));
-            ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
+            ASSERT_FALSE(exec->getPlanExplainer().isSbeExplainer());
         }
     });
 }
@@ -532,7 +523,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
 TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachBranch) {
     setUpSubPlannerTest();
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
-        auto exec = getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+        auto exec = getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
         PlanSummaryStats stats;
         exec->getPlanExplainer().getSummaryStats(&stats);
 
@@ -552,7 +543,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest,
     unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     setUpSubPlannerTest();
 
-    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
 
     // With featureFlagSbeFull enabled, the subplanner now writes to the classic cache (two
     // per-branch entries), not the SBE plan cache.
@@ -564,7 +555,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerCachesEachBranchWhenSbePlanCac
     unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", false);
     setUpSubPlannerTest();
 
-    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
 
     // When "featureFlagSbeFull" is *not* enabled, the subplanner should write two entries to the
     // classic cache -- one for each branch. It should not write to the SBE plan cache.
@@ -573,7 +564,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerCachesEachBranchWhenSbePlanCac
 
     // If we subplan a second time, we should still see multi-planning since the cache entries are
     // inactive.
-    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
 
     // The third time, the active cache entries will get used and we should not see any
     // multi-planning for either $or branch.
@@ -600,10 +591,14 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
 
     auto [cqForCacheWrite, plannerDataForCacheWrite] = createPlannerData();
     auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
-        200 /*resultDocCount*/, plannerDataForCacheWrite.cq);
+        /*resultDocCount=*/200, plannerDataForCacheWrite.cq);
     {
-        MultiPlanner planner{
-            std::move(plannerDataForCacheWrite), std::move(solutions), true /*shouldWriteToCache*/};
+        MultiPlanner planner{std::move(plannerDataForCacheWrite),
+                             std::move(solutions),
+                             true /*shouldWriteToCache*/,
+                             kNoopReplanCounterCb,
+                             boost::none /* replanReason */,
+                             PlanSelectionStrategy::kMultiPlanner};
 
         auto exec = planner.makeExecutor(std::move(cqForCacheWrite));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
@@ -623,30 +618,16 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
                 std::make_unique<sbe::MockExceededMemoryLimitStage>(0), std::move(planStageData));
         }
 
-        const bool deferredEnabled =
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.checkEnabled();
-        if (deferredEnabled) {
-            // With the deferred executor, the cached planner signals replanning by throwing
-            // ReplanningRequired rather than replanning inline.
-            ASSERT_THROWS_WITH_CHECK(
-                plannerGenerator->makePlanner(),
-                ExceptionFor<ErrorCodes::ReplanningRequired>,
-                ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
-                    ASSERT_STRING_SEARCH_REGEX(ex.reason(), "cached plan returned: ");
-                    ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
-                              plan_cache_util::CacheMode::NeverCache);
-                }));
-        } else {
-            std::unique_ptr<PlannerInterface> cachedPlanner = plannerGenerator->makePlanner();
-            auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
-            PlanSummaryStats stats;
-            cachedExec->getPlanExplainer().getSummaryStats(&stats);
-            ASSERT_TRUE(stats.replanReason)
-                << "CachedPlanner should replan upon hitting a memory exceeds error.";
-            ASSERT_STRING_SEARCH_REGEX(*stats.replanReason, "cached plan returned: ");
-            assertPlanExecutorReturnsCorrectSums(expectedSums, cachedExec.get());
-        }
-
+        // With the deferred executor, the cached planner signals replanning by throwing
+        // ReplanningRequired rather than replanning inline.
+        ASSERT_THROWS_WITH_CHECK(
+            plannerGenerator->makePlanner(),
+            ExceptionFor<ErrorCodes::ReplanningRequired>,
+            ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
+                ASSERT_STRING_SEARCH_REGEX(ex.reason(), "cached plan returned: ");
+                ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
+                          plan_cache_util::CacheMode::NeverCache);
+            }));
         ASSERT(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
     }
 }
@@ -661,16 +642,19 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
 
     auto [cq, plannerData] = createPlannerData();
     auto [solutions, expectedSums] =
-        createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
+        createVirtualScanQuerySolutionsForDefaultFilter(/*resultDocCount=*/200, plannerData.cq);
     {
-        MultiPlanner planner{
-            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+        MultiPlanner planner{std::move(plannerData),
+                             std::move(solutions),
+                             true /*shouldWriteToCache*/,
+                             kNoopReplanCounterCb,
+                             boost::none /* replanReason */,
+                             PlanSelectionStrategy::kMultiPlanner};
         auto exec = planner.makeExecutor(std::move(cq));
         assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
     }
 
     {  // Run CachedPlanner to execute the cached plan.
-        std::unique_ptr<PlannerInterface> cachedPlanner;
         auto [cq, plannerData] = createPlannerData();
         auto [classicCacheKey, plannerGenerator] =
             makePlannerGeneratorFromClassicCache(cq.get(),
@@ -690,34 +674,18 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
                 std::make_unique<sbe::MockExceededMaxReadsStage>(0), std::move(planStageData));
         }
 
-
-        const bool deferredEnabled =
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.checkEnabled();
-        if (deferredEnabled) {
-            // With the deferred executor the cached planner deactivates the cache entry and then
-            // signals replanning via ReplanningRequired (re-caching happens at the retry level).
-            ASSERT_THROWS_WITH_CHECK(
-                plannerGenerator->makePlanner(),
-                ExceptionFor<ErrorCodes::ReplanningRequired>,
-                ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
-                    ASSERT_STRING_SEARCH_REGEX(ex.reason(),
-                                               "cached plan was less efficient than expected");
-                    ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
-                              plan_cache_util::CacheMode::AlwaysCache);
-                }));
-            ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
-        } else {
-            cachedPlanner = plannerGenerator->makePlanner();
-            auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
-            PlanSummaryStats stats;
-            cachedExec->getPlanExplainer().getSummaryStats(&stats);
-            ASSERT_TRUE(stats.replanReason)
-                << "CachedPlanner should replan upon hitting max number of reads allowed.";
-            ASSERT_STRING_SEARCH_REGEX(*stats.replanReason,
-                                       "cached plan was less efficient than expected");
-            assertPlanExecutorReturnsCorrectSums(expectedSums, cachedExec.get());
-            ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
-        }
+        // With the deferred executor the cached planner deactivates the cache entry and then
+        // signals replanning via ReplanningRequired (re-caching happens at the retry level).
+        ASSERT_THROWS_WITH_CHECK(
+            plannerGenerator->makePlanner(),
+            ExceptionFor<ErrorCodes::ReplanningRequired>,
+            ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
+                ASSERT_STRING_SEARCH_REGEX(ex.reason(),
+                                           "cached plan was less efficient than expected");
+                ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
+                          plan_cache_util::CacheMode::AlwaysCache);
+            }));
+        ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
     }
 }
 

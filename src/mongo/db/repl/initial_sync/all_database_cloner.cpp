@@ -1,37 +1,9 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/repl/initial_sync/all_database_cloner.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -40,7 +12,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/initial_sync/all_database_cloner.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
@@ -61,24 +32,32 @@
 #include <mutex>
 #include <string_view>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
 namespace mongo {
 namespace repl {
 using namespace std::literals::string_view_literals;
 
-AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
-                                     const HostAndPort& source,
-                                     DBClientConnection* client,
-                                     StorageInterface* storageInterface,
-                                     ThreadPool* dbPool,
-                                     std::shared_ptr<InitialSyncSummaryStats> summaryStats)
+AllDatabaseCloner::AllDatabaseCloner(
+    InitialSyncSharedData* sharedData,
+    const HostAndPort& source,
+    DBClientConnection* client,
+    StorageInterface* storageInterface,
+    ThreadPool* dbPool,
+    std::shared_ptr<InitialSyncSummaryStats> summaryStats,
+    std::shared_ptr<FastCountInitialSyncAggregator> fastCountAggregator)
     : InitialSyncBaseCloner(
           "AllDatabaseCloner"sv, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _getInitialSyncIdStage("getInitialSyncId", this, &AllDatabaseCloner::getInitialSyncIdStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage),
-      _summaryStats(summaryStats) {}
+      _summaryStats(summaryStats),
+      _fastCountAggregator(std::move(fastCountAggregator)) {}
 
 BaseCloner::ClonerStages AllDatabaseCloner::getStages() {
     return {&_connectStage, &_getInitialSyncIdStage, &_listDatabasesStage};
@@ -171,9 +150,9 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
 
     databasesArray = getClient()->getDatabaseInfos(
         BSONObj(),
-        true /* nameOnly */,
-        false /*authorizedDatabases*/,
-        multiTenancyAndRequireTenantIdEnabled /*useListDatabsesForAllTenants*/);
+        /*nameOnly=*/true,
+        /*authorizedDatabases=*/false,
+        /*useListDatabasesForAllTenants=*/multiTenancyAndRequireTenantIdEnabled);
 
     size_t idxToInsertNextAdmin = 0;
     for (const auto& dbBSON : databasesArray) {
@@ -271,7 +250,8 @@ void AllDatabaseCloner::postStage() {
                                                                       getClient(),
                                                                       getStorageInterface(),
                                                                       getDBPool(),
-                                                                      _summaryStats);
+                                                                      _summaryStats,
+                                                                      _fastCountAggregator);
         }
         auto dbStatus = _currentDatabaseCloner->run();
         if (dbStatus.isOK()) {

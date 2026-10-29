@@ -1,39 +1,11 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/s/balancer/move_unsharded_policy.h"
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
-#include "mongo/db/s/balancer/move_unsharded_policy.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -44,6 +16,10 @@
 #include <ostream>
 #include <set>
 #include <string>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -101,7 +77,7 @@ TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
         _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                  getShardStats(operationContext()),
                                                  &availableShards,
-                                                 true /*onlyTrackedCollections*/);
+                                                 /*onlyTrackedCollection=*/true);
     ASSERT_EQ(1, migrateInfoVector.size());
     ASSERT_EQ(collections[0].getUuid(), migrateInfoVector[0].uuid);
 }
@@ -152,7 +128,7 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
             _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                      getShardStats(operationContext()),
                                                      &availableShards,
-                                                     true /*onlyTrackedCollections*/);
+                                                     /*onlyTrackedCollection=*/true);
 
         ASSERT_EQ(1, migrateInfoVector.size());
         std::cout << "Removing " << migrateInfoVector[0].nss.toString_forTest() << std::endl;
@@ -192,8 +168,99 @@ TEST_F(MoveUnshardedPolicyTest, DontMigrateAnyCollectionIfReshardingMinimumDurat
         _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                  getShardStats(operationContext()),
                                                  &availableShards,
-                                                 true /*onlyTrackedCollections*/);
+                                                 /*onlyTrackedCollection=*/true);
     ASSERT_EQ(0, migrateInfoVector.size());
+}
+
+TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfOneAlwaysSkipsWhenShardedCollections) {
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5000};
+
+    setupShards({kShard0, kShard1});
+    setupDatabase(kDbName, kShardId0);
+
+    // A threshold of 1.0 means the balancer should always skip moveCollection in favor of a chunk
+    // migration whenever there are sharded collections that can be balanced.
+    FailPointEnableBlock fp("balancerShouldReturnRandomMigrations",
+                            BSON("skipMoveCollectionThreshold" << 1.0));
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up an unsplittable collection that could be moved.
+    setUpUnsplittableCollection(
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable"),
+        kShardId0);
+
+    // Set up a sharded collection so there is something to balance via chunk migrations.
+    const auto shardedNss =
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_sharded");
+    const auto shardedUUID = UUID::gen();
+    const ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
+    setUpCollection(shardedNss, shardedUUID, version);
+
+    // Run several rounds to be confident the skip is deterministic and not random luck.
+    for (int i = 0; i < 20; ++i) {
+        auto availableShards = getAllShardIds(operationContext());
+        const auto& migrateInfoVector =
+            _unshardedPolicy.selectCollectionsToMove(operationContext(),
+                                                     getShardStats(operationContext()),
+                                                     &availableShards,
+                                                     /*onlyTrackedCollection=*/true);
+        ASSERT_EQ(0, migrateInfoVector.size());
+    }
+}
+
+TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfZeroNeverSkips) {
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5000};
+
+    setupShards({kShard0, kShard1});
+    setupDatabase(kDbName, kShardId0);
+
+    // A threshold of 0.0 means the balancer should never skip moveCollection, even when there are
+    // sharded collections that could be balanced.
+    FailPointEnableBlock fp("balancerShouldReturnRandomMigrations",
+                            BSON("skipMoveCollectionThreshold" << 0.0));
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up an unsplittable collection that should always be moved.
+    const auto unsplittableColl = setUpUnsplittableCollection(
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_unsplittable"),
+        kShardId0);
+
+    // Set up a sharded collection to ensure it is the threshold, not the absence of sharded
+    // collections, that drives the behavior.
+    const auto shardedNss =
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl_sharded");
+    const auto shardedUUID = UUID::gen();
+    const ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
+    setUpCollection(shardedNss, shardedUUID, version);
+
+    auto availableShards = getAllShardIds(operationContext());
+    const auto& migrateInfoVector =
+        _unshardedPolicy.selectCollectionsToMove(operationContext(),
+                                                 getShardStats(operationContext()),
+                                                 &availableShards,
+                                                 /*onlyTrackedCollection=*/true);
+    ASSERT_EQ(1, migrateInfoVector.size());
+    ASSERT_EQ(unsplittableColl.getUuid(), migrateInfoVector[0].uuid);
+}
+
+TEST_F(MoveUnshardedPolicyTest, AcceptsFCVMismatchDuringResharding) {
+    const ChunkVersion version({OID::gen(), Timestamp(1)}, {1, 0});
+    const ChunkType chunk(
+        UUID::gen(), ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY)), version, kShardId0);
+    const MigrateInfo action(kShardId1, kNamespace, chunk, ForceJumbo::kDoNotForce, boost::none);
+
+    ASSERT_DOES_NOT_THROW(_unshardedPolicy.applyActionResult(
+        operationContext(),
+        action,
+        Status{ErrorCodes::Error(13222300), "FCV mismatch during resharding"}));
 }
 
 }  // namespace

@@ -17,7 +17,7 @@ __cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool e
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_RET;
 
-    if ((ret = __wt_time_value_validate(session, tw, NULL, false)) != 0)
+    if ((ret = __wt_time_value_validate(session, tw, NULL, false, false)) != 0)
         return (expected_error ?
             WT_ERROR :
             __wt_panic(session, ret, "value timestamp window failed validation"));
@@ -347,7 +347,6 @@ __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value, const void *k
 {
     WT_BTREE *btree;
     WT_CELL_KV key, val;
-    WT_DECL_RET;
     size_t packed_size;
     uint8_t pfx;
 
@@ -370,8 +369,12 @@ __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value, const void *k
         __wt_cell_compress_prefix_key(
           s->last_key, key_data, key_size, s->key_pfx_last, btree->prefix_compression_min, &pfx);
 
-    /* Copy the non-prefix bytes into the key buffer. */
-    WT_ERR(__wt_buf_set(session, &key.buf, (uint8_t *)key_data + pfx, key_size - pfx));
+    /*
+     * Reference the non-prefix bytes in place: the caller's key storage remains valid until the
+     * copy into the new image below, so no intermediate buffer is needed.
+     */
+    key.buf.data = (const uint8_t *)key_data + pfx;
+    key.buf.size = key_size - pfx;
     s->key_pfx_last = pfx;
     key.cell_len = __wt_cell_pack_leaf_key(&key.cell, pfx, key.buf.size);
     key.len = key.cell_len + key.buf.size;
@@ -393,7 +396,7 @@ __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value, const void *k
      */
     packed_size = key.len + val.len;
     if (new_image->size + packed_size > new_image->memsize)
-        WT_ERR(__wt_buf_grow(session, new_image, new_image->size + packed_size));
+        WT_RET(__wt_buf_grow(session, new_image, new_image->size + packed_size));
 
     /* Recompute write pointer after possible realloc */
     WT_ASSERT(session, new_image->mem != NULL);
@@ -409,12 +412,18 @@ __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value, const void *k
     }
     new_image->size += packed_size;
 
-    /* Update last key for next prefix compression comparison */
-    WT_ERR(__wt_buf_set(session, s->last_key, key_data, key_size));
+    /*
+     * Remember the full key for the next prefix compression comparison. The first prefix bytes
+     * already match what's stored in last_key, so only copy the suffix.
+     */
+    if (btree->prefix_compression) {
+        WT_RET(__wt_buf_grow(session, s->last_key, key_size));
+        memcpy((uint8_t *)s->last_key->mem + pfx, (const uint8_t *)key_data + pfx, key_size - pfx);
+        s->last_key->data = s->last_key->mem;
+        s->last_key->size = key_size;
+    }
 
-err:
-    __wt_buf_free(session, &key.buf);
-    return (ret);
+    return (0);
 }
 
 /*
@@ -1669,11 +1678,19 @@ __cell_redo_page_del_cleanup(
 
     WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
-    write_gen = S2BT(session)->base_write_gen;
-
-    WT_ASSERT(session, dsk->write_gen != 0);
-    if (dsk->write_gen > write_gen)
-        return;
+    /*
+     * If there is no disk image the parent page was never reconciled, meaning the page_del was
+     * either created in-memory this run or moved here from an old parent during a B-tree split. In
+     * either case, skip the write-generation guard and always run the cleanup: stale previous-run
+     * txn IDs get cleared, and clearing a committed current-run txnid to WT_TXN_NONE is
+     * semantically correct (globally visible).
+     */
+    if (dsk != NULL) {
+        write_gen = S2BT(session)->base_write_gen;
+        WT_ASSERT(session, dsk->write_gen != 0);
+        if (dsk->write_gen > write_gen)
+            return;
+    }
 
     if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
         return;
@@ -1776,6 +1793,27 @@ __wt_cell_unpack_addr(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
 }
 
 /*
+ * __wt_cell_unpack_addr_delta --
+ *     Unpack an address cell from an internal page delta. The cell's values are resolved against
+ *     the base image's header, but whether its transaction ids are from an earlier run is a
+ *     property of the delta that carries the cell: make the clearing decision with the delta's own
+ *     write generation, not the base image's.
+ */
+static WT_INLINE void
+__wt_cell_unpack_addr_delta(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *base_dsk,
+  const WT_PAGE_HEADER *delta_dsk, WT_CELL *cell, WT_CELL_UNPACK_ADDR *unpack_addr)
+{
+    WT_DECL_RET;
+
+    ret = __wt_cell_unpack_safe(session, base_dsk, cell, unpack_addr, NULL, NULL);
+    WT_ASSERT(session, ret == 0);
+    WT_UNUSED(ret); /* Avoid "unused variable" warnings in non-debug builds. */
+
+    if (__cell_unpack_window_need_cleanup(session, delta_dsk->write_gen))
+        __cell_addr_window_cleanup(session, base_dsk, unpack_addr);
+}
+
+/*
  * __wt_cell_unpack_kv --
  *     Unpack a value WT_CELL into a structure.
  */
@@ -1812,6 +1850,25 @@ __wt_cell_unpack_kv(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL
     WT_UNUSED(ret); /* Avoid "unused variable" warnings in non-debug builds. */
 
     __cell_unpack_window_cleanup_kv(session, dsk, unpack_value);
+}
+
+/*
+ * __wt_cell_unpack_kv_delta --
+ *     Unpack a value cell from an internal page delta; see the address variant above for why the
+ *     clearing decision uses the delta's own write generation.
+ */
+static WT_INLINE void
+__wt_cell_unpack_kv_delta(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *base_dsk,
+  const WT_PAGE_HEADER *delta_dsk, WT_CELL *cell, WT_CELL_UNPACK_KV *unpack_value)
+{
+    WT_DECL_RET;
+
+    ret = __wt_cell_unpack_safe(session, base_dsk, cell, NULL, unpack_value, NULL);
+    WT_ASSERT(session, ret == 0);
+    WT_UNUSED(ret); /* Avoid "unused variable" warnings in non-debug builds. */
+
+    if (__cell_unpack_window_need_cleanup(session, delta_dsk->write_gen))
+        __cell_kv_window_cleanup(session, unpack_value);
 }
 
 /*
@@ -1945,15 +2002,20 @@ __wt_page_cell_data_ref_kv(
  * when an entry is consumed or discarded, triggering a fresh decode on the next call.
  *
  * The base page header is passed to the unpack helpers so they can resolve timestamps stored
- * relative to the base page.
+ * relative to the base page. The delta's own header decides whether the cell's transaction ids are
+ * from an earlier run: keying that decision on the base image's write generation would clear the
+ * ids of a current-run delta cell whenever the base image happens to be older, publishing an
+ * address whose aggregate no longer covers the page it references.
  */
-#define WT_CELL_DELTA_INT_UNPACK(session, base_dsk, s)                                      \
-    do {                                                                                    \
-        __wt_cell_unpack_kv(session, base_dsk, (WT_CELL *)(s)->cell, &(s)->unpack.key);     \
-        (s)->cell += (s)->unpack.key.__len;                                                 \
-        __wt_cell_unpack_addr(session, base_dsk, (WT_CELL *)(s)->cell, &(s)->unpack.value); \
-        (s)->cell += (s)->unpack.value.__len;                                               \
-        (s)->unpacked = true;                                                               \
+#define WT_CELL_DELTA_INT_UNPACK(session, s)                                                 \
+    do {                                                                                     \
+        __wt_cell_unpack_kv_delta(                                                           \
+          session, (s)->base_dsk, (s)->delta_dsk, (WT_CELL *)(s)->cell, &(s)->unpack.key);   \
+        (s)->cell += (s)->unpack.key.__len;                                                  \
+        __wt_cell_unpack_addr_delta(                                                         \
+          session, (s)->base_dsk, (s)->delta_dsk, (WT_CELL *)(s)->cell, &(s)->unpack.value); \
+        (s)->cell += (s)->unpack.value.__len;                                                \
+        (s)->unpacked = true;                                                                \
     } while (0)
 
 /*
@@ -1974,29 +2036,32 @@ __wt_page_cell_data_ref_kv(
         (s)->unpacked = true;                                                             \
     } while (0)
 
-#define WT_CELL_FOREACH_DELTA_LEAF(session, dsk, unpack)                                        \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-          __i -= 2) {                                                                           \
+#define WT_CELL_FOREACH_DELTA_LEAF(session, dsk, unpack)                     \
+    do {                                                                     \
+        uint32_t __i;                                                        \
+        uint8_t *__cell;                                                     \
+        for (__cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk), \
+            __i = (dsk)->u.entries;                                          \
+          __i > 0; __i -= 2) {                                               \
             WT_CELL_DELTA_LEAF_UNPACK(session, dsk, unpack, __cell);
 
-#define WT_CELL_FOREACH_ADDR(session, dsk, unpack)                                              \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-          --__i) {                                                                              \
-            __wt_cell_unpack_addr(session, dsk, (WT_CELL *)__cell, &(unpack));                  \
+#define WT_CELL_FOREACH_ADDR(session, dsk, unpack)                             \
+    do {                                                                       \
+        uint32_t __i;                                                          \
+        uint8_t *__cell;                                                       \
+        for (__cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk),   \
+            __i = (dsk)->u.entries;                                            \
+          __i > 0; --__i) {                                                    \
+            __wt_cell_unpack_addr(session, dsk, (WT_CELL *)__cell, &(unpack)); \
             __cell += (unpack).__len;
 
-#define WT_CELL_FOREACH_KV(session, dsk, unpack)                                                \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-          __cell += (unpack).__len, --__i) {                                                    \
+#define WT_CELL_FOREACH_KV(session, dsk, unpack)                             \
+    do {                                                                     \
+        uint32_t __i;                                                        \
+        uint8_t *__cell;                                                     \
+        for (__cell = WT_PAGE_HEADER_READ_BYTE(session, S2BT(session), dsk), \
+            __i = (dsk)->u.entries;                                          \
+          __i > 0; __cell += (unpack).__len, --__i) {                        \
             __wt_cell_unpack_kv(session, dsk, (WT_CELL *)__cell, &(unpack));
 
 #define WT_CELL_FOREACH_END \

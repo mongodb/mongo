@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -70,7 +44,7 @@ namespace mongo {
  */
 extern FailPoint disableMatchExpressionOptimization;
 
-class MONGO_MOD_PUBLIC MatchExpression {
+class [[MONGO_MOD_PUBLIC]] MatchExpression {
     MatchExpression(const MatchExpression&) = delete;
     MatchExpression& operator=(const MatchExpression&) = delete;
 
@@ -523,6 +497,30 @@ public:
      */
     static bool isInternalNodeWithPath(MatchType m);
 
+    //
+    // Dynamic predicate reordering: selectivity accounting.
+    //
+    // A node that is the child of a reordering-enabled AND/OR/NOR node accumulates the number of
+    // times it short-circuited its parent's evaluation. The parent periodically sorts its children
+    // by this counter so that the child most likely to terminate evaluation early is tried first.
+    // See 'ListOfMatchExpression::allowReordering()'.
+
+    /**
+     * Records that this node short-circuited the evaluation of its parent. Called on the hot path,
+     * once per evaluated document at most.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE void incrementShortCircuitCounter() const {
+        ++_shortCircuitCounter;
+    }
+
+    std::uint32_t getShortCircuitCounter() const {
+        return _shortCircuitCounter;
+    }
+
+    void resetShortCircuitCounter() const {
+        _shortCircuitCounter = 0;
+    }
+
 protected:
     /**
      * Subclasses that are collation-aware must implement this method in order to capture changes
@@ -546,6 +544,12 @@ protected:
 
 private:
     MatchType _matchType;
+
+    // Number of times this node short-circuited the evaluation of its parent since the parent last
+    // reordered its children. It stays zero for a node whose parent does not
+    // have reordering enabled, which is every node of every non-change-stream query.
+    mutable std::uint32_t _shortCircuitCounter = 0;
+
     std::unique_ptr<TagData> _tagData;
 };
 
@@ -565,6 +569,6 @@ inline MatchExpression::ConstIterator end(const MatchExpression& expr) {
     return {&expr, expr.numChildren()};
 }
 
-using StatusWithMatchExpression MONGO_MOD_PUBLIC = StatusWith<std::unique_ptr<MatchExpression>>;
+using StatusWithMatchExpression [[MONGO_MOD_PUBLIC]] = StatusWith<std::unique_ptr<MatchExpression>>;
 
 }  // namespace mongo

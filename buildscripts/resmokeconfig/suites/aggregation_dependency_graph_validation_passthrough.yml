@@ -12,7 +12,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/aggregation/**/*.js
-    - jstests/product_limits/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
   exclude_files:
     # Exclude helper and utility files that aren't actual tests
     - jstests/aggregation/extras/**/*.js
@@ -20,20 +20,21 @@ selector:
     # which conflicts with the suite's automatic stage injection and the stage's
     # internal-only (non-user-request) gating.
     - jstests/aggregation/sources/internal_assert_data_assumptions_test.js
-    # TODO SERVER-127290
-    - jstests/aggregation/sources/shred_documents.js
     # TODO SERVER-23229: remove when the underlying issue is resolved.
     - jstests/aggregation/sources/group/groupMissing.js
     # TODO SERVER-127292
     - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
-    # TODO SERVER-127304
+    # Numeric field names in the lookup join keys trigger a pre-existing bug in dependency graph
+    # validation (canPathBeArray() false-negative), unrelated to this test's logic (SERVER-127302).
+    - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_sparse.js
+    # TODO SERVER-127292: $_internalAssertDataAssumptions blocks SBE pushdown, causing $lookup to
+    # fall back to the classic engine which does a full foreign collection scan per local document,
+    # making scannedObjects counts diverge from the SBE-optimized values this test asserts.
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/sources/project/remove_redundant_projects.js
-    # TODO SERVER-128465
-    - jstests/aggregation/**/*pbt*.js
     # This test deliberately constructs pipelines at the 1000-stage limit; injecting
     # $_internalAssertDataAssumptions stages pushes them over the limit.
     - jstests/aggregation/exec/query_limits_test.js
-    - jstests/product_limits/query_limits_test.js
 
 executor:
   fixture:

@@ -17,6 +17,7 @@
  *   uses_multi_shard_transaction,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -34,8 +35,14 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: foreignNs, find: {_id: MinKey}, to: st.shard1.shardName}),
 );
 st.refreshCatalogCacheForNs(st.s, foreignNs);
-assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
-assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(
+        st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: foreignNs}),
+    );
+    assert.commandWorked(
+        st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: foreignNs}),
+    );
+}
 
 // Pre-populate local (so the $lookup has input) and pre-warm shard0's catalog cache for foreign so
 // the in-txn $lookup doesn't trigger a refresh that snapshot read concern would reject.

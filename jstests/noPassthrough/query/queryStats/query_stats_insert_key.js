@@ -2,7 +2,7 @@
  * This test confirms that query stats store key fields for an insert command are properly nested
  * and none are missing.
  *
- * @tags: [featureFlagQueryStatsInsert]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
@@ -13,7 +13,10 @@ import {
     resetQueryStatsStore,
     runCommandAndValidateQueryStats,
 } from "jstests/libs/query/query_stats_utils.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {
+    shardedWriteCmdQueryStatsFixture,
+    standaloneWriteCmdQueryStatsFixture,
+} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 
 const collName = jsTestName();
 
@@ -141,37 +144,13 @@ function runInsertKeyTests(topologyName, setupFn, teardownFn, validateFn = null)
     });
 }
 
-runInsertKeyTests(
-    "Standalone",
-    () => {
-        const conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
-        });
-        const testDB = conn.getDB("test");
-        testDB[collName].drop();
-        return {fixture: conn, testDB};
-    },
-    (fixture) => MongoRunner.stopMongod(fixture),
-);
+const standalone = standaloneWriteCmdQueryStatsFixture();
+runInsertKeyTests("Standalone", standalone.setupFn, standalone.teardownFn);
 
-runInsertKeyTests(
-    "Sharded",
-    () => {
-        const st = new ShardingTest({
-            shards: 2,
-            mongosOptions: {
-                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
-            },
-        });
-        const testDB = st.s.getDB("test");
-        st.shardColl(testDB[collName], {_id: 1}, {_id: 1}, {_id: 1});
-        return {fixture: st, testDB};
-    },
-    (st) => st.stop(),
-    ({testDB, coll}) => {
-        const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
-        assert.gte(Object.keys(stats.shards).length, 2, "Expected chunks on at least 2 shards", {
-            shards: stats.shards,
-        });
-    },
-);
+const sharded = shardedWriteCmdQueryStatsFixture(collName);
+runInsertKeyTests("Sharded", sharded.setupFn, sharded.teardownFn, ({testDB, coll}) => {
+    const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
+    assert.gte(Object.keys(stats.shards).length, 2, "Expected chunks on at least 2 shards", {
+        shards: stats.shards,
+    });
+});

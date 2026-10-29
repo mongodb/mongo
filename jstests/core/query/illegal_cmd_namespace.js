@@ -11,7 +11,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // On a sharded cluster we need to create the database to throw the expected error instead of just
 // returning an empty batch.
-if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+if (FixtureHelpers.isMongos(db)) {
     // Create database
     assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }

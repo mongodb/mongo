@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 
@@ -442,7 +416,7 @@ boost::optional<KeyStringEntry> _getNextDistinctKeyInIndex(
     // to the next distinct keyString after the current one.
     key_string::Builder builder(version);
     auto keyStringForSeekWithoutRecordId = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-        currKeyStringBson, ordering, true /*isForward*/, false /*inclusive*/, builder);
+        currKeyStringBson, ordering, /*isForward=*/true, /*inclusive=*/false, builder);
 
     return indexCursor->seekForKeyString(opCtx, keyStringForSeekWithoutRecordId);
 }
@@ -482,7 +456,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
 
     auto indexCursor =
         std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
-    indexCursor->setEndPosition(batchEndBson, true /*inclusive*/);
+    indexCursor->setEndPosition(batchEndBson, /*inclusive=*/true);
 
     LOGV2_DEBUG(8065400,
                 3,
@@ -819,10 +793,36 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                                                                  << "objId" << rehydratedObjId));
                 }
                 HealthLogInterface::get(opCtx)->log(*logEntry);
+
+                // It is important that data InvalidBSON is skipped so that BSONObj methods are not
+                // called on structurally invalid BSON.
+                if (status.code() != ErrorCodes::NonConformantBSON) {
+                    continue;
+                }
             }
         }
 
-        BSONObj currentObj = record.toBson();
+        BSONObj currentObj;
+        try {
+            // TODO(SERVER-133724): Ensure data is validated before calling `toBson`, or avoid
+            // using BSONObj.
+            currentObj = record.toBson();
+        } catch (const ExceptionFor<ErrorCodes::BSONInternalError>& ex) {
+            const auto msg = "Document is not well-formed BSON";
+            const auto status = Status(ex.code(), msg);
+            std::unique_ptr<HealthLogEntry> logEntry = dbCheckErrorHealthLogEntry(
+                _secondaryIndexCheckParameters,
+                collPtr->ns(),
+                collPtr->uuid(),
+                msg,
+                ScopeEnum::Document,
+                OplogEntriesEnum::Batch,
+                status,
+                BSON("recordID" << currentRecordId.toString() << "objId" << rehydratedObjId));
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            continue;
+        }
+
         if (!currentObj.hasField("_id")) {
             return Status(ErrorCodes::NoSuchKey,
                           "Document with record ID " + currentRecordId.toString() + " missing _id");
@@ -1060,8 +1060,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    entry.getSecondaryIndexCheckParameters(),
                                    &dataThrottle,
                                    indexName,
-                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
-                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                                   /*maxBytes=*/std::numeric_limits<int64_t>::max(),
                                    Date_t::now() +
                                        Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
 
@@ -1084,9 +1084,9 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
                                    &dataThrottle,
-                                   boost::none,                         /*indexName*/
-                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
-                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   /*indexName=*/boost::none,
+                                   /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                                   /*maxBytes=*/std::numeric_limits<int64_t>::max(),
                                    Date_t::now() +
                                        Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
                     uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
@@ -1101,9 +1101,9 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                            batchEnd,
                            entry.getSecondaryIndexCheckParameters(),
                            &dataThrottle,
-                           boost::none,                         /*indexName*/
-                           std::numeric_limits<int64_t>::max(), /*maxCount*/
-                           std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                           /*indexName=*/boost::none,
+                           /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                           /*maxBytes=*/std::numeric_limits<int64_t>::max(),
                            Date_t::now() +
                                Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
             const auto status = hasher->hashForCollectionCheck(opCtx, collection);
@@ -1297,7 +1297,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             auto healthLogEntry =
                 mongo::dbCheckHealthLogEntry(invocation.getSecondaryIndexCheckParameters(),
                                              invocation.getNss(),
-                                             boost::none /*collectionUUID*/,
+                                             /*collectionUUID=*/boost::none,
                                              SeverityEnum::Warning,
                                              warningMsg,
                                              ScopeEnum::Cluster,
@@ -1323,7 +1323,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                 skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
                 ScopeEnum::Cluster,
                 type,
-                boost::none /*data*/);
+                /*data=*/boost::none);
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
             if (MONGO_unlikely(sleepToWaitForHealthLogWrite.shouldFail()) &&

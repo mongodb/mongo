@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
 
@@ -54,6 +28,11 @@ constexpr std::string_view kDataCapacity = "systemMetrics.mounts.data.capacity"s
 constexpr std::string_view kDataAvailable = "systemMetrics.mounts.data.available"sv;
 constexpr std::string_view kDataFree = "systemMetrics.mounts.data.free"sv;
 constexpr std::string_view kTmpCapacity = "systemMetrics.mounts.tmp.capacity"sv;
+
+// A mountpoint whose name will not resolve to a valid otel metric name
+constexpr std::string_view kInvalidMount = "/run/user/1000"sv;
+constexpr std::string_view kInvalidMountMetricName =
+    "systemMetrics.mounts.run.user.1000.capacity"sv;
 
 BSONObj makeMountsBson(std::string_view mountpoint,
                        long long capacity,
@@ -127,6 +106,36 @@ TEST_F(SystemMountOtelMetricsTest, UpdateIsIdempotentForSameValues) {
 
     auto passkey = DynamicMetricNameTestPasskeyMaker::make();
     ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 8000);
+}
+
+TEST_F(SystemMountOtelMetricsTest, SkipMountpointsWithInvalidNames) {
+    // The valid mountpoint (kDataMount) should create a metric, and the invalid mountpoint
+    // (kInvalidMount) should be skipped.
+    SystemMountMetrics metrics{{std::string(kDataMount), std::string(kInvalidMount)}};
+
+    BSONObjBuilder both;
+    {
+        BSONObjBuilder sub(both.subobjStart(kDataMount));
+        sub.appendNumber("capacity", 1000LL);
+        sub.appendNumber("available", 400LL);
+        sub.appendNumber("free", 500LL);
+    }
+    {
+        BSONObjBuilder sub(both.subobjStart(kInvalidMount));
+        sub.appendNumber("capacity", 9000LL);
+        sub.appendNumber("available", 100LL);
+        sub.appendNumber("free", 200LL);
+    }
+    metrics.update(both.obj());
+
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 1000);
+
+    // The metric name should never have been registered.
+    ASSERT_THROWS_CODE(
+        _capturer.readInt64Gauge(DynamicMetricNameMaker::make(kInvalidMountMetricName, passkey)),
+        DBException,
+        ErrorCodes::KeyNotFound);
 }
 
 }  // namespace

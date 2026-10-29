@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,9 +13,14 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/functional.h"
 
+#include <functional>
 #include <variant>
 
 #include <boost/optional/optional.hpp>
+
+namespace mongo {
+class ScopedCollectionFilter;
+}  // namespace mongo
 
 namespace mongo::exec::agg {
 
@@ -91,18 +70,61 @@ public:
         return std::holds_alternative<Local>(d);
     }
 
+    /**
+     * What acquisition (if any) the caller already holds, passed to run() so eligibility can skip
+     * routing when ownership is already determinable from a held acquisition.
+     *
+     * The arms differ in how a Local decision relates to placement staleness:
+     *   - HeldUnshardedCollectionLocally / HeldShardedCollection: the decision reflects the
+     *     placement observed when the held acquisition was taken (some time T). The caller installs
+     *     nothing further.
+     *   - NoHeldAcquisition: the decision is based on the latest, possibly stale, cached routing
+     *     information. A Local decision therefore carries the shard/db version it was based on, and
+     *     the caller MUST take a versioned acquisition on the namespace. If placement changed since
+     *     the decision, that acquisition throws StaleConfig, which run() refreshes and retries.
+     *
+     * Arm -> decision:
+     *   NoHeldAcquisition              -> Use routing information to determine if the document
+     *                                     belongs to this shard. Returns a version to attach to
+     *                                     ScopedSetShardRole before acquiring the collection.
+     *   HeldUnshardedCollectionLocally -> Collection is unsharded on the local shard.
+     *                                     Nothing to install as collection is already acquired.
+     *   HeldShardedCollection          -> Consult keyBelongsToMe() on the ScopedCollectionFilter.
+     *                                     Nothing to install as collection is already acquired.
+     */
+    struct NoHeldAcquisition {};
+    struct HeldUnshardedCollectionLocally {};
+    struct HeldShardedCollection {
+        std::reference_wrapper<const ScopedCollectionFilter> filter;
+    };
+    using AcquisitionState =
+        std::variant<NoHeldAcquisition, HeldUnshardedCollectionLocally, HeldShardedCollection>;
+
     virtual ~LocalLookupEligibility() = default;
 
     /**
-     * Computes the Decision for (nss, documentKey), invokes 'body' with it, and returns body's
-     * result. The eligibility owns catalog-and-routing (CAR) error handling, so 'body' stays
-     * sharding-agnostic.
+     * Computes the Decision for (nss, documentKey) given what the caller currently holds
+     * 'acquisitionState', invokes 'body' with it, and returns body's result. On the
+     * NoHeldAcquisition arm the eligibility owns catalog-and-routing (CAR) error handling, so
+     * 'body' stays sharding-agnostic.
      */
     virtual SingleDocumentLookupExecutor::LookupResult run(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body) const = 0;
+
+    /**
+     * Whether a Local decision from this eligibility, for a sharded collection, is reached by
+     * inspecting the documentKey's shard key (CRI targeting or keyBelongsToMe). When true,
+     * ownership has already been resolved per lookup, so the executor may skip the redundant
+     * post-read shard filter that would otherwise drop orphans. Eligibilities that only ever decide
+     * Local for unsharded collections (no shard filter exists to skip) are unaffected either way.
+     */
+    virtual bool checksShardKeyOwnership() const {
+        return false;
+    }
 };
 
 /**
@@ -117,6 +139,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body)
         const override {
         return body(Local{});
@@ -132,6 +155,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const Document& documentKey,
+        const AcquisitionState& acquisitionState,
         function_ref<SingleDocumentLookupExecutor::LookupResult(const Decision&)> body)
         const override {
         return body(Unknown{});

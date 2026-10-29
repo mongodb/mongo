@@ -120,7 +120,12 @@ export function populateSimplePlanStabilityDataset(collName, collSize) {
         assert.commandWorked(coll.createIndex({[field + "_compound"]: 1}));
 
         for (const suffix of ["_idx", "_noidx", "_compound"]) {
-            db.runCommand({analyze: collName, key: field + suffix, numberBuckets: 1000});
+            db.runCommand({
+                analyze: collName,
+                mode: "histograms",
+                key: field + suffix,
+                numberBuckets: 1000,
+            });
         }
     }
 

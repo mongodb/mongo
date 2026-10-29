@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/repl/task_runner.h"
@@ -235,14 +209,18 @@ TEST_F(TaskRunnerTest, Cancel) {
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
+    bool activeChecked = false;
 
-    // Running this task causes the task runner to wait for another task that
-    // is never scheduled.
+    // The task blocks until the test has checked isActive(). Otherwise the task could complete and
+    // make the task runner inactive before the check.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        std::lock_guard<std::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         status = theStatus;
         taskRunning = true;
         condition.notify_all();
+        while (!activeChecked) {
+            condition.wait(lk);
+        }
         return TaskRunner::NextAction::kDisposeOperationContext;
     };
 
@@ -251,13 +229,18 @@ TEST_F(TaskRunnerTest, Cancel) {
     getTaskRunner().cancel();
 
     getTaskRunner().schedule(task);
-    ASSERT_TRUE(getTaskRunner().isActive());
+    // Capture the result before unblocking the task so a failed assertion below cannot leave the
+    // task blocked in its condition wait.
+    bool isActiveResult = getTaskRunner().isActive();
     {
         std::unique_lock<std::mutex> lk(mutex);
+        activeChecked = true;
+        condition.notify_all();
         while (!taskRunning) {
             condition.wait(lk);
         }
     }
+    ASSERT_TRUE(isActiveResult);
 
     // It is fine to call cancel() multiple times.
     getTaskRunner().cancel();
@@ -312,25 +295,34 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
+    bool activeChecked = false;
 
-    // Running this task causes the task runner to wait for another task that
-    // is never scheduled.
+    // The task blocks until the test has checked isActive(). Otherwise the task could complete and
+    // make the task runner inactive before the check.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        std::lock_guard<std::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         status = theStatus;
         taskRunning = true;
         condition.notify_all();
+        while (!activeChecked) {
+            condition.wait(lk);
+        }
         return TaskRunner::NextAction::kDisposeOperationContext;
     };
 
     getTaskRunner().schedule(task);
-    ASSERT_TRUE(getTaskRunner().isActive());
+    // Capture the result before unblocking the task so a failed assertion below cannot leave the
+    // task blocked in its condition wait.
+    bool isActiveResult = getTaskRunner().isActive();
     {
         std::unique_lock<std::mutex> lk(mutex);
+        activeChecked = true;
+        condition.notify_all();
         while (!taskRunning) {
             condition.wait(lk);
         }
     }
+    ASSERT_TRUE(isActiveResult);
 
     destroyTaskRunner();
 

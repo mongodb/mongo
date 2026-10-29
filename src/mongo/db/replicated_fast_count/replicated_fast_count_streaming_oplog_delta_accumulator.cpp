@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 
@@ -43,6 +17,7 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
+using namespace std::literals::string_view_literals;
 
 // ---------- Layer 1 / Layer 2 fast-scan support ----------
 //
@@ -53,10 +28,12 @@ namespace {
 //
 // Layer 1 catches "no delta possible" entries from raw BSON: noop / km / container ops and
 // commands whose `o.firstElement` isn't in the set we dispatch on. Direct CRUD on a fast-count-
-// store namespace lands here too.
+// store namespace lands here too. A noop whose o2 identifies a repairReplicatedMetadata entry is
+// routed to Layer 2 instead, since it carries explicit metadata diff.
 //
 // Layer 2 handles single-op CRUD (`i`/`u`/`d`) on user collections that carry an `m` size-
-// metadata object. It computes the delta and records it directly.
+// metadata object, and repairReplicatedMetadata noop entries. It computes the delta and records
+// it directly.
 //
 // Anything else (importCollection, kCreate-from-migrate, partial-txn chain members, malformed
 // entries) falls through to the Layer 3 OplogEntry::parse path inside DeltaAccumulator.
@@ -64,20 +41,21 @@ namespace {
 // Helper used by the fast lanes to accumulate per-uuid deltas. Same semantics as the homonymous
 // helper in `replicated_fast_count_delta_utils.cpp` (private there); duplicated here to keep
 // the fast lanes self-contained.
-void recordCollectionSizeCountDelta(const UUID& uuid,
-                                    const CollectionSizeCount& sizeCountDelta,
-                                    SizeCountDeltas& sizeCountDeltasOut) {
-    auto [it, inserted] =
-        sizeCountDeltasOut.try_emplace(uuid, SizeCountDelta{sizeCountDelta, DDLState::kNone});
+void recordCollectionReplicatedMetadataDelta(
+    const UUID& uuid,
+    const CollectionReplicatedMetadata& metadataDelta,
+    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    auto [it, inserted] = replicatedMetadataDeltasOut.try_emplace(
+        uuid, ReplicatedMetadataDelta{metadataDelta, DDLState::kNone});
     if (!inserted) {
-        it->second.sizeCount = it->second.sizeCount + sizeCountDelta;
+        it->second.metadata = it->second.metadata + metadataDelta;
     }
 }
 
 // Fields we read from a raw oplog BSON during the fast lanes. References live inside `raw`. The
 // caller must keep that BSONObj alive.
 struct ScanFields {
-    BSONElement op, ns, ui, m, o, ts, container;
+    BSONElement op, ns, ui, m, o, o2, ts, container;
 };
 
 // Single forward iteration over `raw`, capturing only the fields the fast lanes need. Also
@@ -100,6 +78,8 @@ ScanFields extractScanFields(const BSONObj& raw) {
                 const char a = fname[0], b = fname[1];
                 if (a == 'o' && b == 'p') {
                     v.op = elem;
+                } else if (a == 'o' && b == '2') {
+                    v.o2 = elem;
                 } else if (a == 'n' && b == 's') {
                     v.ns = elem;
                 } else if (a == 'u' && b == 'i') {
@@ -119,7 +99,7 @@ ScanFields extractScanFields(const BSONObj& raw) {
                 }
                 break;
             case 9:
-                if (fname == "container"_sd) {
+                if (fname == "container"sv) {
                     v.container = elem;
                 }
                 break;
@@ -128,23 +108,8 @@ ScanFields extractScanFields(const BSONObj& raw) {
     return v;
 }
 
-bool isFastCountStoreCollName(std::string_view coll) {
-    return coll == NamespaceString::kReplicatedFastCountStore ||
-        coll == NamespaceString::kReplicatedFastCountStoreTimestamps;
-}
-
-// True if `nsElem` references the no-tenant `config.fast_count_metadata_store{_timestamps}`
-// namespace.
-bool nsIsFastCountStore(BSONElement nsElem) {
-    if (nsElem.type() != BSONType::string) {
-        return false;
-    }
-    const auto ns = nsElem.valueStringData();
-    constexpr std::string_view kConfigDot = "config."_sd;
-    if (!ns.starts_with(kConfigDot)) {
-        return false;
-    }
-    return isFastCountStoreCollName(ns.substr(kConfigDot.size()));
+bool isContainerOpType(std::string_view op) {
+    return op.size() == 2 && op[0] == 'c' && (op[1] == 'i' || op[1] == 'u' || op[1] == 'd');
 }
 
 // Categorizes the `o.firstElement` of a `c` (command) entry.
@@ -164,12 +129,12 @@ CommandKind classifyCommand(BSONElement oElem, const BSONObj& raw) {
         return CommandKind::kMalformed;
     }
     const auto first = oElem.Obj().firstElement().fieldNameStringData();
-    if (first == "applyOps"_sd)
+    if (first == "applyOps"sv)
         return CommandKind::kApplyOps;
-    if (first == "commitTransaction"_sd)
+    if (first == "commitTransaction"sv)
         return CommandKind::kCommitTransaction;
-    if (first == "create"_sd || first == "drop"_sd || first == "truncateRange"_sd ||
-        first == "importCollection"_sd) {
+    if (first == "create"sv || first == "drop"sv || first == "truncateRange"sv ||
+        first == "importCollection"sv) {
         return CommandKind::kInterestingOther;
     }
     // Anything else falls into the "produces no delta" bucket. This covers known no-delta
@@ -192,18 +157,32 @@ enum class FastDecision {
     kCrud,
     kApplyOps,
     kCommitTxn,
+    kNoopRepair,
     kNeedsParse,
 };
 
+// The `type` discriminator value carried in the o2 of a no-op oplog entry that repairs a
+// collection's replicated metadata with explicit size/count/hash diffs or an absolute hash.
+constexpr std::string_view kRepairReplicatedMetadataType = "repairReplicatedMetadata"sv;
+
+// True if `o2` is the o2 object of a repairReplicatedMetadata no-op entry.
+bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
+    const auto typeElem = o2.getField("type"sv);
+    return typeElem.type() == BSONType::string &&
+        typeElem.valueStringData() == kRepairReplicatedMetadataType;
+}
+
 FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
+    // A malformed or missing `ts` must never be counted as "processed" by a fast lane: only
+    // entries whose `ts` is a real timestamp may advance `lastTimestamp`. Route anything else
+    // to Layer 3 so `repl::OplogEntry::parse` surfaces the error.
+    if (f.ts.type() != BSONType::timestamp) {
+        return FastDecision::kNeedsParse;
+    }
     if (f.op.type() != BSONType::string) {
         return FastDecision::kNeedsParse;
     }
     const auto opStr = f.op.valueStringData();
-
-    if (nsIsFastCountStore(f.ns)) {
-        return FastDecision::kFastCountStoreSkip;
-    }
 
     if (opStr.size() == 1) {
         switch (opStr[0]) {
@@ -212,6 +191,9 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
             case 'd':
                 return FastDecision::kCrud;
             case 'n':
+                if (f.o2.type() == BSONType::object && isRepairReplicatedMetadataO2(f.o2.Obj())) {
+                    return FastDecision::kNoopRepair;
+                }
                 return FastDecision::kCountedNoDelta;
             case 'c':
                 switch (classifyCommand(f.o, raw)) {
@@ -229,12 +211,10 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
         }
     } else if (opStr.size() == 2) {
         // Container ops (ci/cu/cd) and key material (km) never carry size metadata we count.
-        const bool isContainerOp =
-            opStr[0] == 'c' && (opStr[1] == 'i' || opStr[1] == 'u' || opStr[1] == 'd');
+        const bool isContainerOp = isContainerOpType(opStr);
         if (isContainerOp || (opStr[0] == 'k' && opStr[1] == 'm')) {
             // Container ops targeting a replicated-fast-count ident are internal writes; skip
-            // them without advancing lastTimestamp to avoid the feedback loop the typed path
-            // documents in `operationsOnFastCountStores`.
+            // them without advancing lastTimestamp.
             if (isContainerOp && f.container.type() == BSONType::string &&
                 ident::isReplicatedFastCountIdent(f.container.valueStringData())) {
                 return FastDecision::kFastCountStoreSkip;
@@ -251,7 +231,7 @@ FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
 // (0 or 1) when handled.
 boost::optional<int> tryRecordFastCrud(const ScanFields& f,
                                        const BSONObj& raw,
-                                       SizeCountDeltas& sizeCountDeltasOut) {
+                                       ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     if (f.m.eoo()) {
         return 0;  // No `m` field → no delta possible from this entry. Counted as "processed".
     }
@@ -262,9 +242,23 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
     }
     const auto mObj = f.m.Obj();
     const auto szElem = mObj.getField(SingleOpSizeMetadata::kSzFieldName);
-    if (szElem.eoo() || !szElem.isNumber()) {
-        // `sz` is required and must be numeric per SingleOpSizeMetadata. Anything else is
+    const auto hElem = mObj.getField(SingleOpSizeMetadata::kHFieldName);
+    if (szElem.eoo()) {
+        if (!hElem.eoo()) {
+            // A hash with no size delta is a contribution that cannot be folded in. Fall through
+            // so Layer 3 reports it and skips the entry, keeping that in one place.
+            return boost::none;
+        }
+        return 0;  // No `sz` field → no delta possible from this entry. Counted as "processed".
+    }
+    if (!szElem.isNumber()) {
+        // `sz` must be numeric per SingleOpSizeMetadata. Anything else is
         // malformed; fall through to Layer 3.
+        return boost::none;
+    }
+    if (!hElem.eoo() && !hElem.isNumber()) {
+        // `h` must be numeric per SingleOpSizeMetadata. Anything else is malformed; fall through
+        // to Layer 3.
         return boost::none;
     }
     if (f.ns.type() != BSONType::string) {
@@ -288,7 +282,8 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
     }
     if (f.ui.eoo()) {
         // Missing `ui` is an invariant violation; let Layer 3 surface it via its existing
-        // massert in `extractSizeCountDeltaForOpImpl` so the failure message stays in one place.
+        // massert in `extractReplicatedMetadataForOpImpl` so the failure message stays in one
+        // place.
         return boost::none;
     }
     const auto entryUuid = uassertStatusOK(UUID::parse(f.ui));
@@ -306,10 +301,16 @@ boost::optional<int> tryRecordFastCrud(const ScanFields& f,
         default:
             MONGO_UNREACHABLE;
     }
-    recordCollectionSizeCountDelta(
+    boost::optional<int64_t> hash;
+    if (!hElem.eoo()) {
+        hash = hElem.safeNumberLong();
+    }
+    recordCollectionReplicatedMetadataDelta(
         entryUuid,
-        CollectionSizeCount{.size = szElem.safeNumberInt(), .count = countDelta},
-        sizeCountDeltasOut);
+        CollectionReplicatedMetadata{
+            .sizeCount = CollectionSizeCount{.size = szElem.safeNumberInt(), .count = countDelta},
+            .hash = hash},
+        replicatedMetadataDeltasOut);
     return 1;
 }
 
@@ -324,27 +325,31 @@ struct FastApplyOpsOutcome {
     int processed = 0;
 };
 
-// Layer 2.5: handle a non-partial `applyOps` whose inner ops are all simple CRUD (i/u/d) with
-// their own `m` size metadata and `ui`. The caller must not have an active partial-txn chain.
+// Layer 2.5: handle a non-partial `applyOps` whose inner ops are simple CRUD (i/u/d) with their
+// own `m` size metadata and `ui`, and/or container ops (ci/cu/cd). The caller must not have an
+// active partial-txn chain.
 //
-// Inner ops that target the internal fast-count-store are tracked separately. If every inner op
-// is internal the outcome is `kAllInternal` (skip the entry, like `operationsOnFastCountStores`).
-// If the applyOps mixes user and internal inner ops, the internal ones are dropped silently and
-// only the user-collection deltas are recorded.
-FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCountDeltasOut) {
+// Inner ops that target the internal fast-count-store (a fast-count-store namespace, or a
+// container op on a replicated-fast-count ident) are tracked separately. If every inner op is
+// internal the outcome is `kAllInternal`, skip the entry.
+// Otherwise the outcome is `kProcessed`: internal inner ops are dropped silently, container ops on
+// other idents contribute no delta but still advance the checkpoint, and user-collection CRUD
+// deltas are recorded.
+FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f,
+                                    ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     const auto oObj = f.o.Obj();
 
     // Prepared applyOps hold their deltas until the matching commitTransaction. The prepare entry
     // itself contributes zero deltas. TxnDeltaBuffer also returns 0 in this case (after clearing
     // any active chain). Caller's `!isTrackingChain()` gate guarantees no chain to clear, so we
     // just record 0 (counted as processed, ts advances).
-    if (oObj.getField("prepare"_sd).trueValue()) {
+    if (oObj.getField("prepare"sv).trueValue()) {
         return {FastApplyOpsOutcome::kProcessed, 0};
     }
     // Partial-transaction members must go through Layer 3: one OplogEntry::parse to seed the
     // chain in TxnDeltaBuffer, after which subsequent chain entries flow through Layer 3 because
     // `isTrackingChain()` returns true.
-    if (oObj.getField("partialTxn"_sd).trueValue()) {
+    if (oObj.getField("partialTxn"sv).trueValue()) {
         return {FastApplyOpsOutcome::kFallThrough};
     }
 
@@ -356,8 +361,8 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
 
     // Accumulate into a local map so that if a later inner op forces a Layer 3 fall-through, the
     // earlier inner ops' deltas don't double-count when Layer 3 reprocesses the whole applyOps.
-    SizeCountDeltas localDeltas;
-    bool sawUserOp = false;
+    ReplicatedMetadataDeltas localDeltas;
+    bool sawNonInternalOp = false;
     int processed = 0;
 
     for (const auto& innerElem : innerArray) {
@@ -375,12 +380,30 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
             innerF.m = f.m;
         }
 
-        // Layer 2.5 only handles inner CRUD. Anything else (nested applyOps, kCreate/kDrop,
-        // truncateRange, etc.) requires the full dispatch.
+        // Layer 2.5 handles inner CRUD (i/u/d) and container ops (ci/cu/cd). Anything else (nested
+        // applyOps, kCreate/kDrop, truncateRange, etc.) requires the full dispatch.
         if (innerF.op.type() != BSONType::string) {
             return {FastApplyOpsOutcome::kFallThrough};
         }
         const auto innerOp = innerF.op.valueStringData();
+
+        // Container ops (ci/cu/cd) carry no collection size/count delta. Mirrors the bare-container
+        // handling in classifyForFastLane().
+        if (isContainerOpType(innerOp)) {
+            if (innerF.container.type() != BSONType::string) {
+                return {FastApplyOpsOutcome::kFallThrough};
+            }
+            if (ident::isReplicatedFastCountIdent(innerF.container.valueStringData())) {
+                // Internal fast-count-store inner op; skip it without advancing the checkpoint, to
+                // avoid the feedback loop.
+                continue;
+            }
+            // Container op on any other ident (e.g. an index container). No delta, but it is a real
+            // replicated op, so the entry must still advance the checkpoint timestamp.
+            sawNonInternalOp = true;
+            continue;
+        }
+
         if (innerOp.size() != 1) {
             return {FastApplyOpsOutcome::kFallThrough};
         }
@@ -389,12 +412,7 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
             return {FastApplyOpsOutcome::kFallThrough};
         }
 
-        if (nsIsFastCountStore(innerF.ns)) {
-            // Internal fast-count-store inner op contributes no delta.
-            continue;
-        }
-
-        sawUserOp = true;
+        sawNonInternalOp = true;
         auto handled = tryRecordFastCrud(innerF, innerRaw, localDeltas);
         if (!handled) {
             // Inner op had a shape Layer 2 couldn't handle. Bail out so Layer 3 can reprocess
@@ -404,20 +422,21 @@ FastApplyOpsOutcome tryFastApplyOps(const ScanFields& f, SizeCountDeltas& sizeCo
         processed += *handled;
     }
 
-    if (!sawUserOp) {
+    if (!sawNonInternalOp) {
         // Every inner op was on the fast-count-store. Skip the entry entirely.
         return {FastApplyOpsOutcome::kAllInternal};
     }
 
     for (const auto& [uuid, delta] : localDeltas) {
-        recordCollectionSizeCountDelta(uuid, delta.sizeCount, sizeCountDeltasOut);
+        recordCollectionReplicatedMetadataDelta(uuid, delta.metadata, replicatedMetadataDeltasOut);
     }
     return {FastApplyOpsOutcome::kProcessed, processed};
 }
 
 // Layer 2.5: handle a `commitTransaction` entry by reading the `m` array variant directly.
 // Returns boost::none if the shape is unexpected; `m` absent yields 0.
-boost::optional<int> tryFastCommitTxn(const ScanFields& f, SizeCountDeltas& sizeCountDeltasOut) {
+boost::optional<int> tryFastCommitTxn(const ScanFields& f,
+                                      ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
     if (f.m.eoo()) {
         return 0;
     }
@@ -437,13 +456,93 @@ boost::optional<int> tryFastCommitTxn(const ScanFields& f, SizeCountDeltas& size
             return boost::none;
         }
         const auto uuid = uassertStatusOK(UUID::parse(uuidElem));
-        recordCollectionSizeCountDelta(
+        // TODO SERVER-133292: Support tracking the collection hash with prepared transactions.
+        recordCollectionReplicatedMetadataDelta(
             uuid,
-            CollectionSizeCount{.size = szElem.safeNumberLong(), .count = ctElem.safeNumberLong()},
-            sizeCountDeltasOut);
+            CollectionReplicatedMetadata{.sizeCount =
+                                             CollectionSizeCount{.size = szElem.safeNumberLong(),
+                                                                 .count = ctElem.safeNumberLong()},
+                                         .hash = boost::none},
+            replicatedMetadataDeltasOut);
         ++processed;
     }
     return processed;
+}
+
+// The uuid and metadata carried by a repairReplicatedMetadata o2 object.
+struct NoopRepair {
+    UUID uuid;
+    CollectionReplicatedMetadata metadata;
+    HashUpdateMode hashUpdateMode;
+};
+
+// Extracts the collection uuid and metadata from a repairReplicatedMetadata o2 object. Returns
+// boost::none if the shape is malformed (missing/non-numeric fields, both `hDiff` and `hSet`,
+// unparsable uuid). Unlike CRUD's `m`, a no-op's o2 isn't otherwise validated by replication, so a
+// malformed repair entry is ignored (no delta) rather than treated as fatal.
+boost::optional<NoopRepair> tryExtractNoopRepair(const BSONObj& o2Obj) {
+    const auto uuidElem = o2Obj.getField("uuid"sv);
+    const auto mElem = o2Obj.getField("m"sv);
+    if (uuidElem.eoo() || !mElem.isABSONObj()) {
+        return boost::none;
+    }
+    const auto mObj = mElem.Obj();
+    const auto szElem = mObj.getField("sz"sv);
+    const auto ctElem = mObj.getField("ct"sv);
+    const auto hDiffElem = mObj.getField("hDiff"sv);
+    const auto hSetElem = mObj.getField("hSet"sv);
+    if (szElem.eoo() && ctElem.eoo() && hDiffElem.eoo() && hSetElem.eoo()) {
+        return boost::none;
+    }
+    // `sz`, `ct`, `hDiff`, and `hSet` are each optional but a present field must be numeric;
+    // malformed input invalidates the whole entry rather than partially applying it.
+    const auto isMalformed = [](const BSONElement& elem) {
+        return !elem.eoo() && !elem.isNumber();
+    };
+    if (isMalformed(szElem) || isMalformed(ctElem) || isMalformed(hDiffElem) ||
+        isMalformed(hSetElem) || (!hDiffElem.eoo() && !hSetElem.eoo())) {
+        return boost::none;
+    }
+    auto uuid = UUID::parse(uuidElem);
+    if (!uuid.isOK()) {
+        return boost::none;
+    }
+    const CollectionSizeCount sizeCount{.size = szElem.eoo() ? 0 : szElem.safeNumberLong(),
+                                        .count = ctElem.eoo() ? 0 : ctElem.safeNumberLong()};
+    if (!hSetElem.eoo()) {
+        return NoopRepair{.uuid = uuid.getValue(),
+                          .metadata = {.sizeCount = sizeCount, .hash = hSetElem.safeNumberLong()},
+                          .hashUpdateMode = HashUpdateMode::kSet};
+    }
+    // An absent `hDiff` folds as the XOR identity so that the window's accumulated hash is
+    // preserved.
+    return NoopRepair{.uuid = uuid.getValue(),
+                      .metadata = {.sizeCount = sizeCount,
+                                   .hash = hDiffElem.eoo() ? kEmptyCollectionValidationHash
+                                                           : hDiffElem.safeNumberLong()},
+                      .hashUpdateMode = HashUpdateMode::kFold};
+}
+
+// Layer 2: handle a no-op entry whose o2 repairs a collection's replicated metadata. A malformed
+// o2 is ignored (no delta) rather than surfaced as an error. Always fully handled.
+int tryRecordFastNoopRepair(const ScanFields& f,
+                            ReplicatedMetadataDeltas& replicatedMetadataDeltasOut) {
+    auto repair = tryExtractNoopRepair(f.o2.Obj());
+    if (!repair) {
+        return 0;
+    }
+    if (repair->hashUpdateMode == HashUpdateMode::kFold) {
+        recordCollectionReplicatedMetadataDelta(
+            repair->uuid, repair->metadata, replicatedMetadataDeltasOut);
+        return 1;
+    }
+    // Size and count still add up, but the set hash overrides every hash contribution before it in
+    // the window. Later contributions fold into the set value.
+    auto& delta = replicatedMetadataDeltasOut[repair->uuid];
+    delta.metadata.sizeCount = delta.metadata.sizeCount + repair->metadata.sizeCount;
+    delta.metadata.hash = repair->metadata.hash;
+    delta.hashUpdateMode = HashUpdateMode::kSet;
+    return 1;
 }
 
 // Returns true if the oplog entry is a container operation on a replicated fast count ident.
@@ -451,59 +550,10 @@ bool isContainerOpOnFastCountIdent(const repl::OplogEntry& oplogEntry) {
     auto container = oplogEntry.getContainer();
     return container && ident::isReplicatedFastCountIdent(*container);
 }
-
-// Returns true if all operations within the provided oplog entry are on the internal fast count
-// collections or containers.
-bool operationsOnFastCountStores(const NamespaceString& nss, const repl::OplogEntry& oplogEntry) {
-    if (isContainerOpOnFastCountIdent(oplogEntry)) {
-        return true;
-    }
-
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-
-    if (nss == fastCountStoreNss || nss == fastCountTimestampNss) {
-        return true;
-    }
-
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kCreate ||
-        oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kDrop) {
-        // kCreate/kDrop entries use the $cmd namespace (e.g. config.$cmd), not the target
-        // collection's namespace. Use CommandHelpers::parseNsCollectionRequired to extract the
-        // actual target NSS from the first field of the command object (o.create / o.drop).
-        const auto targetNss =
-            CommandHelpers::parseNsCollectionRequired(nss.dbName(), oplogEntry.getObject());
-        if (targetNss == fastCountStoreNss || targetNss == fastCountTimestampNss) {
-            return true;
-        }
-    }
-
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        std::vector<repl::OplogEntry> innerEntries;
-        repl::ApplyOps::extractOperationsTo(
-            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
-
-        for (const auto& op : innerEntries) {
-            if (isContainerOpOnFastCountIdent(op)) {
-                continue;
-            }
-            const auto& nss = op.getNss();
-            if (nss != fastCountStoreNss && nss != fastCountTimestampNss) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    return false;
-}
-
 }  // namespace
 
 boost::optional<int> TxnDeltaBuffer::tryConsume(const repl::OplogEntry& entry,
-                                                SizeCountDeltas& globalResult) {
+                                                ReplicatedMetadataDeltas& globalResult) {
     if (entry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
         if (_isTrackingActiveChain()) {
             LOGV2_DEBUG(12742700,
@@ -571,7 +621,8 @@ void TxnDeltaBuffer::_clearTxnChainState() {
     _txnChainState = boost::none;
 }
 
-int DeltaAccumulator::consume(const repl::OplogEntry& oplogEntry, SizeCountDeltas& globalResult) {
+int DeltaAccumulator::consume(const repl::OplogEntry& oplogEntry,
+                              ReplicatedMetadataDeltas& globalResult) {
     if (auto n = _txnBuffer.tryConsume(oplogEntry, globalResult)) {
         return *n;
     }
@@ -588,8 +639,9 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
     // including writes to the fast-count internal collections themselves. Those internal
     // entries are filtered out of per-collection accumulation below, but their bytes remain
     // counted against the oplog UUID.
-    _result.deltas[_options.oplogUuid].sizeCount.size += static_cast<int64_t>(rec.data.size());
-    _result.deltas[_options.oplogUuid].sizeCount.count += 1;
+    _result.deltas[_options.oplogUuid].metadata.sizeCount.size +=
+        static_cast<int64_t>(rec.data.size());
+    _result.deltas[_options.oplogUuid].metadata.sizeCount.count += 1;
 
     const auto raw = rec.data.toBson();
 
@@ -605,11 +657,6 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 }
                 return;
             case FastDecision::kCountedNoDelta:
-                if (fields.ts.type() != BSONType::timestamp) {
-                    // Malformed entry: missing or wrong-typed `ts`. Fall through to Layer 3
-                    // so `repl::OplogEntry::parse` surfaces the error.
-                    break;
-                }
                 _result.lastTimestamp = fields.ts.timestamp();
                 if (_options.isCheckpoint) {
                     recordCheckpointOplogEntryProcessed();
@@ -618,9 +665,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 return;
             case FastDecision::kCrud:
                 if (auto handled = tryRecordFastCrud(fields, raw, _result.deltas)) {
-                    if (fields.ts.type() == BSONType::timestamp) {
-                        _result.lastTimestamp = fields.ts.timestamp();
-                    }
+                    _result.lastTimestamp = fields.ts.timestamp();
                     if (_options.isCheckpoint) {
                         recordCheckpointOplogEntryProcessed();
                         recordCheckpointSizeCountEntryProcessed(*handled);
@@ -639,20 +684,25 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                     }
                     return;
                 }
-                if (fields.ts.type() == BSONType::timestamp) {
-                    _result.lastTimestamp = fields.ts.timestamp();
-                }
+                _result.lastTimestamp = fields.ts.timestamp();
                 if (_options.isCheckpoint) {
                     recordCheckpointOplogEntryProcessed();
                     recordCheckpointSizeCountEntryProcessed(outcome.processed);
                 }
                 return;
             }
+            case FastDecision::kNoopRepair: {
+                const int handled = tryRecordFastNoopRepair(fields, _result.deltas);
+                _result.lastTimestamp = fields.ts.timestamp();
+                if (_options.isCheckpoint) {
+                    recordCheckpointOplogEntryProcessed();
+                    recordCheckpointSizeCountEntryProcessed(handled);
+                }
+                return;
+            }
             case FastDecision::kCommitTxn:
                 if (auto handled = tryFastCommitTxn(fields, _result.deltas)) {
-                    if (fields.ts.type() == BSONType::timestamp) {
-                        _result.lastTimestamp = fields.ts.timestamp();
-                    }
+                    _result.lastTimestamp = fields.ts.timestamp();
                     if (_options.isCheckpoint) {
                         recordCheckpointOplogEntryProcessed();
                         recordCheckpointSizeCountEntryProcessed(*handled);
@@ -666,7 +716,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
     }
 
     const auto entry = massertStatusOK(repl::OplogEntry::parse(raw));
-    if (operationsOnFastCountStores(entry.getNss(), entry)) {
+    if (isContainerOpOnFastCountIdent(entry)) {
         if (_options.isCheckpoint) {
             recordCheckpointOplogEntrySkipped();
         }
@@ -692,10 +742,10 @@ OplogScanResult StreamingOplogDeltaAccumulator::finish() {
     return std::move(_result);
 }
 
-OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCursor,
-                                                const Timestamp& seekAfterTS,
-                                                UUID oplogUuid,
-                                                bool isCheckpoint) {
+OplogScanResult aggregateReplicatedMetadataDeltasInOplog(SeekableRecordCursor& oplogCursor,
+                                                         const Timestamp& seekAfterTS,
+                                                         UUID oplogUuid,
+                                                         bool isCheckpoint) {
     StreamingOplogDeltaAccumulator acc({
         .isCheckpoint = isCheckpoint,
         .oplogUuid = oplogUuid,

@@ -12,6 +12,7 @@ import {
     deleteExtensionConfigs,
     checkPlatformCompatibleWithExtensions,
     generateExtensionConfigWithOptions,
+    getExtensionConfDir,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
 checkPlatformCompatibleWithExtensions();
@@ -155,6 +156,7 @@ describe("$listExtensions with some extensions loaded", function () {
     const extensionsToLoad = [libParseExtension, libFooExtension, libTestOptionsExtension];
     const extOpts = {
         loadExtensions: extensionsToLoad,
+        extensionsConfigPath: getExtensionConfDir(),
     };
 
     function checkResultsCorrectAndSorted(conn) {

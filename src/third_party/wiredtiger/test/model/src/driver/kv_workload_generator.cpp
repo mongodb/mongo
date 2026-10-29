@@ -86,6 +86,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
 
     checkpoint = 0.02;
     checkpoint_crash = 0.002;
+    checkpoint_crash_trigger = 0.001;
     crash = 0.002;
     evict = 0.1;
     restart = 0.002;
@@ -108,18 +109,12 @@ kv_workload_generator_spec::kv_workload_generator_spec()
 }
 
 /*
- * kv_workload_generator::_default_spec --
- *     The default workload specification.
- */
-const kv_workload_generator_spec kv_workload_generator::_default_spec;
-
-/*
  * kv_workload_generator::kv_workload_generator --
  *     Create a new workload generator.
  */
 kv_workload_generator::kv_workload_generator(const kv_workload_generator_spec &spec, uint64_t seed)
-    : _workload_ptr(std::make_shared<kv_workload>()), _workload(*(_workload_ptr.get())),
-      _last_table_id(0), _last_txn_id(0), _random(seed), _spec(spec)
+    : _workload_ptr(std::make_shared<kv_workload>()), _workload(*_workload_ptr), _last_table_id(0),
+      _last_txn_id(0), _random(seed), _spec(spec)
 {
 }
 
@@ -201,7 +196,7 @@ kv_workload_generator::sequence_traversal::find_next_barrier(size_t start)
 {
     for (size_t i = start; i < _sequences.size(); i++) {
         kv_workload_sequence_ptr &seq = _sequences[i];
-        if (_barrier_fn(*seq.get()))
+        if (_barrier_fn(*seq))
             return seq->seq_no();
     }
     return _sequences.size();
@@ -379,21 +374,6 @@ kv_workload_generator::generate_connection_stress_config()
 }
 
 /*
- * kv_workload_generator::generate_connection_log_config --
- *     Generate random WiredTiger log configurations.
- */
-std::string
-kv_workload_generator::generate_connection_log_config()
-{
-    std::string wt_env_config;
-
-    if (_spec.conn_logging > _random.next_float())
-        wt_env_config = model::join(wt_env_config, "log=(enabled=true)");
-
-    return wt_env_config;
-}
-
-/*
  * kv_workload_generator::create_table --
  *     Create a table.
  */
@@ -438,7 +418,7 @@ kv_workload_generator::generate_transaction(size_t seq_no)
     /* Start the new transaction. */
     kv_workload_sequence_ptr txn_ptr =
       std::make_shared<kv_workload_sequence>(seq_no, kv_workload_sequence_type::transaction);
-    kv_workload_sequence &txn = *txn_ptr.get();
+    kv_workload_sequence &txn = *txn_ptr;
     txn << operation::begin_transaction(txn_id);
 
     /* If we're going to use "set commit timestamp," start with it. */
@@ -530,18 +510,37 @@ kv_workload_generator::generate_transaction(size_t seq_no)
 void
 kv_workload_generator::run()
 {
-    /* Top-level configuration. */
+    /*
+     * Top-level configuration. The model applies one database configuration wholesale, so collect
+     * the keys and emit them together.
+     */
+    std::string database_config;
     if (_random.next_float() < _spec.disaggregated) {
         _database_config.disaggregated = true;
-        _workload << operation::config("database", "disaggregated=true");
+        database_config = join(database_config, "disaggregated=true");
 
         /* Adjust the specs based on what's not supported. */
         _spec.column_var = 0;
         _spec.rollback_to_stable = 0;
 
+        /*
+         * A layered table is created with logging disabled whatever the connection is configured
+         * with, so connection logging says nothing about the workload's data. That also settles the
+         * phase-named crash: the checkpoint is published to the page log after the point where
+         * those crashes are taken, so there is no phase here that keeps it.
+         */
+        _spec.conn_logging = 0;
+        _spec.checkpoint_crash_trigger = 0;
+
         /* FIXME-WT-15040 Prepared transactions are not yet supported. */
         _spec.prepared_transaction = 0;
     }
+    if (_random.next_float() < _spec.conn_logging) {
+        _database_config.logging = true;
+        database_config = join(database_config, "logging=true");
+    }
+    if (!database_config.empty())
+        _workload << operation::config("database", database_config);
 
     /* Create tables. */
     uint64_t num_tables = _random.next_uint64(_spec.min_tables, _spec.max_tables);
@@ -602,8 +601,20 @@ kv_workload_generator::run()
 
                 kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
                   _sequences.size(), kv_workload_sequence_type::checkpoint_crash);
-                uint64_t random_number = _random.next_uint64(1, 1000);
-                *p << operation::checkpoint_crash(random_number);
+                *p << operation::checkpoint_crash(_random.next_uint64(1, 1000));
+                _sequences.push_back(std::move(p));
+
+                if (!has_checkpoint)
+                    has_stable_timestamp = false;
+            }
+            probability_case(_spec.checkpoint_crash_trigger)
+            {
+                kv_workload_sequence_ptr p = std::make_shared<kv_workload_sequence>(
+                  _sequences.size(), kv_workload_sequence_type::checkpoint_crash);
+                operation::checkpoint_crash_phase phase = _random.next_uint64(0, 1) == 0 ?
+                  operation::checkpoint_crash_phase::before_checkpoint_commit :
+                  operation::checkpoint_crash_phase::before_metadata_sync;
+                *p << operation::checkpoint_crash_trigger(phase);
                 _sequences.push_back(std::move(p));
 
                 if (!has_checkpoint)
@@ -687,13 +698,16 @@ kv_workload_generator::run()
      * get executed roughly at the positions selected by the serial workload generation above. To do
      * this, we will make each preceding transaction, and the last special sequences, as
      * dependencies.
+     *
+     * Walk backwards so that each special sequence already has its edge to the next one when the
+     * preceding sequences merge its must-finish-before set.
      */
-    for (size_t last_nontransaction = 0, i = 0; i < _sequences.size(); i++)
-        if (_sequences[i]->type() != kv_workload_sequence_type::transaction) {
-            for (size_t prev = last_nontransaction; prev < i; prev++)
-                _sequences[prev]->must_finish_before(_sequences[i].get());
-            last_nontransaction = i;
-        }
+    for (size_t next_nontransaction = _sequences.size(), i = _sequences.size(); i-- > 0;) {
+        if (next_nontransaction < _sequences.size())
+            _sequences[i]->must_finish_before(_sequences[next_nontransaction]);
+        if (_sequences[i]->type() != kv_workload_sequence_type::transaction)
+            next_nontransaction = i;
+    }
 
     /*
      * Rollback to stable must be executed outside of transactions, so make sure to add the
@@ -701,10 +715,11 @@ kv_workload_generator::run()
      */
     for (size_t i = 0; i < _sequences.size(); i++)
         if (_sequences[i]->type() == kv_workload_sequence_type::rollback_to_stable) {
-            for (size_t j = 0; j < i; j++)
-                _sequences[j]->must_finish_before(_sequences[i].get());
+            /* Add the outgoing edges first, so that the preceding sequences inherit them. */
             for (size_t j = i + 1; j < _sequences.size(); j++)
-                _sequences[i]->must_finish_before(_sequences[j].get());
+                _sequences[i]->must_finish_before(_sequences[j]);
+            for (size_t j = 0; j < i; j++)
+                _sequences[j]->must_finish_before(_sequences[i]);
         }
 
     /*
@@ -712,11 +727,20 @@ kv_workload_generator::run()
      * must be run serially to preserve the serial workload's semantics. It is not sufficient to
      * just ensure that conflicting transactions commit in the correct order, because WiredTiger
      * would abort the second transaction with WT_ROLLBACK.
+     *
+     * Walk backwards so that each later sequence has all of its outgoing edges, and thus its
+     * complete must-finish-before set, by the time an earlier sequence merges it. That lets us skip
+     * the expensive overlap check for pairs that are already ordered.
+     *
+     * The inner loop goes forward, from the nearest later sequence to the farthest. Once the
+     * current sequence must finish before a nearby sequence, it must also finish before everything
+     * that the nearby sequence must finish before, so we can skip checking those farther sequences.
      */
-    for (size_t i = 0; i < _sequences.size(); i++)
+    for (size_t i = _sequences.size(); i-- > 0;)
         for (size_t j = i + 1; j < _sequences.size(); j++)
-            if (_sequences[i]->overlaps_with(_sequences[j]))
-                _sequences[i]->must_finish_before(_sequences[j].get());
+            if (!_sequences[i]->ordered_before(_sequences[j]) &&
+              _sequences[i]->overlaps_with(_sequences[j]))
+                _sequences[i]->must_finish_before(_sequences[j]);
 
     /*
      * Fill in the timestamps. Break up the collection of sequences into blocks of transactions
@@ -741,10 +765,25 @@ kv_workload_generator::run()
     for (sequence_traversal t(_sequences, barrier_fn); t.has_more(); t.complete_all()) {
         for (sequence_state *s : t.runnable()) {
 
+            /*
+             * A checkpoint crash that WiredTiger can recover from behaves as a checkpoint followed
+             * by a crash, which leaves the timestamps where they were.
+             */
+            bool recoverable_checkpoint_crash = false;
+            if (s->sequence->type() == kv_workload_sequence_type::checkpoint_crash &&
+              _database_config.logging) {
+                const operation::any &crash_op = (*s->sequence)[0];
+                recoverable_checkpoint_crash =
+                  std::holds_alternative<operation::checkpoint_crash_trigger>(crash_op) &&
+                  operation::checkpoint_committed_at(
+                    std::get<operation::checkpoint_crash_trigger>(crash_op).phase);
+            }
+
             /* Simulate how checkpoints, crashes, and restarts manipulate the timestamps. */
             if (s->sequence->type() == kv_workload_sequence_type::checkpoint ||
               s->sequence->type() == kv_workload_sequence_type::restart ||
-              s->sequence->type() == kv_workload_sequence_type::rollback_to_stable) {
+              s->sequence->type() == kv_workload_sequence_type::rollback_to_stable ||
+              recoverable_checkpoint_crash) {
                 ckpt_oldest = oldest;
                 ckpt_stable = stable;
                 if (ckpt_stable == k_timestamp_none)
@@ -795,6 +834,7 @@ kv_workload_generator::run()
         /* If the operation resulted in a database crash or restart, stop all started sequences. */
         if (std::holds_alternative<operation::crash>(op) ||
           std::holds_alternative<operation::checkpoint_crash>(op) ||
+          std::holds_alternative<operation::checkpoint_crash_trigger>(op) ||
           std::holds_alternative<operation::restart>(op)) {
             t.complete_all();
             continue;

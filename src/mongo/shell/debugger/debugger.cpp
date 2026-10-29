@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/shell/debugger/debugger.h"
 
@@ -64,19 +38,19 @@ namespace debugger {
 using namespace protocol;
 
 // Execution state
-static AtomicWord<bool> _paused{false};
+static Atomic<bool> _paused{false};
 static std::string _pausedScript;
 static int _pausedLine{0};
 
-AtomicWord<bool> _configurationDone{false};
+Atomic<bool> _configurationDone{false};
 static stdx::condition_variable _pauseCV;
 
 // Evaluation state for debugger REPL
 std::string _pendingEval;
 std::string _evalResult;
-AtomicWord<bool> _hasEvalRequest{false};
-AtomicWord<bool> _evalComplete{false};
-AtomicWord<bool> _fromInteractiveREPL{false};
+Atomic<bool> _hasEvalRequest{false};
+Atomic<bool> _evalComplete{false};
+Atomic<bool> _fromInteractiveREPL{false};
 
 // Data captured when paused
 static std::vector<Scope> _capturedScopes;
@@ -92,7 +66,7 @@ static std::map<std::string, std::set<int>> _breakpoints;
 
 // URLs that were updated after scripts may have already loaded (for retroactive application)
 static std::vector<std::string> _pendingBPUpdateUrls;
-static AtomicWord<bool> _hasBPUpdateRequest{false};
+static Atomic<bool> _hasBPUpdateRequest{false};
 
 /**
  *  DebuggerObject
@@ -951,7 +925,7 @@ void DebuggerGlobal::unpause() {
     _pauseCV.notify_all();
 }
 
-static AtomicWord<bool> _shouldStop{false};
+static Atomic<bool> _shouldStop{false};
 std::unique_ptr<std::thread> _stdinThread;
 
 void DebuggerGlobal::cleanup() {
@@ -1054,7 +1028,7 @@ void DebuggerGlobal::handleStdinThread() {
 Status DebuggerGlobal::init(JSContext* cx) {
     // The shell may create multiple JS scopes (e.g., for parallel operations). The debugger
     // is process-wide state: only initialize it once for the first scope.
-    static AtomicWord<bool> _initialized{false};
+    static Atomic<bool> _initialized{false};
     if (_initialized.swap(true)) {
         return Status::OK();
     }

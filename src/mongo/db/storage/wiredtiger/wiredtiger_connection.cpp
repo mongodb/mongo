@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 
@@ -252,8 +226,7 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
 
     uint64_t currentEngineEpoch = _engineEpoch.load();
     uint64_t currentRtsEpoch = _rtsEpoch.load();
-    if (isShuttingDown() || session->_getEngineEpoch() != currentEngineEpoch ||
-        session->_getRtsEpoch() != currentRtsEpoch) {
+    if (isCleanShuttingDown() || session->_getEngineEpoch() != currentEngineEpoch) {
         invariant(session->_getEngineEpoch() <= currentEngineEpoch);
         // There is a race condition with clean shutdown, where the storage engine is ripped
         // from underneath OperationContexts, which are not "active" (i.e., do not have any
@@ -264,9 +237,10 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
         return;
     }
 
-    if (session->_getRtsEpoch() != currentRtsEpoch) {
-        // When the session is stale due to rollback to stable, we skip caching and return early.
-        // The session and cursor will be closed by the session wrapper.
+    if (isShuttingDown() || session->_getRtsEpoch() != currentRtsEpoch) {
+        // The session is stale due to a rollback to stable, which leaves the WT_CONNECTION intact.
+        // Skip caching and return early: the session and its cursors must still be closed, which
+        // the session wrapper does, or WiredTiger keeps holding the data handles of their tables.
         invariant(session->_getRtsEpoch() <= currentRtsEpoch);
         return;
     }

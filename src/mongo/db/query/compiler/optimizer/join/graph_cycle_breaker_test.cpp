@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/join/graph_cycle_breaker.h"
 
@@ -82,9 +56,8 @@ public:
         alternativePaths = {{a, pa1}, {b, pb1}, {c, pc1}, {d, pd1}, {e, pe1}, {f, pf1}};
 
         for (size_t i = 0; i <= kMaxEdgeId; ++i) {
-            edgeSelectivities.emplace_back(
-                cost_based_ranker::SelectivityType{static_cast<double>(i + 1) / (2.0 * kMaxEdgeId)},
-                cost_based_ranker::EstimationSource::Code);
+            edgeSelectivities.push_back(
+                makeJoinSelectivityEstimate(static_cast<double>(i + 1) / (2.0 * kMaxEdgeId)));
         }
     }
 
@@ -126,9 +99,7 @@ public:
     }
 
     void setSelectivity(EdgeId edgeId, double newSelectivity) {
-        edgeSelectivities[edgeId] = cost_based_ranker::SelectivityEstimate(
-            cost_based_ranker::SelectivityType(newSelectivity),
-            cost_based_ranker::EstimationSource::Code);
+        edgeSelectivities[edgeId] = makeJoinSelectivityEstimate(newSelectivity);
     }
 
     GraphCycleBreaker makeCycleBreaker() {
@@ -234,7 +205,7 @@ TEST_F(GraphCycleBreakerTest, GraphWithComplexCycles) {
     // This edge is ignored due to its incompatible predicates.
     auto edge_db = addEdge(d, b, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 3);
+    validateCycles(/*expectedNumberOfCycles=*/3);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_ca, edge_db);
     //  Two edges are expected to be removed.
@@ -251,7 +222,7 @@ TEST_F(GraphCycleBreakerTest, NoCycleGraph) {
     auto edge_bc = addEdge(b, c);
     auto edge_cd = addEdge(c, d);
 
-    validateCycles(/*expectedNumberOfCycles*/ 0);
+    validateCycles(/*expectedNumberOfCycles=*/0);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd);
     // No edges are expected to be removed.
@@ -263,7 +234,7 @@ TEST_F(GraphCycleBreakerTest, DisconnectedGraph) {
     auto edge_ab = addEdge(a, b);
     auto edge_cd = addEdge(c, d);
 
-    validateCycles(/*expectedNumberOfCycles*/ 0);
+    validateCycles(/*expectedNumberOfCycles=*/0);
 
     auto newEdges = breakCycles(edge_ab, edge_cd);
     // No edges are expected to be removed.
@@ -281,7 +252,7 @@ TEST_F(GraphCycleBreakerTest, DisconnectedGraphWithCycles) {
     auto edge_ef = addEdge(e, f);
     auto edge_fd = addEdge(f, d);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2);
+    validateCycles(/*expectedNumberOfCycles=*/2);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca, edge_de, edge_ef, edge_fd);
     // Two edges are expected to be removed.
@@ -305,7 +276,7 @@ TEST_F(GraphCycleBreakerTest, IncompatiblePredicates) {
     auto edge_da = addEdge(d, a, alternativePaths);
     auto edge_ea = addEdge(e, a, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 1);
+    validateCycles(/*expectedNumberOfCycles=*/1);
 
     // One big loop case
     {
@@ -340,7 +311,7 @@ TEST_F(GraphCycleBreakerTest, TwoCyclesWithDifferentPredicates) {
     // Because of the predicates there it doesn't form a big cycle: A - B - C - D - E - F - A
     auto edge_fa = addEdge(f, a, p1, p2);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2);
+    validateCycles(/*expectedNumberOfCycles=*/2);
 
     auto newEdges =
         breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_de, edge_ef, edge_fd, edge_fa);
@@ -361,7 +332,7 @@ TEST_F(GraphCycleBreakerTest, TwoCyclesWithASharedEdge) {
     auto edge_ef = addEdge(e, f, alternativePaths);
     auto edge_fa = addEdge(f, a, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2);
+    validateCycles(/*expectedNumberOfCycles=*/2);
 
     // The shared edge
     ASSERT_EQ(edge_da, edge_ad);
@@ -394,7 +365,7 @@ TEST_F(GraphCycleBreakerTest, CliqueOf4) {
     auto edge_de = addEdge(d, e);
     auto edge_ef = addEdge(e, f);
 
-    validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(4));
+    validateCycles(/*expectedNumberOfCycles=*/cyclesInClique(4));
 
     auto newEdges =
         breakCycles(edge_ab, edge_bc, edge_cd, edge_de, edge_ef, edge_ca, edge_da, edge_db);
@@ -420,7 +391,7 @@ TEST_F(GraphCycleBreakerTest, TwoCliquesOf4) {
     addEdge(d, e, alternativePaths);
     addEdge(e, f, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2 * cyclesInClique(4));
+    validateCycles(/*expectedNumberOfCycles=*/2 * cyclesInClique(4));
 }
 
 TEST_F(GraphCycleBreakerTest, CliqueOf6) {
@@ -434,7 +405,7 @@ TEST_F(GraphCycleBreakerTest, CliqueOf6) {
         }
     }
 
-    validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(6));
+    validateCycles(/*expectedNumberOfCycles=*/cyclesInClique(6));
 }
 
 

@@ -326,29 +326,41 @@ __wt_background_compact_start(WT_SESSION_IMPL *session)
     WT_DECL_RET;
     uint32_t id;
     const char *uri;
+    bool new_stat;
 
     bm = S2BT(session)->bm;
     id = S2BT(session)->id;
     uri = session->dhandle->name;
 
     compact_stat = __background_compact_get_stat(session, uri, id);
+    new_stat = compact_stat == NULL;
 
-    /* If the table is not in the list, allocate a new entry and insert it. */
-    if (compact_stat == NULL) {
+    /* If the table is not in the list, allocate a new entry. */
+    if (new_stat) {
         WT_ERR(__wt_calloc_one(session, &compact_stat));
         WT_ERR(__wt_strdup(session, uri, &compact_stat->uri));
         compact_stat->id = id;
-        __background_compact_list_insert(session, compact_stat);
     }
 
     /* Fill starting information prior to running compaction. */
     WT_ERR(bm->size(bm, session, &compact_stat->start_size));
     compact_stat->prev_compact_time = __wt_clock(session);
 
+    /*
+     * Insert a new entry only once this function can no longer fail, otherwise the error path would
+     * leave a freed entry linked into the connection's tracking list.
+     */
+    if (new_stat)
+        __background_compact_list_insert(session, compact_stat);
+
     return (0);
 
 err:
-    __wt_free(session, compact_stat);
+    if (new_stat) {
+        if (compact_stat != NULL)
+            __wt_free(session, compact_stat->uri);
+        __wt_free(session, compact_stat);
+    }
 
     return (ret);
 }
@@ -516,20 +528,17 @@ __background_compact_find_next_uri(WT_SESSION_IMPL *session, WT_ITEM *uri, WT_IT
             break;
         }
 
-        /* Check the file is eligible for compaction. */
-        if (__wt_compact_check_eligibility(session, key)) {
-            /*
-             * Check the list of files background compact has tracked statistics for. This avoids
-             * having to open a dhandle for the file if compaction is unlikely to work efficiently
-             * on this file.
-             */
-            WT_ERR(cursor->get_value(cursor, &value));
-            WT_ERR(__wt_config_getones(session, value, "id", &id));
-            WT_ERR(__background_compact_should_skip(session, key, id.val, &skip));
-            if (!skip)
-                break;
-            WT_STAT_CONN_INCR(session, background_compact_skipped);
-        }
+        /*
+         * Check the list of files background compact has tracked statistics for. This avoids having
+         * to open a dhandle for the file if compaction is unlikely to work efficiently on this
+         * file.
+         */
+        WT_ERR(cursor->get_value(cursor, &value));
+        WT_ERR(__wt_config_getones(session, value, "id", &id));
+        WT_ERR(__background_compact_should_skip(session, key, id.val, &skip));
+        if (!skip)
+            break;
+        WT_STAT_CONN_INCR(session, background_compact_skipped);
 
         /*
          * FIXME-WT-15259: will wrap the metadata forward-traversal logic (including the
@@ -728,11 +737,18 @@ __background_compact_server(void *arg)
 
     WT_STAT_CONN_SET(session, background_compact_running, 0);
 
-err:
+    /*
+     * Free the connection-level exclude list and configuration only on a clean exit. A concurrent
+     * background compaction caller can read and free that shared state under the lock, which this
+     * thread does not hold here; the clean exit path is reached only when the storage engine is
+     * closing, so no such caller is running. The error path skips this and panics, aborting the
+     * process, so any in-flight signal keeps operating on valid memory.
+     */
     __background_compact_exclude_list_clear(session, true);
     __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_EXIT);
-
     __wt_free(session, conn->background_compact.config);
+
+err:
     __wt_scr_free(session, &config);
     __wt_scr_free(session, &next_uri);
     __wt_scr_free(session, &uri);

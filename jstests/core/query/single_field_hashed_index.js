@@ -3,6 +3,7 @@
  * Cannot implicitly shard accessed collections because of extra shard key index in sharded
  * collection.
  * @tags: [
+ *   uses_explain,
  *   assumes_no_implicit_index_creation,
  *   requires_fastcount,
  *   requires_getmore,

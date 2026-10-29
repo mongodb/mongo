@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -107,6 +81,8 @@ MONGO_FAIL_POINT_DEFINE(skipReconstructPreparedTransactions);
 MONGO_FAIL_POINT_DEFINE(applyPrepareTxnOpsFailsWithWriteConflict);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOutForApplyPrepare);
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint);
 
 class ScopedSetTxnInfoOnOperationContext {
 public:
@@ -227,9 +203,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                 return repl::applyOperation_inlock(opCtx,
                                                    coll,
                                                    ApplierOperation{&op},
-                                                   false /*alwaysUpsert*/,
+                                                   /*alwaysUpsert=*/false,
                                                    oplogApplicationMode,
-                                                   true /*isDataConsistent*/);
+                                                   /*isDataConsistent=*/true);
             }();
             if (!status.isOK()) {
                 return status;
@@ -533,9 +509,27 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     // include the commit oplog entry's 'ts' field, which is what we want.
     auto lastEntryInTxnObj = lastEntryInTxn.getEntry().toBSON();
 
+    // A retryable batch links its first entry to the previous applyOps chain, so its walk must
+    // stop at this chain's boundary rather than run to the end as a transaction does.
+    // applyOpsChainOperationTotal() reads the terminal's 'count', the total number of operations in
+    // the chain; subtract the ones we already hold outside the oplog walk (the terminal itself,
+    // plus any cachedOps from the same applier batch) to get how many the walk still needs to
+    // collect from the oplog. walkApplyOpsChain() then decrements that budget per entry and stops
+    // at zero, before reaching the previous chain. A single-entry batch has no 'count', so the
+    // total falls back to this entry's own op count and nothing is left to walk.
+    boost::optional<std::size_t> opsStillToCollect;
+    if (lastEntryInTxn.getMultiOpType() == repl::MultiOplogEntryType::kApplyOpsAppliedAtomically) {
+        auto accountedFor = repl::numOperationsInApplyOps(prepareOrUnpreparedCommit);
+        for (const auto* cachedOp : cachedOps) {
+            accountedFor += repl::numOperationsInApplyOps(*cachedOp);
+        }
+        opsStillToCollect = repl::remainingApplyOpsChainOps(
+            repl::applyOpsChainOperationTotal(lastEntryInTxn), accountedFor);
+    }
+
     // First retrieve and transform the ops from the oplog, which will be retrieved
     // in reverse order.
-    while (iter.hasNext()) {
+    walkApplyOpsChain(iter, opsStillToCollect, [&] {
         const auto& operationEntry = iter.nextFatalOnErrors(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
@@ -548,7 +542,8 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
         // the entire thing in chronological order.  Fortunately STL arrays of BSON
         // objects should be fast to reverse (just pointer copies).
         std::reverse(ops.begin() + prevOpsEnd, ops.end());
-    }
+        return repl::numOperationsInApplyOps(operationEntry);
+    });
     std::reverse(ops.begin(), ops.end());
 
     // Next retrieve and transform the ops from the current batch, which are in
@@ -580,7 +575,7 @@ std::vector<OplogEntry> readTransactionOperationsFromOplogChain(
     const OplogEntry& lastEntryInTxn,
     const std::vector<OplogEntry*>& cachedOps) noexcept {
     auto [txnOps, _] = _readTransactionOperationsFromOplogChain(
-        opCtx, lastEntryInTxn, cachedOps, false /*checkForCommands*/);
+        opCtx, lastEntryInTxn, cachedOps, /*checkForCommands=*/false);
     return std::move(txnOps);
 }
 
@@ -589,7 +584,7 @@ std::pair<std::vector<OplogEntry>, bool> readTransactionOperationsFromOplogChain
     const OplogEntry& lastEntryInTxn,
     const std::vector<OplogEntry*>& cachedOps) noexcept {
     return _readTransactionOperationsFromOplogChain(
-        opCtx, lastEntryInTxn, cachedOps, true /*checkForCommands*/);
+        opCtx, lastEntryInTxn, cachedOps, /*checkForCommands=*/true);
 }
 
 namespace {
@@ -691,7 +686,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
             // Starts the WUOW.
             txnParticipant.unstashTransactionResources(
-                opCtx, "prepareTransaction", false /* forUnyield */, openSnapshotOptions);
+                opCtx, "prepareTransaction", /*forUnyield=*/false, openSnapshotOptions);
             invariant(shard_role_details::getRecoveryUnit(opCtx)->isActive());
 
             // Set this in case the application of any ops needs to use the prepare timestamp
@@ -708,7 +703,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             // committed txn statements.
             const auto& committedStmtIds = stmtIds ? stmtIds : _getCommittedStmtIds(lsid, txnOps);
             if (committedStmtIds) {
-                txnParticipant.addCommittedStmtIds(opCtx, *committedStmtIds, prepareOp.getOpTime());
+                txnParticipant.addCommittedStmtIds(
+                    opCtx, *committedStmtIds, prepareOp.getOpTime(), prepareOp.getWallClockTime());
             }
 
             if (MONGO_unlikely(applyPrepareTxnOpsFailsWithWriteConflict.shouldFail())) {
@@ -954,7 +950,7 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
         // pass them to the op-observer. The callback is only called for completeness and is not
         // expected to do anything for a reclaimed prepared transaction.
         opObserver->onTransactionPrepareNonPrimaryForChunkMigration(
-            opCtx, lsid, boost::none /* statements */, boost::none /* prepareOpTime */);
+            opCtx, lsid, /*statements=*/boost::none, /*prepareOpTime=*/boost::none);
 
         ReclaimedPreparedTxnTracker::get(opCtx)->trackPrepareExit(txnParticipant.onExitPrepare());
 
@@ -989,6 +985,14 @@ std::vector<Timestamp> getUnmatchedTxnPrepareTimestampsForLog(
 
 void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) try {
     LOGV2(11535500, "Recovering prepared transactions from precise checkpoint");
+
+    if (MONGO_unlikely(
+            hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint.shouldFail())) {
+        LOGV2(11535503,
+              "Hanging due to hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint fail "
+              "point");
+        hangBeforeRecoveringPreparedTransactionsFromPreciseCheckpoint.pauseWhileSet(opCtx);
+    }
 
     // Find all transactions left in prepare according to the transaction table.
     ExpectedTxnMap expectedTransactions;
@@ -1060,6 +1064,12 @@ void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) t
                     "processedPreparedIdTimestamps"_attr = processedPrepareTimestamps);
     }
 } catch (DBException& ex) {
+    if (ErrorCodes::isShutdownError(ex.code())) {
+        LOGV2(11615300,
+              "Interrupted at shutdown while recovering prepared transactions from checkpoint.",
+              "reason"_attr = ex.toStatus());
+        throw;
+    }
     LOGV2_FATAL(11372902,
                 "Exception while recovering prepared transactions from checkpoint.",
                 "reason"_attr = ex.toStatus());

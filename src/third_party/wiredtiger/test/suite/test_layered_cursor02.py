@@ -57,6 +57,7 @@ class test_layered_cursor02(wttest.WiredTigerTestCase, DisaggConfigMixin):
         c = self.session.open_cursor(self.uri)
 
         old_vals = []
+        self.session.begin_transaction()
         for k in range(1000):
             size = r.randint(1000, 10000)
             repeats = r.randint(1, size)
@@ -67,12 +68,12 @@ class test_layered_cursor02(wttest.WiredTigerTestCase, DisaggConfigMixin):
             c[k] = oldv
             old_vals.append(oldv)
 
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
+
         self.session.checkpoint()
 
-        # We don't need a second WT to test what we want -- reopen the existing
-        # one and tell it to grab the latest checkpoint.
-        self.reopen_conn(config=self.conn_base_config + f'disaggregated=(role="follower",checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")')
-        c = self.session.open_cursor(self.uri)
+        # Step down to a follower via a live reconfigure instead of restarting.
+        self.conn.reconfigure('disaggregated=(role="follower")')
 
         for k in range(1000):
             (oldv, mods, newv) = create_mods(r, size, repeats, nmods, maxdiff, self.valuefmt, old_vals[k])

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 /* The contents of this file are meant to be used by
@@ -39,7 +13,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -47,7 +20,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
@@ -66,11 +39,13 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
-namespace MONGO_MOD_PUB idl_server_parameter_bounds {
+namespace [[MONGO_MOD_PUBLIC]] idl_server_parameter_bounds {
 // Predicate rules for bounds conditions
 struct GT {
-    static constexpr inline std::string_view description = "greater than"_sd;
+    static constexpr inline std::string_view kind = "gt";
+    static constexpr inline std::string_view description = "greater than";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a > b;
@@ -78,7 +53,8 @@ struct GT {
 };
 
 struct LT {
-    static constexpr inline std::string_view description = "less than"_sd;
+    static constexpr inline std::string_view kind = "lt";
+    static constexpr inline std::string_view description = "less than";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a < b;
@@ -86,7 +62,8 @@ struct LT {
 };
 
 struct GTE {
-    static constexpr inline std::string_view description = "greater than or equal to"_sd;
+    static constexpr inline std::string_view kind = "gte";
+    static constexpr inline std::string_view description = "greater than or equal to";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a >= b;
@@ -94,13 +71,14 @@ struct GTE {
 };
 
 struct LTE {
-    static constexpr inline std::string_view description = "less than or equal to"_sd;
+    static constexpr inline std::string_view kind = "lte";
+    static constexpr inline std::string_view description = "less than or equal to";
     template <typename T, typename U>
     static constexpr bool evaluate(const T& a, const U& b) {
         return a <= b;
     }
 };
-}  // namespace MONGO_MOD_PUB idl_server_parameter_bounds
+}  // namespace idl_server_parameter_bounds
 
 namespace idl_server_parameter_detail {
 
@@ -114,16 +92,16 @@ template <typename T>
 constexpr inline bool hasClusterServerParameter = stdx::is_detected_v<HasClusterServerParameter, T>;
 
 // Wrapped type unwrappers.
-// e.g. Given AtomicWord<int>, get std::int32_t and normalized store/load methods.
+// e.g. Given Atomic<int>, get std::int32_t and normalized store/load methods.
 template <typename U>
 struct storage_wrapper;
 
 template <typename U>
-struct storage_wrapper<AtomicWord<U>> {
+struct storage_wrapper<Atomic<U>> {
     static constexpr bool isTenantAware = false;
 
     using type = U;
-    storage_wrapper(AtomicWord<U>& storage) : _storage(storage), _defaultValue(storage.load()) {}
+    storage_wrapper(Atomic<U>& storage) : _storage(storage), _defaultValue(storage.load()) {}
 
     void store(const U& value, const boost::optional<TenantId>& id) {
         invariant(!id.is_initialized());
@@ -147,7 +125,7 @@ struct storage_wrapper<AtomicWord<U>> {
     }
 
 private:
-    AtomicWord<U>& _storage;
+    Atomic<U>& _storage;
 
     // Copy of original value to be read from during resets.
     U _defaultValue;
@@ -276,7 +254,7 @@ private:
  * Specialization of ServerParameter used by IDL generator.
  */
 template <ServerParameterType paramType, typename T>
-class MONGO_MOD_PUB IDLServerParameterWithStorage : public ServerParameter {
+class [[MONGO_MOD_PUBLIC]] IDLServerParameterWithStorage : public ServerParameter {
 private:
     using SPT = ServerParameterType;
     using SW = idl_server_parameter_detail::storage_wrapper<T>;
@@ -366,7 +344,7 @@ public:
         if (isRedact()) {
             b->append(name, "###");
         } else if constexpr (paramType == SPT::kClusterWide) {
-            b->append("_id"_sd, name);
+            b->append("_id"sv, name);
             b->appendElementsUnique(getValue(tenantId).toBSON());
         } else {
             b->append(name, getValue(tenantId));
@@ -489,6 +467,7 @@ public:
      */
     template <class predicate>
     void addBound(const element_type& bound) {
+        _bounds.push_back({predicate::kind, bound});
         addValidator(
             [bound, spname = name()](const element_type& value, const boost::optional<TenantId>&) {
                 if (!predicate::evaluate(value, bound)) {
@@ -501,15 +480,33 @@ public:
             });
     }
 
+    void appendConstraints(BSONObjBuilder* b) const {
+        if (_bounds.empty()) {
+            return;
+        }
+        BSONArrayBuilder arr(b->subarrayStart("bounds"));
+        for (const auto& [kind, value] : _bounds) {
+            BSONObjBuilder entry(arr.subobjStart());
+            entry.append("kind", kind);
+            entry.append("value", value);
+        }
+    }
+
 private:
+    struct Bound {
+        std::string_view kind;
+        element_type value;
+    };
+
     SW _storage;
 
     std::vector<std::function<validator_t>> _validators;
+    std::vector<Bound> _bounds;
     std::function<onUpdate_t> _onUpdate;
     std::once_flag _setDefaultOnce;
 };
 
 template <typename Storage>
-using ClusterParameterWithStorage MONGO_MOD_PUB =
+using ClusterParameterWithStorage [[MONGO_MOD_PUBLIC]] =
     IDLServerParameterWithStorage<ServerParameterType::kClusterWide, TenantIdMap<Storage>>;
 }  // namespace mongo

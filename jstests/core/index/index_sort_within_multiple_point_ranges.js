@@ -8,6 +8,7 @@
  * - more than one index can satisfy the query
  * - the query asks for a sort within each point range
  * @tags: [
+ *   uses_explain,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_getmore,
  * ]

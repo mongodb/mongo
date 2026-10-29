@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/repl/replication_recovery.h"
@@ -74,7 +48,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -202,7 +176,9 @@ public:
 
 class ReplicationRecoveryTest : public ServiceContextMongoDTest {
 protected:
-    ReplicationRecoveryTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     OperationContext* getOperationContext() {
         return _opCtx.get();
@@ -1648,6 +1624,48 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneForInitialSyncKeepsU
 }
 
 TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogAsStandaloneForInitialSyncAdvancesOldestTimestampWithNoOplogToApply) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    // The recovery timestamp is at the top of the oplog, so there are no oplog entries to replay
+    // during initial sync recovery. See SERVER-131554.
+    _setUpOplog(opCtx, getStorageInterface(), {5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(5, 5));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(5, 5), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx, /*duringInitialSync=*/true);
+
+    // The initial data timestamp is set to the top of the oplog, and the oldest timestamp must be
+    // advanced to match it even though no oplog entries were applied. Otherwise the node could
+    // serve reads before the initial data timestamp.
+    ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
+              Timestamp(5, 5));
+    ASSERT_EQ(opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+              Timestamp(5, 5));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoverFromOplogAsStandaloneForInitialSyncAdvancesOldestTimestampAfterOplogReplay) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    // The recovery timestamp is behind the top of the oplog, so oplog entries are replayed. The
+    // oldest timestamp must reach the top of the oplog / initial data timestamp. See SERVER-131554.
+    _setUpOplog(opCtx, getStorageInterface(), {2, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(2, 2), 1));
+
+    recovery.recoverFromOplogAsStandalone(opCtx, /*duringInitialSync=*/true);
+    _assertDocsInTestCollection(opCtx, {5});
+
+    ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
+              Timestamp(5, 5));
+    ASSERT_EQ(opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+              Timestamp(5, 5));
+}
+
+TEST_F(ReplicationRecoveryTest,
        RecoverFromOplogAsStandaloneWithTakeUnstableCheckpointOnShutdownRecoversOplog) {
     gTakeUnstableCheckpointOnShutdown = true;
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
@@ -1758,7 +1776,7 @@ TEST_F(ReplicationRecoveryTest, RecoverySetsValidateFeaturesAsPrimaryToFalseWhil
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
-    recovery.recoverFromOplog(opCtx, boost::none /* recoveryTs */);
+    recovery.recoverFromOplog(opCtx, /*stableTimestamp=*/boost::none);
 
     ASSERT_FALSE(serverGlobalParams.validateFeaturesAsPrimary.load());
 }

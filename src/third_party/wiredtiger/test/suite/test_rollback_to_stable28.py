@@ -39,7 +39,6 @@ import wttest
 # perform this in recovery to ensure that all the in-memory images have
 # the proper write generation number and we don't end up reading stale
 # transaction ID's stored on the page.
-@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_rollback_to_stable28(test_rollback_to_stable_base):
     conn_config = 'statistics=(all),verbose=(rts:5)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide
@@ -148,11 +147,7 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
         self.assertGreater(recovery_run_write_gen, checkpoint_write_gen)
         self.assertGreater(recovery_write_gen, recovery_run_write_gen)
 
-        # Read the statistics of pages that have been update restored (to check the mechanism was used).
-        stat_cursor = self.session.open_cursor('statistics:')
-        pages_update_restored = stat_cursor[stat.conn.cache_write_restore_scrub][2]
-        stat_cursor.close()
-        self.assertGreater(pages_update_restored, 0)
+        self.assertStatGreaterSoon(stat.conn.cache_write_restore_scrub, 0)
 
         # Check that after recovery, we see the correct data with respect to our previous stable timestamp (40).
         self.check(value_c, uri, nrows, 40)

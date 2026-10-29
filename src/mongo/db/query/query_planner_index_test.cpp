@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -36,9 +10,10 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -272,8 +247,7 @@ TEST_F(QueryPlannerTest, NegationCannotUseSparseIndex) {
     // will match documents which don't have an "a" field.
     addIndex(fromjson("{a: 1}"),
              false,  // multikey
-             true    // sparse
-    );
+             /*sparse=*/true);
     runQuery(fromjson("{a: {$ne: 5}}"));
     assertHasOnlyCollscan();
 
@@ -286,8 +260,7 @@ TEST_F(QueryPlannerTest, NegationInElemMatchDoesNotUseSparseIndex) {
     // "$elemMatch value", but it is not something we've implemented.
     addIndex(fromjson("{a: 1}"),
              true,  // multikey
-             true   // sparse
-    );
+             /*sparse=*/true);
     runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
     assertHasOnlyCollscan();
 
@@ -355,8 +328,7 @@ TEST_F(QueryPlannerTest, NotLtEmptyArrayShouldNotUseIndex) {
 TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
     addIndex(BSON("i" << 1),
              false,  // multikey
-             true    // sparse
-    );
+             /*sparse=*/true);
 
     runQuery(fromjson("{i: {$eq: null}}"));
     assertHasOnlyCollscan();
@@ -371,8 +343,8 @@ TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
 TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProperty) {
     // Create two indexes on the same key pattern; one sparse, the other non-sparse. This is
     // permitted because the 'sparse' property is part of the index signature.
-    addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false);
-    addIndex(fromjson("{a: 1}"), "a_sparse", /*multikey*/ false, /*sparse*/ true, /*unique*/ false);
+    addIndex(fromjson("{a: 1}"), /*multikey=*/false, /*sparse=*/false);
+    addIndex(fromjson("{a: 1}"), "a_sparse", /*multikey=*/false, /*sparse=*/true, /*unique=*/false);
 
     runQuery(fromjson("{a: 1}"));
 
@@ -388,8 +360,8 @@ TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProper
 TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentUniqueProperty) {
     // Create two indexes on the same key pattern; one unique, the other non-unique. This is
     // permitted because the 'unique' property is part of the index signature.
-    addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false, /*unique*/ false);
-    addIndex(fromjson("{a: 1}"), "a_unique", /*multikey*/ false, /*sparse*/ false, /*unique*/ true);
+    addIndex(fromjson("{a: 1}"), /*multikey=*/false, /*sparse=*/false, /*unique=*/false);
+    addIndex(fromjson("{a: 1}"), "a_unique", /*multikey=*/false, /*sparse=*/false, /*unique=*/true);
 
     runQuery(fromjson("{a: 1}"));
 
@@ -905,8 +877,7 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
 TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
-    // True means multikey.
-    addIndex(BSON("a" << 1), true);
+    addIndex(BSON("a" << 1), /*multikey=*/true);
 
     // This one goes to 11.
     runQuery(fromjson("{a:1, a:2, a:3, a:4, a:5, a:6, a:7, a:8, a:9, a:10, a:11}"));
@@ -924,6 +895,64 @@ TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
         "{ixscan: {filter: null, pattern: {a:1}}},"        // 8
         "{ixscan: {filter: null, pattern: {a:1}}},"        // 9
         "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");  // 10
+}
+
+// A query with exactly kMaxSelfIntersections (10) predicates over a multikey index gets the full
+// self-intersection plan without truncation.
+TEST_F(QueryPlannerTest, IntersectSelfIntersectionsAtCapBoundary) {
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1), /*multikey=*/true);
+
+    runQuery(fromjson("{a:1, a:2, a:3, a:4, a:5, a:6, a:7, a:8, a:9, a:10}"));
+
+    assertSolutionExists(
+        "{fetch: {node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 1
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 2
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 3
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 4
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 5
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 6
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 7
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 8
+        "{ixscan: {filter: null, pattern: {a:1}}},"        // 9
+        "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");  // 10
+}
+
+// internalQueryEnumerationMaxIntersectPerAnd bounds how many intersection choices the enumerator
+// generates per AND node; single-index plans are unaffected.
+TEST_F(QueryPlannerTest, IntersectPerAndLimitCapsIntersectionChoices) {
+    QueryKnobGuardForTest maxIntersectPerAnd{
+        opCtx.get(), "internalQueryEnumerationMaxIntersectPerAnd", 1};
+    params.mainCollectionInfo.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    runQuery(fromjson("{a: 1, b: 1, c: 1}"));
+
+    // Three intersection pairs are possible ({a,b}, {a,c}, {b,c}), but the limit stops enumeration
+    // after it is exceeded, so we get the three single-index plans plus a truncated set of
+    // intersection plans.
+    assertSolutionExists(
+        "{fetch: {filter: {b:1,c:1}, node: {ixscan: {filter: null, pattern: {a:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1,c:1}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1,b:1}, node: {ixscan: {filter: null, pattern: {c:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:1,b:1,c:1}, node: {andSorted: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a:1}}},"
+        "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    // With the default limit (3) this query produces all three intersection pairs (6 solutions
+    // total); the limit of 1 must have truncated that set.
+    ASSERT_LT(getNumSolutions(), 6U);
+    for (const auto& soln : solns) {
+        ASSERT_TRUE(soln->_enumeratorExplainInfo.hitIndexedAndLimit)
+            << "solution did not report hitIndexedAndLimit: " << soln->toString();
+    }
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectSubnodes) {
@@ -1059,7 +1088,8 @@ TEST_F(QueryPlannerTest, IntersectDisabledAndSort) {
 // Ensure that disabling AND_HASH intersection works properly.
 TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
     // Turn index intersection on but disable hash-based intersection.
-    internalQueryPlannerEnableHashIntersection.store(false);
+    QueryKnobGuardForTest disableHashIntersection{
+        opCtx.get(), "internalQueryPlannerEnableHashIntersection", false};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
@@ -1359,6 +1389,57 @@ TEST_F(QueryPlannerTest, EmptyQueryWithoutProjectionUsesCollscan) {
     runQuery(BSONObj());
     assertNumSolutions(1);
     assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountUsesCountScanOnIdIndex) {
+    // An unfiltered aggregation $count reaches the planner as a count-like query with an empty
+    // predicate. Even in the presence of inapplicable secondary indexes, the planner should
+    // enumerate a COUNT_SCAN of the _id index instead of only a collection scan.
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{count_scan: {pattern: {_id: 1}, startKey: [{'$minKey': 1}], endKey: [{'$maxKey': 1}], "
+        "startKeyInclusive: true, endKeyInclusive: true}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountFallsBackToCollscanWhenKnobDisabled) {
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    QueryKnobGuardForTest knobGuard(
+        opCtx.get(),
+        std::string_view{"internalQueryPlannerEnableCountScanForUnfilteredCount"},
+        false);
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountFallsBackToCollscanWithShardFilter) {
+    // Shard filtering requires the documents themselves, so the planner should fall back to a
+    // collection scan in that case.
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists("{sharding_filter: {node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountPlansWholeIndexScanWithSkipAndLimit) {
+    // The planner wraps the solutions in LIMIT/SKIP stages for the count command's skip and
+    // limit; the enforcing CountStage is added above the plan root in getExecutorCount(). The
+    // LIMIT root prevents turnIxscanIntoCount() from converting the whole index scan into a
+    // COUNT_SCAN, so the fallback solution is a whole index scan over the _id index.
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    runQuerySkipLimit(BSONObj(), 5, 10);
+    assertNumSolutions(2);
+    assertSolutionExists(
+        "{limit: {n: 10, node: {skip: {n: 5, node: {ixscan: {pattern: {_id: 1}, "
+        "bounds: {_id: [['MinKey', 'MaxKey', true, true]]}}}}}}}");
+    assertSolutionExists("{limit: {n: 10, node: {skip: {n: 5, node: {cscan: {dir: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanIfEnabled) {

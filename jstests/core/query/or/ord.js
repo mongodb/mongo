@@ -1,6 +1,7 @@
 // Test the dropping indexes required by an indexed $or causes the query to fail cleanly.
 //
 // @tags: [
+//   uses_explain,
 //   requires_getmore,
 //   # An index drop does not necessarily cause cursors to be killed on the secondary.
 //   does_not_support_causal_consistency,

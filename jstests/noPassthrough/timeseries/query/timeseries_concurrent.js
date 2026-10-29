@@ -10,7 +10,6 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -27,10 +26,8 @@ function runAndAssertAggregation(coll, pred, ids) {
 }
 
 function runTests(conn, db, coll, testCases) {
-    // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
-    const sbeEnabled =
-        checkSbeFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
+    // $match pushdown requires sbe to be fully enabled.
+    const sbeEnabled = checkSbeFullyEnabled(db);
 
     for (let testCase of testCases) {
         let preds = testCase.preds;

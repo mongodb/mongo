@@ -1,8 +1,12 @@
 // Ensure that a call to _flushRoutingTableCacheUpdates in a sharded cluster will return error if
 // attempted on a database instead of a collection.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {skipTestIfAuthoritativeShardsEnabled} from "jstests/sharding/libs/sharding_util.js";
 
 let st = new ShardingTest({});
+// _flushRoutingTableCacheUpdates can not be used when the shard catalog is authoritative.
+// TODO (SERVER-98118): Remove this test once 9.0 becomes last LTS.
+skipTestIfAuthoritativeShardsEnabled(st.s, () => st.stop());
 const testDBName = jsTestName();
 const collName = "coll";
 const testDB = st.s.getDB(testDBName);

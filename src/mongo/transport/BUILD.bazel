@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "transport_layer_common",
     srcs = [
+        "backpressure_connection_metrics.cpp",
         "hello_metrics.cpp",
         "session.cpp",
         "session_establishment_rate_limiter.cpp",
@@ -51,6 +52,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "connections_server_status_section",
+    srcs = ["connections_server_status_section.cpp"],
+    hdrs = ["connections_server_status_section.h"],
+    deps = [
+        ":service_executor",
+        ":session_manager",
+        ":transport_layer",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_library(
     name = "transport_layer_manager",
     srcs = [
         "transport_layer_manager_impl.cpp",
@@ -63,6 +78,7 @@ mongo_cc_library(
         "//src/mongo/transport/handoff:handoff_feature_flag_gen",
     ],
     deps = [
+        ":connections_server_status_section",
         ":service_executor",
         ":session_manager",
         ":transport_layer",
@@ -86,10 +102,15 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "transport_layer_mock",
-    srcs = ["transport_layer_mock.cpp"],
+    srcs = [
+        "mock_reactor.cpp",
+        "mock_transport_layer_with_mock_reactor.cpp",
+        "transport_layer_mock.cpp",
+    ],
     deps = [
         ":session_util",
         ":transport_layer_common",
+        "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/net:network",
     ],
 )
@@ -110,6 +131,7 @@ idl_generator(
 mongo_cc_library(
     name = "transport_layer",
     srcs = [
+        "backpressure_connection_metrics_collection.cpp",
         "proxy_protocol_header_parser.cpp",
         "proxy_protocol_tlv_extraction.cpp",
         "//src/mongo/transport/asio:asio_session_impl.cpp",
@@ -125,6 +147,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }],
     deps = [
+        ":message_filter_hooks",
         ":service_executor",
         ":session_manager",
         ":session_util",
@@ -142,6 +165,7 @@ mongo_cc_library(
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:connection_purpose",
         "//src/mongo/util/net:ssl_manager",
         "//src/mongo/util/options_parser",
         "//src/third_party/asio",
@@ -253,6 +277,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:clock_sources",
     ],
 )
@@ -297,14 +322,17 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db:traffic_recorder",
+        "//src/mongo/db/admission:egress_response_rate_limiter",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/stats:counters",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/rpc:message",
+        "//src/mongo/util:clock_sources",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:connection_purpose",
         "//src/mongo/util/net:ssl_manager",
     ],
 )
@@ -340,11 +368,17 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission:ingress_request_admission_context",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
+        "//src/mongo/db/admission:rate_limiter",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/otel",
+        "//src/mongo/otel/traces:traces_test_util",
         "//src/mongo/otel/traces:tracing",
+        "//src/mongo/otel/traces/sampler",
         "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:telemetry_context_section",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
     ],
@@ -365,10 +399,14 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "transport_test",
     srcs = [
+        "backpressure_connection_metrics_test.cpp",
         "hello_metrics_test.cpp",
+        "ingress_handshake_metrics_test.cpp",
         "max_conns_override_test.cpp",
         "message_compressor_manager_test.cpp",
         "message_compressor_registry_test.cpp",
+        "mock_reactor_test.cpp",
+        "mock_transport_layer_with_mock_reactor_test.cpp",
         "proxy_protocol_header_parser_test.cpp",
         "proxy_protocol_tlv_ssl_peer_info_test.cpp",
         "service_executor_test.cpp",
@@ -395,9 +433,12 @@ mongo_cc_unit_test(
         ":transport_layer_mock",
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:commands",
         "//src/mongo/db:dbmessage",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission:egress_response_rate_limiter",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/rpc",
@@ -416,6 +457,17 @@ mongo_cc_integration_test(
     srcs = [
         "//src/mongo/transport/asio:asio_transport_layer_integration_test.cpp",
     ],
+    deps = [
+        ":transport_layer_egress_init",
+        ":transport_layer_integration_test_fixture",
+        "//src/mongo:base",
+        "//src/third_party/asio",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "backpressure_connection_metrics_integration_test",
+    srcs = ["backpressure_connection_metrics_integration_test.cpp"],
     deps = [
         ":transport_layer_egress_init",
         ":transport_layer_integration_test_fixture",

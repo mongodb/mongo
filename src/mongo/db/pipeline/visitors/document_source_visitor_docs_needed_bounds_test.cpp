@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 
 #include "mongo/bson/bsonmisc.h"
@@ -56,7 +30,8 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 class VisitorDocsNeededBoundsTest : public AggregationContextFixture {
 protected:
-    VisitorDocsNeededBoundsTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         // Need to intialize the sharding state so that any pipelines that use $lookup pass pipeline
         // validation.
         ShardingState::create(getServiceContext());
@@ -196,8 +171,8 @@ protected:
     }
 
     auto internalSearchIdLookup() {
-        return DocumentSourceInternalSearchIdLookUp::createFromBson(
-            BSON("$_internalSearchIdLookup" << BSONObj()).firstElement(), getExpCtx());
+        return make_intrusive<DocumentSourceInternalSearchIdLookUp>(DocumentSourceIdLookupSpec{},
+                                                                    getExpCtx());
     }
 };
 
@@ -423,49 +398,49 @@ TEST_F(VisitorDocsNeededBoundsTest, UnionWithSkipSortLimit) {
 
 TEST_F(VisitorDocsNeededBoundsTest, SearchUnwind1) {
     auto bounds =
-        buildPipelineAndExtractBounds({search(), unwind(/*includeNullIfEmptyOrMissing*/ false)});
+        buildPipelineAndExtractBounds({search(), unwind(/*includeNullIfEmptyOrMissing=*/false)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, SearchUnwind2) {
     auto bounds =
-        buildPipelineAndExtractBounds({search(), unwind(/*includeNullIfEmptyOrMissing*/ true)});
+        buildPipelineAndExtractBounds({search(), unwind(/*includeNullIfEmptyOrMissing=*/true)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, SkipUnwindLimit1) {
     auto bounds = buildPipelineAndExtractBounds(
-        {skip(8), unwind(/*includeNullIfEmptyOrMissing*/ false), limit(25)});
+        {skip(8), unwind(/*includeNullIfEmptyOrMissing=*/false), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, SkipUnwindLimit2) {
     auto bounds = buildPipelineAndExtractBounds(
-        {skip(8), unwind(/*includeNullIfEmptyOrMissing*/ true), limit(25)});
+        {skip(8), unwind(/*includeNullIfEmptyOrMissing=*/true), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, SearchSkipLimitUnwind) {
     auto bounds = buildPipelineAndExtractBounds(
-        {search(), skip(8), limit(25), unwind(/*includeNullIfEmptyOrMissing*/ false)});
+        {search(), skip(8), limit(25), unwind(/*includeNullIfEmptyOrMissing=*/false)});
     assertDiscreteAndEq(bounds.getMinBounds(), 33);
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipLimit1) {
     auto bounds = buildPipelineAndExtractBounds(
-        {unwind(/*includeNullIfEmptyOrMissing*/ false), skip(8), limit(25)});
+        {unwind(/*includeNullIfEmptyOrMissing=*/false), skip(8), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipLimit2) {
     auto bounds = buildPipelineAndExtractBounds(
-        {unwind(/*includeNullIfEmptyOrMissing*/ true), skip(8), limit(25)});
+        {unwind(/*includeNullIfEmptyOrMissing=*/true), skip(8), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 33);
 }
@@ -475,7 +450,7 @@ TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnwindSkipLimit1) {
     // for the sake of algorithmic simplicity, we'll assume the pipeline is written well, such that
     // we can base the constraints on the earliest $skip+$limit.
     auto bounds = buildPipelineAndExtractBounds(
-        {skip(3), limit(5), unwind(/*includeNullIfEmptyOrMissing*/ false), skip(8), limit(25)});
+        {skip(3), limit(5), unwind(/*includeNullIfEmptyOrMissing=*/false), skip(8), limit(25)});
     assertDiscreteAndEq(bounds.getMinBounds(), 8);
     assertDiscreteAndEq(bounds.getMaxBounds(), 8);
 }
@@ -483,28 +458,28 @@ TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnwindSkipLimit1) {
 TEST_F(VisitorDocsNeededBoundsTest, SkipLimitUnwindSkipLimit2) {
     // Same note as SkipLimitUnwindSkipLimit1.
     auto bounds = buildPipelineAndExtractBounds(
-        {skip(50), limit(150), unwind(/*includeNullIfEmptyOrMissing*/ false), skip(3), limit(7)});
+        {skip(50), limit(150), unwind(/*includeNullIfEmptyOrMissing=*/false), skip(3), limit(7)});
     assertDiscreteAndEq(bounds.getMinBounds(), 200);
     assertDiscreteAndEq(bounds.getMaxBounds(), 200);
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, UnwindSortSkipLimit) {
     auto bounds = buildPipelineAndExtractBounds(
-        {unwind(/*includeNullIfEmptyOrMissing*/ false), sort(), skip(3), limit(7)});
+        {unwind(/*includeNullIfEmptyOrMissing=*/false), sort(), skip(3), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipLimitSort) {
     auto bounds = buildPipelineAndExtractBounds(
-        {unwind(/*includeNullIfEmptyOrMissing*/ false), skip(3), limit(7), sort()});
+        {unwind(/*includeNullIfEmptyOrMissing=*/false), skip(3), limit(7), sort()});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, UnwindSkipSortLimit) {
     auto bounds = buildPipelineAndExtractBounds(
-        {unwind(/*includeNullIfEmptyOrMissing*/ false), skip(3), sort(), limit(7)});
+        {unwind(/*includeNullIfEmptyOrMissing=*/false), skip(3), sort(), limit(7)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
 }
@@ -629,14 +604,14 @@ TEST_F(VisitorDocsNeededBoundsTest, LimitLookup) {
 
 TEST_F(VisitorDocsNeededBoundsTest, LookupWithUnwindLimit1) {
     auto bounds = buildPipelineAndExtractBounds(
-        {lookupWithUnwind(/*includeNullIfEmptyOrMissing*/ true), limit(25)});
+        {lookupWithUnwind(/*includeNullIfEmptyOrMissing=*/true), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertDiscreteAndEq(bounds.getMaxBounds(), 25);
 }
 
 TEST_F(VisitorDocsNeededBoundsTest, LookupWithUnwindLimit2) {
     auto bounds = buildPipelineAndExtractBounds(
-        {lookupWithUnwind(/*includeNullIfEmptyOrMissing*/ false), limit(25)});
+        {lookupWithUnwind(/*includeNullIfEmptyOrMissing=*/false), limit(25)});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }

@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "*redaction*":
     approvers:
       - 10gen/server-security

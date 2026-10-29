@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * Connect to a Mongo database as a database, from C++.
@@ -61,6 +35,10 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/otel/traces/tracing_enablement.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
@@ -94,7 +72,7 @@ using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
-AtomicWord<long long> DBClientBase::ConnectionIdSequence;
+Atomic<long long> DBClientBase::ConnectionIdSequence;
 
 void (*DBClientBase::withConnection_do_not_use)(std::string host,
                                                 std::function<void(DBClientBase*)>) = nullptr;
@@ -147,11 +125,10 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
 }
 
 namespace {
-void appendMetadata(OperationContext* opCtx,
-                    const rpc::RequestMetadataWriter& metadataWriter,
-                    const ClientAPIVersionParameters& apiParameters,
-                    OpMsgRequest& request) {
-
+void appendMetadataWriterAndApiParameters(OperationContext* opCtx,
+                                          const rpc::RequestMetadataWriter& metadataWriter,
+                                          const ClientAPIVersionParameters& apiParameters,
+                                          OpMsgRequest& request) {
     if (!metadataWriter && !apiParameters.getVersion()) {
         return;
     }
@@ -193,6 +170,27 @@ void appendMetadata(OperationContext* opCtx,
 
     request.body = bob.obj();
 }
+
+void appendMetadata(OperationContext* opCtx,
+                    const rpc::RequestMetadataWriter& metadataWriter,
+                    const ClientAPIVersionParameters& apiParameters,
+                    int maxWireVersion,
+                    ConnectionString::ConnectionType connectionType,
+                    OpMsgRequest& request) {
+    appendMetadataWriterAndApiParameters(opCtx, metadataWriter, apiParameters, request);
+
+    // INT_MAX is the StreamableReplicaSetMonitor sentinel for an unknown topology.
+    const bool targetAcceptsTelemetrySection = (maxWireVersion >= WireVersion::WIRE_VERSION_90 &&
+                                                maxWireVersion != std::numeric_limits<int>::max());
+    // A kLocal connection talks to the local server in-process, so there is no need to propagate a
+    // telemetry context as it will be available on OperationContext.
+    const bool isLocalConnection = connectionType == ConnectionString::ConnectionType::kLocal;
+    if (targetAcceptsTelemetrySection && !isLocalConnection && opCtx) {
+        auto& holder = otel::TelemetryContextHolder::getDecoration(opCtx);
+        request.telemetryContext =
+            otel::traces::TelemetryContextSerializer::toSection(holder.getTelemetryContext().get());
+    }
+}
 }  // namespace
 
 auth::ValidatedTenancyScope DBClientBase::_createInnerRequestVTS(
@@ -204,15 +202,44 @@ auth::ValidatedTenancyScope DBClientBase::_createInnerRequestVTS(
     return auth::ValidatedTenancyScope::kNotRequired;
 }
 
+namespace {
+/** Starts a span for the given command name if it will not be executed locally. */
+boost::optional<otel::traces::Span> maybeStartSpan(OperationContext* opCtx,
+                                                   ConnectionString::ConnectionType connectionType,
+                                                   std::string_view commandName,
+                                                   otel::traces::SpanKind kind) {
+    // For local connections, we will maintain the same opCtx and start a span when the command
+    // starts, so we don't need to start a span here that would have the same name.
+    if (connectionType == ConnectionString::ConnectionType::kLocal) {
+        return boost::none;
+    }
+    return otel::traces::Span::startEgressSpan(
+        opCtx,
+        otel::traces::getOrRegisterCommandSpanName(commandName),
+        otel::traces::SpanOptions{.kind = kind});
+}
+}  // namespace
+
 DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request.
     ensureConnection();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
-    appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
+    // Fire-and-forget sets moreToCome on the wire; use PRODUCER per OTel messaging conventions.
+    boost::optional<otel::traces::Span> span =
+        maybeStartSpan(opCtx, type(), request.getCommandName(), otel::traces::SpanKind::kProducer);
+
+    appendMetadata(opCtx, _metadataWriter, _apiParameters, getMaxWireVersion(), type(), request);
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
-    say(requestMsg);
+    try {
+        say(requestMsg);
+    } catch (const DBException& e) {
+        if (span.has_value()) {
+            span->setStatus(e.toStatus());
+        }
+        throw;
+    }
     return this;
 }
 
@@ -225,7 +252,10 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     auto host = getServerAddress();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
-    appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
+    boost::optional<otel::traces::Span> span =
+        maybeStartSpan(opCtx, type(), request.getCommandName(), otel::traces::SpanKind::kClient);
+
+    appendMetadata(opCtx, _metadataWriter, _apiParameters, getMaxWireVersion(), type(), request);
 
     auto requestMsg = request.serialize();
     Message replyMsg;
@@ -236,16 +266,29 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
         e.addContext(str::stream() << str::stream() << "network error while attempting to run "
                                    << "command '" << request.getCommandName() << "' "
                                    << "on host '" << host << "' ");
+        if (span.has_value()) {
+            span->setStatus(e.toStatus());
+        }
         throw;
     }
 
     auto commandReply = parseCommandReplyMessage(host, replyMsg);
 
-    uassert(ErrorCodes::RPCProtocolNegotiationFailed,
-            str::stream() << "Mismatched RPC protocols - request was '"
+    if (rpc::protocolForMessage(requestMsg) != commandReply->getProtocol()) {
+        Status status(ErrorCodes::RPCProtocolNegotiationFailed,
+                      str::stream()
+                          << "Mismatched RPC protocols - request was '"
                           << networkOpToString(requestMsg.operation()) << "' '"
-                          << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ",
-            rpc::protocolForMessage(requestMsg) == commandReply->getProtocol());
+                          << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ");
+        if (span.has_value()) {
+            span->setStatus(status);
+        }
+        uassertStatusOK(status);
+    }
+
+    if (span.has_value()) {
+        span->setStatus(getStatusFromCommandResult(commandReply->getCommandReply()));
+    }
 
     return {std::move(commandReply), this};
 }
@@ -615,7 +658,7 @@ BSONObj DBClientBase::findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj fi
 }
 
 unique_ptr<DBClientCursor> DBClientBase::getMore(const NamespaceString& nss, long long cursorId) {
-    unique_ptr<DBClientCursor> c(new DBClientCursor(this, nss, cursorId, false /*isExhaust*/));
+    unique_ptr<DBClientCursor> c(new DBClientCursor(this, nss, cursorId, /*isExhaust=*/false));
     if (c->init())
         return c;
     return nullptr;

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/pipeline/search/document_source_search.h"
 
 #include "mongo/bson/bsonmisc.h"
@@ -37,15 +11,19 @@
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
+#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -61,8 +39,61 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
-class SearchTest : service_context_test::WithSetupTransportLayer,
-                   public AggregationContextFixture {};
+// One spec per internal-only field. Used by both the external-client rejection test and the
+// internal-client acceptance test so the two stay in lock-step as fields are added.
+static const std::vector<std::pair<std::string, std::string>> kInternalSearchFieldCases = {
+    {"mongotQuery",
+     R"({$search: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+    {"mergingPipeline",
+     R"({$search: {mergingPipeline: [{$lookup: {from: "secret", as: "leak", pipeline: []}}]}})"},
+    {"metadataMergeProtocolVersion", R"({$search: {metadataMergeProtocolVersion: 1}})"},
+    {"requiresSearchSequenceToken", R"({$search: {requiresSearchSequenceToken: true}})"},
+    {"requiresSearchMetaCursor", R"({$search: {requiresSearchMetaCursor: true}})"},
+    {"view",
+     R"({$search: {view: {name: "secretView", effectivePipeline: [{$match: {leaked: true}}]}}})"},
+    {"limit", R"({$search: {limit: 100}})"},
+    {"sortSpec", R"({$search: {sortSpec: {field: 1}}})"},
+    {"docsNeededBounds", R"({$search: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
+};
+
+// Owns the pipelines referenced by a DocumentSource::DistributedPlanContext so the ctx can be
+// passed by pointer into distributedPlanLogic() without dangling.
+class OwningDistributedPlanContext : public DocumentSource::DistributedPlanContext {
+public:
+    OwningDistributedPlanContext(std::unique_ptr<Pipeline> pipelinePrefix,
+                                 std::unique_ptr<Pipeline> pipelineSuffix,
+                                 boost::optional<OrderedPathSet> shardKeys)
+        : DocumentSource::DistributedPlanContext{*pipelinePrefix, *pipelineSuffix, this->shardKeys},
+          pipelinePrefix(std::move(pipelinePrefix)),
+          pipelineSuffix(std::move(pipelineSuffix)),
+          shardKeys(std::move(shardKeys)) {}
+    std::unique_ptr<Pipeline> pipelinePrefix;
+    std::unique_ptr<Pipeline> pipelineSuffix;
+    boost::optional<OrderedPathSet> shardKeys;
+};
+
+class SearchTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+protected:
+    // Builds a DistributedPlanContext whose suffix is the given pipeline. The prefix is empty.
+    auto makePlanCtx(std::string_view pipelineJson) {
+        auto bson = fromjson(pipelineJson);
+        std::vector<BSONObj> rawPipeline;
+        for (const auto& element : bson) {
+            rawPipeline.push_back(element.Obj());
+        }
+        auto pipelinePrefix = pipeline_factory::makePipeline(
+            std::vector<BSONObj>{}, getExpCtx(), {.attachCursorSource = false});
+        auto pipelineSuffix =
+            pipeline_factory::makePipeline(rawPipeline, getExpCtx(), {.attachCursorSource = false});
+        return OwningDistributedPlanContext(
+            std::move(pipelinePrefix), std::move(pipelineSuffix), boost::none);
+    }
+};
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {
@@ -153,8 +184,8 @@ DEATH_TEST_F(SearchDeathTest,
 
     // Simulate router sending featureFlagSearchExtension=true.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), true}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $search: {
@@ -175,8 +206,8 @@ TEST_F(SearchTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
 
     // Simulate router sending featureFlagSearchExtension=false.
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), false}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto spec = fromjson(R"({
         $search: {
@@ -191,12 +222,13 @@ TEST_F(SearchTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearch) {
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), true}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$search: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -206,12 +238,15 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearch) {
 }
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchFlagDisabled) {
-    // No flag values, so featureFlagSearchExtension is false.
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{});
+    // Disable extensions for this test.
+    auto& flag = feature_flags::gFeatureFlagSearchExtension;
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(
+        std::vector<IFRFlagWireEntry>{IFRFlagWireEntry{flag.getName(), false}});
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$search: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -222,12 +257,13 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchFlagDisabled) {
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearchMeta) {
     auto& flag = feature_flags::gFeatureFlagSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), true}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$searchMeta: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -237,12 +273,14 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsTrueForSearchMeta) {
 }
 
 TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchMetaFlagDisabled) {
-    // No flag values, so featureFlagSearchExtension is false.
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{});
+    auto& flag = feature_flags::gFeatureFlagSearchExtension;
+    std::vector<IFRFlagWireEntry> flagValues{IFRFlagWireEntry{flag.getName(), false}};
+    auto ifrContext = IncrementalFeatureRolloutContext::forTest(flagValues);
 
     auto origExtensions = serverGlobalParams.extensions;
     ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
-    serverGlobalParams.extensions.push_back("mongot-extension");
+    serverGlobalParams.extensions.push_back(
+        std::string{search_helper_bson_obj::detail::kMongotExtensionName});
 
     auto pipeline = std::vector<BSONObj>{
         fromjson(R"({$searchMeta: {index: "idx", text: {query: "a", path: "b"}}})")};
@@ -311,6 +349,171 @@ TEST_F(SearchTest,
         expCtx, nonExtensionStage, boost::none)};
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
     ASSERT_FALSE(search_helpers::isExtensionMongotPipeline(pipeline.get()));
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchTest, ExternalClientCannotSupplyInternalSearchFields) {
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    auto nss = getExpCtx()->getNamespaceString();
+    for (const auto& [fieldName, specJson] : kInternalSearchFieldCases) {
+        SCOPED_TRACE(fieldName);
+        const auto specBson = fromjson(specJson);
+        auto lpds = SearchLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
+        ASSERT_THROWS_CODE(lpds->validate(externalOpCtx.get()), AssertionException, 5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields,
+// since they are set by the router during sharded search planning. Iterates the same case list
+// as the external-client test so the two stay in sync.
+TEST_F(SearchTest, InternalClientCanSupplyInternalSearchFields) {
+    // The default test client has no transport session and is treated as internal.
+    auto opCtx = getExpCtx()->getOperationContext();
+    auto nss = getExpCtx()->getNamespaceString();
+
+    for (const auto& [fieldName, specJson] : kInternalSearchFieldCases) {
+        SCOPED_TRACE(fieldName);
+        const auto specBson = fromjson(specJson);
+        auto lpds = SearchLiteParsed::parse(nss, specBson.firstElement(), LiteParserOptions{});
+        ASSERT_DOES_NOT_THROW(lpds->validate(opCtx));
+    }
+}
+
+// createFromBson must accept a spec already in its serialized internal ('mongotQuery') form;
+// validation of those fields belongs to the LiteParse layer.
+TEST_F(SearchTest, CreateFromBsonAcceptsSerializedInternalSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    const auto serializedSpec = fromjson(R"({
+        $search: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}, count: {type: "total"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: []
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceSearch::createFromBson(serializedSpec.firstElement(), expCtx));
+}
+
+TEST_F(SearchTest, SerializeAnonymizesMongotQueryForQueryStats) {
+    const auto mongotQuery = fromjson("{index: 'default', text: {query: 'cakes', path: 'title'}}");
+    const auto stageObj = BSON("$search" << mongotQuery);
+
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    intrusive_ptr<DocumentSource> searchDS =
+        DocumentSourceSearch::createFromBson(stageObj.firstElement(), expCtx);
+
+    const auto anonymized = Document({{"$search", Value(std::string{"?object"})}});
+
+    // Query stats must collapse the whole query to a single anonymized object, regardless of
+    // topology.
+    expCtx->setInRouter(false);
+    ASSERT_DOCUMENT_EQ(
+        searchDS->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions)
+            .getDocument(),
+        anonymized);
+
+    expCtx->setInRouter(true);
+    ASSERT_DOCUMENT_EQ(
+        searchDS->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions)
+            .getDocument(),
+        anonymized);
+}
+
+TEST_F(SearchTest, SerializeForExplainEmitsFullSpecOnlyOnRouter) {
+    const auto mongotQuery = fromjson("{index: 'default', text: {query: 'cakes', path: 'title'}}");
+    const auto stageObj = BSON("$search" << mongotQuery);
+
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    intrusive_ptr<DocumentSource> searchDS =
+        DocumentSourceSearch::createFromBson(stageObj.firstElement(), expCtx);
+
+    query_shape::SerializationOptions opts;
+    opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+
+    // On a shard, explain only needs the mongotQuery, so the $search value is just the user query.
+    expCtx->setInRouter(false);
+    auto onShard = searchDS->serialize(opts);
+    ASSERT_DOCUMENT_EQ(onShard.getDocument(), Document({{"$search", Document(mongotQuery)}}));
+
+    // On a router, explain emits the full spec so the internal routing fields reach the shards.
+    expCtx->setInRouter(true);
+    auto onRouter = searchDS->serialize(opts);
+    ASSERT_DOCUMENT_EQ(onRouter.getDocument(),
+                       searchDS->serialize(query_shape::SerializationOptions{}).getDocument());
+    ASSERT_DOCUMENT_NE(onRouter.getDocument(), onShard.getDocument());
+    ASSERT_DOCUMENT_EQ(onRouter.getDocument()
+                           .getField("$search")
+                           .getDocument()
+                           .getField("mongotQuery")
+                           .getDocument(),
+                       Document(mongotQuery));
+}
+
+// distributedPlanLogic() must not recompute requiresSearchMetaCursor from the current pipeline for
+// a spec stamped by a router: the $$SEARCH_META reference may live in the merging half, which
+// isn't visible to the shard-side pipeline. The recompute block is gated on
+// _plannedShardedSearchLocally, which is only set when the stage planned the search itself, so a
+// router-stamped spec must keep its merge stages even when the visible suffix doesn't reference
+// $$SEARCH_META.
+TEST_F(SearchTest, DistributedPlanLogicKeepsMergeForRouterStampedSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    // A spec in its router-stamped form: the router computed the merging pipeline and stamped
+    // requiresSearchMetaCursor=true because the merging half references $$SEARCH_META.
+    const auto serializedSpec = fromjson(R"({
+        $search: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: [{$group: {_id: "$type", value: {$sum: "$metaVal"}}}],
+            requiresSearchMetaCursor: true
+        }
+    })");
+    auto searchDS = DocumentSourceSearch::createFromBson(serializedSpec.firstElement(), expCtx);
+
+    // Suffix does NOT reference $$SEARCH_META. If distributedPlanLogic() recomputed
+    // requiresSearchMetaCursor here, the merge stage would be dropped even though the merging half
+    // needs it.
+    auto ctx = makePlanCtx(R"([{$project: {x: 1}}])");
+    auto dpl = searchDS->distributedPlanLogic(&ctx);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
+}
+
+// Informational probes (requiredToRunOnRouter()/stageCanRunInParallel() style call sites) pass
+// ctx == nullptr. They must not crash and must produce the same merge plan as a real split.
+TEST_F(SearchTest, DistributedPlanLogicProbeKeepsMergeForRouterStampedSpec) {
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+
+    const auto serializedSpec = fromjson(R"({
+        $search: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: [{$group: {_id: "$type", value: {$sum: "$metaVal"}}}],
+            requiresSearchMetaCursor: true
+        }
+    })");
+    auto searchDS = DocumentSourceSearch::createFromBson(serializedSpec.firstElement(), expCtx);
+
+    // A probe passes ctx == nullptr and must produce the same merge plan as a real split.
+    auto dpl = searchDS->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(std::string_view(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"sv);
 }
 
 }  // namespace

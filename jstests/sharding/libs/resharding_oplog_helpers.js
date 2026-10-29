@@ -204,6 +204,7 @@ export function runOplogFetcherReplLagTest(config) {
     );
 
     restartServerReplication(st.rs0.getSecondaries()[1]);
+
     st.stop();
 }
 
@@ -242,7 +243,8 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
     rst.startSet({oplogSize: 1, oplogMinRetentionHours: 0.000001});
     rst.initiate();
 
-    // This test relies on size-based oplog truncation, which may be disabled in disagg.
+    // This test relies on marker-based oplog truncation, which may be disabled in disagg.
+    // TODO(SERVER-125068) remove this once this feature flag is deleted
     skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
     jsTest.log("Inserting documents to generate oplog entries");
@@ -306,14 +308,24 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
     jsTest.log(
         "Run aggregation pipeline on incomplete oplog with $_requestReshardingResumeToken set to false",
     );
-    assert.commandWorked(
-        localDb.runCommand({
+    // Expect the aggregation to succeed if $_requestReshardingResumeToken is false.
+    // Transient CappedPositionLost errors may occur during truncation and can safely be retried.
+    assert.soon(() => {
+        const res = localDb.runCommand({
             aggregate: "oplog.rs",
             pipeline: [{$match: {ts: {$gte: oplogEntry.ts}}}],
             $_requestReshardingResumeToken: false,
             cursor: {},
-        }),
-    );
+        });
+
+        if (!res.ok && res.code == ErrorCodes.CappedPositionLost) {
+            jsTest.log("Encountered a CappedPositionLost error, retrying the command.");
+            return false;
+        }
+
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out retrying the oplog aggregate on CappedPositionLost");
 
     jsTest.log("Run non-$gte oplog aggregation pipeline with $_requestReshardingResumeToken set");
     assert.commandFailedWithCode(

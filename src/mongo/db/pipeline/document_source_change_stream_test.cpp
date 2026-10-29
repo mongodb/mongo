@@ -1,37 +1,12 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
@@ -39,6 +14,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
@@ -63,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -78,6 +55,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -191,6 +170,36 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                        ErrorCodes::BadValue);
 }
 
+TEST_F(ChangeStreamStageTest, ShouldRejectMatchCollectionUUIDForUpdateLookupWithoutUpdateLookup) {
+    auto expCtx = getExpCtx();
+
+    // Omitting 'fullDocument' defaults to 'default', not 'updateLookup'.
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("matchCollectionUUIDForUpdateLookup" << true))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        12888201);
+
+    // 'matchCollectionUUIDForUpdateLookup' is only allowed for 'updateLookup'.
+    ASSERT_DOES_NOT_THROW(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("matchCollectionUUIDForUpdateLookup"
+                                                    << true << "fullDocument" << "updateLookup"))
+                .firstElement(),
+            expCtx););
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("matchCollectionUUIDForUpdateLookup"
+                                                    << true << "fullDocument" << "required"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        12888201);
+}
+
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
 
@@ -200,7 +209,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                expCtx->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+                expCtx->getOperationContext(), std::move(collection), /*commitTime=*/boost::none);
         });
     }
 
@@ -226,7 +235,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAfterAndResumeAfterOptions) {
         Lock::GlobalWrite lk(opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(opCtx, std::move(collection), /*commitTime=*/boost::none);
         });
     }
 
@@ -257,7 +266,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterO
         Lock::GlobalWrite lk(opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(opCtx, std::move(collection), /*commitTime=*/boost::none);
         });
     }
 
@@ -283,7 +292,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID)
         Lock::GlobalWrite lk(opCtx);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(opCtx, std::move(collection), /*commitTime=*/boost::none);
         });
     }
 
@@ -296,6 +305,34 @@ TEST_F(ChangeStreamStageTest, ShouldRejectResumeAfterWithResumeTokenMissingUUID)
             expCtx),
         AssertionException,
         ErrorCodes::InvalidResumeToken);
+}
+
+TEST_F(ChangeStreamStageTest, ShouldRejectResumeFromNamespacePlacementChangedEvent) {
+    auto expCtx = getExpCtx();
+    auto opCtx = expCtx->getOperationContext();
+
+    // Need to put the collection in the collection catalog so the resume token is valid.
+    {
+        Lock::GlobalWrite lk(opCtx);
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(opCtx, std::move(collection), /*commitTime=*/boost::none);
+        });
+    }
+
+    // An event resume token from a 'namespacePlacementChanged' control event is not a valid point
+    // to resume a change stream from.
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName
+                                << BSON("resumeAfter" << makeResumeToken(
+                                            kDefaultTs,
+                                            testUuid(),
+                                            Value(),
+                                            DSChangeStream::kNamespacePlacementChangedOpType)))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       ErrorCodes::InvalidResumeToken);
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
@@ -342,13 +379,12 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForNonSystemCollection) {
     DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 }
 
-TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
+TEST_F(ChangeStreamStageTest, ShowMigrationsSucceedsOnMongos) {
     auto expCtx = getExpCtx();
     expCtx->setInRouter(true);
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
 
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
+    ASSERT_DOES_NOT_THROW(DSChangeStream::createFromBson(spec.firstElement(), expCtx));
 }
 
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
@@ -359,17 +395,122 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
 
     ASSERT_EQ("^unittest\\.someCollection$",
               DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.someCollection$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.someCollection"),
                       DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
 
     ASSERT_EQ("^someCollection$", DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^someCollection$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "someCollection"),
                       DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
 
     ASSERT_EQ("^unittest\\.\\$cmd$",
               DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.$cmd"),
                       DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+// Builds an insert oplog entry BSON for the given namespace so that we can exercise the oplog match
+// expression's namespace matching directly.
+namespace {
+BSONObj makeInsertOplogEntryBSON(std::string_view ns) {
+    return makeOplogEntry(OpTypeEnum::kInsert,
+                          NamespaceString::createNamespaceString_forTest(boost::none, ns),
+                          BSON("_id" << 0))
+        .getEntry()
+        .toBSON();
+}
+}  // namespace
+
+// The oplog match stage of a single-collection change stream must match the watched collection's
+// namespace exactly (case-sensitively), and must not match a namespace that differs only in case.
+// This must hold regardless of the pipeline's collation.
+TEST_F(ChangeStreamStageTest, OplogMatchNamespaceIsCaseSensitiveWithoutCollation) {
+    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream" << BSONObj())};
+
+    auto pipeline =
+        buildTestPipelineForCollection(rawPipeline, "unittests.change_stream_case_sensitive");
+
+    auto oplogMatchStage =
+        getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
+    ASSERT_NE(nullptr, oplogMatchStage);
+
+    const auto* matchExpr = oplogMatchStage->getMatchExpression();
+
+    // An insert into the exact namespace is matched.
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.change_stream_case_sensitive")));
+
+    // An insert into a namespace that only differs in case is not matched.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.cHaNgE_sTrEaM_cAsE_sEnSiTiVe")));
+}
+
+// Same as above, but the change stream pipeline runs with a custom, case-insensitive collation
+// (modeled by the "to lower string" mock collator). The oplog namespace matching must remain
+// case-sensitive, because the collation must only apply to the generated change events and not to
+// the scan over the oplog. This is the scenario exercised by jstests/change_streams/collation.js.
+TEST_F(ChangeStreamStageTest, OplogMatchNamespaceIsCaseSensitiveWithCustomCollation) {
+    getExpCtx()->setCollator(
+        std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString));
+
+    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream" << BSONObj())};
+
+    auto pipeline =
+        buildTestPipelineForCollection(rawPipeline, "unittests.change_stream_case_insensitive");
+
+    auto oplogMatchStage =
+        getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
+    ASSERT_NE(nullptr, oplogMatchStage);
+
+    const auto* matchExpr = oplogMatchStage->getMatchExpression();
+
+    // An insert into the exact namespace is matched.
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.change_stream_case_insensitive")));
+
+    // An insert into a namespace that only differs in case must not be matched, even though the
+    // case-insensitive collation would otherwise consider the two namespaces equal.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe")));
+
+    // An insert into an entirely different namespace is not matched either.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.some_other_collection")));
+}
+
+// The transaction unwind stage applies a filter to the individual operations extracted from
+// transaction oplog entries. Just like the oplog $match, this filter must match the watched
+// collection's namespace case-sensitively, even when the change stream pipeline runs with a custom,
+// case-insensitive collation. In a sharded cluster the shard parses this filter using the
+// collection's collation, so without stripping the collator the namespace comparison would
+// incorrectly match a namespace that only differs in case. This is the scenario exercised by
+// jstests/change_streams/collation.js in the multi-statement transaction passthrough suites.
+TEST_F(ChangeStreamStageTest, UnwindTransactionNamespaceIsCaseSensitiveWithCustomCollation) {
+    getExpCtx()->setCollator(
+        std::make_shared<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString));
+
+    const std::vector<BSONObj> rawPipeline = {BSON("$changeStream" << BSONObj())};
+
+    auto pipeline =
+        buildTestPipelineForCollection(rawPipeline, "unittests.change_stream_case_insensitive");
+
+    auto unwindTransactionStage =
+        getStageFromPipeline<DocumentSourceChangeStreamUnwindTransaction>(pipeline.get());
+    ASSERT_NE(nullptr, unwindTransactionStage);
+
+    const auto* matchExpr = unwindTransactionStage->getMatchExpression();
+
+    // An insert into the exact namespace is matched.
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.change_stream_case_insensitive")));
+
+    // An insert into a namespace that only differs in case must not be matched, even though the
+    // custom collation would otherwise consider the two namespaces equal.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe")));
+
+    // An insert into an entirely different namespace is not matched either.
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        matchExpr, makeInsertOplogEntryBSON("unittests.some_other_collection")));
 }
 
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
@@ -388,7 +529,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
 
     ASSERT_EQ("^unittest\\.system\\.views$",
               DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.system\\.views$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.system.views"),
                       DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx));
 
     ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
@@ -399,7 +540,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
 
     ASSERT_EQ("^unittest\\.\\$cmd$",
               DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
-    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+    ASSERT_BSONOBJ_EQ(BSON("" << "unittest.$cmd"),
                       DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
 }
 
@@ -448,6 +589,8 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
@@ -570,6 +713,8 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForAllDatabasesC
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
@@ -592,6 +737,8 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForDatabaseLevel
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
@@ -612,6 +759,8 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
     // Intentionally set the global 'ChangeStreamReaderBuilder' instance to a nullptr.
@@ -634,6 +783,8 @@ DEATH_TEST_REGEX_F(
 
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     // Intentionally set the global 'DataToShardsAllocationQueryService' instance to a nullptr.
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(nullptr);
@@ -653,6 +804,8 @@ DEATH_TEST_REGEX_F(
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -700,6 +853,8 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterForSupportedEvents) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -749,6 +904,8 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterFor
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForDataShard) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -869,19 +1026,19 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
                                             "$or": [
                                                 {
                                                     "o.create": {
-                                                        "$regex": "^change_stream$"
+                                                        "$eq": "change_stream"
                                                     }
                                                 },
                                                 {
                                                     "o.createIndexes": {
-                                                        "$regex": "^change_stream$"
+                                                        "$eq": "change_stream"
                                                     }
                                                 }
                                             ]
                                         },
                                         {
                                             "ns": {
-                                                "$regex": "^unittests\\.\\$cmd$"
+                                                "$eq": "unittests.$cmd"
                                             }
                                         }
                                     ]
@@ -890,7 +1047,7 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
                         },
                         {
                             "o.applyOps.ns": {
-                                "$regex": "^unittests\\.change_stream$"
+                                "$eq": "unittests.change_stream"
                             }
                         },
                         {
@@ -950,13 +1107,13 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
         {
             "$and": [
                 {
-                    "op": {
-                        "$eq": "n"
+                    "o2.endOfTransaction": {
+                        "$eq": "unittests.change_stream"
                     }
                 },
                 {
-                    "o2.endOfTransaction": {
-                        "$regex": "^unittests\\.change_stream$"
+                    "op": {
+                        "$eq": "n"
                     }
                 }
             ]
@@ -1012,19 +1169,19 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                                                     "$or": [
                                                         {
                                                             "o.create": {
-                                                                "$regex": "^change_stream$"
+                                                                "$eq": "change_stream"
                                                             }
                                                         },
                                                         {
                                                             "o.createIndexes": {
-                                                                "$regex": "^change_stream$"
+                                                                "$eq": "change_stream"
                                                             }
                                                         }
                                                     ]
                                                 },
                                                 {
                                                     "ns": {
-                                                        "$regex": "^unittests\\.\\$cmd$"
+                                                        "$eq": "unittests.$cmd"
                                                     }
                                                 }
                                             ]
@@ -1033,7 +1190,7 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                                 },
                                 {
                                     "o.applyOps.ns": {
-                                        "$regex": "^unittests\\.change_stream$"
+                                        "$eq": "unittests.change_stream"
                                     }
                                 },
                                 {
@@ -1093,13 +1250,13 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                 {
                     "$and": [
                         {
-                            "op": {
-                                "$eq": "n"
+                            "o2.endOfTransaction": {
+                                "$eq": "unittests.change_stream"
                             }
                         },
                         {
-                            "o2.endOfTransaction": {
-                                "$regex": "^unittests\\.change_stream$"
+                            "op": {
+                                "$eq": "n"
                             }
                         }
                     ]
@@ -2252,7 +2409,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
 
     LogicalSessionFromClient lsid = testLsid();
     std::vector<Document> results =
-        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, /*hasTxnNumber=*/false);
 
     ASSERT_EQ(results.size(), 1u);
 
@@ -2286,7 +2443,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
     };
     LogicalSessionFromClient lsid = testLsid();
     std::vector<Document> results =
-        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, /*hasTxnNumber=*/false);
 
     ASSERT_EQ(results.size(), 3u);
 
@@ -2324,7 +2481,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyOmitsSessionInfo
         getApplyOpsResults(applyOpsDoc,
                            lsid,
                            kDefaultSpec,
-                           true /* hasTxnNumber */,
+                           /*hasTxnNumber=*/true,
                            repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
 
     // Both inner operations are unwound into insert events.
@@ -2365,7 +2522,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyDoesNotEmitEndOf
         getApplyOpsResults(applyOpsDoc,
                            lsid,
                            kShowExpandedEventsSpec,
-                           true /* hasTxnNumber */,
+                           /*hasTxnNumber=*/true,
                            repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
 
     // Only the two inserts are emitted -- there is no trailing endOfTransaction event.
@@ -2594,7 +2751,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
     // Note that we never expect to see a 'commitTimestamp' event field because the events are
     // not from a prepared transaction.
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2615,7 +2772,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
     // Note that we never expect to see a 'commitTimestamp' event field because the events are
     // not from a prepared transaction.
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2636,7 +2793,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 789);
     // Note that we never expect to see a 'commitTimestamp' event field because the events are
     // not from a prepared transaction.
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2647,6 +2804,107 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
                                        DSChangeStream::kInsertOpType,
                                        ResumeTokenData::FromInvalidate::kNotFromInvalidate,
                                        2));
+}
+
+// Builds one entry of a kApplyOpsAppliedAtomically batch: an applyOps wrapping a single insert of
+// 'insertId', tagged with the atomic multiOpType. 'partialTxn' and 'count' are set when provided,
+// which is how a multi-entry batch's non-terminal and terminal entries are distinguished.
+repl::OplogEntry makeAtomicBatchEntry(const OperationSessionInfo& sessionInfo,
+                                      repl::OpTime opTime,
+                                      repl::OpTime prevOpTime,
+                                      int insertId,
+                                      bool partialTxn = false,
+                                      boost::optional<int> count = boost::none) {
+    BSONObjBuilder oField;
+    oField.append(
+        "applyOps",
+        BSON_ARRAY(BSON("op" << "i"
+                             << "ns" << nss.ns_forTest() << "ui" << testUuid() << "o"
+                             << BSON("_id" << insertId) << "o2" << BSON("_id" << insertId))));
+    if (partialTxn) {
+        oField.append("partialTxn", true);
+    }
+    if (count) {
+        oField.append("count", *count);
+    }
+    auto entry = makeOplogEntry(OpTypeEnum::kCommand,
+                                nss.getCommandNS(),
+                                oField.obj(),
+                                testUuid(),
+                                boost::none,  // fromMigrate
+                                boost::none,  // o2 field
+                                opTime,
+                                sessionInfo,
+                                prevOpTime);
+    return unittest::assertGet(repl::OplogEntry::parse(entry.getEntry().toBSON().addField(
+        BSON(repl::OplogEntry::kMultiOpTypeFieldName
+             << repl::MultiOplogEntryType::kApplyOpsAppliedAtomically)
+            .firstElement())));
+}
+
+// The previous statement has fallen off the oplog. Bounding the unwind by 'count' means the batch's
+// own entries suffice, so a truncated predecessor is not a spurious ChangeStreamHistoryLost.
+TEST_F(ChangeStreamStageTest, RetryableAtomicBatchUnwindToleratesTruncatedPreviousStatement) {
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+
+    // Statement 0 is not built at all: it stands in for a statement truncated from the oplog.
+    // Statement 1's first entry links to where it used to be.
+    repl::OpTime truncatedStmt0OpTime(Timestamp(100, 1), 1);
+    repl::OpTime stmt1FirstOpTime(Timestamp(100, 2), 1);
+    repl::OpTime stmt1TerminalOpTime(Timestamp(100, 3), 1);
+    auto stmt1First = makeAtomicBatchEntry(
+        sessionInfo, stmt1FirstOpTime, truncatedStmt0OpTime, 456, /*partialTxn=*/true);
+    auto stmt1Terminal = makeAtomicBatchEntry(sessionInfo,
+                                              stmt1TerminalOpTime,
+                                              stmt1FirstOpTime,
+                                              789,
+                                              /*partialTxn=*/false,
+                                              /*count=*/2);
+
+    auto execPipeline = makeExecPipeline(stmt1Terminal, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    // The mock has only statement 1's entries. Reaching for statement 0 would raise
+    // IncompleteTransactionHistory, which the stage surfaces as ChangeStreamHistoryLost.
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
+        std::vector<repl::OplogEntry>{stmt1Terminal, stmt1First}));
+
+    for (int expectedId : {456, 789}) {
+        auto next = transform->getNext();
+        ASSERT(next.isAdvanced());
+        auto nextDoc = next.releaseDocument();
+        ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), expectedId);
+    }
+    ASSERT(transform->getNext().isEOF());
+}
+
+// A single-entry atomic batch's prevOpTime is purely a session-history link, so the unwind must
+// not walk it at all. The link points at an entry the mock cannot supply, so any walk fails.
+TEST_F(ChangeStreamStageTest, RetryableAtomicBatchSingleEntryUnwindSkipsChainWalk) {
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+
+    // A single-entry batch: no 'count', and prevOpTime links to a statement the mock cannot supply.
+    repl::OpTime unreachablePrevOpTime(Timestamp(100, 1), 1);
+    auto entry = makeAtomicBatchEntry(
+        sessionInfo, repl::OpTime(Timestamp(100, 2), 1), unreachablePrevOpTime, 123);
+
+    auto execPipeline = makeExecPipeline(entry, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
+    invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
+
+    // Only the entry itself is available; there is nothing behind it to walk to.
+    getExpCtx()->setMongoProcessInterface(
+        std::make_unique<ChangeStreamMockMongoInterface>(std::vector<repl::OplogEntry>{entry}));
+
+    auto next = transform->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQ(next.releaseDocument()[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
+    ASSERT(transform->getNext().isEOF());
 }
 
 TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
@@ -3107,7 +3365,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -3127,7 +3385,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -3266,6 +3524,57 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 3);
 }
 
+// Helper class for testing that an unexpected command type is unwound inside a transactional
+// applyOps oplog entry throws an expected assertion.
+class ChangeStreamUnwindTransactionApplyOpsDeathTest : public ChangeStreamStageTestDeathTest {
+public:
+    void assertThrowsUnexpectedOpInApplyOpsAssertion(const Document& commandDoc) {
+        unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
+
+        Document applyOpsDoc{{"applyOps", Value{std::vector<Document>{commandDoc}}}};
+
+        LogicalSessionFromClient lsid = testLsid();
+        ASSERT_THROWS_CODE(getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec),
+                           AssertionException,
+                           7694300);
+    }
+};
+
+DEATH_TEST_REGEX_F(ChangeStreamUnwindTransactionApplyOpsDeathTest,
+                   TransformApplyOpsWithCollModOperation,
+                   "Tripwire assertion.*7694300") {
+    assertThrowsUnexpectedOpInApplyOpsAssertion(
+        Document{{"op", "c"sv},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
+                 {"ui", testUuid()},
+                 {"o", Value{Document{{"collMod", nss.coll()}}}},
+                 // collMod handler reads o2 for stateBeforeChange (collectionOptions_old,
+                 // indexOptions_old); provide an empty document to avoid a crash on missing o2.
+                 {"o2", Value{Document{}}}});
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamUnwindTransactionApplyOpsDeathTest,
+                   TransformApplyOpsWithDropOperation,
+                   "Tripwire assertion.*7694300") {
+    assertThrowsUnexpectedOpInApplyOpsAssertion(
+        Document{{"op", "c"sv},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
+                 {"ui", testUuid()},
+                 {"o", Value{Document{{"drop", nss.coll()}}}}});
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamUnwindTransactionApplyOpsDeathTest,
+                   TransformApplyOpsWithDropIndexesOperation,
+                   "Tripwire assertion.*7694300") {
+    assertThrowsUnexpectedOpInApplyOpsAssertion(
+        Document{{"op", "c"sv},
+                 {"ns", std::string(nss.db_forTest()) + ".$cmd"},
+                 {"ui", testUuid()},
+                 {"o", Value{Document{{"dropIndexes", nss.coll()}, {"index", "x_1"sv}}}},
+                 // dropIndexes handler reads o2 as the index spec for operationDescription.
+                 {"o2", Value{Document{{"key", Document{{"x", 1}}}, {"name", "x_1"sv}}}}});
+}
+
 TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
     const Timestamp ts(3, 45);
     const long long term = 4;
@@ -3348,7 +3657,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
 // A `ci` (container insert) is an internal storage operation used for inserting into containers.
 // `ci` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
-    auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+    auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), /*term=*/1),
                                                   "containerIdent"sv,
                                                   1LL,
                                                   BSONBinData("V", 1, BinDataGeneral));
@@ -3360,7 +3669,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
 // `cd` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerDelete) {
     auto cd = repl::makeContainerDeleteOplogEntry(
-        repl::OpTime(Timestamp(10, 10), 1 /* term */), "containerIdent"sv, 1LL);
+        repl::OpTime(Timestamp(10, 10), /*term=*/1), "containerIdent"sv, 1LL);
 
     checkTransformation(cd, boost::none);
 }
@@ -4125,6 +4434,8 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) 
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -4160,6 +4471,8 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShardShowSystemEvents) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -4320,11 +4633,12 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldIn
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
 
@@ -4368,11 +4682,12 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
 
@@ -4415,11 +4730,12 @@ TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
     // Create a resume token from only the timestamp.
@@ -4488,8 +4804,9 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                       std::move(collection),
+                                       /*commitTime=*/boost::none);
         });
     }
 
@@ -5111,11 +5428,12 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2Field
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
     BSONObj docKey = BSON("_id" << 1 << "shardKey" << 2);
@@ -5154,11 +5472,12 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldUseO2FieldInOplog) {
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
     BSONObj docKey = BSON("_id" << 1);
@@ -5198,8 +5517,9 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(expCtx->getOperationContext(), [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
+            catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                       std::move(collection),
+                                       /*commitTime=*/boost::none);
         });
     }
 
@@ -5225,11 +5545,12 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
@@ -5264,11 +5585,12 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
     {
         Lock::GlobalWrite lk(getExpCtx()->getOperationContext());
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(uuid, nss);
-        CollectionCatalog::write(
-            getExpCtx()->getOperationContext(), [&](CollectionCatalog& catalog) {
-                catalog.registerCollection(
-                    getExpCtx()->getOperationContext(), std::move(collection), /*ts=*/boost::none);
-            });
+        CollectionCatalog::write(getExpCtx()->getOperationContext(),
+                                 [&](CollectionCatalog& catalog) {
+                                     catalog.registerCollection(getExpCtx()->getOperationContext(),
+                                                                std::move(collection),
+                                                                /*commitTime=*/boost::none);
+                                 });
     }
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
@@ -5370,6 +5692,8 @@ TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamStagesOrder) {
 TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5400,6 +5724,8 @@ TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
 TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5429,6 +5755,8 @@ TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
 TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamV2StagesOrder) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5483,6 +5811,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleMatch) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5538,6 +5868,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5599,6 +5931,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5659,6 +5993,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleProject) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -5714,6 +6050,8 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleProject) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -6785,6 +7123,465 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamOplogMatchEmptyFo
     auto opts = query_shape::SerializationOptions{
         .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
+}
+
+// Change-stream option/scope usage metric tests
+
+class ChangeStreamMetricsTest : public ChangeStreamStageTest {
+protected:
+    // Returns the current value of a metric nested under "metrics.changeStreams".
+    // relPath: dot-separated path relative to "metrics.changeStreams",
+    //          e.g. "option.showExpandedEvents" or "scope.cluster".
+    static long long readCsMetric(std::string_view relPath) {
+        BSONObjBuilder bob;
+        globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+        BSONObj root = bob.obj();  // Must outlive obj — embeddedObject() is a non-owning view.
+        auto metricsEl = root["metrics"];
+        if (metricsEl.eoo())
+            return 0;
+        auto csEl = metricsEl.embeddedObject()["changeStreams"];
+        if (csEl.eoo())
+            return 0;
+        BSONObj obj = csEl.embeddedObject();
+        while (true) {
+            auto dot = relPath.find('.');
+            if (dot == std::string_view::npos) {
+                return obj[relPath].numberLong();
+            }
+            auto el = obj[relPath.substr(0, dot)];
+            if (el.eoo())
+                return 0;
+            obj = el.embeddedObject();
+            relPath = relPath.substr(dot + 1);
+        }
+    }
+
+    // Opens a $changeStream on mongod (inRouter must be false).
+    void openOnMongod(const BSONObj& stageSpec) {
+        getExpCtx()->setUpdateChangeStreamFeatureCounters(true);
+        getExpCtx()->setInRouter(false);
+        DocumentSourceChangeStream::createFromBson(stageSpec.firstElement(), getExpCtx());
+    }
+
+    void openOnMongos(const BSONObj& stageSpec) {
+        getExpCtx()->setUpdateChangeStreamFeatureCounters(true);
+        getExpCtx()->setInRouter(true);
+        DocumentSourceChangeStream::createFromBson(stageSpec.firstElement(), getExpCtx());
+    }
+};
+
+TEST_F(ChangeStreamMetricsTest, DoesNotCountOptionsTwiceInSameChangeStreamMongod) {
+    const auto spec = BSON("$changeStream" << BSON("showExpandedEvents" << true));
+    getExpCtx()->setInRouter(false);
+
+    const long long before = readCsMetric("option.showExpandedEvents");
+    DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQ(before + 1, readCsMetric("option.showExpandedEvents"));
+
+    DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQ(before + 1, readCsMetric("option.showExpandedEvents"));
+}
+
+TEST_F(ChangeStreamMetricsTest, DoesNotCountOptionsTwiceInSameChangeStreamMongos) {
+    const auto spec = BSON("$changeStream" << BSON("showExpandedEvents" << true));
+    getExpCtx()->setInRouter(true);
+
+    const long long before = readCsMetric("option.showExpandedEvents");
+    DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQ(before + 1, readCsMetric("option.showExpandedEvents"));
+
+    DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_EQ(before + 1, readCsMetric("option.showExpandedEvents"));
+}
+
+// Each boolean option counter increments by exactly 1 when the option is set to true.
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersIncrementOnTrue) {
+    struct Case {
+        std::string_view optionKey;
+        std::string_view metricRelPath;
+        // Extra options required for the option under test to be a legal combination, e.g.
+        // 'matchCollectionUUIDForUpdateLookup' requires 'fullDocument: updateLookup'.
+        BSONObj extraOptions = BSONObj();
+    };
+    const Case cases[] = {
+        {"showExpandedEvents", "option.showExpandedEvents"},
+        {"showMigrationEvents", "option.showMigrationEvents"},
+        {"showSystemEvents", "option.showSystemEvents"},
+        {"showRawUpdateDescription", "option.showRawUpdateDescription"},
+        {"ignoreRemovedShards", "option.ignoreRemovedShards"},
+        {"matchCollectionUUIDForUpdateLookup",
+         "option.matchCollectionUUIDForUpdateLookup",
+         BSON("fullDocument" << "updateLookup")},
+    };
+    for (const auto& c : cases) {
+        // mongod
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongod(
+                BSON("$changeStream" << BSON(c.optionKey << true).addFields(c.extraOptions)));
+            ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
+        }
+
+        // mongos
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongos(
+                BSON("$changeStream" << BSON(c.optionKey << true).addFields(c.extraOptions)));
+            ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
+        }
+    }
+}
+
+// Boolean option counters do NOT increment when the option is explicitly set to false.
+// This validates the .value_or(false) fix: boost::optional<bool>{false} must not be
+// treated as truthy by the increment call.
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersDoNotIncrementWhenExplicitlyFalse) {
+    struct Case {
+        std::string_view optionKey;
+        std::string_view metricRelPath;
+    };
+    const Case cases[] = {
+        {"showExpandedEvents", "option.showExpandedEvents"},
+        {"showMigrationEvents", "option.showMigrationEvents"},
+        {"showSystemEvents", "option.showSystemEvents"},
+        {"showRawUpdateDescription", "option.showRawUpdateDescription"},
+        {"ignoreRemovedShards", "option.ignoreRemovedShards"},
+        {"matchCollectionUUIDForUpdateLookup", "option.matchCollectionUUIDForUpdateLookup"},
+    };
+    for (const auto& c : cases) {
+        // mongod
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongod(BSON("$changeStream" << BSON(c.optionKey << false)));
+            ASSERT_EQ(before, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
+        }
+
+        // mongos
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongos(BSON("$changeStream" << BSON(c.optionKey << false)));
+            ASSERT_EQ(before, readCsMetric(c.metricRelPath)) << "option: " << c.optionKey;
+        }
+    }
+}
+
+// Boolean option counters do NOT increment when the option is omitted (default false).
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersDoNotIncrementWhenAbsentMongod) {
+    struct Case {
+        std::string_view metricRelPath;
+    };
+    const Case cases[] = {
+        {"option.showExpandedEvents"},
+        {"option.showMigrationEvents"},
+        {"option.showSystemEvents"},
+        {"option.showRawUpdateDescription"},
+        {"option.ignoreRemovedShards"},
+        {"option.matchCollectionUUIDForUpdateLookup"},
+    };
+
+    std::vector<long long> before;
+    for (const auto& c : cases) {
+        before.push_back(readCsMetric(c.metricRelPath));
+    }
+
+    openOnMongod(BSON("$changeStream" << BSONObj()));
+
+    for (size_t i = 0; i < std::size(cases); ++i) {
+        ASSERT_EQ(before[i], readCsMetric(cases[i].metricRelPath))
+            << "metric: " << cases[i].metricRelPath;
+    }
+}
+
+TEST_F(ChangeStreamMetricsTest, BooleanOptionCountersDoNotIncrementWhenAbsentMongos) {
+    struct Case {
+        std::string_view metricRelPath;
+    };
+    const Case cases[] = {
+        {"option.showExpandedEvents"},
+        {"option.showMigrationEvents"},
+        {"option.showSystemEvents"},
+        {"option.showRawUpdateDescription"},
+        {"option.ignoreRemovedShards"},
+        {"option.matchCollectionUUIDForUpdateLookup"},
+    };
+
+    std::vector<long long> before;
+    for (const auto& c : cases) {
+        before.push_back(readCsMetric(c.metricRelPath));
+    }
+
+    openOnMongos(BSON("$changeStream" << BSONObj()));
+
+    for (size_t i = 0; i < std::size(cases); ++i) {
+        ASSERT_EQ(before[i], readCsMetric(cases[i].metricRelPath))
+            << "metric: " << cases[i].metricRelPath;
+    }
+}
+
+// fullDocument counters: only non-default values (required / updateLookup / whenAvailable) count.
+TEST_F(ChangeStreamMetricsTest, FullDocumentCountersIncrementForNonDefaultValues) {
+    struct Case {
+        std::string_view value;
+        std::string_view metricRelPath;
+    };
+    const Case cases[] = {
+        {"required", "option.fullDocument.required"},
+        {"updateLookup", "option.fullDocument.updateLookup"},
+        {"whenAvailable", "option.fullDocument.whenAvailable"},
+    };
+    for (const auto& c : cases) {
+        // mongod
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongod(BSON("$changeStream" << BSON("fullDocument" << c.value)));
+            ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "fullDocument: " << c.value;
+        }
+
+        // mongos
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongos(BSON("$changeStream" << BSON("fullDocument" << c.value)));
+            ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath)) << "fullDocument: " << c.value;
+        }
+    }
+}
+
+// fullDocument=default does NOT count (it is the default value).
+TEST_F(ChangeStreamMetricsTest, FullDocumentDefaultDoesNotCount) {
+    // mongod
+    {
+        const long long beforeRequired = readCsMetric("option.fullDocument.required");
+        const long long beforeLookup = readCsMetric("option.fullDocument.updateLookup");
+        const long long beforeWhen = readCsMetric("option.fullDocument.whenAvailable");
+
+        openOnMongod(BSON("$changeStream" << BSON("fullDocument" << "default")));
+
+        ASSERT_EQ(beforeRequired, readCsMetric("option.fullDocument.required"));
+        ASSERT_EQ(beforeLookup, readCsMetric("option.fullDocument.updateLookup"));
+        ASSERT_EQ(beforeWhen, readCsMetric("option.fullDocument.whenAvailable"));
+    }
+
+    // mongos
+    {
+        const long long beforeRequired = readCsMetric("option.fullDocument.required");
+        const long long beforeLookup = readCsMetric("option.fullDocument.updateLookup");
+        const long long beforeWhen = readCsMetric("option.fullDocument.whenAvailable");
+
+        openOnMongos(BSON("$changeStream" << BSON("fullDocument" << "default")));
+
+        ASSERT_EQ(beforeRequired, readCsMetric("option.fullDocument.required"));
+        ASSERT_EQ(beforeLookup, readCsMetric("option.fullDocument.updateLookup"));
+        ASSERT_EQ(beforeWhen, readCsMetric("option.fullDocument.whenAvailable"));
+    }
+}
+
+// fullDocumentBeforeChange counters: required and whenAvailable count; off does not.
+TEST_F(ChangeStreamMetricsTest, FullDocumentBeforeChangeCountersIncrementForNonDefaultValues) {
+    struct Case {
+        std::string_view value;
+        std::string_view metricRelPath;
+    };
+    const Case cases[] = {
+        {"required", "option.fullDocumentBeforeChange.required"},
+        {"whenAvailable", "option.fullDocumentBeforeChange.whenAvailable"},
+    };
+    for (const auto& c : cases) {
+        // mongod
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongod(BSON("$changeStream" << BSON("fullDocumentBeforeChange" << c.value)));
+            ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath))
+                << "fullDocumentBeforeChange: " << c.value;
+        }
+
+        // mongos
+        {
+            const long long before = readCsMetric(c.metricRelPath);
+            openOnMongos(BSON("$changeStream" << BSON("fullDocumentBeforeChange" << c.value)));
+            ASSERT_EQ(before + 1, readCsMetric(c.metricRelPath))
+                << "fullDocumentBeforeChange: " << c.value;
+        }
+    }
+}
+
+// fullDocumentBeforeChange=off does NOT count (it is the default value).
+TEST_F(ChangeStreamMetricsTest, FullDocumentBeforeChangeOffDoesNotCount) {
+    // mongod
+    {
+        const long long beforeRequired = readCsMetric("option.fullDocumentBeforeChange.required");
+        const long long beforeWhen = readCsMetric("option.fullDocumentBeforeChange.whenAvailable");
+
+        openOnMongod(BSON("$changeStream" << BSON("fullDocumentBeforeChange" << "off")));
+
+        ASSERT_EQ(beforeRequired, readCsMetric("option.fullDocumentBeforeChange.required"));
+        ASSERT_EQ(beforeWhen, readCsMetric("option.fullDocumentBeforeChange.whenAvailable"));
+    }
+
+    // mongos
+    {
+        const long long beforeRequired = readCsMetric("option.fullDocumentBeforeChange.required");
+        const long long beforeWhen = readCsMetric("option.fullDocumentBeforeChange.whenAvailable");
+
+        openOnMongos(BSON("$changeStream" << BSON("fullDocumentBeforeChange" << "off")));
+
+        ASSERT_EQ(beforeRequired, readCsMetric("option.fullDocumentBeforeChange.required"));
+        ASSERT_EQ(beforeWhen, readCsMetric("option.fullDocumentBeforeChange.whenAvailable"));
+    }
+}
+
+// resumeAfter and startAfter counters increment when the options are user-provided.
+TEST_F(ChangeStreamMetricsTest, ResumeTokenOptionsIncrementCounters) {
+    // Build a high-water-mark resume token valid for resumeAfter.
+    auto resumeToken = ResumeToken::makeHighWaterMarkToken(kDefaultTs, 2);
+
+    // mongod
+    {
+        const long long beforeResume = readCsMetric("option.resumeAfter");
+        openOnMongod(BSON("$changeStream" << BSON("resumeAfter" << resumeToken.toBSON())));
+        ASSERT_EQ(beforeResume + 1, readCsMetric("option.resumeAfter"));
+
+        const long long beforeStart = readCsMetric("option.startAfter");
+        openOnMongod(BSON("$changeStream" << BSON("startAfter" << resumeToken.toBSON())));
+        ASSERT_EQ(beforeStart + 1, readCsMetric("option.startAfter"));
+    }
+
+    // mongos
+    {
+        const long long beforeResume = readCsMetric("option.resumeAfter");
+        openOnMongos(BSON("$changeStream" << BSON("resumeAfter" << resumeToken.toBSON())));
+        ASSERT_EQ(beforeResume + 1, readCsMetric("option.resumeAfter"));
+
+        const long long beforeStart = readCsMetric("option.startAfter");
+        openOnMongos(BSON("$changeStream" << BSON("startAfter" << resumeToken.toBSON())));
+        ASSERT_EQ(beforeStart + 1, readCsMetric("option.startAfter"));
+    }
+}
+
+// startAtOperationTime counter increments when the user sets it, but NOT when the system
+// auto-sets it because no resume point was specified.
+TEST_F(ChangeStreamMetricsTest, StartAtOperationTimeOnlyCountsUserProvidedValue) {
+    // mongod
+    {
+        const long long before = readCsMetric("option.startAtOperationTime");
+
+        // User-provided startAtOperationTime: should count.
+        openOnMongod(BSON("$changeStream" << BSON("startAtOperationTime" << Timestamp(100, 1))));
+        ASSERT_EQ(before + 1, readCsMetric("option.startAtOperationTime"));
+
+        // No resume option at all: system auto-sets startAtOperationTime; should NOT count.
+        const long long afterUserSet = readCsMetric("option.startAtOperationTime");
+        openOnMongod(BSON("$changeStream" << BSONObj()));
+        ASSERT_EQ(afterUserSet, readCsMetric("option.startAtOperationTime"));
+    }
+
+    // mongos
+    {
+        const long long before = readCsMetric("option.startAtOperationTime");
+
+        // User-provided startAtOperationTime: should count.
+        openOnMongos(BSON("$changeStream" << BSON("startAtOperationTime" << Timestamp(100, 1))));
+        ASSERT_EQ(before + 1, readCsMetric("option.startAtOperationTime"));
+
+        // No resume option at all: system auto-sets startAtOperationTime; should NOT count.
+        const long long afterUserSet = readCsMetric("option.startAtOperationTime");
+        openOnMongos(BSON("$changeStream" << BSONObj()));
+        ASSERT_EQ(afterUserSet, readCsMetric("option.startAtOperationTime"));
+    }
+}
+
+// Scope counters: collection, database, and cluster all increment correctly.
+TEST_F(ChangeStreamMetricsTest, ScopeCounters) {
+    const auto collectionNss =
+        NamespaceString::createNamespaceString_forTest("unittests"sv, "change_stream");
+    const auto databaseNss = NamespaceString::makeCollectionlessAggregateNSS(
+        NamespaceString::createNamespaceString_forTest("unittests"sv).dbName());
+    const auto adminNss = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
+
+    // mongod
+    {
+        // Collection scope.
+        getExpCtx()->setNamespaceString(collectionNss);
+        const long long beforeColl = readCsMetric("scope.collection");
+        openOnMongod(BSON("$changeStream" << BSONObj()));
+        ASSERT_EQ(beforeColl + 1, readCsMetric("scope.collection"));
+
+        // Database scope.
+        getExpCtx()->setNamespaceString(databaseNss);
+        const long long beforeDb = readCsMetric("scope.db");
+        openOnMongod(BSON("$changeStream" << BSONObj()));
+        ASSERT_EQ(beforeDb + 1, readCsMetric("scope.db"));
+
+        // Cluster scope: admin db with allChangesForCluster=true.
+        getExpCtx()->setNamespaceString(adminNss);
+        const long long beforeCluster = readCsMetric("scope.cluster");
+        openOnMongod(BSON("$changeStream" << BSON("allChangesForCluster" << true)));
+        ASSERT_EQ(beforeCluster + 1, readCsMetric("scope.cluster"));
+    }
+
+    // mongos
+    {
+        // Collection scope.
+        getExpCtx()->setNamespaceString(collectionNss);
+        const long long beforeColl = readCsMetric("scope.collection");
+        openOnMongos(BSON("$changeStream" << BSONObj()));
+        ASSERT_EQ(beforeColl + 1, readCsMetric("scope.collection"));
+
+        // Database scope.
+        getExpCtx()->setNamespaceString(databaseNss);
+        const long long beforeDb = readCsMetric("scope.db");
+        openOnMongos(BSON("$changeStream" << BSONObj()));
+        ASSERT_EQ(beforeDb + 1, readCsMetric("scope.db"));
+
+        // Cluster scope: admin db with allChangesForCluster=true.
+        getExpCtx()->setNamespaceString(adminNss);
+        const long long beforeCluster = readCsMetric("scope.cluster");
+        openOnMongos(BSON("$changeStream" << BSON("allChangesForCluster" << true)));
+        ASSERT_EQ(beforeCluster + 1, readCsMetric("scope.cluster"));
+    }
+}
+
+// Verify that option and scope counters are visible through the otel pipeline, not just
+// serverStatus. The counters are eagerly initialized at static-init time so they exist before any
+// stream is opened.
+TEST_F(ChangeStreamMetricsTest, OptionAndScopeMetricsAreVisibleViaOtel) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // mongod
+    {
+        const auto beforeOption = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents);
+        const auto beforeScope =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kChangeStreamScopeCollection);
+
+        openOnMongod(BSON("$changeStream" << BSON("showExpandedEvents" << true)));
+
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents),
+                  beforeOption + 1);
+        ASSERT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kChangeStreamScopeCollection),
+            beforeScope + 1);
+    }
+
+    // mongos
+    {
+        const auto beforeOption = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents);
+        const auto beforeScope =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kChangeStreamScopeCollection);
+
+        openOnMongos(BSON("$changeStream" << BSON("showExpandedEvents" << true)));
+
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents),
+                  beforeOption + 1);
+        ASSERT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kChangeStreamScopeCollection),
+            beforeScope + 1);
+    }
 }
 
 }  // namespace

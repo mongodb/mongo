@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/exec/sbe/util/print_options.h"
@@ -148,13 +122,12 @@ static std::pair<value::TypeTags, value::Value> makeBsonObject(const BSONObj& bo
 
 static std::pair<value::TypeTags, value::Value> makeArraySetWithCollator(
     const BSONArray& arr, CollatorInterface* collator) {
-    auto [tmpTag, tmpVal] = makeBsonArray(arr);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpArr = value::TagValueOwned::fromRaw(makeBsonArray(arr));
 
-    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+    value::ArrayEnumerator enumerator{tmpArr.tag(), tmpArr.value()};
 
     auto [arrTag, arrVal] = value::makeNewArraySet(collator);
-    value::ValueGuard guard{arrTag, arrVal};
+    value::TagValueOwned arrSet = value::TagValueOwned::fromRaw(arrTag, arrVal);
 
     auto arrView = value::getArraySetView(arrVal);
 
@@ -164,19 +137,18 @@ static std::pair<value::TypeTags, value::Value> makeArraySetWithCollator(
 
         arrView->push_back_clone(tag, val);
     }
-    guard.reset();
+    arrSet.reset();
 
     return {arrTag, arrVal};
 }
 
 static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
-    auto [tmpTag, tmpVal] = makeBsonArray(arr);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpArr = value::TagValueOwned::fromRaw(makeBsonArray(arr));
 
-    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+    value::ArrayEnumerator enumerator{tmpArr.tag(), tmpArr.value()};
 
     auto [arrTag, arrVal] = value::makeNewArraySet();
-    value::ValueGuard guard{arrTag, arrVal};
+    value::TagValueOwned arrSet = value::TagValueOwned::fromRaw(arrTag, arrVal);
 
     auto arrView = value::getArraySetView(arrVal);
 
@@ -186,19 +158,18 @@ static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& ar
 
         arrView->push_back_clone(tag, val);
     }
-    guard.reset();
+    arrSet.reset();
 
     return {arrTag, arrVal};
 }
 
 static std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) {
-    auto [tmpTag, tmpVal] = makeBsonArray(arr);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpArr = value::TagValueOwned::fromRaw(makeBsonArray(arr));
 
-    value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+    value::ArrayEnumerator enumerator{tmpArr.tag(), tmpArr.value()};
 
     auto [arrTag, arrVal] = value::makeNewArray();
-    value::ValueGuard guard{arrTag, arrVal};
+    value::TagValueOwned arrOwned = value::TagValueOwned::fromRaw(arrTag, arrVal);
 
     auto arrView = value::getArrayView(arrVal);
 
@@ -209,19 +180,18 @@ static std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) 
         auto [copyTag, copyVal] = value::copyValue(tag, val);
         arrView->push_back_raw(copyTag, copyVal);
     }
-    guard.reset();
+    arrOwned.reset();
 
     return {arrTag, arrVal};
 }
 
 static std::pair<value::TypeTags, value::Value> makeObject(const BSONObj& obj) {
-    auto [tmpTag, tmpVal] = makeBsonObject(obj);
-    value::ValueGuard tmpGuard{tmpTag, tmpVal};
+    value::TagValueOwned tmpObj = value::TagValueOwned::fromRaw(makeBsonObject(obj));
 
-    value::ObjectEnumerator enumerator{tmpTag, tmpVal};
+    value::ObjectEnumerator enumerator{tmpObj.tag(), tmpObj.value()};
 
     auto [objTag, objVal] = value::makeNewObject();
-    value::ValueGuard guard{objTag, objVal};
+    value::TagValueOwned objOwned = value::TagValueOwned::fromRaw(objTag, objVal);
 
     auto objView = value::getObjectView(objVal);
 
@@ -231,7 +201,7 @@ static std::pair<value::TypeTags, value::Value> makeObject(const BSONObj& obj) {
         objView->push_back_raw(enumerator.getFieldName(), copyTag, copyVal);
         enumerator.advance();
     }
-    guard.reset();
+    objOwned.reset();
 
     return {objTag, objVal};
 }
@@ -276,7 +246,7 @@ static std::vector<value::TagValueOwned> makeOwnedVector(std::initializer_list<T
     std::vector<value::TagValueOwned> owned;
     owned.reserve(values.size());
     for (const auto& tv : values) {
-        owned.emplace_back(tv);
+        owned.push_back(value::TagValueOwned::fromRaw(tv));
     }
     return owned;
 }
@@ -291,7 +261,6 @@ static std::pair<value::TypeTags, value::Value> makeEmptyState(
     state->push_back_raw(makeInt64(maxSize) /* MaxSize */);
     state->push_back_raw(makeInt32(0) /* MemUsage */);
     state->push_back_raw(makeInt32(memLimit) /* MemLimit */);
-    state->push_back_raw(makeBool(true) /* IsGroupAccum */);
 
     return {stateTag, stateVal};
 }

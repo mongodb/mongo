@@ -5,7 +5,7 @@
  *   featureFlagShardFilteringDistinctScan,
  *   do_not_wrap_aggregations_in_facets,
  *   not_allowed_with_signed_security_token,
- *   requires_fcv_82
+ *   requires_fcv_82,
  * ]
  */
 
@@ -19,6 +19,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 2});
+
 const db = prepareShardedCollectionWithOrphans(st);
 
 function assertDistinctResultsAndExplain({field, query, expectedOutput, validateExplain}) {

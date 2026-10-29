@@ -1,40 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 
-#include <cstddef>
-#include <cstdint>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
@@ -44,6 +12,8 @@
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <iterator>
 #include <map>
@@ -51,6 +21,10 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 
 namespace mongo::abt {
@@ -150,12 +124,12 @@ public:
      * Here and below: "other" printer(s) may be siphoned out.
      */
     ExplainPrinterImpl& print(ExplainPrinterImpl& other) {
-        return print(other, false /*singleLevel*/);
+        return print(other, /*singleLevel=*/false);
     }
 
     template <class P>
     ExplainPrinterImpl& printSingleLevel(P& other, const std::string& singleLevelSpacer = " ") {
-        return print(other, true /*singleLevel*/, singleLevelSpacer);
+        return print(other, /*singleLevel=*/true, singleLevelSpacer);
     }
 
     ExplainPrinterImpl& printAppend(ExplainPrinterImpl& other) {
@@ -484,7 +458,7 @@ public:
      * Here and below: "other" printer(s) may be siphoned out.
      */
     ExplainPrinterImpl& print(ExplainPrinterImpl& other) {
-        return print(other, false /*append*/);
+        return print(other, /*append=*/false);
     }
 
     ExplainPrinterImpl& printSingleLevel(ExplainPrinterImpl& other,
@@ -494,18 +468,18 @@ public:
     }
 
     ExplainPrinterImpl& printAppend(ExplainPrinterImpl& other) {
-        return print(other, true /*append*/);
+        return print(other, /*append=*/true);
     }
 
     ExplainPrinterImpl& print(std::vector<ExplainPrinterImpl>& other) {
-        return print(other, false /*append*/);
+        return print(other, /*append=*/false);
     }
 
     ExplainPrinterImpl& printAppend(std::vector<ExplainPrinterImpl>& other) {
-        return print(other, true /*append*/);
+        return print(other, /*append=*/true);
     }
 
-    ExplainPrinterImpl& setChildCount(const size_t /*childCount*/) {
+    ExplainPrinterImpl& setChildCount(/*childCount=*/const size_t) {
         // Ignored.
         return *this;
     }
@@ -706,7 +680,7 @@ public:
     /**
      * Nodes
      */
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const References& references,
                              std::vector<ExplainPrinter> inResults) {
         ExplainPrinter printer;
@@ -721,7 +695,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const ExpressionBinder& binders,
                              std::vector<ExplainPrinter> inResults) {
         ExplainPrinter printer;
@@ -747,13 +721,13 @@ public:
     /**
      * Expressions
      */
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Blackhole& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Blackhole& expr) {
         ExplainPrinter printer("Blackhole");
         printer.separator(" []");
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Constant& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Constant& expr) {
         ExplainPrinter printer("Const");
         printer.separator(" [").fieldName("tag", ExplainVersion::V3);
 
@@ -768,7 +742,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Variable& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Variable& expr) {
         ExplainPrinter printer("Variable");
         printer.separator(" [")
             .fieldName("name", ExplainVersion::V3)
@@ -777,7 +751,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const UnaryOp& expr,
                              ExplainPrinter inResult) {
         ExplainPrinter printer("UnaryOp");
@@ -791,7 +765,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const BinaryOp& expr,
                              ExplainPrinter leftResult,
                              ExplainPrinter rightResult) {
@@ -809,7 +783,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const NaryOp& expr,
                              std::vector<ExplainPrinter> argResults) {
         ExplainPrinter printer("NaryOp");
@@ -827,7 +801,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const If& expr,
                              ExplainPrinter condResult,
                              ExplainPrinter thenResult,
@@ -845,7 +819,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const Switch& expr,
                              std::vector<ExplainPrinter> argResults) {
         ExplainPrinter printer("Switch");
@@ -864,7 +838,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const Let& expr,
                              ExplainPrinter bindResult,
                              ExplainPrinter exprResult) {
@@ -882,7 +856,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const MultiLet& expr,
                              std::vector<ExplainPrinter> results) {
         auto numBinds = expr.numBinds();
@@ -910,7 +884,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const LambdaAbstraction& expr,
                              ExplainPrinter inResult) {
         ExplainPrinter printer("LambdaAbstraction");
@@ -932,7 +906,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const FunctionCall& expr,
                              std::vector<ExplainPrinter> argResults) {
         ExplainPrinter printer("FunctionCall");
@@ -949,7 +923,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Source& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Source& expr) {
         ExplainPrinter printer("Source");
         printer.separator(" []");
         return printer;
@@ -1023,9 +997,9 @@ static void printBSONstr(PrinterType& printer,
 }
 
 std::string ExplainGenerator::explainBSONStr(const ABT::reference_type node) {
-    sbe::value::TagValueOwned vg{explainBSON(node)};
+    sbe::value::TagValueOwned bson = sbe::value::TagValueOwned::fromRaw(explainBSON(node));
     ExplainPrinterImpl<ExplainVersion::V2> printer;
-    printBSONstr(printer, vg.tag(), vg.value());
+    printBSONstr(printer, bson.tag(), bson.value());
     return printer.str();
 }
 }  // namespace mongo::abt

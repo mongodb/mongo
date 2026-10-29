@@ -1,40 +1,17 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_builds/multi_index_block.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
+#include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
@@ -53,11 +30,14 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/unittest/barrier.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -303,8 +283,8 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
         coll.getCollectionPtr(),
         {},
         {},
-        /*saveCursorBeforeWrite*/ []() {},
-        /*restoreCursorAfterWrite*/ []() {}));
+        /*saveCursorBeforeWrite=*/[]() {},
+        /*restoreCursorAfterWrite=*/[]() {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
     ASSERT_OK(indexer->checkConstraints(operationContext(), coll.getCollectionPtr()));
 
@@ -375,10 +355,8 @@ TEST_F(MultiIndexBlockResumableTest, DuplicateKeyRecordingSurvivesWriteConflict)
     {
         auto failPoint = enableWriteConflictForWrites(
             FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-        const auto initialTimesEntered = failPoint->initialTimesEntered();
         ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx, getNSS()));
-        EXPECT_EQ(initialTimesEntered + 1,
-                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1))
+        EXPECT_EQ(1, failPoint->waitForOneNewEntry())
             << "Expected exactly one WCE during the duplicate-key recording retry";
     }
 
@@ -412,8 +390,8 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
         coll.get(),
         {},
         {},
-        /*saveCursorBeforeWrite*/ []() {},
-        /*restoreCursorAfterWrite*/ []() {}));
+        /*saveCursorBeforeWrite=*/[]() {},
+        /*restoreCursorAfterWrite=*/[]() {}));
     indexer->abortWithoutCleanup(operationContext(), coll.get());
 }
 
@@ -861,8 +839,7 @@ TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
@@ -1132,6 +1109,301 @@ TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), indexBuildIdent));
     EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+}
+
+TEST_F(MultiIndexBlockTest, InitFailureAfterResumableTableCreationDropsResumeTable) {
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto spec = BSON("key" << BSON("a" << 1) << "name"
+                           << "a_1"
+                           << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion));
+    // Requesting the same spec twice fails the second index build block, which runs after the
+    // internal index build table has been created.
+    IndexBuildInfo indexBuildInfo(spec, "index-1", *storageEngine);
+    IndexBuildInfo duplicateIndexBuildInfo(spec, "index-2", *storageEngine);
+
+    // This ident is what init() generates internally for the resume table
+    auto resumeTableIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_NOT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo, duplicateIndexBuildInfo},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none)
+                      .getStatus());
+
+    // The resume table should have been created
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), resumeTableIdent));
+
+    // immediatelyCompletePendingDrop() returns OK even if the ident isn't drop-pending, but if it
+    // wasn't drop-pending the ident would still exist afterwards.
+    ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), resumeTableIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), resumeTableIdent));
+}
+
+TEST_F(MultiIndexBlockTest, ResumablePrimaryDrivenIndexBuildTableIsCreatedAfterOnInit) {
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    auto indexer = getIndexer();
+    auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    bool onInitRan = false;
+    auto specs = unittest::assertGet(indexer->init(
+        operationContext(),
+        coll,
+        {indexBuildInfo},
+        [&] {
+            onInitRan = true;
+            EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
+                *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+        },
+        MultiIndexBlock::InitMode::SteadyState,
+        boost::none));
+    EXPECT_EQ(specs.size(), 1);
+    EXPECT_TRUE(onInitRan);
+
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, PdibPersistsMultikeyStateRecoveredWhileDraining) {
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto indexer = getIndexer();
+    auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo{BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine};
+
+    ASSERT_OK(indexer
+                  ->init(operationContext(),
+                         coll,
+                         {indexBuildInfo},
+                         MultiIndexBlock::kNoopOnInitFn,
+                         MultiIndexBlock::InitMode::SteadyState,
+                         boost::none)
+                  .getStatus());
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
+        wuow.commit();
+    }
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    // Nothing the collection scan saw was multikey.
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    {
+        auto beforeInfo = index_builds::readAndParseResumeIndexInfo(
+            storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+        ASSERT_TRUE(beforeInfo);
+        ASSERT_EQ(beforeInfo->getIndexes().size(), 1);
+        EXPECT_FALSE(beforeInfo->getIndexes()[0].getIsMultikey());
+    }
+
+    // A concurrent write that makes the index multikey, recorded as a side write.
+    auto* entry = coll->getIndexCatalog()->findIndexByName(
+        operationContext(), "a_1", IndexCatalog::InclusionPolicy::kAll);
+    ASSERT(entry);
+    auto interceptor = entry->indexBuildInterceptor();
+    ASSERT(interceptor);
+
+    key_string::HeapBuilder ksBuilder{key_string::Version::kLatestVersion};
+    ksBuilder.appendNumberLong(10);
+    ksBuilder.appendRecordId(RecordId{2});
+    key_string::Value keyString{ksBuilder.release()};
+    MultikeyPaths multikeyPaths{MultikeyComponents{0}};
+    {
+        WriteUnitOfWork wuow(operationContext());
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         coll.get(),
+                                         entry,
+                                         {keyString},
+                                         {},
+                                         multikeyPaths,
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        wuow.commit();
+    }
+
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    // The drained state is now in the resume record, not only in this node's memory.
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    EXPECT_TRUE(resumeInfo->getIndexes()[0].getIsMultikey());
+    EXPECT_FALSE(resumeInfo->getIndexes()[0].getMultikeyPaths().empty());
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, PdibPersistsMultikeyStateRecoveredWhileRetryingSkippedRecords) {
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
+
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto indexer = getIndexer();
+    auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a.b" << 1) << "name"
+                                  << "a.b_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    ASSERT_OK(indexer
+                  ->init(operationContext(),
+                         coll,
+                         {indexBuildInfo},
+                         MultiIndexBlock::kNoopOnInitFn,
+                         MultiIndexBlock::InitMode::SteadyState,
+                         boost::none)
+                  .getStatus());
+
+    // Scanned: the array sits at "a.b", the second path component.
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  coll.get(),
+                                  BSON("_id" << 0 << "a" << BSON("b" << BSON_ARRAY(1 << 2)))));
+        wuow.commit();
+    }
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    const auto multikeyComponents = [&]() -> std::vector<int32_t> {
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+        auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+            storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+        ASSERT_TRUE(resumeInfo);
+        ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+        auto& paths = resumeInfo->getIndexes()[0].getMultikeyPaths();
+        ASSERT_EQ(paths.size(), 1);
+        return paths[0].getMultikeyComponents();
+    };
+
+    // Only the second component so far, from the document the scan saw.
+    EXPECT_EQ(std::vector<int32_t>{1}, multikeyComponents());
+
+    // A document whose array sits at "a" instead, written after the scan and left undrained, so
+    // that the retry below is the only thing that can report its paths.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(
+            operationContext(), coll.get(), BSON("_id" << 1 << "a" << BSON_ARRAY(BSON("b" << 9)))));
+        wuow.commit();
+    }
+
+    auto* entry = coll->getIndexCatalog()->findIndexByName(
+        operationContext(), "a.b_1", IndexCatalog::InclusionPolicy::kAll);
+    ASSERT(entry);
+    auto interceptor = entry->indexBuildInterceptor();
+    ASSERT(interceptor);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        interceptor->getSkippedRecordTracker().record(operationContext(), coll.get(), RecordId{2});
+        wuow.commit();
+    }
+
+    ASSERT_OK(indexer->retrySkippedRecords(operationContext(), coll.get()));
+
+    // The retry found the first component multikey, and that reached the resume record.
+    EXPECT_EQ((std::vector<int32_t>{0, 1}), multikeyComponents());
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 // With resumable PDIB enabled, the first call to drainBackgroundWrites must
@@ -1661,6 +1933,22 @@ private:
     boost::optional<unittest::ServerParameterGuard> _containerWritesEnabled;
 };
 
+// Returns the serverStatus value at metrics.indexBuilds.<metric>.
+int64_t readIndexBuildsServerStatusMetric(std::string_view metric) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    const BSONObj root = bob.obj();
+    return root["metrics"]["indexBuilds"][metric].numberLong();
+}
+
+// Returns the serverStatus value at metrics.indexBuilds.<phase>.<metric>.
+int64_t readPerPhaseServerStatusMetric(std::string_view metric, std::string_view phase) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    const BSONObj root = bob.obj();
+    return root["metrics"]["indexBuilds"][phase][metric].numberLong();
+}
+
 std::string protocolTestName(IndexBuildProtocol protocol) {
     switch (protocol) {
         case IndexBuildProtocol::kSinglePhase:
@@ -1679,16 +1967,47 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     configureIndexerForProtocol(indexer);
 
     otel::metrics::OtelMetricsCapturer capturer;
+    const auto scanPhaseAttrs = std::tuple{idl::serialize(IndexBuildPhaseEnum::kCollectionScan)};
+    const auto bulkLoadPhaseAttrs = std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)};
     int64_t scannedBefore = 0;
+    int64_t bytesScannedBefore = 0;
     int64_t keysGeneratedBefore = 0;
+    int64_t bytesGeneratedBefore = 0;
     int64_t keysInsertedBefore = 0;
+    int64_t bytesInsertedBefore = 0;
+    int64_t scanMicrosBefore = 0;
+    int64_t bulkLoadMicrosBefore = 0;
+    const int64_t ssDocsScannedBefore = readIndexBuildsServerStatusMetric("docsScanned");
+    const int64_t ssBytesScannedBefore = readIndexBuildsServerStatusMetric("bytesScanned");
+    const int64_t ssScanKeysBefore =
+        readPerPhaseServerStatusMetric("keysProcessed", "collectionScan");
+    const int64_t ssScanBytesBefore =
+        readPerPhaseServerStatusMetric("bytesProcessed", "collectionScan");
+    const int64_t ssScanMicrosBefore =
+        readPerPhaseServerStatusMetric("phaseDurationMicros", "collectionScan");
+    const int64_t ssBulkLoadKeysBefore =
+        readPerPhaseServerStatusMetric("keysProcessed", "bulkLoad");
+    const int64_t ssBulkLoadBytesBefore =
+        readPerPhaseServerStatusMetric("bytesProcessed", "bulkLoad");
+    const int64_t ssBulkLoadMicrosBefore =
+        readPerPhaseServerStatusMetric("phaseDurationMicros", "bulkLoad");
     if (capturer.canReadMetrics()) {
         scannedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned);
-        keysGeneratedBefore =
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan);
-        keysInsertedBefore =
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan);
+        bytesScannedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesScanned);
+        keysGeneratedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed, scanPhaseAttrs);
+        bytesGeneratedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed, scanPhaseAttrs);
+        keysInsertedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildKeysProcessed, bulkLoadPhaseAttrs);
+        bytesInsertedBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildBytesProcessed, bulkLoadPhaseAttrs);
+        scanMicrosBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildPhasesDuration, scanPhaseAttrs);
+        bulkLoadMicrosBefore = capturer.readInt64Counter(
+            otel::metrics::MetricNames::kIndexBuildPhasesDuration, bulkLoadPhaseAttrs);
     }
 
     auto acq =
@@ -1739,15 +2058,44 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
                                              RecoveryUnit::ReadSource::kNoTimestamp,
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
+    EXPECT_EQ(readIndexBuildsServerStatusMetric("docsScanned"),
+              ssDocsScannedBefore + numDocsInColl);
+    EXPECT_GT(readIndexBuildsServerStatusMetric("bytesScanned"), ssBytesScannedBefore);
+    EXPECT_EQ(readPerPhaseServerStatusMetric("keysProcessed", "collectionScan"),
+              ssScanKeysBefore + (numDocsInColl * numIndexSpecs));
+    EXPECT_GT(readPerPhaseServerStatusMetric("bytesProcessed", "collectionScan"),
+              ssScanBytesBefore);
+    EXPECT_GT(readPerPhaseServerStatusMetric("phaseDurationMicros", "collectionScan"),
+              ssScanMicrosBefore);
+    EXPECT_EQ(readPerPhaseServerStatusMetric("keysProcessed", "bulkLoad"),
+              ssBulkLoadKeysBefore + (numDocsInColl * numIndexSpecs));
+    EXPECT_GT(readPerPhaseServerStatusMetric("bytesProcessed", "bulkLoad"), ssBulkLoadBytesBefore);
+    EXPECT_GT(readPerPhaseServerStatusMetric("phaseDurationMicros", "bulkLoad"),
+              ssBulkLoadMicrosBefore);
+
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
                   scannedBefore + numDocsInColl);
-        EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan),
-            keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
-        EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
-            keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesScanned),
+                  bytesScannedBefore);
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            scanPhaseAttrs),
+                  keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                            scanPhaseAttrs),
+                  bytesGeneratedBefore);
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            bulkLoadPhaseAttrs),
+                  keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                            bulkLoadPhaseAttrs),
+                  bytesInsertedBefore);
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+                                            scanPhaseAttrs),
+                  scanMicrosBefore);
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+                                            bulkLoadPhaseAttrs),
+                  bulkLoadMicrosBefore);
     }
 
     {
@@ -1763,12 +2111,128 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
                   scannedBefore + numDocsInColl);
-        EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan),
-            keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
-        EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
-            keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesScanned),
+                  bytesScannedBefore);
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            scanPhaseAttrs),
+                  keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            bulkLoadPhaseAttrs),
+                  keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+                                            scanPhaseAttrs),
+                  scanMicrosBefore);
+        EXPECT_GT(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildPhasesDuration,
+                                            bulkLoadPhaseAttrs),
+                  bulkLoadMicrosBefore);
+    }
+}
+
+TEST_P(MultiIndexBlockMetricsTest, WriteStatsCountKeysAndBytesWrittenToIndexTables) {
+    auto indexer = getIndexer();
+    configureIndexerForProtocol(indexer);
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    const auto bulkLoadPhaseAttrs = std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)};
+    const auto drainPhaseAttrs = std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)};
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    // Nothing has been written to an index table yet.
+    EXPECT_EQ(indexer->getIndexTableWrites().numKeysWrittenBulkLoad, 0);
+    EXPECT_EQ(indexer->getIndexTableWrites().numBytesWrittenBulkLoad, 0);
+    EXPECT_EQ(indexer->getIndexTableWrites().numKeysWrittenSideWritesDrain, 0);
+    EXPECT_EQ(indexer->getIndexTableWrites().numBytesWrittenSideWritesDrain, 0);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none)
+                      .getStatus());
+        wuow.commit();
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 1 << "a" << 2)));
+        wuow.commit();
+    }
+    constexpr int64_t numDocsInColl = 2;
+
+    // The size of a key string with one field.
+    const auto sampleKeyStringSize =
+        static_cast<int64_t>(key_string::HeapBuilder(key_string::Version::kLatestVersion,
+                                                     BSON("" << 1),
+                                                     Ordering::make(BSON("x" << 1)),
+                                                     RecordId(1))
+                                 .getSize());
+    const int64_t expectedKeyStringBytes = sampleKeyStringSize * numDocsInColl;
+
+    // Scans the collection and bulk loads the sorted keys into the index table.
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    const auto afterBulkLoad = indexer->getIndexTableWrites();
+    EXPECT_EQ(afterBulkLoad.numKeysWrittenBulkLoad, numDocsInColl);
+    EXPECT_EQ(afterBulkLoad.numBytesWrittenBulkLoad, expectedKeyStringBytes);
+    // We should not have recorded any side writes.
+    EXPECT_EQ(afterBulkLoad.numKeysWrittenSideWritesDrain, 0);
+    EXPECT_EQ(afterBulkLoad.numBytesWrittenSideWritesDrain, 0);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            bulkLoadPhaseAttrs),
+                  afterBulkLoad.numKeysWrittenBulkLoad);
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                            bulkLoadPhaseAttrs),
+                  afterBulkLoad.numBytesWrittenBulkLoad);
+    }
+
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    const auto afterDrain = indexer->getIndexTableWrites();
+    EXPECT_EQ(afterDrain.numKeysWrittenSideWritesDrain, numDocsInColl);
+    EXPECT_EQ(afterDrain.numBytesWrittenSideWritesDrain, expectedKeyStringBytes);
+    // The bulk load metrics should not have changed.
+    EXPECT_EQ(afterDrain.numKeysWrittenBulkLoad, afterBulkLoad.numKeysWrittenBulkLoad);
+    EXPECT_EQ(afterDrain.numBytesWrittenBulkLoad, afterBulkLoad.numBytesWrittenBulkLoad);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                            drainPhaseAttrs),
+                  afterDrain.numBytesWrittenSideWritesDrain);
+        EXPECT_EQ(afterDrain.numKeysWrittenSideWritesDrain,
+                  capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            drainPhaseAttrs));
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
     }
 }
 
@@ -1803,8 +2267,7 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
@@ -1827,6 +2290,9 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
 // _writeStateToContainer went through the container_write path (which fires the observer).
 class ResumeStateContainerInsertObserver : public OpObserverNoop {
 public:
+    // Keep the batched base-class overloads visible; they fan out to the single-op overrides below.
+    using OpObserverNoop::onContainerInsert;
+
     void onContainerInsert(OperationContext*,
                            std::string_view ident,
                            int64_t key,
@@ -2018,6 +2484,7 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
                                           iam->getSortedDataInterface()->getContainer(),
                                           keys.begin()->getView(),
                                           keys.begin()->getTypeBitsView(),
+                                          boost::none,
                                           container_write::NonexistentKeyGuarantee{}));
         wuow.commit();
     }
@@ -2221,6 +2688,161 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, SpillPersistsMultikeyStateOfTheDocumentItCheckpoints) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // 40 keys of ~64 KB is ~2.5 MB of key data against the 1 MB budget below.
+    constexpr int kKeysPerDocument = 40;
+    constexpr size_t kElementSizeBytes = 64 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    // The document is multikey and is the first the build sees, so nothing else can have marked the
+    // index multikey by the time it spills.
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        BSONArrayBuilder arr;
+        for (int i = 0; i < kKeysPerDocument; ++i) {
+            arr.append(std::to_string(i) + std::string(kElementSizeBytes, 'a'));
+        }
+        ASSERT_OK(
+            Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << arr.arr())));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    auto& indexState = resumeInfo->getIndexes()[0];
+
+    // The document was spilled, and the state that says so also says the index is multikey.
+    ASSERT_TRUE(indexState.getLastSpilledRecordId());
+    EXPECT_EQ(indexState.getLastSpilledRecordId()->getLong(), 1);
+    EXPECT_TRUE(indexState.getIsMultikey());
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// A single document generating more key data than the sorter's memory budget must still be spilled
+// as one unit.
+TEST_F(MultiIndexBlockTest, SpillDoesNotSplitOneDocumentsKeys) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // 40 keys of ~64 KB each is ~2.5 MB of key data, well past the 1 MB budget below, so the
+    // sorter wants to spill part-way through this one document's keys.
+    constexpr int keysPerDocument = 40;
+    constexpr size_t elementSizeBytes = 64 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        BSONArrayBuilder arr;
+        for (int i = 0; i < keysPerDocument; ++i) {
+            // Distinct per element, so the document generates exactly kKeysPerDocument keys.
+            arr.append(std::to_string(i) + std::string(elementSizeBytes, 'a'));
+        }
+        ASSERT_OK(
+            Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << arr.arr())));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    auto& indexState = resumeInfo->getIndexes()[0];
+
+    // One spill, holding every key of the document -- not one spill part-way through them.
+    ASSERT_TRUE(indexState.getRanges());
+    EXPECT_EQ(indexState.getRanges()->size(), 1);
+    ASSERT_TRUE(indexState.getNumKeys());
+    EXPECT_EQ(*indexState.getNumKeys(), keysPerDocument);
+
+    // The spilled position covers the whole document.
+    ASSERT_TRUE(indexState.getLastSpilledRecordId());
+    EXPECT_EQ(indexState.getLastSpilledRecordId()->getLong(), 1);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
     unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
@@ -2284,6 +2906,99 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     // by the collection's RecordId range.
     EXPECT_GT(lastSpilledRecordId->getLong(), 0);
     EXPECT_LE(lastSpilledRecordId->getLong(), numDocs);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// Every index in a build sorts into its own sorter and so spills at its own pace. Each one must
+// still keep a document's keys together, so a build where all three indexes overflow on the same
+// document persists one whole-document range per index.
+TEST_F(MultiIndexBlockTest, SpillDoesNotSplitOneDocumentsKeysForMultipleIndexes) {
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+
+    // The 1 MB budget below is split across the three indexes, so each sorter gets ~349 KB. Each
+    // field contributes 20 keys of ~32 KB (~640 KB), overflowing every one of them.
+    constexpr int kKeysPerDocument = 20;
+    constexpr size_t kElementSizeBytes = 32 * 1024;
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        auto makeArray = [&](std::string_view field) {
+            BSONArrayBuilder arr;
+            for (int i = 0; i < kKeysPerDocument; ++i) {
+                arr.append(std::string(field) + std::to_string(i) +
+                           std::string(kElementSizeBytes, 'a'));
+            }
+            return arr.arr();
+        };
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  coll.get(),
+                                  BSON("_id" << 0 << "a" << makeArray("a") << "b" << makeArray("b")
+                                             << "c" << makeArray("c"))));
+        wuow.commit();
+    }
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto makeInfo = [&](std::string_view field, std::string_view ident) {
+        return IndexBuildInfo(BSON("key" << BSON(field << 1) << "name"
+                                         << (std::string(field) + "_1") << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              std::string(ident),
+                              engine);
+    };
+    std::vector<IndexBuildInfo> infos{
+        makeInfo("a", "index-1"), makeInfo("b", "index-2"), makeInfo("c", "index-3")};
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           infos,
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), infos.size());
+
+    for (auto&& indexState : resumeInfo->getIndexes()) {
+        const auto indexName = indexState.getSpec()["name"].String();
+
+        // One spill per index, holding all of that index's keys for the document.
+        ASSERT_TRUE(indexState.getRanges()) << indexName;
+        EXPECT_EQ(indexState.getRanges()->size(), 1) << indexName;
+        ASSERT_TRUE(indexState.getNumKeys()) << indexName;
+        EXPECT_EQ(*indexState.getNumKeys(), kKeysPerDocument) << indexName;
+
+        // And each index's spilled position covers the whole document.
+        ASSERT_TRUE(indexState.getLastSpilledRecordId()) << indexName;
+        EXPECT_EQ(indexState.getLastSpilledRecordId()->getLong(), 1) << indexName;
+    }
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
@@ -3224,9 +3939,8 @@ TEST_F(MultiIndexBlockTest, SeedWriteSurvivesWriteConflict) {
     // Inject a single WCE — the seed write's `writeConflictRetry` must absorb it and retry.
     auto failPoint = enableWriteConflictForWrites(
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-    const auto initialTimesEntered = failPoint->initialTimesEntered();
     ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
-    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    EXPECT_EQ(1, failPoint->waitForOneNewEntry());
 
     // After the retry, the table contains exactly 1 + numIndexes records.
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
@@ -3680,5 +4394,283 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
+
+// appendBuildInfo() and getPhase() are called by other threads (e.g. listIndexes) while the index
+// build thread changes phase. Run with TSAN to detect unsynchronized access to the build state.
+TEST_F(MultiIndexBlockTest, ConcurrentPhaseChange) {
+    auto indexer = getIndexer();
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    const auto indexSpec = BSON("key" << BSON("a" << 1)   //
+                                      << "name" << "a_1"  //
+                                      << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion));
+    auto indexBuildInfo = IndexBuildInfo(indexSpec, "index-1", *storageEngine);
+
+    {
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        {
+            CollectionWriter coll(operationContext(), &acq);
+            WriteUnitOfWork wuow(operationContext());
+            ASSERT_OK(indexer
+                          ->init(operationContext(),
+                                 coll,
+                                 {indexBuildInfo},
+                                 MultiIndexBlock::kNoopOnInitFn,
+                                 MultiIndexBlock::InitMode::SteadyState,
+                                 boost::none)
+                          .getStatus());
+            wuow.commit();
+        }
+
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = 0; i < 100; ++i) {
+            ASSERT_OK(Helpers::insert(
+                operationContext(), acq.getCollectionPtr(), BSON("_id" << i << "a" << i)));
+        }
+        wuow.commit();
+    }
+
+    Atomic<bool> buildFinished{false};
+    unittest::Barrier bar(2);
+    unittest::JoinThread builder([&] {
+        bar.countDownAndWait();
+        ThreadClient tc(getServiceContext()->getService());
+        auto opCtx = tc->makeOperationContext();
+        ON_BLOCK_EXIT([&] { buildFinished.store(true); });
+
+        ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx.get(), getNSS()));
+
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), getNSS(), AcquisitionPrerequisites::kWrite),
+                                     MODE_IX);
+        ASSERT_OK(
+            indexer->drainBackgroundWrites(opCtx.get(),
+                                           RecoveryUnit::ReadSource::kNoTimestamp,
+                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+    });
+
+    bar.countDownAndWait();
+    while (!buildFinished.load()) {
+        BSONObjBuilder bob;
+        indexer->appendBuildInfo(&bob);
+        static_cast<void>(indexer->getPhase());
+    }
+    builder.join();
+
+    ASSERT_EQ(indexer->getPhase(), IndexBuildPhaseEnum::kDrainWrites);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_OK(indexer->commit(operationContext(),
+                              coll.getWritableCollection(operationContext()),
+                              MultiIndexBlock::kNoopOnCreateEachFn,
+                              MultiIndexBlock::kNoopOnCommitFn));
+    wuow.commit();
+}
+
+TEST(PrimaryDrivenIndexBuildKnobs, BulkLoadThrottleRateIsUnsetByDefault) {
+    ASSERT_EQ(index_builds::primary_driven::bulkLoadPhaseContainerWriteMBperSec.load(), 0);
+}
+
+// Tests that the bulk load phase of a primary-driven index build is throttled correctly.
+class MultiIndexBlockBulkLoadThrottleTest : public MultiIndexBlockTest {
+protected:
+    static constexpr auto kErrorMargin = Milliseconds(100);
+
+    void setUp() override {
+        MultiIndexBlockTest::setUp();
+        _containerWritesEnabled.emplace("featureFlagContainerWrites", true);
+        _pdibEnabled.emplace("featureFlagPrimaryDrivenIndexBuilds", true);
+        static_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(getServiceContext()))
+            ->alwaysAllowWrites(true);
+        // One key per batch, and a yield after every key, ensuring that the throttling mechanism is
+        // exercised.
+        _yieldIterations.emplace("internalIndexBuildBulkLoadYieldIterations", 1);
+        _batchSize.emplace("primaryDrivenIndexBuildIndexInsertionBatchSize", 1);
+        _rate.emplace("primaryDrivenIndexBuildBulkLoadPhaseContainerWriteMBperSec", 0);
+    }
+
+    void setRate(int mbPerSec) {
+        index_builds::primary_driven::bulkLoadPhaseContainerWriteMBperSec.store(mbPerSec);
+    }
+
+    /**
+     * Inserts 'numDocs' documents, builds 'numIndexes' indexes over them, and reports how long the
+     * build took into 'elapsed'.
+     */
+    void setUpBuild(int numDocs,
+                    int numIndexes,
+                    ContainerWriteBehavior behavior = ContainerWriteBehavior::kReplicate,
+                    IndexBuildMethodEnum method = IndexBuildMethodEnum::kPrimaryDriven) {
+        auto* opCtx = operationContext();
+        auto* indexer = getIndexer();
+        indexer->setBuildUUID(UUID::gen());
+        indexer->setIndexBuildMethod(method);
+        indexer->setContainerWriteBehavior(behavior);
+
+        auto acq = acquireCollection(opCtx,
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx, getNSS(), AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
+        CollectionWriter coll(opCtx, &acq);
+
+        {
+            WriteUnitOfWork wuow(opCtx);
+            for (int i = 0; i < numDocs; i++) {
+                ASSERT_OK(
+                    Helpers::insert(opCtx, coll.get(), BSON("_id" << i << "a" << i << "b" << i)));
+            }
+            wuow.commit();
+        }
+
+        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        std::vector<IndexBuildInfo> indexBuildInfos;
+        const std::array<std::string, 2> fields{"a", "b"};
+        ASSERT_LTE(numIndexes, static_cast<int>(fields.size()));
+        for (int i = 0; i < numIndexes; i++) {
+            indexBuildInfos.emplace_back(
+                BSON("key" << BSON(fields[i] << 1) << "name" << (fields[i] + "_1") << "v"
+                           << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                std::string("index-") + std::to_string(i + 1),
+                *storageEngine);
+        }
+
+        ASSERT_OK(indexer->init(opCtx,
+                                coll,
+                                indexBuildInfos,
+                                MultiIndexBlock::kNoopOnInitFn,
+                                MultiIndexBlock::InitMode::SteadyState,
+                                boost::none));
+    }
+
+    /**
+     * Cleans up the build set up above, which has to happen before ~MultiIndexBlock().
+     */
+    void cleanUpBuild() {
+        auto* opCtx = operationContext();
+        opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, getNSS(), AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            CollectionWriter coll(opCtx, &acq);
+            getIndexer()->abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
+        });
+    }
+
+    /**
+     * Runs a build over 'numDocs' documents with 'numIndexes' indexes and reports how long the scan
+     * and bulk load took into 'elapsed'.
+     */
+    void timeBuild(int numDocs,
+                   int numIndexes,
+                   Milliseconds* elapsed,
+                   ContainerWriteBehavior behavior = ContainerWriteBehavior::kReplicate,
+                   IndexBuildMethodEnum method = IndexBuildMethodEnum::kPrimaryDriven) {
+        setUpBuild(numDocs, numIndexes, behavior, method);
+
+        // insertAllDocumentsInCollection runs the collection scan and the bulk load phase, which is
+        // the phase that we are timing.
+        Timer timer;
+        ASSERT_OK(getIndexer()->insertAllDocumentsInCollection(operationContext(), getNSS()));
+        *elapsed = duration_cast<Milliseconds>(timer.elapsed());
+
+        cleanUpBuild();
+    }
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _containerWritesEnabled;
+    boost::optional<unittest::ServerParameterGuard> _pdibEnabled;
+    boost::optional<unittest::ServerParameterGuard> _yieldIterations;
+    boost::optional<unittest::ServerParameterGuard> _batchSize;
+    boost::optional<unittest::ServerParameterGuard> _rate;
+};
+
+// A zero rate does not pace anything, even though the failpoint below charges every key as 512KB.
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, ZeroRateDoesNotThrottle) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(0);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10, /*numIndexes=*/1, &elapsed);
+    ASSERT_LT(elapsed, Seconds(1));
+}
+
+// Interrupting a build while it is waiting on the throttle must abort the build, not crash the
+// process.
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, InterruptDuringThrottleWaitAbortsBuild) {
+    // Every charge counts as 2MB, so a single key exceeds the 1MB/s throttle rate and should
+    // trigger a wait of at least a second.
+    FailPointEnableBlock fp("fixedCursorDataSizeOf2MBForDataThrottle");
+    setRate(1);
+
+    // Stop the collection scan from yielding by setting the yield parameters to very high numbers.
+    unittest::ServerParameterGuard scanYieldIterations{"internalQueryExecYieldIterations", 1000};
+    unittest::ServerParameterGuard scanYieldPeriod{"internalQueryExecYieldPeriodMS", 60000};
+
+    setUpBuild(/*numDocs=*/2, /*numIndexes=*/1);
+
+    // Set a deadline of half a second for the operation context that the index build will run on,
+    // meaning the operation should be killed before the index build completes.
+    operationContext()->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
+
+    const auto status = getIndexer()->insertAllDocumentsInCollection(operationContext(), getNSS());
+    const auto yields = CurOp::get(operationContext())->numYields();
+
+    cleanUpBuild();
+
+    ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
+
+    // Verify that we yielded, which should only come from the bulk phase, to verify that we were
+    // interrupted while throttling.
+    ASSERT_GTE(yields, 1);
+}
+
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, NonReplicatingBuildIsNotThrottled) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(1);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10,
+              /*numIndexes=*/1,
+              &elapsed,
+              ContainerWriteBehavior::kDoNotReplicate);
+    ASSERT_LT(elapsed, Seconds(1));
+}
+
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, NonZeroRateThrottlesBulkLoad) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(1);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10, /*numIndexes=*/1, &elapsed);
+    // Generate 10 keys, each 512KB, for a total of 5MB. At a rate of 1MB/s, the build should take
+    // about five seconds.
+    ASSERT_GTE(elapsed, Seconds(3) - kErrorMargin);
+}
+
+// The rate applies to the build, not to each index in it: trying to build twice the number keys
+// with the same throttle rate as the test above should take about twice as long.
+TEST_F(MultiIndexBlockBulkLoadThrottleTest, RateAppliesToTheWholeBuildNotEachIndex) {
+    FailPointEnableBlock fp("fixedCursorDataSizeOf512KBForDataThrottle");
+    setRate(1);
+
+    Milliseconds elapsed{0};
+    timeBuild(/*numDocs=*/10, /*numIndexes=*/2, &elapsed);
+    // 20 keys at 512KB each is 10MB. At a rate of 1MB/s, the build should take
+    // about ten seconds.
+    ASSERT_GTE(elapsed, Seconds(10) - kErrorMargin);
+}
+
 }  // namespace
 }  // namespace mongo

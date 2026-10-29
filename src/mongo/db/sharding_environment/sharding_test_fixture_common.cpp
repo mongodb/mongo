@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
@@ -51,6 +25,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 
 #include <chrono>
 #include <cstddef>
@@ -64,9 +39,7 @@ namespace mongo {
 
 using executor::NetworkTestEnv;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon(
-    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext)
-    : ServiceContextTest(std::move(scopedGlobalContext)) {}
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() {}
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
     invariant(!_opCtxHolder,
@@ -74,6 +47,7 @@ ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
 }
 
 void ShardingTestFixtureCommon::setUp() {
+    ServiceContextTest::setUp();
     _opCtxHolder = makeOperationContext();
 
     ResourceYielderFactory::initialize(getServiceContext());
@@ -81,6 +55,7 @@ void ShardingTestFixtureCommon::setUp() {
 
 void ShardingTestFixtureCommon::tearDown() {
     _opCtxHolder.reset();
+    ServiceContextTest::tearDown();
 }
 
 void ShardingTestFixtureCommon::shutdownExecutorPool() {
@@ -91,12 +66,45 @@ void ShardingTestFixtureCommon::shutdownExecutorPool() {
     }
     _executorPoolShutDown = true;
 
-    grid->getExecutorPool()->shutdown_forTest();
-    for (auto mockNet : {&_mockNetwork, &_mockNetworkForPool}) {
-        executor::NetworkInterfaceMock::InNetworkGuard(*mockNet)
-            ->drainUnfinishedNetworkOperations();
+    // Interrupt every in-flight operation so any command synchronously blocked on the mock network
+    // (e.g. a ShardRegistry lookup parked in Fetcher::join) unwinds instead of deadlocking the
+    // cooperative InNetworkGuard drain below. Cleared once the pool is joined so the remaining
+    // teardown can use fresh operation contexts.
+    getServiceContext()->setKillAllOperations();
+
+    auto executorPool = grid->getExecutorPool();
+    executorPool->shutdown_forTest();
+
+    // Keep running the mock networks until no executor in the pool has a registered callback left.
+    //
+    // A single drain pass is not enough. Threads that are not synchronized with teardown (e.g. the
+    // CursorCleanup pool, which fires killOperations at the sharding executor) can be parked inside
+    // ThreadPoolTaskExecutor::scheduleRemoteCommand between registering their callback and handing
+    // the request to the network. Such a callback is invisible to the network mock, so a one-shot
+    // drain returns having done nothing and the executor join() will end up waiting forever.
+    Timer drainTimer;
+    while (executorPool->hasTasks_forTest()) {
+        for (auto mockNet : {&_mockNetwork, &_mockNetworkForPool}) {
+            executor::NetworkInterfaceMock::InNetworkGuard(*mockNet)
+                ->drainUnfinishedNetworkOperations();
+        }
+
+        if (drainTimer.elapsed() > kExecutorPoolDrainTimeout) {
+            BSONObjBuilder diagnostics;
+            executorPool->appendDiagnosticBSON_forTest(&diagnostics);
+            uasserted(13246100,
+                      fmt::format("Timed out draining the executor pool during teardown; some "
+                                  "callback never completed. Executor diagnostics: {}",
+                                  diagnostics.obj().toString()));
+        }
+
+        // Allow executor to do some work before looping again.
+        sleepmillis(500);
     }
-    grid->getExecutorPool()->join_forTest();
+
+    executorPool->join_forTest();
+
+    getServiceContext()->unsetKillAllOperations();
 }
 
 OperationContext* ShardingTestFixtureCommon::operationContext() const {
@@ -185,7 +193,7 @@ void ShardingTestFixtureCommon::addRemoteShards(
 
     for (auto shard : shardInfos) {
         ShardType shardType;
-        shardType.setHandle(ShardHandle(ShardId(std::get<0>(shard).toString()), boost::none));
+        shardType.setName(std::get<0>(shard).toString());
         shardType.setHost(std::get<1>(shard).toString());
         shards.push_back(shardType);
 
@@ -200,36 +208,43 @@ void ShardingTestFixtureCommon::addRemoteShards(
 
     auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
 
-    onFindWithMetadataCommand([this, &shards](const executor::RemoteCommandRequest& request) {
-        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-            request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
+    // shardRegistry()->reload() only goes over the (mocked) network if this fixture's
+    // ShardingCatalogClient does; fixtures that override makeShardingCatalogClient() to answer
+    // getAllShards() synchronously in-process (as e.g. AppendRawResponsesTest does) never issue a
+    // "find" command at all, and the reload resolves on its own.
+    if (catalogClientUsesNetworkForGetAllShards()) {
+        onFindWithMetadataCommand([this, &shards](const executor::RemoteCommandRequest& request) {
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
-        // If there is no '$db', append it.
-        auto cmd = static_cast<OpMsgRequest>(request).body;
-        auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
+            // If there is no '$db', append it.
+            auto cmd = static_cast<OpMsgRequest>(request).body;
+            auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
-        ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
-        ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
-        ASSERT_FALSE(query->getLimit().has_value());
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(),
+                      NamespaceString::kConfigsvrShardsNamespace);
+            ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
+            ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
+            ASSERT_FALSE(query->getLimit().has_value());
 
-        std::vector<BSONObj> shardsToReturn;
+            std::vector<BSONObj> shardsToReturn;
 
-        Timestamp maxTopologyTime;
-        std::transform(shards.begin(),
-                       shards.end(),
-                       std::back_inserter(shardsToReturn),
-                       [&maxTopologyTime](const ShardType& shard) {
-                           maxTopologyTime = std::max(shard.getTopologyTime(), maxTopologyTime);
-                           return shard.toBSON();
-                       });
+            Timestamp maxTopologyTime;
+            std::transform(shards.begin(),
+                           shards.end(),
+                           std::back_inserter(shardsToReturn),
+                           [&maxTopologyTime](const ShardType& shard) {
+                               maxTopologyTime = std::max(shard.getTopologyTime(), maxTopologyTime);
+                               return shard.toBSON();
+                           });
 
-        BSONObjBuilder bob;
-        bob.append(VectorClock::kTopologyTimeFieldName, maxTopologyTime);
+            BSONObjBuilder bob;
+            bob.append(VectorClock::kTopologyTimeFieldName, maxTopologyTime);
 
-        return std::make_tuple(shardsToReturn, bob.obj());
-    });
+            return std::make_tuple(shardsToReturn, bob.obj());
+        });
+    }
 
     future.default_timed_get();
 }

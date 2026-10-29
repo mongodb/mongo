@@ -42,9 +42,8 @@ class SetUpEC2Instance(PowercycleCommand):
             "etc",
             "buildscripts",
             "dist-test/bin",
-            "poetry.lock",
+            "uv.lock",
             "pyproject.toml",
-            "poetry_requirements.txt",
         ]
 
         shared_libs = "dist-test/lib"
@@ -70,8 +69,17 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{cmds}; $python_loc -m venv --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
-        cmds = f"{cmds}; pushd $remote_dir && python3 -m pip install -r poetry_requirements.txt && popd"
-        cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync --without powercycle-incompatible && popd"
+        # Bootstrap uv into the remote venv and install all dependency groups
+        # except powercycle-incompatible (rapidyaml is broken on atlas distros
+        # used by powercycle). uv version is read from
+        # $remote_dir/buildscripts/uv_version.txt, which is the same canonical
+        # pin file that uv_sync.sh, venv_setup.sh, and the Dockerfiles use.
+        cmds = f'{cmds}; pushd $remote_dir && python3 -m pip install "uv==$(cat buildscripts/uv_version.txt)" && popd'
+        # UV_PROJECT_ENVIRONMENT is required: uv ignores $VIRTUAL_ENV for
+        # project commands and would otherwise sync into $remote_dir/.venv,
+        # leaving the activated venv empty. --locked forbids uv from
+        # re-resolving and rewriting a stale uv.lock at install time.
+        cmds = f"{cmds}; pushd $remote_dir && UV_PROJECT_ENVIRONMENT=$VIRTUAL_ENV python3 -m uv sync --locked --all-groups --no-group powercycle-incompatible --no-install-project && popd"
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
 

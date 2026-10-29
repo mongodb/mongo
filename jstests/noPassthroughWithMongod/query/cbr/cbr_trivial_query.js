@@ -1,4 +1,9 @@
-import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
+/**
+ * @tags: [
+ *   requires_fcv_90,
+ * ]
+ */
+import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -65,22 +70,25 @@ function multiKey() {
     assert.eq(res.length, 1);
 }
 
-const oldCBRConfig = getCBRConfig(db);
+const oldCBRConfig = getPlanRankerConfig(db);
 
 try {
-    for (const mode of ["automaticCE", "samplingCE"]) {
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                featureFlagCostBasedRanker: true,
-                internalQueryCBRCEMode: mode,
-            }),
-        );
+    const configs = [
+        {featureFlagCostBasedRanker: true, internalQueryPlanRanker: "mixed"},
+        {
+            featureFlagCostBasedRanker: true,
+            internalQueryPlanRanker: "costBased",
+            internalQueryCBRCEMode: "samplingCE",
+        },
+    ];
+
+    for (const config of configs) {
+        setPlanRankerConfig(db, config);
 
         triviallyTrue();
         triviallyFalse();
         multiKey();
     }
 } finally {
-    setCBRConfig(db, oldCBRConfig);
+    setPlanRankerConfig(db, oldCBRConfig);
 }

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -56,7 +30,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -91,7 +65,7 @@ namespace repl {
  * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
  * into dbtests.
  */
-class MONGO_MOD_OPEN ReplicationCoordinatorMock : public ReplicationCoordinator {
+class [[MONGO_MOD_OPEN]] ReplicationCoordinatorMock : public ReplicationCoordinator {
     ReplicationCoordinatorMock(const ReplicationCoordinatorMock&) = delete;
     ReplicationCoordinatorMock& operator=(const ReplicationCoordinatorMock&) = delete;
 
@@ -155,14 +129,14 @@ public:
 
     bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
 
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::canAcceptWritesForDatabase)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::canAcceptWritesForDatabase)]]
     bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                            const DatabaseName& dbName) override;
 
     bool canAcceptWritesFor(OperationContext* opCtx,
                             const NamespaceStringOrUUID& nsOrUUID) override;
 
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::canAcceptWritesFor)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::canAcceptWritesFor)]]
     bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                    const NamespaceStringOrUUID& nsOrUUID) override;
 
@@ -178,7 +152,7 @@ public:
     Status checkCanServeReadsFor(OperationContext* opCtx,
                                  const NamespaceString& ns,
                                  bool secondaryOk) override;
-    MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::checkCanServeReadsFor)
+    [[MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinatorMock::checkCanServeReadsFor)]]
     Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         bool secondaryOk) override;
@@ -354,7 +328,8 @@ public:
                              const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 
-    Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+    Status processHeartbeatV1(OperationContext* opCtx,
+                              const ReplSetHeartbeatArgsV1& args,
                               ReplSetHeartbeatResponse* response) override;
 
     /**
@@ -383,7 +358,10 @@ public:
 
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
-    Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) override;
+    Status stepUpIfEligible(
+        OperationContext* opCtx,
+        bool skipDryRun,
+        boost::optional<Date_t> priorPrimaryStopAcceptingWritesTime = boost::none) override;
 
     /**
      * Sets the return value for calls to getConfig.
@@ -405,6 +383,13 @@ public:
                               const BSONObj& cmdObj,
                               OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                               OnRemoteCmdCompleteFn onRemoteCmdComplete)>;
+
+    /**
+     * Injects a custom 'runCmdOnPrimaryAndAwaitResponse' functor. Unless one is set, commands
+     * are silently discarded and answered with a successful {"ok": 1} response.
+     */
+    void setRunCmdOnPrimaryAndAwaitResponseFunction(
+        RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction);
 
     /**
      * Always allow writes even if this node is a writable primary. Used by sharding unit tests.

@@ -11,7 +11,6 @@
 import {after, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = jsTestName();
@@ -23,9 +22,14 @@ const rst = new ReplSetTest({
         setParameter: {
             featureFlagCostBasedRanker: true,
             featureFlagPersistentStats: true,
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
             internalQuerySamplingCEMethod: "random",
             internalQuerySamplingBySequentialScan: false,
+            // Explicitly disable for variants that enable this.
+            internalQuerySamplingByStrides: false,
+            // TODO SERVER-117707: remove once CBR supports SBE.
+            internalQueryFrameworkControl: "forceClassicEngine",
         },
     },
 });
@@ -37,7 +41,7 @@ const secondary = rst.getSecondary();
 const primaryDB = primary.getDB(kDbName);
 const secondaryDB = secondary.getDB(kDbName);
 
-// TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+// TODO SERVER-135439: Remove once featureFlagPersistentStats is enabled by default.
 if (!FeatureFlagUtil.isEnabled(primaryDB, "PersistentStats")) {
     jsTest.log.info(`Skipping ${jsTestName()}: featureFlagPersistentStats is not enabled`);
     rst.stopSet();
@@ -89,6 +93,7 @@ function assertSampleDocReplicatedExactly(expectedId) {
         secondaryDoc,
         "sample document on secondary does not exactly match the primary",
     );
+    PersistentSamplesUtils.assertSamplesCollClustered(secondaryDB);
 }
 
 describe("analyze sample on replica sets", function () {
@@ -185,13 +190,6 @@ describe("analyze sample on replica sets", function () {
             );
         });
     });
-
-    // TODO SERVER-92589: Remove once CBR supports SBE.
-    if (checkSbeFullyEnabled(primaryDB)) {
-        jsTest.log.info(`Skipping remaining tests: ${jsTestName()}: CBR does not support SBE`);
-        rst.stopSet();
-        quit();
-    }
 
     describe("CE on secondary uses persisted sample", function () {
         it("uses on-the-fly sampling when no persisted sample exists", function () {

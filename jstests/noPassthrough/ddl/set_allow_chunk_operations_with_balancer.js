@@ -3,7 +3,7 @@
  * that disabling the flag on one collection does not affect the balancing of others.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  * ]
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

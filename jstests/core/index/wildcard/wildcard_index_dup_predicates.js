@@ -1,6 +1,7 @@
 /**
  * Test wildcard index support when the query contains duplicate predicates.
  * @tags: [
+ *   uses_explain,
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,
  * ]

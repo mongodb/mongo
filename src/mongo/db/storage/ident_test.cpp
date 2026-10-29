@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/storage/ident.h"
 
 #include "mongo/unittest/unittest.h"
@@ -76,27 +50,27 @@ TEST_F(IdentGenerationTest, CollectionIdentsAreUnique) {
                                         << ", directoryForIndexes: " << directoryForIndexes;
     };
 
-    testGeneratesUniqueIdents(false /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(false /* directoryPerDB */, true /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, true /* directoryForIndexes */);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/true);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/true);
 }
 
 TEST_F(IdentGenerationTest, CollectionIdentsYieldIsCollectionIdentTrue) {
     const auto identDefault = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/false);
     assertIsCollectionIdent(identDefault);
 
     const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/false);
     assertIsCollectionIdent(identDirectoryPerDB);
 
     const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsCollectionIdent(identDirectoryForIndexes);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsCollectionIdent(identDirectoryPerDBAndIndexes);
 }
 
@@ -135,27 +109,27 @@ TEST_F(IdentGenerationTest, IndexIdentsAreUnique) {
                                         << ", directoryForIndexes: " << directoryForIndexes;
     };
 
-    testGeneratesUniqueIdents(false /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(false /* directoryPerDB */, true /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, true /* directoryForIndexes */);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/true);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/true);
 }
 
 TEST_F(IdentGenerationTest, IndexIdentsYieldIsIndexIdentTrue) {
     const auto identDefault = ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/false);
     assertIsIndexIdent(identDefault);
 
     const auto identDirectoryPerDB = ident::generateNewIndexIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/false);
     assertIsIndexIdent(identDirectoryPerDB);
 
     const auto identDirectoryForIndexes = ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsIndexIdent(identDirectoryForIndexes);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsIndexIdent(identDirectoryPerDBAndIndexes);
 }
 
@@ -288,21 +262,21 @@ TEST_F(IdentGenerationTest, ValidCollectionIdents) {
 
 TEST_F(IdentGenerationTest, IdentDirectoryForCollectionIdents) {
     const auto identDefault = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/false);
 
     EXPECT_EQ(ident::getDirectory(identDefault), ""sv);
 
     const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/false);
     const auto dbComponent = ident::createDBNamePathComponent(kTestDB);
     EXPECT_EQ(ident::getDirectory(identDirectoryPerDB), std::string_view{dbComponent});
 
     const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     EXPECT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"sv);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
-        kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/true);
     const auto dbComponentWithCollection = dbComponent + "/collection";
     EXPECT_EQ(ident::getDirectory(identDirectoryPerDBAndIndexes),
               std::string_view{dbComponentWithCollection});
@@ -341,6 +315,17 @@ TEST_F(IdentGenerationTest, InvalidIdents) {
     EXPECT_FALSE(ident::isValidIdent("db/index/:a"));
     // dbname containing characters that should have been escaped
     EXPECT_FALSE(ident::isValidIdent("db[name]/index/a"));
+
+    // Format 3 ("$dbName/$identType-$uniqueTag") must validate the dbName segment identically to
+    // Format 4. Path traversal components in the dbName must be rejected (SERVER path traversal).
+    EXPECT_FALSE(ident::isValidIdent("../collection-abcdef0123456789abcdef0123456789"));
+    EXPECT_FALSE(ident::isValidIdent("../index-0"));
+    EXPECT_FALSE(ident::isValidIdent("./collection-0"));
+    EXPECT_FALSE(ident::isValidIdent("../internal-0"));
+    // dbname in Format 3 containing characters that should have been escaped
+    EXPECT_FALSE(ident::isValidIdent("db[name]/collection-0"));
+    // Nested path traversal in the Format 3 dbName segment
+    EXPECT_FALSE(ident::isValidIdent("db/../collection-0"));
 }
 
 TEST_F(IdentGenerationTest, IdentDirectoryRejectsInvalidIdents) {

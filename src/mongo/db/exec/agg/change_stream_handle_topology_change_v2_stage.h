@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_metrics.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream.h"
@@ -206,6 +181,14 @@ public:
          * 'highWaterMark', using a high water mark token.
          */
         virtual void setHighWaterMark(Timestamp highWaterMark) = 0;
+
+        /**
+         * Enables or disables advancement of the client-visible high water mark based on the
+         * minimum promised sort key of the shards. Disabled while reading a bounded change stream
+         * segment in ignore-removed-shards mode, where a shard promise may point beyond the segment
+         * end and therefore must not be exposed to the client.
+         */
+        virtual void setPromisedSortKeyHighWaterMarkAdvancement(bool enabled) = 0;
     };
 
     /**
@@ -241,7 +224,15 @@ public:
     };
 
     ChangeStreamHandleTopologyChangeV2Stage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            std::shared_ptr<Parameters> params);
+                                            std::shared_ptr<Parameters> params,
+                                            ChangeStreamTopologyChangeV2MetricsRecorder metrics =
+                                                getChangeStreamTopologyChangeV2MetricsRecorder());
+
+    /**
+     * Decrements the degraded gauge if it is still counted, in case 'doDispose()' was never
+     * called for this stage. Delegates to the same idempotent logic as 'doDispose()'.
+     */
+    ~ChangeStreamHandleTopologyChangeV2Stage() override;
 
     /**
      * Returns a string representation of the state name.
@@ -267,61 +258,71 @@ public:
     /**
      * Returns the '_lastAllocationToShardsRequestTime' value for testing.
      */
-    MONGO_MOD_PRIVATE Date_t getLastAllocationToShardsRequestTime_forTest() const {
+    [[MONGO_MOD_PRIVATE]] Date_t getLastAllocationToShardsRequestTime_forTest() const {
         return _lastAllocationToShardsRequestTime;
     }
 
     /**
      * Sets the value of '_lastAllocationToShardsRequestTime' value for testing.
      */
-    MONGO_MOD_PRIVATE void setLastAllocationToShardsRequestTime_forTest(Date_t lastRequestTime) {
+    [[MONGO_MOD_PRIVATE]] void setLastAllocationToShardsRequestTime_forTest(
+        Date_t lastRequestTime) {
         _lastAllocationToShardsRequestTime = lastRequestTime;
     }
 
     /**
      * Returns the '_segmentStartTimestamp' value for testing.
      */
-    MONGO_MOD_PRIVATE const boost::optional<Timestamp>& getSegmentStartTimestamp_forTest() const {
+    [[MONGO_MOD_PRIVATE]] const boost::optional<Timestamp>& getSegmentStartTimestamp_forTest()
+        const {
         return _segmentStartTimestamp;
     }
 
     /**
      * Sets the value of '_segmentStartTimestamp' value for testing.
      */
-    MONGO_MOD_PRIVATE void setSegmentStartTimestamp_forTest(Timestamp ts) {
+    [[MONGO_MOD_PRIVATE]] void setSegmentStartTimestamp_forTest(Timestamp ts) {
         _segmentStartTimestamp = ts;
     }
 
     /**
      * Returns the '_segmentEndTimestamp' value for testing.
      */
-    MONGO_MOD_PRIVATE const boost::optional<Timestamp>& getSegmentEndTimestamp_forTest() const {
+    [[MONGO_MOD_PRIVATE]] const boost::optional<Timestamp>& getSegmentEndTimestamp_forTest() const {
         return _segmentEndTimestamp;
     }
 
     /**
      * Sets the value of '_segmentEndTimestamp' value for testing.
      */
-    MONGO_MOD_PRIVATE void setSegmentEndTimestamp_forTest(Timestamp ts) {
+    [[MONGO_MOD_PRIVATE]] void setSegmentEndTimestamp_forTest(Timestamp ts) {
         _segmentEndTimestamp = ts;
     }
 
     /**
      * Returns the current state.
      */
-    MONGO_MOD_PRIVATE State getState_forTest() const {
+    [[MONGO_MOD_PRIVATE]] State getState_forTest() const {
         return _state;
     }
 
     /**
      * Injects the current start state for testing, and optionally validates the state transition.
      */
-    MONGO_MOD_PRIVATE void setState_forTest(State state, bool validateStateTransition);
+    [[MONGO_MOD_PRIVATE]] void setState_forTest(State state, bool validateStateTransition);
+
+    /**
+     * Records an entry into 'state' via '_metrics', bypassing '_setState()''s transition
+     * validation so tests can exercise every state's counter directly.
+     */
+    [[MONGO_MOD_PRIVATE]] void recordStateEntry_forTest(State state) const {
+        _recordStateEntry(state);
+    }
 
     /**
      * Runs a single iteration of the internal state machine for testing.
      */
-    MONGO_MOD_PRIVATE boost::optional<DocumentSource::GetNextResult>
+    [[MONGO_MOD_PRIVATE]] boost::optional<DocumentSource::GetNextResult>
     runGetNextStateMachine_forTest();
 
     // Maximum number of 'ShardNotFound' errors in a row that the stage will accept in the
@@ -337,6 +338,19 @@ private:
     GetNextResult doGetNext() final;
 
     /**
+     * Releases resources held by this stage. If the stage is torn down while in degraded mode, no
+     * state-machine transition fires anymore, so the currently-degraded gauge is decremented here
+     * to avoid leaking the count.
+     */
+    void doDispose() final;
+
+    /**
+     * Decrements the currently-degraded gauge if it is still counted. Idempotent via
+     * '_degradedCounted', so it is safe to call from both 'doDispose()' and the destructor.
+     */
+    void _decrementDegradedIfCounted();
+
+    /**
      * Runs a single iteration of the internal state machine.
      */
     boost::optional<DocumentSource::GetNextResult> _runGetNextStateMachine();
@@ -345,6 +359,13 @@ private:
      * Sets the state to 'newState'.
      */
     void _setState(State newState);
+
+    /**
+     * Counts an entry into 'newState' via '_metrics'. Must only be called for transitions that
+     * passed the validation in '_setState()': in particular 'kUninitialized' is unreachable
+     * (transitions back to it are forbidden) and has no counter.
+     */
+    void _recordStateEntry(State newState) const;
 
     /**
      * Asserts that the current state is equal to 'expectedState' and the change stream's read mode
@@ -401,6 +422,14 @@ private:
 
     // The current state that the state machine for 'doGetNext()' and its callees is in.
     State _state = State::kUninitialized;
+
+    // Metrics recorder for this stage's state machine, injected at construction.
+    ChangeStreamTopologyChangeV2MetricsRecorder _metrics;
+
+    // Whether this stage is currently counted in the 'changeStreams.shardTargeting.degraded'
+    // gauge. Tracked separately from '_state' so that the gauge adjustment is idempotent across
+    // the exit transition in '_setState()' and the decrement in 'doDispose()'.
+    bool _degradedCounted = false;
 
     // If an exception was caught during processing, the exception status will be recorded here, and
     // the same exception will be re-thrown for any further invocation of 'doGetNext()'.

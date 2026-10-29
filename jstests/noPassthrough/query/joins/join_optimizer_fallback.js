@@ -6,21 +6,31 @@
  * ]
  */
 import {joinOptUsed, plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
-import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    getWinningPlanFromExplain,
+    getAllPlanStages,
+    getQueryPlanner,
+} from "jstests/libs/query/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
-// Test that cross-DB joins are not accepted by the join optimizer.
 const db1 = "test";
 const db2 = "test2";
 const db3 = "test3";
+const configDb = "config";
 
 const coll1 = conn.getDB(db1)[jsTestName() + "_coll1"];
 const coll12 = conn.getDB(db1)[jsTestName() + "_coll2"];
 const coll13 = conn.getDB(db1)[jsTestName() + "_coll3"];
 const coll2 = conn.getDB(db2)[jsTestName() + "_coll2"];
 const coll3 = conn.getDB(db3)[jsTestName() + "_coll3"];
+const internalForeignCollPrefix = "cache.chunks." + db1 + "." + jsTestName();
+const internalForeignColl2 = conn
+    .getDB(configDb)
+    .getCollection(internalForeignCollPrefix + "_coll2");
+const internalForeignColl3 = conn
+    .getDB(configDb)
+    .getCollection(internalForeignCollPrefix + "_coll3");
 const collBase = conn.getDB(db1)[jsTestName() + "_base"];
 const collLeft = conn.getDB(db1)[jsTestName() + "_left"];
 const collRight = conn.getDB(db1)[jsTestName() + "_right"];
@@ -30,6 +40,8 @@ coll12.drop();
 coll13.drop();
 coll2.drop();
 coll3.drop();
+internalForeignColl2.drop();
+internalForeignColl3.drop();
 collBase.drop();
 collLeft.drop();
 collRight.drop();
@@ -39,12 +51,16 @@ assert.commandWorked(coll12.insertOne({a: 1, b: 1, c: 1, d: "foo"}));
 assert.commandWorked(coll13.insertOne({a: 1, b: 1, d: "foo"}));
 assert.commandWorked(coll2.insertOne({a: 1, b: 1}));
 assert.commandWorked(coll3.insertOne({a: 1, b: 1}));
+assert.commandWorked(internalForeignColl2.insertOne({a: 1, b: 1}));
+assert.commandWorked(internalForeignColl3.insertOne({a: 1, b: 1}));
 // Add index for multikeyness info for path arrayness.
 assert.commandWorked(coll1.createIndex({dummy: 1, a: 1, b: 1, "x.c": 1}));
 assert.commandWorked(coll12.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
 assert.commandWorked(coll13.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
 assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1}));
+assert.commandWorked(internalForeignColl2.createIndex({dummy: 1, a: 1, b: 1}));
+assert.commandWorked(internalForeignColl3.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(collBase.insert({_id: 0, lk: 1, rk: 1}));
 assert.commandWorked(collLeft.insert({_id: "left", lk: 1, a: 1}));
 assert.commandWorked(collRight.insert({_id: "right", rk: 1, b: 1}));
@@ -63,25 +79,42 @@ function assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expecte
     assert.eq(coll.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
 }
 
+function getFallbackReason(explain) {
+    return getQueryPlanner(explain).joinFallbackReason;
+}
+
 // This helper is for test cases where the entire pipeline is ineligible for join optimization.
-function runTestCaseIneligiblePipeline({coll = coll1, pipeline, aggOptions = {}, expectedCount}) {
+function runTestCaseIneligiblePipeline({
+    coll = coll1,
+    pipeline,
+    aggOptions = {},
+    expectedCount,
+    expectedFallbackReason,
+}) {
     assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
     const explain = coll.explain().aggregate(pipeline, aggOptions);
     assert(
         !joinOptUsed(explain),
         "Expected join optimizer and actual usage differ: " + tojson(explain),
     );
+    assert.eq(
+        expectedFallbackReason,
+        getFallbackReason(explain),
+        "Unexpected join optimizer fallback reason",
+        {explain},
+    );
 }
 
 // This helper is for test cases where the prefix is eligible for join opt but the suffix is not
-// eligible for join opt.
+// eligible for join opt. We assert that join opt fell back gracefully by ensuring we observe
+// only the expected number of join-opt nodes.
 function runTestCaseIneligibleSuffix({
     coll = coll1,
     pipeline,
     aggOptions = {},
     expectedCount,
     expectedNumJoinNodes,
-    expectedNonJoinSBENodes = 0,
+    expectedFallbackReason,
 }) {
     assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
     const explain = coll.explain().aggregate(pipeline, aggOptions);
@@ -99,45 +132,47 @@ function runTestCaseIneligibleSuffix({
         expectedNumJoinNodes,
         "Unexpected number of join-opt nodes: " + tojson(explain),
     );
-    // We construct the join model then push eligible stages from the suffix into SBE,
-    // which are consequently grafted above the join stages. All of our suffix stages
-    // that are ineligible for join reordering are however eligible for SBE pushdown.
-    // Our test cases so far only push sort or $lookup/$unwind into SBE - thus we only
-    // check for those SBE stages.
-    stages.slice(0, expectedNonJoinSBENodes).forEach(function (stage) {
-        assert(stage.stage === "EQ_LOOKUP_UNWIND" || stage.stage === "SORT", stage);
-    });
 
-    // Make sure we see the amount of join nodes in the prefix that we expected.
-    // Slice's end index is exclusive eg it will not look at node at index 1.
-    stages.slice(expectedNonJoinSBENodes, expectedNumJoinNodes).forEach(function (stage) {
-        assert(plannerStageIsJoinOptNode(stage), stage);
-    });
-
-    // Make sure there are no join nodes in the suffix.
-    stages.slice(expectedNonJoinSBENodes + expectedNumJoinNodes).forEach(function (stage) {
-        assert(!plannerStageIsJoinOptNode(stage), stage);
-    });
+    assert.eq(
+        expectedFallbackReason,
+        getFallbackReason(explain),
+        "Unexpected join optimizer fallback reason",
+        {explain},
+    );
 }
 
 // This helper is for test cases where the entire pipeline is eligible for join optimization.
-function runTestCaseEligiblePipeline({coll = coll1, pipeline, aggOptions = {}, expectedCount}) {
+function runTestCaseEligiblePipeline({
+    coll = coll1,
+    pipeline,
+    aggOptions = {},
+    expectedCount,
+    expectedFallbackReason = null,
+}) {
     assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
     const explain = coll.explain().aggregate(pipeline, aggOptions);
     assert(
         joinOptUsed(explain),
         "Expected join optimizer and actual usage differ: " + tojson(explain),
     );
+    assert.eq(
+        expectedFallbackReason,
+        getFallbackReason(explain),
+        "Unexpected join optimizer fallback reason",
+        {explain},
+    );
 }
 
-// Cross-db $lookup (eg join collections on different databases) is ineligible for optimization.
+// Cross-db $lookup is generally not supported, but config.cache.chunks.* is an internal exemption
+// to the {from: {db: ..., coll: ...}} syntax. The join optimizer must still reject these pipelines
+// because the foreign collections are in another database.
 runTestCaseIneligiblePipeline({
     pipeline: [
         {
             $lookup: {
                 from: {
-                    db: db2,
-                    coll: coll2.getName(),
+                    db: configDb,
+                    coll: internalForeignColl2.getName(),
                 },
                 localField: "a",
                 foreignField: "a",
@@ -148,8 +183,8 @@ runTestCaseIneligiblePipeline({
         {
             $lookup: {
                 from: {
-                    db: db3,
-                    coll: coll3.getName(),
+                    db: configDb,
+                    coll: internalForeignColl3.getName(),
                 },
                 localField: "a",
                 foreignField: "a",
@@ -159,28 +194,28 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$coll3"},
     ],
     expectedCount: 1,
+    // Note: we don't report a fallback reason on every query, only on those where we made progress in building a join model (and hence initialized query stats metrics). Server status updates for all fallbacks.
+    expectedFallbackReason: null,
 });
 
-// Prefix is eligible but suffix is cross-DB $lookup and therefore ineligible.
+// Prefix is eligible but suffix is an internally-exempt cross-DB $lookup and therefore the whole
+// pipeline is ineligible for join optimization.
 runTestCaseIneligiblePipeline({
     pipeline: [
         {
             $lookup: {
-                from: {
-                    db: db1,
-                    coll: coll12.getName(),
-                },
+                from: coll12.getName(),
                 localField: "a",
                 foreignField: "a",
-                as: "coll2",
+                as: "coll12",
             },
         },
-        {$unwind: "$coll2"},
+        {$unwind: "$coll12"},
         {
             $lookup: {
                 from: {
-                    db: db3,
-                    coll: coll3.getName(),
+                    db: configDb,
+                    coll: internalForeignColl3.getName(),
                 },
                 localField: "a",
                 foreignField: "a",
@@ -190,6 +225,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$coll3"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: null,
 });
 
 // Query involving only a cross-product is not accepted by the join optimizer.
@@ -205,6 +241,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$coll2"},
     ],
     expectedCount: 0,
+    expectedFallbackReason: "graphDisconnected",
 });
 
 // Prefix eligible and suffix is cross-product $lookup is not accepted by the join optimizer.
@@ -229,6 +266,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$coll13"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "graphDisconnected",
 });
 
 // Fallback if the prefix of the pipeline contains a $sort.
@@ -239,6 +277,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 runTestCaseIneligiblePipeline({
@@ -249,6 +288,82 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "ineligiblePrefixStage",
+});
+
+// Fallback if the prefix of the pipeline contains an exclusion $project on the base collection.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$project: {b: 0}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+    expectedFallbackReason: "ineligiblePrefixStage",
+});
+
+// Same, for an exclusion $project on a subpath, and with a preceding $match.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$match: {b: 1}},
+        {$project: {"x.c": 0}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+    expectedFallbackReason: "ineligiblePrefixStage",
+});
+
+// Excluding only "_id" is still an exclusion projection, so it falls back too.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$project: {_id: 0}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+    expectedFallbackReason: "ineligiblePrefixStage",
+});
+
+// Excluding "_id" while including other fields is fine.
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {$project: {_id: 0, m: "$a"}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "m", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// An exclusion $project is only restricted on the base collection- it is still supported inside a
+// $lookup sub-pipeline.
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$project: {d: 0}}],
+            },
+        },
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
+// An exclusion $project after the joins (in the suffix) is unaffected.
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$project: {"x._id": 0}},
+    ],
+    expectedCount: 1,
+    // The prefix is join-optimized, but the exclusion $project in the suffix stops the join graph,
+    // so a fallback reason is still reported.
+    expectedFallbackReason: "unsupportedStage",
 });
 
 // Fallback if $lookup sub-pipeline contains a $sort.
@@ -266,6 +381,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "ineligibleSubPipelineStage",
 });
 
 // Regression test for tassert 11116400 "unexpected $match": a $limit before a $match prevents the
@@ -281,6 +397,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$x"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "ineligiblePrefixStage",
 });
 
 // Join opt should be applied to the prefix because it is eligible but
@@ -310,9 +427,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: checkSbeFullyEnabled(coll1.getDB())
-        ? 1 /* $sort will be pushed down to SBE only for trySbeEngine */
-        : 0,
+    expectedFallbackReason: "unsupportedStage",
 });
 
 // Conflicting prefix in the second as field
@@ -325,7 +440,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "invalidEmbedPath",
 });
 
 // Conflicting prefix in the second as field.
@@ -338,7 +453,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "invalidEmbedPath",
 });
 
 // Conflicting prefix in the second as field.
@@ -351,7 +466,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "invalidEmbedPath",
 });
 
 // Conflicting prefix in the second as field.
@@ -364,7 +479,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "invalidEmbedPath",
 });
 
 runTestCaseEligiblePipeline({
@@ -390,7 +505,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "invalidEmbedPath",
 });
 
 // $lookup with no join predicate can still be optimized if the rest of the pipeline establishes
@@ -430,7 +545,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "outerJoinUnwind",
 });
 
 // Eligible prefix followed by ineligible $unwind with includeArrayIndex.
@@ -443,7 +558,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
-    expectedNonJoinSBENodes: 1,
+    expectedFallbackReason: "unwindIncludeArrayIndex",
 });
 
 // Fallback when $unwind has both preserveNullAndEmptyArrays and includeArrayIndex.
@@ -453,6 +568,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: {path: "$x", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "outerJoinUnwind",
 });
 
 // Aggregation is ineligible when a hint is specified.
@@ -473,6 +589,7 @@ runTestCaseIneligiblePipeline({
     ],
     aggOptions: {hint: "a_1"},
     expectedCount: 1,
+    expectedFallbackReason: null,
 });
 
 runTestCaseIneligiblePipeline({
@@ -489,6 +606,7 @@ runTestCaseIneligiblePipeline({
     ],
     aggOptions: {hint: {$natural: 1}},
     expectedCount: 1,
+    expectedFallbackReason: null,
 });
 
 runTestCaseEligiblePipeline({
@@ -522,6 +640,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$coll12"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "rootedOrSubplanning",
 });
 
 // Same goes for a rooted $or on the first collection we're joining on.
@@ -539,6 +658,7 @@ runTestCaseIneligiblePipeline({
         {$unwind: "$coll12"},
     ],
     expectedCount: 1,
+    expectedFallbackReason: "rootedOrSubplanning",
 });
 
 // But, we will permit a prefix to a rooted-$or query.
@@ -569,6 +689,7 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 1,
+    expectedFallbackReason: "rootedOrSubplanning",
 });
 
 // We don't bail out if our predicate is too complex to run as a rooted-$or.
@@ -605,6 +726,37 @@ runTestCaseIneligibleSuffix({
     ],
     expectedCount: 1,
     expectedNumJoinNodes: 2,
+    expectedFallbackReason: null,
+});
+
+// We don't support computed join predicates.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                as: "x",
+                let: {aa: "$a"},
+                pipeline: [
+                    {$project: {a: "xyz-computed"}},
+                    {$match: {$expr: {$eq: ["$a", "$$aa"]}}},
+                ],
+            },
+        },
+        {$unwind: "$x"},
+    ],
+    expectedCount: 0,
+    expectedFallbackReason: "unsupportedStage",
+});
+
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$project: {a: "some-computed-field"}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 0,
+    expectedFallbackReason: "unresolvableJoinPath",
 });
 
 // Numeric path in join predicate falls back gracefully even when the path is indexed.
@@ -632,6 +784,7 @@ runTestCaseIneligibleSuffix({
             {$unwind: "$joined"},
         ],
         expectedCount: 1,
+        expectedFallbackReason: "predicateFieldNumericComponent",
     });
 
     // $expr syntax.
@@ -648,6 +801,7 @@ runTestCaseIneligibleSuffix({
             {$unwind: "$joined"},
         ],
         expectedCount: 1,
+        expectedFallbackReason: "predicateFieldNumericComponent",
     });
 
     // Repeat, but now changing the base coll to be numeric.
@@ -658,6 +812,7 @@ runTestCaseIneligibleSuffix({
             {$unwind: "$joined"},
         ],
         expectedCount: 1,
+        expectedFallbackReason: "predicateFieldNumericComponent",
     });
 
     runTestCaseIneligiblePipeline({
@@ -674,6 +829,7 @@ runTestCaseIneligibleSuffix({
             {$unwind: "$joined"},
         ],
         expectedCount: 0,
+        expectedFallbackReason: "predicateFieldNumericComponent",
     });
 
     // Validate trailing $match case.
@@ -690,6 +846,7 @@ runTestCaseIneligibleSuffix({
             {$match: {$expr: {$eq: ["$joined.a.0", "$a"]}}},
         ],
         expectedCount: 0,
+        expectedFallbackReason: "graphDisconnected",
     });
 
     runTestCaseIneligiblePipeline({
@@ -706,6 +863,7 @@ runTestCaseIneligibleSuffix({
             {$match: {$expr: {$eq: ["$joined.a", "$a.0"]}}},
         ],
         expectedCount: 0,
+        expectedFallbackReason: "graphDisconnected",
     });
 }
 
@@ -773,6 +931,7 @@ for (const systemVar of ["$$NOW", "$$ROOT", "$$CURRENT"]) {
             {$unwind: "$left"},
         ],
         expectedCount: 0,
+        expectedFallbackReason: "graphDisconnected",
     });
 }
 

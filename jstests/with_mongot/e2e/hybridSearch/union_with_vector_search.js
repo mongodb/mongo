@@ -1,5 +1,6 @@
 /**
- * Testing $unionWith: {$vectorSearch}
+ * Testing $unionWith: {$vectorSearch}, including hybrid patterns that combine $search and
+ * $vectorSearch in the same pipeline via $unionWith and $lookup (SERVER-96412).
  * The collection used for $vectorSearch in this test includes no score ties.
  */
 
@@ -11,7 +12,10 @@ import {
     getMovieSearchIndexSpec,
     getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
-import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
+import {
+    assertDocArrExpectedFuzzy,
+    assertIfVectorSearchNotAllowedInLookup,
+} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const moviesCollName = jsTestName() + "_movies";
 const moviesColl = db.getCollection(moviesCollName);
@@ -531,6 +535,81 @@ let unionWithMatchVS = [
 assert.commandFailedWithCode(
     db.runCommand({aggregate: basicCollName, pipeline: unionWithMatchVS, cursor: {}}),
     40602,
+);
+
+// Hybrid patterns: $search + $vectorSearch in the same pipeline (SERVER-96412).
+const searchQuery = {
+    index: getMovieSearchIndexSpec().name,
+    text: {query: "ape", path: "title"},
+};
+
+// $vectorSearch then $unionWith {$search}.
+let vsUnionWithSearch = getVSQuery(2).concat([
+    {$project: {_id: 1, title: 1}},
+    {
+        $unionWith: {
+            coll: moviesCollName,
+            pipeline: [{$search: searchQuery}, {$project: {_id: 1, title: 1}}],
+        },
+    },
+]);
+let vsUnionWithSearchResult = moviesColl.aggregate(vsUnionWithSearch).toArray();
+assert.gt(vsUnionWithSearchResult.length, 2, {vsUnionWithSearchResult});
+
+// $search then $unionWith {$vectorSearch}.
+let searchUnionWithVS = [
+    {$search: searchQuery},
+    {$project: {_id: 1, title: 1}},
+    {
+        $unionWith: {
+            coll: moviesCollName,
+            pipeline: getVSQuery(2).concat([{$project: {_id: 1, title: 1}}]),
+        },
+    },
+];
+let searchUnionWithVSResult = moviesColl.aggregate(searchUnionWithVS).toArray();
+assert.gt(searchUnionWithVSResult.length, 2, {searchUnionWithVSResult});
+
+// $vectorSearch then $lookup {$search}.
+let vsLookupSearch = getVSQuery(2).concat([
+    {$project: {_id: 1, title: 1}},
+    {
+        $lookup: {
+            from: moviesCollName,
+            pipeline: [{$search: searchQuery}, {$project: {_id: 1, title: 1}}],
+            as: "searchResults",
+        },
+    },
+]);
+let vsLookupSearchResult = moviesColl.aggregate(vsLookupSearch).toArray();
+assert.eq(vsLookupSearchResult.length, 2, {vsLookupSearchResult});
+for (const doc of vsLookupSearchResult) {
+    assert.gt(doc.searchResults.length, 0, {doc});
+}
+
+// $search then $lookup {$vectorSearch}.
+// $vectorSearch inside $lookup requires featureFlagExtensionsInsideHybridSearch.
+let searchLookupVS = [
+    {$search: searchQuery},
+    {$project: {_id: 1, title: 1}},
+    {
+        $lookup: {
+            from: moviesCollName,
+            pipeline: getVSQuery(2).concat([{$project: {_id: 1, title: 1}}]),
+            as: "vsResults",
+        },
+    },
+];
+assertIfVectorSearchNotAllowedInLookup(
+    db,
+    () => moviesColl.runCommand("aggregate", {pipeline: searchLookupVS, cursor: {}}),
+    () => {
+        let searchLookupVSResult = moviesColl.aggregate(searchLookupVS).toArray();
+        assert.gt(searchLookupVSResult.length, 0, {searchLookupVSResult});
+        for (const doc of searchLookupVSResult) {
+            assert.eq(doc.vsResults.length, 2, {doc});
+        }
+    },
 );
 
 dropSearchIndex(moviesColl, {name: getMovieSearchIndexSpec().name});

@@ -1,36 +1,9 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -51,6 +24,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 /**
  * This stage implements a variation on the ARHASH algorithm (see
  * https://dl.acm.org/doi/10.1145/93605.98746), by running one iteration of the ARHASH algorithm to
@@ -60,7 +34,7 @@ namespace mongo {
  */
 class SampleFromTimeseriesBucket final : public PlanStage {
 public:
-    static constexpr std::string_view kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET"_sd;
+    static constexpr std::string_view kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET"sv;
 
     /**
      * Constructs a 'SampleFromTimeseriesBucket' stage which uses 'bucketUnpacker' to materialize

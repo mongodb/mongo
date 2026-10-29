@@ -1,7 +1,7 @@
 /*
  * Tests that $scoreFusion must not be any stage other than the first in an aggregation pipeline.
  *
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
+ * @tags: [requires_fcv_82]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {

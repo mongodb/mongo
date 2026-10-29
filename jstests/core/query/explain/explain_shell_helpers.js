@@ -3,6 +3,7 @@
  * against a sharded collection is wrapped in a "shards" object with keys for each shard.
  *
  * @tags: [
+ *   uses_explain,
  *   # The 'totalDocsExamined' values reported by explain queries can be higher than expected by
  *   # this test if the balancer moves chunks around while the explain queries are running.
  *   assumes_balancer_off,

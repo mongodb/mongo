@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,9 +11,11 @@
 #include <string_view>
 
 #include <fmt/format.h>
+using namespace std::literals::string_view_literals;
 
 namespace mongo {
 namespace express {
+using namespace std::literals::string_view_literals;
 class IteratorStats {
 public:
     const std::string& stageName() const {
@@ -58,7 +34,7 @@ public:
         return _indexName;
     }
 
-    const std::string& indexKeyPattern() const {
+    const BSONObj& indexKeyPattern() const {
         return _indexKeyPattern;
     }
 
@@ -82,8 +58,8 @@ public:
         _indexName = std::string{indexName};
     }
 
-    void setIndexKeyPattern(std::string_view indexKeyPattern) {
-        _indexKeyPattern = std::string{indexKeyPattern};
+    void setIndexKeyPattern(const BSONObj& indexKeyPattern) {
+        _indexKeyPattern = indexKeyPattern.getOwned();
     }
 
     void setProjectionCovered(bool projectionCovered) {
@@ -99,11 +75,11 @@ public:
     }
 
     void appendDataAccessStats(BSONObjBuilder& builder) const {
-        if (!_indexKeyPattern.empty()) {
-            builder.append("keyPattern"_sd, _indexKeyPattern);
+        if (!_indexKeyPattern.isEmpty()) {
+            builder.append("keyPattern"sv, _indexKeyPattern);
         }
         if (!_indexName.empty()) {
-            builder.append("indexName"_sd, _indexName);
+            builder.append("indexName"sv, _indexName);
         }
     }
 
@@ -112,7 +88,7 @@ private:
     size_t _numKeysExamined{0};
     size_t _numDocumentsFetched{0};
     std::string _indexName;
-    std::string _indexKeyPattern;
+    BSONObj _indexKeyPattern;
     bool _projectionCovered{false};
 };
 
@@ -216,9 +192,8 @@ public:
           _commonStats(commonStats),
           _projection(std::move(projection)) {}
 
-    const ExplainVersion& getVersion() const override {
-        static const ExplainVersion kExplainVersion = "1";
-        return kExplainVersion;
+    bool isSbeExplainer() const override {
+        return false;
     }
 
     bool areThereRejectedPlansToExplain() const override {
@@ -229,18 +204,36 @@ public:
 
     void getSummaryStats(PlanSummaryStats* statsOut) const override;
 
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const override;
+    boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const override {
+        return PlanSelectionStrategy::kExpress;
+    }
 
     PlanStatsDetails getWinningPlanTrialStats() const override {
         return {};
     }
 
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const override {
-        return {};
-    }
+    /**
+     * Express plans are single plans by construction so no candidate is ever enumerated, ranked, or
+     * rejected. This always returns exactly one entry, the winner.
+     */
+    std::vector<ExplainPlanEntry> getPlanEntries(
+        const ExplainPolicy& policy,
+        PlanStatsFormat format,
+        PlanSelectionStrategy decidingPlanRanker) const override;
 
 private:
+    /**
+     * The per-plan formatting core behind getPlanEntries() in both formats. 'format' selects
+     * between them; see PlanStatsFormat.
+     */
+    PlanStatsDetails _formatPlanStats(const ExplainPolicy& policy, PlanStatsFormat format) const;
+
+    /**
+     * Appends the fields describing the plan's structure - the stage and what it accesses. These
+     * are common to both formats and stay flat on the node in each.
+     */
+    void _appendPlanStructure(BSONObjBuilder& bob) const;
+
     const express::PlanStats* _planStats;
     const express::IteratorStats* _iteratorStats;
     const express::WriteOperationStats* _writeOperationStats;

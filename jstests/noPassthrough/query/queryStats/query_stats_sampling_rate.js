@@ -6,7 +6,10 @@
 import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 
 let options = {
-    setParameter: {internalQueryStatsRateLimit: 0},
+    setParameter: {
+        internalQueryStatsSampleRate: 0,
+        internalQueryStatsWriteCmdSampleRate: 0,
+    },
 };
 
 const conn = MongoRunner.runMongod(options);
@@ -19,7 +22,7 @@ for (let i = 0; i < 20; i++) {
 
 coll.find({foo: 1}).batchSize(2).toArray();
 
-// Reading query stats store with a sampling rate of 0 should return 0 documents.
+// Reading query stats store with both sampling parameters set to 0 should return 0 documents.
 let stats = getQueryStats(testdb);
 assert.eq(stats.length, 0);
 

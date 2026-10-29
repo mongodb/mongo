@@ -2,6 +2,7 @@
  * Tests that replacing a document with an equivalent document with different types for the fields
  * will update the index entries associated with that document.
  * @tags: [
+ *   uses_explain,
  *   requires_getmore,
  * ]
  */

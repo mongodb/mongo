@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 
@@ -104,14 +78,16 @@ bool isNodeUnsupportedByCBR(StageType type) {
     // Once every node here is supported by CBR we should delete this function and any references to
     // it.
     switch (type) {
-        case STAGE_SHARDING_FILTER:  // TODO SERVER-99073: Implement shard filter
-        case STAGE_DISTINCT_SCAN:    // TODO SERVER-99075: Implement distinct scan
+        case STAGE_COLLSCAN_MULTI_RANGE:  // This is an execution-only stage.
+        case STAGE_DISTINCT_SCAN:         // TODO SERVER-99075: Implement distinct scan
+        case STAGE_BATCHED_FETCH:         // TODO SERVER-136666: Implement batched fetch
         case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
         case STAGE_GEO_NEAR_2D:
         case STAGE_GEO_NEAR_2DSPHERE:
         case STAGE_SORT_KEY_GENERATOR:
-        case STAGE_RETURN_KEY: {
+        case STAGE_RETURN_KEY:
+        case STAGE_STREAMING_GROUP: {
             return true;
         }
         case STAGE_BATCHED_DELETE:
@@ -144,7 +120,6 @@ bool isNodeUnsupportedByCBR(StageType type) {
         case STAGE_EQ_LOOKUP:
         case STAGE_EQ_LOOKUP_UNWIND:
         case STAGE_SEARCH:
-        case STAGE_WINDOW:
         case STAGE_SENTINEL:
         case STAGE_UNPACK_TS_BUCKET:
         case STAGE_COLLSCAN:
@@ -157,6 +132,7 @@ bool isNodeUnsupportedByCBR(StageType type) {
         case STAGE_SORT_MERGE:
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE:
+        case STAGE_SHARDING_FILTER:
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
         case STAGE_PROJECTION_SIMPLE:
@@ -173,6 +149,7 @@ bool isNodeUnexpectedByCBR(StageType type) {
     switch (type) {
         case STAGE_BATCHED_DELETE:
         case STAGE_CACHED_PLAN:
+        case STAGE_COLLSCAN_MULTI_RANGE:
         case STAGE_COUNT:
         case STAGE_COUNT_SCAN:
         case STAGE_DELETE:
@@ -198,10 +175,10 @@ bool isNodeUnexpectedByCBR(StageType type) {
         case STAGE_UNWIND:
         case STAGE_UPDATE:
         case STAGE_GROUP:
+        case STAGE_STREAMING_GROUP:
         case STAGE_EQ_LOOKUP:
         case STAGE_EQ_LOOKUP_UNWIND:
         case STAGE_SEARCH:
-        case STAGE_WINDOW:
         case STAGE_SENTINEL:
         case STAGE_UNPACK_TS_BUCKET: {
             return true;
@@ -218,6 +195,7 @@ bool isNodeUnexpectedByCBR(StageType type) {
         case STAGE_VIRTUAL_SCAN:
         case STAGE_IXSCAN:
         case STAGE_FETCH:
+        case STAGE_BATCHED_FETCH:
         case STAGE_AND_HASH:
         case STAGE_AND_SORTED:
         case STAGE_OR:

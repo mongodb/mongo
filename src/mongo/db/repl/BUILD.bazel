@@ -21,6 +21,41 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "internode_validation_hash_utils",
+    srcs = [
+        "internode_validation_hash_utils.cpp",
+    ],
+    hdrs = [
+        "internode_validation_hash_utils.h",
+    ],
+    deps = [
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        "//src/mongo:base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/third_party/xxhash",
+    ],
+)
+
+mongo_cc_library(
+    name = "internode_validation_metrics",
+    srcs = [
+        "internode_validation_metrics.cpp",
+    ],
+    hdrs = [
+        "internode_validation_metrics.h",
+    ],
+    deps = [
+        ":oplog_entry",
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "intent_registry",
     srcs = [
         "intent_guard.cpp",
@@ -43,6 +78,14 @@ mongo_cc_library(
     deps = [
         ":repl_server_parameters",
         "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "clean_shutdown_gen",
+    src = "clean_shutdown.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
     ],
 )
 
@@ -70,6 +113,7 @@ mongo_cc_library(
         "storage_interface.cpp",
     ],
     deps = [
+        ":clean_shutdown_idl",
         ":optime",
         "//src/mongo/db:service_context",
     ],
@@ -118,6 +162,7 @@ mongo_cc_library(
     name = "oplog_entry",
     srcs = [
         "container_oplog_entry_gen",
+        "container_oplog_entry_serialization.cpp",
         "create_oplog_entry_gen",
         "oplog_entry.cpp",
         "oplog_entry_gen",
@@ -133,6 +178,19 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/replicated_fast_count:durable_size_metadata_idl",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "container_oplog_entry_serialization_test",
+    srcs = [
+        "container_oplog_entry_serialization_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":oplog_entry",
+        "//src/mongo:base",
+        "//src/mongo/unittest",
     ],
 )
 
@@ -645,6 +703,18 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "clean_shutdown_idl",
+    srcs = [
+        ":clean_shutdown_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:basic_types_serialization",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
     name = "replication_process",
     srcs = [
         "replication_consistency_markers.cpp",
@@ -739,7 +809,10 @@ mongo_cc_library(
         ":repl_coordinator_interface",
         "//src/mongo:base",
         "//src/mongo/db:commands",
+        "//src/mongo/db:metrics_filtering_util",
+        "//src/mongo/db:metrics_policy_manager_default",
         "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands:test_commands_enabled",
@@ -851,6 +924,8 @@ mongo_cc_library(
     deps = [
         ":apply_ops_command_info",
         ":image_collection_entry",
+        ":internode_validation_hash_utils",
+        ":internode_validation_metrics",
         ":local_oplog_info",
         ":oplog_constraint_violation_logger",
         ":repl_coordinator_interface",
@@ -873,6 +948,7 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index_builds:index_build_oplog_entry",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/index_builds/primary_driven:enabled",
         "//src/mongo/db/index_builds/primary_driven:primary_driven_index_builds",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_util",
@@ -885,6 +961,7 @@ mongo_cc_library(
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_op_observer",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_uncommitted_changes",
+        "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role",
@@ -895,10 +972,11 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:set_multikey_metadata_oplog_helpers",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
-        "//src/mongo/db/storage:storage_engine_direct_crud",
+        "//src/mongo/db/storage:checkpointer",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/transaction",
+        "//src/mongo/db/update:update_document_diff",
         "//src/mongo/rpc:command_status",
         "//src/mongo/s:common_s",
     ],
@@ -955,6 +1033,7 @@ mongo_cc_library(
         "storage_interface_impl.cpp",
     ],
     deps = [
+        ":clean_shutdown_idl",
         ":local_oplog_info",
         ":oplog",
         ":repl_server_parameters",
@@ -1011,6 +1090,7 @@ mongo_cc_library(
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/db/pipeline:change_stream_preimage",
+        "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/shard_role:shard_role_api_stor_ex",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/util:log_and_backoff",
@@ -1050,6 +1130,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "repl_network_traffic_stats",
+    srcs = [
+        "repl_network_traffic_stats.cpp",
+    ],
+    hdrs = [
+        "repl_network_traffic_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "oplog_fetcher",
     srcs = [
         "oplog_fetcher.cpp",
@@ -1057,6 +1151,7 @@ mongo_cc_library(
     deps = [
         ":abstract_async_component",
         ":repl_coordinator_interface",
+        ":repl_network_traffic_stats",
         ":repl_server_parameters",
         ":replica_set_messages",
         ":replication_auth",
@@ -1070,6 +1165,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/topology/vector_clock:logical_time_metadata_hook",
         "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:log_and_backoff",
     ],
 )
 
@@ -1102,6 +1198,7 @@ mongo_cc_library(
         ":oplog",
         ":primary_only_service",
         ":repl_coordinator_interface",
+        ":repl_server_parameters",
         ":repl_settings",
         ":replica_set_messages",
         ":replication_auth",
@@ -1117,6 +1214,7 @@ mongo_cc_library(
         "//src/mongo/db/repl/hello:hello_auth",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/repl/split_horizon",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/stats:counters",
         "//src/mongo/transport:message_compressor",
     ],
@@ -1164,6 +1262,7 @@ mongo_cc_library(
     name = "oplog_application",
     srcs = [
         "insert_group.cpp",
+        "oplog_applier_dispatch.cpp",
         "oplog_applier_impl.cpp",
         "oplog_applier_utils.cpp",
         "session_update_tracker.cpp",
@@ -1187,15 +1286,100 @@ mongo_cc_library(
         "//src/mongo/db/commands:mongod_fsync",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl/initial_sync:initial_syncer",
+        "//src/mongo/db/replicated_fast_count:repair_replicated_metadata_idl",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
+        "//src/mongo/db/replicated_fast_count:size_count_checkpoint_validator",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/stats:timer_stats",
+        "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util/concurrency:thread_pool",
         "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "pipelined_applier_otel_metrics",
+    srcs = [
+        "pipelined_applier_otel_metrics.cpp",
+    ],
+    hdrs = [
+        "pipelined_applier_otel_metrics.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
+    name = "pipelined_applier_batch_tracker",
+    srcs = [
+        "pipelined_applier_batch_tracker.cpp",
+    ],
+    hdrs = [
+        "pipelined_applier_batch_tracker.h",
+    ],
+    deps = [
+        ":optime",
+        "//src/mongo:base",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/stdx",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "pipelined_applier_advancer",
+    srcs = [
+        "pipelined_applier_advancer.cpp",
+    ],
+    hdrs = [
+        "pipelined_applier_advancer.h",
+    ],
+    deps = [
+        ":pipelined_applier_batch_tracker",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/stdx",
+    ],
+)
+
+mongo_cc_library(
+    name = "pipelined_oplog_applier",
+    srcs = [
+        "pipelined_applier_worker_pool.cpp",
+        "pipelined_oplog_applier.cpp",
+    ],
+    hdrs = [
+        "pipelined_applier_worker_pool.h",
+        "pipelined_oplog_applier.h",
+    ],
+    deps = [
+        ":apply_ops_command_info",
+        ":oplog",
+        ":oplog_application",
+        ":oplog_application_interface",
+        ":oplog_entry",
+        ":pipelined_applier_advancer",
+        ":pipelined_applier_batch_tracker",
+        ":pipelined_applier_otel_metrics",
+        ":repl_coordinator_interface",
+        ":storage_interface",
+        "//src/mongo:base",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
+        "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/util:fail_point",
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )
 
@@ -1426,6 +1610,7 @@ mongo_cc_library(
         "replication_coordinator_impl_heartbeat.cpp",
         "replication_coordinator_impl_step_up_step_down.cpp",
         "vote_requester.cpp",
+        "write_concern_waiter_list.cpp",
     ],
     deps = [
         "auto_get_rstl_for_stepup_stepdown",
@@ -1455,6 +1640,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/repl/clang_checked",
         "//src/mongo/db/repl/initial_sync:initial_syncer",
         "//src/mongo/db/repl/split_horizon",
         "//src/mongo/db/rss:disable_snapshotting_fail_point",
@@ -1824,6 +2010,22 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "replication_info_test",
+    srcs = [
+        "replication_info_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":replication_info",
+        ":replication_process",
+        ":replmocks",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "db_repl_misc_test",
     srcs = [
         "abstract_async_component_test.cpp",
@@ -1834,6 +2036,7 @@ mongo_cc_unit_test(
         "idempotency_document_structure_test.cpp",
         "insert_group_test.cpp",
         "isself_test.cpp",
+        "local_oplog_info_test.cpp",
         "member_config_test.cpp",
         "optime_extract_test.cpp",
         "primary_only_service_test.cpp",
@@ -1896,8 +2099,11 @@ mongo_cc_unit_test(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/auth:authorization_manager_global",
+        "//src/mongo/db/auth:authorization_session_test_fixture",
+        "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands:create_command",
         "//src/mongo/db/commands:mongod_fcv",
         "//src/mongo/db/exec/mutable_bson",
@@ -1946,17 +2152,20 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "db_repl_coordinator_test",
     srcs = [
+        "lock_guard_with_deferred_task_test.cpp",
         "replication_coordinator_applied_op_time_observer_test.cpp",
         "replication_coordinator_impl_elect_v1_test.cpp",
         "replication_coordinator_impl_heartbeat_v1_test.cpp",
         "replication_coordinator_impl_reconfig_test.cpp",
         "replication_coordinator_impl_test.cpp",
         "topology_coordinator_v1_test.cpp",
+        "write_concern_waiter_list_test.cpp",
     ],
     tags = [
         "mongo_unittest_fifth_group",
     ],
     deps = [
+        ":intent_registry",
         ":isself",
         ":optime_observer",
         ":repl_coordinator_impl",
@@ -2009,6 +2218,9 @@ mongo_cc_unit_test(
         ":task_executor_mock",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
+        "//src/mongo/db/storage:checkpointer",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
     ],
@@ -2030,6 +2242,99 @@ mongo_cc_unit_test(
         "//src/mongo/db:server_base",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipelined_oplog_applier_test",
+    srcs = [
+        "pipelined_oplog_applier_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":oplog",
+        ":oplog_application_interface",
+        ":oplog_applier_batcher_test_fixture",
+        ":oplog_applier_impl_test_fixture",
+        ":oplog_entry",
+        ":oplog_entry_test_helpers",
+        ":pipelined_oplog_applier",
+        "//src/mongo:base",
+        "//src/mongo/db:multi_key_path_tracker",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index:multikey_paths",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog",
+        "//src/mongo/db/shard_role/shard_catalog:set_multikey_metadata_oplog_helpers",
+        "//src/mongo/db/storage/kv:kv_engine",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/unittest",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipelined_applier_advancer_test",
+    srcs = [
+        "pipelined_applier_advancer_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":pipelined_applier_advancer",
+        ":pipelined_applier_batch_tracker",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/stdx",
+        "//src/mongo/unittest",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipelined_applier_batch_tracker_test",
+    srcs = [
+        "pipelined_applier_batch_tracker_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":pipelined_applier_batch_tracker",
+        "//src/mongo:base",
+        "//src/mongo/stdx",
+        "//src/mongo/unittest",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipelined_applier_worker_pool_test",
+    srcs = [
+        "pipelined_applier_worker_pool_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":oplog_applier_batcher_test_fixture",
+        ":pipelined_oplog_applier",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/stdx",
+        "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
     ],
 )
 
@@ -2086,6 +2391,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "oplog_replicated_record_id_test",
     srcs = [
+        "internode_validation_hash_test.cpp",
         "oplog_clustered_collection_fast_path_test.cpp",
         "oplog_delete_record_id_test.cpp",
         "oplog_insert_record_id_test.cpp",
@@ -2093,14 +2399,20 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [
+        ":internode_validation_hash_utils",
+        ":internode_validation_metrics",
         ":oplog_applier_impl_test_fixture",
         ":oplog_entry",
         ":oplog_entry_test_helpers",
+        ":replmocks",
         ":storage_interface_impl",
+        "//src/mongo/bson/column",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/dbtests:mocklib",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
@@ -2210,7 +2522,6 @@ mongo_cc_unit_test(
         ":replication_recovery",
         ":storage_interface",
         "//src/mongo/db/session:session_catalog_mongod",
-        "//src/mongo/db/storage:journal_flusher",
     ],
 )
 
@@ -2243,6 +2554,20 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_benchmark(
+    name = "internode_validation_hash_bm",
+    srcs = [
+        "internode_validation_hash_bm.cpp",
+    ],
+    tags = ["repl_bm"],
+    deps = [
+        ":internode_validation_hash_utils",
+        ":replmocks",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/shard_role:service_context_non_d",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "oplog_entry_bm",
     srcs = [
         "oplog_entry_bm.cpp",
@@ -2263,6 +2588,7 @@ mongo_cc_benchmark(
     ],
     tags = ["repl_bm"],
     deps = [
+        ":internode_validation_hash_utils",
         ":repl_coordinator_impl",
         ":repl_coordinator_interface",
         ":replication_consistency_markers_impl",
@@ -2285,8 +2611,11 @@ mongo_cc_benchmark(
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/db/update:update_document_diff",
         "//src/mongo/transport:session_manager",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:periodic_runner_factory",
     ],
 )
@@ -2414,6 +2743,7 @@ mongo_cc_library(
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:oplog_truncate_markers",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_oplog_manager",
         "//src/mongo/db/topology/vector_clock:vector_clock_mutable",
     ],
 )

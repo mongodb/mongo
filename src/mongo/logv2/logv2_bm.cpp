@@ -1,50 +1,7 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <iostream>
-#include <string>
-
-#include <benchmark/benchmark.h>
-#include <boost/core/typeinfo.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/iostreams/categories.hpp>
-#include <boost/iostreams/device/null.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/log/sinks/sync_frontend.hpp>
-#include <boost/log/sinks/text_ostream_backend.hpp>
-// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
-// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
-// IWYU pragma: no_include "boost/iostreams/detail/wrap_unwrap.hpp"
-#include <boost/iostreams/imbue.hpp>
-#include <boost/log/core/core.hpp>
-// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
 #include "mongo/base/status.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/log.h"
@@ -55,11 +12,27 @@
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/util/assert_util.h"
 
+#include <iostream>
+#include <string>
 #include <string_view>
 
+#include <benchmark/benchmark.h>
+#include <boost/core/typeinfo.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/iostreams/categories.hpp>
+#include <boost/iostreams/device/null.hpp>
+#include <boost/iostreams/imbue.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/log/core/core.hpp>
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/exceptions.hpp>
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/wrap_unwrap.hpp"
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

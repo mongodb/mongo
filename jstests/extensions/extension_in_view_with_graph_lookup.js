@@ -2,15 +2,19 @@
  * Test that $graphLookup can run on views containing extension stages, either directly in the
  * view definition or within a $unionWith subpipeline.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [
+ *   featureFlagExtensionsAPI,
+ *   featureFlagExtensionStubParsers,
+ *   featureFlagExtensionsInsideHybridSearch,
+ *   requires_fcv_90,
+ * ]
  */
 
 import {describe, it} from "jstests/libs/mochalite.js";
 
 function getSocialMediaUserData() {
-    // Static, deterministic dataset with 8 users forming a connected graph.
-    // Each user has at most 2 friends, with some having only 1 friend.
-    // Friendships are bidirectional (1-1 relation).
+    // Static, deterministic dataset of 8 users forming a connected graph, with bidirectional
+    // friendships and at most 2 friends each.
     return [
         {_id: 0, name: "Alice", friends: ["Bob", "Charlie"]},
         {_id: 1, name: "Bob", friends: ["Alice", "Henry"]},
@@ -39,7 +43,12 @@ function runGraphLookup(fromViewName, fromViewPipeline, source = collName) {
     // Sanity check to make sure the view returns what we expect.
     const view = db[fromViewName];
     const viewCount = view.count();
-    assert.gte(viewCount, expectedUsersInView, view.find().toArray());
+    assert.eq(
+        viewCount,
+        expectedUsersInView,
+        `view should return exactly ${expectedUsersInView} users`,
+        view.find().toArray(),
+    );
 
     const results = coll
         .aggregate([
@@ -94,6 +103,46 @@ describe("$graphLookup with extension stages in view definition", function () {
         runGraphLookup(collName + "_nested_view", [], nestedViewName);
         assert.commandWorked(coll.getDB().runCommand({drop: nestedViewName}));
     });
+
+    it("should run $graphLookup on a view whose definition starts with a kDoNothing desugaring extension", function () {
+        // $desugarAddViewName expands to a kDoNothing first stage. In a view *definition* there is
+        // no outer view to bind to, so no viewName is stamped and the traversal still sees every
+        // document.
+        const viewName = collName + "_graph_donothing_view";
+        assert.commandWorked(db.createView(viewName, collName, [{$desugarAddViewName: {}}]));
+        try {
+            const results = coll
+                .aggregate([
+                    {$limit: 1},
+                    {
+                        $graphLookup: {
+                            from: viewName,
+                            startWith: "Grace",
+                            connectFromField: "friends",
+                            connectToField: "name",
+                            as: "connections",
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 1, results);
+            assert.eq(
+                results[0].connections.length,
+                numUsers,
+                "traversal should reach all users through the view",
+                results,
+            );
+            for (const doc of results[0].connections) {
+                assert(
+                    !doc.hasOwnProperty("viewName") || doc.viewName === "",
+                    `a desugarer in a view definition must not stamp viewName: ${tojson(doc)}`,
+                    results,
+                );
+            }
+        } finally {
+            assert.commandWorked(db.runCommand({drop: viewName}));
+        }
+    });
 });
 
 describe("$graphLookup with $unionWith and extension stages", function () {
@@ -142,5 +191,140 @@ describe("$graphLookup with $unionWith and extension stages", function () {
             },
         ]);
         assert.commandWorked(coll.getDB().runCommand({drop: nestedViewName}));
+    });
+});
+
+describe("$graphLookup with extensions in the outer pipeline and restrictSearchWithMatch", function () {
+    it("should run an extension stage in the outer pipeline alongside $graphLookup on an extension view", function () {
+        const viewName = collName + "_outer_ext_view";
+        assert.commandWorked(
+            db.createView(viewName, collName, [{$readNDocuments: {numDocs: expectedUsersInView}}]),
+        );
+        try {
+            const results = coll
+                .aggregate([
+                    {$limit: 1},
+                    {$testBar: {outer: 1}},
+                    {
+                        $graphLookup: {
+                            from: viewName,
+                            startWith: "Grace",
+                            connectFromField: "friends",
+                            connectToField: "name",
+                            as: "connections",
+                        },
+                    },
+                    {$testBar: {alsoOuter: 1}},
+                ])
+                .toArray();
+            assert.eq(results.length, 1, results);
+            assert.eq(results[0].connections.length, expectedUsersInView, results);
+        } finally {
+            assert.commandWorked(db.runCommand({drop: viewName}));
+        }
+    });
+
+    it("should apply restrictSearchWithMatch when $graphLookup targets a desugaring-extension view", function () {
+        // The view desugars $matchTopN, then restrictSearchWithMatch filters the traversal down to
+        // Grace alone, so it cannot expand past her.
+        const viewName = collName + "_restrict_view";
+        assert.commandWorked(
+            db.createView(viewName, collName, [
+                {$matchTopN: {filter: {}, sort: {_id: 1}, limit: numUsers}},
+            ]),
+        );
+        try {
+            const results = coll
+                .aggregate([
+                    {$limit: 1},
+                    {
+                        $graphLookup: {
+                            from: viewName,
+                            startWith: "Grace",
+                            connectFromField: "friends",
+                            connectToField: "name",
+                            as: "connections",
+                            restrictSearchWithMatch: {name: "Grace"},
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 1, results);
+            assert.eq(
+                results[0].connections.length,
+                1,
+                "restrictSearchWithMatch should admit only Grace",
+                results,
+            );
+            assert.eq(results[0].connections[0].name, "Grace", results);
+        } finally {
+            assert.commandWorked(db.runCommand({drop: viewName}));
+        }
+    });
+
+    // The allowedInLookup constraint is enforced only in DocumentSourceLookup and LiteParsedLookup;
+    // $graphLookup has no equivalent check, so allowedInLookup=false in a targeted view's
+    // definition is NOT rejected. These two cases pin that asymmetry down.
+    it("should allow $graphLookup on a view whose definition holds a stage with allowedInLookup=false", function () {
+        const viewName = collName + "_graph_allowed_view";
+        assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {}}]));
+        try {
+            const results = coll
+                .aggregate([
+                    {$limit: 1},
+                    {
+                        $graphLookup: {
+                            from: viewName,
+                            startWith: "Grace",
+                            connectFromField: "friends",
+                            connectToField: "name",
+                            as: "connections",
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 1, results);
+            // $testFoo is a no-op passthrough, so the traversal reaches every user.
+            assert.eq(
+                results[0].connections.length,
+                numUsers,
+                "allowedInLookup does not constrain $graphLookup, so the full traversal is returned",
+                results,
+            );
+        } finally {
+            assert.commandWorked(db.runCommand({drop: viewName}));
+        }
+    });
+
+    it("should allow $graphLookup on a view whose definition holds a desugar-into-disallowed stage", function () {
+        // $desugarFoo expands into $testFoo (allowedInLookup=false), which $graphLookup likewise
+        // does not constrain.
+        const viewName = collName + "_graph_desugar_allowed_view";
+        assert.commandWorked(db.createView(viewName, collName, [{$desugarFoo: {}}]));
+        try {
+            const results = coll
+                .aggregate([
+                    {$limit: 1},
+                    {
+                        $graphLookup: {
+                            from: viewName,
+                            startWith: "Grace",
+                            connectFromField: "friends",
+                            connectToField: "name",
+                            as: "connections",
+                        },
+                    },
+                ])
+                .toArray();
+            assert.eq(results.length, 1, results);
+            assert.eq(
+                results[0].connections.length,
+                numUsers,
+                "desugared allowedInLookup=false stage is likewise unconstrained under $graphLookup",
+                results,
+            );
+        } finally {
+            assert.commandWorked(db.runCommand({drop: viewName}));
+        }
     });
 });

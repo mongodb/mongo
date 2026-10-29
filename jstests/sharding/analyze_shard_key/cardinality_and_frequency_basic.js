@@ -6,7 +6,6 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {numMostCommonValues} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
 import {
     testAnalyzeCandidateShardKeysShardedCollection,
@@ -15,6 +14,13 @@ import {
 } from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common_tests.js";
 
 const numNodesPerRS = 2;
+
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS,
+};
 
 const setParameterOpts = {
     analyzeShardKeyNumMostCommonValues: numMostCommonValues,
@@ -26,7 +32,6 @@ const setParameterOpts = {
         rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
     });
 
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
     testAnalyzeCandidateShardKeysUnshardedCollection(st.s, {st}, writeConcern);
     testAnalyzeCandidateShardKeysShardedCollection(st.s, st, writeConcern);
     testAnalyzeCurrentShardKeys(st.s, st, writeConcern);
@@ -43,9 +48,7 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.startSet();
     rst.initiate();
 
-    const primary = rst.getPrimary();
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(primary, numNodesPerRS);
-    testAnalyzeCandidateShardKeysUnshardedCollection(primary, {rst}, writeConcern);
+    testAnalyzeCandidateShardKeysUnshardedCollection(rst.getPrimary(), {rst}, writeConcern);
 
     rst.stopSet();
 }

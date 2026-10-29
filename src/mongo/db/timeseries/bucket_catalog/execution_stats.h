@@ -1,40 +1,14 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/memory.h"
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 namespace mongo::timeseries::bucket_catalog {
 
 struct ExecutionStats {
@@ -45,50 +19,50 @@ struct ExecutionStats {
 
     // Cardinality of opened and archived buckets. Used to estimate storage engine cache usage for
     // the workload.
-    AtomicWord<long long> numActiveBuckets;
+    Atomic<long long> numActiveBuckets;
 
     /**
      * Counters. The values represent statistics of what has happened in the system for diagnostics.
      * The values only increment and are not decremented from the global statistics when collections
      * are dropped.
      */
-    AtomicWord<long long> numBucketInserts;
-    AtomicWord<long long> numBucketUpdates;
-    AtomicWord<long long> numBucketsOpenedDueToMetadata;
-    AtomicWord<long long> numBucketsClosedDueToCount;
-    AtomicWord<long long> numBucketsClosedDueToSchemaChange;
-    AtomicWord<long long> numBucketsClosedDueToSize;
-    AtomicWord<long long> numBucketsClosedDueToCachePressure;
-    AtomicWord<long long> numBucketsClosedDueToTimeForward;
-    AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
-    AtomicWord<long long> numBucketsClosedDueToReopening;
-    AtomicWord<long long> numBucketsArchivedDueToMemoryThreshold;
-    AtomicWord<long long> numBucketsArchivedDueToTimeBackward;
-    AtomicWord<long long> numBucketsFrozen;
-    AtomicWord<long long> numCompressedBucketsConvertedToUnsorted;
-    AtomicWord<long long> numCommits;
-    AtomicWord<long long> numWaits;
-    AtomicWord<long long> numMeasurementsCommitted;
-    AtomicWord<long long> numBucketsReopened;
-    AtomicWord<long long> numBucketsKeptOpenDueToLargeMeasurements;
-    AtomicWord<long long> numBucketsFetched;
-    AtomicWord<long long> numBucketsQueried;
-    AtomicWord<long long> numBucketFetchesFailed;
-    AtomicWord<long long> numBucketQueriesFailed;
-    AtomicWord<long long> numBucketReopeningsFailedDueToEraMismatch;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMalformedIdField;
-    AtomicWord<long long> numBucketReopeningsFailedDueToHashCollision;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMarkedFrozen;
-    AtomicWord<long long> numBucketReopeningsFailedDueToValidator;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMarkedClosed;
-    AtomicWord<long long> numBucketReopeningsFailedDueToMinMaxCalculation;
-    AtomicWord<long long> numBucketReopeningsFailedDueToSchemaGeneration;
-    AtomicWord<long long> numBucketReopeningsFailedDueToUncompressedTimeColumn;
-    AtomicWord<long long> numBucketReopeningsFailedDueToCompressionFailure;
-    AtomicWord<long long> numBucketReopeningsFailedDueToWriteConflict;
-    AtomicWord<long long> numDuplicateBucketsReopened;
-    AtomicWord<long long> numBucketDocumentsTooLargeInsert;
-    AtomicWord<long long> numBucketDocumentsTooLargeUpdate;
+    Atomic<long long> numBucketInserts;
+    Atomic<long long> numBucketUpdates;
+    Atomic<long long> numBucketsOpenedDueToMetadata;
+    Atomic<long long> numBucketsClosedDueToCount;
+    Atomic<long long> numBucketsClosedDueToSchemaChange;
+    Atomic<long long> numBucketsClosedDueToSize;
+    Atomic<long long> numBucketsClosedDueToCachePressure;
+    Atomic<long long> numBucketsClosedDueToTimeForward;
+    Atomic<long long> numBucketsClosedDueToMemoryThreshold;
+    Atomic<long long> numBucketsClosedDueToReopening;
+    Atomic<long long> numBucketsArchivedDueToMemoryThreshold;
+    Atomic<long long> numBucketsArchivedDueToTimeBackward;
+    Atomic<long long> numBucketsFrozen;
+    Atomic<long long> numCompressedBucketsConvertedToUnsorted;
+    Atomic<long long> numCommits;
+    Atomic<long long> numWaits;
+    Atomic<long long> numMeasurementsCommitted;
+    Atomic<long long> numBucketsReopened;
+    Atomic<long long> numBucketsKeptOpenDueToLargeMeasurements;
+    Atomic<long long> numBucketsFetched;
+    Atomic<long long> numBucketsQueried;
+    Atomic<long long> numBucketFetchesFailed;
+    Atomic<long long> numBucketQueriesFailed;
+    Atomic<long long> numBucketReopeningsFailedDueToEraMismatch;
+    Atomic<long long> numBucketReopeningsFailedDueToMalformedIdField;
+    Atomic<long long> numBucketReopeningsFailedDueToHashCollision;
+    Atomic<long long> numBucketReopeningsFailedDueToMarkedFrozen;
+    Atomic<long long> numBucketReopeningsFailedDueToValidator;
+    Atomic<long long> numBucketReopeningsFailedDueToMarkedClosed;
+    Atomic<long long> numBucketReopeningsFailedDueToMinMaxCalculation;
+    Atomic<long long> numBucketReopeningsFailedDueToSchemaGeneration;
+    Atomic<long long> numBucketReopeningsFailedDueToUncompressedTimeColumn;
+    Atomic<long long> numBucketReopeningsFailedDueToCompressionFailure;
+    Atomic<long long> numBucketReopeningsFailedDueToWriteConflict;
+    Atomic<long long> numDuplicateBucketsReopened;
+    Atomic<long long> numBucketDocumentsTooLargeInsert;
+    Atomic<long long> numBucketDocumentsTooLargeUpdate;
 };
 
 class ExecutionStatsController {

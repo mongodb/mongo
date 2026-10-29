@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -99,7 +73,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Check return value 1 (pause).
     auto result = docSource->runGetNextStateMachine_forTest();
@@ -176,7 +150,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest, StateFetchingNormalGettingChangeE
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
@@ -243,7 +217,7 @@ TEST_F(
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Before executing the stage, fake that there is already another data-shard cursor open.
     getCursorManagerMock(params)->openCursorsOnDataShards(
@@ -262,6 +236,10 @@ TEST_F(
     // Undo mode must have been turned on when entering the degraded fetching state.
     ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
 
+    // Promised sort keys must not advance the client-visible high water mark while reading a
+    // bounded segment, as a promise could point beyond the segment end.
+    ASSERT_FALSE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
+
     // Calling the state machine will start a new segment.
     getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 3));
 
@@ -274,6 +252,10 @@ TEST_F(
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+
+    // Entering an unbounded segment must re-enable advancement of the client-visible high water
+    // mark from promised sort keys.
+    ASSERT_TRUE(*getCursorManagerMock(params)->getPromisedSortKeyHighWaterMarkAdvancement());
 
     const stdx::unordered_set<ShardId> expectedShardCursors = {ShardId("shardB")};
     ASSERT_FALSE(params->cursorManager->isCursorOnConfigServerOpen());
@@ -345,7 +327,7 @@ TEST_F(
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Enable 'ShardNotFound' exceptions, so opening the next cursor will throw. This makes the
     // stage start a new segment.
@@ -414,7 +396,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
@@ -492,7 +474,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -619,7 +601,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     // Must enable undo mode when entering the degraded fetching mode.
     getCursorManagerMock(params)->enableUndoNextMode();
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -763,7 +745,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -854,7 +836,7 @@ DEATH_TEST_REGEX_F(DSV2StateFetchingNormalAndDegradedTestDeathTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -881,7 +863,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest, StateDowngrading) {
                                dataToShardsAllocationQueryService.get());
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kDowngrading, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kDowngrading, /*validateStateTransition=*/false);
 
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(),
                        AssertionException,

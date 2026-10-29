@@ -4,6 +4,7 @@
  *
  * Tests which create views aren't expected to work when collections are implicitly sharded.
  * @tags: [
+ *   uses_explain,
  *   assumes_unsharded_collection,
  *   # Assumes FCV remain stable during the entire duration of the test
  *   # TODO SERVER-92954: remove once validation of validator during creation of tracked collection
@@ -29,10 +30,7 @@ collForeign.drop();
 // TODO SERVER-92954 remove this helper function after validation of validator during creation of
 // tracked collection is fixed
 function useShardingCoordinatorForCreate() {
-    return (
-        (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) &&
-        TestData.implicitlyTrackUnshardedCollectionOnCreation
-    );
+    return FixtureHelpers.isMongos(db) && TestData.implicitlyTrackUnshardedCollectionOnCreation;
 }
 
 for (let i = 0; i < 5; i++) {

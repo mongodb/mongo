@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
@@ -56,7 +30,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -830,31 +804,6 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
     return {std::move(finalStage), std::move(finalOutputs), std::move(boundsSlots)};
 }
 
-std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderState& state,
-                                                                   const CollectionPtr& collection,
-                                                                   const std::string& indexName,
-                                                                   const BSONObj& keyPattern,
-                                                                   bool forward,
-                                                                   SbExpr lowKeyExpr,
-                                                                   SbExpr highKeyExpr,
-                                                                   const PlanStageReqs& reqs,
-                                                                   PlanNodeId nodeId) {
-    PlanStageReqs ixScanReqs = computeReqsForIndexScan(reqs, keyPattern);
-
-    auto [stage, outputs] = generateSingleIntervalIndexScanImpl(state,
-                                                                collection,
-                                                                indexName,
-                                                                keyPattern,
-                                                                std::move(lowKeyExpr),
-                                                                std::move(highKeyExpr),
-                                                                ixScanReqs,
-                                                                nodeId,
-                                                                forward);
-
-    return setResultAndAdditionalFieldSlots(
-        std::move(stage), std::move(outputs), keyPattern, reqs, state, nodeId);
-}
-
 std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& state,
                                                          const CollectionPtr& collection,
                                                          const IndexScanNode* ixn,
@@ -996,11 +945,13 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
     IndexIntervals intervals) {
-    sbe::value::TagValueOwned bounds{sbe::value::makeNewArray()};
+    sbe::value::TagValueOwned bounds =
+        sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
     auto arr = sbe::value::getArrayView(bounds.value());
     arr->reserve(intervals.size());
     for (auto&& [lowKey, highKey] : intervals) {
-        sbe::value::TagValueOwned interval{sbe::value::makeNewObject()};
+        sbe::value::TagValueOwned interval =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewObject());
         auto obj = sbe::value::getObjectView(interval.value());
         obj->reserve(2);
         obj->push_back_raw("l"sv,
@@ -1045,17 +996,17 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
         intervalsRequired != IntervalsRequired::MultiInterval) {
         boost::optional<std::pair<SbSlot, SbSlot>> indexScanBoundsSlots;
         std::tie(stage, outputs, indexScanBoundsSlots) =
-            generateSingleIntervalIndexScanAndSlotsImpl(
-                state,
-                collection,
-                indexName,
-                keyPattern,
-                forward,
-                boost::none,
-                boost::none,
-                reqs,
-                ixn->nodeId(),
-                intervalsRequired == IntervalsRequired::EqualityInterval /* isPointInterval */);
+            generateSingleIntervalIndexScanAndSlotsImpl(state,
+                                                        collection,
+                                                        indexName,
+                                                        keyPattern,
+                                                        forward,
+                                                        boost::none,
+                                                        boost::none,
+                                                        reqs,
+                                                        ixn->nodeId(),
+                                                        /*isPointInterval=*/intervalsRequired ==
+                                                            IntervalsRequired::EqualityInterval);
         tassert(6484702, "lowKey and highKey runtime slots must be present", indexScanBoundsSlots);
         parameterizedScanSlots = {ParameterizedIndexScanSlots::SingleIntervalPlan{
             indexScanBoundsSlots->first.getId(), indexScanBoundsSlots->second.getId()}};
@@ -1096,7 +1047,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
         stagesAndSlots.emplace_back(std::move(optimizedStage), std::move(optimizedOutputs));
 
         // Define a lambda for creating a BranchStage.
-        auto makeBranchStage = [&](sbe::PlanStage::Vector inputStages,
+        auto makeBranchStage = [&](SbStage::Vector inputStages,
                                    std::vector<SbSlotVector> inputSlots) {
             return b.makeBranch(std::move(inputStages[0]),
                                 std::move(inputStages[1]),

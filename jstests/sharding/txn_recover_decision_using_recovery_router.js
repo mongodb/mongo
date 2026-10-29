@@ -246,13 +246,10 @@ const lsid = {
 let txnNumber = 0;
 
 // Force refresh of dbVersion now to avoid conflicting locks with test transactions.
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: "test.user"}));
-assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: "test.user"}));
-
 if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: "test.user"}));
+    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: "test.user"}));
     assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: "test"}));
-}
-if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) {
     assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: "test"}));
 }
 

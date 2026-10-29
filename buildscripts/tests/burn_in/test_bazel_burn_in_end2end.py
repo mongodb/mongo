@@ -11,13 +11,31 @@ import time
 import unittest
 from unittest.mock import call, patch
 
+import yaml
+
+
+def _is_nightly_project() -> bool:
+    """Return True if running under the mongodb-mongo-master-nightly Evergreen project."""
+
+    # The nightly project runs against etc/evergreen_nightly.yml, which (unlike release branches)
+    # has the test_dev variants commented out, so it defines no variant with the resmoke_tests
+    # burn-in task. Burn-in task generation therefore produces nothing there and the burn-in-task
+    # end-to-end test cannot assert on it.
+    NIGHTLY_PROJECT_NAME = "mongodb-mongo-master-nightly"
+    try:
+        with open("../expansions.yml", encoding="utf8") as f:
+            expansions = yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        # No expansions (e.g. local runs) means this is not the nightly project.
+        return False
+    return expansions.get("project") == NIGHTLY_PROJECT_NAME
+
+
 BAZEL_NO_REMOTE_EXEC_CONFIG = "--config=no-remote-exec"
 # Query only the resmoke suites subtree instead of all targets to keep this
 # end-to-end test's runtime reasonable.
-RESMOKE_CONFIG_CQUERY = "kind(resmoke_config, //jstests/suites/...)"
-RESMOKE_CONFIG_STARLARK_EXPR = (
-    "': '.join([str(target.label).replace('@@','')] + " "[f.path for f in target.files.to_list()])"
-)
+RESMOKE_CONFIG_SCOPE = "//jstests/suites/..."
+RESMOKE_CONFIG_QUERY = f"kind(resmoke_config, {RESMOKE_CONFIG_SCOPE})"
 MAX_BAZEL_COMMAND_RETRIES = 3
 INITIAL_BAZEL_COMMAND_RETRY_DELAY_SECONDS = 1
 
@@ -28,20 +46,42 @@ def _bazel_build_command() -> list[str]:
         "build",
         BAZEL_NO_REMOTE_EXEC_CONFIG,
         "--build_tag_filters=resmoke_config",
-        "//...",
+        RESMOKE_CONFIG_SCOPE,
     ]
 
 
-def _bazel_cquery_command() -> list[str]:
+def _bazel_query_command() -> list[str]:
     return [
         "bazel",
-        "cquery",
+        "query",
         BAZEL_NO_REMOTE_EXEC_CONFIG,
-        "--output=starlark",
-        "--starlark:expr",
-        RESMOKE_CONFIG_STARLARK_EXPR,
-        RESMOKE_CONFIG_CQUERY,
+        RESMOKE_CONFIG_QUERY,
     ]
+
+
+def _resmoke_config_output_path(label: str) -> str:
+    """Return the path of the config file produced by the given resmoke_config target.
+
+    The rule declares its output as `<target name minus the _config suffix>.yml` in the
+    target's own package (see `_resmoke_config_impl` in bazel/resmoke/resmoke.bzl), so the
+    path is fully determined by the label. Deriving it lets us use `bazel query`, which only
+    needs the loading phase, instead of `bazel cquery`, which builds a second
+    configured-target graph and costs more than the build it follows.
+    """
+    package, name = label.removeprefix("@@").removeprefix("//").split(":")
+    return os.path.join("bazel-bin", package, name.removesuffix("_config") + ".yml")
+
+
+def _resmoke_suite_configs(query_stdout: str) -> str:
+    """Build the label -> config path mapping from `bazel query` output."""
+    lines = []
+    for label in query_stdout.split():
+        path = _resmoke_config_output_path(label)
+        # Targets that are incompatible with this platform build no config file. They have
+        # no mapping to emit, and burn-in cannot run them anyway.
+        if os.path.exists(path):
+            lines.append(f"{label}: {path}")
+    return "\n".join(lines) + "\n"
 
 
 def _run_bazel_command_with_backoff(
@@ -70,8 +110,8 @@ def _run_bazel_build_with_backoff() -> subprocess.CompletedProcess[str]:
     return _run_bazel_command_with_backoff(_bazel_build_command(), "build")
 
 
-def _run_bazel_cquery_with_backoff() -> subprocess.CompletedProcess[str]:
-    return _run_bazel_command_with_backoff(_bazel_cquery_command(), "cquery")
+def _run_bazel_query_with_backoff() -> subprocess.CompletedProcess[str]:
+    return _run_bazel_command_with_backoff(_bazel_query_command(), "query")
 
 
 @unittest.skipUnless(
@@ -92,18 +132,18 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
             )
 
         print("Generating resmoke_suite_configs.yml...")
-        cquery_result = _run_bazel_cquery_with_backoff()
+        query_result = _run_bazel_query_with_backoff()
 
-        if cquery_result.returncode != 0:
+        if query_result.returncode != 0:
             raise RuntimeError(
                 "Failed to query resmoke configs with bazel after "
                 f"{MAX_BAZEL_COMMAND_RETRIES + 1} attempts:\n"
-                f"stdout: {cquery_result.stdout}\n"
-                f"stderr: {cquery_result.stderr}"
+                f"stdout: {query_result.stdout}\n"
+                f"stderr: {query_result.stderr}"
             )
 
         with open("resmoke_suite_configs.yml", "w") as f:
-            f.write(cquery_result.stdout)
+            f.write(_resmoke_suite_configs(query_result.stdout))
 
     @classmethod
     def tearDownClass(cls):
@@ -111,6 +151,10 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
         if os.path.exists("resmoke_suite_configs.yml"):
             os.remove("resmoke_suite_configs.yml")
 
+    @unittest.skipIf(
+        _is_nightly_project(),
+        "The nightly project's Evergreen config has no burn-in variants, so no tasks are generated",
+    )
     def test_generate_tasks(self):
         mock_changed_files = "jstests/core/js/jssymbol.js"
 
@@ -303,8 +347,47 @@ class TestBazelCommandConfiguration(unittest.TestCase):
     def test_build_uses_bazelrc_raapi_without_remote_execution(self):
         self.assert_uses_bazelrc_raapi_without_remote_execution(_bazel_build_command())
 
-    def test_cquery_uses_bazelrc_raapi_without_remote_execution(self):
-        self.assert_uses_bazelrc_raapi_without_remote_execution(_bazel_cquery_command())
+    def test_query_uses_bazelrc_raapi_without_remote_execution(self):
+        self.assert_uses_bazelrc_raapi_without_remote_execution(_bazel_query_command())
+
+
+class TestResmokeSuiteConfigs(unittest.TestCase):
+    def test_output_path_derived_from_label(self):
+        self.assertEqual(
+            os.path.join("bazel-bin", "jstests/suites", "core.yml"),
+            _resmoke_config_output_path("//jstests/suites:core_config"),
+        )
+
+    def test_output_path_strips_repository_prefix(self):
+        self.assertEqual(
+            _resmoke_config_output_path("//jstests/suites:core_config"),
+            _resmoke_config_output_path("@@//jstests/suites:core_config"),
+        )
+
+    def test_configs_map_labels_to_existing_paths(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.makedirs(os.path.join(tmpdir, "bazel-bin", "jstests", "suites"))
+            with open(os.path.join(tmpdir, "bazel-bin", "jstests", "suites", "core.yml"), "w"):
+                pass
+
+            cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                configs = _resmoke_suite_configs(
+                    "//jstests/suites:core_config\n//jstests/suites:incompatible_config\n"
+                )
+            finally:
+                os.chdir(cwd)
+
+        # The incompatible target builds no config file and is filtered out.
+        self.assertEqual(
+            {
+                "//jstests/suites:core_config": os.path.join(
+                    "bazel-bin", "jstests/suites", "core.yml"
+                )
+            },
+            yaml.safe_load(configs),
+        )
 
 
 class TestRunBazelCommandWithBackoff(unittest.TestCase):
@@ -333,13 +416,13 @@ class TestRunBazelCommandWithBackoff(unittest.TestCase):
 
     @patch("buildscripts.tests.burn_in.test_bazel_burn_in_end2end.time.sleep")
     @patch("buildscripts.tests.burn_in.test_bazel_burn_in_end2end.subprocess.run")
-    def test_cquery_retries_until_success(self, run_mock, sleep_mock):
+    def test_query_retries_until_success(self, run_mock, sleep_mock):
         run_mock.side_effect = [
             subprocess.CompletedProcess(args=["bazel"], returncode=1, stdout="", stderr="failed"),
             subprocess.CompletedProcess(args=["bazel"], returncode=0, stdout="success", stderr=""),
         ]
 
-        result = _run_bazel_cquery_with_backoff()
+        result = _run_bazel_query_with_backoff()
 
         self.assertEqual(0, result.returncode)
         self.assertEqual(2, run_mock.call_count)

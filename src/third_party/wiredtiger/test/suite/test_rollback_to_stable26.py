@@ -130,9 +130,7 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
             # Wait for checkpoint to start before committing last transaction.
             ckpt_started = 0
             while not ckpt_started:
-                stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
-                stat_cursor.close()
+                ckpt_started = self.get_stat(stat.conn.checkpoint_state) != 0
                 time.sleep(1)
 
             prepare_session.rollback_transaction()

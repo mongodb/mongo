@@ -14,6 +14,7 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {kPbtInterruptAfterTimeLimitMs} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -255,5 +256,6 @@ fc.assert(
         // The search space for this PBT is small because express path covers a narrow range of
         // queries. 300 runs should be enough.
         numRuns: 150,
+        interruptAfterTimeLimit: kPbtInterruptAfterTimeLimitMs,
     },
 );

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -37,39 +11,53 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC UncommittedFastCountChange {
+class RecordStore;
+
+/**
+ * The uncommitted size/count changes to the associated `RecordStore`.
+ *
+ * The `RecordStore*` must be stored for correctness. At commit time, the `RecordStore` size/count
+ * atomics are updated, but the collection catalog may not contain a newly created collection yet,
+ * so the `RecordStore` instance cannot be looked up through the catalog.
+ *
+ * `recordStore` is a non-owning pointer because the lifetime of the `RecordStore` must exceed the
+ * lifetime of `this`. A `RecordStore` instance is only destroyed when its corresponding collection
+ * is dropped from the catalog. A collection drop requires an X lock, so it cannot interleave with
+ * the operations that commit these changes (insert, update, delete).
+ */
+struct [[MONGO_MOD_PUBLIC]] UncommittedFastCountChange {
+    CollectionSizeCount delta;
+    RecordStore* recordStore = nullptr;
+};
+
+using UncommittedFastCountChangeMap = boost::container::flat_map<UUID, UncommittedFastCountChange>;
+
+class [[MONGO_MOD_PUBLIC]] UncommittedFastCountChanges {
 public:
-    /**
-     * Returns an immutable reference to the UncommittedFastCountChange instance associated with
-     * this particular OperationContext, returning an empty instance if none exist.
-     */
-    static const UncommittedFastCountChange& getForRead(OperationContext* opCtx);
-
-    /**
-     * Returns a mutable reference to the UncommittedFastCountChange instance associated with
-     * this particular OperationContext, creating one if none exist.
-     *
-     * If an instance is created, a callback will be registered for the RecoveryUnit attached to the
-     * OperationContext that will update the changes tracked in _trackedChanges.
-     */
-    static UncommittedFastCountChange& getForWrite(OperationContext* opCtx);
-
     /**
      * Given a collection UUID, returns the current uncommitted value of size and count for that
      * collection. If the collection UUID does not exist, an empty CollectionSizeCount is returned.
      */
-    CollectionSizeCount find(const UUID& uuid) const;
+    static CollectionSizeCount find(OperationContext* opCtx, UUID uuid);
 
     /**
-     * Records a change in count and size for the given collection UUID. This is a no-op when both
-     * deltas are zero or if the provided namespace string is not eligible to be tracked by the
-     * replicated fast count collection.
+     * Records a change in size and count for the given collection UUID. This is a no-op when both
+     * deltas are zero or if the provided namespace string is not eligible to be tracked by
+     * replicated fast count.
      */
-    void record(const NamespaceString& nss, const UUID& uuid, int64_t numDelta, int64_t sizeDelta);
+    static void record(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       UUID uuid,
+                       UncommittedFastCountChange change);
 
 private:
-    // Map of collection UUID to uncommitted values for size and count.
-    boost::container::flat_map<UUID, CollectionSizeCount> _trackedChanges;
+    void _record(const NamespaceString& nss, UUID uuid, UncommittedFastCountChange change);
+
+    CollectionSizeCount _find(UUID uuid) const;
+
+    // Map of collection UUID to its uncommitted size/count delta and the RecordStore that delta
+    // must be applied to on commit.
+    UncommittedFastCountChangeMap _trackedChanges;
 };
 
 }  // namespace mongo

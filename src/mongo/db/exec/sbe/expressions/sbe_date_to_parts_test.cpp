@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -44,10 +18,10 @@ namespace mongo::sbe {
 class SBEDateToPartsTest : public EExpressionTestFixture {
 public:
     void runAndAssertNothing(const vm::CodeFragment* compiledExpr) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        ASSERT_EQUALS(runTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(runVal, 0);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        ASSERT_EQUALS(result.tag(), sbe::value::TypeTags::Nothing);
+        ASSERT_EQUALS(result.value(), 0);
     }
 
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
@@ -58,9 +32,9 @@ public:
                                 const int32_t& minute,
                                 const int32_t& second,
                                 const int32_t& millisecond) {
-        auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-        value::ValueGuard guard(runTag, runVal);
-        auto obj = value::getObjectView(runVal);
+        value::TagValueOwned result =
+            value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr));
+        auto obj = value::getObjectView(result.value());
 
         auto [yearTag, yearVal] = obj->getField("year");
         ASSERT_EQUALS(yearTag, value::TypeTags::NumberInt32);

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,9 +13,11 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/pcre.h"
 
+#include <string_view>
+
 #include <fmt/format.h>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 /**
  * Defines a basic set of matchers to be used with the ASSERT_THAT macro (see
@@ -54,7 +30,7 @@ namespace mongo::unittest::match {
 using namespace ::testing;
 using ::testing::Matcher;
 
-namespace MONGO_MOD_FILE_PRIVATE match_details {
+namespace [[MONGO_MOD_FILE_PRIVATE]] match_details {
 inline std::string maybeNegate(bool negation, std::string str) {
     if (negation)
         return fmt::format("not ({})", str);
@@ -113,7 +89,7 @@ public:
 
     Matcher<const Exception&> _matcher;
 };
-}  // namespace MONGO_MOD_FILE_PRIVATE match_details
+}  // namespace match_details
 
 inline auto Any() {
     return _;
@@ -184,6 +160,55 @@ MATCHER_P(
     return ExplainMatchResult(value, arg.getValue(), result_listener);
 }
 
+/**
+ * `AsStringView(value)` matches a string view constructed from value against `matcher`.
+ *
+ * Useful when an api or a property is of type `char const*` and a string-like object is required
+ * for the matcher.
+ *
+ * Example:
+ *  std::string s = "string";
+ *  ASSERT_THAT("string literal", AsStringView(StartsWith(s)));
+ */
+MATCHER_P(AsStringView,
+          matcher,
+          fmt::format("as string view {}",
+                      testing::DescribeMatcher<std::string_view>(matcher, negation))) {
+    return ExplainMatchResult(matcher, std::string_view(arg), result_listener);
+}
+
+/**
+ * `CodeIs(matcher)` matches the result of code() against `matcher`.
+ *
+ * Example:
+ *  AssertionException& ex = ...;
+ *  ASSERT_THAT(ex, CodeIs(ErrorCodes::InternalError));
+ */
+MATCHER_P(
+    CodeIs,
+    matcher,
+    fmt::format("{} an object whose code() result {}",
+                negation ? "isn't" : "is",
+                testing::DescribeMatcher<decltype(std::declval<arg_type>().code())>(matcher))) {
+    return ExplainMatchResult(matcher, arg.code(), result_listener);
+}
+
+
+/**
+ * `WhatIs(matcher)` matches the result of what() against `matcher`.
+ *
+ * Example:
+ *  AssertionException& ex = ...;
+ *  ASSERT_THAT(ex, WhatIs(StrEq("exception message")));
+ */
+MATCHER_P(
+    WhatIs,
+    matcher,
+    fmt::format("{} an object whose what() result {}",
+                negation ? "isn't" : "is",
+                testing::DescribeMatcher<decltype(std::declval<arg_type>().what())>(matcher))) {
+    return ExplainMatchResult(matcher, arg.what(), result_listener);
+}
 
 /**
  * `StatusWithHasStatus(status)` matches a `StatusWith` whose status matches

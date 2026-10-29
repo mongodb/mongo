@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 
@@ -64,14 +38,15 @@ namespace {
 const auto getMaintainerThread =
     ServiceContext::declareDecoration<std::unique_ptr<OplogCapMaintainerThread>>();
 
-// Cumulative amount of time spent truncating the oplog.
-AtomicWord<int64_t> totalTimeTruncating;
+// Serializes start/stop transitions so two callers can never interleave.
+const auto getMaintainerThreadMutex = ServiceContext::declareDecoration<std::mutex>();
 
-// Cumulative number of truncates of the oplog.
-AtomicWord<int64_t> truncateCount;
+// Number of OplogCapMaintainerThreads currently executing run() for a given ServiceContext. Used
+// to confirm we only ever have one running thread per ServiceContext.
+const auto getActiveThreadCount = ServiceContext::declareDecoration<Atomic<int>>();
 
 // Cumulative number of times the thread has been interrupted
-AtomicWord<int64_t> interruptCount;
+Atomic<int64_t> interruptCount;
 
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogSampling);
@@ -101,34 +76,41 @@ public:
             // In certain modes, like read-only, no truncate markers are created.
             if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
                 auto method = truncateMarkers->getMarkersCreationMethod();
-                if (method == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
-                    builder.append("totalTimeProcessingMicros",
-                                   truncateMarkers->getCreationProcessingTime().count());
-                    builder.append("processingMethod", "sampling");
-                } else if (method == CollectionTruncateMarkers::MarkersCreationMethod::InProgress) {
+                if (method == CollectionTruncateMarkers::MarkersCreationMethod::InProgress) {
                     invariant(truncateMarkers->getCreationProcessingTime().count() == 0);
                     builder.append("totalTimeProcessingMicros", -1);
                     builder.append("processingMethod", "in progress");
-                } else if (method ==
-                           CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {
-                    builder.append("totalTimeProcessingMicros", -1);
-                    builder.append("processingMethod", "empty collection");
                 } else {
                     builder.append("totalTimeProcessingMicros",
                                    truncateMarkers->getCreationProcessingTime().count());
-                    builder.append("processingMethod", "scanning");
+                    if (method == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
+                        builder.append("processingMethod", "sampling");
+                    } else if (method ==
+                               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {
+                        builder.append("processingMethod", "empty collection");
+                    } else {
+                        builder.append("processingMethod", "scanning");
+                    }
                 }
                 builder.appendNumber("truncateMarkersCount",
                                      static_cast<long long>(truncateMarkers->numMarkers()));
+                builder.appendNumber("minBytesPerMarker",
+                                     static_cast<long long>(truncateMarkers->minBytesPerMarker()));
             }
         }
 
         if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
             builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
+            // FTDC stores metrics as integers and truncates doubles, so a fractional retention
+            // in hours (e.g. 0.75h) would be lost as 0 in the FTDC metric stream. Emit the
+            // retention in minutes as an integer to preserve sub-hour precision there.
+            builder.append("oplogMinRetentionMinutes",
+                           static_cast<long long>(oplogMinRetentionHours * 60));
         }
 
-        builder.append("totalTimeTruncatingMicros", totalTimeTruncating.load());
-        builder.append("truncateCount", truncateCount.load());
+        builder.append("totalTimeTruncatingMicros",
+                       oplog_truncation::getTotalTimeTruncatingMicros());
+        builder.append("truncateCount", oplog_truncation::getTruncateCount());
         builder.append("interruptCount", interruptCount.load());
 
         return builder.obj();
@@ -166,13 +148,28 @@ void startOplogCapMaintainerThread(ServiceContext* serviceContext,
         return;
     }
 
-    std::unique_ptr<OplogCapMaintainerThread> maintainerThread =
-        std::make_unique<OplogCapMaintainerThread>();
-    OplogCapMaintainerThread::set(serviceContext, std::move(maintainerThread));
+    // Serialize against a concurrent start/stop so we can't race on the decoration slot.
+    std::lock_guard<std::mutex> lk(getMaintainerThreadMutex(serviceContext));
+
+    // Overlapping storage-lifecycle events can each reach start without a matching stop of the
+    // currently running instance. Tear it down here if it is running.
+    if (auto* existing = OplogCapMaintainerThread::get(serviceContext);
+        existing && existing->running()) {
+        LOGV2_WARNING(
+            13139400,
+            "Found a running OplogCapMaintainerThread when starting a new one; shutting "
+            "the existing one down before restarting. This is unexpected and may indicate "
+            "an unbalanced start/stop of the oplog cap maintainer thread.");
+        existing->shutdown(Status(ErrorCodes::InterruptedDueToStorageChange,
+                                  "Restarting the OplogCapMaintainerThread"));
+    }
+
+    OplogCapMaintainerThread::set(serviceContext, std::make_unique<OplogCapMaintainerThread>());
     OplogCapMaintainerThread::get(serviceContext)->go();
 }
 
 void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& reason) {
+    std::lock_guard<std::mutex> lk(getMaintainerThreadMutex(serviceContext));
     if (OplogCapMaintainerThread* maintainerThread = OplogCapMaintainerThread::get(serviceContext);
         maintainerThread) {
         maintainerThread->shutdown(reason);
@@ -227,9 +224,10 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;
         }
-        LOGV2(10621107,
-              "Looking for excess documents to delete",
-              "oplogSizeBytes"_attr = rs->dataSize());
+        LOGV2_DEBUG(10621107,
+                    2,
+                    "Looking for excess documents to delete",
+                    "oplogSizeBytes"_attr = rs->dataSize());
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
@@ -240,6 +238,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         // Oplog went away or we timed out waiting for oplog space to reclaim.
         return false;
     }
+
+    LOGV2(13283603, "Oplog collection may have excess truncation markers, attempting truncation");
 
     {
         // Oplog state could have changed while yielding. Reacquire global lock
@@ -264,11 +264,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             return false;
         }
 
-        auto elapsedMicros = timer.micros();
-        totalTimeTruncating.fetchAndAdd(elapsedMicros);
-        truncateCount.fetchAndAdd(1);
-
-        auto elapsedMillis = elapsedMicros / 1000;
+        auto elapsedMillis = timer.millis();
         LOGV2(22402,
               "Oplog truncation finished",
               "pinnedOplogTimestamp"_attr = mayTruncateUpTo,
@@ -288,6 +284,15 @@ RecordId OplogCapMaintainerThread::_reclaimOplog(OperationContext* opCtx,
 
 void OplogCapMaintainerThread::run() {
     LOGV2(5295000, "Oplog cap maintainer thread started", "threadName"_attr = name());
+
+    // There must only ever be one maintainer thread running per ServiceContext. This guard catches
+    // a thread that was started without being registered. dassert so it fails loudly in debug
+    // builds without adding a production crash path.
+    auto& activeThreadCount = getActiveThreadCount(getGlobalServiceContext());
+    dassert(activeThreadCount.fetchAndAdd(1) == 0,
+            "More than one OplogCapMaintainerThread is running");
+    ON_BLOCK_EXIT([&] { activeThreadCount.fetchAndSubtract(1); });
+
     ThreadClient tc(name(),
                     getGlobalServiceContext()->getService(),
                     Client::noSession(),
@@ -357,7 +362,9 @@ void OplogCapMaintainerThread::run() {
                                                     rss::consensus::IntentRegistry::Intent::Read});
                 const auto& oplog = oplogRead->getCollection();
                 if (oplog) {
-                    // Initial marker creation.
+                    // Initial marker creation. Note that while this thread scans/samples the
+                    // record store, concurrent oplog inserts are unaccounted for. The effect is a
+                    // bounded undercount and we truncate slightly later than expected.
                     auto oplogTruncateMarkers =
                         _createInitialMarkers(_uniqueCtx->get(), *oplog->getRecordStore());
                     invariant(oplogTruncateMarkers);
@@ -468,7 +475,8 @@ void OplogCapMaintainerThread::run() {
 
 std::shared_ptr<OplogTruncateMarkers> OplogCapMaintainerThread::_createInitialMarkers(
     OperationContext* opCtx, RecordStore& rs) const {
-    auto initialMarkers = OplogTruncateMarkers::beginMarkerCreation(opCtx, rs);
+    auto initialMarkers = OplogTruncateMarkers::beginMarkerCreation(
+        opCtx, rs, OplogTruncateMarkers::estimateOplogSize(rs));
     return std::make_shared<OplogTruncateMarkers>(std::move(initialMarkers), *rs.oplog());
 }
 

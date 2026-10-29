@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/ticketing/ticket_semaphore.h"
 
@@ -42,6 +16,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/packaged_task.h"
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -50,13 +25,20 @@
 
 namespace mongo {
 
-using SemaphoreFactory = std::function<std::unique_ptr<TicketSemaphore>(int)>;
+using SemaphoreFactory =
+    std::function<std::unique_ptr<TicketSemaphore>(int, Milliseconds basePollInterval)>;
 
 // Generous timeout so tests fail with a useful diagnostic instead of hanging.
 constexpr auto kWaitTimeout = Minutes{1};
+constexpr auto kDefaultPollInterval = Milliseconds{500};
 
 Date_t getDeadline() {
     return Date_t::now() + kWaitTimeout;
+}
+
+// Mirrors UnorderedTicketSemaphore::acquire() poll-deadline selection.
+Date_t pollDeadline(Date_t until, Date_t now, Milliseconds pollInterval) {
+    return std::min(until, now + pollInterval);
 }
 
 /**
@@ -79,8 +61,9 @@ public:
         ServiceContextTest::tearDown();
     }
 
-    std::unique_ptr<TicketSemaphore> makeSemaphore(int numPermits) {
-        return GetParam()(numPermits);
+    std::unique_ptr<TicketSemaphore> makeSemaphore(
+        int numPermits, Milliseconds basePollInterval = kDefaultPollInterval) {
+        return GetParam()(numPermits, basePollInterval);
     }
 
     OperationContext* opCtx() {
@@ -209,7 +192,7 @@ TEST_P(TicketSemaphoreTest, AcquireSucceedsWhenAvailable) {
     auto sem = makeSemaphore(3);
     MockAdmissionContext admCtx;
 
-    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, Date_t::max(), true /* interruptible */));
+    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, Date_t::max(), /*interruptible=*/true));
     ASSERT_EQ(sem->available(), 2);
 }
 
@@ -218,11 +201,11 @@ TEST_P(TicketSemaphoreTest, AcquireTimesOut) {
     MockAdmissionContext admCtx;
 
     auto deadline = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, deadline, true /* interruptible */));
+    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, deadline, /*interruptible=*/true));
 
     MockAdmissionContext admCtx2;
     auto deadline2 = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx2, deadline2, false /* interruptible */));
+    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx2, deadline2, /*interruptible=*/false));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireOpCtxDeadlineThrows) {
@@ -234,7 +217,7 @@ TEST_P(TicketSemaphoreTest, AcquireOpCtxDeadlineThrows) {
 
     MockAdmissionContext admCtx;
     ASSERT_THROWS_CODE(
-        sem->acquire(deadlineOpCtx.get(), &admCtx, Date_t::max(), true /* interruptible */),
+        sem->acquire(deadlineOpCtx.get(), &admCtx, Date_t::max(), /*interruptible=*/true),
         DBException,
         ErrorCodes::MaxTimeMSExpired);
 }
@@ -248,8 +231,7 @@ TEST_P(TicketSemaphoreTest, AcquireExplicitDeadlineReturnsFalse) {
 
     MockAdmissionContext admCtx;
     auto shortDeadline = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(
-        sem->acquire(deadlineOpCtx.get(), &admCtx, shortDeadline, true /* interruptible */));
+    ASSERT_FALSE(sem->acquire(deadlineOpCtx.get(), &admCtx, shortDeadline, /*interruptible=*/true));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireBlocksAndSucceedsWhenReleased) {
@@ -281,6 +263,37 @@ TEST_P(TicketSemaphoreTest, AcquireBlocksAndSucceedsWhenReleased) {
     ASSERT_TRUE(result);
 }
 
+TEST_P(TicketSemaphoreTest, AcquireBeforeShortDeadlineSucceedsWhenReleased) {
+    constexpr auto kBasePollInterval = Seconds{10};
+    auto sem = makeSemaphore(1, kBasePollInterval);
+
+    // Exhaust the single permit.
+    ASSERT_TRUE(sem->tryAcquire());
+    ASSERT_EQ(sem->available(), 0);
+
+    // The minimum jittered poll interval is 8 seconds. Use a deadline 5 seconds away so this
+    // is the final wait, with a multi-second margin for slow test hosts. Waking because a
+    // permit becomes available must not be mistaken for that deadline expiring.
+    auto* rawSem = sem.get();
+    Future<bool> acquireFuture = spawn([&, rawSem]() {
+        auto client = getServiceContext()->getService()->makeClient("shortDeadlineWaiter");
+        auto waiterOpCtx = client->makeOperationContext();
+        MockAdmissionContext waiterAdmCtx;
+        auto deadline = Date_t::now() + Seconds{5};
+        return rawSem->acquire(waiterOpCtx.get(), &waiterAdmCtx, deadline, true);
+    });
+
+    waitUntilBlocked(rawSem, 1);
+    rawSem->release();
+
+    bool result = false;
+    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        result = std::move(acquireFuture).get(_opCtx.get());
+    });
+
+    ASSERT_TRUE(result);
+}
+
 TEST_P(TicketSemaphoreTest, AcquireRespectsInterrupt) {
     auto sem = makeSemaphore(0);
 
@@ -292,7 +305,7 @@ TEST_P(TicketSemaphoreTest, AcquireRespectsInterrupt) {
 
     Future<void> acquireFuture = spawn([&, rawSem, rawOpCtx]() {
         MockAdmissionContext admCtx;
-        rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), true /* interruptible */);
+        rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), /*interruptible=*/true);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -423,12 +436,12 @@ TEST_P(TicketSemaphoreTest, MaxWaitersZeroRejectsWaiters) {
 
     // Acquire succeeds without queuing when a permit is available.
     MockAdmissionContext admCtx;
-    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, getDeadline(), true /* interruptible */));
+    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, getDeadline(), /*interruptible=*/true));
     ASSERT_EQ(sem->available(), 0);
 
     // But once no permits are available, it must queue — which is rejected at maxWaiters 0.
     MockAdmissionContext admCtx2;
-    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx2, getDeadline(), true /* interruptible */),
+    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx2, getDeadline(), /*interruptible=*/true),
                        DBException,
                        ErrorCodes::AdmissionQueueOverflow);
 }
@@ -453,7 +466,7 @@ TEST_P(TicketSemaphoreTest, MaxWaitersAllowsUpToLimit) {
 
     // A 3rd waiter exceeds the limit.
     MockAdmissionContext admCtx;
-    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx, getDeadline(), true /* interruptible */),
+    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx, getDeadline(), /*interruptible=*/true),
                        DBException,
                        ErrorCodes::AdmissionQueueOverflow);
 
@@ -546,7 +559,7 @@ TEST_P(TicketSemaphoreTest, NonInterruptibleAcquireReturnsFalseOnKillAndTimeout)
     auto deadline = Date_t::now() + Milliseconds{500};
     Future<bool> acquireFuture = spawn([&, rawSem, rawOpCtx, deadline]() {
         MockAdmissionContext admCtx;
-        return rawSem->acquire(rawOpCtx, &admCtx, deadline, false /* interruptible */);
+        return rawSem->acquire(rawOpCtx, &admCtx, deadline, /*interruptible=*/false);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -569,7 +582,7 @@ TEST_P(TicketSemaphoreTest, NonInterruptibleAcquireWaitsForPermitAfterKill) {
 
     Future<bool> acquireFuture = spawn([&, rawSem, rawOpCtx]() {
         MockAdmissionContext admCtx;
-        return rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), false /* interruptible */);
+        return rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), /*interruptible=*/false);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -594,7 +607,7 @@ TEST_P(TicketSemaphoreTest, WaiterCountDecreasesAfterTimeout) {
 
     MockAdmissionContext admCtx;
     auto shortDeadline = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, shortDeadline, false /* interruptible */));
+    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, shortDeadline, /*interruptible=*/false));
     ASSERT_EQ(rawSem->waiters(), 0);
 
     // The waiter slot was reclaimed, so a new waiter can queue without overflow.
@@ -602,8 +615,7 @@ TEST_P(TicketSemaphoreTest, WaiterCountDecreasesAfterTimeout) {
         auto client = svcCtx->getService()->makeClient("waiter");
         auto waiterOpCtx = client->makeOperationContext();
         MockAdmissionContext admCtx2;
-        return rawSem->acquire(
-            waiterOpCtx.get(), &admCtx2, getDeadline(), true /* interruptible */);
+        return rawSem->acquire(waiterOpCtx.get(), &admCtx2, getDeadline(), /*interruptible=*/true);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -625,8 +637,8 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
     auto* rawSem = sem.get();
 
     // Track maximum concurrent permit holders to verify no overbooking.
-    AtomicWord<int> concurrentHolders{0};
-    AtomicWord<int> maxConcurrentHolders{0};
+    Atomic<int> concurrentHolders{0};
+    Atomic<int> maxConcurrentHolders{0};
 
     std::vector<stdx::thread> threads;
     for (int i = 0; i < numThreads; ++i) {
@@ -789,16 +801,89 @@ TEST_P(TicketSemaphoreTest, ResizePositiveButRemainsNegativeKeepsWaitersBlocked)
     ASSERT_EQ(rawSem->available(), 0);
 }
 
+TEST_P(TicketSemaphoreTest, AcquireHonorsDeadlineWhenPermitsRemainNegative) {
+    constexpr auto kBasePollInterval = Milliseconds{50};
+    constexpr auto kAcquireTimeout = Milliseconds{200};
+    auto sem = makeSemaphore(0, kBasePollInterval);
+    auto* rawSem = sem.get();
+
+    Future<bool> acquireFuture = spawn([&, rawSem]() {
+        auto client = getServiceContext()->getService()->makeClient("negativePermitsWaiter");
+        auto waiterOpCtx = client->makeOperationContext();
+        waiterOpCtx->setDeadlineAfterNowBy(Milliseconds{500}, ErrorCodes::ExceededTimeLimit);
+        MockAdmissionContext admCtx;
+        return rawSem->acquire(waiterOpCtx.get(), &admCtx, Date_t::now() + kAcquireTimeout, true);
+    });
+
+    waitUntilBlocked(rawSem, 1);
+
+    // Immediate resizing can make the permit count negative while existing tickets are still held.
+    // The waiter must continue sleeping and honor its explicit deadline rather than busy-looping.
+    rawSem->resize(-1);
+
+    bool result = true;
+    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        result = std::move(acquireFuture).get(_opCtx.get());
+    });
+    ASSERT_FALSE(result);
+}
+
+TEST_P(TicketSemaphoreTest, AcquireWithNegativePermitsAndShortDeadlineReturnsFalse) {
+    constexpr auto kBasePollInterval = Milliseconds{100};
+    constexpr auto kAcquireTimeout = Milliseconds{50};
+    auto sem = makeSemaphore(-1, kBasePollInterval);
+
+    auto client = getServiceContext()->getService()->makeClient("shortDeadlineWaiter");
+    auto waiterOpCtx = client->makeOperationContext();
+    waiterOpCtx->setDeadlineAfterNowBy(Milliseconds{500}, ErrorCodes::ExceededTimeLimit);
+    MockAdmissionContext admCtx;
+
+    ASSERT_FALSE(sem->acquire(
+        waiterOpCtx.get(), &admCtx, Date_t::now() + kAcquireTimeout, true /* interruptible */));
+}
+
+TEST(UnorderedTicketSemaphorePollDeadlineTest, BetweenPollWindows) {
+    // A deadline between poll intervals should be selected on the second wait.
+    constexpr auto kMinPoll = Milliseconds{400};
+    constexpr auto kMaxPoll = Milliseconds{600};
+    constexpr auto kBasePoll = Milliseconds{500};
+
+    const auto now = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto until = now + Milliseconds{650};
+
+    for (auto firstPoll : {kMinPoll, kBasePoll, kMaxPoll}) {
+        const auto firstDeadline = pollDeadline(until, now, firstPoll);
+        ASSERT_EQ(firstDeadline, now + firstPoll);
+        ASSERT_LT(firstDeadline, until);
+
+        for (auto secondPoll : {kMinPoll, kBasePoll, kMaxPoll}) {
+            ASSERT_EQ(pollDeadline(until, firstDeadline, secondPoll), until);
+        }
+    }
+}
+
+TEST(UnorderedTicketSemaphorePollDeadlineTest, ShortDeadline) {
+    // A deadline shorter than the poll interval should be selected on the first wait.
+    const auto now = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto until = now + Milliseconds{50};
+
+    for (auto poll : {Milliseconds{400}, Milliseconds{500}, Milliseconds{600}}) {
+        ASSERT_EQ(pollDeadline(until, now, poll), until);
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(UnorderedTicketSemaphore,
                          TicketSemaphoreTest,
-                         testing::Values([](int numPermits) -> std::unique_ptr<TicketSemaphore> {
+                         testing::Values([](int numPermits, Milliseconds basePollInterval)
+                                             -> std::unique_ptr<TicketSemaphore> {
                              return std::make_unique<UnorderedTicketSemaphore>(
-                                 numPermits, static_cast<int>(DEFAULT_MAX_CONN));
+                                 numPermits, static_cast<int>(DEFAULT_MAX_CONN), basePollInterval);
                          }));
 
 INSTANTIATE_TEST_SUITE_P(OrderedTicketSemaphore,
                          TicketSemaphoreTest,
-                         testing::Values([](int numPermits) -> std::unique_ptr<TicketSemaphore> {
+                         testing::Values([](int numPermits,
+                                            Milliseconds) -> std::unique_ptr<TicketSemaphore> {
                              return std::make_unique<OrderedTicketSemaphore>(
                                  numPermits, static_cast<int>(DEFAULT_MAX_CONN));
                          }));

@@ -1,6 +1,17 @@
 # MongoDB Extensions Public API
 
-The canonical Public API header is `mongo/db/extension/public/api.h`.
+The Public API is split across two headers with different stability guarantees:
+
+- `mongo/db/extension/public/api_contract.h` is the **frozen loading contract**: the
+  version-agnostic pieces the host and the extension must agree on independent of any negotiated API
+  version. It holds the Phase-1 entry point (`get_mongodb_extension_versions`),
+  `MongoExtensionAPIVersion`, and `MongoExtensionAPIVersionVector`. This header must never change
+  once published; that is enforced at compile time by
+  `src/mongo/db/extension/shared/tests/api_contract_test.cpp`, which checks every declaration
+  against frozen twin definitions.
+- `mongo/db/extension/public/api.h` is the **versioned API surface** for the current API major
+  (currently 1.0): all stage types, host services, and the Phase-2 entry point
+  (`get_mongodb_extension`).
 
 ## Implementing Polymorphism Across API Boundary
 
@@ -104,8 +115,13 @@ objects for execution.
 
 ## Extension Initialization
 
-All extensions must expose a `get_mongodb_extension` function symbol as the top-level extension
-entrypoint for the host to facilitate extension loading and initialization. The `MongoExtension`
-initialization function receives a pointer to the `MongoExtensionHostPortal`, which provides a
-function `registerStageDescriptor`. Each aggregation stage you wish to load as part of an extension
-must be registered during initialization.
+Extension loading is a two-phase protocol, and all extensions must export two function symbols (see
+`api_contract.h`):
+
+1. `get_mongodb_extension_versions` (Phase 1): the extension advertises every version of the
+   Extensions API it implements.
+2. `get_mongodb_extension` (Phase 2): the host selects a compatible version and invokes this
+   entrypoint with the chosen version. The `MongoExtension` initialization function receives a
+   pointer to the `MongoExtensionHostPortal`, which provides a function `registerStageDescriptor`.
+   Each aggregation stage you wish to load as part of an extension must be registered during
+   initialization.

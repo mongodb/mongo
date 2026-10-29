@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 // IWYU pragma: no_include "cxxabi.h"
@@ -62,7 +36,6 @@
 
 #include <functional>
 #include <future>  // IWYU pragma: keep
-#include <future>
 #include <initializer_list>
 #include <memory>
 #include <mutex>
@@ -273,21 +246,16 @@ TEST_F(OperationContextTest, CancellationTokenIsCancelableAtFirst) {
 }
 
 class OperationTestWithMockClock : public OperationContextTest {
-    // This constructor lets us give a variable name to mockClock so we can copy the same
-    // shared_ptr into SharedClockSourceAdapters we give to ServiceContext::make and the
-    // mockClock member variable.
-    explicit OperationTestWithMockClock(std::shared_ptr<ClockSourceMock> mockClock)
-        : OperationContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
-                                   std::make_unique<SharedClockSourceAdapter>(mockClock),
-                                   std::make_unique<TickSourceMock<>>()))),
-          mockClock(std::move(mockClock)) {}
-
 public:
-    OperationTestWithMockClock()
-        : OperationTestWithMockClock(std::make_shared<ClockSourceMock>()) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                 std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                 std::make_unique<TickSourceMock<>>()));
+    }
 
     void setUp() override {
+        OperationContextTest::setUp();
         client = getServiceContext()->getService()->makeClient("OperationDeadlineTest");
     }
 
@@ -302,7 +270,7 @@ public:
         opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; });
     }
 
-    const std::shared_ptr<ClockSourceMock> mockClock;
+    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
     ServiceContext::UniqueClient client;
 };
 using OperationDeadlineTests = OperationTestWithMockClock;

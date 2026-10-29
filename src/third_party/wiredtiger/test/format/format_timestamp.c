@@ -42,7 +42,7 @@ timestamp_minimum_committed(void)
         return replay_maximum_committed();
 
     /* A barrier additionally prevents using cache values here. */
-    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    ts = __wt_atomic_load_uint64_acquire(&g.timestamp);
     if (tinfo_list != NULL)
         for (tlp = tinfo_list; *tlp != NULL; ++tlp) {
             commit_ts = (*tlp)->commit_ts;
@@ -73,12 +73,20 @@ timestamp_sync_threads_commit_ts(void)
     TINFO **tlp;
     wt_timestamp_t ts;
 
+    /*
+     * Workers committed up to g.timestamp (atomic post-increment, so g.timestamp equals the last
+     * used value). timestamp_minimum_committed() returns g.timestamp-1, which would leave the final
+     * committed timestamp uncovered by stable. Bump by one so stable lands exactly at the last used
+     * timestamp.
+     */
+    __wt_atomic_add_uint64_v(&g.timestamp, 1);
+
     if (tinfo_list == NULL)
         return;
 
-    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    ts = __wt_atomic_load_uint64_acquire(&g.timestamp);
     for (tlp = tinfo_list; *tlp != NULL; ++tlp)
-        WT_RELEASE_WRITE_WITH_BARRIER((*tlp)->commit_ts, ts);
+        __wt_atomic_store_uint64_release(&(*tlp)->commit_ts, ts);
 }
 
 /*
@@ -102,14 +110,18 @@ timestamp_query(const char *query, wt_timestamp_t *tsp)
 
 /*
  * timestamp_init --
- *     Set the timestamp on open to the database's recovery timestamp, or some non-zero value.
+ *     Set the timestamp on open to the recovery or stable timestamp, or some non-zero value.
  */
 void
 timestamp_init(void)
 {
     testutil_check(timestamp_query("get=recovery", &g.timestamp));
+    if (g.reopen)
+        g.timestamp = WT_MAX(g.timestamp, g.stable_timestamp);
     if (g.timestamp == WT_TS_NONE)
         g.timestamp = MIN_TIMESTAMP;
+    if (g.reopen && disagg_is_multi_node())
+        g.reopen_timestamp = g.timestamp;
 }
 
 /*
@@ -122,7 +134,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
     static const char *oldest_timestamp_str = "oldest_timestamp=";
     static const char *stable_timestamp_str = "stable_timestamp=";
     WT_CONNECTION *conn;
-    wt_timestamp_t oldest_timestamp, stable_timestamp, stop_timestamp;
+    wt_timestamp_t lag, oldest_timestamp, stable_timestamp, stop_timestamp;
     char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
 
     /* Ensure timestamps are used. */
@@ -141,7 +153,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          * For predictable replay, our end state is to have the stable timestamp represent a precise
          * number of operations.
          */
-        WT_ACQUIRE_READ_WITH_BARRIER(stop_timestamp, g.stop_timestamp);
+        stop_timestamp = __wt_atomic_load_uint64_acquire(&g.stop_timestamp);
         if (stable_timestamp > stop_timestamp && stop_timestamp != WT_TS_NONE)
             stable_timestamp = stop_timestamp;
 
@@ -160,6 +172,17 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
          */
         if (allow_lag)
             oldest_timestamp -= (oldest_timestamp - g.oldest_timestamp) / 2;
+
+        /*
+         * Under precise checkpoint this thread ticks every few milliseconds and the halving above
+         * converges to a near-zero gap between oldest and stable, so snap_repeat's historical reads
+         * age out almost immediately and repeatable-read verification is silently lost. Trail
+         * oldest behind stable far enough that recorded operations stay readable, never moving
+         * oldest backwards: populate and role-switch callers pin oldest to stable.
+         */
+        lag = snap_repeat_ts_span();
+        if (allow_lag && GV(PRECISE_CHECKPOINT) && stable_timestamp > lag)
+            oldest_timestamp = WT_MAX(stable_timestamp - lag, g.oldest_timestamp);
     }
 
     testutil_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
@@ -202,10 +225,16 @@ timestamp(void *arg)
      * rollback errors, and we don't have the luxury of giving up on an operation that has rolled
      * back.
      */
-    while (!g.workers_finished) {
+    while (!g.workers_finished && !__wt_atomic_load_bool_v_relaxed(&g.timestamp_quit)) {
         if (!GV(RUNS_PREDICTABLE_REPLAY)) {
+            /*
+             * Under precise checkpoint, eviction can only write pages whose updates are at or below
+             * the stable timestamp. A long gap between stable timestamp advances lets dirty pages
+             * accumulate above-stable writes faster than eviction can drain them, increasing the
+             * risk of cache pressure. Sleep 0-9ms to keep the interval short.
+             */
             if (GV(PRECISE_CHECKPOINT))
-                random_sleep(&g.extra_rnd, 1);
+                __wt_sleep(0, rng(&g.extra_rnd) % (10 * WT_THOUSAND));
             else
                 random_sleep(&g.extra_rnd, 15);
         } else {

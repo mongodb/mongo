@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/asio/asio_session.h"
@@ -39,13 +14,15 @@
 
 #include <list>
 #include <map>
-#include <memory>
 #include <mutex>
+#include <source_location>
+#include <string>
 #include <vector>
 
 #include <poll.h>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace transport {
@@ -111,17 +88,48 @@ public:
     }
 
 private:
+    struct Caller {
+        std::source_location location;
+        std::string threadName;
+    };
+
+    class AuditedPromise {
+    public:
+        AuditedPromise() = default;
+        explicit AuditedPromise(Promise<void>);
+
+        /** Moves the underlying promise out of this object and return the promise. */
+        Promise<void> release(std::source_location location = std::source_location::current());
+
+        /** Sets the specified status as an error value on the underlying promise. */
+        void setError(Status status,
+                      std::source_location location = std::source_location::current());
+
+    private:
+        logv2::DynamicAttributes logAttributes(const Caller& previous, const Caller& current);
+
+        Promise<void> _promise;
+        boost::optional<Caller> _releaseCaller;
+        boost::optional<Caller> _setErrorCaller;
+    };
+
     struct Timer {
+        Timer() = default;
+        Timer(size_t id, Promise<void> promise);
+
         size_t id;  // Stores the unique identifier for the timer, provided by `ReactorTimer`.
-        Promise<void> promise;
         bool canceled = false;
+        AuditedPromise promise;
     };
 
     struct TransportSession {
+        TransportSession() = default;
+        TransportSession(int fd, short events, bool canceled, Promise<void> promise);
+
         int fd;
         short events;  // Events to consider while polling for this session (e.g., `POLLIN`).
         bool canceled = false;
-        Promise<void> promise;
+        AuditedPromise promise;
     };
 
     bool _cancelTimer(size_t timerId);

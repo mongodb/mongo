@@ -8,6 +8,7 @@ mongo_cc_library(
         "dist/astro.c",
         "dist/astro.h",
         "dist/dow.c",
+        "dist/duration.c",
         "dist/fallbackmap.h",
         "dist/interval.c",
         "dist/parse_date.c",

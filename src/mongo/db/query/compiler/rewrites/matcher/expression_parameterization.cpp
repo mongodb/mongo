@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 
@@ -103,10 +77,8 @@ void MatchExpressionParameterizationVisitor::visit(WhereMatchExpression* expr) {
     expr->setInputParamId(_context->nextInputParamId(expr));
 }
 
-void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
-    ComparisonMatchExpressionBase* expr) {
-    auto type = expr->getData().type();
-    switch (type) {
+bool isEligibleForComparisonAutoParameterization(const BSONElement& data) {
+    switch (data.type()) {
         case BSONType::minKey:
         case BSONType::eoo:
         case BSONType::null:
@@ -116,61 +88,44 @@ void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
         case BSONType::undefined:
         case BSONType::object:
         case BSONType::boolean:
-            break;
+            return false;
 
         case BSONType::string:
-            if (!expr->getData().str().empty()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+            return !data.str().empty();
         case BSONType::binData:
         case BSONType::oid:
         case BSONType::regEx:
         case BSONType::code:
         case BSONType::symbol:
         case BSONType::codeWScope:
-            expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            break;
+            return true;
         case BSONType::timestamp:
-            if (expr->getData().timestamp() != Timestamp::max() &&
-                expr->getData().timestamp() != Timestamp::min()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+            return data.timestamp() != Timestamp::max() && data.timestamp() != Timestamp::min();
         case BSONType::date:
-            if (expr->getData().Date() != Date_t::max() &&
-                expr->getData().Date() != Date_t::min()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+            return data.Date() != Date_t::max() && data.Date() != Date_t::min();
         case BSONType::numberInt:
-            if (expr->getData().numberInt() != std::numeric_limits<int>::max() &&
-                expr->getData().numberInt() != std::numeric_limits<int>::min()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+            return data.numberInt() != std::numeric_limits<int>::max() &&
+                data.numberInt() != std::numeric_limits<int>::min();
         case BSONType::numberLong:
-            if (expr->getData().numberLong() != std::numeric_limits<long long>::max() &&
-                expr->getData().numberLong() != std::numeric_limits<long long>::min()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+            return data.numberLong() != std::numeric_limits<long long>::max() &&
+                data.numberLong() != std::numeric_limits<long long>::min();
         case BSONType::numberDouble: {
-            auto doubleVal = expr->getData().numberDouble();
-            if (!std::isnan(doubleVal) && doubleVal != std::numeric_limits<double>::max() &&
+            auto doubleVal = data.numberDouble();
+            return !std::isnan(doubleVal) && doubleVal != std::numeric_limits<double>::max() &&
                 doubleVal != std::numeric_limits<double>::min() &&
                 doubleVal != std::numeric_limits<double>::infinity() &&
-                doubleVal != -std::numeric_limits<double>::infinity()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+                doubleVal != -std::numeric_limits<double>::infinity();
         }
         case BSONType::numberDecimal:
-            if (!expr->getData().numberDecimal().isNaN() &&
-                !expr->getData().numberDecimal().isInfinite()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
-            }
-            break;
+            return !data.numberDecimal().isNaN() && !data.numberDecimal().isInfinite();
+    }
+    MONGO_UNREACHABLE_TASSERT(13408005);
+}
+
+void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
+    ComparisonMatchExpressionBase* expr) {
+    if (isEligibleForComparisonAutoParameterization(expr->getData())) {
+        expr->setInputParamId(_context->nextReusableInputParamId(expr));
     }
 }
 

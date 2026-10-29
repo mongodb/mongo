@@ -57,6 +57,9 @@ class test_layered_config13(wttest.WiredTigerTestCase):
     uri = f"layered:{test_name}"
     uri_local = f"table:{test_name}local"
 
+    # Keep track of the timestamps this test uses.
+    timestamp = 0
+
     def wiredtiger_open(self, *args, **kwargs):
         os.makedirs(logdir, exist_ok=True)
         return super().wiredtiger_open(*args, **kwargs)
@@ -70,12 +73,16 @@ class test_layered_config13(wttest.WiredTigerTestCase):
 
         # Put data to tables with checkpoints to ensure that we generate some history.
         for value in ["aaa", "bbb", "ccc"]:
+            self.timestamp += 1
             cursor = self.session.open_cursor(self.uri, None, None)
+            self.session.begin_transaction()
             cursor["A"] = value
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(self.timestamp))
             cursor.close()
             cursor = self.session.open_cursor(self.uri_local, None, None)
             cursor["A"] = value
             cursor.close()
+            self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(self.timestamp))
             self.session.checkpoint()
 
         # Reopen the connection.

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,8 +12,11 @@
 #include "mongo/db/query/compiler/stats/collection_statistics.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -97,6 +74,13 @@ struct CollectionInfo {
 
     // Histogram-based statistics for fields in the collection.
     std::unique_ptr<stats::CollectionStatistics> collStats{nullptr};
+
+    // The collection's estimated data size in bytes, captured when COLLECTION_EXCEEDS_SCAN_BYTES
+    // or its dry-run variant is set, for use in dry-run/rejection LOGV2 logging.
+    long long maxEstimatedScanBytesCollectionSize{0};
+
+    // The configured maxEstimatedScanBytes threshold, captured alongside the above.
+    long long maxEstimatedScanBytesThreshold{0};
 };
 
 
@@ -114,7 +98,7 @@ struct TraversalPreference {
     std::string clusterField;
 };
 
-struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
+struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QueryPlannerParams {
     enum Options {
         // You probably want to set this.
         DEFAULT = 0,
@@ -199,6 +183,16 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         // Set this if you want the planner to generate a QSN that will be compatible with the
         // SBE stage builder.
         TARGET_SBE_STAGE_BUILDER = 1 << 14,
+
+        // Set when maxEstimatedScanBytes is enabled and the collection exceeds the configured
+        // threshold. The planner will refuse to output an unbounded COLLSCAN. Cleared by a
+        // $natural hint (command-level or PQS).
+        COLLECTION_EXCEEDS_SCAN_BYTES = 1 << 15,
+
+        // Set when maxEstimatedScanBytesDryRun is enabled. Alongside COLLECTION_EXCEEDS_SCAN_BYTES,
+        // causes the planner to log and count a would-be rejection instead of actually rejecting
+        // the query.
+        MAX_ESTIMATED_SCAN_BYTES_DRY_RUN = 1 << 16,
     };
 
     /**
@@ -236,8 +230,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         const MultipleCollectionAccessor& collections;
         size_t plannerOptions = DEFAULT;
         boost::optional<TraversalPreference> traversalPreference = boost::none;
-        bool cbrEnabled = false;
-        QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
+        QueryPlanRankerEnum planRanker = QueryPlanRankerEnum::kMixed;
+        bool alwaysFillOutCollectionInfo = false;
     };
 
     /**
@@ -285,8 +279,13 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     explicit QueryPlannerParams(ArgsForSingleCollectionQuery&& args)
         : providedOptions(args.plannerOptions),
           traversalPreference(std::move(args.traversalPreference)),
-          cbrEnabled(args.cbrEnabled),
-          planRankerMode(args.planRankerMode) {
+          planRanker(args.planRanker),
+          alwaysFillOutCollectionInfo(args.alwaysFillOutCollectionInfo) {
+        // TODO: SERVER-129697: Remove when the featureFlagCostBasedRanker is removed.
+        if (!feature_flags::gFeatureFlagCostBasedRanker.checkEnabled()) {
+            planRanker = QueryPlanRankerEnum::kMultiPlanner;
+            planRankerOverwriteReason = PlanRankerReason::kCBRFeatureFlagDisabled;
+        }
         mainCollectionInfo.options = args.plannerOptions;
         if (!args.collections.hasMainCollection()) {
             return;
@@ -295,14 +294,17 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         // histogramCE will cause queries to fail if the query contains a predicate on a field
         // without a histogram. We don't create histograms on internal collections. To prevent such
         // queries from failing, we use multiplanning in this case.
-        if (cbrEnabled && planRankerMode == QueryPlanRankerModeEnum::kHistogramCE &&
+        if (planRanker == QueryPlanRankerEnum::kCostBased &&
+            args.canonicalQuery.getExpCtx()->getQueryKnobConfiguration().getCBRCEMode() ==
+                QueryCBRCEModeEnum::kHistogramCE &&
             args.canonicalQuery.nss().dbName().isInternalDb()) {
-            cbrEnabled = false;
+            planRanker = QueryPlanRankerEnum::kMultiPlanner;
+            planRankerOverwriteReason = PlanRankerReason::kHistogramCEInternalColl;
         }
         fillOutPlannerParamsForExpressQuery(
             args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
         fillOutMainCollectionPlannerParams(
-            args.opCtx, args.canonicalQuery, args.collections, args.cbrEnabled);
+            args.opCtx, args.canonicalQuery, args.collections, isCBREnabled());
     }
 
     /**
@@ -333,6 +335,9 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
 
     explicit QueryPlannerParams(ArgsForTest&& args) {
         mainCollectionInfo.options = DEFAULT;
+        // ArgsForTest does not populate collStats or other CBR infrastructure, so CBR code
+        // paths must not be triggered.
+        planRanker = QueryPlanRankerEnum::kMultiPlanner;
     }
 
     QueryPlannerParams(const QueryPlannerParams&) = delete;
@@ -382,11 +387,6 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     // forcing a fetch.
     BSONObj shardKey;
 
-    // What's the max number of indexed solutions we want to output?  It's expensive to compare
-    // plans via the MultiPlanStage, and the set of possible plans is very large for certain
-    // index+query combinations.
-    size_t maxIndexedSolutions = internalQueryPlannerMaxIndexedSolutions.load();
-
     // Specifies the clusteredIndex information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
     boost::optional<ClusteredCollectionInfo> clusteredInfo = boost::none;
@@ -410,8 +410,36 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     // Were query settings applied?
     bool querySettingsApplied{false};
 
-    bool cbrEnabled{false};
-    QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
+    QueryPlanRankerEnum planRanker{QueryPlanRankerEnum::kMixed};
+
+    // Set when construction overwrites 'planRanker' to a value other than the one the
+    // internalQueryPlanRanker knob requested (feature flag off, histogramCE on an internal
+    // database). After such an overwrite the source of the knob's value is not recoverable from
+    // 'planRanker' alone, so the reason for the value change is recorded here and emitted as
+    // rankerChoice.reason V3 explain field.
+    boost::optional<PlanRankerReason> planRankerOverwriteReason;
+
+    /**
+     * The reason dictated by configuration alone, when configuration alone dictates the ranker
+     * choice. Three possible outcomes:
+     * - the overwrite reason if QueryPlannerParams constructor overrode the query knob,
+     * - kQueryPlanRankerKnob if the knob explicitly picked a ranker
+     * - none when the choice is deferred to a planning-time decision (mixed)
+     */
+    boost::optional<PlanRankerReason> getPlanRankerReasonFromConfig() const {
+        if (planRankerOverwriteReason) {
+            return planRankerOverwriteReason;
+        }
+        if (planRanker == QueryPlanRankerEnum::kMultiPlanner ||
+            planRanker == QueryPlanRankerEnum::kCostBased) {
+            return PlanRankerReason::kQueryPlanRankerKnob;
+        }
+        return boost::none;
+    }
+
+    bool isCBREnabled() const {
+        return planRanker != QueryPlanRankerEnum::kMultiPlanner;
+    }
 
     struct ReplanningData {
         std::string replanReason;
@@ -420,6 +448,12 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     };
     // Populated if we are replanning.
     boost::optional<ReplanningData> replanningData = boost::none;
+
+    // If true, the planner will always fill out collection info for the main collection, even if it
+    // is an _id hack query which would normally skip getting collection info from the catalog. This
+    // is used for the SbeSingleDocumentLookupExecutor which invokes the QueryPlanner on an _id hack
+    // eligible query but still expects the planner to construct a plan.
+    bool alwaysFillOutCollectionInfo = false;
 
 private:
     bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,
@@ -484,4 +518,15 @@ private:
 bool shouldWaitForOplogVisibility(OperationContext* opCtx,
                                   const CollectionPtr& collection,
                                   bool tailable);
+
+/**
+ * Converts catalog metadata for an index into an IndexEntry suitable for query planning. Performs
+ * index reads (multikey paths for wildcard indexes) and must not be called without storage engine
+ * access.
+ */
+IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                           const CollectionPtr& collection,
+                                           std::shared_ptr<const IndexCatalogEntry> ice,
+                                           const CanonicalQuery& canonicalQuery);
+
 }  // namespace mongo

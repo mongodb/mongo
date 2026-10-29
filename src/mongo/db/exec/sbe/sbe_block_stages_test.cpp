@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file contains tests for sbe::TsBlockToCellBlockStage and sbe::BlockToRowStage.
@@ -41,6 +15,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -53,8 +28,34 @@ using namespace std::literals::string_view_literals;
 class BlockStagesTest : public PlanStageTestFixture {
 protected:
     BSONObj compressBucket(const BSONObj& bucket) {
-        return *timeseries::compressBucket(bucket, /*timeFieldName*/ "time"sv, /*nss*/ {}, false)
+        return *timeseries::compressBucket(bucket, /*timeFieldName=*/"time"sv, /*nss=*/{}, false)
                     .compressedBucket;
+    }
+
+    // Compresses 'bucket' and then forces 'control.count' to 'count'. Compression always writes a
+    // 'control.count' matching the actual number of measurements, so this is the only way to build
+    // a compressed bucket whose count disagrees with its data columns.
+    BSONObj compressBucketWithExplicitCount(const BSONObj& bucket, int32_t count) {
+        const auto compressed = compressBucket(bucket);
+
+        BSONObjBuilder builder;
+        for (auto&& elem : compressed) {
+            if (elem.fieldNameStringData() != timeseries::kBucketControlFieldName) {
+                builder.append(elem);
+                continue;
+            }
+
+            BSONObjBuilder control(builder.subobjStart(timeseries::kBucketControlFieldName));
+            for (auto&& controlField : elem.Obj()) {
+                if (controlField.fieldNameStringData() !=
+                    timeseries::kBucketControlCountFieldName) {
+                    control.append(controlField);
+                }
+            }
+            control.append(timeseries::kBucketControlCountFieldName, count);
+        }
+
+        return builder.obj();
     }
 
     std::tuple<std::unique_ptr<PlanStage>, value::SlotVector /*outSlots*/> makeBlockToRow(
@@ -66,7 +67,7 @@ protected:
                                                       std::move(blockSlots),
                                                       outSlots,
                                                       bitsetSlotId,
-                                                      1 /*nodeId*/,
+                                                      /*nodeId=*/1,
                                                       getYieldPolicy());
         return {std::move(blockToRowStage), std::move(outSlots)};
     }
@@ -100,7 +101,7 @@ protected:
                                                              metaSlot,
                                                              bitmapSlot,
                                                              std::string{tsOptions.getTimeField()},
-                                                             1 /*nodeId*/);
+                                                             /*nodeId=*/1);
 
         return {std::move(tsBucketStage), std::move(blockSlots), bitmapSlot, metaSlot};
     }
@@ -317,7 +318,7 @@ TEST_F(BlockStagesTest, UnpackTwoBucketsWithSameSchemaMeasurements_Yield) {
                         cellPathsForBucketsWithSameSchemaMeasurements,
                         tsOptionsForBucketsWithSameSchemaMeasurements,
                         expectedDataForBucketsWithSameSchemaMeasurements,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 const auto compressedBucketsWithSameSchemaMeasurements =
@@ -337,7 +338,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_TwoBucketsWithSameSchemaMeasurements_Y
                         cellPathsForBucketsWithSameSchemaMeasurements,
                         tsOptionsForBucketsWithSameSchemaMeasurements,
                         expectedDataForBucketsWithSameSchemaMeasurements,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -379,7 +380,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithNoMeta_Yield) {
                         cellPathsForBucketWithNoMeta,
                         tsOptionsForBucketWithNoMeta,
                         expectedDataForBucketWithNoMeta,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithNoMeta) {
@@ -395,7 +396,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithNoMeta_Yield) {
                         cellPathsForBucketWithNoMeta,
                         tsOptionsForBucketWithNoMeta,
                         expectedDataForBucketWithNoMeta,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -439,7 +440,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithOneMissingField_Yield) {
                         cellPathsForBucketWithOneMissingField,
                         tsOptionsForBucketWithOneMissingField,
                         expectedDataForBucketWithOneMissingField,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField) {
@@ -455,13 +456,15 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField_Yield) {
                         cellPathsForBucketWithOneMissingField,
                         tsOptionsForBucketWithOneMissingField,
                         expectedDataForBucketWithOneMissingField,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 // Note that this data has the 'control.count' field. It facilitates testing the case where we
 // extract the number of measurements in a bucket directly from it when the bucket is compressed.
 // To make sure that we are not relying on the 'time' field to figure out the number of measurements
-// in a bucket, we have set the 'time' field to 4 elements array which is actually invalid data.
+// in a bucket, we have set the 'time' field to 4 elements array which is actually invalid data. The
+// tests below compress this bucket with 'compressBucketWithExplicitCount()' to keep the count at 3,
+// since compression on its own rewrites the count to match the 4 time elements.
 //
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
 // they are mandatory fields. This data is not valid timeseries data.
@@ -491,19 +494,21 @@ const auto expectedDataForBucketWithOneMissingFieldAndCount = std::vector{
 };
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount) {
-    runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingFieldAndCount)),
-                        cellPathsForBucketWithOneMissingFieldAndCount,
-                        tsOptionsForBucketWithOneMissingFieldAndCount,
-                        expectedDataForBucketWithOneMissingFieldAndCount);
+    runUnpackBucketTest(
+        BSON_ARRAY(compressBucketWithExplicitCount(bucketWithOneMissingFieldAndCount, 3)),
+        cellPathsForBucketWithOneMissingFieldAndCount,
+        tsOptionsForBucketWithOneMissingFieldAndCount,
+        expectedDataForBucketWithOneMissingFieldAndCount);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount_Yield) {
     // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
-    runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingFieldAndCount)),
-                        cellPathsForBucketWithOneMissingFieldAndCount,
-                        tsOptionsForBucketWithOneMissingFieldAndCount,
-                        expectedDataForBucketWithOneMissingFieldAndCount,
-                        /*yieldAfter*/ 1);
+    runUnpackBucketTest(
+        BSON_ARRAY(compressBucketWithExplicitCount(bucketWithOneMissingFieldAndCount, 3)),
+        cellPathsForBucketWithOneMissingFieldAndCount,
+        tsOptionsForBucketWithOneMissingFieldAndCount,
+        expectedDataForBucketWithOneMissingFieldAndCount,
+        /*yieldAfter=*/1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -552,7 +557,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithMultipleMissingFields_Yield) {
                         cellPathsForBucketWithMultipleMissingFields,
                         tsOptionsForBucketWithMultipleMissingFields,
                         expectedDataForBucketWithMultipleMissingFields,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithMultipleMissingFields) {
@@ -568,7 +573,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithMultipleMissingFields_Yield)
                         cellPathsForBucketWithMultipleMissingFields,
                         tsOptionsForBucketWithMultipleMissingFields,
                         expectedDataForBucketWithMultipleMissingFields,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -649,7 +654,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithArrayField_Yield) {
                         cellPathsForBucketWithArrayField,
                         tsOptionsForBucketWithArrayField,
                         expectedDataForBucketWithArrayField,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithArrayField) {
@@ -665,7 +670,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithArrayField_Yield) {
                         cellPathsForBucketWithArrayField,
                         tsOptionsForBucketWithArrayField,
                         expectedDataForBucketWithArrayField,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -718,7 +723,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithObjectField_Yield) {
                         cellPathsForBucketWithObjectField,
                         tsOptionsForBucketWithObjectField,
                         expectedDataForBucketWithObjectField,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField) {
@@ -734,7 +739,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField_Yield) {
                         cellPathsForBucketWithObjectField,
                         tsOptionsForBucketWithObjectField,
                         expectedDataForBucketWithObjectField,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 /*
@@ -818,7 +823,7 @@ void BlockStagesTest::testBlockToBitmap(
 
     // Run the test twice, once without yielding and once with yielding.
     iterateBlockAndAssert(false);
-    blockToRow->open(true /* reOpen */);
+    blockToRow->open(/*reOpen=*/true);
     iterateBlockAndAssert(true);
 }
 
@@ -908,7 +913,7 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
         obj->push_back_raw("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
         expected->push_back_raw(value::TypeTags::Object, valArg2);
     }
-    value::ValueGuard expectedGuard(tagExpected, valExpected);
+    value::TagValueOwned expectedArray = value::TagValueOwned::fromRaw(tagExpected, valExpected);
 
     testBlockToBitmap(blocks, {std::vector<bool>{true, true, true, true, true, true}}, *expected);
 }

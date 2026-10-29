@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/checked_cast.h"
@@ -36,7 +10,7 @@
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/assert_util.h"
@@ -2016,6 +1990,13 @@ int ocspClientCallback(SSL* ssl, void* arg) {
 
     auto response = UniqueOCSPResponse(d2i_OCSP_RESPONSE(NULL, &response_ptr, length));
 
+    if (response == nullptr) {
+        LOGV2_ERROR(12836200,
+                    "ocspClientCallback: Failed to decode OCSP response from DER format",
+                    "error"_attr = getSSLFailure("OCSP response decode failed."));
+        return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
+    }
+
     auto swStapleOK = verifyStapledResponse(ssl, peerCert.get(), response.get());
 
     // The swStapleOK object has three states. If the status returned by the function is
@@ -2266,7 +2247,7 @@ void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
             "OCSP Fetch and Staple",
             [this, sm = _manager->shared_from_this()](Client* client) { doPeriodicJob(); },
             getPeriodForStapleJob(swDurationInitial),
-            true /*isKillableByStepdown*/));
+            /*isKillableByStepdown=*/true));
 
     _ocspStaplingAnchor.start();
 }
@@ -3404,7 +3385,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
 
             if (X509_cmp_time(expiration, &threshold) < 0) {
                 int days = 0, secs = 0;
-                if (!ASN1_TIME_diff(&days, &secs, nullptr /* now */, expiration)) {
+                if (!ASN1_TIME_diff(&days, &secs, /*now=*/nullptr, expiration)) {
                     tlsEmitWarningExpiringClientCertificate(peerSubject);
                 } else {
                     tlsEmitWarningExpiringClientCertificate(peerSubject, Days(days));
@@ -3453,8 +3434,21 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         for (int i = 0; i < sanNamesList; i++) {
             const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
             if (currentName && currentName->type == GEN_DNS) {
-                std::string dnsName(
-                    reinterpret_cast<char*>(ASN1_STRING_data(currentName->d.dNSName)));
+                // Build the dNSName from its ASN.1 length, not as a C string: an IA5String may
+                // contain an embedded NUL that would truncate the name and spoof the match. Skip
+                // malformed entries (a real DNS name never contains a NUL).
+                const unsigned char* dnsNameData = ASN1_STRING_get0_data(currentName->d.dNSName);
+                const int dnsNameLen = ASN1_STRING_length(currentName->d.dNSName);
+                if (!dnsNameData || dnsNameLen < 0) {
+                    certificateNames << "<invalid SAN entry skipped>, ";
+                    continue;
+                }
+                std::string dnsName(reinterpret_cast<const char*>(dnsNameData),
+                                    static_cast<size_t>(dnsNameLen));
+                if (dnsName.find('\0') != std::string::npos) {
+                    certificateNames << "<invalid SAN entry skipped>, ";
+                    continue;
+                }
                 auto swCIDRDNSName = CIDR::parse(dnsName);
                 if (swCIDRDNSName.isOK()) {
                     LOGV2_WARNING(23237,

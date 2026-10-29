@@ -6,25 +6,23 @@ depending on the surrounding repo's tag layout while still exercising real
 ``git``.
 """
 
-import os
 import tempfile
 import unittest
-from typing import Optional
 from unittest import TestCase
 
 from git import Git, Repo
 from git.exc import GitCommandError
 from gitdb.exc import BadName
 
-from buildscripts.resmokelib.multiversion.previous_release_tag import find_previous_release_tag
+from buildscripts.resmokelib.multiversion.previous_release_tag import (
+    find_previous_release_tag,
+    is_at_or_descending_target,
+    list_release_tags,
+)
 
 
-def _commit(repo: Repo, message: str, filename: str = "f", content: Optional[str] = None) -> str:
+def _commit(repo: Repo, message: str) -> str:
     """Create a commit in ``repo`` and return its full SHA."""
-    path = os.path.join(repo.working_dir, filename)
-    with open(path, "a", encoding="utf-8") as fh:
-        fh.write(content if content is not None else message + "\n")
-    repo.index.add([filename])
     repo.index.commit(message)
     return repo.head.commit.hexsha
 
@@ -189,6 +187,79 @@ class TestPreReleaseVsRelease(_RepoCase):
         self.assertEqual(
             find_previous_release_tag("HEAD", repo_root=self.repo.working_dir), "r8.3.1"
         )
+
+
+class TestListReleaseTags(_RepoCase):
+    def test_lists_tags_newest_first_with_version_and_commit(self):
+        for tag in [
+            "r9.0.0",
+            "r9.1.0-rc1021",
+            "r9.0.0-rc1020",
+            "r9.0.1",
+            "r9.0.0-alpha0",
+            "r9.1.0-alpha0",
+        ]:
+            _commit(self.repo, "message")
+            self.repo.create_tag(tag)
+
+        tags = list_release_tags(repo_root=self.repo.working_dir)
+
+        self.assertEqual(
+            [(t.tag, t.version) for t in tags],
+            [
+                ("r9.1.0-rc1021", "9.1.0-rc1021"),
+                ("r9.1.0-alpha0", "9.1.0-alpha0"),
+                ("r9.0.1", "9.0.1"),
+                ("r9.0.0", "9.0.0"),
+                ("r9.0.0-rc1020", "9.0.0-rc1020"),
+                ("r9.0.0-alpha0", "9.0.0-alpha0"),
+            ],
+        )
+        # The commit is the tagged commit, not the tag object.
+        for tag in tags:
+            self.repo.commit(tag.tag)  # raises if unresolvable
+            self.assertEqual(tag.commit, self.repo.commit(tag.tag).hexsha)
+
+    def test_peels_annotated_tags_to_the_commit(self):
+        sha = _commit(self.repo, "c1")
+        self.repo.create_tag("r9.0.0-rc1020", ref=sha, message="annotated tag")
+
+        tags = list_release_tags(repo_root=self.repo.working_dir)
+
+        self.assertEqual(tags[0].commit, sha)
+
+    def test_pattern_narrows_the_search(self):
+        _commit(self.repo, "c1")
+        self.repo.create_tag("r8.0.0")
+        _commit(self.repo, "c2")
+        self.repo.create_tag("r9.0.0")
+
+        tags = list_release_tags(repo_root=self.repo.working_dir, pattern="r9.*.*")
+
+        self.assertEqual([t.tag for t in tags], ["r9.0.0"])
+
+
+class TestIsAtOrDescendingTarget(_RepoCase):
+    def test_target_itself_is_at(self):
+        sha = _commit(self.repo, "c1")
+        self.assertTrue(is_at_or_descending_target(sha, sha, repo_root=self.repo.working_dir))
+
+    def test_descendant_of_target_is_excluded(self):
+        sha = _commit(self.repo, "c1")
+        descendant = _commit(self.repo, "c2")
+        self.assertTrue(
+            is_at_or_descending_target(descendant, sha, repo_root=self.repo.working_dir)
+        )
+
+    def test_ancestor_of_target_is_kept(self):
+        sha = _commit(self.repo, "c1")
+        head = _commit(self.repo, "c2")
+        self.assertFalse(is_at_or_descending_target(sha, head, repo_root=self.repo.working_dir))
+
+    def test_defaults_to_head(self):
+        sha = _commit(self.repo, "c1")
+        self.repo.create_tag("r9.0.0-rc1020")
+        self.assertTrue(is_at_or_descending_target(sha, repo_root=self.repo.working_dir))
 
 
 if __name__ == "__main__":

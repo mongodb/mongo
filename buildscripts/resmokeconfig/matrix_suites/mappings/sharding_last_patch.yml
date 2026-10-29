@@ -1,0 +1,8 @@
+base_suite: sharding
+overrides:
+  - "multiversion.sharding_multiversion_selector"
+  - "multiversion.sharding_multiversion_testdata_last_patch"
+# Deliberately no `sharding_last_patch_excluded_files`: the last-lts list holds
+# cross-major-version incompatibilities (e.g. "re-enable now that 9.0 is last LTS"),
+# which do not apply to an upgrade within one release series. Add one here if a
+# genuine same-series incompatibility turns up.

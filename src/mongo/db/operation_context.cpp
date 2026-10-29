@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/operation_context.h"
@@ -124,6 +98,24 @@ void OperationContext::setDeadlineByDate(Date_t when, ErrorCodes::Error timeoutE
     setDeadlineAndMaxTime(when, computeMaxTimeFromDeadline(when), timeoutError);
 }
 
+void OperationContext::setMaxTimeFromTotalBudget(Microseconds total,
+                                                 ErrorCodes::Error timeoutError) {
+    if (total <= Microseconds::zero()) {
+        total = Microseconds::max();
+    }
+
+    if (total == Microseconds::max()) {
+        _deadline = Date_t::max();
+    } else {
+        auto& clock = fastClockSource();
+        _deadline = clock.now() + clock.getPrecision() + total - getElapsedTime();
+    }
+    // '_maxTime' holds the total budget (not the remaining time) so that
+    // 'getRemainingMaxTimeMicros()' does not double-count elapsed time.
+    _maxTime = total;
+    _timeoutError = timeoutError;
+}
+
 void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::Error timeoutError) {
     Date_t when;
     if (maxTime < Microseconds::zero()) {
@@ -190,18 +182,7 @@ void OperationContext::restoreMaxTimeMS() {
 
     auto maxTime = *_storedMaxTime;
     _storedMaxTime = boost::none;
-
-    if (maxTime <= Microseconds::zero()) {
-        maxTime = Microseconds::max();
-    }
-
-    if (maxTime == Microseconds::max()) {
-        _deadline = Date_t::max();
-    } else {
-        auto& clock = fastClockSource();
-        _deadline = clock.now() + clock.getPrecision() + maxTime - _elapsedTime.elapsed();
-    }
-    _maxTime = maxTime;
+    setMaxTimeFromTotalBudget(maxTime, _timeoutError);
 }
 
 namespace {

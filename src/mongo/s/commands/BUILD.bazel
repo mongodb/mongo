@@ -40,6 +40,22 @@ mongo_cc_library(
     ],
 )
 
+# Standalone helper with minimal prerequisites so it can be used from code that should not
+# otherwise need to depend on the router-role sharding libraries.
+mongo_cc_library(
+    name = "document_shard_key_query_conversion",
+    srcs = [
+        "document_shard_key_query_conversion.cpp",
+    ],
+    hdrs = [
+        "document_shard_key_query_conversion.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
 mongo_cc_library(
     name = "cluster_commands_common",
     srcs = [
@@ -50,6 +66,7 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_write_cmd.cpp",
     ],
     deps = [
+        ":document_shard_key_query_conversion",
         "//src/mongo/db:default_max_time_ms_cluster_parameter",
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:internal_transactions_feature_flag",
@@ -158,6 +175,7 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_aggregate_cmd_s.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_analyze_cmd.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_cmd_s.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_clear_join_plan_cache_cmd.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_count_cmd_s.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_current_op.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_distinct_cmd.cpp",
@@ -193,6 +211,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:cluster_server_parameter_commands_invocation",
         "//src/mongo/db/commands:core",
         "//src/mongo/db/commands:create_command",
+        "//src/mongo/db/commands:fsync_idl",
         "//src/mongo/db/commands:kill_common",
         "//src/mongo/db/commands:list_databases_command",
         "//src/mongo/db/commands:profile_common",
@@ -211,6 +230,8 @@ mongo_cc_library(
         "//src/mongo/db/commands/query_cmd:search_index_commands",
         "//src/mongo/db/ftdc:ftdc_server",
         "//src/mongo/db/matcher:expressions_mongod_only",
+        "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/memory_tracking:query_memory_load_shedding",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:map_reduce_output_format",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
@@ -322,6 +343,19 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "document_shard_key_query_conversion_test",
+    srcs = [
+        "document_shard_key_query_conversion_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":document_shard_key_query_conversion",
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "s_commands_test",
     srcs = [
         "document_shard_key_update_test.cpp",
@@ -330,6 +364,7 @@ mongo_cc_unit_test(
         "//src/mongo/s/commands/query_cmd:cluster_aggregate_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_bulk_write_uwe_test.cpp",
+        "//src/mongo/s/commands/query_cmd:cluster_count_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_delete_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_distinct_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_explain_test.cpp",

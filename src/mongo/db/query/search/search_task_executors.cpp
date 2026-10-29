@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/query/search/search_task_executors.h"
@@ -43,8 +17,12 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/synchronized_value.h"
+#include "mongo/util/timer.h"
 
 #include <memory>
 #include <string_view>
@@ -90,17 +68,16 @@ struct State {
 #endif
         } else {
             mongotExecutorNetworkInterface = makeNetworkInterface(
-                kMongotExecutorName, nullptr, nullptr, makeMongotConnPoolOptions());
+                kMongotExecutorName, {.connectionPoolOptions = makeMongotConnPoolOptions()});
 
             // Make a separate search index management NetworkInterface that's independently
             // configurable.
             ConnectionPool::Options searchIndexPoolOptions;
             searchIndexPoolOptions.skipAuthentication =
                 globalSearchIndexParams.skipAuthToSearchIndexServer;
-            searchIdxNetworkInterface = makeNetworkInterface(kSearchIndexManagementExecutorName,
-                                                             nullptr,
-                                                             nullptr,
-                                                             std::move(searchIndexPoolOptions));
+            searchIdxNetworkInterface =
+                makeNetworkInterface(kSearchIndexManagementExecutorName,
+                                     {.connectionPoolOptions = std::move(searchIndexPoolOptions)});
         }
 
         auto mongotThreadPool =
@@ -116,11 +93,19 @@ struct State {
 
     synchronized_value<std::shared_ptr<TaskExecutor>> mongotExecutor;
     synchronized_value<std::shared_ptr<TaskExecutor>> searchIndexMgmtExecutor;
+
+    // Set before shutdown-time cursor draining begins, so that no new search cursor (and therefore
+    // no new PinnedConnectionTaskExecutor) can be established during the whole shutdown window.
+    Atomic<bool> shuttingDown{false};
 };
 
 const auto getExecutorHolder = ServiceContext::declareDecoration<State>();
 
 Rarely _shutdownLogSampler;
+
+// Pauses shutdown after draining the PinnedConnectionTaskExecutors but before shutting down the
+// underlying executor. Used by tests to establish a cursor in that window and verify it is refused.
+MONGO_FAIL_POINT_DEFINE(pauseBeforeShuttingDownSearchTaskExecutor);
 
 void destroyTaskExecutor(synchronized_value<std::shared_ptr<TaskExecutor>>& executor) {
     // We have just shut down this TaskExecutor, so it should start rejecting all new requests and
@@ -137,7 +122,22 @@ void destroyTaskExecutor(synchronized_value<std::shared_ptr<TaskExecutor>>& exec
     // Tick the log sampler in advance to avoid logging immediately - only log if it's a long wait.
     _shutdownLogSampler.tick();
 
+    // Bound how long we wait for outstanding references (held by in-progress or idle search
+    // cursors) to be released; an unbounded wait can hang shutdown. If they outlive the timeout,
+    // proceed and let the executor be reclaimed once its remaining owners go away. A value of 0
+    // means wait forever.
+    const Milliseconds timeout{globalMongotParams.shutdownTimeoutMS.load()};
+    Timer timer;
+
     while (!weakReference.expired()) {
+        if (timeout > Milliseconds::zero() && timer.elapsed() >= timeout) {
+            LOGV2_WARNING(12984901,
+                          "Timed out waiting for the search task executor to be destroyed during "
+                          "shutdown; proceeding anyway. Outstanding references will be released "
+                          "when their owning operations or cursors complete.",
+                          "timeout"_attr = timeout);
+            return;
+        }
         if (_shutdownLogSampler.tick()) {
             LOGV2_INFO(11323800, "Waiting for search task executor to be destroyed.");
         }
@@ -152,6 +152,10 @@ void shutdownTaskExecutor(ServiceContext* svc,
         // The underlying TaskExecutor must outlive any PinnedConnectionTaskExecutor that uses it,
         // so we must drain PCTEs first and then shut down the executor.
         shutdownPinnedExecutors(svc, execPtr);
+        if (MONGO_unlikely(pauseBeforeShuttingDownSearchTaskExecutor.shouldFail())) {
+            LOGV2(13515400, "pausing at pauseBeforeShuttingDownSearchTaskExecutor fail point");
+            pauseBeforeShuttingDownSearchTaskExecutor.pauseWhileSet();
+        }
         execPtr->shutdown();
         execPtr->join();
     }
@@ -183,7 +187,7 @@ public:
             }
             {
                 BSONObjBuilder networkInterface = sub.subobjStart("networkInterface");
-                exec->appendNetworkInterfaceStats(networkInterface, true /*forServerStatus*/);
+                exec->appendNetworkInterfaceStats(networkInterface, /*forServerStatus=*/true);
             }
             {
                 BSONObjBuilder connectionPool = sub.subobjStart("connectionPool");
@@ -205,19 +209,27 @@ const auto& searchTaskExecutorSection =
 }  // namespace
 
 StatusWith<std::shared_ptr<TaskExecutor>> getMongotTaskExecutor(ServiceContext* svc) {
-    if (auto mongotExec = getExecutorHolder(svc).mongotExecutor.get()) {
-        return mongotExec;
+    auto& holder = getExecutorHolder(svc);
+    auto mongotExec = holder.mongotExecutor.get();
+    if (holder.shuttingDown.load() || !mongotExec) {
+        return {ErrorCodes::ShutdownInProgress, "mongot task executor is shutting down"};
     }
-    return {ErrorCodes::ShutdownInProgress, "mongot task executor is shutting down"};
+    return mongotExec;
 }
 
 StatusWith<std::shared_ptr<TaskExecutor>> getSearchIndexManagementTaskExecutor(
     ServiceContext* svc) {
-    if (auto indexMgmtExec = getExecutorHolder(svc).searchIndexMgmtExecutor.get()) {
-        return indexMgmtExec;
+    auto& holder = getExecutorHolder(svc);
+    auto indexMgmtExec = holder.searchIndexMgmtExecutor.get();
+    if (holder.shuttingDown.load() || !indexMgmtExec) {
+        return {ErrorCodes::ShutdownInProgress,
+                "search index management task executor is shutting down"};
     }
-    return {ErrorCodes::ShutdownInProgress,
-            "search index management task executor is shutting down"};
+    return indexMgmtExec;
+}
+
+void beginSearchExecutorShutdown(ServiceContext* svc) {
+    getExecutorHolder(svc).shuttingDown.store(true);
 }
 
 void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
@@ -235,6 +247,12 @@ void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
 
 void shutdownSearchExecutorsIfNeeded(ServiceContext* svc) {
     auto& state = getExecutorHolder(svc);
+
+    // New search cursors must already be rejected by the time we get here, so that no request can
+    // establish a cursor (and therefore a PCTE) against an executor we are about to shut down. Both
+    // mongod and mongos call beginSearchExecutorShutdown() before this.
+    invariant(state.shuttingDown.load());
+
     if (!globalMongotParams.host.empty()) {
         LOGV2_INFO(10026102, "Shutting down mongot task executor.");
         shutdownTaskExecutor(svc, state.mongotExecutor);

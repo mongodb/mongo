@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
 // @tags: [
+//   uses_explain,
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_fcv_81,
 // ]
@@ -78,7 +79,7 @@ assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 // Check that the DISTINCT_SCAN stage has the correct stats.
-let stage = getPlanStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN");
+let stage = getPlanStage(getWinningPlanFromExplain(explain), "DISTINCT_SCAN");
 assert.eq({a: 1}, stage.keyPattern);
 assert.eq("a_1", stage.indexName);
 assert.eq(false, stage.isMultiKey);

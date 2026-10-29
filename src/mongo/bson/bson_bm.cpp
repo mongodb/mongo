@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/status.h"
@@ -309,6 +283,32 @@ void BM_validate_contents(benchmark::State& state) {
     state.SetBytesProcessed(totalSize);
 }
 
+void BM_validateDepthForUserStorage(benchmark::State& state) {
+    auto arrayLen = state.range(0);
+    auto numFields = state.range(1);
+    auto nestingLimit = state.range(2);
+
+    BSONArrayBuilder builder;
+    size_t totalSize = 0;
+    for (auto i = 0; i < arrayLen; ++i) {
+        builder.append(buildDeepObj(i, numFields, nestingLimit));
+    }
+    BSONObj array = builder.done();
+
+    const auto& elem = array[0].Obj();
+    auto status = validateBSONDepthForUserStorage(elem);
+    if (!status.isOK())
+        LOGV2(10101801, "Depth validation failed", "elem"_attr = elem, "status"_attr = status);
+    invariant(status);
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(validateBSONDepthForUserStorage(array));
+        totalSize += array.objsize();
+    }
+    state.SetBytesProcessed(totalSize);
+}
+
 /**
  * Benchmark BSON validation for objects that have no nesting but many field names. The first range
  * argument (state.range(0)) indicates the number of wide objects to validate. The second range
@@ -374,6 +374,9 @@ BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kExtended)
 BENCHMARK_TEMPLATE(BM_validateObj, BSONValidateModeEnum::kFull)
     ->Ranges({{64, 512}, {10, 20}, {2, 5}})
     ->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_validateDepthForUserStorage)
+    ->Ranges({{1, 64}, {1, 32}, {1, 4}})
+    ->Unit(benchmark::kMicrosecond);
 
 void BM_objBuilderAppendInt(benchmark::State& state) {
     int n = state.range(0);
@@ -420,6 +423,62 @@ void BM_objBuilderAppendStreamedValue(benchmark::State& state) {
 BENCHMARK(BM_objBuilderAppendInt)->DenseRange(1, 8)->Range(9, 1 << 20);
 BENCHMARK(BM_objBuilderAppendIntStreamOperator)->DenseRange(1, 8)->Range(9, 1 << 20);
 BENCHMARK(BM_objBuilderAppendStreamedValue)->DenseRange(1, 8)->Range(9, 1 << 20);
+
+/**
+ * The BSONObjBuilder here is pre-populated with state.range(0) fields, and the object passed to
+ * appendElementsUnique() has the same number of fields, 'numOverlapping' of which have field names
+ * that already exist in the builder.
+ */
+void objBuilderAppendElementsUnique(benchmark::State& state, int numOverlapping) {
+    const int n = state.range(0);
+
+    auto makeFieldName = [](int i) {
+        return fmt::format("field_name_{}", i);
+    };
+
+    BSONObjBuilder existingBuilder;
+    for (int i = 0; i < n; ++i) {
+        existingBuilder.append(makeFieldName(i), i);
+    }
+    BSONObj existing = existingBuilder.obj();
+
+    // The first 'numOverlapping' field names of the merged object are shared with the existing
+    // object, the remaining ones are distinct from it.
+    BSONObjBuilder toMergeBuilder;
+    for (int i = 0; i < n; ++i) {
+        toMergeBuilder.append(makeFieldName(n - numOverlapping + i), i);
+    }
+    BSONObj toMerge = toMergeBuilder.obj();
+
+    int reps = 0;
+    for (auto _ : state) {
+        BSONObjBuilder bob;
+        bob.appendElements(existing);
+        bob.appendElementsUnique(toMerge);
+        benchmark::DoNotOptimize(bob.done());
+        ++reps;
+    }
+    state.SetItemsProcessed(int64_t{n} * reps);
+}
+
+// None of the fields of the merged object already exist in the builder.
+void BM_objBuilderAppendElementsUniqueNoneExisting(benchmark::State& state) {
+    objBuilderAppendElementsUnique(state, 0);
+}
+
+// Half of the fields of the merged object already exist in the builder.
+void BM_objBuilderAppendElementsUniqueHalfExisting(benchmark::State& state) {
+    objBuilderAppendElementsUnique(state, state.range(0) / 2);
+}
+
+// All fields of the merged object already exist in the builder.
+void BM_objBuilderAppendElementsUniqueAllExisting(benchmark::State& state) {
+    objBuilderAppendElementsUnique(state, state.range(0));
+}
+
+BENCHMARK(BM_objBuilderAppendElementsUniqueNoneExisting)->DenseRange(1, 8)->Range(9, 1 << 14);
+BENCHMARK(BM_objBuilderAppendElementsUniqueHalfExisting)->DenseRange(1, 8)->Range(9, 1 << 14);
+BENCHMARK(BM_objBuilderAppendElementsUniqueAllExisting)->DenseRange(1, 8)->Range(9, 1 << 14);
 
 }  // namespace
 }  // namespace mongo

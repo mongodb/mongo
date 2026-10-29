@@ -9,7 +9,7 @@ const classicConn = MongoRunner.runMongod({
     setParameter: {internalQueryFrameworkControl: "forceClassicEngine"},
 });
 const bpConn = MongoRunner.runMongod({
-    setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true},
+    setParameter: {featureFlagSbeFull: true},
 });
 
 assert.neq(null, classicConn, "classicConn mongod was unable to start up");

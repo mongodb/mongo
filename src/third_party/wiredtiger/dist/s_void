@@ -42,6 +42,7 @@ func_ok()
         -e '/int __curlog_reset$/d' \
         -e '/int __cursor_fix_implicit$/d' \
         -e '/int __delete_redo_window_cleanup_skip$/d' \
+        -e '/int __disagg_assert_no_active_writes_callback$/d' \
         -e '/int __gen_active_callback$/d' \
         -e '/int __gen_oldest_callback$/d' \
         -e '/int __handle_close_default$/d' \
@@ -75,7 +76,6 @@ func_ok()
         -e '/int __wt_block_compact_start$/d' \
         -e '/int __wt_block_disagg_manager_create$/d' \
         -e '/int __wt_block_manager_size$/d' \
-        -e '/int __wt_block_tiered_load$/d' \
         -e '/int __wt_block_write_size$/d' \
         -e '/int __wt_btcur_skip_page$/d' \
         -e '/int __wt_buf_catfmt$/d' \
@@ -152,11 +152,6 @@ func_ok()
         -e '/int demo_file_sync$/d' \
         -e '/int demo_fs_directory_list_free$/d' \
         -e '/int demo_fs_exist$/d' \
-        -e '/int dir_store_directory_list_free$/d' \
-        -e '/int dir_store_err$/d' \
-        -e '/int dir_store_file_lock$/d' \
-        -e '/int dir_store_file_sync$/d' \
-        -e '/int dir_store_fs_terminate$/d' \
         -e '/int enable_disagg$/d' \
         -e '/int error_handler$/d' \
         -e '/int fail_file_lock$/d' \
@@ -183,6 +178,7 @@ func_ok()
         -e '/int lz4_terminate$/d' \
         -e '/int main$/d' \
         -e '/int message_handler$/d' \
+        -e '/int node_run$/d' \
         -e '/int nop_decompress$/d' \
         -e '/int nop_decrypt$/d' \
         -e '/int nop_error$/d' \

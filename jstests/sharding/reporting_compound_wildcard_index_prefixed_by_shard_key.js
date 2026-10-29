@@ -14,6 +14,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 3,
+    // Disable the range deleter, since it can bump the counter beyond what the test expects
+    rs: {setParameter: {disableResumableRangeDeleter: true}},
 });
 
 const shardKeyPattern = {
@@ -72,5 +74,12 @@ assert.commandWorked(
 );
 checkLogAndServerStatusMetrics(st.shard1, 1, 2);
 checkLogAndServerStatusMetrics(st.shard2, 1, 1);
+
+// Re-enable the range deleter to allow orphan clean-up
+for (const shard of [st.shard0, st.shard1, st.shard2]) {
+    assert.commandWorked(
+        shard.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}),
+    );
+}
 
 st.stop();

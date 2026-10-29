@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
@@ -339,6 +313,64 @@ TEST(PathArraynessTest, FieldRefTooManyComponents) {
     ASSERT_EQ(pathArrayness.canPathBeArray(fieldRefLong, &expCtx), true);
 }
 
+// A durably-committed index can contain an over-deep dotted field name (more path components than
+// maxBSONDepth allows) if it was created with an elevated maxBSONDepth. addPathsFromIndexKeyPattern
+// must not throw on such a key pattern (which would crash the server on startup); it should skip
+// the offending path conservatively.
+TEST(PathArraynessTest, AddPathsFromIndexKeyPatternSkipsOverDeepFieldName) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
+    // Build a dotted field name with more components than the FieldPath limit of 200.
+    std::string overDeepField = "x";
+    for (int i = 0; i < BSONDepth::kDefaultMaxAllowableDepth + 10; ++i) {
+        overDeepField += ".x";
+    }
+
+    BSONObj keyPattern = BSON(overDeepField << 1);
+    MultikeyPaths multikeyPaths{MultikeyComponents{0U}};
+
+    PathArrayness pathArrayness;
+    auto initialState = pathArrayness.exportToMap_forTest();
+
+    // Must not throw even though the field name exceeds the FieldPath depth limit.
+    ASSERT_DOES_NOT_THROW(pathArrayness.addPathsFromIndexKeyPattern(
+        keyPattern, multikeyPaths, /*isFullRebuild=*/true));
+
+    // The over-deep path is skipped, so the trie is unchanged.
+    ASSERT_EQ(initialState, pathArrayness.exportToMap_forTest());
+
+    // Looking up the (absent) path conservatively reports it can be an array.
+    FieldRef overDeepRef(overDeepField);
+    ASSERT_EQ(pathArrayness.canPathBeArray(overDeepRef, &expCtx), true);
+}
+
+// A compound index that mixes a valid field with an over-deep field should still add the valid
+// field to the trie while skipping only the over-deep one.
+TEST(PathArraynessTest, AddPathsFromIndexKeyPatternSkipsOnlyOverDeepComponent) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
+    std::string overDeepField = "x";
+    for (int i = 0; i < BSONDepth::kDefaultMaxAllowableDepth + 10; ++i) {
+        overDeepField += ".x";
+    }
+
+    // Compound: {"a": 1, "<overDeep>": 1}. "a" is non-multikey (empty components).
+    BSONObj keyPattern = BSON("a" << 1 << overDeepField << 1);
+    MultikeyPaths multikeyPaths{MultikeyComponents{}, MultikeyComponents{0U}};
+
+    PathArrayness pathArrayness;
+    ASSERT_DOES_NOT_THROW(pathArrayness.addPathsFromIndexKeyPattern(
+        keyPattern, multikeyPaths, /*isFullRebuild=*/true));
+
+    auto state = pathArrayness.exportToMap_forTest();
+    // Only the valid "a" component was added.
+    ASSERT_EQ(state.size(), 1U);
+    ASSERT_EQ(state["a"], false);
+
+    FieldRef aRef("a");
+    ASSERT_EQ(pathArrayness.canPathBeArray(aRef, &expCtx), false);
+}
+
 // FieldRef allows any field name starting with $, but FieldPath only allows certain
 // dollar-prefixed fields (like "$ref", "$id", etc.). A field like "$invalidField" should fail
 // FieldPath validation.
@@ -542,7 +574,9 @@ protected:
 
     bool hasInvalidatedPaths() {
         return PathArrayness::getFirstInvalidatedPath(
-                   _expCtx.nonArrayPathsForNss(_expCtx.getNamespaceString()), _current)
+                   _expCtx.nonArrayPathsForNss(_expCtx.getNamespaceString()),
+                   _current,
+                   _expCtx.getNamespaceString())
             .has_value();
     }
 
@@ -717,8 +751,8 @@ TEST(PathArraynessInvalidation, SharedPathArraynessDoesNotLeakNonArrayPathsAcros
     current.addPath(FieldPath("b"), MultikeyComponents{0}, true);
     current.addPath(FieldPath("c"), MultikeyComponents{}, true);
 
-    ASSERT_FALSE(PathArrayness::getFirstInvalidatedPath(nonArrayPaths1, current).has_value());
-    ASSERT_TRUE(PathArrayness::getFirstInvalidatedPath(nonArrayPaths2, current).has_value());
+    ASSERT_FALSE(PathArrayness::getFirstInvalidatedPath(nonArrayPaths1, current, nss).has_value());
+    ASSERT_TRUE(PathArrayness::getFirstInvalidatedPath(nonArrayPaths2, current, nss).has_value());
 }
 
 TEST(ExpressionContextFieldRefOverload, InvalidEmptyPath) {

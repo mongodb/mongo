@@ -1,37 +1,8 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/cstdint.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/commands/query_cmd/bulk_write.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -45,7 +16,6 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/query_cmd/bulk_write.h"
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
@@ -123,7 +93,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
@@ -138,6 +108,7 @@
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -151,6 +122,12 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -745,22 +722,13 @@ bool handleGroupedInserts(OperationContext* opCtx,
     invariant(insertDocs.size() == numOps);
 
     // Handle FLE inserts.
-    if (nsEntry.getEncryptionInformation().has_value()) {
-        {
-            // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-            std::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+    if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+        auto processed = attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
+        if (processed) {
+            responses.addInsertReplies(opCtx, firstOpIdx, out);
+            return out.canContinue;
         }
-
-        if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
-            auto processed =
-                attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
-            if (processed) {
-                responses.addInsertReplies(opCtx, firstOpIdx, out);
-                return out.canContinue;
-            }
-            // Fallthrough to standard inserts.
-        }
+        // Fallthrough to standard inserts.
     }
 
     // Create nested CurOp for insert.
@@ -821,8 +789,10 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
         auto stmtId = opCtx->isRetryableWrite() ? bulk_write_common::getStatementId(req, idx)
                                                 : kUninitializedStmtId;
-        const bool wasAlreadyExecuted =
-            opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId);
+        const auto timestampIfAlreadyExecuted = opCtx->isRetryableWrite()
+            ? txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)
+            : boost::none;
+        const bool wasAlreadyExecuted = bool(timestampIfAlreadyExecuted);
 
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -871,8 +841,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
                                                               ex,
                                                               nsString,
                                                               req.getOrdered(),
-                                                              false /* isMultiUpdate */,
-                                                              boost::none /* sampleId */,
+                                                              /*isMultiUpdate=*/false,
+                                                              /*sampleId=*/boost::none,
                                                               &out);
             }
             if (!out.canContinue) {
@@ -880,6 +850,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
             }
         } else if (wasAlreadyExecuted) {
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - *timestampIfAlreadyExecuted);
 
             SingleWriteResult res;
             res.setN(1);
@@ -1086,15 +1058,8 @@ bool handleDeleteOp(OperationContext* opCtx,
         validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE deletes.
-        if (nsEntry.getEncryptionInformation().has_value()) {
-            {
-                std::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
-                return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
-            }
+        if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+            return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
         // Non-FLE deletes (including timeseries deletes) will be handled by
@@ -1102,8 +1067,11 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+            if (auto alreadyExecutedTimestamp =
+                    txnParticipant.checkStatementExecutedAndGetWallClockTime(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                    opCtx->fastClockSource().now() - *alreadyExecutedTimestamp);
                 // Since multi:true is not allowed with retryable writes if the statement was
                 // executed there will always be 1 document deleted.
                 responses.addDeleteReply(
@@ -1268,7 +1236,7 @@ void explainDeleteOp(OperationContext* opCtx,
     write_ops_exec::explainDelete(
         opCtx,
         deleteRequest,
-        nullptr /* deleteOp */,  // null while bulkWrite query stats unsupported
+        /*deleteOp=*/nullptr,  // null while bulkWrite query stats unsupported
         isTimeseriesLogicalRequest,
         req.getSerializationContext(),
         command,
@@ -1495,15 +1463,14 @@ public:
 
             if (replies.size() == 0 || bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
                 // Skip cursor creation and return the simplest reply.
-                auto reply =
-                    BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                                              0 /* cursorId */, {} /* firstBatch */, cursorNss),
-                                          summaryFields.nErrors,
-                                          summaryFields.nInserted,
-                                          summaryFields.nMatched,
-                                          summaryFields.nModified,
-                                          summaryFields.nUpserted,
-                                          summaryFields.nDeleted);
+                auto reply = BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                                       /*id=*/0, /*firstBatch=*/{}, cursorNss),
+                                                   summaryFields.nErrors,
+                                                   summaryFields.nInserted,
+                                                   summaryFields.nMatched,
+                                                   summaryFields.nModified,
+                                                   summaryFields.nUpserted,
+                                                   summaryFields.nDeleted);
 
                 if (!retriedStmtIds.empty()) {
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
@@ -1668,16 +1635,9 @@ bool handleUpdateOp(OperationContext* opCtx,
         validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE updates.
-        if (nsEntry.getEncryptionInformation().has_value()) {
-            {
-                std::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
-                // Map to processFLEUpdate.
-                return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
-            }
+        if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+            // Map to processFLEUpdate.
+            return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
         const auto [preConditions, isTimeseriesLogicalRequest] =
@@ -1710,6 +1670,8 @@ bool handleUpdateOp(OperationContext* opCtx,
             if (auto entry =
                     txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                    opCtx->fastClockSource().now() - entry->getWallClockTime());
 
                 auto [numMatched, numDocsModified, upserted] =
                     getRetryResultForUpdate(opCtx, nsString, op, entry);
@@ -1867,6 +1829,11 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     size_t idx = 0;
 
+    // Increment the total number of retryable commands. Retried commands are counted by the below
+    // hook.
+    if (opCtx->isRetryableWrite()) {
+        RetryableWritesStats::get(opCtx)->incrementRetryableCommandsCount();
+    }
     ON_BLOCK_EXIT([&] {
         // If any statements were retried then increment command counter.
         write_ops_exec::updateRetryStats(opCtx, !responses.getRetriedStmtIds().empty());
@@ -1876,20 +1843,16 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         std::any_of(req.getNsInfo().begin(), req.getNsInfo().end(), [](const auto& nsInfo) {
             return nsInfo.getEncryptionInformation().has_value();
         });
-
-    if (hasEncryptionInformation) {
-        uassert(ErrorCodes::BadValue,
-                "BulkWrite with Queryable Encryption supports only a single namespace.",
-                req.getNsInfo().size() == 1);
-    }
+    uassert(ErrorCodes::BadValue,
+            "BulkWrite with Queryable Encryption supports only a single namespace.",
+            !hasEncryptionInformation || req.getNsInfo().size() == 1);
+    const bool fleCrudProcessed = hasEncryptionInformation &&
+        !prepareForFLERewrite(opCtx, req.getNsInfo()[0].getEncryptionInformation());
 
     const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
     DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
         opCtx, bypassDocumentValidation);
 
-    const auto& firstNsInfo = req.getNsInfo()[0];
-    const bool fleCrudProcessed = write_ops_exec::getFleCrudProcessed(
-        opCtx, firstNsInfo.getEncryptionInformation(), firstNsInfo.getNs().dbName().tenantId());
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, bypassDocumentValidation, fleCrudProcessed);
 

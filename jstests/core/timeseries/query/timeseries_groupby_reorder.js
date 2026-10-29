@@ -383,6 +383,41 @@ coll.drop();
     );
 })();
 
+// Test $size directly (not via the $count rewrite) on a meta field that holds an array. This
+// exercises the SBE $size expression independent of the bucket compression/version rewrite.
+(function testGroupKey_WithSizeOnMetaField() {
+    const t = new Date();
+    const docs = [
+        {time: t, myMeta: ["a", "b"], val: 3},
+        {time: t, myMeta: ["a"], val: 4},
+        {time: t, myMeta: ["a", "b", "c"], val: 5},
+    ];
+    runGroupRewriteTest(
+        coll,
+        docs,
+        [{$group: {_id: null, x: {$sum: {$size: "$myMeta"}}}}],
+        [{"_id": null, "x": 2 + 1 + 3}],
+        true /* excludeMeta */,
+    );
+})();
+
+// Test $size directly on a measurement field that holds an array, grouped by meta. This exercises
+// the SBE $size expression on unpacked measurement data.
+(function testMetaGroupKey_WithSizeOnMeasurementField() {
+    const t = new Date();
+    const docs = [
+        {time: t, myMeta: 1, readings: [1, 2]},
+        {time: t, myMeta: 3, readings: [1]},
+        {time: t, myMeta: 1, readings: [1, 2, 3]},
+    ];
+    runGroupRewriteTest(
+        coll,
+        docs,
+        [{$group: {_id: "$myMeta", x: {$sum: {$size: "$readings"}}}}, {$match: {_id: 1}}],
+        [{"_id": 1, "x": 2 + 3}],
+    );
+})();
+
 // Test with a constant group key with the $count accumulator when there is no metaField. The
 // rewrite should apply.
 (function testConstGroupKey_WithCountAccumulator_NoMetaField() {

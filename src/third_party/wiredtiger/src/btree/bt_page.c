@@ -24,8 +24,8 @@ static int __inmem_row_leaf_entries(WT_SESSION_IMPL *, const WT_PAGE_HEADER *, u
  *     older duplicates are discarded.
  */
 static int
-__page_find_min_delta_int(WT_SESSION_IMPL *session, WTI_DELTA_INT_MERGE_STATE s[], int32_t *min_d,
-  int32_t delta_count, WT_PAGE_HEADER *base_page_header)
+__page_find_min_delta_int(
+  WT_SESSION_IMPL *session, WTI_DELTA_INT_MERGE_STATE s[], int32_t *min_d, int32_t delta_count)
 {
     WT_ITEM cur_key, min_key;
     int32_t j;
@@ -47,7 +47,7 @@ __page_find_min_delta_int(WT_SESSION_IMPL *session, WTI_DELTA_INT_MERGE_STATE s[
          * skip decoding and compare against the already-decoded key.
          */
         if (!s[i].unpacked)
-            WT_CELL_DELTA_INT_UNPACK(session, base_page_header, &s[i]);
+            WT_CELL_DELTA_INT_UNPACK(session, &s[i]);
 
         if (j == -1) {
             j = i;
@@ -190,7 +190,7 @@ __page_init_base_leaf_merge_state(
   WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE_HEADER *base_dsk, WTI_BASE_LEAF_MERGE_STATE *s)
 {
     s->entries = base_dsk->u.entries;
-    s->cell = WT_PAGE_HEADER_BYTE(btree, base_dsk);
+    s->cell = WT_PAGE_HEADER_READ_BYTE(session, btree, base_dsk);
     s->unpacked = false;
     s->empty_value_cell = false;
 
@@ -222,17 +222,23 @@ __page_init_delta_leaf_merge_state(WT_SESSION_IMPL *session, WT_BTREE *btree, WT
   size_t delta_size, WTI_DELTA_LEAF_MERGE_STATE **sp)
 {
     WTI_DELTA_LEAF_MERGE_STATE *s = NULL;
+
     WT_RET(__wt_calloc_def(session, delta_size, &s));
+
+    /*
+     * Publish the array before initializing its entries: if a per-entry allocation fails part-way
+     * through the loop, the caller's cleanup must be able to reach the entries already initialized.
+     */
+    *sp = s;
 
     for (size_t i = 0; i < delta_size; i++) {
         WT_PAGE_HEADER *tmp = (WT_PAGE_HEADER *)deltas[i].data;
-        s[i].cell = WT_PAGE_HEADER_BYTE(btree, tmp);
+        s[i].cell = WT_PAGE_HEADER_READ_BYTE(session, btree, tmp);
         s[i].entries = tmp->u.entries;
         s[i].unpacked = false;
         WT_RET(__wt_scr_alloc(session, 0, &s[i].current_key));
         WT_RET(__wt_calloc_one(session, &s[i].unpack));
     }
-    *sp = s;
 
     return (0);
 }
@@ -246,16 +252,29 @@ __page_free_delta_leaf_merge_state(
   WT_SESSION_IMPL *session, size_t delta_size, WTI_DELTA_LEAF_MERGE_STATE **sp)
 {
     WTI_DELTA_LEAF_MERGE_STATE *s = *sp;
+
+    /*
+     * Initialization can fail before the array is allocated, leaving it NULL with nothing to
+     * release. Entries the allocation did not initialize are zero-filled, so releasing them is a
+     * no-op.
+     */
+    if (s == NULL)
+        return;
+
     for (size_t i = 0; i < delta_size; i++) {
         __wt_scr_free(session, &s[i].current_key);
         __wt_free(session, s[i].unpack);
     }
     __wt_free(session, s);
+    *sp = NULL;
 }
 
 /*
  * __time_window_clear_obsolete --
- *     Where possible modify time window values to avoid writing obsolete values to the cell.
+ *     Clear a globally visible start from a value's time window to avoid writing obsolete values to
+ *     the cell. A globally visible stop is not handled here: the caller drops the whole cell in
+ *     that case, so it is never packed, and never clearing a stop means we cannot leave a live
+ *     start above a zeroed stop.
  */
 static WT_INLINE void
 __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
@@ -264,28 +283,12 @@ __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
     if (WT_TIME_WINDOW_IS_EMPTY(tw))
         return;
 
-    /*
-     * Check if the start of the time window is globally visible, and if so remove unnecessary
-     * values.
-     */
     if (__wt_txn_tw_start_visible_all(session, tw)) {
         /* The durable timestamp should never be less than the start timestamp. */
         WT_ASSERT(session, tw->start_ts <= tw->durable_start_ts);
 
         tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
         tw->start_txn = WT_TXN_NONE;
-    }
-
-    /*
-     * Check if the stop of the time window is globally visible, and if so remove unnecessary
-     * values.
-     */
-    if (__wt_txn_tw_stop_visible_all(session, tw)) {
-        /* The durable timestamp should never be less than the stop timestamp. */
-        WT_ASSERT(session, tw->stop_ts <= tw->durable_stop_ts);
-
-        tw->stop_ts = tw->durable_stop_ts = WT_TS_NONE;
-        tw->stop_txn = WT_TXN_NONE;
     }
 }
 
@@ -297,7 +300,7 @@ static int
 __page_init_dsk_leaf_merge_state(
   WT_SESSION_IMPL *session, WT_BTREE *btree, WT_ITEM *new_image, WTI_DISK_LEAF_MERGE_STATE *s)
 {
-    s->cell_ptr = WT_PAGE_HEADER_BYTE(btree, new_image->mem);
+    s->cell_ptr = WT_PAGE_HEADER_WRITE_BYTE(btree, new_image->mem);
     s->all_empty_value = true;
     s->any_empty_value = false;
     s->entries = 0;
@@ -370,21 +373,31 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
             WT_ERR(__wt_compare(
               session, btree->collator, base_state.current_key, delta_state[j].current_key, &cmp));
 
-        /* Build disk image */
+        /*
+         * Build the disk image. A key whose stop is globally visible is a globally visible delete
+         * that no reader can see, so skip materializing it. Only a real value cell carries a stop:
+         * an empty-value cell has no value cell and, by construction, an empty time window (a live
+         * zero-length value), so it is never a delete and its unpack_value time window is not its
+         * own -- never test it for a stop.
+         */
         if (cmp < 0) {
-            __time_window_clear_obsolete(session, &base_state.unpack_value->tw);
-            /* Pack row-leaf base key/value. */
-            WT_ERR(__wt_cell_pack_leaf_kv(session, base_state.empty_value_cell,
-              base_state.current_key->data, base_state.current_key->size,
-              base_state.unpack_value->data, base_state.unpack_value->size,
-              &base_state.unpack_value->tw, new_image, &disk_s));
+            if (base_state.empty_value_cell ||
+              !__wt_txn_tw_stop_visible_all(session, &base_state.unpack_value->tw)) {
+                __time_window_clear_obsolete(session, &base_state.unpack_value->tw);
+                /* Pack row-leaf base key/value. */
+                WT_ERR(__wt_cell_pack_leaf_kv(session, base_state.empty_value_cell,
+                  base_state.current_key->data, base_state.current_key->size,
+                  base_state.unpack_value->data, base_state.unpack_value->size,
+                  &base_state.unpack_value->tw, new_image, &disk_s));
 
 #ifdef HAVE_DIAGNOSTIC
-            WT_TIME_AGGREGATE_UPDATE(session, ta, &base_state.unpack_value->tw);
+                WT_TIME_AGGREGATE_UPDATE(session, ta, &base_state.unpack_value->tw);
 #endif
+            }
         } else {
-            /* Pack row-leaf delta entry. */
-            if (!F_ISSET(delta_state[j].unpack, WT_DELTA_LEAF_IS_DELETE)) {
+            /* Pack row-leaf delta entry, dropping globally visible deletes. */
+            if (!F_ISSET(delta_state[j].unpack, WT_DELTA_LEAF_IS_DELETE) &&
+              !__wt_txn_tw_stop_visible_all(session, &delta_state[j].unpack->delta_value.tw)) {
                 __time_window_clear_obsolete(session, &delta_state[j].unpack->delta_value.tw);
                 WT_ERR(__wt_cell_pack_leaf_kv(session,
                   delta_state[j].unpack->delta_value_data.size == 0 &&
@@ -437,10 +450,16 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
     dsk->type = WT_PAGE_ROW_LEAF;
     dsk->flags = 0;
 
-    if (disk_s.all_empty_value)
-        F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
-    if (!disk_s.any_empty_value)
-        F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
+    /*
+     * The all-empty and no-empty value flags are mutually exclusive; with no entries both would be
+     * set vacuously (an invalid combination), so only set them when the page has values.
+     */
+    if (disk_s.entries != 0) {
+        if (disk_s.all_empty_value)
+            F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
+        if (!disk_s.any_empty_value)
+            F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
+    }
 
     /* Compute final on-disk image size using pointer difference. */
     new_image->size = WT_PTRDIFF(disk_s.cell_ptr, new_image->mem);
@@ -451,8 +470,7 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
     dsk->reserved = 0;
     dsk->version = WT_PAGE_VERSION_TS;
 
-    /* Clear the memory owned by the block manager. */
-    memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
+    btree->bm->block_header_init(btree->bm, session, dsk);
 
 err:
     __wt_scr_free(session, &disk_s.last_key);
@@ -512,7 +530,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
      * pointer, delivering the next pair.
      */
     base_state.dsk = base_image_header;
-    base_state.cell = WT_PAGE_HEADER_BYTE(btree, base_image_header);
+    base_state.cell = WT_PAGE_HEADER_READ_BYTE(session, btree, base_image_header);
     base_state.entries = base_image_header->u.entries;
     base_state.unpacked = false;
 
@@ -529,7 +547,9 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     WT_RET(__wt_calloc_def(session, delta_size, &delta_state));
     for (size_t i = 0; i < delta_size; ++i) {
         WT_PAGE_HEADER *dhdr = (WT_PAGE_HEADER *)deltas[i].data;
-        delta_state[i].cell = WT_PAGE_HEADER_BYTE(btree, dhdr);
+        delta_state[i].base_dsk = base_image_header;
+        delta_state[i].delta_dsk = dhdr;
+        delta_state[i].cell = WT_PAGE_HEADER_READ_BYTE(session, btree, dhdr);
         delta_state[i].entries = dhdr->u.entries;
         delta_state[i].unpacked = false;
     }
@@ -543,7 +563,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
      */
     WT_CELL_BASE_INT_UNPACK(session, &base_state);
 
-    cell_ptr = WT_PAGE_HEADER_BYTE(btree, new_image->data);
+    cell_ptr = WT_PAGE_HEADER_WRITE_BYTE(btree, new_image->data);
     /*
      * Initialize the size here since the cell packing function uses it to calculate where to begin
      * writing the first packed key and value data.
@@ -593,8 +613,7 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     for (;;) {
         /* Find the minimum delta entry only when needed. */
         if (j == -1)
-            WT_ERR(__page_find_min_delta_int(
-              session, delta_state, &j, (int32_t)delta_size, base_image_header));
+            WT_ERR(__page_find_min_delta_int(session, delta_state, &j, (int32_t)delta_size));
 
         /* Check if both base and all deltas are exhausted. */
         if (base_state.entries == 0 && j == -1)
@@ -677,6 +696,8 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     hdr->type = WT_PAGE_ROW_INT;
     hdr->reserved = 0;
     hdr->version = WT_PAGE_VERSION_TS;
+
+    btree->bm->block_header_init(btree->bm, session, hdr);
 
 err:
     __wt_free(session, delta_state);
@@ -946,10 +967,18 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
      * error.
      */
     WT_UNUSED(btree);
-    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_READONLY));
+    WT_ASSERT(session, !F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY));
 
     /* We don't handle in-memory prepare resolution here. */
-    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_IN_MEMORY));
+    WT_ASSERT(session, !__wt_btree_stays_in_memory(btree));
+
+    /*
+     * The prepared updates are already on disk, so the page must not end up dirty. The modify path
+     * would otherwise dirty the page and the tree; flag the page so it stays clean. The page isn't
+     * yet reachable by other threads, so the flag needs no synchronization.
+     */
+    WT_RET(__wt_page_modify_init(session, page));
+    F_SET(page->modify, WT_PAGE_MODIFY_INSTANTIATING);
 
     __wt_btcur_init(session, &cbt);
     __wt_btcur_open(&cbt);
@@ -1012,16 +1041,15 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
         }
     }
 
-    /*
-     * The data is written to the disk so we can mark the page clean after re-instantiating prepared
-     * updates to avoid reconciling the page every time.
-     */
-    __wt_page_modify_clear(session, page);
-
     if (0) {
 err:
         __wt_free_update_list(session, &upd);
     }
+    F_CLR(page->modify, WT_PAGE_MODIFY_INSTANTIATING);
+
+    /* The page with re-instantiated prepared updates should be clean. */
+    WT_ASSERT(session, !__wt_page_is_modified(page));
+
     WT_TRET(__wt_btcur_close(&cbt, true));
     __wt_scr_free(session, &value);
     return (ret);
@@ -1065,6 +1093,28 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
 
     dsk = image;
     alloc_entries = 0;
+
+    /*
+     * Eviction trusts the reference's internal/leaf flag, taken from the parent's address cell.
+     * Reject a mismatch before parsing in the cell walks below.
+     */
+    if (ref != NULL && !__wt_ref_type_matches_page(ref, dsk->type)) {
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+        if (!__wt_ref_type_mismatch_returns_error(session))
+            WT_RET_PANIC(session, WT_ERROR, "page type does not match reference type");
+        WT_RET_MSG(session, WT_ERROR, "page type does not match reference type");
+    }
+
+    /*
+     * The reference only distinguishes internal from leaf, so a cross-format page can slip past the
+     * check above and be misread through the wrong page union. Check the tree's format too.
+     */
+    if (!__wt_page_type_matches_btree(S2BT(session), dsk->type)) {
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+        if (!__wt_ref_type_mismatch_returns_error(session))
+            WT_RET_PANIC(session, WT_ERROR, "page type does not belong in this tree");
+        WT_RET_MSG(session, WT_ERROR, "page type does not belong in this tree");
+    }
 
     /*
      * Figure out how many underlying objects the page references so we can allocate them along with
@@ -1212,6 +1262,24 @@ err:
 }
 
 /*
+ * __inmem_deleted_ref_should_dirty_parent --
+ *     Return whether rebuilding deleted references should dirty their internal page.
+ */
+static WT_INLINE bool
+__inmem_deleted_ref_should_dirty_parent(WT_SESSION_IMPL *session)
+{
+    /*
+     * Checkpoint cleanup examines each deleted child after reading a disaggregated page and dirties
+     * the parent if any child can be removed. Other trees and readers retain the existing behavior.
+     * FIXME-WT-18564: local block manager trees rely on this dirtying to reclaim the blocks of
+     * deleted children, so the suppression cannot extend to them until that path is covered.
+     */
+    return (S2BT(session)->modified &&
+      (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) ||
+        session != S2C(session)->cc_cleanup.session));
+}
+
+/*
  * __inmem_col_int_init_ref --
  *     Initialize one ref in a column-store internal page.
  */
@@ -1219,10 +1287,6 @@ static int
 __inmem_col_int_init_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *home, uint32_t hint,
   void *addr, uint64_t recno, bool internal, bool deleted, WT_PAGE_DELETED *page_del)
 {
-    WT_BTREE *btree;
-
-    btree = S2BT(session);
-
     __wt_tsan_suppress_store_wt_page_ptr_v(&ref->home, home);
     ref->pindex_hint = hint;
     ref->addr = addr;
@@ -1243,12 +1307,7 @@ __inmem_col_int_init_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *home, u
         }
         WT_REF_SET_STATE(ref, WT_REF_DELETED);
 
-        /*
-         * If the tree is already dirty and so will be written, mark the page dirty. (We want to
-         * free the deleted pages, but if the handle is read-only or if the application never
-         * modifies the tree, we're not able to do so.)
-         */
-        if (btree->modified) {
+        if (__inmem_deleted_ref_should_dirty_parent(session)) {
             WT_RET(__wt_page_modify_init(session, home));
             __wt_page_only_modify_set(session, home);
         }
@@ -1387,7 +1446,8 @@ __inmem_col_var(
         }
 
         /* If we find a prepare, we'll have to instantiate it in the update chain later. */
-        if (!F_ISSET(btree, WT_BTREE_READONLY) && WT_TIME_WINDOW_HAS_PREPARE(&(unpack.tw)))
+        if (!F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) &&
+          WT_TIME_WINDOW_HAS_PREPARE(&(unpack.tw)))
             instantiate_upd = true;
 
         indx++;
@@ -1408,7 +1468,6 @@ __inmem_col_var(
 static int
 __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 {
-    WT_BTREE *btree;
     WT_CELL_UNPACK_ADDR unpack;
     WT_DECL_ITEM(current);
     WT_DECL_RET;
@@ -1416,8 +1475,6 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
     WT_REF *ref, **refp;
     uint32_t hint;
     bool overflow_keys;
-
-    btree = S2BT(session);
 
     WT_RET(__wt_scr_alloc(session, 0, &current));
 
@@ -1431,7 +1488,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
     hint = 0;
     WT_CELL_FOREACH_ADDR (session, page->dsk, unpack) {
         ref = *refp;
-        ref->home = page;
+        __wt_atomic_store_ptr_relaxed(&ref->home, page);
         ref->pindex_hint = hint++;
 
         switch (unpack.type) {
@@ -1477,12 +1534,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
             }
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
 
-            /*
-             * If the tree is already dirty and so will be written, mark the page dirty. (We want to
-             * free the deleted pages, but if the handle is read-only or if the application never
-             * modifies the tree, we're not able to do so.)
-             */
-            if (btree->modified) {
+            if (__inmem_deleted_ref_should_dirty_parent(session)) {
                 WT_ERR(__wt_page_modify_init(session, page));
                 __wt_page_only_modify_set(session, page);
             }
@@ -1686,7 +1738,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *instantiate_updp
         }
 
         /* If we find a prepare, we'll have to instantiate it in the update chain later. */
-        if (!F_ISSET(btree, WT_BTREE_READONLY) && WT_TIME_WINDOW_HAS_PREPARE(&unpack.tw))
+        if (!F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) && WT_TIME_WINDOW_HAS_PREPARE(&unpack.tw))
             instantiate_prepare_upd = true;
     }
     WT_CELL_FOREACH_END;

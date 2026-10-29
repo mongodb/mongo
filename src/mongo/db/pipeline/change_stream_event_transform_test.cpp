@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/change_stream_event_transform.h"
 
@@ -162,6 +136,39 @@ TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransform) {
                                      boost::none,   // fromMigrate
                                      boost::none);  // o2
 
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), opDescription, DocumentSourceChangeStream::kCreateOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kCreateOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription},
+        {DocumentSourceChangeStream::kNsTypeField, "collection"sv}};
+
+    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
+}
+
+TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransformStripsRecordIdsReplicated) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+    // Namespace for the command, i.e. "testDB.$cmd".
+    const NamespaceString commandNss = NamespaceString::makeCommandNamespace(nss.dbName());
+    const auto opDescription = Value(fromjson("{idIndex: {v: 2, key: {_id: 1}, name: '_id_'}}"));
+    const auto idIndex = Value(fromjson("{v: 2, key: {_id: 1}, name: '_id_'}"));
+    auto oplogEntry = makeOplogEntry(
+        repl::OpTypeEnum::kCommand,  // op type
+        commandNss,                  // namespace
+        BSON("create" << nss.coll() << "idIndex" << idIndex << "recordIdsReplicated" << true),  // o
+        testUuid(),    // uuid
+        boost::none,   // fromMigrate
+        boost::none);  // o2
+
+    // 'recordIdsReplicated' is internal and must not show up in 'operationDescription'.
     Document expectedDoc{
         {DocumentSourceChangeStream::kIdField,
          makeResumeToken(
@@ -489,7 +496,7 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  "Tripwire assertion.*11888300") {
     // Container insert ("ci") oplog type is not supported by the event transformer.
     auto oplogEntry =
-        repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+        repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), /*term=*/1),
                                             "containerIdent"sv,
                                             1LL,
                                             BSONBinData("V", 1, BinDataGeneral));
@@ -503,7 +510,7 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  "Tripwire assertion.*12178900") {
     // Container update ("cu") oplog type is not supported by the event transformer.
     auto oplogEntry =
-        repl::makeContainerUpdateOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+        repl::makeContainerUpdateOplogEntry(repl::OpTime(Timestamp(10, 10), /*term=*/1),
                                             "containerIdent"sv,
                                             1LL,
                                             BSONBinData("V", 1, BinDataGeneral));
@@ -517,7 +524,7 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  "Tripwire assertion.*11888301") {
     // Container delete ("cd") oplog type is not supported by the event transformer.
     auto oplogEntry = repl::makeContainerDeleteOplogEntry(
-        repl::OpTime(Timestamp(10, 10), 1 /* term */), "containerIdent"sv, 1LL);
+        repl::OpTime(Timestamp(10, 10), /*term=*/1), "containerIdent"sv, 1LL);
 
     // This will tassert in the event transformer, because it does not expect a 'cd' oplog entry.
     ASSERT_THROWS_CODE(applyTransformation(oplogEntry), AssertionException, 11888301);
@@ -642,6 +649,64 @@ TEST(
              BSON("to" << BSON("db" << bucketsNss.db_forTest() << "coll" << bucketsNss.coll()))}},
     };
     ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, collNss), expectedDoc);
+}
+
+// Applies the default transformation with a caller-provided spec, without forcing
+// 'showExpandedEvents' like the applyTransformation() helper above does.
+Document applyTransformationWithSpec(const repl::OplogEntry& oplogEntry,
+                                     DocumentSourceChangeStreamSpec spec) {
+    spec.setStartAtOperationTime(kDefaultTs);
+    ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(nss), spec);
+    return transformer.applyTransformation(Document(oplogEntry.getEntry().toBSON()));
+}
+
+repl::OplogEntry makeUpdateOplogEntry() {
+    return makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                          nss,
+                          BSON("$v" << 2 << "diff" << BSON("u" << BSON("y" << 2))),  // o
+                          testUuid(),
+                          boost::none,                  // fromMigrate
+                          BSON("x" << 1 << "y" << 1));  // o2
+}
+
+TEST(ChangeStreamEventTransformTest, MatchCollectionUUIDForUpdateLookupEmitsCollectionUUID) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+
+    auto event = applyTransformationWithSpec(makeUpdateOplogEntry(), spec);
+    ASSERT_VALUE_EQ(event[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
+}
+
+TEST(ChangeStreamEventTransformTest, UpdateLookupWithoutMatchCollectionUUIDOmitsCollectionUUID) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
+
+    auto event = applyTransformationWithSpec(makeUpdateOplogEntry(), spec);
+    ASSERT_TRUE(event[DocumentSourceChangeStream::kCollectionUuidField].missing());
+}
+
+TEST(ChangeStreamEventTransformTest, MatchCollectionUUIDForUpdateLookupOmitsUUIDOnNonUpdateEvents) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setFullDocument(FullDocumentModeEnum::kUpdateLookup);
+    spec.setMatchCollectionUUIDForUpdateLookup(true);
+
+    auto insertEntry = makeOplogEntry(repl::OpTypeEnum::kInsert,
+                                      nss,
+                                      BSON("_id" << 1 << "x" << 2),  // o
+                                      testUuid(),
+                                      boost::none,        // fromMigrate
+                                      BSON("_id" << 1));  // o2
+    auto event = applyTransformationWithSpec(insertEntry, spec);
+    ASSERT_TRUE(event[DocumentSourceChangeStream::kCollectionUuidField].missing());
+}
+
+TEST(ChangeStreamEventTransformTest, ShowExpandedEventsEmitsCollectionUUIDWithoutMatchFlag) {
+    DocumentSourceChangeStreamSpec spec;
+    spec.setShowExpandedEvents(true);
+
+    auto event = applyTransformationWithSpec(makeUpdateOplogEntry(), spec);
+    ASSERT_VALUE_EQ(event[DocumentSourceChangeStream::kCollectionUuidField], Value(testUuid()));
 }
 
 }  // namespace

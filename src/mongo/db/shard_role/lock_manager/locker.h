@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -40,7 +14,7 @@
 #include "mongo/db/shard_role/lock_manager/fast_list_based_map.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/duration.h"
@@ -79,7 +53,7 @@ class LockOrderingsSet;
 // are required because of cyclic dependency between the service_context and write_unit_of_work
 // libraries, due to Locker being currently owned by the OperationContext. This will go away once
 // SERVER-77213 is done which will move locker entirely under TransactionResources (shard_role_api).
-class MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes") Locker {
+class [[MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes")]] Locker {
 public:
     Locker(ServiceContext* serviceContext);
     virtual ~Locker();
@@ -123,7 +97,7 @@ public:
      * reference to AtomicLockStats, meaning that they can change at any time after they are
      * returned.
      */
-    using AtomicLockStats = LockStats<AtomicWord<long long>>;
+    using AtomicLockStats = LockStats<Atomic<long long>>;
     const AtomicLockStats& stats() const {
         return _stats;
     }
@@ -833,7 +807,7 @@ protected:
     LockMode _modeForTicket = MODE_NONE;
 
     // Indicates whether the client is active reader/writer or is queued.
-    AtomicWord<ClientState> _clientState{ClientState::kInactive};
+    Atomic<ClientState> _clientState{ClientState::kInactive};
 
     // If true, shared locks will participate in two-phase locking.
     bool _sharedLocksShouldTwoPhaseLock = false;
@@ -855,7 +829,7 @@ protected:
     unsigned char _globalLockMode = (1 << MODE_NONE);
 
     // Tracks whether this operation should be killed on step down.
-    AtomicWord<bool> _wasGlobalLockTakenInModeConflictingWithWrites{false};
+    Atomic<bool> _wasGlobalLockTakenInModeConflictingWithWrites{false};
 
     // If isValid(), the ResourceId of the resource currently waiting for the lock. If not valid,
     // there is no resource currently waiting.
@@ -878,7 +852,7 @@ protected:
  * Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same fairness as other LockManager
  * locks.
  */
-class MONGO_MOD_PUBLIC ResourceMutex {
+class [[MONGO_MOD_PUBLIC]] ResourceMutex {
 public:
     ResourceMutex(std::string resourceLabel);
 
@@ -906,7 +880,7 @@ private:
  * incredibly conservative in using this. The presence of this class implies that a deadlock may
  * occur in that part of the codebase.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DisableLockerRuntimeOrderingChecks {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] DisableLockerRuntimeOrderingChecks {
     // We only do things in debug builds, release builds are essentially no-ops
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 public:
@@ -934,7 +908,7 @@ public:
  * Op 2: Holds the exclusive lock Op 1 is waiting for, while this operation is waiting for some
  *       operation beyond Timestamp(5) to become visible in the oplog.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT AllowLockAcquisitionOnTimestampedUnitOfWork {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] AllowLockAcquisitionOnTimestampedUnitOfWork {
 public:
     explicit AllowLockAcquisitionOnTimestampedUnitOfWork(Locker* locker)
         : _locker(locker), _originalValue(_locker->getAssertOnLockAttempt()) {

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
@@ -55,8 +29,8 @@ struct c_api_to_cpp_api<::MongoExtensionAggStageAstNode> {
  */
 class AggStageAstNodeAPI : public VTableAPI<::MongoExtensionAggStageAstNode> {
 public:
-    AggStageAstNodeAPI(::MongoExtensionAggStageAstNode* ptr)
-        : VTableAPI<::MongoExtensionAggStageAstNode>(ptr) {}
+    AggStageAstNodeAPI(::MongoExtensionAggStageAstNode* ptr, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionAggStageAstNode>(ptr, capability) {}
 
     /**
      * Returns a std::string_view containing the name of this aggregation stage.
@@ -99,16 +73,23 @@ public:
      */
     void bindResolvedNamespace(const ::MongoExtensionResolvedNamespace& resolvedNamespace);
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
-        tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            11347800, "AggStageAstNode 'get_properties' is null", vtable.get_properties != nullptr);
-        tassert(11113700, "AggStageAstNode 'promote' is null", vtable.promote != nullptr);
-        tassert(11565501, "AggStageAstNode 'clone' is null", vtable.clone != nullptr);
-        tassert(11507400,
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'get_name' is null",
+                vtable.get_name != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'get_properties' is null",
+                vtable.get_properties != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'promote' is null",
+                vtable.promote != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
+                "AggStageAstNode 'clone' is null",
+                vtable.clone != nullptr);
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageAstNode 'get_first_stage_view_application_policy` is null",
                 vtable.get_first_stage_view_application_policy != nullptr);
-        tassert(11507500,
+        tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageAstNode `bind_resolved_namespace` is null",
                 vtable.bind_resolved_namespace != nullptr);
     }

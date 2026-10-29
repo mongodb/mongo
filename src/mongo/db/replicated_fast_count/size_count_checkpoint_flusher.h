@@ -1,89 +1,89 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/fail_point.h"
-
-#include <mutex>
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 
 namespace mongo::replicated_fast_count {
 
 class SizeCountStore;
 class SizeCountTimestampStore;
 
+namespace flusher {
+
 /**
- * Persists size and count checkpoints when signaled.
+ * Metadata about a successful flush.
  */
-class SizeCountCheckpointFlusher {
-public:
-    SizeCountCheckpointFlusher(SizeCountStore* sizeCountStore,
-                               SizeCountTimestampStore* timestampStore);
+struct FlushResult {
+    /**
+     * The timestamp of the previous successful flush. If this is the first flush, then its
+     * value is `Timestamp::min()`.
+     */
+    Timestamp previousValidAsOfTS;
 
     /**
-     * Runs the flush loop until opCtx is interrupted (shutdown signal).
+     * The timestamp persisted to the fast count timestamp store during this flush.
      */
-    void run(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer);
+    Timestamp newValidAsOfTS;
 
     /**
-     * Signals that a flush should be performed on the next loop iteration.
+     * The number of deltas in the checkpoint buffer when checked out.
      */
-    void requestFlush();
-
-    bool isFlushRequested_ForTest() const;
-    void runOneFlushCycle_ForTest(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer);
-
-private:
-    /**
-     * Wrapper of a single flush cycle. Updates top-level flush metrics.
-     */
-    void _runOneFlushCycle(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer);
+    size_t checkpointBufferSize;
 
     /**
-     * Extracts the pending checkpoint from buffer and executes the flush. Returns the number of
-     * collections updated. All errors managed internally. Returns 0 if the flush wasn't executed.
+     * The counts of the writes persisted to the fast count metadata store. `entryWriteCount` is
+     * <= `checkpointBufferSize` because some deltas can be skipped. See
+     * `persistCheckpointSnapshot()`.
      */
-    size_t _doFlush(OperationContext* opCtx, SizeCountCheckpointBuffer& buffer);
+    CheckpointWriteCounts writeCounts;
 
-    SizeCountStore* _sizeCountStore;
-    SizeCountTimestampStore* _timestampStore;
-
-    FailPoint* _fpFailDuringFlush{nullptr};
-    FailPoint* _fpHangAfterReplicatedFastCountSnapshot{nullptr};
-    FailPoint* _fpSleepAfterFlush{nullptr};
-    FailPoint* _fpHangBeforePersistingNewEntries{nullptr};
-
-    mutable std::mutex _mutex;
-    stdx::condition_variable _flushCv;
-    bool _flushRequested{false};
+    /**
+     * The number of attempts required to successfully flush the checkpoint to the fast count
+     * metadata store and the fast count timestamp store. This value is 1 unless there was a
+     * write conflict.
+     */
+    size_t flushAttempts;
 };
 
+/**
+ * Persists the checkpoint metadata `batch` to the `SizeCountStore` and `SizeCountTimestampStore`,
+ * retrying if a `WriteConflictException` occurs.
+ *
+ * Returns a `FlushResult` if the flush was successful, or `boost::none` otherwise.
+ */
+boost::optional<FlushResult> flush(OperationContext* opCtx,
+                                   SizeCountStore& sizeCountStore,
+                                   SizeCountTimestampStore& timestampStore,
+                                   const OplogScanResult& batch);
+
+/**
+ * Writes a no-op watermark entry to the oplog, marking the cutoff point for the next replicated
+ * metadata checkpoint. The watermark's timestamp becomes the checkpoint's valid-as-of timestamp.
+ *
+ * The following diagram shows the oplog entries for one checkpoint, in timestamp order:
+ *
+ *   ...---[user writes]-----[W]----------[[M][TS]]---...
+ *                          ts = T      ts = T' (T' > T)
+ *
+ * Key:
+ *
+ *   [user writes]  Replicated writes to fast-count-eligible collections. Each contributes a delta
+ *                  that will later be flushed.
+ *
+ *   [W]            The watermark: a no-op entry whose timestamp T is the valid-as-of timestamp for
+ *                  the next checkpoint.
+ *
+ *   [M]            The metadata store container write: one per collection in the batch, persisting
+ *                  the collection's replicated metadata with valid-as-of = T.
+ *
+ *   [TS]           The timestamps store container write: advances the global valid-as-of to T.
+ *
+ * The watermark message (`kWatermarkMsg`) distinguishes this no-op from other no-op entries.
+ */
+void writeWatermark(OperationContext* opCtx);
+
+}  // namespace flusher
 }  // namespace mongo::replicated_fast_count

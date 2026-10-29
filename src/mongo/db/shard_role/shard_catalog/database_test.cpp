@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/database.h"
 
@@ -34,8 +8,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index_builds/index_build_block.h"
@@ -113,8 +85,6 @@ private:
     void tearDown() override;
 
 protected:
-    explicit DatabaseTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
-
     ServiceContext::UniqueOperationContext _opCtx;
     NamespaceString _nss;
     OpObserverRegistry* _opObserverRegistry;
@@ -240,7 +210,7 @@ TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
     // OpObserver which validates each collection created in this test is persisted in the local
     // catalog and generates a 'CreateCollCatalogIdentifier'.
     auto createOpObserver =
-        std::make_unique<CreateCollCatalogIdentifierObserver>(true /* expectIdentifiers */);
+        std::make_unique<CreateCollCatalogIdentifierObserver>(/*expectIdentifiers=*/true);
     _opObserverRegistry->addObserver(std::move(createOpObserver));
 
     auto opCtx = _opCtx.get();
@@ -262,14 +232,14 @@ TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
     CollectionOptions bucketsOptions{
         .clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat(),
         .timeseries = TimeseriesOptions{"t"}};
-    runCreateCollection(opCtx, bucketsNSS, CollectionOptions{}, false /* createDefaultIndexes*/);
+    runCreateCollection(opCtx, bucketsNSS, CollectionOptions{}, /*createDefaultIndexes=*/false);
 }
 
 TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCollection) {
     // Register an OpObserver to validate the collection isn't persisted in the local catalog and
     // thus does not generate a 'CreateCollCatalogIdentifier'.
     auto createOpObserver =
-        std::make_unique<CreateCollCatalogIdentifierObserver>(false /* expectIdentifiers */);
+        std::make_unique<CreateCollCatalogIdentifierObserver>(/*expectIdentifiers=*/false);
     _opObserverRegistry->addObserver(std::move(createOpObserver));
 
     // Virtual collections are not persisted to the local catalog.
@@ -319,9 +289,9 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
                 db->createCollection(_opCtx.get(), _nss),
                 AssertionException,
                 ErrorCodes::DatabaseDropPending,
-                (StringBuilder() << "Cannot create collection " << _nss.toStringForErrorMsg()
-                                 << " - database is in the process of being dropped.")
-                    .stringData());
+                fmt::format("Cannot create collection {} - database is in the process of being "
+                            "dropped.",
+                            _nss.toStringForErrorMsg()));
         });
 }
 
@@ -543,10 +513,10 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
 
         auto nss1 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
         if (!re.matchView(nss1.ns_forTest())) {
-            FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns_forTest()
-                                  << "\" does not match regular expression \"" << re.pattern()
-                                  << "\"")
-                     .str());
+            FAIL(fmt::format(
+                "First generated namespace \"{}\" does not match regular expression \"{}\"",
+                nss1.ns_forTest(),
+                re.pattern()));
         }
 
         // Create collection using generated namespace so that makeUniqueCollectionNamespace()
@@ -560,10 +530,10 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
 
         auto nss2 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
         if (!re.matchView(nss2.ns_forTest())) {
-            FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns_forTest()
-                                  << "\" does not match regular expression \"" << re.pattern()
-                                  << "\"")
-                     .str());
+            FAIL(fmt::format(
+                "Second generated namespace \"{}\" does not match regular expression \"{}\"",
+                nss2.ns_forTest(),
+                re.pattern()));
         }
 
         // Second generated namespace should not collide with the first because a collection
@@ -646,12 +616,12 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
             CollectionOptions options;
             options.setNoIdIndex();
 
-            ASSERT_THROWS_CODE_AND_WHAT(
-                db->createCollection(_opCtx.get(), _nss, options),
-                AssertionException,
-                50001,
-                (str::stream() << "autoIndexId:false is not allowed for collection "
-                               << _nss.toStringForErrorMsg() << " because it can be replicated"));
+            ASSERT_THROWS_CODE_AND_WHAT(db->createCollection(_opCtx.get(), _nss, options),
+                                        AssertionException,
+                                        50001,
+                                        fmt::format("autoIndexId:false is not allowed for "
+                                                    "collection {} because it can be replicated",
+                                                    _nss.toStringForErrorMsg()));
         });
 }
 
@@ -714,129 +684,6 @@ TEST_F(DatabaseTest, DatabaseHolderImplTest) {
     ASSERT_EQUALS(dbIndex.viewAll().size(), 1);
 }
 
-// Creating a new database whose name conflicts case-insensitively with an existing database must be
-// rejected. Re-opening the same database must succeed (no self-conflict). Test both ASCII and
-// non-ASCII case pairs.
-TEST_F(DatabaseTest, OpenDbRejectsCaseConflict) {
-    auto opCtx = _opCtx.get();
-    auto holder = DatabaseHolder::get(opCtx);
-
-    auto testConflict = [&](std::string_view lowerStr, std::string_view upperStr) {
-        DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, lowerStr);
-        DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, upperStr);
-
-        // Create with lowercase.
-        {
-            Lock::DBLock dbLock(opCtx, lower, MODE_X);
-            ASSERT_TRUE(holder->openDb(opCtx, lower, nullptr));
-        }
-
-        // Re-opening must succeed (no self-conflict).
-        {
-            Lock::DBLock dbLock(opCtx, lower, MODE_X);
-            ASSERT_TRUE(holder->openDb(opCtx, lower, nullptr));
-        }
-
-        // Attempting to create with different case must fail.
-        ASSERT_THROWS_CODE(
-            [&] {
-                Lock::DBLock dbLock(opCtx, upper, MODE_X);
-                holder->openDb(opCtx, upper, nullptr);
-            }(),
-            AssertionException,
-            ErrorCodes::DatabaseDifferCase);
-    };
-
-    testConflict("test", "Test");
-    testConflict("æbler", "Æbler");
-}
-
-// Pre-existing databases whose names conflict case-insensitively (e.g. created before the
-// non-ASCII DatabaseDifferCase check existed) must remain accessible after an upgrade. openDb skips
-// the conflict check when isNew==false, i.e. the database already has collections in the catalog.
-TEST_F(DatabaseTest, OpenDbAllowsPreExistingNonAsciiCaseConflict) {
-    auto opCtx = _opCtx.get();
-
-    DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, "æbler");
-    DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, "Æbler");
-
-    // Creates a collection in dbName then closes the database from the holder. Closing removes
-    // it from the holder's conflict index but does NOT evict collections from the
-    // CollectionCatalog (onCloseDatabase only removes views/resource entries), so
-    // getAllCollectionUUIDsFromDb still returns non-empty and the next openDb will see
-    // isNew==false, skipping the conflict check.
-    auto createAndClose = [&](const DatabaseName& dbName) {
-        NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "c");
-        writeConflictRetry(opCtx, "createAndClose", nss, [&] {
-            auto acq = acquireCollection(opCtx,
-                                         CollectionAcquisitionRequest::fromOpCtx(
-                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                         MODE_X);
-            auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, dbName);
-            WriteUnitOfWork wuow(opCtx);
-            ASSERT_TRUE(db->createCollection(opCtx, nss));
-            wuow.commit();
-        });
-        {
-            AutoGetDb autoDb(opCtx, dbName, MODE_X);
-            DatabaseHolder::get(opCtx)->close(opCtx, dbName);
-        }
-        ASSERT_FALSE(CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty());
-    };
-
-    // Each DB must be seeded while the other is absent from the holder's conflict index.
-    createAndClose(lower);
-    createAndClose(upper);
-
-    // Simulate startup reopening pre-existing conflicting databases: both openDb calls must
-    // succeed without throwing DatabaseDifferCase.
-    auto holder = DatabaseHolder::get(opCtx);
-    for (const auto& dbName : {lower, upper}) {
-        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-        ASSERT_TRUE(holder->openDb(opCtx, dbName, nullptr));
-    }
-
-    // Both databases are now accessible via the holder.
-    for (const auto& dbName : {lower, upper}) {
-        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-        ASSERT_TRUE(holder->getDb(opCtx, dbName));
-    }
-}
-
-// When !isEnforcingConstraints() (e.g. secondary applying oplog entries), openDb must skip the
-// conflict check so that a new-binary secondary can replicate two databases created by an
-// old-binary primary whose names conflict under Unicode case-folding.
-TEST_F(DatabaseTest, OpenDbSkipsConflictCheckWhenNotEnforcingConstraints) {
-    auto opCtx = _opCtx.get();
-
-    DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, "æbler");
-    DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, "Æbler");
-
-    // Create "æbler" normally (replicated write, i.e. primary path).
-    {
-        Lock::DBLock dbLock(opCtx, lower, MODE_X);
-        bool justCreated = false;
-        auto* db = DatabaseHolder::get(opCtx)->openDb(opCtx, lower, &justCreated);
-        ASSERT_TRUE(db);
-        ASSERT_TRUE(justCreated);
-    }
-
-    // Simulate a secondary applying an oplog entry for "Æbler" while "æbler" already exists.
-    // The conflict check must be skipped, so openDb must not throw DatabaseDifferCase.
-    // Also verify that justCreated is still set even when !isEnforcingConstraints().
-    {
-        opCtx->setEnforceConstraints(false);
-        ON_BLOCK_EXIT([&] { opCtx->setEnforceConstraints(true); });
-        ASSERT_FALSE(opCtx->isEnforcingConstraints());
-
-        Lock::DBLock dbLock(opCtx, upper, MODE_X);
-        bool justCreated = false;
-        auto* db = DatabaseHolder::get(opCtx)->openDb(opCtx, upper, &justCreated);
-        ASSERT_TRUE(db);
-        ASSERT_TRUE(justCreated);
-    }
-}
-
 // --- Tests for shouldSetRecordIdsReplicated logic ---
 
 // Minimal stub provider whose shouldUseReplicatedRecordIds() returns true.
@@ -862,6 +709,12 @@ public:
     }
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         return true;
+    }
+    bool shouldUseReplicatedFastCount() const override {
+        return false;
+    }
+    std::string getMainWiredTigerTableSettings() const override {
+        return "";
     }
 };
 

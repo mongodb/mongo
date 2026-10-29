@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -59,7 +33,7 @@ namespace mongo {
  * Thin adapter making std::pmr::memory_resource usable as a non-polymorphic
  * upstream resource for RecyclingFixedSizeBufferResource. Defaults to new/delete.
  */
-class MONGO_MOD_PRIVATE PmrUpstreamResource {
+class [[MONGO_MOD_PRIVATE]] PmrUpstreamResource {
 public:
     PmrUpstreamResource() : _mr{std::pmr::new_delete_resource()} {}
     explicit PmrUpstreamResource(std::pmr::memory_resource* mr) : _mr{mr} {}
@@ -94,7 +68,7 @@ private:
  * from the upstream resource. Each overflow chunk holds `overflowChunkElementCount` blocks.
  */
 template <typename Upstream = PmrUpstreamResource>
-class MONGO_MOD_PRIVATE RecyclingFixedSizeBufferResource {
+class [[MONGO_MOD_PRIVATE]] RecyclingFixedSizeBufferResource {
 public:
     RecyclingFixedSizeBufferResource(void* buf,
                                      size_t sz,
@@ -221,7 +195,7 @@ namespace detail {
 
 /** Models the size and alignment of a std::list node for inline buffer sizing. */
 template <typename T>
-struct MONGO_MOD_PRIVATE ListNodeSizer {
+struct [[MONGO_MOD_PRIVATE]] ListNodeSizer {
     void* next;
     void* prev;
     T value;
@@ -232,7 +206,7 @@ struct MONGO_MOD_PRIVATE ListNodeSizer {
  * std::pmr::list can be driven by our custom free-list recycler via polymorphic_allocator.
  */
 template <typename Upstream = PmrUpstreamResource>
-class MONGO_MOD_PRIVATE RecyclingFixedSizeBufferPmrResource : public std::pmr::memory_resource {
+class [[MONGO_MOD_PRIVATE]] RecyclingFixedSizeBufferPmrResource : public std::pmr::memory_resource {
 public:
     RecyclingFixedSizeBufferPmrResource(void* buf,
                                         size_t sz,
@@ -262,7 +236,7 @@ private:
  * _buf -> _resource (takes pointer to _buf).
  */
 template <typename T, size_t inlineElementCount, size_t overflowChunkElementCount>
-class MONGO_MOD_PRIVATE RecyclingPmrMemoryBase {
+class [[MONGO_MOD_PRIVATE]] RecyclingPmrMemoryBase {
 public:
     std::pmr::polymorphic_allocator<void> makeAllocator() {
         return std::pmr::polymorphic_allocator<void>{&_resource};
@@ -282,7 +256,7 @@ private:
  * _buf -> _mono (uses _buf) -> _opts -> _pool (uses _mono).
  */
 template <typename T, size_t inlineElementCount, size_t overflowChunkElementCount>
-class MONGO_MOD_PRIVATE DefaltRecyclingPmrMemoryBase {
+class [[MONGO_MOD_PRIVATE]] DefaltRecyclingPmrMemoryBase {
 public:
     std::pmr::polymorphic_allocator<void> makeAllocator() {
         return std::pmr::polymorphic_allocator<void>{&_pool};
@@ -312,7 +286,7 @@ private:
 template <typename T,
           size_t inlineElementCount,
           size_t overflowChunkElementCount = inlineElementCount>
-class MONGO_MOD_PRIVATE RecyclingPmrInlineList
+class [[MONGO_MOD_PRIVATE]] RecyclingPmrInlineList
     : private detail::RecyclingPmrMemoryBase<T, inlineElementCount, overflowChunkElementCount>,
       public std::pmr::list<T> {
     using MemBase =
@@ -344,7 +318,7 @@ public:
 template <typename T,
           size_t inlineElementCount,
           size_t overflowChunkElementCount = inlineElementCount>
-class MONGO_MOD_PRIVATE DefaultRecyclingPmrInlineList
+class [[MONGO_MOD_PRIVATE]] DefaultRecyclingPmrInlineList
     : private detail::
           DefaltRecyclingPmrMemoryBase<T, inlineElementCount, overflowChunkElementCount>,
       public std::pmr::list<T> {
@@ -402,7 +376,7 @@ using RecyclingList = RecyclingPmrInlineList<T, inlineElementCount, overflowChun
  *   from the internal structure of the list.
  */
 template <class Key, class Value, size_t InlineCapacity>
-class MONGO_MOD_PRIVATE RecyclingListBasedMap {
+class [[MONGO_MOD_PRIVATE]] RecyclingListBasedMap {
 public:
     struct Entry : std::pair<Key, Value> {
         using std::pair<Key, Value>::pair;

@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 # This version does not use timestamps.
 
 @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     format_values = [
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
@@ -64,7 +63,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
-            cursor[ds.key(i)] = value
+            cursor[ds.key(i)] = value(i)
             if i % 101 == 0:
                 self.session.commit_transaction()
                 self.session.begin_transaction()
@@ -95,7 +94,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         count = 0
         zcount = 0
         for k, v in cursor:
-            self.assertEqual(v, value)
+            i = ds.reverse_key_by_format(k, ds.key_format)
+            self.assertEqual(v, value(i))
             count += 1
         #self.session.rollback_transaction()
         self.assertEqual(count, nrows)
@@ -116,10 +116,14 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        value_a = "aaaaa" * 100
+        # Every row gets a distinct value. Variable-length column store run-length encodes
+        # runs of identical values, which packs the whole table into a handful of leaf pages
+        # and leaves the truncate range with no interior page to fast-delete.
+        def value(i):
+            return "{}-{}".format(i, "aaaaa" * 100)
 
         # Write some data at time 10.
-        self.large_updates(uri, ds, nrows, value_a)
+        self.large_updates(uri, ds, nrows, value)
 
         # Reopen the connection (which checkpoints it) so it's all on disk and not in memory.
         self.reopen_conn()
@@ -129,7 +133,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
         # Check stats to make sure we fast-deleted at least one page.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
         self.assertGreater(fastdelete_pages, 0)
 
         # Take a checkpoint.
@@ -141,4 +145,4 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Read the checkpoint.
         nonzeros = nrows // 2
         zeros = nrows - nonzeros
-        self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a)
+        self.check(ds, self.first_checkpoint, nonzeros, zeros, value)

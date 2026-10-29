@@ -36,13 +36,27 @@ void
 __wti_block_disagg_decrease_size(
   WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg, uint64_t size)
 {
-    WT_UNUSED(session);
+    uint64_t orig;
 
-    /* FIXME WT-16864: re-enable this assert once the disagg block size accounting bug is fixed. */
-    if (__wt_atomic_load_uint64(&block_disagg->size) < size)
-        __wt_atomic_store_uint64(&block_disagg->size, 0);
-    else
-        (void)__wt_atomic_sub_uint64(&block_disagg->size, size);
+    /*
+     * Check for underflow and decrement as a single atomic step. The CAS guarantees we subtract
+     * from the same value we validated, closing the race between the check and the subtraction. A
+     * failed CAS means a concurrent update beat us to it; reload and retry.
+     *
+     * Clamping to zero hides a real accounting bug where we decrement more than was added. Remove
+     * the clamp once that bug is fixed and add the assert back in.
+     */
+    do {
+        orig = __wt_atomic_load_uint64(&block_disagg->size);
+    } while (!__wt_atomic_cas_uint64(&block_disagg->size, orig, orig < size ? 0 : orig - size));
+
+    if (orig < size)
+        /* FIXME-WT-18039: Replace this and the WT_ASSERT below with a WT_ASSERT_ALWAYS. */
+        __wt_verbose_level_id(session, 1888100, WT_VERB_DISAGGREGATED_STORAGE, WT_VERBOSE_WARNING,
+          "disaggregated block size underflow: decrementing %" PRIu64 " from %" PRIu64
+          ", clamped to 0",
+          size, orig);
+    WT_ASSERT(session, orig >= size);
 }
 
 /*
@@ -68,16 +82,15 @@ __wt_block_disagg_set_size(WT_SESSION_IMPL *session, uint64_t size)
 }
 
 /*
- * __wt_block_disagg_obsolete_delta_chain --
- *     Notify the block manager that a delta chain has been obsoleted by a full page image. The
- *     cumulative size of the old chain is no longer counted toward the total.
+ * __wt_block_disagg_decrease_size --
+ *     Decrease the total byte count. Exposed for callers outside the block manager; reconciliation
+ *     uses it when a full page image obsoletes a delta chain.
  */
 void
-__wt_block_disagg_obsolete_delta_chain(WT_SESSION_IMPL *session, uint64_t cumulative_size)
+__wt_block_disagg_decrease_size(WT_SESSION_IMPL *session, uint64_t size)
 {
     WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED));
-    __wti_block_disagg_decrease_size(
-      session, (WT_BLOCK_DISAGG *)S2BT(session)->bm->block, cumulative_size);
+    __wti_block_disagg_decrease_size(session, (WT_BLOCK_DISAGG *)S2BT(session)->bm->block, size);
 }
 
 /*

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -38,10 +12,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/client/shard_factory.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -70,16 +43,15 @@ namespace mongo {
 
 namespace shard_registry_stats {
 
-MONGO_MOD_PRIVATE extern Counter64& blockedOpsGauge;
+[[MONGO_MOD_PRIVATE]] extern Counter64& blockedOpsGauge;
 
 }  // namespace shard_registry_stats
 
-class MONGO_MOD_PRIVATE ShardRegistryData {
+class [[MONGO_MOD_PRIVATE]] ShardRegistryData {
 public:
     using ShardMap = stdx::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
-    using ShardUUIDMap = stdx::unordered_map<UUID, std::shared_ptr<Shard>, UUID::Hash>;
-    using ShardHandleToConnectionStringMap =
-        stdx::unordered_map<ShardHandle, ConnectionString, ShardHandle::HashByName>;
+    using ShardIdToConnectionStringMap =
+        stdx::unordered_map<ShardId, ConnectionString, ShardId::Hasher>;
 
     /**
      * Creates a basic ShardRegistryData, that only contains the config shard.  Needed during
@@ -92,7 +64,7 @@ public:
      * Builds a ShardRegistryData from a map of shardId -> connectionString.
      * Creates Shard instances (and their RSMs) for each entry.
      */
-    static ShardRegistryData buildFromShardDocs(const ShardHandleToConnectionStringMap& shardDocs,
+    static ShardRegistryData buildFromShardDocs(const ShardIdToConnectionStringMap& shardDocs,
                                                 ShardFactory* shardFactory);
 
     /**
@@ -118,13 +90,12 @@ public:
                                                 ShardFactory* shardFactory);
 
     /**
-     * Returns the shard matching the given ShardRef, or nullptr if no such shard.
+     * Returns the shard matching the given identifier, or nullptr if no such shard.
      *
-     * If shardRef holds a UUID, looks up the shard in the UUID index only. If shardRef holds a
-     * string, looks up first by shard name (ShardId). If 'allowNonShardIdIdentifiers' is true, the
-     * lookup will continue by connection string and host and port.
+     * If 'allowNonShardIdIdentifiers' is false, only shard ids are considered. If true, the
+     * identifier may also be a connection string or host and port.
      */
-    std::shared_ptr<Shard> findShard(const ShardRef& shardRef,
+    std::shared_ptr<Shard> findShard(const ShardId& shardId,
                                      bool allowNonShardIdIdentifiers = false) const;
 
     /**
@@ -158,11 +129,6 @@ private:
     friend class ShardRegistryTest;
 
     /**
-     * Returns the shard with the given shard uuid, or nullptr if no such shard.
-     */
-    std::shared_ptr<Shard> _findByShardUUID(const UUID& shardUUID) const;
-
-    /**
      * Returns the shard with the given shard id, or nullptr if no such shard.
      */
     std::shared_ptr<Shard> _findByShardId(const ShardId&) const;
@@ -176,9 +142,6 @@ private:
      * Puts the given shard object into the lookup maps.
      */
     void _addShard(std::shared_ptr<Shard>);
-
-    // Map of ShardUUID -> Shard
-    ShardUUIDMap _shardUUIDLookup;
 
     // Map of shardName -> Shard
     ShardMap _shardIdLookup;
@@ -216,7 +179,7 @@ private:
  * registry discovers an updated connection string for another shard via a replica set topology
  * change, it will persist that update to `config.shards`.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardRegistry {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardRegistry {
     ShardRegistry(const ShardRegistry&) = delete;
     ShardRegistry& operator=(const ShardRegistry&) = delete;
 
@@ -298,20 +261,20 @@ public:
     std::shared_ptr<Shard> getConfigShard() const;
 
     /**
-     * Returns a shared pointer to the shard object matching the given ShardRef, or ShardNotFound
-     * otherwise.
+     * Returns a shared pointer to the shard object with the given identifier, or ShardNotFound
+     * error otherwise.
      *
-     * If 'allowNonShardIdIdentifiers' is false, only shard uuid/ids are considered. If true, the
+     * If 'allowNonShardIdIdentifiers' is false, only shard ids are considered. If true, the
      * identifier may also be a connection string or host and port.
      *
      * May refresh the shard registry if there's no cached information about the shard.
      */
     StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx,
-                                                const ShardRef& shardRef,
+                                                const ShardId& shardId,
                                                 bool allowNonShardIdIdentifiers = false);
 
     SemiFuture<std::shared_ptr<Shard>> getShard(ExecutorPtr executor,
-                                                const ShardRef& shardRef,
+                                                const ShardId& shardId,
                                                 bool allowNonShardIdIdentifiers = false) noexcept;
 
     /**
@@ -328,18 +291,6 @@ public:
      * The order of the elements is not guaranteed.
      */
     std::vector<ShardId> getAllShardIds(OperationContext* opCtx);
-
-    /**
-     * Returns a vector containing all known shards as ShardRefs.
-     * The order of the elements is not guaranteed. Do not add any usage of this method; Contact the
-     * Catalog And Routing team when in doubt.
-     *
-     * TODO SERVER-127411: temporary convenience until ShardRegistry data exposes ShardRefs
-     * directly. Always returns string-variant refs, so the results must NOT be compared against
-     * feature-flag-aware refs (e.g. ShardHandle::toShardRef(opCtx)), which may hold the UUID
-     * variant.
-     */
-    std::vector<ShardRef> getAllShardRefs_UNSAFE(OperationContext* opCtx);
 
     /**
      * Returns the number of shards.
@@ -488,9 +439,9 @@ private:
          * Create a Time which will cause merging of force reload requests that have been made
          * before 'lookupFn' is evaluated, and contain the topologyTime returned by 'lookupFn'.
          */
-        using LookupFn = std::function<
-            std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, Timestamp>()>;
-        static std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, Time> makeWithLookup(
+        using LookupFn =
+            std::function<std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Timestamp>()>;
+        static std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Time> makeWithLookup(
             LookupFn&& lookupFn);
 
         /**
@@ -519,7 +470,7 @@ private:
         }
 
         // Source for the _forceReloadIncrement field.
-        static AtomicWord<Increment> _forceReloadIncrementSource;
+        static Atomic<Increment> _forceReloadIncrementSource;
 
         // The _forceReloadIncrement is used to indicate that the latest data should be fetched
         // from the configsvrs regardless of the topologyTime (ie. when the topologyTime can't be
@@ -533,9 +484,9 @@ private:
     };
 
     struct Stats {
-        AtomicWord<long long> activeRefreshCount{0};
-        AtomicWord<long long> totalRefreshCount{0};
-        AtomicWord<long long> failedRefreshCount{0};
+        Atomic<long long> activeRefreshCount{0};
+        Atomic<long long> totalRefreshCount{0};
+        Atomic<long long> failedRefreshCount{0};
 
         void report(BSONObjBuilder* builder) const;
     } _stats;
@@ -597,10 +548,9 @@ private:
      * Tears down RSMs and fires removal hooks for shards that are present in cachedData
      * but absent from the fetched shardDocs.
      */
-    void _tearDownRemovedShards(
-        OperationContext* opCtx,
-        const Cache::ValueHandle& cachedData,
-        const ShardRegistryData::ShardHandleToConnectionStringMap& shardDocs);
+    void _tearDownRemovedShards(OperationContext* opCtx,
+                                const Cache::ValueHandle& cachedData,
+                                const ShardRegistryData::ShardIdToConnectionStringMap& shardDocs);
 
     void _initializeCacheIfNecessary() const;
 
@@ -643,7 +593,7 @@ private:
     mutable ObservableMutex<std::mutex> _mutex;
 
     // Set to true once one of the init methods have been called.
-    AtomicWord<bool> _isInitialized{false};
+    Atomic<bool> _isInitialized{false};
 
     // Stores a reference to the configShard.
     ShardRegistryData _configShardData;
@@ -656,10 +606,10 @@ private:
     LatestConnStrings _latestConnStrings;
 
     // Set to true in shutdown call to prevent calling it twice.
-    AtomicWord<bool> _isShutdown{false};
+    Atomic<bool> _isShutdown{false};
 
     // Set to true when in recovery mode
-    AtomicWord<bool> _isRecoveryMode{false};
+    Atomic<bool> _isRecoveryMode{false};
 
     /**
      * Clears the cached latest connection strings and ReplicaSetMonitors.

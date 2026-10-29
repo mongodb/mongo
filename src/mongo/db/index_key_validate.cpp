@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_key_validate.h"
 
@@ -130,6 +104,12 @@ MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 // When the skipTTLIndexExpireAfterSecondsValidation failpoint is enabled,
 // validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexExpireAfterSecondsValidation);
+
+// When the 'skipWildcardIndexProjectionValidation' failpoint is enabled, validation of a compound
+// wildcard index's 'wildcardProjection' will be disabled. This allows tests to create the invalid
+// indexes which older binaries allowed before SERVER-113685.
+// TODO (SERVER-132386): Remove this failpoint once 10.0 becomes last LTS.
+MONGO_FAIL_POINT_DEFINE(skipWildcardIndexProjectionValidation);
 
 const std::set<std::string_view> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
@@ -314,6 +294,18 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                               "field name starts with '$'.");
             }
         }
+    }
+
+    return Status::OK();
+}
+
+Status validateIndexName(std::string_view name) {
+    if (name.find('\0') != std::string::npos) {
+        return Status(ErrorCodes::CannotCreateIndex, "index name cannot contain NUL bytes");
+    }
+
+    if (name.empty()) {
+        return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
     }
 
     return Status::OK();
@@ -604,7 +596,7 @@ StatusWith<BSONObj> validateIndexSpec(
                                       << "' field can't be an empty object"};
             }
             try {
-                if (key.nFields() > 1) {
+                if (key.nFields() > 1 && !skipWildcardIndexProjectionValidation.shouldFail()) {
                     auto validationStatus =
                         validateWildcardProjection(key, indexSpecElem.embeddedObject());
                     if (!validationStatus.isOK()) {

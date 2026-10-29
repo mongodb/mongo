@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2024-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -107,10 +81,10 @@ public:
             inputBab << BSON_ARRAY(fromjson(inputs[i]));
             outputBab << fromjson(makeExpectedArr(outputs[i]))[expectedFieldName];
         }
-        auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
-        value::ValueGuard inputGuard{inputTag, inputVal};
-        auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
-        value::ValueGuard expectedGuard{expectedTag, expectedVal};
+        value::TagValueOwned input =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(inputBab.arr()));
+        value::TagValueOwned expected =
+            value::TagValueOwned::fromRaw(stage_builder::makeValue(outputBab.arr()));
 
         auto makeStageFn = [&, this](value::SlotVector scanSlots,
                                      std::unique_ptr<PlanStage> scanStage) {
@@ -134,8 +108,8 @@ public:
             return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
         };
 
-        inputGuard.reset();
-        expectedGuard.reset();
+        auto [inputTag, inputVal] = input.releaseToRaw();
+        auto [expectedTag, expectedVal] = expected.releaseToRaw();
         runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
     }
 };
@@ -153,13 +127,13 @@ TEST_F(ExtractFieldPathsStageTest, SinglePathNonNestedNonArrayToplevelFieldSlotT
     // `inputBab` is an array of subarrays. Each subarray has an element for each input slot.
     BSONArrayBuilder inputBab;
     inputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
-    auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(inputBab.arr()));
     // `outputBab` is an array of subarrays. Each subarray has an element for each output slot.
     BSONArrayBuilder outputBab;
     outputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(outputBab.arr()));
     auto makeStageFn = [&, this](value::SlotVector scanSlots,
                                  std::unique_ptr<PlanStage> scanStage) {
         std::vector<FieldPath> paths{"a"};
@@ -181,8 +155,8 @@ TEST_F(ExtractFieldPathsStageTest, SinglePathNonNestedNonArrayToplevelFieldSlotT
             makeS<ExtractFieldPathsStage>(std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
         return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
     };
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 
@@ -190,13 +164,13 @@ TEST_F(ExtractFieldPathsStageTest, SingleToplevelFieldSlotNestedPathTest) {
     // `inputBab` is an array of subarrays. Each subarray has an element for each input slot.
     BSONArrayBuilder inputBab;
     inputBab << BSON_ARRAY(BSON("b" << 1)) << BSON_ARRAY(BSON("b" << 2));
-    auto [inputTag, inputVal] = stage_builder::makeValue(inputBab.arr());
-    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::TagValueOwned input =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(inputBab.arr()));
     // `outputBab` is an array of subarrays. Each subarray has an element for each output slot.
     BSONArrayBuilder outputBab;
     outputBab << BSON_ARRAY(1) << BSON_ARRAY(2);
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(outputBab.arr());
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    value::TagValueOwned expected =
+        value::TagValueOwned::fromRaw(stage_builder::makeValue(outputBab.arr()));
     auto makeStageFn = [&, this](value::SlotVector scanSlots,
                                  std::unique_ptr<PlanStage> scanStage) {
         std::vector<FieldPath> paths{"a.b"};
@@ -218,8 +192,8 @@ TEST_F(ExtractFieldPathsStageTest, SingleToplevelFieldSlotNestedPathTest) {
             makeS<ExtractFieldPathsStage>(std::move(scanStage), inputs, outputs, kEmptyPlanNodeId);
         return std::make_pair(outputSlots, std::move(extractFieldPathsStage));
     };
-    inputGuard.reset();
-    expectedGuard.reset();
+    auto [inputTag, inputVal] = input.releaseToRaw();
+    auto [expectedTag, expectedVal] = expected.releaseToRaw();
     runTestMulti(1, inputTag, inputVal, expectedTag, expectedVal, makeStageFn);
 }
 

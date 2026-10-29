@@ -1,0 +1,24 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//bazel/toolchains/rust:mongo_rust_toolchain.bzl", "mongo_rust_toolchains")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_rust_toolchains()
+
+# Where first-party crates get full debug info on top of the toolchain's line tables: the
+# C++ -g2/-g3 levels, on the linux targets the mongo toolchains above cover. See
+# MONGO_RUSTC_FIRST_PARTY_FLAGS.
+[
+    selects.config_setting_group(
+        name = "first_party_full_debug_info_dbg_level_" + level,
+        match_all = [
+            "@platforms//os:linux",
+            "//bazel/config:debug_symbols_enabled",
+            "//bazel/config:dbg_level_" + level,
+        ],
+    )
+    for level in [
+        "2",
+        "3",
+    ]
+]

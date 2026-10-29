@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -62,19 +36,22 @@ public:
                       bool mirrored = false,
                       boost::optional<UUID> sampleId = boost::none,
                       boost::optional<BSONObj> projSpec = boost::none,
-                      bool flipDistinctScanDirection = false)
+                      bool flipDistinctScanDirection = false,
+                      bool unwindsArrays = false)
         : _key(std::move(key)),
           _mirrored(mirrored),
           _sampleId(std::move(sampleId)),
           _projSpec(std::move(projSpec)),
-          _flipDistinctScanDirection(flipDistinctScanDirection) {}
+          _flipDistinctScanDirection(flipDistinctScanDirection),
+          _unwindsArrays(unwindsArrays) {}
 
     CanonicalDistinct(const CanonicalDistinct& other)
         : _key(other.getKey()),
           _mirrored(other.isMirrored()),
           _sampleId(other.getSampleId()),
           _projSpec(other.getProjectionSpec()),
-          _flipDistinctScanDirection(other.isDistinctScanDirectionFlipped()) {
+          _flipDistinctScanDirection(other.isDistinctScanDirectionFlipped()),
+          _unwindsArrays(other.unwindsArrays()) {
         setSortRequirement(other.getSortRequirement());
     }
 
@@ -102,6 +79,10 @@ public:
 
     bool isDistinctScanDirectionFlipped() const {
         return _flipDistinctScanDirection;
+    }
+
+    bool unwindsArrays() const {
+        return _unwindsArrays;
     }
 
     void setRewrittenGroupStage(
@@ -147,6 +128,10 @@ private:
     // preserve the semantics of the query.
     // TODO SERVER-94369: Remove this and rely entirely on '_sortRequirement'.
     bool _flipDistinctScanDirection{false};
+
+    // When set to true, signals that we are a processing a $unwind+$group query, which means that
+    // DISTINCT_SCAN may enumerate each multikey index entry as its own value.
+    bool _unwindsArrays{false};
 
     // When the aggreation rewriting is successful and the multiplanning generates a DISTINCT_SCAN,
     // we need to do the last modifications to the pipeline to be compatible with the DISTINCT_SCAN.

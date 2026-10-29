@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
 
@@ -244,7 +218,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 3000, /*docPaddingBytes*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/3000, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -274,7 +248,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID1Doc) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 1, /*docPaddingBytes*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/1, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -325,8 +299,8 @@ TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 10, /*docPaddingSize*/ 100);
-    insertPreImages(kNsUUID1, /*numPreImages*/ 1990, /*docPaddingSize*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/10, /*docPaddingBytes=*/100);
+    insertPreImages(kNsUUID1, /*numPreImages=*/1990, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -358,7 +332,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUID) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 4000, /*docPaddingBytes*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/4000, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -392,8 +366,8 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDs) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 1000, /*docPaddingSize*/ 100);
-    insertPreImages(kNsUUID1, /*numPreImages*/ 1000, /*docPaddingSize*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/1000, /*docPaddingBytes=*/100);
+    insertPreImages(kNsUUID1, /*numPreImages=*/1000, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
 
@@ -424,8 +398,8 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFew) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 1999, /*docPaddingSize*/ 100);
-    insertPreImages(kNsUUID1, /*numPreImages*/ 1, /*docPaddingSize*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/1999, /*docPaddingBytes=*/100);
+    insertPreImages(kNsUUID1, /*numPreImages=*/1, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -464,7 +438,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
     }
 
     for (const auto& nsUUID : nsUUIDs) {
-        insertPreImages(nsUUID, /*numPreImages*/ 555, /*docPaddingSize*/ 100);
+        insertPreImages(nsUUID, /*numPreImages=*/555, /*docPaddingBytes=*/100);
     }
 
     auto truncateMarkers = getInitializedTruncateMarkers();
@@ -503,7 +477,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingMultiplePassesStatsAreCumulative) {
     }
 
     for (const auto& nsUUID : nsUUIDs) {
-        insertPreImages(nsUUID, /*numPreImages*/ 555, /*docPaddingSize*/ 100);
+        insertPreImages(nsUUID, /*numPreImages=*/555, /*docPaddingBytes=*/100);
     }
 
     boost::optional<long long> prevMillis;

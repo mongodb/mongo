@@ -2,6 +2,7 @@
  * Tests that explain executionStats on a $unionWith against a view properly resolves the view and
  * shows the view's pipeline in the explain output.
  * @tags: [
+ *   uses_explain,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,

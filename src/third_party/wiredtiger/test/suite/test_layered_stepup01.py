@@ -62,10 +62,12 @@ class test_layered_stepup01(wttest.WiredTigerTestCase):
         self.pr('opening cursor')
         cursor = self.session.open_cursor(self.uri, None, None)
 
+        self.session.begin_transaction()
         for i in range(self.nitems):
             cursor["Hello " + str(i)] = "World"
             cursor["Hi " + str(i)] = "There"
             cursor["OK " + str(i)] = "Go"
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
 
         # Ensure that all data makes it to the follower.
         cursor.close()
@@ -83,10 +85,12 @@ class test_layered_stepup01(wttest.WiredTigerTestCase):
         # Part 3: Insert content to old follower
         #
         cursor = session_follow.open_cursor(self.uri, None, None)
+        session_follow.begin_transaction()
         for i in range(self.nitems):
             cursor["* Hello " + str(i)] = "World"
             cursor["* Hi " + str(i)] = "There"
             cursor["* OK " + str(i)] = "Go"
+        session_follow.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         cursor.close()
         session_follow.checkpoint()

@@ -1,37 +1,14 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/modules.h"
+
+#include <memory>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
@@ -42,17 +19,19 @@ class InMatchExpression;
 class StringListSet;
 class PlanYieldPolicySBE;
 class AccumulationStatement;
-struct WindowFunctionStatement;
 
 namespace sbe {
 class InList;
 }
 
 namespace stage_builder {
+
+class SbBlueprint;
+using namespace std::literals::string_view_literals;
 struct Environment;
 struct PlanStageStaticData;
 
-static constexpr auto kNothingEnvSlotName = "nothing"_sd;
+static constexpr auto kNothingEnvSlotName = "nothing"sv;
 
 /**
  * Common parameters to SBE stage builder functions extracted into separate class to simplify
@@ -77,24 +56,20 @@ struct StageBuilderState {
                       boost::intrusive_ptr<ExpressionContext> expCtx,
                       bool needsMerge,
                       bool allowDiskUse,
-                      IncrementalFeatureRolloutContext& ifrContext)
-        : slotIdGenerator{slotIdGenerator},
-          frameIdGenerator{frameIdGenerator},
-          spoolIdGenerator{spoolIdGenerator},
-          inListsMap{inListsMap},
-          collatorsMap{collatorsMap},
-          sortSpecMap{sortSpecMap},
-          opCtx{opCtx},
-          env{env},
-          data{data},
-          variables{variables},
-          yieldPolicy{yieldPolicy},
-          expCtx{expCtx},
-          needsMerge{needsMerge},
-          allowDiskUse{allowDiskUse},
-          ifrContext(ifrContext) {}
+                      IncrementalFeatureRolloutContext& ifrContext);
+    // The constructor and destructor are defined out of line so that this header does not need
+    // the full SbBlueprint definition.
+    ~StageBuilderState();
 
     StageBuilderState(const StageBuilderState& other) = delete;
+
+    /**
+     * Returns the blueprint tree built so far. Every SbStage handle held by the stage builders
+     * refers to a node of this blueprint.
+     */
+    SbBlueprint& blueprint() {
+        return *_blueprint;
+    }
 
     sbe::value::SlotId getGlobalVariableSlot(Variables::Id variableId);
 
@@ -113,7 +88,6 @@ struct StageBuilderState {
     sbe::value::SlotId getNothingSlot();
     sbe::value::SlotId getEmptyObjSlot();
     sbe::value::SlotId getSortSpecSlot(const AccumulationStatement* sortPattern);
-    sbe::value::SlotId getSortSpecSlot(const WindowFunctionStatement* sortPattern);
     boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
     boost::optional<sbe::value::SlotId> getCollatorSlot();
     boost::optional<sbe::value::SlotId> getOplogTsSlot();
@@ -177,9 +151,14 @@ struct StageBuilderState {
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
 
+    const bool legacyDottedPathNullSemantics;
+
     IncrementalFeatureRolloutContext& ifrContext;
 
     SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
+
+private:
+    std::unique_ptr<SbBlueprint> _blueprint;
 };  // struct StageBuilderState
 }  // namespace stage_builder
 }  // namespace mongo

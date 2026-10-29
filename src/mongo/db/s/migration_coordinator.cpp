@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/migration_coordinator.h"
 
@@ -33,21 +7,24 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -80,13 +57,17 @@ LogicalSessionId getSystemLogicalSessionId() {
 }
 
 TxnNumber getNextTxnNumber() {
-    static AtomicWord<TxnNumber> nextTxnNumber{0};
+    static Atomic<TxnNumber> nextTxnNumber{0};
     return nextTxnNumber.fetchAndAdd(2);
 }
 
 }  // namespace
 
 namespace migrationutil {
+
+void logMigrationTermination(logv2::DynamicAttributes attrs) {
+    LOGV2(12960100, "Chunk migration terminated", attrs);
+}
 
 MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            MigrationSessionId sessionId,
@@ -186,7 +167,7 @@ void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
 
 
 boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, bool clearShardCatalogCache) {
     auto decision = _migrationInfo.getDecision();
     if (!decision) {
         LOGV2(
@@ -207,7 +188,7 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
           logAttrs(_migrationInfo.getNss()));
 
     if (!_releaseRecipientCriticalSectionFuture) {
-        launchReleaseRecipientCriticalSection(opCtx);
+        launchReleaseRecipientCriticalSection(opCtx, clearShardCatalogCache);
     }
 
     // Persist the config time before the migration decision to ensure that in case of stepdown
@@ -405,13 +386,15 @@ void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
                  WriteConcernOptions{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
 
-void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContext* opCtx) {
+void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContext* opCtx,
+                                                                 bool clearShardCatalogCache) {
     _releaseRecipientCriticalSectionFuture =
         migrationutil::launchReleaseCriticalSectionOnRecipientFuture(
             opCtx,
             _migrationInfo.getRecipientShardId(),
             _migrationInfo.getNss(),
-            _migrationInfo.getMigrationSessionId());
+            _migrationInfo.getMigrationSessionId(),
+            clearShardCatalogCache);
 }
 
 void MigrationCoordinator::_waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(

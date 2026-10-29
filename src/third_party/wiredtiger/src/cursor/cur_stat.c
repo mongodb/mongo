@@ -16,6 +16,10 @@
 #define WT_STAT_KEY_MIN(cst) ((cst)->stats_base)
 #define WT_STAT_KEY_OFFSET(cst) ((cst)->key - (cst)->stats_base)
 
+#define WT_STAT_OTEL_SUBSET_FLAGS \
+    (WT_STAT_OTEL_COUNTERS | WT_STAT_OTEL_GAUGES | WT_STAT_OTEL_HISTOGRAMS | WT_STAT_OTEL_NONE)
+#define WT_STAT_OTEL_SUBSET(cst) F_ISSET(cst, WT_STAT_OTEL_SUBSET_FLAGS)
+
 /*
  * __curstat_print_value --
  *     Convert statistics cursor value to printable format.
@@ -183,6 +187,80 @@ __curstat_set_value(WT_CURSOR *cursor, ...)
 }
 
 /*
+ * __curstat_otel_next --
+ *     Move to the next statistic of the cursor's OTel type.
+ */
+static int
+__curstat_otel_next(WT_CURSOR_STAT *cst)
+{
+    if (cst->notpositioned) {
+        if (cst->otel_count == 0)
+            return (WT_NOTFOUND);
+        cst->notpositioned = false;
+        cst->otel_idx = 0;
+    } else if (cst->otel_idx + 1 < cst->otel_count)
+        ++cst->otel_idx;
+    else
+        return (WT_NOTFOUND);
+
+    cst->key = cst->otel_keys[cst->otel_idx];
+    return (0);
+}
+
+/*
+ * __curstat_otel_prev --
+ *     Move to the previous statistic of the cursor's OTel type.
+ */
+static int
+__curstat_otel_prev(WT_CURSOR_STAT *cst)
+{
+    if (cst->notpositioned) {
+        if (cst->otel_count == 0)
+            return (WT_NOTFOUND);
+        cst->notpositioned = false;
+        cst->otel_idx = cst->otel_count - 1;
+    } else if (cst->otel_idx > 0)
+        --cst->otel_idx;
+    else
+        return (WT_NOTFOUND);
+
+    cst->key = cst->otel_keys[cst->otel_idx];
+    return (0);
+}
+
+/*
+ * __curstat_otel_key_cmp --
+ *     Compare two statistics keys.
+ */
+static int
+__curstat_otel_key_cmp(const void *keyp, const void *elemp)
+{
+    int key = *(const int *)keyp;
+    int elem = *(const int *)elemp;
+    return (key < elem ? -1 : (key > elem ? 1 : 0));
+}
+
+/*
+ * __curstat_otel_search --
+ *     Position on the cursor's key if it is a statistic of the cursor's OTel type.
+ */
+static int
+__curstat_otel_search(WT_CURSOR_STAT *cst)
+{
+    /* An empty subset has no keys array to search. */
+    if (cst->otel_count == 0)
+        return (WT_NOTFOUND);
+
+    const int *found =
+      bsearch(&cst->key, cst->otel_keys, cst->otel_count, sizeof(int), __curstat_otel_key_cmp);
+    if (found == NULL)
+        return (WT_NOTFOUND);
+
+    cst->otel_idx = (u_int)(found - cst->otel_keys);
+    return (0);
+}
+
+/*
  * __curstat_next --
  *     WT_CURSOR->next method for the statistics cursor type.
  */
@@ -203,7 +281,9 @@ __curstat_next(WT_CURSOR *cursor)
     }
 
     /* Move to the next item. */
-    if (cst->notpositioned) {
+    if (WT_STAT_OTEL_SUBSET(cst))
+        WT_ERR(__curstat_otel_next(cst));
+    else if (cst->notpositioned) {
         cst->notpositioned = false;
         cst->key = WT_STAT_KEY_MIN(cst);
         if (cst->next_set != NULL)
@@ -246,7 +326,9 @@ __curstat_prev(WT_CURSOR *cursor)
     }
 
     /* Move to the previous item. */
-    if (cst->notpositioned) {
+    if (WT_STAT_OTEL_SUBSET(cst))
+        WT_ERR(__curstat_otel_prev(cst));
+    else if (cst->notpositioned) {
         cst->notpositioned = false;
         cst->key = WT_STAT_KEY_MAX(cst);
         if (cst->next_set != NULL)
@@ -287,7 +369,7 @@ __curstat_reset(WT_CURSOR *cursor)
 
     /* Reset the session statistics to zero. */
     if (strcmp(cursor->uri, "statistics:session") == 0)
-        __wt_stat_session_clear_single(&session->stats);
+        __wt_stat_session_clear_single(&session->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
 
 err:
     API_END_RET(session, ret);
@@ -316,7 +398,9 @@ __curstat_search(WT_CURSOR *cursor)
         cst->notinitialized = false;
     }
 
-    if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
+    if (WT_STAT_OTEL_SUBSET(cst))
+        WT_ERR(__curstat_otel_search(cst));
+    else if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
         WT_ERR(WT_NOTFOUND);
 
     cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
@@ -375,7 +459,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
     __wt_stat_connection_init_single(&cst->u.conn_stats);
     __wt_stat_connection_aggregate(conn->stats, &cst->u.conn_stats);
     if (F_ISSET(cst, WT_STAT_CLEAR))
-        __wt_stat_connection_clear_all(conn->stats);
+        __wt_stat_connection_clear_all(conn->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
 
     cst->stats = (int64_t *)&cst->u.conn_stats;
     cst->stats_base = WT_CONNECTION_STATS_BASE;
@@ -398,7 +482,7 @@ __init_layered_constituent_stats(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
     if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
         __wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
         if (F_ISSET(cst, WT_STAT_CLEAR))
-            __wt_stat_dsrc_clear_all(dhandle->stats);
+            __wt_stat_dsrc_clear_all(dhandle->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
     }
 
     return (ret);
@@ -432,8 +516,25 @@ __curstat_layered_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT
 
 retry:
     stable_uri = layered->stable_uri;
-    /* Now do the stable table. */
-    if (!S2C(session)->layered_table_manager.leader) {
+    /*
+     * Now do the stable table. A table created while the step-down timestamp was set has no stable
+     * constituent until a later step-up creates one, so it reports the same way a follower does.
+     */
+    if (!__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader) ||
+      __wt_atomic_load_bool_relaxed(&layered->step_down_created)) {
+        /*
+         * Neither case has the stable's pages resident in the local cache, so its non-walk stats
+         * are ~0 - except the block size, which we read from the checkpoint metadata directly since
+         * this path never opens the stable table to obtain it. A table with no stable constituent
+         * has no metadata entry either, which reads back as a size of zero.
+         */
+        if (!F_ISSET(cst, WT_STAT_TYPE_TREE_WALK)) {
+            uint64_t ckpt_size = 0;
+            WT_ERR(__wt_block_disagg_ckpt_size(session, stable_uri, &ckpt_size));
+            cst->u.dsrc_stats.block_size += (int64_t)ckpt_size;
+            goto done;
+        }
+
         /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
         WT_ERR_NOTFOUND_OK(
           __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
@@ -455,8 +556,27 @@ retry:
     }
 
     ret = __wt_session_get_dhandle(session, stable_uri, NULL, NULL, 0);
-    if (ret == EBUSY)
+    if (ret == EBUSY) {
+        /*
+         * The retry re-fetches the checkpoint name and reallocates the scratch buffer, so release
+         * both before looping.
+         */
+        __wt_free(session, checkpoint_name);
+        __wt_scr_free(session, &stable_uri_buf);
         goto retry;
+    }
+
+    /*
+     * A reader races the role change across a step-up or step-down, so a leader can still find the
+     * stable constituent missing here. The role and the step-down mark are read above without a
+     * lock: step-down clears the mark before it publishes the follower role, and step-up publishes
+     * the leader role before it creates the stable tables a follower era left missing.
+
+     */
+    if (ret == ENOENT) {
+        ret = 0;
+        goto done;
+    }
 
     WT_ERR(ret);
 
@@ -485,65 +605,167 @@ err:
 }
 
 /*
- * __wt_curstat_size_local --
- *     Fast-path size retrieval for a local file. If the file exists, set *existp and return the
- *     size via *sizep. A non-existent file is not an error; *existp will be false.
+ * __curstat_size_local --
+ *     Fast-path size retrieval for a local file. *was_fast is true if the lookup is successful, or
+ *     false if the file is missing.
  */
-int
-__wt_curstat_size_local(
-  WT_SESSION_IMPL *session, const char *filename, bool *existp, int64_t *sizep)
+static int
+__curstat_size_local(
+  WT_SESSION_IMPL *session, const char *filename, bool *was_fastp, int64_t *sizep)
 {
-    wt_off_t size;
+    *was_fastp = false;
 
-    WT_RET(__wt_fs_exist(session, filename, existp));
-    if (*existp) {
-        WT_RET(__wt_block_manager_named_size(session, filename, &size));
-        *sizep = (int64_t)size;
-    }
+    bool file_exists = false;
+    WT_RET(__wt_fs_exist(session, filename, &file_exists));
+    if (!file_exists)
+        return (0);
 
+    wt_off_t size = 0;
+    const int ret = __wt_block_manager_named_size(session, filename, &size);
+
+    /* Treat a concurrent file removal the same as the file not originally existing. */
+    WT_RET_ERROR_OK(ret, ENOENT);
+    if (ret == ENOENT)
+        return (0);
+
+    *was_fastp = true;
+    *sizep = (int64_t)size;
     return (0);
 }
 
 /*
- * __wt_curstat_size_disagg --
- *     Fast-path size retrieval for a disaggregated table. There is no local file on disk, so the
- *     size comes from the last checkpoint entry in the metadata. If found, set *existp and return
- *     the size via *sizep. A missing metadata entry is not an error; *existp will be false.
+ * __curstat_size_shared --
+ *     Fast-path size retrieval from shared-file metadata. Metadata with no checkpoint entry has a
+ *     size of zero.
  */
-int
-__wt_curstat_size_disagg(WT_SESSION_IMPL *session, const char *uri, bool *existp, int64_t *sizep)
+static int
+__curstat_size_shared(WT_SESSION_IMPL *session, const char *file_config, int64_t *sizep)
 {
-    uint64_t ckpt_size;
+    WT_ASSERT(session, file_config != NULL);
 
-    *existp = false;
-    WT_RET(__wt_block_disagg_ckpt_size(session, uri, &ckpt_size));
-    if (ckpt_size > 0) {
-        *sizep = (int64_t)ckpt_size;
-        *existp = true;
-    }
-
+    uint64_t checkpoint_size = 0;
+    WT_RET_NOTFOUND_OK(__wt_ckpt_last_size(session, file_config, &checkpoint_size));
+    *sizep = (int64_t)checkpoint_size;
     return (0);
 }
 
 /*
  * __curstat_file_size --
- *     Fast-path size retrieval for a file: URI. Try to determine the size without opening the
- *     dhandle: first check for a local file on disk, then fall back to reading the checkpoint size
- *     from the metadata (for disaggregated storage). If neither succeeds, *existp is false and the
- *     caller should fall through to the slow path.
+ *     Fast-path size retrieval for a file URI. On a disaggregated connection, use file metadata to
+ *     select the size source. A missing metadata entry returns WT_NOTFOUND.
  */
 static int
-__curstat_file_size(
-  WT_SESSION_IMPL *session, const char *uri, const char *filename, bool *existp, int64_t *sizep)
+__curstat_file_size(WT_SESSION_IMPL *session, const char *file_uri, bool *was_fastp, int64_t *sizep)
 {
-    /* Try the local file first. */
-    WT_RET(__wt_curstat_size_local(session, filename, existp, sizep));
-    if (*existp)
+    const char *filename = file_uri;
+    WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
+
+    *was_fastp = false;
+
+    WT_DECL_RET;
+    char *file_config = NULL;
+    bool shared = false;
+
+    if (__wt_conn_is_disagg(session)) {
+        WT_ERR(__wt_metadata_search(session, file_uri, &file_config));
+        const char *config[] = {WT_CONFIG_BASE(session, file_meta), file_config, NULL};
+
+        /* Use the block manager to classify if the file is disagg or not. */
+        WT_ERR(__wt_btree_shared(session, file_uri, config, &shared));
+    }
+
+    if (shared) {
+        WT_ERR(__curstat_size_shared(session, file_config, sizep));
+        *was_fastp = true;
+    } else
+        WT_ERR(__curstat_size_local(session, filename, was_fastp, sizep));
+
+err:
+    __wt_free(session, file_config);
+    return (ret);
+}
+
+/*
+ * __curstat_table_size --
+ *     Fast-path size retrieval for a simple table URI. A missing table metadata entry returns
+ *     WT_NOTFOUND.
+ */
+static int
+__curstat_table_size(
+  WT_SESSION_IMPL *session, const char *table_uri, bool *was_fastp, int64_t *sizep)
+{
+    const char *table_name = table_uri;
+    WT_PREFIX_SKIP_REQUIRED(session, table_name, "table:");
+
+    *was_fastp = false;
+
+    WT_DECL_RET;
+    WT_CONFIG_ITEM column_config = {0};
+    WT_ITEM uri_buffer = {0};
+    bool simple = false;
+    char *stable_config = NULL;
+    char *table_config = NULL;
+
+    /* Only tables that are "simple" (no named columns) can use the fast path. */
+    WT_RET(__wt_metadata_search(session, table_uri, &table_config));
+    WT_ERR(__wt_config_getones(session, table_config, "columns", &column_config));
+    WT_ERR(__wt_is_simple_table(session, &column_config, &simple));
+    if (!simple)
+        goto err;
+
+    /* A stable file is always shared, so read its metadata directly. */
+    if (__wt_conn_is_disagg(session)) {
+        WT_ERR(__wt_buf_fmt(session, &uri_buffer, "file:%s.wt_stable", table_name));
+        ret = __wt_metadata_search(session, uri_buffer.data, &stable_config);
+        if (ret == 0) {
+            WT_ERR(__curstat_size_shared(session, stable_config, sizep));
+            *was_fastp = true;
+        }
+        WT_ERR_NOTFOUND_OK(ret, false);
+    }
+
+    /* At this point, disagg or not, fall back to the local non-layered file. */
+    if (!*was_fastp) {
+        WT_ERR(__wt_buf_fmt(session, &uri_buffer, "file:%s.wt", table_name));
+        WT_ERR_NOTFOUND_OK(__curstat_file_size(session, uri_buffer.data, was_fastp, sizep), false);
+    }
+
+err:
+    __wt_free(session, stable_config);
+    __wt_free(session, table_config);
+    __wt_buf_free(session, &uri_buffer);
+    return (ret);
+}
+
+/*
+ * __curstat_size --
+ *     Fast-path size retrieval for a file or table URI.
+ */
+static int
+__curstat_size(WT_SESSION_IMPL *session, const char *uri, bool *was_fastp, int64_t *sizep)
+{
+    bool checkpoint_view;
+
+    WT_ASSERT(session, uri != NULL);
+    WT_ASSERT(session, was_fastp != NULL);
+    WT_ASSERT(session, sizep != NULL);
+
+    *was_fastp = false;
+    *sizep = 0;
+
+    if (WT_PREFIX_MATCH(uri, "table:"))
+        return (__curstat_table_size(session, uri, was_fastp, sizep));
+
+    WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
+
+    /* Checkpoint-view URIs require the slow path. */
+    checkpoint_view = false;
+    if (__wt_conn_is_disagg(session))
+        WT_RET(__wt_btree_name_is_shared_checkpoint(session, uri, &checkpoint_view));
+    if (checkpoint_view)
         return (0);
 
-    /* No local file; check the metadata for a disagg checkpoint size. */
-    WT_RET(__wt_curstat_size_disagg(session, uri, existp, sizep));
-    return (0);
+    return (__curstat_file_size(session, uri, was_fastp, sizep));
 }
 
 /*
@@ -556,32 +778,6 @@ __curstat_file_init(
 {
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
-    int64_t size;
-    const char *filename;
-    bool exist;
-
-    /*
-     * If we are only getting the size of the file, try to avoid opening the dhandle. This only
-     * applies to file: types. Tiered tables need to use the dhandle. If the fast path fails to
-     * determine a size, fall through to the slow path below.
-     */
-    if (F_ISSET(cst, WT_STAT_TYPE_SIZE) && WT_PREFIX_MATCH(uri, "file:")) {
-        filename = uri;
-        WT_PREFIX_SKIP(filename, "file:");
-
-        size = 0;
-        WT_RET(__curstat_file_size(session, uri, filename, &exist, &size));
-        if (exist) {
-            __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
-            cst->u.dsrc_stats.block_size = size;
-            __wt_curstat_dsrc_final(cst);
-            return (0);
-        }
-        /*
-         * Neither the local file nor the disagg metadata entry was found; fall through to the slow
-         * path which opens the dhandle.
-         */
-    }
 
     WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0, NULL, NULL));
     dhandle = session->dhandle;
@@ -594,7 +790,7 @@ __curstat_file_init(
         __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
         __wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
         if (F_ISSET(cst, WT_STAT_CLEAR))
-            __wt_stat_dsrc_clear_all(dhandle->stats);
+            __wt_stat_dsrc_clear_all(dhandle->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
         __wt_curstat_dsrc_final(cst);
     }
 
@@ -602,22 +798,6 @@ __curstat_file_init(
     WT_TRET(__wt_session_release_dhandle(session));
 
     return (ret);
-}
-
-/*
- * __curstat_tiered_init --
- *     Initialize the statistics for a tiered table.
- */
-static int
-__curstat_tiered_init(
-  WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
-{
-    /*
-     * This is currently just a wrapper for the file initialization to get block manager level
-     * statistics. If or when we want to collect statistics on objects then this function will need
-     * to use schema operations to work down from the active object to other flushed objects.
-     */
-    return (__curstat_file_init(session, uri, cfg, cst));
 }
 
 /*
@@ -645,7 +825,7 @@ __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
      */
     memcpy(&cst->u.session_stats, &session->stats, sizeof(WT_SESSION_STATS));
     if (F_ISSET(cst, WT_STAT_CLEAR))
-        __wt_stat_session_clear_single(&session->stats);
+        __wt_stat_session_clear_single(&session->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
 
     cst->stats = (int64_t *)&cst->u.session_stats;
     cst->stats_base = WT_SESSION_STATS_BASE;
@@ -654,14 +834,13 @@ __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 }
 
 /*
- * __wt_curstat_init --
- *     Initialize a statistics cursor.
+ * __curstat_init_stats --
+ *     Initialize a statistics cursor's set of keys to expose.
  */
-int
-__wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
+static int
+__curstat_init_stats(
+  WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
-    const char *dsrc_uri;
-
     if (strcmp(uri, "statistics:") == 0) {
         __curstat_conn_init(session, cst);
         return (0);
@@ -669,7 +848,22 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
 
     /* Data source statistics are only available after recovery completes. */
     WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_RECOVERY_COMPLETE));
-    dsrc_uri = uri + strlen("statistics:");
+    const char *dsrc_uri = uri + strlen("statistics:");
+
+    /* Resolve file or simple-table sizes without opening dhandles or performing schema ops. */
+    if (F_ISSET(cst, WT_STAT_TYPE_SIZE) &&
+      (WT_PREFIX_MATCH(dsrc_uri, "file:") || WT_PREFIX_MATCH(dsrc_uri, "table:"))) {
+        bool was_fast = false;
+        int64_t size = 0;
+        WT_RET(__curstat_size(session, dsrc_uri, &was_fast, &size));
+
+        if (was_fast) {
+            __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+            cst->u.dsrc_stats.block_size = size;
+            __wt_curstat_dsrc_final(cst);
+            return (0);
+        }
+    }
 
     if (strcmp(dsrc_uri, "session") == 0) {
         __curstat_session_init(session, cst);
@@ -684,12 +878,48 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
         WT_RET(__curstat_layered_init(session, dsrc_uri, cst));
     else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
         WT_RET(__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
-    else if (WT_PREFIX_MATCH(dsrc_uri, "tiered:"))
-        WT_RET(__curstat_tiered_init(session, dsrc_uri, cfg, cst));
     else
         return (__wt_bad_object_type(session, uri));
 
     return (0);
+}
+
+/*
+ * __curstat_otel_init --
+ *     Initialize a statistics cursor's OTel set of keys to expose and related fields.
+ */
+static int
+__curstat_otel_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
+{
+    cst->otel_keys = NULL;
+    cst->otel_count = 0;
+    cst->otel_idx = 0;
+
+    if (!WT_STAT_OTEL_SUBSET(cst))
+        return (0);
+
+    uint32_t otel_flag = F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS);
+    switch (cst->stats_base) {
+    case WT_CONNECTION_STATS_BASE:
+        return (__wt_stat_connection_otel_keys(otel_flag, &cst->otel_keys, &cst->otel_count));
+    case WT_DSRC_STATS_BASE:
+        return (__wt_stat_dsrc_otel_keys(otel_flag, &cst->otel_keys, &cst->otel_count));
+    case WT_SESSION_STATS_BASE:
+        return (__wt_stat_session_otel_keys(otel_flag, &cst->otel_keys, &cst->otel_count));
+    default:
+        return (__wt_illegal_value(session, cst->stats_base));
+    }
+}
+
+/*
+ * __wt_curstat_init --
+ *     Initialize a statistics cursor.
+ */
+int
+__wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
+{
+    WT_RET(__curstat_init_stats(session, uri, cfg, cst));
+    return (__curstat_otel_init(session, cst));
 }
 
 /*
@@ -811,6 +1041,34 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
         /* If the connection configures clear, so do we. */
         if (FLD_ISSET(conn->stat_flags, WT_STAT_CLEAR))
             F_SET(cst, WT_STAT_CLEAR);
+
+        /*
+         * Parse the OTel-specific statistics type flags after inheriting the connection's
+         * configurations.
+         */
+        uint32_t otel_flags = 0;
+        if ((ret = __wt_config_subgets(session, &cval, "otel_none", &sval)) == 0 && sval.val != 0)
+            otel_flags |= WT_STAT_OTEL_NONE;
+        WT_ERR_NOTFOUND_OK(ret, false);
+        if ((ret = __wt_config_subgets(session, &cval, "otel_counters", &sval)) == 0 &&
+          sval.val != 0)
+            otel_flags |= WT_STAT_OTEL_COUNTERS;
+        WT_ERR_NOTFOUND_OK(ret, false);
+        if ((ret = __wt_config_subgets(session, &cval, "otel_gauges", &sval)) == 0 && sval.val != 0)
+            otel_flags |= WT_STAT_OTEL_GAUGES;
+        WT_ERR_NOTFOUND_OK(ret, false);
+        if ((ret = __wt_config_subgets(session, &cval, "otel_histograms", &sval)) == 0 &&
+          sval.val != 0)
+            otel_flags |= WT_STAT_OTEL_HISTOGRAMS;
+        WT_ERR_NOTFOUND_OK(ret, false);
+
+        /* Clearing the lowest set bit leaves a nonzero result only if more than one was set. */
+        if ((otel_flags & (otel_flags - 1)) != 0)
+            WT_ERR_MSG(session, EINVAL,
+              "Only one of otel_none, otel_counters, otel_gauges, otel_histograms configuration "
+              "values should be "
+              "specified");
+        F_SET(cst, otel_flags);
     }
 
     /*
@@ -857,3 +1115,32 @@ err:
 
     return (ret);
 }
+
+#ifdef HAVE_UNITTEST
+int
+__ut_curstat_size_local(
+  WT_SESSION_IMPL *session, const char *filename, bool *was_fastp, int64_t *sizep)
+{
+    return (__curstat_size_local(session, filename, was_fastp, sizep));
+}
+
+int
+__ut_curstat_size_shared(WT_SESSION_IMPL *session, const char *file_config, int64_t *sizep)
+{
+    return (__curstat_size_shared(session, file_config, sizep));
+}
+
+int
+__ut_curstat_file_size(
+  WT_SESSION_IMPL *session, const char *file_uri, bool *was_fastp, int64_t *sizep)
+{
+    return (__curstat_file_size(session, file_uri, was_fastp, sizep));
+}
+
+int
+__ut_curstat_table_size(
+  WT_SESSION_IMPL *session, const char *table_uri, bool *was_fastp, int64_t *sizep)
+{
+    return (__curstat_table_size(session, table_uri, was_fastp, sizep));
+}
+#endif

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -70,7 +44,7 @@ namespace mongo {
 /**
  * Keeps track of the transaction state. A session is in use when it is being used by a request.
  */
-class MONGO_MOD_PUB TransactionRouter {
+class [[MONGO_MOD_PUBLIC]] TransactionRouter {
     struct PrivateState;
     struct ObservableState;
 
@@ -105,7 +79,7 @@ public:
      * cannot be changed without restarting the transactions that may have already been begun on
      * every participant, i.e. clearing the current participant list.
      */
-    struct MONGO_MOD_PRIVATE SharedTransactionOptions {
+    struct [[MONGO_MOD_PRIVATE]] SharedTransactionOptions {
         // Set for all distributed transactions.
         TxnNumberAndRetryCounter txnNumberAndRetryCounter;
         APIParameters apiParameters;
@@ -117,6 +91,8 @@ public:
         boost::optional<LogicalTime> placementConflictTimeForNonSnapshotReadConcern;
 
         bool isInternalTransactionForRetryableWrite;
+
+        bool isServerInitiatedTransaction;
     };
 
     /**
@@ -156,6 +132,21 @@ public:
 
         // True if this participant operates as a subrouter in the transaction.
         bool isSubRouter{false};
+
+        // The replication term observed for this participant. Set on the first reply that
+        // carries a term (in the `term` sub-field of `$replData`, or for additional
+        // participants, in AdditionalParticipantInfo.term). A subsequent reply with a
+        // different term means the participant's primary changed mid-transaction; under
+        // unprepared 2PC that means the in-memory transaction state on the old primary was
+        // lost, so the router aborts the transaction.
+        boost::optional<std::int64_t> term;
+    };
+
+    // Forwarded by a sub-router in its TxnResponseMetadata.additionalParticipants reply, so
+    // the upstream router can detect a participant that changed primaries mid-transaction.
+    struct AdditionalParticipantInfoLocal {
+        boost::optional<bool> readOnly;
+        boost::optional<std::int64_t> term;
     };
 
     /**
@@ -165,11 +156,14 @@ public:
     struct ParsedParticipantResponseMetadata {
         Status status;
         TxnResponseMetadata txnResponseMetadata;
+        // Replication term observed from the participant, read from $replData.term.
+        // boost::none when the participant did not include it (older binary).
+        boost::optional<std::int64_t> observedTerm;
     };
 
     // Container for timing stats for the current transaction. Includes helpers for calculating some
     // metrics like transaction duration.
-    struct MONGO_MOD_PRIVATE TimingStats {
+    struct [[MONGO_MOD_PRIVATE]] TimingStats {
         /**
          * Returns the duration of the transaction. The transaction start time must have been set
          * before this can be called.
@@ -279,13 +273,14 @@ public:
         void trySetInactive(TickSource* tickSource, TickSource::Tick curTicks);
 
         /**
-         * Marks the transaction as having begun commit, updating relevent stats. Assumes the
+         * Marks the transaction as having begun commit, updating relevant stats. Assumes the
          * transaction is currently active.
          */
         void startCommit(TickSource* tickSource,
                          TickSource::Tick curTicks,
                          TransactionRouter::CommitType commitType,
-                         std::size_t numParticipantsAtCommit);
+                         std::size_t numParticipantsAtCommit,
+                         bool isServerInitiated);
 
         /**
          * Marks the transaction as over, updating stats based on the termination cause, which is
@@ -295,7 +290,8 @@ public:
                             TickSource::Tick curTicks,
                             TransactionRouter::TerminationCause terminationCause,
                             TransactionRouter::CommitType commitType,
-                            std::string_view abortCause);
+                            std::string_view abortCause,
+                            bool isServerInitiated);
 
     private:
         // Pointer to the service context used to get the tick source and router wide transaction
@@ -385,6 +381,14 @@ public:
         void beginOrContinueTxn(OperationContext* opCtx,
                                 TxnNumber txnNumber,
                                 TransactionActions action);
+
+        /**
+         * Explicit override to indicate that a transaction is server-initiated even though
+         * it runs on an external user's opCtx, e.g. for the legacy WouldChangeOwningShard
+         * flow, where a retryable write is promoted to a transaction. Must follow
+         * beginOrContinueTxn, after _resetRouterState resets isServerInitiatedTransaction.
+         */
+        void setIsServerInitiatedTransaction(OperationContext* opCtx);
 
         /**
          * Updates transaction diagnostics and, if necessary, the number of active yielders when the
@@ -512,16 +516,17 @@ public:
 
         /**
          * If this router is a sub-router and the txnNumber and retryCounter match that on the
-         * opCtx, returns a map containing {participantShardId : readOnly} for each
+         * opCtx, returns a map containing {participantShardId : {readOnly, term}} for each
          * participant added by this router. It's possible that readOnly is not set if either an
-         * error occured before receiving a response from a particular shard, or a shard returned an
-         * error.
+         * error occurred before receiving a response from a particular shard, or a shard returned
+         * an error. `term` is the replication term most recently observed for that participant; it
+         * is empty until the first response from the participant has been processed.
          *
          * Returns boost::none if this router is not a sub-router, or if the txnNumber or
          * retryCounter on this router do not match that on the opCtx.
          */
-        boost::optional<StringMap<boost::optional<bool>>> getAdditionalParticipantsForResponse(
-            OperationContext* opCtx);
+        boost::optional<StringMap<AdditionalParticipantInfoLocal>>
+        getAdditionalParticipantsForResponse(OperationContext* opCtx);
 
         /**
          * Returns whether it is safe to retry a command that failed with a stale error. It is not
@@ -553,6 +558,26 @@ public:
          * errors, but ignores the responses from each shard.
          */
         void implicitlyAbortTransaction(OperationContext* opCtx, const Status& status);
+
+        /**
+         * Latches a participant-metadata failure (e.g. a participant primary change) discovered
+         * on a cursor-cleanup drain, where the error cannot be thrown back to a client. The latched
+         * status is thrown by raiseDeferredAbortIfNeeded() at the end of the command whose cleanup
+         * observed it; that command's error path runs the implicit abort and consumes the latch.
+         * No-op if the router is uninitialized, the transaction is already terminating (which also
+         * covers a coordinator-owned commit), or the router is a sub-router (which has no command
+         * hook that could raise a latch; its observations surface via later metadata to the
+         * top-level router, or fail-late at prepare). Never throws.
+         */
+        void recordDeferredAbort(const Status& status);
+
+        /**
+         * Throws the latched deferred-abort status if one is pending, without consuming the latch
+         * or aborting: the caller's error path runs the implicit abort, which consumes the latch.
+         * No-op if nothing is latched. A latched abort implies an initialized router (a new
+         * txnNumber clears the latch via _resetRouterState), which is asserted.
+         */
+        void raiseDeferredAbortIfNeeded();
 
         /**
          * If a coordinator has been selected for this transaction already, constructs a recovery
@@ -697,6 +722,17 @@ public:
                                 boost::optional<bool> isSubRouter);
 
         /**
+         * Records the replication term observed for `shard` on first contact, or asserts
+         * `NoSuchTransaction` if the participant's previously-recorded term differs. A term
+         * change always indicates the participant's primary changed mid-transaction — unprepared
+         * 2PC state on the old primary was lost — so the transaction must abort with a
+         * retryable error rather than commit a partial result.
+         */
+        void _validateAndRecordParticipantTerm(OperationContext* opCtx,
+                                               const ShardId& shard,
+                                               boost::optional<std::int64_t> observedTerm);
+
+        /**
          * Updates relevant metrics when the router receives an explicit abort from the client.
          */
         void _onExplicitAbort(OperationContext* opCtx);
@@ -723,7 +759,7 @@ public:
         void _onNonRetryableCommitError(OperationContext* opCtx, Status commitStatus);
 
         /**
-         * Updates relevent metrics when a transaction is continued.
+         * Updates relevant metrics when a transaction is continued.
          */
         void _onContinue(OperationContext* opCtx);
 
@@ -899,6 +935,10 @@ private:
         // Indicates whether the router was created by a shard that is an active transaction
         // participant.
         bool subRouter{false};
+
+        // Indicates if the current transaction was started by the server itself (internal
+        // transaction) rather than explicitly by a user. Set when the transaction starts.
+        bool isServerInitiatedTransaction{false};
     } _o;
 
     /**
@@ -929,6 +969,11 @@ private:
 
         // Track whether commit or abort have been initiated.
         bool terminationInitiated{false};
+
+        // A participant-metadata failure discovered on a cursor-cleanup drain, latched to be
+        // raised at the end of the observing command (whose error path runs the implicit abort).
+        // Unset means no deferred abort is pending.
+        boost::optional<Status> deferredAbort;
 
         // Tracks databases that this transaction has attempted to create.
         std::set<DatabaseName> createdDatabases;

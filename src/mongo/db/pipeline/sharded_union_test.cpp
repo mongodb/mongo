@@ -1,36 +1,7 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -69,7 +40,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -92,6 +62,10 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 
 namespace mongo {
 namespace {
@@ -244,14 +218,14 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     ChunkType chunk1(cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
-                     ShardRef{"0"});
+                     {"0"});
     chunk1.setName(OID::gen());
     version.incMinor();
 
     ChunkType chunk2(cm.getUUID(),
                      {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{"1"});
+                     {"1"});
     chunk2.setName(OID::gen());
     version.incMinor();
 
@@ -332,21 +306,19 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     ChunkType chunk1(cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
-                     ShardRef{shards[0].getName()});
+                     {shards[0].getName()});
     chunk1.setName(OID::gen());
     version.incMinor();
 
-    ChunkType chunk2(cm.getUUID(),
-                     {BSON("_id" << 0), BSON("_id" << 10)},
-                     version,
-                     ShardRef{shards[1].getName()});
+    ChunkType chunk2(
+        cm.getUUID(), {BSON("_id" << 0), BSON("_id" << 10)}, version, {shards[1].getName()});
     chunk2.setName(OID::gen());
     version.incMinor();
 
     ChunkType chunk3(cm.getUUID(),
                      {BSON("_id" << 10), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{shards[0].getName()});
+                     {shards[0].getName()});
     chunk3.setName(OID::gen());
 
     expectCollectionAndChunksAggregation(
@@ -436,7 +408,7 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
         cm.getUUID(),
         {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
         version,
-        ShardRef{shards[0].getName()});
+        {shards[0].getName()});
     chunk1.setName(OID::gen());
 
     expectCollectionAndChunksAggregation(
@@ -497,14 +469,14 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     ChunkType chunk1(cm.getUUID(),
                      {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
                      version,
-                     ShardRef{"0"});
+                     {"0"});
     chunk1.setName(OID::gen());
     version.incMinor();
 
     ChunkType chunk2(cm.getUUID(),
                      {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
                      version,
-                     ShardRef{"1"});
+                     {"1"});
     chunk2.setName(OID::gen());
     version.incMinor();
 
@@ -520,12 +492,12 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             Status{ResolvedNamespace{expectedBackingNs, expectedBackingNs, viewPipeline, BSONObj()},
-                   "It was a view!"_sd});
+                   "It was a view!"sv});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             Status{ResolvedNamespace{expectedBackingNs, expectedBackingNs, viewPipeline, BSONObj()},
-                   "It was a view!"_sd});
+                   "It was a view!"sv});
     });
 
     // That error should be incorporated, then we should target both shards. The results should be

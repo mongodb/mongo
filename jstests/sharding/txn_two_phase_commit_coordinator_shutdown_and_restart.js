@@ -7,10 +7,6 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction, requires_persistence]
  */
 
-// The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
-// test causes failovers on a shard, so the cached connection is not usable.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 // Since we expect prepared transactions in progress when shutting down a node, we will need to skip
 // these validation checks.
 TestData.skipCheckDBHashes = true;

@@ -74,9 +74,7 @@ class test_layered_delta11(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.session.checkpoint()
 
         # Verify that we haven't written any internal page delta
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_internal][2], 0)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_internal, uri), 0)
 
     def test_inserts_to_split(self):
         uri = f"layered:{self.test_name}"
@@ -111,9 +109,7 @@ class test_layered_delta11(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.session.checkpoint()
 
         # Verify that we haven't written any internal page delta
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_internal][2], 0)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_internal, uri), 0)
 
     def test_deletes(self):
         uri = f"layered:{self.test_name}"
@@ -151,6 +147,4 @@ class test_layered_delta11(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.session.checkpoint()
 
         # Verify that we haven't written any internal page delta
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
-        self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_internal][2], 0)
-        stat_cursor.close()
+        self.assertEqual(self.get_stat(stat.dsrc.rec_page_delta_internal, uri), 0)

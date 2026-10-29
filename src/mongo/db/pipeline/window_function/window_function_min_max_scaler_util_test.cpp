@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/window_function/window_function_min_max_scaler_util.h"
 
@@ -43,7 +17,9 @@ namespace {
 
 class WindowFunctionMinMaxScalerUtilTest : public AggregationContextFixture {
 public:
-    WindowFunctionMinMaxScalerUtilTest() : expCtx(getExpCtx()) {
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        expCtx = getExpCtx();
         auto collator = std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString);
         expCtx->setCollator(std::move(collator));
@@ -79,8 +55,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultAllZerosTest) {
                                 Value(0),  // windowMin
                                 Value(0),  // windowMax
                                 Value(0),  // sMin
-                                Value(0)   // sMax
-    );
+                                /*sMax=*/Value(0));
 }
 
 // Tests that if windowMin and windowMax are equal, sMin is always returned.
@@ -90,8 +65,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowMinAndMaxEqualTest
     assertComputeResultExpected(Value(0),          // expectedResult
                                 Value(windowMin),  // currentValue
                                 Value(windowMin),  // windowMin
-                                Value(windowMin)   // windowMax
-    );
+                                /*windowMax=*/Value(windowMin));
 
     // Test same case, with sMin and sMax scaled.
     int sMin = getRandomBetweenBounds(1, 1000);
@@ -101,8 +75,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowMinAndMaxEqualTest
                                 Value(windowMin),  // windowMin
                                 Value(windowMin),  // windowMax
                                 Value(sMin),       // sMin
-                                Value(sMax)        // sMax
-    );
+                                /*sMax=*/Value(sMax));
 }
 
 // Tests that if current value is windowMin, sMin is always returned
@@ -113,8 +86,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultResultIsWindowMinTest) {
     assertComputeResultExpected(Value(0),          // expectedResult
                                 Value(windowMin),  // currentValue
                                 Value(windowMin),  // windowMin
-                                Value(windowMax)   // windowMax
-    );
+                                /*windowMax=*/Value(windowMax));
 
     // Test same case, with sMin and sMax scaled.
     int sMin = getRandomBetweenBounds(1, 1000);
@@ -124,8 +96,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultResultIsWindowMinTest) {
                                 Value(windowMin),  // windowMin
                                 Value(windowMax),  // windowMax
                                 Value(sMin),       // sMin
-                                Value(sMax)        // sMax
-    );
+                                /*sMax=*/Value(sMax));
 }
 
 // Tests that if the current value is the windowMax, sMax is always returned
@@ -136,8 +107,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultCurrentIsWindowMaxTest) 
     assertComputeResultExpected(Value(1),          // expectedResult
                                 Value(windowMax),  // currentValue
                                 Value(windowMin),  // windowMin
-                                Value(windowMax)   // windowMax
-    );
+                                /*windowMax=*/Value(windowMax));
 
     // Test same case, with sMin and sMax scaled.
     int sMin = getRandomBetweenBounds(1, 1000);
@@ -147,8 +117,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultCurrentIsWindowMaxTest) 
                                 Value(windowMin),  // windowMin
                                 Value(windowMax),  // windowMax
                                 Value(sMin),       // sMin
-                                Value(sMax)        // sMax
-    );
+                                /*sMax=*/Value(sMax));
 }
 
 // Tests that if the current value is between the windowMin and windowMax,
@@ -165,8 +134,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateTest) 
         assertComputeResultExpected(Value(expectedValue),  // expectedResult
                                     Value(currentValue),   // currentValue
                                     Value(windowMin),      // windowMin
-                                    Value(windowMax)       // windowMax
-        );
+                                    /*windowMax=*/Value(windowMax));
     }
 
     // Test same case, with sMin and sMax scaled.
@@ -181,8 +149,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateTest) 
                                     Value(windowMin),      // windowMin
                                     Value(windowMax),      // windowMax
                                     Value(sMin),           // sMin
-                                    Value(sMax)            // sMax
-        );
+                                    /*sMax=*/Value(sMax));
     }
 }
 
@@ -201,8 +168,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateWithDo
         assertComputeResultExpected(Value(expectedValue),  // expectedResult
                                     Value(currentValue),   // currentValue
                                     Value(windowMin),      // windowMin
-                                    Value(windowMax)       // windowMax
-        );
+                                    /*windowMax=*/Value(windowMax));
     }
 
     // Test same case, with sMin and sMax scaled.
@@ -219,8 +185,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateWithDo
                                     Value(windowMin),      // windowMin
                                     Value(windowMax),      // windowMax
                                     Value(sMin),           // sMin
-                                    Value(sMax)            // sMax
-        );
+                                    /*sMax=*/Value(sMax));
     }
 }
 

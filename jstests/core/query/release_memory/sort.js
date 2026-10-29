@@ -13,12 +13,15 @@
  *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
  *   # consistent, no add/remove shard operations should occur during the test.
  *   assumes_stable_shard_list,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
+    runReleaseMemoryTestWithRetries,
     setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -89,11 +92,20 @@ const pipelines = [
 for (let pipeline of pipelines) {
     jsTest.log.info("Testing pipeline: ", pipeline);
 
-    let previousSpillCount = getSortSpillCounter();
-    assertCursorSortedByIndex(coll.aggregate(pipeline));
-    assert.eq(previousSpillCount, getSortSpillCounter());
+    // Verify that a full aggregate without releaseMemory does not spill. Wrapped in retries
+    // because background $group operations (which use the sorter) can increment the sort spill
+    // counter and cause false failures, especially in slow builds like TSAN.
+    runReleaseMemoryTestWithRetries(() => {
+        let previousSpillCount = getSortSpillCounter();
+        assertCursorSortedByIndex(coll.aggregate(pipeline));
+        assert.eq(previousSpillCount, getSortSpillCounter());
+    });
 
-    {
+    // Verify that releaseMemory spills the cursor's sort data. Each sub-test reads its own
+    // baseline to avoid cross-contamination from background spill activity.
+    runReleaseMemoryTestWithRetries(() => {
+        let previousSpillCount = getSortSpillCounter();
+
         const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
         const cursorId = cursor.getId();
         assert.eq(previousSpillCount, getSortSpillCounter());
@@ -102,10 +114,9 @@ for (let pipeline of pipelines) {
         assert.commandWorked(releaseMemoryRes);
         assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
         assert.lt(previousSpillCount, getSortSpillCounter());
-        previousSpillCount = getSortSpillCounter();
 
         assertCursorSortedByIndex(cursor);
-    }
+    });
 
     {
         const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}, allowDiskUse: false});
@@ -121,6 +132,8 @@ for (let pipeline of pipelines) {
         assertCursorSortedByIndex(cursor);
     }
 
+    // Verify behavior with a reduced sort memory limit. Use try-finally to guarantee the limit
+    // is restored even if an assertion fails inside the block.
     {
         const originalKnobValue = getServerParameter(sortMemoryLimitKnob);
         setServerParameter(sortMemoryLimitKnob, 5 * 1024 * 1024);
@@ -132,19 +145,25 @@ for (let pipeline of pipelines) {
         if (sbeFullyEnabled) {
             coll.getPlanCache().clear();
         }
+        try {
+            runReleaseMemoryTestWithRetries(() => {
+                let previousSpillCount = getSortSpillCounter();
 
-        const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
-        const cursorId = cursor.getId();
-        assert.lt(previousSpillCount, getSortSpillCounter());
-        previousSpillCount = getSortSpillCounter();
+                const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
+                const cursorId = cursor.getId();
+                assert.lt(previousSpillCount, getSortSpillCounter());
+                previousSpillCount = getSortSpillCounter();
 
-        const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
-        assert.commandWorked(releaseMemoryRes);
-        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-        assert.eq(previousSpillCount, getSortSpillCounter());
+                const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
+                assert.commandWorked(releaseMemoryRes);
+                assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+                assert.eq(previousSpillCount, getSortSpillCounter());
 
-        assertCursorSortedByIndex(cursor);
-        setServerParameter(sortMemoryLimitKnob, originalKnobValue);
+                assertCursorSortedByIndex(cursor);
+            });
+        } finally {
+            setServerParameter(sortMemoryLimitKnob, originalKnobValue);
+        }
     }
 
     // No disk space available for spilling.

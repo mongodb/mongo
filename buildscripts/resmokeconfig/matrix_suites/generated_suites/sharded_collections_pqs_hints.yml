@@ -20,7 +20,7 @@ executor:
     shell_options:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");;
-        await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+        await import("jstests/libs/override_methods/query/make_cursor_hints_into_query_settings.js");
       global_vars:
         TestData:
           isHintsToQuerySettingsSuite: true
@@ -31,13 +31,13 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
     num_shards: 2
@@ -106,6 +106,7 @@ selector:
     - jstests/core/index/wildcard/wildcard_index_filter.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/query/index_key_expression.js
     - jstests/core/index/geo/geo6.js
     - jstests/core/index/index_check6.js
     - jstests/core/index/index_diag.js

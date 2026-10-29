@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/fle_crud.h"
@@ -70,7 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
@@ -210,7 +184,7 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 
 UUID fieldNameToUUID(std::string_view field) {
     std::array<char, UUID::kNumBytes> buf;
-    murmur3(field, 123456 /*seed*/, buf);
+    murmur3(field, /*seed=*/123456, buf);
     return UUID::fromCDR(buf);
 }
 
@@ -1599,7 +1573,7 @@ EncryptedFieldConfig makeTextEfcSingleField(std::string_view path,
     qtc.setCaseSensitive(true);
     qtc.setDiacriticSensitive(true);
     EncryptedField ef(keyId, std::string{path});
-    ef.setBsonType("string"_sd);
+    ef.setBsonType("string"sv);
     ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtc)});
     EncryptedFieldConfig efc({std::move(ef)});
     efc.setEscCollection(std::string{"enxcol_.coll.esc"});
@@ -1612,10 +1586,10 @@ EncryptedFieldConfig makeTextEfcSingleField(std::string_view path,
 TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
     unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
-    auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
+    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, /*contention=*/1);
     auto fields = efc.getFields();
 
-    auto doc = makeTextInsertPayload("encrypted"_sd, keyId, 100 /* sampled c */);
+    auto doc = makeTextInsertPayload("encrypted"sv, keyId, 100 /* sampled c */);
     auto payload = EDCServerCollection::getEncryptedFieldInfo(doc);
     ASSERT_THROWS_CODE(
         validateInsertUpdatePayloads(_opCtx.get(), fields, payload), DBException, 9188700);
@@ -1624,10 +1598,10 @@ TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
 TEST_F(FleCrudTest, validateTextSearchInsertValidContention) {
     unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
-    auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
+    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, /*contention=*/1);
     auto fields = efc.getFields();
 
-    auto doc = makeTextInsertPayload("encrypted"_sd, keyId, 1 /* sampled c */);
+    auto doc = makeTextInsertPayload("encrypted"sv, keyId, 1 /* sampled c */);
     auto payload = EDCServerCollection::getEncryptedFieldInfo(doc);
     validateInsertUpdatePayloads(_opCtx.get(), fields, payload);
 }
@@ -1942,14 +1916,7 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
     std::vector<QueryTypeConfig> qtcs;
     for (const auto& schema : _schemas) {
         QueryTypeConfig qtc;
-        // Use the deprecated "Preview" query type name when building the EFC that gets
-        // passed to libmongocrypt, since libmongocrypt does not yet recognize the new name.
-        // TODO SERVER-129158 Remove this mapping once libmongocrypt supports "substring".
-        auto mongocryptType = schema.type;
-        if (mongocryptType == QueryTypeEnum::Substring) {
-            mongocryptType = QueryTypeEnum::SubstringPreviewDeprecated;
-        }
-        qtc.setQueryType(mongocryptType);
+        qtc.setQueryType(schema.type);
         if (schema.type == QueryTypeEnum::Substring ||
             schema.type == QueryTypeEnum::SubstringPreviewDeprecated) {
             qtc.setStrMaxLength(schema.mlen);
@@ -2335,7 +2302,7 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
     for (auto qt : {QueryTypeEnum::Substring, QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
         auto qt_index = queryTypeToIndex(qt);
         for (const auto& [exactStr, count] : paddingCounts[qt_index]) {
-            verifyESCEntriesForString(exactStr, count, qt, true /*padding*/);
+            verifyESCEntriesForString(exactStr, count, qt, /*padding=*/true);
         }
         for (const auto& [affix, count] : affixCounts[qt_index]) {
             verifyESCEntriesForString(affix, count, qt);
@@ -2502,7 +2469,7 @@ TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidExactEncryptedTokensForTextS
         StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                     exactSet.getEscDerivedToken().asPrfBlock()),
                                 boost::none,
-                                boost::none /* msize */)
+                                /*msize=*/boost::none)
             .encrypt({{}}));
     ASSERT_THROWS_CODE_AND_WHAT(
         processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false),
@@ -2538,7 +2505,7 @@ TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidSubstringEncryptedTokensForT
     ts.setEncryptedTokens(StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                                       ts.getEscDerivedToken().asPrfBlock()),
                                                   boost::none,
-                                                  boost::none /* msize */)
+                                                  /*msize=*/boost::none)
                               .encrypt({{}}));
     ASSERT_THROWS_CODE_AND_WHAT(
         processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false),

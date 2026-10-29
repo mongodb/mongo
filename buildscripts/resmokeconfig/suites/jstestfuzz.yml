@@ -11,7 +11,6 @@ executor:
   config:
     shell_options:
       crashOnInvalidBSONError: ""
-      objcheck: ""
   hooks:
     - class: FuzzerRestoreSettings
     - class: RunQueryStats
@@ -28,7 +27,7 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true
       verbose: ""

@@ -1,35 +1,10 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
@@ -45,6 +20,9 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/pcre_util.h"
 
 #include <string>
@@ -62,9 +40,127 @@ using namespace std::literals::string_view_literals;
 using boost::intrusive_ptr;
 
 namespace {
-auto& changeStreamsShowExpandedEvents =
-    *MetricBuilder<Counter64>{"changeStreams.showExpandedEvents"};
+
+otel::metrics::Counter<int64_t>& makeCsCounter(otel::metrics::MetricName name,
+                                               std::string dottedPath,
+                                               std::string desc) {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = std::move(dottedPath),
+        .role = ClusterRole{ClusterRole::None},
+    };
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        name, std::move(desc), otel::metrics::MetricUnit::kEvents, opts);
 }
+
+// Renamed from "changeStreams.showExpandedEvents"; see downstream DWH/TOOLS ticket.
+auto& csOptShowExpandedEvents =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowExpandedEvents,
+                  "changeStreams.option.showExpandedEvents",
+                  "Number of change streams opened with showExpandedEvents.");
+auto& csOptShowMigrationEvents =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowMigrationEvents,
+                  "changeStreams.option.showMigrationEvents",
+                  "Number of change streams opened with showMigrationEvents.");
+auto& csOptShowSystemEvents =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowSystemEvents,
+                  "changeStreams.option.showSystemEvents",
+                  "Number of change streams opened with showSystemEvents.");
+auto& csOptShowRawUpdateDescription =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowRawUpdateDescription,
+                  "changeStreams.option.showRawUpdateDescription",
+                  "Number of change streams opened with showRawUpdateDescription.");
+auto& csOptIgnoreRemovedShards =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionIgnoreRemovedShards,
+                  "changeStreams.option.ignoreRemovedShards",
+                  "Number of change streams opened with ignoreRemovedShards.");
+auto& csOptMatchCollectionUUIDForUpdateLookup =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionMatchCollectionUUIDForUpdateLookup,
+                  "changeStreams.option.matchCollectionUUIDForUpdateLookup",
+                  "Number of change streams opened with matchCollectionUUIDForUpdateLookup.");
+auto& csOptStartAfter = makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionStartAfter,
+                                      "changeStreams.option.startAfter",
+                                      "Number of change streams opened with startAfter.");
+auto& csOptResumeAfter = makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionResumeAfter,
+                                       "changeStreams.option.resumeAfter",
+                                       "Number of change streams opened with resumeAfter.");
+auto& csOptStartAtOperationTime =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionStartAtOperationTime,
+                  "changeStreams.option.startAtOperationTime",
+                  "Number of change streams opened with startAtOperationTime.");
+auto& csOptFullDocumentRequired =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentRequired,
+                  "changeStreams.option.fullDocument.required",
+                  "Number of change streams opened with fullDocument=required.");
+auto& csOptFullDocumentUpdateLookup =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentUpdateLookup,
+                  "changeStreams.option.fullDocument.updateLookup",
+                  "Number of change streams opened with fullDocument=updateLookup.");
+auto& csOptFullDocumentWhenAvailable =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentWhenAvailable,
+                  "changeStreams.option.fullDocument.whenAvailable",
+                  "Number of change streams opened with fullDocument=whenAvailable.");
+auto& csOptFullDocumentBeforeChangeRequired =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionFullDocumentBeforeChangeRequired,
+                  "changeStreams.option.fullDocumentBeforeChange.required",
+                  "Number of change streams opened with fullDocumentBeforeChange=required.");
+auto& csOptFullDocumentBeforeChangeWhenAvailable = makeCsCounter(
+    otel::metrics::MetricNames::kChangeStreamOptionFullDocumentBeforeChangeWhenAvailable,
+    "changeStreams.option.fullDocumentBeforeChange.whenAvailable",
+    "Number of change streams opened with fullDocumentBeforeChange=whenAvailable.");
+auto& csScopeCluster = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeCluster,
+                                     "changeStreams.scope.cluster",
+                                     "Number of cluster-scoped change streams opened.");
+auto& csScopeDb = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeDb,
+                                "changeStreams.scope.db",
+                                "Number of database-scoped change streams opened.");
+auto& csScopeCollection = makeCsCounter(otel::metrics::MetricNames::kChangeStreamScopeCollection,
+                                        "changeStreams.scope.collection",
+                                        "Number of collection-scoped change streams opened.");
+
+void incrementFullDocumentMetric(FullDocumentModeEnum mode) {
+    switch (mode) {
+        case FullDocumentModeEnum::kRequired:
+            csOptFullDocumentRequired.add(1);
+            break;
+        case FullDocumentModeEnum::kUpdateLookup:
+            csOptFullDocumentUpdateLookup.add(1);
+            break;
+        case FullDocumentModeEnum::kWhenAvailable:
+            csOptFullDocumentWhenAvailable.add(1);
+            break;
+        default:
+            break;
+    }
+}
+
+void incrementFullDocumentBeforeChangeMetric(FullDocumentBeforeChangeModeEnum mode) {
+    switch (mode) {
+        case FullDocumentBeforeChangeModeEnum::kRequired:
+            csOptFullDocumentBeforeChangeRequired.add(1);
+            break;
+        case FullDocumentBeforeChangeModeEnum::kWhenAvailable:
+            csOptFullDocumentBeforeChangeWhenAvailable.add(1);
+            break;
+        default:
+            break;
+    }
+}
+
+void incrementScopeMetric(ChangeStreamType type) {
+    switch (type) {
+        case ChangeStreamType::kAllDatabases:
+            csScopeCluster.add(1);
+            break;
+        case ChangeStreamType::kDatabase:
+            csScopeDb.add(1);
+            break;
+        case ChangeStreamType::kCollection:
+            csScopeCollection.add(1);
+            break;
+    }
+}
+}  // namespace
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(changeStream,
                                      DocumentSourceChangeStream::LiteParsed::parse,
@@ -134,10 +230,10 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getNsMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the ns match string. We may optimize this to
-    // exact matches ('$eq') for single collection change streams in the future to improve matching
-    // performance. This is currently not safe because of collations that can affect the matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) == ChangeStreamType::kCollection) {
+        return BSON("" << NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext()));
+    }
     return BSON("" << BSONRegEx(getNsRegexForChangeStream(expCtx)));
 }
 
@@ -162,11 +258,12 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the view ns match string. We may optimize this to
-    // exact matches ('$eq') for single database change streams in the future to improve matching
-    // performance. This currently may not be safe because of collations that can affect the
-    // matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) == ChangeStreamType::kDatabase) {
+        return BSON("" << fmt::format("{}.system.views",
+                                      DatabaseNameUtil::serialize(
+                                          nss.dbName(), expCtx->getSerializationContext())));
+    }
     return BSON("" << BSONRegEx(getViewNsRegexForChangeStream(expCtx)));
 }
 
@@ -188,11 +285,10 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getCollMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the collection match string. We may optimize this
-    // to exact matches ('$eq') for single collection change streams in the future to improve
-    // matching performance. This currently may not be safe because of collations that can affect
-    // the matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) == ChangeStreamType::kCollection) {
+        return BSON("" << nss.coll());
+    }
     return BSON("" << BSONRegEx(getCollRegexForChangeStream(expCtx)));
 }
 
@@ -216,11 +312,11 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
 
 BSONObj DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-105554
-    // Currently we always return a BSONRegEx with the collection-less aggregate ns match string. We
-    // may optimize this to exact matches ('$eq') for single collection and single database change
-    // streams in the future to improve matching performance. This currently may not be safe because
-    // of collations that can affect the matching.
+    const auto& nss = expCtx->getNamespaceString();
+    if (ChangeStream::getChangeStreamType(nss) != ChangeStreamType::kAllDatabases) {
+        return BSON("" << NamespaceStringUtil::serialize(nss.getCommandNS(),
+                                                         SerializationContext::stateDefault()));
+    }
     return BSON("" << BSONRegEx(getCmdNsRegexForChangeStream(expCtx)));
 }
 
@@ -254,6 +350,15 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
 
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
+
+    // Capture whether the user explicitly provided each resume option. These booleans must be
+    // captured here — before the blocks below that mutate 'spec' (auto-setting
+    // startAtOperationTime for new streams, or replacing startAfter with resumeAfter for HWM
+    // tokens). Reading from 'spec' directly at the metric increment site would count
+    // server-injected values, not user intent.
+    const bool userSetResumeAfter = spec.getResumeAfter().has_value();
+    const bool userSetStartAfter = spec.getStartAfter().has_value();
+    const bool userSetStartAtOperationTime = spec.getStartAtOperationTime().has_value();
 
     // If the user did not specify an explicit starting point, set it to the current time.
     if (!spec.getResumeAfter() && !spec.getStartAfter() && !spec.getStartAtOperationTime()) {
@@ -297,6 +402,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
 
     if (changeStreamVersion == ChangeStreamReaderVersionEnum::kV2) {
         OperationContext* opCtx = expCtx->getOperationContext();
+
+        // Record on CurOp so it rides onto the ClusterClientCursor at registration (mirroring
+        // isChangeStreamQuery). The router getMore precondition uses this to kill-and-resume the
+        // cursor on the v1 path if the IFR flag is later turned off.
+        CurOp::get(opCtx)->debug().usesChangeStreamV2ShardTargeting = true;
+
         ChangeStreamReaderBuilder* readerBuilder =
             ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
         tassert(10743908, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
@@ -315,9 +426,35 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->setChangeStreamSpec(spec);
 
-    // Only increment counter during actual execution, not during query shape parsing.
-    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
-        changeStreamsShowExpandedEvents.increment(spec.getShowExpandedEvents());
+    // Only increment during actual execution, not query shape parsing.
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries() &&
+        expCtx->updateChangeStreamFeatureCounters()) {
+        if (spec.getShowExpandedEvents().value_or(false))
+            csOptShowExpandedEvents.add(1);
+        if (spec.getShowMigrationEvents().value_or(false))
+            csOptShowMigrationEvents.add(1);
+        if (spec.getShowSystemEvents().value_or(false))
+            csOptShowSystemEvents.add(1);
+        if (spec.getShowRawUpdateDescription().value_or(false))
+            csOptShowRawUpdateDescription.add(1);
+        if (spec.getIgnoreRemovedShards().value_or(false))
+            csOptIgnoreRemovedShards.add(1);
+        if (spec.getMatchCollectionUUIDForUpdateLookup().value_or(false))
+            csOptMatchCollectionUUIDForUpdateLookup.add(1);
+
+        if (userSetResumeAfter)
+            csOptResumeAfter.add(1);
+        if (userSetStartAfter)
+            csOptStartAfter.add(1);
+        if (userSetStartAtOperationTime)
+            csOptStartAtOperationTime.add(1);
+
+        incrementFullDocumentMetric(spec.getFullDocument());
+        incrementFullDocumentBeforeChangeMetric(spec.getFullDocumentBeforeChange());
+        incrementScopeMetric(changeStream.getChangeStreamType());
+
+        // Prevent updating the feature counters again for the same query.
+        expCtx->setUpdateChangeStreamFeatureCounters(false);
     }
 
     return change_stream::pipeline_helpers::buildPipeline(expCtx, spec, resumeToken);
@@ -336,6 +473,15 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
     }
 
     OperationContext* opCtx = expCtx->getOperationContext();
+
+    // Check the IFR kill switch for v2 shard targeting. This is a runtime-toggleable flag that
+    // allows emergency rollback of v2.
+    const auto& ifrContext = expCtx->getIfrContext();
+    const bool v2Enabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamReaderV2);
+    if (!v2Enabled) {
+        return ChangeStreamReaderVersionEnum::kV1;
+    }
 
     // Check feature flag 'featureFlagChangeStreamPreciseShardTargeting' that is required to enable
     // v2 change stream readers.
@@ -426,9 +572,11 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !expCtx->getNamespaceString().isSystem() ||
                 (spec.getAllowToRunOnSystemNS() && !expCtx->getInRouter()));
 
-    uassert(31123,
-            "Change streams from router may not show migration events",
-            !(expCtx->getInRouter() && spec.getShowMigrationEvents()));
+    uassert(12888201,
+            "matchCollectionUUIDForUpdateLookup may only be specified when fullDocument is "
+            "'updateLookup'",
+            !spec.getMatchCollectionUUIDForUpdateLookup() ||
+                spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
 
     uassert(50865,
             "Do not specify both 'resumeAfter' and 'startAfter' in a $changeStream stage",
@@ -446,6 +594,18 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             "Attempting to resume a change stream using 'resumeAfter' is not allowed from an "
             "invalidate notification",
             !(spec.getResumeAfter() && resumeToken->fromInvalidate));
+
+    // A resume token from a 'namespacePlacementChanged' control event cannot be used to resume a
+    // change stream. These events are not exposed to users, so an event resume token referring to
+    // one is not a valid resumption point. High-water-mark tokens are unaffected.
+    uassert(ErrorCodes::InvalidResumeToken,
+            "Attempting to resume a change stream from a 'namespacePlacementChanged' event is not "
+            "allowed",
+            !resumeToken || ResumeToken::isHighWaterMarkToken(*resumeToken) ||
+                Value::compare(
+                    resumeToken->eventIdentifier[DocumentSourceChangeStream::kOperationTypeField],
+                    Value(DocumentSourceChangeStream::kNamespacePlacementChangedOpType),
+                    nullptr) != 0);
 
     // If we are resuming a single-collection stream, the resume token should always contain a
     // UUID unless the token is from endOfTransaction event or a high water mark.

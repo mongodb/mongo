@@ -32,6 +32,8 @@ export class Dataset {
         const sessionDb = session.getDatabase(this.constructor.name);
 
         print(`Populating dataset ${this.constructor.name} ...`);
+        // Drop any pre-existing data in the collection.
+        sessionDb.getCollection(this.collection()).remove({});
         this.populate(sessionDb);
         print("Population complete.");
         for (const workload of this.workloads()) {
@@ -231,6 +233,8 @@ export class DatasetManyCollections extends Dataset {
             print(`Creating collection ${collName}`);
             db.createCollection(collName);
             const coll = db.getCollection(collName);
+            // Remove any pre-existing data.
+            coll.remove({});
             assert.commandWorked(coll.insert({f0: 1}));
             assert.commandWorked(coll.createIndex({f0: 1}));
         }
@@ -488,25 +492,3 @@ export class DatasetSharded extends DatasetManyFields {
         this.shardedTest.stop();
     }
 }
-
-export const DATASETS = [
-    DatasetOneField,
-    DatasetOneFieldIndex,
-    DatasetOneFieldPartialIndex,
-    DatasetOneDocumentOneField,
-    DatasetOneStringField,
-    DatasetWideArray,
-    DatasetWideArrayIndex,
-    DatasetManyCollections,
-    DatasetManyFields,
-    DatasetManyFieldsMultiFieldIndex,
-    DatasetManyFieldsIndexes,
-    DatasetManyFieldsPartialIndex,
-    DatasetManyFieldsWildcardIndex,
-    DatasetLongValue,
-    DatasetLongValueIndex,
-    DatasetLongValueHashed,
-    DatasetLongValueTextIndex,
-    DatasetSharded,
-    DatasetNestedJSON,
-];

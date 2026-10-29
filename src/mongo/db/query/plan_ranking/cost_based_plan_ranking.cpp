@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
 
@@ -33,11 +7,14 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
-#include "mongo/db/query/plan_ranking/plan_ranker_method.h"
+#include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -54,8 +31,7 @@ using namespace cost_based_ranker;
 CostEstimate estimateCBRCost(const CanonicalQuery& query,
                              const std::vector<std::unique_ptr<QuerySolution>>& solutions) {
     const auto& qkc = query.getExpCtx()->getQueryKnobConfiguration();
-    auto sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(
-        qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError());
+    auto sampleSize = ce::calculateSampleSize(qkc);
 
     const auto randomSampleInc = makeCostCoefficient(nsec(1400));
     const auto matchExprInc = makeCostCoefficient(nsec(160));
@@ -83,11 +59,13 @@ CostEstimate estimateCBRCost(const CanonicalQuery& query,
 /**
  * Optionally run remaining MP trials, then pick the best plan based on whatever information was
  * collected so far. The function is mostly a wrapper for pickBestPlan, and the logic that extracts
- * the best plan from the MultiPlanner.
+ * the best plan from the MultiPlanner. 'reason' is the rankerChoice.reason set by the caller.
+ * Recorded only for explain queries.
  */
 StatusWith<PlanRankingResult> getBestMPPlan(
     OperationContext* opCtx,
     classic_runtime_planner::MultiPlanner& mp,
+    PlanRankerReason reason,
     boost::optional<trial_period::TrialPhaseConfig> remainingTrialConfig = boost::none) {
     if (remainingTrialConfig) {
         auto status = mp.runTrials(*remainingTrialConfig);
@@ -100,25 +78,39 @@ StatusWith<PlanRankingResult> getBestMPPlan(
         return status;
     }
 
-    // MP selected the winning plan. Add it to the debug logs.
-    CurOp::get(opCtx)->debug().planRankerMethod = PlanRankerMethod::kMultiPlanner;
-
     PlanRankingResult out;
     auto soln = mp.extractQuerySolution();
     // TODO SERVER-117118 Reenable this assertion once we can decouple from multiplanner.
     // tassert(11306811, "Expected multi-planner to have returned a solution!", soln);
     out.solutions.push_back(std::move(soln));
+    // TODO SERVER-132012, SERVER-132079: implement the general version - create the explain-data
+    // carrier at a single point whenever the query is an explain, rather than at each
+    // PlanRankingResult construction site.
+    if (mp.cq()->getExplain()) {
+        out.maybeExplainData.emplace();
+        out.maybeExplainData->planRankerReason = reason;
+    }
     out.execState = std::move(mp).extractExecState();
+    // The multi-planner chose the winner, record its selection strategy.
+    out.planSelectionStrategy = PlanSelectionStrategy::kMultiPlanner;
     return out;
 }
 
+/**
+ * Re-enumerates all solutions and lets the CBR strategy rank them. 'reasonIfChoseWinner' is the
+ * rankerChoice.reason recorded by the caller only when CBR chooses a single winner:
+ * CBR may instead find plans uncostable and hand back multiple solutions for the multi-planner to
+ * finish, in which case the inner strategy has already recorded kCBRInestimableNode and owns the
+ * field - the calling branch names an intent, not the outcome.
+ */
 StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
                                              CanonicalQuery& query,
                                              QueryPlannerParams& plannerParams,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              const MultipleCollectionAccessor& collections,
-                                             StringSet topLevelSampleFieldNames,
-                                             bool hasRelevantMultikeyIndex) {
+                                             ce::TopLevelSampleFields topLevelSampleFieldNames,
+                                             bool hasRelevantMultikeyIndex,
+                                             PlanRankerReason reasonIfChoseWinner) {
     // Multiplanning has already consumed the solutions; re-enumerate them.
     // TODO SERVER-127982: Remove this repeated enumeration by making multiplanner operate on a
     // vector of solutions without taking ownership.
@@ -131,8 +123,6 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
     CBRPlanRankingStrategy cbrStrategy;
-    auto origMode =
-        std::exchange(plannerParams.planRankerMode, QueryPlanRankerModeEnum::kSamplingCE);
     auto result = cbrStrategy.rankPlans(opCtx,
                                         query,
                                         plannerParams,
@@ -141,7 +131,22 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
                                         std::move(solutions),
                                         std::move(topLevelSampleFieldNames),
                                         hasRelevantMultikeyIndex);
-    plannerParams.planRankerMode = origMode;
+    if (result.isOK()) {
+        auto& value = result.getValue();
+        if (value.needsWorksMeasuredForPlanCache) {
+            // needsWorksMeasuredForPlanCache is true if there was no complete multi-plan trial,
+            // which means that the winning plan was chosen by CBR.
+            if (value.maybeExplainData) {
+                value.maybeExplainData->planRankerReason = reasonIfChoseWinner;
+            }
+        } else if (value.maybeExplainData) {
+            tassert(13237705,
+                    "expected the inner CBR strategy to have recorded kCBRInestimableNode when it "
+                    "could not choose a single winner",
+                    value.maybeExplainData->planRankerReason ==
+                        PlanRankerReason::kCBRInestimableNode);
+        }
+    }
     return result;
 }
 
@@ -177,8 +182,13 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const auto cbrCost = estimateCBRCost(query, solutions);
     tassert(11306808, "CBR cannot have 0 cost", approxGt(cbrCost, zeroCost));
 
-    auto mp = classic_runtime_planner::MultiPlanner(
-        std::move(plannerData), std::move(solutions), PlanExplainerData{});
+    // This MultiPlanner runs the trials; whether MP or CBR ends up choosing the winner is decided
+    // below and reported on the returned PlanRankingResult.
+    auto mp = classic_runtime_planner::MultiPlanner(std::move(plannerData),
+                                                    std::move(solutions),
+                                                    PlanExplainerData{},
+                                                    /*addingCBRChosenPlanToPlanCache=*/false,
+                                                    PlanSelectionStrategy::kMultiPlanner);
 
     auto trialConfig = mp.getTrialPhaseConfig();
     // These are the trial limits based on MP defaults or user-set requirements.
@@ -186,7 +196,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const auto numResultsMP = trialConfig.targetNumResults;
 
     // Number of works that each plan should do in order to collect enough execution stats.
-    size_t numWorksPerPlanEst = internalQueryNumWorksPerPlanForMPEstimation.load();
+    size_t numWorksPerPlanEst = static_cast<size_t>(
+        query.getExpCtx()->getQueryKnobConfiguration().getNumWorksPerPlanForMPEstimation());
     // TODO SERVER-115645 use the child of LIMIT/SORT nodes to estimate plan productivity
     // see comment in MultiPlanStage::estimateAllPlans
     if (skipCount > 0) {
@@ -211,9 +222,9 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         // We choose MP in order to avoid planning time regressions.
         // Choosing MP due to full batch may miss good plans due to data skew or blocking plans.
         LOGV2_INFO(11306807,
-                   "AutomaticCE chooses MP (1)",
+                   "Mixed plan ranker chooses MP (1)",
                    "Reason"_attr = " because of EOF or full batch");
-        return getBestMPPlan(opCtx, mp);
+        return getBestMPPlan(opCtx, mp, PlanRankerReason::kMpEarlyExit);
     }
 
     // Compare the cost of MP vs CBR and decide which strategy to use to estimate all plans.
@@ -225,10 +236,11 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto estResWithStatus = mp.estimateAllPlans();
     if (!estResWithStatus.isOK()) {
         LOGV2_INFO(12023300,
-                   "AutomaticCE chooses MP (2)",
+                   "Mixed plan ranker chooses MP (2)",
                    "Reason"_attr = " because plan contains inestimable node(s)");
         return getBestMPPlan(opCtx,
                              mp,
+                             PlanRankerReason::kInestimableMP,
                              trial_period::TrialPhaseConfig{
                                  .maxNumWorksPerPlan = numWorksPerPlanMP - numWorksPerPlanEst,
                                  .targetNumResults = numResultsMP});
@@ -239,7 +251,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
             numResultsMP > estRes.bestPlanNumResults);
 
     LOGV2_INFO(11093900,
-               "AutomaticCE begin: ",
+               "Mixed plan ranker begin: ",
                "numWorksPerPlanMP"_attr = numWorksPerPlanMP,
                "numResultsMP"_attr = numResultsMP,
                "numWorksPerPlanEst"_attr = numWorksPerPlanEst,
@@ -253,7 +265,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const double minProductivityForMP = static_cast<double>(numResultsMP) / numWorksPerPlanMP;
     if (estRes.bestPlanProductivity <= minProductivityForMP) {
         LOGV2_INFO(11306804,
-                   "AutomaticCE chooses CBR (3)",
+                   "Mixed plan ranker chooses CBR (3)",
                    "Reason"_attr = "very low productivity",
                    "Condition"_attr = "estRes.bestPlanProductivity < minProductivityForMP",
                    "minProductivityForMPAdjusted"_attr = minProductivityForMP,
@@ -266,7 +278,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                               yieldPolicy,
                               collections,
                               std::move(rctx.topLevelSampleFieldNames),
-                              rctx.hasRelevantMultikeyIndex);
+                              rctx.hasRelevantMultikeyIndex,
+                              PlanRankerReason::kCbrCheaperThanMp);
     }
 
     // Remaining number of documents to fill a batch, that is, to end MP.
@@ -283,7 +296,9 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto remMPCost = remNumWorks * totalCostPerEstWork;
 
     double minRequiredImprovementRatio =
-        internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice.load();
+        query.getExpCtx()
+            ->getQueryKnobConfiguration()
+            .getMinRequiredImprovementRatioForCostBasedRankerChoice();
     double maxAchievableImprovementRatio = ratio(remMPCost, cbrCost);
     LOGV2_INFO(11306803,
                "Comparing MP with CBR:",
@@ -294,19 +309,21 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
 
     if (maxAchievableImprovementRatio < minRequiredImprovementRatio) {
         LOGV2_INFO(11306802,
-                   "AutomaticCE chooses MP (4)",
+                   "Mixed plan ranker chooses MP (4)",
                    "Reason"_attr = "the required improvement is not achievable",
                    "Condition"_attr =
                        "maxAchievableImprovementRatio < minRequiredImprovementRatio");
         return getBestMPPlan(opCtx,
                              mp,
+                             PlanRankerReason::kMpCheaperThanCbr,
                              trial_period::TrialPhaseConfig{
                                  .maxNumWorksPerPlan = numWorksPerPlanMP - numWorksPerPlanEst,
                                  .targetNumResults = numResultsMP});
     }
 
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
-    LOGV2_INFO(11306800, "AutomaticCE chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
+    LOGV2_INFO(
+        11306800, "Mixed plan ranker chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
     mp.emitAccumulatedStats();
     return getBestCBRPlan(opCtx,
                           query,
@@ -314,7 +331,8 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                           yieldPolicy,
                           collections,
                           std::move(rctx.topLevelSampleFieldNames),
-                          rctx.hasRelevantMultikeyIndex);
+                          rctx.hasRelevantMultikeyIndex,
+                          PlanRankerReason::kCbrCheaperThanMp);
 }
 
 }  // namespace plan_ranking

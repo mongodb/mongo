@@ -177,14 +177,14 @@ struct __wti_log {
                                    /*
                                     * Log file information
                                     */
-    uint32_t fileid;               /* Current log file number */
+    wt_shared uint32_t fileid;     /* Current log file number */
     uint32_t prep_fileid;          /* Pre-allocated file number */
     wt_shared uint32_t tmp_fileid; /* Temporary file number */
 #ifdef HAVE_DIAGNOSTIC
     uint32_t min_fileid; /* Minimum file number needed */
 #endif
     wt_shared uint32_t prep_missed; /* Pre-allocated file misses */
-    WT_FH *log_fh;                  /* Logging file handle */
+    wt_shared WT_FH *log_fh;        /* Logging file handle */
     WT_FH *log_dir_fh;              /* Log directory file handle */
     wt_shared WT_FH *log_close_fh;  /* Logging file handle to close */
     wt_shared WT_LSN log_close_lsn; /* LSN needed to close */

@@ -5,6 +5,7 @@
 // The $or -> $in optimization was expanded in 8.0 and therefore cannot be compared to older
 // versions.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 //   requires_fcv_80,
 //   requires_getmore,

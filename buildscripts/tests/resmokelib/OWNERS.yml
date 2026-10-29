@@ -3,3 +3,8 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-test-infrastructure
+  # Test selection error handling, co-owned with the team that owns the selection service.
+  - "**/test_fail_on_test_selection_error.py":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+      - 10gen/devprod-services-integrations

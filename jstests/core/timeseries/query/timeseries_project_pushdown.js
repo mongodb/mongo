@@ -4,6 +4,7 @@
  * occur in certain situations.
  *
  * @tags: [
+ *   uses_explain,
  *   requires_timeseries,
  *   requires_fcv_72,
  *   # Refusing to run a test that issues an aggregation command with explain because it may

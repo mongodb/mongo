@@ -15,6 +15,7 @@ import {
     checkPlatformCompatibleWithExtensions,
     deleteExtensionConfigs,
     generateExtensionConfigWithOptions,
+    getExtensionConfDir,
     withExtensions,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
@@ -66,7 +67,13 @@ withExtensions({"libtest_options_mongo_extension.so": {optionA: false}}, (conn) 
             extensionOptions,
         );
         try {
-            checkExtensionFailsToLoad({options: {loadExtensions: extensionName}, st: st});
+            checkExtensionFailsToLoad({
+                options: {
+                    loadExtensions: extensionName,
+                    extensionsConfigPath: getExtensionConfDir(),
+                },
+                st: st,
+            });
         } finally {
             deleteExtensionConfigs([extensionName]);
         }

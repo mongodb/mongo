@@ -15,9 +15,12 @@ import yaml
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.extensions import (
     add_extensions_signature_pub_key_path,
+    build_mongot_dynamic_options,
     delete_extension_configs,
     find_and_generate_all_extension_configs,
     find_and_generate_named_extension_configs,
+    get_mongot_extension_name,
+    mongot_extension_requested,
     normalize_load_extensions,
 )
 from buildscripts.resmokelib.testing.fixtures import interface
@@ -78,6 +81,44 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
 
+        if "set_parameters" not in self.mongod_options:
+            self.mongod_options["set_parameters"] = {}
+
+        if launch_mongot:
+            self.launch_mongot_bool = True
+
+            # mongot exposes two ports that it will listen for ingress communication on: "port",
+            # which expects the MongoRPC protocol, and "grpcPort", which expects the MongoDB
+            # gRPC protocol. When useGrpcForSearch is true, mongos and mongod will communicate
+            # with mongot using gRPC, and so we must set the "mongotHost" option to the listening
+            # address that expects the gRPC protocol. However, the testing infrastructure also
+            # communicates with mongot directly using the pymongo driver, which must communicate
+            # using MongoRPC, and so we also setup the "port" on mongot to listen for MongoRPC
+            # connections no matter what.
+            #
+            # Computed before load_extensions processing, which may need mongotHost.
+            self.mongot_port = fixturelib.get_next_port(job_num)
+            if self.mongod_options["set_parameters"].get("useGrpcForSearch"):
+                self.mongot_grpc_port = fixturelib.get_next_port(job_num)
+                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_grpc_port)
+            else:
+                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
+
+            # In future architectures, this could change
+            self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
+                "mongotHost"
+            ]
+        else:
+            self.launch_mongot_bool = False
+        # If a suite enables launching mongot, the necessary startup options for the MongoTFixture will be created in
+        # setup_mongot_params() which is called by the builders after all other fixture types have been setup (and
+        # therefore all other nodes have been assigned ports, which allows mongot to connect to a given mongod or
+        # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
+        self.mongot = None
+        # When true, launch_mongot() spawns mongot but does not block on await_ready(); the parent
+        # fixture is responsible for calling await_mongot_ready() after replSetInitiate.
+        self.defer_mongot_await_ready = False
+
         # Process load_extensions: ["*"] means all, otherwise load named extensions.
         _load_exts = normalize_load_extensions(load_extensions)
         if load_extensions is None and self.config.LOAD_ALL_EXTENSIONS:
@@ -94,18 +135,23 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 skip_extensions_signature_verification, self.config, self.mongod_options
             )
         elif _load_exts:
+            dynamic_options = None
+            if mongot_extension_requested(_load_exts, self.launch_mongot_bool):
+                dynamic_options = {
+                    get_mongot_extension_name(): build_mongot_dynamic_options(
+                        self.mongod_options["mongotHost"]
+                    )
+                }
             self.loaded_extensions = find_and_generate_named_extension_configs(
                 extension_names=_load_exts,
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
                 logger=self.logger,
                 mongod_options=self.mongod_options,
+                dynamic_options=dynamic_options,
             )
             add_extensions_signature_pub_key_path(
                 skip_extensions_signature_verification, self.config, self.mongod_options
             )
-
-        if "set_parameters" not in self.mongod_options:
-            self.mongod_options["set_parameters"] = {}
 
         if add_feature_flags:
             ifr_flags = set(self.config.IFR_FEATURE_FLAGS or [])
@@ -156,36 +202,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.priority_port = fixturelib.get_next_port(job_num)
             self.mongod_options["priorityPort"] = self.priority_port
 
-        if launch_mongot:
-            self.launch_mongot_bool = True
-
-            # mongot exposes two ports that it will listen for ingress communication on: "port",
-            # which expects the MongoRPC protocol, and "grpcPort", which expects the MongoDB
-            # gRPC protocol. When useGrpcForSearch is true, mongos and mongod will communicate
-            # with mongot using gRPC, and so we must set the "mongotHost" option to the listening
-            # address that expects the gRPC protocol. However, the testing infrastructure also
-            # communicates with mongot directly using the pymongo driver, which must communicate
-            # using MongoRPC, and so we also setup the "port" on mongot to listen for MongoRPC
-            # connections no matter what.
-            self.mongot_port = fixturelib.get_next_port(job_num)
-            if self.mongod_options["set_parameters"].get("useGrpcForSearch"):
-                self.mongot_grpc_port = fixturelib.get_next_port(job_num)
-                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_grpc_port)
-            else:
-                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
-
-            # In future architectures, this could change
-            self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
-                "mongotHost"
-            ]
-        else:
-            self.launch_mongot_bool = False
-        # If a suite enables launching mongot, the necessary startup options for the MongoTFixture will be created in
-        # setup_mongot_params() which is called by the builders after all other fixture types have been setup (and
-        # therefore all other nodes have been assigned ports, which allows mongot to connect to a given mongod or
-        # mongos. The MongoTFixture is then launched by the MongoDFixture in setup().
-        self.mongot = None
-
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS or self.mongod_options[
             "set_parameters"
         ].get("featureFlagGRPC"):
@@ -205,7 +221,14 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         mongot.setup()
         self.mongot = mongot
-        self.mongot.await_ready()
+        # Parent fixtures defer this to after replSetInitiate.
+        if not self.defer_mongot_await_ready:
+            self.mongot.await_ready()
+
+    def await_mongot_ready(self):
+        """Await mongot readiness. Called by parent fixtures after the replica set is initiated."""
+        if self.mongot is not None:
+            self.mongot.await_ready()
 
     def setup(self, temporary_flags={}):
         """Set up the mongod."""
@@ -430,6 +453,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             name=self.logger.name,
             port=self.port,
             pid=self.mongod.pid,
+            version=self._get_binary_version(self.mongod_executable),
         )
         return [info]
 
@@ -569,6 +593,19 @@ class MongodLauncher(object):
         # Setting it in the .yml file overrides this.
         if "orphanCleanupDelaySecs" not in suite_set_parameters:
             suite_set_parameters["orphanCleanupDelaySecs"] = 1
+
+        # migrationRecipientPITHistoryToPreserveInSecs controls the PIT history window preserved by
+        # chunk migrations in tests. In production, this is controlled directly by the server
+        # parameter minSnapshotHistoryWindowInSeconds.
+        #
+        # If a chunk migration moves a chunk back to one of its original shards after the chunk has
+        # been split, the migration may break point-in-time snapshot access for the portion of the
+        # split chunk left behind. To preserve snapshot accessibility, the migration is rejected when
+        # this condition is detected. The snapshot window preserved by chunk migrations is controlled
+        # by migrationRecipientPITHistoryToPreserveInSecs in tests and by minSnapshotHistoryWindowInSeconds
+        # in production.
+        if "migrationRecipientPITHistoryToPreserveInSecs" not in suite_set_parameters:
+            suite_set_parameters["migrationRecipientPITHistoryToPreserveInSecs"] = 1
 
         # Increase the default config server command timeout to 5 minutes to avoid spurious
         # failures on slow machines.

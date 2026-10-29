@@ -595,6 +595,24 @@ assert.commandFailedWithCode(
     }),
     605001,
 );
+
+// $linearFill must reject expression-based sortBy (e.g. $meta) at parse time.
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {
+                $_internalSetWindowFields: {
+                    sortBy: {score: {$meta: "randVal"}},
+                    output: {val: {$linearFill: "$val"}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.FailedToParse,
+);
+
 // Mixing dates with numerics in sort field is not allowed.
 coll.drop();
 collection = [

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -39,7 +13,7 @@
 
 #include <boost/optional.hpp>
 
-MONGO_MOD_PUBLIC;
+[[MONGO_MOD_PUBLIC]];
 
 namespace mongo::container_write {
 
@@ -53,6 +27,27 @@ namespace mongo::container_write {
 struct NonexistentKeyGuarantee {};
 
 /**
+ * A trivially copyable class that callers pass to container_write methods to guarantee that the
+ * caller has already asserted that it is possible to write to containers. This enables a
+ * performance optimization of avoiding the need to repeatedly assert on each container write
+ * operation.
+ */
+class CanAcceptContainerWritesGuarantee {
+public:
+    /**
+     * Asserts that container write support is enabled and that the node can accept writes for
+     * containers. Validating this createds CanAcceptContainerWritesGuarantee which can be passed
+     * into container_write operations, allowing them to skip re-asserting on each successive
+     * container write operation in a batch.
+     */
+    [[nodiscard]] static CanAcceptContainerWritesGuarantee assertCanAcceptContainerWrites(
+        OperationContext* opCtx);
+
+private:
+    CanAcceptContainerWritesGuarantee() = default;  // Creation must pass through the factory.
+};
+
+/**
  * Inserts into the given container and logs the operation in the oplog. If nkg is provided, the
  * caller guarantees the key does not already exist; otherwise, the insert will be rejected if the
  * key exists.
@@ -62,6 +57,7 @@ Status insert(OperationContext* opCtx,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none,
               boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
 
 /**
@@ -74,6 +70,37 @@ Status insert(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none,
+              boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
+
+/**
+ * Inserts a range of key/value pairs into the given container as a single batched write -- the
+ * container reuses one cursor for the whole range -- and logs each insert in the oplog. 'keys' and
+ * 'values' must be the same length and are matched up by position.
+ *
+ * If nkg is provided, the caller guarantees that none of the keys already exist. Without it the
+ * batch is rejected if any key exists, and because the failure is reported for the batch as a whole
+ * the caller cannot tell which key collided or how many of the others were written; callers that
+ * need to attribute a KeyExists to a particular key must insert one key at a time instead.
+ */
+Status insert(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              IntegerKeyedContainer& container,
+              std::span<const int64_t> keys,
+              std::span<const std::span<const char>> values,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none,
+              boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
+
+/**
+ * Inserts a range of key/value pairs into the given container as a single batched write. See the
+ * IntegerKeyedContainer overload above for the batching and KeyExists semantics.
+ */
+Status insert(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              StringKeyedContainer& container,
+              std::span<const std::span<const char>> keys,
+              std::span<const std::span<const char>> values,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none,
               boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
 
 /**
@@ -84,7 +111,8 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
-              std::span<const char> value);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 /**
  * Updates the value at the given key in the container and logs the operation in the oplog.
@@ -94,7 +122,8 @@ Status update(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
               std::span<const char> key,
-              std::span<const char> value);
+              std::span<const char> value,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 /**
  * Removes from the given container and logs the operation in the oplog.
@@ -102,7 +131,8 @@ Status update(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
-              int64_t key);
+              int64_t key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 /**
  * Removes from the given container and logs the operation in the oplog.
@@ -110,6 +140,7 @@ Status remove(OperationContext* opCtx,
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
-              std::span<const char> key);
+              std::span<const char> key,
+              boost::optional<CanAcceptContainerWritesGuarantee> wg = boost::none);
 
 }  // namespace mongo::container_write

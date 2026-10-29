@@ -1,0 +1,97 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "type_system",
+    srcs = [
+        "expression_typing.cpp",
+        "matcher_typing.cpp",
+        "type.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_library(
+    name = "type_system_test_util",
+    srcs = [
+        "type_system_test_util.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_system_test_util_test",
+    srcs = [
+        "type_system_test_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":type_system_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "field_map_test",
+    srcs = [
+        "field_map_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":type_system",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_test",
+    srcs = [
+        "type_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":type_system",
+        ":type_system_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "matcher_typing_test",
+    srcs = [
+        "matcher_typing_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":type_system",
+        ":type_system_test_util",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "expression_typing_test",
+    srcs = [
+        "expression_typing_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":type_system",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)

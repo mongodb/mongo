@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -99,7 +73,7 @@
  * };
  */
 
-namespace MONGO_MOD_PUB mongo {
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 /**
  * Runtime options that control the Sorter's behavior
@@ -409,7 +383,7 @@ private:
  * Data iterator over an Input stream used in the MergeIterator.
  */
 template <typename Key, typename Value>
-class MONGO_MOD_PRIVATE Stream {
+class [[MONGO_MOD_PRIVATE]] Stream {
 public:
     typedef sorter::Iterator<Key, Value> Input;
     Stream(size_t sourceId, std::shared_ptr<Input> iter)
@@ -449,7 +423,7 @@ private:
 //
 // Used for the BoundedSorter and spillWithHeap in the sorter::Spiller class.
 template <typename Key, typename Value, typename Comparator>
-struct MONGO_MOD_PRIVATE Greater {
+struct [[MONGO_MOD_PRIVATE]] Greater {
 
     // Prevent default construction.
     explicit Greater(Comparator const* compare) : compare(compare) {}
@@ -590,6 +564,9 @@ private:
 
 }  // namespace sorter
 
+template <typename Key, typename Value>
+class SorterBatchGuard;
+
 /**
  * Each instance of this class accepts (Key, Value) pairs and, depending on its SortOptions and the
  * configured Spiller/Storage, may keep them in memory or spill sorted ranges to an external
@@ -695,9 +672,68 @@ public:
     virtual void spill() = 0;
 
 protected:
+    /**
+     * Spills if the in-memory data has grown past 'maxMemoryUsageBytes' and spilling is not
+     * currently suppressed.
+     */
+    void _spillIfOverBudget() {
+        if (!_spillingSuppressed && _stats.memUsage() > _opts.maxMemoryUsageBytes) {
+            spill();
+        }
+    }
+
     SortOptions _opts;
 
     boost::optional<SharedBufferFragmentBuilder> _memPool;
+
+private:
+    friend class SorterBatchGuard<Key, Value>;
+
+    void _suppressSpilling() {
+        invariant(!_spillingSuppressed);
+        _spillingSuppressed = true;
+    }
+
+    void _allowSpilling() {
+        invariant(_spillingSuppressed);
+        _spillingSuppressed = false;
+    }
+
+    bool _spillingSuppressed = false;
+};
+
+/**
+ * Scoped guard that keeps the given sorter from spilling partway through a batch. As a result, the
+ * sorter may temporarily exceed its configured memory limit while this guard is active.
+ */
+template <typename Key, typename Value>
+class SorterBatchGuard {
+    SorterBatchGuard(const SorterBatchGuard&) = delete;
+    SorterBatchGuard& operator=(const SorterBatchGuard&) = delete;
+
+public:
+    explicit SorterBatchGuard(Sorter<Key, Value>& sorter) : _sorter(&sorter) {
+        _sorter->_suppressSpilling();
+    }
+
+    ~SorterBatchGuard() {
+        if (_sorter) {
+            _sorter->_allowSpilling();
+        }
+    }
+
+    /**
+     * Closes the batch, spilling if the sorter is now over its memory budget. Call exactly once.
+     */
+    void finish() {
+        invariant(_sorter);
+        auto* sorter = std::exchange(_sorter, nullptr);
+        sorter->_allowSpilling();
+        sorter->_spillIfOverBudget();
+    }
+
+private:
+    Sorter<Key, Value>* _sorter;
 };
 
 
@@ -830,7 +866,7 @@ public:
     }
 
     void forceSpill() override {
-        _spill(0 /*maxMemoryUsageBytes*/);
+        _spill(/*maxMemoryUsageBytes=*/0);
     }
 
     void setBound(Key key) override;
@@ -858,4 +894,4 @@ private:
     boost::optional<Key> _min;
     bool _done = false;
 };
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

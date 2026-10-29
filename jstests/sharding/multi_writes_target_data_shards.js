@@ -21,7 +21,6 @@ const st = new ShardingTest({shards: 3, other: {enableBalancer: false}});
 
 // The test enforces inconsistent state across shards to validate the behavior of updates and
 // deletes
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckDBHashes = true;
 TestData.skipCheckOrphans = true;

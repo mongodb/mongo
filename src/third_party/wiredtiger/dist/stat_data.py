@@ -20,159 +20,167 @@
 #
 # The no_clear and no_scale flags are normally always set together (values that
 # are maintained over time are normally not scaled per second).
+#
+# A statistic's OTel type is set with the separate optional otel_type argument, after the flags.
+# Exactly one value may be given:
+#       otel_counter   Monotonic counter
+#       otel_gauge     Point-in-time value that can go up and down
+#       otel_histogram Distribution of recorded values
+#       otel_none      Not an OTel metric (the default if otel_type is omitted)
 
 from operator import attrgetter
 import sys
 
 class Stat:
-    def __init__(self, name, tag, desc, flags=''):
+    def __init__(self, name, tag, desc, flags='', otel_type='otel_none'):
         self.name = name
         self.desc = tag + ': ' + desc
         self.flags = flags
+        self.otel_type = otel_type
 
     def __cmp__(self, other):
         return cmp(self.desc.lower(), other.desc.lower())
 
 class AutoCommitStat(Stat):
     prefix = 'autocommit'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, AutoCommitStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, AutoCommitStat.prefix, desc, flags, otel_type)
 
 class BackgroundCompactStat(Stat):
     prefix = 'background-compact'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, BackgroundCompactStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BackgroundCompactStat.prefix, desc, flags, otel_type)
 
 class BackupStat(Stat):
     prefix = 'backup'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, BackupStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BackupStat.prefix, desc, flags, otel_type)
 
 class BlockCacheStat(Stat):
     prefix = 'block-cache'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, BlockCacheStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BlockCacheStat.prefix, desc, flags, otel_type)
 class BlockDisaggStat(Stat):
     prefix = 'block-disagg'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, BlockDisaggStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BlockDisaggStat.prefix, desc, flags, otel_type)
 class BlockStat(Stat):
     prefix = 'block-manager'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, BlockStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BlockStat.prefix, desc, flags, otel_type)
 class BtreeStat(Stat):
     prefix = 'btree'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, BtreeStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BtreeStat.prefix, desc, flags, otel_type)
+class BtreeSizeStat(Stat):
+    prefix = 'btree-size'
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, BtreeSizeStat.prefix, desc, flags, otel_type)
 class CacheStat(Stat):
     prefix = 'cache'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CacheStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CacheStat.prefix, desc, flags, otel_type)
 class CapacityStat(Stat):
     prefix = 'capacity'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CapacityStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CapacityStat.prefix, desc, flags, otel_type)
 class CheckpointCleanupStat(Stat):
     prefix = 'checkpoint-cleanup'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CheckpointCleanupStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CheckpointCleanupStat.prefix, desc, flags, otel_type)
 class CheckpointStat(Stat):
     prefix = 'checkpoint'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CheckpointStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CheckpointStat.prefix, desc, flags, otel_type)
 class CompressStat(Stat):
     prefix = 'compression'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CompressStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CompressStat.prefix, desc, flags, otel_type)
 class ConnStat(Stat):
     prefix = 'connection'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, ConnStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, ConnStat.prefix, desc, flags, otel_type)
 class CursorErrorStat(Stat):
     prefix = 'cursor'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CursorErrorStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CursorErrorStat.prefix, desc, flags, otel_type)
 class CursorStat(Stat):
     prefix = 'cursor'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CursorStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CursorStat.prefix, desc, flags, otel_type)
 class CursorSweepStat(Stat):
     prefix = 'cursor'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, CursorSweepStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, CursorSweepStat.prefix, desc, flags, otel_type)
 class DhandleStat(Stat):
     prefix = 'data-handle'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, DhandleStat.prefix, desc, flags, otel_type)
 class DisaggStat(Stat):
     prefix = 'disagg'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, DisaggStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, DisaggStat.prefix, desc, flags, otel_type)
 class EvictCacheWalkStat(Stat):
     prefix = 'cache_walk'
-    def __init__(self, name, desc, flags=''):
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
         flags += ',cache_walk'
-        Stat.__init__(self, name, EvictCacheWalkStat.prefix, desc, flags)
+        Stat.__init__(self, name, EvictCacheWalkStat.prefix, desc, flags, otel_type)
 class EvictStat(Stat):
     prefix = 'cache'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, EvictStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, EvictStat.prefix, desc, flags, otel_type)
 class LayeredStat(Stat):
     prefix = 'layered'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LayeredStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, LayeredStat.prefix, desc, flags, otel_type)
 class LiveRestoreStat(Stat):
     prefix = 'live-restore'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LiveRestoreStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, LiveRestoreStat.prefix, desc, flags, otel_type)
 class LoadControlStat(Stat):
     prefix = 'load-control'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LoadControlStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, LoadControlStat.prefix, desc, flags, otel_type)
 class LockStat(Stat):
     prefix = 'lock'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LockStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, LockStat.prefix, desc, flags, otel_type)
 class LogStat(Stat):
     prefix = 'log'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LogStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, LogStat.prefix, desc, flags, otel_type)
 class SessionStat(Stat):
     prefix = 'session'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, SessionStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, SessionStat.prefix, desc, flags, otel_type)
 class PerfHistStat(Stat):
     prefix = 'perf'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, PerfHistStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, PerfHistStat.prefix, desc, flags, otel_type)
 class PrefetchStat(Stat):
     prefix = 'prefetch'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, PrefetchStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, PrefetchStat.prefix, desc, flags, otel_type)
 class RecStat(Stat):
     prefix = 'reconciliation'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, RecStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, RecStat.prefix, desc, flags, otel_type)
 class SessionOpStat(Stat):
     prefix = 'session'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
-class StorageStat(Stat):
-    prefix = 'tiered-storage'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, StorageStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, SessionOpStat.prefix, desc, flags, otel_type)
 class ThreadStat(Stat):
     prefix = 'thread-state'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, ThreadStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, ThreadStat.prefix, desc, flags, otel_type)
 class TxnStat(Stat):
     prefix = 'transaction'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, TxnStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, TxnStat.prefix, desc, flags, otel_type)
 class YieldStat(Stat):
     prefix = 'thread-yield'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, YieldStat.prefix, desc, flags)
+    def __init__(self, name, desc, flags='', otel_type='otel_none'):
+        Stat.__init__(self, name, YieldStat.prefix, desc, flags, otel_type)
 
 ##########################################
 # CONNECTION statistics
@@ -235,8 +243,6 @@ conn_stats = [
     ##########################################
     # Block cache statistics
     ##########################################
-    BlockCacheStat('block_cache_app_thread_put_time', 'time application threads spent adding pages to the disaggregated victim cache (usecs)'),
-    BlockCacheStat('block_cache_app_thread_puts', 'pages added to the disaggregated victim cache by application threads'),
     BlockCacheStat('block_cache_blocks', 'total blocks'),
     BlockCacheStat('block_cache_blocks_evicted', 'evicted blocks'),
     BlockCacheStat('block_cache_blocks_insert_read', 'total blocks inserted on read path'),
@@ -254,15 +260,11 @@ conn_stats = [
     BlockCacheStat('block_cache_bytes_insert_read', 'total bytes inserted on read path'),
     BlockCacheStat('block_cache_bytes_insert_write', 'total bytes inserted on write path'),
     BlockCacheStat('block_cache_bytes_update', 'cached bytes updated'),
-    BlockCacheStat('block_cache_cold_not_cached', 'cold collection pages not added to the disaggregated victim cache during eviction'),
     BlockCacheStat('block_cache_eviction_passes', 'number of eviction passes'),
     BlockCacheStat('block_cache_hits', 'number of hits'),
     BlockCacheStat('block_cache_lookups', 'lookups'),
     BlockCacheStat('block_cache_misses', 'number of misses'),
     BlockCacheStat('block_cache_not_evicted_overhead', 'number of blocks not evicted due to overhead'),
-    BlockCacheStat('block_cache_put_time', 'time spent adding pages to the disaggregated victim cache (usecs)'),
-    BlockCacheStat('block_cache_put_time_max', 'maximum time spent adding a single page to the disaggregated victim cache, reset per checkpoint (usecs)', 'no_clear,no_scale'),
-    BlockCacheStat('block_cache_puts', 'pages added to the disaggregated victim cache'),
 
     ##########################################
     # Block manager statistics
@@ -341,16 +343,27 @@ conn_stats = [
     CacheStat('cache_pages_dirty', 'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty_ingest', 'tracked dirty pages in the cache from the ingest btrees', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty_stable', 'tracked dirty pages in the cache from the stable btrees', 'no_clear,no_scale'),
-    CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
+    CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale', 'otel_gauge'),
     CacheStat('cache_pages_inuse_ingest', 'pages currently held in the cache from the ingest btrees', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse_leaf', 'leaf pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse_stable', 'pages currently held in the cache from the stable btrees', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
+    CacheStat('cache_scrub_image_bytes', 'bytes of clean re-instantiation images retained by checkpoint scrub', 'no_clear,no_scale,size'),
+    CacheStat('cache_scrub_image_pages', 'pages with a clean re-instantiation image retained by checkpoint scrub', 'no_clear,no_scale'),
+    CacheStat('cache_shared_dsk_bytes_duplicate', 'shared disk bytes saved by sharing duplicate disk images', 'no_clear,no_scale,size'),
     CacheStat('cache_shared_dsk_hash_size', 'shared disk hash table size', 'no_clear,no_scale'),
     CacheStat('cache_shared_dsk_hit', 'shared disk hit'),
+    CacheStat('cache_shared_dsk_lock_contention', 'shared disk bucket lock contention count'),
     CacheStat('cache_shared_dsk_miss', 'shared disk miss'),
     CacheStat('cache_tolerance_level', 'cache tolerance configured', 'no_clear,no_scale,size'),
+    CacheStat('cache_top5_dirty_pct', 'percentage of cache held as dirty leaf bytes by the top 5 tables', 'no_clear,no_scale'),
+    CacheStat('cache_top5_inuse_pct', 'percentage of cache held by the top 5 tables', 'no_clear,no_scale'),
+    CacheStat('cache_top5_updates_pct', 'percentage of cache held as update bytes by the top 5 tables', 'no_clear,no_scale'),
+    CacheStat('cache_top_dirty_pct', 'percentage of cache held as dirty leaf bytes by the top 32 tables', 'no_clear,no_scale'),
+    CacheStat('cache_top_inuse_pct', 'percentage of cache held by the top 32 tables', 'no_clear,no_scale'),
+    CacheStat('cache_top_updates_pct', 'percentage of cache held as update bytes by the top 32 tables', 'no_clear,no_scale'),
+    CacheStat('cache_truncate_txn_uncommitted_bytes', 'pages dirtied by fast-truncate in uncommitted txn - bytes', 'no_clear,no_scale,size'),
     CacheStat('cache_updates_txn_uncommitted_bytes', 'updates in uncommitted txn - bytes', 'no_clear,no_scale,size'),
     CacheStat('cache_updates_txn_uncommitted_count', 'updates in uncommitted txn - count', 'no_clear,no_scale,size'),
     CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),
@@ -364,13 +377,16 @@ conn_stats = [
     EvictStat('eviction_active_workers', 'eviction worker thread active', 'no_clear'),
     EvictStat('eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
     EvictStat('eviction_app_attempt', 'page evict attempts by application threads'),
+    EvictStat('eviction_app_bounded_wait_exceeded', 'application eviction assists stopped when the bounded wait was exhausted'),
     EvictStat('eviction_app_dirty_attempt', 'modified page evict attempts by application threads'),
     EvictStat('eviction_app_dirty_fail', 'modified page evict failures by application threads'),
     EvictStat('eviction_app_fail', 'page evict failures by application threads'),
     EvictStat('eviction_app_time', 'application thread time evicting (usecs)'),
+    EvictStat('eviction_ckpt_snapshot_declined', 'evictions that found no snapshot published by the running checkpoint'),
     EvictStat('eviction_clear_ordinary', 'pages removed from the ordinary queue to be queued for urgent eviction'),
     EvictStat('eviction_consider_prefetch', 'pages considered for eviction that were brought in by pre-fetch', 'no_clear,no_scale'),
     EvictStat('eviction_dhandle_complete_walk', 'eviction server completed walks of all dhandles', 'no_clear,no_scale'),
+    EvictStat('eviction_disagg_publish_cleared', 'disaggregated tables the eviction server published'),
     EvictStat('eviction_empty_score', 'eviction empty score', 'no_clear,no_scale'),
     EvictStat('eviction_fail', 'pages selected for eviction unable to be evicted'),
     EvictStat('eviction_fail_active_children_on_an_internal_page', 'pages selected for eviction unable to be evicted because of active children on an internal page'),
@@ -438,16 +454,21 @@ conn_stats = [
     EvictStat('eviction_server_skip_pages_last_running', 'eviction server skips pages that are written with transactions greater than the last running'),
     EvictStat('eviction_server_skip_pages_prune_timestamp', 'eviction server skips pages that are written with transactions greater than the prune timestamp'),
     EvictStat('eviction_server_skip_pages_prune_timestamp_not_move', 'eviction server skips pages that have been reconciled previously at the same prune timestamp'),
+    EvictStat('eviction_server_skip_pages_restored_unchanged', 'eviction server skips restored pages whose pinned stable timestamp and oldest transaction ID have not moved since the last eviction'),
     EvictStat('eviction_server_skip_pages_retry', 'eviction server skips pages that previously failed eviction and likely will again'),
     EvictStat('eviction_server_skip_stable_trees', 'eviction server skips stable btrees in disagg'),
+    EvictStat('eviction_server_skip_stale_disagg_pages', 'eviction server skips pages on an outdated disaggregated read-only btree that a reader still has open'),
     EvictStat('eviction_server_skip_trees_eviction_disabled', 'eviction server skips trees that disable eviction'),
     EvictStat('eviction_server_skip_trees_not_useful_before', 'eviction server skips trees that were not useful before'),
-    EvictStat('eviction_server_skip_trees_read_only', 'eviction server skips trees that are read-only if it is not looking for clean pages'),
+    EvictStat('eviction_server_skip_trees_read_only', 'eviction server skips checkpointed stable btrees on followers when not looking for clean pages'),
     EvictStat('eviction_server_skip_trees_stick_in_cache', 'eviction server skips trees that are configured to stick in cache'),
     EvictStat('eviction_server_skip_trees_too_many_active_walks', 'eviction server skips trees because there are too many active walks'),
+    EvictStat('eviction_server_skip_trees_walk_complete', 'eviction server skips resuming trees whose walk already traversed the whole tree'),
     EvictStat('eviction_server_skip_unwanted_pages', 'eviction server skips pages that we do not want to evict'),
     EvictStat('eviction_server_skip_unwanted_tree', 'eviction server skips tree that we do not want to evict'),
     EvictStat('eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
+    EvictStat('eviction_server_walk_dominating_cache', 'eviction server walks trees within their walk period because they dominate the cache'),
+    EvictStat('eviction_server_walk_dominating_cache_unproductive', 'eviction server walks trees within their walk period because they dominate the cache but queues no pages'),
     EvictStat('eviction_slow', 'eviction server unable to reach eviction goal'),
     EvictStat('eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear'),
     EvictStat('eviction_state', 'eviction state', 'no_clear,no_scale'),
@@ -506,6 +527,8 @@ conn_stats = [
     CheckpointCleanupStat('checkpoint_cleanup_handle_processed', 'most recent handles processed'),
     CheckpointCleanupStat('checkpoint_cleanup_inmem_pages_visited', 'most recent in-memory pages visited'),
     CheckpointCleanupStat('checkpoint_cleanup_success', 'successful calls'),
+    CheckpointCleanupStat('checkpoint_cleanup_thread_start', 'checkpoint cleanup thread started'),
+    CheckpointCleanupStat('checkpoint_cleanup_thread_stop', 'checkpoint cleanup thread stopped'),
 
     ##########################################
     # Checkpoint statistics
@@ -522,14 +545,13 @@ conn_stats = [
     CheckpointStat('checkpoint_handle_duration', 'most recent duration for gathering all handles (usecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_handle_lock_duration', 'most recent duration for locking the handles (usecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_handle_locked', 'most recent handles metadata locked'),
-    CheckpointStat('checkpoint_handle_meta_check_duration', 'most recent duration for handles metadata checked (usecs)', 'no_clear,no_scale'),
-    CheckpointStat('checkpoint_handle_meta_checked', 'most recent handles metadata checked'),
     CheckpointStat('checkpoint_handle_skip_duration', 'most recent duration for gathering skipped handles (usecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_handle_skipped', 'most recent handles skipped'),
     CheckpointStat('checkpoint_handle_walked', 'most recent handles walked'),
     CheckpointStat('checkpoint_hs_pages_reconciled', 'number of history store pages reconciled'),
     CheckpointStat('checkpoint_pages_reconciled', 'number of pages reconciled'),
     CheckpointStat('checkpoint_pages_reconciled_bytes', 'number of bytes reconciled'),
+    CheckpointStat('checkpoint_pages_reconciliation_skipped_evict_snapshot', 'number of pages whose reconciliation was skipped because eviction already reconciled them under the checkpoint snapshot'),
     CheckpointStat('checkpoint_pages_visited_internal', 'number of internal pages visited'),
     CheckpointStat('checkpoint_pages_visited_leaf', 'number of leaf pages visited'),
     CheckpointStat('checkpoint_parallel_pages_reconciled', 'number of pages reconciled by checkpoint parallel worker threads'),
@@ -547,6 +569,10 @@ conn_stats = [
     CheckpointStat('checkpoint_scrub_total', 'scrub total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_skipped', 'checkpoints skipped because database was clean'),
     CheckpointStat('checkpoint_state', 'progress state', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_stepdown_time_max', 'step down checkpoint max time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_stepdown_time_min', 'step down checkpoint min time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_stepdown_time_recent', 'step down checkpoint most recent time (msecs)', 'no_clear,no_scale'),
+    CheckpointStat('checkpoint_stepdown_time_total', 'step down checkpoint total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_stop_stress_active', 'stop timing stress active', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_sync', 'number of files synced'),
     CheckpointStat('checkpoint_sync_rec_pct', 'the percentage of checkpoint sync time spent in reconciliation across all threads', 'no_clear,no_scale'),
@@ -568,7 +594,7 @@ conn_stats = [
     CursorStat('cursor_cache', 'cursor close calls that result in cache'),
     CursorStat('cursor_cached_count', 'cached cursor count', 'no_clear,no_scale'),
     CursorStat('cursor_create', 'cursor create calls'),
-    CursorStat('cursor_insert', 'cursor insert calls'),
+    CursorStat('cursor_insert', 'cursor insert calls', '', 'otel_counter'),
     CursorStat('cursor_insert_bulk', 'cursor bulk loaded cursor insert calls'),
     CursorStat('cursor_insert_bytes', 'cursor insert key and value bytes', 'size'),
     CursorStat('cursor_modify', 'cursor modify calls'),
@@ -605,27 +631,68 @@ conn_stats = [
     DisaggStat('disagg_abandon_checkpoint_failed', 'abandon checkpoints failed'),
     DisaggStat('disagg_abandon_checkpoint_succeed', 'abandon checkpoints succeeded'),
     DisaggStat('disagg_apply_checkpoint_meta_time', 'apply checkpoint metadata most recent time (msecs)'),
+    DisaggStat('disagg_checkpoint_binary_compatible_version',
+        'checkpoint metadata compatible version this binary supports', 'no_clear,no_scale'),
+    DisaggStat('disagg_checkpoint_binary_version',
+        'checkpoint metadata version this binary writes', 'no_clear,no_scale'),
+    DisaggStat('disagg_checkpoint_defer', 'checkpoint pick-ups deferred for active transaction snapshots'),
+    DisaggStat('disagg_checkpoint_defer_adopt_wait',
+        'time the most recently adopted checkpoint spent deferred, zero if adopted on delivery (msecs)', 'no_clear,no_scale'),
+    DisaggStat('disagg_checkpoint_delivered_lsn', 'most recently delivered checkpoint metadata LSN', 'no_clear,no_scale'),
+    DisaggStat('disagg_checkpoint_meta_lsn', 'most recently adopted checkpoint metadata LSN', 'no_clear,no_scale'),
+    DisaggStat('disagg_checkpoint_storage_compatible_version',
+        'checkpoint metadata compatible version of the most recently picked up checkpoint: 0 none',
+        'no_clear,no_scale'),
+    DisaggStat('disagg_checkpoint_storage_version',
+        'checkpoint metadata version of the most recently picked up checkpoint: 0 none',
+        'no_clear,no_scale'),
     DisaggStat('disagg_conn_reconfig', 'connection reconfiguration'),
     DisaggStat('disagg_database_size', 'database size', 'size'),
+    DisaggStat('disagg_ingest_stable_tombstone_stripped', 'ingest-to-stable tombstone escape bytes stripped'),
     DisaggStat('disagg_pick_up_checkpoint_time', 'pick up checkpoint most recent time (msecs)'),
+    DisaggStat('disagg_pick_up_checkpoint_time_startup', 'pick up checkpoint time at startup (msecs)'),
     DisaggStat('disagg_pick_up_file_meta_inserted', 'new file metadata entries inserted during checkpoint pick-up'),
     DisaggStat('disagg_pick_up_file_meta_updated', 'existing file metadata entries updated during checkpoint pick-up'),
     DisaggStat('disagg_role_leader', 'role leader'),
+    DisaggStat('disagg_snapshot_rebuild', 'snapshots rebuilt after racing a checkpoint pick-up or role change'),
+    # FIXME-WT-18206: remove the mode statistic along with the legacy escaped-stable support.
+    DisaggStat('disagg_stable_tombstone_encoding',
+        'stable tombstone encoding mode: 0 not yet determined, 1 legacy escaped, 2 unescaped',
+        'no_clear,no_scale'),
+    DisaggStat('disagg_step_down_attempted', 'step downs attempted'),
+    DisaggStat('disagg_step_down_completed', 'step downs completed'),
+    DisaggStat('disagg_step_down_in_progress', 'step down in progress', 'no_clear,no_scale'),
     DisaggStat('disagg_step_down_time', 'step down most recent time (msecs)'),
+    DisaggStat('disagg_step_down_window_creates', 'tables created without a stable constituent while the step-down timestamp is set'),
+    DisaggStat('disagg_step_up_checkpoint_restart_time', 'step up checkpoint restart most recent time (msecs)'),
+    DisaggStat('disagg_step_up_clear_ingest_retry', 'step up ingest table clear truncates retried after a conflict'),
+    DisaggStat('disagg_step_up_deferred_pickup_retries', 'step up deferred checkpoint pickup retries before stepping up'),
+    DisaggStat('disagg_step_up_deferred_pickup_retry_time', 'step up deferred checkpoint pickup retry most recent time (msecs)'),
+    DisaggStat('disagg_step_up_in_progress', 'step up in progress', 'no_clear,no_scale'),
+    DisaggStat('disagg_step_up_ingest_drain_bytes', 'step up ingest table drain bytes moved to stable tables'),
+    DisaggStat('disagg_step_up_ingest_drain_time', 'step up ingest table drain most recent time (msecs)'),
+    DisaggStat('disagg_step_up_ingest_tables_drained', 'step up ingest tables drained'),
+    DisaggStat('disagg_step_up_missing_stable_create_time', 'step up missing stable table create most recent time (msecs)'),
+    DisaggStat('disagg_step_up_missing_stable_tables_created', 'step up missing stable tables created'),
     DisaggStat('disagg_step_up_time', 'step up most recent time (msecs)'),
+    DisaggStat('disagg_victim_cache_app_thread_put_time', 'time application threads spent adding pages to the victim cache (usecs)'),
+    DisaggStat('disagg_victim_cache_app_thread_puts', 'pages added to the victim cache by application threads'),
+    DisaggStat('disagg_victim_cache_cold_not_cached', 'cold collection pages not added to the victim cache during eviction'),
+    DisaggStat('disagg_victim_cache_put_failures', 'failed page inserts into the victim cache'),
+    DisaggStat('disagg_victim_cache_put_time', 'time spent adding pages to the victim cache (usecs)'),
+    DisaggStat('disagg_victim_cache_put_time_max', 'maximum time spent adding a single page to the victim cache, reset per checkpoint (usecs)', 'no_clear,no_scale'),
+    DisaggStat('disagg_victim_cache_puts', 'pages added to the victim cache'),
 
     ##########################################
     # Dhandle statistics
     ##########################################
     DhandleStat('dh_conn_handle_btree_count', 'btree connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_conn_handle_checkpoint_count', 'checkpoint connection data handles currently active', 'no_clear,no_scale'),
-    # dh_conn_handle_count = The sum of dh_conn_handle_{btree,table,tiered,tiered_tree}_count.
+    # dh_conn_handle_count = The sum of dh_conn_handle_{btree,table}_count.
     DhandleStat('dh_conn_handle_count', 'connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_conn_handle_layered_count', 'Layered connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_conn_handle_size', 'connection data handle size', 'no_clear,no_scale,size'),
     DhandleStat('dh_conn_handle_table_count', 'Table connection data handles currently active', 'no_clear,no_scale'),
-    DhandleStat('dh_conn_handle_tiered_count', 'Tiered connection data handles currently active', 'no_clear,no_scale'),
-    DhandleStat('dh_conn_handle_tiered_tree_count', 'Tiered_Tree connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_session_handles', 'session dhandles swept'),
     DhandleStat('dh_session_sweeps', 'session sweep attempts'),
     # dh_sweep_dead_close formerly called dh_sweep_close.
@@ -643,10 +710,6 @@ conn_stats = [
     ##########################################
     LayeredStat('layered_table_manager_checkpoints_disagg_pick_up_follower', 'number of checkpoints picked up by a follower'),
     LayeredStat('layered_table_manager_tables', 'the number of tables the layered table manager has open'),
-    LayeredStat('layered_truncate_list_gc_entries_removed', 'the number of truncate list entries removed by garbage collection'),
-    LayeredStat('layered_truncate_list_gc_runs', 'the number of times truncate list garbage collection ran with a valid prune timestamp'),
-    LayeredStat('layered_truncate_list_search_calls', 'the number of times the truncate list was searched'),
-    LayeredStat('layered_truncate_list_search_entries_walked', 'the number of truncate list entries walked during search'),
 
     ##########################################
     # Live Restore statistics
@@ -669,9 +732,9 @@ conn_stats = [
     ##########################################
     # Load Control statistics
     ##########################################
-    LoadControlStat('read_load', 'read load at the system level'),
+    LoadControlStat('read_load', 'read load at the system level', 'no_clear,no_scale'),
     LoadControlStat('read_reject_count', 'number of read operations rejected due to load control'),
-    LoadControlStat('write_load', 'write load at the system level'),
+    LoadControlStat('write_load', 'write load at the system level', 'no_clear,no_scale'),
     LoadControlStat('write_reject_count', 'number of write operations rejected due to load control'),
 
     ##########################################
@@ -697,6 +760,10 @@ conn_stats = [
     LockStat('lock_table_wait_application', 'table lock application thread time waiting for the table lock (usecs)'),
     LockStat('lock_table_wait_internal', 'table lock internal thread time waiting for the table lock (usecs)'),
     LockStat('lock_table_write_count', 'table write lock acquisitions'),
+    LockStat('lock_truncate_list_read_count', 'truncate list read lock acquisitions'),
+    LockStat('lock_truncate_list_wait_application', 'truncate list lock application thread wait time (usecs)'),
+    LockStat('lock_truncate_list_wait_internal', 'truncate list lock internal thread wait time (usecs)'),
+    LockStat('lock_truncate_list_write_count', 'truncate list write lock acquisitions'),
     LockStat('lock_txn_global_read_count', 'txn global read lock acquisitions'),
     LockStat('lock_txn_global_wait_application', 'txn global lock application thread time waiting (usecs)'),
     LockStat('lock_txn_global_wait_internal', 'txn global lock internal thread time waiting (usecs)'),
@@ -793,16 +860,16 @@ conn_stats = [
     PerfHistStat('perf_hist_disaggbmwrite_latency_lt5000', 'disagg block manager write latency histogram (bucket 6) - 2500-4999us'),
     PerfHistStat('perf_hist_disaggbmwrite_latency_lt10000', 'disagg block manager write latency histogram (bucket 7) - 5000-9999us'),
     PerfHistStat('perf_hist_disaggbmwrite_latency_total_usecs', 'disagg block manager write latency histogram total (usecs)'),
-    PerfHistStat('perf_hist_fsread_latency_gt1000', 'file system read latency histogram (bucket 9) - 1000ms+'),
-    PerfHistStat('perf_hist_fsread_latency_lt2', 'file system read latency histogram (bucket 1) - 0-1ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt5', 'file system read latency histogram (bucket 2) - 2-4ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt10', 'file system read latency histogram (bucket 3) - 5-9ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt50', 'file system read latency histogram (bucket 4) - 10-49ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt100', 'file system read latency histogram (bucket 5) - 50-99ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt250', 'file system read latency histogram (bucket 6) - 100-249ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt500', 'file system read latency histogram (bucket 7) - 250-499ms'),
-    PerfHistStat('perf_hist_fsread_latency_lt1000', 'file system read latency histogram (bucket 8) - 500-999ms'),
-    PerfHistStat('perf_hist_fsread_latency_total_msecs', 'file system read latency histogram total (msecs)'),
+    PerfHistStat('perf_hist_fsread_latency_gt1000', 'file system read latency histogram (bucket 9) - 1000ms+', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt2', 'file system read latency histogram (bucket 1) - 0-1ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt5', 'file system read latency histogram (bucket 2) - 2-4ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt10', 'file system read latency histogram (bucket 3) - 5-9ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt50', 'file system read latency histogram (bucket 4) - 10-49ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt100', 'file system read latency histogram (bucket 5) - 50-99ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt250', 'file system read latency histogram (bucket 6) - 100-249ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt500', 'file system read latency histogram (bucket 7) - 250-499ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_lt1000', 'file system read latency histogram (bucket 8) - 500-999ms', '', 'otel_histogram'),
+    PerfHistStat('perf_hist_fsread_latency_total_msecs', 'file system read latency histogram total (msecs)', '', 'otel_histogram'),
     PerfHistStat('perf_hist_fswrite_latency_gt1000', 'file system write latency histogram (bucket 9) - 1000ms+'),
     PerfHistStat('perf_hist_fswrite_latency_lt2', 'file system write latency histogram (bucket 1) - 0-1ms'),
     PerfHistStat('perf_hist_fswrite_latency_lt5', 'file system write latency histogram (bucket 2) - 2-4ms'),
@@ -885,6 +952,7 @@ conn_stats = [
     ##########################################
     # Session operations
     ##########################################
+    SessionOpStat('session_hs_verify_btrees_checked', 'history store verify number of btrees checked against the data store', 'no_clear,no_scale'),
     SessionOpStat('session_open', 'open session count', 'no_clear,no_scale'),
     SessionOpStat('session_query_ts', 'session query timestamp calls'),
     SessionOpStat('session_table_alter_fail', 'table alter failed calls', 'no_clear,no_scale'),
@@ -907,6 +975,8 @@ conn_stats = [
     SessionOpStat('session_table_create_import_repair', 'table create with import repair calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_create_import_success', 'table create with import successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
+    SessionOpStat('session_table_drop_deferred', 'table drop deferred operations pending', 'no_clear,no_scale'),
+    SessionOpStat('session_table_drop_deferred_applied', 'table drop deferred operations applied', 'no_clear,no_scale'),
     SessionOpStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_drop_success', 'table drop successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_publish_fail', 'table publish failed calls', 'no_clear,no_scale'),
@@ -916,21 +986,8 @@ conn_stats = [
     SessionOpStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
+    SessionOpStat('session_table_verify_hs_keys_checked', 'table verify number of history store keys checked against the data store', 'no_clear,no_scale'),
     SessionOpStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
-
-    ##########################################
-    # Tiered storage statistics
-    ##########################################
-    StorageStat('flush_tier', 'flush_tier operation calls'),
-    StorageStat('flush_tier_fail', 'flush_tier failed calls'),
-    StorageStat('flush_tier_skipped', 'flush_tier tables skipped due to no checkpoint'),
-    StorageStat('flush_tier_switched', 'flush_tier tables switched'),
-    StorageStat('local_objects_inuse', 'attempts to remove a local object and the object is in use'),
-    StorageStat('local_objects_removed', 'local objects removed'),
-    StorageStat('tiered_retention', 'tiered storage local retention time (secs)', 'no_clear,no_scale,size'),
-    StorageStat('tiered_work_units_created', 'tiered operations scheduled'),
-    StorageStat('tiered_work_units_dequeued', 'tiered operations dequeued and processed'),
-    StorageStat('tiered_work_units_removed', 'tiered operations removed without processing'),
 
     ##########################################
     # Thread Count statistics
@@ -972,7 +1029,10 @@ conn_stats = [
     TxnStat('txn_rollback', 'transactions rolled back'),
     TxnStat('txn_rollback_oldest_id', 'oldest transaction ID rolled back for eviction'),
     TxnStat('txn_rollback_oldest_pinned', 'oldest pinned transaction ID rolled back for eviction'),
+    TxnStat('txn_rollback_stepdown', 'write transactions rolled back for straddling the step-down timestamp setting boundary'),
     TxnStat('txn_rollback_to_stable_running', 'transaction rollback to stable currently running', 'no_clear,no_scale'),
+    TxnStat('txn_rollback_too_large_for_cache',
+        'transactions rolled back because their own dirty content exceeds the eviction updates or dirty trigger'),
     TxnStat('txn_rts', 'rollback to stable calls'),
     TxnStat('txn_rts_pages_visited', 'rollback to stable pages visited'),
     TxnStat('txn_rts_tree_walk_skip_pages', 'rollback to stable tree walk skipping pages'),
@@ -990,7 +1050,10 @@ conn_stats = [
     TxnStat('txn_set_ts_stable_disagg_epoch', 'set timestamp stable disaggregated schema epoch calls'),
     TxnStat('txn_set_ts_stable_disagg_epoch_upd', 'set timestamp stable disaggregated schema epoch updates'),
     TxnStat('txn_set_ts_stable_upd', 'set timestamp stable updates'),
+    TxnStat('txn_stepdown_epoch_set', 'step-down disaggregated schema epoch is currently set', 'no_clear,no_scale'),
+    TxnStat('txn_stepdown_ts_set', 'step-down timestamp is currently set', 'no_clear,no_scale'),
     TxnStat('txn_timestamp_oldest_active_read', 'transaction read timestamp of the oldest active reader', 'no_clear,no_scale'),
+    TxnStat('txn_truncate_dirty_cache_rollback', 'truncate operations rolled back because they pinned too much dirty cache'),
     TxnStat('txn_walk_sessions', 'transaction walk of concurrent sessions'),
 
     ##########################################
@@ -1002,6 +1065,7 @@ conn_stats = [
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
     YieldStat('application_cache_uninterruptible_ops', 'application thread operations waiting for mandatory cache eviction'),
     YieldStat('application_cache_uninterruptible_time', 'application thread time waiting for mandatory cache eviction (usecs)'),
+    YieldStat('application_evict_checkpoint_snapshot', 'application thread eviction used the published checkpoint snapshot for visibility'),
     YieldStat('application_evict_snapshot_refreshed', 'application thread snapshot refreshed for eviction'),
     YieldStat('child_modify_blocked_page', 'page reconciliation yielded due to child modification'),
     YieldStat('dhandle_lock_blocked', 'data handle lock yielded'),
@@ -1061,12 +1125,46 @@ dsrc_stats = [
     BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale,size'),
+    BtreeStat('btree_obsolete_ondisk_kv_analyzed', 'pages analyzed for obsolete on-disk key/value pairs', 'no_scale,tree_walk'),
+    BtreeStat('btree_obsolete_ondisk_kv_bytes', 'obsolete on-disk key/value bytes', 'no_scale,size,tree_walk'),
+    BtreeStat('btree_obsolete_ondisk_kv_bytes_mixed', 'obsolete on-disk key/value bytes on mixed pages', 'no_scale,size,tree_walk'),
+    BtreeStat('btree_obsolete_ondisk_kv_pages', 'pages with obsolete on-disk key/value pairs', 'no_scale,tree_walk'),
     BtreeStat('btree_overflow', 'overflow pages', 'no_scale,tree_walk'),
     BtreeStat('btree_row_empty_values', 'row-store empty values', 'no_scale,tree_walk'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,tree_walk'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,tree_walk'),
-    BtreeStat('btree_row_leaf_avg_entries', 'row-store leaf page recent average entries (EWMA)', 'no_scale'),
-    BtreeStat('btree_row_leaf_pages', 'row-store leaf pages (approximate, incremental)', 'no_scale'),
+    BtreeStat('btree_row_leaf_avg_entries', 'row-store leaf page recent average entries (EWMA), or UINT64_MAX if never tracked and awaiting a tree-walk correction', 'no_scale'),
+    BtreeStat('btree_row_leaf_pages', 'row-store leaf pages (approximate, incremental), or UINT64_MAX if never tracked and awaiting a tree-walk correction', 'no_scale'),
+
+    ##########################################
+    # Btree size summary statistics (opt-in, accumulated by a debug=(size_stats) cursor scan)
+    ##########################################
+    BtreeSizeStat('btree_size_deleted_key_bytes', 'deleted key bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_deleted_key_count', 'deleted key count', 'no_scale'),
+    BtreeSizeStat('btree_size_deleted_value_bytes', 'deleted value bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_deleted_value_count', 'deleted value count', 'no_scale'),
+    BtreeSizeStat('btree_size_internal_bytes', 'internal page bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_internal_pages', 'internal pages', 'no_scale'),
+    BtreeSizeStat('btree_size_key_bytes', 'key bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_key_count', 'key count', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_bytes', 'leaf page bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_leaf_hist_0', 'leaf page-size histogram bucket 0', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_1', 'leaf page-size histogram bucket 1', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_2', 'leaf page-size histogram bucket 2', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_3', 'leaf page-size histogram bucket 3', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_4', 'leaf page-size histogram bucket 4', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_5', 'leaf page-size histogram bucket 5', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_6', 'leaf page-size histogram bucket 6', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_7', 'leaf page-size histogram bucket 7', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_8', 'leaf page-size histogram bucket 8 (>= pre-compression leaf page budget)', 'no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_buckets', 'leaf page-size histogram bucket count', 'max_aggregate,no_scale'),
+    BtreeSizeStat('btree_size_leaf_hist_ceiling', 'leaf page-size histogram ceiling', 'max_aggregate,no_scale,size'),
+    BtreeSizeStat('btree_size_leaf_pages', 'leaf pages', 'no_scale'),
+    BtreeSizeStat('btree_size_no_image_pages', 'pages skipped for having no on-disk image', 'no_scale'),
+    BtreeSizeStat('btree_size_overflow_bytes', 'overflow page bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_overflow_pages', 'overflow pages', 'no_scale'),
+    BtreeSizeStat('btree_size_value_bytes', 'value bytes', 'no_scale,size'),
+    BtreeSizeStat('btree_size_value_count', 'value count', 'no_scale'),
 
     ##########################################
     # Eviction statistics
@@ -1276,9 +1374,11 @@ conn_dsrc_stats = [
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_obsolete_updates_removed', 'obsolete updates removed'),
     CacheStat('cache_pages_prefetch', 'pages requested from the cache due to pre-fetch'),
+    CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_pages_requested_hs', 'pages requested from the history store'),
     CacheStat('cache_pages_requested_internal', 'pages requested from the cache internal'),
     CacheStat('cache_pages_requested_leaf', 'pages requested from the cache leaf'),
+    CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_checkpoint', 'pages read into cache by checkpoint'),
     CacheStat('cache_read_deleted', 'pages read into cache after truncate'),
     CacheStat('cache_read_deleted_prepared', 'pages read into cache after truncate in prepare state'),
@@ -1296,10 +1396,13 @@ conn_dsrc_stats = [
     CacheStat('cache_write_hs', 'page written requiring history store records'),
     CacheStat('cache_write_restore_invisible', 'pages written requiring in-memory restoration due to invisible updates'),
     CacheStat('cache_write_restore_scrub', 'pages written requiring in-memory restoration due to scrub eviction'),
+    CacheStat('cache_write_restore_scrub_checkpoint', 'pages written requiring in-memory restoration due to checkpoint scrub'),
+    CacheStat('cache_write_restore_scrub_skipped_dirty', 'checkpoint scrub skipped because the page will be left dirty'),
 
     ##########################################
     # Checkpoint Cleanup statistics
     ##########################################
+    CheckpointCleanupStat('checkpoint_cleanup_pages_deleted_not_visible_all', 'internal pages whose deleted children were all still visible to some reader'),
     CheckpointCleanupStat('checkpoint_cleanup_pages_evict', 'pages added for eviction'),
     CheckpointCleanupStat('checkpoint_cleanup_pages_obsolete_tw', 'pages dirtied due to obsolete time window'),
     CheckpointCleanupStat('checkpoint_cleanup_pages_read_obsolete_tw', 'pages read into cache due to obsolete time window'),
@@ -1339,9 +1442,18 @@ conn_dsrc_stats = [
     CursorStat('cursor_reposition_failed', 'Total number of times cursor fails to temporarily release pinned page to encourage eviction of hot or large page'),
     CursorStat('cursor_search_near_prefix_fast_paths', 'Total number of times a search near has exited due to prefix config'),
     CursorStat('cursor_skip_hs_cur_position', 'Total number of entries skipped to position the history store cursor'),
-    CursorStat('cursor_tree_walk_del_page_skip', 'Total number of deleted pages skipped during tree walk'),
+    CursorStat('cursor_tree_walk_del_leaf_page_skip', 'Total number of deleted leaf pages skipped during tree walk'),
     CursorStat('cursor_tree_walk_inmem_del_page_skip', 'Total number of in-memory deleted pages skipped during tree walk'),
+    CursorStat('cursor_tree_walk_ondisk_del_internal_page_skip', 'Total number of on-disk deleted internal pages skipped during tree walk'),
     CursorStat('cursor_tree_walk_ondisk_del_page_skip', 'Total number of on-disk deleted pages skipped during tree walk'),
+    CursorStat('cursor_tree_walk_read_only_del_internal_page_skip', 'Total number of in-memory deleted internal pages of a read-only btree skipped during tree walk'),
+    CursorStat('cursor_tree_walk_skip_lock_contended', 'Total number of times a tree walk waited for the page lock during the page skip check'),
+    CursorStat('cursor_truncate_fast_delete_fallback_in_memory', 'range truncate fast-delete candidates in memory or busy'),
+    CursorStat('cursor_truncate_fast_delete_fallback_pages', 'range truncate fast-delete candidates rejected'),
+    CursorStat('cursor_truncate_fast_delete_pages', 'range truncate fast-delete pages'),
+    CursorStat('cursor_truncate_fast_delete_pages_skipped_already_deleted', 'range truncate fast-delete skipped, all entries already deleted'),
+    CursorStat('cursor_truncate_internal_bytes_dirtied', 'range truncate internal page bytes newly dirtied', 'size'),
+    CursorStat('cursor_truncate_internal_pages_dirtied', 'range truncate internal pages newly dirtied'),
 
     ##########################################
     # Cursor API error statistics
@@ -1353,7 +1465,6 @@ conn_dsrc_stats = [
     CursorErrorStat('cursor_equals_error', 'cursor equals calls that return an error'),
     CursorErrorStat('cursor_get_key_error', 'cursor get key calls that return an error'),
     CursorErrorStat('cursor_get_value_error', 'cursor get value calls that return an error'),
-    CursorErrorStat('cursor_insert_check_error', 'cursor insert check calls that return an error'),
     CursorErrorStat('cursor_insert_error', 'cursor insert calls that return an error'),
     CursorErrorStat('cursor_largest_key_error', 'cursor largest key calls that return an error'),
     CursorErrorStat('cursor_modify_error', 'cursor modify calls that return an error'),
@@ -1393,6 +1504,9 @@ conn_dsrc_stats = [
     LayeredStat('layered_curs_next_ingest', 'Layered table cursor next operations from the ingest btrees'),
     LayeredStat('layered_curs_next_stable', 'Layered table cursor next operations from the stable btrees'),
     LayeredStat('layered_curs_open_stable', 'Layered table cursor opens the stable btree for the first time'),
+    LayeredStat('layered_curs_open_stable_ckpt_pickup_race', 'Layered table cursor stable open raced a checkpoint pickup'),
+    LayeredStat('layered_curs_open_stable_refused', 'Layered table cursor stable open refused to preserve a transaction snapshot'),
+    LayeredStat('layered_curs_open_stable_stepdown_race', 'Layered table cursor stable open rolled back after racing a step-down'),
     LayeredStat('layered_curs_prev', 'Layered table cursor prev operations'),
     LayeredStat('layered_curs_prev_ingest', 'Layered table cursor prev operations from the ingest btrees'),
     LayeredStat('layered_curs_prev_stable', 'Layered table cursor prev operations from the stable btrees'),
@@ -1404,7 +1518,12 @@ conn_dsrc_stats = [
     LayeredStat('layered_curs_search_near_ingest', 'Layered table cursor search near operations from the ingest btrees'),
     LayeredStat('layered_curs_search_near_stable', 'Layered table cursor search near operations from the stable btrees'),
     LayeredStat('layered_curs_search_stable', 'Layered table cursor search operations from the stable btrees'),
+    LayeredStat('layered_curs_stable_value_tombstone', 'Layered table stable values equal to the tombstone byte sequence'),
+    LayeredStat('layered_curs_stable_value_tombstone_prefix', 'Layered table stable values beginning with the tombstone byte sequence and ending with a non-tombstone byte'),
+    LayeredStat('layered_curs_stable_value_tombstone_suffix', 'Layered table stable values beginning with the tombstone byte sequence and ending with a tombstone byte'),
+    LayeredStat('layered_curs_stable_value_tombstone_x3', 'Layered table stable values equal to three tombstone bytes'),
     LayeredStat('layered_curs_update', 'Layered table cursor update operations'),
+    LayeredStat('layered_stable_live_open_refused', 'Layered table live stable open refused on a follower'),
 
     LayeredStat('layered_table_manager_checkpoints', 'checkpoints performed on this table by the layered table manager'),
     LayeredStat('layered_table_manager_checkpoints_disagg_pick_up_failed', 'disagg pick up checkpoints failed'),
@@ -1412,6 +1531,19 @@ conn_dsrc_stats = [
     LayeredStat('layered_table_manager_logops_applied', 'how many log applications the layered table manager applied on this tree'),
     LayeredStat('layered_table_manager_logops_skipped', 'how many log applications the layered table manager skipped on this tree'),
     LayeredStat('layered_table_manager_skip_lsn', 'how many previously-applied LSNs the layered table manager skipped on this tree'),
+
+    LayeredStat('layered_truncate_ingest_tombstones_written', 'follower truncate ingest tombstones written'),
+    LayeredStat('layered_truncate_list_clear_entries_removed', 'truncate list entries removed by clearing'),
+    LayeredStat('layered_truncate_list_entries_inserted', 'truncate list entries inserted'),
+    LayeredStat('layered_truncate_list_gc_entries_examined', 'truncate list entries examined by garbage collection'),
+    LayeredStat('layered_truncate_list_gc_entries_removed', 'the number of truncate list entries removed by garbage collection'),
+    LayeredStat('layered_truncate_list_gc_runs', 'the number of times truncate list garbage collection ran with a valid prune timestamp'),
+    LayeredStat('layered_truncate_list_rollback_entries_removed', 'truncate list entries removed by transaction rollback'),
+    LayeredStat('layered_truncate_list_search_calls', 'the number of times the truncate list was searched'),
+    LayeredStat('layered_truncate_list_search_entries_walked', 'the number of truncate list entries walked during search'),
+    LayeredStat('layered_truncate_list_search_hits', 'truncate list searches that completed with a matching range'),
+    LayeredStat('layered_truncate_list_search_misses', 'truncate list searches that completed without a matching range'),
+    LayeredStat('layered_truncate_list_write_conflicts', 'truncate list write conflicts'),
 
     ##########################################
     # Reconciliation statistics
@@ -1430,7 +1562,6 @@ conn_dsrc_stats = [
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),
-    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_page_delta_eligible', 'pages eligible for delta generation'),
     RecStat('rec_page_delta_internal', 'internal page deltas written'),
     RecStat('rec_page_delta_internal_key_deleted', 'internal page delta keys deleted'),
@@ -1444,8 +1575,12 @@ conn_dsrc_stats = [
     RecStat('rec_page_delta_rejected_non_single_page', 'page deltas rejected due to non-single page in previous reconciliation'),
     RecStat('rec_page_delta_rejected_size_threshold', 'page deltas rejected due to size threshold'),
     RecStat('rec_page_delta_rejected_zero_entries', 'page deltas rejected due to zero entries'),
+    RecStat('rec_page_delta_shared_hs_internal', 'internal page deltas written for the shared history store'),
+    RecStat('rec_page_delta_shared_hs_leaf', 'leaf page deltas written for the shared history store'),
     RecStat('rec_page_full_image_internal', 'full internal pages written instead of a page delta'),
     RecStat('rec_page_full_image_leaf', 'full leaf pages written instead of a page delta'),
+    RecStat('rec_page_full_image_shared_hs_internal', 'full internal pages written instead of a page delta for the shared history store'),
+    RecStat('rec_page_full_image_shared_hs_leaf', 'full leaf pages written instead of a page delta for the shared history store'),
     RecStat('rec_page_mods_gt500', 'changes since prior reconciliation (bucket 8) greater than 500'),
     RecStat('rec_page_mods_le10', 'changes since prior reconciliation (bucket 2) between 6 and 10'),
     RecStat('rec_page_mods_le100', 'changes since prior reconciliation (bucket 5) between 51 and 100'),
@@ -1529,7 +1664,9 @@ session_stats = [
     SessionStat('lock_dhandle_wait', 'dhandle lock wait time (usecs)'),
     SessionStat('lock_schema_wait', 'schema lock wait time (usecs)'),
     SessionStat('read_time', 'page read from disk to cache time (usecs)'),
-    SessionStat('txn_bytes_dirty', 'dirty bytes in this txn', 'no_clear,no_scale,size'),
+    SessionStat('txn_bytes_dirty', 'dirty bytes in this txn, from both updates and fast-truncate', 'no_clear,no_scale,size'),
+    SessionStat('txn_truncate_bytes_dirty', 'dirty bytes pinned by fast-truncate in this txn', 'no_clear,no_scale,size'),
     SessionStat('txn_updates', 'number of updates in this txn', 'no_clear,no_scale,size'),
+    SessionStat('txn_updates_bytes_dirty', 'dirty bytes from updates in this txn', 'no_clear,no_scale,size'),
     SessionStat('write_time', 'page write from cache to disk time (usecs)'),
 ]

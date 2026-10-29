@@ -1,11 +1,12 @@
 // Simple covered index query test with sort on _id
 // @tags: [
+//   uses_explain,
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 // ]
 
 // Include helpers for analyzing explain output.
-import {isIndexOnly} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.getCollection("covered_sort_2");
 coll.drop();
@@ -19,7 +20,7 @@ coll.insert({_id: null});
 // Test no query
 let plan = coll.find({}, {_id: 1}).sort({_id: -1}).hint({_id: 1}).explain("executionStats");
 assert(
-    isIndexOnly(db, plan.queryPlanner.winningPlan),
+    isIndexOnly(db, getWinningPlanFromExplain(plan)),
     "sort.2.1 - indexOnly should be true on covered query",
 );
 assert.eq(

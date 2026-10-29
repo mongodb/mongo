@@ -1,37 +1,13 @@
-# Copyright (C) 2025-present MongoDB, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Server Side Public License, version 1,
-# as published by MongoDB, Inc.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# Server Side Public License for more details.
-#
-# You should have received a copy of the Server Side Public License
-# along with this program. If not, see
-# <http://www.mongodb.com/licensing/server-side-public-license>.
-#
-# As a special exception, the copyright holders give permission to link the
-# code of portions of this program with the OpenSSL library under certain
-# conditions as described in each individual source file and distribute
-# linked combinations including the program with the OpenSSL library. You
-# must comply with the Server Side Public License in all respects for
-# all of the code used other than as permitted herein. If you modify file(s)
-# with this exception, you may extend this exception to your version of the
-# file(s), but you are not obligated to do so. If you do not wish to do so,
-# delete this exception statement from your version. If you delete this
-# exception statement from all source files in the program, then also delete
-# it in the license file.
-#
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
 
 global:
-    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/platform/atomic_word.h"
-        - "mongo/db/query/stage_memory_limit_knobs/knobs_protector.h"
+        - "mongo/platform/atomic.h"
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
 
 server_parameters:
     internalDocumentSourceLookupCacheSizeBytes:
@@ -40,12 +16,18 @@ server_parameters:
             will cache before abandoning the cache and executing the full pipeline on each iteration."
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceLookupCacheSizeBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceGraphLookupMaxMemoryBytes:
         description: >-
@@ -53,12 +35,18 @@ server_parameters:
             in-memory before spilling.
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceGraphLookupMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceGraphLookupMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceGroupMaxMemoryBytes:
         description: >-
@@ -66,12 +54,18 @@ server_parameters:
             before spilling to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceGroupMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceGroupMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
         description: >-
@@ -79,12 +73,18 @@ server_parameters:
             in-memory before throwing an error.
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceSetWindowFieldsMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceSetWindowFieldsMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceBucketAutoMaxMemoryBytes:
         description: >-
@@ -92,34 +92,49 @@ server_parameters:
             before spilling to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceBucketAutoMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceBucketAutoMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalDocumentSourceDensifyMaxMemoryBytes:
         description: "Limits the number of bytes densification can use to store partition information."
         set_at: [startup, runtime]
         cpp_varname: "internalDocumentSourceDensifyMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: documentSourceDensifyMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryFacetBufferSizeBytes:
         description: "The number of bytes to buffer at once during a $facet stage."
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFacetBufferSizeBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryFacetBufferSizeBytes
 
     internalTextOrStageMaxMemoryBytes:
         description: >-
@@ -127,12 +142,18 @@ server_parameters:
             spilling to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalTextOrStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: textOrStageMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -140,12 +161,18 @@ server_parameters:
             be before we spill to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashLookupApproxMemoryUseInBytesBeforeSpill
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -153,12 +180,18 @@ server_parameters:
             be before we spill to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashAggApproxMemoryUseInBytesBeforeSpill
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxSpoolMemoryUsageBytes:
         description: >-
@@ -167,12 +200,18 @@ server_parameters:
             but this limit will still constrain the memory consumption.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxSpoolMemoryUsageBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxSpoolMemoryUsageBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQueryMaxBlockingSortMemoryUsageBytes:
         description: >-
@@ -181,12 +220,15 @@ server_parameters:
             possible to sort more data, but this limit will still constrain the memory consumption.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxBlockingSortMemoryUsageBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryMaxBlockingSortMemoryUsageBytes
 
     internalOrStageMaxMemoryBytes:
         description: >-
@@ -194,12 +236,15 @@ server_parameters:
             failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalOrStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: orStageMaxMemoryBytes
 
     internalNearStageMaxMemoryBytes:
         description: >-
@@ -207,12 +252,18 @@ server_parameters:
             spilling to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalNearStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: nearStageMaxMemoryBytes
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalMergeSortStageMaxMemoryBytes:
         description: >-
@@ -220,12 +271,15 @@ server_parameters:
             before failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalMergeSortStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: mergeSortStageMaxMemoryBytes
 
     internalIndexScanStageMaxMemoryBytes:
         description: >-
@@ -233,12 +287,15 @@ server_parameters:
             failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalIndexScanStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: indexScanStageMaxMemoryBytes
 
     internalSlotBasedExecutionUniqueStageMaxMemoryBytes:
         description: >-
@@ -246,12 +303,15 @@ server_parameters:
             in-memory before failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalSBEUniqueStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeUniqueStageMaxMemoryBytes
 
     internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes:
         description: >-
@@ -259,12 +319,15 @@ server_parameters:
             in-memory before failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalSBEMergeJoinStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeMergeJoinStageMaxMemoryBytes
 
     internalSlotBasedExecutionAndHashStageMaxMemoryBytes:
         description: >-
@@ -272,12 +335,15 @@ server_parameters:
             in-memory before failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalSBEAndHashStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeAndHashStageMaxMemoryBytes
 
     internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill:
         description: >-
@@ -285,12 +351,18 @@ server_parameters:
             be before we spill to disk.
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashJoinApproxMemoryUseInBytesBeforeSpill
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalUpdateStageMaxMemoryBytes:
         description: >-
@@ -298,12 +370,15 @@ server_parameters:
             before failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalUpdateStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: updateStageMaxMemoryBytes
 
     internalCountScanStageMaxMemoryBytes:
         description: >-
@@ -311,62 +386,12 @@ server_parameters:
             failing the query.
         set_at: [startup, runtime]
         cpp_varname: "internalCountScanStageMaxMemoryBytes"
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         default:
             expr: std::numeric_limits<long long>::max()
         validator:
             gt: 0
         redact: false
-
-    internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes:
-        description: >-
-            Maximum number of bytes that can be in use during expression evaluation for a single
-            document in a $project, $addFields, $set, $unset, $replaceRoot, or $replaceWith when
-            query and expression memory tracking are enabled.
-        set_at: [startup, runtime]
-        cpp_varname: "internalSingleDocumentTransformationStageMaxExpressionEvaluationBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
-    internalMatchStageMaxExpressionEvaluationBytes:
-        description: >-
-            Maximum number of bytes that can be in use during expression evaluation for a single
-            document in a $match when query and expression memory tracking are enabled.
-        set_at: [startup, runtime]
-        cpp_varname: "internalMatchStageMaxExpressionEvaluationBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
-    internalLookupStageMaxExpressionEvaluationBytes:
-        description: >-
-            Maximum number of bytes that can be in use while evaluating let variable expressions
-            for a single document in a $lookup when query and expression memory tracking are enabled.
-        set_at: [startup, runtime]
-        cpp_varname: "internalLookupStageMaxExpressionEvaluationBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
-
-    internalRedactStageMaxExpressionEvaluationBytes:
-        description: >-
-            Maximum number of bytes that can be in use during expression evaluation for a single
-            document in a $redact.
-        set_at: [startup, runtime]
-        cpp_varname: "internalRedactStageMaxExpressionEvaluationBytes"
-        cpp_vartype: AtomicWord<long long>
-        default:
-            expr: 100 * 1024 * 1024
-        validator:
-            gt: 0
-        redact: false
+        annotations:
+            query_knob:
+                wire_name: countScanStageMaxMemoryBytes

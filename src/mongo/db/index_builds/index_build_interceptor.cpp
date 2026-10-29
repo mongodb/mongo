@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_builds/index_build_interceptor.h"
 
@@ -40,9 +14,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
 #include "mongo/db/index_builds/index_builds_common.h"
-#include "mongo/db/index_builds/primary_driven/tearable_side_write_redo_state.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -52,7 +27,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -79,17 +53,7 @@ auto& sideWritesDeletedCounter = otel::metrics::MetricsService::instance().creat
     otel::metrics::MetricNames::kIndexBuildSideWritesDeleted,
     "Total number of side write deletes written",
     otel::metrics::MetricUnit::kOperations);
-
-const auto getOnTearableSideWriteRedoHookDecoration =
-    ServiceContext::declareDecoration<OnTearableSideWriteRedoFn>();
 }  // namespace
-
-void setOnTearableSideWriteRedoHook(ServiceContext* svcCtx, OnTearableSideWriteRedoFn hook) {
-    getOnTearableSideWriteRedoHookDecoration(svcCtx) = std::move(hook);
-}
-const OnTearableSideWriteRedoFn& getOnTearableSideWriteRedoHook(ServiceContext* svcCtx) {
-    return getOnTearableSideWriteRedoHookDecoration(svcCtx);
-}
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexBuildInfo& indexBuildInfo,
@@ -112,11 +76,8 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
             opCtx, *indexBuildInfo.constraintViolationsIdent, createMode);
     }
-    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
+    auto isPrimaryDrivenIndexBuild = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (isPrimaryDrivenIndexBuild) {
         uassert(11411100, "sorterIdent is not provided", indexBuildInfo.sorterIdent);
         uassert(11411101,
@@ -153,12 +114,14 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(
     return Status::OK();
 }
 
-Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
-                                                   const CollectionPtr& coll,
-                                                   const IndexCatalogEntry* indexCatalogEntry,
-                                                   const InsertDeleteOptions& options,
-                                                   TrackDuplicates trackDuplicates,
-                                                   DrainYieldPolicy drainYieldPolicy) {
+Status IndexBuildInterceptor::drainWritesIntoIndex(
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry* indexCatalogEntry,
+    const InsertDeleteOptions& options,
+    const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
+    TrackDuplicates trackDuplicates,
+    DrainYieldPolicy drainYieldPolicy) {
     // Sorted index types may choose to disallow duplicates (enforcing an unique index).
     // Only sorted indexes will use this lambda passed through the IndexAccessMethod interface.
     auto onDuplicateKeyFn = [=, this](const CollectionPtr& coll,
@@ -168,8 +131,36 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             : Status::OK();
     };
 
-    return _sideWritesTracker.drainWritesIntoIndex(
-        opCtx, coll, indexCatalogEntry, options, onDuplicateKeyFn, drainYieldPolicy);
+    // Report any multikey state the batch recovered from its records while its transaction is
+    // still open, so the caller can persist it alongside the keys it applied.
+    SideWritesTracker::OnBatchAppliedFn onBatchApplied;
+    if (onMultikeyPathsRecovered) {
+        onBatchApplied = [&](OperationContext* opCtx) -> Status {
+            boost::optional<MultikeyPaths> recovered;
+            {
+                std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+                if (!std::exchange(_multikeyPathsRecovered, false)) {
+                    return Status::OK();
+                }
+                recovered = _multikeyPaths;
+            }
+            auto status = onMultikeyPathsRecovered(opCtx, recovered.value_or(MultikeyPaths{}));
+            if (!status.isOK()) {
+                // Leave the state flagged so a later batch reports it again.
+                std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+                _multikeyPathsRecovered = true;
+            }
+            return status;
+        };
+    }
+
+    return _sideWritesTracker.drainWritesIntoIndex(opCtx,
+                                                   coll,
+                                                   indexCatalogEntry,
+                                                   options,
+                                                   onDuplicateKeyFn,
+                                                   onBatchApplied,
+                                                   drainYieldPolicy);
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
@@ -211,6 +202,23 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
     return _multikeyPaths;
 }
 
+void IndexBuildInterceptor::_mergeMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+    std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+    if (_multikeyPaths) {
+        MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), multikeyPaths);
+    } else {
+        // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey "shape".
+        // Initialize `_multikeyPaths` with the right shape from the first result.
+        _multikeyPaths = multikeyPaths;
+    }
+}
+
+void IndexBuildInterceptor::recordDrainedMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+    _mergeMultikeyPaths(multikeyPaths);
+    std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+    _multikeyPathsRecovered = true;
+}
+
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         const CollectionPtr& coll,
                                         const IndexCatalogEntry* indexCatalogEntry,
@@ -231,18 +239,12 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         keys.size(), multikeyMetadataKeys, multikeyPaths);
 
     // No need to take the multikeyPaths mutex if this would not change any multikey state.
-    if (op == Op::kInsert && isMultikey) {
+    bool isMultikeyInsert = op == Op::kInsert && isMultikey;
+    if (isMultikeyInsert) {
         // SERVER-39705: It's worth noting that a document may not generate any keys, but be
         // described as being multikey. This step must be done to maintain parity with `validate`s
         // expectations.
-        std::unique_lock<std::mutex> lk(_multikeyPathMutex);
-        if (_multikeyPaths) {
-            MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), multikeyPaths);
-        } else {
-            // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey
-            // "shape". Initialize `_multikeyPaths` with the right shape from the first result.
-            _multikeyPaths = multikeyPaths;
-        }
+        _mergeMultikeyPaths(multikeyPaths);
     }
 
     if (*numKeysOut == 0) {
@@ -257,6 +259,26 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                 sideWritesDeletedCounter.add(written);
             }
         });
+
+    // The multikey state this document implies, to be recorded on the first of its key records.
+    // Each record holds a single key, so the drain cannot re-derive from them that a document
+    // generated several.
+    BSONObj multikeyFields;
+    if (isMultikeyInsert) {
+        BSONObjBuilder multikeyBuilder;
+        multikeyBuilder.append(kSideWriteMultikeyFieldName, true);
+        if (!multikeyPaths.empty()) {
+            // Empty paths mean the index does not support path-level multikey tracking; the flag
+            // above is then the whole of the state. Only serialize when there is more to say, since
+            // `multikey_paths::serialize` expects one entry per key pattern field.
+            BSONObjBuilder pathsBuilder(
+                multikeyBuilder.subobjStart(kSideWriteMultikeyPathsFieldName));
+            multikey_paths::serialize(
+                indexCatalogEntry->descriptor()->keyPattern(), multikeyPaths, pathsBuilder);
+            pathsBuilder.doneFast();
+        }
+        multikeyFields = multikeyBuilder.obj();
+    }
 
     // Reuse the same builder to avoid an allocation per key.
     BufBuilder builder;
@@ -274,7 +296,16 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         builder.reset();
         keyString.serialize(builder);
         BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
-        toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << binData));
+
+        BSONObjBuilder recordBuilder;
+        recordBuilder.append("op", op == Op::kInsert ? "i" : "d");
+        recordBuilder.append("key", binData);
+        if (toInsert.empty() && !multikeyFields.isEmpty()) {
+            // Only the first record carries the multikey state. Every record is applied, and
+            // applying it more than once is idempotent, so one is enough.
+            recordBuilder.appendElements(multikeyFields);
+        }
+        toInsert.emplace_back(recordBuilder.obj());
     }
 
     if (op == Op::kInsert) {
@@ -285,31 +316,70 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
             builder.reset();
             keyString.serialize(builder);
             BSONBinData binData(builder.buf(), builder.len(), BinDataGeneral);
-            toInsert.emplace_back(BSON("op" << "i"
-                                            << "key" << binData));
-        }
-    }
 
-    // If a primary-driven index build is redoing a write that produced a tearable side write, write
-    // an abort sentinel into the affected collection's builds before this side write is buffered,
-    // so the sentinel replicates ahead of it.
-    auto& redoState = index_builds::primary_driven::getTearableSideWriteRedoState(opCtx);
-    if (auto redoCollectionUUID = redoState.armedCollectionUUID();
-        redoCollectionUUID && !redoState.flagPersisted()) {
-        redoState.setFlagPersisted();
-        if (auto& hook = getOnTearableSideWriteRedoHook(opCtx->getServiceContext())) {
-            hook(opCtx, *redoCollectionUUID);
+            BSONObjBuilder recordBuilder;
+            recordBuilder.append("op", "i");
+            recordBuilder.append("key", binData);
+            if (toInsert.empty() && !multikeyFields.isEmpty()) {
+                // A wildcard index reports multikey through its metadata keys alone, so a document
+                // can produce these records and no key records at all. The state then rides on the
+                // first metadata record instead.
+                recordBuilder.appendElements(multikeyFields);
+            }
+            toInsert.emplace_back(recordBuilder.obj());
         }
     }
 
     return _sideWritesTracker.bufferSideWrite(opCtx, coll, indexCatalogEntry, std::move(toInsert));
 }
 
-Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
-                                                  const CollectionPtr& collection,
-                                                  const IndexCatalogEntry* indexCatalogEntry,
-                                                  RetrySkippedRecordMode mode) {
-    return _skippedRecordTracker.retrySkippedRecords(opCtx, collection, indexCatalogEntry, mode);
+Status IndexBuildInterceptor::retrySkippedRecords(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexCatalogEntry* indexCatalogEntry,
+    const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
+    RetrySkippedRecordMode mode) {
+    return _skippedRecordTracker.retrySkippedRecords(
+        opCtx, collection, indexCatalogEntry, onMultikeyPathsRecovered, mode);
 }
+
+namespace index_builds {
+namespace {
+const auto _pendingInterceptors = ServiceContext::declareDecoration<PendingInterceptors>();
+}  // namespace
+
+PendingInterceptors& getPendingInterceptors(ServiceContext* svcCtx) {
+    return _pendingInterceptors(svcCtx);
+}
+
+std::shared_ptr<IndexBuildInterceptor> PendingInterceptors::find(
+    std::string_view indexIdent) const {
+    std::lock_guard lk(_mutex);
+    auto it = _interceptors.find(indexIdent);
+    return it == _interceptors.end() ? nullptr : it->second;
+}
+
+bool PendingInterceptors::contains(std::string_view indexIdent) const {
+    std::lock_guard lk(_mutex);
+    return _interceptors.contains(indexIdent);
+}
+
+void PendingInterceptors::add(std::string_view indexIdent,
+                              std::shared_ptr<IndexBuildInterceptor> interceptor) {
+    std::lock_guard lk(_mutex);
+    _interceptors[std::string{indexIdent}] = std::move(interceptor);
+}
+
+void PendingInterceptors::erase(std::string_view indexIdent) {
+    std::lock_guard lk(_mutex);
+    _interceptors.erase(indexIdent);
+}
+
+void PendingInterceptors::clear() {
+    std::lock_guard lk(_mutex);
+    _interceptors.clear();
+}
+
+}  // namespace index_builds
 
 }  // namespace mongo

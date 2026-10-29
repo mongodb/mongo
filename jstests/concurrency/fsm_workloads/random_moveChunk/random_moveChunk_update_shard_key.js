@@ -13,7 +13,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/move_chunk_errors.js";
+import {ConcurrentOperation} from "jstests/concurrency/fsm_workload_helpers/cluster_scalability/chunk_operation_errors.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 

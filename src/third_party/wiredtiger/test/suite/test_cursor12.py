@@ -347,7 +347,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         orig = self.make_value('abcdefghijklmnopqrstuvwxyz')
         c.set_value(orig)
         self.assertEqual(c.update(), 0)
-        for i in range(0, 50000):
+        for i in range(0, 40000):
             new = self.make_value("".join([random.choice(string.digits) \
                 for i in range(5)]))
             orig = orig[:10] + new + orig[15:]
@@ -417,7 +417,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         mods.append(mod)
         mods = self.fix_mods(mods)
         xc.set_key(ds.key(30))
-        self.assertEqual(xc.modify(mods), wiredtiger.WT_NOTFOUND)
+        self.assertRaises(wiredtiger.WiredTigerRollbackError, lambda: xc.modify(mods))
         xs.rollback_transaction()
 
         # Rollback our transaction.

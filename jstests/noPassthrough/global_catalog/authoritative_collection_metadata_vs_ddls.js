@@ -5,7 +5,7 @@
  * no inconsistencies after each DDL.
  *
  * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
+ *   requires_fcv_90,
  *   requires_timeseries,
  * ]
  */
@@ -78,7 +78,6 @@ describe("Authoritative collection metadata vs DDLs", function () {
         node,
         ns,
         {expectedUuid, expectedKey, expectedChunks, expectedTimeseriesFields, expectedTimestamp},
-        skipLastModCheck = false,
     ) {
         const label = node.host;
         const meta = getShardCatalogCollMetadata(node, ns);
@@ -114,13 +113,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 tojson(shardChunks[i].max),
                 `${label}: chunk ${i} max boundary mismatch`,
             );
-            if (!skipLastModCheck) {
-                assert.eq(
-                    tojson(expectedChunks[i].lastmod),
-                    tojson(shardChunks[i].lastmod),
-                    `${label}: chunk ${i} placement version (lastmod) mismatch`,
-                );
-            }
+            assert.eq(
+                tojson(expectedChunks[i].lastmod),
+                tojson(shardChunks[i].lastmod),
+                `${label}: chunk ${i} placement version (lastmod) mismatch`,
+            );
         }
     }
 
@@ -496,6 +493,8 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 }),
             );
 
+            st.awaitReplicationOnShards();
+
             {
                 const globalMeta = getGlobalCatalogCollMetadata(ns2);
                 const allGlobalChunks = getAllGlobalCatalogChunks(globalMeta.uuid);
@@ -593,6 +592,181 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
             const shard1GlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, st.shard1.shardName);
             assert.gt(shard1GlobalChunks.length, 0);
+        });
+
+        it("cleans up untracked collection metadata from the donor shard", () => {
+            const db = setupDb("moveprimary_no_tracked");
+            const dbName = db.getName();
+            const coll = db.coll;
+
+            assert.commandWorked(coll.insert([{x: -1}, {x: 1}]));
+
+            st.awaitReplicationOnShards();
+
+            // Make sure that the primary and a secondary have populated the in-memory state.
+            assert.eq(2, coll.find({}).toArray().length);
+            assert.eq(2, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+
+            st.awaitReplicationOnShards();
+
+            // Make sure that the primary and a secondary in the new dbPrimary have populated the in-memory state.
+            assert.eq(2, coll.find({}).toArray().length);
+            assert.eq(2, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            // Shard 0 should not have any in-memory state for the untracked collection.
+            st.rs0.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                assert.eq("UNKNOWN", res.global, res);
+            });
+
+            // Shard 1 should either not have any in-memory state for the untracked collection or knows that it is untracked.
+            st.rs1.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                if (res.global !== "UNKNOWN") {
+                    const cmpResult = timestampCmp(res.global, Timestamp(0, 0));
+                    assert.eq(0, cmpResult, res);
+                }
+            });
+        });
+    });
+
+    describe("moveRange", function () {
+        let donorShard;
+        let donorShardName;
+        let recipientShard;
+        let recipientShardName;
+
+        before(function () {
+            donorShard = st.shard0;
+            donorShardName = donorShard.shardName;
+            recipientShard = st.shard1;
+            recipientShardName = recipientShard.shardName;
+        });
+
+        function assertCatalogsConvergedAfterMove(ns, expectedKey) {
+            st.awaitReplicationOnShards();
+
+            assertTrackedCollectionMetadataOnShardCatalogs(ns, {oldTrackedNs: `${ns}.__absent__`});
+            assertInMemoryMetadataSharded(donorShard.rs.getPrimary(), ns, expectedKey);
+            assertInMemoryMetadataSharded(recipientShard.rs.getPrimary(), ns, expectedKey);
+        }
+
+        it("moves a whole chunk to the recipient and updates both shard catalogs", function () {
+            const db = setupDb("moverange_whole_chunk");
+            const ns = `${db.getName()}.coll`;
+
+            // Two chunks, both on the DB primary (shard0).
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            // Move the range [0, MaxKey) to shard1.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveRange: ns,
+                    min: {x: 0},
+                    max: {x: MaxKey},
+                    toShard: recipientShardName,
+                }),
+            );
+
+            const uuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(
+                getGlobalCatalogChunks(uuid, recipientShardName).length,
+                1,
+                "recipient shard1 should own a chunk after moveRange",
+            );
+            assert.eq(
+                getGlobalCatalogChunks(uuid, donorShardName).length,
+                2,
+                "donor shard0 should still own a chunk after moveRange",
+            );
+
+            assertCatalogsConvergedAfterMove(ns, {x: 1});
+        });
+
+        it("splits a chunk and moves the sub-range, reflecting new boundaries in both shard catalogs", function () {
+            const db = setupDb("moverange_split_subrange");
+            const ns = `${db.getName()}.coll`;
+
+            // Single chunk [MinKey, MaxKey) on the DB primary (shard0).
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: -5}, {x: 5}, {x: 15}]));
+
+            // moveRange on a strict sub-range splits the owning chunk into
+            // [MinKey, 0), [0, 10), [10, MaxKey) and moves the middle range to shard1.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveRange: ns,
+                    min: {x: 0},
+                    max: {x: 10},
+                    toShard: recipientShardName,
+                }),
+            );
+
+            const uuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(
+                3,
+                getAllGlobalCatalogChunks(uuid).length,
+                "moveRange on a sub-range should split the chunk into three",
+            );
+            assert.eq(
+                3,
+                getGlobalCatalogChunks(uuid, donorShardName).length,
+                "donor shard0 should own two chunks",
+            );
+            assert.eq(
+                1,
+                getGlobalCatalogChunks(uuid, recipientShardName).length,
+                "recipient shard1 should own exactly the moved sub-range",
+            );
+
+            assertCatalogsConvergedAfterMove(ns, {x: 1});
+        });
+
+        // Chunks currently owned by a shard, matching only on the live `shard` field. Unlike
+        // getGlobalCatalogChunks, this ignores placement history, so a shard that moved its last
+        // chunk away reports zero even though it remains in the chunk's history.
+        function getCurrentlyOwnedChunks(uuid, shardId) {
+            return st.s
+                .getDB("config")
+                .chunks.find({uuid: uuid, shard: shardId})
+                .sort({min: 1})
+                .toArray();
+        }
+
+        it("moves the last chunk off the donor, leaving it a chunkless primary", function () {
+            const db = setupDb("moverange_last_chunk");
+            const ns = `${db.getName()}.coll`;
+
+            // Single chunk on the DB primary (shard0); moving it away leaves shard0 chunkless but
+            // still the database primary, so it must keep a chunkless shard catalog entry.
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            assert.commandWorked(
+                db.adminCommand({
+                    moveRange: ns,
+                    min: {x: MinKey},
+                    max: {x: MaxKey},
+                    toShard: recipientShardName,
+                }),
+            );
+
+            const uuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(
+                0,
+                getCurrentlyOwnedChunks(uuid, donorShardName).length,
+                "donor shard should currently own no chunks after moving its last chunk",
+            );
+            assert.eq(
+                1,
+                getCurrentlyOwnedChunks(uuid, recipientShardName).length,
+                "recipient shard should own the moved chunk",
+            );
+
+            assertCatalogsConvergedAfterMove(ns, {x: 1});
         });
     });
 
@@ -793,6 +967,35 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 assertShardCatalogAbsentOnNode(node, ns2, uuid2);
                 assertInMemoryMetadataNotSharded(node, ns1);
                 assertInMemoryMetadataNotSharded(node, ns2);
+            });
+        });
+
+        it("cleans up untracked collection metadata from the shards", () => {
+            const db = setupDb("dropdb_untracked");
+            const coll = db.coll;
+
+            assert.commandWorked(coll.insert([{x: -1}, {x: 1}]));
+
+            st.awaitReplicationOnShards();
+
+            assert.eq(2, coll.find({}).toArray().length);
+            assert.eq(2, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            assert.commandWorked(db.dropDatabase());
+
+            st.awaitReplicationOnShards();
+
+            assert.eq(0, coll.find({}).toArray().length);
+            assert.eq(0, coll.find({}).readPref("secondaryPreferred").toArray().length);
+
+            // Shards should have no garbage data in memory after the drop.
+            st.rs0.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                assert.eq("UNKNOWN", res.global, res);
+            });
+            st.rs1.nodes.forEach((node) => {
+                const res = getInMemoryCollectionMetadata(node, coll.getFullName());
+                assert.eq("UNKNOWN", res.global, res);
             });
         });
     });
@@ -1476,11 +1679,15 @@ describe("Authoritative collection metadata vs DDLs", function () {
             const ns = `${db.getName()}.coll`;
 
             assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
-            // TODO SERVER-128550: Uncomment these lines such that the test exercises a more interesting layout once chunk migration is authoritative.
-            // assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
-            // assert.commandWorked(
-            //     db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
-            // );
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: ns,
+                    find: {x: 0},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
+            );
             assert.commandWorked(
                 db.coll.insert([
                     {x: -1, y: -1},
@@ -1586,16 +1793,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     assertInMemoryMetadataNotSharded(rs.getPrimary(), ns);
                 } else {
                     rs.nodes.forEach((node) => {
-                        assertShardCatalogOnNode(
-                            node,
-                            ns,
-                            {
-                                expectedUuid: sourceUuid,
-                                expectedKey: sourceKey,
-                                expectedChunks: shardGlobalChunks,
-                            },
-                            true /* skipLastModCheck */,
-                        );
+                        assertShardCatalogOnNode(node, ns, {
+                            expectedUuid: sourceUuid,
+                            expectedKey: sourceKey,
+                            expectedChunks: shardGlobalChunks,
+                        });
                     });
                     assertInMemoryMetadataSharded(rs.getPrimary(), ns, sourceKey);
                 }

@@ -18,13 +18,9 @@
  *   uses_prepare_transaction,
  *   uses_transactions,
  *   requires_fcv_81,
- *   # TODO SERVER-123918: remove the multiversion incompatible tag.
- *   multiversion_incompatible,
  * ]
  */
 
-// Restarts cause issues with authentication for awaiting replication.
-TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 // Restarts shard nodes with no keyFile.
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;

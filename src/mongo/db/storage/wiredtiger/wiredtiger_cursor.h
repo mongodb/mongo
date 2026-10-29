@@ -1,43 +1,22 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_managed_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/shared_buffer.h"
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
 #include <wiredtiger.h>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -54,6 +33,12 @@ public:
         bool readOnce{false};
         bool allowOverwrite{false};
         bool random{false};
+        // When 'true', open the cursor with the WiredTiger debug=(size_stats) option so it
+        // accumulates a per-b-tree size summary as it traverses. Such cursors bypass the cursor
+        // cache so the summary counters are reset exactly once per open, and the owning cursor logs
+        // the summary when the scan completes. Requires an ordered walk, so it is incompatible with
+        // 'random'.
+        bool sizeStats{false};
     };
 
     /**
@@ -63,7 +48,7 @@ public:
      *
      * If 'random' is true, every next calls will yield records in a random order.
      */
-    WiredTigerCursor(Params params, std::string_view uri, WiredTigerSession& session);
+    WiredTigerCursor(Params params, const std::string& uri, WiredTigerSession& session);
 
     // Prevent duplication of the logical owned-ness of the cursors via move or copy.
     WiredTigerCursor(WiredTigerCursor&&) = delete;
@@ -85,10 +70,22 @@ public:
         return &_session;
     }
 
+    // Called by the owning cursor when a forward walk has reached the end of the data, i.e. the
+    // size-stats scan is complete. In most cases this is a no-op.
+    void onScanComplete();
+
 protected:
     uint64_t _tableID;
     WiredTigerSession& _session;
     std::string _config;
+    // When 'true', this cursor was opened outside the cursor cache and must be closed (not returned
+    // to the cache) on destruction so its size-summary counters are never reused across opens.
+    bool _sizeStats = false;
+    // Set once a size_stats cursor has logged its summary, so onScanComplete() is idempotent.
+    bool _sizeStatsLogged = false;
+    // On-disk table URI, set only for size_stats cursors so onScanComplete() can read back and log
+    // the accumulated summary. Left unset (none) otherwise.
+    boost::optional<std::string> _uri;
 
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
@@ -146,5 +143,25 @@ public:
 private:
     WT_CURSOR* _cursor = nullptr;  // Owned
     WiredTigerSession& _session;
+};
+
+/**
+ * A WiredTiger implementation of KVEngineDirectCrudCursor, wrapping a single reusable
+ * WiredTigerCursor for direct key-value CRUD operations on an ident.
+ */
+class WiredTigerDirectCrudCursor : public KVEngineDirectCrudCursor {
+public:
+    WiredTigerDirectCrudCursor(WiredTigerCursor::Params params,
+                               const std::string& uri,
+                               WiredTigerSession& session)
+        : _cursor(params, uri, session) {}
+
+    Status insert(RecoveryUnit& ru, Key key, std::span<const char> value) override;
+    Status update(RecoveryUnit& ru, Key key, std::span<const char> value) override;
+    StatusWith<UniqueBuffer> get(Key key) override;
+    Status remove(RecoveryUnit& ru, Key key) override;
+
+private:
+    WiredTigerCursor _cursor;
 };
 }  // namespace mongo

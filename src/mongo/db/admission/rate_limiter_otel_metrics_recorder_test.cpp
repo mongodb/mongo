@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 
@@ -138,6 +112,52 @@ TEST(RateLimiterMetricsRecorderOtelTest, RecordsQueueTimeDistributionHistogram) 
     ASSERT_EQ(histogram.counts[0], 1u);  // (-inf, 50]   : 30
     ASSERT_EQ(histogram.counts[2], 2u);  // (100, 250]   : 120, 120
     ASSERT_EQ(histogram.counts[4], 1u);  // (500, 1000]  : 600
+}
+
+TEST(RateLimiterMetricsRecorderOtelTest, PartialSpecTracksOnlyProvidedMetrics) {
+    OtelMetricsCapturer capturer;
+
+    RateLimiterOtelMetricsRecorder recorder{RateLimiterOtelMetricsRecorder::MetricsSpec{
+        .successfulAdmissions = MetricNames::kTest5,
+        .rejectedAdmissions = MetricNames::kTest6,
+    }};
+
+    recorder.record(SuccessfulAdmission{3.0});
+    recorder.record(SuccessfulAdmission{1.0});
+    recorder.record(RejectedAdmission{});
+
+    // Events whose instruments were not created are silently dropped.
+    recorder.record(AttemptedAdmission{});
+    recorder.record(ExemptedAdmission{});
+    recorder.record(AddedToQueue{});
+    recorder.record(AddedToQueue{});
+    recorder.record(RemovedFromQueue{});
+    recorder.record(InterruptedInQueue{});
+    recorder.record(TokensAcquired{2.5});
+    recorder.record(TokensAvailable{42.0});
+    recorder.record(AverageTimeQueuedMicros{100.0});
+
+    // The provided metrics are tracked.
+    ASSERT_EQ(recorder.successfulAdmissions(), 2);
+    ASSERT_EQ(recorder.rejectedAdmissions(), 1);
+
+    // Everything else reads back its zero-valued default (boost::none for the moving average).
+    ASSERT_EQ(recorder.attemptedAdmissions(), 0);
+    ASSERT_EQ(recorder.exemptedAdmissions(), 0);
+    ASSERT_EQ(recorder.addedToQueue(), 0);
+    ASSERT_EQ(recorder.removedFromQueue(), 0);
+    ASSERT_EQ(recorder.interruptedInQueue(), 0);
+    ASSERT_EQ(recorder.tokensAcquired(), 0);
+    ASSERT_EQ(recorder.tokensAvailable(), 0);
+    ASSERT_EQ(recorder.currentQueueDepth(), 0);
+    ASSERT_FALSE(recorder.averageTimeQueuedMicros());
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kTest5), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kTest6), 1);
 }
 
 }  // namespace

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -35,8 +9,13 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -599,6 +578,13 @@ public:
         return holds_alternative<OptimizedAbt>(_storage);
     }
 
+    /**
+     * Calls 'callback' for each slot variable referenced by this SbExpr. Local variables (bound
+     * by Let or Lambda nodes within the expression) are not reported. Does nothing if this SbExpr
+     * is null.
+     */
+    void visitReferencedSlots(const std::function<void(SbSlot)>& callback) const;
+
     void setFinishedOptimizing();
 
 private:
@@ -644,9 +630,71 @@ private:
 };
 
 /**
- * "SbStage" is short for "stage builder stage". SbStage is an alias for a unique pointer type.
+ * Index of a node within an SbBlueprint.
  */
-using SbStage = std::unique_ptr<sbe::PlanStage>;
+struct SbBlueprintNodeIdx {
+    uint32_t value{0};
+
+    bool operator==(const SbBlueprintNodeIdx&) const = default;
+};
+
+/**
+ * "SbStage" is short for "stage builder stage". An SbStage is a move-only handle to a node of the
+ * blueprint tree owned by StageBuilderState. SbBuilder methods consume the handles of a stage's
+ * children and return the handle of the new stage. The blueprint tree is lowered to
+ * sbe::PlanStages once the whole tree has been built.
+ */
+class SbStage {
+public:
+    using Vector = std::vector<SbStage>;
+
+    SbStage() = default;
+    explicit SbStage(SbBlueprintNodeIdx idx) : _idx(idx) {}
+
+    // Moving empties the source, so that a node can only be consumed through one handle.
+    SbStage(SbStage&& other) noexcept : _idx(std::exchange(other._idx, kEmpty)) {}
+    SbStage& operator=(SbStage&& other) noexcept {
+        _idx = std::exchange(other._idx, kEmpty);
+        return *this;
+    }
+
+    SbStage(const SbStage&) = delete;
+    SbStage& operator=(const SbStage&) = delete;
+
+    explicit operator bool() const {
+        return _idx != kEmpty;
+    }
+
+    /**
+     * Returns the index of the blueprint node this handle refers to. The handle must not be empty.
+     */
+    SbBlueprintNodeIdx idx() const {
+        tassert(13621600, "Expected a non-empty SbStage", *this);
+        return _idx;
+    }
+
+    /**
+     * Returns the index of the blueprint node this handle refers to and empties the handle.
+     */
+    SbBlueprintNodeIdx release() {
+        auto idx = this->idx();
+        _idx = kEmpty;
+        return idx;
+    }
+
+    template <typename... Ts>
+    static Vector makeVector(Ts&&... stages) {
+        Vector result;
+        result.reserve(sizeof...(Ts));
+        (result.emplace_back(std::move(stages)), ...);
+        return result;
+    }
+
+private:
+    static constexpr SbBlueprintNodeIdx kEmpty{std::numeric_limits<uint32_t>::max()};
+
+    SbBlueprintNodeIdx _idx{kEmpty};
+};
 
 /**
  * For a number of EExpression-related structures, we have corresponding "SbExpr" versions
@@ -682,6 +730,13 @@ struct SbHashAggSinglePurposeScalarAccumulator {
     SbExpr transform;
 };
 
+template <class Implementation>
+struct SbHashAggMinMaxNAccumulator {
+    SbExpr transform;
+    SbExpr maxSizeExpr;
+    int32_t memLimit;
+};
+
 /**
  * An object that can be lowered into the execute HashAggAccumulator object used by an SBE
  * HashAggStage.
@@ -705,21 +760,14 @@ struct SbHashAggAccumulator {
         SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorTerminal>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorPartial>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::FirstHashAggAccumulator>,
-        SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>>
+        SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>,
+        SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>,
+        SbHashAggMinMaxNAccumulator<sbe::MaxNHashAggAccumulator>,
+        SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulatorPartial>,
+        SbHashAggMinMaxNAccumulator<sbe::MaxNHashAggAccumulatorPartial>>
         implementation;
 };
 using SbHashAggAccumulatorVector = std::vector<SbHashAggAccumulator>;
-
-struct SbWindow {
-    SbSlotVector windowExprSlots;
-    SbSlotVector frameFirstSlots;
-    SbSlotVector frameLastSlots;
-    SbExpr::Vector initExprs;
-    SbExpr::Vector addExprs;
-    SbExpr::Vector removeExprs;
-    SbExpr lowBoundExpr;
-    SbExpr highBoundExpr;
-};
 
 inline void addVariableTypesHelper(VariableTypes& varTypes, SbSlot slot) {
     if (auto typeSig = slot.getTypeSignature()) {

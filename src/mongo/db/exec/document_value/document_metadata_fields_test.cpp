@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 
@@ -494,7 +468,6 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnMergeWith) {
 TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     // Tests that for certain types of metadata fields, related to a score,
     // the 'score' metadata is also set.
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     // 'searchScore'
     {
@@ -524,32 +497,7 @@ TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     }
 }
 
-// TODO SERVER-85426 Remove this test when the feature flag is removed.
-TEST(DocumentMetadataFieldsTest, FFGatedFieldsNotSetWithoutFlag) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
-
-    DocumentMetadataFields metadata;
-    metadata.setScore(10);
-    metadata.setScoreDetails(Value(BSON("foo" << "bar")));
-    metadata.setScoreAndScoreDetails(Value(BSON("value" << 2)));
-    metadata.setVectorSearchScore(15);
-    metadata.setSearchScore(7);
-    metadata.setTextScore(5);
-    metadata.setSearchScoreDetails(BSON("search" << "details"));
-
-    ASSERT_TRUE(metadata.hasSearchScore());
-    ASSERT_TRUE(metadata.hasVectorSearchScore());
-    ASSERT_TRUE(metadata.hasTextScore());
-    ASSERT_TRUE(metadata.hasSearchScoreDetails());
-
-    // 'score' and 'scoreDetails' are flag-gated so should not be set.
-    ASSERT_FALSE(metadata.hasScoreDetails());
-    ASSERT_FALSE(metadata.hasScore());
-}
-
 TEST(DocumentMetadataFieldsTest, ScoreDetailsWithScoreMetadataTest) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
-
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScoreDetails());
     ASSERT_FALSE(metadata.hasScore());
@@ -571,7 +519,6 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsWithScoreMetadataTest) {
 TEST(DocumentMetadataFieldsTest, ScoreDetailsMetadataSetOnOtherMetadataTest) {
     // Tests that setting "searchScoreDetails" also sets "scoreDetails" but does not set "score" or
     // "searchScore".
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasSearchScoreDetails());
@@ -589,7 +536,6 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsMetadataSetOnOtherMetadataTest) {
 }
 
 TEST(DocumentMetadataFieldsTest, ScoreDetailsAloneMetadataTest) {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     {
         DocumentMetadataFields metadata;
         metadata.setScoreDetails(Value(BSON("value" << 5 << "otherDetails" << 10)));
@@ -667,7 +613,6 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsAloneMetadataTest) {
 TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
     // Tests that setting "searchScoreDetails" also sets "scoreDetails" but does not set "score" or
     // "searchScore".
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScoreDetails());
@@ -685,7 +630,6 @@ TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
 DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsNonNumeric,
                  "Tripwire assertion.*9679300") {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     DocumentMetadataFields metadata;
     metadata.setScoreAndScoreDetails(Value(BSON("value" << "string")));
 }
@@ -693,7 +637,6 @@ DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
 DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsMissing,
                  "Tripwire assertion.*9679300") {
-    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     DocumentMetadataFields metadata;
     metadata.setScoreAndScoreDetails(Value(BSON("non-value" << "string")));
 }

@@ -18,7 +18,7 @@ executor:
   config:
     shell_options:
       eval:
-        globalThis.testingReplication = true;; await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');;
+        globalThis.testingReplication = true;; await import('jstests/libs/override_methods/query/single_crud_op_as_bulk_write.js');;
         await import('jstests/libs/override_methods/enable_causal_consistency.js');
   fixture:
     class: ReplicaSetFixture
@@ -26,7 +26,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
+        internalQueryStatsSampleRate: 1.0
         internalQueryStatsWriteCmdSampleRate: 1.0
     num_nodes: 2
   hooks:
@@ -70,6 +70,7 @@ selector:
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
     - jstests/core/query/distinct/distinct_collator.js
+    - jstests/core/query/bson_size_limit_agg.js
     - jstests/core/txns/transactions_profiling.js
     - jstests/core/txns/currentop_blocked_operations.js
     - jstests/core/txns/transactions_profiling_with_drops.js

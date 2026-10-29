@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 
@@ -118,8 +92,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
                                                   std::shared_ptr<Collection> coll,
                                                   Entry::Action action) {
     const auto& nss = coll->ns();
-    auto uuid = coll->uuid();
-    _entries.push_back({action, coll, nss, uuid});
+    _entries.push_back({action, std::move(coll), nss});
 }
 
 void UncommittedCatalogUpdates::writableCollection(std::shared_ptr<Collection> collection) {
@@ -134,7 +107,7 @@ void UncommittedCatalogUpdates::renameCollection(const Collection* collection,
     });
     invariant(it != _entries.rend());
     it->nss = collection->ns();
-    _entries.push_back({Entry::Action::kRenamedCollection, nullptr, from, boost::none, it->nss});
+    _entries.push_back({Entry::Action::kRenamedCollection, nullptr, from, it->nss});
 }
 
 void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
@@ -152,7 +125,6 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
     // Transform the found entry into a dropped entry.
     invariant(it->collection.get() == collection);
     it->action = Entry::Action::kDroppedCollection;
-    it->externalUUID = it->collection->uuid();
     it->droppedCollection = it->collection;
     it->collection = nullptr;
 }
@@ -162,7 +134,6 @@ void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbNa
     _entries.push_back({Entry::Action::kReplacedViewsForDatabase,
                         nullptr,
                         NamespaceString{dbName},
-                        boost::none,
                         {},
                         std::move(vfdb)});
 }

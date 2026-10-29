@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index_builds/side_writes_tracker.h"
 
@@ -40,6 +14,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_build_interceptor_gen.h"
+#include "mongo/db/index_builds/primary_driven/enabled.h"
 #include "mongo/db/index_builds/side_writes_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -50,7 +25,6 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -112,11 +86,8 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
     std::vector<RecordId> rids;
     rs.reserveRecordIds(opCtx, *shard_role_details::getRecoveryUnit(opCtx), &rids, toInsert.size());
 
-    // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
+    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     LOGV2_DEBUG(20691,
                 2,
@@ -124,12 +95,17 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                 "numRecords"_attr = toInsert.size(),
                 "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
-    if (primaryDrivenFeatureFlagEnabled) {
+    if (primaryDrivenIndexBuildEnabled) {
         invariant(rs.keyFormat() == KeyFormat::Long);
         IntegerKeyedContainer& container =
             std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg;
 
         for (size_t i = 0; i < toInsert.size(); ++i) {
+            if (!wg) {
+                wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                               assertCanAcceptContainerWrites(opCtx));
+            }
             auto& doc = toInsert[i];
             const auto& rid = rids[i];
             auto status =
@@ -138,6 +114,7 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                                         container,
                                         rid.getLong(),
                                         std::span<const char>(doc.objdata(), doc.objsize()),
+                                        wg,
                                         container_write::NonexistentKeyGuarantee{});
             if (!status.isOK())
                 return status;
@@ -228,6 +205,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
     const IndexCatalogEntry* indexCatalogEntry,
     const InsertDeleteOptions& options,
     const IndexAccessMethod::KeyHandlerFn& onDuplicateKeyFn,
+    const OnBatchAppliedFn& onBatchApplied,
     DrainYieldPolicy drainYieldPolicy) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -237,7 +215,17 @@ Status SideWritesTracker::drainWritesIntoIndex(
     int64_t totalDeleted = 0;
     int64_t totalInserted = 0;
     int64_t totalBytesDrained = 0;
+    // Total keystring bytes this drain wrote to the index table, for both insertions and
+    // deletions. Unlike 'totalBytesDrained', which measures the side-table records read, this
+    // measures the index keys written.
+    int64_t totalKeyBytesWritten = 0;
     Timer timer;
+    Microseconds durationLastUpdated{0};
+    ON_BLOCK_EXIT([&] {
+        recordIndexBuildSideWritesProcessedStats(0, 0, timer.elapsed() - durationLastUpdated);
+        _drainKeysWritten += totalInserted + totalDeleted;
+        _drainBytesWritten += totalKeyBytesWritten;
+    });
 
     const int64_t appliedAtStart = _numApplied;
 
@@ -256,7 +244,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         // meter only logs after a large number of calls to hit(), but since we use such large
         // batch sizes, progress would rarely be displayed.
         progress.get(lk)->reset(
-            count() - appliedAtStart /* total */, 3 /* secondsBetween */, 1 /* checkInterval */);
+            /*total=*/count() - appliedAtStart, /*secondsBetween=*/3, /*checkInterval=*/1);
     }
 
     // Apply operations in batches per WriteUnitOfWork. The batch size limit allows the drain to
@@ -270,6 +258,9 @@ Status SideWritesTracker::drainWritesIntoIndex(
     const int32_t kMB = 1024 * 1024;
     invariant(kBatchMaxMB <= std::numeric_limits<int32_t>::max() / kMB);
     const int32_t kBatchMaxBytes = kBatchMaxMB * kMB;
+
+    bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
+        opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     // In a single WriteUnitOfWork, scan the side table up to the batch or memory limit, apply
     // the keys to the index, and delete the side table records. Returns true if the cursor has
@@ -287,14 +278,10 @@ Status SideWritesTracker::drainWritesIntoIndex(
         // concern. And thus will observe data that can be rolled back via replication.
         shard_role_details::getRecoveryUnit(opCtx)->allowOneUntimestampedWrite();
 
-        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-        auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        bool primaryDrivenFeatureFlagEnabled = fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot);
-        WriteUnitOfWork wuow(opCtx,
-                             primaryDrivenFeatureFlagEnabled ? WriteUnitOfWork::kGroupForTransaction
-                                                             : WriteUnitOfWork::kDontGroup);
+        int64_t batchKeyBytesInserted = 0;
+        int64_t batchKeyBytesDeleted = 0;
+
+        WriteUnitOfWork wuow(opCtx);
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
@@ -341,7 +328,9 @@ Status SideWritesTracker::drainWritesIntoIndex(
                     options,
                     std::move(onDuplicateKeyUniqueFn),
                     &totalInserted,
-                    &totalDeleted);
+                    &totalDeleted,
+                    &batchKeyBytesInserted,
+                    &batchKeyBytesDeleted);
                 !status.isOK()) {
                 return status;
             }
@@ -360,15 +349,21 @@ Status SideWritesTracker::drainWritesIntoIndex(
 
         // Delete documents from the side table as soon as they have been inserted into the
         // index. This ensures that no key is ever inserted twice and no keys are skipped.
+        boost::optional<container_write::CanAcceptContainerWritesGuarantee> wg;
         for (const auto& recordId : recordsAddedToIndex) {
-            if (primaryDrivenFeatureFlagEnabled) {
+            if (primaryDrivenIndexBuildEnabled) {
+                if (!wg) {
+                    wg.emplace(container_write::CanAcceptContainerWritesGuarantee::
+                                   assertCanAcceptContainerWrites(opCtx));
+                }
                 IntegerKeyedContainer& container =
                     std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer())
                         .get();
                 auto status = container_write::remove(opCtx,
                                                       *shard_role_details::getRecoveryUnit(opCtx),
                                                       container,
-                                                      recordId.getLong());
+                                                      recordId.getLong(),
+                                                      wg);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -382,6 +377,12 @@ Status SideWritesTracker::drainWritesIntoIndex(
             return true;
         }
 
+        if (onBatchApplied) {
+            if (auto status = onBatchApplied(opCtx); !status.isOK()) {
+                return status;
+            }
+        }
+
         wuow.commit();
 
         {
@@ -391,6 +392,13 @@ Status SideWritesTracker::drainWritesIntoIndex(
         _numApplied += batchSize;
         sideWritesDrainedCounter.add(batchSize);
         totalBytesDrained += batchSizeBytes;
+        totalKeyBytesWritten += batchKeyBytesInserted + batchKeyBytesDeleted;
+        auto timeElapsed = timer.elapsed();
+
+        recordIndexBuildSideWritesProcessedStats(batchSize,
+                                                 batchKeyBytesInserted + batchKeyBytesDeleted,
+                                                 timeElapsed - durationLastUpdated);
+        durationLastUpdated = timeElapsed;
 
         // Lock yielding will be directed by the yield policy provided.
         // We will typically yield locks during the draining phase if we are holding intent

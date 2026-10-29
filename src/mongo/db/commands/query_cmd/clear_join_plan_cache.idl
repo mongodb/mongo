@@ -1,0 +1,20 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    cpp_namespace: "mongo"
+    mod_visibility: public
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/idl/generic_argument.idl"
+
+commands:
+    clearJoinPlanCache:
+        description: "Parser for the clearJoinPlanCache command"
+        command_name: clearJoinPlanCache
+        cpp_name: ClearJoinPlanCacheCommandRequest
+        strict: true
+        api_version: ""
+        namespace: ignored
+        reply_type: OkReply

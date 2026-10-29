@@ -5,9 +5,6 @@ import {
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
 } from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
-
-const isUsingSbePlanCache = sbePlanCacheEnabled(db);
 
 const coll = db.ne_array_indexability;
 coll.drop();
@@ -31,18 +28,9 @@ function runTest(queryToCache, queryToRunAfterCaching) {
 
     const explain = assert.commandWorked(coll.find(queryToRunAfterCaching).explain());
 
-    // For the classic plan cache, the query with the $ne: array should have the same
-    // 'planCacheShapeHash', but a different 'planCacheKey'. The SBE plan cache, on the other hand,
-    // does not auto-parameterize $in or $eq involving a constant of type array, and therefore will
-    // consider the two queries to have different shapes.
-    if (isUsingSbePlanCache) {
-        assert.neq(explain.queryPlanner.planCacheShapeHash, cacheEntries[0].planCacheShapeHash);
-    } else {
-        assert.eq(explain.queryPlanner.planCacheShapeHash, cacheEntries[0].planCacheShapeHash);
-    }
-
-    // For both the classic and SBE plan caches, the two queries must have different plan cache
-    // keys.
+    // The query with the $ne: array should have the same 'planCacheShapeHash' but a different
+    // 'planCacheKey'.
+    assert.eq(explain.queryPlanner.planCacheShapeHash, cacheEntries[0].planCacheShapeHash);
     assert.neq(explain.queryPlanner.planCacheKey, cacheEntries[0].planCacheKey);
 }
 

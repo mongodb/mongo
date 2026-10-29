@@ -16,7 +16,7 @@
 //   requires_scripting,
 // ]
 
-import {isLinux} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/server_security/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB("profile_mapreduce");

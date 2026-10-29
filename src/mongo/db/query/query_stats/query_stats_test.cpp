@@ -1,48 +1,28 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/query/query_stats/query_stats.h"
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_knob_descriptors_integration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_snapshot.h"
+#include "mongo/db/query/query_settings/query_settings.h"
+#include "mongo/db/query/query_settings/query_settings_context_test_util.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
@@ -64,7 +44,6 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
     query_shape::FindCmdShape findShape(*parsedFind, expCtx);
 
-    unittest::ServerParameterGuard controller("featureFlagQueryStats", true);
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, false);
 
@@ -99,6 +78,59 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     ASSERT(opDebug.getQueryStatsInfo().key == nullptr);
     ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, true);
     ASSERT_FALSE(opDebug.getQueryStatsInfo().keyHash.has_value());
+}
+
+TEST_F(QueryStatsTest, QueryStatsSampleRateOverrideDetectedFromQuerySettings) {
+    auto opCtx = makeOperationContext();
+
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 1.0))};
+
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    ASSERT_EQ(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+    // The overridden value is readable through the generated accessor.
+    ASSERT_EQ(1.0, config.getQueryStatsSampleRate());
+    // An unrelated knob was not overridden.
+    ASSERT_EQ(config.getKnobSource(query_knobs::kPlanEvaluationWorks.id), KnobSource::kDefault);
+}
+
+TEST_F(QueryStatsTest, QueryStatsSampleRateNotOverriddenWithoutSettings) {
+    auto opCtx = makeOperationContext();
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    // With no query settings override, the knob comes from the global snapshot only.
+    ASSERT_NE(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+}
+
+TEST_F(QueryStatsTest, QueryStatsSamplingRateOverrideResolvedFromSettingsState) {
+    auto opCtx = makeOperationContext();
+
+    // Settings carrying the knob resolve to the overridden rate through the knob configuration.
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 0.25))};
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    ASSERT_EQ(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+    ASSERT_EQ(config.get(query_knobs::kQueryStatsSampleRate), 0.25);
+}
+
+TEST_F(QueryStatsTest, QueryStatsSamplingRateOverrideAbsentForOtherKnobs) {
+    auto opCtx = makeOperationContext();
+
+    // Settings that do not carry 'queryStatsSampleRate' leave it at its global source, even when
+    // they carry another PQS-settable knob.
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        opCtx.get(),
+        BSON("queryKnobs" << BSON("queryMaxMemoryUsageBytesPerOperation" << 1024 * 1024))};
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    ASSERT_NE(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+
+    // Reading the other knob through the same configuration observes its own override.
+    ASSERT_EQ(config.getKnobSource(query_knobs::kMaxMemoryUsageBytesPerOperation.id),
+              KnobSource::kQuerySettings);
+    ASSERT_EQ(config.get(query_knobs::kMaxMemoryUsageBytesPerOperation), 1024 * 1024);
 }
 
 TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
@@ -239,7 +271,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     auto opCtx = makeOperationContext();
 
     {
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
@@ -247,7 +278,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test that window-based rate limiting will be elected when sampling rate is set to 0.0
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
@@ -258,7 +288,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
 
     {  // Test that sampling-based rate limiting takes precedence over window-based policy when both
        // are enabled.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
 
@@ -268,7 +297,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test idempotency when both parameters are set but being set in different order.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
 
@@ -278,7 +306,6 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test that query stats is disabled when both rate limit and sample rate are set to 0.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 0.0);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
@@ -294,7 +321,6 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     auto serviceCtx = opCtx->getServiceContext();
 
     {
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
                                                       0.042);
 
@@ -304,7 +330,6 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     }
 
     {  // Full sampling rate of 1.0 should yield a per-thousand rate of 1000.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate", 1.0);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
@@ -313,13 +338,101 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     }
 
     {  // A rate of 0.0 should disable write command sampling.
-        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
         unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate", 0.0);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
         ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
         ASSERT_EQ(limiter.getSamplingRate(), 0);
     }
+}
+
+TEST(QueryStatsKeyBsonValidation, AcceptsShallowKey) {
+    ASSERT_OK(validateQueryStatsKeyBson(BSON("queryShape" << BSON("command" << "find"))));
+}
+
+TEST(QueryStatsKeyBsonValidation, RejectsKeyTooDeepToBeWrappedInAReply) {
+    BSONObj deep = BSON("a" << 1);
+    for (std::uint32_t i = 1; i <= BSONDepth::getMaxDepthForUserStorage(); ++i) {
+        deep = BSON("a" << deep);
+    }
+    ASSERT_EQ(validateQueryStatsKeyBson(deep).code(), ErrorCodes::Overflow);
+}
+
+TEST_F(QueryStatsTest, KeyHashIndexStaysBoundedAfterEviction) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    // With the errors flag off, an entry reserves no error budget, so a budgeted entry stays small
+    // enough that 'kCacheSizeBytes' below holds at least one of them.
+    const bool errorsFlagWasEnabled = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
+    ON_BLOCK_EXIT([&] {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(errorsFlagWasEnabled);
+    });
+    feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(false);
+
+    auto serviceCtx = getServiceContext();
+    // Holds some but not all of the 'kNumShapes' shapes written below, so entries are evicted and
+    // the index has to shrink in lockstep. 'kNumShapes' is derived from this budget.
+    static constexpr int kCacheSizeBytes = 4000;
+    QueryStatsStoreManager::get(serviceCtx) =
+        std::make_unique<QueryStatsStoreManager>(kCacheSizeBytes, /*numPartitions*/ 1);
+    QueryStatsStoreManager::getRateLimiter(serviceCtx)
+        .configureWindowBased(INT_MAX);  // collect all
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+
+    // Identifies a shape both ways: 'storeKey' (absl::HashOf) and 'userVisibleHash' (SHA256)
+    struct ShapeId {
+        std::string userVisibleHash;
+        std::size_t storeKey;
+    };
+
+    // Registers + writes a distinct find shape (unique field name per 'i') and returns its ids.
+    auto writeShape = [&](int i) -> ShapeId {
+        auto opCtx = makeOperationContext();
+        auto fcr = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
+        fcr->setFilter(BSON(("field" + std::to_string(i)) << i));
+        auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcr).build();
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        registerRequest(opCtx.get(), nss, [&]() {
+            return std::make_unique<FindKey>(expCtx,
+                                             *parsedFind->findCommandRequest,
+                                             std::move(findShape),
+                                             query_shape::CollectionType::kCollection);
+        });
+        auto& info = CurOp::get(*opCtx)->debug().getQueryStatsInfo();
+        // Capture the identifiers before 'key' is moved into writeQueryStats.
+        ShapeId id{computeUserVisibleHash(opCtx.get(), *info.key), *info.keyHash};
+        writeQueryStats(opCtx.get(), info.keyHash, std::move(info.key), QueryStatsSnapshot{});
+        return id;
+    };
+
+    // Twice as many shapes as the budget can hold by raw entry size, so entries are certainly
+    // evicted while the budget still fits at least one of them. A budgeted entry is always larger
+    // than 'sizeof(QueryStatsEntry)' (see 'QueryStatsStoreEntryBudgetor'), so this many cannot fit.
+    static constexpr int kNumShapes =
+        2 * (kCacheSizeBytes / static_cast<int>(sizeof(QueryStatsEntry)));
+    std::vector<ShapeId> shapes;
+    for (int i = 0; i < kNumShapes; ++i) {
+        shapes.push_back(writeShape(i));
+    }
+
+    auto& manager = QueryStatsStoreManager::get(serviceCtx);
+    auto& store = manager->getQueryStatsStore();
+
+    // Per shape, the index must resolve its userVisibleHash if the store still holds the entry.
+    size_t survived = 0;
+    size_t evicted = 0;
+    for (const auto& shape : shapes) {
+        const bool inStore = store.lookup(shape.storeKey).isOK();
+        const bool inIndex = !manager->findStoreKeysByUserHash({shape.userVisibleHash}).empty();
+        ASSERT_EQ(inIndex, inStore) << "keyHash index and store disagree for a shape";
+        inStore ? ++survived : ++evicted;
+    }
+
+    ASSERT_GT(survived, 0u);
+    ASSERT_GT(evicted, 0u);
+    ASSERT_EQ(manager->numMappings_forTest(), survived);
 }
 
 }  // namespace mongo::query_stats

@@ -21,7 +21,7 @@ executor:
       eval:
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');;
-        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+        await import("jstests/libs/override_methods/query/query_shape_hash_stability.js");
       global_vars:
         TestData:
           defaultReadConcernLevel: null
@@ -58,6 +58,7 @@ selector:
   exclude_with_any_tags:
     - assumes_write_concern_unchanged
     - assumes_against_mongod_not_mongos
+    - backport_required_multiversion
     - multiversion_incompatible
     - requires_2_or_more_shards
     - requires_sharding

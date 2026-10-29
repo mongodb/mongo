@@ -1,36 +1,11 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cmath>
@@ -38,6 +13,28 @@
 
 #include <boost/optional/optional.hpp>
 namespace mongo {
+
+// Computes the 0-based rank for discrete percentile 'p' on a dataset of 'n' values.
+//
+// We define "percentile" as: value 'P' such that at least ceil(p*n) samples are _less or equal_
+// to 'P' and no more than ceil(p*n) samples are strictly _less_ than 'P'. Thus p=0 maps to the
+// min and p=1 maps to the max. Ambiguity (e.g. D={1,2,...,10}, P(0.1) in [1,2]) is resolved
+// towards the lower rank.
+//
+// Used by both DiscretePercentile and TDigest, which share this definition.
+inline int computeDiscreteRank(int n, double p) {
+    if (p >= 1.0) {
+        return n - 1;
+    }
+    const auto ceilRank = std::ceil(n * p);
+    // 'p' is validated finite and within [0, 1] in parseP(), so 'ceilRank' is an exact
+    // non-negative int. Keep the impossible non-finite case loud (as representAsChecked did)
+    // instead of silently returning 0, but without its optional round-trip on this hot path.
+    tassert(13448900,
+            "non-finite percentile rank computed; 'p' must be validated to [0, 1] upstream",
+            std::isfinite(ceilRank));
+    return std::max(0, static_cast<int>(ceilRank) - 1);
+}
 
 /**
  * Eventually we'll be supporting multiple types of percentiles (discrete, continuous, approximate)

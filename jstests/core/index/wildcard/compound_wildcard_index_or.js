@@ -3,6 +3,7 @@
  * OR queries.
  *
  * @tags: [
+ *   uses_explain,
  *   assumes_against_mongod_not_mongos,
  *   assumes_read_concern_local,
  *   assumes_balancer_off,

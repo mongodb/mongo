@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -35,6 +9,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
@@ -43,15 +18,32 @@
 
 #include <string_view>
 
-
 namespace mongo::query_settings {
+namespace {
+
+void logQueryKnobOverrideErrors(std::vector<QueryShapeConfiguration>& settingsArray) {
+    for (auto& config : settingsArray) {
+        auto& settings = config.getSettings();
+        if (auto knobs = settings.getQueryKnobs()) {
+            knobs->logErrors(BSON("queryShapeHash" << config.getQueryShapeHash().toHexString()));
+            // These errors have now been reported; don't let them linger in the value that gets
+            // cached in QuerySettingsManager, or a later per-query merge with a fresh, error-free
+            // override (see lookupQuerySettingsWithRejectionCheck) would spuriously reject the
+            // query over an already-handled, stale error.
+            knobs->clearErrors();
+            settings.setQueryKnobs(std::move(*knobs));
+        }
+    }
+}
+
+}  // namespace
 
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            BSONObjBuilder* bob,
                                            std::string_view name,
-                                           const boost::optional<TenantId>& tenantId) {
+                                           const boost::optional<TenantId>&) {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
-    auto config = querySettingsService.getAllQueryShapeConfigurations(tenantId);
+    auto config = querySettingsService.getAllQueryShapeConfigurations();
 
     bob->append(QuerySettingsClusterParameterValue::k_idFieldName,
                 querySettingsService.getQuerySettingsClusterParameterName());
@@ -67,25 +59,30 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
 }
 
 Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
-                                          const boost::optional<TenantId>& tenantId) {
+                                          const boost::optional<TenantId>&) {
     auto* serviceContext = getGlobalServiceContext();
     auto& querySettingsService = QuerySettingsService::get(serviceContext);
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         newValueElement.Obj(),
         IDLParserContext("querySettingsParameterValue",
-                         boost::none /* vts */,
-                         tenantId,
+                         /*vts=*/boost::none,
+                         /* tenantId */ boost::none,
                          SerializationContext::stateDefault()));
 
     // Skip installing the new settings if the incoming 'clusterParameterTime' did not change.
     // The cluster parameter time acts as the version of the configuration, meaning if it hasn't
     // changed, the configuration hasn't either, making this a no-op.
-    if (newSettings.getClusterParameterTime() ==
-        querySettingsService.getClusterParameterTime(tenantId)) {
+    if (newSettings.getClusterParameterTime() == querySettingsService.getClusterParameterTime()) {
         return Status::OK();
     }
 
     auto& settingsArray = newSettings.getSettingsArray();
+
+    // A knob override may have become invalid since it was accepted (e.g. removed, or its range
+    // tightened) by the time this already-accepted value is (re-)applied via oplog application or
+    // startup load. fromBSON() already dropped any such offending knob; just log it here rather
+    // than letting it take down the node.
+    logQueryKnobOverrideErrors(settingsArray);
 
     // TODO SERVER-97546 Remove PQS index hint sanitization.
     querySettingsService.sanitizeQuerySettingsHints(settingsArray);
@@ -101,19 +98,19 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                                       /* size */ static_cast<int>(newValueElement.valuesize()),
                                       /* rejectCount */ static_cast<int>(rejectCount));
     querySettingsService.setAllQueryShapeConfigurations(
-        {std::move(settingsArray), newSettings.getClusterParameterTime()}, tenantId);
+        {std::move(settingsArray), newSettings.getClusterParameterTime()});
     return Status::OK();
 }
 
-Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>& tenantId) {
+Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>&) {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
-    querySettingsService.removeAllQueryShapeConfigurations(tenantId);
+    querySettingsService.removeAllQueryShapeConfigurations();
     return Status::OK();
 }
 
 LogicalTime QuerySettingsClusterParameter::getClusterParameterTime(
-    const boost::optional<TenantId>& tenantId) const {
+    const boost::optional<TenantId>&) const {
     auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
-    return querySettingsService.getClusterParameterTime(tenantId);
+    return querySettingsService.getClusterParameterTime();
 }
 };  // namespace mongo::query_settings

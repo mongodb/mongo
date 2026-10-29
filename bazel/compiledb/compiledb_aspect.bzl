@@ -1,7 +1,9 @@
 """Aspect-based compile_commands fragment generation."""
 
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 _COMPILEDB_WORKAROUND_FEATURES = [
     "layering_check",
@@ -220,6 +222,14 @@ def _compiler_path(cc_toolchain):
         return compiler.path
     return compiler
 
+def is_msvc_compiler(compiler):
+    return (
+        compiler.endswith("cl.exe") or
+        compiler.endswith("/cl") or
+        compiler.endswith("\\cl") or
+        compiler.endswith("clang-cl")
+    )
+
 def _should_materialize_artifact(path):
     return path.startswith("bazel-out/")
 
@@ -389,7 +399,7 @@ def _compiledb_aspect_impl(target, ctx):
             OutputGroupInfo(compiledb_report = depset(transitive = [dep_outputs, dep_required_inputs])),
         ]
 
-    cc_toolchain = find_cpp_toolchain(ctx)
+    cc_toolchain = find_cc_toolchain(ctx)
     original_requested_features, original_unsupported_features = _requested_and_unsupported_features(ctx)
     original_feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -428,7 +438,7 @@ def _compiledb_aspect_impl(target, ctx):
         cpp_user_compile_flags,
     )
     compiler = _compiler_path(cc_toolchain)
-    is_msvc = compiler.endswith("cl.exe") or compiler.endswith("/cl") or compiler.endswith("\\cl.exe")
+    is_msvc = is_msvc_compiler(compiler)
     c_toolchain_flags = None
     cpp_toolchain_flags = None
     outputs = []
@@ -485,7 +495,7 @@ compiledb_aspect = aspect(
     implementation = _compiledb_aspect_impl,
     fragments = ["cpp"],
     attrs = {
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
+        "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
     },
     toolchains = [
         "@bazel_tools//tools/cpp:toolchain_type",

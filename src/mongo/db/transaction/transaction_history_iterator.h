@@ -1,39 +1,18 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/modules.h"
 
-namespace MONGO_MOD_PUB mongo {
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
+
+namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class OperationContext;
 
@@ -41,7 +20,7 @@ class OperationContext;
  * An iterator class that traverses backwards through a transaction's oplog entries by following the
  * "prevOpTime" link in each entry.
  */
-class MONGO_MOD_OPEN TransactionHistoryIteratorBase {
+class [[MONGO_MOD_OPEN]] TransactionHistoryIteratorBase {
 public:
     virtual ~TransactionHistoryIteratorBase() = default;
 
@@ -63,6 +42,27 @@ public:
      */
     virtual repl::OpTime nextOpTime(OperationContext* opCtx) = 0;
 };
+
+/**
+ * Walks back through an applyOps chain, running 'step' (which fetches and processes one entry and
+ * returns how many operations it consumed) until the chain ends or 'opsStillToCollect' reaches
+ * zero. A transaction's chain is null-terminated, so it passes no budget and walks to the end. A
+ * retryable batch's first entry instead links to the previous applyOps chain, so it passes the ops
+ * left to collect; stopping on the count avoids reading a previous chain that may have been
+ * truncated from the oplog. 'step' owns the fetch because callers differ over next(), nextOpTime()
+ * and nextFatalOnErrors().
+ */
+template <typename StepFn>
+void walkApplyOpsChain(TransactionHistoryIteratorBase& iter,
+                       boost::optional<std::size_t> opsStillToCollect,
+                       StepFn&& step) {
+    while ((!opsStillToCollect || *opsStillToCollect > 0) && iter.hasNext()) {
+        const std::size_t consumed = step();
+        if (opsStillToCollect) {
+            *opsStillToCollect = repl::remainingApplyOpsChainOps(*opsStillToCollect, consumed);
+        }
+    }
+}
 
 class TransactionHistoryIterator : public TransactionHistoryIteratorBase {
 public:
@@ -105,4 +105,4 @@ private:
     Timestamp _commitTimestamp;
 };
 
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

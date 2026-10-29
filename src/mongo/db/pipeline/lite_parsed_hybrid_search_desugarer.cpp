@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/lite_parsed_hybrid_search_desugarer.h"
 
@@ -40,7 +14,6 @@
 #include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 #include "mongo/db/pipeline/lite_parsed_score_fusion_desugarer_utils.h"
 #include "mongo/db/pipeline/stage_params.h"
-#include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
@@ -54,14 +27,14 @@ namespace {
 
 // Pairs each input pipeline name with its parsed LiteParsedPipeline, sorted by name so
 // ordering-sensitive output (e.g. scoreDetails) is deterministic.
-std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>> collectSortedInputPipelines(
-    const BSONObj& pipelinesSpec, const std::vector<OwnedLiteParsedPipeline>& subPipelines) {
-    std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>> sorted;
+std::vector<std::pair<std::string, const LiteParsedPipeline*>> collectSortedInputPipelines(
+    const BSONObj& pipelinesSpec, const ConstSubPipelinesView& subPipelines) {
+    std::vector<std::pair<std::string, const LiteParsedPipeline*>> sorted;
     sorted.reserve(subPipelines.size());
     {
         size_t idx = 0;
         for (const auto& elem : pipelinesSpec) {
-            sorted.emplace_back(elem.fieldName(), &subPipelines[idx++]);
+            sorted.emplace_back(elem.fieldName(), &*subPipelines[idx++]);
         }
     }
     std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
@@ -71,7 +44,7 @@ std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>> collectSorte
 }
 
 std::vector<std::string> namesOf(
-    const std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>>& sorted) {
+    const std::vector<std::pair<std::string, const LiteParsedPipeline*>>& sorted) {
     std::vector<std::string> names;
     names.reserve(sorted.size());
     for (const auto& [name, _] : sorted) {
@@ -105,7 +78,11 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
                              const NamespaceString& nss,
                              std::string_view userCollName) {
     const auto& spec = stage.getSpec();
-    const auto& subPipelines = *stage.getSubPipelines();
+    const auto subPipelinesView = stage.getSubPipelines();
+    tassert(13733900,
+            "$rankFusion: expected subpipelines on a lite-parsed $rankFusion stage",
+            subPipelinesView.has_value());
+    const auto& subPipelines = *subPipelinesView;
     const bool includeScoreDetails = spec.getScoreDetails();
 
     auto sorted = collectSortedInputPipelines(spec.getInput().getPipelines(), subPipelines);
@@ -127,7 +104,7 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
 
     for (size_t i = 0; i < sorted.size(); ++i) {
         const auto& pipelineName = sorted[i].first;
-        const LiteParsedPipeline& subPipeline = sorted[i].second->pipeline();
+        const LiteParsedPipeline& subPipeline = *sorted[i].second;
         double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
         StageSpecs perPipeline = rank_fusion_utils::buildRankFusionInputPipelinePreamble(
@@ -154,24 +131,15 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
     out.push_back(common_utils::parseOwnedStage(
         nss, rank_fusion_utils::buildRankAddFieldsBson(pipelineNames)));
 
-    // TODO SERVER-85426: Remove this branch once all feature flags have been removed.
-    if (isRankFusionFullEnabled()) {
+    out.push_back(common_utils::parseOwnedStage(
+        nss, rank_fusion_utils::buildSetMetadataScoreBson(pipelineNames)));
+    if (includeScoreDetails) {
         out.push_back(common_utils::parseOwnedStage(
-            nss, rank_fusion_utils::buildSetMetadataScoreBson(pipelineNames)));
-        if (includeScoreDetails) {
-            out.push_back(common_utils::parseOwnedStage(
-                nss,
-                rank_fusion_utils::buildCalculatedFinalScoreDetailsBson(pipelineNames, weights)));
-            out.push_back(common_utils::parseOwnedStage(
-                nss, rank_fusion_utils::buildSetMetadataScoreDetailsBson()));
-        }
-        out.push_back(common_utils::parseOwnedStage(nss, common_utils::buildSortByScoreMetaBson()));
-    } else {
+            nss, rank_fusion_utils::buildCalculatedFinalScoreDetailsBson(pipelineNames, weights)));
         out.push_back(common_utils::parseOwnedStage(
-            nss, rank_fusion_utils::buildAddFieldsScoreBson(pipelineNames)));
-        out.push_back(
-            common_utils::parseOwnedStage(nss, rank_fusion_utils::buildSortByScoreScalarBson()));
+            nss, rank_fusion_utils::buildSetMetadataScoreDetailsBson()));
     }
+    out.push_back(common_utils::parseOwnedStage(nss, common_utils::buildSortByScoreMetaBson()));
     out.push_back(common_utils::parseOwnedStage(nss,
                                                 common_utils::buildProjectRemoveInternalFieldsBson(
                                                     rank_fusion_utils::kInternalFieldsName)));
@@ -205,7 +173,11 @@ StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
                               const NamespaceString& nss,
                               std::string_view userCollName) {
     const auto& spec = stage.getSpec();
-    const auto& subPipelines = *stage.getSubPipelines();
+    const auto subPipelinesView = stage.getSubPipelines();
+    tassert(13733901,
+            "$scoreFusion: expected subpipelines on a lite-parsed $scoreFusion stage",
+            subPipelinesView.has_value());
+    const auto& subPipelines = *subPipelinesView;
     const bool includeScoreDetails = spec.getScoreDetails();
 
     auto sorted = collectSortedInputPipelines(spec.getInput().getPipelines(), subPipelines);
@@ -229,7 +201,7 @@ StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
 
     for (size_t i = 0; i < sorted.size(); ++i) {
         const auto& pipelineName = sorted[i].first;
-        const LiteParsedPipeline& subPipeline = sorted[i].second->pipeline();
+        const LiteParsedPipeline& subPipeline = *sorted[i].second;
         double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
         StageSpecs perPipeline = score_fusion_utils::buildScoreFusionInputPipelinePreamble(
@@ -302,22 +274,14 @@ size_t scoreFusionStageExpander(LiteParsedPipeline* pipeline,
 
 namespace mongo {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterRankFusionStageExpander, ("EndStageIdAllocation"))
-(InitializerContext*) {
-    tassert(12197000,
-            "RankFusionStageParams::id not allocated",
-            RankFusionStageParams::id != StageParams::kUnallocatedId);
-    LiteParsedDesugarer::registerStageExpander(
-        RankFusionStageParams::id, lite_parsed_hybrid_search_desugarer::rankFusionStageExpander);
-}
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(
+    rankFusion,
+    RankFusionStageParams::id,
+    lite_parsed_hybrid_search_desugarer::rankFusionStageExpander);
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterScoreFusionStageExpander, ("EndStageIdAllocation"))
-(InitializerContext*) {
-    tassert(12197400,
-            "ScoreFusionStageParams::id not allocated",
-            ScoreFusionStageParams::id != StageParams::kUnallocatedId);
-    LiteParsedDesugarer::registerStageExpander(
-        ScoreFusionStageParams::id, lite_parsed_hybrid_search_desugarer::scoreFusionStageExpander);
-}
+REGISTER_LITE_PARSED_DESUGARER_STAGE_EXPANDER(
+    scoreFusion,
+    ScoreFusionStageParams::id,
+    lite_parsed_hybrid_search_desugarer::scoreFusionStageExpander);
 
 }  // namespace mongo

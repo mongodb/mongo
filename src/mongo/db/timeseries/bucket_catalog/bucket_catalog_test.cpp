@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 
@@ -37,7 +11,6 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
@@ -47,7 +20,6 @@
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -61,7 +33,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
@@ -102,6 +73,18 @@ protected:
         const mongo::NamespaceString& nss,
         const UUID& uuid,
         const mongo::BSONObj& doc);
+
+    // Sets up the two buckets an interrupted-reopening test needs: an archived bucket at
+    // 'archivedTime' for archive-based reopening to target, and an open bucket two hours earlier
+    // for the first staged measurement to land in. Both are committed. Returns the open bucket's
+    // batch.
+    std::shared_ptr<WriteBatch> _makeArchivedAndOpenBuckets(Date_t archivedTime);
+
+    // Stages 'insertContext' on behalf of 'opCtx', which is killed and parked in archived-bucket
+    // reopening, and asserts that staging throws Interrupted.
+    void _stageInsertBatchExpectingInterrupt(const Collection* bucketsColl,
+                                             OperationContext* opCtx,
+                                             BatchedInsertContext& insertContext);
 
     // Check that each group of objects has compatible schema with itself, but that inserting the
     // first object in new group closes the existing bucket and opens a new one
@@ -340,6 +323,24 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
     finish(*_bucketCatalog, batch);
 }
 
+BatchedInsertContext _buildSingleInsertContext(BucketCatalog& bucketCatalog,
+                                               const UUID& uuid,
+                                               const TimeseriesOptions& options,
+                                               const std::vector<BSONObj>& measurements) {
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = buildBatchedInsertContexts(bucketCatalog,
+                                                            uuid,
+                                                            options,
+                                                            measurements,
+                                                            /*startIndex=*/0,
+                                                            /*numDocsToStage=*/measurements.size(),
+                                                            /*indices=*/{},
+                                                            errorsAndIndices);
+    ASSERT_TRUE(errorsAndIndices.empty());
+    ASSERT_EQ(1, batchedInsertContexts.size());
+    return std::move(batchedInsertContexts[0]);
+}
+
 std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithoutReopening(
     OperationContext* opCtx,
     BucketCatalog& catalog,
@@ -347,17 +348,7 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     const UUID& uuid,
     const mongo::BSONObj& doc) {
     auto timeseriesOptions = _getTimeseriesOptions(nss);
-    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(catalog,
-                                                                            uuid,
-                                                                            timeseriesOptions,
-                                                                            {doc},
-                                                                            /*startIndex=*/0,
-                                                                            /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
-                                                                            errorsAndIndices);
-    ASSERT(errorsAndIndices.empty());
-    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto batchedInsertCtx = _buildSingleInsertContext(catalog, uuid, timeseriesOptions, {doc});
     auto measurementTimestamp = std::get<Date_t>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
     auto& stripe = *catalog.stripes[batchedInsertCtx.stripeNumber];
@@ -365,61 +356,65 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     auto options = batchedInsertCtx.options;
     auto& stats = batchedInsertCtx.stats;
     auto collator = _getCollator(nss);
-    Bucket& bucket = [&]() -> Bucket& {
-        auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
-        auto bucketOpenedDueToMetadata = true;
-        if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
-                                                               stripe,
-                                                               WithLock::withoutLock(),
-                                                               doc,
-                                                               bucketKey,
-                                                               measurementTimestamp,
-                                                               options,
-                                                               collator,
-                                                               _storageCacheSizeBytes,
-                                                               allowQueryBasedReopening,
-                                                               stats,
-                                                               bucketOpenedDueToMetadata)) {
-            return *eligibleBucket;
+    for (int retries = 0; retries < 2; ++retries) {
+        Bucket& bucket = [&]() -> Bucket& {
+            auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
+            auto bucketOpenedDueToMetadata = true;
+            if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
+                                                                   stripe,
+                                                                   WithLock::withoutLock(),
+                                                                   doc,
+                                                                   bucketKey,
+                                                                   measurementTimestamp,
+                                                                   options,
+                                                                   collator,
+                                                                   _storageCacheSizeBytes,
+                                                                   allowQueryBasedReopening,
+                                                                   stats,
+                                                                   bucketOpenedDueToMetadata)) {
+                return *eligibleBucket;
+            }
+
+            // Roll over buckets to preemptively update the stats.
+            findAndRolloverOpenBuckets(catalog,
+                                       stripe,
+                                       WithLock::withoutLock(),
+                                       bucketKey,
+                                       measurementTimestamp,
+                                       Seconds(*options.getBucketMaxSpanSeconds()),
+                                       allowQueryBasedReopening,
+                                       bucketOpenedDueToMetadata);
+
+            return internal::allocateBucket(catalog,
+                                            stripe,
+                                            WithLock::withoutLock(),
+                                            bucketKey,
+                                            options,
+                                            measurementTimestamp,
+                                            collator,
+                                            stats);
+        }();
+
+        auto opId = opCtx->getOpID();
+        size_t currentPosition = 0;
+        auto writeBatch =
+            bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
+                                                                         opId,
+                                                                         collator,
+                                                                         batchedInsertCtx,
+                                                                         WithLock::withoutLock(),
+                                                                         _storageCacheSizeBytes,
+                                                                         bucket,
+                                                                         currentPosition);
+        if (writeBatch) {
+            ASSERT_EQ(currentPosition, 1);
+            return writeBatch;
         }
-
-        // Roll over buckets to preemptively update the stats.
-        findAndRolloverOpenBuckets(catalog,
-                                   stripe,
-                                   WithLock::withoutLock(),
-                                   bucketKey,
-                                   measurementTimestamp,
-                                   Seconds(*options.getBucketMaxSpanSeconds()),
-                                   allowQueryBasedReopening,
-                                   bucketOpenedDueToMetadata);
-
-        return internal::allocateBucket(catalog,
-                                        stripe,
-                                        WithLock::withoutLock(),
-                                        bucketKey,
-                                        options,
-                                        measurementTimestamp,
-                                        collator,
-                                        stats);
-    }();
-
-    auto opId = opCtx->getOpID();
-    size_t currentPosition = 0;
-    std::shared_ptr<bucket_catalog::WriteBatch> writeBatch =
-        activeBatch(catalog.trackingContexts, bucket, opId, batchedInsertCtx.stripeNumber, stats);
-    EXPECT_EQ(bucket_catalog::internal::StageInsertBatchResult::Success,
-              bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
-                                                                           opId,
-                                                                           collator,
-                                                                           batchedInsertCtx,
-                                                                           stripe,
-                                                                           WithLock::withoutLock(),
-                                                                           _storageCacheSizeBytes,
-                                                                           bucket,
-                                                                           currentPosition,
-                                                                           writeBatch));
-
-    return writeBatch;
+    }
+    // The second insert attempt must always succeed as it'll be on a fresh bucket. If that fails as
+    // well, we'd loop forever.
+    GTEST_FAIL();
+    return nullptr;
 }
 
 void BucketCatalogTest::_testMeasurementSchema(
@@ -466,7 +461,7 @@ BSONObj BucketCatalogTest::_getCompressedBucketDoc(const BSONObj& bucketDoc) {
     CompressionResult compressionResult = compressBucket(bucketDoc,
                                                          _timeField,
                                                          _ns1,
-                                                         /*validateDecompression*/ true);
+                                                         /*validateDecompression=*/true);
     return compressionResult.compressedBucket.value();
 }
 
@@ -625,7 +620,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithMetaField(
         userMeasurementsBatch,
         /*startIndex=*/0,
         /*numDocsToStage=*/userMeasurementsBatch.size(),
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         stats,
         trackingContext,
         errorsAndIndices);
@@ -735,8 +730,8 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithoutMetaField(
                                               bucketsColl->getTimeseriesOptions().get(),
                                               userMeasurementsBatch,
                                               /*startIndex=*/0,
-                                              /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                              /*docsToRetry=*/{},
+                                              /*numDocs=*/userMeasurementsBatch.size(),
+                                              /*indices=*/{},
                                               stats,
                                               trackingContext,
                                               errorsAndIndices);
@@ -906,7 +901,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
                                                    batchOfMeasurements,
                                                    /*startIndex=*/0,
                                                    /*numDocsToStage=*/batchOfMeasurements.size(),
-                                                   /*docsToRetry=*/{},
+                                                   /*indices=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -918,15 +913,17 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
     EXPECT_EQ(numMeasurements, batchOfMeasurements.size());
 
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
-        auto writeBatches = bucket_catalog::stageInsertBatch(_opCtx,
-                                                             *_bucketCatalog,
-                                                             bucketsColl.get(),
-                                                             _opCtx->getOpID(),
-                                                             _stringDataComparatorUnused,
-                                                             _storageCacheSizeBytes,
-                                                             _compressBucketFuncUnused,
-                                                             AllowQueryBasedReopening::kAllow,
-                                                             batchedInsertContexts[i]);
+        bucket_catalog::TimeseriesWriteBatches writeBatches;
+        bucket_catalog::stageInsertBatch(_opCtx,
+                                         *_bucketCatalog,
+                                         bucketsColl.get(),
+                                         _opCtx->getOpID(),
+                                         _stringDataComparatorUnused,
+                                         _storageCacheSizeBytes,
+                                         _compressBucketFuncUnused,
+                                         AllowQueryBasedReopening::kAllow,
+                                         batchedInsertContexts[i],
+                                         writeBatches);
         EXPECT_EQ(writeBatches.size(), numWriteBatches[i]);
     }
 }
@@ -1037,7 +1034,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                    measurements,
                                                    /*startIndex=*/0,
                                                    /*numDocsToStage=*/measurements.size(),
-                                                   /*docsToRetry=*/{},
+                                                   /*indices=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     EXPECT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
@@ -1066,23 +1063,21 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
             bucketToInsertInto->rolloverReason = RolloverReason::kNone;
         }
         size_t prevNumMeasurements = bucketToInsertInto->numMeasurements;
-        auto newWriteBatch = activeBatch(_bucketCatalog->trackingContexts,
-                                         *bucketToInsertInto,
-                                         _opCtx->getOpID(),
-                                         curBatch.stripeNumber,
-                                         curBatch.stats);
         size_t prevCurPosition = curPosition;
-        auto successfulInsertion =
+        auto newWriteBatch =
             internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
                                                          _opCtx->getOpID(),
                                                          bucketsColl->getDefaultCollator(),
                                                          curBatch,
-                                                         stripe,
                                                          stripeLock,
                                                          _storageCacheSizeBytes,
                                                          *bucketToInsertInto,
-                                                         curPosition,
-                                                         newWriteBatch);
+                                                         curPosition);
+        if (prevCurPosition < curPosition) {
+            EXPECT_TRUE(newWriteBatch);
+        } else {
+            EXPECT_FALSE(newWriteBatch);
+        }
         EXPECT_EQ((bucketToInsertInto->numMeasurements - prevNumMeasurements),
                   numMeasurementsInWriteBatch[i]);
         curPositionFromNumMeasurementsInBatch += numMeasurementsInWriteBatch[i];
@@ -1099,13 +1094,6 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                            stripeLock,
                            *bucketToInsertInto,
                            RolloverReason::kSchemaChange);
-        if (i == (numMeasurementsInWriteBatch.size() - 1)) {
-            EXPECT_EQ(successfulInsertion,
-                      bucket_catalog::internal::StageInsertBatchResult::Success);
-        } else {
-            EXPECT_NE(successfulInsertion,
-                      bucket_catalog::internal::StageInsertBatchResult::Success);
-        }
     }
 }
 
@@ -1310,7 +1298,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         {BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1)))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1322,7 +1310,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         {BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0)))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -1343,7 +1331,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                                                            << BSON("f" << 1 << "g" << 0)))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1357,7 +1345,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                                                            << BSON("g" << 0 << "f" << 1)))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -1379,7 +1367,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                                            << BSON_ARRAY("123" << "456")))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1393,7 +1381,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                                            << BSON_ARRAY("123" << "456")))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -1412,7 +1400,7 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
         {BSON(_timeField << Date_t::now() << _metaField << BSONNULL)},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1424,7 +1412,7 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
                                                    {BSON(_timeField << Date_t::now())},
                                                    /*startIndex=*/0,
                                                    /*numDocsToStage=*/1,
-                                                   /*docsToRetry=*/{},
+                                                   /*indices=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -2547,33 +2535,29 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
                                                                             {doc},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
 
-    // Get the next sequential OID so that we can trigger an ID collision down the line.
-    auto OIDAndRoundedTime = internal::generateBucketOID(time, batchedInsertCtx.options);
-    OID nextBucketOID = std::get<OID>(OIDAndRoundedTime);
+    [[maybe_unused]] auto [currentOID, unusedTs] =
+        internal::generateBucketOID(time, batchedInsertCtx.options);
+    auto collidingOID = predictNextBucketOID(currentOID);
+    BucketId collidingBucketId{_uuid1, collidingOID, batchedInsertCtx.key.signature()};
 
-    BucketId nextBucketId{_uuid1, nextBucketOID, batchedInsertCtx.key.signature()};
+    // Mark the bucketID as frozen, which creates an entry for this bucketId in the bucket state
+    // registry but not in the openBucketsById map. This simulates a bucket that was reopened, found
+    // to be corrupted, and frozen during compression.
+    freezeBucket(_bucketCatalog->bucketStateRegistry, collidingBucketId);
+    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
 
-    // Mark the next bucketID as being frozen. We could arrive at this state if there was a bucket
-    // that we tried reopening that was not compressed, and was also corrupted; when we try to
-    // compress it and fail to do so successfully because it is corrupted, we freeze it. When it is
-    // in this state, it wouldn't in memory in the openBucketsByKey/openBucketsById structures of
-    // any stripe, but it would have an entry in the bucketStateRegistry for its id. This is an edge
-    // case since currently there should be no way to end up with the same bucketID across
-    // stripes/within the same stripe.
-    freezeBucket(_bucketCatalog->bucketStateRegistry, nextBucketId);
-
-    // We should see bucket collision that gets retried, leading to the insert eventually
-    // succeeding.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "B"));
-    EXPECT_NE(nextBucketId, batch2->bucketId) << batch2->toBSON();
-    // We should check that the bucketID that we failed to create is not stored in the stripe.
-    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
+    EXPECT_NE(collidingBucketId, batch2->bucketId) << batch2->toBSON();
+    // There should be no id in the openBucketsById map for the bucketId - the frozen bucket did not
+    // have an entry, and we should have erased the one we added when trying to allocate a new
+    // bucket that ended up colliding with the existing entry in the bucket state registry.
+    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(collidingBucketId));
 }
 
 TEST_F(BucketCatalogTest, WriteConflictIfPrepareCommitOnClearedBucket) {
@@ -2652,7 +2636,7 @@ TEST_F(BucketCatalogTest, FindOpenBucketsReturnsBucket) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2684,7 +2668,7 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2720,7 +2704,7 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithClearedBucket) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2756,7 +2740,7 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithFrozenBucket) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2792,7 +2776,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2832,7 +2816,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2874,7 +2858,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2917,7 +2901,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2958,7 +2942,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3000,7 +2984,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3047,7 +3031,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
                                                                             {measurementSchema1},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3090,7 +3074,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3133,7 +3117,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3177,7 +3161,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3220,7 +3204,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3264,7 +3248,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3314,7 +3298,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3369,7 +3353,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3427,7 +3411,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                                                             {measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3478,7 +3462,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                                                                             {measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -5393,7 +5377,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5433,7 +5417,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5476,7 +5460,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5517,7 +5501,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5557,7 +5541,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
                                                   userMeasurementsBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5594,7 +5578,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
                                                   userMeasurementsBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5637,7 +5621,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -5683,7 +5667,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -5734,7 +5718,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/docsToRetry,
+                                                  /*indices=*/docsToRetry,
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5783,7 +5767,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/docsToRetry,
+                                                  /*indices=*/docsToRetry,
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -6021,6 +6005,203 @@ TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsNonNegative) {
     // Reset all stats.
     collStats.numActiveBuckets.swap(0);
     globalStats.numActiveBuckets.swap(0);
+}
+
+// Asserts that 'bucketId' retains no write batch for 'opId'. A bucket that is gone entirely
+// trivially retains nothing.
+void _assertNoBatchRegistered(BucketCatalog& bucketCatalog,
+                              const BucketId& bucketId,
+                              OperationId opId) {
+    auto& stripe = *bucketCatalog.stripes[internal::getStripeNumber(bucketCatalog, bucketId)];
+    const Bucket* bucket = internal::findBucket(bucketCatalog.bucketStateRegistry,
+                                                stripe,
+                                                WithLock::withoutLock(),
+                                                bucketId,
+                                                internal::IgnoreBucketState::kYes);
+    if (bucket) {
+        EXPECT_EQ(0, bucket->batches.count(opId));
+    }
+}
+
+std::shared_ptr<WriteBatch> BucketCatalogTest::_makeArchivedAndOpenBuckets(Date_t archivedTime) {
+    auto archivedBatch =
+        _insertOneWithoutReopening(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   _uuid1,
+                                   BSON(_timeField << archivedTime << _metaField << _metaValue));
+    _commit(_ns1, archivedBatch, 0);
+
+    auto& stripe =
+        *_bucketCatalog
+             ->stripes[internal::getStripeNumber(*_bucketCatalog, archivedBatch->bucketId)];
+    Bucket* archivedBucket = internal::useBucket(_bucketCatalog->bucketStateRegistry,
+                                                 stripe,
+                                                 WithLock::withoutLock(),
+                                                 archivedBatch->bucketId,
+                                                 internal::IgnoreBucketState::kNo);
+    ASSERT(archivedBucket);
+    internal::rollover(*_bucketCatalog,
+                       stripe,
+                       WithLock::withoutLock(),
+                       *archivedBucket,
+                       RolloverReason::kTimeBackward);
+
+    auto openBatch = _insertOneWithoutReopening(
+        _opCtx,
+        *_bucketCatalog,
+        _ns1,
+        _uuid1,
+        BSON(_timeField << archivedTime - Hours(2) << _metaField << _metaValue));
+    _commit(_ns1, openBatch, 0);
+    return openBatch;
+}
+
+void BucketCatalogTest::_stageInsertBatchExpectingInterrupt(const Collection* bucketsColl,
+                                                            OperationContext* opCtx,
+                                                            BatchedInsertContext& insertContext) {
+    FailPointEnableBlock hangBeforeFetch("hangTimeseriesReopenArchivedBucketBeforeFetch");
+    // Mirror prepareInsertsToBuckets: the batches staged before the throw are still registered in
+    // their buckets, and the caller owns aborting them.
+    TimeseriesWriteBatches writeBatches;
+    ASSERT_THROWS_CODE(stageInsertBatch(opCtx,
+                                        *_bucketCatalog,
+                                        bucketsColl,
+                                        opCtx->getOpID(),
+                                        _stringDataComparatorUnused,
+                                        _storageCacheSizeBytes,
+                                        _compressBucketFuncUnused,
+                                        AllowQueryBasedReopening::kAllow,
+                                        insertContext,
+                                        writeBatches),
+                       DBException,
+                       ErrorCodes::Interrupted);
+    ASSERT_FALSE(writeBatches.empty());
+    abortWriteBatches(
+        *_bucketCatalog, writeBatches, Status{ErrorCodes::Interrupted, "interrupted"});
+}
+
+TEST_F(BucketCatalogTest, ExceptionDuringStagingAbortsRegisteredBatches) {
+    const Date_t archivedTime = Date_t::fromMillisSinceEpoch(1000000000000);
+    auto openBatch = _makeArchivedAndOpenBuckets(archivedTime);
+    const Date_t openTime = archivedTime - Hours(2);
+
+    const auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    auto insertContext = _buildSingleInsertContext(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << openTime + Minutes(1) << _metaField << _metaValue),
+         BSON(_timeField << archivedTime + Minutes(30) << _metaField << _metaValue)});
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const auto& bucketsColl = *autoColl;
+    auto [interruptedClient, interruptedOpCtx] = _makeOperationContext();
+    interruptedOpCtx->markKilled(ErrorCodes::Interrupted);
+
+    // The first measurement is staged into the open bucket, registering a write batch in it. The
+    // second measurement rolls that bucket over and attempts to reopen the archived bucket, where
+    // the interruptible failpoint throws because the operation is killed.
+    _stageInsertBatchExpectingInterrupt(bucketsColl.get(), interruptedOpCtx.get(), insertContext);
+
+    // The write batch registered for the first measurement must have been aborted rather than
+    // leaked; no bucket may retain a batch that no caller can ever commit or abort.
+    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
+    _assertNoBatchRegistered(*_bucketCatalog, openBatch->bucketId, interruptedOpCtx->getOpID());
+    ASSERT(internal::findOpenBuckets(stripe, WithLock::withoutLock(), insertContext.key).empty());
+}
+
+TEST_F(BucketCatalogTest, ExceptionDuringStagingAbortsOtherOperationsBatches) {
+    const Date_t archivedTime = Date_t::fromMillisSinceEpoch(1000000000000);
+    auto openBatch = _makeArchivedAndOpenBuckets(archivedTime);
+    const Date_t openTime = archivedTime - Hours(2);
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
+    const auto& bucketsColl = *autoColl;
+
+    // A bystander operation stages a measurement into the open bucket and leaves it uncommitted,
+    // so its write batch is still registered in that bucket.
+    const auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    auto bystanderContext = _buildSingleInsertContext(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << openTime + Minutes(1) << _metaField << _metaValue)});
+    auto [bystanderClient, bystanderOpCtx] = _makeOperationContext();
+    TimeseriesWriteBatches bystanderBatches;
+    stageInsertBatch(bystanderOpCtx.get(),
+                     *_bucketCatalog,
+                     bucketsColl.get(),
+                     bystanderOpCtx->getOpID(),
+                     _stringDataComparatorUnused,
+                     _storageCacheSizeBytes,
+                     _compressBucketFuncUnused,
+                     AllowQueryBasedReopening::kAllow,
+                     bystanderContext,
+                     bystanderBatches);
+    ASSERT_EQ(1, bystanderBatches.size());
+    auto bystanderBatch = bystanderBatches.front();
+    ASSERT_EQ(openBatch->bucketId, bystanderBatch->bucketId);
+    ASSERT(!isWriteBatchFinished(*bystanderBatch));
+
+    auto insertContext = _buildSingleInsertContext(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << openTime + Minutes(2) << _metaField << _metaValue),
+         BSON(_timeField << archivedTime + Minutes(30) << _metaField << _metaValue)});
+
+    auto [interruptedClient, interruptedOpCtx] = _makeOperationContext();
+    interruptedOpCtx->markKilled(ErrorCodes::Interrupted);
+
+    _stageInsertBatchExpectingInterrupt(bucketsColl.get(), interruptedOpCtx.get(), insertContext);
+
+    // Aborting the interrupted operation's batch takes the whole bucket down, so the bystander's
+    // unprepared batch sharing that bucket is aborted with the same status.
+    ASSERT(isWriteBatchFinished(*bystanderBatch));
+    ASSERT_EQ(ErrorCodes::Interrupted, getWriteBatchStatus(*bystanderBatch));
+
+    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
+    _assertNoBatchRegistered(*_bucketCatalog, openBatch->bucketId, interruptedOpCtx->getOpID());
+    _assertNoBatchRegistered(*_bucketCatalog, openBatch->bucketId, bystanderOpCtx->getOpID());
+
+    // The bucket itself is removed from the catalog, since no prepared batch was outstanding.
+    ASSERT_FALSE(internal::useBucket(_bucketCatalog->bucketStateRegistry,
+                                     stripe,
+                                     WithLock::withoutLock(),
+                                     openBatch->bucketId,
+                                     internal::IgnoreBucketState::kYes));
+    ASSERT(internal::findOpenBuckets(stripe, WithLock::withoutLock(), insertContext.key).empty());
+}
+
+TEST_F(BucketCatalogTest, StagingRecheckRolloverDoesNotLeakBatch) {
+    const Date_t time = Date_t::fromMillisSinceEpoch(1000000000000);
+    auto committedBatch =
+        _insertOneWithoutReopening(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   _uuid1,
+                                   BSON(_timeField << time << _metaField << _metaValue));
+    _commit(_ns1, committedBatch, 0);
+
+    std::shared_ptr<bucket_catalog::WriteBatch> secondBatch;
+    {
+        FailPointEnableBlock forceRecheckRollover("timeseriesForceStagingRecheckRollover");
+        secondBatch = _insertOneWithoutReopening(
+            _opCtx,
+            *_bucketCatalog,
+            _ns1,
+            _uuid1,
+            BSON(_timeField << time + Seconds(1) << _metaField << _metaValue));
+    }
+
+    // The measurement lands in a new bucket after the forced rollover.
+    EXPECT_NE(secondBatch->bucketId, committedBatch->bucketId);
+
+    // The second measurement must not have registered a write batch in the original bucket
+    _assertNoBatchRegistered(*_bucketCatalog, committedBatch->bucketId, _opCtx->getOpID());
+
+    _commit(_ns1, secondBatch, 0);
 }
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

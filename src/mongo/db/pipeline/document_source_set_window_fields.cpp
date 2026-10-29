@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
-#include <boost/container/small_vector.hpp>
-#include <boost/optional.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types.h"
@@ -40,7 +13,6 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
@@ -56,7 +28,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/fail_point.h"
@@ -67,9 +39,12 @@
 #include <algorithm>
 #include <iterator>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -149,7 +124,6 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     FieldRefSet fieldSet;
     std::vector<FieldRef> backingRefs;
 
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::noRequirements);
     std::vector<WindowFunctionStatement> outputFields;
     const auto& output = spec.getOutput();
     backingRefs.reserve(output.nFields());
@@ -161,22 +135,15 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
                 fieldSet.insert(&backingRefs.back(), &conflict));
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
-    auto sbeCompatibility =
-        std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
-    return create(expCtx,
-                  std::move(partitionBy),
-                  std::move(sortBy),
-                  std::move(outputFields),
-                  sbeCompatibility);
+    return create(expCtx, std::move(partitionBy), std::move(sortBy), std::move(outputFields));
 }
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     optional<intrusive_ptr<Expression>> partitionBy,
     optional<SortPattern> sortBy,
-    std::vector<WindowFunctionStatement> outputFields,
-    SbeCompatibility sbeCompatibility) {
+    std::vector<WindowFunctionStatement> outputFields) {
 
     // Starting with an input like this:
     //     {$setWindowFields: {partitionBy: {$foo: "$x"}, sortBy: {y: 1}, output: {...}}}
@@ -298,30 +265,16 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     if (!combined.empty()) {
-        // Use the new $rank implementation that depends on sort key metadata if
-        // 1) we are the context of a $rankFusion query, or
-        // 2) the feature flag is enabled
-        // #1 is because $rankFusion was backported to 8.0, and we don't want $rankFusion queries to
-        // fail during an FCV-gated upgrade. #2 is because we still need to preserve FCV-gating for
-        // generic $setWindowFields queries in order to avoid failures during upgrade (this
-        // $setWindowFields feature is *only* enabled for $rankFusion on 8.0, so it is new behavior
-        // on this version).
-        // TODO SERVER-85426 Always generate sort key metadata.
-        bool shouldOutputSortKeyMetadata =
-            expCtx->isHybridSearch() || expCtx->isBasicRankFusionFeatureFlagEnabled();
         result.push_back(
             DocumentSourceSort::create(expCtx,
                                        SortPattern{std::move(combined)},
                                        // We will rely on this to efficiently compute ranks.
-                                       {.outputSortKeyMetadata = shouldOutputSortKeyMetadata}));
+                                       {.outputSortKeyMetadata = true}));
     }
 
     // $_internalSetWindowFields
-    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(expCtx,
-                                                                           simplePartitionByExpr,
-                                                                           std::move(sortBy),
-                                                                           std::move(outputFields),
-                                                                           sbeCompatibility));
+    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(
+        expCtx, simplePartitionByExpr, std::move(sortBy), std::move(outputFields)));
 
     // $unset
     if (complexPartitionBy) {
@@ -341,17 +294,14 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
     }
 
     if (_outputFields.size() > 0) {
-        // Calculate the new expression SBE compatibility after optimization without overwriting
-        // the previous SBE compatibility value. See the optimize() function for $group for a more
-        // detailed explanation.
-        auto expCtx = _outputFields[0].expr->expCtx();
-        TemporarySbeCompatibilityGuard guard(expCtx, SbeCompatibility::noRequirements);
-
+        // Optimizing the output expressions may lower the expression context's SBE compatibility.
+        // Guard it so that optimizing this stage, which never runs in SBE, doesn't affect the SBE
+        // eligibility of other stages sharing the same expression context.
+        TemporarySbeCompatibilityGuard guard(_outputFields[0].expr->expCtx(),
+                                             SbeCompatibility::noRequirements);
         for (auto&& outputField : _outputFields) {
             outputField.expr->optimize();
         }
-
-        _sbeCompatibility = std::min(_sbeCompatibility, expCtx->getSbeCompatibility());
     }
     return this;
 }
@@ -402,16 +352,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         sortBy.emplace(*sortSpec, expCtx);
     }
 
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::noRequirements);
     std::vector<WindowFunctionStatement> outputFields;
     for (auto&& elem : spec.getOutput()) {
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
     }
-    auto sbeCompatibility =
-        std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx, partitionBy, sortBy, outputFields, sbeCompatibility);
+        expCtx, partitionBy, sortBy, outputFields);
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::optimizeAt(

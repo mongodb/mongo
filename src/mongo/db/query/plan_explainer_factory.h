@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -36,6 +10,7 @@
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/modules.h"
 
@@ -47,10 +22,21 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash = boost::none,
                                     boost::optional<std::string> replanReason = boost::none);
 
-std::unique_ptr<PlanExplainer> make(PlanStage* root,
-                                    boost::optional<size_t> cachedPlanHash,
-                                    boost::optional<std::string> replanReason,
-                                    boost::optional<PlanExplainerData> maybeExplainData);
+/**
+ * 'isExplain' states whether the executor being explained serves an explain command; it lets the
+ * classic explainer take its pre-execution snapshot of an in-tree MultiPlanStage's trial
+ * statistics at construction without imposing that cost on normal queries.
+ *
+ * TODO SERVER-132012: replace the flag by choosing an explain-specialized PlanExplainer subclass
+ * here in the factory.
+ */
+std::unique_ptr<PlanExplainer> make(
+    PlanStage* root,
+    boost::optional<size_t> cachedPlanHash,
+    boost::optional<std::string> replanReason,
+    boost::optional<PlanExplainerData> maybeExplainData,
+    bool isExplain,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
@@ -74,7 +60,7 @@ std::unique_ptr<PlanExplainer> make(
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains = nullptr,
     bool usedJoinOpt = false,
-    cost_based_ranker::EstimateMap estimates = {},
     std::vector<JoinOptPlan> rejectedPlans = {},
-    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
+    boost::optional<PlanExplainerData> maybeExplainData = boost::none,
+    boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 }  // namespace mongo::plan_explainer_factory

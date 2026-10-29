@@ -5,8 +5,8 @@ Python script to interact with proxy protocol server.
 This script is a wrapper around the [proxy-protocol][1] package.
 The most recent source code is available on [GitHub][2].
 
-The installed version is listed in the
-"[tool.poetry.group.testing.dependencies]" section of `pyproject.toml`.
+The installed version is listed in the `[dependency-groups]` "testing"
+section of `pyproject.toml`.
 
 This wrapper adds two patches:
 1. Logs "Now listening on [...]" when the server is ready
@@ -38,6 +38,9 @@ _sni_store = {}  # type: Dict[int, str]
 # OID for the MongoDB roles X509v3 extension.
 _MONGO_ROLES_OID_DOTTED = "1.3.6.1.4.1.34601.2.1.1"
 
+# PP2 SSL sub-TLV carrying the peer's MongoDB roles (kProxyProtocolSSLTlvPeerRoles).
+_MONGO_ROLES_TLV_TYPE = 0xE1
+
 
 def _extract_cert_info(der_cert_bytes: bytes) -> tuple[Optional[str], Optional[bytes]]:
     """Extract subject DN (RFC 4514 string) and roles (raw DER) from a DER certificate.
@@ -63,6 +66,42 @@ def _extract_cert_info(der_cert_bytes: bytes) -> tuple[Optional[str], Optional[b
     return dn_str, roles_der
 
 
+def _der_encode_roles(roles: list) -> bytes:
+    """DER-encode a list of {"role": ..., "db": ...} objects.
+
+    Produces the same encoding as the MongoDB roles X509v3 extension, which the server
+    parses with parsePeerRoles():
+
+        MongoDBAuthorizationGrants ::= SET OF MongoDBRole
+        MongoDBRole ::= SEQUENCE { role UTF8String, database UTF8String }
+    """
+
+    def encode_length(length: int) -> bytes:
+        if length < 0x80:
+            return bytes([length])
+        payload = length.to_bytes((length.bit_length() + 7) // 8, "big")
+        return bytes([0x80 | len(payload)]) + payload
+
+    def encode_tlv(tag: int, value: bytes) -> bytes:
+        return bytes([tag]) + encode_length(len(value)) + value
+
+    kUTF8String = 0x0C
+    kSequence = 0x30
+    kSet = 0x31
+
+    encoded_roles = b""
+    for entry in roles:
+        if not isinstance(entry, dict) or "role" not in entry or "db" not in entry:
+            raise ValueError(f"Role entry must have 'role' and 'db' fields: {entry!r}")
+        encoded_roles += encode_tlv(
+            kSequence,
+            encode_tlv(kUTF8String, str(entry["role"]).encode("utf-8"))
+            + encode_tlv(kUTF8String, str(entry["db"]).encode("utf-8")),
+        )
+
+    return encode_tlv(kSet, encoded_roles)
+
+
 # See setTLVs docstring in jstests/sharding/libs/proxy_protocol.js for format.
 def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> dict[int, bytes]:
     import json
@@ -85,7 +124,17 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> dict[int, bytes]:
             raise ValueError("TLV type is invalid")
         if "value" not in obj:
             raise ValueError("TLV object missing required field 'value'")
-        return type_num, str(obj["value"]).encode("utf-8")
+        val = obj["value"]
+        # The peer roles TLV carries MongoDB roles, DER-encoded the same way the roles X509v3
+        # extension is; every other TLV carries UTF-8 text.
+        if type_num == _MONGO_ROLES_TLV_TYPE:
+            if not isinstance(val, list):
+                raise ValueError(
+                    f"TLV {_MONGO_ROLES_TLV_TYPE:#04x} value expected to be a list of roles, "
+                    f"got {type(val).__name__}"
+                )
+            return type_num, _der_encode_roles(val)
+        return type_num, str(val).encode("utf-8")
 
     def parse_ssl_tlv(obj: dict) -> dict[int, bytes]:
         ret: dict[int, bytes] = {}

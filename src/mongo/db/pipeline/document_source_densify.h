@@ -1,35 +1,8 @@
-/**
- *    Copyright (C) 2021-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -63,6 +36,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+using namespace std::literals::string_view_literals;
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Densify);
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalDensify);
@@ -235,12 +209,12 @@ private:
 };
 class RangeStatement {
 public:
-    static constexpr std::string_view kArgUnit = "unit"_sd;
-    static constexpr std::string_view kArgBounds = "bounds"_sd;
-    static constexpr std::string_view kArgStep = "step"_sd;
+    static constexpr std::string_view kArgUnit = "unit"sv;
+    static constexpr std::string_view kArgBounds = "bounds"sv;
+    static constexpr std::string_view kArgStep = "step"sv;
 
-    static constexpr std::string_view kValFull = "full"_sd;
-    static constexpr std::string_view kValPartition = "partition"_sd;
+    static constexpr std::string_view kValFull = "full"sv;
+    static constexpr std::string_view kValPartition = "partition"sv;
 
     struct Full {};
     struct Partition {};
@@ -268,9 +242,9 @@ public:
         MutableDocument spec;
         spec[kArgStep] = opts.serializeLiteral(_step);
         spec[kArgBounds] =
-            visit(OverloadedVisitor{[&](Full) { return Value(kValFull); },
-                                    [&](Partition) { return Value(kValPartition); },
-                                    [&](ExplicitBounds bounds) {
+            visit(OverloadedVisitor{[&](const Full&) { return Value(kValFull); },
+                                    [&](const Partition&) { return Value(kValPartition); },
+                                    [&](const ExplicitBounds& bounds) {
                                         return Value(std::vector<Value>(
                                             {opts.serializeLiteral(bounds.first.toValue()),
                                              opts.serializeLiteral(bounds.second.toValue())}));
@@ -288,7 +262,7 @@ private:
 };
 
 namespace document_source_densify {
-constexpr std::string_view kStageName = "$densify"_sd;
+constexpr std::string_view kStageName = "$densify"sv;
 
 /**
  * The 'internal' parameter specifies whether or not we create a sort stage that is required for
@@ -316,10 +290,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
 
 class DocumentSourceInternalDensify final : public DocumentSource {
 public:
-    static constexpr std::string_view kStageName = "$_internalDensify"_sd;
-    static constexpr std::string_view kPartitionByFieldsFieldName = "partitionByFields"_sd;
-    static constexpr std::string_view kFieldFieldName = "field"_sd;
-    static constexpr std::string_view kRangeFieldName = "range"_sd;
+    static constexpr std::string_view kStageName = "$_internalDensify"sv;
+    static constexpr std::string_view kPartitionByFieldsFieldName = "partitionByFields"sv;
+    static constexpr std::string_view kFieldFieldName = "field"sv;
+    static constexpr std::string_view kRangeFieldName = "range"sv;
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                   FieldPath field,

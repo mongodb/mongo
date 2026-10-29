@@ -65,16 +65,12 @@ class test_checkpoint26(wttest.WiredTigerTestCase):
             self.session.commit_transaction()
 
         # There should be no eviction activity at this point.
-        stat_cursor = self.session.open_cursor('statistics:')
-        pages_evicted_during_checkpoint = stat_cursor[stat.conn.eviction_pages_in_parallel_with_checkpoint][2]
+        pages_evicted_during_checkpoint = self.get_stat(stat.conn.eviction_pages_in_parallel_with_checkpoint)
         self.assertEqual(pages_evicted_during_checkpoint, 0)
-        stat_cursor.close()
 
         # Make checkpoint perform eviction.
         self.session.checkpoint()
 
         # Read the statistics of pages that have been evicted during checkpoint.
-        stat_cursor = self.session.open_cursor('statistics:')
-        pages_evicted_during_checkpoint = stat_cursor[stat.conn.eviction_pages_in_parallel_with_checkpoint][2]
+        pages_evicted_during_checkpoint = self.get_stat(stat.conn.eviction_pages_in_parallel_with_checkpoint)
         self.assertGreater(pages_evicted_during_checkpoint, 0)
-        stat_cursor.close()

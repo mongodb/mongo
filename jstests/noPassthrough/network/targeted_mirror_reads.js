@@ -139,12 +139,14 @@ verifyParameterOptions(
 // Now check targeted mirroring behavior
 
 // First, set the sampling rate to 0 so none of the initial reads are mirrored. This will make the
-// assertions made later more predictable.
+// assertions made later more predictable. We disable both the general and targeted sampling rates:
+// processedAsSecondary is a single node-wide counter shared by both mirroring modes, so a stray
+// general mirror would otherwise trip the targeted-mode assertions below.
 rst.nodes.forEach(function (node) {
     assert.commandWorked(
         MirrorReadsHelpers.setParameter({
             nodeToReadFrom: node,
-            value: {targetedMirroring: {samplingRate: 0.0}},
+            value: {samplingRate: 0.0, targetedMirroring: {samplingRate: 0.0}},
         }),
     );
 });
@@ -266,7 +268,10 @@ rsConfig.members.forEach(function (member) {
     assert.commandWorked(
         MirrorReadsHelpers.setParameter({
             nodeToReadFrom: nodeToReadFrom,
-            value: {targetedMirroring: {samplingRate: samplingRate, tag: tagTwo}},
+            value: {
+                samplingRate: 0.0,
+                targetedMirroring: {samplingRate: samplingRate, tag: tagTwo},
+            },
         }),
     );
 
@@ -343,7 +348,7 @@ rsConfig.members.forEach(function (member) {
 assert.commandWorked(
     MirrorReadsHelpers.setParameter({
         nodeToReadFrom: rst.getSecondaries()[0],
-        value: {targetedMirroring: {samplingRate: 0.0}},
+        value: {samplingRate: 0.0, targetedMirroring: {samplingRate: 0.0}},
     }),
 );
 

@@ -13,6 +13,85 @@
 # python buildscripts/resmoke.py run --suites=core
 
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//bazel/resmoke:jstestfuzz.bzl", "jstestfuzz_generate")
+
+resmoke_suite_test(
+    name = "search",
+    config = "//buildscripts/resmokeconfig:suites/search.yml",
+    data = [
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    shard_count = 8,
+    tags = [
+        "ci-all-variants",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "search_auth",
+    config = "//buildscripts/resmokeconfig:suites/search_auth.yml",
+    data = [
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    shard_count = 50,
+    tags = [
+        "ci-all-variants",
+        "incompatible_with_bazel_remote_test",  # Mongotmock fails to establish a connection in remote executors.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "search_ssl",
+    config = "//buildscripts/resmokeconfig:suites/search_ssl.yml",
+    data = [
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    tags = [
+        "ci-all-variants",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
 
 resmoke_suite_test(
     name = "search_community",
@@ -25,9 +104,9 @@ resmoke_suite_test(
         "//jstests/with_mongot/search_mocked/lib:all_javascript_files",
         "//x509:generate_main_certificates",
     ],
-    shard_count = 4,
+    shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "search_community_mongotmock",
     ],
     target_compatible_with = select({
@@ -56,7 +135,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "search_community_mongotmock",
     ],
     target_compatible_with = select({
@@ -199,7 +278,7 @@ resmoke_suite_test(
         "//jstests/with_mongot/vector_search_mocked/ssl:all_javascript_files",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -224,9 +303,9 @@ resmoke_suite_test(
         "//jstests/with_mongot/mongotmock/lib",
         "//jstests/with_mongot/search_mocked:all_javascript_files",
     ],
-    shard_count = 8,
+    shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -240,6 +319,298 @@ resmoke_suite_test(
         "//src/mongo/db:mongod",
         "//src/mongo/db/query/search/mongotmock",
         "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongot_e2e_sharded_collections",
+    config = "//buildscripts/resmokeconfig:suites/mongot_e2e_sharded_collections.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "mongot_e2e_tests",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongot_e2e_single_node",
+    config = "//buildscripts/resmokeconfig:suites/mongot_e2e_single_node.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "mongot_e2e_tests",
+    ],
+    target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongot_e2e_single_shard",
+    config = "//buildscripts/resmokeconfig:suites/mongot_e2e_single_shard.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "mongot_e2e_tests",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongot_e2e_sharded_cluster",
+    config = "//buildscripts/resmokeconfig:suites/mongot_e2e_sharded_cluster.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "mongot_e2e_tests",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongot_community_e2e_sharded_collections",
+    config = "//buildscripts/resmokeconfig:suites/mongot_community_e2e_sharded_collections.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "mongot_e2e_tests",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongot_community_e2e_single_node",
+    config = "//buildscripts/resmokeconfig:suites/mongot_community_e2e_single_node.yml",
+    data = ["//bazel/resmoke/mongot:mongot-localdev"],
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "mongot_e2e_tests",
+    ],
+    target_compatible_with = select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "vector_search",
+    config = "//buildscripts/resmokeconfig:suites/vector_search.yml",
+    data = [
+        # Ship the extension shared objects (e.g. libvector_search_extension.so) into the
+        # sandbox so remote executors can load them via loadExtensions.
+        "//:install-extensions",
+        "//jstests/with_mongot/mongotmock/lib",
+        "//src/mongo/db/extension/test_examples:resmoke_data",
+    ],
+    tags = [
+        "ci-all-variants",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        # Extensions are not supported on amazon2 (see extension_helpers.js).
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "vector_search_auth",
+    config = "//buildscripts/resmokeconfig:suites/vector_search_auth.yml",
+    data = [
+        # Ship the extension shared objects (e.g. libvector_search_extension.so) into the
+        # sandbox so remote executors can load them via loadExtensions.
+        "//:install-extensions",
+        "//jstests/libs:authTestsKey",
+        "//jstests/with_mongot/mongotmock/lib",
+        "//src/mongo/db/extension/test_examples:resmoke_data",
+    ],
+    tags = [
+        "ci-all-variants",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        # Extensions are not supported on amazon2 (see extension_helpers.js).
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_timeseries_fuzzer_tests",
+    extra_args = [
+        "--diffTestingMode",
+        "timeseries",
+        "--numPipelines=750",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 1400,
+)
+
+resmoke_suite_test(
+    name = "aggregation_timeseries_fuzzer",
+    srcs = [":aggregation_timeseries_fuzzer_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 50,
+    tags = [
+        "aggfuzzer",
+        "ci-all-variants",
+        "common",
+        "incompatible_debug_mode",
+        "incompatible_development_variant",
+        "random_name",
+        "require_npm",
+        "timeseries",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+jstestfuzz_generate(
+    name = "aggregation_timeseries_fuzzer_deterministic_tests",
+    bundle = "@jstestfuzz_deterministic//:bundle",
+    extra_args = [
+        "--diffTestingMode",
+        "timeseries",
+        "--numPipelines=1000",
+    ],
+    npm_command = "agg-fuzzer",
+    num_generated_files = 112,
+    seed = "1726779665485",
+)
+
+resmoke_suite_test(
+    name = "aggregation_timeseries_fuzzer_deterministic",
+    srcs = [":aggregation_timeseries_fuzzer_deterministic_tests"],
+    config = "//buildscripts/resmokeconfig:suites/generational_fuzzer.yml",
+    resmoke_args = ["--mongodSetParameters={logComponentVerbosity: {command: 2}}"],
+    shard_count = 8,
+    tags = [
+        "auxiliary",
+        "ci-fuzzer-deterministic",
+        "common",
+        "incompatible_debug_mode",
+        "random_name",
+        "require_npm",
+        "timeseries",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",
     ],
 )

@@ -1,40 +1,18 @@
-/**
- *    Copyright (C) 2019-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/memory_tracking/memory_usage_limit.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -129,6 +107,63 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissin
     auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});
     ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
                     objectWithNestedObject->evaluate(Document(), &(expCtx.variables), {}));
+}
+
+namespace {
+boost::intrusive_ptr<Expression> makeFieldPathObject(ExpressionContextForTest* expCtx) {
+    return ExpressionObject::create(
+        expCtx,
+        {{"a", ExpressionFieldPath::createPathFromString(expCtx, "a", expCtx->variablesParseState)},
+         {"b",
+          ExpressionFieldPath::createPathFromString(expCtx, "b", expCtx->variablesParseState)}});
+}
+}  // namespace
+
+TEST(ExpressionObjectEvaluate, WithinPerExpressionCapDoesNotThrow) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    // Default cap is large; a small object stays well under it.
+    Document doc{{"a", "hello"sv}, {"b", "world"sv}};
+    EvaluationContext ctx{};
+    ASSERT_VALUE_EQ(object->evaluate(doc, &expCtx.variables, ctx),
+                    Value(Document{{"a", "hello"sv}, {"b", "world"sv}}));
+}
+
+TEST(ExpressionObjectEvaluate, ThrowsExceededMemoryLimitWhenOverPerExpressionCap) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    // Sets the knob so the lowered cap is observed by ExpressionObject::evaluate.
+    QueryKnobGuardForTest limitGuard{
+        expCtx.getOperationContext(), "internalQueryMaxSingleExpressionMemoryUsageBytes", 8};
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    EvaluationContext ctx{};
+    try {
+        object->evaluate(doc, &expCtx.variables, ctx);
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$object");
+    }
+}
+
+TEST(ExpressionObjectEvaluate, OutputAccountingDoesNotChargeCtxTracker) {
+    // $object accounts its output locally against the per-expression cap. The tracker wired into
+    // the EvaluationContext is therefore not charged by $object itself (child expressions may still
+    // consult it).
+    auto expCtx = ExpressionContextForTest{};
+    auto object = makeFieldPathObject(&expCtx);
+
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{8}};
+    EvaluationContext ctx{.tracker = &tracker};
+
+    Document doc{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}};
+    ASSERT_VALUE_EQ(object->evaluate(doc, &expCtx.variables, ctx),
+                    Value(Document{{"a", std::string(100, 'x')}, {"b", std::string(100, 'y')}}));
+    ASSERT_EQ(tracker.peakTrackedMemoryBytes(), 0);
+    ASSERT_EQ(tracker.inUseTrackedMemoryBytes(), 0);
 }
 
 }  // namespace expression_evaluation_test

@@ -29,18 +29,38 @@ mongo_cc_library(
         "index_hints_serialization.cpp",
         "query_framework_serialization.cpp",
         "query_knob_overrides.cpp",
+        "query_settings.cpp",
         "query_settings_comment.cpp",
+        "query_settings_context.cpp",
         "query_settings_hash.cpp",
         ":query_settings_gen",
     ],
-    hdrs = ["query_knob_overrides.h"],
+    hdrs = [
+        "query_settings.h",
+    ],
     deps = [
         ":query_settings_service_dependencies",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query:query_lifespan",
         "//src/mongo/db/query/query_knobs:query_knob",
         "//src/mongo/db/query/query_shape:query_shape_hash",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_settings_command_hooks",
+    srcs = [
+        "query_settings_command_hooks.cpp",
+    ],
+    hdrs = [
+        "query_settings_command_hooks.h",
+    ],
+    deps = [
+        ":query_settings",
+        "//src/mongo/db:commands",
     ],
 )
 
@@ -81,6 +101,7 @@ mongo_cc_library(
         "//src/mongo/client:remote_command_targeter",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/crypto:sha256_block",
+        "//src/mongo/db:commands",
         "//src/mongo/db:index_key_validate",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
@@ -97,6 +118,19 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "query_settings_context_test_util",
+    srcs = [
+        "query_settings_context_test_util.cpp",
+    ],
+    hdrs = ["query_settings_context_test_util.h"],
+    deps = [
+        ":query_settings",
+        "//src/mongo/db:commands",
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "query_settings_service_test",
     srcs = [
@@ -105,6 +139,7 @@ mongo_cc_unit_test(
         "query_knob_overrides_test.cpp",
         "query_settings_backfill_test.cpp",
         "query_settings_cluster_parameter_impl_test.cpp",
+        "query_settings_context_test.cpp",
         "query_settings_hash_test.cpp",
         "query_settings_manager_test.cpp",
         "query_settings_service_test.cpp",
@@ -114,9 +149,13 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":query_settings",
+        ":query_settings_context_test_util",
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
+        "//src/mongo/db/pipeline:document_source_join_plan_cache_stats",  # Necessary because tests rely on the $joinPlanCacheStats pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
         "//src/mongo/db/query/query_knobs:query_knob_test_knobs",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/executor:mock_async_rpc",

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/transport/asio/asio_networking_baton.h"
@@ -37,9 +11,12 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <string_view>
 
 #include <sys/eventfd.h>
 
@@ -154,6 +131,69 @@ public:
 
 }  // namespace
 
+AsioNetworkingBaton::AuditedPromise::AuditedPromise(Promise<void> promise)
+    : _promise(std::move(promise)) {}
+
+Promise<void> AsioNetworkingBaton::AuditedPromise::release(std::source_location location) {
+    _releaseCaller = Caller{.location = location, .threadName = std::string(getThreadName())};
+    return std::move(_promise);
+}
+
+void AsioNetworkingBaton::AuditedPromise::setError(Status status, std::source_location location) {
+    Caller caller{.location = location, .threadName = std::string(getThreadName())};
+
+    if (_releaseCaller) {
+        logv2::DynamicAttributes attrs = logAttributes(*_releaseCaller, caller);
+        LOGV2_FATAL(13140003,
+                    "Attempted to set error on Promise in AsioNetworkingBaton, but the Promise has "
+                    "already been moved from.",
+                    attrs);
+    }
+
+    if (_setErrorCaller) {
+        logv2::DynamicAttributes attrs = logAttributes(*_setErrorCaller, caller);
+        LOGV2_FATAL(13140004,
+                    "Attempted to set error on Promise in AsioNetworkingBaton, but the Promise has "
+                    "already had an error set on it.",
+                    attrs);
+    }
+
+    _setErrorCaller = std::move(caller);
+    _promise.setError(std::move(status));
+}
+
+logv2::DynamicAttributes AsioNetworkingBaton::AuditedPromise::logAttributes(const Caller& previous,
+                                                                            const Caller& current) {
+    logv2::DynamicAttributes attrs;
+
+    attrs.add("previousCallerThreadName", previous.threadName);
+    attrs.add("previousCallerFile", std::string_view(previous.location.file_name()));
+    attrs.add("previousCallerLine", previous.location.line());
+    attrs.add("previousCallerColumn", previous.location.column());
+    if (std::string_view func = previous.location.function_name(); !func.empty()) {
+        attrs.add("previousCallerFunction", func);
+    }
+
+    attrs.add("currentCallerThreadName", current.threadName);
+    attrs.add("currentCallerFile", std::string_view(current.location.file_name()));
+    attrs.add("currentCallerLine", current.location.line());
+    attrs.add("currentCallerColumn", current.location.column());
+    if (std::string_view func = current.location.function_name(); !func.empty()) {
+        attrs.add("currentCallerFunction", func);
+    }
+
+    return attrs;
+}
+
+AsioNetworkingBaton::Timer::Timer(size_t id, Promise<void> promise)
+    : id(id), promise(std::move(promise)) {}
+
+AsioNetworkingBaton::TransportSession::TransportSession(int fd,
+                                                        short events,
+                                                        bool canceled,
+                                                        Promise<void> promise)
+    : fd(fd), events(events), canceled(canceled), promise(std::move(promise)) {}
+
 void AsioNetworkingBaton::schedule(Task func) {
     auto task = [this, func = std::move(func)](std::unique_lock<std::mutex> lk) mutable {
         auto status = _opCtx ? Status::OK() : getDetachedError();
@@ -238,11 +278,11 @@ void AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
          it = _timers.erase(it)) {
         Timer& timer = it->second;
         if (timer.canceled) {
-            toCancel.push_back(std::move(timer.promise));
+            toCancel.push_back(timer.promise.release());
         } else {
-            toFulfill.push_back(std::move(timer.promise));
+            toFulfill.push_back(timer.promise.release());
         }
-        _timersById.erase(it->second.id);
+        _timersById.erase(timer.id);
     }
 }
 
@@ -265,7 +305,7 @@ Future<void> AsioNetworkingBaton::addSession(Session& session, Type type) {
 Future<void> AsioNetworkingBaton::waitUntil(const ReactorTimer& reactorTimer,
                                             Date_t expiration) try {
     auto pf = makePromiseFuture<void>();
-    _addTimer(expiration, Timer{reactorTimer.id(), std::move(pf.promise)});
+    _addTimer(expiration, Timer(reactorTimer.id(), std::move(pf.promise)));
 
     return std::move(pf.future);
 } catch (const DBException& ex) {
@@ -277,7 +317,7 @@ Future<void> AsioNetworkingBaton::waitUntil(Date_t expiration, const Cancellatio
     DummyTimer dummy;
     const size_t timerId = dummy.id();
 
-    _addTimer(expiration, Timer{timerId, std::move(pf.promise)});
+    _addTimer(expiration, Timer(timerId, std::move(pf.promise)));
 
     token.onCancel().thenRunOn(shared_from_this()).getAsync([this, timerId](Status s) {
         if (s.isOK()) {
@@ -316,9 +356,9 @@ void AsioNetworkingBaton::_addTimer(Date_t expiration, Timer timer) {
         // cancellation right now so we can put the new copy in its place.
         boost::optional<Promise<void>> promise;
         if (auto it = _timersById.find(id); it != _timersById.end()) {
-            Timer timer = std::exchange(it->second->second, {});
+            Timer timer = std::exchange(it->second->second, Timer());
             invariant(timer.canceled, "Tried to overwrite an existing and active timer");
-            promise = std::move(timer.promise);
+            promise = timer.promise.release();
             _timers.erase(it->second);
             _timersById.erase(it);
         }
@@ -344,7 +384,7 @@ bool AsioNetworkingBaton::cancelSession(Session& session) {
 
     // If the session is still pending, cancel it immediately, inline.
     if (auto it = _pendingSessions.find(id); it != _pendingSessions.end()) {
-        TransportSession ts = std::exchange(it->second, {});
+        TransportSession ts = std::exchange(it->second, TransportSession());
         invariant(!ts.canceled, "Canceling session in baton failed");
         _pendingSessions.erase(it);
         lk.unlock();
@@ -375,7 +415,7 @@ bool AsioNetworkingBaton::cancelSession(Session& session) {
             return;
         }
 
-        TransportSession ts = std::exchange(iter->second, {});
+        TransportSession ts = std::exchange(iter->second, TransportSession());
         _sessions.erase(iter);
         lk.unlock();
 
@@ -579,9 +619,9 @@ std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBato
         if (psit->revents) {
             TransportSession& ts = (*sit)->second;
             if (ts.canceled) {
-                toCancel.push_back(std::move(ts.promise));
+                toCancel.push_back(ts.promise.release());
             } else {
-                toFulfill.push_back(std::move(ts.promise));
+                toFulfill.push_back(ts.promise.release());
             }
             _sessions.erase(*sit);
             --events;
@@ -626,7 +666,7 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
         auto activeIt = _sessions.find(id);
         if (activeIt != _sessions.end()) {
             invariant(activeIt->second.canceled, "Adding session to baton failed");
-            promise = std::move(activeIt->second.promise);
+            promise = activeIt->second.promise.release();
             _sessions.erase(activeIt);
         }
 

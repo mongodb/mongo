@@ -26,6 +26,10 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
     size_t footprint;
 
     btree = S2BT(session);
+
+    if (!__wt_btree_eviction_enabled(btree))
+        return (false);
+
     page = ref->page;
 
     /* Leaf pages only. */
@@ -377,9 +381,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         addr_tmp.type = addr.type;
         WT_TIME_AGGREGATE_COPY(&addr_tmp.ta, &full_image_ta);
 
-        int verify_ret =
-          __wt_verify_dsk_image(session, "[verify the newly built full disk image from deltas]",
-            new_image.data, new_image.size, &addr_tmp, WT_VRFY_DISK_EMPTY_PAGE_OK);
+        int verify_ret = __wt_verify_dsk_image(session,
+          "[verify the newly built full disk image from deltas]", new_image.data, new_image.size,
+          &addr_tmp, WT_VRFY_DISK_EMPTY_PAGE_OK | WT_VRFY_DISK_FROM_DELTA);
         WT_ASSERT_ALWAYS(session, verify_ret == 0,
           "verification failed for the newly built full disk image from deltas!");
 #endif
@@ -489,7 +493,8 @@ skip_disk_read:
     WT_ERR(__wt_conn_page_history_track_read(session, page));
 
     /* Read only page must be clean. */
-    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_READONLY) || !__wt_page_is_modified(page));
+    WT_ASSERT(
+      session, !F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) || !__wt_page_is_modified(page));
 
 skip_read:
     F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);
@@ -562,6 +567,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
      * dominate these statistics.
      */
     if (!LF_ISSET(WT_READ_CACHE)) {
+        WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested);
         if (WT_IS_HS(session->dhandle))
             WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested_hs);
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
@@ -605,7 +611,7 @@ read:
              */
             if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
                 WT_RET(__wt_evict_app_assist_worker_check(
-                  session, true, txn->mod_count == 0, false, NULL));
+                  session, true, txn->mod_count == 0, false, false, NULL));
             WT_RET(__page_read(session, ref, flags));
             read_from_disk = true;
             /* We just read a page, don't evict it before we have a chance to use it. */
@@ -681,7 +687,7 @@ read:
              * making the problem better.
              */
             if (evict_skip || F_ISSET(session, WT_SESSION_RESOLVING_TXN) ||
-              LF_ISSET(WT_READ_NO_SPLIT) || btree->evict_disabled > 0)
+              LF_ISSET(WT_READ_NO_SPLIT))
                 goto skip_evict;
 
             /*
@@ -807,7 +813,8 @@ skip_evict:
          * cache, substitute that for a sleep.
          */
         if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE)) {
-            WT_RET(__wt_evict_app_assist_worker_check(session, true, true, false, &cache_work));
+            WT_RET(
+              __wt_evict_app_assist_worker_check(session, true, true, false, false, &cache_work));
             if (cache_work)
                 continue;
         }

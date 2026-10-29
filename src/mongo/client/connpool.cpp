@@ -1,39 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 // _ todo: reconnect?
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/client/connpool.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -42,7 +14,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -68,9 +39,14 @@
 #include <string>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
 #endif
+// IWYU pragma: no_include "cxxabi.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -78,9 +54,6 @@
 namespace mongo {
 
 namespace {
-const int kDefaultIdleTimeout = std::numeric_limits<int>::max();
-const int kDefaultMaxInUse = std::numeric_limits<int>::max();
-
 auto makeDuration(double secs) {
     return Milliseconds(static_cast<Milliseconds::rep>(1000 * secs));
 }
@@ -99,17 +72,6 @@ using std::string;
 using std::vector;
 
 // ------ PoolForHost ------
-
-PoolForHost::PoolForHost()
-    : _created(0),
-      _minValidCreationTimeMicroSec(0),
-      _type(ConnectionString::ConnectionType::kInvalid),
-      _maxPoolSize(kPoolSizeUnlimited),
-      _maxInUse(kDefaultMaxInUse),
-      _checkedOut(0),
-      _badConns(0),
-      _parentDestroyed(false),
-      _inShutdown(false) {}
 
 PoolForHost::~PoolForHost() {
     clear();
@@ -360,17 +322,7 @@ public:
 
 // ------ DBConnectionPool ------
 
-const int PoolForHost::kPoolSizeUnlimited(-1);
-
-DBConnectionPool::DBConnectionPool()
-    : _name("dbconnectionpool"),
-      _maxPoolSize(PoolForHost::kPoolSizeUnlimited),
-      _maxInUse(kDefaultMaxInUse),
-      _idleTimeout(kDefaultIdleTimeout),
-      _inShutdown(false),
-      _hooks(new list<DBConnectionHook*>())
-
-{}
+DBConnectionPool::DBConnectionPool() : _hooks(new list<DBConnectionHook*>()) {}
 
 void DBConnectionPool::shutdown() {
     if (!_inShutdown.swap(true)) {
@@ -798,7 +750,7 @@ void ScopedDbConnection::clearPool() {
     globalConnPool.clear();
 }
 
-AtomicWord<int> AScopedConnection::_numConnections;
+Atomic<int> AScopedConnection::_numConnections;
 
 MONGO_INITIALIZER(SetupDBClientBaseWithConnection)(InitializerContext*) {
     DBClientBase::withConnection_do_not_use = [](std::string host,

@@ -7,12 +7,16 @@
  *
  * @tags: [
  *  featureFlagExtensionsAPI,
- *  featureFlagExtensionsInsideHybridSearch,
+ *  requires_fcv_90,
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
+import {
+    expandEachPerShard,
+    expandPerShard,
+    getDrmShardInfo,
+} from "jstests/extensions/libs/document_results_and_metadata_utils.js";
 
 describe("$_internalDocumentResultsAndMetadata basic document-only behavior", function () {
     let coll;
@@ -22,7 +26,7 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
         coll = db[jsTestName()];
         assertDropCollection(db, coll.getName());
         assert.commandWorked(coll.insertOne({placeholder: true}));
-        nShards = FixtureHelpers.numberOfShardsForCollection(coll);
+        ({nShards} = getDrmShardInfo(db, coll));
     });
 
     it("returns all docs from every shard", function () {
@@ -34,7 +38,7 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
             {_id: 3, score: 2, name: "doc_3"},
             {_id: 4, score: 1, name: "doc_4"},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -51,7 +55,7 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
             {_id: 0, score: 5, name: "doc_0"},
             {_id: 1, score: 4, name: "doc_1"},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -64,7 +68,7 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
             {_id: 1, score: 2, name: "doc_1"},
             {_id: 2, score: 1, name: "doc_2"},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 
@@ -80,7 +84,7 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
             {_id: 4, score: 1, name: "doc_4"},
         ];
         // After $sort, every per-shard doc appears nShards times.
-        const expected = perShardDocs.flatMap((d) => Array(nShards).fill(d));
+        const expected = expandEachPerShard(nShards, perShardDocs);
         assert.eq(result, expected, {result, nShards});
     });
 
@@ -92,8 +96,44 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
             score: numDocs - i,
             name: `doc_${i}`,
         }));
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
+    });
+
+    it("returns all 500 docs across dynamic exchange batches", function () {
+        const numDocs = 500;
+        const result = coll.aggregate([{$extensionMultiStream: {numDocs}}]).toArray();
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            _id: i,
+            score: numDocs - i,
+            name: `doc_${i}`,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
+    it("$limit through a batched exchange returns exactly N docs", function () {
+        const result = coll
+            .aggregate([{$extensionMultiStream: {numDocs: 200}}, {$limit: 10}])
+            .toArray();
+        assert.eq(result.length, 10, {result});
+    });
+
+    it("returns all docs when document stream exceeds the Exchange buffer", function () {
+        const numDocs = 40;
+        const docPad = 512 * 1024;
+        const result = coll.aggregate([{$extensionMultiStream: {numDocs, docPad}}]).toArray();
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            _id: i,
+            score: numDocs - i,
+            name: `doc_${i}`,
+        }));
+        const expected = expandPerShard(nShards, perShardDocs);
+        assert.sameMembers(
+            result.map((d) => ({_id: d._id, score: d.score, name: d.name})),
+            expected,
+            {nShards},
+        );
     });
 
     it("preserves user-owned _streamType field in output documents", function () {
@@ -105,7 +145,7 @@ describe("$_internalDocumentResultsAndMetadata basic document-only behavior", fu
             {_id: 1, score: 2, name: "doc_1", _streamType: -1},
             {_id: 2, score: 1, name: "doc_2", _streamType: -1},
         ];
-        const expected = Array(nShards).fill(perShardDocs).flat();
+        const expected = expandPerShard(nShards, perShardDocs);
         assert.sameMembers(result, expected, {result, nShards});
     });
 });

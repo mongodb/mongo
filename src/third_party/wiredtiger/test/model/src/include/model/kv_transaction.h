@@ -137,8 +137,7 @@ public:
     inline timestamp_t
     prepare_timestamp() const noexcept
     {
-        std::lock_guard lock_guard(_lock); /* So that Coverity does not complain. */
-        return _prepare_timestamp;
+        return _prepare_timestamp.load(std::memory_order_acquire);
     }
 
     /*
@@ -287,7 +286,7 @@ private:
 
     timestamp_t _commit_timestamp;
     timestamp_t _durable_timestamp;
-    timestamp_t _prepare_timestamp;
+    std::atomic<timestamp_t> _prepare_timestamp;
     timestamp_t _read_timestamp;
     kv_transaction_snapshot_ptr _snapshot;
 

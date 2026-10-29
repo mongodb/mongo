@@ -977,3 +977,7 @@ class MongoDBHelp(gdb.Command):
 MongoDBHelp()
 
 print("MongoDB GDB commands loaded, run 'mongodb-help' for list of commands")
+print(
+    "GDB indexes are added automatically for Linux CI builds with --fission=no. "
+    "For other builds, add one with: bazel run gdb-add-index -- <path-to-binary>"
+)

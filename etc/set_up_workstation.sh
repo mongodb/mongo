@@ -53,28 +53,31 @@ setup_mongo_venv() {
     echo "################################################################################"
     echo "Setting up the local virtual environment..."
 
-    # PYTHON_KEYRING_BACKEND is needed to make poetry install work
-    # See guide https://wiki.corp.mongodb.com/display/KERNEL/Virtual+Workstation
-    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
     /opt/mongodbtoolchain/v5/bin/python3.13 -m venv python3-venv
 
     source ./python3-venv/bin/activate
-    POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --no-root --sync
+    # `uv sync --all-groups --no-install-project` installs every PEP 735
+    # dependency group from pyproject.toml into the venv (replaces the
+    # prior `poetry install --no-root --sync`). UV_PROJECT_ENVIRONMENT is
+    # required: uv ignores $VIRTUAL_ENV for project commands and would
+    # otherwise sync into `<repo>/.venv`.
+    UV_PROJECT_ENVIRONMENT="${VIRTUAL_ENV}" uv sync --locked --all-groups --no-install-project
     deactivate
 
     echo "Finished setting up the local virtual environment..."
     echo "Activate it by running 'source python3-venv/bin/activate'"
 }
 
-setup_poetry() {
+setup_uv() {
     echo "################################################################################"
-    echo "Installing 'poetry' command..."
+    echo "Installing 'uv' command..."
     export PATH="$PATH:$HOME/.local/bin"
-    if command -v poetry &>/dev/null; then
-        echo "'poetry' command exists; skipping setup"
+    if command -v uv &>/dev/null; then
+        echo "'uv' command exists; skipping setup"
     else
-        pipx install poetry --pip-args="-r $(pwd)/poetry_requirements.txt"
-        echo "Finished installing poetry..."
+        # Canonical uv version source is buildscripts/uv_version.txt.
+        pipx install "uv==$(cat "$(dirname "${BASH_SOURCE[0]}")/../buildscripts/uv_version.txt")"
+        echo "Finished installing uv..."
     fi
 }
 
@@ -161,13 +164,13 @@ run_setup() {
 
     setup_bash
 
-    setup_clang_config
     setup_gdb
     setup_pipx
     setup_db_contrib_tool # This step requires `setup_pipx` to have been run.
-    setup_poetry          # This step requires `setup_pipx` to have been run.
+    setup_uv              # This step requires `setup_pipx` to have been run.
 
-    setup_mongo_venv # This step requires `setup_poetry` to have been run.
+    setup_mongo_venv   # This step requires `setup_uv` to have been run.
+    setup_clang_config # This step requires `setup_mongo_venv` to have been run (bazel wrapper needs venv deps).
 
     echo "Please run 'source ~/.bashrc' to complete setup!"
 }

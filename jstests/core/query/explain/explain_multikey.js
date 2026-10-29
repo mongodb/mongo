@@ -3,6 +3,7 @@
 // This test examines the explain output to verify that certain indexes are multi-key, which may not
 // be the case on all shards.
 // @tags: [
+//   uses_explain,
 //   assumes_unsharded_collection,
 // ]
 import {

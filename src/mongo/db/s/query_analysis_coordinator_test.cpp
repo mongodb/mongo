@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/s/query_analysis_coordinator.h"
 
@@ -148,7 +122,7 @@ protected:
         assertContainsSampler(samplers,
                               mongosDoc.getName(),
                               mongosDoc.getPing(),
-                              boost::none /*numQueriesPerSecond */);
+                              /*numQueriesPerSecond=*/boost::none);
     }
 
     void assertContainsSampler(const StringMap<QueryAnalysisCoordinator::Sampler>& samplers,
@@ -251,7 +225,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsSameCollectionUUid) {
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update should cause the configuration to have the new sample rate.
     configurations = coordinator->getConfigurationsForTest();
@@ -285,7 +259,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationDifferentCollectionUUid)
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update should cause the configuration to have the new collection uuid, sample rate and
     // start time.
@@ -318,7 +292,7 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate0.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update to mode "off" should cause the configuration to get removed.
     configurations = coordinator->getConfigurationsForTest();
@@ -331,7 +305,7 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate1.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update to mode "on" should cause the configuration to get recreated.
     configurations = coordinator->getConfigurationsForTest();
@@ -358,7 +332,7 @@ TEST_F(QueryAnalysisCoordinatorTest, DeleteConfigurationsModeOn) {
     uassertStatusOK(deleteToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc.toBSON(),
-                                             false /* multi */));
+                                             /*multi=*/false));
 
     // The delete should cause the configuration to get removed.
     configurations = coordinator->getConfigurationsForTest();
@@ -383,7 +357,7 @@ TEST_F(QueryAnalysisCoordinatorTest, DeleteConfigurationsModeOff) {
     uassertStatusOK(deleteToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc.toBSON(),
-                                             false /* multi */));
+                                             /*multi=*/false));
 
     // The delete should be a noop.
     configurations = coordinator->getConfigurationsForTest();
@@ -517,7 +491,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateSamplersOnUpdate) {
                                              MongosType::ConfigNS,
                                              BSON(MongosType::name << mongosName0),
                                              mongosDocPostUpdate.toBSON(),
-                                             false /* upsert */));
+                                             /*upsert=*/false));
 
     // The update should cause the sampler to have the new ping time.
     samplers = coordinator->getSamplersForTest();
@@ -541,7 +515,7 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveSamplersOnDelete) {
     assertContainsSampler(samplers, mongosDoc);
 
     uassertStatusOK(deleteToConfigCollection(
-        operationContext(), MongosType::ConfigNS, mongosDoc.toBSON(), false /* multi */));
+        operationContext(), MongosType::ConfigNS, mongosDoc.toBSON(), /*multi=*/false));
 
     // The delete should cause the sampler to get removed.
     samplers = coordinator->getSamplersForTest();
@@ -657,8 +631,7 @@ TEST_F(QueryAnalysisCoordinatorTest, ResetLastNumQueriesExecutedOnStepUp) {
 
     // After stepup, the sampler should have an unknown number of queries executed per second.
     samplers = coordinator->getSamplersForTest();
-    assertContainsSampler(
-        samplers, mongosName0, pingTime, boost::none /* numQueriesExecutedPerSecond */);
+    assertContainsSampler(samplers, mongosName0, pingTime, /*numQueriesPerSecond=*/boost::none);
 }
 
 TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerBasic) {
@@ -700,7 +673,7 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerOneDisabledCo
 
     auto startTime0 = now();
     auto analyzerDoc0 = makeConfigQueryAnalyzersDocument(
-        nss0, collUuid0, QueryAnalyzerModeEnum::kOff, boost::none /* samplesPerSec */, startTime0);
+        nss0, collUuid0, QueryAnalyzerModeEnum::kOff, /*samplesPerSec=*/boost::none, startTime0);
     uassertStatusOK(insertToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc0.toBSON()));

@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2022-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -95,9 +69,7 @@ class UserWritesRecoverableCriticalSectionService
 public:
     static const NamespaceString kGlobalUserWritesNamespace;
     static const NamespaceString kBlockReplicaSetWritesNamespace;
-
     UserWritesRecoverableCriticalSectionService() = default;
-
     static UserWritesRecoverableCriticalSectionService* get(ServiceContext* serviceContext);
     static UserWritesRecoverableCriticalSectionService* get(OperationContext* opCtx);
 
@@ -150,13 +122,29 @@ public:
         boost::optional<UserWritesBlockReasonEnum> reason = boost::none);
 
     /**
-     * This method is called when we have to mirror the state on disk of the recoverable critical
-     * section to memory (on startUp or on rollback).
+     * Mirrors on-disk recoverable critical sections into memory. Recovers both user write blocking
+     * and replica set write blocking.
      */
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
     /**
-     * Acquires the user writes critical section preventing replica set writes.
+     * Mirrors the on-disk user writes critical section into memory. Used on rollback of
+     * config.user_writes_critical_sections.
+     */
+    void recoverUserWritesCriticalSection(OperationContext* opCtx);
+
+    /**
+     * Mirrors the on-disk replica set writes critical section into memory. Used on rollback of
+     * config.replica_set_writes_critical_section. When the durable document is missing (for
+     * example, a rolled-back acquire), clears in-memory replica set write blocking. Does not
+     * re-enable auto-compaction.
+     */
+    void recoverReplicaSetWritesCriticalSection(OperationContext* opCtx);
+
+    /**
+     * Acquires the user writes critical section preventing replica set writes. On the primary, a
+     * newly inserted document with allowDeletions:false synchronously pauses background
+     * auto-compaction after committing.
      */
     void acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         OperationContext* opCtx,
@@ -165,13 +153,25 @@ public:
         ReplicaSetWritesBlockReasonEnum reason);
 
     /**
+     * If the replica set writes critical section is already active, updates only its
+     * 'allowDeletions' option. The existing reason must match. Returns false if the critical
+     * section has not been acquired. Repeating the current 'allowDeletions' value is a no-op.
+     * Each allowDeletions change increments replicaSetWritesBlockCounters for the reason. A
+     * true-to-false transition synchronously pauses background auto-compaction on the primary and
+     * on secondaries (best effort) during replicated application.
+     */
+    bool updateAllowDeletionsForActiveReplicaSetWriteBlock(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           bool allowDeletions,
+                                                           ReplicaSetWritesBlockReasonEnum reason);
+
+    /**
      * Releases the prevent writes critical section, allowing replica set writes again.
      */
     void releaseRecoverableCriticalSectionBlockingReplicaSetWrites(
         OperationContext* opCtx,
         const NamespaceString& nss,
         ReplicaSetWritesBlockReasonEnum reason);
-
 
 private:
     void onConsistentDataAvailable(OperationContext* opCtx,

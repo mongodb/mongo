@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/base/error_codes.h"
@@ -43,6 +17,8 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/metrics_filtering_util.h"
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -223,6 +199,18 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
     p.appendSystemDetails(extra);
     reply.setExtra(extra.obj());
 
+    auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+    bool requireFiltering = metricsPolicyManager.requiresFiltering(
+        opCtx, MetricsCategoryEnum::kHostInfo, /*forceFiltered=*/false);
+
+    if (requireFiltering) {
+        const auto& matcher =
+            metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kHostInfo);
+        BSONObjBuilder bob;
+        metrics_filtering_util::appendPaths(bob, reply.toBSON(), matcher);
+        reply = HostInfoReply::parseOwned(bob.obj());
+    }
+
     return reply;
 }
 MONGO_REGISTER_COMMAND(HostInfoCmd).forRouter().forShard();
@@ -247,6 +235,19 @@ GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext* op
     GetCmdLineOptsReply reply;
     reply.setArgv(serverGlobalParams.argvArray);
     reply.setParsed(serverGlobalParams.parsedOpts);
+
+    auto& metricsPolicyManager = MetricsPolicyManager::get(opCtx);
+    bool requireFiltering = metricsPolicyManager.requiresFiltering(
+        opCtx, MetricsCategoryEnum::kGetCmdLineOpts, /*forceFiltered=*/false);
+
+    if (requireFiltering) {
+        const auto& matcher =
+            metricsPolicyManager.getAllowlistMatcher(MetricsCategoryEnum::kGetCmdLineOpts);
+        BSONObjBuilder bob;
+        metrics_filtering_util::appendPaths(bob, reply.toBSON(), matcher);
+        reply = GetCmdLineOptsReply::parseOwned(bob.obj());
+    }
+
     return reply;
 }
 MONGO_REGISTER_COMMAND(GetCmdLineOptsCmd).forRouter().forShard();
@@ -343,8 +344,7 @@ public:
         auto request = GetLogCommand::parse(cmdObj, IDLParserContext{"getLog"});
         auto logName = request.getCommandParameter();
         if (logName == "*") {
-            std::vector<std::string> names;
-            logv2::RamLog::getNames(names);
+            auto names = logv2::RamLog::getNames();
 
             BSONArrayBuilder arr(result.subarrayStart("names"sv));
             for (const auto& name : names) {
@@ -353,7 +353,7 @@ public:
             arr.doneFast();
 
         } else {
-            logv2::RamLog* ramlog = logv2::RamLog::getIfExists(std::string{logName});
+            logv2::RamLog* ramlog = logv2::RamLog::getIfExists(logName);
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "No log named '" << logName << "'",
                     ramlog != nullptr);

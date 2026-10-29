@@ -79,7 +79,7 @@ function testFindCommand(st, dbName, collName, doc, testCase) {
             assert(!winningPlan.keyPattern);
         } else {
             assert.eq(winningPlan.stage, "EXPRESS_IXSCAN", winningPlan);
-            assert.eq(winningPlan.keyPattern, "{ _id: 1 }", winningPlan);
+            assert.eq(winningPlan.keyPattern, {_id: 1}, winningPlan);
         }
     } else if (!testCase.skipHashedShardKeyIndexCreation || testCase.containsCompatibleIndex) {
         assert.eq(winningPlan.stage, "FETCH", winningPlan);

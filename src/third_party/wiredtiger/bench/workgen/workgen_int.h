@@ -317,10 +317,13 @@ struct SleepOperationInternal : OperationInternal {
 
 struct VerifyOperationInternal : OperationInternal {
     std::string verify_session_config;
+    std::string verify_call_config;
 
-    VerifyOperationInternal() : OperationInternal(), verify_session_config() {}
+    VerifyOperationInternal() :
+        OperationInternal(), verify_session_config(), verify_call_config() {}
     VerifyOperationInternal(const VerifyOperationInternal &other) :
-        OperationInternal(other), verify_session_config(other.verify_session_config) {}
+        OperationInternal(other), verify_session_config(other.verify_session_config),
+        verify_call_config(other.verify_call_config) {}
     virtual void parse_config(const std::string &config);
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
 };

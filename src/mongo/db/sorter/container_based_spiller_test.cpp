@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/sorter/container_based_spiller.h"
 
@@ -40,7 +14,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/record_store_write_conflict_fail_points.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -51,6 +25,8 @@
 
 #include <limits>
 #include <memory>
+#include <numeric>
+#include <ostream>
 #include <span>
 #include <string>
 #include <utility>
@@ -63,6 +39,15 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 using Storage = ContainerBasedStorage<IntWrapper, IntWrapper>;
+
+class SpillerCallbackMock : public SpillCallbacks {
+public:
+    MOCK_METHOD(void, preSpill, (), (override));
+    MOCK_METHOD(void, onSpill, (), (override));
+    MOCK_METHOD(void, onSpillBatch, (), (override));
+    MOCK_METHOD(void, postSpill, (), (override));
+    MOCK_METHOD(void, onChunkWritten, (int64_t bytesWritten), (override));
+};
 
 TEST(ContainerIteratorTest, Iterate) {
     RecoveryUnitNoop ru;
@@ -130,7 +115,7 @@ TEST(ContainerIteratorTest, Iterate) {
                                                        containerKey1,
                                                        containerKey5 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/3272515249,
+                                                       /*checksum=*/3272515249,
                                                        sorter::kLatestChecksumVersion};
 
     // Before iteration starts, getRange() reports no current position.
@@ -277,14 +262,14 @@ TEST(ContainerIteratorTest, MultipleCursors) {
         containerKey1,
         containerKey2 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
-        /*_checksumCalculator=*/71873048,
+        /*checksum=*/71873048,
         sorter::kLatestChecksumVersion};
     ContainerIterator<IntWrapper, IntWrapper> iterator2{
         container.getCursor(ru),
         containerKey3,
         containerKey4 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
-        /*_checksumCalculator=*/2815298670,
+        /*checksum=*/2815298670,
         sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator1.more());
@@ -323,7 +308,7 @@ TEST(ContainerIteratorTest, ContainerMissingKey) {
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/4104690164,
+                                                       /*checksum=*/4104690164,
                                                        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
@@ -362,7 +347,7 @@ TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/4104690164,
+                                                       /*checksum=*/4104690164,
                                                        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
@@ -394,7 +379,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV1Fails, "116059
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*checksum=*/0,
                                                        SorterChecksumVersion::v1};
 
     ASSERT_TRUE(iterator.more());
@@ -423,7 +408,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "116059
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*checksum=*/0,
                                                        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
@@ -449,7 +434,7 @@ TEST_P(ContainerIteratorTest, EmptyIteratorHasZeroChecksum) {
                                                        /*start=*/0,
                                                        /*end=*/1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*checksum=*/0,
                                                        ContainerIteratorTest::GetParam()};
 }
 
@@ -583,6 +568,73 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
     EXPECT_EQ(this->sorterTracker.bytesSpilled.load(), 16);
 }
 
+/**
+ * Runs over element types of differing serialized width, so a reported write size has to track the
+ * entries actually written rather than any fixed value.
+ */
+template <typename Element>
+class SortedContainerWriterElementTypedTest : public SortedContainerWriterTest {};
+
+using ContainerElementTypes = testing::Types<ContainerElementWrapper<char>,
+                                             ContainerElementWrapper<int16_t>,
+                                             ContainerElementWrapper<int32_t>,
+                                             ContainerElementWrapper<int64_t>>;
+TYPED_TEST_SUITE(SortedContainerWriterElementTypedTest, ContainerElementTypes);
+
+TYPED_TEST(SortedContainerWriterElementTypedTest,
+           AddAlreadySortedWrapperReportsBytesInsideNestedWriteUnitOfWork) {
+    using Element = TypeParam;
+
+    auto opCtx = this->makeOperationContext();
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(opCtx.get()));
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(
+        std::make_shared<Ident>(str::stream() << "bytes_written_test_" << sizeof(Element)));
+    SortOptions opts;
+    const int64_t startingKey = 11;
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
+    SortedContainerWriter<Element, Element> writer(
+        *opCtx,
+        ru,
+        container,
+        stats,
+        opts,
+        startingKey,
+        sorter::kLatestChecksumVersion,
+        typename SortedContainerWriter<Element, Element>::Settings{});
+
+    const Element k1{1};
+    const Element v1{2};
+    const Element k2{3};
+    const Element v2{4};
+
+    BufBuilder expected;
+    k1.serializeForSorter(expected);
+    v1.serializeForSorter(expected);
+    const int64_t entrySize = expected.len();
+    ASSERT_EQ(entrySize, 2 * static_cast<int64_t>(sizeof(typename Element::ElementType)));
+
+    // mergeSpills() calls addAlreadySortedWrapper() from inside an enclosing unit of work, so the
+    // writer's own unit of work is nested and its onCommit handlers do not run until this outer one
+    // commits. The reported size must be available as soon as the call returns.
+    {
+        WriteUnitOfWork wuow{opCtx.get()};
+        EXPECT_EQ(writer.addAlreadySortedWrapper(k1, v1).bytesWritten, entrySize);
+        EXPECT_EQ(writer.addAlreadySortedWrapper(k2, v2).bytesWritten, entrySize);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(stats.bytesSpilled(), 2 * entrySize);
+    EXPECT_EQ(stats.numSpilledEntries(), 2);
+
+    this->template exhaustIterators<Element, Element>(writer);
+}
+
 TEST_F(SortedContainerWriterTest, StatsUpdatedOnCommit) {
     auto opCtx = makeOperationContext();
     auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(
@@ -712,7 +764,27 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
     }
 }
 
-TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSerialization) {
+enum class ContainerWriterMode {
+    Single,
+    Batched,
+};
+
+std::ostream& operator<<(std::ostream& os, ContainerWriterMode mode) {
+    switch (mode) {
+        case ContainerWriterMode::Single:
+            return os << "Single";
+        case ContainerWriterMode::Batched:
+            return os << "Batched";
+    }
+    MONGO_UNREACHABLE_TASSERT(11605901);
+}
+
+class SortedContainerWriterModeParameterizedTest
+    : public SortedContainerWriterTest,
+      public testing::WithParamInterface<ContainerWriterMode> {};
+
+TEST_P(SortedContainerWriterModeParameterizedTest,
+       ContainerWriterStoresEmptyValueForZeroLengthSerialization) {
     auto opCtx = makeOperationContext();
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
     auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
@@ -734,16 +806,33 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
         startingKey,
         sorter::kLatestChecksumVersion,
         SortedContainerWriter<NullValue, NullValue>::Settings{});
-    writer.addAlreadySorted(NullValue{}, NullValue{});
 
-    ASSERT_EQ(container.entries().size(), 1U);
-    EXPECT_EQ(container.entries()[0].first, startingKey);
-    EXPECT_TRUE(container.entries()[0].second.empty());
+    const std::vector<std::pair<NullValue, NullValue>> entries(3);
+    switch (GetParam()) {
+        case ContainerWriterMode::Single:
+            for (auto& [k, v] : entries) {
+                writer.addAlreadySorted(k, v);
+            }
+            break;
+        case ContainerWriterMode::Batched: {
+            const auto result =
+                writer.addAlreadySortedBatch(entries, std::numeric_limits<int64_t>::max());
+            EXPECT_EQ(result.kvPairsWritten, static_cast<int64_t>(entries.size()));
+            EXPECT_EQ(result.bytesWritten, 0);
+            break;
+        }
+    }
+
+    ASSERT_EQ(container.entries().size(), entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        EXPECT_EQ(container.entries()[i].first, startingKey + static_cast<int64_t>(i));
+        EXPECT_TRUE(container.entries()[i].second.empty());
+    }
 
     exhaustIterators<NullValue, NullValue>(writer);
 }
 
-TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) {
+TEST_P(SortedContainerWriterModeParameterizedTest, ContainerWriterAllowsNullValueWithNonNullKey) {
     auto opCtx = makeOperationContext();
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
     auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
@@ -766,19 +855,40 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
         sorter::kLatestChecksumVersion,
         SortedContainerWriter<IntWrapper, NullValue>::Settings{});
 
-    const IntWrapper key{123};
-    writer.addAlreadySorted(key, NullValue{});
+    const std::vector<std::pair<IntWrapper, NullValue>> entries{{IntWrapper{123}, NullValue{}},
+                                                                {IntWrapper{124}, NullValue{}},
+                                                                {IntWrapper{125}, NullValue{}}};
+    switch (GetParam()) {
+        case ContainerWriterMode::Single:
+            for (auto& [k, v] : entries) {
+                writer.addAlreadySorted(k, v);
+            }
+            break;
+        case ContainerWriterMode::Batched: {
+            auto result =
+                writer.addAlreadySortedBatch(entries, std::numeric_limits<int64_t>::max());
+            EXPECT_EQ(result.kvPairsWritten, static_cast<int64_t>(entries.size()));
+            break;
+        }
+    }
 
-    ASSERT_EQ(container.entries().size(), 1U);
-    EXPECT_EQ(container.entries()[0].first, startingKey);
+    ASSERT_EQ(container.entries().size(), entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        EXPECT_EQ(container.entries()[i].first, startingKey + static_cast<int64_t>(i));
 
-    BufBuilder expected;
-    key.serializeForSorter(expected);
-    NullValue{}.serializeForSorter(expected);
-    EXPECT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
+        BufBuilder expected;
+        entries[i].first.serializeForSorter(expected);
+        entries[i].second.serializeForSorter(expected);
+        EXPECT_EQ(container.entries()[i].second, std::string(expected.buf(), expected.len()));
+    }
 
     exhaustIterators<IntWrapper, NullValue>(writer);
 }
+
+INSTANTIATE_TEST_SUITE_P(NullValueSorterWrites,
+                         SortedContainerWriterModeParameterizedTest,
+                         testing::Values(ContainerWriterMode::Single, ContainerWriterMode::Batched),
+                         testing::PrintToStringParamName{});
 
 class ContainerBasedSpillerTest : public ServiceContextMongoDTest,
                                   public testing::WithParamInterface<std::tuple<int64_t, int64_t>> {
@@ -811,7 +921,8 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats stats{nullptr};
-    int64_t spilled = 0;
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    auto& callbacksRef = *callbacks;
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
@@ -820,13 +931,17 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         stats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        {.onSpill =
-             [&spiller, &spilled] {
-                 EXPECT_EQ(spiller.iterators().size(), ++spilled);
-             }},
+        std::move(callbacks),
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
+
+    EXPECT_CALL(callbacksRef, preSpill).Times(2);
+    EXPECT_CALL(callbacksRef, postSpill).Times(2);
+    int spilled = 0;
+    EXPECT_CALL(callbacksRef, onSpill).Times(2).WillRepeatedly([&]() {
+        EXPECT_EQ(spiller.iterators().size(), ++spilled);
+    });
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
     std::span span{data};
@@ -838,7 +953,6 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
                   Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
                   span.subspan(2, 2));
 
-    EXPECT_EQ(spilled, 2);
     ASSERT_EQ(spiller.iterators().size(), 2);
     auto it1 = spiller.iterators()[0];
     auto it2 = spiller.iterators()[1];
@@ -854,6 +968,59 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     EXPECT_EQ(it2->next().first, 125);
 }
 
+TEST_P(ContainerBasedSpillerTest, SpillWritesAllEntriesAcrossMultipleBatches) {
+    auto opCtx = makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(opCtx.get()))
+        ->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container{
+        std::make_shared<Ident>(ident::generateNewInternalIdent("multi_batch_spill"sv))};
+    SorterContainerStats stats{nullptr};
+    using Settings = Spiller<IntWrapper, IntWrapper, IWComparator>::Settings;
+
+    ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator> spiller{
+        *opCtx,
+        ru,
+        container,
+        stats,
+        boost::none,
+        sorter::kLatestChecksumVersion,
+        nullptr,
+        batchSize(),
+        batchBytes(),
+        testSpillingMinAvailableDiskSpaceBytes};
+
+    // Enough entries that every (batchSize, batchBytes) combination needs many passes through the
+    // subspan loop. The count is coprime with every batchSize under test, so the final batch is
+    // always a short remainder rather than a full one.
+    static constexpr int kNumEntries = 101;
+    std::vector<std::pair<IntWrapper, IntWrapper>> data;
+    data.reserve(kNumEntries);
+    for (int i = 0; i < kNumEntries; ++i) {
+        data.push_back({IntWrapper{i * 10}, IntWrapper{-i * 10}});
+    }
+
+    spiller.spill(SortOptions{}, Settings{}, std::span{data});
+
+    ASSERT_EQ(container.entries().size(), static_cast<size_t>(kNumEntries));
+    EXPECT_EQ(stats.numSpilledEntries(), kNumEntries);
+    const int64_t firstKey = container.entries()[0].first;
+    for (size_t i = 0; i < container.entries().size(); ++i) {
+        EXPECT_EQ(container.entries()[i].first, firstKey + static_cast<int64_t>(i));
+    }
+
+    ASSERT_EQ(spiller.iterators().size(), 1U);
+    auto it = spiller.iterators()[0];
+    for (int i = 0; i < kNumEntries; ++i) {
+        ASSERT_TRUE(it->more());
+        auto [key, val] = it->next();
+        EXPECT_EQ(key, i * 10);
+        EXPECT_EQ(val, -i * 10);
+    }
+    EXPECT_FALSE(it->more());
+}
+
 TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     auto opCtx = makeOperationContext();
 
@@ -865,7 +1032,6 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
-    int64_t spilled = 0;
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
@@ -874,10 +1040,12 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        {.onSpill =
-             [&spilled] {
-                 ++spilled;
-             }},
+        [&] {
+            auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+            // 3 spills plus 2 merge passes
+            EXPECT_CALL(*callbacks, onSpill).Times(5);
+            return callbacks;
+        }(),
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -907,7 +1075,6 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     auto& iterators = spiller.iterators();
     EXPECT_EQ(iterators.size(), 2);
     EXPECT_EQ(container.entries().size(), data.size());
-    EXPECT_EQ(spilled, 3 + 2);  // 3 spills and 2 merge passes
 
     ASSERT_TRUE(iterators[0]->more());
     EXPECT_EQ(iterators[0]->next().first, 50);
@@ -935,7 +1102,18 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     const auto identStr = ident::generateNewInternalIdent("container_spill"sv);
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
-    int64_t spilled = 0;
+
+    std::pair<IntWrapper, NullValue> data[] = {{50, {}},
+                                               {100, {}},
+                                               {75, {}},
+                                               {125, {}},
+                                               {120, {}},
+                                               {115, {}},
+                                               {110, {}},
+                                               {150, {}},
+                                               {175, {}},
+                                               {105, {}}};
+    std::span span{data};
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
@@ -944,27 +1122,18 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        {.onSpill =
-             [&spilled] {
-                 ++spilled;
-             }},
+        [&] {
+            auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+            // One spill per element plus 8 merge passes
+            EXPECT_CALL(*callbacks, onSpill).Times(span.size() + 8);
+            return callbacks;
+        }(),
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
 
-    std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}},
-                                                       {100, {}},
-                                                       {75, {}},
-                                                       {125, {}},
-                                                       {120, {}},
-                                                       {115, {}},
-                                                       {110, {}},
-                                                       {150, {}},
-                                                       {175, {}},
-                                                       {105, {}}};
-    std::span<std::pair<IntWrapper, NullValue>> span{data};
 
-    for (size_t i = 0; i < data.size(); ++i) {
+    for (size_t i = 0; i < span.size(); ++i) {
         spiller.spill(SortOptions{},
                       Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
                       span.subspan(i, 1));
@@ -980,8 +1149,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
 
     auto& iterators = spiller.iterators();
     EXPECT_EQ(iterators.size(), 3);
-    EXPECT_EQ(container.entries().size(), data.size());
-    EXPECT_EQ(spilled, data.size() + 8);  // data.size() spills and 8 merge passes
+    EXPECT_EQ(container.entries().size(), span.size());
 
     ASSERT_TRUE(iterators[0]->more());
     EXPECT_EQ(iterators[0]->next().first, 50);
@@ -1023,6 +1191,9 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsOnSpillSeesCompleteIteratorView) {
     SorterContainerStats containerStats{nullptr};
     std::vector<std::vector<std::pair<int64_t, int64_t>>> snapshots;
 
+    auto callbacks = std::make_unique<SpillerCallbackMock>();
+    auto& callbacksRef = *callbacks;
+
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
         *shard_role_details::getRecoveryUnit(opCtx.get()),
@@ -1030,18 +1201,19 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsOnSpillSeesCompleteIteratorView) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        {.onSpill =
-             [&spiller, &snapshots]() {
-                 std::vector<std::pair<int64_t, int64_t>> snapshot;
-                 for (const auto& it : spiller.iterators()) {
-                     auto range = it->getRange();
-                     snapshot.emplace_back(range.getStart(), range.getEnd());
-                 }
-                 snapshots.push_back(std::move(snapshot));
-             }},
+        std::move(callbacks),
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
+
+    EXPECT_CALL(callbacksRef, onSpill).WillRepeatedly([&] {
+        std::vector<std::pair<int64_t, int64_t>> snapshot;
+        for (const auto& it : spiller.iterators()) {
+            auto range = it->getRange();
+            snapshot.emplace_back(range.getStart(), range.getEnd());
+        }
+        snapshots.push_back(std::move(snapshot));
+    });
 
     // Five single-element spills so each starting iterator covers exactly one container key.
     std::vector<std::pair<IntWrapper, NullValue>> data{
@@ -1130,7 +1302,7 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
             stats,
             ns.dbName(),
             sorter::kLatestChecksumVersion,
-            ContainerBasedSpiller<IntWrapper, NullValue, IWComparator>::SpillCallbacks{},
+            nullptr,
             batchSize(),
             batchBytes(),
             testSpillingMinAvailableDiskSpaceBytes};
@@ -1160,7 +1332,7 @@ TEST_P(ContainerBasedSpillerTest, SpillerWithStartingKeyPreservesExistingEntries
             stats,
             boost::none,
             sorter::kLatestChecksumVersion,
-            ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>::SpillCallbacks{},
+            nullptr,
             batchSize(),
             batchBytes(),
             testSpillingMinAvailableDiskSpaceBytes};
@@ -1195,8 +1367,13 @@ TEST_F(SortedContainerWriterTest, GetSortedIteratorReadsRange) {
     using KV = std::pair<IntWrapper, IntWrapper>;
     using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
 
-    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
-        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(*opCtx,
+                                                          ru,
+                                                          container,
+                                                          stats,
+                                                          /*currKey=*/1,
+                                                          boost::none,
+                                                          sorter::kLatestChecksumVersion);
 
     std::vector<KV> entries = {{10, 1}, {20, 2}, {30, 3}, {40, 4}, {50, 5}};
     SortOptions opts;
@@ -1231,8 +1408,13 @@ TEST_F(SortedContainerWriterTest, ReconstructPartiallyConsumedIterator) {
     using KV = std::pair<IntWrapper, IntWrapper>;
     using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
 
-    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
-        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(*opCtx,
+                                                          ru,
+                                                          container,
+                                                          stats,
+                                                          /*currKey=*/1,
+                                                          boost::none,
+                                                          sorter::kLatestChecksumVersion);
 
     std::vector<KV> entries = {{10, 1}, {20, 2}, {30, 3}, {40, 4}, {50, 5}};
     SortOptions opts;
@@ -1284,8 +1466,13 @@ TEST_F(SortedContainerWriterTest, MergeIteratorReconstructsAllKeysAcrossRanges) 
     using KV = std::pair<IntWrapper, IntWrapper>;
     using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
 
-    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
-        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(*opCtx,
+                                                          ru,
+                                                          container,
+                                                          stats,
+                                                          /*currKey=*/1,
+                                                          boost::none,
+                                                          sorter::kLatestChecksumVersion);
 
     // Three sorted ranges chosen so the merge interleaves all three (no range is fully drained
     // before another starts) at the time we persist mid-merge.
@@ -1372,8 +1559,13 @@ TEST_F(SortedContainerWriterTest, ReconstructPartiallyExhaustedIterator) {
     using KV = std::pair<IntWrapper, IntWrapper>;
     using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
 
-    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
-        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(*opCtx,
+                                                          ru,
+                                                          container,
+                                                          stats,
+                                                          /*currKey=*/1,
+                                                          boost::none,
+                                                          sorter::kLatestChecksumVersion);
 
     std::vector<KV> entries = {{10, 1}, {20, 2}, {30, 3}};
     SortOptions opts;
@@ -1404,66 +1596,10 @@ TEST_F(SortedContainerWriterTest, ReconstructPartiallyExhaustedIterator) {
     EXPECT_FALSE(reconstructed->more());
 }
 
-TEST(ContainerIteratorTest, RecoverCursorAfterAbandoningSnapshot) {
-    auto harnessHelper = newRecordStoreHarnessHelper();
-    auto rs = harnessHelper->newRecordStore("test.container",
-                                            RecordStore::Options{.keyFormat = KeyFormat::Long});
-    auto& container =
-        std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
-
-    auto opCtx = harnessHelper->newOperationContext();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
-
-    const std::vector<std::pair<IntWrapper, IntWrapper>> data = {
-        {1, 1},
-        {2, 2},
-        {3, 3},
-        {4, 4},
-        {5, 5},
-    };
-
-    SorterChecksumCalculator checksumCalc{sorter::kLatestChecksumVersion};
-    {
-        StorageWriteTransaction txn(ru);
-        int64_t containerKey = 1;
-        for (auto& [k, v] : data) {
-            BufBuilder buf;
-            k.serializeForSorter(buf);
-            v.serializeForSorter(buf);
-            ASSERT_OK(container.insert(ru,
-                                       containerKey++,
-                                       {buf.buf(), static_cast<size_t>(buf.len())},
-                                       container::ExistingKeyPolicy::reject));
-            checksumCalc.addData(buf.buf(), buf.len());
-        }
-        txn.commit();
-    }
-
-    ContainerIterator<IntWrapper, IntWrapper> iter(container.getCursor(ru),
-                                                   /*start=*/1,
-                                                   /*end=*/static_cast<int64_t>(data.size()) + 1,
-                                                   Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                   checksumCalc.checksum(),
-                                                   sorter::kLatestChecksumVersion);
-
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{1, 1}));
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{2, 2}));
-
-    // Testing that we can recover from this.
-    ru.abandonSnapshot();
-
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{3, 3}));
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{4, 4}));
-    ASSERT_TRUE(iter.more());
-    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
-    EXPECT_FALSE(iter.more());
-}
-
-class ContainerBasedSpillerWriteConflictTest : public ServiceContextMongoDTest {
+/**
+ * Provides a storage-backed IntegerKeyedContainer.
+ */
+class StorageBackedContainerTest : public ServiceContextMongoDTest {
 public:
     // TODO (SERVER-116165): Remove.
     unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
@@ -1498,12 +1634,65 @@ protected:
         return *shard_role_details::getRecoveryUnit(_opCtx.get());
     }
 
-    SorterContainerStats stats{nullptr};
-
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<RecordStore> _tempRS;
     IntegerKeyedContainer* _container = nullptr;
+};
+
+TEST_F(StorageBackedContainerTest, RecoverCursorAfterAbandoningSnapshot) {
+    const std::vector<std::pair<IntWrapper, IntWrapper>> data = {
+        {1, 1},
+        {2, 2},
+        {3, 3},
+        {4, 4},
+        {5, 5},
+    };
+
+    SorterChecksumCalculator checksumCalc{sorter::kLatestChecksumVersion};
+    {
+        StorageWriteTransaction txn(ru());
+        int64_t containerKey = 1;
+        for (auto& [k, v] : data) {
+            BufBuilder buf;
+            k.serializeForSorter(buf);
+            v.serializeForSorter(buf);
+            ASSERT_OK(container().insert(ru(),
+                                         containerKey++,
+                                         {buf.buf(), static_cast<size_t>(buf.len())},
+                                         container::ExistingKeyPolicy::reject));
+            checksumCalc.addData(buf.buf(), buf.len());
+        }
+        txn.commit();
+    }
+
+    ContainerIterator<IntWrapper, IntWrapper> iter(container().getCursor(ru()),
+                                                   /*start=*/1,
+                                                   /*end=*/static_cast<int64_t>(data.size()) + 1,
+                                                   Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                   checksumCalc.checksum(),
+                                                   sorter::kLatestChecksumVersion);
+
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{1, 1}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{2, 2}));
+
+    // Testing that we can recover from this.
+    ru().abandonSnapshot();
+
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{3, 3}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{4, 4}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
+    EXPECT_FALSE(iter.more());
+}
+
+class ContainerBasedSpillerWriteConflictTest : public StorageBackedContainerTest {
+protected:
+    SorterContainerStats stats{nullptr};
 };
 
 // Calls mergeSpills() with a deterministic WCE on the first merged write. Exercises SERVER-126155
@@ -1516,7 +1705,7 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsSurvivesCursorResetUnd
         stats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>::SpillCallbacks{},
+        nullptr,
         /*batchSize=*/1,
         /*batchBytes=*/std::numeric_limits<int64_t>::max(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -1566,28 +1755,8 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsSurvivesCursorResetUnd
 TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
     using Spiller = ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>;
 
-    std::unique_ptr<FailPointEnableBlock> writeConflict;
-    FailPoint::EntryCountT wceCountBefore = 0;
-    // onSpill fires on every spill() call as well as inside mergeSpills(); only arm during the
-    // merge so the nTimes=1 token is consumed by mergeSpills_remove rather than a later spill's
-    // insert.
-    bool armOnNextOnSpill = false;
-
-    Spiller::SpillCallbacks callbacks{
-        .onSpill =
-            [&] {
-                if (!armOnNextOnSpill) {
-                    return;
-                }
-                // _runOnSpill() fires between mergeSpills_insert and mergeSpills_remove. Arming
-                // here guarantees the nTimes=1 token is consumed by the first remove() call.
-                writeConflict = enableWriteConflictForWrites(
-                    FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
-                wceCountBefore = writeConflict->initialTimesEntered();
-                armOnNextOnSpill = false;
-            },
-    };
-
+    auto callbacks = std::make_unique<SpillerCallbackMock>();
+    auto& callbacksRef = *callbacks;
     Spiller spiller{*opCtx(),
                     ru(),
                     container(),
@@ -1599,7 +1768,7 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
                     /*batchBytes=*/std::numeric_limits<int64_t>::max(),
                     testSpillingMinAvailableDiskSpaceBytes};
 
-    std::vector<std::pair<IntWrapper, IntWrapper>> data{
+    std::pair<IntWrapper, IntWrapper> data[] = {
         {10, 100},
         {40, 400},  // range 0
         {20, 200},
@@ -1615,7 +1784,13 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
     ASSERT_EQ(spiller.iterators().size(), 3);
 
     SorterStats sorterStats{nullptr};
-    armOnNextOnSpill = true;
+
+    std::unique_ptr<FailPointEnableBlock> writeConflict;
+    EXPECT_CALL(callbacksRef, onSpill).WillOnce([&] {
+        writeConflict = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    });
+
     spiller.mergeSpills(SortOptions{},
                         SpillerSettings{},
                         sorterStats,
@@ -1623,11 +1798,11 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
                         /*numTargetedSpills=*/1,
                         /*maxSpillsPerMerge=*/3);
 
-    ASSERT_EQ((*writeConflict)->waitForTimesEntered(wceCountBefore + 1), wceCountBefore + 1)
+    ASSERT_EQ(writeConflict->waitForOneNewEntry(), 1)
         << "Expected exactly one WCE to fire inside mergeSpills_remove";
 
     ASSERT_EQ(spiller.iterators().size(), 1);
-    const std::vector<std::pair<int, int>> expected{
+    const std::pair<int, int> expected[] = {
         {10, 100}, {20, 200}, {30, 300}, {40, 400}, {50, 500}, {60, 600}};
     auto it = spiller.iterators()[0];
     for (const auto& [k, v] : expected) {
@@ -1660,8 +1835,7 @@ protected:
             std::make_shared<Ident>(ident::generateNewInternalIdent("container_spill"sv)));
     }
 
-    auto makeContainerBasedSpiller(
-        ContainerBasedSpiller<IntWrapper, NullValue, IWComparator>::SpillCallbacks callbacks = {}) {
+    auto makeContainerBasedSpiller(std::unique_ptr<SpillCallbacks> callbacks = nullptr) {
         return ContainerBasedSpiller<IntWrapper, NullValue, IWComparator>{
             *_opCtx,
             *shard_role_details::getRecoveryUnit(_opCtx.get()),
@@ -1684,18 +1858,18 @@ TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillerEntryPo
     int preCount = 0;
     int onCount = 0;
     int postCount = 0;
-    auto spiller = makeContainerBasedSpiller({.preSpill = [&] { ++preCount; },
-                                              .onSpill = [&] { ++onCount; },
-                                              .postSpill =
-                                                  [&] {
-                                                      ++postCount;
-                                                  }});
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    EXPECT_CALL(*callbacks, preSpill).WillRepeatedly([&] { ++preCount; });
+    EXPECT_CALL(*callbacks, onSpill).WillRepeatedly([&] { ++onCount; });
+    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([&] { ++postCount; });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
 
     std::vector<std::pair<IntWrapper, NullValue>> data{
         {10, {}}, {20, {}}, {30, {}}, {40, {}}, {50, {}}, {60, {}}};
     std::span span{data};
 
-    // Each spill() call invokes pre/on/post exactly once around its internal writeConflictRetry.
+    // Each spill() call invokes pre/on/post exactly once around its internal
+    // writeConflictRetry.
     spiller.spill(SortOptions{}, Settings{}, span.subspan(0, 2));
     EXPECT_EQ(preCount, 1);
     EXPECT_EQ(onCount, 1);
@@ -1715,6 +1889,60 @@ TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillerEntryPo
     EXPECT_EQ(postCount, 3);
 }
 
+TEST_F(ContainerBasedSpillerCallbackTest, OnChunkWrittenFiresPerChunkWithBytesWritten) {
+    std::vector<int64_t> chunks;
+    int preCount = 0;
+    // kBatchSize is 4, so a 10-entry spill is written as chunks of 4, 4 and 2.
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    EXPECT_CALL(*callbacks, preSpill).WillRepeatedly([&] { ++preCount; });
+    EXPECT_CALL(*callbacks, onChunkWritten).WillRepeatedly([&](int64_t bytes) {
+        chunks.push_back(bytes);
+    });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    std::vector<std::pair<IntWrapper, NullValue>> data;
+    for (int i = 0; i < 10; ++i) {
+        data.emplace_back(IntWrapper{i}, NullValue{});
+    }
+    spiller.spill(SortOptions{}, Settings{}, std::span{data});
+
+    // Several chunks per spill, i.e. the callback is a finer-grained hook than preSpill/postSpill.
+    ASSERT_EQ(preCount, 1);
+    ASSERT_EQ(chunks.size(), 3);
+    for (auto bytes : chunks) {
+        ASSERT_GT(bytes, 0);
+    }
+    // The reported bytes account for exactly what was spilled, so a caller charging a rate limiter
+    // per chunk bills the same total as the container stats report.
+    ASSERT_EQ(std::accumulate(chunks.begin(), chunks.end(), int64_t{0}),
+              _containerStats.bytesSpilled());
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, OnChunkWrittenFiresWhileMergingSpills) {
+    std::vector<int64_t> chunks;
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    EXPECT_CALL(*callbacks, onChunkWritten).WillRepeatedly([&](int64_t bytes) {
+        chunks.push_back(bytes);
+    });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{
+        {10, {}}, {20, {}}, {30, {}}, {40, {}}, {50, {}}, {60, {}}};
+    std::span span{data};
+    spiller.spill(SortOptions{}, Settings{}, span.subspan(0, 3));
+    spiller.spill(SortOptions{}, Settings{}, span.subspan(3, 3));
+    const auto chunksFromSpills = chunks.size();
+    ASSERT_GT(chunksFromSpills, 0);
+
+    // Merges rewrite the merged ranges into the container, so they are paced too.
+    SorterStats sorterStats{nullptr};
+    spiller.mergeSpills(SortOptions{}, Settings{}, sorterStats, IWComparator(ASC), 1, 2);
+    ASSERT_GT(chunks.size(), chunksFromSpills);
+    for (auto bytes : chunks) {
+        ASSERT_GT(bytes, 0);
+    }
+}
+
 TEST_F(ContainerBasedSpillerCallbackTest, NoCallbacksLeavesSpillsAsNoOps) {
     // No callbacks passed: spill() must route through the no-op branch for each.
     auto spiller = makeContainerBasedSpiller();
@@ -1724,24 +1952,87 @@ TEST_F(ContainerBasedSpillerCallbackTest, NoCallbacksLeavesSpillsAsNoOps) {
 }
 
 TEST_F(ContainerBasedSpillerCallbackTest, PostSpillFiresEvenWhenOnSpillThrows) {
-    int preCount = 0;
-    int postCount = 0;
-    // onSpill throws after the writeConflictRetry succeeds, proving the postSpill guard runs even
-    // when the exception propagates out of spill().
-    auto spiller = makeContainerBasedSpiller(
-        {.preSpill = [&] { ++preCount; },
-         .onSpill = [] { uasserted(ErrorCodes::InternalError, "simulated post-spill failure"); },
-         .postSpill =
-             [&] {
-                 ++postCount;
-             }});
+    // onSpill throws after the writeConflictRetry succeeds, proving the postSpill guard runs
+    // even when the exception propagates out of spill().
+    auto callbacks = std::make_unique<SpillerCallbackMock>();
+    EXPECT_CALL(*callbacks, preSpill).Times(1);
+    EXPECT_CALL(*callbacks, onSpill).WillOnce([] {
+        uasserted(ErrorCodes::InternalError, "simulated post-spill failure");
+    });
+    EXPECT_CALL(*callbacks, postSpill).Times(1);
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    std::pair<IntWrapper, NullValue> data[] = {{10, {}}, {20, {}}};
+    ASSERT_THROWS_CODE(spiller.spill({}, {}, data), DBException, ErrorCodes::InternalError);
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, OnSpillBatchFiresAtBatchBoundaries) {
+    auto callbacks = std::make_unique<SpillerCallbackMock>();
+    auto& callbacksRef = *callbacks;
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    // kBatchSize is 4, so spilling batches the 10 pairs as 4, 4, 2. onSpillBatch fires at each
+    // interior batch boundary, so twice, and never mid-batch or after the trailing batch.
+    EXPECT_CALL(callbacksRef, onSpillBatch).Times(2).WillRepeatedly([&] {
+        // Interior batch boundaries don't produce an iterator
+        EXPECT_TRUE(spiller.iterators().empty());
+    });
+
+    std::pair<IntWrapper, NullValue> data[] = {{10, {}},
+                                               {20, {}},
+                                               {30, {}},
+                                               {40, {}},
+                                               {50, {}},
+                                               {60, {}},
+                                               {70, {}},
+                                               {80, {}},
+                                               {90, {}},
+                                               {100, {}}};
+    spiller.spill(SortOptions{}, Settings{}, data);
+    EXPECT_EQ(1, spiller.iterators().size());
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, OnSpillBatchDoesNotFireForSingleBatch) {
+    // Fewer pairs than kBatchSize means there is no batch boundary, so onSpillBatch never fires.
+    auto callbacks = std::make_unique<SpillerCallbackMock>();
+    EXPECT_CALL(*callbacks, onSpillBatch).Times(0);
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
+    spiller.spill(SortOptions{}, Settings{}, std::span{data});
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, PostSpillThrowingWhileUnwindingDoesNotMaskOriginalError) {
+    // A postSpill that restores a plan executor throws when the operation was interrupted, which is
+    // exactly what happens when a throttled spill is killed mid-wait. The original error must still
+    // be what escapes, and a second exception must not escape the scope guard.
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    EXPECT_CALL(*callbacks, onSpill).WillRepeatedly([] {
+        uasserted(ErrorCodes::InternalError, "simulated post-spill failure");
+    });
+    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([] {
+        uasserted(ErrorCodes::Interrupted, "simulated interrupted cursor restore");
+    });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
     ASSERT_THROWS_CODE(spiller.spill(SortOptions{}, Settings{}, std::span{data}),
                        DBException,
                        ErrorCodes::InternalError);
-    EXPECT_EQ(preCount, 1);
-    EXPECT_EQ(postCount, 1);
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, PostSpillFailureOnSuccessPathPropagates) {
+    // With no exception in flight, a postSpill failure is a real error and must reach the caller.
+    auto callbacks = std::make_unique<testing::NiceMock<SpillerCallbackMock>>();
+    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([] {
+        uasserted(ErrorCodes::Interrupted, "simulated cursor restore failure");
+    });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
+    ASSERT_THROWS_CODE(spiller.spill(SortOptions{}, Settings{}, std::span{data}),
+                       DBException,
+                       ErrorCodes::Interrupted);
 }
 
 TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillWithHeap) {
@@ -1749,11 +2040,11 @@ TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillWithHeap)
     int postCount = 0;
     // spillWithHeap wraps with preSpill/postSpill but does not fire onSpill (matching existing
     // semantics; onSpill is reserved for spill() and mergeSpills()).
-    auto spiller = makeContainerBasedSpiller({.preSpill = [&] { ++preCount; },
-                                              .postSpill =
-                                                  [&] {
-                                                      ++postCount;
-                                                  }});
+    auto callbacks = std::make_unique<SpillerCallbackMock>();
+    EXPECT_CALL(*callbacks, preSpill).WillRepeatedly([&] { ++preCount; });
+    EXPECT_CALL(*callbacks, onSpill).Times(0);
+    EXPECT_CALL(*callbacks, postSpill).WillRepeatedly([&] { ++postCount; });
+    auto spiller = makeContainerBasedSpiller(std::move(callbacks));
 
     IWComparator comp{ASC};
     std::priority_queue<std::pair<IntWrapper, NullValue>,

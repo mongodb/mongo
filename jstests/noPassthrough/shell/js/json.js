@@ -707,6 +707,31 @@ describe("tojsonObject", () => {
         );
     });
 
+    it("escapes field names so the output survives eval()", () => {
+        // tojson's contract is that eval() of its output reproduces the input. Field names are
+        // arbitrary strings and a collection name can hold a backslash or a quote, so they have
+        // to be escaped like values are.
+        const keys = [
+            String.raw`^\Q\|\E`,
+            String.raw`index_bounds_pipe/^\|b/`,
+            'quote"inside',
+            "tab\there",
+            "back\\slash",
+        ];
+        for (const key of keys) {
+            const obj = {[key]: 1};
+            const roundTripped = eval("(" + tojsonObject(obj, "", true) + ")");
+            assert.eq(
+                Object.keys(roundTripped),
+                [key],
+                `field name ${JSON.stringify(key)} did not survive tojson -> eval`,
+            );
+        }
+
+        // A field name needing no escaping is unchanged.
+        assert.eq(tojsonObject({"foo.bar": 1}, "", true), '{ "foo.bar" : 1 }');
+    });
+
     it("multiple fields", () => {
         assert.eq(
             tojsonObject({a: 1, b: 2}, "", false),

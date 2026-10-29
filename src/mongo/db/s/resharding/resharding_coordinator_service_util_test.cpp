@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 
 #include "mongo/base/error_codes.h"
@@ -250,8 +224,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
         BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                  NamespaceString::createNamespaceString_forTest("db.foo"),
                  SerializationContext::stateDefault())),
-        false  // multi
-    );
+        /*multiDelete=*/false);
     BSONObjBuilder resultOneDelete;
     resultOneDelete.append("n", 1);
     ASSERT_DOES_NOT_THROW(
@@ -278,8 +251,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
                  SerializationContext::stateDefault())),
         BSON("key" << 1 << "value" << 2),
         false,  // upsert
-        false   // multi
-    );
+        /*multi=*/false);
     BSONObjBuilder resultOneUpdate;
     resultOneUpdate.append("n", 1);
     ASSERT_DOES_NOT_THROW(
@@ -402,13 +374,15 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
     BSONObj collation = BSON("locale" << "simple");
 
     auto collType = createTempReshardingCollectionType(
-        opCtx.get(), coordinatorDoc, chunkVersion, collation, /*isUnsplittable*/ boost::none);
+        opCtx.get(), coordinatorDoc, chunkVersion, collation, /*isUnsplittable=*/boost::none);
 
     ASSERT_FALSE(collType.getReshardingFields().has_value());
 }
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        SkipReshardingFieldsWritesForCoordinatorHonorsPinnedLastLTSVersionContext) {
+    GTEST_SKIP() << "Test doesn't support FCV 9.1 (TODO: SERVER-132935)";
+
     ReshardingCoordinatorDocument coordinatorDoc;
     // (Generic FCV reference): pin the operation to last-LTS so the InitNoRefresh feature flag,
     // which is gated on the latest FCV, evaluates to false and the legacy write path is
@@ -486,6 +460,9 @@ protected:
         recipientCtx.setState(RecipientStateEnum::kUnused);
         doc.setRecipientShards({RecipientShardEntry(ShardId("recipient0"), recipientCtx)});
 
+        doc.setAuthoritativeMetadataAccessLevel(
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+
         return doc;
     }
 };
@@ -525,11 +502,11 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,
                               CollectionPlacement(10, 1));
 
     auto collType = createTempReshardingCollectionType(
-        opCtx.get(), doc, chunkVersion, BSONObj() /* collation */, boost::none);
+        opCtx.get(), doc, chunkVersion, /*collation=*/BSONObj(), boost::none);
 
     const bool expectMigrationsBlocked =
         isOrdinaryReshardCollection(GetParam()) || isRewriteCollection(GetParam());
-    ASSERT_EQ(collType.getAllowMigrations(), !expectMigrationsBlocked);
+    ASSERT_EQ(collType.getAllowChunkOperations(), !expectMigrationsBlocked);
 }
 
 TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,

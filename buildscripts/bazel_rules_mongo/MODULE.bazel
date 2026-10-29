@@ -1,0 +1,31 @@
+"""bazel_rules_mongo: shared Bazel rules used by the mongo repo (codeowners,
+engflow auth, misc utils).
+
+This is consumed by //MODULE.bazel via `bazel_dep` + `local_path_override`.
+It is a module rather than a plain `local_repository` so that the outer
+MODULE.bazel can `use_extension` on the codeowners extensions defined here —
+`use_extension` labels are resolved during module-graph resolution, which is
+before any `use_repo_rule` repo exists.
+"""
+
+module(
+    name = "bazel_rules_mongo",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_pycross", version = "0.8.3")
+bazel_dep(name = "rules_python", version = "2.2.0")
+
+# `lock_repos` is a single global extension instance: the root module's
+# `lock_import.import_uv(repo = "pypi", lock_file = "//:uv.lock", ...)` tags
+# populate it, and any module in the graph can then `use_repo` the resulting
+# hub. That is how this module's BUILD files reach the outer workspace's
+# uv.lock without declaring a second lock or a second hub.
+lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
+use_repo(lock_repos, "pypi")
+
+codeowners_validator_extension = use_extension("//codeowners:codeowners_validator.bzl", "codeowners_validator_extension")
+use_repo(codeowners_validator_extension, "codeowners_validator")
+
+codeowners_binary_extension = use_extension("//codeowners:codeowners_binary.bzl", "codeowners_binary_extension")
+use_repo(codeowners_binary_extension, "codeowners_binary")

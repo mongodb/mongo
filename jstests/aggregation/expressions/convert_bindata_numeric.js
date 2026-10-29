@@ -88,10 +88,11 @@ const conversionTestDocs = [
     {
         _id: 8,
         input: NumberLong(200),
-        target: {type: "binData", subtype: 4},
+        // Subtype 4 requires exactly 16 bytes, so an 8 byte long can only target subtype 0.
+        target: {type: "binData", subtype: 0},
         byteOrder: "big",
         // Hex: "0x00000000000000c8", 8 byte long
-        expected: BinData(4, "AAAAAAAAAMg="),
+        expected: BinData(0, "AAAAAAAAAMg="),
     },
     // Test conversions from double to BinData
     {
@@ -105,10 +106,10 @@ const conversionTestDocs = [
     {
         _id: 10,
         input: 813245678.98,
-        target: {type: "binData", subtype: 3},
+        target: {type: "binData", subtype: 0},
         byteOrder: "big",
         // Hex: "0x41C83C92777D70A4", 8 byte double
-        expected: BinData(3, "Qcg8knd9cKQ="),
+        expected: BinData(0, "Qcg8knd9cKQ="),
     },
     // Test conversions from BinData to double
     {

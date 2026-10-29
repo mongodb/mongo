@@ -1,5 +1,6 @@
 Checks:          '-*,
                   boost-use-to-string,
+                  bugprone-argument-comment,
                   bugprone-assert-side-effect,
                   bugprone-bad-signal-to-kill-thread,
                   bugprone-bool-pointer-implicit-conversion,

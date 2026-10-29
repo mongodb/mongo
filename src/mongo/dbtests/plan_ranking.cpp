@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 /**
  * This file tests db/query/plan_ranker.cpp and db/query/multi_plan_runner.cpp.
@@ -53,6 +27,7 @@
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration_test_util.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/service_context.h"
@@ -60,6 +35,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -117,6 +93,55 @@ public:
     }
 
     /**
+     * Assert that CBR could not estimate some of the plans for 'cq' (e.g. a zero input cardinality
+     * estimate on an index scan) and handed them to the multi-planner along with the best of the
+     * plans it did estimate, if any, which must match 'expectedBestEstimablePlan'. The plans CBR
+     * estimated but did not pick are rejected. Returns the number of plans handed to the
+     * multi-planner.
+     */
+    size_t assertCBRDefersInestimablePlans(
+        CanonicalQuery* cq,
+        size_t numDocs,
+        const boost::optional<std::string>& expectedBestEstimablePlan) {
+        std::vector<size_t> originalPlanHashes;
+        auto solutions = plan_ranking_tests::cbrRankPlans(cq,
+                                                          numDocs,
+                                                          _opCtx,
+                                                          N,
+                                                          nss,
+                                                          SamplingCEMethodEnum::kRandom,
+                                                          boost::none /* numChunks */,
+                                                          boost::none /* times */,
+                                                          originalPlanHashes);
+        ASSERT_GREATER_THAN(solutions.size(), 1U);
+        ASSERT_LESS_THAN_OR_EQUALS(solutions.size(), originalPlanHashes.size());
+
+        // The best estimable plan, if any, comes first.
+        auto deferred = solutions.begin();
+        if (expectedBestEstimablePlan) {
+            ASSERT(QueryPlannerTestLib::solutionMatches(*expectedBestEstimablePlan,
+                                                        solutions.front()->root())
+                       .isOK())
+                << solutions.front()->toString();
+            ++deferred;
+        } else {
+            ASSERT_EQ(originalPlanHashes.size(), solutions.size());
+        }
+
+        // The inestimable plans follow in the planner's original order. Multi-planner score
+        // ordering is stable for ties, so reordering them would let the winner depend on the
+        // order in which CBR happened to estimate the plans.
+        auto original = originalPlanHashes.begin();
+        for (; deferred != solutions.end(); ++deferred) {
+            original = std::find(original, originalPlanHashes.end(), (*deferred)->hash());
+            ASSERT(original != originalPlanHashes.end())
+                << "inestimable plan out of order: " << (*deferred)->toString();
+            ++original;
+        }
+        return solutions.size();
+    }
+
+    /**
      * Was a backup plan picked during the ranking process?
      */
     bool hasBackupPlan() const {
@@ -145,8 +170,8 @@ private:
     std::vector<std::unique_ptr<QuerySolution>> _bestCBRPlan;
 
     // Run all tests with hash-based intersection enabled.
-    unittest::ServerParameterGuard _enableHashIntersection{
-        "internalQueryPlannerEnableHashIntersection", true};
+    QueryKnobGuardForTest _enableHashIntersection{
+        &_opCtx, "internalQueryPlannerEnableHashIntersection", true};
 
     // Configure Sampling CE with a large sample
     unittest::ServerParameterGuard _samplingMarginOfError{"samplingMarginOfError", 1.0};
@@ -274,10 +299,10 @@ public:
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrSoln->root()).isOK());
 
         // Turn on the "force intersect" option.
-        unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
-                                                              true};
-        unittest::ServerParameterGuard enableSortIntersection{
-            "internalQueryPlannerEnableSortIndexIntersection", true};
+        QueryKnobGuardForTest forceIntersectionPlans{
+            opCtx(), "internalQueryForceIntersectionPlans", true};
+        QueryKnobGuardForTest enableSortIntersection{
+            opCtx(), "internalQueryPlannerEnableSortIndexIntersection", true};
 
         // And run the same query again.
         findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -327,8 +352,8 @@ public:
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
-                                                              true};
+        QueryKnobGuardForTest forceIntersectionPlans{
+            opCtx(), "internalQueryForceIntersectionPlans", true};
 
         const std::string expectedMPPlan(
             "{fetch: {node: {andHash: {nodes: ["
@@ -337,12 +362,14 @@ public:
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedMPPlan, soln->root()).isOK());
 
-        // In fact, the optimal plan is
-        const std::string expectedCBRPlan(
-            "{fetch: {filter: {a:1}, node: "
-            "{ixscan: {filter: null, pattern: {b:1}}}}}");
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(expectedCBRPlan, cbrSoln->root()).isOK());
+        // 'b > 1' matches nothing, so the plan scanning {b: 1} alone sees a zero input estimate
+        // (ZeroCEEstimate). CBR hands it to the multi-planner along with the best estimable plan.
+        // Plans with index intersection are always estimated, so that is the intersection plan.
+        assertCBRDefersInestimablePlans(
+            cq.get(),
+            N,
+            std::string{"{fetch: {node: {andHash: {nodes: ["
+                        "{ixscan: {pattern: {b: 1}}}, {ixscan: {pattern: {a: 1}}}]}}}}"});
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -457,11 +484,9 @@ public:
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
 
-        // Both plans see CE = 0 from the sampler. CardinalityEstimator::clampZeroEstimates
-        // floors approximate zeros to kMinCE and the CostEstimator's additive per-stage minimum
-        // breaks the resulting tie in favour of the structurally cheaper covered plan.
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // Both plans see CE = 0 from the sampler on their scan nodes (ZeroCEEstimate), so CBR
+        // estimates neither and hands both to the multi-planner.
+        assertCBRDefersInestimablePlans(cq.get(), N, boost::none /* expectedBestEstimablePlan */);
     }
 };
 
@@ -493,8 +518,14 @@ public:
         const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // 'a = N+1' matches nothing, so the plan scanning {a: 1} alone sees a zero input estimate
+        // (ZeroCEEstimate). CBR hands it to the multi-planner along with the best estimable plan.
+        // Plans with index intersection are always estimated, so that is the intersection plan.
+        assertCBRDefersInestimablePlans(
+            cq.get(),
+            N,
+            std::string{"{fetch: {node: {andHash: {nodes: ["
+                        "{ixscan: {pattern: {b: 1}}}, {ixscan: {pattern: {a: 1}}}]}}}}"});
     }
 };
 
@@ -530,8 +561,14 @@ public:
         const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        auto cbrSoln = bestCBRPlan(cq.get(), N);
-        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // 'a >= N+1' matches nothing, so the plan scanning {a: 1} alone sees a zero input estimate
+        // (ZeroCEEstimate). CBR hands it to the multi-planner along with the best estimable plan.
+        // Plans with index intersection are always estimated, so that is the intersection plan.
+        assertCBRDefersInestimablePlans(
+            cq.get(),
+            N,
+            std::string{"{fetch: {node: {andHash: {nodes: ["
+                        "{ixscan: {pattern: {b: 1}}}, {ixscan: {pattern: {a: 1}}}]}}}}"});
     }
 };
 

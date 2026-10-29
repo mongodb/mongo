@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
@@ -33,7 +7,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/sharding_environment/shard_handle.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/modules.h"
@@ -49,15 +23,15 @@ namespace mongo {
  * There is one instance of this object per service context on each shard node (primary or
  * secondary). It sits at the top of the hierarchy of the Shard Role runtime-authoritative caches
  * (the subordinate ones being the DatabaseShardingState and CollectionShardingState) and contains
- * global information about the shardedness of the current process, such as its ShardHandle (shard
- * name and optional UUID), clusterId, and cluster role.
+ * global information about the shardedness of the current process, such as its shardId and the
+ * clusterId to which it belongs.
  *
  * SYNCHRONISATION: This class can only be initialised once and if 'setInitialized' is called, it
  * never gets destroyed or uninitialized. Because of this it does not require external
  * synchronisation. Initialisation is driven from outside (specifically
  * ShardingInitializationMongoD, which should be its only caller).
  */
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingState {
+class [[MONGO_MOD_NEEDS_REPLACEMENT]] ShardingState {
     ShardingState(const ShardingState&) = delete;
     ShardingState& operator=(const ShardingState&) = delete;
 
@@ -131,17 +105,6 @@ public:
     ShardId shardId() const;
 
     /**
-     * Returns the shard handle for this node, including its UUID when available.
-     */
-    ShardHandle shardHandle() const;
-
-    /**
-     * Returns a ShardRef representation of this node (based on the currently installed ShardHandle
-     * value).
-     */
-    ShardRef asShardRef(OperationContext* opCtx) const;
-
-    /**
      * Returns the cluster id of the cluster to which this node belongs.
      */
     OID clusterId() const;
@@ -151,15 +114,8 @@ public:
      * successful initialization or an error. This method may only be called once for the lifetime
      * of the object.
      */
-    void setRecoveryCompleted(RecoveredClusterRole role, boost::optional<UUID> shardUuidOnRecovery);
+    void setRecoveryCompleted(RecoveredClusterRole role);
     void setRecoveryFailed(Status failedStatus);
-
-    /**
-     * Updates the shard handle for this node. This method is expected to only be called within the
-     * context of an FCV transition to update the current value of the shard's UUID.
-     * TODO SERVER-126212 Remove this method once 9.0 becomes last LTS.
-     */
-    void onShardHandleUpdate(ShardHandle newShardHandle);
 
     /**
      * Returns the severity the direct shard operation warnings should be logged at. This is
@@ -181,25 +137,11 @@ private:
     Promise<RecoveredClusterRole> _promise;
     Future<RecoveredClusterRole> _future;
 
-    // Mutex protecting the current shard handle. This field is not part of the RecoveredClusterRole
-    // because its value can be updated during an FCV transition, whereas the rest of the fields in
-    // RecoveredClusterRole are expected to be constant after recovery completes. This mutex is
-    // expected to be lightly contended since updates only happen during FCV transitions and reads
-    // happen outside of any critical path.
-    // TODO SERVER-126212 remove this mutex.
-    mutable WriteRarelyRWMutex _shardHandleMutex;
-    // TODO SERVER-126212 embed the shardHandleField into RecoveredClusterRole (removing its shardId
-    // field).
-    ShardHandle _shardHandle;
-
     // Log severity suppressor for direct connection checks
     logv2::SeveritySuppressor _directConnectionLogSuppressor{
         Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
     logv2::SeveritySuppressor _directShardDDLLogSuppressor{
         Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
-
-    // TODO SERVER-126212 Remove this getter (and access _future instead).
-    const ShardHandle& _getShardHandleInstance(const WriteRarelyRWMutex::ReadLock&) const;
 };
 
 }  // namespace mongo

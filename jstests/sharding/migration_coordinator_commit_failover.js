@@ -3,9 +3,6 @@
  * migration coordinator document but before deleting it.
  */
 
-// This test induces failovers on shards.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 import {runMoveChunkMakeDonorStepDownAfterFailpoint} from "jstests/sharding/migration_coordinator_failover_include.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

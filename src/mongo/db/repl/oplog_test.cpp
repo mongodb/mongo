@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/repl/oplog.h"
 
@@ -47,7 +21,9 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -150,7 +126,9 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    const int32_t hash = 0x5EAF9B27;
+    const std::int64_t hash = 8622950721748590592LL;
+    SingleOpSizeMetadata expectedMetadata;
+    expectedMetadata.setH(hash);
 
     MutableOplogEntry op;
     op.setOpType(repl::OpTypeEnum::kInsert);
@@ -158,7 +136,7 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
     op.setUuid(UUID::gen());
     op.setObject(BSON("_id" << 0 << "x" << 10));
     op.setWallClockTime(Date_t::now());
-    op.setDocHash(hash);
+    op.setSizeMetadata(OplogEntrySizeMetadata{expectedMetadata});
 
     {
         auto acq = acquireCollection(opCtx.get(),
@@ -170,8 +148,12 @@ TEST_F(OplogTest, HashSingleOpRoundTrip) {
         wunit.commit();
     }
 
-    const auto entry = _getSingleOplogEntry(opCtx.get());
-    const auto parsedDocHash = entry.getDocHash();
+    const OplogEntry entry = _getSingleOplogEntry(opCtx.get());
+    const auto& sizeMetadata = entry.getSizeMetadata();
+    ASSERT_TRUE(sizeMetadata.has_value());
+    ASSERT_TRUE(std::holds_alternative<SingleOpSizeMetadata>(*sizeMetadata));
+    const boost::optional<std::int64_t> parsedDocHash =
+        std::get<SingleOpSizeMetadata>(*sizeMetadata).getH();
     ASSERT_TRUE(parsedDocHash.has_value());
     EXPECT_EQ(hash, *parsedDocHash);
 }
@@ -435,7 +417,7 @@ public:
                                               _nss.dbName(),
                                               boost::none,
                                               BSON("create" << _nss.coll() << "uuid" << uuid),
-                                              /*allowRenameOutOfTheWay*/ false));
+                                              /*allowRenameOutOfTheWay=*/false));
 
         auto replCoord = ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -555,6 +537,12 @@ public:
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         return true;
     }
+    bool shouldUseReplicatedFastCount() const override {
+        return false;
+    }
+    std::string getMainWiredTigerTableSettings() const override {
+        return "";
+    }
 };
 
 class ApplyCreateWithRecordIdsReplicatedTest : public OplogTest {
@@ -635,6 +623,67 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
                                  MODE_X);
     ASSERT_OK(applyCommand_inlock(
         opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
+}
+
+// ------------------------------------------------------------------
+// Test: oplog writes notify the injected CheckpointSchedulePolicy
+// ------------------------------------------------------------------
+
+class MockCheckpointPolicy : public CheckpointSchedulePolicy {
+public:
+    void waitUntilReady(std::unique_lock<std::mutex>&,
+                        stdx::condition_variable&,
+                        std::function<bool()>) override {}
+    bool accumulateOplogBytes(int64_t bytes) override {
+        _accumulated.fetchAndAdd(bytes);
+        return false;
+    }
+    int64_t accumulated() const {
+        return _accumulated.load();
+    }
+
+private:
+    AtomicWord<int64_t> _accumulated{0};
+};
+
+// Fixture that installs a spy checkpointer and removes it before teardown.
+// The checkpointer is never started, so stopStorageControls must not see it.
+class OplogCheckpointNotificationTest : public OplogTest {
+protected:
+    void tearDown() override {
+        Checkpointer::set(getServiceContext(), nullptr);
+        OplogTest::tearDown();
+    }
+};
+
+TEST_F(OplogCheckpointNotificationTest, OplogWriteNotifiesCheckpointPolicy) {
+    auto opCtx = cc().makeOperationContext();
+
+    MockCheckpointPolicy* mock = nullptr;
+    {
+        auto owned = std::make_unique<MockCheckpointPolicy>();
+        mock = owned.get();
+        Checkpointer::set(getServiceContext(), std::make_unique<Checkpointer>(std::move(owned)));
+    }
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    int64_t expectedBytes = 0;
+    {
+        MutableOplogEntry entry;
+        entry.setOpType(repl::OpTypeEnum::kNoop);
+        entry.setNss(nss);
+        entry.setObject(BSON("msg" << "test"));
+        entry.setWallClockTime(Date_t::now());
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        logOp(opCtx.get(), &entry);
+        wunit.commit();
+        // logOp fills in all oplog fields (ts, t, v, op, ns, …); toBSON() reflects the full
+        // serialized size that notifyOplogWrite accumulates.
+        expectedBytes = entry.toBSON().objsize();
+    }
+
+    ASSERT_GTE(mock->accumulated(), expectedBytes);
 }
 
 }  // namespace

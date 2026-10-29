@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -108,7 +82,7 @@ public:
         SlotType slot;
 
         auto expected = value::makeNewString(longString);
-        value::ValueGuard expectedGuard(expected);
+        value::TagValueOwned expectedOwned = value::TagValueOwned::fromRaw(expected);
 
         setValue(slot, true, value::makeNewString(longString));
 
@@ -146,7 +120,7 @@ private:
     }
 
     void verifyValue(SlotType& slot, TypedValue p) {
-        value::ValueGuard guard(p);
+        value::TagValueOwned pOwned = value::TagValueOwned::fromRaw(p);
         ASSERT_THAT(slot.getViewOfValue(), ValueEq(p));
     }
 
@@ -239,6 +213,78 @@ public:
 };
 TEST_F(BSONObjValueAccessorTest, Tests) {
     runTests();
+}
+
+namespace {
+void resetToView(value::BSONObjValueAccessor& slot, const BSONObj& obj) {
+    slot.reset(value::TagValueView{value::TypeTags::bsonObject,
+                                   value::bitcastFrom<const char*>(obj.objdata())});
+}
+
+const char* viewData(const value::BSONObjValueAccessor& slot) {
+    return value::bitcastTo<const char*>(slot.getViewOfValue().value);
+}
+}  // namespace
+
+TEST_F(BSONObjValueAccessorTest, RepeatedGetOwnedBSONObjSharesOneCopy) {
+    BSONObj obj = BSON("a" << 1 << "b" << "str");
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj first = slot.getOwnedBSONObj();
+    BSONObj second = slot.getOwnedBSONObj();
+    ASSERT_TRUE(first.isOwned());
+    ASSERT_NE(first.objdata(), obj.objdata());
+    ASSERT_EQ(first.objdata(), second.objdata());
+    ASSERT_BSONOBJ_EQ(first, obj);
+}
+
+TEST_F(BSONObjValueAccessorTest, MakeOwnedAfterSharingDoesNotCopy) {
+    BSONObj obj = BSON("a" << 1);
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj shared = slot.getOwnedBSONObj();
+    const char* before = viewData(slot);
+    ASSERT_EQ(before, shared.objdata());
+
+    slot.makeOwned();
+    ASSERT_EQ(viewData(slot), before);
+    ASSERT_EQ(slot.getOwnedBSONObj().objdata(), shared.objdata());
+}
+
+TEST_F(BSONObjValueAccessorTest, ResetAfterSharingKeepsConsumerCopyValid) {
+    BSONObj obj = BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2 << 3));
+    BSONObj other = BSON("c" << 2);
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj shared = slot.getOwnedBSONObj();
+    resetToView(slot, other);
+    ASSERT_EQ(viewData(slot), other.objdata());
+
+    ASSERT_TRUE(shared.isOwned());
+    ASSERT_BSONOBJ_EQ(shared, obj);
+
+    // The next record gets its own copy rather than the previous record's buffer.
+    BSONObj next = slot.getOwnedBSONObj();
+    ASSERT_NE(next.objdata(), shared.objdata());
+    ASSERT_BSONOBJ_EQ(next, other);
+}
+
+TEST_F(BSONObjValueAccessorTest, CopyOrMoveValueAfterSharingCopies) {
+    BSONObj obj = BSON("a" << 1);
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj shared = slot.getOwnedBSONObj();
+    auto copy = slot.copyOrMoveValue();
+    ASSERT_EQ(copy.tag(), value::TypeTags::bsonObject);
+    ASSERT_NE(value::bitcastTo<const char*>(copy.value()), shared.objdata());
+    ASSERT_BSONOBJ_EQ(BSONObj(value::bitcastTo<const char*>(copy.value())), obj);
+
+    // The accessor still holds the shared buffer.
+    ASSERT_EQ(viewData(slot), shared.objdata());
 }
 
 }  // namespace mongo::sbe

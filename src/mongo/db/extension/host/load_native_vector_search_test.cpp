@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/bson/json.h"
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
@@ -59,8 +33,6 @@ protected:
 
     static void SetUpTestSuite() {
         unittest::ServerParameterGuard extensionsAPIController{"featureFlagExtensionsAPI", true};
-        unittest::ServerParameterGuard vecSimilarityExprController{
-            "featureFlagVectorSimilarityExpressions", true};
         ExtensionLoader::load(
             "nativeVectorSearch",
             test_util::makeEmptyExtensionConfig(kNativeVectorSearchLibExtensionPath));
@@ -146,8 +118,6 @@ protected:
 
 private:
     unittest::ServerParameterGuard _extensionsAPIController{"featureFlagExtensionsAPI", true};
-    unittest::ServerParameterGuard _vecSimilarityExprController{
-        "featureFlagVectorSimilarityExpressions", true};
     unittest::ServerParameterGuard _signatureValidationController{
         "featureFlagExtensionsApiSignatureValidation", true};
 };
@@ -155,7 +125,7 @@ private:
 // Tests successful desugar extension loading and verifies stage registration works in pipelines.
 // The libnative_vector_search_mongo_extension.so adds a "$nativeVectorSearch" stage for testing.
 TEST_F(LoadNativeVectorSearchTest, ExtensionRegistration) {
-    auto stageSpec = makeNativeVectorSearchSpec(true /*filter*/);
+    auto stageSpec = makeNativeVectorSearchSpec(/*filter=*/true);
 
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
     ASSERT_EQ(sourceList.size(), 1U);
@@ -178,7 +148,7 @@ TEST_F(LoadNativeVectorSearchTest, ExtensionRegistration) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ true);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/true);
     expectLiteParsedNames(nss,
                           spec,
                           {
@@ -191,7 +161,7 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithFilter) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false);
     expectLiteParsedNames(nss,
                           spec,
                           {
@@ -202,8 +172,28 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
                           });
 }
 
+// An expanded extension stage (LiteParsedExpanded) must report the timeseries ban,
+// matching its LiteParsedExpandable sibling and the full-parsed DocumentSourceExtensionOptimizable.
+// Otherwise the ban is silently skipped when the stage is validated in its desugared form.
+TEST_F(LoadNativeVectorSearchTest, ExpandedExtensionStageCannotRunOnTimeseries) {
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false);
+    auto liteParsed = LiteParsedDocumentSource::parse(nss, spec);
+    auto* lpExpandable =
+        dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpandable*>(liteParsed.get());
+    ASSERT_TRUE(lpExpandable);
+
+    // The first expanded stage ($vectorSearchMetrics) is the extension AST-node stage, represented
+    // by a LiteParsedExpanded.
+    const auto& expanded = lpExpandable->getExpandedPipeline();
+    ASSERT_FALSE(expanded.empty());
+    auto* lpExpanded = dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
+        expanded.front().get());
+    ASSERT_TRUE(lpExpanded);
+    ASSERT_FALSE(lpExpanded->constraints().canRunOnTimeseries);
+}
+
 TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ true);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 5U);
 
@@ -218,7 +208,7 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);  // default = "cosine"
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false);  // default = "cosine"
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -232,7 +222,7 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, CosineNormalizedSerializesAsExpected) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false, "cosine", /*normalize*/ true);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false, "cosine", /*normalize=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
     expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "cosine" } })JSON");
@@ -244,7 +234,7 @@ TEST_F(LoadNativeVectorSearchTest, CosineNormalizedSerializesAsExpected) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, DotProductNoNormalizeSerializesAsExpected) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "dotProduct");
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false, /*metric=*/"dotProduct");
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -258,7 +248,7 @@ TEST_F(LoadNativeVectorSearchTest, DotProductNoNormalizeSerializesAsExpected) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, DotProductNormalizedSerializesAsExpected) {
-    auto spec = makeNativeVectorSearchSpec(false, "dotProduct", /*normalize*/ true);
+    auto spec = makeNativeVectorSearchSpec(false, "dotProduct", /*normalize=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -272,7 +262,7 @@ TEST_F(LoadNativeVectorSearchTest, DotProductNormalizedSerializesAsExpected) {
 
 TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNoNormalizeUsesMultiplyNegation) {
     auto spec =
-        makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "euclidean", /*normalize*/ false);
+        makeNativeVectorSearchSpec(/*filter=*/false, /*metric=*/"euclidean", /*normalize=*/false);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -290,7 +280,7 @@ TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNoNormalizeUsesMul
 
 TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNormalizedSerializesAsExpected) {
     auto spec =
-        makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "euclidean", /*normalize*/ true);
+        makeNativeVectorSearchSpec(/*filter=*/false, /*metric=*/"euclidean", /*normalize=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -305,9 +295,9 @@ TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNormalizedSerializ
 
 TEST_F(LoadNativeVectorSearchTest, NumCandidatesDoesNotAffectExpansionOrSerialization) {
     auto base = makeNativeVectorSearchSpec(
-        /*filter*/ false, "cosine", /*normalize*/ false, /*numCandidates*/ boost::none);
+        /*filter=*/false, "cosine", /*normalize=*/false, /*numCandidates=*/boost::none);
     auto with = makeNativeVectorSearchSpec(
-        /*filter*/ false, "cosine", /*normalize*/ false, /*numCandidates*/ 5);
+        /*filter=*/false, "cosine", /*normalize=*/false, /*numCandidates=*/5);
 
     auto a = desugarAndSerialize(expCtx, base);
     auto b = desugarAndSerialize(expCtx, with);

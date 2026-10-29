@@ -28,14 +28,13 @@
 
 from helper import copy_wiredtiger_home
 from suite_subprocess import suite_subprocess
-import os
+import os, signal
 import wiredtiger, wttest
 
 # JIRA WT-3590: if writing table data fails during close then tables
 # that were updated within the same transaction could get out of sync with
 # each other.
 @wttest.skip_for_hook("nonstandalone", "fails for nonstandalone")
-@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
     '''Test closing/reopening/recovering tables when writes fail'''
 
@@ -105,11 +104,12 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
                 pass
 
         # Expect an error and messages, so turn off stderr checking.
+        self.ignoreStdoutPattern('log_slot_destroy: failed to write slot')
         with self.expectedStderrPattern(''):
-            try:
-                self.close_conn()
-            except wiredtiger.WiredTigerError:
-                self.conn = None
+            # The simulated write failure has to reach the application. Without it this test
+            # verifies recovery of a database that closed cleanly.
+            self.assertRaises(wiredtiger.WiredTigerError, self.close_conn)
+            self.conn = None
 
     def test_bug018(self):
         '''Test closing multiple tables'''
@@ -122,8 +122,16 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.close_conn()
         subdir = 'SUBPROCESS'
-        [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
-            f'{self.test_name}.{self.test_name}.subprocess_bug018')
+        [returncode, new_home_dir] = self.run_subprocess_function(subdir,
+            f'{self.test_name}.{self.test_name}.subprocess_bug018', silent=True)
+
+        # The failed write panics the connection, and a diagnostic build turns that into an abort.
+        # Elsewhere the panic comes back as an error from close, which the subprocess asserts on
+        # before exiting cleanly.
+        if wiredtiger.diagnostic_build():
+            self.assert_crashed(returncode, signal.SIGABRT)
+        else:
+            self.assertEqual(returncode, 0)
 
         # Make a backup for forensics in case something goes wrong.
         backup_dir = 'BACKUP'

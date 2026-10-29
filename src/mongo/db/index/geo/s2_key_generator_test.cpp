@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/index/geo/s2_key_generator.h"
 
@@ -749,5 +723,44 @@ TEST_F(S2KeyGeneratorTest, StrictWindingPolygonInGeometryCollectionRejectsGracef
                                  Ordering::make(BSONObj())),
         DBException,
         ErrorCodes::GeoKeyExtractionFailed);
+}
+
+// Regression test for a null-pointer crash in BigSimplePolygon::GetCapBound(). In a v4 2dsphere
+// index, parseForS2Version() tries GeoJSON first, then falls back to legacy point parsing. When
+// GeoJSON parsing fails (because "coordinates" is a scalar rather than an array), _polygon is left
+// allocated with bigPolygon->_loop == nullptr. If legacy point parsing then succeeds (because the
+// object's first two fields are numeric), both _polygon and _point are set simultaneously.
+// projectInto() branches on _polygon != null and skips projecting _point, so _point->crs stays
+// FLAT. getS2Region() then skips _point (crs != SPHERE) and returns *_polygon->bigPolygon,
+// whose _loop is null — triggering a null dereference in GetCapBound().
+TEST_F(S2KeyGeneratorTest, V4IndexStrictWindingPolygonWithScalarCoordinatesAndLegacyPointFields) {
+    BSONObj keyPattern = fromjson("{loc: '2dsphere'}");
+    BSONObj infoObj = fromjson("{key: {loc: '2dsphere'}, '2dsphereIndexVersion': 4}");
+    S2IndexingParams params;
+    const CollatorInterface* collator = nullptr;
+    index2dsphere::initialize2dsphereParams(infoObj, collator, &params);
+
+    // The document has numeric first-two fields (triggers legacy point fallback in v4),
+    // type Polygon with strict-winding CRS, and a non-array "coordinates" field.
+    BSONObj doc = fromjson(
+        "{loc: {a: 1, b: 2, type: 'Polygon',"
+        " crs: {type: 'name', properties:"
+        "       {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}},"
+        " coordinates: 0}}");
+
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+    // GeoJSON parsing fails (coordinates is not an array), _polygon is reset, legacy point
+    // fallback succeeds on the numeric first-two fields {a:1, b:2} — one key generated.
+    index2dsphere::getS2Keys(allocator,
+                             doc,
+                             keyPattern,
+                             params,
+                             &keys,
+                             &multikeyPaths,
+                             key_string::Version::kLatestVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             Ordering::make(BSONObj()));
+    ASSERT_EQUALS(1U, keys.size());
 }
 }  // namespace

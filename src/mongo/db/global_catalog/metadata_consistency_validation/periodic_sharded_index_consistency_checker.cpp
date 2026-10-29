@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2020-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 
 #include "mongo/db/global_catalog/metadata_consistency_validation/periodic_sharded_index_consistency_checker.h"
@@ -53,7 +27,7 @@
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -96,8 +70,7 @@ PeriodicShardedIndexConsistencyChecker& PeriodicShardedIndexConsistencyChecker::
 
 long long PeriodicShardedIndexConsistencyChecker::getNumShardedCollsWithInconsistentIndexes()
     const {
-    std::lock_guard<std::mutex> lk(_mutex);
-    return _numShardedCollsWithInconsistentIndexes;
+    return _state.load().count();
 }
 
 void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyChecker(
@@ -165,11 +138,8 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
             try {
                 long long numShardedCollsWithInconsistentIndexes = 0;
                 const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-                auto collections =
-                    catalogClient->getShardedCollections(opCtx,
-                                                         DatabaseName::kEmpty,
-                                                         repl::ReadConcernLevel::kLocalReadConcern,
-                                                         {} /*sort*/);
+                auto collections = catalogClient->getShardedCollections(
+                    opCtx, DatabaseName::kEmpty, repl::ReadConcernArgs::kLocal, /*sort=*/{});
 
                 for (const auto& coll : collections) {
                     auto nss = coll.getNss();
@@ -179,6 +149,17 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     // below would currently invariant if one of the targeted shards was the config
                     // server itself.
                     if (nss.isConfigDB()) {
+                        continue;
+                    }
+
+                    // TODO(SERVER-134200): The system.resharding.* can be unaccessible during
+                    // resharding operation, in the window between commit of temporary collection
+                    // placement metadata to config and recipient shard fetching the new placement
+                    // metadata from global catalog. This is a known limitation that can lead to
+                    // transient errors and create noise. Therefore until the flaw of resharding
+                    // pipeline is fixed, the validation is skipped for temporary resharding
+                    // collections.
+                    if (nss.isTemporaryReshardingCollection()) {
                         continue;
                     }
 
@@ -197,7 +178,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         ClusterAggregate::Namespaces{nss, nss},
                         request,
                         PrivilegeVector(),
-                        boost::none /* verbosity */,
+                        /*verbosity=*/boost::none,
                         &responseBuilder,
                         "pipeline to detect inconsistent sharded indexes"sv);
 
@@ -221,11 +202,14 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 // Update the count if this node is still primary. This is necessary because a
                 // stepdown may complete while this job is running and the count should always be
                 // zero on a non-primary node.
-                std::lock_guard<std::mutex> lk(_mutex);
-                if (_isPrimary) {
-                    _numShardedCollsWithInconsistentIndexes =
-                        numShardedCollsWithInconsistentIndexes;
-                }
+                State expectedState = _state.load();
+                State newState;
+                do {
+                    if (!expectedState.isPrimary()) {
+                        return;
+                    }
+                    newState = State(/*isPrimary=*/true, numShardedCollsWithInconsistentIndexes);
+                } while (!_state.compareAndSwap(&expectedState, newState));
             } catch (DBException& ex) {
                 LOGV2(22052,
                       "Error while checking sharded index consistency",
@@ -238,15 +222,10 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
     _shardedIndexConsistencyChecker.start();
 }
 
-void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesShardkeyChecker(
+void PeriodicShardedIndexConsistencyChecker::_launchShardedTimeseriesShardkeyChecker(
     WithLock, ServiceContext* serviceContext) {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
-
-    if (_shardedTimeseriesShardkeyChecker.isValid()) {
-        _shardedTimeseriesShardkeyChecker.resume();
-        return;
-    }
 
     PeriodicRunner::PeriodicJob job(
         "PeriodicShardedTimeseriesShardkeyChecker",
@@ -278,32 +257,27 @@ void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesSha
 
 void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceContext) {
     std::lock_guard<std::mutex> lk(_mutex);
-    if (!_isPrimary) {
-        _isPrimary = true;
-        if (!_shardedIndexConsistencyChecker.isValid()) {
-            // If this is the first time we're stepping up, start a thread to periodically check
-            // index consistency.
-            _launchShardedIndexConsistencyChecker(lk, serviceContext);
-        } else {
-            // If we're stepping up again after having stepped down, just resume the existing task.
-            _shardedIndexConsistencyChecker.resume();
-        }
-        _launchOrResumeShardedTimeseriesShardkeyChecker(lk, serviceContext);
+    auto state = _state.load();
+    if (!state.isPrimary()) {
+        _state.store(State(/*isPrimary=*/true, state.count()));
+
+        _launchShardedIndexConsistencyChecker(lk, serviceContext);
+        _launchShardedTimeseriesShardkeyChecker(lk, serviceContext);
     }
 }
 
 void PeriodicShardedIndexConsistencyChecker::onStepDown() {
     std::lock_guard<std::mutex> lk(_mutex);
-    if (_isPrimary) {
-        _isPrimary = false;
-        invariant(_shardedIndexConsistencyChecker.isValid());
-        // Note pausing a periodic job does not wait for the job to complete if it is concurrently
-        // running, otherwise this would deadlock when the index check tries to lock _mutex when
-        // updating the inconsistent index count.
-        _shardedIndexConsistencyChecker.pause();
-        _shardedTimeseriesShardkeyChecker.pause();
+    auto state = _state.load();
+    if (state.isPrimary()) {
         // Clear the counter to prevent a secondary from reporting an out-of-date count.
-        _numShardedCollsWithInconsistentIndexes = 0;
+        _state.store(State(/*isPrimary=*/false, 0));
+
+        invariant(_shardedIndexConsistencyChecker.isValid());
+        _shardedIndexConsistencyChecker.stop();
+        if (_shardedTimeseriesShardkeyChecker.isValid()) {
+            _shardedTimeseriesShardkeyChecker.stop();
+        }
     }
 }
 

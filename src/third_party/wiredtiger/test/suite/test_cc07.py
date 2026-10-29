@@ -26,11 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import wttest
 from test_cc01 import test_cc_base
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
 # Verify checkpoint cleanup removes the obsolete time window from the pages.
+@wttest.skip_for_hook("disagg", "checkpoint cleanup does not remove obsolete time windows for disaggregated tables")
 class test_cc07(test_cc_base):
     conn_config_common = 'cache_size=1GB,statistics=(all),statistics_log=(json,wait=1,on_close=true)'
 
@@ -47,9 +49,6 @@ class test_cc07(test_cc_base):
     scenarios = make_scenarios(conn_config_values)
 
     def test_cc07(self):
-        if self.runningHook('tiered'):
-            self.skipTest("checkpoint cleanup cannot remove obsolete pages from tiered tables")
-
         create_params = 'key_format=i,value_format=S'
         nrows = 1000
         uri = 'table:cc07'

@@ -246,9 +246,9 @@ class test_config04(wttest.WiredTigerTestCase):
             '/eviction updates target must be lower than the eviction updates trigger/')
 
     def test_invalid_config(self):
-        # The tiered/disagg hook modifies the wiredtiger_open configuration string.
+        # The disagg hook modifies the wiredtiger_open configuration string.
         # This may influence what particular error message occurs in certain cases.
-        classic = not (self.runningHook('tiered') or self.runningHook('disagg'))
+        classic = not self.runningHook('disagg')
         match_any = '/./'
 
         unbalanced_brackets = (['}', '{', '{}}', '(]}', '(create=]}', '(create='],

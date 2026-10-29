@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/commands.h"
 
@@ -54,7 +28,8 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/otel/traces/sampler/sampler.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -63,13 +38,16 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -82,9 +60,6 @@ namespace mongo {
 namespace {
 using namespace std::literals::string_view_literals;
 
-
-using service_context_test::RoleOverride;
-using service_context_test::ServerRoleIndex;
 
 TEST(Commands, CommandNameAtom) {
     CommandNameAtom foo("foo"sv), bar("bar"sv), baz("baz"sv), foo2("foo"sv), baz2("baz"sv),
@@ -180,11 +155,39 @@ DEATH_TEST(CommandsDeathTest, appendCommandStatusNoCodeName, "invariant") {
     CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 }
 
+TEST(ParseNamespaceFromCommand, String) {
+    EXPECT_EQ(CommandHelpers::parseNsFromCommand(
+                  DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                  BSON("command" << "coll")),
+              NamespaceString::createNamespaceString_forTest("test.coll"));
+}
+
+TEST(ParseNamespaceFromCommand, Symbol) {
+    BSONObjBuilder builder;
+    builder.appendSymbol("command", "coll");
+    EXPECT_EQ(CommandHelpers::parseNsFromCommand(
+                  DatabaseName::createDatabaseName_forTest(boost::none, "test"), builder.obj()),
+              NamespaceString::createNamespaceString_forTest("test.coll"));
+}
+
+TEST(ParseNamespaceFromCommand, OtherTypes) {
+    auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    EXPECT_EQ(CommandHelpers::parseNsFromCommand(dbName, BSON("command" << 1)),
+              NamespaceString{dbName});
+    EXPECT_EQ(CommandHelpers::parseNsFromCommand(dbName, BSON("command" << BSONObj())),
+              NamespaceString{dbName});
+}
+
 class ParseNsOrUUID : public ServiceContextTest {
 public:
-    ParseNsOrUUID() : opCtxPtr(makeOperationContext()), opCtx(opCtxPtr.get()) {}
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxPtr = makeOperationContext();
+        opCtx = opCtxPtr.get();
+    }
+
     ServiceContext::UniqueOperationContext opCtxPtr;
-    OperationContext* opCtx;
+    OperationContext* opCtx = nullptr;
 };
 
 TEST_F(ParseNsOrUUID, FailWrongType) {
@@ -320,7 +323,9 @@ public:
     }
 
 protected:
-    TypedCommandTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     ClockSourceMock* clockSource() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
@@ -642,21 +647,19 @@ public:
     }
 };
 
-/**
- * Because ServiceContextTestSetup is a virtual base, its constructor happens
- * before an ordinary generated test class constructor can intervene.
- * To get ahead of it, we virtually inherit a `RoleOverride` to run first.
- */
-template <ServerRoleIndex roleIndex>
-class CommandRegistryTest : public virtual RoleOverride<roleIndex>,
-                            public BasicCommandRegistryTest {
+template <ClusterRole::Value role>
+class CommandRegistryTest : public BasicCommandRegistryTest {
 public:
     ClusterRole serverRole() const override {
-        return getClusterRole(roleIndex);
+        return role;
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{role};
     }
 };
 
-using RouterCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::router>;
+using RouterCommandRegistryTest = CommandRegistryTest<ClusterRole::RouterServer>;
 
 TEST_F(RouterCommandRegistryTest, ServicesInit) {
     auto sc = getGlobalServiceContext();
@@ -669,7 +672,33 @@ TEST_F(RouterCommandRegistryTest, ExecutePlanForService) {
     ASSERT_EQ(result.commandTypes, result.fullSet);
 }
 
-using ShardCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shard>;
+/**
+ * Check that all mongos commands are sampled by default, as a proxy for the entry points of sharded
+ * operations.
+ */
+TEST(Commands, AllRouterCommandsSampledByDefault) {
+    auto& sampler = otel::traces::TracingSampler::get();
+
+    auto savedConfig = sampler.getConfig();
+    ScopeGuard restoreConfig([&] {
+        sampler.updateInternalConfig(savedConfig.defaultSpans, savedConfig.perSpanOverrides);
+    });
+    sampler.updateInternalConfig(
+        {.factor = 1.0, .rateLimits = {.refillRate = 1e6, .maxTokens = 1'000'000}}, {});
+
+    auto* registry = getCommandRegistry(ClusterRole::RouterServer);
+
+    std::vector<std::string> checkedCommands;
+    registry->forEachCommand([&](Command* c) {
+        const auto& spanName = c->getTraceSpanName();
+        ASSERT_TRUE(sampler.shouldSample(spanName.getName(), 0))
+            << "command should be sampled: " << c->getName();
+        checkedCommands.push_back(c->getName());
+    });
+    ASSERT_GT(checkedCommands.size(), 0u);
+}
+
+using ShardCommandRegistryTest = CommandRegistryTest<ClusterRole::ShardServer>;
 
 TEST_F(ShardCommandRegistryTest, ServicesInit) {
     auto sc = getGlobalServiceContext();

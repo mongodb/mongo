@@ -1,37 +1,11 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/aggregated_index_usage_tracker.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -64,8 +38,8 @@ class CollectionIndexUsageTracker
 
     // Statistics that are shared among versions of the same logical collection.
     struct CollectionScanStatsStorage : public RefCountable {
-        AtomicWord<unsigned long long> _collectionScans{0};
-        AtomicWord<unsigned long long> _collectionScansNonTailable{0};
+        Atomic<unsigned long long> _collectionScans{0};
+        Atomic<unsigned long long> _collectionScansNonTailable{0};
     };
 
 public:
@@ -94,7 +68,7 @@ public:
         }
 
         // Number of operations that have used this index.
-        AtomicWord<long long> accesses;
+        Atomic<long long> accesses;
 
         // Date/Time that we started tracking index usage.
         Date_t trackerStartTime;
@@ -135,9 +109,9 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    MONGO_MOD_PUBLIC void registerIndex(std::string_view indexName,
-                                        const BSONObj& indexKey,
-                                        const IndexFeatures& features);
+    [[MONGO_MOD_PUBLIC]] void registerIndex(std::string_view indexName,
+                                            const BSONObj& indexKey,
+                                            const IndexFeatures& features);
 
     /**
      * Erase statistics for index 'indexName'. Can be safely called even if indexName is not
@@ -146,7 +120,7 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    MONGO_MOD_PUBLIC void unregisterIndex(std::string_view indexName);
+    [[MONGO_MOD_PUBLIC]] void unregisterIndex(std::string_view indexName);
 
     /**
      * Get the current state of the usage statistics map. This map will only include indexes that

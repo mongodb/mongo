@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2026-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/matcher/doc_validation/constraint_validation_level_upgrade.h"
 
@@ -42,6 +16,9 @@
 #include "mongo/util/uuid.h"
 
 #include <boost/none.hpp>
+
+// All tests use localOnly=true (local aggregate) since CatalogTestFixture does not spin up a
+// sharding environment.
 
 namespace mongo {
 namespace {
@@ -61,11 +38,8 @@ class ConstraintValidationLevelUpgradeTest : public CatalogTestFixture {};
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForNonExistentCollection) {
     const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     auto* opCtx = operationContext();
-    ASSERT_OK(
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx)));
+    ASSERT_OK(noDocumentsViolatingValidator(
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForCollectionWithNoValidator) {
@@ -76,31 +50,8 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForCollectionWithNoValidat
     options.uuid = UUID::gen();
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
 
-    ASSERT_OK(
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx)));
-}
-
-TEST_F(ConstraintValidationLevelUpgradeTest, PropagatesAggregateError) {
-    const auto nss = NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
-    auto* opCtx = operationContext();
-
-    CollectionOptions options;
-    options.validator = fromjson("{a: {$exists: true}}");
-    options.uuid = UUID::gen();
-    ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
-
-    auto injectedStatus = Status{ErrorCodes::InternalError, "injected aggregate failure"};
-    auto status = noDocumentsViolatingValidator(
-        opCtx,
-        nss,
-        PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-        [&](AggregateCommandRequest&, const PrivilegeVector&) -> StatusWith<BSONObj> {
-            return injectedStatus;
-        });
-    ASSERT_EQ(status, injectedStatus);
+    ASSERT_OK(noDocumentsViolatingValidator(
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForEmptyCollectionWithValidator) {
@@ -113,11 +64,8 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKForEmptyCollectionWithVali
 
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
 
-    ASSERT_OK(
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx)));
+    ASSERT_OK(noDocumentsViolatingValidator(
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesValidator) {
@@ -142,7 +90,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesVal
         noDocumentsViolatingValidator(opCtx,
                                       nss,
                                       PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx))
+                                      /*localOnly=*/true)
             .code(),
         12370902);
 }
@@ -165,11 +113,8 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsOKWhenAllDocumentsConformToV
         wuow.commit();
     }
 
-    ASSERT_OK(
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx)));
+    ASSERT_OK(noDocumentsViolatingValidator(
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesJsonSchemaValidator) {
@@ -194,7 +139,7 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ReturnsErrorWhenDocumentViolatesJso
         noDocumentsViolatingValidator(opCtx,
                                       nss,
                                       PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx))
+                                      /*localOnly=*/true)
             .code(),
         12370902);
 }
@@ -220,11 +165,8 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageTruncatesLargeValidator
         wuow.commit();
     }
 
-    auto status =
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx));
+    auto status = noDocumentsViolatingValidator(
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true);
     ASSERT_EQ(status.code(), 12370902);
     ASSERT_STRING_CONTAINS(status.reason(), "First offending document _id: 1");
     ASSERT_STRING_CONTAINS(status.reason(), "<your collection's validator>");
@@ -241,14 +183,9 @@ TEST_F(ConstraintValidationLevelUpgradeTest, SkipsScanWhenCollectionAlreadyAtCon
     options.uuid = UUID::gen();
     ASSERT_OK(createCollection(opCtx, nss, options, boost::none));
 
-    // The injected runAgg must not be called when the collection is already at constraint level.
+    // The aggregate must not be dispatched when the collection is already at constraint level.
     ASSERT_OK(noDocumentsViolatingValidator(
-        opCtx,
-        nss,
-        PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-        [&](AggregateCommandRequest&, const PrivilegeVector&) -> StatusWith<BSONObj> {
-            MONGO_UNREACHABLE;
-        }));
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true));
 }
 
 TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCollectionHint) {
@@ -269,11 +206,8 @@ TEST_F(ConstraintValidationLevelUpgradeTest, ErrorMessageContainsValidatorAndCol
         wuow.commit();
     }
 
-    auto status =
-        noDocumentsViolatingValidator(opCtx,
-                                      nss,
-                                      PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
-                                      makeLocalValidatorScanFn(opCtx));
+    auto status = noDocumentsViolatingValidator(
+        opCtx, nss, PlacementConcern(boost::none, ShardVersion::UNTRACKED()), /*localOnly=*/true);
     ASSERT_EQ(status.code(), 12370902);
     ASSERT_STRING_CONTAINS(status.reason(), "First offending document _id: 1");
     ASSERT_STRING_CONTAINS(status.reason(), "Run db.testcoll.find({\"$nor\": [");

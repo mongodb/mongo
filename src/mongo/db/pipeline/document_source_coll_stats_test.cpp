@@ -1,41 +1,19 @@
-/**
- *    Copyright (C) 2023-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 
+#include "mongo/db/metrics_policy_manager.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_coll_stats_gen.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <cstdint>
+
+#include <gmock/gmock.h>
 
 namespace mongo {
 namespace {
@@ -128,6 +106,121 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
             }
         })",
         redact(*stage));
+}
+
+using ForceFilteredTestParams = std::tuple<boost::optional<bool>,  // forceFiltered
+                                           bool,                   // fromRouter
+                                           bool                    // featureFlagEnabled
+                                           >;
+
+class MetricsPolicyManagerMock : public MetricsPolicyManager {
+public:
+    MOCK_METHOD(bool,
+                requiresFiltering,
+                (OperationContext*, MetricsCategoryEnum, bool),
+                (const, override));
+
+    MOCK_METHOD(const std::vector<std::string>&,
+                getAllowlistPaths,
+                (MetricsCategoryEnum),
+                (const, override));
+
+    MOCK_METHOD(const PathMatcherNode&,
+                getAllowlistMatcher,
+                (MetricsCategoryEnum),
+                (const, override));
+};
+
+class DocumentSourceCollStatsForceFilteredTest
+    : public DocumentSourceCollStatsTest,
+      public ::testing::WithParamInterface<ForceFilteredTestParams> {};
+
+std::string buildForceFilteredTestName(
+    const ::testing::TestParamInfo<ForceFilteredTestParams>& info) {
+    auto [forceFiltered, fromRouter, featureFlagEnabled] = info.param;
+
+    std::string forceFilteredDesc = forceFiltered ? (*forceFiltered ? "true" : "false") : "notSet";
+    return forceFilteredDesc + "_" + (fromRouter ? "fromRouter" : "notFromRouter") + "_" +
+        (featureFlagEnabled ? "flagEnabled" : "flagDisabled");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ForceFiltered,
+    DocumentSourceCollStatsForceFilteredTest,
+    ::testing::Combine(::testing::Values(true, false, boost::none),  // forceFiltered
+                       ::testing::Values(true, false),               // fromRouter
+                       ::testing::Values(true, false)                // featureFlagEnabled
+                       ),
+    buildForceFilteredTestName);
+
+TEST_P(DocumentSourceCollStatsForceFilteredTest, ForceFiltered) {
+    auto [forceFiltered, fromRouter, featureFlagEnabled] = GetParam();
+    bool inRouter = !fromRouter;
+
+    unittest::ServerParameterGuard featureFlag{"featureFlagCollStatsMetricsFiltering",
+                                               featureFlagEnabled};
+
+    if (fromRouter) {
+        getExpCtx()->setFromRouter(true);
+    }
+
+    if (inRouter) {
+        getExpCtx()->setInRouter(true);
+    }
+
+    // Make 'requiresFiltering' return the same value as 'featureFlagEnabled'.
+    auto mockManager = std::make_unique<MetricsPolicyManagerMock>();
+    EXPECT_CALL(*mockManager, requiresFiltering)
+        .WillRepeatedly(::testing::Return(featureFlagEnabled));
+    MetricsPolicyManager::set(getExpCtx()->getServiceContext(), std::move(mockManager));
+
+    BSONObjBuilder builder;
+    builder.append("count", BSONObj());
+    if (forceFiltered) {
+        builder.append("forceFiltered", *forceFiltered);
+    }
+
+    BSONObj cmdObj = BSON("$collStats" << builder.obj());
+    BSONElement elem = cmdObj.getField("$collStats");
+
+    // Validation fails only when forceFiltered=true and fromRouter=true and
+    // featureFlagEnabled=false.
+    bool shouldSucceed = !(forceFiltered && *forceFiltered && fromRouter && !featureFlagEnabled);
+
+    if (shouldSucceed) {
+        auto stage = DocumentSourceCollStats::createFromBson(elem, getExpCtx());
+        ASSERT(stage);
+
+        auto collStatsStage = dynamic_cast<DocumentSourceCollStats*>(stage.get());
+        ASSERT(collStatsStage);
+
+        auto stageObj = representativeShape(*collStatsStage);
+        auto collStatsObj = stageObj["$collStats"].embeddedObject();
+
+        if (inRouter) {
+            // On a router, 'forceFiltered' is modified based on the metrics policy.
+            // - requiresFiltering=true (featureFlagEnabled=true). It gets set to true.
+            // - requiresFiltering=false (featureFlagEnabled=false). It gets unset.
+            if (featureFlagEnabled) {
+                ASSERT(collStatsObj.hasField("forceFiltered"));
+                ASSERT_EQ(collStatsObj["forceFiltered"].Bool(), true);
+            } else {
+                ASSERT(!collStatsObj.hasField("forceFiltered"));
+            }
+        } else {
+            // On a shard, 'forceFiltered' is kept as-is regardless of the metrics policy.
+            if (forceFiltered) {
+                ASSERT(collStatsObj.hasField("forceFiltered"));
+                ASSERT_EQ(collStatsObj["forceFiltered"].Bool(), *forceFiltered);
+            } else {
+                ASSERT(!collStatsObj.hasField("forceFiltered"));
+            }
+        }
+    } else {
+        ASSERT_THROWS_CODE(DocumentSourceCollStats::createFromBson(elem, getExpCtx()),
+                           AssertionException,
+                           ErrorCodes::IllegalOperation);
+    }
 }
 }  // namespace
 }  // namespace mongo

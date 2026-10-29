@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2018-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/mongod_main.h"
 
@@ -87,6 +61,7 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/mongod_options_general_gen.h"
@@ -108,11 +83,13 @@
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/compiler/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_settings_command_hooks.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -233,7 +210,7 @@
 #include "mongo/otel/metrics/instrumentation/metrics_installer.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/traces/trace_initialization.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
@@ -411,7 +388,7 @@ void logStartup(OperationContext* opCtx) {
         uassertStatusOK(collection_internal::insertDocument(opCtx,
                                                             collection.getCollectionPtr(),
                                                             InsertStatement(o),
-                                                            nullptr /* OpDebug */,
+                                                            /*OpDebug=*/nullptr,
                                                             false));
         wunit.commit();
     });
@@ -423,6 +400,7 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
         void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) override {
             _transportHook.onBeforeRun(opCtx, invocation);
             _systemBucketsHook.onBeforeRun(opCtx, invocation);
+            _querySettingsHook.onBeforeRun(opCtx, invocation);
         }
 
         void onAfterRun(OperationContext* opCtx,
@@ -441,6 +419,7 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
 
         transport::IngressHandshakeMetricsCommandHooks _transportHook{};
         SystemBucketsMetricsCommandHooks _systemBucketsHook{};
+        query_settings::QuerySettingsCommandHooks _querySettingsHook{};
     };
 
     CommandInvocationHooks::set(serviceContext, std::make_unique<MongodCommandInvocationHooks>());
@@ -609,6 +588,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     StorageControl::startStorageControls(
         serviceContext, false, rss.getPersistenceProvider().makeCheckpointSchedulePolicy());
 
+    // Start the RSS pressure sampler here because: (1) its only dependency, the PeriodicRunner, is
+    // now set up; (2) it precedes accepting connections, so it is live (and primed) before any
+    // sheddable query; and (3) storage is up, so the first sample reflects the real allocated
+    // footprint. A no-op if RSS monitoring is disabled.
+    startQueryMemoryRssMonitor(serviceContext);
+
     auto logStartupStats = std::make_unique<ScopeGuard<std::function<void()>>>([&] {
         initAndListenTotalTimer = {};
         startupInfoBuilder.append("Startup from clean shutdown?",
@@ -653,6 +638,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         LOGV2_ERROR(20534,
                     "Running the selected storage engine with profiling is not supported",
                     "storageEngine"_attr = storageGlobalParams.engine);
+        exitCleanly(ExitCode::badOptions);
+    }
+    if (!rss.getPersistenceProvider().supportsProfilingLevel(serverGlobalParams.defaultProfile)) {
+        LOGV2_ERROR(13170500,
+                    "Profile level is not supported in this storage mode",
+                    "profilingLevel"_attr = serverGlobalParams.defaultProfile,
+                    "storageMode"_attr = rss.getPersistenceProvider().name());
         exitCleanly(ExitCode::badOptions);
     }
 
@@ -701,7 +693,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         exitCleanly(ExitCode::fail);
     }
 
-    if (storageGlobalParams.validate || storageGlobalParams.validateParallel) {
+    if (storageGlobalParams.validate) {
         LOGV2(9437302, "Finished validating collections");
         exitCleanly(ExitCode::clean);
     }
@@ -1386,7 +1378,8 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
                 },
         }),
         executor::makeNetworkInterface(
-            "ReplNodeDbWorkerNetwork", nullptr, makeShardingEgressHooksList(serviceContext)));
+            "ReplNodeDbWorkerNetwork",
+            {.metadataHook = makeShardingEgressHooksList(serviceContext)}));
 }
 
 void setUpReplicaSetDDLHooks(ServiceContext* serviceContext) {
@@ -1732,6 +1725,17 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         globalConnPool.shutdown();
     }
 
+    // Reject new search cursors before draining existing ones, so that no cursor (and therefore no
+    // PinnedConnectionTaskExecutor) can be established during the shutdown window.
+    executor::beginSearchExecutorShutdown(serviceContext);
+
+    if (auto cursorManager = CursorManager::get(serviceContext)) {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::disposeIdleMongotCursors,
+                                       &shutdownTimeElapsedBuilder);
+        cursorManager->disposeIdleMongotCursorsForShutdown(opCtx);
+    }
+
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::shutDownSearchTaskExecutors,
@@ -1926,7 +1930,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     if (auto grid = Grid::get(serviceContext)) {
-        grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, false /* isMongos */);
+        grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, /*isMongos=*/false);
     }
 
     LOGV2_OPTIONS(9439300, {LogComponent::kSharding}, "Shutting down the filtering metadata cache");
@@ -1939,13 +1943,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         configServerRoutingInfoCache->shutDownAndJoin();
     }
 
-    {
+    if (auto&& rwc = ReadWriteConcernDefaults::getDecoration(serviceContext->getService())) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::shutDownAndJoinReadWriteConcernDefaults,
                                        &shutdownTimeElapsedBuilder);
         LOGV2_OPTIONS(
             11437200, {LogComponent::kDefault}, "Shutting down the ReadWriteConcernDefaults");
-        ReadWriteConcernDefaults::get(serviceContext->getService()).shutDownAndJoin();
+        rwc->shutDownAndJoin();
     }
 
     // Finish shutting down the TransportLayers
@@ -1993,7 +1997,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2(4784930, "Shutting down the storage engine");
         // Allow memory leak for faster shutdown.
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
-                                                                        true /* memLeakAllowed */);
+                                                                        /*memLeakAllowed=*/true);
     }
 
     // Stop FTDC before tearing down FlowControl. The FTDC background thread runs serverStatus

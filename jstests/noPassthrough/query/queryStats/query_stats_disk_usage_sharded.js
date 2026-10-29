@@ -184,7 +184,7 @@ function runUnionWithShardedPipelineTest(st) {
 }
 
 const options = {
-    setParameter: {internalQueryStatsRateLimit: -1},
+    setParameter: {internalQueryStatsSampleRate: 1},
 };
 
 const st = new ShardingTest(Object.assign({shards: 2, other: {mongosOptions: options}}));

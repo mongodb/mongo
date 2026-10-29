@@ -1,40 +1,16 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
+#include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional/optional.hpp>
@@ -81,7 +57,7 @@ StatusWith<PlanRankingResult> planAndRank(plan_ranking::PlanRankingStrategy& str
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(query,
                            plannerParams,
-                           topLevelSampleFieldNames,
+                           topLevelSampleFieldNames.relevantIndexOutput(),
                            boost::optional<bool&>(hasRelevantMultikeyIndex));
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
@@ -161,6 +137,8 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
+    // Assert that we recorded that the multi-planner picked the winner.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
@@ -194,6 +172,8 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
+    // Assert that we recorded that the multi-planner picked the winner.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR) {
@@ -380,6 +360,9 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     ASSERT_EQ(stats->totalWorks, 23333);  // 10000 + 10000 + 3333
 
     ASSERT_TRUE(status.getValue().execState);
+    // CBR could not decide and the resumed multi-planner picked the winner, confirm that the
+    // strategy was recorded.
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
 }
 
 TEST_F(CBRForNoMPResultsTest, MPPicksBlockingSortAndEOFs) {

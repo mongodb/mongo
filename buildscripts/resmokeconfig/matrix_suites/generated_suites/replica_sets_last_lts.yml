@@ -12,6 +12,8 @@ executor:
       global_vars:
         TestData:
           mongosBinVersion: last-lts
+          setParameters:
+            failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
           useRandomBinVersionsWithinReplicaSet: last-lts
       nodb: ""
 matrix_suite: true
@@ -27,6 +29,7 @@ selector:
     - backport_required_multiversion
     - replica_sets_multiversion_backport_required_multiversion
     - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+    - disables_test_commands
   roots:
     - jstests/replsets/*.js
 test_kind: js_test

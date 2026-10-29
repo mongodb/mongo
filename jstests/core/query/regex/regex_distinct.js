@@ -2,6 +2,7 @@
  * Verify the usage of DISTINCT_SCAN when a regex ending with .* is a prefix of an index.
  *
  * @tags: [
+ *  uses_explain,
  *  requires_fcv_53,
  *  assumes_read_concern_local,
  *  # Makes checks about the number of shards in the collection.

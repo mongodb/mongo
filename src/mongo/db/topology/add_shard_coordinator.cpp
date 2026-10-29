@@ -1,31 +1,5 @@
-/**
- *    Copyright (C) 2025-present MongoDB, Inc.
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */
+// Copyright (c) MongoDB, Inc.
+// SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/topology/add_shard_coordinator.h"
 
@@ -130,10 +104,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 _doc.setChosenName(shardName);
 
                 // Assign a UUID for the new shard when the feature flag is enabled.
-                const bool useUUID =
-                    _doc.getShardIdentificationType() != ShardIdentificationTypeEnum::kShardId;
-
-                if (!_doc.getShardUuid().has_value() && useUUID) {
+                if (!_doc.getShardUuid().has_value() &&
+                    feature_flags::gFeatureFlagAssignUUIDToShard.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     if (_doc.getIsConfigShard()) {
                         // For config-shard transitions, reuse the UUID already stored in the
                         // config server's shard identity document.
@@ -275,7 +249,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto dbList = _doc.getPreExistingDatabasesOnPromotion();
 
                 topology_change_helpers::blockDDLCoordinatorsAndDrain(
-                    opCtx, /*persistRecoveryDocument*/ false);
+                    opCtx, /*persistRecoveryDocument=*/false);
 
                 auto& shardingCatalogManager = *ShardingCatalogManager::get(opCtx);
 
@@ -285,10 +259,9 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto shardMembershipLock =
                     shardingCatalogManager.acquireShardMembershipLockForTopologyChange(opCtx);
 
-
                 ShardType shard;
-                shard.setHandle(
-                    ShardHandle(ShardId(std::string{*_doc.getChosenName()}), _doc.getShardUuid()));
+                shard.setName(std::string{*_doc.getChosenName()});
+                shard.setUuid(_doc.getShardUuid());
                 shard.setHost(targeter.connectionString().toString());
 
                 auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
@@ -347,7 +320,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                     for (const auto& dbName : dbs) {
                         auto database = shardingCatalogManager.localCatalogClient()->getDatabase(
-                            opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
+                            opCtx, dbName, repl::ReadConcernArgs::kLocal);
                         const auto& session = getNewSession(opCtx);
                         sharding_ddl_util::commitCreateDatabaseMetadataToShardCatalog(
                             opCtx, database, session, executor, token);
@@ -370,7 +343,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 shardRegistry->reload(opCtx);
                 tassert(9870601,
                         "Shard not found in ShardRegistry after committing addShard",
-                        shardRegistry->getShard(opCtx, ShardRef(shard.getName())).isOK());
+                        shardRegistry->getShard(opCtx, shard.getName()).isOK());
 
                 topology_change_helpers::
                     hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
@@ -422,7 +395,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
                 _unblockFCVChangesOnNewShard(opCtx, **executor, isAuthoritative);
                 topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                                /*removeRecoveryDocument*/ false);
+                                                                /*removeRecoveryDocument=*/false);
             }))
         .then(_buildPhaseHandler(Phase::kFinal,
                                  [this, _ = shared_from_this()](auto* opCtx) {
@@ -519,7 +492,7 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                            /*removeRecoveryDocument*/ false);
+                                                            /*removeRecoveryDocument=*/false);
             topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
         });
 }
@@ -684,7 +657,7 @@ bool AddShardCoordinator::_hasShardingDataOnReplicaSet(OperationContext* opCtx) 
             opCtx,
             targeter,
             nss,
-            BSONObj() /* filter */,
+            /*filter=*/BSONObj(),
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&](const std::vector<BSONObj>& docs) -> bool {
                 if (!docs.empty()) {
@@ -938,7 +911,7 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(OperationContext* opCtx) 
         opCtx,
         targeter,
         NamespaceString::kUserWritesCriticalSectionsNamespace,
-        BSONObj() /* filter */,
+        /*filter=*/BSONObj(),
         repl::ReadConcernLevel::kMajorityReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
